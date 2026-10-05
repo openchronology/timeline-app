@@ -1,0 +1,12 @@
+FROM postgres:16-bookworm AS build
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential postgresql-server-dev-16 libgmp-dev python3 ca-certificates curl && rm -rf /var/lib/apt/lists/*
+ARG PGMP_COMMIT=1849585416f2bc3d070bf8cef6a659907687ec7f
+WORKDIR /build
+RUN curl -fsSL "https://codeload.github.com/dvarrazzo/pgmp/tar.gz/$PGMP_COMMIT" -o pgmp.tar.gz && tar -xzf pgmp.tar.gz --strip-components=1
+RUN python3 tools/unmix.py < sql/pgmp.pysql > sql/pgmp--1.1.sql && python3 tools/sql2extension.py --extname pgmp sql/pgmp--1.1.sql > sql/pgmp--unpackaged--1.1.sql && make PG_CONFIG=/usr/lib/postgresql/16/bin/pg_config with_llvm=no -j2 && make PG_CONFIG=/usr/lib/postgresql/16/bin/pg_config with_llvm=no DESTDIR=/stage install
+
+FROM postgres:16-bookworm
+RUN apt-get update && apt-get install -y --no-install-recommends libgmp10 && rm -rf /var/lib/apt/lists/*
+COPY --from=build /stage/ /
+COPY --from=build /build/COPYING /build/pgmp.tar.gz /usr/share/doc/pgmp/
+RUN cp /usr/share/common-licenses/GPL-3 /usr/share/doc/pgmp/GPL-3

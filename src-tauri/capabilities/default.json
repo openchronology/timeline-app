@@ -1,0 +1,6 @@
+{
+  "identifier": "main",
+  "description": "The bundled offline editor window",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#192d25" />
+    <title>OpenChronology — a place for moments</title>
+    <link rel="stylesheet" href="./app.css" />
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <a class="brand" href="#"
+        ><span class="brand-mark" aria-hidden="true">◷</span>openchronology<span
+          class="brand-version"
+          >01</span
+        ></a
+      >
+      <div class="header-right">
+        <span id="storage-badge" class="badge">Browser draft</span
+        ><button id="server-button" hidden>Server connection</button><button id="account-button">Sign in</button
+        ><button id="logout-button" hidden>Sign out</button>
+      </div>
+    </header>
+    <div class="app-layout">
+      <aside class="workspace">
+        <div class="eyebrow">YOUR WORKSPACE</div>
+        <button id="new-button" class="workspace-new">＋ New timeline</button>
+        <div id="timeline-list" class="timeline-list">
+          <div class="workspace-note">
+            A timeline is a collection of moments.<br />Make room for yours.
+          </div>
+        </div>
+        <div class="workspace-bottom">
+          <span class="status-dot"></span><span id="workspace-status">Stored in this browser</span>
+          <p>Point events. Exact coordinates.<br />As much space as you need.</p>
+        </div>
+      </aside>
+      <main>
+        <div class="document-toolbar">
+          <div class="breadcrumbs">
+            Timelines <span>/</span> <span id="owner-label">Local workspace</span>
+          </div>
+          <div class="file-actions">
+            <button id="import-button">Import JSON</button
+            ><button id="export-button">Export JSON ↗</button
+            ><button id="och-import" hidden>Import .och</button><button id="och-export" hidden>Export .och ↗</button
+            ><button id="sqlite-open" hidden>Open SQLite</button
+            ><button id="sqlite-save" hidden>Save SQLite</button
+            ><button id="sqlite-save-as" hidden>Save SQLite as…</button
+            ><button id="share-button" hidden>Sharing</button
+            ><button id="publish-button" class="button-primary">Save to server</button>
+          </div>
+        </div>
+        <section class="document-heading">
+          <div class="eyebrow">A WINDOW INTO TIME</div>
+          <input
+            id="timeline-title"
+            class="title-input"
+            aria-label="Timeline title"
+            maxlength="300"
+            value="A notebook of moments"
+          /><textarea
+            id="timeline-description"
+            class="description-input"
+            aria-label="Timeline description"
+            rows="1"
+          >
+Every point has a place. Explore the spaces between them.</textarea
+          >
+          <div class="document-meta">
+            <span id="event-count">10 events</span><span class="meta-separator">·</span
+            ><span id="save-status">A local draft, ready to explore</span>
+          </div>
+        </section>
+        <section class="timeline-card" aria-label="Timeline window">
+          <div class="view-toolbar">
+            <div>
+              <span class="view-name">Timeline</span
+              ><span id="visible-count" class="muted">All moments</span>
+            </div>
+            <div class="view-controls">
+              <button id="presentation-button">Time display</button>
+              <button id="zoom-out" aria-label="Zoom out">−</button
+              ><button id="zoom-in" aria-label="Zoom in">＋</button
+              ><button id="fit-button">Fit all</button
+              ><button id="add-button" class="button-primary">＋ Event</button>
+            </div>
+          </div>
+          <div id="time-context" class="time-context" hidden></div>
+          <div
+            id="timeline-stage"
+            class="timeline-stage"
+            tabindex="0"
+            role="application"
+            aria-label="Interactive timeline. Drag to pan, scroll to zoom, or use arrow keys and plus/minus."
+          >
+            <div id="axis" class="axis"></div>
+            <div id="markers" class="markers"></div>
+            <div id="empty-window" class="empty-window" hidden>
+              No moments in this window.<br /><button id="empty-fit">Fit the timeline</button>
+            </div>
+            <div id="loading-window" class="loading-window" hidden>Loading this window…</div>
+          </div>
+          <div class="timeline-footer">
+            <span class="gesture-help">↔ Drag to pan <span>·</span> Scroll or pinch to zoom</span
+            ><label class="density-control"
+              >Group within
+              <input
+                id="density"
+                type="range"
+                min="12"
+                max="48"
+                value="24"
+                aria-label="Grouping distance in pixels"
+              /><output id="density-value">24 px</output></label
+            >
+          </div>
+        </section>
+        <div class="window-bounds">
+          <label
+            >LEFT BOUND<input
+              id="left-bound"
+              spellcheck="false"
+              aria-label="Left time bound in timeline format" /></label
+          ><span>→</span
+          ><label
+            >RIGHT BOUND<input
+              id="right-bound"
+              spellcheck="false"
+              aria-label="Right time bound in timeline format" /></label
+          ><button id="apply-bounds">Go</button><button id="undo-button" disabled>Undo edit</button>
+        </div>
+        <details class="presented-bounds">
+          <summary>Exact rational bounds</summary>
+          <div class="window-bounds">
+            <label>LEFT RATIONAL<input id="exact-left" spellcheck="false" /></label>
+            <label>RIGHT RATIONAL<input id="exact-right" spellcheck="false" /></label>
+            <button id="apply-exact-bounds">Go to exact bounds</button>
+          </div>
+          <p class="field-hint">
+            These are the underlying coordinates, independent of time display settings.
+          </p>
+        </details>
+        <section class="below-timeline">
+          <div class="reading-note">
+            <span class="small-orbit" aria-hidden="true">⊙</span>
+            <div>
+              <h2>Closer reveals more.</h2>
+              <p>
+                Nearby moments gather into a single point. Zoom in to discover the individual events
+                inside.
+              </p>
+              <button id="dense-demo" class="text-button">Explore 20,000 tiny moments ↗</button>
+            </div>
+          </div>
+          <div class="precision-note">
+            <div class="eyebrow">NOTHING LOST BETWEEN THE TICKS</div>
+            <p>Coordinates remain exact, even when the gaps get very small.</p>
+          </div>
+        </section>
+      </main>
+      <aside id="inspector" class="inspector">
+        <div class="inspector-heading">
+          <span class="eyebrow">THE SELECTED MOMENT</span
+          ><button id="close-inspector" aria-label="Close event details">×</button>
+        </div>
+        <div id="inspector-intro">
+          <div class="inspector-orbit">⊙</div>
+          <h2>A little context<br />for every point.</h2>
+          <p>Select an event to see its details, or add a moment of your own.</p>
+        </div>
+        <div id="group-details" hidden>
+          <h2 id="group-title"></h2>
+          <p id="group-note" class="muted"></p>
+          <button id="group-zoom">Zoom into this group</button>
+          <div id="group-events" class="group-events"></div>
+          <button id="group-more" hidden>Next 100 events</button>
+        </div>
+        <form id="event-form" hidden>
+          <label
+            >Title<input
+              id="event-title"
+              required
+              maxlength="1000"
+              placeholder="Name this moment" /></label
+          ><label
+            >Exact time<input
+              id="event-time"
+              required
+              spellcheck="false"
+              placeholder="1/3, 0.25, or an ISO timestamp"
+          /></label>
+          <p class="field-hint">
+            A raw rational coordinate. ISO input here means Unix seconds; use displayed time for
+            this timeline’s units or calendar.
+          </p>
+          <label>Displayed time<input id="event-presented" spellcheck="false" /></label>
+          <button id="parse-event-presented" type="button">Use this displayed value</button>
+          <p class="field-hint">
+            Saving keeps the exact time above. This button explicitly replaces it with the parsed
+            value.
+          </p>
+          <label
+            >Notes<textarea
+              id="event-description"
+              rows="5"
+              placeholder="What happened here?"
+            ></textarea>
+          </label>
+          <details>
+            <summary>Additional metadata</summary>
+            <label
+              >JSON object<textarea id="event-metadata" rows="6" spellcheck="false">{}</textarea>
+            </label>
+          </details>
+          <div id="event-error" class="form-error" role="alert"></div>
+          <div class="event-actions">
+            <button id="event-save" class="button-primary" type="submit">Save event</button
+            ><button id="event-delete" class="button-danger" type="button">Delete</button>
+          </div>
+        </form>
+      </aside>
+    </div>
+    <input id="json-file" type="file" accept=".ochx,.json,application/json" hidden />
+    <input id="och-file" type="file" accept=".och,application/vnd.openchronology.sqlite" hidden />
+    <dialog id="presentation-dialog">
+      <form id="presentation-form">
+        <div class="dialog-heading">
+          <h2>Timeline time display</h2>
+          <button type="button" data-close="presentation-dialog" aria-label="Close">×</button>
+        </div>
+        <p class="field-hint">
+          These settings belong to this timeline and are included in saved files and server copies.
+          Event coordinates stay exact.
+        </p>
+        <label
+          >Representation<select id="presentation-mode">
+            <option value="rational">Exact rational</option>
+            <option value="float">Floating point / decimal</option>
+            <option value="scientific">Scientific notation</option>
+            <option value="si">SI prefixes</option>
+            <option value="gregorian">Gregorian timestamp</option>
+            <option value="custom">Custom JavaScript / TypeScript subset</option>
+          </select></label
+        >
+        <div id="presentation-numeric">
+          <label
+            >Unit preset<select id="presentation-unit-preset">
+              <option value="">Choose a preset…</option>
+            </select></label
+          >
+          <label
+            >Unit label<input
+              id="presentation-unit"
+              maxlength="80"
+              placeholder="years, minutes, s…"
+          /></label>
+          <label
+            >Significant digits<input id="presentation-digits" type="number" min="1" max="30"
+          /></label>
+          <p class="field-hint">
+            Numeric labels are rounded. SI prefixes work best with unit symbols such as s. A Julian
+            year is exactly 365.25 days.
+          </p>
+        </div>
+        <div id="presentation-calendar" hidden>
+          <label class="calendar-label"
+            ><input id="presentation-adaptive" type="checkbox" checked /> Abbreviate chart labels to
+            the visible scale</label
+          >
+          <label
+            >Calendar coordinate preset<select id="presentation-epoch">
+              <option value="">Choose a preset…</option>
+              <option value="unix">Unix seconds</option>
+              <option value="mjd">Modified Julian Date days (legacy)</option>
+            </select></label
+          >
+          <label
+            >Timezone offset in minutes<input
+              id="presentation-offset"
+              type="number"
+              min="-1439"
+              max="1439"
+          /></label>
+          <p class="field-hint">
+            Proleptic Gregorian calendar with a fixed UTC offset. Input must include Z or ±HH:MM.
+            Repeating fractional seconds print as {+n/d}.
+          </p>
+        </div>
+        <div id="presentation-transform">
+          <label
+            >Stored coordinate at displayed zero<input id="presentation-origin" spellcheck="false"
+          /></label>
+          <label
+            >Stored coordinates per displayed unit<input id="presentation-scale" spellcheck="false"
+          /></label>
+          <p class="field-hint">
+            Displayed value = (stored time − origin) / scale. For Gregorian display, the displayed
+            unit is one second from 1970-01-01T00:00:00Z.
+          </p>
+        </div>
+        <label
+          >Ruler graduation<select id="presentation-ruler">
+            <option value="">Automatic for this representation</option>
+            <option value="decimal">Decimal (ten subdivisions)</option>
+            <option value="gregorian">Gregorian calendar</option>
+            <option value="steps">Custom exact steps</option>
+          </select></label
+        >
+        <div id="presentation-ruler-steps" hidden>
+          <label
+            >Increasing steps (JSON array)<textarea
+              id="presentation-steps"
+              rows="3"
+              maxlength="65536"
+              spellcheck="false"
+              placeholder='["1", "60", "3600", "86400"]'
+            ></textarea>
+          </label>
+          <p class="field-hint">
+            Each step is an exact interval in displayed units, smallest first. Adjacent steps define
+            the subdivisions. For custom printers, use stored coordinate units. Beyond this list,
+            graduations continue by powers of ten.
+          </p>
+        </div>
+        <div id="presentation-custom" hidden>
+          <label
+            >Printer and parser source<textarea
+              id="presentation-source"
+              rows="12"
+              maxlength="16384"
+              spellcheck="false"
+            ></textarea>
+          </label>
+          <button id="presentation-example" type="button">Load minutes example</button>
+          <p class="field-hint">
+            Define function print(time, api) and function parse(text, api). Optional Rational,
+            TimeAPI and primitive type annotations are supported. Only const declarations, return,
+            string concatenation, comparisons, conditional expressions and api calls are allowed. No
+            globals, imports, property access, loops or other function calls.
+          </p>
+          <details>
+            <summary>Available API</summary>
+            <p class="field-hint">
+              rational(text), parseNumber(text), exact(q), add/sub/mul/div(q,q), neg(q), abs(q),
+              compare(q,q), decimal(q,places), scientific(q,digits), timestamp(q,offsetMinutes),
+              parseTimestamp(text), trim(text), stripSuffix(text,suffix), slice(text,start,end),
+              replace(text,from,to), upper/lower(text), startsWith/endsWith(text,prefix). Custom
+              code receives only the exact coordinate; unit scale and origin are handled by your
+              code.
+            </p>
+          </details>
+        </div>
+        <label
+          >Preview exact coordinate<input
+            id="presentation-preview-time"
+            value="1/3"
+            spellcheck="false"
+        /></label>
+        <label
+          >Preview context<select id="presentation-preview-purpose">
+            <option value="input">Exact editing value</option>
+            <option value="axis">Ruler label</option>
+            <option value="event">Event label</option>
+            <option value="tooltip">Full tooltip</option>
+          </select></label
+        >
+        <p class="field-hint">
+          Preview uses the current window span and viewport width. Custom helpers: hasView(),
+          viewLeft(), viewRight(), viewSpan(), viewWidth(), unitsPerPixel(), labelResolution(),
+          purpose(). Existing printers and parsers can ignore this context.
+        </p>
+        <button id="presentation-preview" type="button">Preview printer and parser</button>
+        <output id="presentation-preview-result" class="presentation-preview"></output>
+        <div id="presentation-error" class="form-error" role="alert"></div>
+        <div class="dialog-actions">
+          <button id="presentation-save" class="button-primary" type="submit">
+            Save display settings
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="connection-dialog">
+      <form id="connection-form">
+        <div class="dialog-heading"><h2>Server connection</h2><button type="button" data-close="connection-dialog">×</button></div>
+        <label>Server address<input id="server-origin" type="url" value="https://timescale.info" required spellcheck="false" /></label>
+        <p class="field-hint">The official server is https://timescale.info. You can connect to your own HTTPS server. Local .och files work without a connection.</p>
+        <div id="connection-error" class="form-error" role="alert"></div>
+        <div class="dialog-actions"><button type="button" id="server-disconnect">Disconnect</button><button type="submit" class="button-primary">Connect</button></div>
+      </form>
+    </dialog>
+    <dialog id="desktop-approval-dialog">
+      <div class="dialog-heading"><h2>Connect a desktop session</h2><button data-close="desktop-approval-dialog">×</button></div>
+      <p>Approve only if you started this connection in OpenChronology and the code matches the desktop window.</p>
+      <output id="desktop-approval-code"></output>
+      <button id="desktop-approve" class="button-primary">Approve connection</button>
+    </dialog>
+    <dialog id="account-dialog">
+      <form id="account-form">
+        <div class="dialog-heading">
+          <h2>Your OpenChronology account</h2>
+          <button type="button" data-close="account-dialog" aria-label="Close">×</button>
+        </div>
+        <p>Private timelines, collaborators, and public sharing.</p>
+        <div id="password-fields"><label
+          >Username<input
+            id="account-name"
+            required
+            minlength="3"
+            maxlength="32"
+            autocomplete="username"
+            pattern="[A-Za-z0-9][A-Za-z0-9_-]{2,31}" /></label
+        ><label
+          >Password<input
+            id="account-password"
+            type="password"
+            required
+            minlength="12"
+            maxlength="1024"
+            autocomplete="current-password"
+        /></label>
+        <p class="field-hint">At least 12 characters.</p>
+        <div class="dialog-actions">
+          <button class="button-primary" type="submit" name="action" value="login">Sign in</button
+          ><button type="submit" name="action" value="register">Create account</button>
+        </div></div>
+        <div id="provider-buttons"><button type="button" data-provider="google" hidden>Continue with Google</button><button type="button" data-provider="github" hidden>Continue with GitHub</button><button type="button" data-provider="facebook" hidden>Continue with Facebook</button></div>
+        <button id="desktop-login" type="button" hidden>Sign in using your browser</button>
+        <p id="desktop-login-status" class="field-hint"></p>
+        <div id="account-sessions" hidden><h3>Active sessions</h3><div id="session-list"></div><button id="revoke-sessions" type="button">Sign out other sessions</button></div>
+        <div id="account-error" class="form-error" role="alert"></div>
+      </form>
+    </dialog>
+    <dialog id="sharing-dialog">
+      <div class="dialog-heading">
+        <h2>Share this timeline.</h2>
+        <button data-close="sharing-dialog" aria-label="Close">×</button>
+      </div>
+      <label
+        >Visibility<select id="visibility">
+          <option value="private">Private — you and your collaborators</option>
+          <option value="public">Public — anyone with the link can view</option>
+        </select></label
+      ><button id="copy-link">Copy timeline link</button>
+      <p id="sharing-link" class="sharing-link"></p>
+      <h3>Collaborators</h3>
+      <div id="members-list"></div>
+      <form id="member-form">
+        <label>Account username<input id="member-name" required /></label>
+        <div class="dialog-actions">
+          <select id="member-role" aria-label="Collaborator role">
+            <option value="viewer">Viewer</option>
+            <option value="editor">Editor</option></select
+          ><button type="submit" class="button-primary">Add collaborator</button>
+        </div>
+      </form>
+      <div id="sharing-error" class="form-error" role="alert"></div>
+    </dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

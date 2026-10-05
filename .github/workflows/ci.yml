@@ -1,0 +1,170 @@
+name: OpenChronology
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  core:
+    name: Core / ${{ matrix.manager }} / Node ${{ matrix.node }}
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        node: [22, 24]
+        manager: [npm, pnpm, yarn]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Install pnpm
+        if: matrix.manager == 'pnpm'
+        run: |
+          npm install --global --prefix "$RUNNER_TEMP/package-managers" pnpm@11.26.0
+          echo "$RUNNER_TEMP/package-managers/bin" >> "$GITHUB_PATH"
+      - name: Install Yarn
+        if: matrix.manager == 'yarn'
+        run: |
+          npm install --global --prefix "$RUNNER_TEMP/package-managers" @yarnpkg/cli-dist@4.10.3
+          echo "$RUNNER_TEMP/package-managers/bin" >> "$GITHUB_PATH"
+      - name: Install locked dependencies
+        env:
+          PACKAGE_MANAGER: ${{ matrix.manager }}
+        run: |
+          case "$PACKAGE_MANAGER" in
+            npm) npm ci ;;
+            pnpm) pnpm install --frozen-lockfile ;;
+            yarn) yarn install --immutable ;;
+          esac
+      - name: Check types and test both builds
+        env:
+          PACKAGE_MANAGER: ${{ matrix.manager }}
+        run: |
+          "$PACKAGE_MANAGER" run typecheck
+          "$PACKAGE_MANAGER" run build:offline
+          "$PACKAGE_MANAGER" run test
+          case "$PACKAGE_MANAGER" in
+            npm) npm exec -- tauri --version ;;
+            *) "$PACKAGE_MANAGER" exec tauri --version ;;
+          esac
+          git diff --exit-code -- package.json package-lock.json pnpm-lock.yaml yarn.lock
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: matrix.node == 24 && matrix.manager == 'npm'
+        with:
+          name: openchronology-offline-html
+          path: dist/openchronology-offline.html
+          if-no-files-found: error
+  browser:
+    name: Browser / ${{ matrix.browser }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps "$BROWSER"
+        env:
+          BROWSER: ${{ matrix.browser }}
+      - run: npm run build
+      - run: npm run test:browser
+        env:
+          BROWSER: ${{ matrix.browser }}
+      - run: npm run test:offline:browser
+        env:
+          BROWSER: ${{ matrix.browser }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: browser-${{ matrix.browser }}
+          path: artifacts/
+          if-no-files-found: ignore
+  postgres:
+    name: PostgreSQL 16 / native pgmp / accounts and sharing
+    runs-on: ubuntu-24.04
+    env:
+      PG_CONFIG: /usr/lib/postgresql/16/bin/pg_config
+      PGHOST: 127.0.0.1
+      PGPORT: 5433
+      PGUSER: rational_test
+      PGDATABASE: rational_app
+      DATABASE_URL: postgresql://rational_test@127.0.0.1:5433/rational_app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: dvarrazzo/pgmp
+          ref: 1849585416f2bc3d070bf8cef6a659907687ec7f
+          path: upstream/pgmp
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install PostgreSQL and native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-16 postgresql-server-dev-16 libgmp-dev build-essential python3
+          "$PG_CONFIG" --bindir >> "$GITHUB_PATH"
+          echo "PGDATA=$RUNNER_TEMP/openchronology-postgres" >> "$GITHUB_ENV"
+      - name: Build and install real pgmp
+        working-directory: upstream/pgmp
+        run: |
+          python3 tools/unmix.py < sql/pgmp.pysql > sql/pgmp--1.1.sql
+          python3 tools/sql2extension.py --extname pgmp sql/pgmp--1.1.sql > sql/pgmp--unpackaged--1.1.sql
+          make PG_CONFIG="$PG_CONFIG" with_llvm=no -j2
+          sudo make PG_CONFIG="$PG_CONFIG" with_llvm=no install
+      - name: Start an isolated PostgreSQL instance
+        run: |
+          initdb -D "$PGDATA" -U "$PGUSER" --auth=trust
+          pg_ctl -D "$PGDATA" -l "$RUNNER_TEMP/openchronology-postgres.log" -o "-p $PGPORT -h 127.0.0.1 -k $RUNNER_TEMP" -w start
+          createdb "$PGDATABASE"
+          psql -X -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION pgmp;'
+      - run: npm ci
+      - run: npm run build
+      - run: node test/sql-oracle.mjs
+      - run: npm run test:postgres
+      - name: Stop PostgreSQL
+        if: always()
+        run: |
+          if test -f "$PGDATA/postmaster.pid"; then pg_ctl -D "$PGDATA" -m fast -w stop; fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: postgres-log
+          path: ${{ runner.temp }}/openchronology-postgres.log
+  desktop:
+    name: SQLite persistence / Linux desktop package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install desktop and SQLite dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake pkg-config libgmp-dev libsqlite3-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+          rustup update stable --no-self-update
+          rustup default stable
+      - run: cargo fmt --manifest-path native-store/Cargo.toml --check
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - run: cargo test --manifest-path native-store/Cargo.toml --locked
+      - run: npm ci
+      - run: npm run desktop:build
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: openchronology-linux
+          path: src-tauri/target/release/bundle/deb/*.deb
+          if-no-files-found: error

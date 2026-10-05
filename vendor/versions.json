@@ -1,0 +1,8 @@
+{
+  "rational-map": "16b87f0a4836750d5d91b27cabb06b5ad287d185",
+  "sqlite-rational": "7239057ecd134da17f7bf7c75acddb315464e858",
+  "repositories": {
+    "rational-map": "https://github.com/athanclark/rational-map",
+    "sqlite-rational": "https://github.com/athanclark/sqlite-rational"
+  }
+}

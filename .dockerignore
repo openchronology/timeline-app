@@ -1,0 +1,11 @@
+node_modules
+.yarn
+.pnp.*
+dist
+**/target
+**/.git
+**/.github
+artifacts
+.env
+*.octimeline.sqlite*
+upstream

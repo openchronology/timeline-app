@@ -1,0 +1,332 @@
+import { Rational as Q, RationalMap } from 'rational-ordered-map';
+import { parseTimestamp } from './calendar.js';
+import { validatePresentation } from './presentation.js';
+import type { TimePresentation } from './presentation.js';
+export {
+  createPresenter,
+  validatePresentation,
+  DEFAULT_PRESENTATION,
+  UNIT_PRESETS,
+  CUSTOM_EXAMPLE,
+  compileCustom,
+  parseNumber,
+  printNumber,
+} from './presentation.js';
+export type { TimePresentation } from './presentation.js';
+export type { PresentationContext, TimePresenter } from './presentation.js';
+export { planRuler, validateRulerPolicy } from './ruler.js';
+export type { RulerPolicy, RulerTick, RulerPlan } from './ruler.js';
+export { parseTimestamp, printTimestamp } from './calendar.js';
+export { Q, RationalMap };
+export type Metadata = { [key: string]: unknown; title?: string; description?: string };
+export interface PointEvent {
+  id: string;
+  time: string;
+  metadata: Metadata;
+}
+export interface TimelineDocument {
+  format: 'openchronology';
+  version: 1;
+  title: string;
+  description: string;
+  presentation?: TimePresentation;
+  events: PointEvent[];
+}
+export interface FrameGroup {
+  first: string;
+  last: string;
+  count: string;
+  distinct: number;
+  title?: string;
+  id?: string;
+}
+export interface Frame {
+  groups: FrameGroup[];
+  visitedNodes: number;
+  revision?: string;
+}
+export function parseTime(text: string): Q {
+  if (text.includes('T')) return parseTimestamp(text);
+  return text.includes('/') ? Q.parse(text) : Q.parseDecimal(text);
+}
+export function validateDocument(value: unknown): TimelineDocument {
+  if (!value || typeof value !== 'object') throw new Error('Expected an OpenChronology document.');
+  const doc = value as Record<string, unknown>;
+  if (doc.format !== 'openchronology' || doc.version !== 1)
+    throw new Error('Unsupported timeline format or version.');
+  if (
+    typeof doc.title !== 'string' ||
+    doc.title.length > 300 ||
+    typeof doc.description !== 'string' ||
+    doc.description.length > 20000
+  )
+    throw new Error('The timeline needs a title and description.');
+  if (!Array.isArray(doc.events) || doc.events.length > 200000)
+    throw new Error('Expected at most 200,000 point events.');
+  const ids = new Set<string>();
+  const events = doc.events.map((raw: unknown): PointEvent => {
+    if (!raw || typeof raw !== 'object') throw new Error('Invalid event.');
+    const e = raw as Record<string, unknown>;
+    if (typeof e.id !== 'string' || !/^[A-Za-z0-9_.:-]{1,128}$/.test(e.id) || ids.has(e.id))
+      throw new Error('Event IDs must be unique ASCII identifiers.');
+    ids.add(e.id);
+    if (typeof e.time !== 'string')
+      throw new Error('Time must be a string containing an exact rational or finite decimal.');
+    if (!e.metadata || typeof e.metadata !== 'object' || Array.isArray(e.metadata))
+      throw new Error('Event metadata must be a JSON object.');
+    const metadata = JSON.parse(JSON.stringify(e.metadata)) as Metadata;
+    for (const field of ['title', 'description']) {
+      if (metadata[field] !== undefined && typeof metadata[field] !== 'string')
+        throw new Error(`Event ${field} must be text.`);
+    }
+    return { id: e.id, time: parseTime(e.time).toString(), metadata };
+  });
+  return {
+    format: 'openchronology',
+    version: 1,
+    title: doc.title,
+    description: doc.description,
+    ...(doc.presentation === undefined
+      ? {}
+      : { presentation: validatePresentation(doc.presentation) }),
+    events,
+  };
+}
+export class TimelineIndex {
+  readonly points = new RationalMap<readonly PointEvent[]>((bucket) => BigInt(bucket.length));
+  readonly byId = new Map<string, PointEvent>();
+  title: string;
+  description: string;
+  presentation?: TimePresentation;
+  constructor(document: TimelineDocument) {
+    this.title = document.title;
+    this.description = document.description;
+    this.presentation = document.presentation
+      ? validatePresentation(document.presentation)
+      : undefined;
+    // Bulk-load coincident events once; copying/sorting a growing bucket per event is quadratic.
+    const buckets = new Map<string, PointEvent[]>();
+    for (const event of document.events) {
+      if (this.byId.has(event.id)) throw new Error('Event IDs must be unique.');
+      const time = parseTime(event.time).toString();
+      const normalized = Object.freeze({
+        ...event,
+        time,
+        metadata: Object.freeze({ ...event.metadata }),
+      });
+      this.byId.set(event.id, normalized);
+      const bucket = buckets.get(time);
+      if (bucket) bucket.push(normalized);
+      else buckets.set(time, [normalized]);
+    }
+    for (const [time, bucket] of buckets) {
+      bucket.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      this.points.set(Q.parse(time), Object.freeze(bucket));
+    }
+  }
+  put(event: PointEvent): void {
+    const time = parseTime(event.time),
+      normalized = Object.freeze({
+        ...event,
+        time: time.toString(),
+        metadata: Object.freeze({ ...event.metadata }),
+      });
+    this.delete(event.id);
+    const bucket = [...(this.points.get(time) ?? []), normalized].sort((a, b) =>
+      a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+    );
+    this.points.set(time, Object.freeze(bucket));
+    this.byId.set(event.id, normalized);
+  }
+  delete(id: string): boolean {
+    const event = this.byId.get(id);
+    if (!event) return false;
+    const key = Q.parse(event.time),
+      bucket = this.points.get(key)!.filter((e) => e.id !== id);
+    if (bucket.length) this.points.set(key, Object.freeze(bucket));
+    else this.points.delete(key);
+    this.byId.delete(id);
+    return true;
+  }
+  document(): TimelineDocument {
+    return {
+      format: 'openchronology',
+      version: 1,
+      title: this.title,
+      description: this.description,
+      ...(this.presentation ? { presentation: this.presentation } : {}),
+      events: [...this.points].flatMap(([, bucket]) => [...bucket]),
+    };
+  }
+  frame(viewport: Viewport, width: number, pixels = 24): Frame {
+    const result = this.points.overview(
+      viewport.left,
+      viewport.right,
+      viewport.threshold(width, pixels),
+      'span',
+      { includeUpper: true },
+    );
+    return {
+      visitedNodes: result.stats.visitedNodes,
+      groups: result.groups.map((group) => {
+        const first = group.firstTime.toString(),
+          only = group.entryCount === 1n ? this.points.get(group.firstTime)![0] : undefined;
+        return {
+          first,
+          last: group.lastTime.toString(),
+          count: group.entryCount.toString(),
+          distinct: group.distinctCount,
+          ...(only ? { id: only.id, title: only.metadata.title ?? 'Untitled event' } : {}),
+        };
+      }),
+    };
+  }
+  eventsBetween(first: string, last: string, limit = 100): PointEvent[] {
+    const result: PointEvent[] = [];
+    for (const [, bucket] of this.points.range(Q.parse(first), Q.parse(last), {
+      includeUpper: true,
+    })) {
+      for (const event of bucket) {
+        result.push(event);
+        if (result.length >= limit) return result;
+      }
+    }
+    return result;
+  }
+}
+/** Pixel arithmetic is rationalized at the input boundary. Absolute times never become Numbers. */
+export function screenQ(value: number): Q {
+  if (!Number.isFinite(value)) throw new Error('Invalid screen coordinate.');
+  return Q.from(BigInt(Math.round(value * 1024)), 1024n);
+}
+/** Opposite wheel deltas use reciprocal factors, avoiding systematic round-trip drift. */
+export function wheelZoomFactor(delta: number): Q {
+  if (!Number.isFinite(delta)) throw new Error('Invalid wheel delta.');
+  const amount = Math.max(-0.7, Math.min(0.7, delta * 0.002)),
+    scale = BigInt(Math.round(Math.exp(Math.abs(amount)) * 1000000));
+  return amount < 0 ? Q.from(1000000n, scale) : Q.from(scale, 1000000n);
+}
+
+function floorBinaryExponent(value: Q): number {
+  const n = value.numerator,
+    d = value.denominator;
+  let exponent = n.toString(2).length - d.toString(2).length;
+  if (exponent >= 0 ? n < d << BigInt(exponent) : n << BigInt(-exponent) < d) exponent--;
+  return exponent;
+}
+
+function roundToBinaryGrid(value: Q, exponent: number): Q {
+  const n = exponent < 0 ? value.numerator << BigInt(-exponent) : value.numerator,
+    d = exponent > 0 ? value.denominator << BigInt(exponent) : value.denominator,
+    magnitude = n < 0n ? -n : n,
+    rounded = ((magnitude + d / 2n) / d) * (n < 0n ? -1n : 1n);
+  return exponent >= 0
+    ? Q.from(rounded << BigInt(exponent))
+    : Q.from(rounded, 1n << BigInt(-exponent));
+}
+
+export class Viewport {
+  constructor(
+    public left: Q = Q.from(-2n),
+    public span: Q = Q.from(28n),
+  ) {
+    if (span.compare(Q.zero) <= 0) throw new Error('The visible window must have positive width.');
+  }
+  get right(): Q {
+    return this.left.add(this.span);
+  }
+  clone(): Viewport {
+    return new Viewport(this.left, this.span);
+  }
+  /**
+   * Keep camera precision proportional to the visible scale, rather than gesture history.
+   * One grid step is at most 1/2^20 CSS pixel. Both edges move by at most one step.
+   * Only camera coordinates are rounded; event times and explicit query bounds stay exact.
+   */
+  rasterize(width: number): Viewport {
+    if (!Number.isFinite(width)) throw new Error('Invalid screen width.');
+    const samples = BigInt(Math.max(1, Math.ceil(width))) << 20n,
+      precision = this.span.div(Q.from(samples)),
+      exponent = floorBinaryExponent(precision);
+    return new Viewport(
+      roundToBinaryGrid(this.left, exponent),
+      roundToBinaryGrid(this.span, exponent),
+    );
+  }
+  at(pixel: number, width: number): Q {
+    return this.left.add(this.span.mul(screenQ(pixel).div(screenQ(width))));
+  }
+  x(time: Q, width: number): number {
+    return time.sub(this.left).div(this.span).toApproximateNumber() * width;
+  }
+  threshold(width: number, pixels: number): Q {
+    return this.span.mul(screenQ(pixels).div(screenQ(Math.max(1, width))));
+  }
+  pan(pixelDelta: number, width: number): Viewport {
+    return new Viewport(
+      this.left.sub(this.span.mul(screenQ(pixelDelta).div(screenQ(width)))),
+      this.span,
+    );
+  }
+  zoom(pixel: number, width: number, factor: Q): Viewport {
+    if (factor.compare(Q.zero) <= 0) throw new Error('Zoom factor must be positive.');
+    const anchor = this.at(pixel, width),
+      span = this.span.mul(factor);
+    return new Viewport(anchor.sub(span.mul(screenQ(pixel).div(screenQ(width)))), span);
+  }
+  pinch(startMid: number, currentMid: number, width: number, factor: Q): Viewport {
+    const span = this.span.mul(factor),
+      anchor = this.at(startMid, width);
+    return new Viewport(anchor.sub(span.mul(screenQ(currentMid).div(screenQ(width)))), span);
+  }
+  static fit(first?: Q, last?: Q): Viewport {
+    if (!first || !last) return new Viewport();
+    const extent = last.sub(first),
+      span = extent.equals(Q.zero) ? Q.from(4n) : extent.mul(Q.from(7n, 5n));
+    return new Viewport(first.sub(span.sub(extent).div(Q.from(2n))), span);
+  }
+}
+export function label(time: Q): string {
+  const text = time.denominator === 1n ? time.numerator.toString() : time.toString();
+  return text.length <= 26 ? text : `${text.slice(0, 12)}…${text.slice(-9)}`;
+}
+export function demo(dense = false): TimelineDocument {
+  const names = [
+    'An idea arrives',
+    'First sketch',
+    'A conversation',
+    'A new direction',
+    'The working prototype',
+    'Notes in the margin',
+    'A useful discovery',
+    'The first release',
+    'A quiet refinement',
+    'What comes next',
+  ];
+  const times = ['0', '1/3', '3', '7/2', '8', '10', '41/3', '17', '21', '24'];
+  const events: PointEvent[] = names.map((title, i) => ({
+    id: `sample-${i}`,
+    time: times[i],
+    metadata: {
+      title,
+      description:
+        i === 1
+          ? 'One third is exact, however far you zoom.'
+          : 'A point in time. Add a note or move its exact coordinate.',
+    },
+  }));
+  if (dense)
+    for (let i = 0; i < 20000; i++)
+      events.push({
+        id: `dense-${i.toString().padStart(5, '0')}`,
+        time: Q.from(10000000000n + BigInt(i), 1000000000n).toString(),
+        metadata: { title: `Small moment ${i + 1}` },
+      });
+  return validateDocument({
+    format: 'openchronology',
+    version: 1,
+    title: dense ? 'Twenty thousand tiny moments' : 'A notebook of moments',
+    description: 'Every point has a place. Explore the spaces between them.',
+    events,
+  });
+}

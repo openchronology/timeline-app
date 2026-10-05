@@ -1,0 +1,35 @@
+{
+  "name": "openchronology",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/dev.mjs",
+    "start": "node server/main.mjs",
+    "migrate": "node server/migrate.mjs",
+    "test": "node scripts/build.mjs && node --test test/*.test.mjs",
+    "test:browser": "node test/browser.mjs",
+    "test:postgres": "node test/postgres.mjs",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build -- --locked",
+    "typecheck": "tsc --noEmit",
+    "build:offline": "node scripts/build-offline.mjs",
+    "test:offline:browser": "node test/offline-browser.mjs"
+  },
+  "dependencies": {
+    "rational-ordered-map": "file:vendor/rational-ordered-map-0.1.0.tgz",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "typescript": "5.9.3",
+    "playwright": "1.58.2",
+    "@tauri-apps/cli": "2.12.1"
+  },
+  "description": "An exact rational timeline editor for the browser and desktop",
+  "license": "MIT"
+}

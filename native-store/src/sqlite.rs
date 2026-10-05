@@ -1,0 +1,179 @@
+//! A small RAII binding to the same system SQLite linked by sqlite-rational.
+use std::{
+    ffi::{c_char, c_int, c_void, CStr, CString},
+    marker::PhantomData,
+    path::Path,
+    ptr, slice,
+};
+extern "C" {
+    fn sqlite3_open_v2(
+        path: *const c_char,
+        db: *mut *mut c_void,
+        flags: c_int,
+        vfs: *const c_char,
+    ) -> c_int;
+    fn sqlite3_close(db: *mut c_void) -> c_int;
+    fn sqlite3_errmsg(db: *mut c_void) -> *const c_char;
+    fn sqlite3_prepare_v2(
+        db: *mut c_void,
+        sql: *const c_char,
+        len: c_int,
+        stmt: *mut *mut c_void,
+        tail: *mut *const c_char,
+    ) -> c_int;
+    fn sqlite3_bind_text(
+        stmt: *mut c_void,
+        index: c_int,
+        text: *const c_char,
+        len: c_int,
+        destructor: Option<unsafe extern "C" fn(*mut c_void)>,
+    ) -> c_int;
+    fn sqlite3_step(stmt: *mut c_void) -> c_int;
+    fn sqlite3_column_count(stmt: *mut c_void) -> c_int;
+    fn sqlite3_column_type(stmt: *mut c_void, col: c_int) -> c_int;
+    fn sqlite3_column_text(stmt: *mut c_void, col: c_int) -> *const u8;
+    fn sqlite3_column_bytes(stmt: *mut c_void, col: c_int) -> c_int;
+    fn sqlite3_finalize(stmt: *mut c_void) -> c_int;
+    fn sqlite3_busy_timeout(db: *mut c_void, ms: c_int) -> c_int;
+    fn sqlite3_limit(db: *mut c_void, id: c_int, value: c_int) -> c_int;
+    fn sqlite3_progress_handler(db: *mut c_void, steps: c_int, callback: Option<unsafe extern "C" fn(*mut c_void) -> c_int>, context: *mut c_void);
+    fn sqlite_rational_register(db: *mut c_void) -> c_int;
+}
+pub struct Connection {
+    raw: *mut c_void,
+    _budget: Box<u64>,
+}
+unsafe extern "C" fn progress(context: *mut c_void) -> c_int {
+    let remaining = &mut *context.cast::<u64>();
+    *remaining = remaining.saturating_sub(1);
+    if *remaining == 0 { 1 } else { 0 }
+}
+struct Statement<'a> {
+    raw: *mut c_void,
+    _db: PhantomData<&'a Connection>,
+}
+impl Drop for Connection {
+    fn drop(&mut self) {
+        unsafe {
+            sqlite3_close(self.raw);
+        }
+    }
+}
+impl Drop for Statement<'_> {
+    fn drop(&mut self) {
+        unsafe {
+            sqlite3_finalize(self.raw);
+        }
+    }
+}
+impl Connection {
+    pub fn open(path: &Path, create: bool) -> Result<Self, String> {
+        let name = CString::new(path.to_str().ok_or("The file path must be Unicode")?)
+            .map_err(|e| e.to_string())?;
+        let mut raw = ptr::null_mut();
+        let result = unsafe {
+            sqlite3_open_v2(
+                name.as_ptr(),
+                &mut raw,
+                if create { 2 | 4 } else { 1 },
+                ptr::null(),
+            )
+        };
+        if raw.is_null() {
+            return Err("Could not open SQLite file".into());
+        }
+        let mut db = Self { raw, _budget: Box::new(20000) };
+        if result != 0 {
+            return Err(db.error());
+        }
+        unsafe {
+            sqlite3_busy_timeout(raw, 5000);
+            if std::env::var("OCH_CONVERSION_LIMITS").as_deref() == Ok("1") {
+                sqlite3_limit(raw, 0, 32 * 1024 * 1024);
+                sqlite3_limit(raw, 1, 100000);
+                sqlite3_limit(raw, 2, 128);
+                sqlite3_limit(raw, 3, 128);
+                sqlite3_progress_handler(raw, 1000, Some(progress), (&mut *db._budget as *mut u64).cast());
+            }
+        }
+        if unsafe { sqlite_rational_register(raw) } != 0 {
+            return Err(db.error());
+        }
+        db.execute("PRAGMA trusted_schema=OFF", &[])?;
+        db.execute("PRAGMA foreign_keys=ON", &[])?;
+        Ok(db)
+    }
+    fn error(&self) -> String {
+        unsafe {
+            CStr::from_ptr(sqlite3_errmsg(self.raw))
+                .to_string_lossy()
+                .into_owned()
+        }
+    }
+    pub fn query(
+        &self,
+        sql: &str,
+        parameters: &[&str],
+    ) -> Result<Vec<Vec<Option<String>>>, String> {
+        let sql = CString::new(sql).map_err(|e| e.to_string())?;
+        let mut raw = ptr::null_mut();
+        if unsafe { sqlite3_prepare_v2(self.raw, sql.as_ptr(), -1, &mut raw, ptr::null_mut()) } != 0
+        {
+            return Err(self.error());
+        }
+        let stmt = Statement {
+            raw,
+            _db: PhantomData,
+        };
+        for (i, value) in parameters.iter().enumerate() {
+            let len: c_int = value
+                .len()
+                .try_into()
+                .map_err(|_| "SQLite value is too large")?;
+            // SQLITE_STATIC: parameters remain borrowed until this statement is finalized.
+            if unsafe {
+                sqlite3_bind_text(stmt.raw, (i + 1) as c_int, value.as_ptr().cast(), len, None)
+            } != 0
+            {
+                return Err(self.error());
+            }
+        }
+        let mut rows = Vec::new();
+        loop {
+            match unsafe { sqlite3_step(stmt.raw) } {
+                101 => break,
+                100 => {
+                    let mut row = Vec::new();
+                    for col in 0..unsafe { sqlite3_column_count(stmt.raw) } {
+                        if unsafe { sqlite3_column_type(stmt.raw, col) } == 5 {
+                            row.push(None);
+                            continue;
+                        }
+                        let ptr = unsafe { sqlite3_column_text(stmt.raw, col) };
+                        let len = unsafe { sqlite3_column_bytes(stmt.raw, col) } as usize;
+                        if ptr.is_null() {
+                            return Err("SQLite could not allocate a result value".into());
+                        }
+                        row.push(Some(
+                            String::from_utf8(unsafe { slice::from_raw_parts(ptr, len) }.to_vec())
+                                .map_err(|e| e.to_string())?,
+                        ));
+                    }
+                    rows.push(row);
+                }
+                _ => return Err(self.error()),
+            }
+        }
+        Ok(rows)
+    }
+    pub fn execute(&self, sql: &str, parameters: &[&str]) -> Result<(), String> {
+        self.query(sql, parameters).map(|_| ())
+    }
+    pub fn scalar(&self, sql: &str, parameters: &[&str]) -> Result<String, String> {
+        self.query(sql, parameters)?
+            .into_iter()
+            .next()
+            .and_then(|row| row.into_iter().next().flatten())
+            .ok_or_else(|| "Missing SQLite result".into())
+    }
+}

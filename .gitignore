@@ -1,0 +1,11 @@
+node_modules/
+.yarn/
+.pnp.*
+dist/
+target/
+artifacts/
+upstream/
+.env
+*.octimeline.sqlite
+*.octimeline.sqlite-journal
+src-tauri/gen/
