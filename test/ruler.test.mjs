@@ -198,3 +198,83 @@ test('custom breakpoint steps are validated, persisted, transformed and continue
     assert.throws(() => validateRulerPolicy({ kind: 'steps', steps }));
   assert.throws(() => validateRulerPolicy({ kind: 'javascript', source: 'fetch()' }));
 });
+
+test('graduations crossfade by zoom depth, remain fixed during panning, and have no navigation history', () => {
+  const at = (span) => planRuler(context(0n, span, 1000));
+  const early = at(Q.from(20n, 3n)),
+    middle = at(Q.from(25n, 3n)),
+    late = at(Q.from(10n));
+  const alpha = (plan) => tickAt(plan, Q.one).labelOpacity;
+  assert(alpha(early) > alpha(middle) && alpha(middle) > alpha(late));
+  assert(Math.abs(alpha(middle) - 0.5) < 1e-12);
+  const parent = tickAt(planRuler(context(-5n, Q.from(25n, 3n), 1000)), Q.zero);
+  assert.equal(parent.labelOpacity, 1); // Coincident labels blend once, without dimming the origin.
+  const moved = planRuler(context(Q.from(1n, 3n), Q.from(25n, 3n), 1000));
+  assert.equal(tickAt(moved, Q.one).labelOpacity, alpha(middle));
+  assert.deepEqual(at(Q.from(25n, 3n)), middle); // Same zoom always gives the same weights.
+  for (const tick of middle.ticks)
+    for (const field of ['opacity', 'majorOpacity', 'boundaryOpacity', 'labelOpacity'])
+      assert(Number.isFinite(tick[field]) && tick[field] >= 0 && tick[field] <= 1);
+});
+
+test('major, subdivision and civil breakpoints have continuous spatial alpha on both sides', () => {
+  const epsilon = Q.from(1n, 1000000n),
+    width = 1200;
+  for (const [policy, span] of [
+    [{ kind: 'decimal' }, Q.from(BigInt(width), 90n)],
+    [{ kind: 'decimal' }, Q.from(BigInt(width), 90n).div(Q.from(10n))],
+    [calendar, Q.from(60n * BigInt(width), 70n)],
+    [calendar, Q.from(10n * BigInt(width), 9n)],
+    [calendar, Q.from(2629800n * BigInt(width), 70n)],
+    [calendar, Q.from(86400n, 2n)],
+    [{ kind: 'steps', steps: ['1', '60', '3600', '86400'] }, Q.from(BigInt(width), 90n)],
+    [{ kind: 'steps', steps: ['1', '60', '3600', '86400'] }, Q.from(60n * BigInt(width), 90n)],
+    [{ kind: 'steps', steps: ['1', '60', '3600', '86400'] }, Q.from(86400n * BigInt(width), 90n)],
+  ]) {
+    const below = planRuler(context(-1n, span.mul(Q.one.sub(epsilon)), width), policy),
+      above = planRuler(context(-1n, span.mul(Q.one.add(epsilon)), width), policy);
+    const times = new Set([...below.ticks, ...above.ticks].map((t) => t.time.toString()));
+    for (const time of times) {
+      const a = tickAt(below, Q.parse(time)),
+        b = tickAt(above, Q.parse(time));
+      for (const field of ['opacity', 'majorOpacity', 'boundaryOpacity', 'labelOpacity'])
+        assert(
+          Math.abs((a?.[field] ?? 0) - (b?.[field] ?? 0)) < 0.0001,
+          `${policy.kind} ${span.toString()} ${time}: ${field} jumped`,
+        );
+    }
+  }
+});
+
+test('fade weights stay meaningful for huge coordinates, tiny scales and nearly equal custom steps', () => {
+  const scale = Q.from(1n, 10n ** 1100n),
+    offset = Q.from(10n ** 1200n);
+  const normal = planRuler(context(0n, Q.from(25n, 3n), 1000));
+  const huge = planRuler(context(offset, scale.mul(Q.from(25n, 3n)), 1000));
+  for (const tick of huge.ticks)
+    for (const field of ['opacity', 'majorOpacity', 'boundaryOpacity', 'labelOpacity'])
+      assert(Number.isFinite(tick[field]) && tick[field] >= 0 && tick[field] <= 1);
+  // Choose the target exactly halfway through two steps closer than floating point can represent.
+  const tiny = Q.from(1n, 10n ** 100n),
+    step = Q.one.add(tiny),
+    target = Q.one.add(tiny.div(Q.from(2n)));
+  const plan = planRuler(context(0n, target.mul(Q.from(1000n, 90n)), 1000), {
+    kind: 'steps',
+    steps: ['1', step.toString()],
+  });
+  const tick = tickAt(plan, step);
+  assert(Math.abs(tick.majorOpacity - 0.5) < 1e-12);
+  const presenter = createPresenter({
+    ...DEFAULT_PRESENTATION,
+    scale: scale.toString(),
+    origin: offset.toString(),
+  });
+  const scaled = presenter.rules(context(offset, Q.from(25n, 3n).mul(scale), 1000));
+  for (const original of normal.ticks) {
+    const transformed = tickAt(scaled, offset.add(original.time.mul(scale)));
+    assert.equal(transformed.labelOpacity, original.labelOpacity);
+    original.labels.forEach((label, index) =>
+      same(transformed.labels[index].interval, label.interval.mul(scale)),
+    );
+  }
+});

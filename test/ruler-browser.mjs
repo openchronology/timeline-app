@@ -24,15 +24,19 @@ export async function checkRuler(page, restoreDocument) {
     await frame();
   };
   const ticks = () =>
-    page
-      .locator('.axis-tick')
-      .evaluateAll((nodes) =>
-        nodes.map((node) => ({
-          time: node.dataset.time,
-          x: parseFloat(node.style.left),
-          major: !!node.querySelector('.tick-label'),
-        })),
-      );
+    page.locator('.axis-tick').evaluateAll((nodes) =>
+      nodes.map((node) => ({
+        time: node.dataset.time,
+        x: parseFloat(node.style.left),
+        major: !!node.querySelector('.tick-label'),
+        guideOpacity: Number(node.querySelector('.tick-guide').style.opacity),
+        notchOpacity: Number(node.querySelector('.tick-notch').style.opacity),
+        labelOpacity: [...node.querySelectorAll('.tick-label')].reduce(
+          (sum, label) => sum + Number(label.style.opacity),
+          0,
+        ),
+      })),
+    );
   await imported({
     format: 'openchronology',
     version: 1,
@@ -60,6 +64,23 @@ export async function checkRuler(page, restoreDocument) {
   const closer = await ticks();
   assert(closer.some((tick) => tick.time === '1/10' && tick.major));
   assert(closer.some((tick) => tick.time === '1/100' && !tick.major));
+  const width = await input('timeline-stage').evaluate((node) => node.clientWidth - 96);
+  const breakpoint = Q.from(BigInt(width), 90n);
+  await go('0', breakpoint.mul(Q.from(3n, 4n)).toString());
+  const middle = (await ticks()).find((tick) => tick.time === '1/1');
+  assert(Math.abs(middle.labelOpacity - 0.5) < 1e-9);
+  await page.waitForTimeout(120);
+  assert.equal(
+    (await ticks()).find((tick) => tick.time === '1/1').labelOpacity,
+    middle.labelOpacity,
+  );
+  const epsilon = Q.from(1n, 1000000n);
+  await go('0', breakpoint.mul(Q.one.sub(epsilon)).toString());
+  const fading = (await ticks()).find((tick) => tick.time === '1/1');
+  await go('0', breakpoint.mul(Q.one.add(epsilon)).toString());
+  const promoted = (await ticks()).find((tick) => tick.time === '1/1');
+  for (const field of ['guideOpacity', 'notchOpacity', 'labelOpacity'])
+    assert(Math.abs(fading[field] - promoted[field]) < 0.0001);
 
   await input('presentation-button').click();
   await input('presentation-ruler').selectOption('steps');

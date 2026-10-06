@@ -1,3 +1,4 @@
+import { pluginMetadata } from '../dist/core.mjs';
 import { randomUUID } from 'node:crypto';
 import { indexedNodes } from './tree.mjs';
 export class HttpError extends Error {
@@ -69,7 +70,7 @@ export class PostgresStore {
       );
     }
     await client.query(
-      'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,updated_at=now() WHERE id=$1',
+      'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,updated_at=now() WHERE id=$1',
       [
         id,
         document.title,
@@ -77,6 +78,7 @@ export class PostgresStore {
         tree.root,
         tree.count,
         document.presentation ? JSON.stringify(document.presentation) : null,
+        document.plugins === undefined ? null : JSON.stringify(document.plugins),
       ],
     );
   }
@@ -147,6 +149,7 @@ export class PostgresStore {
           title: t.title,
           description: t.description,
           ...(t.presentation ? { presentation: t.presentation } : {}),
+          ...(t.plugins ? { plugins: t.plugins } : {}),
           events: rows.map((r) => r.event),
         },
       };
@@ -157,7 +160,7 @@ export class PostgresStore {
       await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
       const t = await this.access(id, userId, c);
       if (query.kind === 'overview') {
-        const { rows } = await c.query('SELECT * FROM oc_overview($1,$2::mpq,$3::mpq,$4::mpq)', [
+        const { rows } = await c.query('SELECT * FROM oc_overview_v2($1,$2::mpq,$3::mpq,$4::mpq)', [
           id,
           query.lower,
           query.upper,
@@ -170,7 +173,15 @@ export class PostgresStore {
             last: r.last_time,
             count: r.event_count,
             distinct: r.distinct_count,
-            ...(r.event_id ? { id: r.event_id, title: r.title ?? 'Untitled event' } : {}),
+            ...(r.event_id
+              ? {
+                  id: r.event_id,
+                  title: r.title ?? '',
+                  ...(t.plugins?.some((p) => p.enabled)
+                    ? { metadata: pluginMetadata(t.plugins, r.metadata ?? {}) }
+                    : {}),
+                }
+              : {}),
           })),
           visitedNodes: rows.at(-1)?.visited_nodes ?? 0,
         };

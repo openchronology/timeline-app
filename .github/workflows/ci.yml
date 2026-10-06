@@ -9,6 +9,47 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  docker:
+    name: Docker Compose / pgmp and web server
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      COMPOSE_PROJECT_NAME: openchronology-ci
+      POSTGRES_PASSWORD: ci-only-password-with-punctuation-!@
+      APP_ORIGIN: http://localhost:5173
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Build and start the suite
+        run: docker compose up --build --wait --wait-timeout 180
+      - name: Verify native pgmp and bounded rational queries
+        run: |
+          docker compose exec -T database psql -X -U openchronology -d openchronology -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$ BEGIN
+            IF '1/3'::mpq + '1/6'::mpq <> '1/2'::mpq THEN
+              RAISE EXCEPTION 'Incorrect rational arithmetic';
+            END IF;
+            IF (SELECT count(*) FROM (VALUES ('-1/3'::mpq), ('1/3'::mpq), ('2/3'::mpq)) AS events(time)
+                WHERE time BETWEEN '0'::mpq AND '1/2'::mpq) <> 1 THEN
+              RAISE EXCEPTION 'Incorrect bounded rational query';
+            END IF;
+          END $$;
+          SQL
+      - run: node test/docker-smoke.mjs
+      - name: Verify the SQLite converter inside the web image
+        run: docker compose run --rm --no-deps --volume "$PWD/test:/app/test:ro" app node test/files.mjs
+      - name: Verify migrations can run again
+        run: |
+          docker compose run --rm migrate
+          node test/docker-smoke.mjs
+      - name: Container logs
+        if: always()
+        run: docker compose logs --no-color
+      - name: Remove the disposable CI stack
+        if: always()
+        run: docker compose down --volumes --remove-orphans
   core:
     name: Core / ${{ matrix.manager }} / Node ${{ matrix.node }}
     runs-on: ubuntu-24.04
@@ -114,7 +155,7 @@ jobs:
       - name: Install PostgreSQL and native build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-16 postgresql-server-dev-16 libgmp-dev build-essential python3
+          sudo apt-get install -y postgresql-16 postgresql-server-dev-16 libgmp-dev libsqlite3-dev build-essential cmake python3
           "$PG_CONFIG" --bindir >> "$GITHUB_PATH"
           echo "PGDATA=$RUNNER_TEMP/openchronology-postgres" >> "$GITHUB_ENV"
       - name: Build and install real pgmp
@@ -133,6 +174,12 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: node test/sql-oracle.mjs
+      - name: Build the isolated SQLite file converter
+        run: |
+          rustup update stable --no-self-update
+          rustup default stable
+          cargo build --manifest-path native-store/Cargo.toml --locked --release --bin och-convert
+      - run: node test/files.mjs
       - run: npm run test:postgres
       - name: Stop PostgreSQL
         if: always()
@@ -161,7 +208,11 @@ jobs:
       - run: cargo fmt --manifest-path native-store/Cargo.toml --check
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - run: cargo test --manifest-path native-store/Cargo.toml --locked
+      - run: cargo build --manifest-path native-store/Cargo.toml --locked --release --bin och-convert
       - run: npm ci
+      - run: npm run build
+      - run: node test/files.mjs
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
       - run: npm run desktop:build
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

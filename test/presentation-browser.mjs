@@ -40,10 +40,12 @@ export async function checkPresentation(page, restoreDocument) {
   );
   await input('presentation-save').click();
   await page.locator('.event-marker:not(.group)').first().click();
-  assert.match(await input('event-presented').inputValue(), /minutes$/);
+  assert.match(await input('event-time').inputValue(), /minutes$/);
   await input('event-title').fill('Renamed without rounding');
-  await input('event-save').click();
-  assert.equal(await input('event-time').inputValue(), '1/3');
+  await page.waitForFunction(() =>
+    document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+  );
+  assert.equal(await input('event-exact').inputValue(), '1/3');
   let document = await exported();
   assert.equal(document.presentation.mode, 'float');
   assert.equal(document.presentation.scale, '60/1');
@@ -65,10 +67,11 @@ export async function checkPresentation(page, restoreDocument) {
   await page.evaluate(() => new Promise(requestAnimationFrame));
   assert.equal(await input('exact-left').inputValue(), '6/1');
   assert.equal(await input('exact-right').inputValue(), '120/1');
-  await input('event-presented').fill('1.5 minutes');
-  await input('parse-event-presented').click();
-  assert.equal(await input('event-time').inputValue(), '90/1');
-  await input('event-save').click();
+  await input('event-time').fill('1.5 minutes');
+  assert.equal(await input('event-exact').inputValue(), '90/1');
+  await page.waitForFunction(() =>
+    document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+  );
   assert.equal((await exported()).events[0].time, '90/1');
 
   await input('presentation-button').click();
@@ -146,13 +149,15 @@ export async function checkPresentation(page, restoreDocument) {
   const tickText = await page.locator('.tick-label').allTextContents();
   assert(tickText.every((label) => !label.includes('2026') && !label.includes('T')));
   assert(tickText.some((label) => /\d{2}h/.test(label)));
-  assert.equal(await page.locator('.event-label small').first().textContent(), '13:45');
-  await page.locator('.event-marker').first().click();
-  assert.equal(await input('event-presented').inputValue(), '2026-10-05T13:45:30Z');
-  await input('event-presented').fill('14:30');
-  await input('parse-event-presented').click();
   assert.equal(
-    await input('event-time').inputValue(),
+    await page.locator('.event-label .event-time-current').first().textContent(),
+    '13:45',
+  );
+  await page.locator('.event-marker').first().click();
+  assert.equal(await input('event-time').inputValue(), '2026-10-05T13:45:30Z');
+  await input('event-time').fill('14:30');
+  assert.equal(
+    await input('event-exact').inputValue(),
     parseTimestamp('2026-10-05T14:30:00Z').toString(),
   );
   // Reproduce the screenshots: a tiny pan across midnight must not reintroduce dates.
@@ -184,7 +189,10 @@ export async function checkPresentation(page, restoreDocument) {
   assert(
     (await page.locator('.tick-label').allTextContents()).every((label) => /^\d{2}s$/.test(label)),
   );
-  assert.deepEqual(await page.locator('.event-label small').allTextContents(), ['03.5s', '13.7s']);
+  assert.deepEqual(await page.locator('.event-label .event-time-current').allTextContents(), [
+    '03.5s',
+    '13.7s',
+  ]);
   await input('left-bound').fill('2026-10-04T23:59:13Z');
   await input('right-bound').fill('2026-10-05T00:00:53Z');
   await input('apply-bounds').click();
@@ -194,7 +202,7 @@ export async function checkPresentation(page, restoreDocument) {
       /^\d{2}m \d{2}s$/.test(label),
     ),
   );
-  assert.deepEqual(await page.locator('.event-label small').allTextContents(), [
+  assert.deepEqual(await page.locator('.event-label .event-time-current').allTextContents(), [
     '00m 03.5s',
     '00m 13.7s',
   ]);

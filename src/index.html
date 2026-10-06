@@ -18,7 +18,8 @@
       >
       <div class="header-right">
         <span id="storage-badge" class="badge">Browser draft</span
-        ><button id="server-button" hidden>Server connection</button><button id="account-button">Sign in</button
+        ><button id="server-button" hidden>Server connection</button
+        ><button id="account-button">Sign in</button
         ><button id="logout-button" hidden>Sign out</button>
       </div>
     </header>
@@ -44,7 +45,8 @@
           <div class="file-actions">
             <button id="import-button">Import JSON</button
             ><button id="export-button">Export JSON ↗</button
-            ><button id="och-import" hidden>Import .och</button><button id="och-export" hidden>Export .och ↗</button
+            ><button id="och-import" hidden>Import .och</button
+            ><button id="och-export" hidden>Export .och ↗</button
             ><button id="sqlite-open" hidden>Open SQLite</button
             ><button id="sqlite-save" hidden>Save SQLite</button
             ><button id="sqlite-save-as" hidden>Save SQLite as…</button
@@ -81,9 +83,12 @@ Every point has a place. Explore the spaces between them.</textarea
             </div>
             <div class="view-controls">
               <button id="presentation-button">Time display</button>
+              <button id="plugins-button">Plugins</button>
               <button id="zoom-out" aria-label="Zoom out">−</button
               ><button id="zoom-in" aria-label="Zoom in">＋</button
               ><button id="fit-button">Fit all</button
+              ><button id="center-vertical">Center axis</button
+              ><button id="clear-selection" hidden>Clear selection</button
               ><button id="add-button" class="button-primary">＋ Event</button>
             </div>
           </div>
@@ -93,17 +98,21 @@ Every point has a place. Explore the spaces between them.</textarea
             class="timeline-stage"
             tabindex="0"
             role="application"
-            aria-label="Interactive timeline. Drag to pan, scroll to zoom, or use arrow keys and plus/minus."
+            aria-label="Interactive timeline. Drag to pan horizontally and vertically, scroll to zoom, Alt-scroll to pan vertically, or use arrow keys and plus/minus."
           >
             <div id="axis" class="axis"></div>
+            <div id="time-cursor" class="time-cursor" role="img" hidden></div>
             <div id="markers" class="markers"></div>
+            <div id="stack-markers" class="markers"></div>
             <div id="empty-window" class="empty-window" hidden>
               No moments in this window.<br /><button id="empty-fit">Fit the timeline</button>
             </div>
             <div id="loading-window" class="loading-window" hidden>Loading this window…</div>
           </div>
           <div class="timeline-footer">
-            <span class="gesture-help">↔ Drag to pan <span>·</span> Scroll or pinch to zoom</span
+            <span class="gesture-help"
+              >Drag to pan in both directions <span>·</span> Scroll or pinch to zoom
+              <span>·</span> Alt-scroll moves vertically</span
             ><label class="density-control"
               >Group within
               <input
@@ -181,26 +190,28 @@ Every point has a place. Explore the spaces between them.</textarea
           <label
             >Title<input
               id="event-title"
-              required
               maxlength="1000"
-              placeholder="Name this moment" /></label
+              placeholder="Optional — show a label on the timeline" /></label
           ><label
             >Exact time<input
               id="event-time"
               required
               spellcheck="false"
-              placeholder="1/3, 0.25, or an ISO timestamp"
+              placeholder="Time in this timeline’s format"
           /></label>
           <p class="field-hint">
-            A raw rational coordinate. ISO input here means Unix seconds; use displayed time for
-            this timeline’s units or calendar.
+            Uses this timeline’s time display. Leaving the text unchanged preserves the exact
+            coordinate, even when the display rounds it.
           </p>
-          <label>Displayed time<input id="event-presented" spellcheck="false" /></label>
-          <button id="parse-event-presented" type="button">Use this displayed value</button>
-          <p class="field-hint">
-            Saving keeps the exact time above. This button explicitly replaces it with the parsed
-            value.
-          </p>
+          <details>
+            <summary>Exact rational coordinate</summary>
+            <input
+              id="event-exact"
+              aria-label="Exact rational coordinate"
+              readonly
+              spellcheck="false"
+            />
+          </details>
           <label
             >Notes<textarea
               id="event-description"
@@ -208,6 +219,7 @@ Every point has a place. Explore the spaces between them.</textarea
               placeholder="What happened here?"
             ></textarea>
           </label>
+          <div id="plugin-event-fields"></div>
           <details>
             <summary>Additional metadata</summary>
             <label
@@ -216,14 +228,41 @@ Every point has a place. Explore the spaces between them.</textarea
           </details>
           <div id="event-error" class="form-error" role="alert"></div>
           <div class="event-actions">
-            <button id="event-save" class="button-primary" type="submit">Save event</button
-            ><button id="event-delete" class="button-danger" type="button">Delete</button>
+            <span id="event-edit-status" class="field-hint" role="status"
+              >Edits apply to the timeline automatically.</span
+            >
+            <button id="event-delete" class="button-danger" type="button">Delete</button>
           </div>
         </form>
       </aside>
     </div>
     <input id="json-file" type="file" accept=".ochx,.json,application/json" hidden />
     <input id="och-file" type="file" accept=".och,application/vnd.openchronology.sqlite" hidden />
+    <dialog id="plugins-dialog" aria-labelledby="plugins-heading">
+      <div class="dialog-heading">
+        <h2 id="plugins-heading">Timeline plugins</h2>
+        <button data-close="plugins-dialog" aria-label="Close plugins">×</button>
+      </div>
+      <p id="plugins-note" class="field-hint"></p>
+      <div id="installed-plugins"></div>
+      <button id="plugins-add" class="button-primary">Add plugin</button>
+    </dialog>
+    <dialog id="plugin-library-dialog" aria-labelledby="plugin-library-heading">
+      <div class="dialog-heading">
+        <h2 id="plugin-library-heading">Plugin library</h2>
+        <button data-close="plugin-library-dialog" aria-label="Close plugin library">×</button>
+      </div>
+      <label
+        >Search plugins<input id="plugin-search" type="search" maxlength="200" autocomplete="off"
+      /></label>
+      <p id="plugin-library-status" role="status"></p>
+      <div id="plugin-library-results"></div>
+      <div class="dialog-actions">
+        <button id="plugin-previous">Previous page</button
+        ><button id="plugin-next">Next page</button>
+      </div>
+      <div id="plugin-library-error" class="form-error" role="alert"></div>
+    </dialog>
     <dialog id="presentation-dialog">
       <form id="presentation-form">
         <div class="dialog-heading">
@@ -383,16 +422,38 @@ Every point has a place. Explore the spaces between them.</textarea
     </dialog>
     <dialog id="connection-dialog">
       <form id="connection-form">
-        <div class="dialog-heading"><h2>Server connection</h2><button type="button" data-close="connection-dialog">×</button></div>
-        <label>Server address<input id="server-origin" type="url" value="https://timescale.info" required spellcheck="false" /></label>
-        <p class="field-hint">The official server is https://timescale.info. You can connect to your own HTTPS server. Local .och files work without a connection.</p>
+        <div class="dialog-heading">
+          <h2>Server connection</h2>
+          <button type="button" data-close="connection-dialog">×</button>
+        </div>
+        <label
+          >Server address<input
+            id="server-origin"
+            type="url"
+            value="https://timescale.info"
+            required
+            spellcheck="false"
+        /></label>
+        <p class="field-hint">
+          The official server is https://timescale.info. You can connect to your own HTTPS server.
+          Local .och files work without a connection.
+        </p>
         <div id="connection-error" class="form-error" role="alert"></div>
-        <div class="dialog-actions"><button type="button" id="server-disconnect">Disconnect</button><button type="submit" class="button-primary">Connect</button></div>
+        <div class="dialog-actions">
+          <button type="button" id="server-disconnect">Disconnect</button
+          ><button type="submit" class="button-primary">Connect</button>
+        </div>
       </form>
     </dialog>
     <dialog id="desktop-approval-dialog">
-      <div class="dialog-heading"><h2>Connect a desktop session</h2><button data-close="desktop-approval-dialog">×</button></div>
-      <p>Approve only if you started this connection in OpenChronology and the code matches the desktop window.</p>
+      <div class="dialog-heading">
+        <h2>Connect a desktop session</h2>
+        <button data-close="desktop-approval-dialog">×</button>
+      </div>
+      <p>
+        Approve only if you started this connection in OpenChronology and the code matches the
+        desktop window.
+      </p>
       <output id="desktop-approval-code"></output>
       <button id="desktop-approve" class="button-primary">Approve connection</button>
     </dialog>
@@ -403,32 +464,42 @@ Every point has a place. Explore the spaces between them.</textarea
           <button type="button" data-close="account-dialog" aria-label="Close">×</button>
         </div>
         <p>Private timelines, collaborators, and public sharing.</p>
-        <div id="password-fields"><label
-          >Username<input
-            id="account-name"
-            required
-            minlength="3"
-            maxlength="32"
-            autocomplete="username"
-            pattern="[A-Za-z0-9][A-Za-z0-9_-]{2,31}" /></label
-        ><label
-          >Password<input
-            id="account-password"
-            type="password"
-            required
-            minlength="12"
-            maxlength="1024"
-            autocomplete="current-password"
-        /></label>
-        <p class="field-hint">At least 12 characters.</p>
-        <div class="dialog-actions">
-          <button class="button-primary" type="submit" name="action" value="login">Sign in</button
-          ><button type="submit" name="action" value="register">Create account</button>
-        </div></div>
-        <div id="provider-buttons"><button type="button" data-provider="google" hidden>Continue with Google</button><button type="button" data-provider="github" hidden>Continue with GitHub</button><button type="button" data-provider="facebook" hidden>Continue with Facebook</button></div>
+        <div id="password-fields">
+          <label
+            >Username<input
+              id="account-name"
+              required
+              minlength="3"
+              maxlength="32"
+              autocomplete="username"
+              pattern="[A-Za-z0-9][A-Za-z0-9_-]{2,31}" /></label
+          ><label
+            >Password<input
+              id="account-password"
+              type="password"
+              required
+              minlength="12"
+              maxlength="1024"
+              autocomplete="current-password"
+          /></label>
+          <p class="field-hint">At least 12 characters.</p>
+          <div class="dialog-actions">
+            <button class="button-primary" type="submit" name="action" value="login">Sign in</button
+            ><button type="submit" name="action" value="register">Create account</button>
+          </div>
+        </div>
+        <div id="provider-buttons">
+          <button type="button" data-provider="google" hidden>Continue with Google</button
+          ><button type="button" data-provider="github" hidden>Continue with GitHub</button
+          ><button type="button" data-provider="facebook" hidden>Continue with Facebook</button>
+        </div>
         <button id="desktop-login" type="button" hidden>Sign in using your browser</button>
         <p id="desktop-login-status" class="field-hint"></p>
-        <div id="account-sessions" hidden><h3>Active sessions</h3><div id="session-list"></div><button id="revoke-sessions" type="button">Sign out other sessions</button></div>
+        <div id="account-sessions" hidden>
+          <h3>Active sessions</h3>
+          <div id="session-list"></div>
+          <button id="revoke-sessions" type="button">Sign out other sessions</button>
+        </div>
         <div id="account-error" class="form-error" role="alert"></div>
       </form>
     </dialog>
@@ -456,6 +527,25 @@ Every point has a place. Explore the spaces between them.</textarea
         </div>
       </form>
       <div id="sharing-error" class="form-error" role="alert"></div>
+    </dialog>
+    <div
+      id="timeline-menu"
+      class="timeline-menu"
+      role="menu"
+      aria-label="Timeline actions"
+      hidden
+    ></div>
+    <dialog
+      id="delete-dialog"
+      aria-labelledby="delete-heading"
+      aria-describedby="delete-description"
+    >
+      <h2 id="delete-heading">Delete event?</h2>
+      <p id="delete-description"></p>
+      <div class="dialog-actions">
+        <button id="delete-cancel" data-close="delete-dialog" type="button">Cancel</button>
+        <button id="delete-confirm" class="button-danger" type="button">Delete event</button>
+      </div>
     </dialog>
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   </body>

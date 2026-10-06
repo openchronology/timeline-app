@@ -169,6 +169,7 @@ export function createPresenter(settings?: TimePresentation): TimePresenter {
         ...tick,
         time: origin.add(tick.time.mul(scale)),
         interval: tick.interval.mul(scale),
+        labels: tick.labels.map((label) => ({ ...label, interval: label.interval.mul(scale) })),
       })),
     };
   };

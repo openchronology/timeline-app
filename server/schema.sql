@@ -12,6 +12,7 @@ ALTER TABLE oc_users ALTER COLUMN password_hash DROP NOT NULL;
 ALTER TABLE oc_sessions ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'web' CHECK(kind IN ('web','desktop'));
 ALTER TABLE oc_sessions ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE oc_sessions ADD COLUMN IF NOT EXISTS last_seen_at timestamptz NOT NULL DEFAULT now();
+CREATE INDEX IF NOT EXISTS oc_sessions_idle ON oc_sessions(last_seen_at);
 CREATE TABLE IF NOT EXISTS oc_identities (
   provider text NOT NULL CHECK(provider IN ('google','github','facebook')), subject text NOT NULL,
   user_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE, PRIMARY KEY(provider,subject),
@@ -44,6 +45,7 @@ CREATE TABLE IF NOT EXISTS oc_timelines (
 CREATE INDEX IF NOT EXISTS oc_timelines_owner ON oc_timelines(owner_id);
 -- Idempotent upgrade for existing installations; NULL preserves older documents.
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS presentation jsonb;
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS plugins jsonb;
 CREATE TABLE IF NOT EXISTS oc_members (
   timeline_id uuid NOT NULL REFERENCES oc_timelines ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE,
@@ -61,8 +63,8 @@ CREATE OR REPLACE FUNCTION oc_qtext(q mpq) RETURNS text LANGUAGE sql IMMUTABLE S
 AS $$ SELECT num(q)::text || '/' || den(q)::text $$;
 
 -- In-order traversal consumes a cached subtree whenever it fits the current span group.
-CREATE OR REPLACE FUNCTION oc_overview(tid uuid, lo mpq, hi mpq, threshold mpq)
-RETURNS TABLE(first_time text,last_time text,event_count text,distinct_count integer,title text,event_id text,visited_nodes integer)
+CREATE OR REPLACE FUNCTION oc_overview_v2(tid uuid, lo mpq, hi mpq, threshold mpq)
+RETURNS TABLE(first_time text,last_time text,event_count text,distinct_count integer,title text,event_id text,visited_nodes integer,metadata jsonb)
 LANGUAGE plpgsql AS $$
 DECLARE ids bigint[]; points boolean[] := ARRAY[false]; idx integer; nid bigint; point boolean;
   n record; a mpq; b mpq; weight bigint; distinct_n integer; whole boolean;
@@ -90,10 +92,10 @@ BEGIN
     END IF;
     IF current_a IS NOT NULL AND a-current_a>=threshold THEN
       first_time:=oc_qtext(current_a); last_time:=oc_qtext(current_b); event_count:=current_weight::text;
-      distinct_count:=current_distinct; visited_nodes:=visits; title:=NULL; event_id:=NULL;
+      distinct_count:=current_distinct; visited_nodes:=visits; title:=NULL; event_id:=NULL; metadata:=NULL;
       IF current_weight=1 THEN
         SELECT events->0 INTO sample FROM oc_nodes WHERE timeline_id=tid AND id=current_id;
-        title:=sample->'metadata'->>'title'; event_id:=sample->>'id';
+        title:=sample->'metadata'->>'title'; event_id:=sample->>'id'; metadata:=sample->'metadata';
       END IF;
       RETURN NEXT; current_a:=NULL;
     END IF;
@@ -108,14 +110,19 @@ BEGIN
   END LOOP;
   IF current_a IS NOT NULL THEN
     first_time:=oc_qtext(current_a); last_time:=oc_qtext(current_b); event_count:=current_weight::text;
-    distinct_count:=current_distinct; visited_nodes:=visits; title:=NULL; event_id:=NULL;
+    distinct_count:=current_distinct; visited_nodes:=visits; title:=NULL; event_id:=NULL; metadata:=NULL;
     IF current_weight=1 THEN
       SELECT events->0 INTO sample FROM oc_nodes WHERE timeline_id=tid AND id=current_id;
-      title:=sample->'metadata'->>'title'; event_id:=sample->>'id';
+      title:=sample->'metadata'->>'title'; event_id:=sample->>'id'; metadata:=sample->'metadata';
     END IF;
     RETURN NEXT;
   END IF;
 END $$;
+
+-- Keep the original result shape for existing callers and conformance tests.
+CREATE OR REPLACE FUNCTION oc_overview(tid uuid, lo mpq, hi mpq, threshold mpq)
+RETURNS TABLE(first_time text,last_time text,event_count text,distinct_count integer,title text,event_id text,visited_nodes integer)
+LANGUAGE sql AS $$ SELECT g.first_time,g.last_time,g.event_count,g.distinct_count,g.title,g.event_id,g.visited_nodes FROM oc_overview_v2(tid,lo,hi,threshold) g $$;
 
 CREATE OR REPLACE FUNCTION oc_events(tid uuid,lo mpq,hi mpq,after_time mpq,after_id text,max_rows integer)
 RETURNS SETOF jsonb LANGUAGE plpgsql AS $$

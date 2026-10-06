@@ -2,23 +2,53 @@
 mod server;
 use openchronology_store::Document;
 use std::{path::PathBuf, sync::Mutex};
-use tauri_plugin_dialog::DialogExt;
 use tauri::Manager;
+use tauri_plugin_dialog::DialogExt;
 #[tauri::command]
-fn desktop_server(state: tauri::State<'_, server::Server>) -> Result<Option<String>, String> { state.configured() }
+fn desktop_open_image(url: String) -> Result<(), String> {
+    server::open_image(&url)
+}
 #[tauri::command]
-fn desktop_connect(app: tauri::AppHandle, state: tauri::State<'_, server::Server>, origin: Option<String>) -> Result<(), String> {
+fn desktop_server(state: tauri::State<'_, server::Server>) -> Result<Option<String>, String> {
+    state.configured()
+}
+#[tauri::command]
+fn desktop_connect(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, server::Server>,
+    origin: Option<String>,
+) -> Result<(), String> {
     state.configure(origin)?;
     let directory = app.path().app_config_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-    std::fs::write(directory.join("server.json"), serde_json::to_vec(&state.configured()?).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
+    std::fs::write(
+        directory.join("server.json"),
+        serde_json::to_vec(&state.configured()?).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())
 }
 #[tauri::command]
-async fn desktop_request(state: tauri::State<'_, server::Server>, path: String, method: String, data: Option<serde_json::Value>, csrf: Option<String>) -> Result<server::Reply, String> { state.request(&path, &method, data, csrf).await }
+async fn desktop_request(
+    state: tauri::State<'_, server::Server>,
+    path: String,
+    method: String,
+    data: Option<serde_json::Value>,
+    csrf: Option<String>,
+) -> Result<server::Reply, String> {
+    state.request(&path, &method, data, csrf).await
+}
 #[tauri::command]
-async fn desktop_auth_start(state: tauri::State<'_, server::Server>) -> Result<serde_json::Value, String> { state.start_login().await }
+async fn desktop_auth_start(
+    state: tauri::State<'_, server::Server>,
+) -> Result<serde_json::Value, String> {
+    state.start_login().await
+}
 #[tauri::command]
-async fn desktop_auth_poll(state: tauri::State<'_, server::Server>) -> Result<serde_json::Value, String> { state.poll_login().await }
+async fn desktop_auth_poll(
+    state: tauri::State<'_, server::Server>,
+) -> Result<serde_json::Value, String> {
+    state.poll_login().await
+}
 #[derive(serde::Serialize)]
 struct Opened {
     document: Document,
@@ -72,9 +102,15 @@ async fn desktop_save(
     files: tauri::State<'_, Mutex<Files>>,
     document: Document,
     save_as: bool,
+    expected_path: Option<String>,
 ) -> Result<Option<String>, String> {
     let existing = files.lock().map_err(|e| e.to_string())?.current.clone();
     let path = if !save_as && existing.is_some() {
+        if existing.as_ref().map(|p| p.to_string_lossy().into_owned()) != expected_path {
+            return Err(
+                "The active file changed. Use Save SQLite as to choose the destination.".into(),
+            );
+        }
         existing.unwrap()
     } else {
         let Some(file) = app
@@ -86,7 +122,11 @@ async fn desktop_save(
         else {
             return Ok(None);
         };
-        file.into_path().map_err(|e| e.to_string())?
+        let mut path = file.into_path().map_err(|e| e.to_string())?;
+        if path.extension().is_none() {
+            path.set_extension("och");
+        }
+        path
     };
     let saving = path.clone();
     tauri::async_runtime::spawn_blocking(move || openchronology_store::save(&saving, &document))
@@ -103,15 +143,23 @@ fn main() {
         .setup(|app| {
             if let Ok(directory) = app.path().app_config_dir() {
                 if let Ok(bytes) = std::fs::read(directory.join("server.json")) {
-                    if let Ok(origin) = serde_json::from_slice::<Option<String>>(&bytes) { let _ = app.state::<server::Server>().configure(origin); }
+                    if let Ok(origin) = serde_json::from_slice::<Option<String>>(&bytes) {
+                        let _ = app.state::<server::Server>().configure(origin);
+                    }
                 }
             }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            desktop_open_image,
             desktop_open,
             desktop_accept_open,
-            desktop_save, desktop_server, desktop_connect, desktop_request, desktop_auth_start, desktop_auth_poll
+            desktop_save,
+            desktop_server,
+            desktop_connect,
+            desktop_request,
+            desktop_auth_start,
+            desktop_auth_poll
         ])
         .run(tauri::generate_context!())
         .expect("Could not start OpenChronology");

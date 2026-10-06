@@ -23,10 +23,42 @@ async function request(application, url, method = 'GET', headers = {}, body) {
     application.listeners('request')[0](req, res).catch(reject);
   });
 }
+test('readiness checks database schema and does not disclose database errors', async () => {
+  assert.equal((await request(createApplication(), '/healthz')).status, 200);
+  let query;
+  const ready = createApplication({
+    pool: {
+      async query(sql) {
+        query = sql;
+      },
+    },
+  });
+  assert.deepEqual((await request(ready, '/healthz')).body, {
+    status: 'ok',
+    storage: 'postgresql',
+  });
+  assert.equal(query, 'SELECT 1 FROM oc_timelines LIMIT 0');
+  const unavailable = createApplication({
+    pool: {
+      async query() {
+        throw new Error('secret connection information');
+      },
+    },
+  });
+  const result = await request(unavailable, '/healthz');
+  assert.equal(result.status, 503);
+  assert.deepEqual(result.body, { status: 'unavailable' });
+});
 test('local deployments serve an anonymous session and reject foreign-origin writes', async () => {
   const app = createApplication();
   const session = await request(app, '/api/session');
-  assert.deepEqual(session.body, { server: false, user: null, csrf: null });
+  assert.deepEqual(session.body, {
+    server: false,
+    user: null,
+    csrf: null,
+    providers: [],
+    fileExchange: false,
+  });
   const write = await request(app, '/api/timelines', 'POST', {
     origin: 'https://attacker.example',
   });

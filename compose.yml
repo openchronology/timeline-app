@@ -1,5 +1,17 @@
+x-app-build: &app-build
+  context: .
+  dockerfile: deploy/Dockerfile.app
+
+x-database-environment: &database-environment
+  PGHOST: database
+  PGPORT: 5432
+  PGUSER: openchronology
+  PGDATABASE: openchronology
+  PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+
 services:
   database:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: deploy/Dockerfile.postgres
@@ -15,22 +27,30 @@ services:
       timeout: 5s
       retries: 20
   migrate:
-    build:
-      context: .
-      dockerfile: deploy/Dockerfile.app
-    environment:
-      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env using the database service hostname}
+    image: openchronology-app:local
+    build: *app-build
+    environment: *database-environment
     command: ['node', 'server/migrate.mjs']
     depends_on:
       database:
         condition: service_healthy
   app:
-    build:
-      context: .
-      dockerfile: deploy/Dockerfile.app
+    restart: unless-stopped
+    init: true
+    image: openchronology-app:local
+    build: *app-build
     environment:
-      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      <<: *database-environment
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:5173}
+      TRUST_PROXY: ${TRUST_PROXY:-0}
+      PLUGIN_LIBRARY: ${PLUGIN_LIBRARY:-}
+      OAUTH_GOOGLE_CLIENT_ID: ${OAUTH_GOOGLE_CLIENT_ID:-}
+      OAUTH_GOOGLE_CLIENT_SECRET: ${OAUTH_GOOGLE_CLIENT_SECRET:-}
+      OAUTH_GITHUB_CLIENT_ID: ${OAUTH_GITHUB_CLIENT_ID:-}
+      OAUTH_GITHUB_CLIENT_SECRET: ${OAUTH_GITHUB_CLIENT_SECRET:-}
+      OAUTH_FACEBOOK_CLIENT_ID: ${OAUTH_FACEBOOK_CLIENT_ID:-}
+      OAUTH_FACEBOOK_CLIENT_SECRET: ${OAUTH_FACEBOOK_CLIENT_SECRET:-}
+      OAUTH_FACEBOOK_GRAPH_VERSION: ${OAUTH_FACEBOOK_GRAPH_VERSION:-}
     ports:
       - '127.0.0.1:5173:5173'
     depends_on:

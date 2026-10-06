@@ -1,4 +1,6 @@
 import pg from 'pg';
+import { readFile } from 'node:fs/promises';
+import { BUILTIN_PLUGINS } from '../dist/core.mjs';
 import { createApplication } from './http.mjs';
 const port = Number(process.env.PORT ?? 5173),
   origin = process.env.APP_ORIGIN ?? `http://localhost:${port}`;
@@ -13,15 +15,24 @@ if (
   !['localhost', '127.0.0.1', '[::1]'].includes(address.hostname)
 )
   throw new Error('Public production deployments require an HTTPS APP_ORIGIN.');
-const pool = process.env.DATABASE_URL
-  ? new pg.Pool({
-      connectionString: process.env.DATABASE_URL,
-      max: 10,
-      statement_timeout: 30000,
-      connectionTimeoutMillis: 10000,
-    })
-  : null;
-const app = createApplication({ pool, origin });
+const pool =
+  process.env.DATABASE_URL || process.env.PGDATABASE
+    ? new pg.Pool({
+        connectionString: process.env.DATABASE_URL,
+        max: 10,
+        statement_timeout: 30000,
+        connectionTimeoutMillis: 10000,
+      })
+    : null;
+const plugins = process.env.PLUGIN_LIBRARY
+  ? [...BUILTIN_PLUGINS, ...JSON.parse(await readFile(process.env.PLUGIN_LIBRARY, 'utf8'))]
+  : BUILTIN_PLUGINS;
+const app = createApplication({
+  pool,
+  origin,
+  plugins,
+  trustProxy: process.env.TRUST_PROXY === '1',
+});
 app.listen(port, process.env.HOST ?? '127.0.0.1', () =>
   console.log(`OpenChronology: ${origin} (${pool ? 'PostgreSQL' : 'browser storage'})`),
 );

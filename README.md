@@ -65,13 +65,16 @@ For a local container deployment:
 
 ```sh
 cp .env.example .env
-# Edit the database password and the matching DATABASE_URL.
-docker compose up --build
+# Set a strong POSTGRES_PASSWORD in .env.
+docker compose up --build --wait
+docker compose logs -f app
 ```
 
-The database has a persistent volume and no published database port. A migration service creates the extension and schema before the application starts. The app binds to `127.0.0.1:5173` on the host. For public hosting, put an HTTPS reverse proxy in front of that port and set `APP_ORIGIN` to the exact external origin, for example `https://chronology.example`. Secure session cookies are selected from that origin. `APP_ORIGIN` has no trailing slash or path.
+Open http://localhost:5173 after startup. See [the deployment guide](docs/docker.md) for upgrades, backups, and production configuration. Compose passes PostgreSQL connection variables directly, so special characters in passwords do not need URL encoding.
 
-For an existing PostgreSQL installation with pgmp available:
+The database has a persistent volume and no published database port. A migration service creates the extension and schema before the application starts. The app binds to `127.0.0.1:5173` on the host. For public hosting, put an HTTPS reverse proxy in front of that port and set `APP_ORIGIN` to the exact external origin, `https://timescale.info`. Secure session cookies are selected from that origin. `APP_ORIGIN` has no trailing slash or path.
+
+Compose also builds and installs the isolated SQLite file converter. For an existing PostgreSQL installation with pgmp available:
 
 ```sh
 npm ci
@@ -79,6 +82,8 @@ npm run build
 export DATABASE_URL='postgresql://user:password@localhost/openchronology'
 export APP_ORIGIN='http://localhost:5173'
 npm run migrate
+# Optional web .och exchange (install Rust, CMake, SQLite/GMP development packages):
+cargo build --manifest-path native-store/Cargo.toml --release --locked --bin och-convert
 npm start
 ```
 
@@ -101,15 +106,31 @@ npm run desktop:build
 
 `src-tauri/target/release/bundle/deb/` contains the package. The desktop embeds sqlite-rational and registers it on each SQLite connection. It opens and saves `.och` files through native dialogs, works without a server, and uses rational-map for the active editable document. SQLite and GMP remain system shared libraries. The first packaged target is Linux; macOS and Windows packaging have not been implemented or validated.
 
+The desktop's **Server connection** defaults to `https://timescale.info`, accepts other HTTPS servers and supports explicit disconnect. It opens provider sign-in in your system browser and asks you to approve a matching desktop code. Username/password sign-in is also available. Connected users can open shared timelines and save editable rational-map documents to PostgreSQL. **Save SQLite** and **Save to server** track changes separately, so either save does not mark the other copy as current.
+
+`.ochx` is the JSON exchange format in all editions; legacy `.json` imports are still accepted. `.och` is an actual SQLite timeline with sqlite-rational indices, not JSON with a different suffix. The web edition's **Import .och** and **Export .och** send conversion requests to the server; uploads require an account and do not automatically publish the imported timeline. Public/readable server snapshots can be downloaded as `.och`. Browsers continue editing in rational-map and never open SQLite directly. The standalone offline HTML supports `.ochx` only. See [file and HTTP contracts](docs/architecture.md).
+
 The locally verified debug build is at `src-tauri/target/debug/openchronology-desktop`; its package is `src-tauri/target/debug/bundle/deb/OpenChronology_0.1.0_amd64.deb`. These generated files are excluded from Git. The hosted workflow builds the release package.
 
 JSON exchange files use `.ochx`. SQLite timelines are actual SQLite databases, have application ID `0x4f43544c` (`OCTL`) and schema version 1, and include persistent rational indexes. They are deliberately different formats. Export/import JSON moves a timeline between a desktop file, a browser draft, and a server timeline. SQLite saves run in a transaction and reject unrelated databases. Treat a browser draft as a convenience and export files you want to keep.
 
+## Timeline plugins
+
+Open **Plugins** beside **Time display** to manage the current timeline's installed plugins. **Add plugin** searches the main server's paginated catalogue. Plugin order, enabled state and version-pinned definitions are saved in `.ochx`, `.och`, browser drafts and PostgreSQL. Changes take effect immediately; later plugins override matching fields and valid marker effects. Removing a plugin preserves moment metadata.
+
+**Moment icons** adds the `iconUrl` metadata field, circular image markers that enlarge on hover/focus, and a larger linked image with a URL editor in the moment details. Use public HTTPS image hosts that allow anonymous cross-origin access. Tauri discovers plugins through its configured server and opens image sources in the system browser. The standalone HTML preserves saved definitions but leaves plugins inactive and makes no image/library requests.
+
+The first plugin API uses validated declarative UI capabilities rather than downloaded executable code. Operators can publish additional definitions with `PLUGIN_LIBRARY`. See [the plugin API and publishing guide](docs/plugins.md). **Run the server migration when upgrading** to add plugin settings and metadata-aware overview queries.
+
 ## Exact time and presentation
+
+Moment time text crossfades over 200 ms when formatting changes, and description rows ease into their new positions over 220 ms. Horizontal positions remain attached to the current view while panning. Both effects respect reduced-motion preferences. There are four description rows (two above and two below), reused cyclically; there is no separate visible-description cap or collision avoidance, so descriptions can overlap. Only visible labels are retained, and interrupted fades keep at most two text layers.
+
+Click or tap empty space to select a time: a yellow vertical cursor follows that exact coordinate as you pan and zoom, and the event editor opens with the time populated. **+Event** also reuses the selected coordinate. Right-click or hold a touch for 550 ms to open timeline actions. Single events offer **Delete**; grouped markers offer **View events**, where each event has its own context menu. Every event deletion requires a confirmation dialog, and can be undone. Cancel or Escape leaves the timeline unchanged.
 
 Use **Time display** for timeline-specific rational, floating point/decimal, scientific, SI-prefix, Gregorian, or custom displays. Configure exact unit scales and origins, labels, significant digits, and fixed timezone offsets. Presets include minutes, Julian years, millions of years, Unix seconds, and the legacy Modified Julian Date convention. Settings travel with JSON, PostgreSQL, browser drafts, and SQLite files. **Run `npm run migrate` (or its pnpm/Yarn equivalent) when upgrading an existing server.**
 
-Custom printers/parsers use a restricted interpreted JavaScript/TypeScript subset with a fixed exact-arithmetic and text API, without browser globals, network, imports, loops, or dynamic execution. Output is plain text and resource budgets are enforced. The event editor preserves its exact time unless you explicitly use its parsed display value. See [time presentation and the custom API](docs/time-presentation.md) for examples, restrictions, and security guidance.
+Custom printers/parsers use a restricted interpreted JavaScript/TypeScript subset with a fixed exact-arithmetic and text API, without browser globals, network, imports, loops, or dynamic execution. Output is plain text and resource budgets are enforced. The event editor prints and parses its time using the timeline display. Unchanged text preserves the exact coordinate even when it is rounded; editing the text chooses the parsed value. Custom source and graduation settings are embedded in both `.ochx` and `.och` saves. See [time presentation and the custom API](docs/time-presentation.md) for examples, restrictions, and security guidance.
 
 Every persisted event time is canonical `numerator/denominator`, with a positive denominator and no fixed precision. Query comparisons and grouping use exact rational arithmetic. No absolute time is converted to a JavaScript `Number`.
 
@@ -119,7 +140,7 @@ Calendar conversion is an optional display adapter with Unix epoch seconds as it
 
 Gregorian chart labels automatically adapt to the current exact span and drawable pixel width, with separate ruler/event precision and a shared date/zone caption. Full timestamps remain in tooltips and editing fields. Turn off **Abbreviate chart labels** to retain full chart labels. Every printer/parser receives optional viewport context; custom source can use `api.viewSpan()`, `api.viewWidth()`, `api.unitsPerPixel()` and `api.purpose()` without exposing browser globals. See [viewport context and helper examples](docs/time-presentation.md#viewport-context).
 
-Ruler marks are anchored to exact values: they move when panning and reveal finer subdivisions when zooming. Numeric rulers divide by ten; Gregorian rulers use actual clock/calendar boundaries, Monday weeks, variable months and leap years. **Time display → Ruler graduation** also accepts a saved list of custom exact steps. Planning enumerates only visible marks, with a bounded tick count at arbitrary rational scales. See [graduations and breakpoints](docs/time-presentation.md#ruler-graduations-and-breakpoints).
+Ruler marks are anchored to exact values: they move when panning and reveal finer subdivisions when zooming. Graduations fade with zoom depth instead of switching abruptly; labels and guide lines smoothly become subdivisions. Visibility freezes when zooming stops and reverses when zooming reverses. Numeric rulers divide by ten; Gregorian rulers use actual clock/calendar boundaries, Monday weeks, variable months and leap years. **Time display → Ruler graduation** also accepts a saved list of custom exact steps. Planning enumerates only visible marks, with a bounded tick count at arbitrary rational scales. See [graduations and breakpoints](docs/time-presentation.md#ruler-graduations-and-breakpoints).
 
 ## Tests and GitHub CI
 
@@ -132,6 +153,9 @@ npm run test:offline:browser
 cargo test --manifest-path native-store/Cargo.toml --locked
 # Dedicated PostgreSQL test database with real pgmp installed:
 DATABASE_URL='postgresql://...' node test/sql-oracle.mjs
+cargo build --manifest-path native-store/Cargo.toml --release --locked --bin och-convert
+node test/files.mjs
+cargo test --manifest-path src-tauri/Cargo.toml --locked
 DATABASE_URL='postgresql://...' npm run test:postgres
 ```
 
@@ -139,8 +163,8 @@ The [GitHub workflow](.github/workflows/ci.yml) runs Node 22/24 tests, Chromium/
 
 This directory is self-contained and can be the root of its own GitHub repository. The two independent rational libraries are pinned under `vendor/`; no build depends on adjacent checkouts. [vendor/versions.json](vendor/versions.json) records their source commits. Their independent upstream CI and the separate `rational-conformance` project remain responsible for library-level conformance. This app adds timeline-level tests.
 
-Local verification during implementation passed the core and HTTP tests, 85 PostgreSQL oracle cases against native pgmp, SQLite persistence tests, TypeScript checking, and a built Linux desktop Debian package (debug profile). The restricted development sandbox prevented browser launch and network listeners, so browser interactions and the complete PostgreSQL HTTP integration suite still need their first hosted CI run. Docker recipes have been prepared, but container image builds have not been run in that sandbox.
+Local verification passed 48 JavaScript cases on Node 22 and 24, nine native tests, real SQLite converter/HTTP-boundary checks, 85 PostgreSQL oracle cases against native pgmp, TypeScript checking, workflow linting, and an updated Linux desktop Debian package (debug profile). The restricted development sandbox prevented browser launch and network listeners, so browser interactions and the complete PostgreSQL HTTP integration suite still need their first hosted CI run. Docker recipes have been prepared, but container image builds have not been run in that sandbox.
 
-Passwords use salted scrypt, sessions use hashed random tokens and HTTP-only cookies, authenticated writes require CSRF tokens, and ACLs are enforced on the server. This initial account system has no password recovery, email verification, or MFA. Registration is open. Put public deployments behind HTTPS and configure deployment-specific signup/rate policies before inviting a wider audience. Sign-in throttling currently keys on the direct peer address, so a reverse proxy shares that limit across clients unless adapted for your trusted proxy configuration.
+Username/password and Google, GitHub and Facebook accounts use server-enforced permissions, expiring/revocable sessions and CSRF protection. Provider secrets stay on the server, desktop credentials stay in native memory, and provider identities are linked explicitly. Configure `APP_ORIGIN=https://timescale.info` and the provider app registrations/environment variables before enabling public sign-in. See [authentication and deployment](docs/authentication.md) for callback URLs, session policies and trusted-proxy settings.
 
 Licensed under MIT. See [third-party notices](THIRD_PARTY.md).

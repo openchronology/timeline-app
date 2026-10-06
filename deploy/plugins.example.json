@@ -1,0 +1,10 @@
+[
+  {
+    "apiVersion": 1,
+    "id": "moment-location",
+    "version": 1,
+    "name": "Moment location",
+    "description": "Add a location text field to selected moment details.",
+    "fields": [{ "kind": "text", "metadataKey": "location", "label": "Location" }]
+  }
+]

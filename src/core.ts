@@ -1,4 +1,8 @@
 import { Rational as Q, RationalMap } from 'rational-ordered-map';
+import { validateInstalledPlugins, validateStackMetadata } from './plugins.js';
+import type { InstalledPlugin } from './plugins.js';
+export * from './plugins.js';
+export { stackWindow } from './stack-layout.js';
 import { parseTimestamp } from './calendar.js';
 import { validatePresentation } from './presentation.js';
 import type { TimePresentation } from './presentation.js';
@@ -30,6 +34,7 @@ export interface TimelineDocument {
   title: string;
   description: string;
   presentation?: TimePresentation;
+  plugins?: InstalledPlugin[];
   events: PointEvent[];
 }
 export interface FrameGroup {
@@ -39,6 +44,7 @@ export interface FrameGroup {
   distinct: number;
   title?: string;
   id?: string;
+  metadata?: Metadata;
 }
 export interface Frame {
   groups: FrameGroup[];
@@ -64,6 +70,7 @@ export function validateDocument(value: unknown): TimelineDocument {
   if (!Array.isArray(doc.events) || doc.events.length > 200000)
     throw new Error('Expected at most 200,000 point events.');
   const ids = new Set<string>();
+  const plugins = doc.plugins === undefined ? undefined : validateInstalledPlugins(doc.plugins);
   const events = doc.events.map((raw: unknown): PointEvent => {
     if (!raw || typeof raw !== 'object') throw new Error('Invalid event.');
     const e = raw as Record<string, unknown>;
@@ -75,6 +82,7 @@ export function validateDocument(value: unknown): TimelineDocument {
     if (!e.metadata || typeof e.metadata !== 'object' || Array.isArray(e.metadata))
       throw new Error('Event metadata must be a JSON object.');
     const metadata = JSON.parse(JSON.stringify(e.metadata)) as Metadata;
+    validateStackMetadata(metadata, plugins);
     for (const field of ['title', 'description']) {
       if (metadata[field] !== undefined && typeof metadata[field] !== 'string')
         throw new Error(`Event ${field} must be text.`);
@@ -89,6 +97,7 @@ export function validateDocument(value: unknown): TimelineDocument {
     ...(doc.presentation === undefined
       ? {}
       : { presentation: validatePresentation(doc.presentation) }),
+    ...(plugins === undefined ? {} : { plugins }),
     events,
   };
 }
@@ -98,12 +107,15 @@ export class TimelineIndex {
   title: string;
   description: string;
   presentation?: TimePresentation;
+  plugins?: InstalledPlugin[];
   constructor(document: TimelineDocument) {
     this.title = document.title;
     this.description = document.description;
     this.presentation = document.presentation
       ? validatePresentation(document.presentation)
       : undefined;
+    this.plugins =
+      document.plugins === undefined ? undefined : validateInstalledPlugins(document.plugins);
     // Bulk-load coincident events once; copying/sorting a growing bucket per event is quadratic.
     const buckets = new Map<string, PointEvent[]>();
     for (const event of document.events) {
@@ -155,6 +167,7 @@ export class TimelineIndex {
       title: this.title,
       description: this.description,
       ...(this.presentation ? { presentation: this.presentation } : {}),
+      ...(this.plugins === undefined ? {} : { plugins: this.plugins }),
       events: [...this.points].flatMap(([, bucket]) => [...bucket]),
     };
   }
@@ -176,7 +189,7 @@ export class TimelineIndex {
           last: group.lastTime.toString(),
           count: group.entryCount.toString(),
           distinct: group.distinctCount,
-          ...(only ? { id: only.id, title: only.metadata.title ?? 'Untitled event' } : {}),
+          ...(only ? { id: only.id, title: only.metadata.title ?? '' } : {}),
         };
       }),
     };

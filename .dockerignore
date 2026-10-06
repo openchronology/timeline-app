@@ -7,5 +7,10 @@ dist
 **/.github
 artifacts
 .env
-*.octimeline.sqlite*
+.env.*
+*.och
+*.och-journal
+*.och-wal
+*.och-shm
+*.sqlite
 upstream

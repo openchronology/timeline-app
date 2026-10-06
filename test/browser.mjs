@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { checkWheelPrecision } from './viewport-browser.mjs';
 import { checkPresentation } from './presentation-browser.mjs';
 import { checkRuler } from './ruler-browser.mjs';
+import { checkSelection } from './selection-browser.mjs';
+import { checkLabelMotion } from './label-motion-browser.mjs';
+import { checkPlugins } from './plugins-browser.mjs';
+import { checkAccounts } from './accounts-browser.mjs';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium, firefox, webkit } from 'playwright';
@@ -56,18 +60,23 @@ const span = async () =>
   );
 try {
   await page.goto('http://localhost:5173/');
+  assert.equal(await page.locator('#calendar-mode').count(), 0);
   await poll(async () => (await markers.count()) > 0);
   assert.match(await input('event-count').textContent(), /10 events/);
   await page.locator('.event-marker:not(.group)').first().click();
   await input('event-title').fill('A renamed moment');
-  await input('event-save').click();
+  await page.waitForFunction(() =>
+    document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+  );
   assert.equal(await input('event-title').inputValue(), 'A renamed moment');
   await input('undo-button').click();
   assert(!(await page.getByRole('button', { name: 'A renamed moment', exact: true }).count()));
   await input('add-button').click();
   await input('event-title').fill('A new exact event');
   await input('event-time').fill('-17/23');
-  await input('event-save').click();
+  await page.waitForFunction(() =>
+    document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+  );
   assert.match(await input('event-count').textContent(), /11 events/);
   await input('undo-button').click();
   const stage = input('timeline-stage'),
@@ -124,11 +133,14 @@ try {
   const downloadPromise = page.waitForEvent('download');
   await input('export-button').click();
   const download = await downloadPromise;
-  assert.match(download.suggestedFilename(), /\.octimeline\.json$/);
+  assert.match(download.suggestedFilename(), /\.ochx$/);
   const exported = validateDocument(JSON.parse(await readFile(await download.path(), 'utf8')));
   assert.deepEqual(exported, document);
   await checkPresentation(page, document);
   await checkRuler(page, document);
+  await checkSelection(page, document);
+  await checkLabelMotion(page, document);
+  await checkPlugins(page, document);
 
   // Real multitouch through Chromium's input protocol; the rational gesture math is also unit tested.
   if (engine === 'chromium') {
@@ -173,6 +185,7 @@ try {
   await mkdir('artifacts', { recursive: true });
   await page.screenshot({ path: `artifacts/timeline-${engine}.png`, fullPage: true });
   assert.deepEqual(errors, []);
+  await checkAccounts(browser);
   console.log(
     `PASS ${engine}: editing, pan/zoom, dense summaries, exact JSON, draft persistence${engine === 'chromium' ? ', touch pan/pinch/tap' : ''}.`,
   );

@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { checkWheelPrecision } from './viewport-browser.mjs';
 import { checkPresentation } from './presentation-browser.mjs';
 import { checkRuler } from './ruler-browser.mjs';
+import { checkSelection } from './selection-browser.mjs';
+import { checkLabelMotion } from './label-motion-browser.mjs';
+import { checkPlugins } from './plugins-browser.mjs';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -65,6 +68,7 @@ const poll = async (predicate) => {
 try {
   // The fragment deliberately resembles a server link; the standalone file must ignore it.
   await page.goto(url + '#timeline/00000000-0000-0000-0000-000000000001');
+  assert.equal(await page.locator('#calendar-mode').count(), 0);
   await poll(async () => (await input('storage-badge').textContent()) === 'Offline HTML');
   assert.match(await input('event-count').textContent(), /0 events/);
   for (const id of [
@@ -73,14 +77,19 @@ try {
     'share-button',
     'sqlite-open',
     'sqlite-save',
+    'server-button',
+    'och-import',
+    'och-export',
   ])
     assert(await input(id).isHidden());
   await input('add-button').click();
   await input('event-title').fill('An exact offline moment');
   await input('event-time').fill('1/3');
-  await input('event-save').click();
+  await page.waitForFunction(() =>
+    document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+  );
   assert.match(await input('event-count').textContent(), /1 events/);
-  assert.equal(await input('event-time').inputValue(), '1/3');
+  assert.equal(await input('event-exact').inputValue(), '1/3');
   await input('fit-button').click();
   await poll(async () => (await markers.count()) === 1);
   const box = await input('timeline-stage').boundingBox(),
@@ -133,7 +142,7 @@ try {
   assert.equal(await page.locator('img').count(), 0);
   await markers.first().click();
   await poll(() => input('event-form').isVisible());
-  assert.equal(await input('event-time').inputValue(), document.events[0].time);
+  assert.equal(await input('event-exact').inputValue(), document.events[0].time);
   const downloading = page.waitForEvent('download');
   await input('export-button').click();
   const download = await downloading;
@@ -144,6 +153,9 @@ try {
   );
   await checkPresentation(page, document);
   await checkRuler(page, document);
+  await checkSelection(page, document);
+  await checkLabelMotion(page, document);
+  await checkPlugins(page, document, true);
   await input('dense-demo').click();
   await poll(async () => (await input('event-count').textContent()).includes('20,010'));
   const group = markers.filter({ hasText: '20k' });

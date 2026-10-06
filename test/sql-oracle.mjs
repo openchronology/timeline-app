@@ -12,6 +12,8 @@ import {
   validateDocument,
   DEFAULT_PRESENTATION,
   CUSTOM_EXAMPLE,
+  MOMENT_ICONS,
+  MOMENT_STACKS,
 } from '../dist/core.mjs';
 import { indexedNodes } from '../server/tree.mjs';
 const value = (s) => (s === null ? 'NULL' : "'" + String(s).replaceAll("'", "''") + "'");
@@ -36,10 +38,26 @@ for (let i = 0; i < 12; i++)
     time: Q.from(offset * scale + BigInt(i), scale).toString(),
     metadata: { title: `Huge ${i}` },
   });
+events[0].metadata.iconUrl = 'https://images.example/icon.png';
+events[0].metadata.stack = [
+  {
+    id: 'first',
+    metadata: {
+      title: 'First child',
+      description: 'Notes',
+      iconUrl: 'https://images.example/child.png',
+    },
+  },
+  { id: 'second', metadata: { title: 'Second child', extra: { enabled: true } } },
+];
 const document = validateDocument({
     format: 'openchronology',
     version: 1,
     title: 'SQL oracle',
+    plugins: [
+      { manifest: MOMENT_ICONS, enabled: true },
+      { manifest: MOMENT_STACKS, enabled: true },
+    ],
     description: '',
     presentation: {
       ...DEFAULT_PRESENTATION,
@@ -58,9 +76,10 @@ const owner = randomUUID(),
     await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'),
     // Upgrade a version-1 installation without the settings column inside this rolled-back test transaction.
     'ALTER TABLE oc_timelines DROP COLUMN presentation;',
+    'ALTER TABLE oc_timelines DROP COLUMN plugins;',
     await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'),
     `INSERT INTO oc_users(id,username,password_hash) VALUES(${value(owner)},'sql-oracle','unused');`,
-    `INSERT INTO oc_timelines(id,owner_id,title,root,event_count,presentation) VALUES(${value(id)},${value(owner)},'Oracle',${tree.root},${tree.count},${value(JSON.stringify(document.presentation))}::jsonb);`,
+    `INSERT INTO oc_timelines(id,owner_id,title,root,event_count,presentation,plugins) VALUES(${value(id)},${value(owner)},'Oracle',${tree.root},${tree.count},${value(JSON.stringify(document.presentation))}::jsonb,${value(JSON.stringify(document.plugins))}::jsonb);`,
   ];
 for (const n of tree.nodes)
   sql.push(
@@ -140,9 +159,10 @@ for (let start = 0; start < dense.nodes.length; start += 250)
       ';',
   );
 sql.push(
-  `COPY (SELECT jsonb_build_object('groups',(SELECT jsonb_agg(answer ORDER BY id) FROM oracle_results),'dense',(SELECT jsonb_agg(to_jsonb(g)) FROM oc_overview(${value(denseId)},'0'::mpq,'1'::mpq,'1'::mpq) g),'page',(SELECT jsonb_agg(e) FROM oc_events(${value(id)},'1/2'::mpq,'1/2'::mpq,NULL,NULL,1) e),'after',(SELECT jsonb_agg(e) FROM oc_events(${value(id)},'1/2'::mpq,'1/2'::mpq,'1/2'::mpq,'same-a',1) e))) TO ${value(answers)};`,
+  `COPY (SELECT jsonb_build_object('pluginFrame',(SELECT to_jsonb(g) FROM oc_overview_v2(${value(id)},${value(events[0].time)}::mpq,${value(events[0].time)}::mpq,'0'::mpq) g LIMIT 1),'coincidentFrame',(SELECT to_jsonb(g) FROM oc_overview_v2(${value(id)},'1/2'::mpq,'1/2'::mpq,'0'::mpq) g LIMIT 1),'groups',(SELECT jsonb_agg(answer ORDER BY id) FROM oracle_results),'dense',(SELECT jsonb_agg(to_jsonb(g)) FROM oc_overview(${value(denseId)},'0'::mpq,'1'::mpq,'1'::mpq) g),'page',(SELECT jsonb_agg(e) FROM oc_events(${value(id)},'1/2'::mpq,'1/2'::mpq,NULL,NULL,1) e),'after',(SELECT jsonb_agg(e) FROM oc_events(${value(id)},'1/2'::mpq,'1/2'::mpq,'1/2'::mpq,'same-a',1) e))) TO ${value(answers)};`,
   // Hex avoids COPY's text escaping of quotes/backslashes in custom formatter source.
   `COPY (SELECT encode(convert_to(presentation::text,'UTF8'),'hex') FROM oc_timelines WHERE id=${value(id)}) TO ${value(join(directory, 'settings.hex'))};`,
+  `COPY (SELECT encode(convert_to(plugins::text,'UTF8'),'hex') FROM oc_timelines WHERE id=${value(id)}) TO ${value(join(directory, 'plugins.hex'))};`,
   'ROLLBACK;',
 );
 const dataIndex = process.argv.indexOf('--pg-data'),
@@ -175,6 +195,18 @@ const settings = JSON.parse(
   ),
 );
 assert.deepEqual(settings, document.presentation);
+assert.deepEqual(
+  JSON.parse(
+    Buffer.from((await readFile(join(directory, 'plugins.hex'), 'utf8')).trim(), 'hex').toString(
+      'utf8',
+    ),
+  ),
+  document.plugins,
+);
+assert.equal(actual.pluginFrame.metadata.iconUrl, events[0].metadata.iconUrl);
+assert.deepEqual(actual.pluginFrame.metadata.stack, events[0].metadata.stack);
+assert.equal(actual.pluginFrame.event_id, events[0].id);
+assert.equal(actual.coincidentFrame.metadata, null);
 assert.deepEqual(actual.groups, expected);
 assert.equal(actual.dense.length, 1);
 assert.equal(actual.dense[0].event_count, '5000');

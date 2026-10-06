@@ -2,7 +2,7 @@
 
 The browser model is `RationalMap<readonly PointEvent[]>`, weighted by bucket size. An auxiliary ID map locates edits without searching the time domain. Different events can occupy the same rational coordinate. IDs are unique ASCII strings of 1–128 characters from `[A-Za-z0-9_.:-]`; this preserves identical event ordering across JavaScript, PostgreSQL's C collation, and SQLite.
 
-## JSON exchange version 1
+## JSON exchange version 1 (.ochx)
 
 ```json
 {
@@ -31,7 +31,7 @@ The optional version-1 `presentation` field belongs to the document and defines 
 
 Presentation context is ephemeral: exact left/span, drawable CSS pixel width, and axis/event/input/tooltip purpose accompany printer and parser calls. Gregorian chart labels suppress common larger fields and subpixel detail, with a shared calendar caption; inputs/tooltips retain the exact full timestamp. Custom scripts access only whitelisted context helpers. None of these abbreviations alter ordered-set comparisons, saved times, or grouping thresholds.
 
-Ruler planning is separate from printing: each presenter provides an exact, value-anchored visible tick plan. Decimal levels subdivide by ten. Civil Gregorian levels align fixed-offset clock fields, Monday weeks, true months/quarters and January 1 year boundaries using BigInt calendar arithmetic. Optional saved `ruler` policies select decimal/calendar graduation or a validated ladder of exact steps. Custom scripts keep their existing restricted print/parse API; their graduation policies are data. Planning starts directly at the visible left boundary and retains no navigation history, with a maximum of 512 ticks. Only relative tick screen positions become floating point numbers. Parent and child marks share positions through exact deduplication, and labels receive the selected level's nominal interval to choose their detail.
+Ruler planning is separate from printing: each presenter provides an exact, value-anchored visible tick plan. Decimal levels subdivide by ten. Civil Gregorian levels align fixed-offset clock fields, Monday weeks, true months/quarters and January 1 year boundaries using BigInt calendar arithmetic. Optional saved `ruler` policies select decimal/calendar graduation or a validated ladder of exact steps. Custom scripts keep their existing restricted print/parse API; their graduation policies are data. Planning starts directly at the visible left boundary and retains no navigation history, with a maximum of 512 ticks. Only relative tick screen positions and normalized spatial fade weights become floating point numbers. Adjacent graduation plans crossfade as zoom depth approaches a breakpoint, with independent subdivision/boundary fades and no time-driven animation. Parent and child marks share positions through exact deduplication, and labels receive the selected level's nominal interval to choose their detail.
 
 Visible bounds are **closed**: `[left, right]`. If the drawable viewport width is `W` and the user selects a grouping distance `P` pixels, the rational threshold is `(right - left) * P / W`. Measured screen coordinates are quantized to 1/1024 pixel before entering rational arithmetic. This quantizes the gesture measurement rather than the time domain.
 
@@ -49,7 +49,7 @@ SQL operations are `oc_overview(timeline_uuid, lower_mpq, upper_mpq, threshold_m
 
 ## HTTP operations
 
-All paths start with `/api/`. Request and response bodies are JSON. Authenticated mutation requests include `X-CSRF-Token` from `/session` or the sign-in response; the session cookie is HTTP-only.
+All paths start with `/api/`. Request and response bodies are JSON except SQLite uploads/downloads. Authenticated mutation requests include `X-CSRF-Token` from `/session` or the sign-in response; the session cookie is HTTP-only.
 
 | Method and path                           | Operation                                            |
 | ----------------------------------------- | ---------------------------------------------------- |
@@ -75,4 +75,26 @@ Read-only server views order their returned summaries in rational-map, then fetc
 
 The Rust `native-store` crate links the independently vendored sqlite-rational C extension and dynamically links system SQLite/GMP. It registers the extension on every connection; application users cannot load arbitrary extension paths. `trusted_schema=OFF` and parameterized queries apply to opened files.
 
-`timeline_meta` contains title/description; `events` contains canonical rational coordinates and JSON metadata; `points` is the persistent augmented coordinate index. Application ID/version identify the file. A failed snapshot write rolls back. Native file paths only enter through Tauri dialogs, and the packaged desktop has no account/server network dependency.
+`timeline_meta` contains title/description; `events` contains canonical rational coordinates and JSON metadata; `points` is the persistent augmented coordinate index. Application ID/version identify the file. A failed snapshot write rolls back. Native file paths only enter through Tauri dialogs, and local editing has no account/server network dependency. The connected desktop transports cloud operations through a native HTTPS client; the webview has no direct network capability. See [authentication](authentication.md).
+
+## SQLite exchange (.och)
+
+`.och` files use SQLite's native file format, application ID `1329812556` and schema version 1. The extension is distinct from `.ochx` JSON. Existing native `.sqlite` files can still be opened through desktop dialogs; new saves default to `.och`.
+
+`POST /files/import` accepts `application/vnd.openchronology.sqlite` (or octet-stream), requires a signed-in CSRF-protected session and returns `{document}`. `POST /files/export` accepts a validated exchange document and returns a SQLite attachment. `GET /timelines/:id/file` exports a snapshot under the same private/public ACL as ordinary viewing. The browser does not parse SQLite, and import does not create a server timeline until the user saves it.
+
+The Node server invokes `och-convert` in a separate process, built from the same `native-store` and sqlite-rational sources as desktop persistence. Compose installs it automatically; other deployments build it with `cargo build --manifest-path native-store/Cargo.toml --release --locked --bin och-convert` or set `OCH_CONVERTER` to an installed executable. An unavailable converter hides file-exchange controls and returns HTTP 503 for conversion. Temporary directories are private and removed after success or failure. Conversion concurrency is limited to two jobs per server process, input/output to 32 MiB, elapsed time to twenty seconds and SQLite work to twenty million instructions. On Linux the child also limits address space to 512 MiB, CPU time to twenty seconds and file output to 32 MiB. Unknown formats, corrupt files, invalid presentation/rationals, executable views in timeline table positions and oversized files are rejected. Normal native-store editing has no converter-specific instruction/memory budget.
+
+## Authentication operations
+
+| Method and path                | Operation                                                                                      |
+| ------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `POST /auth/:provider/start`   | Begin configured Google/GitHub/Facebook sign-in, or `{link:true}` for explicit account linking |
+| `GET /auth/:provider/callback` | Complete a browser-bound one-use provider flow, then redirect locally                          |
+| `POST /auth/device/start`      | Native client obtains secret, visible user code and verification URL                           |
+| `POST /auth/device/approve`    | Authenticated web user approves `{userCode}` with CSRF                                         |
+| `POST /auth/device/poll`       | Native secret polls once per three seconds; approval yields native bearer session              |
+| `GET /auth/account`            | Linked providers and active sessions                                                           |
+| `POST /auth/revoke-others`     | CSRF-protected revocation of all other sessions                                                |
+
+`GET /session` also returns enabled `providers` and a `fileExchange` capability. Before anonymous password/provider sign-in, it issues a short-lived HTTP-only login nonce and returns its CSRF counterpart. See [authentication and operator configuration](authentication.md) for identity verification, expiry, HTTPS and proxy settings.

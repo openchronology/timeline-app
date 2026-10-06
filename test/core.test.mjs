@@ -12,6 +12,24 @@ import {
   wheelZoomFactor,
 } from '../dist/core.mjs';
 import { indexedNodes } from '../server/tree.mjs';
+test('unnamed and blank-named moments stay unnamed in timeline frames', () => {
+  const doc = validateDocument({
+    format: 'openchronology',
+    version: 1,
+    title: 'Optional names',
+    description: '',
+    events: [
+      { id: 'missing', time: '0/1', metadata: { description: 'Notes without a title' } },
+      { id: 'blank', time: '10/1', metadata: { title: '' } },
+    ],
+  });
+  const index = new TimelineIndex(doc);
+  assert.deepEqual(
+    index.frame(new Viewport(Q.parse('-1'), Q.parse('12')), 1000, 1).groups.map((g) => g.title),
+    ['', ''],
+  );
+  assert.equal(index.byId.size, 2);
+});
 
 test('JSON round trips canonical exact times and keeps coincident events', () => {
   const document = validateDocument({

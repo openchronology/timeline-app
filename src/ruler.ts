@@ -14,6 +14,12 @@ export interface RulerTick {
   label: boolean;
   /** Interval used to choose the detail in this tick's label. */
   interval: Q;
+  /** Spatial alpha weights; recomputed from zoom, never elapsed time. */
+  opacity: number;
+  majorOpacity: number;
+  boundaryOpacity: number;
+  labelOpacity: number;
+  labels: { interval: Q; opacity: number }[];
 }
 export interface RulerPlan {
   ticks: RulerTick[];
@@ -141,28 +147,38 @@ function calendarLevels(target: Q): Level[] {
   return levels;
 }
 
-/** All coordinates are exact. Work is bounded by visible graduations, not elapsed time. */
-export function planRuler(
+interface LevelPlan extends RulerPlan {
+  previous: Q;
+  major: Q;
+  next: Q;
+}
+const smooth = (value: number) => {
+  const t = Math.max(0, Math.min(1, value));
+  return t * t * (3 - 2 * t);
+};
+// Only bounded, dimensionless ratios become numbers. Absolute time stays rational.
+function fade(value: Q, start: Q, finish: Q): number {
+  if (value.compare(start) <= 0) return 0;
+  if (value.compare(finish) >= 0) return 1;
+  return smooth(value.sub(start).div(finish.sub(start)).toApproximateNumber());
+}
+function planLevel(
   context: PresentationContext,
-  policy: RulerPolicy = { kind: 'decimal' },
-  offsetMinutes = 0,
-): RulerPlan {
-  validateContext(context);
-  const checked = validateRulerPolicy(policy);
-  if (!Number.isInteger(offsetMinutes) || Math.abs(offsetMinutes) > 1439)
-    throw new Error('Invalid ruler timezone offset.');
-  const pixel = unitsPerPixel(context);
-  // Keep even unusually wide viewports within a fixed DOM/work budget.
-  const majorTarget = pixel.mul(
-    Q.parseDecimal(
-      Math.max(checked.kind === 'gregorian' ? 70 : 90, context.widthPixels / 32).toString(),
-    ),
-  );
-  const minorTarget = pixel.mul(Q.parseDecimal(Math.max(9, context.widthPixels / 384).toString()));
-  let major: Level, minor: Level | undefined, boundary: Level | undefined;
+  checked: RulerPolicy,
+  offsetMinutes: number,
+  majorTarget: Q,
+  minorTarget: Q,
+): LevelPlan {
+  let major: Level, minor: Level | undefined;
+  let previous: Q,
+    next: Q,
+    minors: Level[] = [],
+    boundaries: Level[] = [];
   if (checked.kind === 'decimal') {
     major = decimalLevel(majorTarget);
     minor = fixed(major.step!.div(Q.from(10n)));
+    previous = minor.nominal;
+    next = major.nominal.mul(Q.from(10n));
   } else {
     const levels =
       checked.kind === 'gregorian'
@@ -178,6 +194,15 @@ export function planRuler(
     } else {
       major = levels[index];
       minor = levels[index - 1];
+    }
+    previous = major.nominal.div(Q.from(10n));
+    next = major.nominal.mul(Q.from(10n));
+    if (
+      index >= 0 &&
+      !(checked.kind === 'steps' && index === 0 && !major.nominal.equals(levels[0].nominal))
+    ) {
+      previous = levels[index - 1]?.nominal ?? previous;
+      next = levels[index + 1]?.nominal ?? next;
     }
     if (checked.kind === 'gregorian') {
       if (major.step && major.step.compare(Q.from(10n)) <= 0) {
@@ -195,35 +220,124 @@ export function planRuler(
               ) && fits(level),
           ) ?? levels.find(fits);
       }
-      // Only meaningful parents that fit the window get an extra boundary mark.
-      boundary = levels.find(
+      // Coarser subdivisions already exist while the finest one fades away.
+      // This keeps irregular week/month boundaries stable as density changes.
+      if (minor)
+        minors = levels.filter(
+          (level) =>
+            level.nominal.compare(minor!.nominal) >= 0 && level.nominal.compare(major.nominal) < 0,
+        );
+      boundaries = levels.filter(
         (level) =>
           ['minute', 'hour', 'day', 'month', 'year'].includes(level.name) &&
           level.nominal.compare(major.nominal) > 0 &&
-          level.nominal.compare(context.span) <= 0,
+          level.nominal.compare(context.span.mul(Q.from(2n))) <= 0,
       );
     }
   }
   const shift = checked.kind === 'gregorian' ? Q.from(BigInt(offsetMinutes) * 60n) : Q.zero;
   const localContext = { ...context, left: context.left.add(shift) };
   const ticks = new Map<string, RulerTick>();
-  const insert = (level: Level, weight: RulerTick['level'], label: boolean) => {
+  const insert = (level: Level, weight: RulerTick['level'], label: boolean, opacity: number) => {
+    if (opacity === 0) return;
     for (const localTime of bounds(localContext, level)) {
-      const time = localTime.sub(shift);
-      const existing = ticks.get(time.toString());
-      // A calendar boundary may fall between regular week/hour marks.
-      ticks.set(time.toString(), {
+      const time = localTime.sub(shift),
+        key = time.toString();
+      const existing = ticks.get(key);
+      ticks.set(key, {
         time,
         level: weight,
         label: label || existing?.label === true,
         interval: existing?.label ? existing.interval : level.nominal,
+        opacity: Math.max(opacity, existing?.opacity ?? 0),
+        majorOpacity: Math.max(weight !== 'minor' ? opacity : 0, existing?.majorOpacity ?? 0),
+        boundaryOpacity: Math.max(
+          weight === 'boundary' ? opacity : 0,
+          existing?.boundaryOpacity ?? 0,
+        ),
+        labelOpacity: label ? opacity : (existing?.labelOpacity ?? 0),
+        labels: label ? [{ interval: level.nominal, opacity }] : (existing?.labels ?? []),
       });
     }
   };
-  if (minor && minor.nominal.compare(minorTarget) >= 0) insert(minor, 'minor', false);
-  insert(major, 'major', true);
-  if (boundary) insert(boundary, 'boundary', false);
+  for (const subdivision of minors.length ? minors : minor ? [minor] : []) {
+    insert(
+      subdivision,
+      'minor',
+      false,
+      fade(subdivision.nominal, minorTarget, minorTarget.mul(Q.from(2n))),
+    );
+  }
+  insert(major, 'major', true, 1);
+  for (const boundary of boundaries)
+    insert(
+      boundary,
+      'boundary',
+      false,
+      fade(context.span, boundary.nominal.div(Q.from(2n)), boundary.nominal),
+    );
   const sorted = [...ticks.values()].sort((a, b) => a.time.compare(b.time));
   if (sorted.length > MAX_TICKS) throw new Error('Ruler exceeds its visible tick budget.');
-  return { ticks: sorted, graduation: major.name };
+  return { ticks: sorted, graduation: major.name, previous, major: major.nominal, next };
+}
+
+/** Exact anchored geometry with spatial crossfades between neighboring levels. */
+export function planRuler(
+  context: PresentationContext,
+  policy: RulerPolicy = { kind: 'decimal' },
+  offsetMinutes = 0,
+): RulerPlan {
+  validateContext(context);
+  const checked = validateRulerPolicy(policy);
+  if (!Number.isInteger(offsetMinutes) || Math.abs(offsetMinutes) > 1439)
+    throw new Error('Invalid ruler timezone offset.');
+  const pixel = unitsPerPixel(context);
+  const majorTarget = pixel.mul(
+    Q.parseDecimal(
+      Math.max(checked.kind === 'gregorian' ? 70 : 90, context.widthPixels / 32).toString(),
+    ),
+  );
+  // Reserve room for both spatial layers, including non-nested calendar marks.
+  const minorTarget = pixel.mul(Q.parseDecimal(Math.max(9, context.widthPixels / 192).toString()));
+  const fine = planLevel(context, checked, offsetMinutes, majorTarget, minorTarget);
+  const start =
+    fine.previous.compare(fine.major.div(Q.from(2n))) > 0
+      ? fine.previous
+      : fine.major.div(Q.from(2n));
+  const blend = fade(majorTarget, start, fine.major);
+  const layers: [LevelPlan, number][] = [[fine, 1 - blend]];
+  if (blend > 0)
+    layers.push([planLevel(context, checked, offsetMinutes, fine.next, minorTarget), blend]);
+  const merged = new Map<string, RulerTick>();
+  for (const [plan, alpha] of layers) {
+    if (alpha === 0) continue;
+    for (const tick of plan.ticks) {
+      const key = tick.time.toString(),
+        existing = merged.get(key);
+      if (!existing)
+        merged.set(key, {
+          ...tick,
+          opacity: tick.opacity * alpha,
+          majorOpacity: tick.majorOpacity * alpha,
+          boundaryOpacity: tick.boundaryOpacity * alpha,
+          labelOpacity: tick.labelOpacity * alpha,
+          labels: tick.labels.map((label) => ({ ...label, opacity: label.opacity * alpha })),
+        });
+      else {
+        existing.opacity += tick.opacity * alpha;
+        existing.majorOpacity += tick.majorOpacity * alpha;
+        existing.boundaryOpacity += tick.boundaryOpacity * alpha;
+        existing.labelOpacity += tick.labelOpacity * alpha;
+        existing.labels.push(
+          ...tick.labels.map((label) => ({ ...label, opacity: label.opacity * alpha })),
+        );
+        existing.label ||= tick.label;
+        if (tick.level === 'boundary' || (tick.level === 'major' && existing.level === 'minor'))
+          existing.level = tick.level;
+      }
+    }
+  }
+  const ticks = [...merged.values()].sort((a, b) => a.time.compare(b.time));
+  if (ticks.length > MAX_TICKS) throw new Error('Ruler exceeds its visible tick budget.');
+  return { ticks, graduation: fine.graduation };
 }

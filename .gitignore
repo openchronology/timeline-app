@@ -6,6 +6,9 @@ target/
 artifacts/
 upstream/
 .env
-*.octimeline.sqlite
-*.octimeline.sqlite-journal
+*.och
+*.och-journal
+*.och-wal
+*.och-shm
+*.sqlite
 src-tauri/gen/

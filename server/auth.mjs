@@ -8,17 +8,38 @@ import {
 import { promisify } from 'node:util';
 import { HttpError } from './store.mjs';
 const scrypt = promisify(scryptCallback);
+let passwordWork = 0;
+async function derive(password, salt, version) {
+  if (passwordWork >= 2) throw new HttpError(503, 'Sign-in is busy. Try again shortly.');
+  passwordWork++;
+  try {
+    return await scrypt(password, salt, 64, {
+      N: version === '2' ? 131072 : 16384,
+      r: 8,
+      p: 1,
+      maxmem: 256 * 1024 * 1024,
+    });
+  } finally {
+    passwordWork--;
+  }
+}
 export const tokenHash = (token) => createHash('sha256').update(token).digest('hex');
 export async function passwordHash(password) {
   const salt = randomBytes(16).toString('hex');
-  return `scrypt:1:${salt}:${(await scrypt(password, salt, 64)).toString('hex')}`;
+  return `scrypt:2:${salt}:${(await derive(password, salt, '2')).toString('hex')}`;
 }
 export async function passwordMatches(password, hash) {
   if (typeof hash !== 'string') return false;
   const [algorithm, version, salt, encoded] = hash.split(':');
-  if (algorithm !== 'scrypt' || version !== '1') return false;
+  if (
+    algorithm !== 'scrypt' ||
+    !['1', '2'].includes(version) ||
+    !/^[a-f0-9]{32}$/.test(salt ?? '') ||
+    !/^[a-f0-9]{128}$/.test(encoded ?? '')
+  )
+    return false;
   const expected = Buffer.from(encoded, 'hex'),
-    actual = await scrypt(password, salt, 64);
+    actual = await derive(password, salt, version);
   return expected.length === actual.length && timingSafeEqual(actual, expected);
 }
 export class Auth {
@@ -45,11 +66,19 @@ export class Auth {
       `SELECT s.csrf,s.token_hash,s.kind,s.created_at,u.id,u.username FROM oc_sessions s JOIN oc_users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.kind=$2 AND s.expires_at>now() AND s.last_seen_at>now()-interval '1 day'`,
       [tokenHash(token), bearer ? 'desktop' : 'web'],
     );
-    if (rows[0]) await this.pool.query("UPDATE oc_sessions SET last_seen_at=now() WHERE token_hash=$1 AND last_seen_at<now()-interval '5 minutes'", [rows[0].token_hash]);
+    if (rows[0])
+      await this.pool.query(
+        "UPDATE oc_sessions SET last_seen_at=now() WHERE token_hash=$1 AND last_seen_at<now()-interval '5 minutes'",
+        [rows[0].token_hash],
+      );
     return rows[0] ?? null;
   }
   readCookie(req, name) {
-    return req.headers.cookie?.split(';').map(s => s.trim()).find(s => s.startsWith(name + '='))?.slice(name.length + 1);
+    return req.headers.cookie
+      ?.split(';')
+      .map((s) => s.trim())
+      .find((s) => s.startsWith(name + '='))
+      ?.slice(name.length + 1);
   }
   nonceCookie(name, token, clear = false) {
     return `${this.secure ? '__Host-' : ''}oc_${name}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${clear ? 0 : 600}${this.secure ? '; Secure' : ''}`;
@@ -60,13 +89,18 @@ export class Auth {
   }
   requireLogin(req) {
     const token = this.readCookie(req, `${this.secure ? '__Host-' : ''}oc_login`);
-    if (!token || req.headers['x-csrf-token'] !== token) throw new HttpError(403, 'Refresh the sign-in page before continuing.');
+    if (!token || req.headers['x-csrf-token'] !== token)
+      throw new HttpError(403, 'Refresh the sign-in page before continuing.');
   }
   async rateLimit(ip) {
     this.throttle(ip);
     await this.pool.query('DELETE FROM oc_auth_attempts WHERE expires_at<=now()');
-    const { rows } = await this.pool.query("INSERT INTO oc_auth_attempts(key,count,expires_at) VALUES($1,1,now()+interval '1 minute') ON CONFLICT(key) DO UPDATE SET count=oc_auth_attempts.count+1 RETURNING count", [tokenHash(ip)]);
-    if (rows[0].count > 10) throw new HttpError(429, 'Too many sign-in attempts. Please wait a minute.');
+    const { rows } = await this.pool.query(
+      "INSERT INTO oc_auth_attempts(key,count,expires_at) VALUES($1,1,now()+interval '1 minute') ON CONFLICT(key) DO UPDATE SET count=oc_auth_attempts.count+1 RETURNING count",
+      [tokenHash(ip)],
+    );
+    if (rows[0].count > 10)
+      throw new HttpError(429, 'Too many sign-in attempts. Please wait a minute.');
   }
   cookie(token, clear = false) {
     return `${this.cookieName}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${clear ? 0 : 1209600}${this.secure ? '; Secure' : ''}`;
@@ -110,10 +144,14 @@ export class Auth {
       );
       user = rows[0];
       // Missing/social-only accounts still do the same expensive password work.
-      const dummy = 'scrypt:1:00000000000000000000000000000000:' + '00'.repeat(64);
+      const dummy = 'scrypt:2:00000000000000000000000000000000:' + '00'.repeat(64);
       const matches = await passwordMatches(password, user?.password_hash ?? dummy);
-      if (!user || !matches)
-        throw new HttpError(401, 'Username or password is incorrect.');
+      if (!user || !matches) throw new HttpError(401, 'Username or password is incorrect.');
+      if (user.password_hash.startsWith('scrypt:1:'))
+        await this.pool.query(
+          'UPDATE oc_users SET password_hash=$2 WHERE id=$1 AND password_hash=$3',
+          [user.id, await passwordHash(password), user.password_hash],
+        );
     }
     return this.issue(user, kind);
   }
@@ -121,11 +159,17 @@ export class Auth {
     if (!['web', 'desktop'].includes(kind)) throw new HttpError(400, 'Invalid session kind.');
     const token = randomBytes(32).toString('hex'),
       csrf = randomBytes(32).toString('hex');
-    await this.pool.query('DELETE FROM oc_sessions WHERE expires_at<=now()');
+    await this.pool.query(
+      "DELETE FROM oc_sessions WHERE expires_at<=now() OR last_seen_at<=now()-interval '1 day'",
+    );
     await this.pool.query(
       "INSERT INTO oc_sessions(token_hash,user_id,csrf,kind,expires_at) VALUES($1,$2,$3,$4,now()+interval '14 days')",
       [tokenHash(token), user.id, csrf, kind],
     );
-    return { user: { id: user.id, username: user.username }, csrf, ...(kind === 'web' ? { cookie: this.cookie(token) } : { token }) };
+    return {
+      user: { id: user.id, username: user.username },
+      csrf,
+      ...(kind === 'web' ? { cookie: this.cookie(token) } : { token }),
+    };
   }
 }

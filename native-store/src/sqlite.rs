@@ -36,7 +36,12 @@ extern "C" {
     fn sqlite3_finalize(stmt: *mut c_void) -> c_int;
     fn sqlite3_busy_timeout(db: *mut c_void, ms: c_int) -> c_int;
     fn sqlite3_limit(db: *mut c_void, id: c_int, value: c_int) -> c_int;
-    fn sqlite3_progress_handler(db: *mut c_void, steps: c_int, callback: Option<unsafe extern "C" fn(*mut c_void) -> c_int>, context: *mut c_void);
+    fn sqlite3_progress_handler(
+        db: *mut c_void,
+        steps: c_int,
+        callback: Option<unsafe extern "C" fn(*mut c_void) -> c_int>,
+        context: *mut c_void,
+    );
     fn sqlite_rational_register(db: *mut c_void) -> c_int;
 }
 pub struct Connection {
@@ -46,7 +51,11 @@ pub struct Connection {
 unsafe extern "C" fn progress(context: *mut c_void) -> c_int {
     let remaining = &mut *context.cast::<u64>();
     *remaining = remaining.saturating_sub(1);
-    if *remaining == 0 { 1 } else { 0 }
+    if *remaining == 0 {
+        1
+    } else {
+        0
+    }
 }
 struct Statement<'a> {
     raw: *mut c_void,
@@ -82,7 +91,10 @@ impl Connection {
         if raw.is_null() {
             return Err("Could not open SQLite file".into());
         }
-        let mut db = Self { raw, _budget: Box::new(20000) };
+        let mut db = Self {
+            raw,
+            _budget: Box::new(20000),
+        };
         if result != 0 {
             return Err(db.error());
         }
@@ -93,7 +105,12 @@ impl Connection {
                 sqlite3_limit(raw, 1, 100000);
                 sqlite3_limit(raw, 2, 128);
                 sqlite3_limit(raw, 3, 128);
-                sqlite3_progress_handler(raw, 1000, Some(progress), (&mut *db._budget as *mut u64).cast());
+                sqlite3_progress_handler(
+                    raw,
+                    1000,
+                    Some(progress),
+                    (&mut *db._budget as *mut u64).cast(),
+                );
             }
         }
         if unsafe { sqlite_rational_register(raw) } != 0 {

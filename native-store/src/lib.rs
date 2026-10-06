@@ -18,6 +18,8 @@ pub struct Document {
     pub description: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub presentation: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugins: Option<Value>,
     pub events: Vec<Event>,
 }
 #[derive(Debug, Serialize, Deserialize)]
@@ -36,7 +38,7 @@ fn check_file(db: &Connection) -> Result<(), String> {
     }
     // These names must be data tables, never attacker-supplied SQL views.
     if db.scalar("SELECT count(*) FROM sqlite_schema WHERE name IN ('events','timeline_meta') AND type='table'", &[])? != "2"
-        || db.scalar("SELECT count(*) FROM sqlite_schema WHERE name='timeline_settings' AND type!='table'", &[])? != "0" {
+        || db.scalar("SELECT count(*) FROM sqlite_schema WHERE name IN ('timeline_settings','timeline_plugins') AND type!='table'", &[])? != "0" {
         return Err("Invalid timeline data tables".into());
     }
     Ok(())
@@ -54,6 +56,14 @@ fn validate(doc: &Document) -> Result<(), String> {
     if let Some(presentation) = &doc.presentation {
         if !presentation.is_object() || presentation.to_string().len() > 131072 {
             return Err("Invalid or oversized presentation settings".into());
+        }
+    }
+    if let Some(plugins) = &doc.plugins {
+        if !plugins.is_array()
+            || plugins.as_array().unwrap().len() > 32
+            || plugins.to_string().len() > 131072
+        {
+            return Err("Invalid or oversized plugin settings".into());
         }
     }
     for e in &doc.events {
@@ -94,6 +104,12 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
     let result = (|| {
         db.execute("CREATE TABLE IF NOT EXISTS timeline_meta(singleton INTEGER PRIMARY KEY CHECK(singleton=1),title TEXT NOT NULL,description TEXT NOT NULL)",&[])?;
         db.execute("CREATE TABLE IF NOT EXISTS timeline_settings(singleton INTEGER PRIMARY KEY CHECK(singleton=1),presentation TEXT NOT NULL CHECK(json_valid(presentation)))", &[])?;
+        db.execute("CREATE TABLE IF NOT EXISTS timeline_plugins(singleton INTEGER PRIMARY KEY CHECK(singleton=1),plugins TEXT NOT NULL CHECK(json_valid(plugins)))", &[])?;
+        db.execute("DELETE FROM timeline_plugins", &[])?;
+        if let Some(plugins) = &doc.plugins {
+            let json = serde_json::to_string(plugins).map_err(|e| e.to_string())?;
+            db.execute("INSERT INTO timeline_plugins VALUES(1,?)", &[&json])?;
+        }
         db.execute("DELETE FROM timeline_settings", &[])?;
         if let Some(presentation) = &doc.presentation {
             let json = serde_json::to_string(presentation).map_err(|e| e.to_string())?;
@@ -174,6 +190,24 @@ pub fn open(path: &Path) -> Result<Document, String> {
                 })
                 .transpose()?
         },
+        plugins: if db.scalar(
+            "SELECT count(*) FROM sqlite_schema WHERE name='timeline_plugins' AND type='table'",
+            &[],
+        )? == "0"
+        {
+            None
+        } else {
+            let rows = db.query(
+                "SELECT plugins FROM timeline_plugins WHERE singleton=1",
+                &[],
+            )?;
+            rows.first()
+                .map(|row| {
+                    serde_json::from_str(row[0].as_deref().ok_or("Missing plugin settings")?)
+                        .map_err(|e| e.to_string())
+                })
+                .transpose()?
+        },
         events,
     };
     validate(&doc)?;
@@ -233,6 +267,7 @@ mod tests {
             title: "Exact moments".into(),
             description: "".into(),
             presentation: None,
+            plugins: None,
             events: vec![
                 Event {
                     id: "first".into(),
@@ -280,6 +315,24 @@ mod tests {
         fs::remove_file(path).unwrap();
     }
     #[test]
+    fn uploaded_database_tables_cannot_be_replaced_by_executable_views() {
+        let path = file("malicious-view");
+        save(&path, &doc()).unwrap();
+        {
+            let db = Connection::open(&path, true).unwrap();
+            db.execute("DROP TABLE events", &[]).unwrap();
+            db.execute(
+                "CREATE VIEW events AS SELECT 'id' AS id,'1/1' AS time,'{}' AS metadata",
+                &[],
+            )
+            .unwrap();
+        }
+        assert!(open(&path)
+            .unwrap_err()
+            .contains("Invalid timeline data tables"));
+        fs::remove_file(path).unwrap();
+    }
+    #[test]
     fn presentation_settings_roundtrip_and_legacy_files() {
         let path = file("presentation");
         let mut document = doc();
@@ -309,6 +362,42 @@ mod tests {
         let legacy = open(&path).unwrap();
         assert_eq!(legacy.presentation, None);
         assert_eq!(legacy.events.len(), document.events.len());
+        save(&path, &reopened).unwrap();
+        assert_eq!(open(&path).unwrap(), reopened);
+        fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn plugin_settings_roundtrip_and_legacy_files() {
+        let path = file("plugins");
+        let mut document = doc();
+        document.plugins = Some(serde_json::json!([{
+            "manifest": { "apiVersion": 1, "id": "moment-icons", "version": 1,
+                "name": "Moment icons", "description": "Images", "fields": [{"kind": "image-url", "metadataKey": "iconUrl", "label": "Icon"}],
+                "marker": {"kind": "image", "metadataKey": "iconUrl"}}, "enabled": true
+        }]));
+        document.events[0].metadata.insert(
+            "iconUrl".into(),
+            Value::String("https://images.example/icon.png".into()),
+        );
+        save(&path, &document).unwrap();
+        let reopened = open(&path).unwrap();
+        assert_eq!(reopened.plugins, document.plugins);
+        assert_eq!(
+            reopened.events[0].metadata.get("iconUrl"),
+            document.events[0].metadata.get("iconUrl")
+        );
+        let mut bad = document.clone();
+        bad.plugins = Some(serde_json::json!({"script":"no"}));
+        assert!(save(&path, &bad).is_err());
+        assert_eq!(open(&path).unwrap(), reopened);
+        document.plugins = None;
+        save(&path, &document).unwrap();
+        assert_eq!(open(&path).unwrap().plugins, None);
+        {
+            let db = Connection::open(&path, true).unwrap();
+            db.execute("DROP TABLE timeline_plugins", &[]).unwrap();
+        }
+        assert_eq!(open(&path).unwrap().plugins, None);
         save(&path, &reopened).unwrap();
         assert_eq!(open(&path).unwrap(), reopened);
         fs::remove_file(path).unwrap();
