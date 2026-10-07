@@ -16,6 +16,7 @@ export class PostgresStore {
     const { rows } = await client.query(
       `SELECT t.id,t.revision FROM oc_timelines t
       WHERE t.id=$1 AND (t.visibility='public' OR t.owner_id=$2::uuid
+      OR EXISTS(SELECT 1 FROM oc_users a WHERE a.id=$2::uuid AND a.is_admin AND NOT a.is_disabled)
       OR EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$2::uuid))`,
       [id, userId ?? null],
     );
@@ -25,7 +26,8 @@ export class PostgresStore {
   async access(id, userId, client = this.pool) {
     const { rows } = await client.query(
       `SELECT t.*,u.username AS owner,
-      CASE WHEN t.owner_id=$2::uuid THEN 'owner' ELSE m.role END AS role
+      EXISTS(SELECT 1 FROM oc_timeline_stars s WHERE s.timeline_id=t.id AND s.user_id=$2::uuid) AS starred,
+      CASE WHEN EXISTS(SELECT 1 FROM oc_users admin WHERE admin.id=$2::uuid AND admin.is_admin AND NOT admin.is_disabled) THEN 'admin' WHEN t.owner_id=$2::uuid THEN 'owner' ELSE m.role END AS role
       FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id
       LEFT JOIN oc_members m ON m.timeline_id=t.id AND m.user_id=$2::uuid WHERE t.id=$1`,
       [id, userId ?? null],
@@ -37,7 +39,7 @@ export class PostgresStore {
       const sources = await client.query(
         `SELECT t.id FROM oc_timelines t
         WHERE t.id=ANY($1::uuid[]) AND t.comparison IS NULL AND
-        (t.visibility='public' OR t.owner_id=$2::uuid OR EXISTS
+        (t.visibility='public' OR t.owner_id=$2::uuid OR EXISTS(SELECT 1 FROM oc_users a WHERE a.id=$2::uuid AND a.is_admin AND NOT a.is_disabled) OR EXISTS
           (SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$2::uuid))`,
         [timeline.comparison.sources, userId ?? null],
       );
@@ -47,23 +49,24 @@ export class PostgresStore {
     const { search_document, event_text, ...metadata } = timeline;
     return {
       ...metadata,
-      canWrite: !timeline.comparison && ['owner', 'writer', 'editor'].includes(timeline.role),
+      canWrite:
+        !timeline.comparison && ['owner', 'admin', 'writer', 'editor'].includes(timeline.role),
       canPropose:
         !timeline.comparison &&
         !!userId &&
-        (['owner', 'writer', 'editor', 'contributor'].includes(timeline.role) ||
+        (['owner', 'admin', 'writer', 'editor', 'contributor'].includes(timeline.role) ||
           timeline.visibility === 'public'),
       canEdit:
         !timeline.comparison &&
         !!userId &&
-        (['owner', 'writer', 'editor', 'contributor'].includes(timeline.role) ||
+        (['owner', 'admin', 'writer', 'editor', 'contributor'].includes(timeline.role) ||
           timeline.visibility === 'public'),
-      canShare: timeline.role === 'owner',
+      canShare: ['owner', 'admin'].includes(timeline.role),
       canFork:
         !timeline.comparison &&
         !!userId &&
         (timeline.visibility === 'public' ||
-          timeline.role === 'owner' ||
+          ['owner', 'admin'].includes(timeline.role) ||
           timeline.allow_private_forks),
     };
   }
@@ -86,6 +89,16 @@ export class PostgresStore {
           'Comparison sources must be accessible ordinary timelines; public comparisons require public sources.',
         );
     }
+    // Reject over-quota document growth before rebuilding the rational index.
+    await client.query('UPDATE oc_timelines SET storage_bytes=$2 WHERE id=$1', [
+      id,
+      Buffer.byteLength(JSON.stringify(document)),
+    ]);
+    const additions = await client.query(
+      `SELECT EXISTS(SELECT value FROM jsonb_array_elements_text($2::jsonb)
+        EXCEPT SELECT event->>'id' FROM oc_nodes n CROSS JOIN LATERAL jsonb_array_elements(n.events) event WHERE n.timeline_id=$1) AS added`,
+      [id, JSON.stringify(document.events.map((event) => event.id))],
+    );
     const tree = indexedNodes(document);
     await client.query('DELETE FROM oc_nodes WHERE timeline_id=$1', [id]);
     // Batched inserts keep write round trips bounded; mpq keys never enter a B-tree.
@@ -127,7 +140,7 @@ export class PostgresStore {
       );
     }
     await client.query(
-      'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,tags=$8,assets=$9::jsonb,event_text=$10,comparison=$11::jsonb,updated_at=now() WHERE id=$1',
+      'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,tags=$8,assets=$9::jsonb,event_text=$10,comparison=$11::jsonb,storage_bytes=$12,event_generation=event_generation+CASE WHEN $13 THEN 1 ELSE 0 END,updated_at=now() WHERE id=$1',
       [
         id,
         document.title,
@@ -140,6 +153,8 @@ export class PostgresStore {
         document.assets === undefined ? null : JSON.stringify(document.assets),
         eventSearchText(document),
         document.comparison ? JSON.stringify(document.comparison) : null,
+        Buffer.byteLength(JSON.stringify(document)),
+        additions.rows[0].added,
       ],
     );
   }
@@ -152,6 +167,8 @@ export class PostgresStore {
       return result;
     } catch (e) {
       await c.query('ROLLBACK');
+      if (e.code === 'P0001' && e.message.startsWith('Account storage limit'))
+        throw new HttpError(413, e.message);
       throw e;
     } finally {
       c.release();
@@ -280,6 +297,25 @@ export class PostgresStore {
         [id, t.root],
       );
       return { ...t, ...rows[0] };
+    });
+  }
+  async recent(id, userId, direction = 'last') {
+    if (!['last', 'first'].includes(direction))
+      throw new HttpError(400, 'Invalid recent-event direction.');
+    return this.transaction(async (c) => {
+      await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+      const timeline = await this.access(id, userId, c);
+      if (timeline.comparison)
+        throw new HttpError(409, 'Read recent events from comparison sources.');
+      const { rows } = await c.query('SELECT oc_recent_times($1,$2) AS time', [
+        id,
+        direction === 'first',
+      ]);
+      return {
+        revision: timeline.revision,
+        event_generation: timeline.event_generation,
+        times: rows.map((row) => row.time),
+      };
     });
   }
   async snapshot(id, userId) {

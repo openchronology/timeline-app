@@ -9,6 +9,7 @@ export async function GET() {
   )
     .replace('href="./app.css"', 'href="/app.css"')
     .replace('src="./app.js"', 'src="/app.js"')
+    .replace('href="legal.html"', 'href="/legal"')
     .replace('href="openchronology-web-source.tar.gz"', 'href="/openchronology-web-source.tar.gz"');
   return new Response(html, {
     headers: {

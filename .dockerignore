@@ -20,3 +20,15 @@ upstream
 
 **/.next
 platform/public
+
+# Only Git identity data enters the build context; never Git config or hooks.
+!.git/
+.git/*
+!.git/HEAD
+!.git/index
+!.git/refs/
+!.git/refs/**
+!.git/packed-refs
+!.git/objects/
+!.git/objects/**
+release-assets

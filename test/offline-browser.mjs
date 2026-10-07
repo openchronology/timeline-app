@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
+import { closeMomentDetails, checkMomentDialog } from './moment-dialog-browser.mjs';
 import { checkZoomHelp } from './zoom-help-browser.mjs';
 import { checkWheelPrecision } from './viewport-browser.mjs';
 import { checkPresentation } from './presentation-browser.mjs';
@@ -86,6 +87,7 @@ try {
     'och-export',
   ])
     assert(await input(id).isHidden());
+  await closeMomentDetails(page);
   await input('add-button').click();
   await input('event-title').fill('An exact offline moment');
   await input('event-time').fill('1/3');
@@ -94,6 +96,7 @@ try {
   );
   assert.match(await input('event-count').textContent(), /1 events/);
   assert.equal(await input('event-exact').inputValue(), '1/3');
+  await closeMomentDetails(page);
   await input('fit-button').click();
   await poll(async () => (await markers.count()) === 1);
   const box = await input('timeline-stage').boundingBox(),
@@ -137,6 +140,7 @@ try {
       },
     ],
   });
+  await closeMomentDetails(page);
   await input('json-file').setInputFiles({
     name: 'timeline.ochx',
     mimeType: 'application/json',
@@ -149,6 +153,7 @@ try {
   await poll(() => input('event-form').isVisible());
   assert.equal(await input('event-exact').inputValue(), document.events[0].time);
   const downloading = page.waitForEvent('download');
+  await closeMomentDetails(page);
   await input('export-button').click();
   const download = await downloading;
   assert.match(download.suggestedFilename(), /\.ochx$/);
@@ -156,11 +161,13 @@ try {
     validateDocument(JSON.parse(await readFile(await download.path(), 'utf8'))),
     document,
   );
+  await checkMomentDialog(page, document);
   await checkPresentation(page, document);
   await checkRuler(page, document);
   await checkSelection(page, document);
   await checkLabelMotion(page, document);
   await checkPlugins(page, document, true);
+  await closeMomentDetails(page);
   await input('json-file').setInputFiles({
     name: 'sample.ochx',
     mimeType: 'application/json',

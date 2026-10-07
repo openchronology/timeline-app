@@ -341,7 +341,9 @@ test('Postgres persists plugin settings and projects metadata in overview querie
                 visited_nodes: 3,
               },
             ]
-          : [],
+          : sql.includes('AS added')
+            ? [{ added: true }]
+            : [],
       };
     },
     release() {},
@@ -349,7 +351,7 @@ test('Postgres persists plugin settings and projects metadata in overview querie
   const store = new PostgresStore({ connect: async () => client });
   await store.replace(client, 'id', { ...demo(), plugins });
   assert.deepEqual(
-    JSON.parse(queries.find((q) => q.sql.startsWith('UPDATE oc_timelines SET')).values[6]),
+    JSON.parse(queries.find((q) => q.sql.startsWith('UPDATE oc_timelines SET title=')).values[6]),
     plugins,
   );
   store.access = async () => ({ title: 'Timeline', description: '', plugins, revision: '1' });

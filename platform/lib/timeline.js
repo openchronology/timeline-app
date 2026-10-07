@@ -24,6 +24,8 @@ export function versionInfo(timeline) {
     canWrite,
     canFork,
     comparison,
+    star_count,
+    starred,
   } = timeline;
   return {
     id,
@@ -35,5 +37,7 @@ export function versionInfo(timeline) {
     canWrite,
     canFork,
     comparison,
+    star_count,
+    starred,
   };
 }

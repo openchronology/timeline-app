@@ -1,4 +1,5 @@
 /* Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only */
+@import '../../src/dialog-motion.css';
 :root {
   color-scheme: light;
   font:
@@ -178,17 +179,19 @@ section {
   overflow: auto;
   font: 14px/1.6 system-ui;
 }
-/* The editor owns scrolling; size its frame from the actual navigation/footer
-   heights, including wrapped navigation on narrow screens. */
+/* The editor owns scrolling, including its footer at the end of the document.
+   Size the frame below navigation without introducing a second scrollbar. */
 body:has(.editor-page) {
   height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
-body:has(.editor-page) > .platform-header,
-body:has(.editor-page) > .platform-footer {
+body:has(.editor-page) > .platform-header {
   flex-shrink: 0;
+}
+body:has(.editor-page) > .platform-footer {
+  display: none;
 }
 .editor-page {
   margin: 0;
@@ -282,4 +285,58 @@ dialog {
   max-height: calc(100dvh - 30px);
   overflow: auto;
   overflow-wrap: anywhere;
+}
+
+.account-avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid white;
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.checkbox-label input {
+  width: auto;
+}
+
+.build-identity {
+  overflow-wrap: anywhere;
+}
+.download-menu {
+  position: relative;
+  font-size: 13px;
+}
+.download-menu summary {
+  cursor: pointer;
+  list-style: none;
+  border: 1px solid #69846d;
+  border-radius: 7px;
+  padding: 6px 10px;
+}
+.download-menu > div {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 100;
+  background: #fff;
+  color: #285742;
+  border: 1px solid #d7dfd3;
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 240px;
+  max-width: calc(100vw - 32px);
+  box-shadow: 0 8px 24px #20372c20;
+}
+.platform-header .download-menu > div a {
+  display: block;
+  padding: 8px;
+  color: #285742;
+  text-decoration: none;
+}
+.download-menu > div a:hover {
+  background: #f0f3eb;
 }

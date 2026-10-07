@@ -268,13 +268,19 @@ test('Postgres snapshot replacements bind presentation as JSON data and preserve
   const client = {
     async query(sql, values) {
       queries.push({ sql, values });
-      return { rows: sql.includes('oc_events') ? [{ event: document.events[0] }] : [] };
+      return {
+        rows: sql.includes('oc_events')
+          ? [{ event: document.events[0] }]
+          : sql.includes('AS added')
+            ? [{ added: true }]
+            : [],
+      };
     },
     release() {},
   };
   const store = new PostgresStore({ connect: async () => client });
   await store.replace(client, 'timeline-id', { ...document, presentation });
-  const write = queries.find((q) => q.sql.startsWith('UPDATE oc_timelines SET'));
+  const write = queries.find((q) => q.sql.startsWith('UPDATE oc_timelines SET title='));
   assert.match(write.sql, /presentation=\$6::jsonb/);
   assert.deepEqual(JSON.parse(write.values[5]), presentation);
   store.access = async () => ({ title: document.title, description: '', presentation });
@@ -283,5 +289,8 @@ test('Postgres snapshot replacements bind presentation as JSON data and preserve
   assert.deepEqual(validateDocument(snapshot.document).events, document.events);
   queries.length = 0;
   await store.replace(client, 'timeline-id', document);
-  assert.equal(queries.find((q) => q.sql.startsWith('UPDATE oc_timelines SET')).values[5], null);
+  assert.equal(
+    queries.find((q) => q.sql.startsWith('UPDATE oc_timelines SET title=')).values[5],
+    null,
+  );
 });

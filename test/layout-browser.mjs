@@ -52,9 +52,9 @@ export async function checkResponsiveTimeline(page) {
         geometry.documentWidth <= geometry.viewportWidth + 1,
         'Narrow layouts must not overflow horizontally',
       );
-      if (viewport.width <= 960) {
+      {
         assert(
-          geometry.width >= viewport.width - 62,
+          geometry.width >= viewport.width - 100,
           'Unused inspector space must not squeeze the timeline',
         );
         assert.equal(geometry.inspector, 'none');

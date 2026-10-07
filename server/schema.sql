@@ -354,3 +354,151 @@ ALTER TABLE oc_snapshots ENABLE TRIGGER oc_snapshot_immutable;
 
 -- Saved comparisons are live references, not materialized event indexes.
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS comparison jsonb;
+
+-- Installation administration, account profiles and scoped automation credentials.
+ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS is_admin boolean NOT NULL DEFAULT false;
+ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS is_disabled boolean NOT NULL DEFAULT false;
+ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS avatar_url text NOT NULL DEFAULT '';
+ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS quota_bypass boolean NOT NULL DEFAULT false;
+ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS quota_bytes bigint CHECK(quota_bytes>=0);
+ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS used_bytes bigint NOT NULL DEFAULT 0 CHECK(used_bytes>=0);
+CREATE TABLE IF NOT EXISTS oc_site_settings (
+  singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton),
+  default_quota_bytes bigint NOT NULL DEFAULT 104857600 CHECK(default_quota_bytes>=0),
+  initialized boolean NOT NULL DEFAULT false, bootstrap_admin_id uuid REFERENCES oc_users,
+  enforce_quotas boolean NOT NULL DEFAULT false
+);
+INSERT INTO oc_site_settings(singleton) VALUES(true) ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS oc_api_keys (
+  id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE,
+  name text NOT NULL, prefix text NOT NULL, token_hash text UNIQUE NOT NULL,
+  scopes text[] NOT NULL CHECK(scopes<@ARRAY['timelines:read','timelines:write']::text[] AND cardinality(scopes)>0),
+  created_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL,
+  last_used_at timestamptz, revoked_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS oc_api_keys_user ON oc_api_keys(user_id);
+CREATE TABLE IF NOT EXISTS oc_admin_audit (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, actor_id uuid NOT NULL,
+  action text NOT NULL, target_id text, changes jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS oc_storage_entries (
+  kind text NOT NULL, entry_id text NOT NULL, user_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE,
+  bytes bigint NOT NULL CHECK(bytes>=0), PRIMARY KEY(kind,entry_id)
+);
+ALTER TABLE oc_storage_entries DROP CONSTRAINT IF EXISTS oc_storage_entries_user_id_fkey;
+ALTER TABLE oc_storage_entries ADD CONSTRAINT oc_storage_entries_user_id_fkey FOREIGN KEY(user_id) REFERENCES oc_users ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS oc_storage_user ON oc_storage_entries(user_id);
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS storage_bytes bigint NOT NULL DEFAULT 0;
+UPDATE oc_timelines t SET storage_bytes=s.document_bytes FROM oc_revisions r JOIN oc_snapshots s ON s.id=r.snapshot_id WHERE t.head_revision_id=r.id AND t.storage_bytes=0;
+-- Existing data is counted without deleting it when the new default is smaller.
+UPDATE oc_site_settings SET enforce_quotas=false;
+CREATE OR REPLACE FUNCTION oc_storage_charge() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE delta bigint; uid uuid; u record; settings record;
+BEGIN
+  uid:=CASE WHEN TG_OP='DELETE' THEN OLD.user_id ELSE NEW.user_id END;
+  IF TG_OP='UPDATE' AND NEW.user_id<>OLD.user_id THEN RAISE EXCEPTION 'Storage entries cannot change owner'; END IF;
+  delta:=CASE WHEN TG_OP='DELETE' THEN -OLD.bytes WHEN TG_OP='INSERT' THEN NEW.bytes ELSE NEW.bytes-OLD.bytes END;
+  UPDATE oc_users SET used_bytes=greatest(0,used_bytes+delta) WHERE id=uid RETURNING * INTO u;
+  SELECT * INTO settings FROM oc_site_settings WHERE singleton;
+  IF delta>0 AND settings.enforce_quotas AND NOT u.quota_bypass AND NOT u.is_admin AND u.used_bytes>coalesce(u.quota_bytes,settings.default_quota_bytes) THEN
+    RAISE EXCEPTION USING ERRCODE='P0001', MESSAGE='Account storage limit exceeded. Delete data or ask the administrator for a larger quota.';
+  END IF;
+  RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
+END $$;
+DROP TRIGGER IF EXISTS oc_storage_charge ON oc_storage_entries;
+CREATE TRIGGER oc_storage_charge AFTER INSERT OR UPDATE OR DELETE ON oc_storage_entries FOR EACH ROW EXECUTE FUNCTION oc_storage_charge();
+CREATE OR REPLACE FUNCTION oc_track_storage() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE uid uuid; n bigint; key text; v_kind text:=TG_TABLE_NAME;
+BEGIN
+  key:=CASE WHEN TG_OP='DELETE' THEN OLD.id::text ELSE NEW.id::text END;
+  IF TG_OP='DELETE' THEN DELETE FROM oc_storage_entries WHERE entry_id=key AND oc_storage_entries.kind=v_kind; RETURN OLD; END IF;
+  IF TG_TABLE_NAME='oc_timelines' THEN uid:=NEW.owner_id; n:=NEW.storage_bytes;
+  ELSIF TG_TABLE_NAME='oc_revisions' THEN
+    SELECT owner_id INTO uid FROM oc_timelines WHERE id=NEW.timeline_id;
+    uid:=CASE WHEN NEW.kind IN ('proposal','rebase') THEN NEW.author_id ELSE coalesce(uid,NEW.author_id) END;
+    SELECT document_bytes INTO n FROM oc_snapshots WHERE id=NEW.snapshot_id;
+  ELSIF TG_TABLE_NAME='oc_proposals' THEN uid:=NEW.author_id; n:=octet_length(NEW.document::text)+octet_length(NEW.base_document::text)+octet_length(NEW.body)+octet_length(NEW.title);
+  ELSIF TG_TABLE_NAME='oc_proposal_comments' THEN uid:=NEW.author_id; n:=octet_length(NEW.body);
+  ELSIF TG_TABLE_NAME='oc_plugins' THEN uid:=NEW.owner_id; n:=octet_length(NEW.manifest::text); key:=NEW.id||'/'||NEW.version;
+  END IF;
+  IF uid IS NOT NULL THEN INSERT INTO oc_storage_entries(kind,entry_id,user_id,bytes) VALUES(v_kind,key,uid,coalesce(n,0)) ON CONFLICT(kind,entry_id) DO UPDATE SET bytes=excluded.bytes; END IF;
+  RETURN NEW;
+END $$;
+-- Versioned plugin deletions need the same compound identity as insertions.
+CREATE OR REPLACE FUNCTION oc_track_plugin_storage() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP='DELETE' THEN DELETE FROM oc_storage_entries WHERE kind='oc_plugins' AND entry_id=OLD.id||'/'||OLD.version; RETURN OLD; END IF;
+  INSERT INTO oc_storage_entries(kind,entry_id,user_id,bytes) VALUES('oc_plugins',NEW.id||'/'||NEW.version,NEW.owner_id,octet_length(NEW.manifest::text)) ON CONFLICT(kind,entry_id) DO UPDATE SET bytes=excluded.bytes;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS oc_track_storage ON oc_timelines;
+CREATE TRIGGER oc_track_storage AFTER INSERT OR UPDATE OF storage_bytes OR DELETE ON oc_timelines FOR EACH ROW EXECUTE FUNCTION oc_track_storage();
+DROP TRIGGER IF EXISTS oc_track_storage ON oc_revisions;
+CREATE TRIGGER oc_track_storage AFTER INSERT OR DELETE ON oc_revisions FOR EACH ROW EXECUTE FUNCTION oc_track_storage();
+DROP TRIGGER IF EXISTS oc_track_storage ON oc_proposals;
+CREATE TRIGGER oc_track_storage AFTER INSERT OR UPDATE OF document,base_document,body,title OR DELETE ON oc_proposals FOR EACH ROW EXECUTE FUNCTION oc_track_storage();
+DROP TRIGGER IF EXISTS oc_track_storage ON oc_proposal_comments;
+CREATE TRIGGER oc_track_storage AFTER INSERT OR DELETE ON oc_proposal_comments FOR EACH ROW EXECUTE FUNCTION oc_track_storage();
+DROP TRIGGER IF EXISTS oc_track_storage ON oc_plugins;
+CREATE TRIGGER oc_track_storage AFTER INSERT OR DELETE ON oc_plugins FOR EACH ROW EXECUTE FUNCTION oc_track_plugin_storage();
+INSERT INTO oc_storage_entries SELECT 'oc_timelines',id::text,owner_id,storage_bytes FROM oc_timelines ON CONFLICT(kind,entry_id) DO UPDATE SET bytes=excluded.bytes;
+INSERT INTO oc_storage_entries SELECT 'oc_revisions',r.id::text,CASE WHEN r.kind IN ('proposal','rebase') THEN r.author_id ELSE coalesce(t.owner_id,r.author_id) END,s.document_bytes FROM oc_revisions r JOIN oc_snapshots s ON s.id=r.snapshot_id LEFT JOIN oc_timelines t ON t.id=r.timeline_id WHERE (CASE WHEN r.kind IN ('proposal','rebase') THEN r.author_id ELSE coalesce(t.owner_id,r.author_id) END) IN(SELECT id FROM oc_users) ON CONFLICT(kind,entry_id) DO NOTHING;
+INSERT INTO oc_storage_entries SELECT 'oc_proposals',id::text,author_id,octet_length(document::text)+octet_length(base_document::text)+octet_length(body)+octet_length(title) FROM oc_proposals ON CONFLICT(kind,entry_id) DO NOTHING;
+INSERT INTO oc_storage_entries SELECT 'oc_proposal_comments',id::text,author_id,octet_length(body) FROM oc_proposal_comments ON CONFLICT(kind,entry_id) DO NOTHING;
+INSERT INTO oc_storage_entries SELECT 'oc_plugins',id||'/'||version,owner_id,octet_length(manifest::text) FROM oc_plugins ON CONFLICT(kind,entry_id) DO NOTHING;
+-- AFTER triggers charge only the committed insert/update branch of an upsert.
+-- Reconcile counters from the ledger during each transactional migration.
+UPDATE oc_users u SET used_bytes=coalesce((SELECT sum(bytes) FROM oc_storage_entries WHERE user_id=u.id),0);
+UPDATE oc_site_settings SET enforce_quotas=true;
+
+-- Stars belong to users; counts survive repeated requests and cascade deletions.
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS created_at timestamptz;
+UPDATE oc_timelines SET created_at=updated_at WHERE created_at IS NULL;
+ALTER TABLE oc_timelines ALTER COLUMN created_at SET DEFAULT now();
+ALTER TABLE oc_timelines ALTER COLUMN created_at SET NOT NULL;
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS star_count bigint NOT NULL DEFAULT 0 CHECK(star_count>=0);
+CREATE TABLE IF NOT EXISTS oc_timeline_stars (
+  user_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE,
+  timeline_id uuid NOT NULL REFERENCES oc_timelines ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(user_id,timeline_id)
+);
+CREATE INDEX IF NOT EXISTS oc_timeline_stars_timeline ON oc_timeline_stars(timeline_id);
+CREATE INDEX IF NOT EXISTS oc_timelines_upstream ON oc_timelines(upstream_id) WHERE upstream_id IS NOT NULL;
+CREATE OR REPLACE FUNCTION oc_star_count() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP='INSERT' THEN
+    UPDATE oc_timelines SET star_count=star_count+1 WHERE id=NEW.timeline_id;
+    RETURN NEW;
+  ELSE
+    UPDATE oc_timelines SET star_count=star_count-1 WHERE id=OLD.timeline_id;
+    RETURN OLD;
+  END IF;
+END $$;
+DROP TRIGGER IF EXISTS oc_star_count ON oc_timeline_stars;
+CREATE TRIGGER oc_star_count AFTER INSERT OR DELETE ON oc_timeline_stars
+FOR EACH ROW EXECUTE FUNCTION oc_star_count();
+
+-- Detect added root moments independently from edits and deletions.
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS event_generation bigint NOT NULL DEFAULT 0;
+-- Traverse only the newest/oldest few distinct coordinates, without loading their metadata.
+CREATE OR REPLACE FUNCTION oc_recent_times(tid uuid, oldest boolean DEFAULT false)
+RETURNS SETOF text LANGUAGE plpgsql AS $$
+DECLARE stack bigint[]:=ARRAY[]::bigint[]; nid bigint; n record; emitted integer:=0;
+BEGIN
+  SELECT root INTO nid FROM oc_timelines WHERE id=tid;
+  WHILE nid IS NOT NULL OR cardinality(stack)>0 LOOP
+    WHILE nid IS NOT NULL LOOP
+      stack:=array_append(stack,nid);
+      SELECT left_id,right_id INTO n FROM oc_nodes WHERE timeline_id=tid AND id=nid;
+      IF NOT FOUND THEN RAISE EXCEPTION 'Broken timeline index'; END IF;
+      nid:=CASE WHEN oldest THEN n.left_id ELSE n.right_id END;
+    END LOOP;
+    nid:=stack[cardinality(stack)]; stack:=stack[1:cardinality(stack)-1];
+    SELECT time,left_id,right_id INTO n FROM oc_nodes WHERE timeline_id=tid AND id=nid;
+    RETURN NEXT oc_qtext(n.time); emitted:=emitted+1;
+    IF emitted=8 THEN RETURN; END IF;
+    nid:=CASE WHEN oldest THEN n.right_id ELSE n.left_id END;
+  END LOOP;
+END $$;

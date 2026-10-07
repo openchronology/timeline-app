@@ -49,6 +49,7 @@ function paragraph(text: string) {
 export function createCommunityUI(host: Host) {
   let browserPage = 1,
     minePage = 1,
+    favoritePage = 1,
     pullPage = 1,
     selected: Proposal | null = null,
     request = 0,
@@ -71,9 +72,14 @@ export function createCommunityUI(host: Host) {
     compareSelection();
   };
   const error = (id: string, e: unknown) => text(id, e instanceof Error ? e.message : String(e));
-  async function search(scope: 'mine' | 'public') {
-    const page = scope === 'mine' ? minePage : browserPage,
-      id = scope === 'mine' ? 'dashboard-mine' : 'dashboard-browser';
+  async function search(scope: 'mine' | 'public' | 'starred') {
+    const page = scope === 'mine' ? minePage : scope === 'starred' ? favoritePage : browserPage,
+      id =
+        scope === 'mine'
+          ? 'dashboard-mine'
+          : scope === 'starred'
+            ? 'dashboard-favorites'
+            : 'dashboard-browser';
     const epoch = request;
     el(id + '-list').replaceChildren();
     text(id + '-status', 'Loading…');
@@ -88,6 +94,8 @@ export function createCommunityUI(host: Host) {
         featured: boolean;
         visibility: string;
         event_count: string;
+        star_count?: string;
+        starred?: boolean;
       }[];
       pages: number;
       total: number;
@@ -95,8 +103,9 @@ export function createCommunityUI(host: Host) {
       scope,
       page,
       limit: 12,
-      search: scope === 'mine' ? '' : el<HTMLInputElement>('dashboard-search').value,
-      tag: scope === 'mine' ? '' : el<HTMLInputElement>('dashboard-tag').value,
+      sort: scope === 'public' ? el<HTMLSelectElement>('dashboard-sort').value : 'age',
+      search: scope !== 'public' ? '' : el<HTMLInputElement>('dashboard-search').value,
+      tag: scope !== 'public' ? '' : el<HTMLInputElement>('dashboard-tag').value,
     });
     if (epoch !== request) return;
     for (const t of response.timelines) {
@@ -130,6 +139,22 @@ export function createCommunityUI(host: Host) {
       );
       details.className = 'field-hint';
       card.append(link, details, paragraph(t.description.slice(0, 220)));
+      const star = button(`${t.starred ? '★ Starred' : '☆ Star'} · ${t.star_count ?? '0'}`, () => {
+        star.disabled = true;
+        void host
+          .api<{ starred: boolean; star_count: string }>(`timelines/${t.id}/star`, 'POST', {
+            starred: !t.starred,
+          })
+          .then(() => dashboard())
+          .catch((e) => {
+            error('dashboard-error', e);
+            star.disabled = false;
+          });
+      });
+      star.disabled = !host.user();
+      star.title = host.user() ? 'Toggle favorite' : 'Sign in to star timelines';
+      star.setAttribute('aria-pressed', String(!!t.starred));
+      card.append(star);
       if (!host.user() && (host.guestCopies?.() ?? true) && t.visibility === 'public') {
         const fork = document.createElement('a');
         fork.href = '#guest-fork/' + t.id;
@@ -155,7 +180,9 @@ export function createCommunityUI(host: Host) {
         ? `${response.total} timelines · Page ${page} of ${response.pages}`
         : scope === 'mine'
           ? 'You have no server timelines yet. Create one from the workspace.'
-          : 'No public timelines match this search.',
+          : scope === 'starred'
+            ? 'No favorites yet.'
+            : 'No public timelines match this search.',
     );
     el<HTMLButtonElement>(id + '-previous').disabled = page <= 1;
     el<HTMLButtonElement>(id + '-next').disabled = page >= response.pages;
@@ -171,6 +198,7 @@ export function createCommunityUI(host: Host) {
   async function dashboard() {
     request++;
     el('dashboard-mine').hidden = !host.user();
+    el('dashboard-favorites').hidden = !host.user();
     el('dashboard-signin').hidden = !!host.user();
     text('dashboard-error', '');
     if (!host.server()) {
@@ -182,7 +210,7 @@ export function createCommunityUI(host: Host) {
     }
     const results = await Promise.allSettled([
       search('public'),
-      ...(host.user() ? [search('mine')] : []),
+      ...(host.user() ? [search('mine'), search('starred')] : []),
     ]);
     for (const result of results)
       if (result.status === 'rejected') error('dashboard-error', result.reason);
@@ -204,6 +232,16 @@ export function createCommunityUI(host: Host) {
     minePage++;
     request++;
     void search('mine').catch((e) => error('dashboard-error', e));
+  };
+  for (const direction of [-1, 1])
+    el('dashboard-favorites-' + (direction === -1 ? 'previous' : 'next')).onclick = () => {
+      favoritePage = Math.max(1, favoritePage + direction);
+      request++;
+      void search('starred').catch((e) => error('dashboard-error', e));
+    };
+  el('dashboard-sort').onchange = () => {
+    browserPage = 1;
+    void refreshBrowser();
   };
   for (const id of ['dashboard-search', 'dashboard-tag'])
     el(id).oninput = () => {

@@ -72,7 +72,7 @@ export async function buildOffline() {
     .replace(
       /<link\s+rel="stylesheet"[^>]*\/>/,
       () =>
-        `<style>${css}\nbody[data-offline] .app-layout{grid-template-columns:minmax(0,1fr) var(--inspector)}@media(max-width:960px){body[data-offline] .app-layout{grid-template-columns:minmax(0,1fr)}}body[data-offline] .document-toolbar{justify-content:flex-end}.offline-notices{font-size:10px;max-width:100%;padding:0 30px 20px}.offline-notices pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto}</style>`,
+        `<style>${css}\nbody[data-offline] .app-layout{grid-template-columns:minmax(0,1fr)}@media(max-width:960px){body[data-offline] .app-layout{grid-template-columns:minmax(0,1fr)}}body[data-offline] .document-toolbar{justify-content:flex-end}.offline-notices{font-size:10px;max-width:100%;padding:0 30px 20px}.offline-notices pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto}</style>`,
     )
     .replace(/<script\s+type="module"[^>]*><\/script>/, '')
     .replace(

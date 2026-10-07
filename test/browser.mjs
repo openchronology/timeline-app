@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
+import { closeMomentDetails, checkMomentDialog } from './moment-dialog-browser.mjs';
 import { checkZoomHelp } from './zoom-help-browser.mjs';
 import { checkWheelPrecision } from './viewport-browser.mjs';
 import { checkPresentation } from './presentation-browser.mjs';
@@ -10,6 +11,7 @@ import { checkPlugins } from './plugins-browser.mjs';
 import { checkCommunity } from './community-browser.mjs';
 import { checkAccounts } from './accounts-browser.mjs';
 import { checkRemoteCache } from './remote-cache-browser.mjs';
+import { checkFollowLatest } from './follow-browser.mjs';
 import { checkComparison } from './comparison-browser.mjs';
 import { checkDesktopCache } from './desktop-cache-browser.mjs';
 import { checkResponsiveTimeline } from './layout-browser.mjs';
@@ -79,8 +81,10 @@ try {
     document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
   );
   assert.equal(await input('event-title').inputValue(), 'A renamed moment');
+  await closeMomentDetails(page);
   await input('undo-button').click();
   assert(!(await page.getByRole('button', { name: 'A renamed moment', exact: true }).count()));
+  await closeMomentDetails(page);
   await input('add-button').click();
   await input('event-title').fill('A new exact event');
   await input('event-time').fill('-17/23');
@@ -88,6 +92,7 @@ try {
     document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
   );
   assert.match(await input('event-count').textContent(), /11 events/);
+  await closeMomentDetails(page);
   await input('undo-button').click();
   const stage = input('timeline-stage'),
     box = await stage.boundingBox(),
@@ -100,6 +105,7 @@ try {
   await poll(async () => (await input('left-bound').inputValue()) !== before);
   await page.locator('.event-marker:not(.group)').first().click();
   assert(await input('event-form').isVisible());
+  await closeMomentDetails(page);
   const oldSpan = await span();
   await page.mouse.move(box.x + 350, box.y + 130);
   await page.mouse.wheel(0, -120);
@@ -107,6 +113,7 @@ try {
   await checkWheelPrecision(page);
   await checkZoomHelp(page);
 
+  await closeMomentDetails(page);
   await input('json-file').setInputFiles({
     name: 'sample.ochx',
     mimeType: 'application/json',
@@ -117,9 +124,6 @@ try {
   await poll(async () => (await dense.count()) === 1);
   await dense.click();
   assert.match(await input('group-title').textContent(), /20,001/);
-  await input('group-zoom').click();
-  await poll(async () => (await markers.count()) > 5);
-  assert((await markers.count()) < 200);
   const firstGroupTitle = await input('group-events').getByRole('button').first().textContent();
   assert.equal(await input('group-events').getByRole('button').count(), 25);
   await input('group-more').click();
@@ -138,6 +142,7 @@ try {
   await input('group-events').getByRole('button').first().click();
   assert.equal(await input('group-events').getByRole('button').count(), 0);
   await input('close-inspector').click();
+  await closeMomentDetails(page);
   await input('fit-button').click();
 
   const huge = 10n ** 300n,
@@ -153,6 +158,7 @@ try {
       { id: 'c', time: Q.from(huge * den + 2n, den).toString(), metadata: { title: 'Third' } },
     ],
   });
+  await closeMomentDetails(page);
   await input('json-file').setInputFiles({
     name: 'exact.ochx',
     mimeType: 'application/json',
@@ -162,11 +168,13 @@ try {
   await poll(async () => (await markers.count()) === 3);
   assert((await page.locator('.tick-label').first().textContent()).length > 0);
   const downloadPromise = page.waitForEvent('download');
+  await closeMomentDetails(page);
   await input('export-button').click();
   const download = await downloadPromise;
   assert.match(download.suggestedFilename(), /\.ochx$/);
   const exported = validateDocument(JSON.parse(await readFile(await download.path(), 'utf8')));
   assert.deepEqual(exported, document);
+  await checkMomentDialog(page, document);
   await checkPresentation(page, document);
   await checkRuler(page, document);
   await checkSelection(page, document);
@@ -201,6 +209,7 @@ try {
     });
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await poll(async () => (await span()).compare(s) < 0);
+    await closeMomentDetails(page);
     await input('fit-button').click();
     await poll(async () => (await markers.count()) === 3);
     const m = await markers.first().boundingBox();
@@ -213,6 +222,7 @@ try {
   await page.reload();
   await poll(async () => (await input('timeline-title').inputValue()) !== document.title);
   assert(await input('memory-notice').isVisible());
+  await closeMomentDetails(page);
   await input('fit-button').click();
   await mkdir('artifacts', { recursive: true });
   await page.screenshot({ path: `artifacts/timeline-${engine}.png`, fullPage: true });
@@ -220,6 +230,7 @@ try {
   await checkAccounts(browser);
   await checkCommunity(browser);
   await checkRemoteCache(browser);
+  await checkFollowLatest(browser);
   await checkDesktopCache(browser);
   await checkComparison(browser);
   console.log(

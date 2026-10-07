@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
+import { closeMomentDetails } from './moment-dialog-browser.mjs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Q, TimelineIndex, Viewport, DEFAULT_PRESENTATION } from '../dist/core.mjs';
@@ -155,6 +156,7 @@ export async function checkComparison(browser) {
     await page.locator('.event-marker').first().click();
     assert(await page.locator('#event-time').isDisabled());
     assert(await page.locator('#event-title').isDisabled());
+    await closeMomentDetails(page);
     await page.locator('#compare-combined').uncheck();
     assert(await page.locator('#comparison-settings').isVisible());
     documents[0].events = [{ id: 'new', time: '15/1', metadata: { title: 'New live moment' } }];
@@ -187,7 +189,7 @@ export async function checkComparison(browser) {
     assert.equal(await page.locator('#timeline-title').inputValue(), 'World War II');
     assert.equal(await page.locator('#add-button').isVisible(), false);
     assert.equal(await page.locator('#guest-fork-button').isVisible(), false);
-    assert.equal(await page.locator('#compare-format-dialog').isVisible(), false);
+    await page.locator('#compare-format-dialog').waitFor({ state: 'hidden' });
     assert.equal(await page.locator('.comparison-track').count(), 2);
     assert.match(await page.locator('#event-count').textContent(), /Read-only comparison/);
     assert.equal(errors.length, 0, errors.join('\n'));

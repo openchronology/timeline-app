@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { writeBuildInfo } from './build-info.mjs';
 
 export const copyrightBanner =
   '/*! OpenChronology — Copyright (c) 2026 Athan Clark. GPL-3.0-only; see LICENSE. No warranty. */';
@@ -29,7 +30,17 @@ export async function legalMarkup(source = false) {
 export async function withLegal(html, source = true) {
   if (!html.includes('<!-- OPENCHRONOLOGY_LEGAL -->'))
     throw new Error('Missing legal notice location');
-  return html.replace('<!-- OPENCHRONOLOGY_LEGAL -->', await legalMarkup(source));
+  const info = await writeBuildInfo();
+  const identity = `<span class="build-identity">Build: ${escape(info.label)}</span>`;
+  const footer = source
+    ? '<footer class="legal-notices">© 2026 Athan Clark · GPLv3 · No warranty · <a href="legal.html" target="_top">Terms, privacy &amp; licenses</a> · <a href="openchronology-web-source.tar.gz" download>Source</a> · <!-- BUILD_IDENTITY --></footer>'
+    : await legalMarkup(false);
+  return html.replace(
+    '<!-- OPENCHRONOLOGY_LEGAL -->',
+    source
+      ? footer.replace('<!-- BUILD_IDENTITY -->', identity)
+      : footer.replace('</footer>', ` · ${identity}</footer>`),
+  );
 }
 export async function buildLegal() {
   await mkdir('dist', { recursive: true });

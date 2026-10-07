@@ -20,10 +20,12 @@ export const config = {
     '/',
     '/login',
     '/account',
+    '/admin',
     '/plugins',
     '/legal',
     '/editor',
     '/timelines/:path*',
+    '/users/:path*',
     '/connect/:path*',
   ],
 };

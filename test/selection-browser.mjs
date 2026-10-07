@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
+import { closeMomentDetails } from './moment-dialog-browser.mjs';
 import { readFile } from 'node:fs/promises';
 import { DEFAULT_PRESENTATION } from '../dist/core.mjs';
 
@@ -7,6 +8,7 @@ import { DEFAULT_PRESENTATION } from '../dist/core.mjs';
 export async function checkSelection(page, restoreDocument) {
   const input = (id) => page.locator('#' + id);
   const imported = async (doc) => {
+    await closeMomentDetails(page);
     await input('json-file').setInputFiles({
       name: 'selection.ochx',
       mimeType: 'application/json',
@@ -20,7 +22,8 @@ export async function checkSelection(page, restoreDocument) {
   };
   const exported = async () => {
     const downloading = page.waitForEvent('download');
-    await input('export-button').click();
+    // Inspect serialization without dismissing the editor under test.
+    await input('export-button').evaluate((button) => button.click());
     return JSON.parse(await readFile(await (await downloading).path(), 'utf8'));
   };
   const source =
@@ -49,15 +52,19 @@ export async function checkSelection(page, restoreDocument) {
   assert.equal(await input('event-exact').inputValue(), exact);
   // The cursor follows its coordinate when the view moves rather than a fixed screen pixel.
   const left = await input('time-cursor').evaluate((node) => node.style.left);
+  await closeMomentDetails(page);
   await input('zoom-in').click();
   await page.waitForFunction(
     (old) => document.getElementById('time-cursor').style.left !== old,
     left,
   );
   assert.equal(await input('time-cursor').getAttribute('data-time'), exact);
+  await closeMomentDetails(page);
   await input('add-button').click();
   assert.equal(await input('event-exact').inputValue(), exact);
+  await closeMomentDetails(page);
   await input('fit-button').click();
+  await closeMomentDetails(page);
   await input('clear-selection').click();
   await page.mouse.click(x, y, { button: 'right' });
   assert(await menu.isVisible());
@@ -95,6 +102,7 @@ export async function checkSelection(page, restoreDocument) {
   await input('event-delete').click();
   await input('delete-confirm').click();
   assert.equal((await exported()).events.length, 2);
+  await closeMomentDetails(page);
   await input('undo-button').click();
   assert.equal((await exported()).events.length, 3);
   // Coincident/nearby points are never silently deleted as a group.
@@ -105,6 +113,7 @@ export async function checkSelection(page, restoreDocument) {
   assert.equal(await input('event-count').textContent(), '3 events');
   await input('delete-confirm').click();
   assert.equal((await exported()).events.length, 2);
+  await closeMomentDetails(page);
   await input('undo-button').click();
   // Coincident markers require choosing an individual event before deletion.
   await imported({
@@ -127,6 +136,7 @@ export async function checkSelection(page, restoreDocument) {
   await input('delete-cancel').click();
   assert.equal((await exported()).events.length, 2);
   // A held touch opens a menu without submitting a tap or moving the camera.
+  await closeMomentDetails(page);
   const before = await input('exact-left').inputValue();
   const title = await input('event-title').inputValue();
   await page.mouse.move(x, y);

@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+import { followLatest } from './follow-latest.js';
 import { createSummaryExpansion } from './summary-expansion.js';
 import { pluginExpand } from './plugins.js';
 import { browserEntryCount, BROWSER_COPY_MAX_EVENTS } from './browser-copy.js';
@@ -75,6 +76,7 @@ interface RemoteTimeline {
   presentation?: TimePresentation;
   plugins?: InstalledPlugin[];
   revision: string;
+  event_generation?: string;
   head_revision_id?: string;
   visibility: 'private' | 'public';
   canEdit: boolean;
@@ -85,6 +87,8 @@ interface RemoteTimeline {
   assets?: Record<string, string>;
   owner: string;
   event_count: string;
+  star_count?: string;
+  starred?: boolean;
   first?: string;
   last?: string;
 }
@@ -117,6 +121,13 @@ const sampleTimeline =
   platformEditor && new URLSearchParams(location.search).get('demo') === 'dense';
 const freshTimeline = platformEditor && new URLSearchParams(location.search).get('new') === '1';
 if (platformEditor) document.body.dataset.platformEditor = 'true';
+if (desktop) {
+  for (const link of document.querySelectorAll<HTMLAnchorElement>('.download-menu a'))
+    link.onclick = (event) => {
+      event.preventDefault();
+      void window.__TAURI__!.core.invoke('desktop_open_image', { url: link.href }).catch(fail);
+    };
+}
 let serverOrigin = desktop ? 'https://timescale.info' : location.origin;
 let model: TimelineIndex | null = new TimelineIndex(
     offlineHtml || freshTimeline
@@ -124,7 +135,7 @@ let model: TimelineIndex | null = new TimelineIndex(
           format: 'openchronology',
           version: 1,
           title: 'Untitled timeline',
-          description: '',
+          description: 'A short description for your timeline',
           events: [],
         }
       : demo(sampleTimeline),
@@ -154,6 +165,7 @@ function setDashboard(show: boolean) {
 function hasDashboard() {
   return session.dashboard ?? session.server;
 }
+let starring = false;
 let selectedTime: Q | null = null;
 let displayedEventTime: { text: string; time: Q } | null = null;
 let pendingDelete: { id: string; document: number; remove?: () => void } | null = null;
@@ -194,6 +206,7 @@ function flushEventEdit() {
       } else eventEditHistory.after = point;
       model!.put(point);
       selected = point;
+      text('moment-heading', 'Moment details');
       selectedGroup = null;
       selectedTime = Q.parse(point.time);
       el('event-delete').hidden = false;
@@ -268,6 +281,7 @@ function scaleContents(requested: number, anchor: number) {
 let verticalMinimum = 0,
   verticalMaximum = 0;
 function panVertical(value: number) {
+  follow.navigation();
   verticalOffset = Math.max(verticalMinimum, Math.min(verticalMaximum, value));
   requestRender(false);
 }
@@ -1137,6 +1151,7 @@ function currentComparisonSource(): ComparisonSource | null {
   return {
     key: remoteId ?? 'local-sqlite',
     revision: remoteId ? source.revision : undefined,
+    event_generation: remote?.event_generation,
     working: !!workspace?.changes.size || dirty,
     title: settings?.title ?? remote?.title ?? 'Local SQLite timeline',
     presentation: settings?.presentation ?? remote?.presentation,
@@ -1167,6 +1182,7 @@ async function comparisonSources(ids: string[]): Promise<ComparisonSource[]> {
     sources.push({
       key: id,
       revision: info.revision,
+      event_generation: info.event_generation,
       title: info.title,
       first: info.first,
       last: info.last,
@@ -1206,7 +1222,7 @@ function startComparison(sources: ComparisonSource[], presentation: TimePresenta
   selectedTime = null;
   el('event-form').hidden = true;
   el('group-details').hidden = true;
-  el('inspector-intro').hidden = false;
+  el<HTMLDialogElement>('inspector').close();
   el<HTMLInputElement>('compare-combined').checked = false;
   el('comparison-tracks').replaceChildren();
   for (const track of view.tracks) {
@@ -1248,6 +1264,7 @@ function startComparison(sources: ComparisonSource[], presentation: TimePresenta
         selectedTime = null;
         el('event-form').hidden = true;
         el('group-details').hidden = true;
+        el<HTMLDialogElement>('inspector').close();
         error.textContent = '';
         frame = { groups: [], visitedNodes: 0 };
         requestRender();
@@ -1284,7 +1301,7 @@ function stopComparison(restore = true) {
   el('comparison-settings').hidden = true;
   el('event-form').hidden = true;
   el('group-details').hidden = true;
-  el('inspector-intro').hidden = false;
+  el<HTMLDialogElement>('inspector').close();
   if (restore && comparisonBefore) {
     viewport = comparisonBefore.viewport;
     verticalOffset = comparisonBefore.verticalOffset;
@@ -1345,6 +1362,7 @@ function renderComparison(refresh: boolean) {
   }, 70);
 }
 function heading() {
+  updateFollowControl();
   el('memory-notice').hidden =
     !memoryOnly() ||
     !!remote ||
@@ -1405,7 +1423,7 @@ function heading() {
   text('owner-label', remote ? remote.owner : desktop ? 'Offline workspace' : 'Local workspace');
   const ownerLink = el<HTMLAnchorElement>('owner-label');
   if (remote) {
-    ownerLink.href = '/?owner=' + encodeURIComponent(remote.owner);
+    ownerLink.href = (desktop ? serverOrigin : '') + '/users/' + encodeURIComponent(remote.owner);
     ownerLink.target = '_top';
   } else ownerLink.removeAttribute('href');
   text(
@@ -1442,6 +1460,13 @@ function heading() {
   el('och-import').hidden = offlineHtml || desktop || !session.fileExchange || !session.user;
   el('och-export').hidden = offlineHtml || desktop || !session.fileExchange || !session.user;
   el('share-button').hidden = !remote?.canShare;
+  const star = el<HTMLButtonElement>('timeline-star-button');
+  star.hidden = offlineHtml || platformEditor || !remote;
+  star.disabled = !session.user || starring;
+  star.title = session.user ? 'Toggle favorite' : 'Sign in to star timelines';
+  star.setAttribute('aria-pressed', String(!!remote?.starred));
+  star.textContent = `${remote?.starred ? '★ Starred' : '☆ Star'} · ${remote?.star_count ?? '0'}`;
+
   el('add-button').hidden = !editable();
   el<HTMLButtonElement>('undo-button').disabled = !history.length;
   text(
@@ -1670,7 +1695,7 @@ function loadDocument(doc: TimelineDocument) {
   frameRequest++;
   el('group-details').hidden = true;
   el('event-form').hidden = true;
-  el('inspector-intro').hidden = false;
+  el<HTMLDialogElement>('inspector').close();
   heading();
   requestRender();
   persistDraft();
@@ -1745,7 +1770,7 @@ async function openRemote(id: string) {
   requestRender();
   el('event-form').hidden = true;
   el('group-details').hidden = true;
-  el('inspector-intro').hidden = false;
+  el<HTMLDialogElement>('inspector').close();
   const info = await api<RemoteTimeline>(`timelines/${id}`);
   if (request !== documentRequest) return;
   remote = info;
@@ -1840,7 +1865,6 @@ async function forkInBrowser(id: string) {
 el('guest-fork-button').onclick = () => {
   if (remote) void forkInBrowser(remote.id);
 };
-el('memory-export').onclick = () => el('export-button').click();
 window.addEventListener('beforeunload', (event) => {
   if (memoryOnly() && !remote && !comparison && (dirty || pendingEventEdit)) {
     event.preventDefault();
@@ -2296,6 +2320,12 @@ el<HTMLDialogElement>('plugin-library-dialog').addEventListener('close', () => {
 });
 el<HTMLTextAreaElement>('event-metadata').addEventListener('input', refreshPluginFields);
 
+function showMomentDetails(title: string) {
+  hoverPreview.hide();
+  summaryExpansion.hide();
+  text('moment-heading', title);
+  el<HTMLDialogElement>('inspector').showModal();
+}
 function eventForm(event?: PointEvent, time?: Q) {
   if (comparison && !event) return;
   flushEventEdit();
@@ -2311,7 +2341,6 @@ function eventForm(event?: PointEvent, time?: Q) {
   if (!event) selectedGroup = null;
   el('event-form').hidden = false;
   el('group-details').hidden = true;
-  el('inspector-intro').hidden = true;
   input('event-title').value = event?.metadata.title ?? '';
   selectedTime = event
     ? Q.parse(event.time)
@@ -2336,8 +2365,7 @@ function eventForm(event?: PointEvent, time?: Q) {
   );
   el('event-delete').hidden = !event || !editable();
   text('event-error', '');
-  if (window.innerWidth < 650)
-    el('inspector').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showMomentDetails(event ? 'Moment details' : 'New moment');
 }
 async function groupPage(
   group: FrameGroup,
@@ -2455,7 +2483,6 @@ async function selectGroup(group: FrameGroup) {
     return;
   }
   el('event-form').hidden = true;
-  el('inspector-intro').hidden = true;
   el('group-details').hidden = false;
   text('group-title', `${BigInt(group.count).toLocaleString()} moments`);
   text(
@@ -2466,8 +2493,7 @@ async function selectGroup(group: FrameGroup) {
   );
   el('group-zoom').hidden = group.distinct === 1;
   showGroupPage(page.events, page.next);
-  if (window.innerWidth < 650)
-    el('inspector').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showMomentDetails('Group details');
 }
 function showGroupPage(events: PointEvent[], next: { time: string; id: string } | null) {
   groupCursor = next;
@@ -2491,25 +2517,130 @@ function showGroupPage(events: PointEvent[], next: { time: string; id: string } 
   }
 }
 function zoomGroup(group: FrameGroup) {
+  follow.navigation();
   cancelZoomAnimation();
   if (group.distinct === 1) return;
   viewport = Viewport.fit(Q.parse(group.first), Q.parse(group.last));
   requestRender();
 }
+let followScope = '';
+function currentFollowScope() {
+  if (!platformEditor || desktop || offlineHtml || !session.server) return '';
+  if (comparison)
+    return comparison.tracks.every(
+      (t) => !t.source.working && /^[a-f0-9-]{36}$/i.test(t.source.key),
+    )
+      ? 'compare:' +
+          comparison.tracks
+            .map((t) => t.source.key)
+            .sort()
+            .join(',')
+      : '';
+  return remote ? remote.id : '';
+}
+const follow = followLatest<Viewport>({
+  blocked: () =>
+    !currentFollowScope() ||
+    document.hidden ||
+    dirty ||
+    saving ||
+    pendingEventEdit ||
+    pointers.size > 0 ||
+    !!document.querySelector('dialog[open]'),
+  cancel: () => {
+    if (followingAnimation) cancelZoomAnimation();
+  },
+  error: fail,
+  async load(signal) {
+    const tracks = comparison?.tracks;
+    const times = tracks
+      ? (
+          await Promise.all(
+            tracks.map(async (track) => {
+              const result = await api<{ times: string[] }>(
+                `timelines/${track.source.key}/recent?direction=${track.scale.compare(Q.zero) < 0 ? 'first' : 'last'}`,
+                'GET',
+                undefined,
+                signal,
+              );
+              return result.times.map((time) => Q.parse(time).mul(track.scale).add(track.offset));
+            }),
+          )
+        ).flat()
+      : remote
+        ? (
+            await api<{ times: string[] }>(
+              `timelines/${remote.id}/recent`,
+              'GET',
+              undefined,
+              signal,
+            )
+          ).times.map((time) => Q.parse(time))
+        : [];
+    const recent = times
+      .sort((a, b) => b.compare(a))
+      .filter((time, index, ordered) => !index || !time.equals(ordered[index - 1]))
+      .slice(0, 8);
+    return recent.length ? Viewport.fit(recent.at(-1)!, recent[0]) : null;
+  },
+  apply: (view) => animateView(view.rasterize(width()), true),
+});
+function updateFollowControl() {
+  const scope = currentFollowScope();
+  el('follow-latest-control').hidden = !scope;
+  if (scope !== followScope) {
+    follow.reset();
+    followScope = scope;
+    input('follow-latest').checked = false;
+    if (scope) {
+      try {
+        input('follow-latest').checked = sessionStorage.getItem('och:follow:' + scope) === 'true';
+      } catch {}
+      follow.setEnabled(input('follow-latest').checked);
+    }
+  }
+}
+stage.addEventListener('wheel', () => follow.navigation(), { capture: true, passive: true });
+stage.addEventListener('pointerup', () => follow.navigation());
+document.addEventListener('visibilitychange', () => follow.wake());
+document.addEventListener('pointerdown', (event) => {
+  if (
+    (event.target as HTMLElement).closest(
+      '.view-controls, .window-bounds, #comparison-settings, .timeline-footer, #timeline-actions, dialog',
+    )
+  )
+    follow.navigation();
+});
+el('comparison-settings').addEventListener('input', () => follow.navigation());
+window.addEventListener('resize', () => follow.navigation());
+input('follow-latest').onchange = () => {
+  if (!followScope) return;
+  follow.setEnabled(input('follow-latest').checked);
+  try {
+    sessionStorage.setItem('och:follow:' + followScope, String(input('follow-latest').checked));
+  } catch {}
+};
 let zoomAnimation: number | undefined, zoomTarget: Viewport | undefined;
 function cancelZoomAnimation() {
   if (zoomAnimation !== undefined) cancelAnimationFrame(zoomAnimation);
   zoomAnimation = undefined;
   zoomTarget = undefined;
+  followingAnimation = false;
   delete stage.dataset.zooming;
 }
 function zoom(factor: Q) {
+  follow.navigation();
   const destination = (zoomTarget ?? viewport)
     .zoom(width() / 2, width(), factor)
     .rasterize(width());
+  animateView(destination);
+}
+let followingAnimation = false;
+function animateView(destination: Viewport, automatic = false) {
   cancelZoomAnimation();
+  followingAnimation = automatic;
   if (reducedMotion.matches) {
-    navigate(destination);
+    navigate(destination, false);
     return;
   }
   hoverPreview.hide();
@@ -2528,7 +2659,7 @@ function zoom(factor: Q) {
     const progress = Math.min(1, Math.max(0, (now - started) / 220));
     if (progress === 1) {
       cancelZoomAnimation();
-      navigate(destination);
+      navigate(destination, false);
       return;
     }
     const amount = Q.from(BigInt(Math.round((1 - (1 - progress) ** 3) * 1_000_000)), 1_000_000n);
@@ -2543,13 +2674,15 @@ function zoom(factor: Q) {
   };
   zoomAnimation = requestAnimationFrame(tick);
 }
-function navigate(view: Viewport) {
+function navigate(view: Viewport, manual = true) {
+  if (manual) follow.navigation();
   cancelZoomAnimation();
   closeTimelineMenu();
   viewport = view.rasterize(width());
   requestRender();
 }
 function fit() {
+  follow.navigation();
   cancelZoomAnimation();
   if (comparison) {
     viewport = comparison.fit();
@@ -2655,6 +2788,8 @@ function showTimelineMenu(
   summaryExpansion.hide();
   closeTimelineMenu();
   const menu = el('timeline-menu');
+  const details = el<HTMLDialogElement>('inspector');
+  (details.open ? details : document.body).append(menu);
   menu.replaceChildren();
   const add = (label: string, action: () => void) => {
     const button = document.createElement('button');
@@ -2672,7 +2807,10 @@ function showTimelineMenu(
       selectedGroup = null;
       eventForm(undefined, time);
     });
-  add('Fit all', fit);
+  add('Fit all', () => {
+    fit();
+    details.close();
+  });
   if (point && editable()) {
     if (pluginFields(activePlugins()).some((f) => f.kind === 'stack'))
       add('Add entry to stack', () => addStackEntry(point));
@@ -2854,6 +2992,7 @@ function resetGesture() {
   gesture = { view: viewport.clone(), vertical: verticalOffset, scale: uiScale, ...metrics() };
 }
 stage.addEventListener('pointerdown', (event) => {
+  follow.navigation();
   cancelZoomAnimation();
   hoverPreview.hide();
   summaryExpansion.hide();
@@ -2895,6 +3034,7 @@ stage.addEventListener('pointermove', (event) => {
   if (press && Math.hypot(event.clientX - press.x, event.clientY - press.y) > 5) moved = true;
   if (moved) clearTimeout(longPressTimer);
   if (!moved || longPressed) return;
+  follow.navigation();
   stage.classList.add('dragging');
   if (pointers.size > 1 && gesture.distanceY >= 20)
     uiScale = Math.max(0.2, Math.min(3, (gesture.scale * now.distanceY) / gesture.distanceY));
@@ -3017,32 +3157,46 @@ el('zoom-in').onclick = () => zoom(Q.from(4n, 5n));
 el('zoom-out').onclick = () => zoom(Q.from(5n, 4n));
 el('fit-button').onclick = fit;
 el('center-vertical').onclick = () => {
+  follow.navigation();
   verticalOffset = 192 * (1 - uiScale);
   requestRender(false);
 };
 el('empty-fit').onclick = fit;
 el('add-button').onclick = () => eventForm(undefined, selectedTime ?? undefined);
 el('clear-selection').onclick = () => {
-  el('close-inspector').click();
-};
-el('close-inspector').onclick = () => {
   flushEventEdit();
   pendingEventEdit = false;
   selectedTime = null;
-  selectionRequest++;
-  clearGroupPage();
   selected = null;
   selectedGroup = null;
-  el('event-form').hidden = true;
-  el('group-details').hidden = true;
-  el('inspector-intro').hidden = false;
+  selectionRequest++;
+  clearGroupPage();
+  el<HTMLDialogElement>('inspector').close();
   requestRender();
 };
+el('close-inspector').onclick = () => {
+  flushEventEdit();
+  el<HTMLDialogElement>('inspector').close();
+};
+el<HTMLDialogElement>('inspector').addEventListener('close', () => {
+  if (el<HTMLDialogElement>('inspector').open) return;
+  closeTimelineMenu();
+  flushEventEdit();
+  pendingEventEdit = false;
+  selected = null;
+  selectedGroup = null;
+  selectionRequest++;
+  clearGroupPage();
+  el('event-form').hidden = true;
+  el('group-details').hidden = true;
+  requestRender();
+});
 input('density').oninput = () => {
   text('density-value', `${pixels()} px`);
   requestRender();
 };
 el('apply-bounds').onclick = () => {
+  follow.navigation();
   cancelZoomAnimation();
   try {
     const formatter = timelinePresenter(),
@@ -3209,6 +3363,7 @@ el<HTMLFormElement>('presentation-form').onsubmit = (event) => {
   }
 };
 el('apply-exact-bounds').onclick = () => {
+  follow.navigation();
   cancelZoomAnimation();
   try {
     const left = parseTime(input('exact-left').value),
@@ -3220,7 +3375,10 @@ el('apply-exact-bounds').onclick = () => {
   }
 };
 el('group-zoom').onclick = () => {
-  if (selectedGroup) zoomGroup(selectedGroup);
+  if (selectedGroup) {
+    zoomGroup(selectedGroup);
+    el<HTMLDialogElement>('inspector').close();
+  }
 };
 async function turnGroupPage(direction: -1 | 1) {
   const group = selectedGroup;
@@ -3305,12 +3463,11 @@ el('delete-confirm').onclick = () => {
   if (selected?.id === point.id) {
     selected = null;
     el('event-form').hidden = true;
-    el('inspector-intro').hidden = false;
   }
   selectedGroup = null;
   el('group-details').hidden = true;
-  if (el('event-form').hidden) el('inspector-intro').hidden = false;
   el<HTMLDialogElement>('delete-dialog').close();
+  el<HTMLDialogElement>('inspector').close();
   changed();
 };
 el('undo-button').onclick = () => {
@@ -3325,7 +3482,7 @@ el('undo-button').onclick = () => {
   selected = null;
   selectedGroup = null;
   el('event-form').hidden = true;
-  el('inspector-intro').hidden = false;
+  el<HTMLDialogElement>('inspector').close();
   changed();
 };
 input('timeline-title').onchange = () => {
@@ -3345,6 +3502,25 @@ function mayReplace() {
     confirm('Save or export your changes first if you want to keep them. Replace this timeline?')
   );
 }
+el('timeline-star-button').onclick = async () => {
+  if (!remote || !session.user || starring) return;
+  const id = remote.id;
+  starring = true;
+  heading();
+  try {
+    const result = await api<{ starred: boolean; star_count: string }>(
+      `timelines/${id}/star`,
+      'POST',
+      { starred: !remote.starred },
+    );
+    if (remote?.id === id) Object.assign(remote, result);
+  } catch (error) {
+    fail(error);
+  } finally {
+    starring = false;
+    heading();
+  }
+};
 el('new-button').onclick = () => {
   if (!mayReplace()) return;
   historyReplace();
@@ -3353,11 +3529,13 @@ el('new-button').onclick = () => {
     format: 'openchronology',
     version: 1,
     title: 'Untitled timeline',
-    description: '',
+    description: 'A short description for your timeline',
     events: [],
   });
 };
 function historyReplace() {
+  follow.reset();
+  followScope = '';
   documentRequest++;
   if (!offlineHtml) window.history.replaceState(null, '', location.pathname);
   if (platformEditor) window.parent.postMessage({ type: 'openchronology:local' }, location.origin);
@@ -3763,7 +3941,7 @@ el('delete-timeline').onclick = () => {
             format: 'openchronology',
             version: 1,
             title: 'Untitled timeline',
-            description: '',
+            description: 'A short description for your timeline',
             events: [],
           });
           setDashboard(true);
@@ -3939,7 +4117,7 @@ if (desktop) {
           format: 'openchronology',
           version: 1,
           title: 'Untitled timeline',
-          description: '',
+          description: 'A short description for your timeline',
           events: [],
         });
         toast('The remote snapshot was unavailable. Open a local file or reconnect to view it.');
@@ -4112,7 +4290,7 @@ if (offlineHtml) {
   ])
     el(id).hidden = true;
   document.querySelector('#empty-window')!.firstChild!.textContent =
-    'Import JSON or add your first event.';
+    'Import a timeline or add your first event.';
 }
 if (!offlineHtml)
   live = liveUpdates({
@@ -4141,7 +4319,13 @@ if (!offlineHtml)
         selectedGroup = null;
         el('event-form').hidden = true;
         el('group-details').hidden = true;
+        el<HTMLDialogElement>('inspector').close();
+        const added =
+          sources[0].event_generation !== undefined &&
+          BigInt(sources[0].event_generation) >
+            BigInt(view.tracks.find((t) => t.source.key === id)?.source.event_generation ?? '0');
         view.replaceSource(sources[0]);
+        if (added) follow.addition();
         configureImages(
           Object.assign({}, ...view.tracks.map((t) => t.source.assets ?? {})),
           offlineHtml,
@@ -4160,7 +4344,11 @@ if (!offlineHtml)
       if (info.presentation) info.presentation = validatePresentation(info.presentation);
       if (info.plugins) info.plugins = validateInstalledPlugins(info.plugins);
       if (info.assets) info.assets = validateAssets(info.assets);
+      const added =
+        info.event_generation !== undefined &&
+        BigInt(info.event_generation) > BigInt(remote.event_generation ?? '0');
       remote = info;
+      if (added) follow.addition();
       model = info.canEdit
         ? new RemoteWorkspace({
             format: 'openchronology',
@@ -4184,6 +4372,7 @@ if (!offlineHtml)
       selectedGroup = null;
       el('event-form').hidden = true;
       el('group-details').hidden = true;
+      el<HTMLDialogElement>('inspector').close();
       el('live-notice').hidden = true;
       liveTransitionPending = true;
       heading();
@@ -4255,6 +4444,7 @@ el<HTMLInputElement>('compare-combined').onchange = () => {
   selectedTime = null;
   el('event-form').hidden = true;
   el('group-details').hidden = true;
+  el<HTMLDialogElement>('inspector').close();
   comparison.combined = input('compare-combined').checked;
   uiScale = comparison.combined
     ? 1

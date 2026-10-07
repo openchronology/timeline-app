@@ -28,10 +28,14 @@ for (const key of Object.keys(env))
     delete env[key];
 env.PORT = String(port);
 env.HOSTNAME = '127.0.0.1';
-const child = spawn(process.execPath, [resolve('platform/.next/standalone/platform/server.cjs')], {
-  env,
-  stdio: ['ignore', 'pipe', 'pipe'],
-});
+const child = spawn(
+  process.execPath,
+  [resolve(process.env.PLATFORM_TEST_SERVER ?? 'platform/.next/standalone/platform/server.cjs')],
+  {
+    env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  },
+);
 let logs = '',
   exited = false;
 for (const s of [child.stdout, child.stderr])
@@ -136,6 +140,13 @@ try {
     !(await guest.request('/?search=' + term)).includes(`href="${base}"`),
     'private timeline leaked into public search',
   );
+  await owner.request(api + '/star', { method: 'POST', data: { starred: true } });
+  assert.match(await owner.request('/'), /id="dashboard-favorites"/);
+  const profileUrl = '/users/nextowner_' + suffix;
+  assert(
+    !(await guest.request(profileUrl)).includes(`href="${base}"`),
+    'Private favorites leaked into public profile',
+  );
   await guest.request(base, { status: 404 });
   await guest.request(api + '/document', { status: 404 });
   await contributor.request(base + '/settings', { status: 404 });
@@ -170,6 +181,11 @@ try {
     method: 'PATCH',
     data: { visibility: 'public' },
   });
+  const profile = await guest.request(profileUrl);
+  assert.match(profile, /Public favorites/);
+  assert(profile.includes(`href="${base}"`));
+  for (const sort of ['stars', 'popularity', 'alphabetical', 'age', 'relevance'])
+    assert((await guest.request('/?search=' + term + '&sort=' + sort)).includes(`href="${base}"`));
   const publicPage = await guest.request(base);
   assert.match(publicPage, /title="Timeline editor"/);
   assert(publicPage.includes('/editor/frame#timeline/' + timeline.id));
@@ -214,7 +230,10 @@ try {
   });
   timelines.push(fork.id);
   const forkApi = '/api/timelines/' + fork.id;
-  assert.match(await contributor.request('/timelines/' + fork.id), /Propose saved changes/);
+  // Timeline actions are mounted into the editor frame after hydration.
+  const forkPage = await contributor.request('/timelines/' + fork.id);
+  assert(forkPage.includes('/editor/frame#timeline/' + fork.id));
+  assert(forkPage.includes(timeline.id));
   assert.match(
     await contributor.request('/timelines/' + fork.id + '/pulls/new'),
     /Open pull request/,
@@ -255,7 +274,7 @@ try {
   await owner.request('/api/auth/logout', { method: 'POST', data: {} });
   assert.doesNotMatch(await owner.request('/'), /id="dashboard-mine"/);
   console.log(
-    'PASS Next.js/PostgreSQL accounts, private SSR access, public full-text search, sharing, proposal discussion and writer-only merge.',
+    'PASS Next.js/PostgreSQL accounts, private SSR access, public full-text search, stars, private favorites, public profiles, sorting, sharing, proposal discussion and writer-only merge.',
   );
 } catch (e) {
   console.error(logs);

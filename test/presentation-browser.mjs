@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
+import { closeMomentDetails } from './moment-dialog-browser.mjs';
 import { readFile } from 'node:fs/promises';
 import { validateDocument, DEFAULT_PRESENTATION, parseTimestamp } from '../dist/core.mjs';
 
@@ -7,6 +8,7 @@ import { validateDocument, DEFAULT_PRESENTATION, parseTimestamp } from '../dist/
 export async function checkPresentation(page, restoreDocument) {
   const input = (id) => page.locator('#' + id);
   const imported = async (document) => {
+    await closeMomentDetails(page);
     await input('json-file').setInputFiles({
       name: 'display.ochx',
       mimeType: 'application/json',
@@ -20,7 +22,8 @@ export async function checkPresentation(page, restoreDocument) {
   };
   const exported = async () => {
     const downloading = page.waitForEvent('download');
-    await input('export-button').click();
+    // Inspect serialization without dismissing the editor under test.
+    await input('export-button').evaluate((button) => button.click());
     const download = await downloading;
     return validateDocument(JSON.parse(await readFile(await download.path(), 'utf8')));
   };
@@ -31,6 +34,7 @@ export async function checkPresentation(page, restoreDocument) {
     description: '',
     events: [{ id: 'third', time: '1/3', metadata: { title: 'Third' } }],
   });
+  await closeMomentDetails(page);
   await input('presentation-button').click();
   await input('presentation-mode').selectOption('float');
   await input('presentation-unit-preset').selectOption('2');
@@ -56,6 +60,7 @@ export async function checkPresentation(page, restoreDocument) {
   const exactBounds = await Promise.all(
     ['exact-left', 'exact-right'].map((id) => input(id).inputValue()),
   );
+  await closeMomentDetails(page);
   await input('apply-bounds').click();
   await page.evaluate(() => new Promise(requestAnimationFrame));
   assert.deepEqual(
@@ -64,10 +69,13 @@ export async function checkPresentation(page, restoreDocument) {
   );
   await input('left-bound').fill('0.1 minutes');
   await input('right-bound').fill('2 minutes');
+  await closeMomentDetails(page);
   await input('apply-bounds').click();
   await page.evaluate(() => new Promise(requestAnimationFrame));
   assert.equal(await input('exact-left').inputValue(), '6/1');
   assert.equal(await input('exact-right').inputValue(), '120/1');
+  await input('fit-button').click();
+  await page.locator('.event-marker').first().click();
   await input('event-time').fill('1.5 minutes');
   assert.equal(await input('event-exact').inputValue(), '90/1');
   await page.waitForFunction(() =>
@@ -75,6 +83,7 @@ export async function checkPresentation(page, restoreDocument) {
   );
   assert.equal((await exported()).events[0].time, '90/1');
 
+  await closeMomentDetails(page);
   await input('presentation-button').click();
   await input('presentation-mode').selectOption('gregorian');
   await input('presentation-epoch').selectOption('mjd');
@@ -88,6 +97,7 @@ export async function checkPresentation(page, restoreDocument) {
   document = await exported();
   assert.equal(document.presentation.scale, '1/86400');
 
+  await closeMomentDetails(page);
   await input('presentation-button').click();
   await input('presentation-mode').selectOption('custom');
   const source =
@@ -105,11 +115,13 @@ export async function checkPresentation(page, restoreDocument) {
   assert.match(await input('left-bound').inputValue(), / ticks$/);
   await input('left-bound').fill('1/3 ticks');
   await input('right-bound').fill('100/1 ticks');
+  await closeMomentDetails(page);
   await input('apply-bounds').click();
   await page.evaluate(() => new Promise(requestAnimationFrame));
   assert.equal(await input('exact-left').inputValue(), '1/3');
   assert.equal(await input('exact-right').inputValue(), '100/1');
   await imported({ ...document, title: 'Custom settings reimported' });
+  await closeMomentDetails(page);
   await input('presentation-button').click();
   assert.equal(await input('presentation-source').inputValue(), source);
   await input('presentation-source').fill(
@@ -119,6 +131,7 @@ export async function checkPresentation(page, restoreDocument) {
   await page.evaluate(() => new Promise(requestAnimationFrame));
   assert.equal(await page.locator('img').count(), 0);
   assert.match(await page.locator('.tick-label').first().textContent(), /^<img/);
+  await closeMomentDetails(page);
   await input('presentation-button').click();
   await input('presentation-source').fill(
     'function print(time, api) { return fetch("https://example.invalid"); } function parse(text, api) { return api.rational(text); }',
@@ -144,6 +157,7 @@ export async function checkPresentation(page, restoreDocument) {
   });
   await input('left-bound').fill('2026-10-05T00:00:00Z');
   await input('right-bound').fill('2026-10-06T00:00:00Z');
+  await closeMomentDetails(page);
   await input('apply-bounds').click();
   await page.evaluate(() => new Promise(requestAnimationFrame));
   assert.match(await input('time-context').textContent(), /2026-10-05.*UTC/);
@@ -183,6 +197,7 @@ export async function checkPresentation(page, restoreDocument) {
   });
   await input('left-bound').fill('2026-10-04T23:59:59Z');
   await input('right-bound').fill('2026-10-05T00:00:19Z');
+  await closeMomentDetails(page);
   await input('apply-bounds').click();
   await page.evaluate(() => new Promise(requestAnimationFrame));
   assert.equal(await input('left-bound').inputValue(), '2026-10-04T23:59:59Z CE');
@@ -199,6 +214,7 @@ export async function checkPresentation(page, restoreDocument) {
   ]);
   await input('left-bound').fill('2026-10-04T23:59:13Z');
   await input('right-bound').fill('2026-10-05T00:00:53Z');
+  await closeMomentDetails(page);
   await input('apply-bounds').click();
   await page.evaluate(() => new Promise(requestAnimationFrame));
   assert(
@@ -210,6 +226,7 @@ export async function checkPresentation(page, restoreDocument) {
     '00m 03.5s',
     '00m 13.7s',
   ]);
+  await closeMomentDetails(page);
   await input('presentation-button').click();
   await input('presentation-adaptive').uncheck();
   await input('presentation-save').click();

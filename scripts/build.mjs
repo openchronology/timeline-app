@@ -33,6 +33,7 @@ await build({
     'src/remote-cache.ts',
     'src/comparison.ts',
     'src/live-updates.ts',
+    'src/follow-latest.ts',
     'src/browser-copy.ts',
     'src/summary-expansion.ts',
     'src/image-assets.ts',

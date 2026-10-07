@@ -11,6 +11,7 @@ export interface EventPage {
 export interface ComparisonSource {
   key: string;
   revision?: string;
+  event_generation?: string;
   working?: boolean;
   title: string;
   presentation?: TimePresentation;

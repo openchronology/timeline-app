@@ -50,5 +50,5 @@ export async function checkZoomHelp(page) {
   assert.match(await dialog.textContent(), /Alt-scroll moves vertically/);
   assert.match(await dialog.textContent(), /Ctrl-scroll scales/);
   await page.mouse.click(2, 2);
-  assert(await dialog.isHidden());
+  await dialog.waitFor({ state: 'hidden' });
 }

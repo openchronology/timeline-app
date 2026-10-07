@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+import { setTimelineStar } from './stars.mjs';
+import { Administration, usage, requireDataProvider, avatarValue } from './administration.mjs';
+import { authorizeKey, keyRequestRead } from './api-keys.mjs';
 import { BrowserForks } from './browser-forks.mjs';
 import { queryPlugins } from './query-plugins.mjs';
 import { Collaboration, searchTimelines } from './collaboration.mjs';
@@ -114,6 +117,7 @@ export function createRequestHandler({
       : null,
     oauth = auth ? new OAuth(auth, providers, fetcher) : null,
     devices = auth ? new DeviceAuth(auth) : null;
+  const administration = store ? new Administration(store, auth) : null;
   const collaboration = store ? new Collaboration(store) : null;
   const browserForks = store ? new BrowserForks(store, auth) : null;
   return async (req, res) => {
@@ -134,6 +138,11 @@ export function createRequestHandler({
     try {
       const pathname = new URL(req.url, origin).pathname,
         method = req.method;
+      if (
+        (req.headers.authorization ?? '').startsWith('Bearer och_key_') &&
+        !pathname.startsWith('/api/timelines')
+      )
+        throw new HttpError(403, 'API keys are limited to timeline endpoints.');
       if (pathname === '/healthz' && method === 'GET') {
         try {
           if (pool)
@@ -180,7 +189,14 @@ export function createRequestHandler({
           {
             server: !!pool,
             dashboard: true,
-            user: session ? { id: session.id, username: session.username } : null,
+            user: session
+              ? {
+                  id: session.id,
+                  username: session.username,
+                  isAdmin: !!session.is_admin,
+                  avatarUrl: session.avatar_url ?? '',
+                }
+              : null,
             csrf: session?.csrf ?? nonce,
             providers: oauth?.names() ?? [],
             ...(auth
@@ -228,6 +244,102 @@ export function createRequestHandler({
         }
         const session = await auth.session(req),
           userId = session?.id;
+        if ((req.headers.authorization ?? '').startsWith('Bearer och_key_') && !session)
+          throw new HttpError(401, 'API key is expired, revoked, or invalid.');
+        authorizeKey(session, pathname, method);
+        if (session?.kind === 'api')
+          await auth.rateLimit(
+            'api-key:' + session.api_key_id,
+            Math.max(1, Math.min(1000, Number(process.env.API_KEY_REQUESTS_PER_MINUTE) || 120)),
+          );
+        if (
+          pathname.startsWith('/api/timelines') &&
+          !keyRequestRead(pathname, method) &&
+          method !== 'DELETE'
+        )
+          await requireDataProvider(pool, userId);
+        if (pathname.startsWith('/api/admin/')) {
+          const parts = pathname.slice('/api/admin/'.length).split('/');
+          if (
+            !['users', 'timelines', 'settings'].includes(parts[0]) ||
+            parts.length > 2 ||
+            (parts[1] && !uuid.test(parts[1]))
+          )
+            throw new HttpError(404, 'Unknown administration endpoint.');
+          if (method === 'GET' && !parts[1])
+            return response(
+              res,
+              200,
+              await administration.list(
+                session,
+                parts[0] === 'settings' ? 'users' : parts[0],
+                Object.fromEntries(new URL(req.url, origin).searchParams),
+              ),
+            );
+          if (method === 'PATCH' && (parts[1] || parts[0] === 'settings')) {
+            auth.require(session, req);
+            await auth.rateLimit('admin:' + userId);
+            return response(
+              res,
+              200,
+              await administration.change(
+                session,
+                parts[0],
+                parts[1] ?? null,
+                await body(req, 8192),
+              ),
+            );
+          }
+          throw new HttpError(404, 'Unknown administration action.');
+        }
+        if (pathname === '/api/auth/profile' && method === 'PATCH') {
+          auth.require(session, req);
+          const value = await body(req, 400000);
+          if (!value || Object.keys(value).some((k) => k !== 'avatarUrl'))
+            throw new HttpError(400, 'Invalid profile.');
+          await pool.query('UPDATE oc_users SET avatar_url=$2 WHERE id=$1', [
+            userId,
+            avatarValue(value.avatarUrl),
+          ]);
+          return response(res, 200, { ok: true });
+        }
+        if (pathname === '/api/auth/api-keys') {
+          if (!session) throw new HttpError(401, 'Sign in to manage API keys.');
+          if (method === 'GET') return response(res, 200, { keys: await auth.keys.list(userId) });
+          if (method === 'POST') {
+            auth.require(session, req);
+            await auth.rateLimit('keys:' + userId);
+            return response(res, 201, await auth.keys.create(session, await body(req, 8192)));
+          }
+        }
+        const apiKey = /^\/api\/auth\/api-keys\/([a-f0-9-]{36})$/.exec(pathname);
+        if (apiKey && uuid.test(apiKey[1]) && ['POST', 'DELETE'].includes(method)) {
+          auth.require(session, req);
+          return response(res, 200, await auth.keys.revoke(userId, apiKey[1], method === 'DELETE'));
+        }
+        if (pathname === '/api/auth/identities/unlink' && method === 'POST') {
+          auth.require(session, req);
+          await auth.rateLimit('unlink:' + userId);
+          const value = await body(req, 8192);
+          if (!['google', 'github', 'facebook'].includes(value.provider))
+            throw new HttpError(400, 'Unknown provider.');
+          await auth.security.transaction(async (c) => {
+            const user = (await c.query('SELECT * FROM oc_users WHERE id=$1 FOR UPDATE', [userId]))
+              .rows[0];
+            await auth.security.fresh(c, user, session, value);
+            const count = Number(
+              (await c.query('SELECT count(*) FROM oc_identities WHERE user_id=$1', [userId]))
+                .rows[0].count,
+            );
+            if (!user.password_hash && count <= 1)
+              throw new HttpError(409, 'Keep a password or another linked sign-in method.');
+            await c.query('DELETE FROM oc_identities WHERE user_id=$1 AND provider=$2', [
+              userId,
+              value.provider,
+            ]);
+          });
+          return response(res, 200, { ok: true });
+        }
         const securityRoutes = new Set([
           'mfa/complete',
           'email/enroll',
@@ -291,6 +403,7 @@ export function createRequestHandler({
         }
         if (pathname === '/api/plugins/publish' && method === 'POST') {
           auth.require(session, req);
+          await requireDataProvider(pool, userId);
           await auth.rateLimit('plugin-publish:' + userId);
           const manifest = await library.publish(userId, await body(req, 32768));
           return response(res, 201, manifest);
@@ -355,6 +468,9 @@ export function createRequestHandler({
           ).rows[0];
           return response(res, 200, {
             security: profile,
+            profile: { avatarUrl: session.avatar_url ?? '' },
+            usage: await usage(pool, userId),
+            keys: await auth.keys.list(userId),
             identities: identities.map((row) => row.provider),
             sessions: sessions.map((row) => ({ ...row, current: row.id === session.token_hash })),
           });
@@ -390,6 +506,16 @@ export function createRequestHandler({
             200,
             await searchTimelines(pool, userId, await body(req, 4096), featured),
           );
+        const star = /^\/api\/timelines\/([a-f0-9-]{36})\/star$/.exec(pathname);
+        if (star && uuid.test(star[1]) && method === 'POST') {
+          auth.require(session, req);
+          await auth.rateLimit('stars:' + userId);
+          return response(
+            res,
+            200,
+            await setTimelineStar(pool, store, star[1], userId, await body(req, 1024)),
+          );
+        }
         const pullList = /^\/api\/timelines\/([a-f0-9-]{36})\/proposals\/search$/.exec(pathname);
         if (pullList && uuid.test(pullList[1]) && method === 'POST')
           return response(
@@ -534,11 +660,21 @@ export function createRequestHandler({
           );
         }
         const match =
-          /^\/api\/timelines\/([^/]+)(?:\/(document|query|members|settings|file|changes|revision))?$/.exec(
+          /^\/api\/timelines\/([^/]+)(?:\/(document|query|members|settings|file|changes|revision|recent))?$/.exec(
             pathname,
           );
         if (!match || !uuid.test(match[1])) throw new HttpError(404, 'Unknown endpoint.');
         const [, id, action] = match;
+        if (action === 'recent' && method === 'GET')
+          return response(
+            res,
+            200,
+            await store.recent(
+              id,
+              userId,
+              new URL(req.url, origin).searchParams.get('direction') ?? 'last',
+            ),
+          );
         if (action === 'revision' && method === 'GET')
           return response(res, 200, await store.liveState(id, userId));
         if (!action && method === 'GET')
@@ -780,6 +916,9 @@ export function createRequestHandler({
     } catch (error) {
       const status =
         error.status ??
+        (error.code === 'P0001' && error.message.startsWith('Account storage limit')
+          ? 413
+          : undefined) ??
         (error.code === 'ENOENT'
           ? 404
           : error instanceof SyntaxError ||

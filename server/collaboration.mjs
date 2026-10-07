@@ -10,11 +10,20 @@ export function searchInput(value = {}) {
     typeof value !== 'object' ||
     Array.isArray(value) ||
     Object.keys(value).some(
-      (k) => !['search', 'page', 'limit', 'scope', 'tag', 'owner'].includes(k),
+      (k) => !['search', 'page', 'limit', 'scope', 'tag', 'owner', 'sort', 'starredBy'].includes(k),
     )
   )
     throw new HttpError(400, 'Invalid timeline search.');
-  const { search = '', page = 1, limit = 12, scope = 'public', tag = '', owner = '' } = value;
+  const {
+    search = '',
+    page = 1,
+    limit = 12,
+    scope = 'public',
+    tag = '',
+    owner = '',
+    sort = typeof search === 'string' && search.trim() ? 'relevance' : 'featured',
+    starredBy = '',
+  } = value;
   if (
     typeof search !== 'string' ||
     search.length > 300 ||
@@ -28,7 +37,11 @@ export function searchInput(value = {}) {
     !Number.isSafeInteger(limit) ||
     limit < 1 ||
     limit > 50 ||
-    !['public', 'mine', 'visible'].includes(scope)
+    !['public', 'mine', 'visible', 'starred'].includes(scope) ||
+    !['featured', 'stars', 'popularity', 'alphabetical', 'age', 'relevance'].includes(sort) ||
+    typeof starredBy !== 'string' ||
+    starredBy.length > 64 ||
+    (starredBy !== '' && scope !== 'public')
   )
     throw new HttpError(400, 'Invalid search or pagination.');
   return {
@@ -37,24 +50,35 @@ export function searchInput(value = {}) {
     page,
     limit,
     scope,
+    sort,
+    starredBy: starredBy.normalize('NFC').trim(),
     owner: owner.normalize('NFC').trim(),
   };
 }
 export async function searchTimelines(pool, userId, value, featured = []) {
-  const { search, tag, page, limit, scope, owner } = searchInput(value);
-  if (scope === 'mine' && !userId) throw new HttpError(401, 'Sign in to see your timelines.');
+  const { search, tag, page, limit, scope, owner, sort, starredBy } = searchInput(value);
+  if (['mine', 'starred'].includes(scope) && !userId)
+    throw new HttpError(401, 'Sign in to see your timelines.');
   const { rows } = await pool.query(
     `WITH matching AS (
-    SELECT t.id,t.title,t.description,t.tags,t.visibility,t.revision,t.event_count,t.comparison,t.updated_at,u.username AS owner,
+    SELECT t.id,t.title,t.description,t.tags,t.visibility,t.revision,t.event_count,t.comparison,t.updated_at,t.created_at,t.star_count,u.username AS owner,
+      EXISTS(SELECT 1 FROM oc_timeline_stars s WHERE s.timeline_id=t.id AND s.user_id=$6::uuid) AS starred,
+      t.star_count+(SELECT count(*) FROM oc_timelines f WHERE f.upstream_id=t.id AND f.visibility='public') AS popularity,
       (t.featured OR t.id=ANY($5::uuid[])) AS featured,
       CASE WHEN $2='' THEN 0 ELSE ts_rank_cd(t.search_document,websearch_to_tsquery('english',$2)) END AS rank
     FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id
-    WHERE (CASE WHEN $1::boolean THEN t.owner_id=$6::uuid ELSE (t.visibility='public' OR ($8::boolean AND (t.owner_id=$6::uuid OR EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$6::uuid)))) END)
+    WHERE (CASE WHEN $1::boolean THEN t.owner_id=$6::uuid ELSE (t.visibility='public' OR (($8::boolean OR $11::boolean) AND (t.owner_id=$6::uuid OR EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$6::uuid)))) END)
       AND ($2='' OR t.search_document @@ websearch_to_tsquery('english',$2))
       AND ($7='' OR t.tags @> ARRAY[$7]::text[])
       AND ($9='' OR u.username=$9)
-  ), page AS (SELECT * FROM matching ORDER BY CASE WHEN $2='' THEN featured ELSE false END DESC,rank DESC,updated_at DESC,id LIMIT $3 OFFSET $4)
-  SELECT (SELECT count(*) FROM matching) AS total,coalesce((SELECT jsonb_agg(to_jsonb(page)) FROM page),'[]'::jsonb) AS timelines`,
+      AND (NOT $11::boolean OR EXISTS(SELECT 1 FROM oc_timeline_stars s WHERE s.timeline_id=t.id AND s.user_id=$6::uuid))
+      AND ($12='' OR EXISTS(SELECT 1 FROM oc_timeline_stars s JOIN oc_users su ON su.id=s.user_id WHERE s.timeline_id=t.id AND su.username=$12))
+  ), page AS (SELECT * FROM matching ORDER BY CASE WHEN $10='featured' THEN featured ELSE false END DESC,
+      CASE WHEN $10='relevance' THEN rank ELSE 0 END DESC,
+      CASE WHEN $10='stars' THEN star_count WHEN $10='popularity' THEN popularity ELSE 0 END DESC,
+      CASE WHEN $10='alphabetical' THEN lower(title) ELSE '' END ASC,
+      CASE WHEN $10='age' THEN created_at ELSE NULL END DESC,updated_at DESC,id LIMIT $3 OFFSET $4)
+  SELECT (SELECT count(*) FROM matching) AS total,coalesce((SELECT jsonb_agg(to_jsonb(page)||jsonb_build_object('star_count',page.star_count::text,'popularity',page.popularity::text)) FROM page),'[]'::jsonb) AS timelines`,
     [
       scope === 'mine',
       search,
@@ -65,6 +89,9 @@ export async function searchTimelines(pool, userId, value, featured = []) {
       tag,
       scope === 'visible',
       owner,
+      sort,
+      scope === 'starred',
+      starredBy,
     ],
   );
   const total = Number(rows[0].total);

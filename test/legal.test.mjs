@@ -10,7 +10,8 @@ import { createApplication } from '../server/http.mjs';
 test('legal notices survive all web builds and offline notices have no source download request', async () => {
   const web = await readFile('dist/index.html', 'utf8');
   const offline = await readFile('dist/openchronology-offline.html', 'utf8');
-  for (const html of [web, offline]) {
+  const legal = await readFile('dist/legal.html', 'utf8');
+  for (const html of [legal, offline]) {
     for (const title of [
       'terms of service',
       'privacy notice',
@@ -22,6 +23,8 @@ test('legal notices survive all web builds and offline notices have no source do
     assert(!html.includes('<!-- OPENCHRONOLOGY_LEGAL -->'));
   }
   assert(web.includes('href="openchronology-web-source.tar.gz"'));
+  assert(web.includes('href="legal.html"'));
+  assert(!web.includes('<footer class="legal-notices"><details>'));
   assert(!offline.includes('href="openchronology-web-source.tar.gz"'));
   const { stdout } = await promisify(execFile)('tar', [
     '-tzf',

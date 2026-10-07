@@ -1,0 +1,58 @@
+/* Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only */
+dialog[open] {
+  animation: dialog-enter 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+dialog[open]::backdrop {
+  animation: dialog-backdrop-enter 180ms ease-out both;
+}
+dialog[open][data-dialog-closing] {
+  animation: dialog-exit 140ms ease-in both;
+  pointer-events: none;
+}
+dialog[open][data-dialog-closing]::backdrop {
+  animation: dialog-backdrop-exit 140ms ease-in both;
+}
+@keyframes dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes dialog-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+@keyframes dialog-backdrop-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes dialog-backdrop-exit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog[open],
+  dialog[open]::backdrop,
+  dialog[open][data-dialog-closing],
+  dialog[open][data-dialog-closing]::backdrop {
+    animation: none;
+  }
+}

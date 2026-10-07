@@ -159,7 +159,7 @@ SQLite connections use a 2 MiB page-cache target, disable mmap, and put temporar
 sorting tables on disk. A composite rational-time/ID index supports keyset pages.
 Queries run off the UI thread, serialize per baseline, and release connections
 when finished. The frontend allows one viewport request at a time and ignores
-stale responses after navigation or file generation changes. Desktop **Import JSON** parses `.ochx`/JSON natively into a disk baseline, so its
+stale responses after navigation or file generation changes. Desktop **Import** parses `.ochx`/JSON natively into a disk baseline, so its
 events never pass through the webview. Native parsing temporarily holds the import
 and rejects files over 32 MiB; use `.och` for larger timelines. Programmatic/demo
 imports over 2,048 moments are also staged after their initial JavaScript import.
@@ -225,3 +225,19 @@ unknown addresses share one limit. Guest full-document downloads use the same ga
 and SQLite downloads require authentication. Regular viewport queries remain bounded
 and can display timelines too large to copy. The client also caps streamed response
 bytes before JSON parsing and validates the event count. See [guest behavior](guest-editing.md).
+
+Timeline stars are platform bookmarks stored in `oc_timeline_stars`, with one
+entry per user and timeline. A database trigger keeps each timeline's exact
+`star_count` synchronized, including user and timeline deletion. Star requests
+set an explicit boolean, so retries cannot accidentally toggle a favorite.
+They require an authenticated session, CSRF protection, and read access to the
+timeline. Stars do not change its saved revision or exported document.
+
+The dashboard includes the user's paginated favorites, including accessible
+private timelines. `/users/<username>` shows public timelines and public
+favorites only. Losing access removes a private timeline from search results;
+its bookmark does not grant access. Timeline browsing supports featured-first,
+star count, popularity (stars plus public forks), alphabetical title, newest
+creation date, and full-text relevance. Private forks do not contribute to
+public popularity. Historical timelines created before this migration use
+their previous update timestamp as the best available creation date.

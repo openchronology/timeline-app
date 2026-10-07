@@ -262,3 +262,13 @@ test('proposal mutations and comments enforce login and origin before accepting 
   }
   assert.equal((await request(app, '/api/timelines/search', { scope: 'mine' })).status, 401);
 });
+
+test('timeline sorting defaults and bookmark queries are validated', async () => {
+  assert.equal(searchInput({}).sort, 'featured');
+  assert.equal(searchInput({ search: 'galaxy' }).sort, 'relevance');
+  for (const sort of ['stars', 'popularity', 'alphabetical', 'age', 'relevance'])
+    assert.equal(searchInput({ sort }).sort, sort);
+  assert.throws(() => searchInput({ sort: 'sql' }));
+  assert.throws(() => searchInput({ starredBy: 'someone', scope: 'visible' }));
+  await assert.rejects(searchTimelines({}, null, { scope: 'starred' }), (e) => e.status === 401);
+});

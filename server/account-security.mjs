@@ -364,6 +364,10 @@ export class AccountSecurity {
       await c.query('UPDATE oc_users SET password_hash=$2 WHERE id=$1', [user.id, hash]);
       await c.query("DELETE FROM oc_email_tokens WHERE user_id=$1 AND purpose='reset'", [user.id]);
       await c.query('DELETE FROM oc_sessions WHERE user_id=$1', [user.id]);
+      await c.query(
+        'UPDATE oc_api_keys SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL',
+        [user.id],
+      );
       await c.query('DELETE FROM oc_device_logins WHERE user_id=$1', [user.id]);
       await c.query('DELETE FROM oc_auth_challenges WHERE user_id=$1', [user.id]);
       await this.notify(
@@ -480,6 +484,10 @@ export class AccountSecurity {
       if (action === 'password') {
         await c.query('UPDATE oc_users SET password_hash=$2 WHERE id=$1', [user.id, newHash]);
         await c.query('DELETE FROM oc_sessions WHERE user_id=$1', [user.id]);
+        await c.query(
+          'UPDATE oc_api_keys SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL',
+          [user.id],
+        );
         await c.query('DELETE FROM oc_device_logins WHERE user_id=$1', [user.id]);
         await c.query('DELETE FROM oc_auth_challenges WHERE user_id=$1', [user.id]);
         await c.query("DELETE FROM oc_email_tokens WHERE user_id=$1 AND purpose='reset'", [

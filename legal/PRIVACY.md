@@ -31,7 +31,14 @@ images. It also stores visibility, collaborator permissions, saved revision docu
 fork relationships and ancestry, proposed
 and base snapshots, and discussion comments with account attribution. These support
 editing, search, sharing, collaboration, and export. Private timelines are excluded
-from the public browser and public full-text search.
+from the public browser and public full-text search. Site administrators can
+access and manage private timelines; they are not encrypted from the operator.
+Account profiles may contain an avatar image or HTTPS image URL. Remote avatar
+hosts receive browser requests. Scoped API credentials are stored as hashes with
+names, prefixes, permissions, expiry, revocation, and last-used timestamps. The
+service also records per-user logical storage usage, quota exemptions, suspension
+status, administrator privileges, and an audit trail of administration actions.
+Secrets, passwords, and MFA codes are excluded from that audit trail.
 
 IP addresses are processed for connection handling and abuse prevention; temporary
 authentication rate-limit keys are hashed. Hosting providers and reverse proxies

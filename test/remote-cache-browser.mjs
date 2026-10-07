@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
+import { closeMomentDetails } from './moment-dialog-browser.mjs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Q, Viewport, TimelineIndex } from '../dist/core.mjs';
@@ -184,6 +185,7 @@ export async function checkRemoteCache(browser) {
     await page.waitForFunction(() =>
       document.querySelector('.event-marker[aria-label="Edited nearby moment"]'),
     );
+    await closeMomentDetails(page);
     await bounds('9000', '11000');
     await page.getByRole('button', { name: 'Far away', exact: true }).waitFor();
     assert.equal(await page.locator('.event-marker[aria-label="Edited nearby moment"]').count(), 0);

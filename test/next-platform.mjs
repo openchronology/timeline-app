@@ -21,10 +21,14 @@ for (const key of Object.keys(env))
     delete env[key];
 env.PORT = String(port);
 env.HOSTNAME = '127.0.0.1';
-const child = spawn(process.execPath, [resolve('platform/.next/standalone/platform/server.cjs')], {
-  env,
-  stdio: ['ignore', 'pipe', 'pipe'],
-});
+const child = spawn(
+  process.execPath,
+  [resolve(process.env.PLATFORM_TEST_SERVER ?? 'platform/.next/standalone/platform/server.cjs')],
+  {
+    env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  },
+);
 let logs = '';
 for (const stream of [child.stdout, child.stderr])
   stream.on('data', (chunk) => {
@@ -52,7 +56,12 @@ try {
     html = await dashboard.text();
   assert.equal(dashboard.status, 200);
   assert.match(html, /Explore timelines/);
+  assert.match(html, /Build: /);
+  assert.match(html, /releases\/latest\/download\/openchronology-offline\.html/);
+  assert.match(html, /releases\/latest\/download\/openchronology-desktop-linux-amd64\.deb/);
   assert.match(html, /id="dashboard-browser"/);
+  assert.match(html, /Sort timelines/);
+  assert.doesNotMatch(html, /id="dashboard-favorites"/);
   assert.doesNotMatch(html, /id="dashboard-mine"/);
   assert.doesNotMatch(html, /id="timeline-stage"/);
   assert.match(html, /href="\/editor\?new=1"/);
@@ -163,7 +172,7 @@ try {
           await page.evaluate(() => {
             const root = document.documentElement,
               header = document.querySelector('.platform-header').getBoundingClientRect(),
-              footer = document.querySelector('.platform-footer').getBoundingClientRect(),
+              footer = document.querySelector('.platform-footer'),
               editor = document.querySelector('.editor-frame').getBoundingClientRect();
             return (
               root.scrollHeight <= innerHeight + 1 &&
@@ -171,11 +180,11 @@ try {
               header.top >= 0 &&
               editor.top >= header.bottom &&
               editor.height > 0 &&
-              editor.bottom <= footer.top + 1 &&
-              footer.bottom <= innerHeight + 1
+              editor.bottom <= innerHeight + 1 &&
+              getComputedStyle(footer).display === 'none'
             );
           }),
-          'Editor host must fit its header, frame and footer without a second scrollbar',
+          'Editor host must fit its header and frame without a sticky footer or second scrollbar',
         );
       }
       await page.getByRole('link', { name: 'Account', exact: true }).click();

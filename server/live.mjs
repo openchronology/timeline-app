@@ -53,6 +53,8 @@ export class TimelineNotifications {
   }
 }
 export async function liveResponse(request, services) {
+  if ((request.headers.get('authorization') ?? '').startsWith('Bearer och_key_'))
+    return Response.json({ error: 'API keys are limited to timeline endpoints.' }, { status: 403 });
   if (!services.pool)
     return Response.json({ error: 'Server storage is unavailable.' }, { status: 503 });
   const origin = request.headers.get('origin');

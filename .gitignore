@@ -16,3 +16,4 @@ src-tauri/gen/
 platform/.next/
 platform/public/
 next-env.d.ts
+release-assets/

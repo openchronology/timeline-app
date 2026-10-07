@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
+import StarButton from './star-button.jsx';
 import VersionActions from './version-actions.jsx';
 export default function Editor({
   id,
@@ -42,6 +43,12 @@ export default function Editor({
         actions &&
         createPortal(
           <nav className="timeline-navigation" aria-label="Timeline navigation">
+            <StarButton
+              id={id}
+              count={timeline?.star_count}
+              starred={timeline?.starred}
+              signedIn={signedIn}
+            />
             {!timeline?.comparison && (
               <a target="_top" href={'/timelines/' + id + '/pulls'}>
                 Pull requests

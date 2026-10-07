@@ -192,6 +192,9 @@ jobs:
           rustup default stable
           cargo build --manifest-path native-store/Cargo.toml --locked --release --bin och-convert
       - run: node test/files.mjs
+      - run: node test/stars-postgres.mjs
+      - run: node test/follow-postgres.mjs
+      - run: node test/administration-postgres.mjs
       - run: node test/account-security-postgres.mjs
       - run: npm run test:postgres
       - run: npm run test:platform:postgres

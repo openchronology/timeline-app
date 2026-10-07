@@ -8,6 +8,7 @@ import {
 } from 'node:crypto';
 import { promisify } from 'node:util';
 import { checkPasswordBreach } from './security-crypto.mjs';
+import { ApiKeys } from './api-keys.mjs';
 import { AccountSecurity } from './account-security.mjs';
 import { mailFromEnv, encryptionKey } from './mail.mjs';
 import { HttpError } from './store.mjs';
@@ -57,26 +58,29 @@ export class Auth {
     } = {},
   ) {
     this.pool = pool;
+    this.keys = new ApiKeys(this);
     this.secure = new URL(origin).protocol === 'https:';
     this.cookieName = this.secure ? '__Host-oc_session' : 'oc_session';
     this.attempts = new Map();
     this.origin = origin;
     this.security = new AccountSecurity(this, mailer, key, passwordCheck);
   }
-  throttle(key) {
+  throttle(key, maximum = 10) {
     const now = Date.now();
     for (const [k, v] of this.attempts) if (v.expires < now) this.attempts.delete(k);
     const old = this.attempts.get(key) ?? { count: 0, expires: now + 60000 };
-    if (old.count++ >= 10 || this.attempts.size > 10000)
+    if (old.count++ >= maximum || this.attempts.size > 10000)
       throw new HttpError(429, 'Too many sign-in attempts. Please wait a minute.');
     this.attempts.set(key, old);
   }
   async session(req, client = this.pool) {
+    if ((req.headers.authorization ?? '').startsWith('Bearer och_key_'))
+      return this.keys.session(req, client);
     const bearer = /^Bearer ([a-f0-9]{64})$/.exec(req.headers.authorization ?? ''),
       token = bearer?.[1] ?? this.readCookie(req, this.cookieName);
     if (!token || !/^[a-f0-9]{64}$/.test(token)) return null;
     const { rows } = await client.query(
-      `SELECT s.csrf,s.token_hash,s.kind,s.created_at,s.mfa_verified,u.id,u.username,u.mfa_enabled,u.email_verified_at FROM oc_sessions s JOIN oc_users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.kind=$2 AND s.expires_at>now() AND s.last_seen_at>now()-interval '1 day' AND u.email_verified_at IS NOT NULL AND (NOT u.mfa_enabled OR s.mfa_verified)`,
+      `SELECT s.csrf,s.token_hash,s.kind,s.created_at,s.mfa_verified,u.id,u.username,u.mfa_enabled,u.email_verified_at,u.is_admin,u.avatar_url FROM oc_sessions s JOIN oc_users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.kind=$2 AND s.expires_at>now() AND s.last_seen_at>now()-interval '1 day' AND NOT u.is_disabled AND u.email_verified_at IS NOT NULL AND (NOT u.mfa_enabled OR s.mfa_verified)`,
       [tokenHash(token), bearer ? 'desktop' : 'web'],
     );
     if (rows[0])
@@ -105,14 +109,14 @@ export class Auth {
     if (!token || req.headers['x-csrf-token'] !== token)
       throw new HttpError(403, 'Refresh the sign-in page before continuing.');
   }
-  async rateLimit(ip) {
-    this.throttle(ip);
+  async rateLimit(ip, maximum = 10) {
+    this.throttle(ip, maximum);
     await this.pool.query('DELETE FROM oc_auth_attempts WHERE expires_at<=now()');
     const { rows } = await this.pool.query(
       "INSERT INTO oc_auth_attempts(key,count,expires_at) VALUES($1,1,now()+interval '1 minute') ON CONFLICT(key) DO UPDATE SET count=oc_auth_attempts.count+1 RETURNING count",
       [tokenHash(ip)],
     );
-    if (rows[0].count > 10)
+    if (rows[0].count > maximum)
       throw new HttpError(429, 'Too many sign-in attempts. Please wait a minute.');
   }
   cookie(token, clear = false) {
@@ -120,6 +124,7 @@ export class Auth {
   }
   require(session, req) {
     if (!session) throw new HttpError(401, 'Sign in to continue.');
+    if (session.kind === 'api') return;
     if (req.headers['x-csrf-token'] !== session.csrf)
       throw new HttpError(403, 'Session changed. Reload before saving.');
   }
@@ -146,7 +151,8 @@ export class Auth {
       // Missing/social-only accounts still do the same expensive password work.
       const dummy = 'scrypt:2:00000000000000000000000000000000:' + '00'.repeat(64);
       const matches = await passwordMatches(password, user?.password_hash ?? dummy);
-      if (!user || !matches) throw new HttpError(401, 'Username or password is incorrect.');
+      if (!user || user.is_disabled || !matches)
+        throw new HttpError(401, 'Username or password is incorrect.');
       if (user.password_hash.startsWith('scrypt:1:')) {
         const upgraded = await passwordHash(password);
         const updated = await this.pool.query(
@@ -163,6 +169,7 @@ export class Auth {
     return this.security.begin(user, kind, req, returnTo);
   }
   async issue(user, kind = 'web', mfaVerified = false, client = this.pool) {
+    if (user.is_disabled) throw new HttpError(403, 'Account unavailable.');
     if ('email_verified_at' in user && !user.email_verified_at)
       throw new HttpError(403, 'Email confirmation is required.');
     if (user.mfa_enabled && !mfaVerified)

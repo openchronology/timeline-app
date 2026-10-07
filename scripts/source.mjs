@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { writeBuildInfo } from './build-info.mjs';
 const exec = promisify(execFile);
 const desktop = process.argv.includes('--desktop');
 const vendorFlag = process.argv.indexOf('--rust-vendor');
@@ -15,6 +16,10 @@ if (vendorFlag >= 0 && !nativeVendor) throw new Error('--rust-vendor requires a 
 const temporary = await mkdtemp(join(tmpdir(), 'openchronology-source-'));
 const root = join(temporary, 'openchronology');
 await mkdir(root);
+await writeFile(
+  join(root, 'build-info.json'),
+  JSON.stringify(await writeBuildInfo(), null, 2) + '\n',
+);
 try {
   for (const name of [
     'src',
@@ -36,7 +41,9 @@ try {
         // Test artifacts, local databases, compiler outputs, and private configuration do not belong in releases.
         const part = basename(path);
         return (
-          !['target', 'node_modules', 'build', '.git', 'artifacts', '.next', 'public'].includes(part) &&
+          !['target', 'node_modules', 'build', '.git', 'artifacts', '.next', 'public'].includes(
+            part,
+          ) &&
           !part.startsWith('.env') &&
           !/\.(?:och|ochx|sqlite|db)(?:-wal|-shm|-journal)?$/.test(part)
         );

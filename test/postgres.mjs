@@ -664,7 +664,8 @@ try {
   await viewer.request(`timelines/${fileTimeline.id}/file`, 'GET', undefined, 404);
   assert(Buffer.isBuffer(await owner.request(`timelines/${fileTimeline.id}/file`)));
   await owner.request(`timelines/${fileTimeline.id}/settings`, 'PATCH', { visibility: 'public' });
-  assert(Buffer.isBuffer(await anonymous.request(`timelines/${fileTimeline.id}/file`)));
+  await anonymous.request(`timelines/${fileTimeline.id}/file`, 'GET', undefined, 401);
+  assert(Buffer.isBuffer(await viewer.request(`timelines/${fileTimeline.id}/file`)));
   await owner.request('auth/logout', 'POST', {});
   await owner.request('timelines', 'GET', undefined, 401);
   console.log(

@@ -19,6 +19,29 @@
         ></a
       >
       <div class="header-right">
+        <details class="download-menu">
+          <summary>Download</summary>
+          <div>
+            <a
+              href="https://github.com/openchronology/timeline-app/releases/latest/download/openchronology-offline.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Offline browser HTML</a
+            >
+            <a
+              href="https://github.com/openchronology/timeline-app/releases/latest/download/openchronology-desktop-linux-amd64.deb"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Desktop · Linux (.deb)</a
+            >
+            <a
+              href="https://github.com/openchronology/timeline-app/releases/latest"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Release notes &amp; all downloads</a
+            >
+          </div>
+        </details>
         <button id="new-button">＋ New timeline</button
         ><span id="storage-badge" class="badge">Browser draft</span
         ><button id="server-button" hidden>Server connection</button
@@ -31,7 +54,6 @@
         ><strong>In-memory timeline.</strong> Your work is kept only in this tab. Refreshing or
         closing it loses your changes. Export an .ochx file to keep them.</span
       >
-      <button id="memory-export">Export .ochx</button>
     </aside>
     <p id="guest-fork-status" class="guest-fork-status" role="alert" hidden></p>
     <a id="guest-fork-original" class="guest-fork-original" hidden>View original timeline</a>
@@ -50,6 +72,15 @@
         <div class="dialog-actions">
           <button id="dashboard-mine-previous">Previous</button
           ><button id="dashboard-mine-next">Next</button>
+        </div>
+      </section>
+      <section id="dashboard-favorites" hidden>
+        <h2>Your favorites</h2>
+        <div id="dashboard-favorites-list" class="dashboard-grid"></div>
+        <p id="dashboard-favorites-status" role="status"></p>
+        <div class="dialog-actions">
+          <button id="dashboard-favorites-previous">Previous</button
+          ><button id="dashboard-favorites-next">Next</button>
         </div>
       </section>
       <div class="view-controls">
@@ -76,6 +107,16 @@
               maxlength="300"
               placeholder='Keywords or "exact phrase"' /></label
           ><label>Filter by tag<input id="dashboard-tag" type="search" maxlength="64" /></label>
+          <label
+            >Sort timelines<select id="dashboard-sort">
+              <option value="featured">Featured first</option>
+              <option value="stars">By stars</option>
+              <option value="popularity">By popularity</option>
+              <option value="alphabetical">Alphabetical</option>
+              <option value="age">Newest first</option>
+              <option value="relevance">Relevance</option>
+            </select></label
+          >
         </div>
         <div id="dashboard-browser-list" class="dashboard-grid"></div>
         <p id="dashboard-browser-status" role="status"></p>
@@ -110,8 +151,7 @@
             <a id="owner-label">Local workspace</a>
           </div>
           <div class="file-actions">
-            <button id="import-button">Import JSON</button
-            ><button id="export-button">Export JSON ↗</button
+            <button id="import-button">Import</button><button id="export-button">Export</button
             ><button id="och-import" hidden>Import .och</button
             ><button id="och-export" hidden>Export .och ↗</button
             ><button id="sqlite-open" hidden>Open SQLite</button
@@ -121,7 +161,6 @@
           </div>
         </div>
         <section class="document-heading">
-          <div class="eyebrow">A WINDOW INTO TIME</div>
           <input
             id="timeline-title"
             class="title-input"
@@ -137,6 +176,7 @@
 Every point has a place. Explore the spaces between them.</textarea
           >
           <div id="timeline-actions" class="timeline-actions">
+            <button id="timeline-star-button" hidden>☆ Star · 0</button>
             <button id="share-button" hidden>Sharing</button>
             <button id="pull-button" hidden>Pull requests</button>
             <button id="propose-button" hidden>Propose changes</button>
@@ -165,6 +205,13 @@ Every point has a place. Explore the spaces between them.</textarea
               ><span id="visible-count" class="muted">All moments</span>
             </div>
             <div class="view-controls">
+              <label
+                id="follow-latest-control"
+                class="follow-latest-control"
+                hidden
+                title="Follow new server moments after 15 seconds without navigation"
+                ><input id="follow-latest" type="checkbox" /> Follow latest events</label
+              >
               <button id="presentation-button">Time display</button>
               <button id="plugins-button">Plugins</button>
               <button id="compare-button">Compare</button>
@@ -252,75 +299,70 @@ Every point has a place. Explore the spaces between them.</textarea
           </p>
         </details>
       </main>
-      <aside id="inspector" class="inspector">
-        <div class="inspector-heading">
-          <span class="eyebrow">THE SELECTED MOMENT</span
-          ><button id="close-inspector" aria-label="Close event details">×</button>
-        </div>
-        <div id="inspector-intro">
-          <div class="inspector-orbit">⊙</div>
-          <h2>A little context<br />for every point.</h2>
-          <p>Select an event to see its details, or add a moment of your own.</p>
-        </div>
-        <div id="group-details" hidden>
-          <h2 id="group-title"></h2>
-          <p id="group-note" class="muted"></p>
-          <button id="group-zoom">Zoom into this group</button>
-          <div id="group-events" class="group-events"></div>
-          <p id="group-page-status" class="muted" role="status" aria-live="polite"></p>
-          <button id="group-previous" hidden>Previous page</button>
-          <button id="group-more" hidden>Next 25 moments</button>
-        </div>
-        <form id="event-form" hidden>
-          <label
-            >Title<input
-              id="event-title"
-              maxlength="1000"
-              placeholder="Optional — show a label on the timeline" /></label
-          ><label
-            >Exact time<input
-              id="event-time"
-              required
-              spellcheck="false"
-              placeholder="Time in this timeline’s format"
-          /></label>
-          <p class="field-hint">
-            Uses this timeline’s time display. Leaving the text unchanged preserves the exact
-            coordinate, even when the display rounds it.
-          </p>
-          <details>
-            <summary>Exact rational coordinate</summary>
-            <input
-              id="event-exact"
-              aria-label="Exact rational coordinate"
-              readonly
-              spellcheck="false"
-            />
-          </details>
-          <label
-            >Notes<textarea
-              id="event-description"
-              rows="5"
-              placeholder="What happened here?"
-            ></textarea>
-          </label>
-          <div id="plugin-event-fields"></div>
-          <details>
-            <summary>Additional metadata</summary>
-            <label
-              >JSON object<textarea id="event-metadata" rows="6" spellcheck="false">{}</textarea>
-            </label>
-          </details>
-          <div id="event-error" class="form-error" role="alert"></div>
-          <div class="event-actions">
-            <span id="event-edit-status" class="field-hint" role="status"
-              >Edits apply to the timeline automatically.</span
-            >
-            <button id="event-delete" class="button-danger" type="button">Delete</button>
-          </div>
-        </form>
-      </aside>
     </div>
+    <dialog id="inspector" class="moment-dialog" aria-labelledby="moment-heading">
+      <div class="inspector-heading">
+        <h2 id="moment-heading">Moment details</h2>
+        <button id="close-inspector" aria-label="Close moment details">×</button>
+      </div>
+      <div id="group-details" hidden>
+        <h2 id="group-title"></h2>
+        <p id="group-note" class="muted"></p>
+        <button id="group-zoom">Zoom into this group</button>
+        <div id="group-events" class="group-events"></div>
+        <p id="group-page-status" class="muted" role="status" aria-live="polite"></p>
+        <button id="group-previous" hidden>Previous page</button>
+        <button id="group-more" hidden>Next 25 moments</button>
+      </div>
+      <form id="event-form" hidden>
+        <label
+          >Title<input
+            id="event-title"
+            maxlength="1000"
+            placeholder="Optional — show a label on the timeline" /></label
+        ><label
+          >Exact time<input
+            id="event-time"
+            required
+            spellcheck="false"
+            placeholder="Time in this timeline’s format"
+        /></label>
+        <p class="field-hint">
+          Uses this timeline’s time display. Leaving the text unchanged preserves the exact
+          coordinate, even when the display rounds it.
+        </p>
+        <details>
+          <summary>Exact rational coordinate</summary>
+          <input
+            id="event-exact"
+            aria-label="Exact rational coordinate"
+            readonly
+            spellcheck="false"
+          />
+        </details>
+        <label
+          >Notes<textarea
+            id="event-description"
+            rows="5"
+            placeholder="What happened here?"
+          ></textarea>
+        </label>
+        <div id="plugin-event-fields"></div>
+        <details>
+          <summary>Additional metadata</summary>
+          <label
+            >JSON object<textarea id="event-metadata" rows="6" spellcheck="false">{}</textarea>
+          </label>
+        </details>
+        <div id="event-error" class="form-error" role="alert"></div>
+        <div class="event-actions">
+          <span id="event-edit-status" class="field-hint" role="status"
+            >Edits apply to the timeline automatically.</span
+          >
+          <button id="event-delete" class="button-danger" type="button">Delete</button>
+        </div>
+      </form>
+    </dialog>
     <input id="json-file" type="file" accept=".ochx,.json,application/json" hidden />
     <input id="och-file" type="file" accept=".och,application/vnd.openchronology.sqlite" hidden />
     <dialog id="pull-dialog">

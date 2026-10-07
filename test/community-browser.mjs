@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
+import { closeMomentDetails } from './moment-dialog-browser.mjs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { MOMENT_SHAPES, PLUGIN_EXAMPLE, TimelineIndex, Viewport, Q } from '../dist/core.mjs';
@@ -220,7 +221,8 @@ export async function checkCommunity(browser) {
       document.querySelector('.event-marker[aria-label="Guest changed observation"]'),
     );
     const downloading = page.waitForEvent('download');
-    await page.locator('#memory-export').click();
+    await closeMomentDetails(page);
+    await page.locator('#export-button').click();
     const exported = JSON.parse(await readFile(await (await downloading).path(), 'utf8'));
     assert.equal(exported.events[0].metadata.title, 'Guest changed observation');
     assert.equal(exported.events[0].time, '0/1');

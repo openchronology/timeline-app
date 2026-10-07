@@ -30,9 +30,10 @@ export async function seedPlatform(pool, { manager = '' } = {}) {
       );
     // No password, email or OAuth identity: this account cannot authenticate.
     await client.query(
-      'INSERT INTO oc_users(id,username,password_hash) VALUES($1,$2,NULL) ON CONFLICT(id) DO NOTHING',
+      'INSERT INTO oc_users(id,username,password_hash,quota_bypass) VALUES($1,$2,NULL,true) ON CONFLICT(id) DO NOTHING',
       [SEED_USER_ID, 'seed'],
     );
+    await client.query('UPDATE oc_users SET quota_bypass=true WHERE id=$1', [SEED_USER_ID]);
     let managerId;
     if (manager) {
       const result = await client.query(

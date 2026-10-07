@@ -1,0 +1,70 @@
+name: Tagged release
+on:
+  push:
+    tags: ['v*']
+  release:
+    types: [published]
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  release:
+    name: Offline HTML and Linux desktop release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Resolve immutable release identity
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
+        run: |
+          node --input-type=module -e 'import {releaseVersion} from "./scripts/build-info.mjs"; if(!releaseVersion.test(process.env.RELEASE_TAG)) throw Error("Use a semantic version tag, such as v1.2.3");'
+          git checkout --detach "$RELEASE_TAG"
+          echo "OCH_BUILD_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "OCH_BUILD_VERSION=$RELEASE_TAG" >> "$GITHUB_ENV"
+          node --input-type=module -e 'import {writeFileSync} from "node:fs";writeFileSync("/tmp/tauri-release.json",JSON.stringify({version:process.env.RELEASE_TAG.replace(/^v/, "")}));'
+      - name: Install Linux desktop build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake pkg-config libgmp-dev libsqlite3-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+          rustup update stable --no-self-update
+          rustup default stable
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Build desktop package from this tag
+        run: npm exec -- tauri build --config /tmp/tauri-release.json -- --locked
+      - name: Package matching preferred source and checksums
+        run: |
+          npm run build:source:desktop
+          node scripts/release-assets.mjs "$OCH_BUILD_VERSION"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-${{ github.ref_name }}
+          path: release-assets/
+          if-no-files-found: error
+      - name: Attach runner-built assets and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! gh release view "$OCH_BUILD_VERSION" >/dev/null 2>&1; then
+            gh release create "$OCH_BUILD_VERSION" --verify-tag --draft --title "$OCH_BUILD_VERSION" --generate-notes
+          fi
+          gh release upload "$OCH_BUILD_VERSION" release-assets/* --clobber
+          if [[ "$OCH_BUILD_VERSION" == *-* ]]; then
+            gh release edit "$OCH_BUILD_VERSION" --draft=false --prerelease
+          else
+            gh release edit "$OCH_BUILD_VERSION" --draft=false --latest
+          fi

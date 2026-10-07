@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import AccountAccess from './account-access.jsx';
 import { api } from '../lib/api.js';
 export default function Account({ returnTo = '/', login = false }) {
   const router = useRouter();
@@ -167,6 +168,13 @@ export default function Account({ returnTo = '/', login = false }) {
               email: 'Confirm your email address',
             }[mode] ?? 'Sign in')}
       </h1>
+      {session?.user && !anonymous && (
+        <p>
+          <Link href={'/users/' + encodeURIComponent(session.user.username)}>
+            Your public profile
+          </Link>
+        </p>
+      )}
       {!session && !error && <p role="status">Loading your session…</p>}
       {session?.server === false && (
         <p className="notice">
@@ -435,6 +443,9 @@ export default function Account({ returnTo = '/', login = false }) {
             </button>
           </div>
         </section>
+      )}
+      {session?.user && !anonymous && account && (
+        <AccountAccess session={session} account={account} refresh={refresh} />
       )}
       {codes && (
         <section className="notice">

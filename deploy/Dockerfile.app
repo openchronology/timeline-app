@@ -7,6 +7,9 @@ RUN cargo build --manifest-path native-store/Cargo.toml --release --locked --bin
 RUN cargo vendor --locked --manifest-path native-store/Cargo.toml /app/rust-dependencies
 
 FROM node:24-bookworm-slim AS build
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+ARG OCH_BUILD_COMMIT
+ARG OCH_BUILD_VERSION
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY vendor/rational-ordered-map-0.1.0.tgz vendor/
@@ -26,7 +29,7 @@ COPY test test
 COPY .github .github
 COPY README.md compose.yml tsconfig.json pnpm-lock.yaml yarn.lock .yarnrc.yml .dockerignore .gitignore .env.example ./
 COPY --from=converter /app/rust-dependencies /app/rust-dependencies
-RUN npm run build && node scripts/source.mjs --rust-vendor /app/rust-dependencies && cp dist/openchronology-web-source.tar.gz platform/public/
+RUN --mount=type=bind,target=/build-context export OCH_BUILD_CONTEXT=/build-context OCH_BUILD_COMMIT="$OCH_BUILD_COMMIT" OCH_BUILD_VERSION="$OCH_BUILD_VERSION" && npm run build && node scripts/source.mjs --rust-vendor /app/rust-dependencies && cp dist/openchronology-web-source.tar.gz platform/public/
 
 FROM node:24-bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends libsqlite3-0 libgmp10 && rm -rf /var/lib/apt/lists/*
