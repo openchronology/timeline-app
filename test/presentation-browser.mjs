@@ -6,6 +6,9 @@ import { validateDocument, DEFAULT_PRESENTATION, parseTimestamp } from '../dist/
 
 /** Shared UI checks run against both the regular application and isolated file:// build. */
 export async function checkPresentation(page, restoreDocument) {
+  const originalViewport = page.viewportSize();
+  // Adaptive precision depends on pixels; use a fixed viewport for these label fixtures.
+  await page.setViewportSize({ width: 1000, height: 960 });
   const input = (id) => page.locator('#' + id);
   const imported = async (document) => {
     await closeMomentDetails(page);
@@ -144,6 +147,7 @@ export async function checkPresentation(page, restoreDocument) {
   assert(await input('presentation-dialog').isVisible());
   assert.match(await input('presentation-error').textContent(), /Unknown local variable/);
   await page.locator('[data-close="presentation-dialog"]').click();
+  await input('presentation-dialog').waitFor({ state: 'hidden' });
   const day = parseTimestamp('2026-10-05T00:00:00Z');
   await imported({
     format: 'openchronology',
@@ -167,7 +171,10 @@ export async function checkPresentation(page, restoreDocument) {
   assert.match(await input('time-context').textContent(), /2026-10-05.*UTC/);
   const tickText = await page.locator('.tick-label').allTextContents();
   assert(tickText.every((label) => !label.includes('2026') && !label.includes('T')));
-  assert(tickText.some((label) => /\d{2}h/.test(label)));
+  assert(
+    tickText.some((label) => /\d{2}h/.test(label)),
+    JSON.stringify(tickText),
+  );
   assert.equal(
     await page.locator('.event-label .event-time-current').first().textContent(),
     '13:45',
@@ -240,4 +247,5 @@ export async function checkPresentation(page, restoreDocument) {
   assert.match(await page.locator('.tick-label').first().textContent(), /2026-10-04T/);
   await imported(restoreDocument);
   assert.deepEqual(await exported(), restoreDocument);
+  await page.setViewportSize(originalViewport);
 }
