@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 use std::{env, path::PathBuf, process::Command};
 fn main() {
     let source =

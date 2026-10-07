@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -92,8 +93,8 @@ test('Gregorian printers preserve exact fractions, zones, epochs and legacy MJD 
       assert(calendar.parse(calendar.print(time)).equals(time));
   }
   const mjd = createPresenter(options({ mode: 'gregorian', origin: '40587', scale: '1/86400' }));
-  assert.equal(mjd.print(Q.from(0n)), '1858-11-17T00:00:00Z');
-  assert.equal(mjd.print(Q.from(40587n)), '1970-01-01T00:00:00Z');
+  assert.equal(mjd.print(Q.from(0n)), '1858-11-17T00:00:00Z CE');
+  assert.equal(mjd.print(Q.from(40587n)), '1970-01-01T00:00:00Z CE');
   assert(mjd.parse('1970-01-01T00:00:00.5Z').equals(Q.from(40587n).add(Q.from(1n, 172800n))));
   assert.throws(() => mjd.parse('1900-02-29T00:00:00Z'), /Invalid/);
 });

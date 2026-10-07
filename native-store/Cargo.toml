@@ -2,7 +2,8 @@
 name = "openchronology-store"
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+license = "GPL-3.0-only"
+authors = ["Athan Clark"]
 build = "build.rs"
 
 [dependencies]

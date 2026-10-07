@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { DEFAULT_PRESENTATION } from '../dist/core.mjs';
@@ -57,13 +58,20 @@ export async function checkSelection(page, restoreDocument) {
   await input('add-button').click();
   assert.equal(await input('event-exact').inputValue(), exact);
   await input('fit-button').click();
+  await input('clear-selection').click();
   await page.mouse.click(x, y, { button: 'right' });
   assert(await menu.isVisible());
+  await input('time-cursor').waitFor({ state: 'visible' });
+  const contextTime = await input('time-cursor').getAttribute('data-time');
+  const cursorBox = await input('time-cursor').boundingBox();
+  assert(Math.abs(cursorBox.x + cursorBox.width / 2 - x) < 2);
   assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), ['+Event', 'Fit all']);
   await page.keyboard.press('Escape');
   assert(await menu.isHidden());
   await page.mouse.click(x, y, { button: 'right' });
   await menu.getByRole('menuitem', { name: '+Event', exact: true }).click();
+  assert.equal(await input('event-exact').inputValue(), contextTime);
+  assert.equal(await input('event-time').inputValue(), contextTime + ' ticks');
   await input('event-title').fill('From context menu');
   await input('event-time').fill('4/7 ticks');
   await page.waitForFunction(() =>

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // The single-file build substitutes this module, excluding the HTTP implementation entirely.
 export async function requestApi<T>(
   _path: string,

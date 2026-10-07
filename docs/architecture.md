@@ -51,25 +51,34 @@ SQL operations are `oc_overview(timeline_uuid, lower_mpq, upper_mpq, threshold_m
 
 All paths start with `/api/`. Request and response bodies are JSON except SQLite uploads/downloads. Authenticated mutation requests include `X-CSRF-Token` from `/session` or the sign-in response; the session cookie is HTTP-only.
 
-| Method and path                           | Operation                                            |
-| ----------------------------------------- | ---------------------------------------------------- |
-| `GET /session`                            | Current user, CSRF token, and server capability      |
-| `POST /auth/register`, `POST /auth/login` | Username/password account session                    |
-| `POST /auth/logout`                       | Revoke current session                               |
-| `GET /timelines`                          | Owned and explicitly shared timelines                |
-| `POST /timelines`                         | Create a private timeline from an exchange document  |
-| `GET /timelines/:id`                      | Read authorized timeline metadata and bounds         |
-| `GET /timelines/:id/document`             | Read/export a full snapshot                          |
-| `PUT /timelines/:id`                      | Save `{revision, document}` with conflict detection  |
-| `POST /timelines/:id/query`               | Read bounded summaries or an event page              |
-| `GET /timelines/:id/members`              | Owner lists collaborators                            |
-| `POST /timelines/:id/members`             | Owner sets `{username, role}` (`viewer` or `editor`) |
-| `DELETE /timelines/:id/members`           | Owner removes `{username}`                           |
-| `PATCH /timelines/:id/settings`           | Owner sets `{visibility}` (`private` or `public`)    |
+| Method and path                           | Operation                                                           |
+| ----------------------------------------- | ------------------------------------------------------------------- |
+| `GET /session`                            | Current user, CSRF token, and server capability                     |
+| `POST /auth/register`, `POST /auth/login` | Username/password account session                                   |
+| `POST /auth/logout`                       | Revoke current session                                              |
+| `GET /timelines`                          | Owned and explicitly shared timelines                               |
+| `POST /timelines`                         | Create a private timeline from an exchange document                 |
+| `GET /timelines/:id`                      | Read authorized timeline metadata and bounds                        |
+| `GET /timelines/:id/document`             | Read/export a full snapshot                                         |
+| `PUT /timelines/:id`                      | Save `{revision, document}` with conflict detection                 |
+| `PUT /timelines/:id/changes`              | Save sparse edits against a revision; preserve untouched moments    |
+| `POST /timelines/:id/query`               | Read bounded summaries or an event page                             |
+| `GET /timelines/:id/members`              | Owner lists collaborators                                           |
+| `POST /timelines/:id/members`             | Owner sets `{username, role}` (`viewer`, `contributor` or `writer`) |
+| `DELETE /timelines/:id/members`           | Owner removes `{username}`                                          |
+| `PATCH /timelines/:id/settings`           | Owner sets `{visibility}` (`private` or `public`)                   |
 
 An overview request has `{"kind":"overview","lower":"0/1","upper":"10/1","threshold":"1/100"}`. An event request has `{"kind":"events","lower":"0/1","upper":"10/1","limit":100,"after":null}`. The response includes `next: {time, id}` when another page exists. Event queries may omit bounds; overviews require finite exact bounds and a nonnegative threshold. Private resources conceal their existence from unauthorized readers with HTTP 404. Public readers cannot mutate a timeline.
 
-Read-only server views order their returned summaries in rational-map, then fetch metadata in bounded pages on demand. Editors load a complete rational-map snapshot. The app keeps these states separate: a summary cache is never exported or saved as if it were the complete timeline.
+Both readers and editors of server timelines use a bounded viewport cache, not a complete snapshot. `src/remote-cache.ts` retains one overscanned window (25% of the visible span on each side). Resolution levels use exact powers of two; nearby pans and small zooms can reuse the window and coarsen its summaries locally. Leaving the cached extent, crossing a resolution level, or exceeding its 30-second lifetime schedules a replacement query without clearing the confirmed window. Visible moments and their confirmed grouping remain on screen while loading. A successful response reconciles singleton moments by stable ID, replaces summaries, and releases obsolete detail atomically; rejected, aborted or failed responses leave confirmed data intact. Only one confirmed window is retained, rather than accumulating a history of resolutions. Timeline changes and access revocation clear the cache. The cache accepts at most 2,048 summary groups and 8 MiB of estimated UTF-16 JSON storage. These are payload budgets, not a hard bound on the entire browser process. Requests are debounced, obsolete web fetches are aborted, and native requests are serialized with stale results ignored.
+
+The server HTTP overview enforces a minimum threshold of queried span / 1,024, including when the requested threshold is zero, keeping responses to at most 1,025 anchored groups. The underlying SQL/conformance zero-threshold behavior remains exact and unchanged. Returned `threshold` records the effective server resolution. Cached subtree weights supply **exact** counts without running `COUNT(*)` over every event. The browser does not reconstruct members of summaries. Cached groups can straddle viewport edges; their displayed count covers the complete summarized group, including nearby prefetched coordinates.
+
+Only a selected moment or explicitly opened summary page fetches full metadata (at most 25 events per page). Normal singleton overview metadata is a plugin projection limited to 2,048 characters; larger projections, including large stacks, are deferred to selection. Selected inspector content remains available, while unselected inspector reads are evicted. Unsaved changes and their original coordinates are pinned separately in a sparse rational-map workspace so navigating never discards work. Local/offline/file timelines still use a complete rational-map.
+
+`PUT /timelines/:id/changes` accepts `{revision, settings, changes}`; each change is `{id, event}` or `{id, event: null}`. It validates all data, requires write access and CSRF, locks the current timeline, applies changes to the saved document server-side, preserves untouched events, and creates an immutable checkpoint in one transaction. There are at most 5,000 changes per save. Edits made during an in-flight save are rebased locally onto the accepted checkpoint. Settings contain the exchange document header and optional presentation/plugins/tags/assets, with no event array.
+
+Full JSON/SQLite export, saving a remote timeline as a local file, and legacy document-based proposal submission explicitly materialize a full document for that operation. A sparse editor uses its immutable saved head plus local changes, so it cannot export a partial cache as a complete timeline. Authentication redirects persist the sparse working changes rather than downloading the full timeline. Saving remains a server-side full index rebuild and snapshot checkpoint; incremental index writes are a separate future optimization.
 
 ## Native file boundary
 
@@ -98,3 +107,121 @@ The Node server invokes `och-convert` in a separate process, built from the same
 | `POST /auth/revoke-others`     | CSRF-protected revocation of all other sessions                                                |
 
 `GET /session` also returns enabled `providers` and a `fileExchange` capability. Before anonymous password/provider sign-in, it issues a short-lived HTTP-only login nonce and returns its CSRF counterpart. See [authentication and operator configuration](authentication.md) for identity verification, expiry, HTTPS and proxy settings.
+
+See [collaboration.md](collaboration.md) for the owner custody model, public full-text browser, proposed branches and merge API.
+
+## Hosted platform (Next.js)
+
+`platform/app` is the Next.js App Router application for timescale.info. `/` renders the dashboard on the server, with the account’s own timelines above public full-text search results. Search and pagination use URL parameters and Next forms/links. `/login` and `/account` own browser sign-in, OAuth initiation and session management; `/connect/desktop/:code` owns explicit desktop authorization. `/timelines/:id`, its `/pulls` routes and `/settings` enforce access before rendering. The plugin catalogue and legal pages also use Next routes. Private pages are dynamic, without shared page caching.
+
+App Router handlers under `/api` dispatch streamed requests directly to the existing database/authentication controllers through `server/next-handler.mjs`. There is no second HTTP server or internal HTTP proxy in production. The controllers remain independently testable; `createApplication` is a local test/Tauri development harness. PostgreSQL, pgmp, revision checks, CSRF, signed-in access checks, bounded uploads, OAuth PKCE and session expiration remain server-side. React state never contains provider secrets or native bearer tokens.
+
+`server/platform.mjs` initializes one bounded PostgreSQL pool per server process. It reads server-only environment variables. The Next proxy gives each page request a fresh CSP nonce, with no production `unsafe-eval`. Browsers use HttpOnly cookies and the existing server-issued CSRF tokens through Next APIs. Authentication remains the tested application session service; Next.js supplies its pages and request lifecycle.
+
+The rational editor builds separately with esbuild. The hosted page embeds `/editor/frame` on the same origin; only that frame may be embedded, and it calls the same Next API endpoints. Its resizing and timeline mechanics remain independent of React. Parent/frame navigation validates message origin and source. The standalone HTML has no Next.js runtime or requests; the Tauri edition uses the same editor and can access the public Next API through native HTTPS transport.
+
+Run `npm run dev` for Next.js with editor watchers, `npm run build` for both production builds, and `npm start` for Next.js. Docker runs the generated standalone Next server and includes its public/static assets, the native SQLite converter, and matching application source. See `docs/docker.md`.
+
+## Saved revisions and fork ancestry
+
+PostgreSQL stores immutable JSONB documents in `oc_snapshots`, checkpoint identities in `oc_revisions`, and ordered parent links in `oc_revision_parents`. `oc_timelines.head_revision_id` points to the current saved head; `revision` remains the optimistic-concurrency counter. Forks reference an upstream and initial base, share their initial snapshot, and maintain independent rational indexes and membership. Duplicates share document storage without inheriting ancestry. Saving, syncing and merging update the head and rational index together in a transaction.
+
+`server/versioning.mjs` handles copying, saved-history access and ancestry-aware sync. `server/merge.mjs` performs structured three-way comparisons by moment ID and metadata field, with conservative array conflicts. Source-pinned proposals use immutable checkpoints; explicit updates advance the mutable review revision, and merges record target/source parents. Cross-timeline historical document access is rejected even when a public merge references a private source parent. Deletion preserves ancestor documents required by surviving forks/reviews while removing unreferenced history belonging to the deleted timeline. See [collaboration](collaboration.md) for permissions, routes and migration behavior.
+
+Native SQLite JSON payloads are validated and serialized by `serde_json`. Save atomically recreates the data tables that are fully replaced, migrating older `json_valid()` checks that some system SQLite builds reject with `trusted_schema=OFF`. Schema trust remains disabled, exact rational constraints and indexes remain active, and legacy files stay readable.
+
+## Desktop SQLite viewport storage
+
+Opening `.och` now reads only the timeline header and the summary index root's
+cached total count and bounds; it does not count or enumerate the event table.
+`native-store/src/workspace.rs` maintains a private, disk-backed baseline copied
+with SQLite's [online backup API](https://www.sqlite.org/backup.html), including
+committed WAL content. It does not turn the database into a Rust event vector or
+send a full document through Tauri during ordinary opening/navigation. Baselines
+are removed on normal release/shutdown; their directories have owner-only Unix
+permissions. An abnormal exit can leave temporary files for the OS/operator to
+clean up.
+
+The editor shares `ViewportCache` and `RemoteWorkspace` with server timelines.
+`desktop_query` addresses the active baseline by generation, accepts exact rational
+bounds, and delegates dense grouping to `sqlite-rational`'s persisted `points`
+index. It enforces queried span / 1,024 as the minimum display threshold, including
+when requested grouping is zero. At most 1,025 groups cross the native bridge.
+Singleton plugin metadata is limited to 2 KiB, with longer metadata projected to
+active plugin fields and a short notes preview. Summaries contain no member list.
+Full metadata is retrieved only for selection or explicit summary pages of at
+most 100 moments. Native result budgets reject excessive payloads before IPC;
+the same 8 MiB viewport payload budget applies in the webview. Selected metadata,
+unsaved edits, undo history, global settings/assets, and runtime/DOM overhead are
+additional memory costs.
+
+SQLite connections use a 2 MiB page-cache target, disable mmap, and put temporary
+sorting tables on disk. A composite rational-time/ID index supports keyset pages.
+Queries run off the UI thread, serialize per baseline, and release connections
+when finished. The frontend allows one viewport request at a time and ignores
+stale responses after navigation or file generation changes. Desktop **Import JSON** parses `.ochx`/JSON natively into a disk baseline, so its
+events never pass through the webview. Native parsing temporarily holds the import
+and rejects files over 32 MiB; use `.och` for larger timelines. Programmatic/demo
+imports over 2,048 moments are also staged after their initial JavaScript import.
+
+Saving a local indexed timeline sends settings plus sparse additions, edits and
+deletions, never cached summaries as if they were all the events. Native SQLite
+updates affected coordinate weights and preserves every untouched hidden event.
+Settings include time-display scripts, custom plugins, tags, and assets. Work is
+prepared in a separate disk baseline and the destination is replaced through a
+transactional SQLite backup, so invalid patches leave the original untouched.
+Save As preserves the original file. Generation checks reject stale commands;
+file and WAL modification stamps detect external changes and require Save As.
+As with other file editors, avoid simultaneous editing by another application.
+
+Successful saves rebase edits made while saving and evict clean inspector reads.
+Exporting full JSON or initially publishing a local file to the server remains an
+explicit full-document operation and can temporarily consume more memory; normal
+local saves, browsing, grouping and inspector pagination do not. Preparing and
+copying disk baselines costs disk space and file-size-proportional I/O during open
+and save, traded for bounded UI data and atomic file persistence. Existing JSON
+export/document size limits still apply.
+
+Gregorian presentation uses historical BCE/CE year numbering (1 BCE is astronomical
+Gregorian year 0). Exact input and tooltip timestamps append the era, e.g.
+`0001-01-01T00:00:00Z BCE`; existing signed ISO timestamps remain accepted.
+At geological label resolutions (at least 10,000 years per label), years a
+million or more before the Common Era use `mya`, measured against a fixed
+reference year 2000 CE. Far-future labels use `Myr after 2000 CE`. The caption
+states this reference; it never depends on the current date. These are rounded
+chart labels. Parsing an age places a marker at January 1 of the corresponding
+whole Gregorian year, while exact editable fields retain complete rational
+timestamps. Numeric and custom presentations retain their own unit conventions.
+
+The selected-group inspector retains only its current page of 25 moments.
+Next/Previous requests fetch bounded pages on demand using exact time/ID cursors;
+only lightweight page-start cursors survive navigation. Local coincident buckets
+seek by binary search instead of rescanning earlier pages. Opening a moment,
+closing the inspector, or changing timelines clears the previous list and its
+listeners. Selection/request generations discard late results and errors;
+pagination controls disable while loading to prevent duplicate requests.
+
+## Guest editing and complete browser copies
+
+Guests and standalone HTML users edit complete local rational maps in memory only.
+They do not initialize IndexedDB or auto-save drafts. A persistent banner explains
+refresh/close behavior and links to .ochx export. Signed-in local browser drafts
+retain the existing persistence behavior; Tauri continues using local SQLite.
+
+`POST /api/timelines/:id/browser-fork` accepts `{}` or a saved `{revision}` token.
+It returns the complete document and source revision for public timelines only,
+without inserting a timeline, fork relationship or revision. It caps copies at
+5,000 entries (moments and stack entries) and 4 MiB of JSON, including embedded assets and plugin definitions.
+The service reads precomputed `oc_snapshots.document_bytes` and the timeline event
+count before loading document JSON. New checkpoints record UTF-8 serialized sizes;
+the operator migration measures legacy snapshots once, conservatively using their
+JSONB text size. Admission reserves space for response metadata; an additional
+actual response-size check protects against inconsistent stored counters.
+
+Copy requests use the existing per-client rate limiter (ten/minute), four concurrent
+copies per server process, and a 1.5-second SQL statement timeout. Configure trusted
+proxy address forwarding as described in the authentication deployment guide;
+unknown addresses share one limit. Guest full-document downloads use the same gate,
+and SQLite downloads require authentication. Regular viewport queries remain bounded
+and can display timelines too large to copy. The client also caps streamed response
+bytes before JSON parsing and validates the event count. See [guest behavior](guest-editing.md).

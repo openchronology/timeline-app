@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 //! A small RAII binding to the same system SQLite linked by sqlite-rational.
 use std::{
     ffi::{c_char, c_int, c_void, CStr, CString},
@@ -12,6 +13,14 @@ extern "C" {
         flags: c_int,
         vfs: *const c_char,
     ) -> c_int;
+    fn sqlite3_backup_init(
+        destination: *mut c_void,
+        destination_name: *const c_char,
+        source: *mut c_void,
+        source_name: *const c_char,
+    ) -> *mut c_void;
+    fn sqlite3_backup_step(backup: *mut c_void, pages: c_int) -> c_int;
+    fn sqlite3_backup_finish(backup: *mut c_void) -> c_int;
     fn sqlite3_close(db: *mut c_void) -> c_int;
     fn sqlite3_errmsg(db: *mut c_void) -> *const c_char;
     fn sqlite3_prepare_v2(
@@ -118,7 +127,25 @@ impl Connection {
         }
         db.execute("PRAGMA trusted_schema=OFF", &[])?;
         db.execute("PRAGMA foreign_keys=ON", &[])?;
+        db.execute("PRAGMA cache_size=-2048", &[])?;
+        db.execute("PRAGMA mmap_size=0", &[])?;
+        db.execute("PRAGMA temp_store=FILE", &[])?;
         Ok(db)
+    }
+    pub fn limit_reads(&mut self) {
+        unsafe {
+            sqlite3_limit(self.raw, 0, 32 * 1024 * 1024);
+            sqlite3_limit(self.raw, 1, 100000);
+            sqlite3_limit(self.raw, 2, 128);
+            sqlite3_limit(self.raw, 3, 128);
+            *self._budget = 20000;
+            sqlite3_progress_handler(
+                self.raw,
+                1000,
+                Some(progress),
+                (&mut *self._budget as *mut u64).cast(),
+            );
+        }
     }
     fn error(&self) -> String {
         unsafe {
@@ -127,10 +154,46 @@ impl Connection {
                 .into_owned()
         }
     }
+    pub fn backup_to(&self, path: &Path) -> Result<(), String> {
+        let destination = Self::open(path, true)?;
+        let name = c"main";
+        let backup =
+            unsafe { sqlite3_backup_init(destination.raw, name.as_ptr(), self.raw, name.as_ptr()) };
+        if backup.is_null() {
+            return Err(destination.error());
+        }
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        let result = loop {
+            let rc = unsafe { sqlite3_backup_step(backup, 128) };
+            match rc {
+                101 => break Ok(()),
+                0 => {}
+                5 | 6 if std::time::Instant::now() < deadline => {
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                }
+                _ => break Err(destination.error()),
+            }
+        };
+        let finished = unsafe { sqlite3_backup_finish(backup) };
+        result?;
+        if finished != 0 {
+            return Err(destination.error());
+        }
+        Ok(())
+    }
     pub fn query(
         &self,
         sql: &str,
         parameters: &[&str],
+    ) -> Result<Vec<Vec<Option<String>>>, String> {
+        self.query_limited(sql, parameters, usize::MAX, usize::MAX)
+    }
+    pub fn query_limited(
+        &self,
+        sql: &str,
+        parameters: &[&str],
+        max_rows: usize,
+        max_bytes: usize,
     ) -> Result<Vec<Vec<Option<String>>>, String> {
         let sql = CString::new(sql).map_err(|e| e.to_string())?;
         let mut raw = ptr::null_mut();
@@ -156,10 +219,14 @@ impl Connection {
             }
         }
         let mut rows = Vec::new();
+        let mut bytes = 0usize;
         loop {
             match unsafe { sqlite3_step(stmt.raw) } {
                 101 => break,
                 100 => {
+                    if rows.len() >= max_rows {
+                        return Err("SQLite query exceeds row budget".into());
+                    }
                     let mut row = Vec::new();
                     for col in 0..unsafe { sqlite3_column_count(stmt.raw) } {
                         if unsafe { sqlite3_column_type(stmt.raw, col) } == 5 {
@@ -168,6 +235,10 @@ impl Connection {
                         }
                         let ptr = unsafe { sqlite3_column_text(stmt.raw, col) };
                         let len = unsafe { sqlite3_column_bytes(stmt.raw, col) } as usize;
+                        bytes = bytes.saturating_add(len);
+                        if bytes > max_bytes {
+                            return Err("SQLite query exceeds memory budget".into());
+                        }
                         if ptr.is_null() {
                             return Err("SQLite could not allocate a result value".into());
                         }

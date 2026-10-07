@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
 import { DEFAULT_PRESENTATION, parseTimestamp } from '../dist/core.mjs';
 

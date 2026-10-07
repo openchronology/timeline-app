@@ -7,9 +7,9 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "node scripts/build.mjs",
+    "build": "node scripts/build-platform.mjs",
     "dev": "node scripts/dev.mjs",
-    "start": "node server/main.mjs",
+    "start": "node scripts/start-platform.mjs",
     "migrate": "node server/migrate.mjs",
     "test": "node scripts/build.mjs && node --test test/*.test.mjs",
     "test:browser": "node test/browser.mjs",
@@ -18,11 +18,21 @@
     "desktop:build": "tauri build -- --locked",
     "typecheck": "tsc --noEmit",
     "build:offline": "node scripts/build-offline.mjs",
-    "test:offline:browser": "node test/offline-browser.mjs"
+    "test:offline:browser": "node test/offline-browser.mjs",
+    "build:source": "node scripts/source.mjs",
+    "build:source:desktop": "node scripts/source.mjs --desktop",
+    "build:editor": "node scripts/build.mjs",
+    "test:platform": "node test/next-platform.mjs",
+    "test:platform:postgres": "node test/next-postgres.mjs",
+    "test:versioning:postgres": "node test/versioning-postgres.mjs",
+    "seed": "node server/seed.mjs"
   },
   "dependencies": {
     "rational-ordered-map": "file:vendor/rational-ordered-map-0.1.0.tgz",
-    "pg": "8.23.1"
+    "pg": "8.23.1",
+    "next": "16.3.8",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "esbuild": "0.25.12",
@@ -31,5 +41,6 @@
     "@tauri-apps/cli": "2.12.1"
   },
   "description": "An exact rational timeline editor for the browser and desktop",
-  "license": "MIT"
+  "license": "GPL-3.0-only",
+  "author": "Athan Clark"
 }

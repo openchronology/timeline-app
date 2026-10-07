@@ -1,5 +1,20 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+import { createSummaryExpansion } from './summary-expansion.js';
+import { pluginExpand } from './plugins.js';
+import { browserEntryCount, BROWSER_COPY_MAX_EVENTS } from './browser-copy.js';
+import { liveUpdates } from './live-updates.js';
+import { ComparisonView } from './comparison.js';
+import type { ComparisonSource, ComparisonGroup, EventPage } from './comparison.js';
+import { comparisonUI } from './comparison-ui.js';
+import { createCommunityUI } from './community-ui.js';
+import type { Proposal } from './community-ui.js';
+import { configureImages, imageSource, embedImages } from './image-assets.js';
 import './styles.css';
-import { renderPluginMarker, renderPluginFields } from './plugin-ui.js';
+import { renderPluginMarker, renderPluginFields, renderPluginShape } from './plugin-ui.js';
+import { attachRichText } from './rich-text.js';
+import { pluginRichText } from './plugins.js';
+import { dismissOnBackdrop } from './dialogs.js';
+import { createHoverPreview } from './hover-preview.js';
 import {
   Q,
   RationalMap,
@@ -15,8 +30,15 @@ import {
   validatePluginManifest,
   pluginMarker,
   pluginColor,
+  pluginShape,
+  pluginSize,
+  PLUGIN_EXAMPLE,
+  validateTags,
+  validateAssets,
+  isOfficialPlugin,
   pluginFields,
   stackWindow,
+  scaleTimeline,
   validateStackMetadata,
   validatePresentation,
   DEFAULT_PRESENTATION,
@@ -34,6 +56,7 @@ import type {
   InstalledPlugin,
   PluginManifest,
 } from './core.js';
+import { ViewportCache, RemoteWorkspace, regroup } from './remote-cache.js';
 import { requestApi, importSqlite, exportSqlite } from './transport.js';
 declare const __OFFLINE_HTML__: boolean;
 const offlineHtml = typeof __OFFLINE_HTML__ !== 'undefined' && __OFFLINE_HTML__;
@@ -45,33 +68,58 @@ declare global {
   }
 }
 interface RemoteTimeline {
+  comparison?: { sources: string[]; combined: boolean };
   id: string;
   title: string;
   description: string;
   presentation?: TimePresentation;
   plugins?: InstalledPlugin[];
   revision: string;
+  head_revision_id?: string;
   visibility: 'private' | 'public';
   canEdit: boolean;
   canShare: boolean;
+  canWrite?: boolean;
+  canPropose?: boolean;
+  tags?: string[];
+  assets?: Record<string, string>;
   owner: string;
   event_count: string;
   first?: string;
   last?: string;
 }
+interface NativeOpened {
+  document: TimelineDocument;
+  path: string;
+  generation: number;
+  event_count: string;
+  first?: string;
+  last?: string;
+}
+interface LocalTimeline extends NativeOpened {
+  id: string;
+  revision: string;
+}
+let local: LocalTimeline | null = null;
 interface Session {
   user: { id: string; username: string } | null;
   csrf: string | null;
   server: boolean;
+  dashboard?: boolean;
   providers?: string[];
   fileExchange?: boolean;
 }
 const el = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
 const desktop = !offlineHtml && !!window.__TAURI__,
   stage = el('timeline-stage');
+const platformEditor = !offlineHtml && !desktop && location.pathname === '/editor/frame';
+const sampleTimeline =
+  platformEditor && new URLSearchParams(location.search).get('demo') === 'dense';
+const freshTimeline = platformEditor && new URLSearchParams(location.search).get('new') === '1';
+if (platformEditor) document.body.dataset.platformEditor = 'true';
 let serverOrigin = desktop ? 'https://timescale.info' : location.origin;
 let model: TimelineIndex | null = new TimelineIndex(
-    offlineHtml
+    offlineHtml || freshTimeline
       ? {
           format: 'openchronology',
           version: 1,
@@ -79,13 +127,33 @@ let model: TimelineIndex | null = new TimelineIndex(
           description: '',
           events: [],
         }
-      : demo(),
+      : demo(sampleTimeline),
   ),
   viewport = Viewport.fit(model.points.minKey(), model.points.maxKey());
 let remote: RemoteTimeline | null = null,
   session: Session = { user: null, csrf: null, server: false },
   dirty = false,
   selected: PointEvent | null = null;
+let live: ReturnType<typeof liveUpdates> | undefined;
+let liveTransitionPending = false,
+  animateLiveFrame = false;
+const retiringNodes = new Set<HTMLElement>();
+let comparison: ComparisonView | null = null;
+let comparisonBefore: { viewport: Viewport; verticalOffset: number; uiScale: number } | null = null;
+let comparisonController: AbortController | undefined;
+let comparisonInFlight = false;
+let workingProposal: Proposal | null = null;
+let proposalSubmissionVersion = 0,
+  proposalSubmissionDocument = 0;
+function setDashboard(show: boolean) {
+  el('dashboard').hidden = !show;
+  document.body.dataset.dashboard = String(show);
+  el('memory-notice').hidden = show || !memoryOnly() || !!remote || !!comparison || !model;
+  if (!show) requestRender();
+}
+function hasDashboard() {
+  return session.dashboard ?? session.server;
+}
 let selectedTime: Q | null = null;
 let displayedEventTime: { text: string; time: Q } | null = null;
 let pendingDelete: { id: string; document: number; remove?: () => void } | null = null;
@@ -151,6 +219,52 @@ interface MomentLabel {
 const momentLabels = new Map<string, MomentLabel>();
 const stackLabels = new Map<string, MomentLabel>();
 let verticalOffset = 0;
+let uiScale = 1;
+let renderedUiScale = 1;
+const hoverPreview = createHoverPreview(stage, () => uiScale);
+const summaryExpansion = createSummaryExpansion(stage, {
+  scale: () => uiScale,
+  generation: () =>
+    `${documentRequest}:${editVersion}:${remote?.revision ?? local?.revision ?? ''}:${comparison?.tracks.map((t) => t.source.revision).join(',') ?? ''}`,
+  load: (group, signal) => groupPage(group, null, 5, signal),
+  decorate(button, event) {
+    renderPluginMarker(button, imageSource(pluginMarker(activePlugins(), event.metadata)), 1n);
+    button.style.backgroundColor = pluginColor(activePlugins(), event.metadata) ?? '';
+    button.dataset.size = pluginSize(activePlugins(), event.metadata);
+    renderPluginShape(button, pluginShape(activePlugins(), event.metadata));
+    button.title = `${event.metadata.title || 'Unnamed moment'} · ${presented(Q.parse(event.time))}`;
+    hoverPreview.update(button, activePlugins(), event.metadata);
+    markerGroups.set(button, {
+      first: event.time,
+      last: event.time,
+      count: '1',
+      distinct: 1,
+      id: event.id,
+      metadata: event.metadata,
+      title: event.metadata.title,
+      ...(comparison
+        ? {
+            sourceKey: comparison.tracks.find((track) =>
+              event.id.startsWith(track.source.key + ':'),
+            )?.source.key,
+          }
+        : {}),
+    });
+  },
+  select(event) {
+    selectedGroup = null;
+    eventForm(event);
+  },
+  hidePreview: () => hoverPreview.hide(),
+});
+function scaleContents(requested: number, anchor: number) {
+  hoverPreview.hide();
+  summaryExpansion.hide();
+  const next = scaleTimeline(uiScale, verticalOffset, requested, anchor);
+  uiScale = next.scale;
+  verticalOffset = next.offset;
+  requestRender(false);
+}
 let verticalMinimum = 0,
   verticalMaximum = 0;
 function panVertical(value: number) {
@@ -194,11 +308,32 @@ function updateMomentTime(label: MomentLabel, value: string) {
   };
   current.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' });
 }
-function removeMomentLabel(label: MomentLabel) {
+function removeMomentLabel(label: MomentLabel, fade = false) {
   finishTimeFade(label);
   for (const node of [label.caption, label.stem, label.button]) {
     for (const animation of node.getAnimations({ subtree: true })) animation.cancel();
-    node.remove();
+    if (!fade || reducedMotion.matches) {
+      node.remove();
+      continue;
+    }
+    node.style.pointerEvents = 'none';
+    retiringNodes.add(node);
+    while (retiringNodes.size > 256) {
+      const old = retiringNodes.values().next().value!;
+      old.remove();
+      retiringNodes.delete(old);
+    }
+    const animation = node.animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: 220,
+      easing: 'ease-out',
+      fill: 'forwards',
+    });
+    void animation.finished
+      .catch(() => {})
+      .finally(() => {
+        node.remove();
+        retiringNodes.delete(node);
+      });
   }
 }
 reducedMotion.addEventListener('change', () => {
@@ -211,6 +346,21 @@ let longPressed = false;
 let frame: Frame = { groups: [], visitedNodes: 0 },
   selectedGroup: FrameGroup | null = null,
   groupCursor: { time: string; id: string } | null = null;
+const GROUP_PAGE_SIZE = 25;
+type GroupCursor = { time: string; id: string } | null;
+let groupStarts: GroupCursor[] = [null],
+  groupPageIndex = 0,
+  groupPageRequest = 0;
+function clearGroupPage() {
+  groupPageRequest++;
+  groupCursor = null;
+  groupStarts = [null];
+  groupPageIndex = 0;
+  el('group-events').replaceChildren();
+  el('group-more').hidden = true;
+  el('group-previous').hidden = true;
+  text('group-page-status', '');
+}
 let history: { before?: PointEvent; after?: PointEvent }[] = [],
   frameRequest = 0,
   frameTimer: ReturnType<typeof setTimeout>,
@@ -230,7 +380,8 @@ const input = (id: string) => el<HTMLInputElement>(id),
 let pluginSearchRequest = 0;
 let pluginSearchTimer: ReturnType<typeof setTimeout> | undefined;
 let pluginPage = 1;
-const editable = () => !!model && (!remote || remote.canEdit);
+const memoryOnly = () => !desktop && (offlineHtml || !session.user);
+const editable = () => !comparison && !!model && (!remote || remote.canEdit);
 const width = () => Math.max(1, stage.clientWidth - 96),
   pixels = () => Number(input('density').value);
 function toast(message: string) {
@@ -250,9 +401,71 @@ function eventId(): string {
     byte.toString(16).padStart(2, '0'),
   ).join('');
 }
-async function api<T>(path: string, method = 'GET', data?: unknown): Promise<T> {
+async function api<T>(
+  path: string,
+  method = 'GET',
+  data?: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
   if (offlineHtml) throw new Error('This offline file uses JSON import and export.');
-  return requestApi<T>(path, method, data, session.csrf);
+  return requestApi<T>(path, method, data, session.csrf, signal);
+}
+const remoteCache = new ViewportCache();
+let remoteCacheKey = '',
+  windowController: AbortController | undefined;
+let windowInFlight = false;
+function sparseWorkspace(): RemoteWorkspace | null {
+  return model instanceof RemoteWorkspace ? model : null;
+}
+async function timelineQuery<T>(query: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
+  if (local) {
+    const plugins = activePlugins();
+    const metadata_keys = [
+      ...new Set([
+        ...pluginFields(plugins).map((field) => field.metadataKey),
+        ...plugins
+          .filter((p) => p.enabled)
+          .flatMap((p) => [
+            ...(p.manifest.marker ? [p.manifest.marker.metadataKey] : []),
+            ...(p.manifest.hover || p.manifest.source ? ['title', 'description'] : []),
+            ...(p.manifest.hover ? ['sources'] : []),
+          ]),
+      ]),
+    ];
+    return window.__TAURI__!.core.invoke<T>('desktop_query', {
+      generation: local.generation,
+      query: { ...query, metadata_keys },
+    });
+  }
+  if (!remote) throw new Error('No indexed timeline is open.');
+  return api<T>(`timelines/${remote.id}/query`, 'POST', query, signal);
+}
+async function completeDocument(): Promise<TimelineDocument> {
+  if (comparison) throw new Error('Exit comparison to save or export a source timeline.');
+  if (!sparseWorkspace() && model) return model.document();
+  if (!remote && !local) throw new Error('No timeline is open.');
+  const workspace = documentRequest,
+    index = sparseWorkspace();
+  const changes = index ? new Map(index.changes) : undefined;
+  const settings = index?.document();
+  const savedId = remote?.head_revision_id;
+  const snapshot = local
+    ? {
+        document: await window.__TAURI__!.core.invoke<TimelineDocument>('desktop_document', {
+          generation: local.generation,
+        }),
+      }
+    : index && savedId
+      ? await api<{ document: TimelineDocument }>(`timelines/${remote!.id}/history/${savedId}`)
+      : await api<{ document: TimelineDocument }>(`timelines/${remote!.id}/document`);
+  if (workspace !== documentRequest) throw new Error('The open timeline changed.');
+  if (!changes || !settings) return snapshot.document;
+  const events = new Map(snapshot.document.events.map((e) => [e.id, e]));
+  for (const [id, change] of changes) {
+    if (change.after) events.set(id, change.after);
+    else events.delete(id);
+  }
+  return { ...settings, events: [...events.values()] };
 }
 let pendingFrameRefresh = false;
 function requestRender(refreshFrame = true) {
@@ -263,13 +476,15 @@ function requestRender(refreshFrame = true) {
     scheduled = false;
     const refresh = pendingFrameRefresh;
     pendingFrameRefresh = false;
+    // Hidden dashboards and documents have no usable geometry. Draw after they become visible.
+    if (stage.clientWidth <= 96 || stage.clientHeight === 0) return;
     render(refresh);
   });
 }
 let presenterSettings: TimePresentation | undefined,
   presenter = createPresenter();
 function timelinePresenter() {
-  const settings = model ? model.presentation : remote?.presentation;
+  const settings = comparison?.presentation ?? (model ? model.presentation : remote?.presentation);
   if (settings !== presenterSettings) {
     presenter = createPresenter(settings);
     presenterSettings = settings;
@@ -315,11 +530,44 @@ function axisLabel(
   return full.length <= 27 ? full : full.slice(0, 24) + '…';
 }
 const displayedBounds = new Map<string, { text: string; time: Q }>();
+function comparisonRows() {
+  const rows = new Map<string, { offset: number; title: number }>();
+  let total = 0;
+  if (!comparison || comparison.combined) return { rows, total };
+  const fields = pluginFields(comparison.plugins).filter((field) => field.kind === 'stack');
+  const ordered = [...frame.groups].sort((a, b) => Q.parse(a.first).compare(Q.parse(b.first)));
+  for (const track of comparison.tracks) {
+    let up = 0,
+      down = 0,
+      lane = 0;
+    for (const group of ordered)
+      if ((group as ComparisonGroup).sourceKey === track.source.key) {
+        const depth = fields.reduce(
+          (sum, field) =>
+            sum +
+            (Array.isArray(group.metadata?.[field.metadataKey])
+              ? (group.metadata![field.metadataKey] as unknown[]).length
+              : 0),
+          0,
+        );
+        const extent = Math.max(0, depth * 72 - 40);
+        if (lane++ % 4 < 2) up = Math.max(up, extent);
+        else down = Math.max(down, extent);
+      }
+    rows.set(track.source.key, { offset: total + up, title: total + 22 });
+    total += up + 340 + down;
+  }
+  return { rows, total };
+}
 function renderAxis() {
   const axis = el('axis');
+  const rowPlan = comparisonRows();
   axis.replaceChildren();
   const baseline = document.createElement('div');
   baseline.className = 'axis-baseline';
+  baseline.style.left = `${48 / uiScale}px`;
+  baseline.style.right = `${48 / uiScale}px`;
+  baseline.style.top = `${192 + (comparison && !comparison.combined ? (rowPlan.rows.get(comparison.tracks[0].source.key)?.offset ?? 0) : 0)}px`;
   axis.append(baseline);
   const rulerPresenter = timelinePresenter();
   let rules: RulerPlan;
@@ -340,7 +588,7 @@ function renderAxis() {
     tick.className = 'axis-tick ' + rule.level;
     tick.dataset.time = time.toString();
     tick.dataset.opacity = rule.opacity.toString();
-    tick.style.left = `${48 + viewport.x(time, width())}px`;
+    tick.style.left = `${(48 + viewport.x(time, width())) / uiScale}px`;
     const guide = document.createElement('span');
     guide.className = 'tick-guide';
     guide.style.opacity = rule.majorOpacity.toString();
@@ -383,7 +631,28 @@ function renderAxis() {
       value.title = presented(time) + '\nExact: ' + time.toString();
       tick.append(value);
     }
+    tick.style.transform = `translateY(${comparison && !comparison.combined ? (rowPlan.rows.get(comparison.tracks[0].source.key)?.offset ?? 0) : 0}px)`;
     axis.append(tick);
+  }
+  if (comparison && !comparison.combined) {
+    const originalTicks = [...axis.querySelectorAll<HTMLElement>('.axis-tick')];
+    for (const [index, track] of comparison.tracks.entries()) {
+      const title = document.createElement('div');
+      title.className = 'comparison-axis-title';
+      title.textContent = track.source.title;
+      title.style.top = `${rowPlan.rows.get(track.source.key)?.title ?? 22}px`;
+      axis.append(title);
+      if (!index) continue;
+      const line = baseline.cloneNode(true) as HTMLElement;
+      line.style.top = `${192 + (rowPlan.rows.get(track.source.key)?.offset ?? 0)}px`;
+      axis.append(line);
+      for (const tick of originalTicks) {
+        const clone = tick.cloneNode(true) as HTMLElement;
+        clone.style.transform = `translateY(${rowPlan.rows.get(track.source.key)?.offset ?? 0}px)`;
+        clone.querySelector('.tick-guide')?.remove();
+        axis.append(clone);
+      }
+    }
   }
   for (const [id, value] of [
     ['exact-left', viewport.left.toString()],
@@ -402,6 +671,8 @@ function renderAxis() {
 }
 function drawFrame() {
   const cursor = el('time-cursor');
+  stage.style.setProperty('--timeline-scale', String(uiScale));
+  stage.dataset.uiScale = String(uiScale);
   const cursorX = selectedTime ? viewport.x(selectedTime, width()) : -1;
   cursor.hidden = !selectedTime || cursorX < 0 || cursorX > width();
   el('clear-selection').hidden = !selectedTime;
@@ -410,11 +681,12 @@ function drawFrame() {
     cursor.dataset.time = selectedTime.toString();
     cursor.setAttribute('aria-label', `Selected time: ${presented(selectedTime, 'input')}`);
   }
+  const expandSummaries = pluginExpand(activePlugins());
   const container = el('markers');
   const branches = el('stack-markers');
   const stackRetained = new Set<string>();
   let topExtent = 0,
-    bottomExtent = stage.clientHeight;
+    bottomExtent = stage.clientHeight / uiScale;
   const retained = new Set<string>();
   const ordered: HTMLElement[] = [];
   let visible = 0n;
@@ -422,14 +694,25 @@ function drawFrame() {
   const groups = new RationalMap<FrameGroup>((g) => BigInt(g.count));
   for (const group of frame.groups) groups.set(Q.parse(group.first), group);
   let lane = 0;
-  for (const [, group] of groups) {
+  const orderedGroups = comparison
+    ? [...frame.groups].sort((a, b) => Q.parse(a.first).compare(Q.parse(b.first)))
+    : [...groups].map(([, group]) => group);
+  const trackLanes = new Map<string, number>();
+  const rowPlan = comparisonRows();
+  if (comparison && !comparison.combined) bottomExtent = Math.max(bottomExtent, rowPlan.total);
+  for (const group of orderedGroups) {
+    const sourceKey = (group as ComparisonGroup).sourceKey;
+    const rowOffset = sourceKey ? (rowPlan.rows.get(sourceKey)?.offset ?? 0) : 0;
+
     const first = Q.parse(group.first),
       last = Q.parse(group.last),
       mid = first.add(last).div(Q.from(2n)),
       x = viewport.x(mid, width());
     if (x < 0 || x > width()) continue;
     visible += BigInt(group.count);
-    const key = group.id ? `event:${group.id}` : `group:${group.first}:${group.last}`;
+    const key = group.id
+      ? `event:${group.id}`
+      : `group:${sourceKey ?? ''}:${group.first}:${group.last}`;
     retained.add(key);
     let label = momentLabels.get(key);
     if (!label) {
@@ -457,6 +740,9 @@ function drawFrame() {
         if (currentGroup) zoomGroup(currentGroup);
       });
       container.append(stem, caption, button);
+      if (animateLiveFrame && !reducedMotion.matches)
+        for (const node of [stem, caption, button])
+          node.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' });
     }
     const { button, caption, stem, coordinate } = label;
     const count = BigInt(group.count);
@@ -464,16 +750,24 @@ function drawFrame() {
       'event-marker' +
       (count > 1n ? ' group' : '') +
       (count > 999n ? ' large' : '') +
-      (selectedGroup?.first === group.first ? ' selected' : '');
-    button.style.left = `${48 + x}px`;
+      (selectedGroup?.first === group.first &&
+      (!comparison || (selectedGroup as ComparisonGroup)?.sourceKey === sourceKey)
+        ? ' selected'
+        : '');
+    button.style.left = `${(48 + x) / uiScale}px`;
     markerGroups.set(button, group);
+    summaryExpansion.update(button, group, expandSummaries);
     button.dataset.first = group.first;
     button.dataset.count = group.count;
-    const metadata = group.id ? (model?.byId.get(group.id)?.metadata ?? group.metadata ?? {}) : {};
-    renderPluginMarker(button, pluginMarker(activePlugins(), metadata), count);
+    const metadata = group.id
+      ? ((!comparison ? model?.byId.get(group.id)?.metadata : undefined) ?? group.metadata ?? {})
+      : {};
+    renderPluginMarker(button, imageSource(pluginMarker(activePlugins(), metadata)), count);
     const color = count === 1n ? pluginColor(activePlugins(), metadata) : null;
     button.style.backgroundColor = color ?? '';
-    button.style.borderColor = color ?? '';
+    button.style.borderColor = '';
+    button.dataset.size = count === 1n ? pluginSize(activePlugins(), metadata) : 'medium';
+    renderPluginShape(button, count === 1n ? pluginShape(activePlugins(), metadata) : 'circle');
     button.setAttribute(
       'aria-label',
       count > 1n
@@ -482,12 +776,16 @@ function drawFrame() {
     );
     button.title =
       count > 1n ? `${count} events; select to explore` : group.title?.trim() || 'Unnamed moment';
-    const top = lane++ % 4,
-      labelTop = top < 2 ? 128 - top * 43 : 234 + (top - 2) * 43;
-    stem.style.left = `${48 + x}px`;
-    stem.style.top = `${top < 2 ? labelTop + 32 : 201}px`;
-    stem.style.height = `${top < 2 ? 181 - labelTop - 32 : labelTop - 201}px`;
-    caption.style.left = `${48 + x}px`;
+    const sourceLane = trackLanes.get(sourceKey ?? '') ?? 0;
+    trackLanes.set(sourceKey ?? '', sourceLane + 1);
+    const top = (comparison ? sourceLane : lane++) % 4,
+      labelTop = rowOffset + (top < 2 ? 128 - top * 43 : 234 + (top - 2) * 43);
+    button.style.top = '';
+    button.style.translate = `0 ${rowOffset}px`;
+    stem.style.left = `${(48 + x) / uiScale}px`;
+    stem.style.top = `${top < 2 ? labelTop + 32 : rowOffset + 201}px`;
+    stem.style.height = `${top < 2 ? rowOffset + 181 - labelTop - 32 : labelTop - rowOffset - 201}px`;
+    caption.style.left = `${(48 + x) / uiScale}px`;
     caption.style.top = `${labelTop}px`;
     label.title.textContent =
       count > 1n ? `${count.toLocaleString()} moments` : (group.title ?? '');
@@ -496,6 +794,12 @@ function drawFrame() {
     updateMomentTime(label, axisLabel(mid, 'event'));
     coordinate.title = presented(mid) + '\nExact: ' + mid.toString();
     ordered.push(stem, caption, button);
+    hoverPreview.update(
+      button,
+      activePlugins(),
+      { ...metadata, title: group.title ?? metadata.title },
+      count,
+    );
     if (count === 1n && group.id) {
       let branchDepth = 0;
       for (const field of pluginFields(activePlugins())) {
@@ -508,8 +812,8 @@ function drawFrame() {
         const window = stackWindow(
           labelTop,
           direction,
-          verticalOffset,
-          stage.clientHeight,
+          verticalOffset / uiScale,
+          stage.clientHeight / uiScale,
           branchDepth,
         );
         const far = window.start + window.step * (branchDepth - 1);
@@ -543,12 +847,20 @@ function drawFrame() {
             child = { button, caption, title, coordinate, current, stem };
             stackLabels.set(childKey, child);
             branches.append(stem, caption, button);
+            if (animateLiveFrame && !reducedMotion.matches)
+              for (const node of [stem, caption, button])
+                node.animate([{ opacity: 0 }, { opacity: 1 }], {
+                  duration: 220,
+                  easing: 'ease-out',
+                });
           }
           const y = window.start + window.step * index;
-          const previous = index === 0 ? 192 : y - window.step;
+          const previous = index === 0 ? rowOffset + 192 : y - window.step;
           const title = typeof entry.metadata.title === 'string' ? entry.metadata.title : '';
-          child.button.style.left = `${48 + x}px`;
-          child.button.style.top = `${y - 11}px`;
+          child.button.style.left = `${(48 + x) / uiScale}px`;
+          const size = pluginSize(activePlugins(), entry.metadata);
+          child.button.dataset.size = size;
+          child.button.style.top = `${y - { small: 16, medium: 22, large: 32 }[size] / 2}px`;
           child.button.dataset.stackEntry = entry.id;
           child.button.dataset.parentEvent = group.id;
           child.button.dataset.time = first.toString();
@@ -557,15 +869,20 @@ function drawFrame() {
             `${title.trim() || 'Unnamed stack entry'} — stack entry of ${group.title?.trim() || 'Unnamed moment'}`,
           );
           child.button.title = `${title.trim() || 'Unnamed stack entry'} (inherits ${presented(mid, 'input')})`;
-          renderPluginMarker(child.button, pluginMarker(activePlugins(), entry.metadata), 1n);
+          renderPluginMarker(
+            child.button,
+            imageSource(pluginMarker(activePlugins(), entry.metadata)),
+            1n,
+          );
           const color = pluginColor(activePlugins(), entry.metadata);
           child.button.style.backgroundColor = color ?? '';
-          child.button.style.borderColor = color ?? '';
-          child.caption.style.left = `${48 + x}px`;
+          child.button.style.borderColor = '';
+          renderPluginShape(child.button, pluginShape(activePlugins(), entry.metadata));
+          child.caption.style.left = `${(48 + x) / uiScale}px`;
           child.caption.style.top = `${direction < 0 ? y - 45 : y + 16}px`;
           child.title.textContent = title;
           child.caption.hidden = !title.trim();
-          child.stem.style.left = `${48 + x}px`;
+          child.stem.style.left = `${(48 + x) / uiScale}px`;
           child.stem.style.top = `${Math.min(y, previous)}px`;
           child.stem.style.height = `${Math.abs(y - previous)}px`;
           child.button.onclick = () => {
@@ -584,27 +901,33 @@ function drawFrame() {
               })
               .catch(fail);
           };
+          hoverPreview.update(child.button, activePlugins(), entry.metadata);
         }
       }
     }
   }
   for (const [key, label] of stackLabels)
     if (!stackRetained.has(key)) {
-      removeMomentLabel(label);
+      removeMomentLabel(label, animateLiveFrame);
       stackLabels.delete(key);
     }
-  verticalMinimum = Math.min(0, stage.clientHeight - bottomExtent - 24);
-  verticalMaximum = Math.max(0, -topExtent + 24);
+  const centeredOffset = 192 * (1 - uiScale);
+  verticalMinimum = Math.min(centeredOffset, stage.clientHeight - bottomExtent * uiScale - 24);
+  verticalMaximum = Math.max(centeredOffset, -topExtent * uiScale + 24);
   const clamped = Math.max(verticalMinimum, Math.min(verticalMaximum, verticalOffset));
   if (clamped !== verticalOffset) {
     verticalOffset = clamped;
     requestRender(false);
   }
-  for (const layer of [el('axis'), container, branches])
-    layer.style.transform = `translateY(${verticalOffset}px)`;
+  for (const layer of [el('axis'), container, branches]) {
+    layer.style.width = `${stage.clientWidth / uiScale}px`;
+    layer.style.height = `${stage.clientHeight / uiScale}px`;
+    layer.style.transformOrigin = '0 0';
+    layer.style.transform = `translateY(${verticalOffset}px) scale(${uiScale})`;
+  }
   for (const [key, label] of momentLabels)
     if (!retained.has(key)) {
-      removeMomentLabel(label);
+      removeMomentLabel(label, animateLiveFrame);
       momentLabels.delete(key);
     }
   // Preserve nodes and focus on ordinary renders; reorder only when chronology changes.
@@ -614,39 +937,105 @@ function drawFrame() {
   });
   text('visible-count', `${visible.toLocaleString()} visible · ${frame.groups.length} points`);
   el('empty-window').hidden = frame.groups.length > 0;
+  summaryExpansion.refresh();
+  hoverPreview.refresh();
+  animateLiveFrame = false;
 }
 function render(refreshFrame = true) {
-  if (refreshFrame) renderAxis();
-  if (model) {
+  if (comparison) {
+    renderComparison(refreshFrame);
+    return;
+  }
+  if (refreshFrame || renderedUiScale !== uiScale) {
+    renderAxis();
+    renderedUiScale = uiScale;
+  }
+  if (model && !sparseWorkspace()) {
     if (refreshFrame) frame = model.frame(viewport, width(), pixels());
     el('loading-window').hidden = true;
     drawFrame();
-  } else if (remote) {
+  } else if (remote || local) {
+    const source = local ?? remote!;
+    const key = source.id + ':' + source.revision + ':' + JSON.stringify(activePlugins());
+    if (remoteCacheKey !== key) {
+      remoteCache.clear();
+      remoteCacheKey = key;
+    }
+    const query = remoteCache.plan(viewport, width(), pixels());
+    const cached = remoteCache.get(viewport, query);
+    const base = cached ?? (liveTransitionPending ? frame : remoteCache.visible(viewport));
+    const threshold = viewport.threshold(width(), pixels());
+    // Pending requests keep the last confirmed grouping until the server supplies
+    // its replacement; otherwise zooming would hide singleton markers prematurely.
+    const displayThreshold = cached ? threshold : Q.zero;
+    frame =
+      sparseWorkspace()?.overlay(base, viewport, displayThreshold) ??
+      regroup(base, displayThreshold);
+    sparseWorkspace()?.evict(selected?.id);
     drawFrame();
-    if (!refreshFrame) return;
+    if (!refreshFrame || cached) {
+      if (cached) {
+        clearTimeout(frameTimer);
+        ++frameRequest;
+        windowController?.abort();
+      }
+      el('loading-window').hidden = !!cached;
+      return;
+    }
     clearTimeout(frameTimer);
     const request = ++frameRequest,
-      bounds = viewport.clone(),
-      id = remote.id;
+      id = source.id,
+      revision = source.revision;
+    windowController?.abort();
     el('loading-window').hidden = false;
     frameTimer = setTimeout(() => {
-      void api<Frame>(`timelines/${id}/query`, 'POST', {
-        kind: 'overview',
-        lower: bounds.left.toString(),
-        upper: bounds.right.toString(),
-        threshold: bounds.threshold(width(), pixels()).toString(),
-      })
+      // Native HTTP requests cannot be interrupted by AbortController: keep one active request.
+      if (windowInFlight || comparisonInFlight) return;
+      windowInFlight = true;
+      const controller = (windowController = new AbortController());
+      void timelineQuery<Frame>(
+        {
+          kind: 'overview',
+          ...query,
+          revision,
+          plugins: activePlugins(),
+        },
+        controller.signal,
+      )
         .then((result) => {
-          if (request !== frameRequest || remote?.id !== id) return;
-          frame = result;
-          drawFrame();
+          if (
+            controller.signal.aborted ||
+            request !== frameRequest ||
+            (local ?? remote)?.id !== id ||
+            (local ?? remote)?.revision !== revision
+          )
+            return;
+          remoteCache.store(query, result);
+          animateLiveFrame = liveTransitionPending;
+          liveTransitionPending = false;
+          requestRender(false);
           el('loading-window').hidden = true;
         })
         .catch((error) => {
-          if (request === frameRequest) {
+          if (request === frameRequest && !controller.signal.aborted) {
+            if (local && saving) return;
             el('loading-window').hidden = true;
-            fail(error);
+            if (error?.status === 409 && !dirty && remote) {
+              const view = viewport.clone();
+              void openRemote(id)
+                .then(() => {
+                  if (remote?.id === id) {
+                    viewport = view;
+                    requestRender();
+                  }
+                })
+                .catch(fail);
+            } else fail(error);
           }
+        })
+        .finally(() => {
+          windowInFlight = false;
+          if (request !== frameRequest && (remote || local)) requestRender();
         });
     }, 70);
   } else {
@@ -654,15 +1043,371 @@ function render(refreshFrame = true) {
     drawFrame();
   }
 }
+function currentComparisonSource(): ComparisonSource | null {
+  if (comparison) return null;
+  flushEventEdit();
+  const source = local ?? remote;
+  const index = model;
+  const settings = index
+    ? {
+        title: index.title,
+        presentation: index.presentation,
+        plugins: index.plugins,
+        assets: index.assets,
+      }
+    : undefined;
+  if (!source && index)
+    return {
+      key: 'local',
+      title: index.title,
+      presentation: index.presentation,
+      plugins: index.plugins,
+      assets: index.assets,
+      index,
+      first: index.points.minKey()?.toString(),
+      last: index.points.maxKey()?.toString(),
+    };
+  if (!source) return null;
+  const workspace = sparseWorkspace();
+  const native = local;
+  const remoteId = remote?.id;
+  const query = async (
+    value: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<Frame | EventPage> => {
+    const plugins = comparison?.plugins ?? settings?.plugins ?? remote?.plugins ?? [];
+    const result = native
+      ? await window.__TAURI__!.core.invoke<Frame | EventPage>('desktop_query', {
+          generation: native.generation,
+          query: {
+            ...value,
+            metadata_keys: [...new Set(pluginFields(plugins).map((f) => f.metadataKey))],
+          },
+        })
+      : await api<Frame | EventPage>(
+          `timelines/${remoteId}/query`,
+          'POST',
+          { ...value, revision: source.revision, plugins },
+          signal,
+        );
+    if (!workspace || !workspace.changes.size) return result;
+    if (value.kind === 'overview') {
+      const view = new Viewport(
+        Q.parse(String(value.lower)),
+        Q.parse(String(value.upper)).sub(Q.parse(String(value.lower))),
+      );
+      return workspace.overlay(result as Frame, view, Q.parse(String(value.threshold)));
+    }
+    const page = result as EventPage,
+      after = value.after as { time: string; id: string } | null;
+    const events = page.events.filter((event) => !workspace.changes.has(event.id));
+    for (const { after: event } of workspace.changes.values())
+      if (
+        event &&
+        Q.parse(event.time).compare(Q.parse(String(value.lower))) >= 0 &&
+        Q.parse(event.time).compare(Q.parse(String(value.upper))) <= 0 &&
+        (!after ||
+          Q.parse(event.time).compare(Q.parse(after.time)) > 0 ||
+          (event.time === after.time && event.id > after.id)) &&
+        (!page.next ||
+          Q.parse(event.time).compare(Q.parse(page.next.time)) < 0 ||
+          (event.time === page.next.time && event.id <= page.next.id))
+      )
+        events.push(event);
+    events.sort(
+      (a, b) =>
+        Q.parse(a.time).compare(Q.parse(b.time)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    );
+    const limit = Number(value.limit),
+      last = events[Math.min(limit, events.length) - 1];
+    return {
+      events: events.slice(0, limit),
+      next: events.length > limit ? { time: last.time, id: last.id } : page.next,
+    };
+  };
+  const bounds = [
+    source.first,
+    source.last,
+    index?.points.minKey()?.toString(),
+    index?.points.maxKey()?.toString(),
+  ]
+    .filter(Boolean)
+    .map((q) => Q.parse(q!))
+    .sort((a, b) => a.compare(b));
+  return {
+    key: remoteId ?? 'local-sqlite',
+    revision: remoteId ? source.revision : undefined,
+    working: !!workspace?.changes.size || dirty,
+    title: settings?.title ?? remote?.title ?? 'Local SQLite timeline',
+    presentation: settings?.presentation ?? remote?.presentation,
+    plugins: settings?.plugins ?? remote?.plugins,
+    assets: settings?.assets ?? remote?.assets,
+    first: bounds[0]?.toString(),
+    last: bounds.at(-1)?.toString(),
+    query,
+  };
+}
+async function comparisonSources(ids: string[]): Promise<ComparisonSource[]> {
+  if (ids.length > 8) throw new Error('At most eight timelines can be compared.');
+  const sources: ComparisonSource[] = [];
+  const seen = new Set<string>();
+  for (const id of ids) {
+    const info = await api<RemoteTimeline>(`timelines/${id}`);
+    if (info.comparison) {
+      for (const source of await comparisonSources(info.comparison.sources)) {
+        if (!seen.has(source.key)) {
+          seen.add(source.key);
+          sources.push(source);
+        }
+      }
+      continue;
+    }
+    if (seen.has(id)) continue;
+    seen.add(id);
+    sources.push({
+      key: id,
+      revision: info.revision,
+      title: info.title,
+      first: info.first,
+      last: info.last,
+      presentation: info.presentation ? validatePresentation(info.presentation) : undefined,
+      plugins: info.plugins ? validateInstalledPlugins(info.plugins) : [],
+      assets: info.assets ? validateAssets(info.assets) : {},
+      query: (query, signal) =>
+        api<Frame | EventPage>(
+          `timelines/${id}/query`,
+          'POST',
+          { ...query, revision: info.revision, plugins: comparison?.plugins ?? info.plugins },
+          signal,
+        ),
+    });
+  }
+  if (sources.length > 8) throw new Error('Choose at most eight distinct source timelines.');
+  return sources;
+}
+function startComparison(sources: ComparisonSource[], presentation: TimePresentation) {
+  cancelZoomAnimation();
+  flushEventEdit();
+  const view = new ComparisonView(sources, presentation);
+  if (!comparisonBefore) comparisonBefore = { viewport: viewport.clone(), verticalOffset, uiScale };
+  comparison?.dispose();
+  comparisonController?.abort();
+  windowController?.abort();
+  clearTimeout(frameTimer);
+  comparison = view;
+  remoteCache.clear();
+  sparseWorkspace()?.evict();
+  liveTransitionPending = false;
+  frameRequest++;
+  selectionRequest++;
+  clearGroupPage();
+  selected = null;
+  selectedGroup = null;
+  selectedTime = null;
+  el('event-form').hidden = true;
+  el('group-details').hidden = true;
+  el('inspector-intro').hidden = false;
+  el<HTMLInputElement>('compare-combined').checked = false;
+  el('comparison-tracks').replaceChildren();
+  for (const track of view.tracks) {
+    const row = document.createElement('form');
+    row.className = 'comparison-track';
+    const title = document.createElement('strong');
+    title.textContent = track.source.title;
+    const fields: HTMLInputElement[] = [];
+    for (const name of ['Scale', 'Offset']) {
+      const label = document.createElement('label');
+      label.textContent = name + (name === 'Offset' ? ' (shared coordinates)' : '');
+      const field = document.createElement('input');
+      field.value = name === 'Scale' ? '1' : '0';
+      field.setAttribute('aria-label', `${name} for ${track.source.title}`);
+      fields.push(field);
+      label.append(field);
+      row.append(label);
+    }
+    const button = document.createElement('button');
+    button.textContent = 'Apply alignment';
+    button.type = 'submit';
+    const error = document.createElement('span');
+    error.setAttribute('role', 'status');
+    row.prepend(title);
+    row.append(button, error);
+    row.onsubmit = (event) => {
+      event.preventDefault();
+      try {
+        const scale = Q.parse(fields[0].value),
+          offset = Q.parse(fields[1].value);
+        comparisonController?.abort();
+        clearTimeout(frameTimer);
+        frameRequest++;
+        view.transform(track.source.key, scale, offset);
+        selectionRequest++;
+        clearGroupPage();
+        selected = null;
+        selectedGroup = null;
+        selectedTime = null;
+        el('event-form').hidden = true;
+        el('group-details').hidden = true;
+        error.textContent = '';
+        frame = { groups: [], visitedNodes: 0 };
+        requestRender();
+      } catch (e) {
+        error.textContent = e instanceof Error ? e.message : String(e);
+      }
+    };
+    el('comparison-tracks').append(row);
+  }
+  text(
+    'comparison-conflicts',
+    view.conflicts.length
+      ? `Different definitions share a plugin ID: ${view.conflicts.join(', ')}. The first selected timeline’s definition is used once; plugins enabled in any source are enabled in the view.`
+      : 'Source plugins are combined once per plugin ID.',
+  );
+  setDashboard(false);
+  heading();
+  fit();
+}
+function stopComparison(restore = true) {
+  if (!comparison) return;
+  comparisonController?.abort();
+  comparison.dispose();
+  comparison = null;
+  liveTransitionPending = false;
+  frameRequest++;
+  selectionRequest++;
+  clearTimeout(frameTimer);
+  clearGroupPage();
+  selected = null;
+  selectedGroup = null;
+  selectedTime = null;
+  el('comparison-tracks').replaceChildren();
+  el('comparison-settings').hidden = true;
+  el('event-form').hidden = true;
+  el('group-details').hidden = true;
+  el('inspector-intro').hidden = false;
+  if (restore && comparisonBefore) {
+    viewport = comparisonBefore.viewport;
+    verticalOffset = comparisonBefore.verticalOffset;
+    uiScale = comparisonBefore.uiScale;
+  }
+  comparisonBefore = null;
+  if (restore) {
+    heading();
+    requestRender();
+  }
+}
+function renderComparison(refresh: boolean) {
+  const view = comparison!;
+  const cached = view.cached(viewport, width(), pixels());
+  frame = cached ?? (liveTransitionPending ? frame : view.visible(viewport, width(), pixels()));
+  renderAxis();
+  drawFrame();
+  if (cached) {
+    clearTimeout(frameTimer);
+    ++frameRequest;
+    comparisonController?.abort();
+    el('loading-window').hidden = true;
+    return;
+  }
+  if (!refresh) return;
+  clearTimeout(frameTimer);
+  comparisonController?.abort();
+  const request = ++frameRequest;
+  const snapshot = viewport.clone(),
+    viewportWidth = width(),
+    thresholdPixels = pixels();
+  el('loading-window').hidden = false;
+  frameTimer = setTimeout(() => {
+    if (comparisonInFlight || windowInFlight) return;
+    comparisonInFlight = true;
+    const controller = (comparisonController = new AbortController());
+    void view
+      .frame(snapshot, viewportWidth, thresholdPixels, controller.signal)
+      .then((result) => {
+        if (comparison !== view || request !== frameRequest || controller.signal.aborted) return;
+        animateLiveFrame = liveTransitionPending;
+        liveTransitionPending = false;
+        frame = result;
+        renderAxis();
+        drawFrame();
+        el('loading-window').hidden = true;
+      })
+      .catch((error) => {
+        if (comparison === view && request === frameRequest && !controller.signal.aborted) {
+          el('loading-window').hidden = true;
+          fail(error);
+        }
+      })
+      .finally(() => {
+        comparisonInFlight = false;
+        if (request !== frameRequest && (comparison || remote || local)) requestRender();
+      });
+  }, 70);
+}
 function heading() {
-  input('timeline-title').value = model?.title ?? remote?.title ?? 'Loading timeline…';
+  el('memory-notice').hidden =
+    !memoryOnly() ||
+    !!remote ||
+    !!comparison ||
+    !model ||
+    document.body.dataset.dashboard === 'true';
+  el('guest-fork-button').hidden =
+    offlineHtml ||
+    desktop ||
+    !!session.user ||
+    !remote ||
+    remote.visibility !== 'public' ||
+    !!comparison;
+  void live?.update();
+  el('comparison-settings').hidden = !comparison;
+  for (const id of [
+    'publish-button',
+    'och-export',
+    'export-button',
+    'sqlite-save',
+    'sqlite-save-as',
+    'undo-button',
+    'propose-button',
+    'share-button',
+  ])
+    el(id).toggleAttribute('data-comparison-disabled', !!comparison);
+  configureImages(
+    comparison
+      ? Object.assign({}, ...comparison.tracks.map((t) => t.source.assets ?? {}))
+      : (model?.assets ?? remote?.assets),
+    offlineHtml,
+  );
+  input('timeline-title').value = comparison
+    ? remote?.comparison
+      ? remote.title
+      : 'Timeline comparison'
+    : (model?.title ?? remote?.title ?? 'Loading timeline…');
   el<HTMLTextAreaElement>('timeline-description').value =
     model?.description ?? remote?.description ?? '';
   input('timeline-title').disabled = !editable();
   el<HTMLTextAreaElement>('timeline-description').disabled = !editable();
-  const count = model?.points.entryCount ?? BigInt(remote?.event_count ?? 0);
-  text('event-count', `${count.toLocaleString()} events`);
+  const sparse = sparseWorkspace();
+  const delta = sparse
+    ? [...sparse.changes.values()].reduce(
+        (n, c) => n + (c.after ? 1n : 0n) - (c.before ? 1n : 0n),
+        0n,
+      )
+    : 0n;
+  const count = sparse
+    ? BigInt((local ?? remote)?.event_count ?? 0) + delta
+    : (model?.points.entryCount ?? BigInt(remote?.event_count ?? 0));
+  text(
+    'event-count',
+    comparison
+      ? `${comparison.tracks.length} timelines · Read-only comparison`
+      : `${count.toLocaleString()} events`,
+  );
   text('owner-label', remote ? remote.owner : desktop ? 'Offline workspace' : 'Local workspace');
+  const ownerLink = el<HTMLAnchorElement>('owner-label');
+  if (remote) {
+    ownerLink.href = '/?owner=' + encodeURIComponent(remote.owner);
+    ownerLink.target = '_top';
+  } else ownerLink.removeAttribute('href');
   text(
     'storage-badge',
     remote
@@ -675,11 +1420,27 @@ function heading() {
           ? 'Offline HTML'
           : 'Browser draft',
   );
-  text('publish-button', remote ? 'Save changes' : 'Save to server');
+  text(
+    'publish-button',
+    workingProposal
+      ? 'Update pull request'
+      : remote
+        ? (remote.canWrite ?? remote.canEdit)
+          ? 'Save upstream'
+          : 'Submit pull request'
+        : 'Save to server',
+  );
+  el('pull-button').hidden = offlineHtml || !remote || !session.server || !!remote.comparison;
+  el('propose-button').hidden =
+    offlineHtml || !remote?.canPropose || !editable() || !!workingProposal;
+  if (document.activeElement !== input('timeline-tags'))
+    input('timeline-tags').value = (model?.tags ?? remote?.tags ?? []).join(', ');
+  input('timeline-tags').disabled = !editable();
   el<HTMLButtonElement>('publish-button').disabled = saving || (!!remote && !editable());
-  el('publish-button').hidden = offlineHtml || !session.server || (!!remote && !remote.canEdit);
-  el('och-import').hidden = offlineHtml || desktop || !session.fileExchange;
-  el('och-export').hidden = offlineHtml || desktop || !session.fileExchange;
+  el('publish-button').hidden =
+    offlineHtml || !session.server || !session.user || (!!remote && !remote.canEdit);
+  el('och-import').hidden = offlineHtml || desktop || !session.fileExchange || !session.user;
+  el('och-export').hidden = offlineHtml || desktop || !session.fileExchange || !session.user;
   el('share-button').hidden = !remote?.canShare;
   el('add-button').hidden = !editable();
   el<HTMLButtonElement>('undo-button').disabled = !history.length;
@@ -696,12 +1457,20 @@ function heading() {
           : desktop && sqlitePath
             ? 'Saved in a SQLite timeline'
             : offlineHtml
-              ? 'Export JSON to save your work'
-              : 'A local draft, ready to explore',
+              ? 'Export .ochx to save your work'
+              : memoryOnly()
+                ? 'Export .ochx to save your work'
+                : 'A local draft, ready to explore',
   );
   text(
     'workspace-status',
-    remote ? 'Server timeline' : desktop ? 'Offline workspace' : 'Stored in this browser',
+    remote
+      ? 'Server timeline'
+      : desktop
+        ? 'Offline workspace'
+        : memoryOnly()
+          ? 'In memory only'
+          : 'Stored in this browser',
   );
 }
 async function draftDb(): Promise<IDBDatabase> {
@@ -726,7 +1495,7 @@ async function loadDraft(): Promise<TimelineDocument | null> {
 }
 async function retainForSignIn() {
   flushEventEdit();
-  if (!model) return;
+  if (!model || memoryOnly()) return;
   const db = await draftDb();
   try {
     await new Promise<void>((resolve, reject) => {
@@ -734,7 +1503,17 @@ async function retainForSignIn() {
       tx.objectStore('drafts').put(
         {
           document: model!.document(),
-          remote: remote ? { id: remote.id, revision: remote.revision } : null,
+          sparse: sparseWorkspace() ? [...sparseWorkspace()!.changes.values()] : undefined,
+          remote: remote
+            ? {
+                id: remote.id,
+                revision: remote.revision,
+                head_revision_id: remote.head_revision_id,
+              }
+            : null,
+          proposal: workingProposal
+            ? { id: workingProposal.id, revision: workingProposal.revision }
+            : null,
           dirty,
         },
         'auth-resume',
@@ -755,7 +1534,9 @@ async function restoreAfterSignIn() {
     const saved = await new Promise<
       | {
           document: TimelineDocument;
-          remote: { id: string; revision: string } | null;
+          remote: { id: string; revision: string; head_revision_id?: string } | null;
+          sparse?: { before?: PointEvent; after?: PointEvent }[];
+          proposal?: { id: string; revision: string } | null;
           dirty: boolean;
         }
       | undefined
@@ -779,9 +1560,41 @@ async function restoreAfterSignIn() {
       try {
         const metadata = await api<RemoteTimeline>(`timelines/${saved.remote.id}`);
         if (!metadata.canEdit) throw new Error('Editing access changed.');
-        remote = { ...metadata, revision: saved.remote.revision };
+        if (saved.sparse) {
+          const index = new RemoteWorkspace(validateDocument(saved.document));
+          for (const change of saved.sparse) {
+            if (change.before) index.load(change.before);
+            if (change.after) index.put(change.after);
+            else if (change.before) index.delete(change.before.id);
+          }
+          model = index;
+        }
+        if (saved.proposal) {
+          if (!/^[a-f0-9-]{36}$/i.test(saved.proposal.id))
+            throw new Error('Invalid saved proposal.');
+          const proposal = await api<Proposal>(
+            `timelines/${saved.remote.id}/proposals/${saved.proposal.id}`,
+          );
+          if (!proposal.canUpdate || proposal.revision !== saved.proposal.revision)
+            throw new Error('Proposal access or revision changed.');
+          workingProposal = proposal;
+          remote = {
+            ...metadata,
+            revision: proposal.base_revision,
+            canWrite: false,
+            canEdit: true,
+            canPropose: true,
+          };
+        } else
+          remote = {
+            ...metadata,
+            revision: saved.remote.revision,
+            head_revision_id: saved.remote.head_revision_id ?? metadata.head_revision_id,
+          };
         if (!location.hash) window.history.replaceState(null, '', `#timeline/${remote.id}`);
       } catch {
+        remote = null;
+        workingProposal = null;
         dirty = true;
         toast('Your work was recovered as a local timeline.');
       }
@@ -793,10 +1606,10 @@ async function restoreAfterSignIn() {
   }
 }
 function persistDraft() {
-  if (offlineHtml || remote || desktop || !model) return;
+  if (memoryOnly() || remote || desktop || !model) return;
   clearTimeout(draftTimer);
   draftTimer = setTimeout(() => {
-    if (remote || !model) return;
+    if (memoryOnly() || remote || !model) return;
     const doc = model.document();
     void draftDb()
       .then(
@@ -830,13 +1643,24 @@ function changed() {
   persistDraft();
 }
 function loadDocument(doc: TimelineDocument) {
+  cancelZoomAnimation();
+  if (doc.comparison)
+    throw new Error(
+      'Saved comparisons need their server sources. Open the comparison on the server, or import an individual source timeline.',
+    );
+  stopComparison(false);
+  setDashboard(false);
+  workingProposal = null;
   documentRequest++;
   resetTimeSelection();
+  el('guest-fork-status').hidden = true;
+  el('guest-fork-original').hidden = true;
   selectionRequest++;
   editVersion++;
   remote = null;
   sqlitePath = null;
   sqliteSavedVersion = null;
+  local = null;
   model = new TimelineIndex(doc);
   viewport = Viewport.fit(model.points.minKey(), model.points.maxKey());
   dirty = false;
@@ -850,6 +1674,26 @@ function loadDocument(doc: TimelineDocument) {
   heading();
   requestRender();
   persistDraft();
+  if (desktop && doc.events.length > 2048) {
+    const workspace = documentRequest,
+      version = editVersion;
+    void window
+      .__TAURI__!.core.invoke<NativeOpened>('desktop_stage', { document: doc })
+      .then(async (result) => {
+        if (workspace !== documentRequest || version !== editVersion) return;
+        const header = validateDocument(result.document);
+        await window.__TAURI__!.core.invoke('desktop_accept_open', { path: result.path });
+        if (workspace !== documentRequest || version !== editVersion) return;
+        model = new RemoteWorkspace(header);
+        if (selected) sparseWorkspace()!.load(selected);
+        local = { ...result, id: 'local-sqlite', revision: String(result.generation) };
+        frameRequest++;
+        remoteCache.clear();
+        heading();
+        requestRender();
+      })
+      .catch(fail);
+  }
 }
 async function directory() {
   const list = el('timeline-list');
@@ -865,6 +1709,10 @@ async function directory() {
     small.textContent = `${t.visibility} · ${t.role}`;
     button.append(small);
     button.addEventListener('click', () => {
+      if (platformEditor) {
+        if (mayReplace()) window.parent.location.href = `/timelines/${t.id}`;
+        return;
+      }
       location.hash = `timeline/${t.id}`;
     });
     list.append(button);
@@ -877,6 +1725,9 @@ async function directory() {
   }
 }
 async function openRemote(id: string) {
+  stopComparison(false);
+  setDashboard(false);
+  workingProposal = null;
   const request = ++documentRequest;
   resetTimeSelection();
   selectionRequest++;
@@ -884,6 +1735,7 @@ async function openRemote(id: string) {
   remote = null;
   sqlitePath = null;
   sqliteSavedVersion = null;
+  local = null;
   frame = { groups: [], visitedNodes: 0 };
   selected = null;
   selectedGroup = null;
@@ -899,24 +1751,122 @@ async function openRemote(id: string) {
   remote = info;
   if (info.presentation) info.presentation = validatePresentation(info.presentation);
   if (info.plugins) info.plugins = validateInstalledPlugins(info.plugins);
-  if (info.canEdit) {
-    const snapshot = await api<{ timeline: RemoteTimeline; document: TimelineDocument }>(
-      `timelines/${id}/document`,
-    );
+  if (info.assets) info.assets = validateAssets(info.assets);
+  if (info.tags) info.tags = validateTags(info.tags);
+  if (info.comparison) {
+    const sources = await comparisonSources(info.comparison.sources);
     if (request !== documentRequest) return;
-    remote = snapshot.timeline;
-    model = new TimelineIndex(validateDocument(snapshot.document));
+    startComparison(sources, info.presentation ?? sources[0].presentation ?? DEFAULT_PRESENTATION);
+    comparison!.combined = info.comparison.combined;
+    el<HTMLInputElement>('compare-combined').checked = info.comparison.combined;
+    dirty = false;
+    heading();
+    requestRender();
+    return;
+  }
+  if (info.canEdit) {
+    model = new RemoteWorkspace({
+      format: 'openchronology',
+      version: 1,
+      title: info.title,
+      description: info.description,
+      presentation: info.presentation,
+      plugins: info.plugins,
+      tags: info.tags,
+      assets: info.assets,
+      events: [],
+    });
   }
   viewport = Viewport.fit(
-    model?.points.minKey() ?? (info.first ? Q.parse(info.first) : undefined),
-    model?.points.maxKey() ?? (info.last ? Q.parse(info.last) : undefined),
+    (sparseWorkspace() ? undefined : model?.points.minKey()) ??
+      (info.first ? Q.parse(info.first) : undefined),
+    (sparseWorkspace() ? undefined : model?.points.maxKey()) ??
+      (info.last ? Q.parse(info.last) : undefined),
   );
   dirty = false;
   heading();
   requestRender();
 }
+let browserForkBusy = false;
+async function forkInBrowser(id: string) {
+  if (browserForkBusy || offlineHtml || desktop || !mayReplace()) return;
+  browserForkBusy = true;
+  const request = documentRequest;
+  text('guest-fork-status', 'Copying this public timeline into memory…');
+  el('guest-fork-status').hidden = false;
+  const original = el<HTMLAnchorElement>('guest-fork-original');
+  original.hidden = true;
+  original.href = platformEditor ? `/timelines/${id}` : `#timeline/${id}`;
+  original.target = platformEditor ? '_top' : '_self';
+  el<HTMLButtonElement>('guest-fork-button').disabled = true;
+  try {
+    const result = await api<{ document: TimelineDocument }>(
+      `timelines/${id}/browser-fork`,
+      'POST',
+      {},
+    );
+    if (documentRequest !== request) return;
+    if (
+      !Array.isArray(result.document?.events) ||
+      result.document.events.length > 5000 ||
+      new TextEncoder().encode(JSON.stringify(result)).length > 4 * 1024 * 1024
+    )
+      throw new Error('This copy exceeds the browser limits. No timeline was loaded.');
+    const document = validateDocument(result.document);
+    if (browserEntryCount(document) > BROWSER_COPY_MAX_EVENTS)
+      throw new Error(
+        'This timeline exceeds the 5,000-entry browser limit, including stack entries. No copy was loaded.',
+      );
+    historyReplace();
+    loadDocument(document);
+    dirty = true;
+    heading();
+    text(
+      'guest-fork-status',
+      'Browser fork ready. Edits affect only this in-memory copy. Export .ochx to keep it.',
+    );
+    el('guest-fork-status').hidden = false;
+  } catch (error) {
+    if (documentRequest === request) {
+      text('guest-fork-status', (error as Error).message);
+      el('guest-fork-status').hidden = false;
+      original.hidden = false;
+    }
+  } finally {
+    browserForkBusy = false;
+    el<HTMLButtonElement>('guest-fork-button').disabled = false;
+  }
+}
+el('guest-fork-button').onclick = () => {
+  if (remote) void forkInBrowser(remote.id);
+};
+el('memory-export').onclick = () => el('export-button').click();
+window.addEventListener('beforeunload', (event) => {
+  if (memoryOnly() && !remote && !comparison && (dirty || pendingEventEdit)) {
+    event.preventDefault();
+    event.returnValue = '';
+  }
+});
+window.addEventListener('message', (event) => {
+  if (
+    platformEditor &&
+    event.origin === location.origin &&
+    event.source === window.parent &&
+    event.data?.type === 'openchronology:guest-fork' &&
+    typeof event.data.id === 'string' &&
+    /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(event.data.id)
+  )
+    void forkInBrowser(event.data.id);
+});
 async function route(force = false) {
   if (offlineHtml) return;
+  const guestCopy = /^#guest-fork\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i.exec(
+    location.hash,
+  );
+  if (guestCopy) {
+    await forkInBrowser(guestCopy[1]);
+    return;
+  }
   const desktopRequest = /^#desktop\/([A-Z2-9]{10})$/.exec(location.hash);
   if (desktopRequest) {
     if (!session.user) {
@@ -928,23 +1878,56 @@ async function route(force = false) {
       el<HTMLDialogElement>('desktop-approval-dialog').showModal();
     return;
   }
+  const compared = /^#compare\/([a-f0-9,-]+)$/i.exec(location.hash);
+  if (compared) {
+    if (comparison) return;
+    const ids = [...new Set(compared[1].split(','))];
+    if (
+      ids.length < 2 ||
+      ids.length > 8 ||
+      ids.some((id) => !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id))
+    )
+      throw new Error('Select two to eight valid timelines.');
+    setDashboard(false);
+    const request = documentRequest;
+    const sources = await comparisonSources(ids);
+    if (request === documentRequest) await comparisons.start(sources);
+    return;
+  }
   const match = /^#timeline\/([a-f0-9-]+)$/i.exec(location.hash);
   if (match) {
-    if (remote?.id === match[1] && !force) return;
+    if (remote?.id === match[1] && !force) {
+      setDashboard(false);
+      requestRender();
+      return;
+    }
     if (!mayReplace()) {
       window.history.replaceState(null, '', remote ? `#timeline/${remote.id}` : location.pathname);
       return;
     }
     await openRemote(match[1]);
+  } else if (hasDashboard() && !desktop && !platformEditor) {
+    if (dirty && model) {
+      setDashboard(false);
+      return;
+    }
+    setDashboard(true);
+    await community.dashboard();
   }
 }
 function installedPlugins(): InstalledPlugin[] {
+  if (comparison) return comparison.plugins;
   return model ? (model.plugins ?? []) : (remote?.plugins ?? []);
 }
 function activePlugins(): InstalledPlugin[] {
-  return offlineHtml ? [] : installedPlugins();
+  return installedPlugins();
 }
+let detachRichNotes: (() => void) | undefined;
 function refreshPluginFields() {
+  detachRichNotes?.();
+  detachRichNotes = undefined;
+  if (pluginRichText(activePlugins()))
+    detachRichNotes = attachRichText(el<HTMLTextAreaElement>('event-description'), editable());
   try {
     const metadata = JSON.parse(el<HTMLTextAreaElement>('event-metadata').value);
     if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return;
@@ -968,6 +1951,13 @@ function refreshPluginFields() {
         }
       },
       (event, url) => {
+        if (offlineHtml) {
+          event.preventDefault();
+          toast(
+            'The offline view makes no network requests. The original URL remains in the image field.',
+          );
+          return;
+        }
         if (desktop) {
           event.preventDefault();
           void window.__TAURI__!.core.invoke('desktop_open_image', { url }).catch(fail);
@@ -986,7 +1976,7 @@ function refreshPluginFields() {
   }
 }
 function changePlugins(plugins: InstalledPlugin[]) {
-  if (!editable() || offlineHtml) return;
+  if (!editable()) return;
   const validated = validateInstalledPlugins(plugins);
   model!.plugins = validated.length ? validated : undefined;
   changed();
@@ -1000,10 +1990,11 @@ function showInstalledPlugins() {
   text(
     'plugins-note',
     offlineHtml
-      ? 'Plugin settings are preserved in this file, but plugins are inactive in the standalone HTML. Use the web or desktop app to install and run them.'
+      ? 'Saved official and custom plugins run locally. You can create or import definitions here; the online library is unavailable. External icons need embedded copies.'
       : 'Applied from top to bottom. Later plugins override matching fields and marker effects. Removing a plugin keeps all moment metadata.',
   );
-  el('plugins-add').hidden = offlineHtml || !editable();
+  el('plugins-add').hidden = !editable();
+  el('plugins-create').hidden = !editable();
   if (!installed.length) {
     const note = document.createElement('p');
     note.textContent = 'No plugins installed on this timeline.';
@@ -1013,7 +2004,8 @@ function showInstalledPlugins() {
     const item = document.createElement('section');
     item.className = 'installed-plugin';
     const name = document.createElement('strong');
-    name.textContent = `${index + 1}. ${entry.manifest.name} · v${entry.manifest.version}`;
+    const official = isOfficialPlugin(entry.manifest);
+    name.textContent = `${index + 1}. ${entry.manifest.name} · v${entry.manifest.version} · ${official ? 'Official' : 'Custom'}`;
     const description = document.createElement('p');
     description.textContent = entry.manifest.description;
     const toggle = document.createElement('label');
@@ -1021,7 +2013,7 @@ function showInstalledPlugins() {
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.checked = entry.enabled;
-    checkbox.disabled = !editable() || offlineHtml;
+    checkbox.disabled = !editable();
     checkbox.setAttribute('aria-label', `Enable ${entry.manifest.name}`);
     checkbox.onchange = () =>
       changePlugins(
@@ -1029,17 +2021,14 @@ function showInstalledPlugins() {
           p.manifest.id === entry.manifest.id ? { ...p, enabled: checkbox.checked } : p,
         ),
       );
-    toggle.append(
-      checkbox,
-      document.createTextNode(offlineHtml ? 'Inactive in offline HTML' : 'Enabled'),
-    );
+    toggle.append(checkbox, document.createTextNode('Enabled'));
     const actions = document.createElement('div');
     actions.className = 'plugin-actions';
     const action = (label: string, disabled: boolean, run: () => void) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = label;
-      button.disabled = disabled || !editable() || offlineHtml;
+      button.disabled = disabled || !editable();
       button.onclick = run;
       actions.append(button);
     };
@@ -1050,6 +2039,7 @@ function showInstalledPlugins() {
     };
     action('Move up', index === 0, () => move(-1));
     action('Move down', index === installed.length - 1, () => move(1));
+    action('Edit / export definition', false, () => openPluginAuthor(entry.manifest));
     action('Remove', false, () =>
       changePlugins(installedPlugins().filter((p) => p.manifest.id !== entry.manifest.id)),
     );
@@ -1074,6 +2064,7 @@ async function searchPlugins() {
       page: number;
     }>('plugins/search', 'POST', {
       search: input('plugin-search').value,
+      sort: input('plugin-sort').value,
       page: pluginPage,
       limit: 12,
     });
@@ -1098,7 +2089,7 @@ async function searchPlugins() {
       const item = document.createElement('section');
       item.className = 'library-plugin';
       const name = document.createElement('strong');
-      name.textContent = `${manifest.name} · v${manifest.version}`;
+      name.textContent = `${manifest.name} · v${manifest.version} · ${isOfficialPlugin(manifest) ? 'Official' : 'Custom'}`;
       const description = document.createElement('p');
       description.textContent = manifest.description;
       const capability = document.createElement('p');
@@ -1123,7 +2114,17 @@ async function searchPlugins() {
           text('plugin-library-error', error instanceof Error ? error.message : String(error));
         }
       };
-      item.append(name, description, capability, button);
+      const review = document.createElement('button');
+      review.type = 'button';
+      review.textContent = 'Review definition';
+      review.disabled = !editable();
+      review.onclick = () => {
+        if (doc === documentRequest) openPluginAuthor(manifest);
+      };
+      const actions = document.createElement('div');
+      actions.className = 'plugin-actions';
+      actions.append(review, button);
+      item.append(name, description, capability, actions);
       el('plugin-library-results').append(item);
     }
   } catch (error) {
@@ -1132,14 +2133,138 @@ async function searchPlugins() {
     text('plugin-library-error', error instanceof Error ? error.message : String(error));
   }
 }
+let pluginAuthorDocument = documentRequest;
+let pluginAuthorRequest = 0;
+function setAuthorDefinition(manifest: PluginManifest) {
+  const { source, ...definition } = manifest;
+  el<HTMLTextAreaElement>('plugin-definition').value = JSON.stringify(definition, null, 2);
+  el<HTMLTextAreaElement>('plugin-source').value = source ?? '';
+}
+function openPluginAuthor(manifest: PluginManifest = validatePluginManifest(PLUGIN_EXAMPLE)) {
+  if (!editable()) return;
+  pluginAuthorDocument = documentRequest;
+  pluginAuthorRequest++;
+  setAuthorDefinition(manifest);
+  text('plugin-author-status', '');
+  text('plugin-author-error', '');
+  el<HTMLButtonElement>('plugin-author-publish').disabled =
+    !session.user || !session.server || offlineHtml;
+  el<HTMLDialogElement>('plugin-author-dialog').showModal();
+}
+function authoredPlugin() {
+  if (!editable() || pluginAuthorDocument !== documentRequest)
+    throw new Error('Reopen the plugin editor for the current timeline.');
+  const definition = JSON.parse(el<HTMLTextAreaElement>('plugin-definition').value);
+  const source = el<HTMLTextAreaElement>('plugin-source').value;
+  return validatePluginManifest({ ...definition, ...(source.trim() ? { source } : {}) });
+}
+function installAuthoredPlugin(manifest: PluginManifest, replaceId = manifest.id) {
+  const plugins = installedPlugins().filter(
+    (p) => p.manifest.id !== replaceId && p.manifest.id !== manifest.id,
+  );
+  // Preserve order when editing an installed definition.
+  const index = installedPlugins().findIndex((p) => p.manifest.id === replaceId);
+  plugins.splice(index < 0 ? plugins.length : index, 0, { manifest, enabled: true });
+  changePlugins(plugins);
+}
+function authorError(error: unknown) {
+  text('plugin-author-error', error instanceof Error ? error.message : String(error));
+}
+el('plugins-create').onclick = () => openPluginAuthor();
+el('plugin-author-install').onclick = () => {
+  try {
+    const manifest = authoredPlugin();
+    installAuthoredPlugin(manifest);
+    text('plugin-author-error', '');
+    text(
+      'plugin-author-status',
+      manifest.name + ' is active. Save the timeline to retain the definition.',
+    );
+  } catch (error) {
+    authorError(error);
+  }
+};
+el('plugin-author-export').onclick = () => {
+  try {
+    const manifest = authoredPlugin();
+    download(
+      new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' }),
+      manifest.id,
+      '.plugin.json',
+    );
+    text('plugin-author-error', '');
+  } catch (error) {
+    authorError(error);
+  }
+};
+el('plugin-author-import').onclick = () => input('plugin-definition-file').click();
+input('plugin-definition-file').onchange = async () => {
+  const file = input('plugin-definition-file').files?.[0];
+  input('plugin-definition-file').value = '';
+  if (!file) return;
+  const request = pluginAuthorRequest,
+    doc = pluginAuthorDocument;
+  try {
+    if (file.size > 65536) throw new Error('Plugin file exceeds 64 KiB.');
+    const source = await file.text();
+    if (doc !== documentRequest || request !== pluginAuthorRequest) return;
+    const manifest = validatePluginManifest(JSON.parse(source));
+    setAuthorDefinition(manifest);
+    text('plugin-author-error', '');
+    text('plugin-author-status', 'Definition imported. Review it, then install or publish.');
+  } catch (error) {
+    authorError(error);
+  }
+};
+el('plugin-author-publish').onclick = () => {
+  const button = el<HTMLButtonElement>('plugin-author-publish');
+  button.disabled = true;
+  const request = pluginAuthorRequest,
+    doc = pluginAuthorDocument;
+  void (async () => {
+    const before = authoredPlugin();
+    const manifest = validatePluginManifest(await api('plugins/publish', 'POST', before));
+    if (doc !== documentRequest || request !== pluginAuthorRequest) return;
+    installAuthoredPlugin(manifest, before.id);
+    setAuthorDefinition(manifest);
+    text('plugin-author-error', '');
+    text(
+      'plugin-author-status',
+      'Published publicly as ' +
+        manifest.id +
+        ' v' +
+        manifest.version +
+        '. Increment version for future releases.',
+    );
+  })()
+    .catch((error) => {
+      if (request === pluginAuthorRequest) authorError(error);
+    })
+    .finally(() => {
+      if (request === pluginAuthorRequest)
+        button.disabled = !session.user || !session.server || offlineHtml;
+    });
+};
 el('plugins-button').onclick = () => {
   showInstalledPlugins();
   el<HTMLDialogElement>('plugins-dialog').showModal();
 };
+el('plugin-library-custom').onclick = () => openPluginAuthor();
+input('plugin-sort').onchange = () => {
+  clearTimeout(pluginSearchTimer);
+  pluginPage = 1;
+  void searchPlugins();
+};
 el('plugins-add').onclick = () => {
-  if (!editable() || offlineHtml) return;
+  if (!editable()) return;
   pluginPage = 1;
   input('plugin-search').value = '';
+  input('plugin-search').closest('label')!.hidden = offlineHtml;
+  input('plugin-sort').closest('label')!.hidden = offlineHtml;
+  el('plugin-previous').hidden = offlineHtml;
+  el('plugin-next').hidden = offlineHtml;
+  if (offlineHtml)
+    text('plugin-library-status', 'Offline: choose Custom to create or import a definition.');
   el<HTMLDialogElement>('plugin-library-dialog').showModal();
   void searchPlugins();
 };
@@ -1172,11 +2297,16 @@ el<HTMLDialogElement>('plugin-library-dialog').addEventListener('close', () => {
 el<HTMLTextAreaElement>('event-metadata').addEventListener('input', refreshPluginFields);
 
 function eventForm(event?: PointEvent, time?: Q) {
+  if (comparison && !event) return;
   flushEventEdit();
-  if (event) event = model?.byId.get(event.id) ?? event;
+  if (event && !comparison) {
+    sparseWorkspace()?.load(event);
+    event = model?.byId.get(event.id) ?? event;
+  }
   pendingEventEdit = false;
   eventEditHistory = null;
   selectionRequest++;
+  clearGroupPage();
   selected = event ?? null;
   if (!event) selectedGroup = null;
   el('event-form').hidden = false;
@@ -1198,55 +2328,127 @@ function eventForm(event?: PointEvent, time?: Q) {
     (el(id) as HTMLInputElement).disabled = !editable();
   text(
     'event-edit-status',
-    editable() ? 'Edits apply to the timeline automatically.' : 'Read-only moment.',
+    comparison
+      ? `Read-only comparison · ${event?.metadata.comparisonSource ?? ''} · original coordinate ${event?.metadata.originalTime ?? ''}`
+      : editable()
+        ? 'Edits apply to the timeline automatically.'
+        : 'Read-only moment.',
   );
   el('event-delete').hidden = !event || !editable();
   text('event-error', '');
   if (window.innerWidth < 650)
     el('inspector').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
-async function groupPage(group: FrameGroup, after: { time: string; id: string } | null = null) {
+async function groupPage(
+  group: FrameGroup,
+  after: { time: string; id: string } | null = null,
+  limit = GROUP_PAGE_SIZE,
+  signal?: AbortSignal,
+) {
+  if (comparison) {
+    const page = await comparison.events(group, after, limit, signal);
+    return group.id && BigInt(group.count) === 1n && !after
+      ? { events: page.events.filter((event) => event.id === group.id), next: null }
+      : page;
+  }
+  const workspace = sparseWorkspace();
+  const edited = group.id ? workspace?.changes.get(group.id)?.after : undefined;
+  if (edited && !after) return { events: [edited], next: null };
   let events: PointEvent[],
     next: { time: string; id: string } | null = null;
-  if (model) {
+  if (model && !workspace) {
     events = [];
     scan: for (const [, bucket] of model.points.range(
       Q.parse(after?.time ?? group.first),
       Q.parse(group.last),
       { includeUpper: true },
-    ))
-      for (const e of bucket) {
-        if (after && e.time === after.time && e.id <= after.id) continue;
-        events.push(e);
-        if (events.length > 100) break scan;
+    )) {
+      let start = 0;
+      // Coincident buckets are sorted by ID. Seek rather than walking earlier pages.
+      if (after && bucket[0]?.time === after.time) {
+        let end = bucket.length;
+        while (start < end) {
+          const middle = Math.floor((start + end) / 2);
+          if (bucket[middle].id <= after.id) start = middle + 1;
+          else end = middle;
+        }
       }
-    if (events.length > 100) {
-      events = events.slice(0, 100);
+      for (let i = start; i < bucket.length; i++) {
+        events.push(bucket[i]);
+        if (events.length > limit) break scan;
+      }
+    }
+    if (events.length > limit) {
+      events = events.slice(0, limit);
       const last = events.at(-1)!;
       next = { time: last.time, id: last.id };
     }
   } else {
-    const result = await api<{ events: PointEvent[]; next: { time: string; id: string } | null }>(
-      `timelines/${remote!.id}/query`,
-      'POST',
-      { kind: 'events', lower: group.first, upper: group.last, limit: 100, after },
+    const result = await timelineQuery<{
+      events: PointEvent[];
+      next: { time: string; id: string } | null;
+    }>(
+      {
+        kind: 'events',
+        lower: group.first,
+        upper: group.last,
+        limit: limit,
+        after,
+        revision: (local ?? remote)!.revision,
+      },
+      signal,
     );
-    events = result.events;
+    events = result.events.filter((e) => !workspace?.changes.has(e.id));
     next = result.next;
+    for (const { after: edited } of workspace?.changes.values() ?? []) {
+      if (
+        edited &&
+        Q.parse(edited.time).compare(Q.parse(group.first)) >= 0 &&
+        Q.parse(edited.time).compare(Q.parse(group.last)) <= 0 &&
+        (!after ||
+          Q.parse(edited.time).compare(Q.parse(after.time)) > 0 ||
+          (edited.time === after.time && edited.id > after.id)) &&
+        (!result.next ||
+          Q.parse(edited.time).compare(Q.parse(result.next.time)) < 0 ||
+          (edited.time === result.next.time && edited.id <= result.next.id))
+      )
+        events.push(edited);
+    }
+    events.sort(
+      (a, b) =>
+        Q.parse(a.time).compare(Q.parse(b.time)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    );
+    if (events.length > limit) {
+      events = events.slice(0, limit);
+      const last = events.at(-1)!;
+      next = { time: last.time, id: last.id };
+    }
   }
+  if (group.id && BigInt(group.count) === 1n && !after)
+    return { events: events.filter((event) => event.id === group.id), next: null };
   return { events, next };
 }
 async function selectGroup(group: FrameGroup) {
+  hoverPreview.hide();
+  summaryExpansion.hide();
   flushEventEdit();
   clearTimeout(eventEditTimer);
   pendingEventEdit = false;
   el('event-form').hidden = true;
+  clearGroupPage();
+  el('group-details').hidden = true;
   const request = ++selectionRequest;
   selectedGroup = group;
   selected = null;
   selectedTime = Q.parse(group.first).add(Q.parse(group.last)).div(Q.from(2n));
   requestRender();
-  const page = await groupPage(group);
+  let page: Awaited<ReturnType<typeof groupPage>>;
+  try {
+    page = await groupPage(group);
+  } catch (error) {
+    if (request === selectionRequest) throw error;
+    return;
+  }
   if (request !== selectionRequest) return;
   if (BigInt(group.count) === 1n && page.events[0]) {
     eventForm(page.events[0]);
@@ -1270,6 +2472,10 @@ async function selectGroup(group: FrameGroup) {
 function showGroupPage(events: PointEvent[], next: { time: string; id: string } | null) {
   groupCursor = next;
   el('group-more').hidden = !next;
+  el<HTMLButtonElement>('group-more').disabled = false;
+  el('group-previous').hidden = groupPageIndex === 0;
+  el<HTMLButtonElement>('group-previous').disabled = false;
+  text('group-page-status', `Page ${groupPageIndex + 1} · ${events.length} moments`);
   const list = el('group-events');
   list.replaceChildren();
   for (const e of events) {
@@ -1285,24 +2491,85 @@ function showGroupPage(events: PointEvent[], next: { time: string; id: string } 
   }
 }
 function zoomGroup(group: FrameGroup) {
+  cancelZoomAnimation();
   if (group.distinct === 1) return;
   viewport = Viewport.fit(Q.parse(group.first), Q.parse(group.last));
   requestRender();
 }
+let zoomAnimation: number | undefined, zoomTarget: Viewport | undefined;
+function cancelZoomAnimation() {
+  if (zoomAnimation !== undefined) cancelAnimationFrame(zoomAnimation);
+  zoomAnimation = undefined;
+  zoomTarget = undefined;
+  delete stage.dataset.zooming;
+}
 function zoom(factor: Q) {
-  navigate(viewport.zoom(width() / 2, width(), factor));
+  const destination = (zoomTarget ?? viewport)
+    .zoom(width() / 2, width(), factor)
+    .rasterize(width());
+  cancelZoomAnimation();
+  if (reducedMotion.matches) {
+    navigate(destination);
+    return;
+  }
+  hoverPreview.hide();
+  summaryExpansion.hide();
+  closeTimelineMenu();
+  const from = viewport.clone(),
+    started = performance.now(),
+    doc = documentRequest;
+  zoomTarget = destination;
+  stage.dataset.zooming = 'true';
+  const tick = (now: number) => {
+    if (doc !== documentRequest) {
+      cancelZoomAnimation();
+      return;
+    }
+    const progress = Math.min(1, Math.max(0, (now - started) / 220));
+    if (progress === 1) {
+      cancelZoomAnimation();
+      navigate(destination);
+      return;
+    }
+    const amount = Q.from(BigInt(Math.round((1 - (1 - progress) ** 3) * 1_000_000)), 1_000_000n);
+    viewport = new Viewport(
+      from.left.add(destination.left.sub(from.left).mul(amount)),
+      from.span.add(destination.span.sub(from.span).mul(amount)),
+    ).rasterize(width());
+    renderAxis();
+    if (model && !sparseWorkspace()) frame = model.frame(viewport, width(), pixels());
+    requestRender(false); // Reuse confirmed server data; fetch the final window once.
+    zoomAnimation = requestAnimationFrame(tick);
+  };
+  zoomAnimation = requestAnimationFrame(tick);
 }
 function navigate(view: Viewport) {
+  cancelZoomAnimation();
   closeTimelineMenu();
   viewport = view.rasterize(width());
   requestRender();
 }
 function fit() {
+  cancelZoomAnimation();
+  if (comparison) {
+    viewport = comparison.fit();
+    uiScale = comparison.combined
+      ? 1
+      : Math.min(1, Math.max(0.25, (stage.clientHeight - 48) / (comparison.tracks.length * 340)));
+    verticalOffset = 0;
+    requestRender();
+    return;
+  }
+  uiScale = 1;
   verticalOffset = 0;
-  viewport = Viewport.fit(
-    model?.points.minKey() ?? (remote?.first ? Q.parse(remote.first) : undefined),
-    model?.points.maxKey() ?? (remote?.last ? Q.parse(remote.last) : undefined),
-  );
+  const source = local ?? remote;
+  let first = source?.first ? Q.parse(source.first) : undefined,
+    last = source?.last ? Q.parse(source.last) : undefined;
+  const localFirst = model?.points.minKey(),
+    localLast = model?.points.maxKey();
+  if (localFirst && (!first || localFirst.compare(first) < 0)) first = localFirst;
+  if (localLast && (!last || localLast.compare(last) > 0)) last = localLast;
+  viewport = Viewport.fit(first, last);
   requestRender();
 }
 
@@ -1313,6 +2580,17 @@ function closeTimelineMenu() {
   menu.hidden = true;
 }
 function resetTimeSelection() {
+  liveTransitionPending = false;
+  animateLiveFrame = false;
+  for (const node of retiringNodes) node.remove();
+  retiringNodes.clear();
+  el('live-notice').hidden = true;
+  hoverPreview.hide();
+  summaryExpansion.hide();
+  remoteCache.clear();
+  windowController?.abort();
+  clearTimeout(frameTimer);
+  uiScale = 1;
   clearTimeout(eventEditTimer);
   pendingEventEdit = false;
   eventEditHistory = null;
@@ -1322,6 +2600,7 @@ function resetTimeSelection() {
   el<HTMLDialogElement>('plugins-dialog').close();
   el<HTMLDialogElement>('plugin-library-dialog').close();
   el('plugin-event-fields').replaceChildren();
+  clearGroupPage();
   for (const label of momentLabels.values()) removeMomentLabel(label);
   momentLabels.clear();
   for (const label of stackLabels.values()) removeMomentLabel(label);
@@ -1372,6 +2651,8 @@ function showTimelineMenu(
   group?: FrameGroup,
   childId?: string,
 ) {
+  hoverPreview.hide();
+  summaryExpansion.hide();
   closeTimelineMenu();
   const menu = el('timeline-menu');
   menu.replaceChildren();
@@ -1424,11 +2705,34 @@ function openStageMenu(target: HTMLElement, x: number, y: number) {
     const point = model?.byId.get(branch.dataset.parentEvent);
     if (point)
       showTimelineMenu(x, y, Q.parse(point.time), point, undefined, branch.dataset.stackEntry);
-    else showTimelineMenu(x, y, Q.parse(branch.dataset.time ?? '0/1'));
+    else {
+      showTimelineMenu(x, y, Q.parse(branch.dataset.time ?? '0/1'));
+      const group = frame.groups.find((g) => g.id === branch.dataset.parentEvent);
+      const generation = menuGeneration,
+        doc = documentRequest;
+      if (group && editable())
+        void groupPage(group)
+          .then((page) => {
+            if (generation === menuGeneration && doc === documentRequest && page.events[0])
+              showTimelineMenu(
+                x,
+                y,
+                Q.parse(page.events[0].time),
+                page.events[0],
+                undefined,
+                branch.dataset.stackEntry,
+              );
+          })
+          .catch(fail);
+    }
     return;
   }
   const group = markerGroups.get(target.closest<HTMLElement>('.event-marker')!);
   const time = viewport.at(Math.max(0, Math.min(width(), localX(x))), width());
+  if (!group) {
+    selectedTime = time;
+    requestRender();
+  }
   showTimelineMenu(x, y, time, undefined, group);
   if (group && BigInt(group.count) === 1n && editable()) {
     const generation = menuGeneration,
@@ -1523,6 +2827,8 @@ let gesture: {
     midY: number;
     vertical: number;
     distance: number;
+    distanceY: number;
+    scale: number;
   } | null = null,
   press: { id: number; x: number; y: number; time: number; target: EventTarget | null } | null =
     null,
@@ -1536,7 +2842,8 @@ function metrics() {
   return {
     mid: p.length === 1 ? localX(p[0].x) : localX((p[0].x + p[1].x) / 2),
     midY: p.length === 1 ? p[0].y : (p[0].y + p[1].y) / 2,
-    distance: p.length < 2 ? 1 : Math.max(1, Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y)),
+    distance: p.length < 2 ? 1 : Math.max(1, Math.abs(p[0].x - p[1].x)),
+    distanceY: p.length < 2 ? 0 : Math.abs(p[0].y - p[1].y),
   };
 }
 function resetGesture() {
@@ -1544,9 +2851,12 @@ function resetGesture() {
     gesture = null;
     return;
   }
-  gesture = { view: viewport.clone(), vertical: verticalOffset, ...metrics() };
+  gesture = { view: viewport.clone(), vertical: verticalOffset, scale: uiScale, ...metrics() };
 }
 stage.addEventListener('pointerdown', (event) => {
+  cancelZoomAnimation();
+  hoverPreview.hide();
+  summaryExpansion.hide();
   if (event.pointerType === 'mouse' && event.button !== 0) return;
   if (event.pointerType === 'mouse' && (event.target as HTMLElement).closest('button')) {
     moved = false;
@@ -1586,10 +2896,11 @@ stage.addEventListener('pointermove', (event) => {
   if (moved) clearTimeout(longPressTimer);
   if (!moved || longPressed) return;
   stage.classList.add('dragging');
-  verticalOffset = Math.max(
-    verticalMinimum,
-    Math.min(verticalMaximum, gesture.vertical + now.midY - gesture.midY),
-  );
+  if (pointers.size > 1 && gesture.distanceY >= 20)
+    uiScale = Math.max(0.2, Math.min(3, (gesture.scale * now.distanceY) / gesture.distanceY));
+  const anchor = gesture.midY - stage.getBoundingClientRect().top;
+  verticalOffset =
+    anchor - ((anchor - gesture.vertical) * uiScale) / gesture.scale + now.midY - gesture.midY;
   const next =
     pointers.size === 1
       ? gesture.view.pan(now.mid - gesture.mid, width())
@@ -1597,7 +2908,9 @@ stage.addEventListener('pointermove', (event) => {
           gesture.mid,
           now.mid,
           width(),
-          screenQ(gesture.distance).div(screenQ(now.distance)),
+          gesture.distance >= 20
+            ? screenQ(gesture.distance).div(screenQ(now.distance))
+            : Q.from(1n),
         );
   if (next.left.compare(viewport.left) === 0 && next.span.compare(viewport.span) === 0)
     requestRender(false);
@@ -1643,9 +2956,22 @@ stage.addEventListener(
   'wheel',
   (event) => {
     event.preventDefault();
+    hoverPreview.hide();
+    summaryExpansion.hide();
     clearTimeout(longPressTimer);
     closeTimelineMenu();
-    if (event.altKey) {
+    if (event.ctrlKey) {
+      const delta =
+        event.deltaY *
+        (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? stage.clientHeight : 1);
+      scaleContents(
+        uiScale * Math.exp(-Math.max(-1000, Math.min(1000, delta)) * 0.002),
+        Math.max(
+          0,
+          Math.min(stage.clientHeight, event.clientY - stage.getBoundingClientRect().top),
+        ),
+      );
+    } else if (event.altKey) {
       panVertical(
         verticalOffset -
           event.deltaY *
@@ -1685,11 +3011,13 @@ stage.addEventListener('keydown', (event) => {
   }
 });
 
+el('timeline-help-button').onclick = () =>
+  el<HTMLDialogElement>('timeline-help-dialog').showModal();
 el('zoom-in').onclick = () => zoom(Q.from(4n, 5n));
 el('zoom-out').onclick = () => zoom(Q.from(5n, 4n));
 el('fit-button').onclick = fit;
 el('center-vertical').onclick = () => {
-  verticalOffset = 0;
+  verticalOffset = 192 * (1 - uiScale);
   requestRender(false);
 };
 el('empty-fit').onclick = fit;
@@ -1702,6 +3030,7 @@ el('close-inspector').onclick = () => {
   pendingEventEdit = false;
   selectedTime = null;
   selectionRequest++;
+  clearGroupPage();
   selected = null;
   selectedGroup = null;
   el('event-form').hidden = true;
@@ -1714,6 +3043,7 @@ input('density').oninput = () => {
   requestRender();
 };
 el('apply-bounds').onclick = () => {
+  cancelZoomAnimation();
   try {
     const formatter = timelinePresenter(),
       context = viewContext('input');
@@ -1813,7 +3143,10 @@ el('presentation-example').onclick = () => {
   el<HTMLTextAreaElement>('presentation-source').value = CUSTOM_EXAMPLE;
 };
 el('presentation-button').onclick = () => {
-  const settings = (model ? model.presentation : remote?.presentation) ?? DEFAULT_PRESENTATION;
+  const settings =
+    comparison?.presentation ??
+    (model ? model.presentation : remote?.presentation) ??
+    DEFAULT_PRESENTATION;
   for (const [field, value] of Object.entries({
     mode: settings.mode,
     digits: settings.significantDigits,
@@ -1833,7 +3166,7 @@ el('presentation-button').onclick = () => {
   el<HTMLTextAreaElement>('presentation-source').value = settings.source ?? CUSTOM_EXAMPLE;
   text('presentation-error', '');
   text('presentation-preview-result', '');
-  el<HTMLButtonElement>('presentation-save').disabled = !editable();
+  el<HTMLButtonElement>('presentation-save').disabled = !comparison && !editable();
   displaySections();
   el<HTMLDialogElement>('presentation-dialog').showModal();
 };
@@ -1858,8 +3191,14 @@ el('presentation-preview').onclick = () => {
 };
 el<HTMLFormElement>('presentation-form').onsubmit = (event) => {
   event.preventDefault();
-  if (!editable()) return;
+  if (!comparison && !editable()) return;
   try {
+    if (comparison) {
+      comparison.presentation = displaySettings();
+      el<HTMLDialogElement>('presentation-dialog').close();
+      requestRender();
+      return;
+    }
     const editingTime = !el('event-form').hidden ? readEventTime() : null;
     model!.presentation = displaySettings();
     changed();
@@ -1870,6 +3209,7 @@ el<HTMLFormElement>('presentation-form').onsubmit = (event) => {
   }
 };
 el('apply-exact-bounds').onclick = () => {
+  cancelZoomAnimation();
   try {
     const left = parseTime(input('exact-left').value),
       right = parseTime(input('exact-right').value);
@@ -1882,14 +3222,36 @@ el('apply-exact-bounds').onclick = () => {
 el('group-zoom').onclick = () => {
   if (selectedGroup) zoomGroup(selectedGroup);
 };
+async function turnGroupPage(direction: -1 | 1) {
+  const group = selectedGroup;
+  const cursor = direction === 1 ? groupCursor : groupStarts[groupPageIndex - 1];
+  if (!group || (direction === 1 ? !cursor : groupPageIndex === 0)) return;
+  if (el<HTMLButtonElement>('group-more').disabled) return;
+  const selection = selectionRequest,
+    request = ++groupPageRequest;
+  el<HTMLButtonElement>('group-more').disabled = true;
+  el<HTMLButtonElement>('group-previous').disabled = true;
+  el('group-events').replaceChildren();
+  text('group-page-status', 'Loading page…');
+  try {
+    const page = await groupPage(group, cursor);
+    if (selection !== selectionRequest || request !== groupPageRequest) return;
+    groupPageIndex += direction;
+    groupStarts[groupPageIndex] = cursor;
+    showGroupPage(page.events, page.next);
+  } catch (error) {
+    if (selection !== selectionRequest || request !== groupPageRequest) return;
+    text('group-page-status', 'Could not load this page. Try again.');
+    el<HTMLButtonElement>('group-more').disabled = false;
+    el<HTMLButtonElement>('group-previous').disabled = false;
+    fail(error);
+  }
+}
 el('group-more').onclick = () => {
-  const request = selectionRequest;
-  if (selectedGroup && groupCursor)
-    void groupPage(selectedGroup, groupCursor)
-      .then((p) => {
-        if (request === selectionRequest) showGroupPage(p.events, p.next);
-      })
-      .catch(fail);
+  void turnGroupPage(1);
+};
+el('group-previous').onclick = () => {
+  void turnGroupPage(-1);
 };
 el<HTMLFormElement>('event-form').onsubmit = (event) => {
   event.preventDefault();
@@ -1906,7 +3268,9 @@ document.addEventListener('visibilitychange', () => {
 function requestDelete(point: PointEvent) {
   flushEventEdit();
   point = model?.byId.get(point.id) ?? point;
-  if (!editable() || !model!.byId.has(point.id)) return;
+  if (!editable()) return;
+  sparseWorkspace()?.load(point);
+  if (!model!.byId.has(point.id)) return;
   closeTimelineMenu();
   pendingDelete = { id: point.id, document: documentRequest };
   text(
@@ -1996,11 +3360,13 @@ el('new-button').onclick = () => {
 function historyReplace() {
   documentRequest++;
   if (!offlineHtml) window.history.replaceState(null, '', location.pathname);
+  if (platformEditor) window.parent.postMessage({ type: 'openchronology:local' }, location.origin);
 }
-el('dense-demo').onclick = () => {
+el('dashboard-demo').onclick = () => {
   if (!mayReplace()) return;
   historyReplace();
   sqlitePath = null;
+  setDashboard(false);
   loadDocument(demo(true));
 };
 el('import-button').onclick = () => input('json-file').click();
@@ -2023,15 +3389,26 @@ input('json-file').onchange = () => {
 };
 el('export-button').onclick = () => {
   flushEventEdit();
+  const exportingDocument = documentRequest,
+    exportingVersion = editVersion;
   void (async () => {
-    const doc =
-      model?.document() ??
-      (await api<{ document: TimelineDocument }>(`timelines/${remote!.id}/document`)).document;
+    let doc = await completeDocument();
+    doc = await embedImages(doc, offlineHtml);
     download(
       new Blob([JSON.stringify(doc, null, 2) + '\n'], { type: 'application/json' }),
       doc.title,
       '.ochx',
     );
+    if (
+      memoryOnly() &&
+      !remote &&
+      documentRequest === exportingDocument &&
+      editVersion === exportingVersion
+    ) {
+      dirty = false;
+      heading();
+      text('save-status', 'Exported as .ochx — new edits remain in memory');
+    }
   })().catch(fail);
 };
 function download(blob: Blob, title: string, extension: string) {
@@ -2081,20 +3458,44 @@ el('och-export').onclick = () => {
     }
     if (!model) return;
     download(
-      await exportSqlite('files/export', model.document(), session.csrf),
+      await exportSqlite(
+        'files/export',
+        await embedImages(await completeDocument(), offlineHtml),
+        session.csrf,
+      ),
       model.title,
       '.och',
     );
   })().catch(fail);
 };
 el('account-button').onclick = () => {
+  if (platformEditor) {
+    if (
+      memoryOnly() &&
+      !remote &&
+      (dirty || pendingEventEdit) &&
+      !confirm(
+        'Export your in-memory timeline as .ochx before signing in. Continuing will leave this draft. Continue?',
+      )
+    )
+      return;
+    void retainForSignIn()
+      .then(() => {
+        const returnTo = remote ? `/timelines/${remote.id}` : '/editor';
+        window.parent.location.href = session.user
+          ? '/account'
+          : `/login?returnTo=${encodeURIComponent(returnTo)}`;
+      })
+      .catch(fail);
+    return;
+  }
   void (async () => {
     if (!offlineHtml) await refreshSession();
     if (!session.server) {
       toast('Server sharing is unavailable. Local timelines remain available.');
       return;
     }
-    el('password-fields').hidden = !!session.user;
+    el('password-fields').hidden = desktop || !!session.user;
     el('desktop-login').hidden = !desktop || !!session.user;
     text('account-error', '');
     for (const button of document.querySelectorAll<HTMLButtonElement>('[data-provider]')) {
@@ -2112,6 +3513,7 @@ async function refreshSession() {
   session = await api<Session>('session');
   accountHeading();
   heading();
+  if (document.body.dataset.dashboard === 'true') void community.dashboard().catch(fail);
 }
 async function accountSessions() {
   const result = await api<{
@@ -2187,17 +3589,29 @@ el('desktop-approve').onclick = () => {
     })
     .catch(fail);
 };
+for (const dialog of document.querySelectorAll<HTMLDialogElement>('dialog'))
+  dismissOnBackdrop(dialog);
 for (const button of document.querySelectorAll<HTMLButtonElement>('[data-close]'))
   button.onclick = () => el<HTMLDialogElement>(button.dataset.close!).close();
+el('account-register').onclick = () => {
+  void retainForSignIn()
+    .then(() => location.assign('/login?mode=register'))
+    .catch(fail);
+};
 el<HTMLFormElement>('account-form').onsubmit = (event) => {
   event.preventDefault();
   const action = (event.submitter as HTMLButtonElement)?.value ?? 'login';
   text('account-error', '');
-  void api<{ user: Session['user']; csrf: string }>(`auth/${action}`, 'POST', {
+  void api<{ user: Session['user']; csrf: string; challenge?: string }>(`auth/${action}`, 'POST', {
     username: input('account-name').value,
     password: input('account-password').value,
   })
     .then(async (result) => {
+      if (result.challenge) {
+        await retainForSignIn();
+        location.assign('/login');
+        return;
+      }
       session = { ...session, ...result };
       input('account-password').value = '';
       el<HTMLDialogElement>('account-dialog').close();
@@ -2215,6 +3629,7 @@ function accountHeading() {
   el('server-button').hidden = !desktop;
 }
 el('logout-button').onclick = () => {
+  if (comparison) stopComparison();
   if (!mayReplace()) return;
   void api('auth/logout', 'POST', {})
     .then(() => {
@@ -2227,12 +3642,149 @@ el('logout-button').onclick = () => {
         loadDocument(demo());
       }
       toast('Signed out.');
-      void refreshSession().catch(fail);
+      void refreshSession()
+        .then(() => {
+          if (session.server) {
+            setDashboard(true);
+            return community.dashboard();
+          }
+        })
+        .catch(fail);
     })
     .catch(fail);
 };
+const community = createCommunityUI({
+  api,
+  user: () => session.user,
+  server: () => session.server,
+  guestCopies: () => !desktop && !offlineHtml,
+  timeline: () => remote,
+  document: async () => {
+    flushEventEdit();
+    if (!model) throw new Error('Load an editable timeline first.');
+    proposalSubmissionVersion = editVersion;
+    proposalSubmissionDocument = documentRequest;
+    return embedImages(await completeDocument(), offlineHtml);
+  },
+  compare: (ids) => {
+    const request = documentRequest;
+    void comparisonSources(ids)
+      .then((sources) => {
+        if (request === documentRequest) return comparisons.start(sources);
+      })
+      .catch(fail);
+  },
+  working: () => workingProposal,
+  edit: (proposal) => {
+    if (!mayReplace()) return;
+    const upstream = remote!;
+    loadDocument(validateDocument(proposal.document));
+    remote = {
+      ...upstream,
+      revision: proposal.base_revision,
+      canEdit: proposal.canUpdate,
+      canPropose: proposal.canUpdate,
+      canWrite: false,
+    };
+    workingProposal = proposal;
+    heading();
+    requestRender();
+  },
+  published: (proposal) => {
+    if (proposalSubmissionDocument !== documentRequest) return;
+    workingProposal = proposal;
+    dirty = proposalSubmissionVersion !== editVersion;
+    heading();
+    toast('Pull request saved. Upstream is unchanged.');
+  },
+  reload: async () => {
+    if (remote && mayReplace()) await openRemote(remote.id);
+  },
+});
+if (platformEditor)
+  el('pull-button').onclick = () => {
+    if (remote && mayReplace()) window.parent.location.href = `/timelines/${remote.id}/pulls`;
+  };
+el('dashboard-home').onclick = (event) => {
+  if (offlineHtml) {
+    event.preventDefault();
+    return;
+  }
+  if (!mayReplace()) {
+    event.preventDefault();
+    return;
+  }
+  if (platformEditor) {
+    event.preventDefault();
+    window.parent.location.href = '/';
+    return;
+  }
+  if (hasDashboard()) {
+    event.preventDefault();
+    historyReplace();
+    setDashboard(true);
+    void community.dashboard().catch(fail);
+  }
+};
+el('dashboard-new').onclick = () => el('new-button').click();
+input('timeline-tags').onchange = () => {
+  if (!editable()) return;
+  try {
+    model!.tags = validateTags(
+      input('timeline-tags')
+        .value.split(',')
+        .filter((t) => t.trim()),
+    );
+    text('timeline-tags-error', '');
+    changed();
+  } catch (error) {
+    text('timeline-tags-error', error instanceof Error ? error.message : String(error));
+  }
+};
+el('delete-timeline').onclick = () => {
+  if (!remote?.canShare) return;
+  const id = remote.id,
+    workspace = documentRequest;
+  pendingDelete = {
+    id: '',
+    document: documentRequest,
+    remove: () => {
+      void api('timelines/' + id, 'DELETE')
+        .then(() => {
+          if (workspace !== documentRequest) {
+            void directory().catch(fail);
+            toast('Timeline deleted.');
+            return;
+          }
+          el<HTMLDialogElement>('sharing-dialog').close();
+          dirty = false;
+          historyReplace();
+          loadDocument({
+            format: 'openchronology',
+            version: 1,
+            title: 'Untitled timeline',
+            description: '',
+            events: [],
+          });
+          setDashboard(true);
+          void directory().catch(fail);
+          void community.dashboard().catch(fail);
+        })
+        .catch((error) => text('sharing-error', error.message));
+    },
+  };
+  text(
+    'delete-description',
+    'Permanently delete this timeline, all proposed branches and comments? Export a copy first if you want to retain the data.',
+  );
+  el<HTMLDialogElement>('delete-dialog').showModal();
+};
 el('publish-button').onclick = () => {
   flushEventEdit();
+  if (remote && (workingProposal || !(remote.canWrite ?? remote.canEdit))) {
+    community.propose();
+    return;
+  }
   void (async () => {
     if (!session.user) {
       el('account-button').click();
@@ -2245,20 +3797,63 @@ el('publish-button').onclick = () => {
     const version = editVersion,
       workspace = documentRequest;
     try {
-      const result = remote
-        ? await api<RemoteTimeline>(`timelines/${remote.id}`, 'PUT', {
-            revision: remote.revision,
-            document: model.document(),
-          })
-        : await api<RemoteTimeline>('timelines', 'POST', model.document());
+      const index = sparseWorkspace();
+      const sent = index?.beginSave();
+      const patch = remote ? index?.patch() : undefined;
+      const materialized = remote ? undefined : completeDocument();
+      const sparseDocument =
+        index && remote ? await embedImages(index.document(), false) : undefined;
+      if (patch && sparseDocument)
+        patch.settings.assets = { ...index!.assets, ...sparseDocument.assets };
+      const document =
+        index && remote
+          ? undefined
+          : await embedImages(await (materialized ?? completeDocument()), false);
+      const result =
+        index && remote
+          ? await api<RemoteTimeline>(`timelines/${remote.id}/changes`, 'PUT', {
+              revision: remote.revision,
+              ...patch,
+            })
+          : remote
+            ? await api<RemoteTimeline>(`timelines/${remote.id}`, 'PUT', {
+                revision: remote.revision,
+                document,
+              })
+            : await api<RemoteTimeline>('timelines', 'POST', document);
       if (workspace !== documentRequest) return;
       remote = result;
+      local = null;
+      if (document) model!.assets = document.assets;
+      if (index && sent) {
+        index.accepted(sent, selected?.id);
+        if (patch) index.assets = patch.settings.assets;
+        if (version === editVersion) {
+          history = [];
+          eventEditHistory = null;
+        }
+      }
+      remoteCache.clear();
+      requestRender();
       dirty = version !== editVersion;
+      if (!index && !dirty && !workingProposal) {
+        const local = model!.document();
+        model = new RemoteWorkspace(local);
+        if (selected) sparseWorkspace()!.load(selected);
+        history = [];
+        eventEditHistory = null;
+      }
       window.history.replaceState(null, '', `#timeline/${result.id}`);
       heading();
       await directory();
       toast('Timeline saved. It is ' + result.visibility + '.');
+      if (platformEditor && !dirty)
+        window.parent.postMessage(
+          { type: 'openchronology:published', id: result.id },
+          location.origin,
+        );
     } finally {
+      sparseWorkspace()?.endSave(selected?.id);
       saving = false;
       heading();
     }
@@ -2286,8 +3881,12 @@ async function members() {
 }
 el('share-button').onclick = () => {
   if (!remote?.canShare) return;
+  if (platformEditor) {
+    if (mayReplace()) window.parent.location.href = `/timelines/${remote.id}/settings`;
+    return;
+  }
   el<HTMLSelectElement>('visibility').value = remote.visibility;
-  text('sharing-link', `${serverOrigin}/#timeline/${remote.id}`);
+  text('sharing-link', `${serverOrigin}/timelines/${remote.id}`);
   text('sharing-error', '');
   el<HTMLDialogElement>('sharing-dialog').showModal();
   void members().catch(fail);
@@ -2327,12 +3926,14 @@ if (desktop) {
     el<HTMLDialogElement>('connection-dialog').showModal();
   };
   const connect = async (origin: string | null) => {
-    if (remote && !model) {
+    if (remote && (!model || sparseWorkspace())) {
       try {
         const snapshot = await api<{ document: TimelineDocument }>(
           `timelines/${remote.id}/document`,
         );
-        model = new TimelineIndex(validateDocument(snapshot.document));
+        model = new TimelineIndex(
+          validateDocument(sparseWorkspace()?.apply(snapshot.document) ?? snapshot.document),
+        );
       } catch {
         model = new TimelineIndex({
           format: 'openchronology',
@@ -2372,22 +3973,42 @@ if (desktop) {
     void connect(null).catch((error) => text('connection-error', error.message));
   };
   for (const id of ['sqlite-open', 'sqlite-save', 'sqlite-save-as']) el(id).hidden = false;
+  const adoptNative = async (
+    result: NativeOpened | null,
+    workspace: number,
+    savedFile: boolean,
+  ) => {
+    if (!result || workspace !== documentRequest) return;
+    const document = validateDocument(result.document);
+    await window.__TAURI__!.core.invoke<void>('desktop_accept_open', { path: result.path });
+    if (workspace !== documentRequest) return;
+    historyReplace();
+    loadDocument(document);
+    model = new RemoteWorkspace(document);
+    local = { ...result, id: 'local-sqlite', revision: String(result.generation) };
+    viewport = Viewport.fit(
+      result.first ? Q.parse(result.first) : undefined,
+      result.last ? Q.parse(result.last) : undefined,
+    );
+    sqlitePath = savedFile ? result.path : null;
+    sqliteSavedVersion = savedFile ? editVersion : null;
+    heading();
+    requestRender();
+  };
   el('sqlite-open').onclick = () => {
     if (!mayReplace()) return;
     const workspace = documentRequest;
     void window
-      .__TAURI__!.core.invoke<{ document: TimelineDocument; path: string } | null>('desktop_open')
-      .then(async (result) => {
-        if (!result || workspace !== documentRequest) return;
-        const document = validateDocument(result.document);
-        await window.__TAURI__!.core.invoke<void>('desktop_accept_open', { path: result.path });
-        if (workspace !== documentRequest) return;
-        historyReplace();
-        loadDocument(document);
-        sqlitePath = result.path;
-        sqliteSavedVersion = editVersion;
-        heading();
-      })
+      .__TAURI__!.core.invoke<NativeOpened | null>('desktop_open')
+      .then((result) => adoptNative(result, workspace, true))
+      .catch(fail);
+  };
+  el('import-button').onclick = () => {
+    if (!mayReplace()) return;
+    const workspace = documentRequest;
+    void window
+      .__TAURI__!.core.invoke<NativeOpened | null>('desktop_import')
+      .then((result) => adoptNative(result, workspace, false))
       .catch(fail);
   };
   for (const [id, saveAs] of [
@@ -2396,36 +4017,76 @@ if (desktop) {
   ] as const)
     el(id).onclick = () => {
       flushEventEdit();
+      if (saving) return;
       const version = editVersion,
-        workspace = documentRequest;
+        workspace = documentRequest,
+        index = local ? sparseWorkspace() : null;
+      const sent = index?.beginSave();
+      saving = true;
+      heading();
       void (async () => {
-        const document =
-          model?.document() ??
-          (remote
-            ? validateDocument(
-                (await api<{ document: TimelineDocument }>(`timelines/${remote.id}/document`))
-                  .document,
-              )
-            : null);
-        if (!document || workspace !== documentRequest) return null;
-        return window.__TAURI__!.core.invoke<string | null>('desktop_save', {
-          document,
+        const patch = index?.patch();
+        const document = patch ? undefined : await completeDocument();
+        if (workspace !== documentRequest) return null;
+        const nativePatch = patch
+          ? { ...patch, settings: { ...patch.settings, events: [] as PointEvent[] } }
+          : undefined;
+        if (nativePatch)
+          nativePatch.settings.assets = {
+            ...index!.assets,
+            ...(await embedImages(index!.document(), false)).assets,
+          };
+        return window.__TAURI__!.core.invoke<NativeOpened | null>('desktop_save', {
+          document: document ? await embedImages(document, false) : null,
+          patch: nativePatch ?? null,
+          generation: local?.generation ?? null,
           saveAs: saveAs || !sqlitePath,
           expectedPath: sqlitePath,
         });
       })()
-        .then((path) => {
-          if (!path || workspace !== documentRequest) return;
-          sqlitePath = path;
+        .then((result) => {
+          if (!result || workspace !== documentRequest) return;
+          sqlitePath = result.path;
           sqliteSavedVersion = version;
-          if (!remote) dirty = version !== editVersion;
+          if (model) model.assets = { ...result.document.assets, ...model.assets };
+          if (!remote) {
+            local = { ...result, id: 'local-sqlite', revision: String(result.generation) };
+            if (index && sent) index.accepted(sent, selected?.id);
+            else if (version === editVersion) {
+              model = new RemoteWorkspace(validateDocument(result.document));
+              if (selected) sparseWorkspace()!.load(selected);
+            }
+            // A full-model save with concurrent edits remains fully loaded until its next save.
+            if (!index && version !== editVersion) local = null;
+            dirty = version !== editVersion;
+            if (!dirty) {
+              history = [];
+              eventEditHistory = null;
+            }
+          }
+          remoteCache.clear();
+          frameRequest++;
+          requestRender();
           heading();
           toast('SQLite timeline saved.');
         })
-        .catch(fail);
+        .catch(fail)
+        .finally(() => {
+          if (workspace === documentRequest) index?.endSave(selected?.id);
+          saving = false;
+          heading();
+          requestRender();
+        });
     };
 }
-new ResizeObserver(() => requestRender()).observe(stage);
+const timelineResizeObserver = new ResizeObserver(() => requestRender());
+timelineResizeObserver.observe(stage);
+// Also refresh when the viewport changes or the browser restores a page from its cache.
+window.addEventListener('resize', () => requestRender());
+window.addEventListener('pageshow', () => requestRender());
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) requestRender();
+});
 if (!offlineHtml)
   window.addEventListener('hashchange', () => {
     void route().catch(fail);
@@ -2434,7 +4095,6 @@ if (offlineHtml) {
   document.body.dataset.offline = 'true';
   el('new-button').classList.remove('workspace-new');
   document.querySelector('.file-actions')!.prepend(el('new-button'));
-  document.querySelector<HTMLElement>('.workspace')!.hidden = true;
   document.querySelector<HTMLElement>('.breadcrumbs')!.hidden = true;
   for (const id of [
     'account-button',
@@ -2447,11 +4107,188 @@ if (offlineHtml) {
     'server-button',
     'och-import',
     'och-export',
+    'pull-button',
+    'propose-button',
   ])
     el(id).hidden = true;
   document.querySelector('#empty-window')!.firstChild!.textContent =
     'Import JSON or add your first event.';
 }
+if (!offlineHtml)
+  live = liveUpdates({
+    sources: () =>
+      comparison
+        ? comparison.tracks
+            .filter((t) => t.source.revision && /^[a-f0-9-]{36}$/i.test(t.source.key))
+            .map((t) => ({ id: t.source.key, revision: t.source.revision! }))
+        : remote
+          ? [{ id: remote.id, revision: remote.revision }]
+          : [],
+    available: () => !offlineHtml && !!session.server,
+    native: () => desktop || !platformEditor,
+    check: (id) => api<{ id: string; revision: string }>(`timelines/${id}/revision`),
+    async refresh(id, revision) {
+      const request = documentRequest,
+        view = comparison;
+      if (view) {
+        const sources = await comparisonSources([id]);
+        if (view !== comparison || request !== documentRequest) return;
+        comparisonController?.abort();
+        frameRequest++;
+        selectionRequest++;
+        clearGroupPage();
+        selected = null;
+        selectedGroup = null;
+        el('event-form').hidden = true;
+        el('group-details').hidden = true;
+        view.replaceSource(sources[0]);
+        configureImages(
+          Object.assign({}, ...view.tracks.map((t) => t.source.assets ?? {})),
+          offlineHtml,
+        );
+        liveTransitionPending = true;
+        requestRender();
+        return;
+      }
+      if (!remote || remote.id !== id || remote.revision === revision) return;
+      if (dirty || saving) {
+        el('live-notice').hidden = false;
+        return;
+      }
+      const info = await api<RemoteTimeline>(`timelines/${id}`);
+      if (request !== documentRequest || comparison || remote?.id !== id || dirty || saving) return;
+      if (info.presentation) info.presentation = validatePresentation(info.presentation);
+      if (info.plugins) info.plugins = validateInstalledPlugins(info.plugins);
+      if (info.assets) info.assets = validateAssets(info.assets);
+      remote = info;
+      model = info.canEdit
+        ? new RemoteWorkspace({
+            format: 'openchronology',
+            version: 1,
+            title: info.title,
+            description: info.description,
+            presentation: info.presentation,
+            plugins: info.plugins,
+            tags: info.tags,
+            assets: info.assets,
+            events: [],
+          })
+        : null;
+      history = [];
+      windowController?.abort();
+      remoteCache.clear();
+      frameRequest++;
+      selectionRequest++;
+      clearGroupPage();
+      selected = null;
+      selectedGroup = null;
+      el('event-form').hidden = true;
+      el('group-details').hidden = true;
+      el('live-notice').hidden = true;
+      liveTransitionPending = true;
+      heading();
+      requestRender();
+    },
+    denied(id) {
+      const affected = comparison
+        ? comparison.tracks.some((t) => !id || t.source.key === id)
+        : remote && (!id || remote.id === id);
+      if (!affected) return;
+      if (comparison) stopComparison(false);
+      if (remote && (!id || remote.id === id)) {
+        remote = null;
+        if (!dirty) model = null;
+        remoteCache.clear();
+      }
+      liveTransitionPending = false;
+      resetTimeSelection();
+      frame = { groups: [], visitedNodes: 0 };
+      heading();
+      requestRender();
+      toast('Timeline access changed. Sign in again or choose another timeline.');
+    },
+  });
+el('live-reload').onclick = () => {
+  if (remote && mayReplace()) void openRemote(remote.id).catch(fail);
+};
+window.addEventListener('pagehide', (event) => (event.persisted ? live?.pause() : live?.close()));
+window.addEventListener('pageshow', () => {
+  void live?.update();
+});
+const comparisons = comparisonUI({
+  available: () => !offlineHtml && !!session.server,
+  current: currentComparisonSource,
+  sources: comparisonSources,
+  search: (search, page) =>
+    api('timelines/search', 'POST', { search, page, limit: 12, scope: 'visible' }),
+  start: startComparison,
+  generation: () => documentRequest,
+  fail,
+});
+el('compare-exit').onclick = () => {
+  if (remote?.comparison) {
+    if (platformEditor) window.parent.location.href = '/';
+    else {
+      remote = null;
+      stopComparison(false);
+      setDashboard(true);
+      heading();
+    }
+    return;
+  }
+  stopComparison();
+  if (location.hash.startsWith('#compare/') && platformEditor) {
+    window.parent.location.href = '/';
+    return;
+  }
+  if (location.hash.startsWith('#compare/'))
+    window.history.replaceState(null, '', location.pathname + location.search);
+};
+el<HTMLInputElement>('compare-combined').onchange = () => {
+  if (!comparison) return;
+  comparisonController?.abort();
+  frameRequest++;
+  selectionRequest++;
+  clearGroupPage();
+  selected = null;
+  selectedGroup = null;
+  selectedTime = null;
+  el('event-form').hidden = true;
+  el('group-details').hidden = true;
+  comparison.combined = input('compare-combined').checked;
+  uiScale = comparison.combined
+    ? 1
+    : Math.min(1, Math.max(0.25, (stage.clientHeight - 48) / (comparison.tracks.length * 340)));
+  verticalOffset = 0;
+  requestRender();
+};
+input('compare-file').onchange = async () => {
+  const file = input('compare-file').files?.[0];
+  const request = documentRequest;
+  if (!file) return;
+  try {
+    if (file.size > 32 * 1024 * 1024) throw new Error('Timeline files must be at most 32 MiB.');
+    const raw = await file.text();
+    if (request !== documentRequest || !el<HTMLDialogElement>('compare-dialog').open) return;
+    const doc = validateDocument(JSON.parse(raw)),
+      index = new TimelineIndex(doc);
+    comparisons.addFile({
+      key: 'file-' + eventId(),
+      title: doc.title,
+      index,
+      plugins: doc.plugins,
+      presentation: doc.presentation,
+      assets: doc.assets,
+      first: index.points.minKey()?.toString(),
+      last: index.points.maxKey()?.toString(),
+    });
+  } catch (error) {
+    fail(error);
+  } finally {
+    input('compare-file').value = '';
+  }
+};
+if (!desktop && !offlineHtml && !platformEditor) setDashboard(true);
 heading();
 accountHeading();
 requestRender();
@@ -2471,17 +4308,23 @@ void (async () => {
   }
   if (!desktop && !offlineHtml) {
     try {
-      const draft = await loadDraft();
-      if (draft && !location.hash) loadDocument(validateDocument(draft));
-    } catch {
-      /* Storage can be unavailable in a private browser. */
-    }
-    try {
       await refreshSession();
-      if (session.user) await directory();
-      await restoreAfterSignIn();
+      if (session.user) {
+        try {
+          const draft = await loadDraft();
+          if (draft && !location.hash && !freshTimeline && !sampleTimeline) {
+            loadDocument(validateDocument(draft));
+            setDashboard(!platformEditor);
+          }
+          await restoreAfterSignIn();
+        } catch {
+          /* Authenticated browser storage can be unavailable. */
+        }
+        await directory();
+      }
+      if (!hasDashboard()) setDashboard(false);
     } catch {
-      /* Local editing also works without a server. */
+      setDashboard(false);
     }
   }
   await route();

@@ -1,8 +1,10 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { dependencyLicenses } from './licenses.mjs';
+import { withLegal, copyrightBanner } from './legal.mjs';
 
 export async function buildOffline() {
   const result = await build({
@@ -17,10 +19,14 @@ export async function buildOffline() {
     write: false,
     metafile: true,
     define: { __OFFLINE_HTML__: 'true' },
+    banner: { js: copyrightBanner },
     plugins: [
       {
         name: 'exclude-network-transport',
         setup(builder) {
+          builder.onResolve({ filter: /^\.\/live-updates\.js$/ }, () => ({
+            path: resolve('src/offline-live.ts'),
+          }));
           builder.onResolve({ filter: /^\.\/transport\.js$/ }, () => ({
             path: resolve('src/offline-transport.ts'),
           }));
@@ -30,6 +36,7 @@ export async function buildOffline() {
   });
   if (
     'src/transport.ts' in result.metafile.inputs ||
+    'src/live-updates.ts' in result.metafile.inputs ||
     !('src/offline-transport.ts' in result.metafile.inputs)
   )
     throw new Error('Offline build must exclude the HTTP transport.');
@@ -55,7 +62,7 @@ export async function buildOffline() {
   ];
   const escape = (text) =>
     text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-  let html = await readFile('src/index.html', 'utf8');
+  let html = await withLegal(await readFile('src/index.html', 'utf8'), false);
   html = html
     .replace(
       '<meta charset="utf-8" />',
@@ -65,7 +72,7 @@ export async function buildOffline() {
     .replace(
       /<link\s+rel="stylesheet"[^>]*\/>/,
       () =>
-        `<style>${css}\nbody[data-offline] .app-layout{grid-template-columns:minmax(300px,1fr) var(--inspector)}body[data-offline] .document-toolbar{justify-content:flex-end}.offline-notices{font-size:10px;max-width:100%;padding:0 30px 20px}.offline-notices pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto}</style>`,
+        `<style>${css}\nbody[data-offline] .app-layout{grid-template-columns:minmax(0,1fr) var(--inspector)}@media(max-width:960px){body[data-offline] .app-layout{grid-template-columns:minmax(0,1fr)}}body[data-offline] .document-toolbar{justify-content:flex-end}.offline-notices{font-size:10px;max-width:100%;padding:0 30px 20px}.offline-notices pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto}</style>`,
     )
     .replace(/<script\s+type="module"[^>]*><\/script>/, '')
     .replace(

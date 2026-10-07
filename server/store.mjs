@@ -1,4 +1,5 @@
-import { pluginMetadata } from '../dist/core.mjs';
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+import { Q, pluginMetadata, validateDocument } from '../dist/core.mjs';
 import { randomUUID } from 'node:crypto';
 import { indexedNodes } from './tree.mjs';
 export class HttpError extends Error {
@@ -11,6 +12,16 @@ export class PostgresStore {
   constructor(pool) {
     this.pool = pool;
   }
+  async liveState(id, userId, client = this.pool) {
+    const { rows } = await client.query(
+      `SELECT t.id,t.revision FROM oc_timelines t
+      WHERE t.id=$1 AND (t.visibility='public' OR t.owner_id=$2::uuid
+      OR EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$2::uuid))`,
+      [id, userId ?? null],
+    );
+    if (!rows[0]) throw new HttpError(404, 'Timeline unavailable.');
+    return rows[0];
+  }
   async access(id, userId, client = this.pool) {
     const { rows } = await client.query(
       `SELECT t.*,u.username AS owner,
@@ -22,13 +33,59 @@ export class PostgresStore {
     const timeline = rows[0];
     if (!timeline || (!timeline.role && timeline.visibility !== 'public'))
       throw new HttpError(404, 'Timeline unavailable. Sign in if it is private.');
+    if (timeline.comparison) {
+      const sources = await client.query(
+        `SELECT t.id FROM oc_timelines t
+        WHERE t.id=ANY($1::uuid[]) AND t.comparison IS NULL AND
+        (t.visibility='public' OR t.owner_id=$2::uuid OR EXISTS
+          (SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$2::uuid))`,
+        [timeline.comparison.sources, userId ?? null],
+      );
+      if (sources.rows.length !== timeline.comparison.sources.length)
+        throw new HttpError(404, 'A comparison source is unavailable.');
+    }
+    const { search_document, event_text, ...metadata } = timeline;
     return {
-      ...timeline,
-      canEdit: ['owner', 'editor'].includes(timeline.role),
+      ...metadata,
+      canWrite: !timeline.comparison && ['owner', 'writer', 'editor'].includes(timeline.role),
+      canPropose:
+        !timeline.comparison &&
+        !!userId &&
+        (['owner', 'writer', 'editor', 'contributor'].includes(timeline.role) ||
+          timeline.visibility === 'public'),
+      canEdit:
+        !timeline.comparison &&
+        !!userId &&
+        (['owner', 'writer', 'editor', 'contributor'].includes(timeline.role) ||
+          timeline.visibility === 'public'),
       canShare: timeline.role === 'owner',
+      canFork:
+        !timeline.comparison &&
+        !!userId &&
+        (timeline.visibility === 'public' ||
+          timeline.role === 'owner' ||
+          timeline.allow_private_forks),
     };
   }
   async replace(client, id, document) {
+    document = validateDocument(document);
+    if (document.comparison) {
+      const parent = (
+        await client.query('SELECT owner_id,visibility FROM oc_timelines WHERE id=$1', [id])
+      ).rows[0];
+      const sources = await client.query(
+        `SELECT t.id FROM oc_timelines t
+        WHERE t.id=ANY($1::uuid[]) AND t.id<>$2::uuid AND t.comparison IS NULL
+        AND (t.visibility='public' OR ($3='private' AND (t.owner_id=$4::uuid OR EXISTS
+          (SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$4::uuid))))`,
+        [document.comparison.sources, id, parent.visibility, parent.owner_id],
+      );
+      if (sources.rows.length !== document.comparison.sources.length)
+        throw new HttpError(
+          400,
+          'Comparison sources must be accessible ordinary timelines; public comparisons require public sources.',
+        );
+    }
     const tree = indexedNodes(document);
     await client.query('DELETE FROM oc_nodes WHERE timeline_id=$1', [id]);
     // Batched inserts keep write round trips bounded; mpq keys never enter a B-tree.
@@ -70,7 +127,7 @@ export class PostgresStore {
       );
     }
     await client.query(
-      'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,updated_at=now() WHERE id=$1',
+      'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,tags=$8,assets=$9::jsonb,event_text=$10,comparison=$11::jsonb,updated_at=now() WHERE id=$1',
       [
         id,
         document.title,
@@ -79,6 +136,10 @@ export class PostgresStore {
         tree.count,
         document.presentation ? JSON.stringify(document.presentation) : null,
         document.plugins === undefined ? null : JSON.stringify(document.plugins),
+        document.tags ?? null,
+        document.assets === undefined ? null : JSON.stringify(document.assets),
+        eventSearchText(document),
+        document.comparison ? JSON.stringify(document.comparison) : null,
       ],
     );
   }
@@ -97,6 +158,7 @@ export class PostgresStore {
     }
   }
   async create(userId, document) {
+    document = validateDocument(document);
     const id = randomUUID();
     await this.transaction(async (c) => {
       await c.query('INSERT INTO oc_timelines(id,owner_id,title) VALUES($1,$2,$3)', [
@@ -105,23 +167,109 @@ export class PostgresStore {
         document.title,
       ]);
       await this.replace(c, id, document);
+      await this.checkpoint(c, id, userId, document, 'save');
     });
     return this.access(id, userId);
   }
-  async save(id, userId, revision, document) {
+  async save(id, userId, revision, document, patch = null) {
     return this.transaction(async (c) => {
       await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [id]);
       const t = await this.access(id, userId, c);
-      if (!t.canEdit) throw new HttpError(403, 'Editor access is required.');
+      if (!t.canWrite) throw new HttpError(403, 'Write access is required to update upstream.');
       if (t.revision !== revision)
         throw new HttpError(
           409,
           'Someone changed this timeline. Export your edits before reloading.',
         );
+      if (patch) {
+        const current = await this.branchDocument(c, t);
+        const events = new Map(current.events.map((e) => [e.id, e]));
+        for (const change of patch.changes) {
+          if (change.event) events.set(change.id, change.event);
+          else events.delete(change.id);
+        }
+        document = validateDocument({ ...patch.settings, events: [...events.values()] });
+      }
       await this.replace(c, id, document);
       await c.query('UPDATE oc_timelines SET revision=revision+1 WHERE id=$1', [id]);
+      await this.checkpoint(c, id, userId, document, 'save', [t.head_revision_id]);
       return this.access(id, userId, c);
     });
+  }
+  async checkpoint(client, id, userId, document, kind, parents = [], snapshotId = null) {
+    const { rows } = await client.query('SELECT revision FROM oc_timelines WHERE id=$1', [id]);
+    const revisionId = await this.recordRevision(
+      client,
+      id,
+      userId,
+      document,
+      kind,
+      parents,
+      snapshotId,
+      rows[0].revision,
+    );
+    await client.query('UPDATE oc_timelines SET head_revision_id=$2 WHERE id=$1', [id, revisionId]);
+    return revisionId;
+  }
+  async recordRevision(
+    client,
+    id,
+    userId,
+    document,
+    kind,
+    parents = [],
+    snapshotId = null,
+    number = null,
+  ) {
+    const revisionId = randomUUID();
+    if (!snapshotId) {
+      snapshotId = randomUUID();
+      const serialized = JSON.stringify(validateDocument(document));
+      await client.query(
+        'INSERT INTO oc_snapshots(id,document,document_bytes) VALUES($1,$2::jsonb,$3)',
+        [snapshotId, serialized, Buffer.byteLength(serialized)],
+      );
+    }
+    await client.query(
+      'INSERT INTO oc_revisions(id,timeline_id,number,snapshot_id,author_id,kind) VALUES($1,$2,$3,$4,$5,$6)',
+      [revisionId, id, number, snapshotId, userId, kind],
+    );
+    for (const [position, parent] of [...new Set(parents.filter(Boolean))].entries())
+      await client.query(
+        'INSERT INTO oc_revision_parents(revision_id,parent_id,position) VALUES($1,$2,$3)',
+        [revisionId, parent, position],
+      );
+    return revisionId;
+  }
+  async revisionDocument(client, id) {
+    const { rows } = await client.query(
+      'SELECT s.document FROM oc_revisions r JOIN oc_snapshots s ON s.id=r.snapshot_id WHERE r.id=$1',
+      [id],
+    );
+    if (!rows[0]) throw new HttpError(404, 'Saved revision unavailable.');
+    return rows[0].document;
+  }
+  async removeHistory(client, timelineId) {
+    // Keep ancestors still needed by another fork or submitted review. Other
+    // timelines' private history is never exposed through the history API.
+    const { rows } = await client.query(
+      `WITH RECURSIVE kept(id) AS (
+      SELECT r.id FROM oc_revisions r WHERE r.timeline_id=$1 AND (
+        EXISTS(SELECT 1 FROM oc_timelines t WHERE t.head_revision_id=r.id OR t.fork_base_revision_id=r.id)
+        OR EXISTS(SELECT 1 FROM oc_proposals p WHERE p.base_revision_id=r.id OR p.source_revision_id=r.id OR p.merged_revision_id=r.id)
+        OR EXISTS(SELECT 1 FROM oc_revision_parents p JOIN oc_revisions child ON child.id=p.revision_id WHERE p.parent_id=r.id AND child.timeline_id<>$1))
+      UNION SELECT p.parent_id FROM oc_revision_parents p JOIN kept k ON k.id=p.revision_id
+    ) SELECT r.id,r.snapshot_id FROM oc_revisions r WHERE r.timeline_id=$1 AND r.id NOT IN (SELECT id FROM kept)`,
+      [timelineId],
+    );
+    if (!rows.length) return;
+    const ids = rows.map((r) => r.id);
+    await client.query('DELETE FROM oc_revision_parents WHERE revision_id=ANY($1::uuid[])', [ids]);
+    await client.query('DELETE FROM oc_revisions WHERE id=ANY($1::uuid[])', [ids]);
+    await client.query(
+      'DELETE FROM oc_snapshots s WHERE s.id=ANY($1::uuid[]) AND NOT EXISTS(SELECT 1 FROM oc_revisions r WHERE r.snapshot_id=s.id)',
+      [rows.map((r) => r.snapshot_id)],
+    );
   }
   async metadata(id, userId) {
     return this.transaction(async (c) => {
@@ -150,24 +298,57 @@ export class PostgresStore {
           description: t.description,
           ...(t.presentation ? { presentation: t.presentation } : {}),
           ...(t.plugins ? { plugins: t.plugins } : {}),
+          ...(t.tags === null || t.tags === undefined ? {} : { tags: t.tags }),
+          ...(t.assets ? { assets: t.assets } : {}),
+          ...(t.comparison ? { comparison: t.comparison } : {}),
           events: rows.map((r) => r.event),
         },
       };
+    });
+  }
+  async branchDocument(client, timeline) {
+    const { rows } = await client.query(
+      'SELECT oc_events($1,NULL,NULL,NULL,NULL,200001) AS event',
+      [timeline.id],
+    );
+    return validateDocument({
+      format: 'openchronology',
+      version: 1,
+      title: timeline.title,
+      description: timeline.description,
+      ...(timeline.presentation ? { presentation: timeline.presentation } : {}),
+      ...(timeline.plugins ? { plugins: timeline.plugins } : {}),
+      ...(timeline.tags == null ? {} : { tags: timeline.tags }),
+      ...(timeline.assets ? { assets: timeline.assets } : {}),
+      ...(timeline.comparison ? { comparison: timeline.comparison } : {}),
+      events: rows.map((r) => r.event),
     });
   }
   async query(id, userId, query) {
     return this.transaction(async (c) => {
       await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
       const t = await this.access(id, userId, c);
+      if (t.comparison)
+        throw new HttpError(409, 'Query the comparison’s source timelines individually.');
+      if (query.revision && query.revision !== t.revision)
+        throw new HttpError(
+          409,
+          'The server timeline changed. Save or export your edits before reloading.',
+        );
       if (query.kind === 'overview') {
+        const span = Q.parse(query.upper).sub(Q.parse(query.lower));
+        const minimum = span.compare(Q.zero) > 0 ? span.div(Q.from(1024n)) : Q.zero;
+        const threshold =
+          Q.parse(query.threshold).compare(minimum) < 0 ? minimum.toString() : query.threshold;
         const { rows } = await c.query('SELECT * FROM oc_overview_v2($1,$2::mpq,$3::mpq,$4::mpq)', [
           id,
           query.lower,
           query.upper,
-          query.threshold,
+          threshold,
         ]);
         return {
           revision: t.revision,
+          threshold,
           groups: rows.map((r) => ({
             first: r.first_time,
             last: r.last_time,
@@ -176,9 +357,9 @@ export class PostgresStore {
             ...(r.event_id
               ? {
                   id: r.event_id,
-                  title: r.title ?? '',
-                  ...(t.plugins?.some((p) => p.enabled)
-                    ? { metadata: pluginMetadata(t.plugins, r.metadata ?? {}) }
+                  title: (r.title ?? '').slice(0, 512),
+                  ...((query.plugins ?? t.plugins)?.some((p) => p.enabled)
+                    ? { metadata: overviewMetadata(query.plugins ?? t.plugins, r.metadata ?? {}) }
                     : {}),
                 }
               : {}),
@@ -206,4 +387,33 @@ export class PostgresStore {
       };
     });
   }
+}
+
+function eventSearchText(document) {
+  const text = [];
+  let length = 0;
+  for (const event of document.events) {
+    const metadata = [
+      event.metadata,
+      ...Object.values(event.metadata)
+        .filter(Array.isArray)
+        .flatMap((entries) => entries.map((e) => e?.metadata ?? {})),
+    ];
+    for (const m of metadata)
+      for (const key of ['title', 'description']) {
+        if (typeof m[key] === 'string') {
+          const part = m[key].slice(0, 4096);
+          text.push(part);
+          length += part.length;
+        }
+        if (length >= 1048576) return text.join(' ').slice(0, 1048576);
+      }
+  }
+  return text.join(' ');
+}
+
+// Inspector metadata is fetched separately. Oversized stack/custom fields are not viewport payloads.
+function overviewMetadata(plugins, metadata) {
+  const projected = pluginMetadata(plugins, metadata);
+  return JSON.stringify(projected).length <= 2048 ? projected : {};
 }

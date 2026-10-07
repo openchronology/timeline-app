@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { validateDocument, DEFAULT_PRESENTATION, parseTimestamp } from '../dist/core.mjs';
@@ -154,7 +155,7 @@ export async function checkPresentation(page, restoreDocument) {
     '13:45',
   );
   await page.locator('.event-marker').first().click();
-  assert.equal(await input('event-time').inputValue(), '2026-10-05T13:45:30Z');
+  assert.equal(await input('event-time').inputValue(), '2026-10-05T13:45:30Z CE');
   await input('event-time').fill('14:30');
   assert.equal(
     await input('event-exact').inputValue(),
@@ -184,8 +185,11 @@ export async function checkPresentation(page, restoreDocument) {
   await input('right-bound').fill('2026-10-05T00:00:19Z');
   await input('apply-bounds').click();
   await page.evaluate(() => new Promise(requestAnimationFrame));
-  assert.equal(await input('left-bound').inputValue(), '2026-10-04T23:59:59Z');
-  assert.match(await input('time-context').textContent(), /2026-10-04 → 2026-10-05.*23:59 → 00:00/);
+  assert.equal(await input('left-bound').inputValue(), '2026-10-04T23:59:59Z CE');
+  assert.match(
+    await input('time-context').textContent(),
+    /2026-10-04 CE → 2026-10-05 CE.*23:59 → 00:00/,
+  );
   assert(
     (await page.locator('.tick-label').allTextContents()).every((label) => /^\d{2}s$/.test(label)),
   );

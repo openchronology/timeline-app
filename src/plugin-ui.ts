@@ -1,4 +1,19 @@
-import { imageURL, pluginFields, stackEntries, COLOR_SWATCHES, colorValue } from './plugins.js';
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+import { attachRichText } from './rich-text.js';
+import { imageSource, imagesOffline } from './image-assets.js';
+import {
+  imageURL,
+  sourceLinks,
+  pluginRichText,
+  pluginFields,
+  stackEntries,
+  COLOR_SWATCHES,
+  colorValue,
+  MOMENT_SHAPE_NAMES,
+  shapeValue,
+  MOMENT_SIZES,
+  sizeValue,
+} from './plugins.js';
 import type { InstalledPlugin, StackEntry } from './plugins.js';
 
 function image(alt: string) {
@@ -67,6 +82,85 @@ export function renderPluginFields(
     const section = document.createElement('section');
     section.className = 'plugin-field';
     section.dataset.metadataKey = field.metadataKey;
+    if (field.kind === 'links') {
+      const heading = document.createElement('label');
+      heading.textContent = field.label;
+      const list = document.createElement('ul');
+      list.className = 'plugin-source-links';
+      const input = document.createElement('textarea');
+      input.dataset.pluginKey = field.metadataKey;
+      input.rows = 3;
+      input.maxLength = 100 * 4097;
+      input.spellcheck = false;
+      input.disabled = !editable;
+      const raw = metadata[field.metadataKey];
+      input.value = Array.isArray(raw) ? raw.filter((v) => typeof v === 'string').join('\n') : '';
+      const draw = (links: string[]) => {
+        list.replaceChildren();
+        for (const url of links) {
+          const item = document.createElement('li');
+          const link = document.createElement('a');
+          link.textContent = url;
+          link.href = url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.referrerPolicy = 'no-referrer';
+          item.append(link);
+          list.append(item);
+        }
+        list.hidden = links.length === 0;
+      };
+      const update = (commit: boolean) => {
+        try {
+          const links = sourceLinks(
+            input.value
+              .split(/\r?\n/)
+              .map((s) => s.trim())
+              .filter(Boolean),
+          );
+          input.setCustomValidity('');
+          draw(links);
+          if (commit) onChange(field.metadataKey, links);
+        } catch (error) {
+          input.setCustomValidity((error as Error).message);
+        }
+      };
+      input.oninput = () => update(true);
+      const hint = document.createElement('p');
+      hint.className = 'field-hint';
+      hint.textContent = 'One HTTPS source link per line. Links open only when clicked.';
+      heading.append(input);
+      section.append(list, heading, hint);
+      update(false);
+      if (!editable) {
+        input.hidden = true;
+        hint.hidden = true;
+      }
+      container.append(section);
+      continue;
+    }
+    if (field.kind === 'shape' || field.kind === 'size') {
+      const label = document.createElement('label');
+      label.textContent = field.label;
+      const select = document.createElement('select');
+      select.disabled = !editable;
+      select.dataset.pluginKey = field.metadataKey;
+      for (const shape of field.kind === 'size' ? MOMENT_SIZES : MOMENT_SHAPE_NAMES) {
+        const option = document.createElement('option');
+        option.value = shape;
+        option.textContent = shape[0].toUpperCase() + shape.slice(1);
+        select.append(option);
+      }
+      select.value =
+        field.kind === 'size'
+          ? (sizeValue(metadata[field.metadataKey]) ?? 'medium')
+          : (shapeValue(metadata[field.metadataKey]) ?? 'circle');
+      select.onchange = () => onChange(field.metadataKey, select.value);
+      label.append(select);
+      section.append(label);
+      container.append(section);
+      continue;
+    }
     if (field.kind === 'color') {
       const label = document.createElement('label');
       label.textContent = field.label;
@@ -238,6 +332,8 @@ export function renderPluginFields(
             };
             label.append(input);
             card.append(label);
+            if (key === 'description' && pluginRichText(plugins))
+              attachRichText(input as HTMLTextAreaElement, editable);
           }
           const other = document.createElement('div');
           let syncRaw = () => {};
@@ -376,28 +472,39 @@ export function renderPluginFields(
           link.removeAttribute('href');
           return;
         }
-        link.href = url;
-        if (img.getAttribute('src') !== url) {
+        if (imagesOffline()) link.removeAttribute('href');
+        else link.href = url;
+        const resolved = imageSource(url);
+        if (!resolved) {
+          img.hidden = true;
+          img.removeAttribute('src');
+          note.textContent =
+            'No embedded image copy. Export this timeline from the online app to include its icon.';
+          return;
+        }
+        if (img.getAttribute('src') !== resolved) {
           img.hidden = true;
           const load = () => {
             if (!immediate && (!section.isConnected || !section.getClientRects().length)) return;
             img.hidden = false;
-            img.src = url;
+            img.src = resolved;
           };
           if (immediate) load();
           else previewTimer = setTimeout(load, 300);
         }
       };
       img.onerror = () => {
-        if (img.getAttribute('src') !== imageURL(input.value)) return;
+        if (img.getAttribute('src') !== imageSource(imageURL(input.value))) return;
         img.hidden = true;
         note.textContent =
           'Image could not load. Check the URL and the host’s cross-origin access settings.';
       };
       img.onload = () => {
-        if (img.getAttribute('src') !== imageURL(input.value)) return;
+        if (img.getAttribute('src') !== imageSource(imageURL(input.value))) return;
         img.hidden = false;
-        note.textContent = 'Click the image to open its original source.';
+        note.textContent = imagesOffline()
+          ? 'Embedded offline image. Its original URL is retained below.'
+          : 'Click the image to open its original source.';
       };
       link.onclick = (event) => {
         const url = imageURL(input.value);
@@ -417,4 +524,60 @@ export function renderPluginFields(
     };
     container.append(section);
   }
+}
+
+// SVG strokes provide a real white outline around polygons, rather than clipping a circular border.
+const SHAPE_PATHS: Record<string, string> = {
+  diamond: 'M12 1 L23 12 L12 23 L1 12 Z',
+  square: 'M3 3 H21 V21 H3 Z',
+  triangle: 'M12 2 L23 21 H1 Z',
+  pentagon: 'M12 1 L23 9 L19 23 H5 L1 9 Z',
+  hexagon: 'M6 2 H18 L23 12 L18 22 H6 L1 12 Z',
+  octagon: 'M7 1 H17 L23 7 V17 L17 23 H7 L1 17 V7 Z',
+  star: 'M12 1 L15 8 L23 9 L17 14 L19 23 L12 18 L5 23 L7 14 L1 9 L9 8 Z',
+  terminator: 'M8 4 H16 A8 8 0 0 1 16 20 H8 A8 8 0 0 1 8 4 Z',
+  process: 'M2 5 H22 V19 H2 Z',
+  document: 'M2 3 H22 V19 Q17 15 12 19 Q7 23 2 19 Z',
+  parallelogram: 'M7 4 H23 L17 20 H1 Z',
+};
+export function renderPluginShape(button: HTMLButtonElement, shape: string) {
+  button.dataset.shape = shape;
+  const clips: Record<string, string> = {
+    diamond: 'polygon(50% 0,100% 50%,50% 100%,0 50%)',
+    square: 'inset(0)',
+    triangle: 'polygon(50% 0,100% 100%,0 100%)',
+    pentagon: 'polygon(50% 0,100% 35%,82% 100%,18% 100%,0 35%)',
+    hexagon: 'polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%)',
+    octagon: 'polygon(27% 0,73% 0,100% 27%,100% 73%,73% 100%,27% 100%,0 73%,0 27%)',
+    star: 'polygon(50% 0,63% 32%,100% 36%,73% 59%,82% 100%,50% 77%,18% 100%,27% 59%,0 36%,37% 32%)',
+    terminator: 'inset(15% 0 round 50%)',
+    process: 'inset(14% 0)',
+    document: 'polygon(0 0,100% 0,100% 85%,75% 75%,50% 85%,25% 100%,0 85%)',
+    parallelogram: 'polygon(25% 0,100% 0,75% 100%,0 100%)',
+  };
+  button.style.setProperty('--marker-clip', clips[shape] ?? 'circle(50%)');
+  button.querySelectorAll('.marker-shape').forEach((node) => node.remove());
+  button.classList.toggle('shaped', shape !== 'circle');
+  if (shape === 'circle') return;
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.classList.add('marker-shape');
+  svg.setAttribute('viewBox', '-2 -2 28 28');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', SHAPE_PATHS[shape]);
+  path.setAttribute('fill', button.style.backgroundColor || '#547d5b');
+  path.setAttribute('stroke', 'white');
+  path.setAttribute('stroke-width', '3');
+  path.setAttribute('stroke-linejoin', 'round');
+  path.setAttribute('stroke-width', '5');
+  const border = path.cloneNode(true) as SVGPathElement;
+  border.setAttribute('fill', 'none');
+  const outline = svg.cloneNode(false) as SVGSVGElement;
+  outline.classList.add('marker-outline');
+  outline.append(border);
+  svg.append(path);
+  button.querySelector('.marker-outline')?.remove();
+  button.prepend(svg);
+  button.append(outline);
 }

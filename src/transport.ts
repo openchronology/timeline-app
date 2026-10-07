@@ -1,20 +1,28 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+import { boundedJSON } from './browser-copy.js';
 export async function requestApi<T>(
   path: string,
   method = 'GET',
   data?: unknown,
   csrf?: string | null,
+  signal?: AbortSignal,
 ): Promise<T> {
+  signal?.throwIfAborted();
   if (window.__TAURI__) {
     const reply = await window.__TAURI__.core.invoke<{
       status: number;
       body: T & { error?: string };
     }>('desktop_request', { path, method, data: data ?? null, csrf: csrf ?? null });
+    signal?.throwIfAborted();
     if (reply.status < 200 || reply.status >= 300)
-      throw new Error(reply.body.error ?? 'Request failed.');
+      throw Object.assign(new Error(reply.body.error ?? 'Request failed.'), {
+        status: reply.status,
+      });
     return reply.body;
   }
   const response = await fetch('/api/' + path, {
     method,
+    signal,
     credentials: 'same-origin',
     headers: {
       ...(data !== undefined ? { 'Content-Type': 'application/json' } : {}),
@@ -22,8 +30,11 @@ export async function requestApi<T>(
     },
     ...(data !== undefined ? { body: JSON.stringify(data) } : {}),
   });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error ?? 'Request failed.');
+  const result = (
+    path.endsWith('/browser-fork') ? await boundedJSON(response) : await response.json()
+  ) as { error?: string };
+  if (!response.ok)
+    throw Object.assign(new Error(result.error ?? 'Request failed.'), { status: response.status });
   return result as T;
 }
 export async function importSqlite(file: File, csrf?: string | null): Promise<unknown> {

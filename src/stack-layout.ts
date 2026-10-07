@@ -1,4 +1,11 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 /** Child coordinates are presentation rows, independent of rational time. */
+export function scaleTimeline(current: number, offset: number, requested: number, anchor: number) {
+  if (![current, offset, requested, anchor].every(Number.isFinite) || current <= 0)
+    throw new Error('UI scaling requires finite coordinates and a positive scale.');
+  const scale = Math.max(0.2, Math.min(3, requested));
+  return { scale, offset: anchor - ((anchor - offset) * scale) / current };
+}
 export function stackWindow(
   labelTop: number,
   direction: -1 | 1,

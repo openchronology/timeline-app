@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open <http://localhost:5173>. Without `DATABASE_URL`, this is a local editor with an IndexedDB draft and JSON import/export. No account is needed for local editing. `npm run build && npm start` serves a production build. The contents of `dist/` can also be hosted as a static website; server sharing requires the Node server.
+Open <http://localhost:5173> to the dashboard. Guests see the public timeline browser; signed-in users also see their own timelines above it. Without `DATABASE_URL`, the dashboard explains that server storage is unavailable; choose **New timeline** for in-memory local editing and .ochx import/export. No account is needed for local editing. Guest and standalone drafts live only in memory; export .ochx to retain them. Signed-in browser drafts can use IndexedDB. `npm run build && npm start` serves a production build. The hosted platform uses **Next.js App Router** for the dashboard, full-text search, account and OAuth pages, collaboration, sharing settings, and API routing. The timeline editor is an independent TypeScript application embedded on its own route. `npm run build:editor` creates `dist/` for static-only hosting, offline HTML, and Tauri; static hosting has local editing but no platform accounts or search. `npm run build` builds both the editor and the Next.js platform. Production requires `APP_ORIGIN` to match the external URL.
 
 Drag an empty part of the chart to pan, scroll to zoom around the mouse position, or use one finger to pan and two fingers to pinch. Tap a point to inspect it. Tap empty space or use **＋ Event** to create an event. Groups can be inspected, paginated, and zoomed into. Left/right bounds use the timeline's configured printer and parser. Expand **Exact rational bounds** for underlying integers, fractions, exact decimals, or Unix-seconds fixed-offset ISO timestamps. Arrow keys pan; `+` and `-` zoom. Undo handles event edits and deletions.
 
@@ -59,7 +59,7 @@ The offline bundle excludes the HTTP transport and does not initialize accounts,
 
 ## PostgreSQL deployment
 
-The server uses PostgreSQL with the real pgmp extension. Accounts own private timelines by default. Owners can make a timeline public and add registered accounts as viewers or editors. Public access grants viewing; editing always requires an account with editor or owner access. Sharing links use `#timeline/<uuid>`.
+The server uses PostgreSQL with the real pgmp extension. Accounts own private timelines by default. Owners control visibility, access and deletion. They can add viewers, contributors and writers. Public access grants viewing to everyone; signed-in users can propose changes, while only owners/writers update upstream. Sharing links use `/timelines/<uuid>`. Old `#timeline/<uuid>` bookmarks redirect to their canonical Next.js routes.
 
 For a local container deployment:
 
@@ -106,21 +106,23 @@ npm run desktop:build
 
 `src-tauri/target/release/bundle/deb/` contains the package. The desktop embeds sqlite-rational and registers it on each SQLite connection. It opens and saves `.och` files through native dialogs, works without a server, and uses rational-map for the active editable document. SQLite and GMP remain system shared libraries. The first packaged target is Linux; macOS and Windows packaging have not been implemented or validated.
 
-The desktop's **Server connection** defaults to `https://timescale.info`, accepts other HTTPS servers and supports explicit disconnect. It opens provider sign-in in your system browser and asks you to approve a matching desktop code. Username/password sign-in is also available. Connected users can open shared timelines and save editable rational-map documents to PostgreSQL. **Save SQLite** and **Save to server** track changes separately, so either save does not mark the other copy as current.
+Local `.och` timelines use SQLite viewport queries and persisted proximity summaries, with a bounded nearby cache in the interface. Opening and ordinary local saving do not transfer all moments into JavaScript; only inspected moments and unsaved changes are retained. Desktop JSON imports are parsed natively and staged on disk, while full exports remain explicit operations.
+
+The desktop's **Server connection** defaults to `https://timescale.info`, accepts other HTTPS servers and supports explicit disconnect. It opens provider sign-in in your system browser and asks you to approve a matching desktop code. Password and social sign-in both complete in that browser, including email confirmation and authenticator codes. Connected users can open shared timelines and save editable rational-map documents to PostgreSQL. **Save SQLite** and **Save to server** track changes separately, so either save does not mark the other copy as current.
 
 `.ochx` is the JSON exchange format in all editions; legacy `.json` imports are still accepted. `.och` is an actual SQLite timeline with sqlite-rational indices, not JSON with a different suffix. The web edition's **Import .och** and **Export .och** send conversion requests to the server; uploads require an account and do not automatically publish the imported timeline. Public/readable server snapshots can be downloaded as `.och`. Browsers continue editing in rational-map and never open SQLite directly. The standalone offline HTML supports `.ochx` only. See [file and HTTP contracts](docs/architecture.md).
 
 The locally verified debug build is at `src-tauri/target/debug/openchronology-desktop`; its package is `src-tauri/target/debug/bundle/deb/OpenChronology_0.1.0_amd64.deb`. These generated files are excluded from Git. The hosted workflow builds the release package.
 
-JSON exchange files use `.ochx`. SQLite timelines are actual SQLite databases, have application ID `0x4f43544c` (`OCTL`) and schema version 1, and include persistent rational indexes. They are deliberately different formats. Export/import JSON moves a timeline between a desktop file, a browser draft, and a server timeline. SQLite saves run in a transaction and reject unrelated databases. Treat a browser draft as a convenience and export files you want to keep.
+JSON exchange files use `.ochx`. SQLite timelines are actual SQLite databases, have application ID `0x4f43544c` (`OCTL`) and schema version 1, and include persistent rational indexes. They are deliberately different formats. Export/import JSON moves a timeline between a desktop file, a browser draft, and a server timeline. SQLite saves run in a transaction and reject unrelated databases. Guest browser drafts live only in memory; signed-in browser storage is a convenience. Export files you want to keep.
 
 ## Timeline plugins
 
 Open **Plugins** beside **Time display** to manage the current timeline's installed plugins. **Add plugin** searches the main server's paginated catalogue. Plugin order, enabled state and version-pinned definitions are saved in `.ochx`, `.och`, browser drafts and PostgreSQL. Changes take effect immediately; later plugins override matching fields and valid marker effects. Removing a plugin preserves moment metadata.
 
-**Moment icons** adds the `iconUrl` metadata field, circular image markers that enlarge on hover/focus, and a larger linked image with a URL editor in the moment details. Use public HTTPS image hosts that allow anonymous cross-origin access. Tauri discovers plugins through its configured server and opens image sources in the system browser. The standalone HTML preserves saved definitions but leaves plugins inactive and makes no image/library requests.
+**Moment icons** adds the `iconUrl` metadata field, circular image markers that enlarge on hover/focus, and a larger linked image with a URL editor in the moment details. Use public HTTPS image hosts that allow anonymous cross-origin access. Tauri discovers plugins through its configured server and opens image sources in the system browser. The standalone HTML runs saved official and custom plugins and embedded icon copies without network traffic.
 
-The first plugin API uses validated declarative UI capabilities rather than downloaded executable code. Operators can publish additional definitions with `PLUGIN_LIBRARY`. See [the plugin API and publishing guide](docs/plugins.md). **Run the server migration when upgrading** to add plugin settings and metadata-aware overview queries.
+The plugin API combines validated host UI components with bounded JavaScript/TypeScript-like scripts. **Moment shapes** provides geometric and flowchart symbols. Use **Create / import plugin** to author scripts and fields, install them immediately, or publish immutable versions to the public server library when signed in. Operators can also supply definitions with `PLUGIN_LIBRARY`. See [the plugin API and publishing guide](docs/plugins.md). **Run the server migration when upgrading** to add plugin settings, dashboard search, tags and collaboration tables.
 
 ## Exact time and presentation
 
@@ -147,6 +149,8 @@ Ruler marks are anchored to exact values: they move when panning and reveal fine
 ```sh
 npm run typecheck
 npm test
+npm run build
+npm run test:platform
 npx playwright install --with-deps chromium
 npm run test:browser
 npm run test:offline:browser
@@ -157,6 +161,7 @@ cargo build --manifest-path native-store/Cargo.toml --release --locked --bin och
 node test/files.mjs
 cargo test --manifest-path src-tauri/Cargo.toml --locked
 DATABASE_URL='postgresql://...' npm run test:postgres
+DATABASE_URL='postgresql://...' npm run test:platform:postgres
 ```
 
 The [GitHub workflow](.github/workflows/ci.yml) runs Node 22/24 tests, Chromium/Firefox/WebKit interactions for both the served app and standalone HTML, native PostgreSQL tests including accounts and sharing, SQLite persistence tests, and a Linux desktop package build. Chromium tests include touch pan, pinch, and tap. Browser screenshots, the offline HTML, and the Debian package are retained as artifacts. pgmp compilation and installation both set `with_llvm=no`, avoiding a dependency on the runner's configured Clang version.
@@ -165,6 +170,38 @@ This directory is self-contained and can be the root of its own GitHub repositor
 
 Local verification passed 48 JavaScript cases on Node 22 and 24, nine native tests, real SQLite converter/HTTP-boundary checks, 85 PostgreSQL oracle cases against native pgmp, TypeScript checking, workflow linting, and an updated Linux desktop Debian package (debug profile). The restricted development sandbox prevented browser launch and network listeners, so browser interactions and the complete PostgreSQL HTTP integration suite still need their first hosted CI run. Docker recipes have been prepared, but container image builds have not been run in that sandbox.
 
-Username/password and Google, GitHub and Facebook accounts use server-enforced permissions, expiring/revocable sessions and CSRF protection. Provider secrets stay on the server, desktop credentials stay in native memory, and provider identities are linked explicitly. Configure `APP_ORIGIN=https://timescale.info` and the provider app registrations/environment variables before enabling public sign-in. See [authentication and deployment](docs/authentication.md) for callback URLs, session policies and trusted-proxy settings.
+Username/password and Google, GitHub and Facebook accounts require verified email and support authenticator-app MFA with single-use recovery codes. Password registration requires confirmation; email recovery preserves MFA. Accounts use server-enforced permissions, expiring/revocable sessions and CSRF protection. Provider secrets stay on the server, desktop credentials stay in native memory, and provider identities are linked explicitly. Configure `APP_ORIGIN=https://timescale.info` and the provider app registrations/environment variables before enabling public sign-in. Configure Resend, a verified sender, and a persistent authentication encryption key; run Compose with `--profile mail` for durable delivery. See [authentication and deployment](docs/authentication.md) for callback URLs, session policies and trusted-proxy settings.
 
-Licensed under MIT. See [third-party notices](THIRD_PARTY.md).
+Licensed under GPLv3, copyright Athan Clark. Third-party dependencies retain their original licenses; see [third-party notices](THIRD_PARTY.md).
+
+## Dashboard and collaboration
+
+The server landing page is the dashboard for everyone, including guests. Signed-in users see their owned timelines above a featured-first, paginated public browser; guests see only the public browser. Tags and PostgreSQL full-text search cover timeline descriptions and moment notes. Owners retain sole custody; contributors submit changes through discussed pull requests, while writers can update upstream and merge/reject/close proposals. Stale merges require an explicit rebase. See [dashboard, permissions and API details](docs/collaboration.md). Set `FEATURED_TIMELINES` to public timeline UUIDs for the featured list.
+
+## License and hosted policies
+
+Copyright (c) 2026 Athan Clark, an individual. OpenChronology software, official
+plugins, and first-party documentation use [GPLv3 only](LICENSE). See [NOTICE](NOTICE)
+for scope and [third-party attribution](THIRD_PARTY.md) for dependency licenses.
+User timelines and original user scripts retain their owners' rights.
+
+The [licensing and source distribution guide](docs/licensing.md) explains release
+source bundles. [Service terms](legal/TERMS.md), [privacy](legal/PRIVACY.md), and
+[copyright/abuse reporting](legal/COPYRIGHT.md) for timescale.info are drafts; complete
+[operator details](legal/LAUNCH.md) before public adoption. Notices are embedded in
+the web, desktop, and standalone HTML interfaces; the server also serves `/legal.html`.
+
+Public historical examples can be installed with `docker compose run --rm seed`
+after the stack starts, or `npm run seed` / `pnpm seed` / `yarn seed` with a migrated
+PostgreSQL database. See [seeding instructions](docs/seeding.md) for the six
+featured timelines, source/date conventions, and secure management access.
+
+The dashboard and editor support [read-only comparison and live viewing](docs/comparison.md):
+compare up to eight timelines with exact per-source alignment, shared time display,
+stacked/combined modes, and bounded database caches. Live updates use PostgreSQL
+notifications on the web and metadata polling on desktop.
+
+Guest users can **Fork in browser** from a public timeline or its dashboard card.
+This loads a complete in-memory copy without creating a database timeline.
+Copies are limited to 5,000 entries (moments and stack entries) and 4 MiB; oversized timelines remain viewable
+through the bounded server cache. See [guest editing and copy limits](docs/guest-editing.md).

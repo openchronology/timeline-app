@@ -2,9 +2,9 @@
 name = "openchronology-desktop"
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+license = "GPL-3.0-only"
 description = "An exact rational timeline editor with offline SQLite files"
-authors = ["OpenChronology contributors"]
+authors = ["Athan Clark"]
 
 [build-dependencies]
 tauri-build = { version = "=2.7.1", features = [] }

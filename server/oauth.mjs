@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import {
   randomBytes,
   randomUUID,
@@ -73,12 +74,22 @@ export class OAuth {
   async start(req, provider, input, session) {
     const config = this.providers[provider];
     if (!config) throw new HttpError(404, 'That sign-in provider is not configured.');
-    if (input.link) this.auth.require(session, req);
-    else if (!session) this.auth.requireLogin(req);
+    if (input.link) {
+      this.auth.require(session, req);
+      if (
+        !Number.isFinite(new Date(session.created_at).getTime()) ||
+        Date.now() - new Date(session.created_at).getTime() > 5 * 60000
+      )
+        throw new HttpError(403, 'Sign in again before linking a provider.');
+    } else if (!session) this.auth.requireLogin(req);
     else this.auth.require(session, req);
     await this.auth.rateLimit(req.clientAddress ?? req.socket.remoteAddress ?? 'unknown');
     const returnTo = input.returnTo ?? '/';
-    if (returnTo !== '/' && !/^\/#desktop\/[A-Z2-9]{10}$/.test(returnTo))
+    if (
+      !['/', '/editor', '/account', '/plugins'].includes(returnTo) &&
+      !/^\/(?:#desktop\/|connect\/desktop\/)[A-Z2-9]{10}$/.test(returnTo) &&
+      !/^\/timelines\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(returnTo)
+    )
       throw new HttpError(400, 'Invalid sign-in return location.');
     const state = secret(),
       browser = this.auth.nonce(req, 'oauth'),
@@ -252,7 +263,15 @@ export class OAuth {
       subject = String(identity.id);
     }
     const user = await this.identity(provider, subject, flow.link_user);
-    return { ...(flow.link_user ? {} : await this.auth.issue(user)), returnTo: flow.return_to };
+    const result = flow.link_user
+      ? {}
+      : await this.auth.finishPrimary(user, 'web', req, flow.return_to);
+    return {
+      ...result,
+      returnTo: result.challenge
+        ? '/login?step=' + result.challenge + '&returnTo=' + encodeURIComponent(flow.return_to)
+        : flow.return_to,
+    };
   }
   async identity(provider, subject, linkUser) {
     const client = await this.pool.connect();

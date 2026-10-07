@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import pg from 'pg';
 import { readFile } from 'node:fs/promises';
 if (!process.env.DATABASE_URL && !process.env.PGDATABASE)

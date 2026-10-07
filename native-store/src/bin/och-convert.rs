@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 use openchronology_store::Document;
 use std::{
     io::{self, Read},

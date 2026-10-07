@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { Rational as Q } from 'rational-ordered-map';
 import { compileCustom, CUSTOM_EXAMPLE } from './custom-time.js';
 import { decimalExponent, parseNumber, printNumber } from './numeric.js';

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
@@ -37,7 +38,10 @@ test('readiness checks database schema and does not disclose database errors', a
     status: 'ok',
     storage: 'postgresql',
   });
-  assert.equal(query, 'SELECT 1 FROM oc_timelines LIMIT 0');
+  assert.equal(
+    query,
+    'SELECT t.tags,t.assets,t.search_document,t.head_revision_id,p.source_revision_id FROM oc_timelines t LEFT JOIN oc_proposals p ON false LEFT JOIN oc_plugins l ON false LEFT JOIN oc_revisions r ON false LEFT JOIN oc_snapshots s ON false LIMIT 0',
+  );
   const unavailable = createApplication({
     pool: {
       async query() {
@@ -49,11 +53,12 @@ test('readiness checks database schema and does not disclose database errors', a
   assert.equal(result.status, 503);
   assert.deepEqual(result.body, { status: 'unavailable' });
 });
-test('local deployments serve an anonymous session and reject foreign-origin writes', async () => {
+test('server deployments expose a guest dashboard without database storage and reject foreign-origin writes', async () => {
   const app = createApplication();
   const session = await request(app, '/api/session');
   assert.deepEqual(session.body, {
     server: false,
+    dashboard: true,
     user: null,
     csrf: null,
     providers: [],

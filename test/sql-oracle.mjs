@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Run against an installed pgmp in a disposable database. --pg-data supports restricted local environments.
 import { readFile, mkdtemp, writeFile } from 'node:fs/promises';
 import { openSync, closeSync } from 'node:fs';
@@ -15,6 +16,9 @@ import {
   MOMENT_ICONS,
   MOMENT_STACKS,
 } from '../dist/core.mjs';
+import { searchTimelines } from '../server/collaboration.mjs';
+import { createPluginLibrary } from '../server/plugins.mjs';
+import { PLUGIN_EXAMPLE, validatePluginManifest } from '../dist/core.mjs';
 import { indexedNodes } from '../server/tree.mjs';
 const value = (s) => (s === null ? 'NULL' : "'" + String(s).replaceAll("'", "''") + "'");
 const directory = await mkdtemp(join(tmpdir(), 'openchronology-sql-')),
@@ -158,6 +162,57 @@ for (let start = 0; start < dense.nodes.length; start += 250)
         .join(',') +
       ';',
   );
+const community = validatePluginManifest({
+  ...PLUGIN_EXAMPLE,
+  id: 'u-' + owner.replaceAll('-', '') + '-status-symbols',
+});
+sql.push(
+  `INSERT INTO oc_plugins(id,version,owner_id,manifest) VALUES(${value(community.id)},1,${value(owner)},${value(JSON.stringify(community))}::jsonb);`,
+);
+let catalogueSQL;
+await createPluginLibrary(undefined, {
+  query: async (query, args) => {
+    catalogueSQL = query.replace(/\$(\d+)/g, (_, i) => value(args[Number(i) - 1]));
+    return { rows: [{ total: 0, plugins: [] }] };
+  },
+}).search({ search: 'status-symbols', page: 1, limit: 12 });
+let searchSQL;
+const searchPool = {
+  query: async (query, args) => {
+    searchSQL = query.replace(/\$(\d+)/g, (_, i) => {
+      const parameter = args[Number(i) - 1];
+      return Array.isArray(parameter)
+        ? value('{' + parameter.join(',') + '}')
+        : typeof parameter === 'boolean'
+          ? parameter
+            ? 'TRUE'
+            : 'FALSE'
+          : value(parameter);
+    });
+    return { rows: [{ total: 0, timelines: [] }] };
+  },
+};
+sql.push(
+  `UPDATE oc_timelines SET visibility='public',tags=ARRAY['astronomy'],description='A star map of early navigation',event_text='Telescope calibration',featured=true WHERE id=${value(id)};`,
+);
+await searchTimelines(searchPool, null, { search: '"star map"', tag: 'astronomy' });
+sql.push(
+  `COPY (SELECT encode(convert_to(row_to_json(result)::text,'UTF8'),'hex') FROM (${searchSQL}) result) TO ${value(join(directory, 'search.hex'))};`,
+);
+await searchTimelines(searchPool, null, { scope: 'public' });
+sql.push(
+  `COPY (SELECT encode(convert_to(row_to_json(result)::text,'UTF8'),'hex') FROM (${searchSQL}) result) TO ${value(join(directory, 'browse.hex'))};`,
+);
+const proposalId = randomUUID();
+sql.push(
+  `INSERT INTO oc_proposals(id,timeline_id,author_id,title,base_revision,base_document,document) VALUES(${value(proposalId)},${value(id)},${value(owner)},'Review',1,${value(JSON.stringify(document))}::jsonb,${value(JSON.stringify(document))}::jsonb);`,
+);
+sql.push(
+  `INSERT INTO oc_proposal_comments(proposal_id,author_id,body) VALUES(${value(proposalId)},${value(owner)},'Plain comment');`,
+);
+sql.push(
+  `COPY (SELECT encode(convert_to(row_to_json(result)::text,'UTF8'),'hex') FROM (${catalogueSQL}) result) TO ${value(join(directory, 'catalogue.hex'))};`,
+);
 sql.push(
   `COPY (SELECT jsonb_build_object('pluginFrame',(SELECT to_jsonb(g) FROM oc_overview_v2(${value(id)},${value(events[0].time)}::mpq,${value(events[0].time)}::mpq,'0'::mpq) g LIMIT 1),'coincidentFrame',(SELECT to_jsonb(g) FROM oc_overview_v2(${value(id)},'1/2'::mpq,'1/2'::mpq,'0'::mpq) g LIMIT 1),'groups',(SELECT jsonb_agg(answer ORDER BY id) FROM oracle_results),'dense',(SELECT jsonb_agg(to_jsonb(g)) FROM oc_overview(${value(denseId)},'0'::mpq,'1'::mpq,'1'::mpq) g),'page',(SELECT jsonb_agg(e) FROM oc_events(${value(id)},'1/2'::mpq,'1/2'::mpq,NULL,NULL,1) e),'after',(SELECT jsonb_agg(e) FROM oc_events(${value(id)},'1/2'::mpq,'1/2'::mpq,'1/2'::mpq,'same-a',1) e))) TO ${value(answers)};`,
   // Hex avoids COPY's text escaping of quotes/backslashes in custom formatter source.
@@ -203,6 +258,24 @@ assert.deepEqual(
   ),
   document.plugins,
 );
+const readHex = async (name) =>
+  JSON.parse(
+    Buffer.from((await readFile(join(directory, name), 'utf8')).trim(), 'hex').toString('utf8'),
+  );
+const searched = await readHex('search.hex');
+assert.equal(Number(searched.total), 1);
+assert.equal(searched.timelines[0].id, id);
+const browsed = await readHex('browse.hex');
+assert.equal(Number(browsed.total), 1);
+assert.equal(browsed.timelines[0].id, id);
+assert(browsed.timelines[0].featured);
+const catalogue = JSON.parse(
+  Buffer.from((await readFile(join(directory, 'catalogue.hex'), 'utf8')).trim(), 'hex').toString(
+    'utf8',
+  ),
+);
+assert.equal(Number(catalogue.total), 1);
+assert.deepEqual(catalogue.plugins, [community]);
 assert.equal(actual.pluginFrame.metadata.iconUrl, events[0].metadata.iconUrl);
 assert.deepEqual(actual.pluginFrame.metadata.stack, events[0].metadata.stack);
 assert.equal(actual.pluginFrame.event_id, events[0].id);

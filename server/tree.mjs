@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { TimelineIndex } from '../dist/core.mjs';
 /** Build one immutable balanced tree for a revision. Saves are atomic snapshot replacements. */
 export function indexedNodes(document) {

@@ -1,11 +1,17 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
 import { TimelineFiles } from '../server/files.mjs';
 import {
   validateDocument,
   DEFAULT_PRESENTATION,
   MOMENT_ICONS,
+  RICH_TEXT_NOTES,
   MOMENT_STACKS,
   MOMENT_COLORS,
+  FOCUS_ON_HOVER,
+  MOMENT_SHAPES,
+  PLUGIN_EXAMPLE,
+  validatePluginManifest,
 } from '../dist/core.mjs';
 const converter = new TimelineFiles();
 assert(converter.enabled, 'Build och-convert and set OCH_CONVERTER before running this test.');
@@ -15,10 +21,16 @@ const document = validateDocument({
   title: 'Exact exchange',
   plugins: [
     { manifest: MOMENT_ICONS, enabled: true },
+    { manifest: RICH_TEXT_NOTES, enabled: true },
     { manifest: MOMENT_STACKS, enabled: true },
     { manifest: MOMENT_COLORS, enabled: true },
+    { manifest: FOCUS_ON_HOVER, enabled: true },
+    { manifest: MOMENT_SHAPES, enabled: true },
+    { manifest: validatePluginManifest(PLUGIN_EXAMPLE), enabled: true },
   ],
   description: '',
+  tags: ['offline', 'modded'],
+  assets: { 'https://images.example/icon.png': 'data:image/png;base64,aGVsbG8=' },
   presentation: {
     ...DEFAULT_PRESENTATION,
     mode: 'custom',
@@ -32,6 +44,8 @@ const document = validateDocument({
       time: '-1/3',
       metadata: {
         title: 'Before',
+        description: '**Rich notes** with [source](https://example.org/history)',
+        sources: ['https://example.org/history'],
         iconUrl: 'https://images.example/icon.png',
         color: '#cb4545',
         nested: { value: true },
@@ -40,7 +54,7 @@ const document = validateDocument({
             id: 'child',
             metadata: {
               title: 'Inherited moment',
-              description: 'Stack notes',
+              description: '## Stack notes\n\n*Inherited rich notes*',
               iconUrl: 'https://images.example/child.png',
               custom: { flag: true },
             },

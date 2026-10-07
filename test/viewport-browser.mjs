@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
 import { Q } from '../dist/core.mjs';
 

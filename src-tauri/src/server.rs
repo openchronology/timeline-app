@@ -1,8 +1,10 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 use reqwest::{Client, Method, Url};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{sync::Mutex, time::Duration};
-const LIMIT: usize = 32 * 1024 * 1024;
+// A pull-request reply includes two snapshots, each within the 16 MiB request limit.
+const LIMIT: usize = 40 * 1024 * 1024;
 #[derive(Default)]
 struct Credentials {
     token: Option<String>,
@@ -13,6 +15,18 @@ struct State {
     origin: Option<Url>,
     credentials: Credentials,
     generation: u64,
+}
+fn device_destination(target: &Url, configured: &Url, code: &str) -> bool {
+    code.len() == 10
+        && code
+            .bytes()
+            .all(|c| c.is_ascii_uppercase() || (b'2'..=b'9').contains(&c))
+        && target.origin() == configured.origin()
+        && target.username().is_empty()
+        && target.password().is_none()
+        && target.query().is_none()
+        && ((target.path() == format!("/connect/desktop/{code}") && target.fragment().is_none())
+            || (target.path() == "/" && target.fragment() == Some(&format!("desktop/{code}"))))
 }
 fn capture_token(body: &mut Value, credentials: &mut Credentials) -> Result<(), String> {
     if let Some(token) = body.as_object_mut().and_then(|o| o.remove("token")) {
@@ -278,17 +292,7 @@ impl Server {
         }
         let configured = state.origin.clone().ok_or("Connect to a server first")?;
         let user_code = body["userCode"].as_str().ok_or("Missing desktop code")?;
-        if user_code.len() != 10
-            || !user_code
-                .bytes()
-                .all(|c| c.is_ascii_uppercase() || (b'2'..=b'9').contains(&c))
-            || target.origin() != configured.origin()
-            || !target.username().is_empty()
-            || target.password().is_some()
-            || target.query().is_some()
-            || target.path() != "/"
-            || target.fragment() != Some(&format!("desktop/{user_code}"))
-        {
+        if !device_destination(&target, &configured, user_code) {
             return Err("Invalid sign-in destination".into());
         }
         state.credentials.device_code = Some(device);
@@ -365,6 +369,33 @@ fn open_browser(url: &str) -> Result<(), String> {
 mod tests {
     use super::*;
     #[test]
+    fn desktop_sign_in_accepts_canonical_next_routes_and_legacy_links_only() {
+        let configured = Url::parse("https://timescale.info").unwrap();
+        let code = "ABCDEFGH23";
+        for path in ["/connect/desktop/ABCDEFGH23", "/#desktop/ABCDEFGH23"] {
+            assert!(device_destination(
+                &configured.join(path).unwrap(),
+                &configured,
+                code
+            ));
+        }
+        for value in [
+            "https://evil.example/connect/desktop/ABCDEFGH23",
+            "https://user@timescale.info/connect/desktop/ABCDEFGH23",
+            "https://timescale.info/connect/desktop/ABCDEFGH24",
+            "https://timescale.info/connect/desktop/ABCDEFGH23?next=evil",
+            "https://timescale.info/connect/desktop/ABCDEFGH23#fragment",
+            "https://timescale.info/account",
+        ] {
+            assert!(!device_destination(
+                &Url::parse(value).unwrap(),
+                &configured,
+                code
+            ));
+        }
+        assert!(!device_destination(&configured, &configured, "bad"));
+    }
+    #[test]
     fn origins_and_paths_cannot_escape_the_server() {
         for value in [
             "https://chronology.example",
@@ -393,6 +424,11 @@ mod tests {
             assert!(api_path(value).is_err());
         }
         assert!(api_path("timelines/00000000-0000-0000-0000-000000000000/document").is_ok());
+        assert!(api_path("timelines/search").is_ok());
+        assert!(
+            api_path("timelines/00000000-0000-0000-0000-000000000000/proposals/search").is_ok()
+        );
+        assert!(api_path("timelines/00000000-0000-0000-0000-000000000000/proposals/00000000-0000-0000-0000-000000000001/comments/search").is_ok());
         assert!(api_path("plugins/search").is_ok());
         assert!(api_path("plugins/moment-icons/1").is_ok());
         assert!(api_path("plugins/../auth").is_err());

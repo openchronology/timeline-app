@@ -1,0 +1,22 @@
+OpenChronology — exact rational timeline software
+Copyright (c) 2026 Athan Clark, an individual.
+
+OpenChronology first-party software, including the web interface deployed at
+timescale.info, desktop application, standalone HTML edition, server, official
+plugins, build scripts, and accompanying first-party documentation, is licensed
+under the GNU General Public License version 3 only (SPDX: GPL-3.0-only).
+You may redistribute and modify it under that license. See LICENSE for the full
+terms. It is provided WITHOUT ANY WARRANTY, including merchantability or fitness
+for a particular purpose, to the extent permitted by law.
+
+Third-party components retain their own copyrights and licenses. See
+THIRD_PARTY.md, bundled dependency notices, and vendor licenses. The independent
+rational-map, sqlite-rational, and rational-conformance projects and historical
+projects in the enclosing development workspace retain their existing licenses.
+
+Users retain ownership of their timelines, notes, images, and original plugin or
+formatter scripts. Exporting or hosting those materials does not automatically
+license them under the GPL. Domain registration and rights in the OpenChronology
+and timescale.info names are separate from the software license; no domain
+registration, endorsement, or trademark rights are granted by this notice.
+No nonprofit organization is represented as the copyright holder or operator.

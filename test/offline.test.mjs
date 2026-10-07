@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -30,6 +31,6 @@ test('offline HTML has embedded assets, a valid script hash, and denies external
   assert(links[0][1].startsWith('data:image/svg+xml;base64,'));
   assert(!/sourceMappingURL|<script\b[^>]*type="module"/i.test(html));
   assert(!/@import\b|url\(/i.test(html.match(/<style>([\s\S]*?)<\/style>/)[1]));
-  assert(html.includes('Copyright (c) 2026 OpenChronology contributors'));
+  assert(html.includes('Copyright (c) 2026 Athan Clark'));
   assert(html.includes('rational-ordered-map/LICENSE') && html.includes('fraction.js/LICENSE'));
 });

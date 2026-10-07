@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { Rational as Q } from 'rational-ordered-map';
 import { parseTimestamp, printTimestamp } from './calendar.js';
 import { fixedDecimal, parseNumber, printNumber } from './numeric.js';
@@ -6,7 +7,8 @@ import type { PresentationContext } from './view-context.js';
 
 // This is a small language interpreter, not a JavaScript execution sandbox.
 // No source text is passed to eval, Function, a browser worker, or the server runtime.
-type Value = string | number | boolean | Q;
+export type ScriptValue = string | number | boolean | Q;
+type Value = ScriptValue;
 type Expr =
   | { kind: 'literal'; value: Value }
   | { kind: 'name'; name: string }
@@ -115,7 +117,7 @@ function tokenize(source: string): Token[] {
   return tokens;
 }
 
-function compile(source: string): { print: Body; parse: Body } {
+function compile(source: string, plugin = false, methods = arities): Map<string, Body> {
   const tokens = tokenize(source);
   let at = 0,
     nodes = 0;
@@ -157,7 +159,7 @@ function compile(source: string): { print: Body; parse: Body } {
       if (name === 'api') {
         take('.');
         const method = identifier();
-        if (!Object.hasOwn(arities, method)) throw new Error(`Unavailable API method: ${method}.`);
+        if (!Object.hasOwn(methods, method)) throw new Error(`Unavailable API method: ${method}.`);
         take('(');
         const args: Expr[] = [];
         if (peek() !== ')') {
@@ -168,7 +170,7 @@ function compile(source: string): { print: Body; parse: Body } {
           } while (true);
         }
         take(')');
-        if (!arities[method].includes(args.length))
+        if (!methods[method].includes(args.length))
           throw new Error(`Wrong argument count for api.${method}.`);
         left = { kind: 'call', name: method, args };
       } else {
@@ -202,17 +204,19 @@ function compile(source: string): { print: Body; parse: Body } {
   while (at < tokens.length) {
     take('function');
     const name = identifier();
-    if (!['print', 'parse'].includes(name) || bodies.has(name))
-      throw new Error('Define print and parse exactly once.');
+    if (!(plugin ? ['render'] : ['print', 'parse']).includes(name) || bodies.has(name))
+      throw new Error(
+        plugin ? 'Define render exactly once.' : 'Define print and parse exactly once.',
+      );
     take('(');
     const parameter = identifier();
     if (['api', 'true', 'false'].includes(parameter)) throw new Error('Invalid parameter name.');
-    annotation(name === 'print' ? ['Rational'] : ['string']);
+    annotation(plugin ? ['string'] : name === 'print' ? ['Rational'] : ['string']);
     take(',');
     take('api');
-    annotation(['TimeAPI']);
+    annotation(plugin ? ['PluginAPI'] : ['TimeAPI']);
     take(')');
-    annotation(name === 'print' ? ['string'] : ['Rational']);
+    annotation(plugin || name === 'print' ? ['string'] : ['Rational']);
     take('{');
     const names = new Set([parameter]);
     const locals: Body['locals'] = [];
@@ -236,9 +240,11 @@ function compile(source: string): { print: Body; parse: Body } {
     take('}');
     bodies.set(name, { parameter, locals, result });
   }
-  if (!bodies.has('print') || !bodies.has('parse'))
-    throw new Error('Both print and parse functions are required.');
-  return { print: bodies.get('print')!, parse: bodies.get('parse')! };
+  if (plugin ? !bodies.has('render') : !bodies.has('print') || !bodies.has('parse'))
+    throw new Error(
+      plugin ? 'The render function is required.' : 'Both print and parse functions are required.',
+    );
+  return bodies;
 }
 
 const bitLength = (n: bigint) => (n < 0n ? -n : n).toString(2).length;
@@ -365,7 +371,7 @@ function call(name: string, args: Value[], context?: PresentationContext): Value
   }
 }
 
-function run(body: Body, argument: Value, context?: PresentationContext): Value {
+function run(body: Body, argument: Value, context?: PresentationContext, invoke = call): Value {
   const locals = new Map<string, Value>([[body.parameter, bounded(argument)]]);
   let steps = 0,
     textCost = 0,
@@ -383,7 +389,7 @@ function run(body: Body, argument: Value, context?: PresentationContext): Value 
         break;
       case 'call':
         if (++calls > 128) throw new Error('Custom API call budget exceeded.');
-        result = call(
+        result = invoke(
           expr.name,
           expr.args.map((arg) => evaluate(arg, depth + 1)),
           context,
@@ -443,8 +449,8 @@ export function compileCustom(source: string): {
 } {
   const program = compile(source);
   return {
-    print: (time, context) => string(run(program.print, time, validateContext(context))),
-    parse: (text, context) => rational(run(program.parse, text, validateContext(context))),
+    print: (time, context) => string(run(program.get('print')!, time, validateContext(context))),
+    parse: (text, context) => rational(run(program.get('parse')!, text, validateContext(context))),
   };
 }
 
@@ -456,3 +462,34 @@ function parse(text: string, api: TimeAPI): Rational {
   const minutes = api.parseNumber(api.stripSuffix(text, " minutes"));
   return api.mul(minutes, api.rational("60"));
 }`;
+
+/** Compile only; no user source executes during manifest validation. */
+export function compilePluginScript(source: string) {
+  const methods = {
+    get: [1],
+    shape: [1],
+    size: [1],
+    color: [1],
+    icon: [1],
+    card: [0],
+    expand: [0],
+    merge: [2],
+    none: [0],
+    trim: [1],
+    upper: [1],
+    lower: [1],
+    startsWith: [2],
+    endsWith: [2],
+    slice: [2, 3],
+    replace: [3],
+  };
+  const body = compile(source, true, methods).get('render')!;
+  return (invoke: (name: string, args: ScriptValue[]) => ScriptValue): string =>
+    string(
+      run(body, '', undefined, (name, args) => {
+        if (['trim', 'upper', 'lower', 'startsWith', 'endsWith', 'slice', 'replace'].includes(name))
+          return call(name, args);
+        return invoke(name, args);
+      }),
+    );
+}

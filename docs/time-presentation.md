@@ -1,6 +1,6 @@
 # Timeline time presentation
 
-Use **Time display** above the chart to configure a timeline. Settings are included in JSON exports, browser drafts, PostgreSQL snapshots, and desktop SQLite files. Shared readers use the saved settings; changes require editor access.
+Use **Time display** above the chart to configure a timeline. Settings are included in JSON exports, browser drafts, PostgreSQL snapshots, and desktop SQLite files. Shared readers use the saved settings; contributors propose changes and writers update upstream.
 
 Stored events always retain their exact reduced rationals. The **Exact time** event field uses the timeline’s printer/parser. Unchanged text retains its original exact coordinate: renaming an event never parses its rounded label. Editing the time text explicitly chooses the parsed coordinate. Expand **Exact rational coordinate** to inspect the stored value. Custom printer/parser source and ruler settings are stored in both `.ochx` JSON and `.och` SQLite files, including server-mediated conversion. The main **Left bound** and **Right bound** fields print and parse using the timeline's presentation, including its units, epoch and custom code. **Go** preserves the exact coordinate of any unchanged field, even when its displayed text is rounded. Expand **Exact rational bounds** to inspect or edit the underlying coordinates directly.
 

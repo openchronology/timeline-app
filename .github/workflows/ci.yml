@@ -89,16 +89,23 @@ jobs:
           "$PACKAGE_MANAGER" run typecheck
           "$PACKAGE_MANAGER" run build:offline
           "$PACKAGE_MANAGER" run test
+          "$PACKAGE_MANAGER" run build
+          "$PACKAGE_MANAGER" run test:platform
           case "$PACKAGE_MANAGER" in
             npm) npm exec -- tauri --version ;;
             *) "$PACKAGE_MANAGER" exec tauri --version ;;
           esac
           git diff --exit-code -- package.json package-lock.json pnpm-lock.yaml yarn.lock
+      - name: Package matching web source
+        if: matrix.node == 24 && matrix.manager == 'npm'
+        run: npm run build:source
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: matrix.node == 24 && matrix.manager == 'npm'
         with:
           name: openchronology-offline-html
-          path: dist/openchronology-offline.html
+          path: |
+            dist/openchronology-offline.html
+            dist/openchronology-web-source.tar.gz
           if-no-files-found: error
   browser:
     name: Browser / ${{ matrix.browser }}
@@ -118,6 +125,11 @@ jobs:
         env:
           BROWSER: ${{ matrix.browser }}
       - run: npm run build
+      - name: Next.js platform browser integration
+        run: npm run test:platform
+        env:
+          PLATFORM_BROWSER_TEST: '1'
+          BROWSER: ${{ matrix.browser }}
       - run: npm run test:browser
         env:
           BROWSER: ${{ matrix.browser }}
@@ -180,7 +192,13 @@ jobs:
           rustup default stable
           cargo build --manifest-path native-store/Cargo.toml --locked --release --bin och-convert
       - run: node test/files.mjs
+      - run: node test/account-security-postgres.mjs
       - run: npm run test:postgres
+      - run: npm run test:platform:postgres
+      - run: npm run test:versioning:postgres
+      - run: node test/seed-postgres.mjs
+      - run: node test/browser-fork-postgres.mjs
+      - run: node test/comparison-live-postgres.mjs
       - name: Stop PostgreSQL
         if: always()
         run: |
@@ -214,8 +232,11 @@ jobs:
       - run: node test/files.mjs
       - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
       - run: npm run desktop:build
+      - run: npm run build:source:desktop
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: openchronology-linux
-          path: src-tauri/target/release/bundle/deb/*.deb
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            dist/openchronology-desktop-source.tar.gz
           if-no-files-found: error

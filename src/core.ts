@@ -1,8 +1,9 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { Rational as Q, RationalMap } from 'rational-ordered-map';
-import { validateInstalledPlugins, validateStackMetadata } from './plugins.js';
+import { validateInstalledPlugins, validateStackMetadata, imageURL } from './plugins.js';
 import type { InstalledPlugin } from './plugins.js';
 export * from './plugins.js';
-export { stackWindow } from './stack-layout.js';
+export { stackWindow, scaleTimeline } from './stack-layout.js';
 import { parseTimestamp } from './calendar.js';
 import { validatePresentation } from './presentation.js';
 import type { TimePresentation } from './presentation.js';
@@ -28,13 +29,42 @@ export interface PointEvent {
   time: string;
   metadata: Metadata;
 }
+export interface SavedComparison {
+  sources: string[];
+  combined: boolean;
+}
+export function validateComparison(value: unknown): SavedComparison {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new Error('Invalid saved comparison.');
+  const v = value as Record<string, unknown>;
+  if (
+    Object.keys(v).some((k) => !['sources', 'combined'].includes(k)) ||
+    !Array.isArray(v.sources) ||
+    v.sources.length < 2 ||
+    v.sources.length > 8 ||
+    v.sources.some(
+      (id) => typeof id !== 'string' || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id),
+    ) ||
+    typeof v.combined !== 'boolean'
+  )
+    throw new Error(
+      'A saved comparison requires two to eight distinct timeline IDs and a view mode.',
+    );
+  const sources = (v.sources as string[]).map((id) => id.toLowerCase());
+  if (new Set(sources).size !== sources.length)
+    throw new Error('Comparison sources must be distinct.');
+  return { sources, combined: v.combined };
+}
 export interface TimelineDocument {
   format: 'openchronology';
   version: 1;
+  comparison?: SavedComparison;
   title: string;
   description: string;
   presentation?: TimePresentation;
   plugins?: InstalledPlugin[];
+  tags?: string[];
+  assets?: Record<string, string>;
   events: PointEvent[];
 }
 export interface FrameGroup {
@@ -50,10 +80,47 @@ export interface Frame {
   groups: FrameGroup[];
   visitedNodes: number;
   revision?: string;
+  threshold?: string;
 }
 export function parseTime(text: string): Q {
   if (text.includes('T')) return parseTimestamp(text);
   return text.includes('/') ? Q.parse(text) : Q.parseDecimal(text);
+}
+export function validateTags(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length > 40) throw new Error('Use at most 40 tags.');
+  const tags = value.map((tag) => {
+    if (typeof tag !== 'string') throw new Error('Tags must be text.');
+    const normalized = tag.normalize('NFC').trim().toLowerCase();
+    if (!normalized || normalized.length > 64 || /[\x00-\x1f\x7f,]/.test(normalized))
+      throw new Error('Tags must be 1–64 characters without commas or control characters.');
+    return normalized;
+  });
+  return [...new Set(tags)];
+}
+export function validateAssets(value: unknown): Record<string, string> {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Object.keys(value).length > 200
+  )
+    throw new Error('Invalid embedded images.');
+  const assets: Record<string, string> = {};
+  let bytes = 0;
+  for (const [url, data] of Object.entries(value)) {
+    if (
+      imageURL(url) !== url ||
+      url.length > 4096 ||
+      typeof data !== 'string' ||
+      !/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/.test(data)
+    )
+      throw new Error('Embedded images require HTTPS keys and base64 raster data.');
+    bytes += data.length;
+    if (data.length > 2097152 || bytes > 8388608)
+      throw new Error('Embedded images are limited to 2 MiB each and 8 MiB total.');
+    assets[url] = data;
+  }
+  return assets;
 }
 export function validateDocument(value: unknown): TimelineDocument {
   if (!value || typeof value !== 'object') throw new Error('Expected an OpenChronology document.');
@@ -69,6 +136,9 @@ export function validateDocument(value: unknown): TimelineDocument {
     throw new Error('The timeline needs a title and description.');
   if (!Array.isArray(doc.events) || doc.events.length > 200000)
     throw new Error('Expected at most 200,000 point events.');
+  const comparison = doc.comparison === undefined ? undefined : validateComparison(doc.comparison);
+  if (comparison && doc.events.length)
+    throw new Error('Saved comparisons reference sources instead of storing events.');
   const ids = new Set<string>();
   const plugins = doc.plugins === undefined ? undefined : validateInstalledPlugins(doc.plugins);
   const events = doc.events.map((raw: unknown): PointEvent => {
@@ -94,10 +164,13 @@ export function validateDocument(value: unknown): TimelineDocument {
     version: 1,
     title: doc.title,
     description: doc.description,
+    ...(comparison ? { comparison } : {}),
     ...(doc.presentation === undefined
       ? {}
       : { presentation: validatePresentation(doc.presentation) }),
     ...(plugins === undefined ? {} : { plugins }),
+    ...(doc.tags === undefined ? {} : { tags: validateTags(doc.tags) }),
+    ...(doc.assets === undefined ? {} : { assets: validateAssets(doc.assets) }),
     events,
   };
 }
@@ -108,7 +181,11 @@ export class TimelineIndex {
   description: string;
   presentation?: TimePresentation;
   plugins?: InstalledPlugin[];
+  tags?: string[];
+  assets?: Record<string, string>;
   constructor(document: TimelineDocument) {
+    this.tags = document.tags === undefined ? undefined : validateTags(document.tags);
+    this.assets = document.assets === undefined ? undefined : validateAssets(document.assets);
     this.title = document.title;
     this.description = document.description;
     this.presentation = document.presentation
@@ -168,6 +245,8 @@ export class TimelineIndex {
       description: this.description,
       ...(this.presentation ? { presentation: this.presentation } : {}),
       ...(this.plugins === undefined ? {} : { plugins: this.plugins }),
+      ...(this.tags === undefined ? {} : { tags: this.tags }),
+      ...(this.assets === undefined ? {} : { assets: this.assets }),
       events: [...this.points].flatMap(([, bucket]) => [...bucket]),
     };
   }

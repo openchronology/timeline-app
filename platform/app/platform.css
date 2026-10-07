@@ -1,0 +1,285 @@
+/* Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only */
+:root {
+  color-scheme: light;
+  font:
+    15px/1.6 system-ui,
+    sans-serif;
+  color: #20372c;
+  background: #f5f6ef;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+a {
+  color: #285742;
+}
+button,
+.button {
+  border: 1px solid #d7dfd3;
+  border-radius: 7px;
+  padding: 8px 13px;
+  background: #fff;
+  color: #285742;
+  cursor: pointer;
+  text-decoration: none;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.primary {
+  background: #285742;
+  color: #fff;
+}
+input,
+textarea {
+  display: block;
+  width: 100%;
+  padding: 9px;
+  border: 1px solid #d7dfd3;
+  border-radius: 7px;
+  background: #fff;
+}
+label {
+  display: block;
+}
+input[type='checkbox'] {
+  display: inline-block;
+  width: auto;
+  margin-right: 8px;
+}
+.platform-header {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 28px;
+  background: #20372c;
+  color: #fff;
+}
+.platform-header a {
+  color: #fff;
+  text-decoration: none;
+}
+.brand {
+  font-size: 20px;
+  font-weight: 700;
+}
+nav,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+main.platform {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 30px 24px;
+}
+.page-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+h1 {
+  font:
+    normal 38px Georgia,
+    serif;
+}
+h2 {
+  font-size: 22px;
+}
+.timeline-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 16px;
+}
+.timeline-card,
+.account-card {
+  padding: 20px;
+  border: 1px solid #d7dfd3;
+  border-radius: 9px;
+  background: #fff;
+  overflow-wrap: anywhere;
+}
+.timeline-card h3 {
+  margin: 0 0 8px;
+}
+.muted {
+  color: #718071;
+  font-size: 13px;
+}
+.search-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 18px 0;
+}
+.search-controls label {
+  flex: 1;
+  min-width: 190px;
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tags button {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+section {
+  margin: 25px 0;
+}
+.pager {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 18px 0;
+}
+.error {
+  color: #9b3636;
+}
+.notice {
+  padding: 14px;
+  border: 1px solid #d7dfd3;
+  border-radius: 7px;
+  background: #fff;
+}
+.account-card {
+  max-width: 520px;
+  margin: 25px auto;
+}
+.account-card label {
+  margin: 14px 0;
+}
+.platform-footer {
+  padding: 20px 28px;
+  font-size: 12px;
+  color: #718071;
+}
+.legal-document pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 600px;
+  overflow: auto;
+  font: 14px/1.6 system-ui;
+}
+/* The editor owns scrolling; size its frame from the actual navigation/footer
+   heights, including wrapped navigation on narrow screens. */
+body:has(.editor-page) {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+body:has(.editor-page) > .platform-header,
+body:has(.editor-page) > .platform-footer {
+  flex-shrink: 0;
+}
+.editor-page {
+  margin: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.editor-frame {
+  display: block;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  height: 0;
+  border: 0;
+  background: #f5f6ef;
+}
+.editor-page h1 {
+  font-size: 24px;
+  margin: 0;
+  padding: 12px 24px;
+}
+.danger {
+  color: #9b3636;
+}
+@media (max-width: 650px) {
+  .platform-header {
+    padding: 14px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .brand {
+    font-size: 18px;
+  }
+  main.platform {
+    padding: 20px 15px;
+  }
+  h1 {
+    font-size: 30px;
+  }
+  .platform-footer {
+    padding: 16px;
+  }
+}
+
+.timeline-navigation {
+  display: flex;
+  flex-shrink: 0;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+}
+.preserve-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+pre {
+  max-width: 100%;
+  overflow: auto;
+}
+textarea {
+  min-height: 6rem;
+}
+
+.compare-tray {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.compare-checkbox {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.compare-checkbox input {
+  width: auto;
+}
+
+.dashboard-introduction {
+  margin: 24px 0;
+  padding: 20px;
+  border: 1px solid #dbe3d5;
+  border-radius: 10px;
+}
+
+dialog {
+  width: fit-content;
+  max-width: min(900px, calc(100vw - 30px));
+  max-height: calc(100dvh - 30px);
+  overflow: auto;
+  overflow-wrap: anywhere;
+}

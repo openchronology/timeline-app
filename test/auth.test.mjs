@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign, createHmac, scryptSync } from 'node:crypto';
@@ -152,7 +153,7 @@ test('authorization state is browser-bound, one-use, provider-bound and never an
     };
   const auth = new Auth(pool, 'https://timescale.info');
   auth.rateLimit = async () => {};
-  auth.issue = async (user) => ({ user, cookie: 'secret-cookie' });
+  auth.finishPrimary = async (user) => ({ user, cookie: 'secret-cookie' });
   const calls = [],
     oauth = new OAuth(
       auth,
@@ -229,7 +230,7 @@ test('Facebook verifies provider identity using the configured API version and a
     },
     'https://timescale.info',
   );
-  auth.issue = async (user) => ({ user });
+  auth.finishPrimary = async (user) => ({ user });
   const oauth = new OAuth(
     auth,
     { facebook: { clientId: 'id', clientSecret: 'secret', version: 'v23.0' } },

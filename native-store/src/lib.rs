@@ -1,8 +1,11 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 mod sqlite;
+mod workspace;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sqlite::Connection;
 use std::{collections::HashSet, path::Path};
+pub use workspace::{Header, Patch, Query, Snapshot};
 const APPLICATION_ID: &str = "1329812556"; // OCTL
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Event {
@@ -20,6 +23,10 @@ pub struct Document {
     pub presentation: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plugins: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assets: Option<Value>,
     pub events: Vec<Event>,
 }
 #[derive(Debug, Serialize, Deserialize)]
@@ -38,7 +45,7 @@ fn check_file(db: &Connection) -> Result<(), String> {
     }
     // These names must be data tables, never attacker-supplied SQL views.
     if db.scalar("SELECT count(*) FROM sqlite_schema WHERE name IN ('events','timeline_meta') AND type='table'", &[])? != "2"
-        || db.scalar("SELECT count(*) FROM sqlite_schema WHERE name IN ('timeline_settings','timeline_plugins') AND type!='table'", &[])? != "0" {
+        || db.scalar("SELECT count(*) FROM sqlite_schema WHERE name IN ('timeline_settings','timeline_plugins','timeline_extras') AND type!='table'", &[])? != "0" {
         return Err("Invalid timeline data tables".into());
     }
     Ok(())
@@ -64,6 +71,25 @@ fn validate(doc: &Document) -> Result<(), String> {
             || plugins.to_string().len() > 131072
         {
             return Err("Invalid or oversized plugin settings".into());
+        }
+    }
+    if let Some(tags) = &doc.tags {
+        if tags.len() > 40
+            || tags.iter().any(|tag| {
+                tag.is_empty()
+                    || tag.encode_utf16().count() > 64
+                    || tag.chars().any(|c| c.is_control() || c == ',')
+            })
+        {
+            return Err("Invalid timeline tags".into());
+        }
+    }
+    if let Some(assets) = &doc.assets {
+        if !assets.is_object()
+            || assets.as_object().unwrap().len() > 200
+            || assets.to_string().len() > 9 * 1024 * 1024
+        {
+            return Err("Invalid or oversized embedded images".into());
         }
     }
     for e in &doc.events {
@@ -102,9 +128,28 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
     }
     db.execute("BEGIN IMMEDIATE", &[])?;
     let result = (|| {
+        // JSON is serialized and validated by serde_json on both write and read.
+        // Older system SQLite builds reject json_valid() in CHECK constraints
+        // with trusted_schema=OFF. Recreate these fully replaced data tables so
+        // existing files with those checks can also be saved without trusting SQL.
+        for table in [
+            "timeline_settings",
+            "timeline_plugins",
+            "timeline_extras",
+            "events",
+        ] {
+            db.execute(&format!("DROP TABLE IF EXISTS {table}"), &[])?;
+        }
         db.execute("CREATE TABLE IF NOT EXISTS timeline_meta(singleton INTEGER PRIMARY KEY CHECK(singleton=1),title TEXT NOT NULL,description TEXT NOT NULL)",&[])?;
-        db.execute("CREATE TABLE IF NOT EXISTS timeline_settings(singleton INTEGER PRIMARY KEY CHECK(singleton=1),presentation TEXT NOT NULL CHECK(json_valid(presentation)))", &[])?;
-        db.execute("CREATE TABLE IF NOT EXISTS timeline_plugins(singleton INTEGER PRIMARY KEY CHECK(singleton=1),plugins TEXT NOT NULL CHECK(json_valid(plugins)))", &[])?;
+        db.execute("CREATE TABLE IF NOT EXISTS timeline_settings(singleton INTEGER PRIMARY KEY CHECK(singleton=1),presentation TEXT NOT NULL)", &[])?;
+        db.execute("CREATE TABLE IF NOT EXISTS timeline_plugins(singleton INTEGER PRIMARY KEY CHECK(singleton=1),plugins TEXT NOT NULL)", &[])?;
+        db.execute("CREATE TABLE IF NOT EXISTS timeline_extras(singleton INTEGER PRIMARY KEY CHECK(singleton=1),extras TEXT NOT NULL)", &[])?;
+        db.execute("DELETE FROM timeline_extras", &[])?;
+        let extras = serde_json::json!({"tags": doc.tags, "assets": doc.assets}).to_string();
+        if extras.len() > 10 * 1024 * 1024 {
+            return Err("Timeline extras exceed 10 MiB".into());
+        }
+        db.execute("INSERT INTO timeline_extras VALUES(1,?)", &[&extras])?;
         db.execute("DELETE FROM timeline_plugins", &[])?;
         if let Some(plugins) = &doc.plugins {
             let json = serde_json::to_string(plugins).map_err(|e| e.to_string())?;
@@ -115,7 +160,7 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
             let json = serde_json::to_string(presentation).map_err(|e| e.to_string())?;
             db.execute("INSERT INTO timeline_settings VALUES(1,?)", &[&json])?;
         }
-        db.execute("CREATE TABLE IF NOT EXISTS events(id TEXT PRIMARY KEY,time TEXT NOT NULL COLLATE RATIONAL_V1 CHECK(q_is_canonical(time)=1),metadata TEXT NOT NULL CHECK(json_valid(metadata))) STRICT",&[])?;
+        db.execute("CREATE TABLE IF NOT EXISTS events(id TEXT PRIMARY KEY,time TEXT NOT NULL COLLATE RATIONAL_V1 CHECK(q_is_canonical(time)=1),metadata TEXT NOT NULL) STRICT",&[])?;
         db.execute(
             "CREATE INDEX IF NOT EXISTS events_time ON events(time COLLATE RATIONAL_V1)",
             &[],
@@ -145,18 +190,33 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
     result
 }
 pub fn open(path: &Path) -> Result<Document, String> {
-    let db = Connection::open(path, false)?;
+    read_document(path, true)
+}
+pub fn header_document(path: &Path) -> Result<Document, String> {
+    read_document(path, false)
+}
+fn read_document(path: &Path, include_events: bool) -> Result<Document, String> {
+    let mut db = Connection::open(path, false)?;
+    if !include_events {
+        db.limit_reads();
+    }
     check_file(&db)?;
     db.execute("BEGIN", &[])?;
-    let metadata = db.query(
+    let metadata = db.query_limited(
         "SELECT title,description FROM timeline_meta WHERE singleton=1",
         &[],
+        1,
+        128 * 1024,
     )?;
     let meta = metadata.first().ok_or("Missing timeline metadata")?;
-    let rows = db.query(
+    let rows = if include_events {
+        db.query(
         "SELECT id,q(time),metadata FROM events ORDER BY time COLLATE RATIONAL_V1,id LIMIT 200001",
         &[],
-    )?;
+    )?
+    } else {
+        Vec::new()
+    };
     let mut events = Vec::new();
     for row in rows {
         events.push(Event {
@@ -166,7 +226,34 @@ pub fn open(path: &Path) -> Result<Document, String> {
                 .map_err(|e| e.to_string())?,
         });
     }
+    let extras: Value = if db.scalar(
+        "SELECT count(*) FROM sqlite_schema WHERE name='timeline_extras' AND type='table'",
+        &[],
+    )? == "0"
+    {
+        Value::Null
+    } else {
+        let rows = db.query_limited(
+            "SELECT extras FROM timeline_extras WHERE singleton=1",
+            &[],
+            1,
+            10 * 1024 * 1024,
+        )?;
+        rows.first()
+            .map(|row| {
+                serde_json::from_str(row[0].as_deref().ok_or("Missing timeline extras")?)
+                    .map_err(|e| e.to_string())
+            })
+            .transpose()?
+            .unwrap_or(Value::Null)
+    };
     let doc = Document {
+        tags: extras
+            .get("tags")
+            .filter(|v| !v.is_null())
+            .map(|v| serde_json::from_value(v.clone()).map_err(|e| e.to_string()))
+            .transpose()?,
+        assets: extras.get("assets").filter(|v| !v.is_null()).cloned(),
         format: "openchronology".into(),
         version: 1,
         title: meta[0].clone().ok_or("Missing title")?,
@@ -178,9 +265,11 @@ pub fn open(path: &Path) -> Result<Document, String> {
         {
             None // Files written before presentation settings remain readable.
         } else {
-            let settings = db.query(
+            let settings = db.query_limited(
                 "SELECT presentation FROM timeline_settings WHERE singleton=1",
                 &[],
+                1,
+                128 * 1024,
             )?;
             settings
                 .first()
@@ -197,9 +286,11 @@ pub fn open(path: &Path) -> Result<Document, String> {
         {
             None
         } else {
-            let rows = db.query(
+            let rows = db.query_limited(
                 "SELECT plugins FROM timeline_plugins WHERE singleton=1",
                 &[],
+                1,
+                128 * 1024,
             )?;
             rows.first()
                 .map(|row| {
@@ -268,6 +359,8 @@ mod tests {
             description: "".into(),
             presentation: None,
             plugins: None,
+            tags: None,
+            assets: None,
             events: vec![
                 Event {
                     id: "first".into(),
@@ -312,6 +405,28 @@ mod tests {
         assert!(open(&path).is_err());
         save(&path, &reopened).unwrap();
         assert_eq!(open(&path).unwrap(), reopened);
+        fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn legacy_json_checks_can_be_saved_without_trusting_the_schema() {
+        let path = file("legacy_json_checks");
+        let document = doc();
+        save(&path, &document).unwrap();
+        let canonical = open(&path).unwrap();
+        {
+            let db = Connection::open(&path, true).unwrap();
+            // Construct a known legacy schema; production never enables trust.
+            db.execute("PRAGMA trusted_schema=ON", &[]).unwrap();
+            db.execute("ALTER TABLE events RENAME TO old_events", &[])
+                .unwrap();
+            db.execute("CREATE TABLE events(id TEXT PRIMARY KEY,time TEXT NOT NULL COLLATE RATIONAL_V1 CHECK(q_is_canonical(time)=1),metadata TEXT NOT NULL CHECK(json_valid(metadata))) STRICT", &[]).unwrap();
+            db.execute("INSERT INTO events SELECT * FROM old_events", &[])
+                .unwrap();
+            db.execute("DROP TABLE old_events", &[]).unwrap();
+        }
+        assert_eq!(open(&path).unwrap(), canonical);
+        save(&path, &document).unwrap();
+        assert_eq!(open(&path).unwrap(), canonical);
         fs::remove_file(path).unwrap();
     }
     #[test]
@@ -364,6 +479,31 @@ mod tests {
         assert_eq!(legacy.events.len(), document.events.len());
         save(&path, &reopened).unwrap();
         assert_eq!(open(&path).unwrap(), reopened);
+        fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn tags_assets_and_custom_code_roundtrip() {
+        let path = file("extras");
+        let mut document = doc();
+        document.tags = Some(vec!["science".into(), "custom".into()]);
+        document.assets = Some(
+            serde_json::json!({"https://images.example/a.png":"data:image/png;base64,aGVsbG8="}),
+        );
+        document.plugins = Some(
+            serde_json::json!([{"manifest":{"apiVersion":1,"id":"status","version":1,"name":"Status","description":"Custom","fields":[],"source":"function render(m,api) { return api.shape(\"diamond\"); }"},"enabled":true}]),
+        );
+        save(&path, &document).unwrap();
+        let reopened = open(&path).unwrap();
+        assert_eq!(reopened.tags, document.tags);
+        assert_eq!(reopened.assets, document.assets);
+        assert_eq!(reopened.plugins, document.plugins);
+        {
+            let db = Connection::open(&path, true).unwrap();
+            db.execute("DROP TABLE timeline_extras", &[]).unwrap();
+        }
+        let legacy = open(&path).unwrap();
+        assert_eq!(legacy.tags, None);
+        assert_eq!(legacy.assets, None);
         fs::remove_file(path).unwrap();
     }
     #[test]

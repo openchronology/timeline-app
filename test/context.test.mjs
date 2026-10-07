@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -25,10 +26,10 @@ test('Gregorian chart labels omit common dates and invisible detail while exact 
   assert.equal(format.print(time, context()), '13:45');
   for (const purpose of ['input', 'tooltip']) {
     const ctx = context(86400n, purpose);
-    assert.equal(format.print(time, ctx), '2026-10-05T13:45:30{+1/3}Z');
+    assert.equal(format.print(time, ctx), '2026-10-05T13:45:30{+1/3}Z CE');
     assert(format.parse(format.print(time, ctx), ctx).equals(time));
   }
-  assert.equal(format.describe(context()), '2026-10-05 → 2026-10-06 · UTC');
+  assert.equal(format.describe(context()), '2026-10-05 CE → 2026-10-06 CE · UTC');
   assert(format.parse('13:45', context()).equals(parseTimestamp('2026-10-05T13:45:00Z')));
 });
 
@@ -55,7 +56,7 @@ test('calendar boundaries remain identifiable, with configured offsets and exact
   assert(format.parse('10-06 00h', context()).equals(left.add(Q.from(86400n))));
   const yearEnd = { ...context(), left: parseTimestamp('2026-12-31T00:00:00Z') };
   assert.equal(format.print(yearEnd.left.add(Q.from(86400n)), yearEnd), '00:00');
-  assert.match(format.describe(yearEnd), /2026-12-31 → 2027-01-01/);
+  assert.match(format.describe(yearEnd), /2026-12-31 CE → 2027-01-01 CE/);
   assert(format.parse('2027-01-01 00:00', yearEnd).equals(yearEnd.left.add(Q.from(86400n))));
   const zone = createPresenter({ ...settings, offsetMinutes: -600 });
   const hawaii = { ...context(), left: parseTimestamp('2026-10-05T00:00:00-10:00') };
@@ -98,7 +99,10 @@ test('crossing minute, hour and midnight boundaries keeps a uniform compact labe
   assert.equal(format.print(midnight.left, { ...midnight, purpose: 'axis' }), '59m 13s');
   assert.equal(format.print(after, { ...midnight, purpose: 'axis' }), '00m 03s');
   assert(format.parse('00m 03s', midnight).equals(after));
-  assert.equal(format.describe(midnight), '1969-12-31 → 1970-01-01 · base 23:00 → 00:00 · UTC');
+  assert.equal(
+    format.describe(midnight),
+    '1969-12-31 CE → 1970-01-01 CE · base 23:00 → 00:00 · UTC',
+  );
   const acrossDay = { ...context(7200n), left: parseTimestamp('2026-10-05T23:00:00Z') };
   assert.equal(format.print(acrossDay.left.add(Q.from(5400n)), acrossDay), '00:30:00');
   assert(format.parse('00:30:00', acrossDay).equals(acrossDay.left.add(Q.from(5400n))));
@@ -123,12 +127,12 @@ test('deep rational zooms use short relative offsets without fixed-precision los
 test('coarse Gregorian views abbreviate to days, months or years and can opt out', () => {
   const format = createPresenter(settings);
   assert.equal(format.print(time, context(86400n * 30n, 'axis')), '10-05');
-  assert.equal(format.print(time, context(86400n * 366n, 'axis')), '2026-10');
-  assert.equal(format.print(time, context(31557600n * 100n, 'axis')), '2026');
+  assert.equal(format.print(time, context(86400n * 366n, 'axis')), '2026-10 CE');
+  assert.equal(format.print(time, context(31557600n * 100n, 'axis')), '2026 CE');
   assert(format.parse('2026-10', context()).equals(parseTimestamp('2026-10-01T00:00:00Z')));
   assert(format.parse('2026', context()).equals(parseTimestamp('2026-01-01T00:00:00Z')));
   const full = createPresenter({ ...settings, adaptiveLabels: false });
-  assert.equal(full.print(time, context()), '2026-10-05T13:45:30{+1/3}Z');
+  assert.equal(full.print(time, context()), '2026-10-05T13:45:30{+1/3}Z CE');
   assert.equal(full.describe(context()), '');
 });
 
@@ -198,4 +202,36 @@ test('context validation applies to all formats without saving viewport data in 
     assert.deepEqual(index.document(), original);
     assert(!JSON.stringify(original).includes('widthPixels'));
   }
+});
+
+test('Gregorian era labels have no year zero and preserve exact BCE fractions and offsets', () => {
+  for (const offsetMinutes of [0, 345, -600]) {
+    const format = createPresenter({ ...settings, offsetMinutes });
+    for (const year of ['0001', '0000', '-0001', '-12000000']) {
+      const t = parseTimestamp(`${year}-02-03T12:34:56{+1/7}Z`);
+      assert(format.parse(format.print(t)).equals(t));
+      assert.match(format.print(t), year === '0001' ? / CE$/ : / BCE$/);
+    }
+  }
+  const format = createPresenter(settings);
+  assert(format.parse('1 BCE').equals(parseTimestamp('0000-01-01T00:00:00Z')));
+  assert(format.parse('2 BCE').equals(parseTimestamp('-0001-01-01T00:00:00Z')));
+  assert(format.parse('1 CE').equals(parseTimestamp('0001-01-01T00:00:00Z')));
+  assert.throws(() => format.parse('0 BCE'), /no year zero/);
+  const ctx = { ...context(86400n * 100n), left: parseTimestamp('-0001-01-01T00:00:00Z') };
+  const t = parseTimestamp('0000-01-02T00:00:00Z');
+  assert(format.parse(format.print(t, ctx), ctx).equals(t));
+});
+
+test('deep Gregorian labels use fixed-reference geological ages but exact inputs retain BCE dates', () => {
+  const format = createPresenter(settings);
+  const t = parseTimestamp('-65998000-01-01T00:00:00Z');
+  const ctx = { ...context(), left: t, span: Q.from(31557600n * 10000000n), purpose: 'axis' };
+  assert.equal(format.print(t, ctx), '66 mya');
+  assert(format.parse('66 mya').equals(t));
+  assert.match(format.describe(ctx), /ages relative to 2000 CE/);
+  assert.match(format.print(t, { ...ctx, purpose: 'input' }), /65998001.*BCE$/);
+  const future = parseTimestamp('10002000-01-01T00:00:00Z');
+  assert.equal(format.print(future, ctx), '10 Myr after 2000 CE');
+  assert(format.parse('10 Myr after 2000 CE').equals(future));
 });

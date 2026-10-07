@@ -1,4 +1,6 @@
 <!doctype html>
+<!-- Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only -->
+
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -10,37 +12,102 @@
   </head>
   <body>
     <header class="app-header">
-      <a class="brand" href="#"
+      <a id="dashboard-home" class="brand" href="#"
         ><span class="brand-mark" aria-hidden="true">◷</span>openchronology<span
           class="brand-version"
           >01</span
         ></a
       >
       <div class="header-right">
-        <span id="storage-badge" class="badge">Browser draft</span
+        <button id="new-button">＋ New timeline</button
+        ><span id="storage-badge" class="badge">Browser draft</span
         ><button id="server-button" hidden>Server connection</button
         ><button id="account-button">Sign in</button
         ><button id="logout-button" hidden>Sign out</button>
       </div>
     </header>
+    <aside id="memory-notice" class="memory-notice" role="status" hidden>
+      <span
+        ><strong>In-memory timeline.</strong> Your work is kept only in this tab. Refreshing or
+        closing it loses your changes. Export an .ochx file to keep them.</span
+      >
+      <button id="memory-export">Export .ochx</button>
+    </aside>
+    <p id="guest-fork-status" class="guest-fork-status" role="alert" hidden></p>
+    <a id="guest-fork-original" class="guest-fork-original" hidden>View original timeline</a>
+    <section id="dashboard" class="dashboard" hidden>
+      <div class="dashboard-heading">
+        <div>
+          <div class="eyebrow">YOUR PLACE IN TIME</div>
+          <h1>Timelines</h1>
+        </div>
+        <button id="dashboard-new" class="button-primary">＋ New timeline</button>
+      </div>
+      <section id="dashboard-mine" hidden>
+        <h2>Your timelines</h2>
+        <div id="dashboard-mine-list" class="dashboard-grid"></div>
+        <p id="dashboard-mine-status" role="status"></p>
+        <div class="dialog-actions">
+          <button id="dashboard-mine-previous">Previous</button
+          ><button id="dashboard-mine-next">Next</button>
+        </div>
+      </section>
+      <div class="view-controls">
+        <span id="dashboard-compare-count">0 selected for comparison</span
+        ><button id="dashboard-compare" disabled>Compare selected</button
+        ><button id="dashboard-compare-clear">Clear selection</button>
+      </div>
+      <section class="dashboard-introduction">
+        <h2>Explore an exact timeline</h2>
+        <p>Pan and zoom through a sample timeline to see nearby moments gather and separate.</p>
+        <button id="dashboard-demo">Explore 20,000 sample moments ↗</button>
+      </section>
+      <section id="dashboard-browser">
+        <h2>Explore timelines</h2>
+        <p class="field-hint">
+          Featured timelines appear first. Search titles, notes and tags across public timelines.
+        </p>
+        <button id="dashboard-signin">Sign in to see your timelines</button>
+        <div class="dashboard-search">
+          <label
+            >Search timelines<input
+              id="dashboard-search"
+              type="search"
+              maxlength="300"
+              placeholder='Keywords or "exact phrase"' /></label
+          ><label>Filter by tag<input id="dashboard-tag" type="search" maxlength="64" /></label>
+        </div>
+        <div id="dashboard-browser-list" class="dashboard-grid"></div>
+        <p id="dashboard-browser-status" role="status"></p>
+        <div class="dialog-actions">
+          <button id="dashboard-browser-previous">Previous</button
+          ><button id="dashboard-browser-next">Next</button>
+        </div>
+      </section>
+      <div id="dashboard-error" class="form-error" role="alert"></div>
+    </section>
+    <dialog id="timeline-help-dialog" aria-labelledby="timeline-help-title">
+      <h2 id="timeline-help-title">Timeline controls</h2>
+      <ul>
+        <li>Drag to pan horizontally and vertically.</li>
+        <li>Scroll or pinch to zoom through time; use + and − for centered zoom.</li>
+        <li>Alt-scroll moves vertically.</li>
+        <li>Ctrl-scroll scales the timeline’s contents.</li>
+        <li>Arrow keys pan; + and − keys zoom when the timeline is focused.</li>
+        <li>Click empty space to select a time. Right-click or hold to open the context menu.</li>
+      </ul>
+      <form method="dialog"><button>Close</button></form>
+    </dialog>
     <div class="app-layout">
-      <aside class="workspace">
-        <div class="eyebrow">YOUR WORKSPACE</div>
-        <button id="new-button" class="workspace-new">＋ New timeline</button>
-        <div id="timeline-list" class="timeline-list">
-          <div class="workspace-note">
-            A timeline is a collection of moments.<br />Make room for yours.
-          </div>
-        </div>
-        <div class="workspace-bottom">
-          <span class="status-dot"></span><span id="workspace-status">Stored in this browser</span>
-          <p>Point events. Exact coordinates.<br />As much space as you need.</p>
-        </div>
-      </aside>
+      <div hidden>
+        <div id="timeline-list"></div>
+        <span id="workspace-status"></span>
+      </div>
       <main>
         <div class="document-toolbar">
           <div class="breadcrumbs">
-            Timelines <span>/</span> <span id="owner-label">Local workspace</span>
+            <a id="timelines-link" href="/" target="_top">Timelines</a> <span>/</span>
+            <a id="owner-label">Local workspace</a>
           </div>
           <div class="file-actions">
             <button id="import-button">Import JSON</button
@@ -50,7 +117,6 @@
             ><button id="sqlite-open" hidden>Open SQLite</button
             ><button id="sqlite-save" hidden>Save SQLite</button
             ><button id="sqlite-save-as" hidden>Save SQLite as…</button
-            ><button id="share-button" hidden>Sharing</button
             ><button id="publish-button" class="button-primary">Save to server</button>
           </div>
         </div>
@@ -70,11 +136,28 @@
           >
 Every point has a place. Explore the spaces between them.</textarea
           >
+          <div id="timeline-actions" class="timeline-actions">
+            <button id="share-button" hidden>Sharing</button>
+            <button id="pull-button" hidden>Pull requests</button>
+            <button id="propose-button" hidden>Propose changes</button>
+            <button id="guest-fork-button" hidden>Fork in browser</button>
+            <div id="platform-timeline-actions"></div>
+          </div>
           <div class="document-meta">
             <span id="event-count">10 events</span><span class="meta-separator">·</span
             ><span id="save-status">A local draft, ready to explore</span>
           </div>
         </section>
+        <label class="document-tags"
+          >Tags (comma-separated)<input
+            id="timeline-tags"
+            maxlength="2600"
+            placeholder="history, science, project" /><span
+            id="timeline-tags-error"
+            class="form-error"
+            role="alert"
+          ></span
+        ></label>
         <section class="timeline-card" aria-label="Timeline window">
           <div class="view-toolbar">
             <div>
@@ -84,6 +167,7 @@ Every point has a place. Explore the spaces between them.</textarea
             <div class="view-controls">
               <button id="presentation-button">Time display</button>
               <button id="plugins-button">Plugins</button>
+              <button id="compare-button">Compare</button>
               <button id="zoom-out" aria-label="Zoom out">−</button
               ><button id="zoom-in" aria-label="Zoom in">＋</button
               ><button id="fit-button">Fit all</button
@@ -92,6 +176,24 @@ Every point has a place. Explore the spaces between them.</textarea
               ><button id="add-button" class="button-primary">＋ Event</button>
             </div>
           </div>
+          <div id="live-notice" class="comparison-settings" hidden role="status">
+            New server changes are available. Your unsaved edits are retained.
+            <button id="live-reload">Reload latest</button>
+          </div>
+          <section id="comparison-settings" class="comparison-settings" hidden>
+            <div class="comparison-heading">
+              <strong>Read-only comparison</strong>
+              <label
+                ><input id="compare-combined" type="checkbox" /> Combine into one timeline</label
+              >
+              <button id="compare-exit">Exit comparison</button>
+            </div>
+            <p class="field-hint">
+              Shared time = original time × scale + offset. Alignment changes only this view.
+            </p>
+            <div id="comparison-tracks"></div>
+            <p id="comparison-conflicts" class="field-hint"></p>
+          </section>
           <div id="time-context" class="time-context" hidden></div>
           <div
             id="timeline-stage"
@@ -110,10 +212,8 @@ Every point has a place. Explore the spaces between them.</textarea
             <div id="loading-window" class="loading-window" hidden>Loading this window…</div>
           </div>
           <div class="timeline-footer">
-            <span class="gesture-help"
-              >Drag to pan in both directions <span>·</span> Scroll or pinch to zoom
-              <span>·</span> Alt-scroll moves vertically</span
-            ><label class="density-control"
+            <button id="timeline-help-button">Help</button>
+            <label class="density-control"
               >Group within
               <input
                 id="density"
@@ -151,23 +251,6 @@ Every point has a place. Explore the spaces between them.</textarea
             These are the underlying coordinates, independent of time display settings.
           </p>
         </details>
-        <section class="below-timeline">
-          <div class="reading-note">
-            <span class="small-orbit" aria-hidden="true">⊙</span>
-            <div>
-              <h2>Closer reveals more.</h2>
-              <p>
-                Nearby moments gather into a single point. Zoom in to discover the individual events
-                inside.
-              </p>
-              <button id="dense-demo" class="text-button">Explore 20,000 tiny moments ↗</button>
-            </div>
-          </div>
-          <div class="precision-note">
-            <div class="eyebrow">NOTHING LOST BETWEEN THE TICKS</div>
-            <p>Coordinates remain exact, even when the gaps get very small.</p>
-          </div>
-        </section>
       </main>
       <aside id="inspector" class="inspector">
         <div class="inspector-heading">
@@ -184,7 +267,9 @@ Every point has a place. Explore the spaces between them.</textarea
           <p id="group-note" class="muted"></p>
           <button id="group-zoom">Zoom into this group</button>
           <div id="group-events" class="group-events"></div>
-          <button id="group-more" hidden>Next 100 events</button>
+          <p id="group-page-status" class="muted" role="status" aria-live="polite"></p>
+          <button id="group-previous" hidden>Previous page</button>
+          <button id="group-more" hidden>Next 25 moments</button>
         </div>
         <form id="event-form" hidden>
           <label
@@ -238,6 +323,64 @@ Every point has a place. Explore the spaces between them.</textarea
     </div>
     <input id="json-file" type="file" accept=".ochx,.json,application/json" hidden />
     <input id="och-file" type="file" accept=".och,application/vnd.openchronology.sqlite" hidden />
+    <dialog id="pull-dialog">
+      <div class="dialog-heading">
+        <h2>Pull requests</h2>
+        <button data-close="pull-dialog" aria-label="Close pull requests">×</button>
+      </div>
+      <div id="pull-list"></div>
+      <p id="pull-status" role="status"></p>
+      <div class="dialog-actions">
+        <button id="pull-previous">Previous</button><button id="pull-next">Next</button>
+      </div>
+      <div id="pull-error" class="form-error" role="alert"></div>
+    </dialog>
+    <dialog id="pull-detail-dialog">
+      <div class="dialog-heading">
+        <h2 id="pull-detail-title"></h2>
+        <button data-close="pull-detail-dialog" aria-label="Close pull request">×</button>
+      </div>
+      <p id="pull-detail-status"></p>
+      <p id="pull-detail-body" class="preserve-lines"></p>
+      <section id="pull-diff"></section>
+      <div class="dialog-actions">
+        <button id="pull-view">View proposed timeline</button
+        ><button id="pull-edit">Edit proposal</button
+        ><button id="pull-export">Export proposal .ochx</button
+        ><button id="pull-rebase">Rebase onto latest upstream</button
+        ><button id="pull-merge" class="button-primary">Merge</button
+        ><button id="pull-reject">Reject</button><button id="pull-close">Close</button>
+      </div>
+      <h3>Discussion</h3>
+      <div id="pull-comments"></div>
+      <button id="pull-comments-more" hidden>More comments</button>
+      <form id="pull-comment-form">
+        <label>Comment<textarea id="pull-comment" required maxlength="20000"></textarea></label
+        ><button type="submit">Add comment</button>
+      </form>
+      <div id="pull-detail-error" class="form-error" role="alert"></div>
+    </dialog>
+    <dialog id="proposal-dialog">
+      <form id="proposal-form">
+        <div class="dialog-heading">
+          <h2>Recommend timeline changes</h2>
+          <button type="button" data-close="proposal-dialog" aria-label="Close proposal form">
+            ×
+          </button>
+        </div>
+        <p class="field-hint">
+          Your draft becomes a pull request. The upstream timeline stays unchanged until someone
+          with write access merges it.
+        </p>
+        <label>Title<input id="proposal-title" required maxlength="300" /></label
+        ><label
+          >Describe the changes<textarea id="proposal-body" maxlength="20000"></textarea></label
+        ><button id="proposal-submit" type="submit" class="button-primary">
+          Submit pull request
+        </button>
+        <div id="proposal-error" class="form-error" role="alert"></div>
+      </form>
+    </dialog>
     <dialog id="plugins-dialog" aria-labelledby="plugins-heading">
       <div class="dialog-heading">
         <h2 id="plugins-heading">Timeline plugins</h2>
@@ -246,12 +389,56 @@ Every point has a place. Explore the spaces between them.</textarea
       <p id="plugins-note" class="field-hint"></p>
       <div id="installed-plugins"></div>
       <button id="plugins-add" class="button-primary">Add plugin</button>
+      <button id="plugins-create">Create / import plugin</button>
     </dialog>
+    <dialog id="plugin-author-dialog" aria-labelledby="plugin-author-heading">
+      <div class="dialog-heading">
+        <h2 id="plugin-author-heading">Plugin editor</h2>
+        <button data-close="plugin-author-dialog" aria-label="Close plugin editor">×</button>
+      </div>
+      <p class="field-hint">
+        Define metadata fields and a restricted render script. No DOM, network, imports, loops or
+        arbitrary calls. Later plugins override earlier effects. Installing takes effect
+        immediately; publishing makes this version public in the server library.
+      </p>
+      <label
+        >Metadata fields and identity (JSON)<textarea
+          id="plugin-definition"
+          spellcheck="false"
+          maxlength="65536"
+        ></textarea>
+      </label>
+      <label
+        >Restricted JavaScript / TypeScript source<textarea
+          id="plugin-source"
+          spellcheck="false"
+          maxlength="16384"
+        ></textarea>
+      </label>
+      <div class="dialog-actions">
+        <button id="plugin-author-install" class="button-primary">Install on timeline</button
+        ><button id="plugin-author-import">Import definition</button
+        ><button id="plugin-author-export">Export definition</button
+        ><button id="plugin-author-publish">Publish to library</button>
+      </div>
+      <p id="plugin-author-status" role="status"></p>
+      <div id="plugin-author-error" class="form-error" role="alert"></div>
+    </dialog>
+    <input id="plugin-definition-file" type="file" accept=".json,application/json" hidden />
     <dialog id="plugin-library-dialog" aria-labelledby="plugin-library-heading">
       <div class="dialog-heading">
         <h2 id="plugin-library-heading">Plugin library</h2>
         <button data-close="plugin-library-dialog" aria-label="Close plugin library">×</button>
       </div>
+      <button id="plugin-library-custom">Custom…</button>
+      <label
+        >Sort plugins<select id="plugin-sort">
+          <option value="popularity">By popularity</option>
+          <option value="alphabetical">Alphabetical</option>
+          <option value="age">Newest first</option>
+        </select></label
+      >
+      <p class="field-hint">Popularity counts public timelines with the plugin enabled.</p>
       <label
         >Search plugins<input id="plugin-search" type="search" maxlength="200" autocomplete="off"
       /></label>
@@ -262,6 +449,39 @@ Every point has a place. Explore the spaces between them.</textarea
         ><button id="plugin-next">Next page</button>
       </div>
       <div id="plugin-library-error" class="form-error" role="alert"></div>
+    </dialog>
+    <dialog id="compare-dialog">
+      <div class="dialog-heading">
+        <h2>Compare timelines</h2>
+        <button data-close="compare-dialog" aria-label="Close">×</button>
+      </div>
+      <p>Select two to eight timelines visible to your account, or add a JSON file.</p>
+      <label>Search timelines<input id="compare-search" type="search" maxlength="300" /></label>
+      <div id="compare-results" class="compare-results"></div>
+      <p id="compare-page" role="status"></p>
+      <button id="compare-previous">Previous</button><button id="compare-next">Next</button>
+      <label
+        >Add .ochx timeline<input
+          id="compare-file"
+          type="file"
+          accept=".ochx,.json,application/json"
+      /></label>
+      <p id="compare-selected" role="status"></p>
+      <div id="compare-chosen" class="view-controls"></div>
+      <button id="compare-start" class="button-primary">Compare selected</button>
+    </dialog>
+    <dialog id="compare-format-dialog">
+      <form method="dialog">
+        <h2>Choose a shared time display</h2>
+        <p>
+          These timelines use different printers or parsers. Choose the display for this comparison.
+          Original times stay unchanged; use scale and offset to align different coordinate
+          conventions.
+        </p>
+        <label>Time display<select id="compare-format"></select></label>
+        <button value="cancel">Cancel</button
+        ><button value="apply" class="button-primary">Use this display</button>
+      </form>
     </dialog>
     <dialog id="presentation-dialog">
       <form id="presentation-form">
@@ -478,14 +698,16 @@ Every point has a place. Explore the spaces between them.</textarea
               id="account-password"
               type="password"
               required
-              minlength="12"
+              minlength="1"
               maxlength="1024"
               autocomplete="current-password"
           /></label>
-          <p class="field-hint">At least 12 characters.</p>
+          <p class="field-hint">
+            Registration and account security settings are available on the website.
+          </p>
           <div class="dialog-actions">
             <button class="button-primary" type="submit" name="action" value="login">Sign in</button
-            ><button type="submit" name="action" value="register">Create account</button>
+            ><button id="account-register" type="button">Create account</button>
           </div>
         </div>
         <div id="provider-buttons">
@@ -511,7 +733,9 @@ Every point has a place. Explore the spaces between them.</textarea
       <label
         >Visibility<select id="visibility">
           <option value="private">Private — you and your collaborators</option>
-          <option value="public">Public — anyone with the link can view</option>
+          <option value="public">
+            Public — everyone can view and signed-in users can propose changes
+          </option>
         </select></label
       ><button id="copy-link">Copy timeline link</button>
       <p id="sharing-link" class="sharing-link"></p>
@@ -522,10 +746,14 @@ Every point has a place. Explore the spaces between them.</textarea
         <div class="dialog-actions">
           <select id="member-role" aria-label="Collaborator role">
             <option value="viewer">Viewer</option>
-            <option value="editor">Editor</option></select
+            <option value="contributor">Contributor — propose changes</option>
+            <option value="writer">Writer — update upstream and merge</option></select
           ><button type="submit" class="button-primary">Add collaborator</button>
         </div>
       </form>
+      <button id="delete-timeline" class="button-danger">
+        Delete timeline and its pull requests
+      </button>
       <div id="sharing-error" class="form-error" role="alert"></div>
     </dialog>
     <div
@@ -548,5 +776,6 @@ Every point has a place. Explore the spaces between them.</textarea
       </div>
     </dialog>
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <!-- OPENCHRONOLOGY_LEGAL -->
   </body>
 </html>

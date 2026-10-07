@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { Rational as Q } from 'rational-ordered-map';
 
 /** Ephemeral display information, in the timeline's stored coordinate units. */

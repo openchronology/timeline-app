@@ -1,16 +1,36 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import pg from 'pg';
 import { readFile } from 'node:fs/promises';
 import { createApplication } from '../server/http.mjs';
+import { flushMail } from '../server/mail.mjs';
 import { tokenHash } from '../server/auth.mjs';
 import assert from 'node:assert/strict';
-import { demo, validateDocument, DEFAULT_PRESENTATION, CUSTOM_EXAMPLE } from '../dist/core.mjs';
+import {
+  demo,
+  validateDocument,
+  DEFAULT_PRESENTATION,
+  CUSTOM_EXAMPLE,
+  PLUGIN_EXAMPLE,
+  MOMENT_SHAPES,
+  TimelineIndex,
+} from '../dist/core.mjs';
 if (!process.env.DATABASE_URL)
   throw new Error('DATABASE_URL must refer to a dedicated test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
 let providerSubject = 42001;
 const providers = { github: { clientId: 'test-client', clientSecret: 'test-secret' } };
+const delivered = [],
+  securityKey = Buffer.alloc(32, 7),
+  mailer = {
+    async send(message) {
+      delivered.push(message);
+    },
+  };
 const app = createApplication({
+  mailer,
+  securityKey,
+  passwordCheck: async () => {},
   pool,
   providers,
   trustProxy: true,
@@ -81,6 +101,29 @@ function client(bearer) {
     },
   };
 }
+async function confirmEmail(c, email) {
+  await flushMail(pool, mailer, securityKey);
+  const message = delivered.findLast((m) => m.to === email && m.text.includes('#verify='));
+  assert(message, 'confirmation email queued');
+  const token = message.text.match(/#verify=([a-f0-9]{64})/)[1];
+  await c.request('auth/email/verify', 'POST', { token });
+}
+async function completeSocial(c, email) {
+  const pending = await c.request('session');
+  if (!pending.user) {
+    assert.equal(pending.challenge, 'email');
+    await c.request('auth/email/enroll', 'POST', { email });
+    await confirmEmail(c, email);
+    await c.request('session');
+    const url = new URL((await c.request('auth/github/start', 'POST', {})).url);
+    await c.request(
+      `auth/github/callback?state=${url.searchParams.get('state')}&code=mock`,
+      'GET',
+      undefined,
+      303,
+    );
+  }
+}
 const owner = client(),
   viewer = client(),
   editor = client(),
@@ -99,14 +142,61 @@ try {
       403,
       false,
     );
-    const r = await c.request('auth/register', 'POST', {
+    const email = `${prefix}_${suffix}@example.test`,
+      password = 'testing exact rational timelines';
+    const pending = await c.request('auth/register', 'POST', {
       username: `${prefix}_${suffix}`,
-      password: 'testing exact rational timelines',
+      email,
+      password,
+      passwordConfirmation: password,
     });
+    assert.equal(pending.verificationRequired, true);
+    assert.equal((await c.request('session')).user, null);
+    await confirmEmail(c, email);
+    const r = await c.request('auth/login', 'POST', { username: `${prefix}_${suffix}`, password });
     accounts.push(r.user.id);
   }
+  // Community definitions use the same account/session protections as timeline writes.
+  await anonymous.request('plugins/publish', 'POST', PLUGIN_EXAMPLE, 401);
+  await owner.request('plugins/publish', 'POST', PLUGIN_EXAMPLE, 403, false);
+  const published = await owner.request('plugins/publish', 'POST', PLUGIN_EXAMPLE, 201);
+  assert.equal(published.id, 'u-' + accounts[0].replaceAll('-', '') + '-status-symbols');
+  await owner.request('plugins/publish', 'POST', published, 409);
+  await viewer.request('plugins/publish', 'POST', published, 400);
+  const updatedPlugin = await owner.request(
+    'plugins/publish',
+    'POST',
+    { ...published, version: 2 },
+    201,
+  );
+  assert.equal(updatedPlugin.version, 2);
+  assert.equal(
+    (await anonymous.request('plugins/' + published.id + '/1')).source,
+    published.source,
+  );
+  assert.equal(
+    (await anonymous.request('plugins/search', 'POST', { search: published.id, page: 1, limit: 1 }))
+      .plugins[0].version,
+    2,
+  );
+  const combined = await anonymous.request('plugins/search', 'POST', {
+    search: '',
+    page: 1,
+    limit: 50,
+  });
+  assert(combined.plugins.some((p) => p.id === 'moment-shapes'));
+  assert(combined.plugins.some((p) => p.id === published.id));
   const document = demo(true);
-  document.presentation = { ...DEFAULT_PRESENTATION, mode: 'custom', source: CUSTOM_EXAMPLE };
+  document.plugins = [
+    { manifest: published, enabled: true },
+    { manifest: MOMENT_SHAPES, enabled: true },
+  ];
+  document.events[0].metadata.status = 'blocked';
+  document.presentation = {
+    ...DEFAULT_PRESENTATION,
+    mode: 'custom',
+    source: CUSTOM_EXAMPLE,
+  };
   const t = await owner.request('timelines', 'POST', document, 201);
   timelines.push(t.id);
   assert.equal(t.visibility, 'private');
@@ -133,6 +223,74 @@ try {
   });
   assert.equal(frame.groups[0].count, '20001');
   assert(frame.visitedNodes < 50);
+  const bounded = await owner.request(`timelines/${t.id}/query`, 'POST', {
+    kind: 'overview',
+    lower: '0',
+    upper: '30',
+    threshold: '0',
+    revision: t.revision,
+  });
+  assert(bounded.groups.length <= 1025);
+  assert(bounded.threshold !== '0');
+  assert.equal(
+    bounded.groups.reduce((n, g) => n + BigInt(g.count), 0n),
+    20010n,
+  );
+  assert(bounded.visitedNodes < 200);
+  const sparseTimeline = await owner.request(
+    'timelines',
+    'POST',
+    {
+      ...document,
+      events: document.events.slice(0, 10),
+    },
+    201,
+  );
+  timelines.push(sparseTimeline.id);
+  const changed = {
+    ...document.events[0],
+    metadata: { ...document.events[0].metadata, title: 'Sparse edit' },
+  };
+  const settings = { ...document, title: 'Sparse save', events: undefined };
+  const patch = {
+    revision: sparseTimeline.revision,
+    settings,
+    changes: [
+      { id: changed.id, event: changed },
+      { id: document.events[1].id, event: null },
+      { id: 'new-sparse', event: { id: 'new-sparse', time: '99/1', metadata: { title: 'New' } } },
+    ],
+  };
+  await viewer.request(`timelines/${sparseTimeline.id}/changes`, 'PUT', patch, 404);
+  await owner.request(`timelines/${sparseTimeline.id}/changes`, 'PUT', patch, 403, false);
+  const patched = await owner.request(`timelines/${sparseTimeline.id}/changes`, 'PUT', patch);
+  assert.equal(patched.revision, '2');
+  const afterPatch = await owner.request(`timelines/${sparseTimeline.id}/document`);
+  assert.equal(afterPatch.document.events.length, 10);
+  assert.equal(afterPatch.document.title, 'Sparse save');
+  assert.equal(
+    afterPatch.document.events.find((e) => e.id === changed.id).metadata.title,
+    'Sparse edit',
+  );
+  assert(!afterPatch.document.events.some((e) => e.id === document.events[1].id));
+  assert.deepEqual(
+    afterPatch.document.events.find((e) => e.id === document.events[3].id),
+    document.events[3],
+  );
+  assert.deepEqual(afterPatch.document.plugins, document.plugins);
+  await owner.request(`timelines/${sparseTimeline.id}/changes`, 'PUT', patch, 409);
+  await owner.request(
+    `timelines/${sparseTimeline.id}/query`,
+    'POST',
+    { kind: 'overview', lower: '0', upper: '100', threshold: '1', revision: '1' },
+    409,
+  );
+  const oldSnapshot = await owner.request(
+    `timelines/${sparseTimeline.id}/history/${sparseTimeline.head_revision_id}`,
+  );
+  assert.equal(oldSnapshot.document.events.length, 10);
+  assert.equal(oldSnapshot.document.events[0].metadata.title, document.events[0].metadata.title);
+
   await viewer.request(`timelines/${t.id}`, 'PUT', { revision: t.revision, document }, 403);
   await owner.request(`timelines/${t.id}`, 'PUT', { revision: t.revision, document }, 403, false);
   const updated = await editor.request(`timelines/${t.id}`, 'PUT', {
@@ -186,6 +344,7 @@ try {
   await client().request(`auth/github/callback?state=${state}&code=mock`, 'GET', undefined, 400);
   await social.request(`auth/github/callback?state=${state}&code=mock`, 'GET', undefined, 303);
   await social.request(`auth/github/callback?state=${state}&code=mock`, 'GET', undefined, 400);
+  await completeSocial(social, `social_${suffix}@example.test`);
   const socialUser = (await social.request('session')).user;
   accounts.push(socialUser.id);
   assert.deepEqual((await social.request('auth/account')).identities, ['github']);
@@ -200,6 +359,7 @@ try {
       undefined,
       303,
     );
+    await completeSocial(other, `social_${providerSubject}_${suffix}@example.test`);
     const user = (await other.request('session')).user;
     if (differentSubject) {
       assert.notEqual(user.id, socialUser.id);
@@ -238,7 +398,7 @@ try {
   // Native approval requires an authenticated browser and cannot be replayed.
   const deviceClient = client(),
     challenge = await deviceClient.request('auth/device/start', 'POST', {});
-  assert.match(challenge.verificationUri, /\/#desktop\/[A-Z2-9]{10}$/);
+  assert.match(challenge.verificationUri, /\/connect\/desktop\/[A-Z2-9]{10}$/);
   assert.deepEqual(
     await deviceClient.request('auth/device/poll', 'POST', { deviceCode: challenge.deviceCode }),
     { pending: true },
@@ -288,6 +448,205 @@ try {
   await owner.request('auth/device/approve', 'POST', { userCode: expired.userCode }, 400);
   await pool.query('DELETE FROM oc_device_logins WHERE user_code=$1', [expired.userCode]);
 
+  // Private contribution branches, write access, discussion, rebase and atomic merge.
+  const upstreamDocument = validateDocument({
+    ...demo(),
+    title: 'Observatory ' + suffix,
+    description: 'A star map of early navigation',
+    tags: ['astronomy', 'science'],
+    events: demo().events.slice(0, 3),
+    plugins: document.plugins,
+  });
+  const custody = await owner.request('timelines', 'POST', upstreamDocument, 201);
+  timelines.push(custody.id);
+  assert(custody.canWrite && custody.canShare);
+  await owner.request(`timelines/${custody.id}/members`, 'POST', {
+    username: `editor_${suffix}`,
+    role: 'contributor',
+  });
+  await owner.request(`timelines/${custody.id}/members`, 'POST', {
+    username: `viewer_${suffix}`,
+    role: 'writer',
+  });
+  const contributorAccess = await editor.request(`timelines/${custody.id}`);
+  assert(
+    contributorAccess.canEdit &&
+      contributorAccess.canPropose &&
+      !contributorAccess.canWrite &&
+      !contributorAccess.canShare,
+  );
+  await editor.request(
+    `timelines/${custody.id}`,
+    'PUT',
+    { revision: custody.revision, document: upstreamDocument },
+    403,
+  );
+  await viewer.request(`timelines/${custody.id}/settings`, 'PATCH', { visibility: 'public' }, 403);
+  const proposedDocument = validateDocument({
+    ...upstreamDocument,
+    title: 'Proposed observatory ' + suffix,
+    events: [
+      ...upstreamDocument.events,
+      {
+        id: 'recommended',
+        time: '1/7',
+        metadata: { title: 'Recommended observation', description: 'Telescope calibration' },
+      },
+    ],
+  });
+  const proposalInput = {
+    title: 'Add an observation',
+    body: 'Please review this change.',
+    baseRevision: custody.revision,
+    document: proposedDocument,
+  };
+  await anonymous.request(`timelines/${custody.id}/proposals`, 'POST', proposalInput, 401);
+  await editor.request(`timelines/${custody.id}/proposals`, 'POST', proposalInput, 403, false);
+  const proposal = await editor.request(
+    `timelines/${custody.id}/proposals`,
+    'POST',
+    proposalInput,
+    201,
+  );
+  assert.equal(proposal.author, `editor_${suffix}`);
+  assert(proposal.canUpdate && !proposal.canMerge);
+  assert.deepEqual(
+    (await owner.request(`timelines/${custody.id}/document`)).document,
+    upstreamDocument,
+  );
+  await anonymous.request(
+    `timelines/${custody.id}/proposals/${proposal.id}`,
+    'GET',
+    undefined,
+    404,
+  );
+  await editor.request(
+    `timelines/${custody.id}/proposals/${proposal.id}/comments`,
+    'POST',
+    { body: '<script>plain text</script>' },
+    201,
+  );
+  await viewer.request(
+    `timelines/${custody.id}/proposals/${proposal.id}/comments`,
+    'POST',
+    { body: 'Reviewed; keeping upstream unchanged for now.' },
+    201,
+  );
+  assert.equal(
+    (await owner.request(`timelines/${custody.id}/proposals/${proposal.id}/comments`)).comments
+      .length,
+    2,
+  );
+  await editor.request(
+    `timelines/${custody.id}/proposals/${proposal.id}/resolve`,
+    'POST',
+    { action: 'merge', revision: proposal.revision },
+    403,
+  );
+  const changedUpstream = validateDocument({
+    ...upstreamDocument,
+    description: 'Updated upstream context: star map navigation.',
+  });
+  await viewer.request(`timelines/${custody.id}`, 'PUT', {
+    revision: custody.revision,
+    document: changedUpstream,
+  });
+  await viewer.request(
+    `timelines/${custody.id}/proposals/${proposal.id}/resolve`,
+    'POST',
+    { action: 'merge', revision: proposal.revision },
+    409,
+  );
+  const rebased = await editor.request(
+    `timelines/${custody.id}/proposals/${proposal.id}/resolve`,
+    'POST',
+    { action: 'rebase', revision: proposal.revision },
+  );
+  assert.equal(rebased.document.description, changedUpstream.description);
+  assert.equal(rebased.document.title, proposedDocument.title);
+  const merged = await viewer.request(
+    `timelines/${custody.id}/proposals/${proposal.id}/resolve`,
+    'POST',
+    { action: 'merge', revision: rebased.revision },
+  );
+  assert.equal(merged.status, 'merged');
+  assert.equal(merged.merged_revision, '3');
+  assert.deepEqual(
+    new TimelineIndex(
+      (await owner.request(`timelines/${custody.id}/document`)).document,
+    ).document(),
+    new TimelineIndex(rebased.document).document(),
+  );
+  await viewer.request(
+    `timelines/${custody.id}/proposals/${proposal.id}/resolve`,
+    'POST',
+    { action: 'merge', revision: merged.revision },
+    409,
+  );
+  const another = await editor.request(
+    `timelines/${custody.id}/proposals`,
+    'POST',
+    { ...proposalInput, baseRevision: '3' },
+    201,
+  );
+  await editor.request(
+    `timelines/${custody.id}/proposals/${another.id}/resolve`,
+    'POST',
+    { action: 'reject', revision: another.revision },
+    403,
+  );
+  assert.equal(
+    (
+      await viewer.request(`timelines/${custody.id}/proposals/${another.id}/resolve`, 'POST', {
+        action: 'reject',
+        revision: another.revision,
+      })
+    ).status,
+    'rejected',
+  );
+  const withdraw = await editor.request(
+    `timelines/${custody.id}/proposals`,
+    'POST',
+    { ...proposalInput, baseRevision: '3' },
+    201,
+  );
+  assert.equal(
+    (
+      await editor.request(`timelines/${custody.id}/proposals/${withdraw.id}/resolve`, 'POST', {
+        action: 'close',
+        revision: withdraw.revision,
+      })
+    ).status,
+    'closed',
+  );
+  assert.equal(
+    (await owner.request(`timelines/${custody.id}/proposals/search`, 'POST', { page: 1, limit: 1 }))
+      .total,
+    3,
+  );
+  const privateSearch = await anonymous.request('timelines/search', 'POST', { search: suffix });
+  assert(!privateSearch.timelines.some((t) => t.id === custody.id));
+  const mine = await owner.request('timelines/search', 'POST', { scope: 'mine' });
+  assert(mine.timelines.some((t) => t.id === custody.id));
+  const writerMine = await viewer.request('timelines/search', 'POST', { scope: 'mine' });
+  assert(!writerMine.timelines.some((t) => t.id === custody.id));
+  await owner.request(`timelines/${custody.id}/settings`, 'PATCH', { visibility: 'public' });
+  const publicSearch = await anonymous.request('timelines/search', 'POST', {
+    search: '"star map"',
+    tag: 'astronomy',
+  });
+  assert(publicSearch.timelines.some((t) => t.id === custody.id));
+  const noteSearch = await anonymous.request('timelines/search', 'POST', { search: 'calibration' });
+  assert(noteSearch.timelines.some((t) => t.id === custody.id));
+  await anonymous.request('timelines/search', 'POST', { scope: 'mine' }, 401);
+  await viewer.request(`timelines/${custody.id}`, 'DELETE', {}, 403);
+  await owner.request(`timelines/${custody.id}`, 'DELETE', {});
+  await anonymous.request(
+    `timelines/${custody.id}/proposals/${proposal.id}`,
+    'GET',
+    undefined,
+    404,
+  );
   // Real server-mediated SQLite exchange, with access and CSRF checks.
   assert.equal((await owner.request('session')).fileExchange, true);
   const small = validateDocument({ ...document, events: document.events.slice(0, 10) });
@@ -314,7 +673,7 @@ try {
 } finally {
   const throttleKeys = [
     ...clientAddresses.flatMap((ip) => [ip, 'file-download:' + ip]),
-    ...accounts.map((id) => 'files:' + id),
+    ...accounts.flatMap((id) => ['files:' + id, 'plugin-publish:' + id, 'proposals:' + id]),
   ].map(tokenHash);
   await pool.query('DELETE FROM oc_auth_attempts WHERE key=ANY($1::text[])', [throttleKeys]);
   await pool.query('DELETE FROM oc_timelines WHERE id=ANY($1::uuid[])', [timelines]);

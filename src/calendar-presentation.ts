@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { Rational as Q } from 'rational-ordered-map';
 import { parseTimestamp, printTimestamp } from './calendar.js';
 import { decimalExponent, fixedDecimal, parseNumber, printNumber } from './numeric.js';
@@ -23,7 +24,36 @@ function parts(time: Q, offset: number) {
     zone: match[7],
   };
 }
-const date = (p: ReturnType<typeof parts>) => `${p.year}-${p.month}-${p.day}`;
+function eraYear(year: string): string {
+  const y = BigInt(year);
+  return `${y > 0n ? y : 1n - y} ${y > 0n ? 'CE' : 'BCE'}`;
+}
+function eraTimestamp(text: string): string {
+  return text.replace(/^([+-]?\d+)(.*)$/, (_, year: string, rest: string) => {
+    const y = BigInt(year);
+    return `${String(y > 0n ? y : 1n - y).padStart(4, '0')}${rest} ${y > 0n ? 'CE' : 'BCE'}`;
+  });
+}
+function normalizeEra(text: string): string {
+  const match = /^(\d+)(.*?)\s+(BCE|CE)(?=\s|$)(.*)$/i.exec(text);
+  if (!match) return text;
+  const year = BigInt(match[1]);
+  if (year === 0n) throw new Error('BCE/CE dates have no year zero.');
+  const y = match[3].toUpperCase() === 'BCE' ? 1n - year : year;
+  return (
+    (y < 0n ? '-' + String(-y).padStart(4, '0') : String(y).padStart(4, '0')) + match[2] + match[4]
+  );
+}
+const date = (p: ReturnType<typeof parts>) => {
+  const [year, era] = eraYear(p.year).split(' ');
+  return `${year.padStart(4, '0')}-${p.month}-${p.day} ${era}`;
+};
+function deepYear(year: string): string {
+  const y = BigInt(year);
+  if (y <= -1000000n) return printNumber(Q.from(2000n - y, 1000000n), 6) + ' mya';
+  if (y >= 1000000n) return printNumber(Q.from(y - 2000n, 1000000n), 6) + ' Myr after 2000 CE';
+  return eraYear(year);
+}
 function precision(context: PresentationContext): Q {
   return unitsPerPixel(context).mul(
     Q.parseDecimal((context.spacingPixels ?? (context.purpose === 'axis' ? 115 : 6)).toString()),
@@ -35,7 +65,7 @@ function abbreviatedDate(p: ReturnType<typeof parts>, base: ReturnType<typeof pa
 /** Input/tooltip text remains an exact isomorphism; chart text intentionally omits invisible detail. */
 export function printCalendar(time: Q, offset: number, context?: PresentationContext): string {
   if (!context || context.purpose === 'input' || context.purpose === 'tooltip')
-    return printTimestamp(time, offset);
+    return eraTimestamp(printTimestamp(time, offset));
   const resolution = precision(context),
     base = parts(context.left, offset);
   if (resolution.compare(Q.from(1n, 1000000n)) < 0)
@@ -46,11 +76,12 @@ export function printCalendar(time: Q, offset: number, context?: PresentationCon
   const rounded = decimals > 0 ? Q.parseDecimal(fixedDecimal(time, decimals)) : time;
   const p = parts(rounded, offset),
     end = parts(context.left.add(context.span), offset);
-  if (resolution.compare(Q.from(31557600n)) >= 0) return p.year;
+  if (resolution.compare(Q.from(31557600n)) >= 0)
+    return resolution.compare(Q.from(315576000000n)) >= 0 ? deepYear(p.year) : eraYear(p.year);
   if (resolution.compare(Q.from(2419200n)) >= 0)
     return base.year === end.year && p.year === base.year
       ? MONTHS[Number(p.month) - 1]
-      : `${p.year}-${p.month}`;
+      : `${eraYear(p.year).split(' ')[0]}-${p.month} ${eraYear(p.year).split(' ')[1]}`;
   const shortDate = abbreviatedDate(p, base);
   if (resolution.compare(DAY) >= 0) return shortDate;
   // Pick fields once for the entire window. Crossing a minute/hour/day must not
@@ -82,7 +113,9 @@ export function describeCalendar(offset: number, context: PresentationContext): 
     Q.parseDecimal(Math.min(6, context.spacingPixels ?? 6).toString()),
   );
   if (eventResolution.compare(Q.from(1n, 1000000n)) < 0)
-    return `Δ from ${printTimestamp(context.left, offset)} · ${zone}`;
+    return `Δ from ${eraTimestamp(printTimestamp(context.left, offset))} · ${zone}`;
+  if (precision(context).compare(Q.from(315576000000n)) >= 0)
+    return `${deepYear(base.year)} → ${deepYear(end.year)} · ages relative to 2000 CE`;
   const dates = date(base) === date(end) ? date(base) : `${date(base)} → ${date(end)}`;
   if (context.span.compare(MINUTE) <= 0) {
     const start = `${base.hour}:${base.minute}`,
@@ -99,7 +132,25 @@ export function describeCalendar(offset: number, context: PresentationContext): 
 
 /** Abbreviations resolve against the left bound's local calendar fields, never the host clock. */
 export function parseCalendar(text: string, offset: number, context?: PresentationContext): Q {
-  const value = text.trim();
+  const age = /^([+]?[\d]+(?:\.\d+)?)\s+(mya|Myr after 2000 CE)$/i.exec(text.trim());
+  if (age) {
+    const years = parseNumber(age[1]).mul(Q.from(1000000n));
+    if (!years.equals(years.floor()))
+      throw new Error('Geological age labels must resolve to whole calendar years.');
+    const amount = BigInt(years.floor().toString().split('/')[0]);
+    const y = age[2].toLowerCase() === 'mya' ? 2000n - amount : 2000n + amount;
+    const year = y < 0n ? '-' + String(-y).padStart(4, '0') : String(y).padStart(4, '0');
+    const zone = offset === 0 ? 'Z' : parts(Q.zero, offset).zone;
+    return parseTimestamp(`${year}-01-01T00:00:00${zone}`);
+  }
+  const value = normalizeEra(text.trim());
+  if (!context && /^[+-]?\d{4,}(?:-\d{2}(?:-\d{2})?)?$/.test(value)) {
+    const components = /^([+-]?\d+)(?:-(\d{2})(?:-(\d{2}))?)?$/.exec(value)!;
+    const zone = offset === 0 ? 'Z' : parts(Q.zero, offset).zone;
+    return parseTimestamp(
+      `${components[1]}-${components[2] ?? '01'}-${components[3] ?? '01'}T00:00:00${zone}`,
+    );
+  }
   if (!context || value.includes('T')) return parseTimestamp(value);
   const base = parts(context.left, offset);
   const delta = /^Δ\s+(.+)s$/.exec(value);

@@ -1,15 +1,22 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
+import { checkZoomHelp } from './zoom-help-browser.mjs';
 import { checkWheelPrecision } from './viewport-browser.mjs';
 import { checkPresentation } from './presentation-browser.mjs';
 import { checkRuler } from './ruler-browser.mjs';
 import { checkSelection } from './selection-browser.mjs';
 import { checkLabelMotion } from './label-motion-browser.mjs';
 import { checkPlugins } from './plugins-browser.mjs';
+import { checkCommunity } from './community-browser.mjs';
 import { checkAccounts } from './accounts-browser.mjs';
+import { checkRemoteCache } from './remote-cache-browser.mjs';
+import { checkComparison } from './comparison-browser.mjs';
+import { checkDesktopCache } from './desktop-cache-browser.mjs';
+import { checkResponsiveTimeline } from './layout-browser.mjs';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium, firefox, webkit } from 'playwright';
-import { Q, validateDocument } from '../dist/core.mjs';
+import { Q, validateDocument, demo } from '../dist/core.mjs';
 
 const engine = process.env.BROWSER ?? 'chromium';
 if (!['chromium', 'firefox', 'webkit'].includes(engine)) throw new Error('Unknown BROWSER');
@@ -63,6 +70,9 @@ try {
   assert.equal(await page.locator('#calendar-mode').count(), 0);
   await poll(async () => (await markers.count()) > 0);
   assert.match(await input('event-count').textContent(), /10 events/);
+  await checkResponsiveTimeline(page);
+  await page.reload();
+  await checkResponsiveTimeline(page);
   await page.locator('.event-marker:not(.group)').first().click();
   await input('event-title').fill('A renamed moment');
   await page.waitForFunction(() =>
@@ -95,8 +105,13 @@ try {
   await page.mouse.wheel(0, -120);
   await poll(async () => (await span()).compare(oldSpan) < 0);
   await checkWheelPrecision(page);
+  await checkZoomHelp(page);
 
-  await input('dense-demo').click();
+  await input('json-file').setInputFiles({
+    name: 'sample.ochx',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(demo(true))),
+  });
   await poll(async () => (await input('event-count').textContent()).includes('20,010'));
   const dense = page.locator('.event-marker').filter({ hasText: '20k' });
   await poll(async () => (await dense.count()) === 1);
@@ -105,8 +120,24 @@ try {
   await input('group-zoom').click();
   await poll(async () => (await markers.count()) > 5);
   assert((await markers.count()) < 200);
+  const firstGroupTitle = await input('group-events').getByRole('button').first().textContent();
+  assert.equal(await input('group-events').getByRole('button').count(), 25);
   await input('group-more').click();
-  assert((await input('group-events').getByRole('button').count()) <= 100);
+  await poll(async () => (await input('group-page-status').textContent()).startsWith('Page 2'));
+  assert.equal(await input('group-events').getByRole('button').count(), 25);
+  assert.notEqual(
+    await input('group-events').getByRole('button').first().textContent(),
+    firstGroupTitle,
+  );
+  await input('group-previous').click();
+  await poll(async () => (await input('group-page-status').textContent()).startsWith('Page 1'));
+  assert.equal(
+    await input('group-events').getByRole('button').first().textContent(),
+    firstGroupTitle,
+  );
+  await input('group-events').getByRole('button').first().click();
+  assert.equal(await input('group-events').getByRole('button').count(), 0);
+  await input('close-inspector').click();
   await input('fit-button').click();
 
   const huge = 10n ** 300n,
@@ -177,17 +208,22 @@ try {
     await poll(() => input('event-form').isVisible());
     assert.equal(await input('event-title').inputValue(), 'First');
   }
-  // Browser draft persistence must preserve rational strings without number conversion.
+  // Guest edits are ephemeral and explicitly exported; refresh starts a fresh session.
   await new Promise((r) => setTimeout(r, 900));
   await page.reload();
-  await poll(async () => (await input('timeline-title').inputValue()) === document.title);
+  await poll(async () => (await input('timeline-title').inputValue()) !== document.title);
+  assert(await input('memory-notice').isVisible());
   await input('fit-button').click();
   await mkdir('artifacts', { recursive: true });
   await page.screenshot({ path: `artifacts/timeline-${engine}.png`, fullPage: true });
   assert.deepEqual(errors, []);
   await checkAccounts(browser);
+  await checkCommunity(browser);
+  await checkRemoteCache(browser);
+  await checkDesktopCache(browser);
+  await checkComparison(browser);
   console.log(
-    `PASS ${engine}: editing, pan/zoom, dense summaries, exact JSON, draft persistence${engine === 'chromium' ? ', touch pan/pinch/tap' : ''}.`,
+    `PASS ${engine}: editing, pan/zoom, dense summaries, exact JSON, in-memory guest editing${engine === 'chromium' ? ', touch pan/pinch/tap' : ''}.`,
   );
 } catch (error) {
   await mkdir('artifacts', { recursive: true });

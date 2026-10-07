@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -61,6 +62,8 @@ export async function checkAccounts(browser) {
       user = { id: 'u', username: 'account' };
       value = { user, csrf: 'test-csrf' };
     } else if (path === '/api/timelines') value = { timelines: [] };
+    else if (path === '/api/timelines/search')
+      value = { timelines: [], total: 0, page: 1, pages: 0 };
     else if (path === '/api/auth/account')
       value = {
         identities: [],
@@ -84,7 +87,8 @@ export async function checkAccounts(browser) {
   page.on('dialog', (dialog) => dialog.accept());
   try {
     await page.goto(origin);
-    await poll(() => page.locator('#och-import').isVisible());
+    await page.locator('#dashboard-new').click();
+    assert(await page.locator('#och-import').isHidden());
     assert.equal(await page.locator('#calendar-mode').count(), 0);
     await page.locator('#account-button').click();
     for (const provider of ['google', 'github', 'facebook'])
@@ -94,6 +98,7 @@ export async function checkAccounts(browser) {
     await page.locator('button[value="login"]').click();
     await poll(async () => (await page.locator('#account-button').textContent()) === '@account');
     assert.equal(await page.locator('#account-password').inputValue(), '');
+    await page.locator('#dashboard-new').click();
     await page.locator('#timeline-title').fill('Pending OAuth edits');
     await page.locator('#timeline-title').dispatchEvent('change');
     await page.locator('#account-button').click();
@@ -133,6 +138,7 @@ export async function checkAccounts(browser) {
     window.nativeCalls = [];
     let user = null;
     let origin = 'https://timescale.info';
+    let serverDocument;
     window.__TAURI__ = {
       core: {
         async invoke(command, args) {
@@ -154,9 +160,16 @@ export async function checkAccounts(browser) {
             user = { id: 'u', username: 'account' };
             return { user, csrf: 'test-csrf' };
           }
-          if (command === 'desktop_save') return '/tmp/local.och';
+          if (command === 'desktop_save')
+            return {
+              path: '/tmp/local.och',
+              generation: 1,
+              event_count: String(args.document.events.length),
+              document: { ...args.document, events: [] },
+            };
           if (command === 'desktop_request') {
             const { path, method, data } = args;
+            if (path === 'timelines' && method === 'POST') serverDocument = data;
             const body =
               path === 'session'
                 ? {
@@ -181,9 +194,15 @@ export async function checkAccounts(browser) {
                         canEdit: true,
                         canShare: true,
                       }
-                    : path.endsWith('/members')
-                      ? { members: [] }
-                      : null;
+                    : path.endsWith('/revision')
+                      ? { id: path.split('/')[1], revision: '1' }
+                      : path.endsWith('/document')
+                        ? { document: serverDocument }
+                        : path.endsWith('/query')
+                          ? { groups: [], visitedNodes: 0 }
+                          : path.endsWith('/members')
+                            ? { members: [] }
+                            : null;
             if (!body) throw new Error('Unexpected native API ' + path);
             return { status: method === 'POST' ? 201 : 200, body };
           }
@@ -220,7 +239,7 @@ export async function checkAccounts(browser) {
     await nativePage.locator('#share-button').click();
     assert.equal(
       await nativePage.locator('#sharing-link').textContent(),
-      'https://timescale.info/#timeline/00000000-0000-0000-0000-000000000001',
+      'https://timescale.info/timelines/00000000-0000-0000-0000-000000000001',
     );
     await nativePage.locator('[data-close="sharing-dialog"]').click();
     await nativePage.locator('#timeline-title').fill('Edited locally and remotely');

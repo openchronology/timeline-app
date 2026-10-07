@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.openchronology.desktop",
   "build": {
-    "beforeDevCommand": "node scripts/build.mjs && node scripts/dev.mjs",
+    "beforeDevCommand": "node scripts/build.mjs && node scripts/dev-editor.mjs",
     "devUrl": "http://localhost:5173",
     "beforeBuildCommand": "node scripts/build.mjs",
     "frontendDist": "../dist"
@@ -27,11 +27,20 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb"],
-    "icon": ["icons/icon.png"],
+    "targets": [
+      "deb"
+    ],
+    "icon": [
+      "icons/icon.png"
+    ],
     "linux": {
       "deb": {
-        "depends": ["libgmp10", "libsqlite3-0", "libwebkit2gtk-4.1-0", "libgtk-3-0"]
+        "depends": [
+          "libgmp10",
+          "libsqlite3-0",
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0"
+        ]
       }
     },
     "resources": [
@@ -39,7 +48,14 @@
       "../THIRD_PARTY.md",
       "../dist/THIRD_PARTY.txt",
       "../vendor/sqlite-rational/THIRD_PARTY.md",
-      "../vendor/sqlite-rational/LICENSE"
-    ]
+      "../vendor/sqlite-rational/LICENSE",
+      "../NOTICE",
+      "../legal/TERMS.md",
+      "../legal/PRIVACY.md",
+      "../legal/COPYRIGHT.md",
+      "../legal/LAUNCH.md"
+    ],
+    "license": "GPL-3.0-only",
+    "copyright": "Copyright (c) 2026 Athan Clark"
   }
 }

@@ -1,3 +1,4 @@
+-- Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 CREATE EXTENSION IF NOT EXISTS pgmp;
 CREATE TABLE IF NOT EXISTS oc_users (
   id uuid PRIMARY KEY, username text UNIQUE NOT NULL, password_hash text NOT NULL,
@@ -150,3 +151,206 @@ BEGIN
     END IF;
   END LOOP;
 END $$;
+
+-- Community definitions are immutable, owner-namespaced versions. Timelines retain snapshots.
+CREATE TABLE IF NOT EXISTS oc_plugins (
+  id text NOT NULL, version bigint NOT NULL CHECK(version>0),
+  owner_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE,
+  manifest jsonb NOT NULL, published_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(id,version), CHECK(octet_length(manifest::text)<=32768)
+);
+CREATE INDEX IF NOT EXISTS oc_plugins_owner ON oc_plugins(owner_id);
+
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS tags text[];
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS assets jsonb;
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS featured boolean NOT NULL DEFAULT false;
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS event_text text NOT NULL DEFAULT '';
+CREATE OR REPLACE FUNCTION oc_tag_text(text[]) RETURNS text LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$ SELECT array_to_string($1,' ') $$;
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS search_document tsvector GENERATED ALWAYS AS (
+  setweight(to_tsvector('english',title),'A') ||
+  setweight(to_tsvector('english',coalesce(oc_tag_text(tags),'')),'A') ||
+  setweight(to_tsvector('english',description),'B') ||
+  setweight(to_tsvector('english',event_text),'C')
+) STORED;
+CREATE INDEX IF NOT EXISTS oc_timelines_search ON oc_timelines USING gin(search_document);
+CREATE INDEX IF NOT EXISTS oc_timelines_tags ON oc_timelines USING gin(tags);
+CREATE INDEX IF NOT EXISTS oc_timelines_public ON oc_timelines(updated_at DESC) WHERE visibility='public';
+ALTER TABLE oc_members DROP CONSTRAINT IF EXISTS oc_members_role_check;
+UPDATE oc_members SET role='writer' WHERE role='editor';
+ALTER TABLE oc_members ADD CONSTRAINT oc_members_role_check CHECK(role IN ('viewer','contributor','writer'));
+CREATE TABLE IF NOT EXISTS oc_proposals (
+  id uuid PRIMARY KEY, timeline_id uuid NOT NULL REFERENCES oc_timelines ON DELETE CASCADE,
+  author_id uuid NOT NULL REFERENCES oc_users, title text NOT NULL, body text NOT NULL DEFAULT '',
+  status text NOT NULL DEFAULT 'open' CHECK(status IN ('open','merged','rejected','closed')),
+  base_revision bigint NOT NULL, revision bigint NOT NULL DEFAULT 1,
+  base_document jsonb NOT NULL, document jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+  resolved_by uuid REFERENCES oc_users, merged_revision bigint
+);
+CREATE INDEX IF NOT EXISTS oc_proposals_timeline ON oc_proposals(timeline_id,created_at DESC);
+CREATE TABLE IF NOT EXISTS oc_proposal_comments (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  proposal_id uuid NOT NULL REFERENCES oc_proposals ON DELETE CASCADE,
+  author_id uuid NOT NULL REFERENCES oc_users, body text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS oc_proposal_comments_page ON oc_proposal_comments(proposal_id,id);
+
+-- Existing timelines become searchable without requiring their owner to resave them.
+UPDATE oc_timelines t SET event_text=coalesce((
+  SELECT left(string_agg(left(coalesce(e->'metadata'->>'title','') || ' ' || coalesce(e->'metadata'->>'description',''),4096),' '),1048576)
+  FROM oc_nodes n CROSS JOIN LATERAL jsonb_array_elements(n.events) e
+  WHERE n.timeline_id=t.id
+),'') WHERE t.event_text='' AND EXISTS (SELECT 1 FROM oc_nodes n WHERE n.timeline_id=t.id);
+
+-- Saved documents and their ancestry are separate from the current rational index.
+CREATE TABLE IF NOT EXISTS oc_snapshots (
+  id uuid PRIMARY KEY, document jsonb NOT NULL
+);
+CREATE TABLE IF NOT EXISTS oc_revisions (
+  id uuid PRIMARY KEY, timeline_id uuid NOT NULL, number bigint,
+  snapshot_id uuid NOT NULL REFERENCES oc_snapshots,
+  author_id uuid, kind text NOT NULL CHECK(kind IN ('baseline','save','fork','duplicate','sync','merge','proposal','rebase')),
+  created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(timeline_id,number)
+);
+CREATE TABLE IF NOT EXISTS oc_revision_parents (
+  revision_id uuid NOT NULL REFERENCES oc_revisions, parent_id uuid NOT NULL REFERENCES oc_revisions,
+  position integer NOT NULL CHECK(position IN (0,1)), PRIMARY KEY(revision_id,position),
+  UNIQUE(revision_id,parent_id), CHECK(revision_id<>parent_id)
+);
+CREATE INDEX IF NOT EXISTS oc_revision_parent_lookup ON oc_revision_parents(parent_id);
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS head_revision_id uuid REFERENCES oc_revisions;
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS upstream_id uuid REFERENCES oc_timelines ON DELETE SET NULL;
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS fork_base_revision_id uuid REFERENCES oc_revisions;
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS allow_private_forks boolean NOT NULL DEFAULT false;
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS publication_restricted boolean NOT NULL DEFAULT false;
+ALTER TABLE oc_proposals ADD COLUMN IF NOT EXISTS base_revision_id uuid REFERENCES oc_revisions;
+ALTER TABLE oc_proposals ADD COLUMN IF NOT EXISTS source_timeline_id uuid REFERENCES oc_timelines ON DELETE SET NULL;
+ALTER TABLE oc_proposals ADD COLUMN IF NOT EXISTS source_revision_id uuid REFERENCES oc_revisions;
+ALTER TABLE oc_proposals ADD COLUMN IF NOT EXISTS merged_revision_id uuid REFERENCES oc_revisions;
+ALTER TABLE oc_proposals ADD COLUMN IF NOT EXISTS from_fork boolean NOT NULL DEFAULT false;
+
+-- Recover the current saved state of older installations, without inventing lost history.
+INSERT INTO oc_snapshots(id,document)
+SELECT t.id,jsonb_build_object('format','openchronology','version',1,'title',t.title,'description',t.description,
+  'events',coalesce((SELECT jsonb_agg(e.event) FROM oc_events(t.id,NULL,NULL,NULL,NULL,200001) AS e(event)),'[]'::jsonb))
+  || CASE WHEN t.presentation IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('presentation',t.presentation) END
+  || CASE WHEN t.plugins IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('plugins',t.plugins) END
+  || CASE WHEN t.tags IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('tags',t.tags) END
+  || CASE WHEN t.assets IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('assets',t.assets) END
+FROM oc_timelines t WHERE t.head_revision_id IS NULL ON CONFLICT DO NOTHING;
+INSERT INTO oc_revisions(id,timeline_id,number,snapshot_id,author_id,kind)
+SELECT id,id,revision,id,owner_id,'baseline' FROM oc_timelines WHERE head_revision_id IS NULL ON CONFLICT DO NOTHING;
+UPDATE oc_timelines SET head_revision_id=id WHERE head_revision_id IS NULL;
+
+-- Older open/closed reviews already retained their documents; give those
+-- documents immutable IDs too. Their lost ancestry cannot be reconstructed.
+INSERT INTO oc_snapshots(id,document)
+SELECT md5('oc-proposal-base:'||id::text)::uuid,base_document FROM oc_proposals WHERE base_revision_id IS NULL
+ON CONFLICT DO NOTHING;
+INSERT INTO oc_snapshots(id,document)
+SELECT md5('oc-proposal-source:'||id::text)::uuid,document FROM oc_proposals WHERE source_revision_id IS NULL
+ON CONFLICT DO NOTHING;
+INSERT INTO oc_revisions(id,timeline_id,snapshot_id,kind)
+SELECT md5('oc-proposal-base:'||id::text)::uuid,timeline_id,md5('oc-proposal-base:'||id::text)::uuid,'baseline'
+FROM oc_proposals WHERE base_revision_id IS NULL ON CONFLICT DO NOTHING;
+INSERT INTO oc_revisions(id,timeline_id,snapshot_id,author_id,kind)
+SELECT md5('oc-proposal-source:'||id::text)::uuid,timeline_id,md5('oc-proposal-source:'||id::text)::uuid,author_id,'proposal'
+FROM oc_proposals WHERE source_revision_id IS NULL ON CONFLICT DO NOTHING;
+INSERT INTO oc_revision_parents(revision_id,parent_id,position)
+SELECT md5('oc-proposal-source:'||id::text)::uuid,coalesce(base_revision_id,md5('oc-proposal-base:'||id::text)::uuid),0
+FROM oc_proposals WHERE source_revision_id IS NULL ON CONFLICT DO NOTHING;
+UPDATE oc_proposals SET base_revision_id=coalesce(base_revision_id,md5('oc-proposal-base:'||id::text)::uuid),
+  source_revision_id=coalesce(source_revision_id,md5('oc-proposal-source:'||id::text)::uuid)
+WHERE base_revision_id IS NULL OR source_revision_id IS NULL;
+
+CREATE OR REPLACE FUNCTION oc_immutable_revision() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN RAISE EXCEPTION 'Saved history is immutable'; END $$;
+DROP TRIGGER IF EXISTS oc_revision_immutable ON oc_revisions;
+CREATE TRIGGER oc_revision_immutable BEFORE UPDATE ON oc_revisions FOR EACH ROW EXECUTE FUNCTION oc_immutable_revision();
+DROP TRIGGER IF EXISTS oc_snapshot_immutable ON oc_snapshots;
+CREATE TRIGGER oc_snapshot_immutable BEFORE UPDATE ON oc_snapshots FOR EACH ROW EXECUTE FUNCTION oc_immutable_revision();
+DROP TRIGGER IF EXISTS oc_parent_immutable ON oc_revision_parents;
+CREATE TRIGGER oc_parent_immutable BEFORE UPDATE ON oc_revision_parents FOR EACH ROW EXECUTE FUNCTION oc_immutable_revision();
+
+-- Verified contact, bounded primary-authentication challenges and application-level MFA.
+ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS email text;
+ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS email_verified_at timestamptz;
+CREATE UNIQUE INDEX IF NOT EXISTS oc_users_email ON oc_users(lower(email)) WHERE email IS NOT NULL;
+ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS mfa_secret text;
+ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS mfa_enabled boolean NOT NULL DEFAULT false;
+ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS mfa_last_step bigint NOT NULL DEFAULT -1;
+ALTER TABLE oc_sessions ADD COLUMN IF NOT EXISTS mfa_verified boolean NOT NULL DEFAULT false;
+CREATE TABLE IF NOT EXISTS oc_registrations (
+  token_hash text PRIMARY KEY, id uuid NOT NULL, username text NOT NULL, email text NOT NULL,
+  password_hash text NOT NULL, browser_hash text NOT NULL, expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS oc_registrations_expiry ON oc_registrations(expires_at);
+CREATE TABLE IF NOT EXISTS oc_auth_challenges (
+  token_hash text PRIMARY KEY,user_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE,
+  browser_hash text NOT NULL,purpose text NOT NULL CHECK(purpose IN ('mfa','email')),
+  kind text NOT NULL CHECK(kind IN ('web','desktop')),return_to text NOT NULL DEFAULT '/',
+  attempts integer NOT NULL DEFAULT 0,expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS oc_auth_challenges_expiry ON oc_auth_challenges(expires_at);
+CREATE TABLE IF NOT EXISTS oc_email_tokens (
+  token_hash text PRIMARY KEY,user_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE,
+  purpose text NOT NULL CHECK(purpose IN ('verify','reset','change')),email text NOT NULL,
+  browser_hash text,old_email text,expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS oc_email_tokens_expiry ON oc_email_tokens(expires_at);
+CREATE TABLE IF NOT EXISTS oc_mfa_setups (
+  user_id uuid PRIMARY KEY REFERENCES oc_users ON DELETE CASCADE,session_hash text NOT NULL,
+  secret text NOT NULL,expires_at timestamptz NOT NULL
+);
+CREATE TABLE IF NOT EXISTS oc_recovery_codes (
+  user_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE,code_hash text NOT NULL,
+  PRIMARY KEY(user_id,code_hash)
+);
+CREATE TABLE IF NOT EXISTS oc_mail_outbox (
+  id uuid PRIMARY KEY,payload text NOT NULL,attempts integer NOT NULL DEFAULT 0,
+  next_attempt_at timestamptz NOT NULL DEFAULT now(),created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS oc_mail_outbox_pending ON oc_mail_outbox(next_attempt_at);
+
+ALTER TABLE oc_device_logins ADD COLUMN IF NOT EXISTS mfa_verified boolean NOT NULL DEFAULT false;
+
+-- Transactional, cross-process live invalidation. No timeline contents are broadcast.
+CREATE OR REPLACE FUNCTION oc_notify_timeline() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM pg_notify('oc_timeline_changes', COALESCE(NEW.id,OLD.id)::text);
+  RETURN NULL;
+END $$;
+DROP TRIGGER IF EXISTS oc_timelines_live ON oc_timelines;
+CREATE TRIGGER oc_timelines_live AFTER INSERT OR UPDATE OR DELETE ON oc_timelines
+FOR EACH ROW EXECUTE FUNCTION oc_notify_timeline();
+CREATE OR REPLACE FUNCTION oc_notify_membership() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM pg_notify('oc_timeline_changes', COALESCE(NEW.timeline_id,OLD.timeline_id)::text);
+  RETURN NULL;
+END $$;
+DROP TRIGGER IF EXISTS oc_members_live ON oc_members;
+CREATE TRIGGER oc_members_live AFTER INSERT OR UPDATE OR DELETE ON oc_members
+FOR EACH ROW EXECUTE FUNCTION oc_notify_membership();
+
+-- Operator seed enrichments run once, preserving later deliberate plugin removals.
+CREATE TABLE IF NOT EXISTS oc_seed_updates (
+  timeline_id uuid NOT NULL REFERENCES oc_timelines ON DELETE CASCADE,
+  update_key text NOT NULL,
+  applied_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(timeline_id, update_key)
+);
+
+-- Size admission for complete browser copies, measured before serving a document.
+ALTER TABLE oc_snapshots ADD COLUMN IF NOT EXISTS document_bytes bigint CHECK(document_bytes>=0);
+-- One-time operator migration: JSONB text size is a conservative upper bound on
+-- compact exported JSON. Requests never perform this measurement themselves.
+-- This metadata-only backfill runs under the migration transaction/table lock;
+-- restore the snapshot guard before commit. The saved documents remain unchanged.
+ALTER TABLE oc_snapshots DISABLE TRIGGER oc_snapshot_immutable;
+UPDATE oc_snapshots SET document_bytes=octet_length(document::text) WHERE document_bytes IS NULL;
+ALTER TABLE oc_snapshots ENABLE TRIGGER oc_snapshot_immutable;
+
+-- Saved comparisons are live references, not materialized event indexes.
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS comparison jsonb;

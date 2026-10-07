@@ -1,4 +1,6 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
+import { checkZoomHelp } from './zoom-help-browser.mjs';
 import { checkWheelPrecision } from './viewport-browser.mjs';
 import { checkPresentation } from './presentation-browser.mjs';
 import { checkRuler } from './ruler-browser.mjs';
@@ -10,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium, firefox, webkit } from 'playwright';
-import { Q, validateDocument } from '../dist/core.mjs';
+import { Q, validateDocument, demo } from '../dist/core.mjs';
 
 const engine = process.env.BROWSER ?? 'chromium';
 if (!['chromium', 'firefox', 'webkit'].includes(engine)) throw new Error('Unknown BROWSER');
@@ -70,6 +72,8 @@ try {
   await page.goto(url + '#timeline/00000000-0000-0000-0000-000000000001');
   assert.equal(await page.locator('#calendar-mode').count(), 0);
   await poll(async () => (await input('storage-badge').textContent()) === 'Offline HTML');
+  assert(await input('memory-notice').isVisible());
+  assert.match(await input('memory-notice').textContent(), /Export an .ochx/);
   assert.match(await input('event-count').textContent(), /0 events/);
   for (const id of [
     'account-button',
@@ -103,6 +107,7 @@ try {
   await page.mouse.wheel(0, -100);
   await poll(async () => (await input('right-bound').inputValue()) !== oldRight);
   await checkWheelPrecision(page);
+  await checkZoomHelp(page);
 
   const offset = 10n ** 300n,
     denominator = 10n ** 200n;
@@ -156,7 +161,11 @@ try {
   await checkSelection(page, document);
   await checkLabelMotion(page, document);
   await checkPlugins(page, document, true);
-  await input('dense-demo').click();
+  await input('json-file').setInputFiles({
+    name: 'sample.ochx',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(demo(true))),
+  });
   await poll(async () => (await input('event-count').textContent()).includes('20,010'));
   const group = markers.filter({ hasText: '20k' });
   await group.click();

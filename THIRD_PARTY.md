@@ -7,6 +7,7 @@
 - **SQLite**, public domain; linked from the system package in desktop and server-converter builds.
 - **reqwest 0.12.28**, MIT/Apache-2.0; native HTTPS transport, with **rustls** and **webpki-roots** as recorded in `src-tauri/Cargo.lock`. Their licenses remain in the crate packages.
 - **Tauri and its Rust dependencies**, MIT/Apache-2.0 and other licenses recorded in crate packages and `src-tauri/Cargo.lock`. **serde/serde_json**, MIT/Apache-2.0.
+- **Next.js 16.3.8**, MIT (Vercel); **React / React DOM 19.2.8**, MIT (Meta and contributors). Their original licenses are retained in installed packages and the standalone server distribution. The platform browser bundles retain dependency license notices. These packages are used only by the hosted platform, not the standalone HTML or Tauri editor.
 - **node-postgres**, MIT. **esbuild**, MIT. **TypeScript**, Apache-2.0. **Playwright**, Apache-2.0. JavaScript dependency versions are in `package-lock.json`.
 
-The Debian package includes this file, the application's MIT license, the SQLite extension's license/notices, and the browser dependency license notices. System GMP, SQLite, GTK, and WebKit packages retain their own licenses.
+The Debian package includes this file, the application's GPLv3 license, the SQLite extension's license/notices, and the browser dependency license notices. System GMP, SQLite, GTK, and WebKit packages retain their own licenses.
