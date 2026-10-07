@@ -37,6 +37,7 @@ export async function checkZoomHelp(page) {
   assert.equal((await camera()).span.toString(), target.span.toString());
 
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.waitForFunction(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
   await page.evaluate(() => document.getElementById('zoom-out').click());
   assert.equal(await stage.getAttribute('data-zooming'), null);
   await page.emulateMedia({ reducedMotion: 'no-preference' });

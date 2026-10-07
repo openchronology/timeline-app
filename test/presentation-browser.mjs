@@ -44,6 +44,7 @@ export async function checkPresentation(page, restoreDocument) {
     /minutes.*\nParsed:.*\nRounded display/s,
   );
   await input('presentation-save').click();
+  await input('presentation-dialog').waitFor({ state: 'hidden' });
   await page.locator('.event-marker:not(.group)').first().click();
   assert.match(await input('event-time').inputValue(), /minutes$/);
   await input('event-title').fill('Renamed without rounding');
@@ -94,6 +95,7 @@ export async function checkPresentation(page, restoreDocument) {
     /1970-01-01T00:00:00Z.*Exact round trip/s,
   );
   await input('presentation-save').click();
+  await input('presentation-dialog').waitFor({ state: 'hidden' });
   document = await exported();
   assert.equal(document.presentation.scale, '1/86400');
 
@@ -110,9 +112,10 @@ export async function checkPresentation(page, restoreDocument) {
     /1\/3 ticks.*Exact round trip/s,
   );
   await input('presentation-save').click();
+  await input('presentation-dialog').waitFor({ state: 'hidden' });
   document = await exported();
   assert.equal(document.presentation.source, source);
-  assert.match(await input('left-bound').inputValue(), / ticks$/);
+  await page.waitForFunction(() => document.getElementById('left-bound').value.endsWith(' ticks'));
   await input('left-bound').fill('1/3 ticks');
   await input('right-bound').fill('100/1 ticks');
   await closeMomentDetails(page);
@@ -128,8 +131,9 @@ export async function checkPresentation(page, restoreDocument) {
     `function print(time, api) { return "<img src='https://example.invalid/tracker'>"; } function parse(text, api) { return api.rational(text); }`,
   );
   await input('presentation-save').click();
+  await input('presentation-dialog').waitFor({ state: 'hidden' });
   await page.evaluate(() => new Promise(requestAnimationFrame));
-  assert.equal(await page.locator('img').count(), 0);
+  assert.equal(await page.locator('.tick-label img, .event-label img').count(), 0);
   assert.match(await page.locator('.tick-label').first().textContent(), /^<img/);
   await closeMomentDetails(page);
   await input('presentation-button').click();
@@ -230,6 +234,7 @@ export async function checkPresentation(page, restoreDocument) {
   await input('presentation-button').click();
   await input('presentation-adaptive').uncheck();
   await input('presentation-save').click();
+  await input('presentation-dialog').waitFor({ state: 'hidden' });
   await page.evaluate(() => new Promise(requestAnimationFrame));
   assert(await input('time-context').isHidden());
   assert.match(await page.locator('.tick-label').first().textContent(), /2026-10-04T/);

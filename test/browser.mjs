@@ -109,7 +109,8 @@ try {
   assert(await input('event-form').isVisible());
   await closeMomentDetails(page);
   const oldSpan = await span();
-  await page.mouse.move(box.x + 350, box.y + 130);
+  const wheelBox = await stage.boundingBox();
+  await page.mouse.move(wheelBox.x + 350, wheelBox.y + 130);
   await page.mouse.wheel(0, -120);
   await poll(async () => (await span()).compare(oldSpan) < 0);
   await checkWheelPrecision(page);
