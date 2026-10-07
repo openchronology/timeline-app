@@ -1,7 +1,14 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { Rational as Q } from 'rational-ordered-map';
 import { parseTimestamp, printTimestamp } from './calendar.js';
-import { decimalExponent, fixedDecimal, parseNumber, printNumber } from './numeric.js';
+import {
+  decimalExponent,
+  fixedDecimal,
+  parseNumber,
+  printNumber,
+  printSI,
+  parseSI,
+} from './numeric.js';
 import { unitsPerPixel } from './view-context.js';
 import type { PresentationContext } from './view-context.js';
 
@@ -50,8 +57,25 @@ const date = (p: ReturnType<typeof parts>) => {
 };
 function deepYear(year: string): string {
   const y = BigInt(year);
-  if (y <= -1000000n) return printNumber(Q.from(2000n - y, 1000000n), 6) + ' mya';
-  if (y >= 1000000n) return printNumber(Q.from(y - 2000n, 1000000n), 6) + ' Myr after 2000 CE';
+  if (y <= -1000000n) {
+    const age = Q.from(2000n - y);
+    const exponent = Math.max(6, Math.floor(decimalExponent(age) / 3) * 3);
+    const units: Record<number, string> = {
+      6: 'mya',
+      9: 'bya',
+      12: 'tya',
+      15: 'pya',
+      18: 'eya',
+      21: 'zya',
+      24: 'yya',
+      27: 'rya',
+      30: 'qya',
+    };
+    return units[exponent]
+      ? printNumber(age.div(Q.from(10n ** BigInt(exponent))), 6) + ' ' + units[exponent]
+      : printNumber(age, 6, true) + ' years ago';
+  }
+  if (y >= 1000000n) return printSI(Q.from(y - 2000n), 6, 'yr') + ' after 2000 CE';
   return eraYear(year);
 }
 function precision(context: PresentationContext): Q {
@@ -68,8 +92,7 @@ export function printCalendar(time: Q, offset: number, context?: PresentationCon
     return eraTimestamp(printTimestamp(time, offset));
   const resolution = precision(context),
     base = parts(context.left, offset);
-  if (resolution.compare(Q.from(1n, 1000000n)) < 0)
-    return 'Δ ' + printNumber(time.sub(context.left), 6) + 's';
+  if (relativeCalendar(context)) return 'Δ ' + printSI(time.sub(context.left), 6, 's');
   const decimals =
     resolution.compare(Q.one) < 0 ? Math.min(6, Math.max(0, -decimalExponent(resolution))) : 0;
   // Only subsecond rounding can carry into another minute/day. Whole calendar fields denote buckets.
@@ -109,10 +132,7 @@ export function describeCalendar(offset: number, context: PresentationContext): 
   const zone = offset === 0 ? 'UTC' : 'UTC' + base.zone;
   // The common caption must explain relative event labels even when ruler labels
   // still have enough space to use absolute fractional seconds.
-  const eventResolution = unitsPerPixel(context).mul(
-    Q.parseDecimal(Math.min(6, context.spacingPixels ?? 6).toString()),
-  );
-  if (eventResolution.compare(Q.from(1n, 1000000n)) < 0)
+  if (relativeCalendar(context))
     return `Δ from ${eraTimestamp(printTimestamp(context.left, offset))} · ${zone}`;
   if (precision(context).compare(Q.from(315576000000n)) >= 0)
     return `${deepYear(base.year)} → ${deepYear(end.year)} · ages relative to 2000 CE`;
@@ -132,13 +152,31 @@ export function describeCalendar(offset: number, context: PresentationContext): 
 
 /** Abbreviations resolve against the left bound's local calendar fields, never the host clock. */
 export function parseCalendar(text: string, offset: number, context?: PresentationContext): Q {
-  const age = /^([+]?[\d]+(?:\.\d+)?)\s+(mya|Myr after 2000 CE)$/i.exec(text.trim());
+  const age =
+    /^([+]?[\d]+(?:\.\d+)?(?:e[+-]?\d+)?)\s+(mya|bya|tya|pya|eya|zya|yya|rya|qya|years ago|[kMGTPEZYRQ]?yr after 2000 CE)$/i.exec(
+      text.trim(),
+    );
   if (age) {
-    const years = parseNumber(age[1]).mul(Q.from(1000000n));
+    const exponents: Record<string, number> = {
+      mya: 6,
+      bya: 9,
+      tya: 12,
+      pya: 15,
+      eya: 18,
+      zya: 21,
+      yya: 24,
+      rya: 27,
+      qya: 30,
+      'years ago': 0,
+    };
+    const future = /after 2000 CE$/i.test(age[2]);
+    const years = future
+      ? parseSI(age[1] + ' ' + age[2].replace(/ after 2000 CE$/i, ''), 'yr')
+      : parseNumber(age[1]).mul(Q.from(10n ** BigInt(exponents[age[2].toLowerCase()])));
     if (!years.equals(years.floor()))
       throw new Error('Geological age labels must resolve to whole calendar years.');
     const amount = BigInt(years.floor().toString().split('/')[0]);
-    const y = age[2].toLowerCase() === 'mya' ? 2000n - amount : 2000n + amount;
+    const y = !future ? 2000n - amount : 2000n + amount;
     const year = y < 0n ? '-' + String(-y).padStart(4, '0') : String(y).padStart(4, '0');
     const zone = offset === 0 ? 'Z' : parts(Q.zero, offset).zone;
     return parseTimestamp(`${year}-01-01T00:00:00${zone}`);
@@ -153,8 +191,8 @@ export function parseCalendar(text: string, offset: number, context?: Presentati
   }
   if (!context || value.includes('T')) return parseTimestamp(value);
   const base = parts(context.left, offset);
-  const delta = /^Δ\s+(.+)s$/.exec(value);
-  if (delta) return context.left.add(parseNumber(delta[1]));
+  const delta = /^Δ\s+(.+)$/.exec(value);
+  if (delta) return context.left.add(parseSI(delta[1], 's'));
   let year = base.year,
     month = base.month,
     day = base.day;
@@ -223,4 +261,11 @@ export function parseCalendar(text: string, offset: number, context?: Presentati
     if (next.compare(context.left.add(context.span)) <= 0) result = next;
   }
   return result;
+}
+
+function relativeCalendar(context: PresentationContext): boolean {
+  return (
+    context.span.compare(Q.one) <= 0 &&
+    unitsPerPixel(context).mul(Q.from(6n)).compare(Q.from(1n, 1000n)) < 0
+  );
 }

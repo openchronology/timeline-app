@@ -49,6 +49,13 @@ const document = validateDocument({
         iconUrl: 'https://images.example/icon.png',
         color: '#cb4545',
         nested: { value: true },
+        durations: [
+          {
+            id: 'linked',
+            endId: 'c',
+            metadata: { title: 'Exchange band', description: 'Retained duration metadata' },
+          },
+        ],
         stack: [
           {
             id: 'child',

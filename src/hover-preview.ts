@@ -5,7 +5,11 @@ import { renderMarkdown } from './rich-text.js';
 import type { InstalledPlugin } from './plugins.js';
 
 /** Host-owned preview: manifests never supply HTML or executable handlers. */
-export function createHoverPreview(stage: HTMLElement, scale: () => number) {
+export function createHoverPreview(
+  stage: HTMLElement,
+  scale: () => number,
+  select: (button: HTMLButtonElement) => void,
+) {
   const card = document.createElement('div');
   card.className = 'focus-card';
   card.setAttribute('role', 'tooltip');
@@ -156,10 +160,11 @@ export function createHoverPreview(stage: HTMLElement, scale: () => number) {
     }
   });
   card.onclick = (event) => {
+    event.stopPropagation();
     if ((event.target as Element).closest('a')) return;
     const button = target;
     hide();
-    button?.click();
+    if (button) select(button);
   };
   card.onpointerdown = (event) => event.stopPropagation();
   card.addEventListener('wheel', (event) => event.stopPropagation(), { passive: true });

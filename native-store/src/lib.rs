@@ -103,6 +103,40 @@ fn validate(doc: &Document) -> Result<(), String> {
         {
             return Err("Event IDs must be unique ASCII identifiers".into());
         }
+        if let Some(value) = e.metadata.get("durations") {
+            let links = value.as_array().ok_or("Durations must be an array")?;
+            if links.len() > 1000 {
+                return Err("Use at most 1000 durations per moment".into());
+            }
+            for link in links {
+                for key in ["id", "endId"] {
+                    let id = link
+                        .get(key)
+                        .and_then(Value::as_str)
+                        .ok_or("Invalid duration identifier")?;
+                    if id.is_empty()
+                        || id.len() > 128
+                        || !id
+                            .bytes()
+                            .all(|c| c.is_ascii_alphanumeric() || b"_.:-".contains(&c))
+                    {
+                        return Err("Invalid duration identifier".into());
+                    }
+                }
+                let metadata = link
+                    .get("metadata")
+                    .and_then(Value::as_object)
+                    .ok_or("Invalid duration metadata")?;
+                for key in ["title", "description"] {
+                    if metadata.get(key).is_some_and(|v| !v.is_string()) {
+                        return Err("Duration titles and notes must be text".into());
+                    }
+                }
+                if metadata.contains_key("durations") {
+                    return Err("Durations cannot contain durations".into());
+                }
+            }
+        }
         for key in ["title", "description"] {
             if e.metadata.get(key).is_some_and(|v| !v.is_string()) {
                 return Err(format!("Event {key} must be text"));
@@ -180,6 +214,7 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
             )?;
         }
         db.execute("INSERT INTO points(time,value,weight) SELECT time,time,count(*) FROM events GROUP BY time COLLATE RATIONAL_V1",&[])?;
+        rebuild_duration_index(&db)?;
         db.execute("PRAGMA application_id=1329812556", &[])?;
         db.execute("PRAGMA user_version=1", &[])?;
         db.execute("COMMIT", &[])
@@ -595,4 +630,35 @@ mod tests {
         assert_eq!(fs::read(&path).unwrap(), b"{\"format\":\"openchronology\"}");
         fs::remove_file(path).unwrap();
     }
+}
+
+/// Rebuild derived links entirely in SQLite; endpoint coordinates never enter the UI cache.
+fn rebuild_duration_index(db: &Connection) -> Result<(), String> {
+    db.execute("DROP TABLE IF EXISTS duration_nodes", &[])?;
+    db.execute("DROP TABLE IF EXISTS duration_intervals", &[])?;
+    db.execute("CREATE TABLE duration_intervals(ord INTEGER PRIMARY KEY,id TEXT NOT NULL UNIQUE,start_id TEXT NOT NULL,end_id TEXT NOT NULL,first TEXT NOT NULL COLLATE RATIONAL_V1,last TEXT NOT NULL COLLATE RATIONAL_V1,metadata TEXT NOT NULL)", &[])?;
+    if db.scalar("SELECT count(*) FROM events s,json_each(s.metadata,'$.durations') d WHERE json_extract(d.value,'$.endId')=s.id OR NOT EXISTS(SELECT 1 FROM events e WHERE e.id=json_extract(d.value,'$.endId'))",&[])? != "0" { return Err("Duration endpoints must be distinct existing moments".into()); }
+    db.execute("INSERT INTO duration_intervals SELECT row_number() OVER (ORDER BY q_min(s.time,e.time) COLLATE RATIONAL_V1,json_extract(d.value,'$.id')),json_extract(d.value,'$.id'),s.id,e.id,q_min(s.time,e.time),q_max(s.time,e.time),json_extract(d.value,'$.metadata') FROM events s,json_each(s.metadata,'$.durations') d JOIN events e ON e.id=json_extract(d.value,'$.endId') WHERE s.id<>e.id", &[])?;
+    if db
+        .scalar("SELECT count(*) FROM duration_intervals", &[])?
+        .parse::<usize>()
+        .map_err(|e| e.to_string())?
+        > 200000
+    {
+        return Err("Use at most 200000 durations per timeline".into());
+    }
+    db.execute("CREATE TABLE duration_nodes(id INTEGER PRIMARY KEY,left_id INTEGER,right_id INTEGER,min_time TEXT NOT NULL COLLATE RATIONAL_V1,max_time TEXT NOT NULL COLLATE RATIONAL_V1)", &[])?;
+    db.execute("WITH RECURSIVE ranges(lo,hi,mid) AS (SELECT 1,count(*),CAST((1+count(*))/2 AS INTEGER) FROM duration_intervals HAVING count(*)>0 UNION ALL SELECT r.lo,r.mid-1,CAST((r.lo+r.mid-1)/2 AS INTEGER) FROM ranges r WHERE r.lo<r.mid UNION ALL SELECT r.mid+1,r.hi,CAST((r.mid+1+r.hi)/2 AS INTEGER) FROM ranges r WHERE r.mid<r.hi) INSERT INTO duration_nodes SELECT mid,CASE WHEN lo<mid THEN CAST((lo+mid-1)/2 AS INTEGER) END,CASE WHEN mid<hi THEN CAST((mid+1+hi)/2 AS INTEGER) END,(SELECT first FROM duration_intervals WHERE ord=lo),(SELECT last FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY last COLLATE RATIONAL_V1 DESC LIMIT 1) FROM ranges", &[])?;
+    Ok(())
+}
+fn duration_window(db: &Connection, lower: &str, upper: &str) -> Result<Value, String> {
+    let rows=db.query_limited("WITH RECURSIVE visible AS (SELECT n.* FROM duration_nodes n WHERE id=(SELECT CAST((1+count(*))/2 AS INTEGER) FROM duration_intervals) AND min_time<=q(?) COLLATE RATIONAL_V1 AND max_time>=q(?) COLLATE RATIONAL_V1 UNION ALL SELECT n.* FROM visible p JOIN duration_nodes n ON n.id IN(p.left_id,p.right_id) WHERE n.min_time<=q(?) COLLATE RATIONAL_V1 AND n.max_time>=q(?) COLLATE RATIONAL_V1) SELECT d.id,d.start_id,d.end_id,d.first,d.last,(SELECT json_group_object(key,substr(value,1,512)) FROM json_each(d.metadata) WHERE key IN ('title','description') AND type='text'),s.time,e.time FROM visible v JOIN duration_intervals d ON d.ord=v.id JOIN events s ON s.id=d.start_id JOIN events e ON e.id=d.end_id WHERE d.first<=q(?) COLLATE RATIONAL_V1 AND d.last>=q(?) COLLATE RATIONAL_V1 LIMIT 257", &[upper,lower,upper,lower,upper,lower],257,8*1024*1024)?;
+    let more = rows.len() > 256;
+    let mut bands = Vec::new();
+    for row in rows.into_iter().take(256) {
+        let metadata: Value =
+            serde_json::from_str(row[5].as_deref().unwrap_or("{}")).map_err(|e| e.to_string())?;
+        bands.push(serde_json::json!({"id":row[0],"startId":row[1],"endId":row[2],"first":row[3],"last":row[4],"metadata":metadata,"startTime":row[6],"endTime":row[7]}));
+    }
+    Ok(serde_json::json!({"durations":bands,"durationsTruncated":more}))
 }

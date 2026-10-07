@@ -114,7 +114,7 @@ test('deep rational zooms use short relative offsets without fixed-precision los
   const ctx = { ...context(), left: left.add(Q.from(1n, 3n)), span: tiny.mul(Q.from(100n)) };
   const point = ctx.left.add(tiny.mul(Q.from(23n))),
     label = format.print(point, ctx);
-  assert.equal(label, 'Δ 2.3e-1099s');
+  assert.equal(label, 'Δ 2.3e-1099 s');
   assert(label.length < 30);
   assert(format.parse(label, ctx).equals(point));
   assert.match(format.describe(ctx), /^Δ from .*\{\+1\/3\}Z/);
@@ -234,4 +234,60 @@ test('deep Gregorian labels use fixed-reference geological ages but exact inputs
   const future = parseTimestamp('10002000-01-01T00:00:00Z');
   assert.equal(format.print(future, ctx), '10 Myr after 2000 CE');
   assert(format.parse('10 Myr after 2000 CE').equals(future));
+});
+
+test('tiny Gregorian offsets use SI seconds consistently for axes, events and parsers', () => {
+  const format = createPresenter(settings);
+  for (const [denominator, unit] of [
+    [1000n, 'ms'],
+    [1000000n, 'µs'],
+    [1000000000n, 'ns'],
+    [1000000000000n, 'ps'],
+    [10n ** 30n, 'qs'],
+  ]) {
+    const ctx = {
+      left: Q.from(14n),
+      span: Q.from(1n, denominator).mul(Q.from(100n)),
+      widthPixels: 1000,
+      purpose: 'event',
+    };
+    const point = ctx.left.add(Q.from(3n, denominator));
+    const label = format.print(point, ctx);
+    assert(label.includes(unit), label);
+    assert(format.parse(label, ctx).equals(point));
+    assert.match(format.describe({ ...ctx, purpose: 'axis' }), /^Δ from /);
+  }
+});
+test('numeric presenters use a common exact origin when absolute significant digits hide the view', () => {
+  for (const mode of ['float', 'scientific', 'si']) {
+    const format = createPresenter({ ...DEFAULT_PRESENTATION, mode, unit: 's' });
+    const ctx = {
+      left: Q.parseDecimal('14.0928211925852388460329559104031158959'),
+      span: Q.from(1n, 10n ** 50n),
+      widthPixels: 1000,
+      purpose: 'axis',
+    };
+    const a = format.print(ctx.left, ctx),
+      b = format.print(ctx.left.add(ctx.span.div(Q.from(2n))), ctx);
+    assert.notEqual(a, b);
+    assert.match(a, /^Δ /);
+    assert(format.parse(b, ctx).equals(ctx.left.add(ctx.span.div(Q.from(2n)))));
+    assert.match(format.describe(ctx), /^Δ from /);
+    assert.doesNotMatch(format.print(ctx.left, { ...ctx, purpose: 'input' }), /^Δ /);
+  }
+});
+test('geological ages continue beyond millions with parseable billions and trillions', () => {
+  const format = createPresenter(settings);
+  for (const [age, suffix] of [
+    [4500000000n, 'bya'],
+    [1000000000000n, 'tya'],
+    [10n ** 30n, 'qya'],
+  ]) {
+    const y = 2000n - age;
+    const point = parseTimestamp(`${y}-01-01T00:00:00Z`);
+    const ctx = { left: point, span: Q.from(age * 31557600n), widthPixels: 1000, purpose: 'event' };
+    const label = format.print(point, ctx);
+    assert(label.includes(suffix), label);
+    assert(format.parse(label).equals(point));
+  }
 });

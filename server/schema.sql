@@ -502,3 +502,12 @@ BEGIN
     nid:=CASE WHEN oldest THEN n.right_id ELSE n.left_id END;
   END LOOP;
 END $$;
+
+-- Derived exact interval tree; duration definitions remain in immutable event snapshots.
+CREATE TABLE IF NOT EXISTS oc_duration_nodes (
+  timeline_id uuid NOT NULL REFERENCES oc_timelines(id) ON DELETE CASCADE,
+  id integer NOT NULL, left_id integer, right_id integer,
+  min_time mpq NOT NULL, max_time mpq NOT NULL,
+  first_time mpq NOT NULL, last_time mpq NOT NULL, band jsonb NOT NULL,
+  PRIMARY KEY(timeline_id,id)
+);
