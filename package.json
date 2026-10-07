@@ -28,17 +28,17 @@
     "seed": "node server/seed.mjs"
   },
   "dependencies": {
-    "rational-ordered-map": "file:vendor/rational-ordered-map-0.1.0.tgz",
-    "pg": "8.23.1",
     "next": "16.3.8",
+    "pg": "8.23.1",
+    "rational-ordered-map": "file:vendor/rational-ordered-map-0.1.0.tgz",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "2.12.1",
     "esbuild": "0.25.12",
-    "typescript": "5.9.3",
     "playwright": "1.58.2",
-    "@tauri-apps/cli": "2.12.1"
+    "typescript": "5.9.3"
   },
   "description": "An exact rational timeline editor for the browser and desktop",
   "license": "GPL-3.0-only",

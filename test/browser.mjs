@@ -83,7 +83,9 @@ try {
   assert.equal(await input('event-title').inputValue(), 'A renamed moment');
   await closeMomentDetails(page);
   await input('undo-button').click();
-  assert(!(await page.getByRole('button', { name: 'A renamed moment', exact: true }).count()));
+  await page
+    .getByRole('button', { name: 'A renamed moment', exact: true })
+    .waitFor({ state: 'detached' });
   await closeMomentDetails(page);
   await input('add-button').click();
   await input('event-title').fill('A new exact event');

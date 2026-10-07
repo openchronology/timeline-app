@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 set -euo pipefail
-brew install autoconf automake libtool pkg-config cmake ninja
+brew install autoconf autoconf-archive automake libtool pkg-config cmake ninja
 vcpkg_root="$RUNNER_TEMP/och-vcpkg"
 git clone https://github.com/microsoft/vcpkg.git "$vcpkg_root"
-git -C "$vcpkg_root" checkout 9e593bb18ea69cc5095e012465dcd675a822ed0d
+git -C "$vcpkg_root" checkout 2cfff9c458d9dcf642e9fa09ba624f9931bb5358
 "$vcpkg_root/bootstrap-vcpkg.sh" -disableMetrics
 if [[ "$(uname -m)" == arm64 ]]; then triplet=arm64-osx; else triplet=x64-osx; fi
 "$vcpkg_root/vcpkg" install "gmp:$triplet" "sqlite3:$triplet"

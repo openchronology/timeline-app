@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 $root = Join-Path $env:RUNNER_TEMP 'och-vcpkg'
 git clone https://github.com/microsoft/vcpkg.git $root
 if ($LASTEXITCODE -ne 0) { throw 'vcpkg clone failed' }
-git -C $root checkout 9e593bb18ea69cc5095e012465dcd675a822ed0d
+git -C $root checkout 2cfff9c458d9dcf642e9fa09ba624f9931bb5358
 if ($LASTEXITCODE -ne 0) { throw 'vcpkg checkout failed' }
 & "$root\bootstrap-vcpkg.bat" -disableMetrics
 if ($LASTEXITCODE -ne 0) { throw 'vcpkg bootstrap failed' }

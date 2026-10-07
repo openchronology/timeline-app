@@ -44,6 +44,7 @@ export async function checkMomentDialog(page, restoreDocument) {
   await input('event-time').fill('10/1');
   await page.keyboard.press('Escape');
   await input('inspector').waitFor({ state: 'hidden' });
+  await input('fit-button').click();
   await page.getByRole('button', { name: 'Created through modal', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Edited through modal', exact: true }).click();
   await page.mouse.click(4, 4);
