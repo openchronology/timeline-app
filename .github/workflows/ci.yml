@@ -54,6 +54,7 @@ jobs:
     name: Core / ${{ matrix.manager }} / Node ${{ matrix.node }}
     runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
         node: [22, 24]
         manager: [npm, pnpm, yarn]
@@ -78,7 +79,7 @@ jobs:
           PACKAGE_MANAGER: ${{ matrix.manager }}
         run: |
           case "$PACKAGE_MANAGER" in
-            npm) npm ci ;;
+            npm) node scripts/npm-ci.mjs ;;
             pnpm) pnpm install --frozen-lockfile ;;
             yarn) yarn install --immutable ;;
           esac
@@ -92,7 +93,7 @@ jobs:
           "$PACKAGE_MANAGER" run build
           "$PACKAGE_MANAGER" run test:platform
           case "$PACKAGE_MANAGER" in
-            npm) npm exec -- tauri --version ;;
+            npm) node node_modules/@tauri-apps/cli/tauri.js --version ;;
             *) "$PACKAGE_MANAGER" exec tauri --version ;;
           esac
           git diff --exit-code -- package.json package-lock.json pnpm-lock.yaml yarn.lock
@@ -120,7 +121,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: node scripts/npm-ci.mjs
       - run: npx playwright install --with-deps "$BROWSER"
         env:
           BROWSER: ${{ matrix.browser }}
@@ -183,7 +184,7 @@ jobs:
           pg_ctl -D "$PGDATA" -l "$RUNNER_TEMP/openchronology-postgres.log" -o "-p $PGPORT -h 127.0.0.1 -k $RUNNER_TEMP" -w start
           createdb "$PGDATABASE"
           psql -X -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION pgmp;'
-      - run: npm ci
+      - run: node scripts/npm-ci.mjs
       - run: npm run build
       - run: node test/sql-oracle.mjs
       - name: Build the isolated SQLite file converter
@@ -212,34 +213,5 @@ jobs:
           name: postgres-log
           path: ${{ runner.temp }}/openchronology-postgres.log
   desktop:
-    name: SQLite persistence / Linux desktop package
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-          cache: npm
-      - name: Install desktop and SQLite dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake pkg-config libgmp-dev libsqlite3-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-          rustup update stable --no-self-update
-          rustup default stable
-      - run: cargo fmt --manifest-path native-store/Cargo.toml --check
-      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
-      - run: cargo test --manifest-path native-store/Cargo.toml --locked
-      - run: cargo build --manifest-path native-store/Cargo.toml --locked --release --bin och-convert
-      - run: npm ci
-      - run: npm run build
-      - run: node test/files.mjs
-      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
-      - run: npm run desktop:build
-      - run: npm run build:source:desktop
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: openchronology-linux
-          path: |
-            src-tauri/target/release/bundle/deb/*.deb
-            dist/openchronology-desktop-source.tar.gz
-          if-no-files-found: error
+    name: Desktop packages
+    uses: ./.github/workflows/desktop.yml

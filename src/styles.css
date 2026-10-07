@@ -985,13 +985,19 @@ dialog h3 {
     display: block;
   }
   .app-header {
-    padding: 0 15px;
+    height: auto;
+    min-height: 64px;
+    padding: 12px 15px;
+    flex-wrap: wrap;
+    gap: 10px;
   }
   .brand-version {
     display: none;
   }
   .header-right {
     gap: 7px;
+    flex-wrap: wrap;
+    min-width: 0;
   }
   .badge {
     font-size: 9px;

@@ -1,0 +1,107 @@
+name: Desktop targets
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        default: ''
+permissions:
+  contents: read
+jobs:
+  native:
+    name: Desktop / ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, target: linux-deb }
+          - { os: macos-15, target: macos-arm64 }
+          - { os: macos-15-intel, target: macos-amd64 }
+          - { os: windows-2025, target: windows-amd64 }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake pkg-config libgmp-dev libsqlite3-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+      - name: macOS pinned static dependencies
+        if: runner.os == 'macOS'
+        run: bash scripts/desktop/macos-dependencies.sh
+      - name: Windows pinned static dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/desktop/windows-dependencies.ps1
+      - name: Stable Rust
+        run: |
+          rustup update stable --no-self-update
+          rustup default stable
+      - run: node scripts/npm-ci.mjs
+      - run: cargo fmt --manifest-path native-store/Cargo.toml --check
+      - run: cargo test --manifest-path native-store/Cargo.toml --locked
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - name: SQLite converter and file contracts
+        if: runner.os == 'Linux'
+        run: |
+          cargo build --manifest-path native-store/Cargo.toml --locked --release --bin och-convert
+          node test/files.mjs
+      - name: Build and stage native package
+        run: node scripts/desktop/build.mjs ${{ matrix.target }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-${{ matrix.target }}
+          path: desktop-artifacts/
+          if-no-files-found: error
+  rocky:
+    name: Desktop / Rocky Linux 10 / RHEL 10 RPM
+    runs-on: ubuntu-24.04
+    container: rockylinux/rockylinux:10
+    timeout-minutes: 90
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - name: Rocky baseline dependencies
+        run: |
+          dnf install -y dnf-plugins-core
+          dnf config-manager --set-enabled crb
+          dnf install -y epel-release
+          dnf install -y git tar gzip xz file curl-minimal gcc gcc-c++ make cmake pkgconf-pkg-config gmp-devel sqlite-devel gtk3-devel webkit2gtk4.1-devel librsvg2-devel openssl-devel rpm-build
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Stable Rust in Rocky container
+        run: |
+          curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs -o /tmp/rustup.sh
+          sh /tmp/rustup.sh -y --profile minimal --default-toolchain stable
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - run: node scripts/npm-ci.mjs
+      - run: cargo test --manifest-path native-store/Cargo.toml --locked
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - run: node scripts/desktop/build.mjs rocky-rpm
+      - name: Validate RPM installs on its Rocky baseline
+        run: |
+          dnf install -y desktop-artifacts/*.rpm
+          ldd /usr/bin/openchronology-desktop | tee /tmp/och-ldd.txt
+          ! grep -q 'not found' /tmp/och-ldd.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-rocky-rpm
+          path: desktop-artifacts/
+          if-no-files-found: error

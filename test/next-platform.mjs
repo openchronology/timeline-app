@@ -145,7 +145,9 @@ try {
           }),
         ),
       });
-      await frame.getByText('Imported through Next', { exact: true }).waitFor();
+      await frame.waitForFunction(
+        () => document.getElementById('timeline-title').value === 'Imported through Next',
+      );
       await frame.waitForFunction(() => document.querySelector('#markers .event-marker'));
       assert.equal(
         await frame.evaluate(() => document.getElementById('left-bound').value.length > 0),

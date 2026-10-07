@@ -9,6 +9,18 @@ export default function Downloads() {
         <a href={latest + '/download/openchronology-desktop-linux-amd64.deb'}>
           Desktop · Linux (.deb)
         </a>
+        <a href={latest + '/download/openchronology-desktop-rocky10-amd64.rpm'}>
+          Desktop · Rocky / RHEL 10 (.rpm)
+        </a>
+        <a href={latest + '/download/openchronology-desktop-macos-arm64.dmg'}>
+          Desktop · macOS Apple silicon (.dmg)
+        </a>
+        <a href={latest + '/download/openchronology-desktop-macos-amd64.dmg'}>
+          Desktop · macOS Intel (.dmg)
+        </a>
+        <a href={latest + '/download/openchronology-desktop-windows-amd64-setup.exe'}>
+          Desktop · Windows (.exe)
+        </a>
         <a href={latest}>Release notes &amp; all downloads</a>
       </div>
     </details>

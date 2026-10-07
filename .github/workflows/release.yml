@@ -7,18 +7,23 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: release-${{ github.ref_name }}
+  group: release-${{ github.event.release.tag_name || github.ref_name }}
   cancel-in-progress: false
 jobs:
-  release:
-    name: Offline HTML and Linux desktop release
+  desktop:
+    uses: ./.github/workflows/desktop.yml
+    with:
+      tag: ${{ github.event.release.tag_name || github.ref_name }}
+  web:
+    name: Offline HTML and matching source
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    permissions:
-      contents: write
+    timeout-minutes: 45
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.release.tag_name || github.ref_name }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -26,45 +31,63 @@ jobs:
           node-version: 24
           cache: npm
       - name: Resolve immutable release identity
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
         run: |
           node --input-type=module -e 'import {releaseVersion} from "./scripts/build-info.mjs"; if(!releaseVersion.test(process.env.RELEASE_TAG)) throw Error("Use a semantic version tag, such as v1.2.3");'
-          git checkout --detach "$RELEASE_TAG"
           echo "OCH_BUILD_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
           echo "OCH_BUILD_VERSION=$RELEASE_TAG" >> "$GITHUB_ENV"
-          node --input-type=module -e 'import {writeFileSync} from "node:fs";writeFileSync("/tmp/tauri-release.json",JSON.stringify({version:process.env.RELEASE_TAG.replace(/^v/, "")}));'
-      - name: Install Linux desktop build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake pkg-config libgmp-dev libsqlite3-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
           rustup update stable --no-self-update
           rustup default stable
-      - run: npm ci
+      - run: node scripts/npm-ci.mjs
       - run: npm run typecheck
+      - run: npm run build:offline
       - run: npm test
-      - name: Build desktop package from this tag
-        run: npm exec -- tauri build --config /tmp/tauri-release.json -- --locked
-      - name: Package matching preferred source and checksums
+      - run: npm run build
+      - run: npm run test:platform
+      - run: npm run build:source:desktop
+      - name: Stage web release files
         run: |
-          npm run build:source:desktop
-          node scripts/release-assets.mjs "$OCH_BUILD_VERSION"
+          mkdir release-assets
+          cp dist/openchronology-offline.html dist/openchronology-web-source.tar.gz dist/openchronology-desktop-source.tar.gz dist/build-info.json release-assets/
+          cp LICENSE release-assets/LICENSE.txt
+          cp NOTICE release-assets/NOTICE.txt
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: release-${{ github.ref_name }}
+          name: release-web
           path: release-assets/
           if-no-files-found: error
+  publish:
+    name: Publish all runner-built release targets
+    needs: [desktop, web]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref_name }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.1
+        with:
+          path: release-assets/
+          merge-multiple: true
+      - name: Validate complete release and calculate checksums
+        run: node scripts/release-assets.mjs "$RELEASE_TAG"
       - name: Attach runner-built assets and publish
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          if ! gh release view "$OCH_BUILD_VERSION" >/dev/null 2>&1; then
-            gh release create "$OCH_BUILD_VERSION" --verify-tag --draft --title "$OCH_BUILD_VERSION" --generate-notes
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "$RELEASE_TAG" --generate-notes
           fi
-          gh release upload "$OCH_BUILD_VERSION" release-assets/* --clobber
-          if [[ "$OCH_BUILD_VERSION" == *-* ]]; then
-            gh release edit "$OCH_BUILD_VERSION" --draft=false --prerelease
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease
           else
-            gh release edit "$OCH_BUILD_VERSION" --draft=false --latest
+            gh release edit "$RELEASE_TAG" --draft=false --latest
           fi
