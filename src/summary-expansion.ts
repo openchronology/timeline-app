@@ -85,14 +85,14 @@ export function createSummaryExpansion(stage: HTMLElement, host: Host) {
     !!target &&
     (target.matches(':hover') ||
       !!overlay?.matches(':hover') ||
-      !!overlay?.querySelector(':focus-visible') ||
+      !!overlay?.contains(document.activeElement) ||
       target.matches(':focus-visible') ||
       !!stage.querySelector('.focus-card.open:hover, .focus-card.open:focus-within'));
   function leave() {
     clearTimeout(closeTimer);
     closeTimer = setTimeout(() => {
       if (!held()) hide(true);
-    }, 220);
+    }, 400);
   }
   stage.querySelector('.focus-card')?.addEventListener('pointerleave', leave);
   stage.querySelector('.focus-card')?.addEventListener('focusout', leave);
@@ -246,13 +246,18 @@ export function createSummaryExpansion(stage: HTMLElement, host: Host) {
         bound.add(button);
         button.addEventListener('pointerenter', (e) => {
           clearTimeout(closeTimer);
-          if (e.pointerType !== 'touch') openTimer = setTimeout(() => void open(button), 100);
+          if (e.pointerType !== 'touch' && e.buttons === 0)
+            openTimer = setTimeout(() => void open(button), 100);
         });
         button.addEventListener('pointerleave', () => {
           clearTimeout(openTimer);
           leave();
         });
-        button.addEventListener('focus', () => void open(button));
+        button.addEventListener('focus', () => {
+          // Mouse focus arrives between down and up: inserting moving members there
+          // changes the click target. Keyboard focus may expand immediately.
+          if (button.matches(':focus-visible')) void open(button);
+        });
         button.addEventListener('blur', leave);
         button.addEventListener('keydown', (e) => {
           if (e.key === 'Escape') hide(true);

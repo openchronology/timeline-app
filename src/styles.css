@@ -1128,6 +1128,8 @@ dialog h3 {
 }
 .timeline-menu {
   position: fixed;
+  inset: auto;
+  margin: 0;
   z-index: 100;
   min-width: 150px;
   padding: 5px;

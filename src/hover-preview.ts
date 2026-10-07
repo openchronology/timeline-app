@@ -60,7 +60,18 @@ export function createHoverPreview(stage: HTMLElement, scale: () => number) {
       w = card.offsetWidth * s,
       h = card.offsetHeight * s;
     card.style.left = `${Math.max(w / 2, Math.min(bounds.width - w / 2, dot.left - bounds.left + dot.width / 2))}px`;
-    card.style.top = `${Math.max(h / 2, Math.min(bounds.height - h / 2, dot.top - bounds.top + dot.height / 2))}px`;
+    let centerY = dot.top - bounds.top + dot.height / 2;
+    const fan = target.closest('.summary-fan');
+    if (fan) {
+      // Keep every expanded member reachable while inspecting one of its neighbors.
+      const members = Array.from(fan.querySelectorAll('.summary-member'), (node) =>
+        node.getBoundingClientRect(),
+      );
+      const top = Math.min(...members.map((member) => member.top)) - bounds.top;
+      const bottom = Math.max(...members.map((member) => member.bottom)) - bounds.top;
+      centerY = top >= h + 12 ? top - h / 2 - 12 : bottom + h / 2 + 12;
+    }
+    card.style.top = `${Math.max(h / 2, Math.min(bounds.height - h / 2, centerY))}px`;
     card.style.setProperty('--card-scale', String(s));
     return true;
   };
@@ -133,7 +144,7 @@ export function createHoverPreview(stage: HTMLElement, scale: () => number) {
   };
   const leave = () => {
     clearTimeout(timer);
-    timer = setTimeout(hide, 100);
+    timer = setTimeout(hide, target?.closest('.summary-fan') ? 350 : 100);
   };
   card.onpointerenter = () => clearTimeout(timer);
   card.onpointerleave = leave;

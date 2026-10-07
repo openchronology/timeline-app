@@ -143,6 +143,7 @@ export function renderPluginFields(
       const label = document.createElement('label');
       label.textContent = field.label;
       const select = document.createElement('select');
+      select.setAttribute('aria-label', field.label);
       select.disabled = !editable;
       select.dataset.pluginKey = field.metadataKey;
       for (const shape of field.kind === 'size' ? MOMENT_SIZES : MOMENT_SHAPE_NAMES) {

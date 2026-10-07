@@ -4,6 +4,8 @@ import { DEFAULT_PRESENTATION, parseTimestamp } from '../dist/core.mjs';
 
 /** Shared checks for retained labels, bounded crossfades and accessible motion. */
 export async function checkLabelMotion(page, restoreDocument) {
+  const originalViewport = page.viewportSize();
+  await page.setViewportSize({ width: 1000, height: 960 });
   const input = (id) => page.locator('#' + id);
   const frame = () => page.evaluate(() => new Promise(requestAnimationFrame));
   const imported = async (doc) => {
@@ -19,6 +21,7 @@ export async function checkLabelMotion(page, restoreDocument) {
     await frame();
   };
   const go = async (left, right) => {
+    await input('exact-left').evaluate((node) => (node.closest('details').open = true));
     await input('exact-left').fill(left);
     await input('exact-right').fill(right);
     await input('apply-exact-bounds').click();
@@ -164,6 +167,7 @@ export async function checkLabelMotion(page, restoreDocument) {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await imported(restoreDocument);
   assert.equal(await page.locator('.event-time-outgoing').count(), 0);
+  await page.setViewportSize(originalViewport);
   await page.evaluate(() => {
     delete window.__motionNode;
     delete window.__motionResult;

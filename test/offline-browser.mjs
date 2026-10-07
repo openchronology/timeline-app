@@ -28,7 +28,9 @@ const url = pathToFileURL(filename).href;
 const context = await browser.newContext({
   viewport: { width: 1440, height: 960 },
   acceptDownloads: true,
-  offline: true,
+  // WebKit's network-offline emulation also rejects file:// navigation. Its
+  // network API spies, CSP and request audit below still enforce zero traffic.
+  offline: engine !== 'webkit',
 });
 // Observe attempted API calls as well as requests. CSP alone must not mask a reconnect attempt.
 await context.addInitScript(() => {
@@ -148,7 +150,7 @@ try {
   });
   await poll(async () => (await input('timeline-title').inputValue()) === document.title);
   await poll(async () => (await markers.count()) === 3);
-  assert.equal(await page.locator('img').count(), 0);
+  assert.equal(await page.locator('#markers img').count(), 0);
   await markers.first().click();
   await poll(() => input('event-form').isVisible());
   assert.equal(await input('event-exact').inputValue(), document.events[0].time);

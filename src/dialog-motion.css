@@ -25,7 +25,7 @@ dialog[open][data-dialog-closing]::backdrop {
 @keyframes dialog-exit {
   from {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: none;
   }
   to {
     opacity: 0;

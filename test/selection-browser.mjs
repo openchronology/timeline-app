@@ -41,12 +41,13 @@ export async function checkSelection(page, restoreDocument) {
   });
   const stage = input('timeline-stage'),
     menu = input('timeline-menu');
+  await stage.scrollIntoViewIfNeeded();
   const box = await stage.boundingBox();
   const x = box.x + 150,
     y = box.y + 50;
   await page.mouse.click(x, y);
   assert(await input('event-form').isVisible());
-  assert(await input('time-cursor').isVisible());
+  await input('time-cursor').waitFor({ state: 'visible' });
   const exact = await input('time-cursor').getAttribute('data-time');
   assert.equal(await input('event-time').inputValue(), exact + ' ticks');
   assert.equal(await input('event-exact').inputValue(), exact);
@@ -139,7 +140,11 @@ export async function checkSelection(page, restoreDocument) {
   await closeMomentDetails(page);
   const before = await input('exact-left').inputValue();
   const title = await input('event-title').inputValue();
-  await page.mouse.move(x, y);
+  await stage.scrollIntoViewIfNeeded();
+  const touchBox = await stage.boundingBox();
+  const touchX = touchBox.x + 150,
+    touchY = touchBox.y + 50;
+  await page.mouse.move(touchX, touchY);
   await stage.evaluate((node) =>
     node.addEventListener(
       'pointerdown',
@@ -154,16 +159,16 @@ export async function checkSelection(page, restoreDocument) {
   await stage.dispatchEvent('pointerdown', {
     pointerId,
     pointerType: 'touch',
-    clientX: x,
-    clientY: y,
+    clientX: touchX,
+    clientY: touchY,
     bubbles: true,
   });
   await menu.waitFor({ state: 'visible' });
   await stage.dispatchEvent('pointerup', {
     pointerId,
     pointerType: 'touch',
-    clientX: x,
-    clientY: y,
+    clientX: touchX,
+    clientY: touchY,
     bubbles: true,
   });
   await page.mouse.up();

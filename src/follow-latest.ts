@@ -17,7 +17,7 @@ export function followLatest<T>(
   clock: Clock = {
     now: () => performance.now(),
     set: (run, delay) => setTimeout(run, delay),
-    clear: clearTimeout,
+    clear: (timer) => clearTimeout(timer),
   },
 ) {
   let enabled = false,

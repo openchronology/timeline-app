@@ -103,8 +103,8 @@ export async function checkComparison(browser) {
           visibility: 'public',
           canEdit: false,
           event_count: '1',
-          first: '10/1',
-          last: '10/1',
+          first: index.points.minKey().toString(),
+          last: index.points.maxKey().toString(),
         },
       });
     }
@@ -154,7 +154,7 @@ export async function checkComparison(browser) {
         ).size === 1,
     );
     await page.locator('.event-marker').first().click();
-    assert(await page.locator('#event-time').isDisabled());
+    await page.waitForFunction(() => document.getElementById('event-time').disabled);
     assert(await page.locator('#event-title').isDisabled());
     await closeMomentDetails(page);
     await page.locator('#compare-combined').uncheck();

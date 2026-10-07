@@ -14,6 +14,9 @@ import {
   PLUGIN_EXAMPLE,
   validatePluginManifest,
   validateDocument,
+  TimelineIndex,
+  Viewport,
+  Q,
 } from '../dist/core.mjs';
 import { createPluginLibrary } from '../server/plugins.mjs';
 const source = 'https://images.example/icon.png';
@@ -26,6 +29,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
   const frame = () => page.evaluate(() => new Promise(requestAnimationFrame));
   const imported = async (doc) => {
     await closeMomentDetails(page);
+    await page.mouse.move(2, 2);
     await input('json-file').setInputFiles({
       name: 'plugins.ochx',
       mimeType: 'application/json',
@@ -182,17 +186,21 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
         metadata: {
           title: richTitle,
           description:
-            '**Bold notes** and *emphasis*\n\n- A list item\n\n<script>window.richAttack = true</script>\n\n[unsafe](javascript:alert(1))',
+            'Notes: **Bold notes** and *emphasis*\n\n- A list item\n\n<script>window.richAttack = true</script>\n\n[unsafe](javascript:alert(1))',
           sources: ['https://example.org/history'],
           stack: [
-            { id: 'rich-child', metadata: { title: 'Rich child', description: '**Child bold**' } },
+            {
+              id: 'rich-child',
+              metadata: { title: 'Rich child', description: 'Notes: **Child bold**' },
+            },
           ],
         },
       },
     ],
   });
   const richMarker = page.locator('#markers .event-marker').first();
-  await richMarker.hover();
+  // Hover intentionally replaces the marker's hit area with its preview card.
+  await richMarker.hover({ force: true });
   const richPreview = input('moment-hover-preview');
   await page.waitForFunction(() =>
     document.getElementById('moment-hover-preview').classList.contains('open'),
@@ -220,8 +228,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
         ),
     ),
   );
-  await page.mouse.move(1, 1);
-  await richMarker.click();
+  await richPreview.click();
   const rootEditor = input('event-form').locator('.rich-text-content').first();
   assert.equal(await rootEditor.locator('strong').textContent(), 'Bold notes');
   assert(await input('event-description').isHidden());
@@ -285,6 +292,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     assert(await input('plugins-create').isVisible());
     assert(await page.getByRole('checkbox', { name: 'Enable Moment icons' }).isEnabled());
     await page.getByRole('button', { name: 'Close plugins', exact: true }).click();
+    await input('plugins-dialog').waitFor({ state: 'hidden' });
     await page.waitForFunction(() =>
       document.querySelector('.event-marker img')?.getAttribute('src')?.startsWith('data:'),
     );
@@ -292,7 +300,8 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     assert.equal(await root.getAttribute('data-shape'), 'diamond');
     assert.equal(await page.locator('.stack-marker').count(), 1);
     await closeMomentDetails(page);
-    await page.getByRole('button', { name: 'With icon', exact: true }).click();
+    await page.getByRole('button', { name: 'With icon', exact: true }).focus();
+    await page.keyboard.press('Enter');
     assert(
       await input('plugin-event-fields').getByLabel('Status', { exact: true }).first().isVisible(),
     );
@@ -345,6 +354,34 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
   await page.route(cloudDocument, (route) =>
     route.fulfill({ json: { timeline: info, document: cloud } }),
   );
+  const cloudQuery = cloudMetadata + '/query';
+  const cloudIndex = new TimelineIndex(cloud);
+  await page.route(cloudQuery, (route) => {
+    const data = route.request().postDataJSON();
+    if (data.kind === 'events')
+      return route.fulfill({
+        json: {
+          events: cloudIndex.eventsBetween(data.lower, data.upper, 100),
+          next: null,
+          revision: info.revision,
+        },
+      });
+    const view = new Viewport(Q.parse(data.lower), Q.parse(data.upper).sub(Q.parse(data.lower)));
+    const frame = cloudIndex.frame(
+      view,
+      1000,
+      Q.parse(data.threshold).div(view.span).toApproximateNumber() * 1000,
+    );
+    return route.fulfill({
+      json: {
+        ...frame,
+        groups: frame.groups.map((group) =>
+          group.id ? { ...group, metadata: cloudIndex.byId.get(group.id).metadata } : group,
+        ),
+        revision: info.revision,
+      },
+    });
+  });
   await page.route(catalogue, (route) =>
     route.fulfill({ json: library.search(route.request().postDataJSON()) }),
   );
@@ -357,7 +394,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
   );
   try {
     await imported(document);
-    assert.equal(await page.locator('.event-marker img').count(), 0);
+    await page.locator('.event-marker img').waitFor({ state: 'detached' });
     await closeMomentDetails(page);
     await page.getByRole('button', { name: 'With icon', exact: true }).click();
     await input('event-title').fill('Unsaved title survives install');
@@ -392,6 +429,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     await input('plugin-library-dialog').waitFor({ state: 'hidden' });
     assert.equal(await input('event-title').inputValue(), 'Unsaved title survives install');
     await page.getByRole('button', { name: 'Close plugins', exact: true }).click();
+    await input('plugins-dialog').waitFor({ state: 'hidden' });
     await page.waitForFunction(
       () => document.querySelector('.event-marker.icon img')?.naturalWidth > 0,
     );
@@ -435,7 +473,9 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     await input('plugins-button').click();
     await page.getByRole('checkbox', { name: 'Enable Moment icons' }).uncheck();
     await page.getByRole('button', { name: 'Close plugins', exact: true }).click();
-    assert.equal(await page.locator('.event-marker img').count(), 0);
+    await input('plugins-dialog').waitFor({ state: 'hidden' });
+    await page.locator('.event-marker img').waitFor({ state: 'detached' });
+    await page.getByRole('button', { name: 'Icon updated', exact: true }).click();
     assert.equal(await page.locator('[data-plugin-key="iconUrl"]').count(), 0);
     assert.equal(
       (await exported()).events[0].metadata.iconUrl,
@@ -445,6 +485,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     await input('plugins-button').click();
     await page.getByRole('checkbox', { name: 'Enable Moment icons' }).check();
     await page.getByRole('button', { name: 'Close plugins', exact: true }).click();
+    await input('plugins-dialog').waitFor({ state: 'hidden' });
     await page.waitForFunction(
       () => document.querySelector('.event-marker.icon img')?.naturalWidth > 0,
     );
@@ -459,6 +500,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     await input('plugins-button').click();
     await page.getByRole('button', { name: 'Remove', exact: true }).click();
     await page.getByRole('button', { name: 'Close plugins', exact: true }).click();
+    await input('plugins-dialog').waitFor({ state: 'hidden' });
     saved = await exported();
     assert(!Object.hasOwn(saved, 'plugins'));
     assert.equal(saved.events[0].metadata.iconUrl, 'https://images.example/changed.png');
@@ -506,11 +548,13 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
       .getByRole('button', { name: 'Move up', exact: true })
       .click();
     await page.getByRole('button', { name: 'Close plugins', exact: true }).click();
+    await input('plugins-dialog').waitFor({ state: 'hidden' });
     await page.waitForFunction(
       () =>
         document.querySelector('.event-marker img')?.getAttribute('src') ===
         'https://images.example/icon.png',
     );
+    await page.getByRole('button', { name: 'With icon', exact: true }).click();
     assert.equal(await page.getByLabel('Moment icon URL', { exact: true }).count(), 1);
     assert.deepEqual(
       (await exported()).plugins.map((p) => p.manifest.id),
@@ -531,8 +575,9 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     await page.getByRole('button', { name: 'Remove', exact: true }).click();
     assert.match(await input('installed-plugins').textContent(), /No plugins installed/);
     await page.getByRole('button', { name: 'Close plugins', exact: true }).click();
+    await input('plugins-dialog').waitFor({ state: 'hidden' });
     await frame();
-    assert.equal(await page.locator('.event-marker img').count(), 0);
+    await page.locator('.event-marker img').waitFor({ state: 'detached' });
     assert(!Object.hasOwn(await exported(), 'plugins'));
     await imported({
       ...document,
@@ -704,6 +749,8 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     await page.getByRole('button', { name: 'Close plugin editor', exact: true }).click();
     await page.getByRole('button', { name: 'Close plugin library', exact: true }).click();
     await page.getByRole('button', { name: 'Close plugins', exact: true }).click();
+    await input('plugins-dialog').waitFor({ state: 'hidden' });
+    await page.getByRole('button', { name: 'With icon', exact: true }).click();
     await input('plugin-event-fields')
       .locator(':scope > [data-metadata-key="status"]')
       .getByLabel('Status', { exact: true })
@@ -749,6 +796,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
       'Offscreen branch entries must not retain DOM nodes',
     );
     const initialCount = await input('visible-count').textContent();
+    await input('timeline-stage').scrollIntoViewIfNeeded();
     const stageBox = await input('timeline-stage').boundingBox();
     await page.mouse.move(stageBox.x + 20, stageBox.y + stageBox.height / 2);
     await page.keyboard.down('Alt');
@@ -775,6 +823,8 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
       .locator('#markers .event-marker')
       .first()
       .evaluate((b) => b.getBoundingClientRect().width);
+    const scaleBox = await input('timeline-stage').boundingBox();
+    await page.mouse.move(scaleBox.x + 20, scaleBox.y + scaleBox.height / 2);
     await page.keyboard.down('Control');
     await page.mouse.wheel(0, 180);
     await page.keyboard.up('Control');
@@ -813,7 +863,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     });
     await frame();
     assert.equal(await page.locator('#markers .event-marker').count(), 1);
-    assert(await page.locator('#markers .event-label').isHidden());
+    await page.locator('#markers .event-label').waitFor({ state: 'hidden' });
     assert.equal(await page.locator('.stack-marker').count(), 2);
     assert.equal(await page.locator('.stack-label:visible').count(), 1);
     assert.equal(
@@ -822,7 +872,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
       'Stack captions must not repeat inherited time',
     );
     await page.getByRole('button', { name: 'Unnamed moment', exact: true }).click();
-    assert(await input('clear-selection').isVisible());
+    await input('clear-selection').waitFor({ state: 'visible' });
     assert(await input('time-cursor').isVisible());
     const cursorLayer = await input('time-cursor').evaluate((node) =>
       Number(getComputedStyle(node).zIndex),
@@ -834,12 +884,12 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     await page.waitForFunction(() =>
       document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
     );
-    assert(await page.locator('#markers .event-label').isVisible());
+    await page.locator('#markers .event-label').waitFor({ state: 'visible' });
     await input('event-title').fill('   ');
     await page.waitForFunction(() =>
       document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
     );
-    assert(await page.locator('#markers .event-label').isHidden());
+    await page.locator('#markers .event-label').waitFor({ state: 'hidden' });
     await closeMomentDetails(page);
     await input('clear-selection').click();
     await frame();
@@ -868,7 +918,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
         },
       ],
     });
-    await page.locator('#markers .event-marker').first().hover();
+    await page.locator('#markers .event-marker').first().hover({ force: true });
     await page.waitForFunction(() =>
       document.getElementById('moment-hover-preview').classList.contains('open'),
     );
@@ -895,6 +945,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
   } finally {
     await page.unroute(cloudMetadata);
     await page.unroute(cloudDocument);
+    await page.unroute(cloudQuery);
     await page.unroute(catalogue);
     await page.unroute(images);
     await imported(restoreDocument);

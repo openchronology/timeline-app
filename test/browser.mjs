@@ -28,7 +28,7 @@ const browser = await { chromium, firefox, webkit }[engine].launch({
 });
 const context = await browser.newContext({
   viewport: { width: 1440, height: 960 },
-  hasTouch: true,
+  hasTouch: engine === 'chromium',
   acceptDownloads: true,
 });
 const errors = [];
@@ -96,8 +96,9 @@ try {
   assert.match(await input('event-count').textContent(), /11 events/);
   await closeMomentDetails(page);
   await input('undo-button').click();
-  const stage = input('timeline-stage'),
-    box = await stage.boundingBox(),
+  const stage = input('timeline-stage');
+  await stage.scrollIntoViewIfNeeded();
+  const box = await stage.boundingBox(),
     before = await input('left-bound').inputValue();
   // Mouse drag must pan, while a subsequent point click must still select.
   await page.mouse.move(box.x + 300, box.y + 60);

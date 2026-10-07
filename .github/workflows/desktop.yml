@@ -74,7 +74,6 @@ jobs:
         shell: /bin/bash -e {0}
     timeout-minutes: 90
     env:
-      PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       RELEASE_TAG: ${{ inputs.tag }}
     steps:
       - name: Rocky baseline dependencies
@@ -83,6 +82,7 @@ jobs:
           dnf config-manager --set-enabled crb
           dnf install -y epel-release
           dnf install -y git tar gzip xz file curl-minimal gcc gcc-c++ make cmake pkgconf-pkg-config gmp-devel sqlite-devel gtk3-devel webkit2gtk4.1-devel librsvg2-devel openssl-devel rpm-build
+          printf '%s\n' /usr/local/bin /usr/bin /bin >> "$GITHUB_PATH"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.tag || github.sha }}

@@ -87,6 +87,7 @@ export async function checkRuler(page, restoreDocument) {
   await input('presentation-ruler').selectOption('steps');
   await input('presentation-steps').fill('["1", "60", "3600", "86400"]');
   await input('presentation-save').click();
+  await input('presentation-dialog').waitFor({ state: 'hidden' });
   await go('0', '86400');
   assert.equal((await ticks()).length, 25);
   assert((await ticks()).some((tick) => tick.time === '3600/1'));
@@ -98,6 +99,7 @@ export async function checkRuler(page, restoreDocument) {
     '86400/1',
   ]);
   await page.locator('[data-close="presentation-dialog"]').click();
+  await input('presentation-dialog').waitFor({ state: 'hidden' });
 
   await imported({
     format: 'openchronology',

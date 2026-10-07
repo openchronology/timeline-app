@@ -38,6 +38,9 @@ export async function checkZoomHelp(page) {
 
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.waitForFunction(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
   await page.evaluate(() => document.getElementById('zoom-out').click());
   assert.equal(await stage.getAttribute('data-zooming'), null);
   await page.emulateMedia({ reducedMotion: 'no-preference' });

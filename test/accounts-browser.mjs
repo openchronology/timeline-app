@@ -38,6 +38,18 @@ export async function checkAccounts(browser) {
     errors = [],
     writes = [];
   let user = null;
+  // Firefox's interception API omits Blob request bodies; inspect the actual fetch
+  // input as well, without substituting a different upload implementation.
+  await context.addInitScript(() => {
+    const fetch = window.fetch.bind(window);
+    window.fetch = async (url, options) => {
+      if (String(url).endsWith('/api/files/import') && options?.body instanceof Blob)
+        window.importHeader = Array.from(
+          new Uint8Array(await options.body.slice(0, 16).arrayBuffer()),
+        );
+      return fetch(url, options);
+    };
+  });
   await context.route(origin + '/**', async (route) => {
     const request = route.request(),
       path = new URL(request.url()).pathname;
@@ -72,7 +84,10 @@ export async function checkAccounts(browser) {
     else if (path === '/api/auth/revoke-others') value = { ok: true };
     else if (path === '/api/auth/google/start') value = { url: origin + '/#provider-test' };
     else if (path === '/api/files/import') {
-      assert(request.postDataBuffer().subarray(0, 16).equals(Buffer.from('SQLite format 3\0')));
+      const bytes =
+        request.postDataBuffer() ??
+        Buffer.from(await request.frame().evaluate(() => window.importHeader));
+      assert(bytes.subarray(0, 16).equals(Buffer.from('SQLite format 3\0')));
       value = { document };
     } else if (path === '/api/files/export')
       return route.fulfill({
@@ -92,7 +107,7 @@ export async function checkAccounts(browser) {
     assert.equal(await page.locator('#calendar-mode').count(), 0);
     await page.locator('#account-button').click();
     for (const provider of ['google', 'github', 'facebook'])
-      assert(await page.locator(`[data-provider="${provider}"]`).isVisible());
+      await page.locator(`[data-provider="${provider}"]`).waitFor({ state: 'visible' });
     await page.locator('#account-name').fill('account');
     await page.locator('#account-password').fill('testing account password');
     await page.locator('button[value="login"]').click();
@@ -236,12 +251,14 @@ export async function checkAccounts(browser) {
       async () =>
         (await nativePage.locator('#save-status').textContent()) === 'Saved on the server',
     );
+    await poll(() => nativePage.locator('#publish-button').isEnabled());
     await nativePage.locator('#share-button').click();
     assert.equal(
       await nativePage.locator('#sharing-link').textContent(),
       'https://timescale.info/timelines/00000000-0000-0000-0000-000000000001',
     );
     await nativePage.locator('[data-close="sharing-dialog"]').click();
+    await nativePage.locator('#sharing-dialog').waitFor({ state: 'hidden' });
     await nativePage.locator('#timeline-title').fill('Edited locally and remotely');
     await nativePage.locator('#timeline-title').dispatchEvent('change');
     await nativePage.locator('#sqlite-save').click();

@@ -2710,6 +2710,7 @@ function closeTimelineMenu() {
   menuGeneration++;
   const menu = el('timeline-menu');
   if (menu.contains(document.activeElement)) stage.focus({ preventScroll: true });
+  if (menu.matches(':popover-open')) menu.hidePopover();
   menu.hidden = true;
 }
 function resetTimeSelection() {
@@ -2832,10 +2833,12 @@ function showTimelineMenu(
       void selectGroup(group).catch(fail);
     });
   menu.hidden = false;
+  menu.popover = 'manual';
+  menu.showPopover();
   const bounds = menu.getBoundingClientRect();
   menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - bounds.width - 4))}px`;
   menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - bounds.height - 4))}px`;
-  menu.querySelector<HTMLButtonElement>('button')?.focus();
+  menu.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
 }
 function openStageMenu(target: HTMLElement, x: number, y: number) {
   const branch = target.closest<HTMLElement>('.stack-marker');
@@ -2991,6 +2994,18 @@ function resetGesture() {
   }
   gesture = { view: viewport.clone(), vertical: verticalOffset, scale: uiScale, ...metrics() };
 }
+stage.addEventListener(
+  'pointerdown',
+  (event) => {
+    // Interactive overlays stop propagation; a fresh mouse press still ends suppression
+    // left by a previous drag or touch gesture before their click reaches capture handlers.
+    if (event.pointerType === 'mouse' && event.button === 0) {
+      moved = false;
+      suppressClickUntil = 0;
+    }
+  },
+  true,
+);
 stage.addEventListener('pointerdown', (event) => {
   follow.navigation();
   cancelZoomAnimation();

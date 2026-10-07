@@ -207,6 +207,7 @@ export function attachRichText(input: HTMLTextAreaElement, editable: boolean) {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = label;
+    b.setAttribute('aria-label', label);
     b.disabled = !editable && !always;
     b.onmousedown = (e) => e.preventDefault();
     b.onclick = action;
@@ -241,6 +242,7 @@ export function attachRichText(input: HTMLTextAreaElement, editable: boolean) {
       for (const b of toolbar.querySelectorAll('button'))
         if (b !== toggle) b.disabled = source || !editable;
       toggle.textContent = source ? 'Visual editor' : 'Edit Markdown';
+      toggle.setAttribute('aria-label', toggle.textContent);
       if (!source) renderMarkdown(editor, input.value);
     },
     true,

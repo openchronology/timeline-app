@@ -28,9 +28,10 @@ export async function stageDesktop(target, tag = '', root = '.') {
   await mkdir(output, { recursive: true });
   await cp(join(dir, files[0]), join(output, spec.asset));
   await writeFile(join(output, target + '-build-info.json'), JSON.stringify(info, null, 2) + '\n');
-  if (process.env.OCH_VCPKG_ROOT) await nativeSources(process.env.OCH_VCPKG_ROOT, output, target);
+  if (process.env.OCH_VCPKG_ROOT)
+    await nativeSources(process.env.OCH_VCPKG_ROOT, output, target, root);
 }
-async function nativeSources(vcpkg, output, target) {
+async function nativeSources(vcpkg, output, target, project) {
   const exec = promisify(execFile),
     temp = await mkdtemp(join(tmpdir(), 'och-native-source-'));
   try {
@@ -47,6 +48,10 @@ async function nativeSources(vcpkg, output, target) {
     for (const name of archives) await cp(join(vcpkg, 'downloads', name), join(root, name));
     for (const name of ['gmp', 'sqlite3'])
       await cp(join(vcpkg, 'ports', name), join(root, 'ports', name), { recursive: true });
+    if (target === 'windows-amd64')
+      await cp(join(project, 'scripts/desktop/triplets'), join(root, 'triplets'), {
+        recursive: true,
+      });
     const revision = (await exec('git', ['-C', vcpkg, 'rev-parse', 'HEAD'])).stdout.trim();
     await writeFile(
       join(root, 'README.txt'),
@@ -54,7 +59,11 @@ async function nativeSources(vcpkg, output, target) {
         target +
         '.\nvcpkg revision: ' +
         revision +
-        '\nUse the included port build recipes with this vcpkg revision.\nUpstream archives contain their licenses and preferred C sources.\n',
+        '\nUse the included port build recipes with this vcpkg revision.\n' +
+        (target === 'windows-amd64'
+          ? 'Windows uses --overlay-triplets=triplets --host-triplet=x64-windows-static-md.\n'
+          : '') +
+        'Upstream archives contain their licenses and preferred C sources.\n',
     );
     await exec('tar', [
       '-czf',

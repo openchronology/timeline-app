@@ -259,12 +259,10 @@ export async function checkCommunity(browser) {
       .getByRole('link', { name: 'My private timeline' })
       .waitFor();
     assert(await page.locator('.app-layout').isHidden());
-    assert(
-      await page
-        .locator('#dashboard-browser-list')
-        .getByRole('link', { name: 'Featured timeline' })
-        .isVisible(),
-    );
+    await page
+      .locator('#dashboard-browser-list')
+      .getByRole('link', { name: 'Featured timeline' })
+      .waitFor({ state: 'visible' });
     await page.locator('#dashboard-browser-next').click();
     await page
       .locator('#dashboard-browser-list')
