@@ -285,6 +285,11 @@ export async function checkCommunity(browser) {
       .getByRole('link', { name: 'Featured timeline' })
       .click();
     await page.locator('#timeline-title').waitFor();
+    await page.waitForFunction(
+      () =>
+        document.getElementById('timeline-title').value === 'Featured timeline' &&
+        document.getElementById('publish-button').textContent === 'Submit pull request',
+    );
     assert.equal(await page.locator('#publish-button').textContent(), 'Submit pull request');
     assert(await page.locator('#share-button').isHidden());
     await page.locator('#timeline-title').fill('Proposed title');
