@@ -240,6 +240,7 @@ export async function checkCommunity(browser) {
     assert.equal(await page.locator('#timeline-title').inputValue(), document.title);
     assert(await page.locator('#guest-fork-original').isVisible());
     assert.equal(await page.evaluate(() => window.idbOpens), 0);
+    await page.waitForFunction(() => document.getElementById('loading-window').hidden);
     await page.goto('http://localhost:5173/');
     storage = false;
     await page.reload();
