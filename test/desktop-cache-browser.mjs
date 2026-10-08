@@ -80,6 +80,7 @@ export async function checkDesktopCache(browser) {
       // Native tag views: a filtered query reads an index of one side of the separation.
       const source = q.filter ? new TimelineIndex(filterDocument(document, q.filter)) : index;
       if (q.filter) filtered.push(q);
+      if (q.kind === 'related') return { related: [], next: null, reachable: 0, direct: 0 };
       if (q.kind === 'tags')
         return { tags: tagCounts(index.byId.values(), index.durations.values()) };
       if (q.kind === 'search') {

@@ -17,7 +17,15 @@ import { mailFromEnv, encryptionKey } from './mail.mjs';
 import { DeviceAuth } from './device-auth.mjs';
 import { TimelineFiles } from './files.mjs';
 import { HttpError, PostgresStore } from './store.mjs';
-import { Q, parseTime, validateDocument, validateDuration, validateTags } from '../dist/core.mjs';
+import {
+  Q,
+  parseTime,
+  validateDocument,
+  validateDuration,
+  validateTags,
+  validateRef,
+  canonicalRelationship,
+} from '../dist/core.mjs';
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 async function body(req, maximum = 16 * 1024 * 1024) {
   if (!req.headers['content-type']?.startsWith('application/json'))
@@ -78,6 +86,17 @@ function document(value, partial = false) {
 /** A tag separation filter: one to forty tags, entities with any of them or none. */
 function viewFilter(value) {
   if (value === undefined || value === null) return undefined;
+  if (value.related !== undefined) {
+    let related;
+    try {
+      related = validateRef(value.related);
+    } catch (error) {
+      throw new HttpError(400, error.message);
+    }
+    if (!['direct', 'all'].includes(value.depth) || !['any', 'none'].includes(value.mode))
+      throw new HttpError(400, 'A relationship filter needs a depth and a mode.');
+    return { related, depth: value.depth, mode: value.mode };
+  }
   let tags;
   try {
     tags = validateTags(value.tags);
@@ -718,6 +737,21 @@ export function createRequestHandler({
           auth.require(session, req);
           const input = await body(req);
           const durationInput = input.durationChanges ?? [];
+          const relationshipInput = input.relationshipChanges ?? [];
+          if (!Array.isArray(relationshipInput) || relationshipInput.length > 5000)
+            throw new HttpError(400, 'Expected at most 5000 changed relationships.');
+          const relationshipChanges = relationshipInput.map((change) => {
+            try {
+              if (typeof change?.related !== 'boolean')
+                throw new Error('Expected related: true or false.');
+              return {
+                ...canonicalRelationship(validateRef(change.a), validateRef(change.b)),
+                related: change.related,
+              };
+            } catch (error) {
+              throw new HttpError(400, error.message);
+            }
+          });
           if (
             typeof input.revision !== 'string' ||
             !/^\d+$/.test(input.revision) ||
@@ -774,6 +808,7 @@ export function createRequestHandler({
               settings,
               changes,
               durationChanges,
+              relationshipChanges,
             }),
           );
         }
@@ -798,6 +833,42 @@ export function createRequestHandler({
           const filter = viewFilter(input.filter);
           if (input.kind === 'tags')
             return response(res, 200, await store.query(id, userId, { kind: 'tags' }));
+          if (input.kind === 'related') {
+            const limit = input.limit ?? 25;
+            let entity;
+            try {
+              entity = validateRef(input.entity);
+            } catch (error) {
+              throw new HttpError(400, error.message);
+            }
+            if (
+              !Number.isInteger(limit) ||
+              limit < 1 ||
+              limit > 100 ||
+              (input.after != null &&
+                (!['moment', 'duration'].includes(input.after.kind) ||
+                  typeof input.after.id !== 'string' ||
+                  !/^[A-Za-z0-9_.:-]{1,128}$/.test(input.after.id)))
+            )
+              throw new HttpError(
+                400,
+                'A related page needs an entity, a limit and a valid cursor.',
+              );
+            return response(
+              res,
+              200,
+              await store.query(id, userId, {
+                kind: 'related',
+                entity:
+                  'moment' in entity
+                    ? { kind: 'moment', id: entity.moment }
+                    : { kind: 'duration', id: entity.duration },
+                after: input.after ? { kind: input.after.kind, id: input.after.id } : null,
+                limit,
+                ...(input.revision ? { revision: input.revision } : {}),
+              }),
+            );
+          }
           if (input.kind === 'overview') {
             const lower = bound(input.lower),
               upper = bound(input.upper),

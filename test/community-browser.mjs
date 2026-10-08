@@ -114,6 +114,9 @@ export async function checkCommunity(browser) {
     if (path === `/api/timelines/${id}/document`)
       return route.fulfill({ json: { timeline: info, document } });
     if (path === `/api/timelines/${id}/query`) {
+      // Opening a moment also lists its relationships.
+      if (value.kind === 'related')
+        return route.fulfill({ json: { related: [], next: null, reachable: 0, direct: 0 } });
       if (value.kind === 'events')
         return route.fulfill({
           json: { events: document.events, next: null, revision: info.revision },

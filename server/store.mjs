@@ -12,6 +12,10 @@ import {
   searchTerms,
   filterDocument,
   viewFilterKey,
+  edgeTree,
+  entityTimes,
+  arcFromBand,
+  relationshipKey,
   snippet,
   SEARCH_PAGE_SIZE,
 } from '../dist/core.mjs';
@@ -118,6 +122,23 @@ export class PostgresStore {
     await writeNodes(client, 'oc_nodes', id, tree);
     const bands = await writeDurationNodes(client, 'oc_duration_nodes', id, document);
     await this.indexSearch(client, id, document, bands);
+    await client.query('DELETE FROM oc_relationships WHERE timeline_id=$1', [id]);
+    const links = document.relationships ?? [];
+    const kind = (ref) => ('moment' in ref ? ['moment', ref.moment] : ['duration', ref.duration]);
+    for (let offset = 0; offset < links.length; offset += 1000) {
+      const params = [];
+      const tuples = links.slice(offset, offset + 1000).map((r) => {
+        const start = params.length;
+        params.push(id, ...kind(r.a), ...kind(r.b));
+        return '(' + Array.from({ length: 5 }, (_, i) => '$' + (start + i + 1)).join(',') + ')';
+      });
+      await client.query(
+        'INSERT INTO oc_relationships(timeline_id,a_kind,a_id,b_kind,b_id) VALUES ' +
+          tuples.join(','),
+        params,
+      );
+    }
+    await writeEdgeNodes(client, id, document);
     // Saved state changed: derived separation views belong to the previous revision.
     await client.query('DELETE FROM oc_views WHERE timeline_id=$1', [id]);
     await client.query(
@@ -330,6 +351,7 @@ export class PostgresStore {
         id,
       ]);
       const durations = await this.durationDefinitions(c, id);
+      const relationships = await this.relationshipList(c, id);
       return {
         timeline: t,
         document: validateDocument({
@@ -344,9 +366,17 @@ export class PostgresStore {
           ...(t.comparison ? { comparison: t.comparison } : {}),
           events: rows.map((r) => r.event),
           ...(durations.length ? { durations } : {}),
+          ...(relationships.length ? { relationships } : {}),
         }),
       };
     });
+  }
+  async relationshipList(client, id) {
+    const { rows } = await client.query(
+      'SELECT a_kind,a_id,b_kind,b_id FROM oc_relationships WHERE timeline_id=$1',
+      [id],
+    );
+    return rows.map((r) => ({ a: { [r.a_kind]: r.a_id }, b: { [r.b_kind]: r.b_id } }));
   }
   /** Standalone duration definitions; legacy rows convert from their moments' metadata. */
   async durationDefinitions(client, id) {
@@ -362,6 +392,7 @@ export class PostgresStore {
       [timeline.id],
     );
     const durations = await this.durationDefinitions(client, timeline.id);
+    const relationships = await this.relationshipList(client, timeline.id);
     return validateDocument({
       format: 'openchronology',
       version: 1,
@@ -374,6 +405,7 @@ export class PostgresStore {
       ...(timeline.comparison ? { comparison: timeline.comparison } : {}),
       events: rows.map((r) => r.event),
       ...(durations.length ? { durations } : {}),
+      ...(relationships.length ? { relationships } : {}),
     });
   }
   /**
@@ -455,6 +487,18 @@ export class PostgresStore {
           AND ($4::mpq='0'::mpq OR last_time-first_time>=$4::mpq) LIMIT 257`,
           [tree, query.lower, query.upper, threshold],
         );
+        // Arcs use the same pruned interval query; separation views draw none.
+        const arcs = view
+          ? { rows: [] }
+          : await c.query(
+              `WITH RECURSIVE visible AS (
+          SELECT n.* FROM oc_edge_nodes n WHERE timeline_id=$1 AND id=1 AND min_time<=$3::mpq AND max_time>=$2::mpq
+          UNION ALL SELECT n.* FROM visible p JOIN oc_edge_nodes n ON n.timeline_id=p.timeline_id AND n.id IN (p.left_id,p.right_id)
+          WHERE n.min_time<=$3::mpq AND n.max_time>=$2::mpq AND NOT coalesce(n.max_extent<$4::mpq AND $4::mpq>'0'::mpq,false)
+        ) SELECT band FROM visible WHERE first_time<=$3::mpq AND last_time>=$2::mpq
+          AND ($4::mpq='0'::mpq OR last_time-first_time>=$4::mpq) LIMIT 257`,
+              [id, query.lower, query.upper, threshold],
+            );
         const collapsed = await c.query(
           `SELECT first_time,last_time,duration_count,band FROM ${names.durationOverview}($1,$2::mpq,$3::mpq,$4::mpq)`,
           [tree, query.lower, query.upper, threshold],
@@ -485,12 +529,65 @@ export class PostgresStore {
         return {
           durations: intervals.rows.slice(0, 256).map((r) => r.band),
           durationsTruncated: intervals.rows.length > 256,
+          edges: arcs.rows.slice(0, 256).map((r) => arcFromBand(r.band)),
+          edgesTruncated: arcs.rows.length > 256,
           revision: t.revision,
           threshold,
           groups: durationClusters.length
             ? coalesceGroups([...momentGroups, ...durationClusters], Q.parse(threshold))
             : momentGroups,
           visitedNodes: rows.at(-1)?.visited_nodes ?? 0,
+        };
+      }
+      if (query.kind === 'related') {
+        // Direct links from both ends, joined to search rows for titles and times.
+        const { rows } = await c.query(
+          `WITH links AS (
+            SELECT b_kind AS kind,b_id AS id FROM oc_relationships WHERE timeline_id=$1 AND a_kind=$2 AND a_id=$3
+            UNION SELECT a_kind,a_id FROM oc_relationships WHERE timeline_id=$1 AND b_kind=$2 AND b_id=$3)
+          SELECT l.kind,l.id,oc_qtext(s.first_time) AS first,oc_qtext(s.last_time) AS last,s.title
+          FROM links l JOIN oc_entity_search s ON s.timeline_id=$1 AND s.kind=l.kind AND s.entity_id=l.id
+          WHERE ($4::text IS NULL OR (l.kind,l.id COLLATE "C")>($4,$5 COLLATE "C"))
+          ORDER BY l.kind,l.id COLLATE "C" LIMIT $6`,
+          [
+            id,
+            query.entity.kind,
+            query.entity.id,
+            query.after?.kind ?? null,
+            query.after?.id ?? '',
+            query.limit + 1,
+          ],
+        );
+        const page = rows.slice(0, query.limit);
+        let reachable, direct;
+        if (!query.after) {
+          // Everything connected through any number of links (an undirected closure).
+          const closure = await c.query(
+            `WITH RECURSIVE reach(kind,id) AS (
+              SELECT $2::text,$3::text
+              UNION SELECT CASE WHEN r.a_kind=x.kind AND r.a_id=x.id THEN r.b_kind ELSE r.a_kind END,
+                           CASE WHEN r.a_kind=x.kind AND r.a_id=x.id THEN r.b_id ELSE r.a_id END
+              FROM reach x JOIN oc_relationships r ON r.timeline_id=$1
+                AND ((r.a_kind=x.kind AND r.a_id=x.id) OR (r.b_kind=x.kind AND r.b_id=x.id)))
+            SELECT count(*)-1 AS count,
+              (SELECT count(*) FROM oc_relationships WHERE timeline_id=$1 AND ((a_kind=$2 AND a_id=$3) OR (b_kind=$2 AND b_id=$3))) AS direct
+            FROM reach`,
+            [id, query.entity.kind, query.entity.id],
+          );
+          reachable = Number(closure.rows[0].count);
+          direct = Number(closure.rows[0].direct);
+        }
+        return {
+          related: page.map((r) => ({
+            kind: r.kind,
+            id: r.id,
+            first: r.first,
+            last: r.last,
+            title: r.title,
+          })),
+          next: rows.length > query.limit ? { kind: page.at(-1).kind, id: page.at(-1).id } : null,
+          ...(reachable === undefined ? {} : { reachable, direct }),
+          revision: t.revision,
         };
       }
       if (query.kind === 'tags') {
@@ -644,6 +741,27 @@ async function writeNodes(client, table, id, tree) {
 }
 /** Writes the augmented duration interval tree; returns resolved bands in tree order. */
 async function writeDurationNodes(client, table, id, document) {
+  const times = new Map(document.events.map((e) => [e.id, e.time]));
+  return writeIntervalNodes(
+    client,
+    table,
+    id,
+    durationTree(document.durations ?? [], (moment) => times.get(moment)),
+  );
+}
+/** Relationship arcs placed between their endpoints' times. */
+async function writeEdgeNodes(client, id, document) {
+  const times = new Map(document.events.map((e) => [e.id, e.time]));
+  const places = entityTimes(document.events, document.durations ?? [], (m) => times.get(m));
+  return writeIntervalNodes(
+    client,
+    'oc_edge_nodes',
+    id,
+    edgeTree(document.relationships ?? [], (key) => places.get(key)),
+  );
+}
+/** Writes an augmented interval tree (durations or arcs); returns bands in tree order. */
+async function writeIntervalNodes(client, table, id, root) {
   await client.query(`DELETE FROM ${table} WHERE timeline_id=$1`, [id]);
   const intervals = [];
   function flatten(node) {
@@ -655,8 +773,7 @@ async function writeDurationNodes(client, table, id, document) {
     row.right = flatten(node.right);
     return ordinal;
   }
-  const times = new Map(document.events.map((e) => [e.id, e.time]));
-  flatten(durationTree(document.durations ?? [], (moment) => times.get(moment)));
+  flatten(root);
   for (let offset = 0; offset < intervals.length; offset += 250) {
     const params = [];
     const tuples = intervals.slice(offset, offset + 250).map(({ ordinal, node, left, right }) => {
@@ -777,10 +894,20 @@ export function applyPatch(current, patch) {
     (moment) => events.has(moment),
     (moment) => lastTimes.get(moment),
   );
+  const links = new Map((current.relationships ?? []).map((r) => [relationshipKey(r), r]));
+  for (const change of patch.relationshipChanges ?? []) {
+    const relationship = { a: change.a, b: change.b };
+    if (change.related) links.set(relationshipKey(relationship), relationship);
+    else links.delete(relationshipKey(relationship));
+  }
+  // Deleting an entity removes its links.
+  const exists = (ref) => ('moment' in ref ? events.has(ref.moment) : durations.has(ref.duration));
+  const relationships = [...links.values()].filter((r) => exists(r.a) && exists(r.b));
   return {
     ...patch.settings,
     events: [...events.values()],
     ...(fixed.length ? { durations: fixed } : {}),
+    ...(relationships.length ? { relationships } : {}),
   };
 }
 function eventSearchText(document) {

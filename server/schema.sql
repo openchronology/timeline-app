@@ -636,3 +636,24 @@ BEGIN
       'oc_timelines', 'oc_views');
   END LOOP;
 END $$;
+
+-- Undirected relationships between entities, stored once in canonical order (a < b by
+-- kind and ID) and indexed from both ends. Rebuilt with the timeline's other indexes on save.
+CREATE TABLE IF NOT EXISTS oc_relationships (
+  timeline_id uuid NOT NULL REFERENCES oc_timelines(id) ON DELETE CASCADE,
+  a_kind text NOT NULL CHECK(a_kind IN ('moment','duration')), a_id text NOT NULL,
+  b_kind text NOT NULL CHECK(b_kind IN ('moment','duration')), b_id text NOT NULL,
+  PRIMARY KEY(timeline_id,a_kind,a_id,b_kind,b_id),
+  CHECK((a_kind,a_id)<>(b_kind,b_id))
+);
+CREATE INDEX IF NOT EXISTS oc_relationships_b ON oc_relationships(timeline_id,b_kind,b_id);
+-- Relationship arcs as exact intervals between their endpoints' times (a duration's start),
+-- in the same augmented interval tree as duration bands.
+CREATE TABLE IF NOT EXISTS oc_edge_nodes (
+  timeline_id uuid NOT NULL REFERENCES oc_timelines(id) ON DELETE CASCADE,
+  id integer NOT NULL, left_id integer, right_id integer,
+  min_time mpq NOT NULL, max_time mpq NOT NULL,
+  first_time mpq NOT NULL, last_time mpq NOT NULL, band jsonb NOT NULL,
+  definition jsonb, max_first mpq, subtree_count integer, min_extent mpq, max_extent mpq,
+  PRIMARY KEY(timeline_id,id)
+);

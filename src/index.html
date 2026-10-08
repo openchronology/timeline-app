@@ -261,7 +261,7 @@ Every point has a place. Explore the spaces between them.</textarea>
           </div>
           <section id="separation-settings" class="comparison-settings" hidden>
             <div class="comparison-heading">
-              <strong>Separated by tags</strong>
+              <strong id="separation-heading">Separated by tags</strong>
               <span id="separation-tags" class="separation-tags"></span>
               <button id="separation-rejoin">Rejoin</button>
             </div>
@@ -294,6 +294,7 @@ Every point has a place. Explore the spaces between them.</textarea>
           >
             <div id="axis" class="axis"></div>
             <div id="time-cursor" class="time-cursor" role="img" hidden></div>
+            <svg id="edge-arcs" class="edge-arcs" role="group" aria-label="Relationships"></svg>
             <div id="duration-bands" class="markers"></div>
             <div id="markers" class="markers"></div>
             <div id="stack-markers" class="markers"></div>
@@ -407,6 +408,7 @@ Every point has a place. Explore the spaces between them.</textarea>
         /></label>
         <div id="plugin-event-fields"></div>
         <section id="event-durations"></section>
+        <section id="event-related" class="related-section"></section>
         <details>
           <summary>Additional metadata</summary>
           <label
@@ -486,6 +488,7 @@ Every point has a place. Explore the spaces between them.</textarea>
             placeholder="Comma-separated, e.g. war, trade"
         /></label>
         <div id="plugin-duration-fields"></div>
+        <section id="duration-related" class="related-section"></section>
         <details>
           <summary>Additional metadata</summary>
           <label
