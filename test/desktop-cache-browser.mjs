@@ -113,6 +113,12 @@ export async function checkDesktopCache(browser) {
   };
   try {
     await page.goto('http://localhost:5173');
+    // Without a server connection, the desktop cannot sign in and file actions use plain names.
+    assert(await page.locator('#account-button').isDisabled());
+    assert.deepEqual(
+      await page.locator('#sqlite-open, #sqlite-save, #sqlite-save-as').allTextContents(),
+      ['Open', 'Save', 'Save As…'],
+    );
     await page.locator('#sqlite-open').click();
     await page.waitForFunction(
       () =>
@@ -149,7 +155,7 @@ export async function checkDesktopCache(browser) {
     assert.equal(reads, 0);
     await page.locator('#sqlite-save').click();
     await page.waitForFunction(
-      () => document.getElementById('save-status').textContent === 'Saved in a SQLite timeline',
+      () => document.getElementById('save-status').textContent === 'Saved to file',
     );
     assert.equal(saves.length, 1);
     assert.equal(saves[0].changes.length, 1);

@@ -35,6 +35,12 @@
               >Desktop · Linux (.deb)</a
             >
             <a
+              href="https://github.com/openchronology/timeline-app/releases/latest/download/openchronology-desktop-linux-amd64.AppImage"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Desktop · Linux (.AppImage)</a
+            >
+            <a
               href="https://github.com/openchronology/timeline-app/releases/latest/download/openchronology-desktop-rocky10-amd64.rpm"
               target="_blank"
               rel="noopener noreferrer"
@@ -178,9 +184,9 @@
             <button id="import-button">Import</button><button id="export-button">Export</button
             ><button id="och-import" hidden>Import .och</button
             ><button id="och-export" hidden>Export .och ↗</button
-            ><button id="sqlite-open" hidden>Open SQLite</button
-            ><button id="sqlite-save" hidden>Save SQLite</button
-            ><button id="sqlite-save-as" hidden>Save SQLite as…</button
+            ><button id="sqlite-open" hidden>Open</button
+            ><button id="sqlite-save" hidden>Save</button
+            ><button id="sqlite-save-as" hidden>Save As…</button
             ><button id="publish-button" class="button-primary">Save to server</button>
           </div>
         </div>
@@ -310,7 +316,8 @@ Every point has a place. Explore the spaces between them.</textarea
               id="right-bound"
               spellcheck="false"
               aria-label="Right time bound in timeline format" /></label
-          ><button id="apply-bounds">Go</button><button id="undo-button" disabled>Undo edit</button>
+          ><button id="apply-bounds">Go</button><button id="undo-button" disabled title="Undo (Ctrl+Z)">Undo</button
+          ><button id="redo-button" disabled title="Redo (Ctrl+Shift+Z)">Redo</button>
         </div>
         <details class="presented-bounds">
           <summary>Exact rational bounds</summary>

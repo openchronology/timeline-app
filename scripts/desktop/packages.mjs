@@ -6,6 +6,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 export const targets = {
   'linux-deb': { bundle: 'deb', suffix: '.deb', asset: 'openchronology-desktop-linux-amd64.deb' },
+  'linux-appimage': {
+    bundle: 'appimage',
+    suffix: '.AppImage',
+    asset: 'openchronology-desktop-linux-amd64.AppImage',
+  },
   'rocky-rpm': { bundle: 'rpm', suffix: '.rpm', asset: 'openchronology-desktop-rocky10-amd64.rpm' },
   'macos-arm64': { bundle: 'dmg', suffix: '.dmg', asset: 'openchronology-desktop-macos-arm64.dmg' },
   'macos-amd64': { bundle: 'dmg', suffix: '.dmg', asset: 'openchronology-desktop-macos-amd64.dmg' },

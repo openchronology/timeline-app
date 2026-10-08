@@ -2,11 +2,31 @@
 @import '../../src/dialog-motion.css';
 :root {
   color-scheme: light;
-  font:
-    15px/1.6 system-ui,
+  /* Shares the editor's type, color and control tokens so both surfaces read as one product. */
+  font-family:
+    Inter,
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
     sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
   color: #20372c;
-  background: #f5f6ef;
+  background: #f5f6f1;
+  --green: #285742;
+  --green-hover: #1d4735;
+  --ink: #20372c;
+  --muted: #6f7c71;
+  --line: #dfe5db;
+  --line-strong: #cdd6c8;
+  --paper: #fff;
+  --hover: #f0f4ec;
+  --focus: #61a378;
+  --radius: 8px;
+  --control-height: 32px;
 }
 * {
   box-sizing: border-box;
@@ -21,37 +41,92 @@ select {
   font: inherit;
 }
 a {
-  color: #285742;
+  color: var(--green);
+  text-underline-offset: 2px;
+}
+a:hover {
+  color: var(--green-hover);
 }
 button,
 .button {
-  border: 1px solid #d7dfd3;
-  border-radius: 7px;
-  padding: 8px 13px;
-  background: #fff;
-  color: #285742;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--control-height);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 0 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
   cursor: pointer;
   text-decoration: none;
+  box-shadow: 0 1px 1px #20372c0a;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+button:hover,
+.button:hover {
+  background: var(--hover);
+  border-color: #bccab6;
+  color: var(--ink);
 }
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
 }
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
 .primary {
-  background: #285742;
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+.primary:hover {
+  background: var(--green-hover);
+  border-color: var(--green-hover);
   color: #fff;
 }
 input,
-textarea {
+textarea,
+select {
   display: block;
   width: 100%;
-  padding: 9px;
-  border: 1px solid #d7dfd3;
-  border-radius: 7px;
-  background: #fff;
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 400;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+input:not([type='checkbox']):not([type='radio']):not([type='file']),
+select {
+  min-height: 36px;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px #61a37833;
 }
 label {
   display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #44584b;
 }
 input[type='checkbox'] {
   display: inline-block;
@@ -65,7 +140,21 @@ input[type='checkbox'] {
   justify-content: space-between;
   gap: 20px;
   padding: 16px 28px;
-  background: #20372c;
+  background: #192d25;
+  color: #eef4eb;
+  border-bottom: 1px solid #284033;
+}
+.platform-header button,
+.platform-header .button {
+  background: transparent;
+  border-color: #46614e;
+  color: #e3eddf;
+  box-shadow: none;
+}
+.platform-header button:hover,
+.platform-header .button:hover {
+  background: #294333;
+  border-color: #5a7862;
   color: #fff;
 }
 .platform-header a {
@@ -73,8 +162,9 @@ input[type='checkbox'] {
   text-decoration: none;
 }
 .brand {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 550;
+  letter-spacing: -0.045em;
 }
 nav,
 .actions {
@@ -111,20 +201,22 @@ h2 {
 .timeline-card,
 .account-card {
   padding: 20px;
-  border: 1px solid #d7dfd3;
-  border-radius: 9px;
-  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: 0 1px 2px #1d38230a;
   overflow-wrap: anywhere;
 }
 .timeline-card h3 {
   margin: 0 0 8px;
 }
 .muted {
-  color: #718071;
+  color: var(--muted);
   font-size: 13px;
 }
 .search-controls {
   display: flex;
+  align-items: flex-end;
   flex-wrap: wrap;
   gap: 16px;
   margin: 18px 0;
@@ -139,7 +231,12 @@ h2 {
   gap: 6px;
 }
 .tags button {
-  padding: 3px 8px;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #edf2e8;
+  border-color: #dbe4d4;
+  box-shadow: none;
   font-size: 12px;
 }
 section {
@@ -155,10 +252,10 @@ section {
   color: #9b3636;
 }
 .notice {
-  padding: 14px;
-  border: 1px solid #d7dfd3;
-  border-radius: 7px;
-  background: #fff;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
 }
 .account-card {
   max-width: 520px;
@@ -170,14 +267,15 @@ section {
 .platform-footer {
   padding: 20px 28px;
   font-size: 12px;
-  color: #718071;
+  color: var(--muted);
 }
 .legal-document pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: 600px;
   overflow: auto;
-  font: 14px/1.6 system-ui;
+  font: inherit;
+  font-size: 14px;
 }
 /* The editor owns scrolling, including its footer at the end of the document.
    Size the frame below navigation without introducing a second scrollbar. */
@@ -275,8 +373,9 @@ textarea {
 .dashboard-introduction {
   margin: 24px 0;
   padding: 20px;
-  border: 1px solid #dbe3d5;
-  border-radius: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
 }
 
 dialog {
@@ -313,9 +412,25 @@ dialog {
 .download-menu summary {
   cursor: pointer;
   list-style: none;
-  border: 1px solid #69846d;
-  border-radius: 7px;
-  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height);
+  border: 1px solid #46614e;
+  border-radius: var(--radius);
+  padding: 0 12px;
+  font-weight: 500;
+}
+.download-menu summary::-webkit-details-marker {
+  display: none;
+}
+.download-menu summary::after {
+  content: '▾';
+  margin-left: 6px;
+  font-size: 10px;
+  opacity: 0.7;
+}
+.download-menu summary:hover {
+  background: #294333;
 }
 .download-menu > div {
   position: absolute;
@@ -333,7 +448,8 @@ dialog {
 }
 .platform-header .download-menu > div a {
   display: block;
-  padding: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
   color: #285742;
   text-decoration: none;
 }
