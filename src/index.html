@@ -203,8 +203,7 @@
             aria-label="Timeline description"
             rows="1"
           >
-Every point has a place. Explore the spaces between them.</textarea
-          >
+Every point has a place. Explore the spaces between them.</textarea>
           <div id="timeline-actions" class="timeline-actions">
             <button id="timeline-star-button" hidden>☆ Star · 0</button>
             <button id="share-button" hidden>Sharing</button>
@@ -316,7 +315,8 @@ Every point has a place. Explore the spaces between them.</textarea
               id="right-bound"
               spellcheck="false"
               aria-label="Right time bound in timeline format" /></label
-          ><button id="apply-bounds">Go</button><button id="undo-button" disabled title="Undo (Ctrl+Z)">Undo</button
+          ><button id="apply-bounds">Go</button
+          ><button id="undo-button" disabled title="Undo (Ctrl+Z)">Undo</button
           ><button id="redo-button" disabled title="Redo (Ctrl+Shift+Z)">Redo</button>
         </div>
         <details class="presented-bounds">
@@ -363,7 +363,6 @@ Every point has a place. Explore the spaces between them.</textarea
           Uses this timeline’s time display. Leaving the text unchanged preserves the exact
           coordinate, even when the display rounds it.
         </p>
-        <div id="event-calendar-picker" hidden></div>
         <details>
           <summary>Exact rational coordinate</summary>
           <input
@@ -848,6 +847,27 @@ Every point has a place. Explore the spaces between them.</textarea
         <button id="delete-cancel" data-close="delete-dialog" type="button">Cancel</button>
         <button id="delete-confirm" class="button-danger" type="button">Delete event</button>
       </div>
+    </dialog>
+    <dialog id="datetime-dialog" class="datetime-dialog" aria-labelledby="datetime-heading">
+      <form id="datetime-form">
+        <div class="dialog-heading">
+          <h2 id="datetime-heading">Choose date and time</h2>
+          <button type="button" data-close="datetime-dialog" aria-label="Close">×</button>
+        </div>
+        <div id="datetime-picker"></div>
+        <label
+          >Or type a time<input id="datetime-text" spellcheck="false" autocomplete="off"
+        /></label>
+        <p class="field-hint">
+          Uses this timeline’s time display. Leaving the text unchanged preserves the exact
+          coordinate, even when the display rounds it.
+        </p>
+        <p id="datetime-error" class="form-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button id="datetime-apply" class="button-primary" type="submit">Apply</button
+          ><button type="button" data-close="datetime-dialog">Cancel</button>
+        </div>
+      </form>
     </dialog>
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     <!-- OPENCHRONOLOGY_LEGAL -->

@@ -3269,25 +3269,11 @@ el('apply-bounds').onclick = () => {
     fail(error);
   }
 };
-function setEventTime(time: Q, refreshCalendar = true) {
+function setEventTime(time: Q) {
   const value = presented(time, 'input');
   displayedEventTime = { text: value, time };
   input('event-time').value = value;
   input('event-exact').value = time.toString();
-  if (refreshCalendar)
-    calendarPicker(
-      el('event-calendar-picker'),
-      model?.presentation ?? remote?.presentation,
-      time,
-      viewContext('input'),
-      !editable(),
-      (next) => {
-        setEventTime(next, false);
-        selectedTime = next;
-        queueEventEdit();
-        requestRender();
-      },
-    );
   for (const label of el('plugin-event-fields').querySelectorAll('.stack-time'))
     label.textContent = `Inherited time: ${value}`;
 }
@@ -3297,6 +3283,126 @@ function readEventTime() {
     ? displayedEventTime.time
     : timelinePresenter().parse(value, viewContext('input'));
 }
+
+/** Gregorian time fields open a calendar dialog; its text field keeps typed entry available. */
+type TimeField = 'event-time' | 'left-bound' | 'right-bound';
+const timeFields: TimeField[] = ['event-time', 'left-bound', 'right-bound'];
+let timeDraft: { field: TimeField; time: Q; text: string } | null = null;
+function calendarPresentation() {
+  const presentation = model?.presentation ?? remote?.presentation;
+  return presentation?.mode === 'gregorian' && !comparison ? presentation : undefined;
+}
+function fieldTime(field: TimeField): Q {
+  if (field === 'event-time') return readEventTime();
+  const value = input(field).value,
+    displayed = displayedBounds.get(field);
+  return displayed?.text === value
+    ? displayed.time
+    : timelinePresenter().parse(value, viewContext('input'));
+}
+function showTimeDraft(time: Q, refreshPicker: boolean) {
+  const presentation = calendarPresentation();
+  if (!timeDraft || !presentation) return;
+  timeDraft.time = time;
+  if (refreshPicker)
+    calendarPicker(el('datetime-picker'), presentation, time, viewContext('input'), false, (next) =>
+      showTimeDraft(next, false),
+    );
+  if (!refreshPicker || document.activeElement !== input('datetime-text')) {
+    timeDraft.text = presented(time, 'input');
+    input('datetime-text').value = timeDraft.text;
+  }
+  text('datetime-error', '');
+}
+function openTimeDialog(field: TimeField) {
+  if (!calendarPresentation() || input(field).disabled || input(field).readOnly) return false;
+  if (field === 'event-time' && !editable()) return false;
+  let time: Q;
+  try {
+    time = fieldTime(field);
+  } catch {
+    // Unparseable text starts from the nearest meaningful time instead of blocking the picker.
+    time =
+      field === 'left-bound'
+        ? viewport.left
+        : field === 'right-bound'
+          ? viewport.right
+          : (selectedTime ?? viewport.left.add(viewport.span.div(Q.from(2n))));
+  }
+  timeDraft = { field, time, text: '' };
+  text(
+    'datetime-heading',
+    field === 'event-time'
+      ? 'Moment date and time'
+      : field === 'left-bound'
+        ? 'Left bound date and time'
+        : 'Right bound date and time',
+  );
+  showTimeDraft(time, true);
+  el<HTMLDialogElement>('datetime-dialog').showModal();
+  return true;
+}
+for (const field of timeFields) {
+  input(field).setAttribute('aria-haspopup', 'dialog');
+  input(field).addEventListener('click', () => {
+    if (openTimeDialog(field)) input(field).blur();
+  });
+  input(field).addEventListener('keydown', (event) => {
+    // Alt+Down is the conventional key for opening a field's picker; plain typing still edits.
+    if (event.altKey && event.key === 'ArrowDown' && openTimeDialog(field)) event.preventDefault();
+  });
+}
+input('datetime-text').oninput = () => {
+  if (!timeDraft) return;
+  try {
+    const value = input('datetime-text').value;
+    if (value === timeDraft.text) return;
+    const time = timelinePresenter().parse(value, viewContext('input'));
+    timeDraft.text = value;
+    showTimeDraft(time, true);
+  } catch {
+    // Incomplete text stays editable; applying reports the parser error.
+  }
+};
+el<HTMLFormElement>('datetime-form').onsubmit = (event) => {
+  event.preventDefault();
+  const draft = timeDraft;
+  if (!draft) return;
+  try {
+    const value = input('datetime-text').value;
+    const time =
+      value === draft.text ? draft.time : timelinePresenter().parse(value, viewContext('input'));
+    if (draft.field === 'event-time') {
+      setEventTime(time);
+      selectedTime = time;
+      text('event-error', '');
+      queueEventEdit();
+    } else {
+      const left = draft.field === 'left-bound' ? time : viewport.left,
+        right = draft.field === 'right-bound' ? time : viewport.right;
+      if (right.compare(left) <= 0)
+        throw new Error('The left bound must be earlier than the right bound.');
+      follow.navigation();
+      cancelZoomAnimation();
+      viewport = new Viewport(left, right.sub(left));
+    }
+    el<HTMLDialogElement>('datetime-dialog').close();
+    requestRender();
+  } catch (error) {
+    text('datetime-error', error instanceof Error ? error.message : String(error));
+  }
+};
+el<HTMLDialogElement>('datetime-dialog').addEventListener('close', () => {
+  // The close event is queued; a dialog reopened for another field keeps its new draft.
+  if (el<HTMLDialogElement>('datetime-dialog').open) return;
+  const field = timeDraft?.field;
+  timeDraft = null;
+  // Focus returns to the field, and focused bounds are not rewritten; show the applied bound.
+  if (field && field !== 'event-time') {
+    input(field).blur();
+    requestRender();
+  }
+});
 input('event-time').oninput = () => {
   try {
     const time = readEventTime();
@@ -3304,19 +3410,6 @@ input('event-time').oninput = () => {
       label.textContent = `Inherited time: ${input('event-time').value}`;
     input('event-exact').value = time.toString();
     selectedTime = time;
-    calendarPicker(
-      el('event-calendar-picker'),
-      model?.presentation ?? remote?.presentation,
-      time,
-      viewContext('input'),
-      !editable(),
-      (next) => {
-        setEventTime(next);
-        selectedTime = next;
-        queueEventEdit();
-        requestRender();
-      },
-    );
     text('event-error', '');
     requestRender();
   } catch {
@@ -3496,11 +3589,11 @@ el<HTMLFormElement>('event-form').onsubmit = (event) => {
   event.preventDefault();
   flushEventEdit();
 };
-el('event-form').addEventListener('input', (event) => {
-  if (!(event.target as HTMLElement).closest('#event-calendar-picker')) queueEventEdit();
+el('event-form').addEventListener('input', () => {
+  queueEventEdit();
 });
-el('event-form').addEventListener('change', (event) => {
-  if (!(event.target as HTMLElement).closest('#event-calendar-picker')) queueEventEdit();
+el('event-form').addEventListener('change', () => {
+  queueEventEdit();
 });
 el('event-form').addEventListener('focusout', () => {
   flushEventEdit();
