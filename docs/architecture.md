@@ -211,7 +211,7 @@ retain the existing persistence behavior; Tauri continues using local SQLite.
 `POST /api/timelines/:id/browser-fork` accepts `{}` or a saved `{revision}` token.
 It returns the complete document and source revision for public timelines only,
 without inserting a timeline, fork relationship or revision. It caps copies at
-5,000 entries (moments and stack entries) and 4 MiB of JSON, including embedded assets and plugin definitions.
+5,000 entries (moments, stack entries and durations) and 4 MiB of JSON, including embedded assets and plugin definitions.
 The service reads precomputed `oc_snapshots.document_bytes` and the timeline event
 count before loading document JSON. New checkpoints record UTF-8 serialized sizes;
 the operator migration measures legacy snapshots once, conservatively using their

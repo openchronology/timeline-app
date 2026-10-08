@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { Q, TimelineIndex, Viewport, DEFAULT_PRESENTATION } from './core.js';
-import type { Frame, FrameGroup, PointEvent, TimePresentation } from './core.js';
+import type { DurationEndpoint, Frame, FrameGroup, PointEvent, TimePresentation } from './core.js';
 import type { InstalledPlugin } from './plugins.js';
 import { ViewportCache, regroup } from './remote-cache.js';
 export type Cursor = { time: string; id: string } | null;
@@ -175,8 +175,8 @@ export class ComparisonView {
       durations: frame.durations?.map((b) => ({
         ...b,
         id: track.source.key + ':' + b.id,
-        startId: track.source.key + ':' + b.startId,
-        endId: track.source.key + ':' + b.endId,
+        start: mapEndpoint(track, b.start),
+        end: mapEndpoint(track, b.end),
         sourceKey: track.source.key,
         startTime: Q.parse(b.startTime).mul(track.scale).add(track.offset).toString(),
         endTime: Q.parse(b.endTime).mul(track.scale).add(track.offset).toString(),
@@ -313,4 +313,10 @@ export function localEvents(
     events: events.slice(0, limit),
     next: events.length > limit ? { time: last.time, id: last.id } : null,
   };
+}
+/** Comparison bands are read-only; endpoints are re-expressed on the combined axis. */
+function mapEndpoint(track: Track, endpoint: DurationEndpoint): DurationEndpoint {
+  return typeof endpoint === 'string'
+    ? Q.parse(endpoint).mul(track.scale).add(track.offset).toString()
+    : { moment: track.source.key + ':' + endpoint.moment };
 }

@@ -1,9 +1,10 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 export const BROWSER_COPY_MAX_BYTES = 4 * 1024 * 1024;
 export const BROWSER_COPY_MAX_EVENTS = 5000;
-/** Stack cards also consume UI memory even though they do not add axis points. */
+/** Stack cards and durations also consume UI memory even though they do not add axis points. */
 export function browserEntryCount(document: {
   events: { metadata: Record<string, unknown> }[];
+  durations?: readonly unknown[];
   plugins?: readonly { manifest: { fields: readonly { kind: string; metadataKey: string }[] } }[];
 }): number {
   const keys = new Set([
@@ -12,7 +13,7 @@ export function browserEntryCount(document: {
       p.manifest.fields.filter((f) => f.kind === 'stack').map((f) => f.metadataKey),
     ),
   ]);
-  let count = document.events.length;
+  let count = document.events.length + (document.durations?.length ?? 0);
   for (const event of document.events) {
     for (const key of keys) {
       const entries = event.metadata[key];

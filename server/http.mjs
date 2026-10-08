@@ -17,7 +17,7 @@ import { mailFromEnv, encryptionKey } from './mail.mjs';
 import { DeviceAuth } from './device-auth.mjs';
 import { TimelineFiles } from './files.mjs';
 import { HttpError, PostgresStore } from './store.mjs';
-import { Q, parseTime, validateDocument } from '../dist/core.mjs';
+import { Q, parseTime, validateDocument, validateDuration } from '../dist/core.mjs';
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 async function body(req, maximum = 16 * 1024 * 1024) {
   if (!req.headers['content-type']?.startsWith('application/json'))
@@ -704,13 +704,18 @@ export function createRequestHandler({
         if (action === 'changes' && method === 'PUT') {
           auth.require(session, req);
           const input = await body(req);
+          const durationInput = input.durationChanges ?? [];
           if (
             typeof input.revision !== 'string' ||
             !/^\d+$/.test(input.revision) ||
             !Array.isArray(input.changes) ||
-            input.changes.length > 5000
+            !Array.isArray(durationInput) ||
+            input.changes.length + durationInput.length > 5000
           )
-            throw new HttpError(400, 'Expected a revision and at most 5000 changed moments.');
+            throw new HttpError(
+              400,
+              'Expected a revision and at most 5000 changed moments and durations.',
+            );
           const settings = document({ ...input.settings, events: [] });
           const ids = new Set();
           const changes = input.changes.map((change) => {
@@ -728,10 +733,35 @@ export function createRequestHandler({
               throw new HttpError(400, 'Changed moment ID mismatch.');
             return { id: change.id, event };
           });
+          const durationIds = new Set();
+          const durationChanges = durationInput.map((change) => {
+            if (
+              !change ||
+              typeof change.id !== 'string' ||
+              !/^[A-Za-z0-9_.:-]{1,128}$/.test(change.id) ||
+              durationIds.has(change.id)
+            )
+              throw new HttpError(400, 'Changed duration IDs must be valid and unique.');
+            durationIds.add(change.id);
+            if (change.duration === null) return { id: change.id, duration: null };
+            let duration;
+            try {
+              duration = validateDuration(change.duration, parseTime);
+            } catch (error) {
+              throw new HttpError(400, error.message);
+            }
+            if (duration.id !== change.id)
+              throw new HttpError(400, 'Changed duration ID mismatch.');
+            return { id: change.id, duration };
+          });
           return response(
             res,
             200,
-            await store.save(id, userId, input.revision, null, { settings, changes }),
+            await store.save(id, userId, input.revision, null, {
+              settings,
+              changes,
+              durationChanges,
+            }),
           );
         }
         if (!action && method === 'PUT') {
@@ -777,6 +807,19 @@ export function createRequestHandler({
                       plugins: queryPlugins(input.plugins),
                     }
                   : {}),
+              }),
+            );
+          }
+          if (input.kind === 'duration') {
+            if (typeof input.id !== 'string' || !/^[A-Za-z0-9_.:-]{1,128}$/.test(input.id))
+              throw new HttpError(400, 'A duration lookup needs its ID.');
+            return response(
+              res,
+              200,
+              await store.query(id, userId, {
+                kind: 'duration',
+                id: input.id,
+                ...(input.revision ? { revision: input.revision } : {}),
               }),
             );
           }

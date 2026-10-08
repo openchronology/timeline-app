@@ -25,6 +25,7 @@ Plugins combine **JSON host component declarations** and an optional restricted 
 - Inspector fields: `text`, `multiline`, `image-url`, `stack`, `shape`, `size`, `color`, and `links`, each bound to one top-level moment metadata key.
 - Marker effects: an `image`, `color`, or `shape` bound to metadata, plus hover cards and restricted scripted effects.
 - Ordering: later enabled definitions replace earlier inspector fields with the same key; later marker hooks with a valid, populated image URL take precedence. Empty or invalid URLs fall back to the preceding valid marker effect, or the normal dot.
+- Targets: an optional `targets` array of `"moments"` and/or `"durations"`. Without it, color markers and hover cards apply to moments and [durations](durations.md); every other plugin applies to moments only. Durations use only text, notes, color and link fields, color markers and hover cards; stacks, shapes, sizes, icons and summary expansion are moment-only.
 
 A plugin can define fields without a marker effect, or an effect without a new editor field. Additional component kinds require an implementation and security review in the host; they are not arbitrary downloaded UI programs. New capabilities will use versioned contracts.
 

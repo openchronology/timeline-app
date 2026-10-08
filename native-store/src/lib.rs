@@ -13,6 +13,14 @@ pub struct Event {
     pub time: String,
     pub metadata: Map<String, Value>,
 }
+/// A standalone duration. Each endpoint is an exact time string or `{"moment": id}`.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct Duration {
+    pub id: String,
+    pub start: Value,
+    pub end: Value,
+    pub metadata: Map<String, Value>,
+}
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Document {
     pub format: String,
@@ -28,6 +36,64 @@ pub struct Document {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assets: Option<Value>,
     pub events: Vec<Event>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub durations: Vec<Duration>,
+}
+fn identifier(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 128
+        && id
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b"_.:-".contains(&c))
+}
+/// Splits an endpoint into (time, moment); exactly one is present.
+fn endpoint(value: &Value) -> Result<(Option<&str>, Option<&str>), String> {
+    match value {
+        Value::String(time) if !time.is_empty() && time.len() <= 65536 => Ok((Some(time), None)),
+        Value::Object(o) if o.len() == 1 => match o.get("moment").and_then(Value::as_str) {
+            Some(id) if identifier(id) => Ok((None, Some(id))),
+            _ => Err("Invalid duration anchor".into()),
+        },
+        _ => Err("A duration endpoint is an exact time or a moment anchor".into()),
+    }
+}
+/// Version-1 files stored durations as links in their start moment's metadata. They become
+/// standalone durations anchored to both original moments.
+pub fn convert_legacy_durations(doc: &mut Document) -> Result<(), String> {
+    for event in &mut doc.events {
+        let Some(value) = event.metadata.remove("durations") else {
+            continue;
+        };
+        let links = value.as_array().ok_or("Durations must be an array")?;
+        if links.len() > 1000 {
+            return Err("Use at most 1000 durations per moment".into());
+        }
+        for link in links {
+            let id = link.get("id").and_then(Value::as_str).unwrap_or_default();
+            let end = link
+                .get("endId")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            if !identifier(id) || !identifier(end) {
+                return Err("Invalid duration identifier".into());
+            }
+            if end == event.id {
+                return Err("Duration endpoints must be distinct existing moments".into());
+            }
+            doc.durations.push(Duration {
+                id: id.into(),
+                start: serde_json::json!({"moment": event.id}),
+                end: serde_json::json!({"moment": end}),
+                metadata: link
+                    .get("metadata")
+                    .and_then(Value::as_object)
+                    .cloned()
+                    .ok_or("Invalid duration metadata")?,
+            });
+        }
+    }
+    doc.durations.sort_by(|a, b| a.id.cmp(&b.id));
+    Ok(())
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Group {
@@ -45,7 +111,7 @@ fn check_file(db: &Connection) -> Result<(), String> {
     }
     // These names must be data tables, never attacker-supplied SQL views.
     if db.scalar("SELECT count(*) FROM sqlite_schema WHERE name IN ('events','timeline_meta') AND type='table'", &[])? != "2"
-        || db.scalar("SELECT count(*) FROM sqlite_schema WHERE name IN ('timeline_settings','timeline_plugins','timeline_extras') AND type!='table'", &[])? != "0" {
+        || db.scalar("SELECT count(*) FROM sqlite_schema WHERE name IN ('timeline_settings','timeline_plugins','timeline_extras','durations') AND type!='table'", &[])? != "0" {
         return Err("Invalid timeline data tables".into());
     }
     Ok(())
@@ -103,39 +169,8 @@ fn validate(doc: &Document) -> Result<(), String> {
         {
             return Err("Event IDs must be unique ASCII identifiers".into());
         }
-        if let Some(value) = e.metadata.get("durations") {
-            let links = value.as_array().ok_or("Durations must be an array")?;
-            if links.len() > 1000 {
-                return Err("Use at most 1000 durations per moment".into());
-            }
-            for link in links {
-                for key in ["id", "endId"] {
-                    let id = link
-                        .get(key)
-                        .and_then(Value::as_str)
-                        .ok_or("Invalid duration identifier")?;
-                    if id.is_empty()
-                        || id.len() > 128
-                        || !id
-                            .bytes()
-                            .all(|c| c.is_ascii_alphanumeric() || b"_.:-".contains(&c))
-                    {
-                        return Err("Invalid duration identifier".into());
-                    }
-                }
-                let metadata = link
-                    .get("metadata")
-                    .and_then(Value::as_object)
-                    .ok_or("Invalid duration metadata")?;
-                for key in ["title", "description"] {
-                    if metadata.get(key).is_some_and(|v| !v.is_string()) {
-                        return Err("Duration titles and notes must be text".into());
-                    }
-                }
-                if metadata.contains_key("durations") {
-                    return Err("Durations cannot contain durations".into());
-                }
-            }
+        if e.metadata.contains_key("durations") {
+            return Err("Durations are stored separately from moments".into());
         }
         for key in ["title", "description"] {
             if e.metadata.get(key).is_some_and(|v| !v.is_string()) {
@@ -143,9 +178,36 @@ fn validate(doc: &Document) -> Result<(), String> {
             }
         }
     }
+    if doc.durations.len() > 200000 {
+        return Err("Use at most 200000 durations per timeline".into());
+    }
+    let mut durations = HashSet::new();
+    for d in &doc.durations {
+        if !identifier(&d.id) || !durations.insert(&d.id) {
+            return Err("Duration IDs must be unique ASCII identifiers".into());
+        }
+        for value in [&d.start, &d.end] {
+            if let (_, Some(moment)) = endpoint(value)? {
+                if !ids.contains(&moment.to_string()) {
+                    return Err("Duration anchors must name existing moments".into());
+                }
+            }
+        }
+        for key in ["title", "description"] {
+            if d.metadata.get(key).is_some_and(|v| !v.is_string()) {
+                return Err("Duration titles and notes must be text".into());
+            }
+        }
+        if d.metadata.contains_key("durations") {
+            return Err("Durations cannot contain durations".into());
+        }
+    }
     Ok(())
 }
 pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
+    let mut doc = doc.clone();
+    convert_legacy_durations(&mut doc)?;
+    let doc = &doc;
     validate(doc)?;
     let db = Connection::open(path, true)?;
     let id = db.scalar("PRAGMA application_id", &[])?;
@@ -171,6 +233,7 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
             "timeline_plugins",
             "timeline_extras",
             "events",
+            "durations",
         ] {
             db.execute(&format!("DROP TABLE IF EXISTS {table}"), &[])?;
         }
@@ -214,6 +277,10 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
             )?;
         }
         db.execute("INSERT INTO points(time,value,weight) SELECT time,time,count(*) FROM events GROUP BY time COLLATE RATIONAL_V1",&[])?;
+        create_duration_table(&db)?;
+        for duration in &doc.durations {
+            insert_duration(&db, duration)?;
+        }
         rebuild_duration_index(&db)?;
         db.execute("PRAGMA application_id=1329812556", &[])?;
         db.execute("PRAGMA user_version=1", &[])?;
@@ -334,11 +401,92 @@ fn read_document(path: &Path, include_events: bool) -> Result<Document, String> 
                 })
                 .transpose()?
         },
+        durations: if include_events
+            && db.scalar(
+                "SELECT count(*) FROM sqlite_schema WHERE name='durations' AND type='table'",
+                &[],
+            )? != "0"
+        {
+            read_durations(&db, None)?
+        } else {
+            Vec::new()
+        },
         events,
     };
+    let mut doc = doc;
+    convert_legacy_durations(&mut doc)?;
     validate(&doc)?;
     db.execute("COMMIT", &[])?;
     Ok(doc)
+}
+fn create_duration_table(db: &Connection) -> Result<(), String> {
+    // Exactly one of time/moment per endpoint; fixed times are canonical exact rationals.
+    db.execute("CREATE TABLE IF NOT EXISTS durations(id TEXT PRIMARY KEY,start_time TEXT COLLATE RATIONAL_V1 CHECK(start_time IS NULL OR q_is_canonical(start_time)=1),start_moment TEXT,end_time TEXT COLLATE RATIONAL_V1 CHECK(end_time IS NULL OR q_is_canonical(end_time)=1),end_moment TEXT,metadata TEXT NOT NULL,CHECK((start_time IS NULL)<>(start_moment IS NULL)),CHECK((end_time IS NULL)<>(end_moment IS NULL))) STRICT", &[])
+}
+pub(crate) fn insert_duration(db: &Connection, d: &Duration) -> Result<(), String> {
+    let (start_time, start_moment) = endpoint(&d.start)?;
+    let (end_time, end_moment) = endpoint(&d.end)?;
+    let metadata = serde_json::to_string(&d.metadata).map_err(|e| e.to_string())?;
+    // Empty strings stand in for NULL; the wrapper binds text parameters only.
+    db.execute(
+        "INSERT INTO durations(id,start_time,start_moment,end_time,end_moment,metadata) VALUES(?1,CASE WHEN ?2='' THEN NULL ELSE q(?2) END,NULLIF(?3,''),CASE WHEN ?4='' THEN NULL ELSE q(?4) END,NULLIF(?5,''),?6) ON CONFLICT(id) DO UPDATE SET start_time=excluded.start_time,start_moment=excluded.start_moment,end_time=excluded.end_time,end_moment=excluded.end_moment,metadata=excluded.metadata",
+        &[
+            &d.id,
+            start_time.unwrap_or(""),
+            start_moment.unwrap_or(""),
+            end_time.unwrap_or(""),
+            end_moment.unwrap_or(""),
+            &metadata,
+        ],
+    )
+}
+fn read_durations(db: &Connection, id: Option<&str>) -> Result<Vec<Duration>, String> {
+    let rows = match id {
+        Some(id) => db.query_limited("SELECT id,q(start_time),start_moment,q(end_time),end_moment,metadata FROM durations WHERE id=?", &[id], 1, 8 * 1024 * 1024)?,
+        None => db.query("SELECT id,q(start_time),start_moment,q(end_time),end_moment,metadata FROM durations ORDER BY id LIMIT 200001", &[])?,
+    };
+    rows.into_iter()
+        .map(|row| {
+            let side = |time: &Option<String>, moment: &Option<String>| match (time, moment) {
+                (Some(t), None) => Ok(Value::String(t.clone())),
+                (None, Some(m)) => Ok(serde_json::json!({"moment": m})),
+                _ => Err("Invalid stored duration endpoint".to_string()),
+            };
+            Ok(Duration {
+                id: row[0].clone().ok_or("Missing duration ID")?,
+                start: side(&row[1], &row[2])?,
+                end: side(&row[3], &row[4])?,
+                metadata: serde_json::from_str(
+                    row[5].as_deref().ok_or("Missing duration metadata")?,
+                )
+                .map_err(|e| e.to_string())?,
+            })
+        })
+        .collect()
+}
+/// Moves legacy links out of moment metadata in a writable working copy.
+pub(crate) fn migrate_durations(db: &Connection) -> Result<(), String> {
+    if db.scalar(
+        "SELECT count(*) FROM sqlite_schema WHERE name='durations' AND type='table'",
+        &[],
+    )? != "0"
+    {
+        return Ok(());
+    }
+    create_duration_table(db)?;
+    if db.scalar("SELECT count(*) FROM events s,json_each(s.metadata,'$.durations') d WHERE json_extract(d.value,'$.endId')=s.id", &[])? != "0" {
+        return Err("Duration endpoints must be distinct existing moments".into());
+    }
+    db.execute("INSERT INTO durations(id,start_time,start_moment,end_time,end_moment,metadata) SELECT json_extract(d.value,'$.id'),NULL,s.id,NULL,json_extract(d.value,'$.endId'),COALESCE(json(json_extract(d.value,'$.metadata')),'{}') FROM events s,json_each(s.metadata,'$.durations') d", &[])?;
+    db.execute("UPDATE events SET metadata=json_remove(metadata,'$.durations') WHERE json_type(metadata,'$.durations') IS NOT NULL", &[])?;
+    Ok(())
+}
+/// A single standalone duration with its full metadata, for opening it in the editor.
+pub(crate) fn duration_by_id(db: &Connection, id: &str) -> Result<Option<Duration>, String> {
+    if !identifier(id) {
+        return Err("Invalid duration identifier".into());
+    }
+    Ok(read_durations(db, Some(id))?.into_iter().next())
 }
 pub fn overview(
     path: &Path,
@@ -413,6 +561,7 @@ mod tests {
                     metadata: Map::new(),
                 },
             ],
+            durations: Vec::new(),
         }
     }
     #[test]
@@ -632,13 +781,16 @@ mod tests {
     }
 }
 
-/// Rebuild derived links entirely in SQLite; endpoint coordinates never enter the UI cache.
+/// Rebuild the interval index entirely in SQLite; anchored endpoints resolve to moment times.
 fn rebuild_duration_index(db: &Connection) -> Result<(), String> {
+    migrate_durations(db)?;
     db.execute("DROP TABLE IF EXISTS duration_nodes", &[])?;
     db.execute("DROP TABLE IF EXISTS duration_intervals", &[])?;
-    db.execute("CREATE TABLE duration_intervals(ord INTEGER PRIMARY KEY,id TEXT NOT NULL UNIQUE,start_id TEXT NOT NULL,end_id TEXT NOT NULL,first TEXT NOT NULL COLLATE RATIONAL_V1,last TEXT NOT NULL COLLATE RATIONAL_V1,metadata TEXT NOT NULL)", &[])?;
-    if db.scalar("SELECT count(*) FROM events s,json_each(s.metadata,'$.durations') d WHERE json_extract(d.value,'$.endId')=s.id OR NOT EXISTS(SELECT 1 FROM events e WHERE e.id=json_extract(d.value,'$.endId'))",&[])? != "0" { return Err("Duration endpoints must be distinct existing moments".into()); }
-    db.execute("INSERT INTO duration_intervals SELECT row_number() OVER (ORDER BY q_min(s.time,e.time) COLLATE RATIONAL_V1,json_extract(d.value,'$.id')),json_extract(d.value,'$.id'),s.id,e.id,q_min(s.time,e.time),q_max(s.time,e.time),json_extract(d.value,'$.metadata') FROM events s,json_each(s.metadata,'$.durations') d JOIN events e ON e.id=json_extract(d.value,'$.endId') WHERE s.id<>e.id", &[])?;
+    db.execute("CREATE TABLE duration_intervals(ord INTEGER PRIMARY KEY,id TEXT NOT NULL UNIQUE,start_json TEXT NOT NULL,end_json TEXT NOT NULL,start_time TEXT NOT NULL COLLATE RATIONAL_V1,end_time TEXT NOT NULL COLLATE RATIONAL_V1,first TEXT NOT NULL COLLATE RATIONAL_V1,last TEXT NOT NULL COLLATE RATIONAL_V1,metadata TEXT NOT NULL)", &[])?;
+    if db.scalar("SELECT count(*) FROM durations d WHERE (d.start_moment IS NOT NULL AND NOT EXISTS(SELECT 1 FROM events e WHERE e.id=d.start_moment)) OR (d.end_moment IS NOT NULL AND NOT EXISTS(SELECT 1 FROM events e WHERE e.id=d.end_moment))", &[])? != "0" {
+        return Err("Duration anchors must name existing moments".into());
+    }
+    db.execute("WITH r AS (SELECT d.id,CASE WHEN d.start_moment IS NULL THEN json_quote(d.start_time) ELSE json_object('moment',d.start_moment) END AS sj,CASE WHEN d.end_moment IS NULL THEN json_quote(d.end_time) ELSE json_object('moment',d.end_moment) END AS ej,COALESCE(d.start_time,(SELECT e.time FROM events e WHERE e.id=d.start_moment)) AS s,COALESCE(d.end_time,(SELECT e.time FROM events e WHERE e.id=d.end_moment)) AS e,d.metadata FROM durations d) INSERT INTO duration_intervals SELECT row_number() OVER (ORDER BY q_min(s,e) COLLATE RATIONAL_V1,id),id,sj,ej,s,e,q_min(s,e),q_max(s,e),metadata FROM r", &[])?;
     if db
         .scalar("SELECT count(*) FROM duration_intervals", &[])?
         .parse::<usize>()
@@ -651,14 +803,16 @@ fn rebuild_duration_index(db: &Connection) -> Result<(), String> {
     db.execute("WITH RECURSIVE ranges(lo,hi,mid) AS (SELECT 1,count(*),CAST((1+count(*))/2 AS INTEGER) FROM duration_intervals HAVING count(*)>0 UNION ALL SELECT r.lo,r.mid-1,CAST((r.lo+r.mid-1)/2 AS INTEGER) FROM ranges r WHERE r.lo<r.mid UNION ALL SELECT r.mid+1,r.hi,CAST((r.mid+1+r.hi)/2 AS INTEGER) FROM ranges r WHERE r.mid<r.hi) INSERT INTO duration_nodes SELECT mid,CASE WHEN lo<mid THEN CAST((lo+mid-1)/2 AS INTEGER) END,CASE WHEN mid<hi THEN CAST((mid+1+hi)/2 AS INTEGER) END,(SELECT first FROM duration_intervals WHERE ord=lo),(SELECT last FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY last COLLATE RATIONAL_V1 DESC LIMIT 1) FROM ranges", &[])?;
     Ok(())
 }
+/// Viewport bands carry a bounded projection: title, a notes preview, and short text fields.
 fn duration_window(db: &Connection, lower: &str, upper: &str) -> Result<Value, String> {
-    let rows=db.query_limited("WITH RECURSIVE visible AS (SELECT n.* FROM duration_nodes n WHERE id=(SELECT CAST((1+count(*))/2 AS INTEGER) FROM duration_intervals) AND min_time<=q(?) COLLATE RATIONAL_V1 AND max_time>=q(?) COLLATE RATIONAL_V1 UNION ALL SELECT n.* FROM visible p JOIN duration_nodes n ON n.id IN(p.left_id,p.right_id) WHERE n.min_time<=q(?) COLLATE RATIONAL_V1 AND n.max_time>=q(?) COLLATE RATIONAL_V1) SELECT d.id,d.start_id,d.end_id,d.first,d.last,(SELECT json_group_object(key,substr(value,1,512)) FROM json_each(d.metadata) WHERE key IN ('title','description') AND type='text'),s.time,e.time FROM visible v JOIN duration_intervals d ON d.ord=v.id JOIN events s ON s.id=d.start_id JOIN events e ON e.id=d.end_id WHERE d.first<=q(?) COLLATE RATIONAL_V1 AND d.last>=q(?) COLLATE RATIONAL_V1 LIMIT 257", &[upper,lower,upper,lower,upper,lower],257,8*1024*1024)?;
+    let rows=db.query_limited("WITH RECURSIVE visible AS (SELECT n.* FROM duration_nodes n WHERE id=(SELECT CAST((1+count(*))/2 AS INTEGER) FROM duration_intervals) AND min_time<=q(?) COLLATE RATIONAL_V1 AND max_time>=q(?) COLLATE RATIONAL_V1 UNION ALL SELECT n.* FROM visible p JOIN duration_nodes n ON n.id IN(p.left_id,p.right_id) WHERE n.min_time<=q(?) COLLATE RATIONAL_V1 AND n.max_time>=q(?) COLLATE RATIONAL_V1) SELECT d.id,d.start_json,d.end_json,d.first,d.last,(SELECT json_group_object(key,CASE key WHEN 'title' THEN substr(value,1,512) WHEN 'description' THEN substr(value,1,2000) ELSE value END) FROM json_each(d.metadata) WHERE type='text' AND (key IN ('title','description') OR length(value)<=256)),d.start_time,d.end_time FROM visible v JOIN duration_intervals d ON d.ord=v.id WHERE d.first<=q(?) COLLATE RATIONAL_V1 AND d.last>=q(?) COLLATE RATIONAL_V1 LIMIT 257", &[upper,lower,upper,lower,upper,lower],257,8*1024*1024)?;
     let more = rows.len() > 256;
     let mut bands = Vec::new();
     for row in rows.into_iter().take(256) {
-        let metadata: Value =
-            serde_json::from_str(row[5].as_deref().unwrap_or("{}")).map_err(|e| e.to_string())?;
-        bands.push(serde_json::json!({"id":row[0],"startId":row[1],"endId":row[2],"first":row[3],"last":row[4],"metadata":metadata,"startTime":row[6],"endTime":row[7]}));
+        let parse = |text: &Option<String>| -> Result<Value, String> {
+            serde_json::from_str(text.as_deref().unwrap_or("null")).map_err(|e| e.to_string())
+        };
+        bands.push(serde_json::json!({"id":row[0],"start":parse(&row[1])?,"end":parse(&row[2])?,"first":row[3],"last":row[4],"metadata":parse(&Some(row[5].clone().unwrap_or_else(|| "{}".into())))?,"startTime":row[6],"endTime":row[7]}));
     }
     Ok(serde_json::json!({"durations":bands,"durationsTruncated":more}))
 }

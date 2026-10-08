@@ -249,6 +249,7 @@ Every point has a place. Explore the spaces between them.</textarea>
               ><button id="fit-button">Fit all</button
               ><button id="center-vertical">Center axis</button
               ><button id="clear-selection" hidden>Clear selection</button
+              ><button id="add-duration-button">＋ Duration</button
               ><button id="add-button" class="button-primary">＋ Event</button>
             </div>
           </div>
@@ -391,6 +392,28 @@ Every point has a place. Explore the spaces between them.</textarea>
         <div class="event-actions">
           <span id="event-edit-status" class="sr-only" role="status"></span>
           <button id="event-delete" class="button-danger" type="button">Delete</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="duration-dialog" class="moment-dialog" aria-labelledby="duration-heading">
+      <div class="inspector-heading">
+        <h2 id="duration-heading">Duration</h2>
+        <button data-close="duration-dialog" aria-label="Close duration details">×</button>
+      </div>
+      <form id="duration-form">
+        <label>Title<input id="duration-title" maxlength="1000" placeholder="Optional" /></label>
+        <div id="duration-endpoints" class="duration-endpoints"></div>
+        <label>Notes<textarea id="duration-description" rows="4"></textarea></label>
+        <div id="plugin-duration-fields"></div>
+        <details>
+          <summary>Additional metadata</summary>
+          <label
+            >JSON object<textarea id="duration-metadata" rows="6" spellcheck="false">{}</textarea>
+          </label>
+        </details>
+        <div id="duration-error" class="form-error" role="alert"></div>
+        <div class="event-actions">
+          <button id="duration-delete" class="button-danger" type="button">Delete duration</button>
         </div>
       </form>
     </dialog>
