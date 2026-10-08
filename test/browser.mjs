@@ -191,7 +191,21 @@ try {
     const cdp = await context.newCDPSession(page),
       b = await stage.boundingBox(),
       y = b.y + 75;
-    const touch = (x, id) => ({ x, y, id, radiusX: 2, radiusY: 2, force: 1 });
+    const touch = (x, id, dy = 0) => ({ x, y: y + dy, id, radiusX: 2, radiusY: 2, force: 1 });
+    const pinch = async (from, to) => {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: from });
+      for (const step of [1, 2, 3])
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchMove',
+          touchPoints: to.map((point, i) => ({
+            ...point,
+            x: from[i].x + ((point.x - from[i].x) * step) / 3,
+            y: from[i].y + ((point.y - from[i].y) * step) / 3,
+          })),
+        });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    };
+    const scale = () => stage.evaluate((node) => node.dataset.uiScale);
     const left = await input('left-bound').inputValue();
     await cdp.send('Input.dispatchTouchEvent', {
       type: 'touchStart',
@@ -214,6 +228,23 @@ try {
     });
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await poll(async () => (await span()).compare(s) < 0);
+    // A diagonal pinch whose fingers drift vertically still only zooms time.
+    const size = await scale(),
+      before = await span();
+    await pinch(
+      [touch(b.x + 260, 1, 20), touch(b.x + 380, 2, -20)],
+      [touch(b.x + 320, 1, 70), touch(b.x + 330, 2, -50)],
+    );
+    await poll(async () => (await span()).compare(before) > 0);
+    assert.equal(await scale(), size);
+    // Fingers stacked vertically resize the contents without changing the time span.
+    const fixed = await span();
+    await pinch(
+      [touch(b.x + 300, 1, -30), touch(b.x + 310, 2, 30)],
+      [touch(b.x + 290, 1, -60), touch(b.x + 320, 2, 60)],
+    );
+    await poll(async () => Number(await scale()) > Number(size));
+    assert.equal((await span()).compare(fixed), 0);
     await closeMomentDetails(page);
     await input('fit-button').click();
     await poll(async () => (await markers.count()) === 3);
