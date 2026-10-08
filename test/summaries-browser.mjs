@@ -19,8 +19,19 @@ export async function checkSummaries(page, restore) {
   const bounds = async (left, right) => {
     await page.locator('#left-bound').fill(left);
     await page.locator('#right-bound').fill(right);
+    // A render between typing and Go must keep the typed (unapplied) left bound.
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('resize'));
+      return new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+    });
+    assert.equal(await page.locator('#left-bound').inputValue(), left);
     await page.locator('#apply-bounds').click();
-    await page.waitForFunction((old) => document.getElementById('left-bound').value !== old, left);
+    await page.waitForFunction(
+      ([l, r]) =>
+        document.getElementById('left-bound').value === l + '/1' &&
+        document.getElementById('right-bound').value === r + '/1',
+      [left, right],
+    );
   };
   const doc = {
     format: 'openchronology',

@@ -705,7 +705,11 @@ function renderAxis() {
     ['right-bound', viewport.right],
   ] as const)
     if (document.activeElement !== el(id)) {
-      const value = presented(time, 'input');
+      const value = presented(time, 'input'),
+        shown = displayedBounds.get(id);
+      // Only navigation or a display change rewrites a bound; re-rendering keeps unapplied typing,
+      // so a left bound typed before moving to the right field survives until Go.
+      if (shown?.text === value && shown.time.equals(time)) continue;
       input(id).value = value;
       displayedBounds.set(id, { text: value, time });
     }
