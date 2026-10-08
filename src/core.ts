@@ -1,3 +1,20 @@
+import {
+  durationLinks,
+  validateDurations,
+  pruneDurations,
+  durationTree,
+  durationWindow,
+} from './durations.js';
+import type { DurationBand, IntervalNode } from './durations.js';
+export {
+  durationOverview,
+  durationLinks,
+  validateDurations,
+  pruneDurations,
+  durationTree,
+  durationWindow,
+} from './durations.js';
+export type { DurationBand, DurationLink } from './durations.js';
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { Rational as Q, RationalMap } from 'rational-ordered-map';
 import { validateInstalledPlugins, validateStackMetadata, imageURL } from './plugins.js';
@@ -77,6 +94,8 @@ export interface FrameGroup {
   metadata?: Metadata;
 }
 export interface Frame {
+  durations?: DurationBand[];
+  durationsTruncated?: boolean;
   groups: FrameGroup[];
   visitedNodes: number;
   revision?: string;
@@ -122,7 +141,7 @@ export function validateAssets(value: unknown): Record<string, string> {
   }
   return assets;
 }
-export function validateDocument(value: unknown): TimelineDocument {
+export function validateDocument(value: unknown, partial = false): TimelineDocument {
   if (!value || typeof value !== 'object') throw new Error('Expected an OpenChronology document.');
   const doc = value as Record<string, unknown>;
   if (doc.format !== 'openchronology' || doc.version !== 1)
@@ -159,6 +178,8 @@ export function validateDocument(value: unknown): TimelineDocument {
     }
     return { id: e.id, time: parseTime(e.time).toString(), metadata };
   });
+  if (!partial) validateDurations(events);
+  else for (const e of events) durationLinks(e.metadata);
   return {
     format: 'openchronology',
     version: 1,
@@ -176,6 +197,8 @@ export function validateDocument(value: unknown): TimelineDocument {
 }
 export class TimelineIndex {
   readonly points = new RationalMap<readonly PointEvent[]>((bucket) => BigInt(bucket.length));
+  private intervals: IntervalNode | null = null;
+  private intervalDirty = true;
   readonly byId = new Map<string, PointEvent>();
   title: string;
   description: string;
@@ -184,6 +207,7 @@ export class TimelineIndex {
   tags?: string[];
   assets?: Record<string, string>;
   constructor(document: TimelineDocument) {
+    validateDurations(document.events);
     this.tags = document.tags === undefined ? undefined : validateTags(document.tags);
     this.assets = document.assets === undefined ? undefined : validateAssets(document.assets);
     this.title = document.title;
@@ -214,6 +238,8 @@ export class TimelineIndex {
     }
   }
   put(event: PointEvent): void {
+    durationLinks(event.metadata);
+    this.intervalDirty = true;
     const time = parseTime(event.time),
       normalized = Object.freeze({
         ...event,
@@ -228,6 +254,7 @@ export class TimelineIndex {
     this.byId.set(event.id, normalized);
   }
   delete(id: string): boolean {
+    this.intervalDirty = true;
     const event = this.byId.get(id);
     if (!event) return false;
     const key = Q.parse(event.time),
@@ -238,7 +265,7 @@ export class TimelineIndex {
     return true;
   }
   document(): TimelineDocument {
-    return {
+    return pruneDurations({
       format: 'openchronology',
       version: 1,
       title: this.title,
@@ -248,9 +275,13 @@ export class TimelineIndex {
       ...(this.tags === undefined ? {} : { tags: this.tags }),
       ...(this.assets === undefined ? {} : { assets: this.assets }),
       events: [...this.points].flatMap(([, bucket]) => [...bucket]),
-    };
+    });
   }
   frame(viewport: Viewport, width: number, pixels = 24): Frame {
+    if (this.intervalDirty) {
+      this.intervals = durationTree(this.byId.values());
+      this.intervalDirty = false;
+    }
     const result = this.points.overview(
       viewport.left,
       viewport.right,
@@ -259,6 +290,7 @@ export class TimelineIndex {
       { includeUpper: true },
     );
     return {
+      ...durationWindow(this.intervals, viewport.left, viewport.right),
       visitedNodes: result.stats.visitedNodes,
       groups: result.groups.map((group) => {
         const first = group.firstTime.toString(),

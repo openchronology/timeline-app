@@ -1,5 +1,12 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-import { Q, pluginMetadata, validateDocument } from '../dist/core.mjs';
+import {
+  Q,
+  pluginMetadata,
+  validateDocument,
+  durationTree,
+  durationOverview,
+  pruneDurations,
+} from '../dist/core.mjs';
 import { randomUUID } from 'node:crypto';
 import { indexedNodes } from './tree.mjs';
 export class HttpError extends Error {
@@ -139,6 +146,49 @@ export class PostgresStore {
         parameters,
       );
     }
+    await client.query('DELETE FROM oc_duration_nodes WHERE timeline_id=$1', [id]);
+    const intervals = [];
+    function flatten(node) {
+      if (!node) return null;
+      const ordinal = intervals.length + 1;
+      const row = { ordinal, node };
+      intervals.push(row);
+      row.left = flatten(node.left);
+      row.right = flatten(node.right);
+      return ordinal;
+    }
+    flatten(durationTree(document.events));
+    for (let offset = 0; offset < intervals.length; offset += 250) {
+      const params = [];
+      const tuples = intervals.slice(offset, offset + 250).map(({ ordinal, node, left, right }) => {
+        const start = params.length;
+        params.push(
+          id,
+          ordinal,
+          left,
+          right,
+          node.min.toString(),
+          node.max.toString(),
+          node.band.first,
+          node.band.last,
+          JSON.stringify({ ...node.band, metadata: durationOverview(node.band.metadata) }),
+        );
+        return (
+          '(' +
+          Array.from(
+            { length: 9 },
+            (_, i) =>
+              '$' + (start + i + 1) + (i >= 4 && i <= 7 ? '::mpq' : i === 8 ? '::jsonb' : ''),
+          ).join(',') +
+          ')'
+        );
+      });
+      await client.query(
+        'INSERT INTO oc_duration_nodes(timeline_id,id,left_id,right_id,min_time,max_time,first_time,last_time,band) VALUES ' +
+          tuples.join(','),
+        params,
+      );
+    }
     await client.query(
       'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,tags=$8,assets=$9::jsonb,event_text=$10,comparison=$11::jsonb,storage_bytes=$12,event_generation=event_generation+CASE WHEN $13 THEN 1 ELSE 0 END,updated_at=now() WHERE id=$1',
       [
@@ -205,7 +255,12 @@ export class PostgresStore {
           if (change.event) events.set(change.id, change.event);
           else events.delete(change.id);
         }
-        document = validateDocument({ ...patch.settings, events: [...events.values()] });
+        document = validateDocument(
+          pruneDurations(
+            { ...patch.settings, events: [...events.values()] },
+            new Set(patch.changes.filter((c) => !c.event).map((c) => c.id)),
+          ),
+        );
       }
       await this.replace(c, id, document);
       await c.query('UPDATE oc_timelines SET revision=revision+1 WHERE id=$1', [id]);
@@ -382,7 +437,17 @@ export class PostgresStore {
           query.upper,
           threshold,
         ]);
+        const intervals = await c.query(
+          `WITH RECURSIVE visible AS (
+          SELECT n.* FROM oc_duration_nodes n WHERE timeline_id=$1 AND id=1 AND min_time<=$3::mpq AND max_time>=$2::mpq
+          UNION ALL SELECT n.* FROM visible p JOIN oc_duration_nodes n ON n.timeline_id=p.timeline_id AND n.id IN (p.left_id,p.right_id)
+          WHERE n.min_time<=$3::mpq AND n.max_time>=$2::mpq
+        ) SELECT band FROM visible WHERE first_time<=$3::mpq AND last_time>=$2::mpq LIMIT 257`,
+          [id, query.lower, query.upper],
+        );
         return {
+          durations: intervals.rows.slice(0, 256).map((r) => r.band),
+          durationsTruncated: intervals.rows.length > 256,
           revision: t.revision,
           threshold,
           groups: rows.map((r) => ({
@@ -402,6 +467,16 @@ export class PostgresStore {
           })),
           visitedNodes: rows.at(-1)?.visited_nodes ?? 0,
         };
+      }
+      if (query.id) {
+        const { rows } = await c.query(
+          `WITH RECURSIVE path AS (
+          SELECT n.id,n.time,n.left_id,n.right_id FROM oc_nodes n JOIN oc_timelines t ON t.id=n.timeline_id AND t.root=n.id WHERE t.id=$1
+          UNION ALL SELECT n.id,n.time,n.left_id,n.right_id FROM path p JOIN oc_nodes n ON n.timeline_id=$1 AND n.id=CASE WHEN p.time>$2::mpq THEN p.left_id WHEN p.time<$2::mpq THEN p.right_id END
+        ) SELECT event FROM path p JOIN oc_nodes n ON n.timeline_id=$1 AND n.id=p.id CROSS JOIN LATERAL jsonb_array_elements(n.events) event WHERE p.time=$2::mpq AND event->>'id'=$3 LIMIT 1`,
+          [id, query.lower, query.id],
+        );
+        return { events: rows.map((r) => r.event), next: null, revision: t.revision };
       }
       const { rows } = await c.query(
         'SELECT oc_events($1,$2::mpq,$3::mpq,$4::mpq,$5,$6) AS event',

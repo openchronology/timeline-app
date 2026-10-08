@@ -172,6 +172,17 @@ export class ComparisonView {
   private mapFrame(track: Track, frame: Frame): Frame {
     return {
       ...frame,
+      durations: frame.durations?.map((b) => ({
+        ...b,
+        id: track.source.key + ':' + b.id,
+        startId: track.source.key + ':' + b.startId,
+        endId: track.source.key + ':' + b.endId,
+        sourceKey: track.source.key,
+        startTime: Q.parse(b.startTime).mul(track.scale).add(track.offset).toString(),
+        endTime: Q.parse(b.endTime).mul(track.scale).add(track.offset).toString(),
+        first: Q.parse(b.first).mul(track.scale).add(track.offset).toString(),
+        last: Q.parse(b.last).mul(track.scale).add(track.offset).toString(),
+      })),
       groups: frame.groups.map((g) => ({
         ...g,
         first: Q.parse(g.first).mul(track.scale).add(track.offset).toString(),
@@ -183,6 +194,8 @@ export class ComparisonView {
   }
   private join(frames: Frame[], threshold: Q): Frame {
     const frame = {
+      durations: frames.flatMap((f) => f.durations ?? []),
+      durationsTruncated: frames.some((f) => f.durationsTruncated),
       groups: frames.flatMap((f) => f.groups),
       visitedNodes: frames.reduce((n, f) => n + f.visitedNodes, 0),
     };
@@ -214,18 +227,34 @@ export class ComparisonView {
           cursor = null;
         }
       }
-      const page = track.source.index
-        ? localEvents(track.source.index, lower, upper, cursor, limit)
-        : ((await track.source.query!(
-            {
-              kind: 'events',
-              lower,
-              upper,
-              after: cursor,
-              limit,
-            },
-            signal,
-          )) as EventPage);
+      const targetId =
+        group.id &&
+        BigInt(group.count) === 1n &&
+        !after &&
+        group.id.startsWith(track.source.key + ':')
+          ? group.id.slice(track.source.key.length + 1)
+          : undefined;
+      const page =
+        targetId && track.source.index
+          ? {
+              events: track.source.index.byId.has(targetId)
+                ? [track.source.index.byId.get(targetId)!]
+                : [],
+              next: null,
+            }
+          : track.source.index
+            ? localEvents(track.source.index, lower, upper, cursor, limit)
+            : ((await track.source.query!(
+                {
+                  kind: 'events',
+                  ...(targetId ? { id: targetId } : {}),
+                  lower,
+                  upper,
+                  after: cursor,
+                  limit,
+                },
+                signal,
+              )) as EventPage);
       more ||= !!page.next;
       for (const event of page.events)
         candidates.push({

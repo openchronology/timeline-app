@@ -70,3 +70,69 @@ export function printNumber(value: Q, digits = 6, scientific = false): string {
   if (result.includes('.')) result = result.replace(/0+$/, '').replace(/\.$/, '');
   return sign + result;
 }
+
+const PREFIXES = [
+  'q',
+  'r',
+  'y',
+  'z',
+  'a',
+  'f',
+  'p',
+  'n',
+  'µ',
+  'm',
+  '',
+  'k',
+  'M',
+  'G',
+  'T',
+  'P',
+  'E',
+  'Z',
+  'Y',
+  'R',
+  'Q',
+];
+const PREFIX_EXPONENTS = new Map([
+  ...PREFIXES.filter(Boolean).map(
+    (prefix) => [prefix, (PREFIXES.indexOf(prefix) - 10) * 3] as const,
+  ),
+  ['u', -6] as const,
+  ['μ', -6] as const,
+  ['c', -2] as const,
+  ['d', -1] as const,
+  ['h', 2] as const,
+  ['da', 1] as const,
+]);
+export function power(exponent: number): Q {
+  return exponent >= 0 ? Q.from(10n ** BigInt(exponent)) : Q.from(1n, 10n ** BigInt(-exponent));
+}
+export function withoutUnit(text: string, unit: string): string {
+  const value = text.trim();
+  if (!unit) return value;
+  if (!value.endsWith(unit)) throw new Error(`Expected the unit ${unit}.`);
+  return value.slice(0, -unit.length).trim();
+}
+export function printSI(value: Q, digits = 6, unit = ''): string {
+  let exponent = value.numerator === 0n ? 0 : Math.floor(decimalExponent(value) / 3) * 3;
+  if (exponent < -30 || exponent > 30)
+    return printNumber(value, digits, true) + (unit ? ' ' + unit : '');
+  let quantity = printNumber(value.div(power(exponent)), digits);
+  if (parseNumber(quantity).abs().compare(Q.from(1000n)) >= 0 && exponent < 30) {
+    exponent += 3;
+    quantity = printNumber(value.div(power(exponent)), digits);
+  }
+  const suffix = PREFIXES[exponent / 3 + 10] + unit;
+  return quantity + (suffix ? ' ' + suffix : '');
+}
+export function parseSI(text: string, unit = ''): Q {
+  let quantity = withoutUnit(text, unit),
+    exponent = 0;
+  const prefix = quantity.endsWith('da') ? 'da' : quantity.at(-1);
+  if (prefix && PREFIX_EXPONENTS.has(prefix)) {
+    exponent = PREFIX_EXPONENTS.get(prefix)!;
+    quantity = quantity.slice(0, -prefix.length).trim();
+  }
+  return parseNumber(quantity).mul(power(exponent));
+}

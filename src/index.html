@@ -275,6 +275,7 @@ Every point has a place. Explore the spaces between them.</textarea
           >
             <div id="axis" class="axis"></div>
             <div id="time-cursor" class="time-cursor" role="img" hidden></div>
+            <div id="duration-bands" class="markers"></div>
             <div id="markers" class="markers"></div>
             <div id="stack-markers" class="markers"></div>
             <div id="empty-window" class="empty-window" hidden>
@@ -355,6 +356,7 @@ Every point has a place. Explore the spaces between them.</textarea
           Uses this timeline’s time display. Leaving the text unchanged preserves the exact
           coordinate, even when the display rounds it.
         </p>
+        <div id="event-calendar-picker" hidden></div>
         <details>
           <summary>Exact rational coordinate</summary>
           <input
@@ -372,6 +374,7 @@ Every point has a place. Explore the spaces between them.</textarea
           ></textarea>
         </label>
         <div id="plugin-event-fields"></div>
+        <section id="event-durations"></section>
         <details>
           <summary>Additional metadata</summary>
           <label
@@ -380,9 +383,7 @@ Every point has a place. Explore the spaces between them.</textarea
         </details>
         <div id="event-error" class="form-error" role="alert"></div>
         <div class="event-actions">
-          <span id="event-edit-status" class="field-hint" role="status"
-            >Edits apply to the timeline automatically.</span
-          >
+          <span id="event-edit-status" class="sr-only" role="status"></span>
           <button id="event-delete" class="button-danger" type="button">Delete</button>
         </div>
       </form>

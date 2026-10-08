@@ -68,9 +68,9 @@ function fileResponse(res, bytes) {
   });
   res.end(bytes);
 }
-function document(value) {
+function document(value, partial = false) {
   try {
-    return validateDocument(value);
+    return validateDocument(value, partial);
   } catch (error) {
     throw new HttpError(400, error.message);
   }
@@ -723,7 +723,7 @@ export function createRequestHandler({
               throw new HttpError(400, 'Changed moment IDs must be valid and unique.');
             ids.add(change.id);
             if (change.event === null) return { id: change.id, event: null };
-            const event = document({ ...settings, events: [change.event] }).events[0];
+            const event = document({ ...settings, events: [change.event] }, true).events[0];
             if (!event || event.id !== change.id)
               throw new HttpError(400, 'Changed moment ID mismatch.');
             return { id: change.id, event };
@@ -781,6 +781,13 @@ export function createRequestHandler({
             );
           }
           if (input.kind !== 'events') throw new HttpError(400, 'Unknown query kind.');
+          if (
+            input.id !== undefined &&
+            (typeof input.id !== 'string' ||
+              !/^[A-Za-z0-9_.:-]{1,128}$/.test(input.id) ||
+              input.lower == null)
+          )
+            throw new HttpError(400, 'A moment lookup needs an ID and its exact coordinate.');
           const limit = input.limit ?? 100;
           if (!Number.isInteger(limit) || limit < 1 || limit > 100)
             throw new HttpError(400, 'Page size must be 1–100.');
@@ -795,6 +802,7 @@ export function createRequestHandler({
             200,
             await store.query(id, userId, {
               kind: 'events',
+              ...(input.id !== undefined ? { id: input.id } : {}),
               ...(input.revision ? { revision: input.revision } : {}),
               lower: bound(input.lower),
               upper: bound(input.upper),

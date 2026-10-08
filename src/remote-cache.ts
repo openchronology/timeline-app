@@ -1,5 +1,12 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-import { Q, TimelineIndex, Viewport } from './core.js';
+import {
+  Q,
+  TimelineIndex,
+  Viewport,
+  pruneDurations,
+  durationLinks,
+  durationOverview,
+} from './core.js';
 import type { Frame, FrameGroup, PointEvent, TimelineDocument } from './core.js';
 
 export interface WindowQuery {
@@ -75,6 +82,10 @@ export class ViewportCache {
     return frame
       ? {
           ...frame,
+          durations: frame.durations?.filter(
+            (b) =>
+              Q.parse(b.last).compare(view.left) >= 0 && Q.parse(b.first).compare(view.right) <= 0,
+          ),
           groups: frame.groups.filter(
             (g) =>
               Q.parse(g.last).compare(view.left) >= 0 && Q.parse(g.first).compare(view.right) <= 0,
@@ -125,13 +136,28 @@ export class RemoteWorkspace extends TimelineIndex {
     return deleted;
   }
   evict(selectedId?: string) {
+    const endpoints = new Set(
+      [...this.changes.values()].flatMap((c) =>
+        c.after ? durationLinks(c.after.metadata).map((d) => d.endId) : [],
+      ),
+    );
     for (const [id] of this.byId)
-      if (id !== selectedId && !this.changes.has(id) && !this.savingIds.has(id)) {
+      if (
+        id !== selectedId &&
+        !endpoints.has(id) &&
+        !this.changes.has(id) &&
+        !this.savingIds.has(id)
+      ) {
         super.delete(id);
         this.originals.delete(id);
       }
     for (const [id] of this.originals)
-      if (id !== selectedId && !this.changes.has(id) && !this.savingIds.has(id))
+      if (
+        id !== selectedId &&
+        !endpoints.has(id) &&
+        !this.changes.has(id) &&
+        !this.savingIds.has(id)
+      )
         this.originals.delete(id);
   }
   beginSave() {
@@ -154,7 +180,10 @@ export class RemoteWorkspace extends TimelineIndex {
       if (change.after) events.set(id, change.after);
       else events.delete(id);
     }
-    return { ...super.document(), events: [...events.values()] };
+    return pruneDurations(
+      { ...super.document(), events: [...events.values()] },
+      new Set([...this.changes].filter(([, c]) => !c.after).map(([id]) => id)),
+    );
   }
   accepted(
     sent: ReadonlyMap<string, { before?: PointEvent; after?: PointEvent }>,
@@ -209,7 +238,58 @@ export class RemoteWorkspace extends TimelineIndex {
           title: after.metadata.title,
           metadata: after.metadata,
         });
-    return regroup({ ...frame, groups }, threshold);
+    const changedStarts = new Set([...this.changes].filter(([, c]) => c.after).map(([id]) => id));
+    const durations = (frame.durations ?? [])
+      .filter(
+        (b) =>
+          !changedStarts.has(b.startId) &&
+          (!this.changes.has(b.startId) || !!this.changes.get(b.startId)?.after) &&
+          (!this.changes.has(b.endId) || !!this.changes.get(b.endId)?.after),
+      )
+      .map((b) => {
+        const endTime = this.changes.get(b.endId)?.after?.time ?? b.endTime;
+        const a = Q.parse(b.startTime),
+          z = Q.parse(endTime);
+        return {
+          ...b,
+          endTime,
+          first: (a.compare(z) <= 0 ? a : z).toString(),
+          last: (a.compare(z) <= 0 ? z : a).toString(),
+        };
+      });
+    for (const [startId, { after }] of this.changes)
+      if (after)
+        for (const link of durationLinks(after.metadata)) {
+          const existing = frame.durations?.find((b) => b.id === link.id);
+          const endpoint = this.byId.get(link.endId);
+          const endTime = endpoint?.time ?? existing?.endTime;
+          if (!endTime || (this.changes.has(link.endId) && !this.changes.get(link.endId)?.after))
+            continue;
+          const a = Q.parse(after.time),
+            z = Q.parse(endTime);
+          durations.push({
+            ...link,
+            startId,
+            startTime: after.time,
+            endTime,
+            first: (a.compare(z) <= 0 ? a : z).toString(),
+            last: (a.compare(z) <= 0 ? z : a).toString(),
+          });
+        }
+    const visibleDurations = durations
+      .filter(
+        (b) => Q.parse(b.last).compare(view.left) >= 0 && Q.parse(b.first).compare(view.right) <= 0,
+      )
+      .map((b) => ({ ...b, metadata: durationOverview(b.metadata) }));
+    return regroup(
+      {
+        ...frame,
+        groups,
+        durations: visibleDurations.slice(0, 256),
+        durationsTruncated: frame.durationsTruncated || visibleDurations.length > 256,
+      },
+      threshold,
+    );
   }
 }
 /** Coarsen server summaries without reconstructing any concealed moments. */

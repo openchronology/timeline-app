@@ -35,6 +35,8 @@ pub struct Cursor {
 #[derive(Deserialize)]
 pub struct Query {
     pub kind: String,
+    #[serde(default)]
+    pub id: Option<String>,
     pub lower: String,
     pub upper: String,
     #[serde(default)]
@@ -104,6 +106,7 @@ impl Snapshot {
             "CREATE INDEX IF NOT EXISTS events_time_id ON events(time COLLATE RATIONAL_V1,id)",
             &[],
         )?;
+        super::rebuild_duration_index(&saved)?;
         snapshot.header()?;
         Ok(snapshot)
     }
@@ -217,7 +220,37 @@ impl Snapshot {
                     }
                     groups.push(group);
                 }
-                json!({"groups":groups,"visitedNodes":visited,"threshold":threshold})
+                {
+                    let mut result = super::duration_window(&db, &q.lower, &q.upper)?;
+                    result["groups"] = json!(groups);
+                    result["visitedNodes"] = json!(visited);
+                    result["threshold"] = json!(threshold);
+                    result
+                }
+            }
+            "events" if q.id.is_some() => {
+                let id = q.id.as_deref().unwrap();
+                if id.is_empty()
+                    || id.len() > 128
+                    || !id
+                        .bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || b"_.:-".contains(&c))
+                {
+                    return Err("Invalid moment identifier".into());
+                }
+                let rows=db.query_limited("SELECT id,q(time),metadata FROM events WHERE id=? AND time=q(?) COLLATE RATIONAL_V1",&[id,&q.lower],1,BUDGET)?;
+                let mut events = Vec::new();
+                for row in rows {
+                    events.push(Event {
+                        id: row[0].clone().ok_or("Missing event id")?,
+                        time: row[1].clone().ok_or("Missing event time")?,
+                        metadata: serde_json::from_str(
+                            row[2].as_deref().ok_or("Missing metadata")?,
+                        )
+                        .map_err(|e| e.to_string())?,
+                    });
+                }
+                json!({"events":events,"next":null})
             }
             "events" => {
                 let limit = q.limit.unwrap_or(100).clamp(1, 100);
@@ -306,6 +339,18 @@ impl Snapshot {
                     db.execute("DELETE FROM events WHERE id=?", &[&change.id])?;
                 }
             }
+            // Cascade links only for explicit endpoint deletions. Invalid new references still fail.
+            let deleted = serde_json::to_string(
+                &patch
+                    .changes
+                    .iter()
+                    .filter(|c| c.event.is_none())
+                    .map(|c| &c.id)
+                    .collect::<Vec<_>>(),
+            )
+            .map_err(|e| e.to_string())?;
+            db.execute("UPDATE events SET metadata=json_set(metadata,'$.durations',json(COALESCE((SELECT json_group_array(json(d.value)) FROM json_each(events.metadata,'$.durations') d WHERE json_extract(d.value,'$.endId') NOT IN (SELECT value FROM json_each(?))),'[]'))) WHERE json_type(metadata,'$.durations')='array'", &[&deleted])?;
+            super::rebuild_duration_index(&db)?;
             for time in affected {
                 db.execute("DELETE FROM points WHERE time=q(?)", &[&time])?;
                 db.execute("INSERT INTO points(time,value,weight) SELECT time,time,count(*) FROM events WHERE time=q(?) COLLATE RATIONAL_V1 GROUP BY time COLLATE RATIONAL_V1",&[&time])?;
@@ -575,5 +620,53 @@ mod safety_tests {
         db.execute("CREATE VIEW points_nodes AS SELECT * FROM real_nodes", &[])
             .unwrap();
         assert!(Snapshot::open(path).is_err());
+    }
+}
+
+#[cfg(test)]
+mod duration_tests {
+    use super::*;
+    #[test]
+    fn linked_bands_cross_empty_windows_and_sparse_deletion_cascades() {
+        let doc:Document=serde_json::from_value(json!({"format":"openchronology","version":1,"title":"Durations","description":"","events":[{"id":"a","time":"-100/1","metadata":{"durations":[{"id":"span","endId":"b","metadata":{"title":"Band","custom":true}}]}},{"id":"b","time":"100/1","metadata":{}}]})).unwrap();
+        let snapshot = Snapshot::from_document(&doc).unwrap();
+        let query: Query = serde_json::from_value(
+            json!({"kind":"overview","lower":"0/1","upper":"1/1","threshold":"0/1"}),
+        )
+        .unwrap();
+        let endpoint: Query = serde_json::from_value(
+            json!({"kind":"events","id":"b","lower":"100/1","upper":"100/1"}),
+        )
+        .unwrap();
+        assert_eq!(snapshot.query(&endpoint).unwrap()["events"][0]["id"], "b");
+        let frame = snapshot.query(&query).unwrap();
+        assert_eq!(frame["groups"].as_array().unwrap().len(), 0);
+        assert_eq!(frame["durations"][0]["first"], "-100/1");
+        assert_eq!(frame["durations"][0]["last"], "100/1");
+        assert_eq!(
+            snapshot.document().unwrap().events[0].metadata["durations"][0]["metadata"]["custom"],
+            true
+        );
+        let settings = snapshot.header().unwrap().document;
+        let patch:Patch=serde_json::from_value(json!({"settings":settings,"changes":[{"id":"b","event":{"id":"b","time":"1/3","metadata":{}}}]})).unwrap();
+        let target = snapshot.directory.join("updated.och");
+        let moved = snapshot.save_patch(&target, &patch).unwrap();
+        assert_eq!(moved.query(&query).unwrap()["durations"][0]["last"], "1/3");
+        let deleted: Patch = serde_json::from_value(
+            json!({"settings":settings,"changes":[{"id":"b","event":null}]}),
+        )
+        .unwrap();
+        let removed = moved.save_patch(&target, &deleted).unwrap();
+        assert!(removed.query(&query).unwrap()["durations"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            removed.document().unwrap().events[0].metadata["durations"],
+            json!([])
+        );
+        let mut invalid = doc.clone();
+        invalid.events[0].metadata["durations"][0]["endId"] = json!("absent");
+        assert!(Snapshot::from_document(&invalid).is_err());
     }
 }

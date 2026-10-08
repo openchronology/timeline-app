@@ -209,7 +209,14 @@ export function pluginSize(
 ): MomentSize {
   return scriptEffects(plugins, metadata).size ?? 'medium';
 }
-const reserved = new Set(['title', 'description', '__proto__', 'prototype', 'constructor']);
+const reserved = new Set([
+  'title',
+  'description',
+  'durations',
+  '__proto__',
+  'prototype',
+  'constructor',
+]);
 function object(value: unknown, keys: string[]): Record<string, unknown> {
   if (
     !value ||

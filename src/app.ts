@@ -1,3 +1,5 @@
+import { durationLinks, pruneDurations } from './durations.js';
+import { calendarPicker } from './calendar-picker.js';
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { followLatest } from './follow-latest.js';
 import { createSummaryExpansion } from './summary-expansion.js';
@@ -205,7 +207,9 @@ function flushEventEdit() {
         history.push(eventEditHistory);
       } else eventEditHistory.after = point;
       model!.put(point);
+      const wasNew = !selected;
       selected = point;
+      if (wasNew) refreshDurations();
       text('moment-heading', 'Moment details');
       selectedGroup = null;
       selectedTime = Q.parse(point.time);
@@ -234,7 +238,11 @@ const stackLabels = new Map<string, MomentLabel>();
 let verticalOffset = 0;
 let uiScale = 1;
 let renderedUiScale = 1;
-const hoverPreview = createHoverPreview(stage, () => uiScale);
+const hoverPreview = createHoverPreview(
+  stage,
+  () => uiScale,
+  (button) => button.click(),
+);
 const summaryExpansion = createSummaryExpansion(stage, {
   scale: () => uiScale,
   generation: () =>
@@ -479,7 +487,10 @@ async function completeDocument(): Promise<TimelineDocument> {
     if (change.after) events.set(id, change.after);
     else events.delete(id);
   }
-  return { ...settings, events: [...events.values()] };
+  return pruneDurations(
+    { ...settings, events: [...events.values()] },
+    new Set([...changes].filter(([, c]) => !c.after).map(([id]) => id)),
+  );
 }
 let pendingFrameRefresh = false;
 function requestRender(refreshFrame = true) {
@@ -684,6 +695,7 @@ function renderAxis() {
     }
 }
 function drawFrame() {
+  renderDurationBands();
   const cursor = el('time-cursor');
   stage.style.setProperty('--timeline-scale', String(uiScale));
   stage.dataset.uiScale = String(uiScale);
@@ -933,7 +945,7 @@ function drawFrame() {
     verticalOffset = clamped;
     requestRender(false);
   }
-  for (const layer of [el('axis'), container, branches]) {
+  for (const layer of [el('axis'), el('duration-bands'), container, branches]) {
     layer.style.width = `${stage.clientWidth / uiScale}px`;
     layer.style.height = `${stage.clientHeight / uiScale}px`;
     layer.style.transformOrigin = '0 0';
@@ -950,7 +962,7 @@ function drawFrame() {
       container.insertBefore(node, container.children[index] ?? null);
   });
   text('visible-count', `${visible.toLocaleString()} visible · ${frame.groups.length} points`);
-  el('empty-window').hidden = frame.groups.length > 0;
+  el('empty-window').hidden = frame.groups.length > 0 || !!frame.durations?.length;
   summaryExpansion.refresh();
   hoverPreview.refresh();
   animateLiveFrame = false;
@@ -2353,6 +2365,7 @@ function eventForm(event?: PointEvent, time?: Q) {
   delete rest.description;
   el<HTMLTextAreaElement>('event-metadata').value = JSON.stringify(rest, null, 2);
   refreshPluginFields();
+  refreshDurations();
   for (const id of ['event-title', 'event-time', 'event-description', 'event-metadata'])
     (el(id) as HTMLInputElement).disabled = !editable();
   text(
@@ -2380,6 +2393,10 @@ async function groupPage(
       : page;
   }
   const workspace = sparseWorkspace();
+  if (!workspace && model && group.id && BigInt(group.count) === 1n && !after) {
+    const point = model.byId.get(group.id);
+    return { events: point ? [point] : [], next: null };
+  }
   const edited = group.id ? workspace?.changes.get(group.id)?.after : undefined;
   if (edited && !after) return { events: [edited], next: null };
   let events: PointEvent[],
@@ -2418,6 +2435,7 @@ async function groupPage(
     }>(
       {
         kind: 'events',
+        ...(group.id && BigInt(group.count) === 1n && !after ? { id: group.id } : {}),
         lower: group.first,
         upper: group.last,
         limit: limit,
@@ -3230,11 +3248,25 @@ el('apply-bounds').onclick = () => {
     fail(error);
   }
 };
-function setEventTime(time: Q) {
+function setEventTime(time: Q, refreshCalendar = true) {
   const value = presented(time, 'input');
   displayedEventTime = { text: value, time };
   input('event-time').value = value;
   input('event-exact').value = time.toString();
+  if (refreshCalendar)
+    calendarPicker(
+      el('event-calendar-picker'),
+      model?.presentation ?? remote?.presentation,
+      time,
+      viewContext('input'),
+      !editable(),
+      (next) => {
+        setEventTime(next, false);
+        selectedTime = next;
+        queueEventEdit();
+        requestRender();
+      },
+    );
   for (const label of el('plugin-event-fields').querySelectorAll('.stack-time'))
     label.textContent = `Inherited time: ${value}`;
 }
@@ -3251,6 +3283,19 @@ input('event-time').oninput = () => {
       label.textContent = `Inherited time: ${input('event-time').value}`;
     input('event-exact').value = time.toString();
     selectedTime = time;
+    calendarPicker(
+      el('event-calendar-picker'),
+      model?.presentation ?? remote?.presentation,
+      time,
+      viewContext('input'),
+      !editable(),
+      (next) => {
+        setEventTime(next);
+        selectedTime = next;
+        queueEventEdit();
+        requestRender();
+      },
+    );
     text('event-error', '');
     requestRender();
   } catch {
@@ -3430,8 +3475,12 @@ el<HTMLFormElement>('event-form').onsubmit = (event) => {
   event.preventDefault();
   flushEventEdit();
 };
-el('event-form').addEventListener('input', queueEventEdit);
-el('event-form').addEventListener('change', queueEventEdit);
+el('event-form').addEventListener('input', (event) => {
+  if (!(event.target as HTMLElement).closest('#event-calendar-picker')) queueEventEdit();
+});
+el('event-form').addEventListener('change', (event) => {
+  if (!(event.target as HTMLElement).closest('#event-calendar-picker')) queueEventEdit();
+});
 el('event-form').addEventListener('focusout', () => {
   flushEventEdit();
 });
@@ -3446,9 +3495,11 @@ function requestDelete(point: PointEvent) {
   if (!model!.byId.has(point.id)) return;
   closeTimelineMenu();
   pendingDelete = { id: point.id, document: documentRequest };
+  text('delete-heading', 'Delete event?');
+  text('delete-confirm', 'Delete event');
   text(
     'delete-description',
-    `Delete “${point.metadata.title || 'Untitled event'}” at ${presented(Q.parse(point.time), 'input')}? You can undo this deletion.`,
+    `Delete “${point.metadata.title || 'Untitled event'}” at ${presented(Q.parse(point.time), 'input')}? Any durations linked to this endpoint will also be removed. You can undo this deletion.`,
   );
   el<HTMLDialogElement>('delete-dialog').showModal();
   el('delete-cancel').focus();
@@ -4534,3 +4585,190 @@ void (async () => {
   }
   await route();
 })().catch(fail);
+
+function refreshDurations() {
+  const host = el('event-durations');
+  host.replaceChildren();
+  const heading = document.createElement('h3');
+  heading.textContent = 'Durations';
+  host.append(heading);
+  const metadata = JSON.parse(el<HTMLTextAreaElement>('event-metadata').value);
+  const links = durationLinks(metadata);
+  const write = () => {
+    const current = JSON.parse(el<HTMLTextAreaElement>('event-metadata').value);
+    current.durations = links;
+    el<HTMLTextAreaElement>('event-metadata').value = JSON.stringify(current, null, 2);
+    queueEventEdit();
+  };
+  for (const link of links) {
+    const card = document.createElement('div');
+    card.className = 'duration-editor';
+    card.dataset.durationId = link.id;
+    const endpoint = document.createElement('p');
+    endpoint.textContent = 'End moment: ' + link.endId;
+    card.append(endpoint);
+    for (const [field, labelText] of [
+      ['title', 'Duration title'],
+      ['description', 'Duration notes'],
+    ] as const) {
+      const label = document.createElement('label');
+      label.textContent = labelText;
+      const control =
+        field === 'title' ? document.createElement('input') : document.createElement('textarea');
+      control.value = link.metadata[field] ?? '';
+      control.disabled = !editable();
+      control.oninput = () => {
+        link.metadata[field] = control.value;
+        write();
+      };
+      label.append(control);
+      card.append(label);
+    }
+    if (editable()) {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'button-danger';
+      remove.textContent = 'Delete duration';
+      remove.onclick = () => {
+        pendingDelete = {
+          id: link.id,
+          document: documentRequest,
+          remove: () => {
+            links.splice(links.indexOf(link), 1);
+            write();
+            flushEventEdit();
+            refreshDurations();
+          },
+        };
+        text('delete-heading', 'Delete duration?');
+        text('delete-confirm', 'Delete duration');
+        text('delete-description', 'Delete this duration? Its endpoint moments will remain.');
+        el<HTMLDialogElement>('delete-dialog').showModal();
+      };
+      card.append(remove);
+    }
+    host.append(card);
+  }
+  if (!editable() || comparison) return;
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.textContent = 'Link to end moment';
+  add.disabled = !selected;
+  const list = document.createElement('div');
+  list.className = 'duration-endpoints';
+  let cursor: { time: string; id: string } | null = null,
+    generation = selectionRequest;
+  const next = document.createElement('button');
+  next.type = 'button';
+  next.textContent = 'Next 25 moments';
+  const load = async () => {
+    if (!selected) return;
+    add.disabled = next.disabled = true;
+    try {
+      const startId = selected.id;
+      let page: { events: PointEvent[]; next: { time: string; id: string } | null };
+      if (!sparseWorkspace() && model)
+        page = await groupPage(
+          {
+            first: model.points.minKey()!.toString(),
+            last: model.points.maxKey()!.toString(),
+            count: '0',
+            distinct: 0,
+          },
+          cursor,
+        );
+      else
+        page = await timelineQuery({
+          kind: 'events',
+          lower: local?.first ?? null,
+          upper: local?.last ?? null,
+          limit: 25,
+          after: cursor,
+          revision: (local ?? remote)!.revision,
+        });
+      if (generation !== selectionRequest || !host.isConnected || selected?.id !== startId) return;
+      list.replaceChildren();
+      for (const endpoint of page.events)
+        if (endpoint.id !== startId) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent =
+            (endpoint.metadata.title || 'Unnamed moment') +
+            ' · ' +
+            presented(Q.parse(endpoint.time), 'event');
+          button.onclick = () => {
+            sparseWorkspace()?.load(endpoint);
+            links.push({
+              id: eventId(),
+              endId: endpoint.id,
+              metadata: { title: '', description: '' },
+            });
+            write();
+            flushEventEdit();
+            refreshDurations();
+          };
+          list.append(button);
+        }
+      cursor = page.next;
+      next.hidden = !cursor;
+      list.append(next);
+      add.hidden = true;
+    } catch (error) {
+      fail(error);
+    } finally {
+      add.disabled = next.disabled = false;
+    }
+  };
+  add.onclick = () => {
+    void load();
+  };
+  next.onclick = () => {
+    void load();
+  };
+  host.append(add, list);
+}
+function renderDurationBands() {
+  const host = el('duration-bands');
+  host.replaceChildren();
+  const rows = comparisonRows().rows;
+  (frame.durations ?? []).forEach((band, i) => {
+    const left = Math.max(0, viewport.x(Q.parse(band.first), width())),
+      right = Math.min(width(), viewport.x(Q.parse(band.last), width()));
+    if (right < left) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'duration-band';
+    button.dataset.durationId = band.id;
+    button.style.left = (48 + left) / uiScale + 'px';
+    button.style.width = Math.max(6, (right - left) / uiScale) + 'px';
+    button.style.top = 202 + (rows.get(band.sourceKey ?? '')?.offset ?? 0) + (i % 3) * 9 + 'px';
+    button.textContent = band.metadata.title ?? '';
+    button.setAttribute('aria-label', 'Duration: ' + (band.metadata.title || 'Unnamed duration'));
+    button.title =
+      (band.metadata.title || 'Duration') +
+      ' · ' +
+      presented(Q.parse(band.first)) +
+      ' → ' +
+      presented(Q.parse(band.last));
+    button.onclick = () => {
+      void selectGroup({
+        id: band.startId,
+        first: band.startTime,
+        last: band.startTime,
+        count: '1',
+        distinct: 1,
+        ...(band.sourceKey ? { sourceKey: band.sourceKey } : {}),
+      })
+        .then(() => el('event-durations').scrollIntoView({ block: 'nearest' }))
+        .catch(fail);
+    };
+    host.append(button);
+  });
+  if (frame.durationsTruncated) {
+    const notice = document.createElement('span');
+    notice.className = 'duration-limit';
+    notice.textContent =
+      'Showing the first 256 durations in this window. Zoom in to narrow the selection.';
+    host.append(notice);
+  }
+}
