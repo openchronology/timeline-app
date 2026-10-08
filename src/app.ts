@@ -51,8 +51,15 @@ import {
   validateDuration,
   durationPlugins,
   momentPlugins,
+  searchIndex,
+  searchTerms,
+  searchText,
+  snippet,
+  SEARCH_PAGE_SIZE,
 } from './core.js';
 import type {
+  SearchPage,
+  SearchResult,
   Duration,
   DurationEndpoint,
   Frame,
@@ -782,7 +789,8 @@ function drawFrame() {
       (selectedGroup?.first === group.first &&
       (!comparison || (selectedGroup as ComparisonGroup)?.sourceKey === sourceKey)
         ? ' selected'
-        : '');
+        : '') +
+      (searchHighlights(group) ? ' search-hit' : '');
     button.style.left = `${(48 + x) / uiScale}px`;
     markerGroups.set(button, group);
     summaryExpansion.update(button, group, expandSummaries);
@@ -1485,6 +1493,7 @@ function heading() {
 
   el('add-button').hidden = !editable();
   el('add-duration-button').hidden = !editable();
+  el('search-button').hidden = !!comparison || (!model && !remote && !local);
   el<HTMLButtonElement>('undo-button').disabled = !history.length;
   el<HTMLButtonElement>('redo-button').disabled = !future.length;
   text(
@@ -5148,6 +5157,177 @@ async function listMoments(host: HTMLElement, choose: (moment: PointEvent) => vo
   more.onclick = () => void load();
   await load();
 }
+/** Text search shows results in a dialog; choosing one moves the view, nothing else. */
+let searchHit: { kind: SearchResult['kind']; id: string; time: Q } | null = null;
+let searchHitTimer: ReturnType<typeof setTimeout> | undefined;
+let searchState = { text: '', page: 1, total: 0n, request: 0 };
+function searchHighlights(group: FrameGroup) {
+  if (searchHit?.kind !== 'moment' || comparison) return false;
+  if (group.id) return group.id === searchHit.id;
+  return (
+    Q.parse(group.first).compare(searchHit.time) <= 0 &&
+    Q.parse(group.last).compare(searchHit.time) >= 0
+  );
+}
+/** Indexed timelines search the saved head; unsaved edits replace their saved matches. */
+function unsavedMatches(text: string) {
+  const sparse = sparseWorkspace();
+  const changed = new Set<string>(),
+    hits: SearchResult[] = [];
+  if (!sparse) return { changed, hits };
+  const terms = searchTerms(text);
+  const consider = (
+    kind: SearchResult['kind'],
+    id: string,
+    first: string,
+    last: string,
+    metadata: Duration['metadata'],
+  ) => {
+    const { title, body } = searchText(metadata);
+    const haystack = (title + ' ' + body).toLowerCase();
+    if (terms.length && terms.every((term) => haystack.includes(term)))
+      hits.push({ kind, id, first, last, title, snippet: snippet(body) });
+  };
+  for (const [id, change] of sparse.changes) {
+    changed.add('moment:' + id);
+    if (change.after)
+      consider('moment', id, change.after.time, change.after.time, change.after.metadata);
+  }
+  const bands = new Map(sparse.overlayDurations(frame.durations ?? []).map((b) => [b.id, b]));
+  for (const [id, change] of sparse.durationChanges) {
+    changed.add('duration:' + id);
+    const band =
+      bands.get(id) ??
+      (change.after ? resolveDuration(change.after, (m) => sparse.momentTime(m)) : null);
+    if (change.after && band)
+      consider('duration', id, band.first, band.last, change.after.metadata);
+  }
+  return { changed, hits };
+}
+async function runSearch(page: number) {
+  const words = input('search-text').value;
+  const request = ++searchState.request;
+  searchState = { ...searchState, text: words, page };
+  el<HTMLButtonElement>('search-previous').disabled = true;
+  el<HTMLButtonElement>('search-next').disabled = true;
+  if (!searchTerms(words).length) {
+    el('search-results').replaceChildren();
+    el('search-previous').parentElement!.hidden = true;
+    text('search-status', 'Type a word from a title or notes.');
+    return;
+  }
+  text('search-status', 'Searching…');
+  try {
+    let result: SearchPage;
+    if (!sparseWorkspace() && model) result = searchIndex(model, words, page);
+    else {
+      result = await timelineQuery<SearchPage>({
+        kind: 'search',
+        text: words,
+        page,
+        revision: (local ?? remote)!.revision,
+      });
+      const { changed, hits } = unsavedMatches(words);
+      const saved = result.results.filter((r) => !changed.has(r.kind + ':' + r.id));
+      const added = page === 1 ? hits : [];
+      // Saved matches hidden by unsaved edits are only known for this page; the total adjusts for them.
+      result = {
+        ...result,
+        results: [...added, ...saved],
+        total: String(
+          BigInt(result.total) -
+            BigInt(result.results.length - saved.length) +
+            BigInt(added.length),
+        ),
+      };
+    }
+    if (request !== searchState.request) return;
+    searchState.total = BigInt(result.total);
+    renderSearchResults(result.results);
+    const pages = (searchState.total + BigInt(SEARCH_PAGE_SIZE) - 1n) / BigInt(SEARCH_PAGE_SIZE);
+    text(
+      'search-status',
+      searchState.total === 0n && !result.results.length
+        ? 'No moments or durations match.'
+        : `${searchState.total} ${searchState.total === 1n ? 'match' : 'matches'}` +
+            (pages > 1n ? ` · page ${page} of ${pages}` : '') +
+            (sparseWorkspace()?.dirtyCount ? ' · includes unsaved edits' : ''),
+    );
+    el<HTMLButtonElement>('search-previous').disabled = page <= 1;
+    el<HTMLButtonElement>('search-next').disabled = BigInt(page) >= pages;
+    el('search-previous').parentElement!.hidden = pages <= 1n;
+  } catch (error) {
+    if (request === searchState.request)
+      text('search-status', error instanceof Error ? error.message : String(error));
+  }
+}
+function renderSearchResults(results: SearchResult[]) {
+  const list = el('search-results');
+  list.replaceChildren();
+  for (const result of results) {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'search-result';
+    const title = document.createElement('strong');
+    title.textContent =
+      result.title || (result.kind === 'moment' ? 'Unnamed moment' : 'Unnamed duration');
+    const meta = document.createElement('span');
+    meta.className = 'search-meta';
+    meta.textContent =
+      (result.kind === 'moment' ? 'Moment · ' : 'Duration · ') +
+      (result.first === result.last
+        ? presented(Q.parse(result.first))
+        : `${presented(Q.parse(result.first))} → ${presented(Q.parse(result.last))}`);
+    button.append(title, meta);
+    if (result.snippet) {
+      const notes = document.createElement('span');
+      notes.className = 'search-snippet';
+      notes.textContent = result.snippet;
+      button.append(notes);
+    }
+    button.onclick = () => goToSearchResult(result);
+    item.append(button);
+    list.append(item);
+  }
+}
+function goToSearchResult(result: SearchResult) {
+  el<HTMLDialogElement>('search-dialog').close();
+  const first = Q.parse(result.first),
+    last = Q.parse(result.last),
+    extent = last.sub(first);
+  // Moments keep the current zoom; durations fit with a margin on both sides.
+  const span = extent.compare(Q.zero) > 0 ? extent.mul(Q.from(7n, 5n)) : viewport.span;
+  const middle = first.add(extent.div(Q.from(2n)));
+  navigate(new Viewport(middle.sub(span.div(Q.from(2n))), span));
+  searchHit = { kind: result.kind, id: result.id, time: first };
+  clearTimeout(searchHitTimer);
+  searchHitTimer = setTimeout(() => {
+    searchHit = null;
+    requestRender(false);
+  }, 2600);
+}
+el('search-button').onclick = () => {
+  if (comparison) return;
+  el<HTMLDialogElement>('search-dialog').showModal();
+  input('search-text').focus();
+  input('search-text').select();
+};
+el<HTMLFormElement>('search-form').onsubmit = (event) => {
+  event.preventDefault();
+  void runSearch(1);
+};
+el('search-previous').onclick = () => void runSearch(Math.max(1, searchState.page - 1));
+el('search-next').onclick = () => void runSearch(searchState.page + 1);
+document.addEventListener('keydown', (event) => {
+  // "/" opens search, as in many web apps; typing in fields is unaffected.
+  if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
+  const target = event.target as HTMLElement;
+  if (target.closest('input, textarea, select, [contenteditable]')) return;
+  if (document.querySelector('dialog[open]') || el('search-button').hidden) return;
+  event.preventDefault();
+  el('search-button').click();
+});
 el('add-duration-button').onclick = () => {
   const span = viewport.span;
   createDuration(
@@ -5179,6 +5359,10 @@ function renderDurationBands() {
       durationButtons.set(key, button);
       host.append(button);
     }
+    button.classList.toggle(
+      'search-hit',
+      searchHit?.kind === 'duration' && searchHit.id === band.id && !band.sourceKey,
+    );
     button.style.left = (48 + left) / uiScale + 'px';
     button.style.width = Math.max(6, (right - left) / uiScale) + 'px';
     button.style.top = 202 + (rows.get(band.sourceKey ?? '')?.offset ?? 0) + (i % 3) * 9 + 'px';

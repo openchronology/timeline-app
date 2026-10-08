@@ -6,6 +6,10 @@ import {
   durationTree,
   durationOverview,
   fixMissingAnchors,
+  searchRows,
+  searchTerms,
+  snippet,
+  SEARCH_PAGE_SIZE,
 } from '../dist/core.mjs';
 import { randomUUID } from 'node:crypto';
 import { indexedNodes } from './tree.mjs';
@@ -159,6 +163,12 @@ export class PostgresStore {
     }
     const times = new Map(document.events.map((e) => [e.id, e.time]));
     flatten(durationTree(document.durations ?? [], (moment) => times.get(moment)));
+    await this.indexSearch(
+      client,
+      id,
+      document,
+      intervals.map(({ node }) => node.band),
+    );
     for (let offset = 0; offset < intervals.length; offset += 250) {
       const params = [];
       const tuples = intervals.slice(offset, offset + 250).map(({ ordinal, node, left, right }) => {
@@ -215,6 +225,32 @@ export class PostgresStore {
         touch,
       ],
     );
+  }
+  /** Rebuilds the timeline's text search rows from a complete document and its resolved bands. */
+  async indexSearch(client, id, document, bands) {
+    await client.query('DELETE FROM oc_entity_search WHERE timeline_id=$1', [id]);
+    const rows = searchRows(document.events, bands);
+    for (let offset = 0; offset < rows.length; offset += 500) {
+      const params = [];
+      const tuples = rows.slice(offset, offset + 500).map((row) => {
+        const start = params.length;
+        params.push(id, row.kind, row.id, row.first, row.last, row.title, row.body);
+        return (
+          '(' +
+          Array.from(
+            { length: 7 },
+            (_, i) => '$' + (start + i + 1) + (i === 3 || i === 4 ? '::mpq' : ''),
+          ).join(',') +
+          ')'
+        );
+      });
+      await client.query(
+        'INSERT INTO oc_entity_search(timeline_id,kind,entity_id,first_time,last_time,title,body) VALUES ' +
+          tuples.join(','),
+        params,
+      );
+    }
+    await client.query('UPDATE oc_timelines SET search_version=1 WHERE id=$1', [id]);
   }
   async transaction(action) {
     const c = await this.pool.connect();
@@ -478,6 +514,32 @@ export class PostgresStore {
           visitedNodes: rows.at(-1)?.visited_nodes ?? 0,
         };
       }
+      if (query.kind === 'search') {
+        const terms = searchTerms(query.text);
+        if (!terms.length) return { results: [], total: '0', page: query.page, revision: t.revision };
+        // Terms contain only letters and digits, so they are safe tsquery prefix operands.
+        const tsquery = terms.map((term) => term + ':*').join(' & ');
+        const { rows } = await c.query(
+          `SELECT kind,entity_id,oc_qtext(first_time) AS first,oc_qtext(last_time) AS last,title,left(body,300) AS body,count(*) OVER() AS total
+          FROM oc_entity_search, to_tsquery('simple',$2) AS q
+          WHERE timeline_id=$1 AND document @@ q
+          ORDER BY ts_rank(document,q) DESC,first_time,kind,entity_id COLLATE "C" LIMIT $3 OFFSET $4`,
+          [id, tsquery, SEARCH_PAGE_SIZE, (query.page - 1) * SEARCH_PAGE_SIZE],
+        );
+        return {
+          results: rows.map((r) => ({
+            kind: r.kind,
+            id: r.entity_id,
+            first: r.first,
+            last: r.last,
+            title: r.title,
+            snippet: snippet(r.body),
+          })),
+          total: rows[0]?.total ?? '0',
+          page: query.page,
+          revision: t.revision,
+        };
+      }
       if (query.kind === 'duration') {
         const { rows } = await c.query(
           "SELECT definition FROM oc_duration_nodes WHERE timeline_id=$1 AND band->>'id'=$2 AND definition IS NOT NULL LIMIT 1",
@@ -522,6 +584,27 @@ export class PostgresStore {
  * from the converted document stores standalone definitions; saved history is immutable and
  * converts when read. Returns the number of converted timelines.
  */
+/** Builds search rows for timelines saved before entity search existed. */
+export async function backfillEntitySearch(client) {
+  const store = new PostgresStore(null);
+  const { rows } = await client.query(
+    'SELECT t.* FROM oc_timelines t WHERE t.search_version<1 AND t.comparison IS NULL',
+  );
+  for (const timeline of rows) {
+    const document = await store.branchDocument(client, timeline);
+    const times = new Map(document.events.map((e) => [e.id, e.time]));
+    const bands = [];
+    const walk = (node) => {
+      if (!node) return;
+      bands.push(node.band);
+      walk(node.left);
+      walk(node.right);
+    };
+    walk(durationTree(document.durations ?? [], (moment) => times.get(moment)));
+    await store.indexSearch(client, timeline.id, document, bands);
+  }
+  return rows.length;
+}
 export async function convertLegacyDurations(client) {
   const store = new PostgresStore(null);
   const { rows } = await client.query(

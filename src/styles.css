@@ -2109,3 +2109,75 @@ dialog button {
 #datetime-picker .calendar-month-nav {
   font-weight: 600;
 }
+
+#search-dialog {
+  width: min(620px, calc(100vw - 30px));
+  min-width: 0;
+}
+.search-row {
+  display: flex;
+  gap: 8px;
+}
+.search-row input {
+  flex: 1;
+}
+.search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: min(60vh, 520px);
+  overflow: auto;
+}
+.search-results:empty {
+  display: none;
+}
+.search-result {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  white-space: normal;
+}
+.search-result strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.search-meta {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: ui-monospace, monospace;
+}
+.search-snippet {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+/* A chosen search result pulses briefly where the view lands. */
+.event-marker.search-hit,
+.duration-band.search-hit {
+  animation: search-hit 0.8s ease-in-out 3;
+  z-index: 6;
+}
+@keyframes search-hit {
+  50% {
+    box-shadow:
+      0 0 0 4px #fff,
+      0 0 0 8px #c59b22;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .event-marker.search-hit,
+  .duration-band.search-hit {
+    animation: none;
+    box-shadow:
+      0 0 0 4px #fff,
+      0 0 0 8px #c59b22;
+  }
+}

@@ -73,7 +73,7 @@ test('server deployments expose a guest dashboard without database storage and r
   });
   assert.equal(notConfigured.status, 503);
 });
-test('overview validation rejects missing, negative, or inexact numeric bounds before accessing storage', async () => {
+test('query validation rejects bad bounds, search text and duration IDs before accessing storage', async () => {
   const app = createApplication({
     pool: {
       query() {
@@ -88,6 +88,12 @@ test('overview validation rejects missing, negative, or inexact numeric bounds b
     { kind: 'overview', lower: '0', upper: '1', threshold: '-1/2' },
     { kind: 'overview', lower: 0, upper: '1', threshold: '1/2' },
     { kind: 'overview', lower: '0', upper: '1/0', threshold: '1/2' },
+    { kind: 'search' },
+    { kind: 'search', text: 'x'.repeat(201) },
+    { kind: 'search', text: 'harbor', page: 0 },
+    { kind: 'search', text: 'harbor', page: 1.5 },
+    { kind: 'duration' },
+    { kind: 'duration', id: 'bad id' },
   ])
     assert.equal((await request(app, path, 'POST', headers, input)).status, 400);
 });

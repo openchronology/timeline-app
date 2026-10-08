@@ -194,6 +194,7 @@ jobs:
           cargo build --manifest-path native-store/Cargo.toml --locked --release --bin och-convert
       - run: node test/files.mjs
       - run: node test/durations-postgres.mjs
+      - run: node test/search-postgres.mjs
       - run: node test/stars-postgres.mjs
       - run: node test/follow-postgres.mjs
       - run: node test/administration-postgres.mjs

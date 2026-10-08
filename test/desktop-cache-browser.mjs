@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { Q, Viewport, TimelineIndex } from '../dist/core.mjs';
+import { Q, Viewport, TimelineIndex, searchIndex } from '../dist/core.mjs';
 export async function checkDesktopCache(browser) {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
@@ -40,7 +40,8 @@ export async function checkDesktopCache(browser) {
     generation = 1,
     reads = 0,
     durationReads = 0;
-  const overviews = [],
+  const searches = [],
+    overviews = [],
     details = [],
     saves = [],
     errors = [];
@@ -64,6 +65,10 @@ export async function checkDesktopCache(browser) {
     if (command === 'desktop_query') {
       assert.equal(args.generation, generation);
       const q = args.query;
+      if (q.kind === 'search') {
+        searches.push(q);
+        return searchIndex(index, q.text, q.page);
+      }
       if (q.kind === 'duration') {
         durationReads++;
         return { duration: document.durations.find((d) => d.id === q.id) ?? null };
@@ -175,6 +180,26 @@ export async function checkDesktopCache(browser) {
     await bounds('0', '20');
     await page.getByRole('button', { name: 'Edited SQLite moment', exact: true }).waitFor();
     assert.equal(reads, 0);
+    // Native search covers the saved file; unsaved edits replace their saved matches.
+    await page.locator('#search-button').click();
+    await page.locator('#search-text').fill('edited');
+    await page.locator('#search-submit').click();
+    await page.waitForFunction(() =>
+      /includes unsaved edits/.test(document.getElementById('search-status').textContent),
+    );
+    assert.deepEqual(
+      await page.locator('#search-results .search-result strong').allTextContents(),
+      ['Edited SQLite moment'],
+    );
+    await page.locator('#search-text').fill('nearby');
+    await page.locator('#search-submit').click();
+    await page.waitForFunction(() =>
+      /No moments or durations match/.test(document.getElementById('search-status').textContent),
+    );
+    assert.equal(searches.at(-1).text, 'nearby');
+    assert.equal(reads, 0);
+    await page.keyboard.press('Escape');
+    await page.locator('#search-dialog').waitFor({ state: 'hidden' });
     // Durations open by ID without loading the file, and save as sparse duration changes.
     const band = page.locator('.duration-band');
     await band.filter({ hasText: 'Cached period' }).click({ force: true });

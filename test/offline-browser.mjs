@@ -1,4 +1,5 @@
 import { checkIssues } from './issues-browser.mjs';
+import { checkSearch } from './search-browser.mjs';
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
 import { closeMomentDetails, checkMomentDialog } from './moment-dialog-browser.mjs';
@@ -171,6 +172,7 @@ try {
   await checkLabelMotion(page, document);
   await checkPlugins(page, document, true);
   await checkIssues(page, document);
+  await checkSearch(page, document);
   await closeMomentDetails(page);
   await input('json-file').setInputFiles({
     name: 'sample.ochx',

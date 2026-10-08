@@ -20,6 +20,16 @@ export {
   MAX_DURATIONS,
 } from './durations.js';
 export type { Duration, DurationBand, DurationEndpoint } from './durations.js';
+export {
+  searchTerms,
+  searchText,
+  searchIndex,
+  searchRows,
+  snippet,
+  SEARCH_PAGE_SIZE,
+  SEARCH_MAX_TERMS,
+} from './search.js';
+export type { SearchResult, SearchPage } from './search.js';
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { Rational as Q, RationalMap } from 'rational-ordered-map';
 import { validateInstalledPlugins, validateStackMetadata, imageURL } from './plugins.js';
