@@ -1165,7 +1165,7 @@ function currentComparisonSource(): ComparisonSource | null {
     revision: remoteId ? source.revision : undefined,
     event_generation: remote?.event_generation,
     working: !!workspace?.changes.size || dirty,
-    title: settings?.title ?? remote?.title ?? 'Local SQLite timeline',
+    title: settings?.title ?? remote?.title ?? 'Local timeline',
     presentation: settings?.presentation ?? remote?.presentation,
     plugins: settings?.plugins ?? remote?.plugins,
     assets: settings?.assets ?? remote?.assets,
@@ -1445,7 +1445,7 @@ function heading() {
         ? 'Public timeline'
         : 'Private timeline'
       : desktop && sqlitePath
-        ? 'SQLite file'
+        ? 'Local file'
         : offlineHtml
           ? 'Offline HTML'
           : 'Browser draft',
@@ -1492,7 +1492,7 @@ function heading() {
         : remote
           ? 'Saved on the server'
           : desktop && sqlitePath
-            ? 'Saved in a SQLite timeline'
+            ? 'Saved to file'
             : offlineHtml
               ? 'Export .ochx to save your work'
               : memoryOnly()
@@ -3870,6 +3870,10 @@ function accountHeading() {
   text('account-button', session.user ? `@${session.user.username}` : 'Sign in');
   el('logout-button').hidden = !session.user;
   el('account-button').hidden = offlineHtml;
+  // The desktop can only sign in through a reachable server connection.
+  const disconnected = desktop && !session.server;
+  el<HTMLButtonElement>('account-button').disabled = disconnected;
+  el('account-button').title = disconnected ? 'Connect to a server to sign in' : '';
   el('server-button').hidden = !desktop;
 }
 el('logout-button').onclick = () => {
@@ -4312,7 +4316,7 @@ if (desktop) {
           frameRequest++;
           requestRender();
           heading();
-          toast('SQLite timeline saved.');
+          toast('Timeline saved.');
         })
         .catch(fail)
         .finally(() => {

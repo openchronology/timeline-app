@@ -92,7 +92,7 @@ async fn desktop_open(app: tauri::AppHandle) -> Result<Option<Opened>, String> {
     let Some(file) = app
         .dialog()
         .file()
-        .add_filter("OpenChronology SQLite timeline", &["och", "sqlite"])
+        .add_filter("OpenChronology timeline", &["och", "sqlite"])
         .blocking_pick_file()
     else {
         return Ok(None);
@@ -197,12 +197,12 @@ fn baseline(app: &tauri::AppHandle, generation: u64) -> Result<Arc<Snapshot>, St
     let state = app.state::<Mutex<Files>>();
     let files = state.lock().map_err(|e| e.to_string())?;
     if files.generation != generation {
-        return Err("The active SQLite timeline changed".into());
+        return Err("The open timeline file changed".into());
     }
     files
         .baseline
         .clone()
-        .ok_or("No SQLite timeline is open".into())
+        .ok_or("No timeline file is open".into())
 }
 #[tauri::command]
 async fn desktop_query(
@@ -237,16 +237,14 @@ async fn desktop_save(
         .clone();
     let path = if !save_as && existing.is_some() {
         if existing.as_ref().map(|p| p.to_string_lossy().into_owned()) != expected_path {
-            return Err(
-                "The active file changed. Use Save SQLite as to choose the destination.".into(),
-            );
+            return Err("The active file changed. Use Save As to choose the destination.".into());
         }
         existing.unwrap()
     } else {
         let Some(file) = app
             .dialog()
             .file()
-            .add_filter("OpenChronology SQLite timeline", &["och", "sqlite"])
+            .add_filter("OpenChronology timeline", &["och", "sqlite"])
             .set_file_name("timeline.och")
             .blocking_save_file()
         else {
@@ -258,19 +256,48 @@ async fn desktop_save(
         }
         path
     };
-    tauri::async_runtime::spawn_blocking(move||{
-        let state=app.state::<Mutex<Files>>();let mut files=state.lock().map_err(|e|e.to_string())?;
-        if let Some(generation)=generation{if files.generation!=generation{return Err("The active SQLite timeline changed before saving".into());}}
-        if !save_as && files.current.as_ref()!=Some(&path){return Err("The save destination changed".into());}
-        if files.current.as_ref()==Some(&path) && files.stamp.as_ref()!=Some(&stamp(&path)?){return Err("This file was changed by another application. Use Save SQLite as to keep both versions.".into());}
-        let next=match (document,patch){
-            (None,Some(patch))=>files.baseline.as_ref().ok_or("No SQLite timeline is open")?.save_patch(&path,&patch)?,
-            (Some(document),None)=>{openchronology_store::save(&path,&document)?;Snapshot::open(&path)?},
-            _=>return Err("Supply either a document or sparse changes".into())
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<Mutex<Files>>();
+        let mut files = state.lock().map_err(|e| e.to_string())?;
+        if let Some(generation) = generation {
+            if files.generation != generation {
+                return Err("The open timeline file changed before saving".into());
+            }
+        }
+        if !save_as && files.current.as_ref() != Some(&path) {
+            return Err("The save destination changed".into());
+        }
+        if files.current.as_ref() == Some(&path) && files.stamp.as_ref() != Some(&stamp(&path)?) {
+            return Err(
+                "This file was changed by another application. Use Save As to keep both versions."
+                    .into(),
+            );
+        }
+        let next = match (document, patch) {
+            (None, Some(patch)) => files
+                .baseline
+                .as_ref()
+                .ok_or("No timeline file is open")?
+                .save_patch(&path, &patch)?,
+            (Some(document), None) => {
+                openchronology_store::save(&path, &document)?;
+                Snapshot::open(&path)?
+            }
+            _ => return Err("Supply either a document or sparse changes".into()),
         };
-        let header=next.header()?;files.baseline=Some(Arc::new(next));files.current=Some(path.clone());files.stamp=Some(stamp(&path)?);files.generation+=1;
-        Ok(Some(Opened{header,path:path.to_string_lossy().into_owned(),generation:files.generation}))
-    }).await.map_err(|e|e.to_string())?
+        let header = next.header()?;
+        files.baseline = Some(Arc::new(next));
+        files.current = Some(path.clone());
+        files.stamp = Some(stamp(&path)?);
+        files.generation += 1;
+        Ok(Some(Opened {
+            header,
+            path: path.to_string_lossy().into_owned(),
+            generation: files.generation,
+        }))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 fn main() {
     tauri::Builder::default()

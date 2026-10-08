@@ -9,6 +9,9 @@ export default function Downloads() {
         <a href={latest + '/download/openchronology-desktop-linux-amd64.deb'}>
           Desktop · Linux (.deb)
         </a>
+        <a href={latest + '/download/openchronology-desktop-linux-amd64.AppImage'}>
+          Desktop · Linux (.AppImage)
+        </a>
         <a href={latest + '/download/openchronology-desktop-rocky10-amd64.rpm'}>
           Desktop · Rocky / RHEL 10 (.rpm)
         </a>
