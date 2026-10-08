@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 //! Disk-backed immutable editing baseline. Ordinary browsing never reads all events.
-use super::{check_file, header_document, validate, Connection, Document, Event};
+use super::{check_file, header_document, validate, Connection, Document, Duration, Event};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -23,9 +23,16 @@ pub struct Change {
     pub event: Option<Event>,
 }
 #[derive(Deserialize)]
+pub struct DurationChange {
+    pub id: String,
+    pub duration: Option<Duration>,
+}
+#[derive(Deserialize)]
 pub struct Patch {
     pub settings: Document,
     pub changes: Vec<Change>,
+    #[serde(default, rename = "durationChanges")]
+    pub duration_changes: Vec<DurationChange>,
 }
 #[derive(Deserialize)]
 pub struct Cursor {
@@ -37,7 +44,9 @@ pub struct Query {
     pub kind: String,
     #[serde(default)]
     pub id: Option<String>,
+    #[serde(default)]
     pub lower: String,
+    #[serde(default)]
     pub upper: String,
     #[serde(default)]
     pub threshold: String,
@@ -188,6 +197,10 @@ impl Snapshot {
         let metadata_keys = serde_json::to_string(&q.metadata_keys).map_err(|e| e.to_string())?;
         let mut db = Connection::open(&self.path, false)?;
         db.limit_reads();
+        if q.kind == "duration" {
+            let id = q.id.as_deref().ok_or("A duration lookup needs its ID")?;
+            return Ok(json!({"duration": super::duration_by_id(&db, id)?}));
+        }
         if db.scalar("SELECT q_cmp(q(?),q(?))", &[&q.lower, &q.upper])? == "1" {
             return Err("Reversed viewport bounds".into());
         }
@@ -291,7 +304,10 @@ impl Snapshot {
     pub fn save_patch(&self, target: &Path, patch: &Patch) -> Result<Self, String> {
         let _gate = self.query_gate.lock().map_err(|e| e.to_string())?;
         validate(&patch.settings)?;
-        if !patch.settings.events.is_empty() || patch.changes.len() > 200000 {
+        if !patch.settings.events.is_empty()
+            || !patch.settings.durations.is_empty()
+            || patch.changes.len() + patch.duration_changes.len() > 200000
+        {
             return Err("Invalid sparse changes".into());
         }
         let staged = Self::open(&self.path)?;
@@ -314,6 +330,41 @@ impl Snapshot {
             }
             let mut affected = std::collections::HashSet::new();
             let mut ids = std::collections::HashSet::new();
+            // Saved times of deleted moments; durations that followed them keep these times.
+            let mut retired = Vec::new();
+            for change in patch.changes.iter().filter(|c| c.event.is_none()) {
+                if let Some(time) = db
+                    .query("SELECT time FROM events WHERE id=?", &[&change.id])?
+                    .first()
+                    .and_then(|r| r[0].clone())
+                {
+                    retired.push((change.id.clone(), time));
+                }
+            }
+            let mut durations = std::collections::HashSet::new();
+            for change in &patch.duration_changes {
+                if !durations.insert(&change.id) {
+                    return Err("Duplicate sparse duration change".into());
+                }
+                match &change.duration {
+                    Some(duration) => {
+                        if duration.id != change.id {
+                            return Err("Mismatched sparse duration id".into());
+                        }
+                        let mut doc = patch.settings.clone();
+                        doc.events = Vec::new();
+                        doc.durations = vec![Duration {
+                            // Anchors are checked against stored moments when the index rebuilds.
+                            start: anchorless(&duration.start),
+                            end: anchorless(&duration.end),
+                            ..duration.clone()
+                        }];
+                        validate(&doc)?;
+                        super::insert_duration(&db, duration)?;
+                    }
+                    None => db.execute("DELETE FROM durations WHERE id=?", &[&change.id])?,
+                }
+            }
             for change in &patch.changes {
                 if !ids.insert(&change.id) {
                     return Err("Duplicate sparse change".into());
@@ -339,17 +390,15 @@ impl Snapshot {
                     db.execute("DELETE FROM events WHERE id=?", &[&change.id])?;
                 }
             }
-            // Cascade links only for explicit endpoint deletions. Invalid new references still fail.
-            let deleted = serde_json::to_string(
-                &patch
-                    .changes
-                    .iter()
-                    .filter(|c| c.event.is_none())
-                    .map(|c| &c.id)
-                    .collect::<Vec<_>>(),
-            )
-            .map_err(|e| e.to_string())?;
-            db.execute("UPDATE events SET metadata=json_set(metadata,'$.durations',json(COALESCE((SELECT json_group_array(json(d.value)) FROM json_each(events.metadata,'$.durations') d WHERE json_extract(d.value,'$.endId') NOT IN (SELECT value FROM json_each(?))),'[]'))) WHERE json_type(metadata,'$.durations')='array'", &[&deleted])?;
+            for (id, time) in &retired {
+                if db.scalar("SELECT count(*) FROM events WHERE id=?", &[id])? == "0" {
+                    db.execute("UPDATE durations SET start_time=?1,start_moment=NULL WHERE start_moment=?2", &[time, id])?;
+                    db.execute(
+                        "UPDATE durations SET end_time=?1,end_moment=NULL WHERE end_moment=?2",
+                        &[time, id],
+                    )?;
+                }
+            }
             super::rebuild_duration_index(&db)?;
             for time in affected {
                 db.execute("DELETE FROM points WHERE time=q(?)", &[&time])?;
@@ -626,8 +675,25 @@ mod safety_tests {
 #[cfg(test)]
 mod duration_tests {
     use super::*;
+    fn spans(snapshot: &Snapshot, query: &Query) -> Vec<(String, String, String)> {
+        let frame = snapshot.query(query).unwrap();
+        let mut bands: Vec<_> = frame["durations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|b| {
+                (
+                    b["id"].as_str().unwrap().to_string(),
+                    b["first"].as_str().unwrap().to_string(),
+                    b["last"].as_str().unwrap().to_string(),
+                )
+            })
+            .collect();
+        bands.sort();
+        bands
+    }
     #[test]
-    fn linked_bands_cross_empty_windows_and_sparse_deletion_cascades() {
+    fn legacy_links_convert_and_anchored_bands_follow_sparse_moment_edits() {
         let doc:Document=serde_json::from_value(json!({"format":"openchronology","version":1,"title":"Durations","description":"","events":[{"id":"a","time":"-100/1","metadata":{"durations":[{"id":"span","endId":"b","metadata":{"title":"Band","custom":true}}]}},{"id":"b","time":"100/1","metadata":{}}]})).unwrap();
         let snapshot = Snapshot::from_document(&doc).unwrap();
         let query: Query = serde_json::from_value(
@@ -641,32 +707,79 @@ mod duration_tests {
         assert_eq!(snapshot.query(&endpoint).unwrap()["events"][0]["id"], "b");
         let frame = snapshot.query(&query).unwrap();
         assert_eq!(frame["groups"].as_array().unwrap().len(), 0);
+        assert_eq!(frame["durations"][0]["start"], json!({"moment":"a"}));
         assert_eq!(frame["durations"][0]["first"], "-100/1");
         assert_eq!(frame["durations"][0]["last"], "100/1");
+        // Legacy links leave moment metadata and become standalone durations.
+        let saved = snapshot.document().unwrap();
+        assert!(!saved.events[0].metadata.contains_key("durations"));
+        assert_eq!(saved.durations[0].metadata["custom"], true);
+        let lookup: Query = serde_json::from_value(json!({"kind":"duration","id":"span"})).unwrap();
         assert_eq!(
-            snapshot.document().unwrap().events[0].metadata["durations"][0]["metadata"]["custom"],
-            true
+            snapshot.query(&lookup).unwrap()["duration"]["end"],
+            json!({"moment":"b"})
         );
         let settings = snapshot.header().unwrap().document;
         let patch:Patch=serde_json::from_value(json!({"settings":settings,"changes":[{"id":"b","event":{"id":"b","time":"1/3","metadata":{}}}]})).unwrap();
         let target = snapshot.directory.join("updated.och");
         let moved = snapshot.save_patch(&target, &patch).unwrap();
         assert_eq!(moved.query(&query).unwrap()["durations"][0]["last"], "1/3");
+        // Deleting a moment pins the duration at the moment's last saved time.
         let deleted: Patch = serde_json::from_value(
             json!({"settings":settings,"changes":[{"id":"b","event":null}]}),
         )
         .unwrap();
         let removed = moved.save_patch(&target, &deleted).unwrap();
-        assert!(removed.query(&query).unwrap()["durations"]
-            .as_array()
-            .unwrap()
-            .is_empty());
         assert_eq!(
-            removed.document().unwrap().events[0].metadata["durations"],
-            json!([])
+            removed.query(&query).unwrap()["durations"][0]["last"],
+            "1/3"
         );
+        assert_eq!(removed.document().unwrap().durations[0].end, json!("1/3"));
         let mut invalid = doc.clone();
         invalid.events[0].metadata["durations"][0]["endId"] = json!("absent");
         assert!(Snapshot::from_document(&invalid).is_err());
+    }
+    #[test]
+    fn standalone_durations_save_sparse_changes_and_reject_unknown_anchors() {
+        let doc:Document=serde_json::from_value(json!({"format":"openchronology","version":1,"title":"Durations","description":"","events":[{"id":"a","time":"0/1","metadata":{}}],"durations":[{"id":"fixed","start":"-5/1","end":"1/3","metadata":{"title":"Fixed"}},{"id":"mixed","start":{"moment":"a"},"end":"2/1","metadata":{}}]})).unwrap();
+        let snapshot = Snapshot::from_document(&doc).unwrap();
+        let query: Query = serde_json::from_value(
+            json!({"kind":"overview","lower":"-1/1","upper":"1/1","threshold":"0/1"}),
+        )
+        .unwrap();
+        assert_eq!(
+            spans(&snapshot, &query),
+            vec![
+                ("fixed".into(), "-5/1".into(), "1/3".into()),
+                ("mixed".into(), "0/1".into(), "2/1".into())
+            ]
+        );
+        assert_eq!(snapshot.document().unwrap().durations, doc.durations);
+        let settings = snapshot.header().unwrap().document;
+        let target = snapshot.directory.join("updated.och");
+        let patch:Patch=serde_json::from_value(json!({"settings":settings,"changes":[],"durationChanges":[{"id":"fixed","duration":null},{"id":"new","duration":{"id":"new","start":"1/2","end":{"moment":"a"},"metadata":{"title":"New"}}}]})).unwrap();
+        let updated = snapshot.save_patch(&target, &patch).unwrap();
+        assert_eq!(
+            spans(&updated, &query),
+            vec![
+                ("mixed".into(), "0/1".into(), "2/1".into()),
+                ("new".into(), "0/1".into(), "1/2".into())
+            ]
+        );
+        let unknown:Patch=serde_json::from_value(json!({"settings":settings,"changes":[],"durationChanges":[{"id":"bad","duration":{"id":"bad","start":{"moment":"absent"},"end":"1/1","metadata":{}}}]})).unwrap();
+        assert!(updated.save_patch(&target, &unknown).is_err());
+        let mut invalid = doc.clone();
+        invalid.durations[0].start = json!("not a rational");
+        assert!(Snapshot::from_document(&invalid).is_err());
+        invalid.durations[0].start = json!({"moment":"absent"});
+        assert!(Snapshot::from_document(&invalid).is_err());
+    }
+}
+/// Validation placeholder for an anchor, so a single duration validates without its moments.
+fn anchorless(endpoint: &Value) -> Value {
+    if endpoint.is_object() {
+        json!("0/1")
+    } else {
+        endpoint.clone()
     }
 }

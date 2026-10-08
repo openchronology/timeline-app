@@ -27,16 +27,25 @@ export async function checkDesktopCache(browser) {
       },
       { id: 'far', time: '10000/1', metadata: { title: 'Far away' } },
     ],
+    durations: [
+      {
+        id: 'period',
+        start: '12/1',
+        end: { moment: 'near' },
+        metadata: { title: 'Cached period', notes: { detail: 'not in viewport payloads' } },
+      },
+    ],
   };
   let index = new TimelineIndex(document),
     generation = 1,
-    reads = 0;
+    reads = 0,
+    durationReads = 0;
   const overviews = [],
     details = [],
     saves = [],
     errors = [];
   const header = () => ({
-    document: { ...document, events: [] },
+    document: { ...document, events: [], durations: [] },
     generation,
     path: '/tmp/cached.och',
     event_count: String(document.events.length),
@@ -55,6 +64,10 @@ export async function checkDesktopCache(browser) {
     if (command === 'desktop_query') {
       assert.equal(args.generation, generation);
       const q = args.query;
+      if (q.kind === 'duration') {
+        durationReads++;
+        return { duration: document.durations.find((d) => d.id === q.id) ?? null };
+      }
       if (q.kind === 'events') {
         details.push(q);
         return { events: index.eventsBetween(q.lower, q.upper, 100), next: null };
@@ -79,7 +92,16 @@ export async function checkDesktopCache(browser) {
         if (change.event) events.set(change.id, change.event);
         else events.delete(change.id);
       }
-      document = { ...args.patch.settings, events: [...events.values()] };
+      const durations = new Map(document.durations.map((d) => [d.id, d]));
+      for (const change of args.patch.durationChanges ?? []) {
+        if (change.duration) durations.set(change.id, change.duration);
+        else durations.delete(change.id);
+      }
+      document = {
+        ...args.patch.settings,
+        events: [...events.values()],
+        durations: [...durations.values()],
+      };
       index = new TimelineIndex(document);
       generation++;
       return header();
@@ -153,12 +175,37 @@ export async function checkDesktopCache(browser) {
     await bounds('0', '20');
     await page.getByRole('button', { name: 'Edited SQLite moment', exact: true }).waitFor();
     assert.equal(reads, 0);
+    // Durations open by ID without loading the file, and save as sparse duration changes.
+    const band = page.locator('.duration-band');
+    await band.filter({ hasText: 'Cached period' }).click({ force: true });
+    await page.locator('#duration-dialog').waitFor({ state: 'visible' });
+    assert.equal(durationReads, 1);
+    assert.equal(await page.locator('#duration-title').inputValue(), 'Cached period');
+    await page.locator('#duration-title').fill('Edited period');
+    await band.filter({ hasText: 'Edited period' }).waitFor();
+    await page.getByRole('button', { name: 'Close duration details' }).click();
+    await page.locator('#duration-dialog').waitFor({ state: 'hidden' });
     await page.locator('#sqlite-save').click();
     await page.waitForFunction(
       () => document.getElementById('save-status').textContent === 'Saved to file',
     );
     assert.equal(saves.length, 1);
     assert.equal(saves[0].changes.length, 1);
+    assert.deepEqual(saves[0].durationChanges, [
+      {
+        id: 'period',
+        duration: {
+          id: 'period',
+          start: '12/1',
+          end: { moment: 'near' },
+          metadata: {
+            title: 'Edited period',
+            description: '',
+            notes: { detail: 'not in viewport payloads' },
+          },
+        },
+      },
+    ]);
     assert.equal(reads, 0);
     assert.equal(document.events.length, 10002);
     assert(document.events.some((e) => e.id === 'far'));
@@ -170,6 +217,8 @@ export async function checkDesktopCache(browser) {
     assert(
       exported.events.some((e) => e.id === 'near' && e.metadata.title === 'Edited SQLite moment'),
     );
+    assert.equal(exported.durations[0].metadata.title, 'Edited period');
+    assert.deepEqual(exported.durations[0].end, { moment: 'near' });
     assert.deepEqual(errors, []);
   } finally {
     await context.close();

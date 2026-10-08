@@ -503,7 +503,8 @@ BEGIN
   END LOOP;
 END $$;
 
--- Derived exact interval tree; duration definitions remain in immutable event snapshots.
+-- Exact interval tree over standalone durations. Each row also holds its duration's full
+-- definition; a NULL definition marks a legacy link row awaiting conversion by migrate.mjs.
 CREATE TABLE IF NOT EXISTS oc_duration_nodes (
   timeline_id uuid NOT NULL REFERENCES oc_timelines(id) ON DELETE CASCADE,
   id integer NOT NULL, left_id integer, right_id integer,
@@ -511,3 +512,5 @@ CREATE TABLE IF NOT EXISTS oc_duration_nodes (
   first_time mpq NOT NULL, last_time mpq NOT NULL, band jsonb NOT NULL,
   PRIMARY KEY(timeline_id,id)
 );
+ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS definition jsonb;
+CREATE INDEX IF NOT EXISTS oc_duration_nodes_duration_id ON oc_duration_nodes(timeline_id,(band->>'id'));

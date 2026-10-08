@@ -5,7 +5,7 @@ import {
   validateDocument,
   durationTree,
   durationOverview,
-  pruneDurations,
+  fixMissingAnchors,
 } from '../dist/core.mjs';
 import { randomUUID } from 'node:crypto';
 import { indexedNodes } from './tree.mjs';
@@ -77,7 +77,7 @@ export class PostgresStore {
           timeline.allow_private_forks),
     };
   }
-  async replace(client, id, document) {
+  async replace(client, id, document, { touch = true } = {}) {
     document = validateDocument(document);
     if (document.comparison) {
       const parent = (
@@ -157,7 +157,8 @@ export class PostgresStore {
       row.right = flatten(node.right);
       return ordinal;
     }
-    flatten(durationTree(document.events));
+    const times = new Map(document.events.map((e) => [e.id, e.time]));
+    flatten(durationTree(document.durations ?? [], (moment) => times.get(moment)));
     for (let offset = 0; offset < intervals.length; offset += 250) {
       const params = [];
       const tuples = intervals.slice(offset, offset + 250).map(({ ordinal, node, left, right }) => {
@@ -172,25 +173,31 @@ export class PostgresStore {
           node.band.first,
           node.band.last,
           JSON.stringify({ ...node.band, metadata: durationOverview(node.band.metadata) }),
+          JSON.stringify({
+            id: node.band.id,
+            start: node.band.start,
+            end: node.band.end,
+            metadata: node.band.metadata,
+          }),
         );
         return (
           '(' +
           Array.from(
-            { length: 9 },
+            { length: 10 },
             (_, i) =>
-              '$' + (start + i + 1) + (i >= 4 && i <= 7 ? '::mpq' : i === 8 ? '::jsonb' : ''),
+              '$' + (start + i + 1) + (i >= 4 && i <= 7 ? '::mpq' : i >= 8 ? '::jsonb' : ''),
           ).join(',') +
           ')'
         );
       });
       await client.query(
-        'INSERT INTO oc_duration_nodes(timeline_id,id,left_id,right_id,min_time,max_time,first_time,last_time,band) VALUES ' +
+        'INSERT INTO oc_duration_nodes(timeline_id,id,left_id,right_id,min_time,max_time,first_time,last_time,band,definition) VALUES ' +
           tuples.join(','),
         params,
       );
     }
     await client.query(
-      'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,tags=$8,assets=$9::jsonb,event_text=$10,comparison=$11::jsonb,storage_bytes=$12,event_generation=event_generation+CASE WHEN $13 THEN 1 ELSE 0 END,updated_at=now() WHERE id=$1',
+      'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,tags=$8,assets=$9::jsonb,event_text=$10,comparison=$11::jsonb,storage_bytes=$12,event_generation=event_generation+CASE WHEN $13 THEN 1 ELSE 0 END,updated_at=CASE WHEN $14 THEN now() ELSE updated_at END WHERE id=$1',
       [
         id,
         document.title,
@@ -205,6 +212,7 @@ export class PostgresStore {
         document.comparison ? JSON.stringify(document.comparison) : null,
         Buffer.byteLength(JSON.stringify(document)),
         additions.rows[0].added,
+        touch,
       ],
     );
   }
@@ -250,17 +258,7 @@ export class PostgresStore {
         );
       if (patch) {
         const current = await this.branchDocument(c, t);
-        const events = new Map(current.events.map((e) => [e.id, e]));
-        for (const change of patch.changes) {
-          if (change.event) events.set(change.id, change.event);
-          else events.delete(change.id);
-        }
-        document = validateDocument(
-          pruneDurations(
-            { ...patch.settings, events: [...events.values()] },
-            new Set(patch.changes.filter((c) => !c.event).map((c) => c.id)),
-          ),
-        );
+        document = validateDocument(applyPatch(current, patch));
       }
       await this.replace(c, id, document);
       await c.query('UPDATE oc_timelines SET revision=revision+1 WHERE id=$1', [id]);
@@ -380,9 +378,10 @@ export class PostgresStore {
       const { rows } = await c.query('SELECT oc_events($1,NULL,NULL,NULL,NULL,200001) AS event', [
         id,
       ]);
+      const durations = await this.durationDefinitions(c, id);
       return {
         timeline: t,
-        document: {
+        document: validateDocument({
           format: 'openchronology',
           version: 1,
           title: t.title,
@@ -393,15 +392,25 @@ export class PostgresStore {
           ...(t.assets ? { assets: t.assets } : {}),
           ...(t.comparison ? { comparison: t.comparison } : {}),
           events: rows.map((r) => r.event),
-        },
+          ...(durations.length ? { durations } : {}),
+        }),
       };
     });
+  }
+  /** Standalone duration definitions; legacy rows convert from their moments' metadata. */
+  async durationDefinitions(client, id) {
+    const { rows } = await client.query(
+      'SELECT definition FROM oc_duration_nodes WHERE timeline_id=$1 AND definition IS NOT NULL ORDER BY definition->>\'id\' COLLATE "C"',
+      [id],
+    );
+    return rows.map((r) => r.definition);
   }
   async branchDocument(client, timeline) {
     const { rows } = await client.query(
       'SELECT oc_events($1,NULL,NULL,NULL,NULL,200001) AS event',
       [timeline.id],
     );
+    const durations = await this.durationDefinitions(client, timeline.id);
     return validateDocument({
       format: 'openchronology',
       version: 1,
@@ -413,6 +422,7 @@ export class PostgresStore {
       ...(timeline.assets ? { assets: timeline.assets } : {}),
       ...(timeline.comparison ? { comparison: timeline.comparison } : {}),
       events: rows.map((r) => r.event),
+      ...(durations.length ? { durations } : {}),
     });
   }
   async query(id, userId, query) {
@@ -468,6 +478,13 @@ export class PostgresStore {
           visitedNodes: rows.at(-1)?.visited_nodes ?? 0,
         };
       }
+      if (query.kind === 'duration') {
+        const { rows } = await c.query(
+          "SELECT definition FROM oc_duration_nodes WHERE timeline_id=$1 AND band->>'id'=$2 AND definition IS NOT NULL LIMIT 1",
+          [id, query.id],
+        );
+        return { duration: rows[0]?.definition ?? null, revision: t.revision };
+      }
       if (query.id) {
         const { rows } = await c.query(
           `WITH RECURSIVE path AS (
@@ -500,9 +517,59 @@ export class PostgresStore {
   }
 }
 
+/**
+ * Durations used to live in their start moment's metadata. Rebuilding the current index
+ * from the converted document stores standalone definitions; saved history is immutable and
+ * converts when read. Returns the number of converted timelines.
+ */
+export async function convertLegacyDurations(client) {
+  const store = new PostgresStore(null);
+  const { rows } = await client.query(
+    'SELECT t.* FROM oc_timelines t WHERE EXISTS(SELECT 1 FROM oc_duration_nodes n WHERE n.timeline_id=t.id AND n.definition IS NULL)',
+  );
+  for (const timeline of rows)
+    await store.replace(client, timeline.id, await store.branchDocument(client, timeline), {
+      touch: false,
+    });
+  return rows.length;
+}
+/** Applies sparse moment and duration edits to the current saved document. */
+export function applyPatch(current, patch) {
+  const events = new Map(current.events.map((e) => [e.id, e]));
+  const lastTimes = new Map(current.events.map((e) => [e.id, e.time]));
+  for (const change of patch.changes) {
+    if (change.event) events.set(change.id, change.event);
+    else events.delete(change.id);
+  }
+  const durations = new Map((current.durations ?? []).map((d) => [d.id, d]));
+  for (const change of patch.durationChanges ?? []) {
+    if (change.duration) durations.set(change.id, change.duration);
+    else durations.delete(change.id);
+  }
+  // Durations following a deleted moment keep its last saved time.
+  const fixed = fixMissingAnchors(
+    [...durations.values()],
+    (moment) => events.has(moment),
+    (moment) => lastTimes.get(moment),
+  );
+  return {
+    ...patch.settings,
+    events: [...events.values()],
+    ...(fixed.length ? { durations: fixed } : {}),
+  };
+}
 function eventSearchText(document) {
   const text = [];
   let length = 0;
+  for (const duration of document.durations ?? [])
+    for (const key of ['title', 'description']) {
+      if (typeof duration.metadata[key] === 'string') {
+        const part = duration.metadata[key].slice(0, 4096);
+        text.push(part);
+        length += part.length;
+      }
+      if (length >= 1048576) return text.join(' ').slice(0, 1048576);
+    }
   for (const event of document.events) {
     const metadata = [
       event.metadata,

@@ -17,8 +17,11 @@ export interface PluginManifest {
   hover?: { kind: 'card' };
   summary?: { kind: 'radial' };
   notes?: { kind: 'markdown' };
+  /** Entities the plugin applies to; omitted means moments, plus durations for colors/cards. */
+  targets?: PluginTarget[];
   source?: string;
 }
+export type PluginTarget = 'moments' | 'durations';
 export interface InstalledPlugin {
   manifest: PluginManifest;
   enabled: boolean;
@@ -253,6 +256,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     'hover',
     'summary',
     'notes',
+    'targets',
     'source',
   ]);
   if (
@@ -307,6 +311,16 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     const notes = object(p.notes, ['kind']);
     if (notes.kind !== 'markdown') throw new Error('Unsupported notes component.');
     result.notes = { kind: 'markdown' };
+  }
+  if (p.targets !== undefined) {
+    if (
+      !Array.isArray(p.targets) ||
+      !p.targets.length ||
+      p.targets.some((t) => t !== 'moments' && t !== 'durations') ||
+      new Set(p.targets).size !== p.targets.length
+    )
+      throw new Error('Plugin targets are "moments" and/or "durations".');
+    result.targets = p.targets as PluginTarget[];
   }
   if (p.source !== undefined) {
     result.source = text(p.source, 16384);
@@ -409,6 +423,43 @@ export const GEOLOGICAL_AGES: PluginManifest = validatePluginManifest({
   ],
   source: 'function render(moment: string, api: PluginAPI): string { return api.none(); }',
 });
+/**
+ * Colors and hover cards apply to durations by default; stacks, shapes, sizes, icons and
+ * summary expansion are moment-only. Older saved manifests have no targets and follow this.
+ */
+export function pluginTargets(manifest: PluginManifest): PluginTarget[] {
+  return (
+    manifest.targets ??
+    (manifest.marker?.kind === 'color' || manifest.hover ? ['moments', 'durations'] : ['moments'])
+  );
+}
+const DURATION_FIELDS = new Set<PluginField['kind']>(['text', 'multiline', 'color', 'links']);
+/** The subset of each plugin that applies to duration bands and their editor. */
+export function durationPlugins(plugins: readonly InstalledPlugin[] = []): InstalledPlugin[] {
+  return plugins
+    .filter((p) => pluginTargets(p.manifest).includes('durations'))
+    .map(({ manifest, enabled }) => {
+      const { summary: _summary, marker, ...rest } = manifest;
+      return {
+        enabled,
+        manifest: {
+          ...rest,
+          // Built-in labels name moments ("Moment color"); in the duration editor say "Color".
+          fields: manifest.fields
+            .filter((f) => DURATION_FIELDS.has(f.kind))
+            .map((f) => ({
+              ...f,
+              label: f.label.replace(/^Moment (\w)/, (_, c) => c.toUpperCase()),
+            })),
+          ...(marker?.kind === 'color' ? { marker } : {}),
+        },
+      };
+    });
+}
+/** Moment rendering ignores plugins that explicitly target only durations. */
+export function momentPlugins(plugins: readonly InstalledPlugin[] = []): InstalledPlugin[] {
+  return plugins.filter((p) => pluginTargets(p.manifest).includes('moments'));
+}
 export function pluginFields(plugins: readonly InstalledPlugin[] = []): PluginField[] {
   const fields = new Map<string, PluginField>();
   for (const { manifest, enabled } of plugins)

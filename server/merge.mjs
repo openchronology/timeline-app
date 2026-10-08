@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { HttpError } from './store.mjs';
-import { validateDocument } from '../dist/core.mjs';
+import { validateDocument, fixMissingAnchors } from '../dist/core.mjs';
 function same(a, b) {
   return canonical(a) === canonical(b);
 }
@@ -18,6 +18,8 @@ function canonical(value) {
   );
 }
 export function rebaseDocument(base, proposal, upstream) {
+  // Older saved versions store durations as moment links; compare standalone definitions.
+  [base, proposal, upstream] = [base, proposal, upstream].map((d) => validateDocument(d));
   const result = { ...upstream };
   const conflicts = [];
   const merge = (a, b, c, key, fields = false) => {
@@ -47,6 +49,26 @@ export function rebaseDocument(base, proposal, upstream) {
     const event = merge(...maps.map((m) => m.get(id)), 'moment ' + id, true);
     if (event) result.events.push(event);
   }
+  const spans = [base, proposal, upstream].map(
+    (d) => new Map((d.durations ?? []).map((x) => [x.id, x])),
+  );
+  const durations = [];
+  for (const id of new Set(spans.flatMap((m) => [...m.keys()]))) {
+    const duration = merge(...spans.map((m) => m.get(id)), 'duration ' + id, true);
+    if (duration) durations.push(duration);
+  }
+  // A merged deletion pins durations that followed the moment at its last known time.
+  const merged = new Set(result.events.map((e) => e.id));
+  const lastTimes = new Map(
+    [base, upstream, proposal].flatMap((d) => d.events.map((e) => [e.id, e.time])),
+  );
+  const fixed = fixMissingAnchors(
+    durations,
+    (moment) => merged.has(moment),
+    (moment) => lastTimes.get(moment),
+  );
+  if (fixed.length) result.durations = fixed;
+  else delete result.durations;
   if (conflicts.length)
     throw Object.assign(
       new HttpError(

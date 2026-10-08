@@ -127,35 +127,75 @@ export async function checkIssues(page, restore) {
     await closed();
     await page.locator('#markers button[aria-label="Start"]').click({ force: true });
     await page.locator('#inspector').waitFor({ state: 'visible' });
-    await page.getByRole('button', { name: 'Link to end moment', exact: true }).click();
-    await page.locator('.duration-endpoints button').filter({ hasText: 'End' }).click();
-    const card = page.locator('.duration-editor');
-    await card.waitFor();
-    await card.getByLabel('Duration title', { exact: true }).fill('Linked span');
-    await page.waitForFunction(() =>
-      document.getElementById('event-edit-status').textContent.startsWith('Applied'),
-    );
-    const saved = await exported();
-    assert.equal(saved.events[0].metadata.durations[0].endId, 'end');
-    assert.equal(saved.events[0].metadata.durations[0].metadata.title, 'Linked span');
+    // Durations are standalone; this one starts at the open moment and follows "End".
+    await page.getByRole('button', { name: 'New duration starting here', exact: true }).click();
+    const durationDialog = page.locator('#duration-dialog');
+    await durationDialog.waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#duration-heading').textContent(), 'New duration');
+    await page.locator('#duration-title').fill('Linked span');
+    const endpoint = durationDialog.locator('[data-endpoint="end"]');
+    await endpoint.locator('select').selectOption('moment');
+    await endpoint.locator('.duration-moments button').filter({ hasText: 'End' }).click();
+    await endpoint.locator('.duration-anchor').filter({ hasText: 'End' }).waitFor();
+    const durationOf = async () => (await exported()).durations?.[0];
+    await page.waitForFunction(() => !document.querySelector('#duration-error').textContent);
+    let saved = await durationOf();
+    for (let i = 0; i < 20 && saved?.metadata.title !== 'Linked span'; i++) {
+      await page.waitForTimeout(100);
+      saved = await durationOf();
+    }
+    assert.deepEqual(saved.start, { moment: 'start' });
+    assert.deepEqual(saved.end, { moment: 'end' });
+    assert.equal(saved.metadata.title, 'Linked span');
+    assert.equal((await exported()).events[0].metadata.durations, undefined);
+    await durationDialog.getByRole('button', { name: 'Close duration details' }).click();
+    await durationDialog.waitFor({ state: 'hidden' });
+    // The moment lists durations that follow it.
+    await page
+      .locator('#event-durations .duration-link')
+      .filter({ hasText: 'Linked span' })
+      .waitFor();
     await closeMomentDetails(page);
-    await page.locator('.duration-band').waitFor({ state: 'visible' });
-    await page.locator('.duration-band').click();
-    await page.locator('#event-durations').waitFor({ state: 'visible' });
+    const band = page.locator('.duration-band');
+    await band.waitFor({ state: 'visible' });
+    // Hover cards apply to durations as well as moments.
+    await band.hover({ force: true });
+    await page.locator('#moment-hover-preview.open').filter({ hasText: 'Linked span' }).waitFor();
+    await band.click({ force: true });
+    await durationDialog.waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#duration-title').inputValue(), 'Linked span');
+    await durationDialog.getByRole('button', { name: 'Close duration details' }).click();
+    await durationDialog.waitFor({ state: 'hidden' });
+    // Deleting a moment pins durations that followed it; undo re-anchors them.
+    await page.locator('#markers button[aria-label="Start"]').click({ force: true });
+    await page.locator('#inspector').waitFor({ state: 'visible' });
     await page.locator('#event-delete').click();
     await page.locator('#delete-dialog').waitFor({ state: 'visible' });
-    assert.match(await page.locator('#delete-description').textContent(), /durations linked/);
+    assert.match(await page.locator('#delete-description').textContent(), /keep its current time/);
     await page.locator('#delete-cancel').click();
     await page.locator('#delete-dialog').waitFor({ state: 'hidden' });
     assert.equal((await exported()).events.length, 2);
     await page.locator('#event-delete').click();
     await page.locator('#delete-confirm').click();
     await page.locator('#inspector').waitFor({ state: 'hidden' });
-    assert.equal((await exported()).events.length, 1);
-    // Bands are removed by the next rendered frame.
-    await page.locator('.duration-band').first().waitFor({ state: 'detached' });
+    const pinned = await exported();
+    assert.equal(pinned.events.length, 1);
+    assert.equal(pinned.durations[0].start, parseTimestamp('2026-10-05T13:46:30Z').toString());
+    await band.waitFor({ state: 'visible' });
+    await page.locator('#undo-button').click();
+    assert.deepEqual((await durationOf()).start, { moment: 'start' });
+    // Deleting the duration leaves both moments.
+    await band.click({ force: true });
+    await durationDialog.waitFor({ state: 'visible' });
+    await page.locator('#duration-delete').click();
+    await page.locator('#delete-confirm').click();
+    await durationDialog.waitFor({ state: 'hidden' });
+    await band.first().waitFor({ state: 'detached' });
+    const remaining = await exported();
+    assert.equal(remaining.events.length, 2);
+    assert.equal(remaining.durations, undefined);
     console.log(
-      'PASS issue regressions: contextual calendar, exact fractions, preview selection, unobtrusive status, linked durations and deletion confirmation.',
+      'PASS issue regressions: contextual calendar, exact fractions, preview selection, unobtrusive status, standalone durations and deletion confirmation.',
     );
   } finally {
     await imported(restore);

@@ -15,7 +15,7 @@ account, persistent server fork, collaborator permission or historical revision 
 created. Once copied, the timeline uses its complete local rational map rather
 than fetching viewport windows or subscribing to source changes.
 
-A copy must fit both **5,000 entries (moments and stack entries)** and **4 MiB of JSON** (including settings,
+A copy must fit both **5,000 entries (moments, stack entries and durations)** and **4 MiB of JSON** (including settings,
 plugin code and images). Oversized copies are rejected with an explicit warning;
 no content is silently truncated. The original remains viewable through the
 normal bounded server cache. Sign in for a persistent database-backed fork of a

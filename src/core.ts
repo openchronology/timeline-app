@@ -1,20 +1,25 @@
 import {
-  durationLinks,
   validateDurations,
-  pruneDurations,
+  validateDuration,
+  convertLegacyDurations,
+  fixMissingAnchors,
   durationTree,
   durationWindow,
 } from './durations.js';
-import type { DurationBand, IntervalNode } from './durations.js';
+import type { Duration, DurationBand, IntervalNode } from './durations.js';
 export {
+  anchorOf,
   durationOverview,
-  durationLinks,
   validateDurations,
-  pruneDurations,
+  validateDuration,
+  convertLegacyDurations,
+  fixMissingAnchors,
+  resolveDuration,
   durationTree,
   durationWindow,
+  MAX_DURATIONS,
 } from './durations.js';
-export type { DurationBand, DurationLink } from './durations.js';
+export type { Duration, DurationBand, DurationEndpoint } from './durations.js';
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { Rational as Q, RationalMap } from 'rational-ordered-map';
 import { validateInstalledPlugins, validateStackMetadata, imageURL } from './plugins.js';
@@ -83,6 +88,7 @@ export interface TimelineDocument {
   tags?: string[];
   assets?: Record<string, string>;
   events: PointEvent[];
+  durations?: Duration[];
 }
 export interface FrameGroup {
   first: string;
@@ -156,7 +162,7 @@ export function validateDocument(value: unknown, partial = false): TimelineDocum
   if (!Array.isArray(doc.events) || doc.events.length > 200000)
     throw new Error('Expected at most 200,000 point events.');
   const comparison = doc.comparison === undefined ? undefined : validateComparison(doc.comparison);
-  if (comparison && doc.events.length)
+  if (comparison && (doc.events.length || (Array.isArray(doc.durations) && doc.durations.length)))
     throw new Error('Saved comparisons reference sources instead of storing events.');
   const ids = new Set<string>();
   const plugins = doc.plugins === undefined ? undefined : validateInstalledPlugins(doc.plugins);
@@ -178,8 +184,12 @@ export function validateDocument(value: unknown, partial = false): TimelineDocum
     }
     return { id: e.id, time: parseTime(e.time).toString(), metadata };
   });
-  if (!partial) validateDurations(events);
-  else for (const e of events) durationLinks(e.metadata);
+  const legacy = convertLegacyDurations(events);
+  const durations = validateDurations(
+    [...(doc.durations === undefined ? [] : asArray(doc.durations)), ...legacy.durations],
+    partial ? null : ids,
+    parseTime,
+  ).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   return {
     format: 'openchronology',
     version: 1,
@@ -192,14 +202,22 @@ export function validateDocument(value: unknown, partial = false): TimelineDocum
     ...(plugins === undefined ? {} : { plugins }),
     ...(doc.tags === undefined ? {} : { tags: validateTags(doc.tags) }),
     ...(doc.assets === undefined ? {} : { assets: validateAssets(doc.assets) }),
-    events,
+    events: legacy.events,
+    ...(durations.length ? { durations } : {}),
   };
+}
+function asArray(value: unknown): unknown[] {
+  if (!Array.isArray(value)) throw new Error('Durations must be an array.');
+  return value;
 }
 export class TimelineIndex {
   readonly points = new RationalMap<readonly PointEvent[]>((bucket) => BigInt(bucket.length));
   private intervals: IntervalNode | null = null;
   private intervalDirty = true;
   readonly byId = new Map<string, PointEvent>();
+  readonly durations = new Map<string, Duration>();
+  /** Last times of deleted moments; anchored durations stay put until saved or re-anchored. */
+  protected retired = new Map<string, string>();
   title: string;
   description: string;
   presentation?: TimePresentation;
@@ -207,7 +225,6 @@ export class TimelineIndex {
   tags?: string[];
   assets?: Record<string, string>;
   constructor(document: TimelineDocument) {
-    validateDurations(document.events);
     this.tags = document.tags === undefined ? undefined : validateTags(document.tags);
     this.assets = document.assets === undefined ? undefined : validateAssets(document.assets);
     this.title = document.title;
@@ -236,17 +253,49 @@ export class TimelineIndex {
       bucket.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
       this.points.set(Q.parse(time), Object.freeze(bucket));
     }
+    for (const duration of validateDurations(document.durations, null, parseTime)) {
+      if (this.durations.has(duration.id)) throw new Error('Duration IDs must be unique.');
+      this.durations.set(duration.id, Object.freeze(duration));
+    }
+  }
+  /** Time of a moment, or of a deleted moment that unsaved anchors still follow. */
+  momentTime(id: string): string | undefined {
+    return this.byId.get(id)?.time ?? this.retired.get(id);
+  }
+  putDuration(duration: Duration): void {
+    const normalized = validateDuration(duration, parseTime);
+    this.durations.set(normalized.id, Object.freeze(normalized));
+    this.intervalDirty = true;
+  }
+  deleteDuration(id: string): boolean {
+    this.intervalDirty = true;
+    return this.durations.delete(id);
+  }
+  /** Durations whose start or end follows this moment. */
+  anchoredTo(moment: string): Duration[] {
+    return [...this.durations.values()].filter(
+      (d) =>
+        (typeof d.start !== 'string' && d.start.moment === moment) ||
+        (typeof d.end !== 'string' && d.end.moment === moment),
+    );
+  }
+  protected durationList(): Duration[] {
+    return fixMissingAnchors(
+      [...this.durations.values()],
+      (id) => this.byId.has(id),
+      (id) => this.retired.get(id),
+    ).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   }
   put(event: PointEvent): void {
-    durationLinks(event.metadata);
     this.intervalDirty = true;
+    this.retired.delete(event.id);
     const time = parseTime(event.time),
       normalized = Object.freeze({
         ...event,
         time: time.toString(),
         metadata: Object.freeze({ ...event.metadata }),
       });
-    this.delete(event.id);
+    this.remove(event.id);
     const bucket = [...(this.points.get(time) ?? []), normalized].sort((a, b) =>
       a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
     );
@@ -254,6 +303,12 @@ export class TimelineIndex {
     this.byId.set(event.id, normalized);
   }
   delete(id: string): boolean {
+    const event = this.byId.get(id);
+    if (event) this.retired.set(id, event.time);
+    return this.remove(id);
+  }
+  /** Removes a moment from the index without treating it as deleted (replacement or eviction). */
+  protected remove(id: string): boolean {
     this.intervalDirty = true;
     const event = this.byId.get(id);
     if (!event) return false;
@@ -265,7 +320,8 @@ export class TimelineIndex {
     return true;
   }
   document(): TimelineDocument {
-    return pruneDurations({
+    const durations = this.durationList();
+    return {
       format: 'openchronology',
       version: 1,
       title: this.title,
@@ -275,11 +331,12 @@ export class TimelineIndex {
       ...(this.tags === undefined ? {} : { tags: this.tags }),
       ...(this.assets === undefined ? {} : { assets: this.assets }),
       events: [...this.points].flatMap(([, bucket]) => [...bucket]),
-    });
+      ...(durations.length ? { durations } : {}),
+    };
   }
   frame(viewport: Viewport, width: number, pixels = 24): Frame {
     if (this.intervalDirty) {
-      this.intervals = durationTree(this.byId.values());
+      this.intervals = durationTree(this.durations.values(), (id) => this.momentTime(id));
       this.intervalDirty = false;
     }
     const result = this.points.overview(

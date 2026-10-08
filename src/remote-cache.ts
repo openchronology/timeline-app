@@ -3,11 +3,31 @@ import {
   Q,
   TimelineIndex,
   Viewport,
-  pruneDurations,
-  durationLinks,
+  anchorOf,
   durationOverview,
+  fixMissingAnchors,
+  resolveDuration,
 } from './core.js';
-import type { Frame, FrameGroup, PointEvent, TimelineDocument } from './core.js';
+import type {
+  Duration,
+  DurationBand,
+  Frame,
+  FrameGroup,
+  PointEvent,
+  TimelineDocument,
+} from './core.js';
+export interface MomentChange {
+  before?: PointEvent;
+  after?: PointEvent;
+}
+export interface DurationChange {
+  before?: Duration;
+  after?: Duration;
+}
+export interface SavingChanges {
+  moments: Map<string, MomentChange>;
+  durations: Map<string, DurationChange>;
+}
 
 export interface WindowQuery {
   lower: string;
@@ -97,12 +117,42 @@ export class ViewportCache {
 
 /** Inspector reads are disposable; unsaved edits and their originals are explicitly pinned. */
 export class RemoteWorkspace extends TimelineIndex {
-  readonly changes = new Map<string, { before?: PointEvent; after?: PointEvent }>();
+  readonly changes = new Map<string, MomentChange>();
+  readonly durationChanges = new Map<string, DurationChange>();
   private originals = new Map<string, PointEvent>();
+  private durationOriginals = new Map<string, Duration>();
   private replacing = false;
   private savingIds = new Set<string>();
+  private savingDurations = new Set<string>();
   constructor(document: TimelineDocument) {
-    super({ ...document, events: [] });
+    super({ ...document, events: [], durations: [] });
+  }
+  /** The saved head is on the server or disk; only loaded and edited durations live here. */
+  protected override durationList(): Duration[] {
+    return [];
+  }
+  get dirtyCount() {
+    return this.changes.size + this.durationChanges.size;
+  }
+  loadDuration(duration: Duration) {
+    if (this.durationChanges.has(duration.id)) return;
+    this.durationOriginals.set(duration.id, duration);
+    super.putDuration(duration);
+  }
+  override putDuration(duration: Duration) {
+    const before =
+      this.durationChanges.get(duration.id)?.before ?? this.durationOriginals.get(duration.id);
+    super.putDuration(duration);
+    const after = this.durations.get(duration.id);
+    if (JSON.stringify(before) === JSON.stringify(after)) this.durationChanges.delete(duration.id);
+    else this.durationChanges.set(duration.id, { before, after });
+  }
+  override deleteDuration(id: string): boolean {
+    const before = this.durationChanges.get(id)?.before ?? this.durationOriginals.get(id);
+    const deleted = super.deleteDuration(id);
+    if (before) this.durationChanges.set(id, { before });
+    else this.durationChanges.delete(id);
+    return deleted;
   }
   load(event: PointEvent) {
     if (this.changes.has(event.id)) return;
@@ -135,10 +185,11 @@ export class RemoteWorkspace extends TimelineIndex {
     }
     return deleted;
   }
-  evict(selectedId?: string) {
+  evict(selectedId?: string, openDurationId?: string) {
+    // Moments anchoring edited durations stay loaded so their bands can be placed locally.
     const endpoints = new Set(
-      [...this.changes.values()].flatMap((c) =>
-        c.after ? durationLinks(c.after.metadata).map((d) => d.endId) : [],
+      [...this.durationChanges.values()].flatMap((c) =>
+        c.after ? [anchorOf(c.after.start), anchorOf(c.after.end)].filter((a) => a !== null) : [],
       ),
     );
     for (const [id] of this.byId)
@@ -148,8 +199,13 @@ export class RemoteWorkspace extends TimelineIndex {
         !this.changes.has(id) &&
         !this.savingIds.has(id)
       ) {
-        super.delete(id);
+        super.remove(id);
         this.originals.delete(id);
+      }
+    for (const [id] of this.durations)
+      if (id !== openDurationId && !this.durationChanges.has(id) && !this.savingDurations.has(id)) {
+        super.deleteDuration(id);
+        this.durationOriginals.delete(id);
       }
     for (const [id] of this.originals)
       if (
@@ -160,36 +216,41 @@ export class RemoteWorkspace extends TimelineIndex {
       )
         this.originals.delete(id);
   }
-  beginSave() {
+  beginSave(): SavingChanges {
     this.savingIds = new Set(this.changes.keys());
-    return new Map(this.changes);
+    this.savingDurations = new Set(this.durationChanges.keys());
+    return { moments: new Map(this.changes), durations: new Map(this.durationChanges) };
   }
   endSave(selectedId?: string) {
     this.savingIds.clear();
+    this.savingDurations.clear();
     this.evict(selectedId);
   }
   patch() {
     return {
-      settings: { ...super.document(), events: undefined },
+      settings: { ...super.document(), events: undefined, durations: undefined },
       changes: [...this.changes].map(([id, change]) => ({ id, event: change.after ?? null })),
+      durationChanges: [...this.durationChanges].map(([id, change]) => ({
+        id,
+        duration: change.after ?? null,
+      })),
     };
   }
+  /** Applies unsaved edits to a complete saved document. */
   apply(document: TimelineDocument): TimelineDocument {
-    const events = new Map(document.events.map((e) => [e.id, e]));
-    for (const [id, change] of this.changes) {
-      if (change.after) events.set(id, change.after);
-      else events.delete(id);
-    }
-    return pruneDurations(
-      { ...super.document(), events: [...events.values()] },
-      new Set([...this.changes].filter(([, c]) => !c.after).map(([id]) => id)),
-    );
+    return applyChanges(document, super.document(), this.changes, this.durationChanges);
   }
-  accepted(
-    sent: ReadonlyMap<string, { before?: PointEvent; after?: PointEvent }>,
-    selectedId?: string,
-  ) {
-    for (const [id, saved] of sent) {
+  accepted(sent: SavingChanges, selectedId?: string) {
+    for (const [id, saved] of sent.durations) {
+      const desired = this.durations.get(id);
+      if (saved.after) this.durationOriginals.set(id, saved.after);
+      else this.durationOriginals.delete(id);
+      if (JSON.stringify(desired) === JSON.stringify(saved.after)) this.durationChanges.delete(id);
+      else if (desired || saved.after)
+        this.durationChanges.set(id, { before: saved.after, after: desired });
+      else this.durationChanges.delete(id);
+    }
+    for (const [id, saved] of sent.moments) {
       const desired = this.byId.get(id);
       if (saved.after) this.originals.set(id, saved.after);
       else this.originals.delete(id);
@@ -199,6 +260,37 @@ export class RemoteWorkspace extends TimelineIndex {
       else this.changes.delete(id);
     }
     this.endSave(selectedId);
+  }
+  /**
+   * Server bands reflect the saved head. Unsaved moment moves carry anchored endpoints with
+   * them, and edited durations replace their saved bands.
+   */
+  overlayDurations(bands: readonly DurationBand[]): DurationBand[] {
+    const saved = new Map(bands.map((b) => [b.id, b]));
+    const savedTime = (band: DurationBand | undefined, moment: string) =>
+      band && anchorOf(band.start) === moment
+        ? band.startTime
+        : band && anchorOf(band.end) === moment
+          ? band.endTime
+          : undefined;
+    const result: DurationBand[] = [];
+    for (const band of bands) {
+      if (this.durationChanges.has(band.id)) continue;
+      const moved = resolveDuration(
+        band,
+        (moment) => this.changes.get(moment)?.after?.time ?? savedTime(band, moment),
+      );
+      result.push(moved ? { ...moved, sourceKey: band.sourceKey } : band);
+    }
+    for (const [id, { after }] of this.durationChanges)
+      if (after) {
+        const band = resolveDuration(
+          after,
+          (moment) => this.momentTime(moment) ?? savedTime(saved.get(id), moment),
+        );
+        if (band) result.push(band);
+      }
+    return result;
   }
   overlay(frame: Frame, view: Viewport, threshold: Q): Frame {
     const groups: FrameGroup[] = [];
@@ -238,44 +330,7 @@ export class RemoteWorkspace extends TimelineIndex {
           title: after.metadata.title,
           metadata: after.metadata,
         });
-    const changedStarts = new Set([...this.changes].filter(([, c]) => c.after).map(([id]) => id));
-    const durations = (frame.durations ?? [])
-      .filter(
-        (b) =>
-          !changedStarts.has(b.startId) &&
-          (!this.changes.has(b.startId) || !!this.changes.get(b.startId)?.after) &&
-          (!this.changes.has(b.endId) || !!this.changes.get(b.endId)?.after),
-      )
-      .map((b) => {
-        const endTime = this.changes.get(b.endId)?.after?.time ?? b.endTime;
-        const a = Q.parse(b.startTime),
-          z = Q.parse(endTime);
-        return {
-          ...b,
-          endTime,
-          first: (a.compare(z) <= 0 ? a : z).toString(),
-          last: (a.compare(z) <= 0 ? z : a).toString(),
-        };
-      });
-    for (const [startId, { after }] of this.changes)
-      if (after)
-        for (const link of durationLinks(after.metadata)) {
-          const existing = frame.durations?.find((b) => b.id === link.id);
-          const endpoint = this.byId.get(link.endId);
-          const endTime = endpoint?.time ?? existing?.endTime;
-          if (!endTime || (this.changes.has(link.endId) && !this.changes.get(link.endId)?.after))
-            continue;
-          const a = Q.parse(after.time),
-            z = Q.parse(endTime);
-          durations.push({
-            ...link,
-            startId,
-            startTime: after.time,
-            endTime,
-            first: (a.compare(z) <= 0 ? a : z).toString(),
-            last: (a.compare(z) <= 0 ? z : a).toString(),
-          });
-        }
+    const durations = this.overlayDurations(frame.durations ?? []);
     const visibleDurations = durations
       .filter(
         (b) => Q.parse(b.last).compare(view.left) >= 0 && Q.parse(b.first).compare(view.right) <= 0,
@@ -291,6 +346,43 @@ export class RemoteWorkspace extends TimelineIndex {
       threshold,
     );
   }
+}
+export interface PendingPatch {
+  changes: { id: string; event: PointEvent | null }[];
+  durationChanges?: { id: string; duration: Duration | null }[];
+}
+/**
+ * Applies moment and duration changes to a complete saved document. Anchors to deleted
+ * moments become fixed at those moments' saved times.
+ */
+export function applyChanges(
+  saved: TimelineDocument,
+  settings: TimelineDocument,
+  moments: ReadonlyMap<string, MomentChange>,
+  durationEdits: ReadonlyMap<string, DurationChange>,
+): TimelineDocument {
+  const events = new Map(saved.events.map((e) => [e.id, e]));
+  const lastTimes = new Map(saved.events.map((e) => [e.id, e.time]));
+  for (const [id, change] of moments) {
+    if (change.before) lastTimes.set(id, change.before.time);
+    if (change.after) events.set(id, change.after);
+    else events.delete(id);
+  }
+  const durations = new Map((saved.durations ?? []).map((d) => [d.id, d]));
+  for (const [id, change] of durationEdits) {
+    if (change.after) durations.set(id, change.after);
+    else durations.delete(id);
+  }
+  const fixed = fixMissingAnchors(
+    [...durations.values()],
+    (id) => events.has(id),
+    (id) => lastTimes.get(id),
+  );
+  return {
+    ...settings,
+    events: [...events.values()],
+    ...(fixed.length ? { durations: fixed } : { durations: undefined }),
+  };
 }
 /** Coarsen server summaries without reconstructing any concealed moments. */
 export function regroup(frame: Frame, threshold: Q): Frame {

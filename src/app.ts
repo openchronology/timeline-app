@@ -1,4 +1,3 @@
-import { durationLinks, pruneDurations } from './durations.js';
 import { calendarPicker } from './calendar-picker.js';
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { followLatest } from './follow-latest.js';
@@ -47,8 +46,15 @@ import {
   DEFAULT_PRESENTATION,
   UNIT_PRESETS,
   CUSTOM_EXAMPLE,
+  anchorOf,
+  resolveDuration,
+  validateDuration,
+  durationPlugins,
+  momentPlugins,
 } from './core.js';
 import type {
+  Duration,
+  DurationEndpoint,
   Frame,
   FrameGroup,
   PointEvent,
@@ -59,7 +65,7 @@ import type {
   InstalledPlugin,
   PluginManifest,
 } from './core.js';
-import { ViewportCache, RemoteWorkspace, regroup } from './remote-cache.js';
+import { ViewportCache, RemoteWorkspace, regroup, applyChanges } from './remote-cache.js';
 import { requestApi, importSqlite, exportSqlite } from './transport.js';
 declare const __OFFLINE_HTML__: boolean;
 const offlineHtml = typeof __OFFLINE_HTML__ !== 'undefined' && __OFFLINE_HTML__;
@@ -384,8 +390,9 @@ function clearGroupPage() {
   text('group-page-status', '');
 }
 type EventEdit = { before?: PointEvent; after?: PointEvent };
-let history: EventEdit[] = [],
-  future: EventEdit[] = [],
+type HistoryEntry = EventEdit | DurationEdit;
+let history: HistoryEntry[] = [],
+  future: HistoryEntry[] = [],
   frameRequest = 0,
   frameTimer: ReturnType<typeof setTimeout>,
   draftTimer: ReturnType<typeof setTimeout>;
@@ -471,6 +478,7 @@ async function completeDocument(): Promise<TimelineDocument> {
   const workspace = documentRequest,
     index = sparseWorkspace();
   const changes = index ? new Map(index.changes) : undefined;
+  const durationChanges = index ? new Map(index.durationChanges) : undefined;
   const settings = index?.document();
   const savedId = remote?.head_revision_id;
   const snapshot = local
@@ -483,16 +491,9 @@ async function completeDocument(): Promise<TimelineDocument> {
       ? await api<{ document: TimelineDocument }>(`timelines/${remote!.id}/history/${savedId}`)
       : await api<{ document: TimelineDocument }>(`timelines/${remote!.id}/document`);
   if (workspace !== documentRequest) throw new Error('The open timeline changed.');
-  if (!changes || !settings) return snapshot.document;
-  const events = new Map(snapshot.document.events.map((e) => [e.id, e]));
-  for (const [id, change] of changes) {
-    if (change.after) events.set(id, change.after);
-    else events.delete(id);
-  }
-  return pruneDurations(
-    { ...settings, events: [...events.values()] },
-    new Set([...changes].filter(([, c]) => !c.after).map(([id]) => id)),
-  );
+  // Saved snapshots may predate standalone durations; validation converts legacy links.
+  if (!changes || !settings) return validateDocument(snapshot.document);
+  return applyChanges(validateDocument(snapshot.document), settings, changes, durationChanges!);
 }
 let pendingFrameRefresh = false;
 function requestRender(refreshFrame = true) {
@@ -999,7 +1000,7 @@ function render(refreshFrame = true) {
     frame =
       sparseWorkspace()?.overlay(base, viewport, displayThreshold) ??
       regroup(base, displayThreshold);
-    sparseWorkspace()?.evict(selected?.id);
+    sparseWorkspace()?.evict(selected?.id, openDuration?.duration.id);
     drawFrame();
     if (!refreshFrame || cached) {
       if (cached) {
@@ -1166,7 +1167,7 @@ function currentComparisonSource(): ComparisonSource | null {
     key: remoteId ?? 'local-sqlite',
     revision: remoteId ? source.revision : undefined,
     event_generation: remote?.event_generation,
-    working: !!workspace?.changes.size || dirty,
+    working: !!workspace?.dirtyCount || dirty,
     title: settings?.title ?? remote?.title ?? 'Local timeline',
     presentation: settings?.presentation ?? remote?.presentation,
     plugins: settings?.plugins ?? remote?.plugins,
@@ -1483,6 +1484,7 @@ function heading() {
   star.textContent = `${remote?.starred ? '★ Starred' : '☆ Star'} · ${remote?.star_count ?? '0'}`;
 
   el('add-button').hidden = !editable();
+  el('add-duration-button').hidden = !editable();
   el<HTMLButtonElement>('undo-button').disabled = !history.length;
   el<HTMLButtonElement>('redo-button').disabled = !future.length;
   text(
@@ -1545,6 +1547,9 @@ async function retainForSignIn() {
         {
           document: model!.document(),
           sparse: sparseWorkspace() ? [...sparseWorkspace()!.changes.values()] : undefined,
+          sparseDurations: sparseWorkspace()
+            ? [...sparseWorkspace()!.durationChanges.values()]
+            : undefined,
           remote: remote
             ? {
                 id: remote.id,
@@ -1577,6 +1582,7 @@ async function restoreAfterSignIn() {
           document: TimelineDocument;
           remote: { id: string; revision: string; head_revision_id?: string } | null;
           sparse?: { before?: PointEvent; after?: PointEvent }[];
+          sparseDurations?: { before?: Duration; after?: Duration }[];
           proposal?: { id: string; revision: string } | null;
           dirty: boolean;
         }
@@ -1607,6 +1613,11 @@ async function restoreAfterSignIn() {
             if (change.before) index.load(change.before);
             if (change.after) index.put(change.after);
             else if (change.before) index.delete(change.before.id);
+          }
+          for (const change of saved.sparseDurations ?? []) {
+            if (change.before) index.loadDuration(change.before);
+            if (change.after) index.putDuration(change.after);
+            else if (change.before) index.deleteDuration(change.before.id);
           }
           model = index;
         }
@@ -1961,8 +1972,9 @@ function installedPlugins(): InstalledPlugin[] {
   if (comparison) return comparison.plugins;
   return model ? (model.plugins ?? []) : (remote?.plugins ?? []);
 }
+/** Plugins that render moments; duration-only plugins apply through durationPlugins. */
 function activePlugins(): InstalledPlugin[] {
-  return installedPlugins();
+  return momentPlugins(installedPlugins());
 }
 let detachRichNotes: (() => void) | undefined;
 function refreshPluginFields() {
@@ -3285,20 +3297,31 @@ function readEventTime() {
 }
 
 /** Gregorian time fields open a calendar dialog; its text field keeps typed entry available. */
-type TimeField = 'event-time' | 'left-bound' | 'right-bound';
-const timeFields: TimeField[] = ['event-time', 'left-bound', 'right-bound'];
-let timeDraft: { field: TimeField; time: Q; text: string } | null = null;
+interface TimeFieldSpec {
+  heading: string;
+  /** False leaves the field as plain text, e.g. for read-only timelines. */
+  editable: () => boolean;
+  read: () => Q;
+  /** Starting point when the field's text does not parse. */
+  fallback: () => Q;
+  /** Throws to keep the dialog open with an explanation. */
+  apply: (time: Q) => void;
+  /** Bounds are rewritten by rendering only when unfocused. */
+  blurAfter?: boolean;
+}
+let timeDraft: { field: HTMLInputElement; spec: TimeFieldSpec; time: Q; text: string } | null =
+  null;
 function calendarPresentation() {
   const presentation = model?.presentation ?? remote?.presentation;
   return presentation?.mode === 'gregorian' && !comparison ? presentation : undefined;
 }
-function fieldTime(field: TimeField): Q {
-  if (field === 'event-time') return readEventTime();
-  const value = input(field).value,
-    displayed = displayedBounds.get(field);
-  return displayed?.text === value
-    ? displayed.time
-    : timelinePresenter().parse(value, viewContext('input'));
+function parseInputTime(value: string) {
+  return timelinePresenter().parse(value, viewContext('input'));
+}
+function boundTime(id: 'left-bound' | 'right-bound') {
+  const value = input(id).value,
+    displayed = displayedBounds.get(id);
+  return displayed?.text === value ? displayed.time : parseInputTime(value);
 }
 function showTimeDraft(time: Q, refreshPicker: boolean) {
   const presentation = calendarPresentation();
@@ -3314,50 +3337,68 @@ function showTimeDraft(time: Q, refreshPicker: boolean) {
   }
   text('datetime-error', '');
 }
-function openTimeDialog(field: TimeField) {
-  if (!calendarPresentation() || input(field).disabled || input(field).readOnly) return false;
-  if (field === 'event-time' && !editable()) return false;
+function openTimeDialog(field: HTMLInputElement, spec: TimeFieldSpec) {
+  if (!calendarPresentation() || field.disabled || field.readOnly || !spec.editable()) return false;
   let time: Q;
   try {
-    time = fieldTime(field);
+    time = spec.read();
   } catch {
     // Unparseable text starts from the nearest meaningful time instead of blocking the picker.
-    time =
-      field === 'left-bound'
-        ? viewport.left
-        : field === 'right-bound'
-          ? viewport.right
-          : (selectedTime ?? viewport.left.add(viewport.span.div(Q.from(2n))));
+    time = spec.fallback();
   }
-  timeDraft = { field, time, text: '' };
-  text(
-    'datetime-heading',
-    field === 'event-time'
-      ? 'Moment date and time'
-      : field === 'left-bound'
-        ? 'Left bound date and time'
-        : 'Right bound date and time',
-  );
+  timeDraft = { field, spec, time, text: '' };
+  text('datetime-heading', spec.heading);
   showTimeDraft(time, true);
   el<HTMLDialogElement>('datetime-dialog').showModal();
   return true;
 }
-for (const field of timeFields) {
-  input(field).setAttribute('aria-haspopup', 'dialog');
-  input(field).addEventListener('click', () => {
-    if (openTimeDialog(field)) input(field).blur();
+function attachTimeDialog(field: HTMLInputElement, spec: TimeFieldSpec) {
+  field.setAttribute('aria-haspopup', 'dialog');
+  field.addEventListener('click', () => {
+    if (openTimeDialog(field, spec)) field.blur();
   });
-  input(field).addEventListener('keydown', (event) => {
+  field.addEventListener('keydown', (event) => {
     // Alt+Down is the conventional key for opening a field's picker; plain typing still edits.
-    if (event.altKey && event.key === 'ArrowDown' && openTimeDialog(field)) event.preventDefault();
+    if (event.altKey && event.key === 'ArrowDown' && openTimeDialog(field, spec))
+      event.preventDefault();
   });
 }
+const viewMiddle = () => viewport.left.add(viewport.span.div(Q.from(2n)));
+attachTimeDialog(input('event-time'), {
+  heading: 'Moment date and time',
+  editable: () => editable(),
+  read: readEventTime,
+  fallback: () => selectedTime ?? viewMiddle(),
+  apply: (time) => {
+    setEventTime(time);
+    selectedTime = time;
+    text('event-error', '');
+    queueEventEdit();
+  },
+});
+for (const id of ['left-bound', 'right-bound'] as const)
+  attachTimeDialog(input(id), {
+    heading: id === 'left-bound' ? 'Left bound date and time' : 'Right bound date and time',
+    editable: () => true,
+    read: () => boundTime(id),
+    fallback: () => (id === 'left-bound' ? viewport.left : viewport.right),
+    blurAfter: true,
+    apply: (time) => {
+      const left = id === 'left-bound' ? time : viewport.left,
+        right = id === 'right-bound' ? time : viewport.right;
+      if (right.compare(left) <= 0)
+        throw new Error('The left bound must be earlier than the right bound.');
+      follow.navigation();
+      cancelZoomAnimation();
+      viewport = new Viewport(left, right.sub(left));
+    },
+  });
 input('datetime-text').oninput = () => {
   if (!timeDraft) return;
   try {
     const value = input('datetime-text').value;
     if (value === timeDraft.text) return;
-    const time = timelinePresenter().parse(value, viewContext('input'));
+    const time = parseInputTime(value);
     timeDraft.text = value;
     showTimeDraft(time, true);
   } catch {
@@ -3370,22 +3411,7 @@ el<HTMLFormElement>('datetime-form').onsubmit = (event) => {
   if (!draft) return;
   try {
     const value = input('datetime-text').value;
-    const time =
-      value === draft.text ? draft.time : timelinePresenter().parse(value, viewContext('input'));
-    if (draft.field === 'event-time') {
-      setEventTime(time);
-      selectedTime = time;
-      text('event-error', '');
-      queueEventEdit();
-    } else {
-      const left = draft.field === 'left-bound' ? time : viewport.left,
-        right = draft.field === 'right-bound' ? time : viewport.right;
-      if (right.compare(left) <= 0)
-        throw new Error('The left bound must be earlier than the right bound.');
-      follow.navigation();
-      cancelZoomAnimation();
-      viewport = new Viewport(left, right.sub(left));
-    }
+    draft.spec.apply(value === draft.text ? draft.time : parseInputTime(value));
     el<HTMLDialogElement>('datetime-dialog').close();
     requestRender();
   } catch (error) {
@@ -3395,11 +3421,11 @@ el<HTMLFormElement>('datetime-form').onsubmit = (event) => {
 el<HTMLDialogElement>('datetime-dialog').addEventListener('close', () => {
   // The close event is queued; a dialog reopened for another field keeps its new draft.
   if (el<HTMLDialogElement>('datetime-dialog').open) return;
-  const field = timeDraft?.field;
+  const draft = timeDraft;
   timeDraft = null;
   // Focus returns to the field, and focused bounds are not rewritten; show the applied bound.
-  if (field && field !== 'event-time') {
-    input(field).blur();
+  if (draft?.spec.blurAfter) {
+    draft.field.blur();
     requestRender();
   }
 });
@@ -3613,7 +3639,7 @@ function requestDelete(point: PointEvent) {
   text('delete-confirm', 'Delete event');
   text(
     'delete-description',
-    `Delete “${point.metadata.title || 'Untitled event'}” at ${presented(Q.parse(point.time), 'input')}? Any durations linked to this endpoint will also be removed. You can undo this deletion.`,
+    `Delete “${point.metadata.title || 'Untitled event'}” at ${presented(Q.parse(point.time), 'input')}? Durations that follow it keep its current time as a fixed endpoint. You can undo this deletion.`,
   );
   el<HTMLDialogElement>('delete-dialog').showModal();
   el('delete-cancel').focus();
@@ -3652,7 +3678,7 @@ el('delete-confirm').onclick = () => {
   changed();
 };
 /** Records a new edit; any redoable edits branch away and are discarded. */
-function record(edit: EventEdit) {
+function record(edit: HistoryEntry) {
   history.push(edit);
   future = [];
 }
@@ -3666,11 +3692,20 @@ function applyEdit(redo: boolean) {
   clearTimeout(eventEditTimer);
   pendingEventEdit = false;
   eventEditHistory = null;
+  flushDurationEdit();
+  if (openDuration) openDuration.edit = null;
   const edit = (redo ? future : history).pop();
   if (!edit || !model) return;
-  const [from, to] = redo ? [edit.before, edit.after] : [edit.after, edit.before];
-  if (from) model.delete(from.id);
-  if (to) model.put(to);
+  if ('duration' in edit) {
+    const [from, to] = redo ? [edit.before, edit.after] : [edit.after, edit.before];
+    if (to) model.putDuration(to);
+    else if (from) model.deleteDuration(from.id);
+    el<HTMLDialogElement>('duration-dialog').close();
+  } else {
+    const [from, to] = redo ? [edit.before, edit.after] : [edit.after, edit.before];
+    if (from) model.delete(from.id);
+    if (to) model.put(to);
+  }
   (redo ? history : future).push(edit);
   selected = null;
   selectedGroup = null;
@@ -4735,162 +4770,419 @@ void (async () => {
   await route();
 })().catch(fail);
 
+/** Durations anchored to the open moment, with a shortcut to start a new one there. */
 function refreshDurations() {
   const host = el('event-durations');
   host.replaceChildren();
   const heading = document.createElement('h3');
   heading.textContent = 'Durations';
   host.append(heading);
-  const metadata = JSON.parse(el<HTMLTextAreaElement>('event-metadata').value);
-  const links = durationLinks(metadata);
-  const write = () => {
-    const current = JSON.parse(el<HTMLTextAreaElement>('event-metadata').value);
-    current.durations = links;
-    el<HTMLTextAreaElement>('event-metadata').value = JSON.stringify(current, null, 2);
-    queueEventEdit();
-  };
-  for (const link of links) {
-    const card = document.createElement('div');
-    card.className = 'duration-editor';
-    card.dataset.durationId = link.id;
-    const endpoint = document.createElement('p');
-    endpoint.textContent = 'End moment: ' + link.endId;
-    card.append(endpoint);
-    for (const [field, labelText] of [
-      ['title', 'Duration title'],
-      ['description', 'Duration notes'],
-    ] as const) {
-      const label = document.createElement('label');
-      label.textContent = labelText;
-      const control =
-        field === 'title' ? document.createElement('input') : document.createElement('textarea');
-      control.value = link.metadata[field] ?? '';
-      control.disabled = !editable();
-      control.oninput = () => {
-        link.metadata[field] = control.value;
-        write();
-      };
-      label.append(control);
-      card.append(label);
+  const moment = selected;
+  if (moment) {
+    const anchored = new Map<string, Duration>();
+    for (const band of frame.durations ?? [])
+      if (!band.sourceKey && [anchorOf(band.start), anchorOf(band.end)].includes(moment.id))
+        anchored.set(band.id, band);
+    for (const duration of model?.anchoredTo(moment.id) ?? []) anchored.set(duration.id, duration);
+    for (const duration of anchored.values()) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'duration-link';
+      button.textContent = durationLabel(duration);
+      button.onclick = () => void openDurationById(duration.id).catch(fail);
+      host.append(button);
     }
-    if (editable()) {
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'button-danger';
-      remove.textContent = 'Delete duration';
-      remove.onclick = () => {
-        pendingDelete = {
-          id: link.id,
-          document: documentRequest,
-          remove: () => {
-            links.splice(links.indexOf(link), 1);
-            write();
-            flushEventEdit();
-            refreshDurations();
-          },
-        };
-        text('delete-heading', 'Delete duration?');
-        text('delete-confirm', 'Delete duration');
-        text('delete-description', 'Delete this duration? Its endpoint moments will remain.');
-        el<HTMLDialogElement>('delete-dialog').showModal();
-      };
-      card.append(remove);
+    if (!anchored.size) {
+      const none = document.createElement('p');
+      none.className = 'field-hint';
+      none.textContent = 'No visible durations start or end at this moment.';
+      host.append(none);
     }
-    host.append(card);
   }
-  if (!editable() || comparison) return;
+  if (!editable() || !moment) return;
   const add = document.createElement('button');
   add.type = 'button';
-  add.textContent = 'Link to end moment';
-  add.disabled = !selected;
-  const list = document.createElement('div');
-  list.className = 'duration-endpoints';
-  let cursor: { time: string; id: string } | null = null,
-    generation = selectionRequest;
-  const next = document.createElement('button');
-  next.type = 'button';
-  next.textContent = 'Next 25 moments';
-  const load = async () => {
-    if (!selected) return;
-    add.disabled = next.disabled = true;
+  add.textContent = 'New duration starting here';
+  add.onclick = () => {
+    flushEventEdit();
+    const start = Q.parse(moment.time);
+    createDuration({ moment: moment.id }, start.add(viewport.span.div(Q.from(8n))).toString());
+  };
+  host.append(add);
+}
+function durationLabel(duration: Duration) {
+  const band =
+    frame.durations?.find((b) => b.id === duration.id) ??
+    (model ? resolveDuration(duration, (id) => model!.momentTime(id)) : null);
+  return (
+    (duration.metadata.title || 'Unnamed duration') +
+    (band ? ` · ${presented(Q.parse(band.first))} → ${presented(Q.parse(band.last))}` : '')
+  );
+}
+
+type DurationEdit = { duration: true; before?: Duration; after?: Duration };
+let openDuration: { duration: Duration; readOnly: boolean; edit: DurationEdit | null } | null =
+  null;
+let durationTimer: ReturnType<typeof setTimeout> | undefined;
+const durationEditable = () => editable() && !!openDuration && !openDuration.readOnly;
+function createDuration(start: DurationEndpoint, end: DurationEndpoint) {
+  if (!editable() || !model) return;
+  const duration: Duration = { id: eventId(), start, end, metadata: { title: '' } };
+  record({ duration: true, after: duration });
+  model.putDuration(duration);
+  changed();
+  showDuration(duration, false, { duration: true, after: duration });
+}
+/** Full metadata is local for complete timelines and fetched for indexed ones. */
+async function openDurationById(id: string) {
+  const band = frame.durations?.find((b) => b.id === id);
+  if (band?.sourceKey) return showDuration(band, true);
+  let duration = model?.durations.get(id);
+  if (!duration && sparseWorkspace()) {
+    const result = await timelineQuery<{ duration: Duration | null }>({
+      kind: 'duration',
+      id,
+      revision: (local ?? remote)!.revision,
+    });
+    if (!result.duration) throw new Error('This duration is no longer available.');
+    sparseWorkspace()!.loadDuration(result.duration);
+    duration = sparseWorkspace()!.durations.get(id);
+  }
+  if (!duration) throw new Error('This duration is no longer available.');
+  showDuration(duration, !editable());
+}
+function showDuration(duration: Duration, readOnly: boolean, edit: DurationEdit | null = null) {
+  flushDurationEdit();
+  openDuration = { duration, readOnly, edit };
+  text('duration-heading', edit && !edit.before ? 'New duration' : 'Duration');
+  input('duration-title').value = duration.metadata.title ?? '';
+  el<HTMLTextAreaElement>('duration-description').value = duration.metadata.description ?? '';
+  const rest = { ...duration.metadata };
+  delete rest.title;
+  delete rest.description;
+  el<HTMLTextAreaElement>('duration-metadata').value = JSON.stringify(rest, null, 2);
+  for (const id of ['duration-title', 'duration-description', 'duration-metadata'])
+    (el(id) as HTMLInputElement).disabled = readOnly;
+  el('duration-delete').hidden = readOnly;
+  text('duration-error', '');
+  renderDurationEndpoints();
+  renderDurationPluginFields();
+  const dialog = el<HTMLDialogElement>('duration-dialog');
+  if (!dialog.open) dialog.showModal();
+}
+/** Reads the form into a duration; throws with a user-facing message when incomplete. */
+function durationFromForm(): Duration {
+  const current = openDuration!.duration;
+  const metadata = JSON.parse(el<HTMLTextAreaElement>('duration-metadata').value);
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata))
+    throw new Error('Additional metadata must be a JSON object.');
+  return validateDuration(
+    {
+      ...current,
+      metadata: {
+        ...metadata,
+        title: input('duration-title').value,
+        description: el<HTMLTextAreaElement>('duration-description').value,
+      },
+    },
+    parseTime,
+  );
+}
+function applyDuration(next: Duration) {
+  if (!openDuration || !model || !durationEditable()) return;
+  if (JSON.stringify(next) === JSON.stringify(openDuration.duration)) return;
+  // One dialog session is one undo step.
+  if (!openDuration.edit) {
+    openDuration.edit = { duration: true, before: openDuration.duration, after: next };
+    record(openDuration.edit);
+  } else openDuration.edit.after = next;
+  model.putDuration(next);
+  openDuration.duration = next;
+  text('duration-error', '');
+  changed();
+}
+function flushDurationEdit() {
+  clearTimeout(durationTimer);
+  durationTimer = undefined;
+  if (!openDuration || !durationEditable()) return;
+  try {
+    applyDuration(durationFromForm());
+  } catch (error) {
+    text('duration-error', error instanceof Error ? error.message : String(error));
+  }
+}
+function queueDurationEdit() {
+  clearTimeout(durationTimer);
+  durationTimer = setTimeout(flushDurationEdit, 250);
+}
+el('duration-form').addEventListener('input', (event) => {
+  if (!(event.target as HTMLElement).closest('#duration-endpoints')) queueDurationEdit();
+});
+el('duration-form').addEventListener('submit', (event) => event.preventDefault());
+el<HTMLDialogElement>('duration-dialog').addEventListener('close', () => {
+  if (el<HTMLDialogElement>('duration-dialog').open) return;
+  flushDurationEdit();
+  openDuration = null;
+  if (selected && !el('event-form').hidden) refreshDurations();
+});
+el('duration-delete').onclick = () => {
+  const current = openDuration;
+  if (!current || !durationEditable()) return;
+  flushDurationEdit();
+  pendingDelete = {
+    id: current.duration.id,
+    document: documentRequest,
+    remove: () => {
+      const duration = model?.durations.get(current.duration.id) ?? current.duration;
+      record({ duration: true, before: duration });
+      model?.deleteDuration(duration.id);
+      openDuration = null;
+      el<HTMLDialogElement>('delete-dialog').close();
+      el<HTMLDialogElement>('duration-dialog').close();
+      changed();
+    },
+  };
+  text('delete-heading', 'Delete duration?');
+  text('delete-confirm', 'Delete duration');
+  text(
+    'delete-description',
+    `Delete “${current.duration.metadata.title || 'Unnamed duration'}”? Moments it follows are not affected. You can undo this deletion.`,
+  );
+  el<HTMLDialogElement>('delete-dialog').showModal();
+  el('delete-cancel').focus();
+};
+function renderDurationPluginFields() {
+  const current = openDuration;
+  if (!current) return;
+  renderPluginFields(
+    el('plugin-duration-fields'),
+    durationPlugins(installedPlugins()),
+    current.duration.metadata,
+    durationEditable(),
+    (key, value) => {
+      try {
+        const metadata = JSON.parse(el<HTMLTextAreaElement>('duration-metadata').value);
+        if (value) metadata[key] = value;
+        else delete metadata[key];
+        el<HTMLTextAreaElement>('duration-metadata').value = JSON.stringify(metadata, null, 2);
+        flushDurationEdit();
+      } catch (error) {
+        text('duration-error', error instanceof Error ? error.message : String(error));
+      }
+    },
+    (event, url) => {
+      event.preventDefault();
+      window.open(url, '_blank', 'noopener,noreferrer');
+    },
+    (title, remove) => remove(),
+  );
+}
+/** Time an endpoint resolves to, from loaded moments or the saved band. */
+function endpointTime(duration: Duration, which: 'start' | 'end'): Q | null {
+  const endpoint = duration[which];
+  if (typeof endpoint === 'string') return Q.parse(endpoint);
+  const time = model?.momentTime(endpoint.moment);
+  if (time) return Q.parse(time);
+  const band = frame.durations?.find((b) => b.id === duration.id);
+  return band ? Q.parse(which === 'start' ? band.startTime : band.endTime) : null;
+}
+function renderDurationEndpoints() {
+  const host = el('duration-endpoints');
+  host.replaceChildren();
+  for (const which of ['start', 'end'] as const) host.append(endpointEditor(which));
+}
+function endpointEditor(which: 'start' | 'end') {
+  const current = openDuration!;
+  const endpoint = current.duration[which];
+  const box = document.createElement('fieldset');
+  box.className = 'duration-endpoint';
+  box.dataset.endpoint = which;
+  const legend = document.createElement('legend');
+  legend.textContent = which === 'start' ? 'Start' : 'End';
+  const mode = document.createElement('select');
+  mode.setAttribute('aria-label', `${legend.textContent} kind`);
+  for (const [value, label] of [
+    ['time', 'Fixed time'],
+    ['moment', 'Follows a moment'],
+  ]) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    mode.append(option);
+  }
+  mode.value = typeof endpoint === 'string' ? 'time' : 'moment';
+  mode.disabled = !durationEditable();
+  box.append(legend, mode);
+  const setEndpoint = (next: DurationEndpoint) => {
+    flushDurationEdit();
     try {
-      const startId = selected.id;
-      let page: { events: PointEvent[]; next: { time: string; id: string } | null };
-      if (!sparseWorkspace() && model)
-        page = await groupPage(
-          {
-            first: model.points.minKey()!.toString(),
-            last: model.points.maxKey()!.toString(),
-            count: '0',
-            distinct: 0,
-          },
-          cursor,
-        );
-      else
-        page = await timelineQuery({
-          kind: 'events',
-          lower: local?.first ?? null,
-          upper: local?.last ?? null,
-          limit: 25,
-          after: cursor,
-          revision: (local ?? remote)!.revision,
-        });
-      if (generation !== selectionRequest || !host.isConnected || selected?.id !== startId) return;
-      list.replaceChildren();
-      for (const endpoint of page.events)
-        if (endpoint.id !== startId) {
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.textContent =
-            (endpoint.metadata.title || 'Unnamed moment') +
-            ' · ' +
-            presented(Q.parse(endpoint.time), 'event');
-          button.onclick = () => {
-            sparseWorkspace()?.load(endpoint);
-            links.push({
-              id: eventId(),
-              endId: endpoint.id,
-              metadata: { title: '', description: '' },
+      applyDuration(validateDuration({ ...openDuration!.duration, [which]: next }, parseTime));
+      renderDurationEndpoints();
+    } catch (error) {
+      text('duration-error', error instanceof Error ? error.message : String(error));
+    }
+  };
+  if (typeof endpoint === 'string') {
+    const field = document.createElement('input');
+    field.className = 'duration-time';
+    field.spellcheck = false;
+    field.setAttribute('aria-label', `${legend.textContent} time`);
+    const shown = presented(Q.parse(endpoint), 'input');
+    field.value = shown;
+    field.disabled = !durationEditable();
+    const read = () => (field.value === shown ? Q.parse(endpoint) : parseInputTime(field.value));
+    field.onchange = () => {
+      try {
+        setEndpoint(read().toString());
+      } catch (error) {
+        text('duration-error', error instanceof Error ? error.message : String(error));
+      }
+    };
+    attachTimeDialog(field, {
+      heading: `Duration ${which} date and time`,
+      editable: durationEditable,
+      read,
+      fallback: () => viewMiddle(),
+      apply: (time) => setEndpoint(time.toString()),
+    });
+    box.append(field);
+  } else {
+    const anchored = model?.byId.get(endpoint.moment);
+    const time = endpointTime(current.duration, which);
+    const summary = document.createElement('p');
+    summary.className = 'duration-anchor';
+    summary.textContent =
+      (anchored?.metadata.title || (anchored ? 'Unnamed moment' : 'Moment ' + endpoint.moment)) +
+      (time ? ' · ' + presented(time) : '');
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.textContent = 'Open moment';
+    open.disabled = !time;
+    open.onclick = () => {
+      if (!time) return;
+      el<HTMLDialogElement>('duration-dialog').close();
+      void selectGroup({
+        id: endpoint.moment,
+        first: time.toString(),
+        last: time.toString(),
+        count: '1',
+        distinct: 1,
+      }).catch(fail);
+    };
+    box.append(summary, open);
+  }
+  const chooser = document.createElement('div');
+  chooser.className = 'duration-moments';
+  if (durationEditable()) {
+    const choose = document.createElement('button');
+    choose.type = 'button';
+    choose.textContent =
+      typeof endpoint === 'string' ? 'Follow a moment…' : 'Choose another moment…';
+    choose.onclick = () =>
+      void listMoments(chooser, (moment) => setEndpoint({ moment: moment.id }));
+    box.append(choose, chooser);
+  }
+  mode.onchange = () => {
+    if (mode.value === 'time') {
+      const time = endpointTime(openDuration!.duration, which) ?? viewMiddle();
+      setEndpoint(time.toString());
+    } else void listMoments(chooser, (moment) => setEndpoint({ moment: moment.id }));
+  };
+  return box;
+}
+/** Pages through moments 25 at a time so a choice never loads the whole timeline. */
+async function listMoments(host: HTMLElement, choose: (moment: PointEvent) => void) {
+  let cursor: { time: string; id: string } | null = null;
+  const generation = documentRequest;
+  const more = document.createElement('button');
+  more.type = 'button';
+  more.textContent = 'Next 25 moments';
+  const load = async () => {
+    more.disabled = true;
+    try {
+      const page: { events: PointEvent[]; next: { time: string; id: string } | null } =
+        !sparseWorkspace() && model
+          ? model.points.size
+            ? await groupPage(
+                {
+                  first: model.points.minKey()!.toString(),
+                  last: model.points.maxKey()!.toString(),
+                  count: '0',
+                  distinct: 0,
+                },
+                cursor,
+              )
+            : { events: [], next: null }
+          : await timelineQuery({
+              kind: 'events',
+              lower: local?.first ?? null,
+              upper: local?.last ?? null,
+              limit: 25,
+              after: cursor,
+              revision: (local ?? remote)!.revision,
             });
-            write();
-            flushEventEdit();
-            refreshDurations();
-          };
-          list.append(button);
-        }
+      if (generation !== documentRequest || !host.isConnected) return;
+      host.replaceChildren();
+      for (const moment of page.events) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent =
+          (moment.metadata.title || 'Unnamed moment') +
+          ' · ' +
+          presented(Q.parse(moment.time), 'event');
+        button.onclick = () => {
+          sparseWorkspace()?.load(moment);
+          choose(moment);
+        };
+        host.append(button);
+      }
+      if (!page.events.length) host.textContent = 'This timeline has no moments yet.';
       cursor = page.next;
-      next.hidden = !cursor;
-      list.append(next);
-      add.hidden = true;
+      if (cursor) host.append(more);
     } catch (error) {
       fail(error);
     } finally {
-      add.disabled = next.disabled = false;
+      more.disabled = false;
     }
   };
-  add.onclick = () => {
-    void load();
-  };
-  next.onclick = () => {
-    void load();
-  };
-  host.append(add, list);
+  more.onclick = () => void load();
+  await load();
 }
+el('add-duration-button').onclick = () => {
+  const span = viewport.span;
+  createDuration(
+    viewport.left.add(span.mul(Q.from(3n, 8n))).toString(),
+    viewport.left.add(span.mul(Q.from(5n, 8n))).toString(),
+  );
+};
+/** Band elements persist by duration so clicks and hover cards survive re-rendering. */
+const durationButtons = new Map<string, HTMLButtonElement>();
 function renderDurationBands() {
   const host = el('duration-bands');
-  host.replaceChildren();
+  host.querySelector('.duration-limit')?.remove();
   const rows = comparisonRows().rows;
+  const plugins = durationPlugins(installedPlugins());
+  const shown = new Set<string>();
   (frame.durations ?? []).forEach((band, i) => {
     const left = Math.max(0, viewport.x(Q.parse(band.first), width())),
       right = Math.min(width(), viewport.x(Q.parse(band.last), width()));
     if (right < left) return;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'duration-band';
-    button.dataset.durationId = band.id;
+    const key = (band.sourceKey ?? '') + '\u0000' + band.id;
+    shown.add(key);
+    let button = durationButtons.get(key);
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'duration-band';
+      button.dataset.durationId = band.id;
+      button.onclick = () => void openDurationById(band.id).catch(fail);
+      durationButtons.set(key, button);
+      host.append(button);
+    }
     button.style.left = (48 + left) / uiScale + 'px';
     button.style.width = Math.max(6, (right - left) / uiScale) + 'px';
     button.style.top = 202 + (rows.get(band.sourceKey ?? '')?.offset ?? 0) + (i % 3) * 9 + 'px';
+    button.style.backgroundColor = pluginColor(plugins, band.metadata) ?? '';
     button.textContent = band.metadata.title ?? '';
     button.setAttribute('aria-label', 'Duration: ' + (band.metadata.title || 'Unnamed duration'));
     button.title =
@@ -4899,20 +5191,13 @@ function renderDurationBands() {
       presented(Q.parse(band.first)) +
       ' → ' +
       presented(Q.parse(band.last));
-    button.onclick = () => {
-      void selectGroup({
-        id: band.startId,
-        first: band.startTime,
-        last: band.startTime,
-        count: '1',
-        distinct: 1,
-        ...(band.sourceKey ? { sourceKey: band.sourceKey } : {}),
-      })
-        .then(() => el('event-durations').scrollIntoView({ block: 'nearest' }))
-        .catch(fail);
-    };
-    host.append(button);
+    hoverPreview.update(button, plugins, band.metadata);
   });
+  for (const [key, button] of durationButtons)
+    if (!shown.has(key)) {
+      button.remove();
+      durationButtons.delete(key);
+    }
   if (frame.durationsTruncated) {
     const notice = document.createElement('span');
     notice.className = 'duration-limit';
