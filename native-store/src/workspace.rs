@@ -33,19 +33,34 @@ pub struct Patch {
     pub changes: Vec<Change>,
     #[serde(default, rename = "durationChanges")]
     pub duration_changes: Vec<DurationChange>,
+    #[serde(default, rename = "relationshipChanges")]
+    pub relationship_changes: Vec<RelationshipChange>,
+}
+#[derive(Deserialize)]
+pub struct RelationshipChange {
+    pub a: Value,
+    pub b: Value,
+    pub related: bool,
 }
 #[derive(Deserialize, Clone)]
 pub struct Cursor {
-    /// Event pages use `time`; duration pages order by start and send `first`.
-    #[serde(alias = "first")]
+    /// Event pages use `time`; duration pages order by start and send `first`; related
+    /// pages order by entity kind and send `kind`.
+    #[serde(alias = "first", alias = "kind")]
     pub time: String,
     pub id: String,
 }
 /// One side of a tag separation: entities with any of the tags, or with none of them.
 #[derive(Deserialize, Clone)]
 pub struct ViewFilter {
+    #[serde(default)]
     pub tags: Vec<String>,
     pub mode: String,
+    /// Relationship separations: the entity and how far to follow links.
+    #[serde(default)]
+    pub related: Option<Value>,
+    #[serde(default)]
+    pub depth: Option<String>,
 }
 #[derive(Deserialize, Clone)]
 pub struct Query {
@@ -70,6 +85,9 @@ pub struct Query {
     pub page: Option<usize>,
     #[serde(default)]
     pub filter: Option<ViewFilter>,
+    /// The entity of a `related` query.
+    #[serde(default)]
+    pub entity: Option<Value>,
 }
 pub struct Snapshot {
     directory: PathBuf,
@@ -133,6 +151,7 @@ impl Snapshot {
             &[],
         )?;
         super::rebuild_duration_index(&saved)?;
+        super::rebuild_edge_index(&saved)?;
         snapshot.header()?;
         Ok(snapshot)
     }
@@ -196,17 +215,42 @@ impl Snapshot {
     /// The derived snapshot for one side of a tag separation. The baseline is immutable, so a
     /// view stays valid for the baseline's lifetime; the two most recent are kept.
     fn view(&self, filter: &ViewFilter) -> Result<std::sync::Arc<Snapshot>, String> {
-        let mut tags: Vec<String> = filter
-            .tags
-            .iter()
-            .map(|t| t.trim().to_lowercase())
-            .collect();
-        tags.sort();
-        tags.dedup();
-        if tags.is_empty() || tags.len() > 40 || !matches!(filter.mode.as_str(), "any" | "none") {
-            return Err("A tag filter needs one to forty tags and a mode".into());
+        if !matches!(filter.mode.as_str(), "any" | "none") {
+            return Err("A separation filter needs a mode".into());
         }
-        let key = format!("{}:{}", filter.mode, tags.join(","));
+        let membership = if let Some(entity) = &filter.related {
+            let (kind, id) = super::entity_ref(entity)?;
+            let direct = match filter.depth.as_deref() {
+                Some("direct") => true,
+                Some("all") => false,
+                _ => return Err("A relationship filter needs a depth".into()),
+            };
+            super::Membership::Related {
+                start: format!("{}:{}", if kind == "moment" { "m" } else { "d" }, id),
+                direct,
+            }
+        } else {
+            let mut tags: Vec<String> = filter
+                .tags
+                .iter()
+                .map(|t| t.trim().to_lowercase())
+                .collect();
+            tags.sort();
+            tags.dedup();
+            if tags.is_empty() || tags.len() > 40 {
+                return Err("A tag filter needs one to forty tags and a mode".into());
+            }
+            super::Membership::Tags(tags)
+        };
+        let key = match &membership {
+            super::Membership::Tags(tags) => format!("{}:{}", filter.mode, tags.join(",")),
+            super::Membership::Related { start, direct } => format!(
+                "{}:related:{}:{}",
+                filter.mode,
+                if *direct { "direct" } else { "all" },
+                start
+            ),
+        };
         if let Some((_, view)) = self
             .views
             .lock()
@@ -216,7 +260,7 @@ impl Snapshot {
         {
             return Ok(view.clone());
         }
-        let document = super::filter_document(self.document()?, &tags, filter.mode == "any");
+        let document = super::filter_document(self.document()?, &membership, filter.mode == "any");
         let view = std::sync::Arc::new(Self::from_document(&document)?);
         let mut views = self.views.lock().map_err(|e| e.to_string())?;
         views.retain(|(k, _)| *k != key);
@@ -269,6 +313,18 @@ impl Snapshot {
                 .collect();
             return Ok(json!({ "tags": tags }));
         }
+        if q.kind == "related" {
+            let entity = q.entity.as_ref().ok_or("A related query needs an entity")?;
+            let (kind, id) = super::entity_ref(entity)?;
+            let after = q.after.as_ref();
+            return related(
+                &db,
+                kind,
+                id,
+                after.map(|c| (c.time.as_str(), c.id.as_str())),
+                q.limit.unwrap_or(25).clamp(1, 100),
+            );
+        }
         if q.kind == "durations" {
             let after = q.after.as_ref();
             if after.is_some_and(|c| c.id.len() > 128 || c.time.len() > 65536) {
@@ -316,6 +372,9 @@ impl Snapshot {
                 }
                 {
                     let mut result = super::duration_window(&db, &q.lower, &q.upper, &threshold)?;
+                    let arcs = super::edge_window(&db, &q.lower, &q.upper, &threshold)?;
+                    result["edges"] = arcs["edges"].clone();
+                    result["edgesTruncated"] = arcs["edgesTruncated"].clone();
                     let clusters = super::duration_summaries(&db, &q.lower, &q.upper, &threshold)?;
                     if !clusters.is_empty() {
                         for c in clusters {
@@ -492,6 +551,16 @@ impl Snapshot {
                 }
             }
             super::rebuild_duration_index(&db)?;
+            super::create_relationship_table(&db)?;
+            for change in &patch.relationship_changes {
+                let link = super::Relationship {
+                    a: change.a.clone(),
+                    b: change.b.clone(),
+                };
+                super::relate(&db, &link, change.related)?;
+            }
+            // Also removes links to deleted entities.
+            super::rebuild_edge_index(&db)?;
             for time in affected {
                 db.execute("DELETE FROM points WHERE time=q(?)", &[&time])?;
                 db.execute("INSERT INTO points(time,value,weight) SELECT time,time,count(*) FROM events WHERE time=q(?) COLLATE RATIONAL_V1 GROUP BY time COLLATE RATIONAL_V1",&[&time])?;
@@ -764,6 +833,140 @@ mod safety_tests {
     }
 }
 
+#[cfg(test)]
+mod relationship_tests {
+    use super::*;
+    fn doc() -> Document {
+        serde_json::from_value(json!({
+            "format":"openchronology","version":1,"title":"Links","description":"",
+            "events":[
+                {"id":"a","time":"0/1","metadata":{"title":"A"}},
+                {"id":"b","time":"100/1","metadata":{"title":"B"}},
+                {"id":"c","time":"200/1","metadata":{"title":"C"}},
+                {"id":"lone","time":"300/1","metadata":{"title":"Lone"}}
+            ],
+            "durations":[{"id":"x","start":"50/1","end":"60/1","metadata":{"title":"X"}}],
+            "relationships":[
+                {"a":{"duration":"x"},"b":{"moment":"a"}},
+                {"a":{"moment":"a"},"b":{"moment":"b"}},
+                {"a":{"moment":"b"},"b":{"moment":"c"}}
+            ]
+        }))
+        .unwrap()
+    }
+    fn query(snapshot: &Snapshot, value: Value) -> Value {
+        snapshot
+            .query(&serde_json::from_value(value).unwrap())
+            .unwrap()
+    }
+    #[test]
+    fn relationships_round_trip_draw_arcs_page_and_follow_edits() {
+        let snapshot = Snapshot::from_document(&doc()).unwrap();
+        assert_eq!(snapshot.document().unwrap().relationships.len(), 3);
+        // Arcs run between moment times and a duration's start; short ones collapse.
+        let frame = query(
+            &snapshot,
+            json!({"kind":"overview","lower":"-10/1","upper":"400/1","threshold":"1/1"}),
+        );
+        let mut arcs: Vec<String> = frame["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| {
+                format!(
+                    "{} {} {}",
+                    e["id"].as_str().unwrap(),
+                    e["first"].as_str().unwrap(),
+                    e["last"].as_str().unwrap()
+                )
+            })
+            .collect();
+        arcs.sort();
+        assert_eq!(
+            arcs,
+            vec![
+                "d:x~m:a 0/1 50/1",
+                "m:a~m:b 0/1 100/1",
+                "m:b~m:c 100/1 200/1"
+            ]
+        );
+        let coarse = query(
+            &snapshot,
+            json!({"kind":"overview","lower":"-10/1","upper":"400/1","threshold":"60/1"}),
+        );
+        assert_eq!(
+            coarse["edges"].as_array().unwrap().len(),
+            2,
+            "The 50-unit arc collapses"
+        );
+        // Related pages from both link directions, with the transitive count first.
+        let related = query(
+            &snapshot,
+            json!({"kind":"related","entity":{"moment":"a"},"limit":1}),
+        );
+        assert_eq!(
+            related["related"][0],
+            json!({"kind":"duration","id":"x","first":"50/1","last":"60/1","title":"X"})
+        );
+        assert_eq!(related["reachable"], 3);
+        let next = query(
+            &snapshot,
+            json!({"kind":"related","entity":{"moment":"a"},"limit":1,"after":related["next"]}),
+        );
+        assert_eq!(next["related"][0]["id"], "b");
+        assert!(next.get("reachable").is_none());
+        assert_eq!(
+            query(
+                &snapshot,
+                json!({"kind":"related","entity":{"moment":"lone"}})
+            )["reachable"],
+            0
+        );
+        // Separations by relationship: direct relations or everything connected.
+        let ids = |filter: Value| -> Vec<String> {
+            query(&snapshot, json!({"kind":"events","lower":"-10/1","upper":"400/1","limit":100,"filter":filter}))["events"]
+                .as_array().unwrap().iter().map(|e| e["id"].as_str().unwrap().to_string()).collect()
+        };
+        assert_eq!(
+            ids(json!({"related":{"moment":"a"},"depth":"direct","mode":"any"})),
+            vec!["a", "b"]
+        );
+        assert_eq!(
+            ids(json!({"related":{"moment":"a"},"depth":"all","mode":"any"})),
+            vec!["a", "b", "c"]
+        );
+        assert_eq!(
+            ids(json!({"related":{"moment":"a"},"depth":"all","mode":"none"})),
+            vec!["lone"]
+        );
+        // Sparse saves add and remove links; deleting an entity removes its links.
+        let settings = snapshot.header().unwrap().document;
+        let target = snapshot.directory.join("updated.och");
+        let patch: Patch = serde_json::from_value(json!({"settings":settings,"changes":[{"id":"b","event":null}],"relationshipChanges":[{"a":{"moment":"lone"},"b":{"moment":"c"},"related":true},{"a":{"duration":"x"},"b":{"moment":"a"},"related":false}]})).unwrap();
+        let updated = snapshot.save_patch(&target, &patch).unwrap();
+        let mut links: Vec<String> = updated
+            .document()
+            .unwrap()
+            .relationships
+            .iter()
+            .map(|r| format!("{}-{}", r.a, r.b))
+            .collect();
+        links.sort();
+        assert_eq!(links, vec![r#"{"moment":"c"}-{"moment":"lone"}"#]);
+        let mut invalid = doc();
+        invalid.relationships.push(super::super::Relationship {
+            a: json!({"moment":"a"}),
+            b: json!({"moment":"a"}),
+        });
+        assert!(Snapshot::from_document(&invalid).is_err());
+        let mut missing = doc();
+        missing.relationships.push(super::super::Relationship {
+            a: json!({"moment":"a"}),
+            b: json!({"duration":"absent"}),
+        });
+        assert!(Snapshot::from_document(&missing).is_err());
+    }
+}
 #[cfg(test)]
 mod view_tests {
     use super::*;
@@ -1232,4 +1435,58 @@ fn search(db: &Connection, text: &str, page: usize) -> Result<Value, String> {
         })
         .collect();
     Ok(json!({"results":results,"total":total,"page":page}))
+}
+/// Directly related entities (both link directions) with titles and times, paged by
+/// (kind, id). The first page also counts everything reachable through any links.
+fn related(
+    db: &Connection,
+    kind: &str,
+    id: &str,
+    after: Option<(&str, &str)>,
+    limit: usize,
+) -> Result<Value, String> {
+    if db.scalar(
+        "SELECT count(*) FROM sqlite_schema WHERE name='relationships' AND type='table'",
+        &[],
+    )? == "0"
+    {
+        return Ok(json!({"related":[],"next":null,"reachable":0,"direct":0}));
+    }
+    let (after_kind, after_id) = after.unwrap_or(("", ""));
+    let take = (limit + 1).to_string();
+    let rows = db.query_limited(
+        "WITH links(kind,id) AS (SELECT b_kind,b_id FROM relationships WHERE a_kind=?1 AND a_id=?2 UNION SELECT a_kind,a_id FROM relationships WHERE b_kind=?1 AND b_id=?2), \
+         shown AS (SELECT l.kind,l.id,q(e.time) AS first,q(e.time) AS last,coalesce(json_extract(e.metadata,'$.title'),'') AS title FROM links l JOIN events e ON l.kind='moment' AND e.id=l.id \
+         UNION ALL SELECT l.kind,l.id,q(d.first),q(d.last),coalesce(json_extract(d.metadata,'$.title'),'') FROM links l JOIN duration_intervals d ON l.kind='duration' AND d.id=l.id) \
+         SELECT kind,id,first,last,title FROM shown WHERE ?3='' OR kind>?3 OR (kind=?3 AND id>?4) ORDER BY kind,id LIMIT CAST(?5 AS INTEGER)",
+        &[kind, id, after_kind, after_id, &take],
+        limit + 1,
+        BUDGET,
+    )?;
+    let more = rows.len() > limit;
+    let page: Vec<Value> = rows
+        .iter()
+        .take(limit)
+        .map(|r| json!({"kind":r[0],"id":r[1],"first":r[2],"last":r[3],"title":r[4]}))
+        .collect();
+    let next = if more {
+        page.last().map(|p| json!({"kind":p["kind"],"id":p["id"]}))
+    } else {
+        None
+    };
+    let mut result = json!({"related":page,"next":next});
+    if after.is_none() {
+        // Everything connected through any number of links (an undirected closure).
+        let count = db.scalar(
+            "WITH RECURSIVE reach(kind,id) AS (SELECT ?1,?2 UNION SELECT CASE WHEN r.a_kind=x.kind AND r.a_id=x.id THEN r.b_kind ELSE r.a_kind END,CASE WHEN r.a_kind=x.kind AND r.a_id=x.id THEN r.b_id ELSE r.a_id END FROM reach x JOIN relationships r ON (r.a_kind=x.kind AND r.a_id=x.id) OR (r.b_kind=x.kind AND r.b_id=x.id)) SELECT count(*)-1 FROM reach",
+            &[kind, id],
+        )?;
+        result["reachable"] = json!(count.parse::<u64>().unwrap_or(0));
+        let direct = db.scalar(
+            "SELECT count(*) FROM relationships WHERE (a_kind=?1 AND a_id=?2) OR (b_kind=?1 AND b_id=?2)",
+            &[kind, id],
+        )?;
+        result["direct"] = json!(direct.parse::<u64>().unwrap_or(0));
+    }
+    Ok(result)
 }

@@ -10,8 +10,15 @@ import {
   collapses,
   coalesceGroups,
   durationGroups,
+  canonicalRelationship,
+  relationshipKey,
+  refKey,
+  edgeBand,
 } from './core.js';
 import type {
+  EdgeBand,
+  EntityRef,
+  Relationship,
   Duration,
   DurationBand,
   Frame,
@@ -27,9 +34,15 @@ export interface DurationChange {
   before?: Duration;
   after?: Duration;
 }
+/** A link's desired state; saving adds or removes it idempotently. */
+export interface RelationshipChange {
+  relationship: Relationship;
+  related: boolean;
+}
 export interface SavingChanges {
   moments: Map<string, MomentChange>;
   durations: Map<string, DurationChange>;
+  relationships: Map<string, RelationshipChange>;
 }
 
 export interface WindowQuery {
@@ -122,20 +135,35 @@ export class ViewportCache {
 export class RemoteWorkspace extends TimelineIndex {
   readonly changes = new Map<string, MomentChange>();
   readonly durationChanges = new Map<string, DurationChange>();
+  readonly relationshipChanges = new Map<string, RelationshipChange>();
   private originals = new Map<string, PointEvent>();
   private durationOriginals = new Map<string, Duration>();
   private replacing = false;
   private savingIds = new Set<string>();
   private savingDurations = new Set<string>();
   constructor(document: TimelineDocument) {
-    super({ ...document, events: [], durations: [] });
+    super({ ...document, events: [], durations: [], relationships: [] });
   }
   /** The saved head is on the server or disk; only loaded and edited durations live here. */
   protected override durationList(): Duration[] {
     return [];
   }
+  protected override relationshipList(): Relationship[] {
+    return [];
+  }
   get dirtyCount() {
-    return this.changes.size + this.durationChanges.size;
+    return this.changes.size + this.durationChanges.size + this.relationshipChanges.size;
+  }
+  override relate(a: EntityRef, b: EntityRef): Relationship {
+    const relationship = super.relate(a, b);
+    this.relationshipChanges.set(relationshipKey(relationship), { relationship, related: true });
+    return relationship;
+  }
+  override unrelate(a: EntityRef, b: EntityRef): boolean {
+    const relationship = canonicalRelationship(a, b);
+    super.unrelate(a, b);
+    this.relationshipChanges.set(relationshipKey(relationship), { relationship, related: false });
+    return true;
   }
   loadDuration(duration: Duration) {
     if (this.durationChanges.has(duration.id)) return;
@@ -222,7 +250,11 @@ export class RemoteWorkspace extends TimelineIndex {
   beginSave(): SavingChanges {
     this.savingIds = new Set(this.changes.keys());
     this.savingDurations = new Set(this.durationChanges.keys());
-    return { moments: new Map(this.changes), durations: new Map(this.durationChanges) };
+    return {
+      moments: new Map(this.changes),
+      durations: new Map(this.durationChanges),
+      relationships: new Map(this.relationshipChanges),
+    };
   }
   endSave(selectedId?: string) {
     this.savingIds.clear();
@@ -237,13 +269,26 @@ export class RemoteWorkspace extends TimelineIndex {
         id,
         duration: change.after ?? null,
       })),
+      relationshipChanges: [...this.relationshipChanges.values()].map(
+        ({ relationship, related }) => ({ ...relationship, related }),
+      ),
     };
   }
   /** Applies unsaved edits to a complete saved document. */
   apply(document: TimelineDocument): TimelineDocument {
-    return applyChanges(document, super.document(), this.changes, this.durationChanges);
+    return applyChanges(
+      document,
+      super.document(),
+      this.changes,
+      this.durationChanges,
+      this.relationshipChanges,
+    );
   }
   accepted(sent: SavingChanges, selectedId?: string) {
+    // A link edited again while saving keeps its newer state.
+    for (const [key, saved] of sent.relationships)
+      if (this.relationshipChanges.get(key)?.related === saved.related)
+        this.relationshipChanges.delete(key);
     for (const [id, saved] of sent.durations) {
       const desired = this.durations.get(id);
       if (saved.after) this.durationOriginals.set(id, saved.after);
@@ -363,14 +408,55 @@ export class RemoteWorkspace extends TimelineIndex {
         groups,
         durations: bands.slice(0, 256),
         durationsTruncated: frame.durationsTruncated || bands.length > 256,
+        edges: this.overlayEdges(frame.edges ?? [], view, threshold),
       },
       threshold,
+    );
+  }
+  /**
+   * Saved arcs follow unsaved moves of their endpoints; unsaved links appear when both
+   * endpoints are loaded, and unlinked or deleted ones disappear.
+   */
+  overlayEdges(edges: readonly EdgeBand[], view: Viewport, threshold: Q): EdgeBand[] {
+    const local = (key: string, saved: string | undefined) => {
+      if (key.startsWith('m:')) {
+        const change = this.changes.get(key.slice(2));
+        if (change && !change.after) return undefined;
+        return change?.after?.time ?? this.byId.get(key.slice(2))?.time ?? saved;
+      }
+      const id = key.slice(2),
+        change = this.durationChanges.get(id);
+      if (change && !change.after) return undefined;
+      const duration = change?.after ?? this.durations.get(id);
+      return duration
+        ? (resolveDuration(duration, (m) => this.momentTime(m))?.startTime ?? saved)
+        : saved;
+    };
+    const result = new Map<string, EdgeBand>();
+    for (const edge of edges) {
+      if (this.relationshipChanges.get(edge.id)?.related === false) continue;
+      const moved = edgeBand(edge, (key) =>
+        local(key, key === refKey(edge.a) ? edge.aTime : edge.bTime),
+      );
+      if (moved) result.set(edge.id, { ...moved, sourceKey: edge.sourceKey });
+    }
+    for (const [key, { relationship, related }] of this.relationshipChanges)
+      if (related && !result.has(key)) {
+        const band = edgeBand(relationship, (k) => local(k, undefined));
+        if (band) result.set(key, band);
+      }
+    return [...result.values()].filter(
+      (e) =>
+        Q.parse(e.last).compare(view.left) >= 0 &&
+        Q.parse(e.first).compare(view.right) <= 0 &&
+        !collapses(e, threshold),
     );
   }
 }
 export interface PendingPatch {
   changes: { id: string; event: PointEvent | null }[];
   durationChanges?: { id: string; duration: Duration | null }[];
+  relationshipChanges?: (Relationship & { related: boolean })[];
 }
 /**
  * Applies moment and duration changes to a complete saved document. Anchors to deleted
@@ -381,6 +467,7 @@ export function applyChanges(
   settings: TimelineDocument,
   moments: ReadonlyMap<string, MomentChange>,
   durationEdits: ReadonlyMap<string, DurationChange>,
+  relationshipEdits: ReadonlyMap<string, RelationshipChange> = new Map(),
 ): TimelineDocument {
   const events = new Map(saved.events.map((e) => [e.id, e]));
   const lastTimes = new Map(saved.events.map((e) => [e.id, e.time]));
@@ -399,10 +486,19 @@ export function applyChanges(
     (id) => events.has(id),
     (id) => lastTimes.get(id),
   );
+  const links = new Map((saved.relationships ?? []).map((r) => [relationshipKey(r), r]));
+  for (const [key, { relationship, related }] of relationshipEdits)
+    if (related) links.set(key, relationship);
+    else links.delete(key);
+  // Deleting an entity removes its links.
+  const exists = (ref: EntityRef) =>
+    'moment' in ref ? events.has(ref.moment) : durations.has(ref.duration);
+  const relationships = [...links.values()].filter((r) => exists(r.a) && exists(r.b));
   return {
     ...settings,
     events: [...events.values()],
     ...(fixed.length ? { durations: fixed } : {}),
+    ...(relationships.length ? { relationships } : {}),
   };
 }
 /** Coarsen server summaries without reconstructing any concealed moments. */

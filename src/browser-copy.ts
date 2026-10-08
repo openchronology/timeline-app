@@ -5,6 +5,7 @@ export const BROWSER_COPY_MAX_EVENTS = 5000;
 export function browserEntryCount(document: {
   events: { metadata: Record<string, unknown> }[];
   durations?: readonly unknown[];
+  relationships?: readonly unknown[];
   plugins?: readonly { manifest: { fields: readonly { kind: string; metadataKey: string }[] } }[];
 }): number {
   const keys = new Set([
@@ -13,7 +14,10 @@ export function browserEntryCount(document: {
       p.manifest.fields.filter((f) => f.kind === 'stack').map((f) => f.metadataKey),
     ),
   ]);
-  let count = document.events.length + (document.durations?.length ?? 0);
+  let count =
+    document.events.length +
+    (document.durations?.length ?? 0) +
+    (document.relationships?.length ?? 0);
   for (const event of document.events) {
     for (const key of keys) {
       const entries = event.metadata[key];

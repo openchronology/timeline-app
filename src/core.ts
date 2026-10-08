@@ -9,6 +9,34 @@ import {
 } from './durations.js';
 import type { Duration, DurationBand, IntervalNode } from './durations.js';
 import { durationGroups, coalesceGroups } from './summaries.js';
+import {
+  validateRelationships,
+  canonicalRelationship,
+  relationshipKey,
+  refKey,
+  adjacency,
+  reachable,
+  entityTimes,
+  edgeTree,
+  arcFromBand,
+} from './relationships.js';
+import type { EdgeBand, EntityRef, Relationship } from './relationships.js';
+export {
+  validateRelationships,
+  validateRef,
+  canonicalRelationship,
+  relationshipKey,
+  refKey,
+  refFromKey,
+  adjacency,
+  reachable,
+  entityTimes,
+  edgeTree,
+  edgeBand,
+  arcFromBand,
+  MAX_RELATIONSHIPS,
+} from './relationships.js';
+export type { EdgeBand, EntityRef, Relationship } from './relationships.js';
 export { durationGroups, coalesceGroups, entityCount } from './summaries.js';
 export {
   anchorOf,
@@ -114,6 +142,7 @@ export interface TimelineDocument {
   assets?: Record<string, string>;
   events: PointEvent[];
   durations?: Duration[];
+  relationships?: Relationship[];
 }
 export interface FrameGroup {
   first: string;
@@ -131,6 +160,9 @@ export interface FrameGroup {
 export interface Frame {
   durations?: DurationBand[];
   durationsTruncated?: boolean;
+  /** Relationship arcs touching the window, longer than the grouping distance. */
+  edges?: EdgeBand[];
+  edgesTruncated?: boolean;
   groups: FrameGroup[];
   visitedNodes: number;
   revision?: string;
@@ -209,6 +241,13 @@ export function validateDocument(value: unknown, partial = false): TimelineDocum
     partial ? null : ids,
     parseTime,
   ).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const durationIds = new Set(durations.map((d) => d.id));
+  const relationships = validateRelationships(
+    doc.relationships,
+    partial
+      ? null
+      : (key) => (key.startsWith('m:') ? ids.has(key.slice(2)) : durationIds.has(key.slice(2))),
+  );
   return {
     format: 'openchronology',
     version: 1,
@@ -223,6 +262,7 @@ export function validateDocument(value: unknown, partial = false): TimelineDocum
     ...(doc.assets === undefined ? {} : { assets: validateAssets(doc.assets) }),
     events: legacy.events,
     ...(durations.length ? { durations } : {}),
+    ...(relationships.length ? { relationships } : {}),
   };
 }
 function asArray(value: unknown): unknown[] {
@@ -233,6 +273,10 @@ export class TimelineIndex {
   readonly points = new RationalMap<readonly PointEvent[]>((bucket) => BigInt(bucket.length));
   private intervals: IntervalNode | null = null;
   private intervalDirty = true;
+  private edges: IntervalNode | null = null;
+  private graph: Map<string, Set<string>> | null = null;
+  /** Links by canonical key. Links to deleted entities stay until saved, so undo restores them. */
+  readonly relationships = new Map<string, Relationship>();
   readonly byId = new Map<string, PointEvent>();
   readonly durations = new Map<string, Duration>();
   /** Last times of deleted moments; anchored durations stay put until saved or re-anchored. */
@@ -276,6 +320,35 @@ export class TimelineIndex {
       if (this.durations.has(duration.id)) throw new Error('Duration IDs must be unique.');
       this.durations.set(duration.id, Object.freeze(duration));
     }
+    for (const relationship of validateRelationships(document.relationships, null))
+      this.relationships.set(relationshipKey(relationship), relationship);
+  }
+  /** Whether a moment or duration currently exists in this index. */
+  hasEntity(key: string): boolean {
+    return key.startsWith('m:') ? this.byId.has(key.slice(2)) : this.durations.has(key.slice(2));
+  }
+  relate(a: EntityRef, b: EntityRef): Relationship {
+    const relationship = canonicalRelationship(a, b);
+    this.relationships.set(relationshipKey(relationship), relationship);
+    this.graph = null;
+    this.intervalDirty = true;
+    return relationship;
+  }
+  unrelate(a: EntityRef, b: EntityRef): boolean {
+    this.graph = null;
+    this.intervalDirty = true;
+    return this.relationships.delete(relationshipKey(canonicalRelationship(a, b)));
+  }
+  /** Undirected links among existing entities. */
+  protected liveRelationships(): Relationship[] {
+    return [...this.relationships.values()].filter(
+      (r) => this.hasEntity(refKey(r.a)) && this.hasEntity(refKey(r.b)),
+    );
+  }
+  /** Directly related entities, as reference keys. */
+  relatedTo(ref: EntityRef, depth = 1): Set<string> {
+    this.graph ??= adjacency(this.liveRelationships());
+    return reachable(this.graph, refKey(ref), depth);
   }
   /** Time of a moment, or of a deleted moment that unsaved anchors still follow. */
   momentTime(id: string): string | undefined {
@@ -285,9 +358,11 @@ export class TimelineIndex {
     const normalized = validateDuration(duration, parseTime);
     this.durations.set(normalized.id, Object.freeze(normalized));
     this.intervalDirty = true;
+    this.graph = null;
   }
   deleteDuration(id: string): boolean {
     this.intervalDirty = true;
+    this.graph = null;
     return this.durations.delete(id);
   }
   /** Durations whose start or end follows this moment. */
@@ -307,6 +382,7 @@ export class TimelineIndex {
   }
   put(event: PointEvent): void {
     this.intervalDirty = true;
+    this.graph = null;
     this.retired.delete(event.id);
     const time = parseTime(event.time),
       normalized = Object.freeze({
@@ -329,6 +405,7 @@ export class TimelineIndex {
   /** Removes a moment from the index without treating it as deleted (replacement or eviction). */
   protected remove(id: string): boolean {
     this.intervalDirty = true;
+    this.graph = null;
     const event = this.byId.get(id);
     if (!event) return false;
     const key = Q.parse(event.time),
@@ -338,8 +415,14 @@ export class TimelineIndex {
     this.byId.delete(id);
     return true;
   }
+  protected relationshipList(): Relationship[] {
+    return this.liveRelationships().sort((a, b) =>
+      relationshipKey(a) < relationshipKey(b) ? -1 : 1,
+    );
+  }
   document(): TimelineDocument {
-    const durations = this.durationList();
+    const durations = this.durationList(),
+      relationships = this.relationshipList();
     return {
       format: 'openchronology',
       version: 1,
@@ -351,11 +434,16 @@ export class TimelineIndex {
       ...(this.assets === undefined ? {} : { assets: this.assets }),
       events: [...this.points].flatMap(([, bucket]) => [...bucket]),
       ...(durations.length ? { durations } : {}),
+      ...(relationships.length ? { relationships } : {}),
     };
   }
   frame(viewport: Viewport, width: number, pixels = 24): Frame {
     if (this.intervalDirty) {
       this.intervals = durationTree(this.durations.values(), (id) => this.momentTime(id));
+      const times = entityTimes(this.byId.values(), this.durations.values(), (id) =>
+        this.momentTime(id),
+      );
+      this.edges = edgeTree(this.liveRelationships(), (key) => times.get(key));
       this.intervalDirty = false;
     }
     const threshold = viewport.threshold(width, pixels);
@@ -374,8 +462,11 @@ export class TimelineIndex {
         ...(only ? { id: only.id, title: only.metadata.title ?? '' } : {}),
       };
     });
+    const arcs = durationWindow(this.edges, viewport.left, viewport.right, 256, collapsed);
     return {
       ...durationWindow(this.intervals, viewport.left, viewport.right, 256, collapsed),
+      edges: arcs.durations.map(arcFromBand),
+      edgesTruncated: arcs.durationsTruncated,
       visitedNodes: result.stats.visitedNodes,
       groups: collapsed
         ? coalesceGroups(

@@ -1,5 +1,13 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { resolveDuration } from './durations.js';
+import {
+  adjacency,
+  reachable,
+  refKey,
+  validateRef,
+  validateRelationships,
+} from './relationships.js';
+import type { EntityRef } from './relationships.js';
 import type { Metadata, PointEvent, TimelineDocument } from './core.js';
 import type { Duration } from './durations.js';
 
@@ -35,29 +43,43 @@ export function entityTags(metadata: Metadata): string[] {
  * A tag separation splits a timeline into entities carrying any of the tags and the rest.
  * Both halves are read-only views of one saved state.
  */
-export interface ViewFilter {
-  tags: string[];
-  mode: 'any' | 'none';
-}
-/** Stable cache key for a filter: mode plus sorted, normalized tags. */
+export type ViewFilter =
+  | { tags: string[]; mode: 'any' | 'none' }
+  /** An entity and its relations (direct, or everything reachable), or everything else. */
+  | { related: EntityRef; depth: 'direct' | 'all'; mode: 'any' | 'none' };
+/** Stable cache key for a filter. */
 export function viewFilterKey(filter: ViewFilter): string {
+  if ('related' in filter)
+    return `${filter.mode}:related:${filter.depth}:${refKey(validateRef(filter.related))}`;
   return filter.mode + ':' + [...validateTags(filter.tags)].sort().join(',');
-}
-function matches(metadata: Metadata, filter: ViewFilter, wanted: Set<string>) {
-  const any = entityTags(metadata).some((tag) => wanted.has(tag));
-  return filter.mode === 'any' ? any : !any;
 }
 /**
  * One side of a separation. Durations are resolved to fixed endpoints first, because the
  * moments they follow may be on the other side.
  */
 export function filterDocument(document: TimelineDocument, filter: ViewFilter): TimelineDocument {
-  const wanted = new Set(validateTags(filter.tags));
+  // Membership on the "any" side, by reference key.
+  let inside: (key: string, metadata: Metadata) => boolean;
+  if ('related' in filter) {
+    const start = refKey(validateRef(filter.related));
+    const set = reachable(
+      adjacency(validateRelationships(document.relationships, null)),
+      start,
+      filter.depth === 'direct' ? 1 : Infinity,
+    );
+    set.add(start);
+    inside = (key) => set.has(key);
+  } else {
+    const wanted = new Set(validateTags(filter.tags));
+    inside = (_key, metadata) => entityTags(metadata).some((tag) => wanted.has(tag));
+  }
+  const keep = (key: string, metadata: Metadata) =>
+    inside(key, metadata) === (filter.mode === 'any');
   const times = new Map(document.events.map((e) => [e.id, e.time]));
-  const events: PointEvent[] = document.events.filter((e) => matches(e.metadata, filter, wanted));
+  const events: PointEvent[] = document.events.filter((e) => keep('m:' + e.id, e.metadata));
   const durations: Duration[] = [];
   for (const duration of document.durations ?? []) {
-    if (!matches(duration.metadata, filter, wanted)) continue;
+    if (!keep('d:' + duration.id, duration.metadata)) continue;
     const band = resolveDuration(duration, (id) => times.get(id));
     if (band)
       durations.push({
@@ -67,10 +89,16 @@ export function filterDocument(document: TimelineDocument, filter: ViewFilter): 
         metadata: duration.metadata,
       });
   }
+  // Links between entities that are both on this side remain.
+  const kept = new Set([...events.map((e) => 'm:' + e.id), ...durations.map((d) => 'd:' + d.id)]);
+  const relationships = (document.relationships ?? []).filter(
+    (r) => kept.has(refKey(r.a)) && kept.has(refKey(r.b)),
+  );
   return {
     ...document,
     events,
     ...(durations.length ? { durations } : { durations: undefined }),
+    ...(relationships.length ? { relationships } : { relationships: undefined }),
   };
 }
 /** Tags used by moments and durations, most used first. */

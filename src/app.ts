@@ -51,6 +51,9 @@ import {
   validateDuration,
   durationPlugins,
   momentPlugins,
+  refKey,
+  refFromKey,
+  canonicalRelationship,
   entityCount,
   entityTags,
   filterDocument,
@@ -62,6 +65,8 @@ import {
   SEARCH_PAGE_SIZE,
 } from './core.js';
 import type {
+  EntityRef,
+  Relationship,
   DurationBand,
   SearchPage,
   SearchResult,
@@ -408,7 +413,8 @@ function clearGroupPage() {
   el('group-duration-list').replaceChildren();
 }
 type EventEdit = { before?: PointEvent; after?: PointEvent };
-type HistoryEntry = EventEdit | DurationEdit;
+type LinkEdit = { link: Relationship; related: boolean };
+type HistoryEntry = EventEdit | DurationEdit | LinkEdit;
 let history: HistoryEntry[] = [],
   future: HistoryEntry[] = [],
   frameRequest = 0,
@@ -511,7 +517,13 @@ async function completeDocument(): Promise<TimelineDocument> {
   if (workspace !== documentRequest) throw new Error('The open timeline changed.');
   // Saved snapshots may predate standalone durations; validation converts legacy links.
   if (!changes || !settings) return validateDocument(snapshot.document);
-  return applyChanges(validateDocument(snapshot.document), settings, changes, durationChanges!);
+  return applyChanges(
+    validateDocument(snapshot.document),
+    settings,
+    changes,
+    durationChanges!,
+    new Map(index!.relationshipChanges),
+  );
 }
 let pendingFrameRefresh = false;
 function requestRender(refreshFrame = true) {
@@ -720,6 +732,7 @@ function renderAxis() {
     }
 }
 function drawFrame() {
+  renderEdgeArcs();
   renderDurationBands();
   const cursor = el('time-cursor');
   stage.style.setProperty('--timeline-scale', String(uiScale));
@@ -979,7 +992,7 @@ function drawFrame() {
     verticalOffset = clamped;
     requestRender(false);
   }
-  for (const layer of [el('axis'), el('duration-bands'), container, branches]) {
+  for (const layer of [el('axis'), el('edge-arcs'), el('duration-bands'), container, branches]) {
     layer.style.width = `${stage.clientWidth / uiScale}px`;
     layer.style.height = `${stage.clientHeight / uiScale}px`;
     layer.style.transformOrigin = '0 0';
@@ -1586,6 +1599,9 @@ async function retainForSignIn() {
           sparseDurations: sparseWorkspace()
             ? [...sparseWorkspace()!.durationChanges.values()]
             : undefined,
+          sparseLinks: sparseWorkspace()
+            ? [...sparseWorkspace()!.relationshipChanges.values()]
+            : undefined,
           remote: remote
             ? {
                 id: remote.id,
@@ -1619,6 +1635,7 @@ async function restoreAfterSignIn() {
           remote: { id: string; revision: string; head_revision_id?: string } | null;
           sparse?: { before?: PointEvent; after?: PointEvent }[];
           sparseDurations?: { before?: Duration; after?: Duration }[];
+          sparseLinks?: { relationship: Relationship; related: boolean }[];
           proposal?: { id: string; revision: string } | null;
           dirty: boolean;
         }
@@ -1650,6 +1667,9 @@ async function restoreAfterSignIn() {
             if (change.after) index.put(change.after);
             else if (change.before) index.delete(change.before.id);
           }
+          for (const { relationship, related } of saved.sparseLinks ?? [])
+            if (related) index.relate(relationship.a, relationship.b);
+            else index.unrelate(relationship.a, relationship.b);
           for (const change of saved.sparseDurations ?? []) {
             if (change.before) index.loadDuration(change.before);
             if (change.after) index.putDuration(change.after);
@@ -2423,6 +2443,7 @@ function eventForm(event?: PointEvent, time?: Q) {
   el<HTMLTextAreaElement>('event-metadata').value = JSON.stringify(rest, null, 2);
   refreshPluginFields();
   refreshDurations();
+  renderRelated(el('event-related'), event ? { moment: event.id } : null);
   for (const id of [
     'event-title',
     'event-time',
@@ -3768,7 +3789,7 @@ function requestDelete(point: PointEvent) {
   text('delete-confirm', 'Delete event');
   text(
     'delete-description',
-    `Delete “${point.metadata.title || 'Untitled event'}” at ${presented(Q.parse(point.time), 'input')}? Durations that follow it keep its current time as a fixed endpoint. You can undo this deletion.`,
+    `Delete “${point.metadata.title || 'Untitled event'}” at ${presented(Q.parse(point.time), 'input')}? Durations that follow it keep its current time as a fixed endpoint, and its relationships are removed. You can undo this deletion.`,
   );
   el<HTMLDialogElement>('delete-dialog').showModal();
   el('delete-cancel').focus();
@@ -3825,7 +3846,12 @@ function applyEdit(redo: boolean) {
   if (openDuration) openDuration.edit = null;
   const edit = (redo ? future : history).pop();
   if (!edit || !model) return;
-  if ('duration' in edit) {
+  if ('link' in edit) {
+    // Undo applies the opposite of the recorded state; redo reapplies it.
+    if (edit.related === redo) model.relate(edit.link.a, edit.link.b);
+    else model.unrelate(edit.link.a, edit.link.b);
+    el<HTMLDialogElement>('duration-dialog').close();
+  } else if ('duration' in edit) {
     const [from, to] = redo ? [edit.before, edit.after] : [edit.after, edit.before];
     if (to) model.putDuration(to);
     else if (from) model.deleteDuration(from.id);
@@ -5019,6 +5045,11 @@ function showDuration(duration: Duration, readOnly: boolean, edit: DurationEdit 
   text('duration-error', '');
   renderDurationEndpoints();
   renderDurationPluginFields();
+  renderRelated(
+    el('duration-related'),
+    readOnly && comparison ? null : { duration: duration.id },
+    readOnly,
+  );
   const dialog = el<HTMLDialogElement>('duration-dialog');
   if (!dialog.open) dialog.showModal();
 }
@@ -5307,7 +5338,7 @@ async function listMoments(host: HTMLElement, choose: (moment: PointEvent) => vo
  * carrying any selected tag move to the upper track; everything else stays below. Indexed
  * timelines query database-built views of the saved state.
  */
-let separation: { tags: string[] } | null = null;
+let separation: Separation | null = null;
 async function loadTagCounts(): Promise<{ tag: string; count: number }[]> {
   if (!sparseWorkspace() && model) return tagCounts(model.byId.values(), model.durations.values());
   const result = await timelineQuery<{ tags: { tag: string; count: number }[] }>({
@@ -5316,21 +5347,32 @@ async function loadTagCounts(): Promise<{ tag: string; count: number }[]> {
   });
   return result.tags;
 }
-function startSeparation(tags: string[]) {
+type Separation =
+  { tags: string[] } | { related: EntityRef; depth: 'direct' | 'all'; label: string };
+function startSeparation(by: string[] | Separation) {
+  const choice: Separation = Array.isArray(by) ? { tags: by } : by;
   flushEventEdit();
   flushDurationEdit();
   const presentation = model?.presentation ?? remote?.presentation ?? DEFAULT_PRESENTATION;
   const plugins = installedPlugins();
-  const label = tags.join(', ');
+  const label = 'tags' in choice ? choice.tags.join(', ') : choice.label;
+  const filterFor = (mode: 'any' | 'none') =>
+    'tags' in choice
+      ? { tags: choice.tags, mode }
+      : { related: choice.related, depth: choice.depth, mode };
   const modes = [
-    { key: 'tagged', mode: 'any' as const, title: `Tagged ${label}` },
+    {
+      key: 'tagged',
+      mode: 'any' as const,
+      title: 'tags' in choice ? `Tagged ${label}` : `Related to ${label}`,
+    },
     { key: 'rest', mode: 'none' as const, title: 'Everything else' },
   ];
   let sources: ComparisonSource[];
   if (!sparseWorkspace() && model) {
     const document = model.document();
     sources = modes.map(({ key, mode, title }) => {
-      const index = new TimelineIndex(filterDocument(document, { tags, mode }));
+      const index = new TimelineIndex(filterDocument(document, filterFor(mode)));
       return {
         key,
         title,
@@ -5355,16 +5397,24 @@ function startSeparation(tags: string[]) {
       last: info.last,
       query: (query, signal) =>
         timelineQuery<Frame | EventPage>(
-          { ...query, filter: { tags, mode }, revision: (local ?? remote)!.revision },
+          { ...query, filter: filterFor(mode), revision: (local ?? remote)!.revision },
           signal,
         ),
     }));
   }
   const before = viewport.clone();
-  separation = { tags };
+  separation = choice;
   startComparison(sources, presentation);
   // Separating keeps the current view rather than fitting both tracks.
   viewport = before;
+  text(
+    'separation-heading',
+    'tags' in choice
+      ? 'Separated by tags'
+      : choice.depth === 'direct'
+        ? 'Separated by relationships'
+        : 'Separated by all connected relationships',
+  );
   text('separation-tags', label);
   heading();
   requestRender();
@@ -5594,6 +5644,294 @@ el('add-duration-button').onclick = () => {
     viewport.left.add(span.mul(Q.from(5n, 8n))).toString(),
   );
 };
+/**
+ * "Related to" lists an entity's direct relationships (25 at a time) and how many more are
+ * connected through other links. Links are undirected; unsaved edits on indexed timelines
+ * are overlaid on the saved list.
+ */
+const linkDisplay = new Map<string, SearchResult>();
+type RelatedEntry = {
+  kind: 'moment' | 'duration';
+  id: string;
+  first: string;
+  last: string;
+  title: string;
+};
+function describe(key: string): RelatedEntry | null {
+  const ref = refFromKey(key);
+  if ('moment' in ref) {
+    const moment = model?.byId.get(ref.moment);
+    if (moment)
+      return {
+        kind: 'moment',
+        id: ref.moment,
+        first: moment.time,
+        last: moment.time,
+        title: moment.metadata.title ?? '',
+      };
+  } else {
+    const duration = model?.durations.get(ref.duration);
+    const band =
+      duration && model ? resolveDuration(duration, (id) => model!.momentTime(id)) : null;
+    if (duration && band)
+      return {
+        kind: 'duration',
+        id: ref.duration,
+        first: band.first,
+        last: band.last,
+        title: duration.metadata.title ?? '',
+      };
+  }
+  const shown = linkDisplay.get(key);
+  return shown ? { ...shown } : null;
+}
+async function relatedPage(ref: EntityRef, after: { kind: string; id: string } | null) {
+  const sparse = sparseWorkspace();
+  if (!sparse && model) {
+    const direct = [...model.relatedTo(ref)].sort();
+    const all = model.relatedTo(ref, Infinity).size;
+    const start = after
+      ? direct.findIndex((k) => k > (after.kind === 'moment' ? 'm:' : 'd:') + after.id)
+      : 0;
+    const keys = start < 0 ? [] : direct.slice(start, start + 25);
+    return {
+      related: keys.map(describe).filter((e): e is RelatedEntry => !!e),
+      next: start >= 0 && start + 25 < direct.length ? refEntry(direct[start + 24]) : null,
+      reachable: after ? undefined : all,
+      direct: direct.length,
+    };
+  }
+  const page = await timelineQuery<{
+    related: RelatedEntry[];
+    next: { kind: string; id: string } | null;
+    reachable?: number;
+    direct?: number;
+  }>({ kind: 'related', entity: ref, after, limit: 25, revision: (local ?? remote)!.revision });
+  // Unsaved links: hide removed ones, add new ones on the first page.
+  const own = refKey(ref);
+  const changes = [...(sparse?.relationshipChanges.values() ?? [])].filter(
+    ({ relationship }) => refKey(relationship.a) === own || refKey(relationship.b) === own,
+  );
+  const other = (r: Relationship) => (refKey(r.a) === own ? refKey(r.b) : refKey(r.a));
+  const removed = new Set(changes.filter((c) => !c.related).map((c) => other(c.relationship)));
+  const added = after
+    ? []
+    : changes
+        .filter((c) => c.related)
+        .map((c) => describe(other(c.relationship)))
+        .filter((e): e is RelatedEntry => !!e);
+  const saved = page.related.filter((e) => !removed.has(entryKey(e)));
+  return {
+    related: [...added.filter((a) => !saved.some((e) => entryKey(e) === entryKey(a))), ...saved],
+    next: page.next,
+    reachable: page.reachable,
+    direct: page.direct ?? page.related.length,
+  };
+}
+function entryKey(e: { kind: string; id: string }) {
+  return (e.kind === 'moment' ? 'm:' : 'd:') + e.id;
+}
+function refEntry(key: string) {
+  const ref = refFromKey(key);
+  return 'moment' in ref
+    ? { kind: 'moment', id: ref.moment }
+    : { kind: 'duration', id: ref.duration };
+}
+function openEntry(entry: RelatedEntry) {
+  if (entry.kind === 'duration') {
+    void openDurationById(entry.id).catch(fail);
+    return;
+  }
+  el<HTMLDialogElement>('duration-dialog').close();
+  void selectGroup({
+    id: entry.id,
+    first: entry.first,
+    last: entry.first,
+    count: '1',
+    distinct: 1,
+  }).catch(fail);
+}
+function setLink(a: EntityRef, b: EntityRef, related: boolean, display?: SearchResult) {
+  if (!model || !editable()) return;
+  const link = canonicalRelationship(a, b);
+  if (display) linkDisplay.set(entryKey(display), display);
+  record({ link, related });
+  if (related) model.relate(link.a, link.b);
+  else model.unrelate(link.a, link.b);
+  changed();
+}
+function renderRelated(host: HTMLElement, ref: EntityRef | null, readOnly = false) {
+  host.replaceChildren();
+  host.hidden = !ref;
+  if (!ref) return;
+  const generation = ++relatedGeneration;
+  const heading = document.createElement('h3');
+  heading.textContent = 'Related to';
+  const list = document.createElement('div');
+  list.className = 'related-list';
+  const status = document.createElement('p');
+  status.className = 'field-hint';
+  const actions = document.createElement('div');
+  actions.className = 'related-actions';
+  host.append(heading, list, status, actions);
+  const canEdit = editable() && !readOnly;
+  let cursor: { kind: string; id: string } | null = null;
+  const more = document.createElement('button');
+  more.type = 'button';
+  more.textContent = 'Next 25 related';
+  const load = async (after: typeof cursor) => {
+    const page = await relatedPage(ref, after);
+    if (generation !== relatedGeneration) return;
+    list.replaceChildren();
+    for (const entry of page.related) {
+      const row = document.createElement('div');
+      row.className = 'related-row';
+      const open = document.createElement('button');
+      open.type = 'button';
+      open.className = 'related-entity';
+      open.textContent =
+        (entry.title || (entry.kind === 'moment' ? 'Unnamed moment' : 'Unnamed duration')) +
+        ' · ' +
+        (entry.kind === 'moment'
+          ? presented(Q.parse(entry.first), 'event')
+          : `${presented(Q.parse(entry.first), 'event')} → ${presented(Q.parse(entry.last), 'event')}`);
+      open.onclick = () => openEntry(entry);
+      row.append(open);
+      if (canEdit) {
+        const unlink = document.createElement('button');
+        unlink.type = 'button';
+        unlink.className = 'related-unlink';
+        unlink.textContent = '×';
+        unlink.setAttribute('aria-label', 'Remove relationship with ' + (entry.title || entry.id));
+        unlink.onclick = () => {
+          setLink(ref, refFromKey(entryKey(entry)), false);
+          renderRelated(host, ref, readOnly);
+        };
+        row.append(unlink);
+      }
+      list.append(row);
+    }
+    cursor = page.next;
+    if (cursor) list.append(more);
+    if (page.reachable !== undefined) {
+      const beyond = page.reachable - page.direct;
+      status.textContent = !page.related.length
+        ? 'No relationships yet.'
+        : beyond > 0
+          ? `${beyond.toLocaleString()} more through other relationships.`
+          : '';
+      actions.replaceChildren();
+      if (page.related.length && !comparison) {
+        const label = describeLabel(ref);
+        for (const [depth, text] of [
+          ['direct', 'Separate related'],
+          ['all', 'Separate all connected'],
+        ] as const) {
+          if (depth === 'all' && beyond <= 0) continue;
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = text;
+          button.onclick = () => {
+            el<HTMLDialogElement>('duration-dialog').close();
+            el<HTMLDialogElement>('inspector').close();
+            startSeparation({ related: ref, depth, label });
+          };
+          actions.append(button);
+        }
+      }
+    }
+  };
+  more.onclick = () => void load(cursor).catch(fail);
+  void load(null).catch(fail);
+  if (!canEdit) return;
+  // New links are found by text search over titles and notes.
+  const add = document.createElement('details');
+  add.className = 'related-add';
+  const summary = document.createElement('summary');
+  summary.textContent = 'Add a relationship';
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.placeholder = 'Search moments and durations';
+  search.setAttribute('aria-label', 'Find an entity to relate');
+  const results = document.createElement('div');
+  results.className = 'related-results';
+  add.append(summary, search, results);
+  host.append(add);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  search.oninput = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const words = search.value;
+      void (async () => {
+        const page: SearchPage =
+          !sparseWorkspace() && model
+            ? searchIndex(model, words, 1)
+            : await timelineQuery<SearchPage>({
+                kind: 'search',
+                text: words,
+                page: 1,
+                revision: (local ?? remote)!.revision,
+              });
+        if (search.value !== words || generation !== relatedGeneration) return;
+        results.replaceChildren();
+        for (const result of page.results) {
+          const other: EntityRef =
+            result.kind === 'moment' ? { moment: result.id } : { duration: result.id };
+          if (refKey(other) === refKey(ref)) continue;
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent =
+            (result.title || 'Untitled') +
+            ' · ' +
+            (result.kind === 'moment' ? 'moment' : 'duration');
+          button.onclick = () => {
+            setLink(ref, other, true, result);
+            renderRelated(host, ref, readOnly);
+          };
+          results.append(button);
+        }
+        if (!page.results.length && searchTerms(words).length)
+          results.textContent = 'No moments or durations match.';
+      })().catch(fail);
+    }, 200);
+  };
+}
+let relatedGeneration = 0;
+function describeLabel(ref: EntityRef) {
+  const entry = describe(refKey(ref));
+  return entry?.title || ('moment' in ref ? 'this moment' : 'this duration');
+}
+/** Relationship arcs between endpoint times; arcs to off-screen entities run off the edge. */
+function renderEdgeArcs() {
+  const svg = el('edge-arcs');
+  svg.replaceChildren();
+  if (comparison) return;
+  const axis = 192;
+  const name = (ref: EntityRef) =>
+    describe(refKey(ref))?.title || ('moment' in ref ? 'Moment' : 'Duration');
+  for (const edge of frame.edges ?? []) {
+    const xa = (48 + viewport.x(Q.parse(edge.aTime), width())) / uiScale,
+      xb = (48 + viewport.x(Q.parse(edge.bTime), width())) / uiScale;
+    const distance = Math.abs(xb - xa);
+    const lift = Math.min(150, 18 + distance * 0.3);
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M ${xa} ${axis} Q ${(xa + xb) / 2} ${axis - 2 * lift} ${xb} ${axis}`);
+    path.setAttribute('class', 'edge-arc');
+    path.dataset.edgeId = edge.id;
+    const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+    title.textContent = `${name(edge.a)} ↔ ${name(edge.b)}`;
+    path.append(title);
+    svg.append(path);
+  }
+  if (frame.edgesTruncated) {
+    const note = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    note.setAttribute('x', '48');
+    note.setAttribute('y', '14');
+    note.setAttribute('class', 'edge-limit');
+    note.textContent = 'Showing the first 256 relationships in this window. Zoom in to see more.';
+    svg.append(note);
+  }
+}
 /** Band elements persist by duration so clicks and hover cards survive re-rendering. */
 const durationButtons = new Map<string, HTMLButtonElement>();
 function renderDurationBands() {

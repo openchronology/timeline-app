@@ -77,6 +77,9 @@ export async function checkComparison(browser) {
       if (path.endsWith('/query')) {
         const query = route.request().postDataJSON();
         queries.push(query);
+        // Opening a moment also lists its relationships.
+        if (query.kind === 'related')
+          return route.fulfill({ json: { related: [], next: null, reachable: 0, direct: 0 } });
         if (query.kind === 'events')
           return route.fulfill({
             json: localEvents(index, query.lower, query.upper, query.after, query.limit),

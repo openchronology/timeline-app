@@ -38,6 +38,32 @@ pub struct Document {
     pub events: Vec<Event>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub durations: Vec<Duration>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub relationships: Vec<Relationship>,
+}
+/// An undirected link between two entities, each `{"moment": id}` or `{"duration": id}`.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct Relationship {
+    pub a: Value,
+    pub b: Value,
+}
+/// (kind, id) of an entity reference.
+pub(crate) fn entity_ref(value: &Value) -> Result<(&'static str, &str), String> {
+    let o = value
+        .as_object()
+        .filter(|o| o.len() == 1)
+        .ok_or("Invalid relationship endpoint")?;
+    let (kind, id) = if let Some(id) = o.get("moment").and_then(Value::as_str) {
+        ("moment", id)
+    } else if let Some(id) = o.get("duration").and_then(Value::as_str) {
+        ("duration", id)
+    } else {
+        return Err("Invalid relationship endpoint".into());
+    };
+    if !identifier(id) {
+        return Err("Invalid relationship endpoint".into());
+    }
+    Ok((kind, id))
 }
 fn identifier(id: &str) -> bool {
     !id.is_empty()
@@ -111,7 +137,7 @@ fn check_file(db: &Connection) -> Result<(), String> {
     }
     // These names must be data tables, never attacker-supplied SQL views.
     if db.scalar("SELECT count(*) FROM sqlite_schema WHERE name IN ('events','timeline_meta') AND type='table'", &[])? != "2"
-        || db.scalar("SELECT count(*) FROM sqlite_schema WHERE name IN ('timeline_settings','timeline_plugins','timeline_extras','durations') AND type!='table'", &[])? != "0" {
+        || db.scalar("SELECT count(*) FROM sqlite_schema WHERE name IN ('timeline_settings','timeline_plugins','timeline_extras','durations','relationships') AND type!='table'", &[])? != "0" {
         return Err("Invalid timeline data tables".into());
     }
     Ok(())
@@ -202,6 +228,25 @@ fn validate(doc: &Document) -> Result<(), String> {
             return Err("Durations cannot contain durations".into());
         }
     }
+    if doc.relationships.len() > 200000 {
+        return Err("Use at most 200000 relationships per timeline".into());
+    }
+    for r in &doc.relationships {
+        let (a, b) = (entity_ref(&r.a)?, entity_ref(&r.b)?);
+        if a == b {
+            return Err("An entity cannot be related to itself".into());
+        }
+        for (kind, id) in [a, b] {
+            let exists = if kind == "moment" {
+                ids.contains(&id.to_string())
+            } else {
+                durations.contains(&id.to_string())
+            };
+            if !exists {
+                return Err("Relationships must connect existing moments and durations".into());
+            }
+        }
+    }
     Ok(())
 }
 pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
@@ -234,6 +279,7 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
             "timeline_extras",
             "events",
             "durations",
+            "relationships",
         ] {
             db.execute(&format!("DROP TABLE IF EXISTS {table}"), &[])?;
         }
@@ -282,6 +328,11 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
             insert_duration(&db, duration)?;
         }
         rebuild_duration_index(&db)?;
+        create_relationship_table(&db)?;
+        for r in &doc.relationships {
+            relate(&db, r, true)?;
+        }
+        rebuild_edge_index(&db)?;
         db.execute("PRAGMA application_id=1329812556", &[])?;
         db.execute("PRAGMA user_version=1", &[])?;
         db.execute("COMMIT", &[])
@@ -411,6 +462,22 @@ fn read_document(path: &Path, include_events: bool) -> Result<Document, String> 
         } else {
             Vec::new()
         },
+        relationships: if include_events
+            && db.scalar(
+                "SELECT count(*) FROM sqlite_schema WHERE name='relationships' AND type='table'",
+                &[],
+            )? != "0"
+        {
+            db.query("SELECT a_kind,a_id,b_kind,b_id FROM relationships ORDER BY a_kind,a_id,b_kind,b_id LIMIT 200001", &[])?
+                .into_iter()
+                .map(|r| {
+                    let side = |k: &Option<String>, i: &Option<String>| serde_json::json!({ k.clone().unwrap_or_default(): i.clone().unwrap_or_default() });
+                    Relationship { a: side(&r[0], &r[1]), b: side(&r[2], &r[3]) }
+                })
+                .collect()
+        } else {
+            Vec::new()
+        },
         events,
     };
     let mut doc = doc;
@@ -473,16 +540,66 @@ fn has_any_tag(metadata: &Map<String, Value>, tags: &[String]) -> bool {
                 .any(|t| t.as_str().is_some_and(|t| tags.iter().any(|w| w == t)))
         })
 }
-/// One side of a tag separation. Durations resolve to fixed endpoints first, because the
-/// moments they follow may be on the other side. Mirrors src/tags.ts filterDocument.
-pub fn filter_document(mut doc: Document, tags: &[String], any: bool) -> Document {
+/// What puts an entity on the upper side of a separation.
+pub enum Membership {
+    /// Any of these (normalized) tags.
+    Tags(Vec<String>),
+    /// This entity ("m:<id>" or "d:<id>") and its relations: direct, or all reachable.
+    Related { start: String, direct: bool },
+}
+fn ref_key(value: &Value) -> Option<String> {
+    let (kind, id) = entity_ref(value).ok()?;
+    Some(format!(
+        "{}:{}",
+        if kind == "moment" { "m" } else { "d" },
+        id
+    ))
+}
+/// One side of a separation. Durations resolve to fixed endpoints first, because the
+/// moments they follow may be on the other side; links between entities that are both on
+/// this side remain. Mirrors src/tags.ts filterDocument.
+pub fn filter_document(mut doc: Document, membership: &Membership, any: bool) -> Document {
     let times: std::collections::HashMap<String, String> = doc
         .events
         .iter()
         .map(|e| (e.id.clone(), e.time.clone()))
         .collect();
-    let keep = |metadata: &Map<String, Value>| has_any_tag(metadata, tags) == any;
-    doc.events.retain(|e| keep(&e.metadata));
+    let related: Option<HashSet<String>> = match membership {
+        Membership::Tags(_) => None,
+        Membership::Related { start, direct } => {
+            let mut graph: std::collections::HashMap<String, Vec<String>> = Default::default();
+            for r in &doc.relationships {
+                if let (Some(a), Some(b)) = (ref_key(&r.a), ref_key(&r.b)) {
+                    graph.entry(a.clone()).or_default().push(b.clone());
+                    graph.entry(b).or_default().push(a);
+                }
+            }
+            let mut found: HashSet<String> = HashSet::from([start.clone()]);
+            let mut frontier = vec![start.clone()];
+            while !frontier.is_empty() {
+                let mut next = Vec::new();
+                for key in frontier {
+                    for neighbour in graph.get(&key).into_iter().flatten() {
+                        if found.insert(neighbour.clone()) {
+                            next.push(neighbour.clone());
+                        }
+                    }
+                }
+                frontier = if *direct { Vec::new() } else { next };
+            }
+            Some(found)
+        }
+    };
+    let keep = |key: String, metadata: &Map<String, Value>| {
+        let inside = match (&related, membership) {
+            (Some(set), _) => set.contains(&key),
+            (None, Membership::Tags(tags)) => has_any_tag(metadata, tags),
+            _ => false,
+        };
+        inside == any
+    };
+    doc.events
+        .retain(|e| keep(format!("m:{}", e.id), &e.metadata));
     let resolve = |endpoint: &Value| match endpoint {
         Value::String(_) => Some(endpoint.clone()),
         _ => endpoint
@@ -494,7 +611,7 @@ pub fn filter_document(mut doc: Document, tags: &[String], any: bool) -> Documen
     doc.durations = doc
         .durations
         .into_iter()
-        .filter(|d| keep(&d.metadata))
+        .filter(|d| keep(format!("d:{}", d.id), &d.metadata))
         .filter_map(|d| {
             Some(Duration {
                 start: resolve(&d.start)?,
@@ -503,6 +620,16 @@ pub fn filter_document(mut doc: Document, tags: &[String], any: bool) -> Documen
             })
         })
         .collect();
+    let kept: HashSet<String> = doc
+        .events
+        .iter()
+        .map(|e| format!("m:{}", e.id))
+        .chain(doc.durations.iter().map(|d| format!("d:{}", d.id)))
+        .collect();
+    doc.relationships.retain(|r| {
+        ref_key(&r.a).is_some_and(|k| kept.contains(&k))
+            && ref_key(&r.b).is_some_and(|k| kept.contains(&k))
+    });
     doc
 }
 /// Moves legacy links out of moment metadata in a writable working copy.
@@ -603,6 +730,7 @@ mod tests {
                 },
             ],
             durations: Vec::new(),
+            relationships: Vec::new(),
         }
     }
     #[test]
@@ -844,11 +972,90 @@ fn rebuild_duration_index(db: &Connection) -> Result<(), String> {
     {
         return Err("Use at most 200000 durations per timeline".into());
     }
-    // Subtree summaries (largest start, count, extent bounds) let short durations collapse
-    // into summaries without enumerating dense clusters; see duration_summaries.
-    db.execute("CREATE TABLE duration_nodes(id INTEGER PRIMARY KEY,left_id INTEGER,right_id INTEGER,min_time TEXT NOT NULL COLLATE RATIONAL_V1,max_time TEXT NOT NULL COLLATE RATIONAL_V1,max_first TEXT NOT NULL COLLATE RATIONAL_V1,cnt INTEGER NOT NULL,min_extent TEXT NOT NULL COLLATE RATIONAL_V1,max_extent TEXT NOT NULL COLLATE RATIONAL_V1)", &[])?;
-    db.execute("WITH RECURSIVE ranges(lo,hi,mid) AS (SELECT 1,count(*),CAST((1+count(*))/2 AS INTEGER) FROM duration_intervals HAVING count(*)>0 UNION ALL SELECT r.lo,r.mid-1,CAST((r.lo+r.mid-1)/2 AS INTEGER) FROM ranges r WHERE r.lo<r.mid UNION ALL SELECT r.mid+1,r.hi,CAST((r.mid+1+r.hi)/2 AS INTEGER) FROM ranges r WHERE r.mid<r.hi) INSERT INTO duration_nodes SELECT mid,CASE WHEN lo<mid THEN CAST((lo+mid-1)/2 AS INTEGER) END,CASE WHEN mid<hi THEN CAST((mid+1+hi)/2 AS INTEGER) END,(SELECT first FROM duration_intervals WHERE ord=lo),(SELECT last FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY last COLLATE RATIONAL_V1 DESC LIMIT 1),(SELECT first FROM duration_intervals WHERE ord=hi),hi-lo+1,(SELECT extent FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY extent COLLATE RATIONAL_V1 LIMIT 1),(SELECT extent FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY extent COLLATE RATIONAL_V1 DESC LIMIT 1) FROM ranges", &[])?;
+    build_interval_nodes(db, "duration_intervals", "duration_nodes")
+}
+/// Balanced augmented nodes over an intervals table ordered by `ord`. Subtree summaries
+/// (largest start, count, extent bounds) let short intervals collapse without enumerating
+/// dense clusters; see duration_summaries.
+fn build_interval_nodes(db: &Connection, intervals: &str, nodes: &str) -> Result<(), String> {
+    db.execute(&format!("DROP TABLE IF EXISTS {nodes}"), &[])?;
+    let sql = "CREATE TABLE duration_nodes(id INTEGER PRIMARY KEY,left_id INTEGER,right_id INTEGER,min_time TEXT NOT NULL COLLATE RATIONAL_V1,max_time TEXT NOT NULL COLLATE RATIONAL_V1,max_first TEXT NOT NULL COLLATE RATIONAL_V1,cnt INTEGER NOT NULL,min_extent TEXT NOT NULL COLLATE RATIONAL_V1,max_extent TEXT NOT NULL COLLATE RATIONAL_V1)";
+    db.execute(&sql.replace("duration_nodes", nodes), &[])?;
+    let sql = "WITH RECURSIVE ranges(lo,hi,mid) AS (SELECT 1,count(*),CAST((1+count(*))/2 AS INTEGER) FROM duration_intervals HAVING count(*)>0 UNION ALL SELECT r.lo,r.mid-1,CAST((r.lo+r.mid-1)/2 AS INTEGER) FROM ranges r WHERE r.lo<r.mid UNION ALL SELECT r.mid+1,r.hi,CAST((r.mid+1+r.hi)/2 AS INTEGER) FROM ranges r WHERE r.mid<r.hi) INSERT INTO duration_nodes SELECT mid,CASE WHEN lo<mid THEN CAST((lo+mid-1)/2 AS INTEGER) END,CASE WHEN mid<hi THEN CAST((mid+1+hi)/2 AS INTEGER) END,(SELECT first FROM duration_intervals WHERE ord=lo),(SELECT last FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY last COLLATE RATIONAL_V1 DESC LIMIT 1),(SELECT first FROM duration_intervals WHERE ord=hi),hi-lo+1,(SELECT extent FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY extent COLLATE RATIONAL_V1 LIMIT 1),(SELECT extent FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY extent COLLATE RATIONAL_V1 DESC LIMIT 1) FROM ranges";
+    db.execute(
+        &sql.replace("duration_nodes", nodes)
+            .replace("duration_intervals", intervals),
+        &[],
+    )?;
     Ok(())
+}
+pub(crate) fn create_relationship_table(db: &Connection) -> Result<(), String> {
+    db.execute("CREATE TABLE IF NOT EXISTS relationships(a_kind TEXT NOT NULL CHECK(a_kind IN ('moment','duration')),a_id TEXT NOT NULL,b_kind TEXT NOT NULL CHECK(b_kind IN ('moment','duration')),b_id TEXT NOT NULL,PRIMARY KEY(a_kind,a_id,b_kind,b_id),CHECK(a_kind<>b_kind OR a_id<>b_id)) STRICT", &[])?;
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS relationships_b ON relationships(b_kind,b_id)",
+        &[],
+    )
+}
+/// Adds or removes a link, stored once in canonical order ("m:" < "d:" style key order).
+pub(crate) fn relate(db: &Connection, r: &Relationship, related: bool) -> Result<(), String> {
+    let (mut a, mut b) = (entity_ref(&r.a)?, entity_ref(&r.b)?);
+    if a == b {
+        return Err("An entity cannot be related to itself".into());
+    }
+    let key = |(k, i): (&str, &str)| format!("{}:{}", if k == "moment" { "m" } else { "d" }, i);
+    if key(a) > key(b) {
+        std::mem::swap(&mut a, &mut b);
+    }
+    if related {
+        db.execute(
+            "INSERT OR IGNORE INTO relationships VALUES(?,?,?,?)",
+            &[a.0, a.1, b.0, b.1],
+        )
+    } else {
+        db.execute(
+            "DELETE FROM relationships WHERE a_kind=? AND a_id=? AND b_kind=? AND b_id=?",
+            &[a.0, a.1, b.0, b.1],
+        )
+    }
+}
+/// Relationship arcs as fixed intervals between endpoint times (a duration's start), in the
+/// same augmented tree as duration bands. Requires the duration index.
+pub(crate) fn rebuild_edge_index(db: &Connection) -> Result<(), String> {
+    create_relationship_table(db)?;
+    // Deleting an entity removes its links.
+    db.execute("DELETE FROM relationships WHERE (a_kind='moment' AND a_id NOT IN (SELECT id FROM events)) OR (b_kind='moment' AND b_id NOT IN (SELECT id FROM events)) OR (a_kind='duration' AND a_id NOT IN (SELECT id FROM durations)) OR (b_kind='duration' AND b_id NOT IN (SELECT id FROM durations))", &[])?;
+    db.execute("DROP TABLE IF EXISTS edge_intervals", &[])?;
+    db.execute("CREATE TABLE edge_intervals(ord INTEGER PRIMARY KEY,id TEXT NOT NULL UNIQUE,start_json TEXT NOT NULL,end_json TEXT NOT NULL,start_time TEXT NOT NULL COLLATE RATIONAL_V1,end_time TEXT NOT NULL COLLATE RATIONAL_V1,first TEXT NOT NULL COLLATE RATIONAL_V1,last TEXT NOT NULL COLLATE RATIONAL_V1,metadata TEXT NOT NULL,extent TEXT COLLATE RATIONAL_V1)", &[])?;
+    db.execute("WITH places(kind,id,time) AS (SELECT 'moment',id,time FROM events UNION ALL SELECT 'duration',id,start_time FROM duration_intervals), r AS (SELECT CASE r.a_kind WHEN 'moment' THEN 'm:' ELSE 'd:' END||r.a_id||'~'||CASE r.b_kind WHEN 'moment' THEN 'm:' ELSE 'd:' END||r.b_id AS id,pa.time AS s,pb.time AS e FROM relationships r JOIN places pa ON pa.kind=r.a_kind AND pa.id=r.a_id JOIN places pb ON pb.kind=r.b_kind AND pb.id=r.b_id) INSERT INTO edge_intervals(ord,id,start_json,end_json,start_time,end_time,first,last,metadata,extent) SELECT row_number() OVER (ORDER BY q_min(s,e) COLLATE RATIONAL_V1,id),id,'null','null',s,e,q_min(s,e),q_max(s,e),'{}',q_sub(q_max(s,e),q_min(s,e)) FROM r", &[])?;
+    build_interval_nodes(db, "edge_intervals", "edge_nodes")
+}
+/// Arcs touching [lower, upper] that are at least as long as the threshold.
+pub(crate) fn edge_window(
+    db: &Connection,
+    lower: &str,
+    upper: &str,
+    threshold: &str,
+) -> Result<Value, String> {
+    if db.scalar(
+        "SELECT count(*) FROM sqlite_schema WHERE name='edge_nodes' AND type='table'",
+        &[],
+    )? == "0"
+    {
+        return Ok(serde_json::json!({"edges":[],"edgesTruncated":false}));
+    }
+    let rows = interval_window(db, "edge_intervals", "edge_nodes", lower, upper, threshold)?;
+    let more = rows.len() > 256;
+    let mut edges = Vec::new();
+    for row in rows.into_iter().take(256) {
+        let id = row[0].clone().unwrap_or_default();
+        let (a, b) = id.split_once('~').ok_or("Invalid arc identifier")?;
+        let side = |key: &str| {
+            let (k, i) = key.split_at(2);
+            serde_json::json!({ if k == "m:" { "moment" } else { "duration" }: i })
+        };
+        edges.push(serde_json::json!({"id":id,"a":side(a),"b":side(b),"first":row[3],"last":row[4],"aTime":row[6],"bTime":row[7]}));
+    }
+    Ok(serde_json::json!({"edges":edges,"edgesTruncated":more}))
 }
 const BAND_COLUMNS: &str = "d.id,d.start_json,d.end_json,d.first,d.last,(SELECT json_group_object(key,CASE key WHEN 'title' THEN substr(value,1,512) WHEN 'description' THEN substr(value,1,2000) ELSE value END) FROM json_each(d.metadata) WHERE type='text' AND (key IN ('title','description') OR length(value)<=256)),d.start_time,d.end_time";
 fn band_json(row: &[Option<String>]) -> Result<Value, String> {
@@ -867,14 +1074,32 @@ fn duration_window(
     upper: &str,
     threshold: &str,
 ) -> Result<Value, String> {
-    let sql = format!("WITH RECURSIVE visible AS (SELECT n.* FROM duration_nodes n WHERE id=(SELECT CAST((1+count(*))/2 AS INTEGER) FROM duration_intervals) AND min_time<=q(?1) COLLATE RATIONAL_V1 AND max_time>=q(?2) COLLATE RATIONAL_V1 UNION ALL SELECT n.* FROM visible p JOIN duration_nodes n ON n.id IN(p.left_id,p.right_id) WHERE n.min_time<=q(?1) COLLATE RATIONAL_V1 AND n.max_time>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp(n.max_extent,q(?3))>=0)) SELECT {BAND_COLUMNS} FROM visible v JOIN duration_intervals d ON d.ord=v.id WHERE d.first<=q(?1) COLLATE RATIONAL_V1 AND d.last>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp(d.extent,q(?3))>=0) LIMIT 257");
-    let rows = db.query_limited(&sql, &[upper, lower, threshold], 257, 8 * 1024 * 1024)?;
+    let rows = interval_window(
+        db,
+        "duration_intervals",
+        "duration_nodes",
+        lower,
+        upper,
+        threshold,
+    )?;
     let more = rows.len() > 256;
     let mut bands = Vec::new();
     for row in rows.into_iter().take(256) {
         bands.push(band_json(&row)?);
     }
     Ok(serde_json::json!({"durations":bands,"durationsTruncated":more}))
+}
+/// Rows of an interval tree touching [lower, upper] and at least as long as the threshold.
+fn interval_window(
+    db: &Connection,
+    intervals: &str,
+    nodes: &str,
+    lower: &str,
+    upper: &str,
+    threshold: &str,
+) -> Result<Vec<Vec<Option<String>>>, String> {
+    let sql = format!("WITH RECURSIVE visible AS (SELECT n.* FROM {nodes} n WHERE id=(SELECT CAST((1+count(*))/2 AS INTEGER) FROM {intervals}) AND min_time<=q(?1) COLLATE RATIONAL_V1 AND max_time>=q(?2) COLLATE RATIONAL_V1 UNION ALL SELECT n.* FROM visible p JOIN {nodes} n ON n.id IN(p.left_id,p.right_id) WHERE n.min_time<=q(?1) COLLATE RATIONAL_V1 AND n.max_time>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp(n.max_extent,q(?3))>=0)) SELECT {BAND_COLUMNS} FROM visible v JOIN {intervals} d ON d.ord=v.id WHERE d.first<=q(?1) COLLATE RATIONAL_V1 AND d.last>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp(d.extent,q(?3))>=0) LIMIT 257");
+    db.query_limited(&sql, &[upper, lower, threshold], 257, 8 * 1024 * 1024)
 }
 /// Durations wholly inside [lower, upper], in start order after an exact (start, ID) cursor.
 pub(crate) fn duration_page(

@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { HttpError } from './store.mjs';
-import { validateDocument, fixMissingAnchors } from '../dist/core.mjs';
+import { validateDocument, fixMissingAnchors, relationshipKey } from '../dist/core.mjs';
 function same(a, b) {
   return canonical(a) === canonical(b);
 }
@@ -69,6 +69,22 @@ export function rebaseDocument(base, proposal, upstream) {
   );
   if (fixed.length) result.durations = fixed;
   else delete result.durations;
+  // Links merge as a set; a link survives only while both of its entities do.
+  const links = [base, proposal, upstream].map(
+    (d) => new Map((d.relationships ?? []).map((r) => [relationshipKey(r), r])),
+  );
+  const present = new Set([
+    ...result.events.map((e) => 'm:' + e.id),
+    ...fixed.map((d) => 'd:' + d.id),
+  ]);
+  const key = (ref) => ('moment' in ref ? 'm:' + ref.moment : 'd:' + ref.duration);
+  const relationships = [];
+  for (const id of new Set(links.flatMap((m) => [...m.keys()]))) {
+    const link = merge(...links.map((m) => m.get(id)), 'relationship ' + id);
+    if (link && present.has(key(link.a)) && present.has(key(link.b))) relationships.push(link);
+  }
+  if (relationships.length) result.relationships = relationships;
+  else delete result.relationships;
   if (conflicts.length)
     throw Object.assign(
       new HttpError(

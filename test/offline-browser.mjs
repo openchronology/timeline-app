@@ -2,6 +2,7 @@ import { checkIssues } from './issues-browser.mjs';
 import { checkSearch } from './search-browser.mjs';
 import { checkSummaries } from './summaries-browser.mjs';
 import { checkTags } from './tags-browser.mjs';
+import { checkRelationships } from './relationships-browser.mjs';
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
 import { closeMomentDetails, checkMomentDialog } from './moment-dialog-browser.mjs';
@@ -177,6 +178,7 @@ try {
   await checkSearch(page, document);
   await checkSummaries(page, document);
   await checkTags(page, document);
+  await checkRelationships(page, document);
   await closeMomentDetails(page);
   await input('json-file').setInputFiles({
     name: 'sample.ochx',

@@ -358,6 +358,9 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
   const cloudIndex = new TimelineIndex(cloud);
   await page.route(cloudQuery, (route) => {
     const data = route.request().postDataJSON();
+    // Opening a moment also lists its relationships.
+    if (data.kind === 'related')
+      return route.fulfill({ json: { related: [], next: null, reachable: 0, direct: 0 } });
     if (data.kind === 'events')
       return route.fulfill({
         json: {
