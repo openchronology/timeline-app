@@ -49,7 +49,7 @@ npm ci
 npm run build:offline
 ```
 
-Double-click `dist/openchronology-offline.html` to open it in a modern browser. You can copy that file into an otherwise empty folder or share it without any adjacent files. JavaScript, CSS, the rational library, the icon, and license notices are embedded. The normal `npm run build` also generates it, and GitHub CI retains it as the `openchronology-offline-html` artifact. Every push to `main` also publishes it to GitHub Pages through `.github/workflows/pages.yml`, after the offline browser test passes; the repository's Pages source must be set to **GitHub Actions**.
+Double-click `dist/openchronology-offline.html` to open it in a modern browser. You can copy that file into an otherwise empty folder or share it without any adjacent files. JavaScript, CSS, the rational library, the icon, and license notices are embedded. The normal `npm run build` also generates it, and GitHub CI retains it as the `openchronology-offline-html` artifact. Every push to `main` also publishes it as the index page of <https://openchronology.github.io/> through `.github/workflows/pages.yml`, after the offline browser test passes. The workflow pushes to the `openchronology/openchronology.github.io` repository with a write deploy key stored as the `PAGES_DEPLOY_KEY` secret.
 
 Each opening starts with one empty timeline. Add and edit point events, pan and zoom, inspect groups, and import or export the same `.ochx` format used by the other editions. Changes live in memory: **export JSON to save your work**. Reopening or reloading the HTML starts fresh; it neither rewrites itself nor stores browser drafts. The New button replaces the current timeline.
 
