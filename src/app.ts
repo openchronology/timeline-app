@@ -2986,14 +2986,20 @@ window.addEventListener('blur', () => {
 
 // Pointer Events give mouse dragging, single-touch panning and two-touch anchored scaling.
 const pointers = new Map<number, { x: number; y: number }>();
+/**
+ * A two-finger gesture does one thing, chosen when the second finger lands: fingers side by side
+ * (up to 60° from horizontal) zoom time; fingers stacked vertically resize the contents.
+ * Coordinates are CSS pixels of the current layout, so the choice follows the screen orientation.
+ */
+const RESIZE_PINCH_SLOPE = Math.tan((60 * Math.PI) / 180);
 let gesture: {
     view: Viewport;
     mid: number;
     midY: number;
     vertical: number;
     distance: number;
-    distanceY: number;
     scale: number;
+    mode: 'pan' | 'zoom' | 'resize';
   } | null = null,
   press: { id: number; x: number; y: number; time: number; target: EventTarget | null } | null =
     null,
@@ -3007,8 +3013,10 @@ function metrics() {
   return {
     mid: p.length === 1 ? localX(p[0].x) : localX((p[0].x + p[1].x) / 2),
     midY: p.length === 1 ? p[0].y : (p[0].y + p[1].y) / 2,
-    distance: p.length < 2 ? 1 : Math.max(1, Math.abs(p[0].x - p[1].x)),
-    distanceY: p.length < 2 ? 0 : Math.abs(p[0].y - p[1].y),
+    // Euclidean separation: drifting between axes during a pinch does not change its factor.
+    distance: p.length < 2 ? 1 : Math.max(1, Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y)),
+    dx: p.length < 2 ? 0 : Math.abs(p[0].x - p[1].x),
+    dy: p.length < 2 ? 0 : Math.abs(p[0].y - p[1].y),
   };
 }
 function resetGesture() {
@@ -3016,7 +3024,14 @@ function resetGesture() {
     gesture = null;
     return;
   }
-  gesture = { view: viewport.clone(), vertical: verticalOffset, scale: uiScale, ...metrics() };
+  const { dx, dy, ...start } = metrics();
+  gesture = {
+    view: viewport.clone(),
+    vertical: verticalOffset,
+    scale: uiScale,
+    ...start,
+    mode: pointers.size < 2 ? 'pan' : dy > dx * RESIZE_PINCH_SLOPE ? 'resize' : 'zoom',
+  };
 }
 stage.addEventListener(
   'pointerdown',
@@ -3075,19 +3090,19 @@ stage.addEventListener('pointermove', (event) => {
   if (!moved || longPressed) return;
   follow.navigation();
   stage.classList.add('dragging');
-  if (pointers.size > 1 && gesture.distanceY >= 20)
-    uiScale = Math.max(0.2, Math.min(3, (gesture.scale * now.distanceY) / gesture.distanceY));
+  if (gesture.mode === 'resize' && gesture.distance >= 20)
+    uiScale = Math.max(0.2, Math.min(3, (gesture.scale * now.distance) / gesture.distance));
   const anchor = gesture.midY - stage.getBoundingClientRect().top;
   verticalOffset =
     anchor - ((anchor - gesture.vertical) * uiScale) / gesture.scale + now.midY - gesture.midY;
   const next =
-    pointers.size === 1
+    gesture.mode === 'pan'
       ? gesture.view.pan(now.mid - gesture.mid, width())
       : gesture.view.pinch(
           gesture.mid,
           now.mid,
           width(),
-          gesture.distance >= 20
+          gesture.mode === 'zoom' && gesture.distance >= 20
             ? screenQ(gesture.distance).div(screenQ(now.distance))
             : Q.from(1n),
         );
@@ -4362,7 +4377,11 @@ if (desktop) {
 const timelineResizeObserver = new ResizeObserver(() => requestRender());
 timelineResizeObserver.observe(stage);
 // Also refresh when the viewport changes or the browser restores a page from its cache.
-window.addEventListener('resize', () => requestRender());
+// A rotation or resize mid-gesture changes the layout under the fingers; restart from here.
+window.addEventListener('resize', () => {
+  if (pointers.size) resetGesture();
+  requestRender();
+});
 window.addEventListener('pageshow', () => requestRender());
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) requestRender();
