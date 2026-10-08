@@ -2192,3 +2192,28 @@ dialog button {
   font-size: 14px;
   margin: 18px 0 8px;
 }
+
+.separate-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  max-height: 260px;
+  overflow: auto;
+}
+.separate-tags .checkbox-label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.separate-tags input {
+  width: auto;
+  min-height: 0;
+}
+.separation-tags {
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--green);
+  overflow-wrap: anywhere;
+}

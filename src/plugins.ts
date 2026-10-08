@@ -216,6 +216,7 @@ const reserved = new Set([
   'title',
   'description',
   'durations',
+  'tags',
   '__proto__',
   'prototype',
   'constructor',

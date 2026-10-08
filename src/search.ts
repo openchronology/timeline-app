@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { Rational as Q } from 'rational-ordered-map';
 import { resolveDuration } from './durations.js';
+import { entityTags } from './tags.js';
 import type { Metadata, PointEvent, TimelineIndex } from './core.js';
 
 export const SEARCH_PAGE_SIZE = 25;
@@ -115,6 +116,7 @@ export function searchRows(
       id: e.id,
       first: e.time,
       last: e.time,
+      tags: entityTags(e.metadata),
       ...searchText(e.metadata),
     })),
     ...durations.map((d) => ({
@@ -122,6 +124,7 @@ export function searchRows(
       id: d.id,
       first: d.first,
       last: d.last,
+      tags: entityTags(d.metadata),
       ...searchText(d.metadata),
     })),
   ];

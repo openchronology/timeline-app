@@ -242,6 +242,7 @@ Every point has a place. Explore the spaces between them.</textarea>
                 ><input id="follow-latest" type="checkbox" /> Follow latest events</label
               >
               <button id="search-button" title="Search moments and durations (/)">Search</button>
+              <button id="separate-button">Separate by tags</button>
               <button id="presentation-button">Time display</button>
               <button id="plugins-button">Plugins</button>
               <button id="compare-button">Compare</button>
@@ -258,6 +259,17 @@ Every point has a place. Explore the spaces between them.</textarea>
             New server changes are available. Your unsaved edits are retained.
             <button id="live-reload">Reload latest</button>
           </div>
+          <section id="separation-settings" class="comparison-settings" hidden>
+            <div class="comparison-heading">
+              <strong>Separated by tags</strong>
+              <span id="separation-tags" class="separation-tags"></span>
+              <button id="separation-rejoin">Rejoin</button>
+            </div>
+            <p id="separation-note" class="field-hint">
+              Read-only. Moments and durations with any of these tags are shown above; everything
+              else stays below.
+            </p>
+          </section>
           <section id="comparison-settings" class="comparison-settings" hidden>
             <div class="comparison-heading">
               <strong>Read-only comparison</strong>
@@ -386,6 +398,13 @@ Every point has a place. Explore the spaces between them.</textarea>
             placeholder="What happened here?"
           ></textarea>
         </label>
+        <label
+          >Tags<input
+            id="event-tags"
+            maxlength="2000"
+            spellcheck="false"
+            placeholder="Comma-separated, e.g. war, trade"
+        /></label>
         <div id="plugin-event-fields"></div>
         <section id="event-durations"></section>
         <details>
@@ -398,6 +417,30 @@ Every point has a place. Explore the spaces between them.</textarea>
         <div class="event-actions">
           <span id="event-edit-status" class="sr-only" role="status"></span>
           <button id="event-delete" class="button-danger" type="button">Delete</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="separate-dialog" aria-labelledby="separate-heading">
+      <form id="separate-form">
+        <div class="dialog-heading">
+          <h2 id="separate-heading">Separate by tags</h2>
+          <button type="button" data-close="separate-dialog" aria-label="Close">×</button>
+        </div>
+        <p class="field-hint">
+          Moments and durations with any chosen tag move into a track above the rest of the
+          timeline. Nothing is changed or saved.
+        </p>
+        <div id="separate-tags" class="separate-tags" role="group" aria-label="Tags"></div>
+        <label
+          >Other tags<input
+            id="separate-extra"
+            spellcheck="false"
+            placeholder="Comma-separated"
+        /></label>
+        <p id="separate-error" class="form-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button id="separate-submit" class="button-primary" type="submit">Separate</button
+          ><button type="button" data-close="separate-dialog">Cancel</button>
         </div>
       </form>
     </dialog>
@@ -435,6 +478,13 @@ Every point has a place. Explore the spaces between them.</textarea>
         <label>Title<input id="duration-title" maxlength="1000" placeholder="Optional" /></label>
         <div id="duration-endpoints" class="duration-endpoints"></div>
         <label>Notes<textarea id="duration-description" rows="4"></textarea></label>
+        <label
+          >Tags<input
+            id="duration-tags"
+            maxlength="2000"
+            spellcheck="false"
+            placeholder="Comma-separated, e.g. war, trade"
+        /></label>
         <div id="plugin-duration-fields"></div>
         <details>
           <summary>Additional metadata</summary>

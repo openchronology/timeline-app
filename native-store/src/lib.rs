@@ -464,6 +464,47 @@ fn read_durations(db: &Connection, id: Option<&str>) -> Result<Vec<Duration>, St
         })
         .collect()
 }
+fn has_any_tag(metadata: &Map<String, Value>, tags: &[String]) -> bool {
+    metadata
+        .get("tags")
+        .and_then(Value::as_array)
+        .is_some_and(|list| {
+            list.iter()
+                .any(|t| t.as_str().is_some_and(|t| tags.iter().any(|w| w == t)))
+        })
+}
+/// One side of a tag separation. Durations resolve to fixed endpoints first, because the
+/// moments they follow may be on the other side. Mirrors src/tags.ts filterDocument.
+pub fn filter_document(mut doc: Document, tags: &[String], any: bool) -> Document {
+    let times: std::collections::HashMap<String, String> = doc
+        .events
+        .iter()
+        .map(|e| (e.id.clone(), e.time.clone()))
+        .collect();
+    let keep = |metadata: &Map<String, Value>| has_any_tag(metadata, tags) == any;
+    doc.events.retain(|e| keep(&e.metadata));
+    let resolve = |endpoint: &Value| match endpoint {
+        Value::String(_) => Some(endpoint.clone()),
+        _ => endpoint
+            .get("moment")
+            .and_then(Value::as_str)
+            .and_then(|m| times.get(m))
+            .map(|t| Value::String(t.clone())),
+    };
+    doc.durations = doc
+        .durations
+        .into_iter()
+        .filter(|d| keep(&d.metadata))
+        .filter_map(|d| {
+            Some(Duration {
+                start: resolve(&d.start)?,
+                end: resolve(&d.end)?,
+                ..d
+            })
+        })
+        .collect();
+    doc
+}
 /// Moves legacy links out of moment metadata in a writable working copy.
 pub(crate) fn migrate_durations(db: &Connection) -> Result<(), String> {
     if db.scalar(

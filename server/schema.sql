@@ -585,3 +585,54 @@ CREATE TABLE IF NOT EXISTS oc_entity_search (
   PRIMARY KEY(timeline_id,kind,entity_id)
 );
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS search_version integer NOT NULL DEFAULT 0;
+-- Entity tags (metadata.tags of moments and durations), listed for tag separation.
+ALTER TABLE oc_entity_search ADD COLUMN IF NOT EXISTS tags text[] NOT NULL DEFAULT '{}';
+
+-- Derived indexes for tag separation: one saved revision filtered to entities with any of a
+-- set of tags, or none of them. Built on first use and cached per revision; a save discards
+-- them. Node tables mirror oc_nodes and oc_duration_nodes, keyed by the view's ID in the
+-- timeline_id column so the generated functions below can share the originals' code.
+CREATE TABLE IF NOT EXISTS oc_views (
+  id uuid PRIMARY KEY,
+  timeline_id uuid NOT NULL REFERENCES oc_timelines(id) ON DELETE CASCADE,
+  revision bigint NOT NULL,
+  filter_key text NOT NULL,
+  root bigint,
+  event_count bigint NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(timeline_id,revision,filter_key)
+);
+CREATE TABLE IF NOT EXISTS oc_view_nodes (
+  timeline_id uuid NOT NULL REFERENCES oc_views ON DELETE CASCADE, id bigint NOT NULL,
+  time mpq NOT NULL, first_time mpq NOT NULL, last_time mpq NOT NULL,
+  left_id bigint, right_id bigint, first_id bigint NOT NULL, bucket_count bigint NOT NULL,
+  event_count bigint NOT NULL, distinct_count integer NOT NULL,
+  events jsonb NOT NULL, PRIMARY KEY(timeline_id,id)
+);
+CREATE TABLE IF NOT EXISTS oc_view_duration_nodes (
+  timeline_id uuid NOT NULL REFERENCES oc_views ON DELETE CASCADE,
+  id integer NOT NULL, left_id integer, right_id integer,
+  min_time mpq NOT NULL, max_time mpq NOT NULL,
+  first_time mpq NOT NULL, last_time mpq NOT NULL, band jsonb NOT NULL,
+  definition jsonb, max_first mpq, subtree_count integer, min_extent mpq, max_extent mpq,
+  PRIMARY KEY(timeline_id,id)
+);
+-- View variants of the traversal functions, generated from the originals so the summary
+-- algorithms have a single definition: only table names (and the root's table) differ.
+DO $$
+DECLARE
+  generated record;
+BEGIN
+  FOR generated IN SELECT * FROM (VALUES
+    ('oc_overview_v2(uuid,mpq,mpq,mpq)', 'oc_overview_v2(', 'oc_view_overview('),
+    ('oc_events(uuid,mpq,mpq,mpq,text,integer)', 'oc_events(', 'oc_view_events('),
+    ('oc_duration_overview(uuid,mpq,mpq,mpq)', 'oc_duration_overview(', 'oc_view_duration_overview(')
+  ) AS f(signature, name, view_name) LOOP
+    EXECUTE replace(replace(replace(replace(
+      pg_get_functiondef(generated.signature::regprocedure),
+      generated.name, generated.view_name),
+      'oc_duration_nodes', 'oc_view_duration_nodes'),
+      'oc_nodes', 'oc_view_nodes'),
+      'oc_timelines', 'oc_views');
+  END LOOP;
+END $$;
