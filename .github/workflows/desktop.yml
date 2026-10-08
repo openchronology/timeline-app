@@ -15,8 +15,8 @@ jobs:
       matrix:
         include:
           - { os: ubuntu-24.04, target: linux-deb }
-          # Build the AppImage on the oldest supported runner so its bundled glibc baseline stays portable.
-          - { os: ubuntu-22.04, target: linux-appimage }
+          # The native store needs SQLite 3.39+, so the AppImage uses the same baseline as the .deb.
+          - { os: ubuntu-24.04, target: linux-appimage }
           - { os: macos-15, target: macos-arm64 }
           - { os: macos-15-intel, target: macos-amd64 }
           - { os: windows-2025, target: windows-amd64 }
