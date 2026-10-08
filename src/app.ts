@@ -51,6 +51,7 @@ import {
   validateDuration,
   durationPlugins,
   momentPlugins,
+  entityCount,
   searchIndex,
   searchTerms,
   searchText,
@@ -58,6 +59,7 @@ import {
   SEARCH_PAGE_SIZE,
 } from './core.js';
 import type {
+  DurationBand,
   SearchPage,
   SearchResult,
   Duration,
@@ -395,6 +397,10 @@ function clearGroupPage() {
   el('group-more').hidden = true;
   el('group-previous').hidden = true;
   text('group-page-status', '');
+  el('group-events').hidden = false;
+  el('group-page-status').hidden = false;
+  el('group-durations').hidden = true;
+  el('group-duration-list').replaceChildren();
 }
 type EventEdit = { before?: PointEvent; after?: PointEvent };
 type HistoryEntry = EventEdit | DurationEdit;
@@ -699,7 +705,11 @@ function renderAxis() {
     ['right-bound', viewport.right],
   ] as const)
     if (document.activeElement !== el(id)) {
-      const value = presented(time, 'input');
+      const value = presented(time, 'input'),
+        shown = displayedBounds.get(id);
+      // Only navigation or a display change rewrites a bound; re-rendering keeps unapplied typing,
+      // so a left bound typed before moving to the right field survives until Go.
+      if (shown?.text === value && shown.time.equals(time)) continue;
       input(id).value = value;
       displayedBounds.set(id, { text: value, time });
     }
@@ -727,7 +737,7 @@ function drawFrame() {
   const ordered: HTMLElement[] = [];
   let visible = 0n;
   // Remote summary metadata is itself ordered in a RationalMap. It is never mistaken for a complete event cache.
-  const groups = new RationalMap<FrameGroup>((g) => BigInt(g.count));
+  const groups = new RationalMap<FrameGroup>((g) => entityCount(g));
   for (const group of frame.groups) groups.set(Q.parse(group.first), group);
   let lane = 0;
   const orderedGroups = comparison
@@ -748,7 +758,9 @@ function drawFrame() {
     visible += BigInt(group.count);
     const key = group.id
       ? `event:${group.id}`
-      : `group:${sourceKey ?? ''}:${group.first}:${group.last}`;
+      : group.duration && group.count === '0'
+        ? `duration:${sourceKey ?? ''}:${group.duration.id}`
+        : `group:${sourceKey ?? ''}:${group.first}:${group.last}`;
     retained.add(key);
     let label = momentLabels.get(key);
     if (!label) {
@@ -781,9 +793,13 @@ function drawFrame() {
           node.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' });
     }
     const { button, caption, stem, coordinate } = label;
-    const count = BigInt(group.count);
+    const count = entityCount(group);
+    // A lone collapsed duration reads like a moment but keeps its own identity and plugins.
+    const span = count === 1n && group.count === '0' ? group.duration : undefined;
+    const plugins = span ? durationPlugins(installedPlugins()) : activePlugins();
     button.className =
       'event-marker' +
+      (span ? ' duration-point' : '') +
       (count > 1n ? ' group' : '') +
       (count > 999n ? ' large' : '') +
       (selectedGroup?.first === group.first &&
@@ -796,23 +812,25 @@ function drawFrame() {
     summaryExpansion.update(button, group, expandSummaries);
     button.dataset.first = group.first;
     button.dataset.count = group.count;
-    const metadata = group.id
-      ? ((!comparison ? model?.byId.get(group.id)?.metadata : undefined) ?? group.metadata ?? {})
-      : {};
-    renderPluginMarker(button, imageSource(pluginMarker(activePlugins(), metadata)), count);
-    const color = count === 1n ? pluginColor(activePlugins(), metadata) : null;
+    const metadata = span
+      ? span.metadata
+      : group.id
+        ? ((!comparison ? model?.byId.get(group.id)?.metadata : undefined) ?? group.metadata ?? {})
+        : {};
+    const name = span
+      ? 'Duration: ' + (span.metadata.title?.trim() || 'Unnamed duration')
+      : group.title?.trim() || 'Unnamed moment';
+    renderPluginMarker(button, imageSource(pluginMarker(plugins, metadata)), count);
+    const color = count === 1n ? pluginColor(plugins, metadata) : null;
     button.style.backgroundColor = color ?? '';
     button.style.borderColor = '';
-    button.dataset.size = count === 1n ? pluginSize(activePlugins(), metadata) : 'medium';
-    renderPluginShape(button, count === 1n ? pluginShape(activePlugins(), metadata) : 'circle');
+    button.dataset.size = count === 1n && !span ? pluginSize(plugins, metadata) : 'medium';
+    renderPluginShape(button, count === 1n && !span ? pluginShape(plugins, metadata) : 'circle');
     button.setAttribute(
       'aria-label',
-      count > 1n
-        ? `${count} events near ${presented(first)}`
-        : group.title?.trim() || 'Unnamed moment',
+      count > 1n ? `${summaryName(group)} near ${presented(first)}` : name,
     );
-    button.title =
-      count > 1n ? `${count} events; select to explore` : group.title?.trim() || 'Unnamed moment';
+    button.title = count > 1n ? `${summaryName(group)}; select to explore` : name;
     const sourceLane = trackLanes.get(sourceKey ?? '') ?? 0;
     trackLanes.set(sourceKey ?? '', sourceLane + 1);
     const top = (comparison ? sourceLane : lane++) % 4,
@@ -825,16 +843,16 @@ function drawFrame() {
     caption.style.left = `${(48 + x) / uiScale}px`;
     caption.style.top = `${labelTop}px`;
     label.title.textContent =
-      count > 1n ? `${count.toLocaleString()} moments` : (group.title ?? '');
-    caption.hidden = count === 1n && !group.title?.trim();
+      count > 1n ? summaryName(group) : span ? (span.metadata.title ?? '') : (group.title ?? '');
+    caption.hidden = count === 1n && !(span ? span.metadata.title : group.title)?.trim();
     stem.hidden = caption.hidden;
     updateMomentTime(label, axisLabel(mid, 'event'));
     coordinate.title = presented(mid) + '\nExact: ' + mid.toString();
     ordered.push(stem, caption, button);
     hoverPreview.update(
       button,
-      activePlugins(),
-      { ...metadata, title: group.title ?? metadata.title },
+      plugins,
+      { ...metadata, title: span ? metadata.title : (group.title ?? metadata.title) },
       count,
     );
     if (count === 1n && group.id) {
@@ -2511,34 +2529,104 @@ async function selectGroup(group: FrameGroup) {
   clearGroupPage();
   el('group-details').hidden = true;
   const request = ++selectionRequest;
+  if (group.count === '0' && group.duration && entityCount(group) === 1n) {
+    // A collapsed duration is still a duration: open it rather than a moment list.
+    selectedGroup = null;
+    requestRender();
+    await openDurationById(group.duration.id, group.duration);
+    return;
+  }
   selectedGroup = group;
   selected = null;
   selectedTime = Q.parse(group.first).add(Q.parse(group.last)).div(Q.from(2n));
   requestRender();
   let page: Awaited<ReturnType<typeof groupPage>>;
   try {
-    page = await groupPage(group);
+    page = BigInt(group.count) > 0n ? await groupPage(group) : { events: [], next: null };
   } catch (error) {
     if (request === selectionRequest) throw error;
     return;
   }
   if (request !== selectionRequest) return;
-  if (BigInt(group.count) === 1n && page.events[0]) {
+  if (entityCount(group) === 1n && page.events[0]) {
     eventForm(page.events[0]);
     return;
   }
   el('event-form').hidden = true;
   el('group-details').hidden = false;
-  text('group-title', `${BigInt(group.count).toLocaleString()} moments`);
+  text('group-title', summaryName(group));
   text(
     'group-note',
-    group.distinct === 1
+    group.distinct === 1 && !group.durationCount
       ? 'These events share the same exact coordinate. Zoom cannot separate coincident points.'
-      : 'These moments are close at this scale. Zoom in to reveal their separate coordinates.',
+      : 'These are close at this scale. Zoom in to reveal their separate coordinates and full durations.',
   );
-  el('group-zoom').hidden = group.distinct === 1;
+  el('group-zoom').hidden = group.distinct === 1 && !group.durationCount;
+  el('group-events').hidden = BigInt(group.count) === 0n;
+  el('group-page-status').hidden = BigInt(group.count) === 0n;
   showGroupPage(page.events, page.next);
+  void showGroupDurations(group, null, request).catch(fail);
   showMomentDetails('Group details');
+}
+type DurationCursor = { first: string; id: string } | null;
+/** Durations whose whole extent lies inside a summary, 25 at a time. */
+async function durationPage(
+  group: FrameGroup,
+  after: DurationCursor,
+): Promise<{ durations: DurationBand[]; next: DurationCursor }> {
+  if (comparison) return { durations: [], next: null };
+  if (!sparseWorkspace() && model) {
+    const lower = Q.parse(group.first),
+      upper = Q.parse(group.last);
+    const inside = [...model.durations.values()]
+      .map((d) => resolveDuration(d, (id) => model!.momentTime(id)))
+      .filter(
+        (b): b is DurationBand =>
+          !!b &&
+          Q.parse(b.first).compare(lower) >= 0 &&
+          Q.parse(b.last).compare(upper) <= 0 &&
+          (!after ||
+            Q.parse(b.first).compare(Q.parse(after.first)) > 0 ||
+            (b.first === after.first && b.id > after.id)),
+      )
+      .sort((a, b) => Q.parse(a.first).compare(Q.parse(b.first)) || (a.id < b.id ? -1 : 1));
+    const page = inside.slice(0, 25);
+    return {
+      durations: page,
+      next: inside.length > 25 ? { first: page[24].first, id: page[24].id } : null,
+    };
+  }
+  return timelineQuery({
+    kind: 'durations',
+    lower: group.first,
+    upper: group.last,
+    after,
+    limit: 25,
+    revision: (local ?? remote)!.revision,
+  });
+}
+let groupDurationCursor: DurationCursor = null;
+async function showGroupDurations(group: FrameGroup, after: DurationCursor, request: number) {
+  const section = el('group-durations');
+  section.hidden = !group.durationCount;
+  el('group-duration-list').replaceChildren();
+  el('group-durations-more').hidden = true;
+  if (!group.durationCount) return;
+  const page = await durationPage(group, after);
+  if (request !== selectionRequest) return;
+  groupDurationCursor = page.next;
+  for (const band of page.durations) {
+    const button = document.createElement('button');
+    button.textContent = band.metadata.title || 'Unnamed duration';
+    const small = document.createElement('small');
+    small.textContent = `${presented(Q.parse(band.first), 'event')} → ${presented(Q.parse(band.last), 'event')}`;
+    button.append(small);
+    button.onclick = () => void openDurationById(band.id, band).catch(fail);
+    el('group-duration-list').append(button);
+  }
+  el('group-durations-more').hidden = !page.next;
+  el('group-durations-more').onclick = () =>
+    void showGroupDurations(group, groupDurationCursor, request).catch(fail);
 }
 function showGroupPage(events: PointEvent[], next: { time: string; id: string } | null) {
   groupCursor = next;
@@ -4819,6 +4907,17 @@ function refreshDurations() {
   };
   host.append(add);
 }
+/** "3 moments", "2 durations" or "3 moments · 2 durations". */
+function summaryName(group: FrameGroup) {
+  const moments = BigInt(group.count),
+    spans = BigInt(group.durationCount ?? '0');
+  const part = (n: bigint, one: string, many: string) =>
+    `${n.toLocaleString()} ${n === 1n ? one : many}`;
+  return [
+    ...(moments ? [part(moments, 'moment', 'moments')] : []),
+    ...(spans ? [part(spans, 'duration', 'durations')] : []),
+  ].join(' · ');
+}
 function durationLabel(duration: Duration) {
   const band =
     frame.durations?.find((b) => b.id === duration.id) ??
@@ -4843,8 +4942,8 @@ function createDuration(start: DurationEndpoint, end: DurationEndpoint) {
   showDuration(duration, false, { duration: true, after: duration });
 }
 /** Full metadata is local for complete timelines and fetched for indexed ones. */
-async function openDurationById(id: string) {
-  const band = frame.durations?.find((b) => b.id === id);
+async function openDurationById(id: string, known?: DurationBand) {
+  const band = known ?? frame.durations?.find((b) => b.id === id);
   if (band?.sourceKey) return showDuration(band, true);
   let duration = model?.durations.get(id);
   if (!duration && sparseWorkspace()) {

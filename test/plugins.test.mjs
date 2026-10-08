@@ -369,7 +369,8 @@ test('Postgres persists plugin settings and projects metadata in overview querie
     stack,
   });
   assert.equal(queries.filter((q) => q.sql.includes('oc_overview_v2')).length, 1);
-  assert.equal(queries.length, 5); // BEGIN, repeatable-read, overview, interval window, COMMIT
+  // BEGIN, repeatable-read, overview, interval window, collapsed-duration summary, COMMIT
+  assert.equal(queries.length, 6);
 });
 
 test('scripted plugins choose safe effects, compose in sequence and preserve exact times', () => {

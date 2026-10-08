@@ -195,6 +195,7 @@ jobs:
       - run: node test/files.mjs
       - run: node test/durations-postgres.mjs
       - run: node test/search-postgres.mjs
+      - run: node test/summaries-postgres.mjs
       - run: node test/stars-postgres.mjs
       - run: node test/follow-postgres.mjs
       - run: node test/administration-postgres.mjs

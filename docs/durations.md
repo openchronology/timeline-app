@@ -39,7 +39,20 @@ Earlier files stored a duration as a link in its starting moment's metadata (`{"
 
 ## Storage and queries
 
-Moment summaries count moments only. Durations have a separate interval query, so a period crossing the viewport is visible even when both endpoints are outside the moment cache. The browser, PostgreSQL and SQLite build augmented balanced interval trees over exact rational bounds, resolving anchors to their moments' times. Database queries prune subtrees outside the viewport and return at most 256 bands, with an explicit notice when more match. Bands use three compact visual lanes; intersecting bands can overlap. Durations are not aggregated into approximate interval counts.
+Durations have a separate interval query, so a period crossing the viewport is visible even when both endpoints are outside the moment cache. The browser, PostgreSQL and SQLite build augmented balanced interval trees over exact rational bounds, resolving anchors to their moments' times. Database queries prune subtrees outside the viewport and return at most 256 bands, with an explicit notice when more match. Bands use three compact visual lanes; intersecting bands can overlap.
+
+## Summaries
+
+A duration is drawn as a band only while its extent reaches the grouping distance: the same exact threshold that groups moments, `(right - left) × grouping pixels / width`. A shorter duration **collapses**: it is summarized like a moment and keyed by its start.
+
+1. Collapsed durations intersecting the window are grouped among themselves with the anchored-span rule moments use. A cluster starts at the first collapsed start; later durations join while `start - anchor < threshold`. The cluster's end is the latest end of its members.
+2. Moment groups and duration clusters are then coalesced in time order: a block joins the previous group while the merged group still spans less than the threshold (`last - first < threshold`), or when both start at the same coordinate. Moment groups are already maximal, so two moment groups never merge with each other; a cluster of short durations joins the nearby moments it overlaps.
+
+Groups report moments (`count`, `distinct`) and collapsed durations (`durationCount`) separately. A group holding exactly one collapsed duration and no moments carries that duration and is drawn as a small capsule marker; clicking it opens the duration. Other summaries list their moments and the durations that lie wholly inside them, 25 at a time. Zooming in shrinks the threshold until the duration becomes a band again.
+
+Each backend computes both steps with exact rationals and without enumerating dense clusters. The interval tree is ordered by start and caches, per subtree, the largest start, the entry count and the smallest and largest extents. A subtree whose durations all collapse and lie inside the window is consumed whole when its starts fit the open cluster; subtrees with no collapsed duration are skipped. PostgreSQL runs this in `oc_duration_overview`, SQLite in the native query, and the browser in `TimelineIndex.frame`. Randomized oracle tests check that PostgreSQL matches the browser and that SQLite and the browser match a brute-force reference.
+
+Server and desktop timelines query saved summaries; unsaved edits move collapsed durations between summaries locally. `npm run migrate` rebuilds duration indexes saved before these subtree summaries existed.
 
 Viewport bands carry a bounded projection of metadata: the title (512 characters), a notes preview (2,000 characters) and other text fields of at most 256 characters, such as colors. Opening a duration fetches its complete definition by ID (`{"kind": "duration", "id": "…"}` on the timeline query endpoint, or the desktop native query).
 

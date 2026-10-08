@@ -7,6 +7,9 @@ import {
   durationOverview,
   fixMissingAnchors,
   resolveDuration,
+  collapses,
+  coalesceGroups,
+  durationGroups,
 } from './core.js';
 import type {
   Duration,
@@ -294,24 +297,35 @@ export class RemoteWorkspace extends TimelineIndex {
   }
   overlay(frame: Frame, view: Viewport, threshold: Q): Frame {
     const groups: FrameGroup[] = [];
+    // Singleton duration summaries are re-placed like bands, so local edits move them.
+    const singles: DurationBand[] = [];
+    const changedStarts = [...this.durationChanges.values()]
+      .map(({ before }) => (before ? resolveDuration(before, (m) => this.momentTime(m)) : null))
+      .filter((b): b is DurationBand => !!b && collapses(b, threshold))
+      .map((b) => Q.parse(b.first));
     for (const group of frame.groups) {
+      if (group.duration && group.count === '0') {
+        singles.push(group.duration);
+        continue;
+      }
       let count = BigInt(group.count);
+      let durations = BigInt(group.durationCount ?? '0');
+      const inside = (time: Q) =>
+        time.compare(Q.parse(group.first)) >= 0 && time.compare(Q.parse(group.last)) <= 0;
       for (const { before } of this.changes.values())
-        if (
-          before &&
-          Q.parse(before.time).compare(Q.parse(group.first)) >= 0 &&
-          Q.parse(before.time).compare(Q.parse(group.last)) <= 0
-        )
-          count--;
-      if (count > 0n)
+        if (before && inside(Q.parse(before.time))) count--;
+      // Edited collapsed durations leave the saved cluster that contained their start.
+      if (durations > 0n) for (const start of changedStarts) if (inside(start)) durations--;
+      if (count > 0n || durations > 0n)
         groups.push(
-          count === BigInt(group.count)
+          count === BigInt(group.count) && durations === BigInt(group.durationCount ?? '0')
             ? group
             : {
                 first: group.first,
                 last: group.last,
                 count: count.toString(),
-                distinct: group.distinct,
+                distinct: count > 0n ? group.distinct : 0,
+                ...(durations > 0n ? { durationCount: durations.toString() } : {}),
               },
         );
     }
@@ -330,18 +344,25 @@ export class RemoteWorkspace extends TimelineIndex {
           title: after.metadata.title,
           metadata: after.metadata,
         });
-    const durations = this.overlayDurations(frame.durations ?? []);
-    const visibleDurations = durations
+    const visible = this.overlayDurations([...(frame.durations ?? []), ...singles])
       .filter(
         (b) => Q.parse(b.last).compare(view.left) >= 0 && Q.parse(b.first).compare(view.right) <= 0,
       )
       .map((b) => ({ ...b, metadata: durationOverview(b.metadata) }));
+    const bands = visible.filter((b) => !collapses(b, threshold));
+    groups.push(
+      ...durationGroups(
+        visible
+          .filter((b) => collapses(b, threshold))
+          .map((band) => ({ first: band.first, last: band.last, count: 1, band })),
+      ),
+    );
     return regroup(
       {
         ...frame,
         groups,
-        durations: visibleDurations.slice(0, 256),
-        durationsTruncated: frame.durationsTruncated || visibleDurations.length > 256,
+        durations: bands.slice(0, 256),
+        durationsTruncated: frame.durationsTruncated || bands.length > 256,
       },
       threshold,
     );
@@ -381,28 +402,10 @@ export function applyChanges(
   return {
     ...settings,
     events: [...events.values()],
-    ...(fixed.length ? { durations: fixed } : { durations: undefined }),
+    ...(fixed.length ? { durations: fixed } : {}),
   };
 }
 /** Coarsen server summaries without reconstructing any concealed moments. */
 export function regroup(frame: Frame, threshold: Q): Frame {
-  const groups: FrameGroup[] = [];
-  for (const group of [...frame.groups].sort((a, b) =>
-    Q.parse(a.first).compare(Q.parse(b.first)),
-  )) {
-    const prev = groups.at(-1);
-    if (
-      prev &&
-      (group.first === prev.first ||
-        Q.parse(group.last).sub(Q.parse(prev.first)).compare(threshold) < 0)
-    ) {
-      groups[groups.length - 1] = {
-        first: prev.first,
-        last: Q.parse(group.last).compare(Q.parse(prev.last)) > 0 ? group.last : prev.last,
-        count: (BigInt(prev.count) + BigInt(group.count)).toString(),
-        distinct: prev.distinct + group.distinct - (prev.last === group.first ? 1 : 0),
-      };
-    } else groups.push(group);
-  }
-  return { ...frame, groups };
+  return { ...frame, groups: coalesceGroups(frame.groups, threshold) };
 }
