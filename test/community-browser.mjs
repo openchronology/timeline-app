@@ -181,7 +181,10 @@ export async function checkCommunity(browser) {
     });
   });
   const page = await context.newPage();
-  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('pageerror', (e) => {
+    // WebKit reports same-origin fetches cancelled mid-flight as access-control failures.
+    if (!/\/api\/\S* due to access control checks\.$/.test(e.message)) errors.push(e.message);
+  });
   page.on('dialog', (dialog) => dialog.accept());
   try {
     await page.goto('http://localhost:5173/');

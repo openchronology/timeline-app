@@ -1,0 +1,54 @@
+name: Offline editor on openchronology.github.io
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  publish:
+    name: Build and publish standalone offline HTML
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: node scripts/npm-ci.mjs
+      - run: npm run typecheck
+      - run: npm run build:editor
+      - run: npm run build:offline
+      - run: npx playwright install --with-deps chromium
+      - name: Verify the file works without a network
+        run: npm run test:offline:browser
+      # The organization site serves its default branch directly; a write deploy key scoped to that
+      # repository (secret PAGES_DEPLOY_KEY) lets this workflow replace only its index page.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: openchronology/openchronology.github.io
+          ref: master
+          path: site
+          ssh-key: ${{ secrets.PAGES_DEPLOY_KEY }}
+      - name: Publish to openchronology.github.io
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          cp dist/openchronology-offline.html site/index.html
+          cd site
+          if git diff --quiet -- index.html; then
+            echo "The published offline editor is already current."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m "Publish offline editor from openchronology/timeline-app@${SOURCE_SHA}"
+          git push origin HEAD:master

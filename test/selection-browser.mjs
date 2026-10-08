@@ -104,8 +104,20 @@ export async function checkSelection(page, restoreDocument) {
   await input('delete-confirm').click();
   assert.equal((await exported()).events.length, 2);
   await closeMomentDetails(page);
+  assert(await input('redo-button').isDisabled());
   await input('undo-button').click();
   assert.equal((await exported()).events.length, 3);
+  // Redo reapplies the undone deletion; keyboard shortcuts walk the same stacks.
+  await input('redo-button').click();
+  assert.equal((await exported()).events.length, 2);
+  await input('timeline-stage').focus();
+  await page.keyboard.press('ControlOrMeta+z');
+  assert.equal((await exported()).events.length, 3);
+  await page.keyboard.press('ControlOrMeta+Shift+z');
+  assert.equal((await exported()).events.length, 2);
+  await page.keyboard.press('ControlOrMeta+z');
+  assert.equal((await exported()).events.length, 3);
+  assert(await input('redo-button').isEnabled());
   // Coincident/nearby points are never silently deleted as a group.
   await page.getByRole('button', { name: 'Other', exact: true }).click({ button: 'right' });
   await menu.getByRole('menuitem', { name: 'Delete', exact: true }).waitFor();
