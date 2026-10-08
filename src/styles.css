@@ -1057,7 +1057,8 @@ dialog h3 {
   .window-bounds button {
     padding: 5px 8px;
   }
-  #undo-button {
+  #undo-button,
+  #redo-button {
     display: none;
   }
   .below-timeline {

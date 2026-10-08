@@ -204,7 +204,7 @@ function flushEventEdit() {
     if (JSON.stringify(point) !== JSON.stringify(selected)) {
       if (!eventEditHistory) {
         eventEditHistory = { before: selected ?? undefined, after: point };
-        history.push(eventEditHistory);
+        record(eventEditHistory);
       } else eventEditHistory.after = point;
       model!.put(point);
       const wasNew = !selected;
@@ -383,7 +383,9 @@ function clearGroupPage() {
   el('group-previous').hidden = true;
   text('group-page-status', '');
 }
-let history: { before?: PointEvent; after?: PointEvent }[] = [],
+type EventEdit = { before?: PointEvent; after?: PointEvent };
+let history: EventEdit[] = [],
+  future: EventEdit[] = [],
   frameRequest = 0,
   frameTimer: ReturnType<typeof setTimeout>,
   draftTimer: ReturnType<typeof setTimeout>;
@@ -1397,6 +1399,7 @@ function heading() {
     'sqlite-save',
     'sqlite-save-as',
     'undo-button',
+    'redo-button',
     'propose-button',
     'share-button',
   ])
@@ -1481,6 +1484,7 @@ function heading() {
 
   el('add-button').hidden = !editable();
   el<HTMLButtonElement>('undo-button').disabled = !history.length;
+  el<HTMLButtonElement>('redo-button').disabled = !future.length;
   text(
     'save-status',
     dirty
@@ -1702,6 +1706,7 @@ function loadDocument(doc: TimelineDocument) {
   viewport = Viewport.fit(model.points.minKey(), model.points.maxKey());
   dirty = false;
   history = [];
+  future = [];
   selected = null;
   selectedGroup = null;
   frameRequest++;
@@ -1777,6 +1782,7 @@ async function openRemote(id: string) {
   selected = null;
   selectedGroup = null;
   history = [];
+  future = [];
   frameRequest++;
   heading();
   requestRender();
@@ -3524,7 +3530,7 @@ el('delete-confirm').onclick = () => {
     el<HTMLDialogElement>('delete-dialog').close();
     return;
   }
-  history.push({ before: point });
+  record({ before: point });
   model!.delete(point.id);
   if (selected?.id === point.id) {
     selected = null;
@@ -3536,21 +3542,49 @@ el('delete-confirm').onclick = () => {
   el<HTMLDialogElement>('inspector').close();
   changed();
 };
-el('undo-button').onclick = () => {
+/** Records a new edit; any redoable edits branch away and are discarded. */
+function record(edit: EventEdit) {
+  history.push(edit);
+  future = [];
+}
+function clearHistory() {
+  history = [];
+  future = [];
+  eventEditHistory = null;
+}
+function applyEdit(redo: boolean) {
   flushEventEdit();
   clearTimeout(eventEditTimer);
   pendingEventEdit = false;
   eventEditHistory = null;
-  const edit = history.pop();
+  const edit = (redo ? future : history).pop();
   if (!edit || !model) return;
-  if (edit.after) model.delete(edit.after.id);
-  if (edit.before) model.put(edit.before);
+  const [from, to] = redo ? [edit.before, edit.after] : [edit.after, edit.before];
+  if (from) model.delete(from.id);
+  if (to) model.put(to);
+  (redo ? history : future).push(edit);
   selected = null;
   selectedGroup = null;
   el('event-form').hidden = true;
   el<HTMLDialogElement>('inspector').close();
   changed();
-};
+}
+el('undo-button').onclick = () => applyEdit(false);
+el('redo-button').onclick = () => applyEdit(true);
+document.addEventListener('keydown', (event) => {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+  const key = event.key.toLowerCase(),
+    redo = (key === 'z' && event.shiftKey) || (key === 'y' && !event.shiftKey);
+  if (key !== 'z' && !redo) return;
+  // Text fields keep their native undo; open modal dialogs other than the inspector own the keyboard.
+  const target = event.target as HTMLElement;
+  if (target.closest('input, textarea, select, [contenteditable]')) return;
+  if (document.querySelector('dialog[open]:not(#inspector)')) return;
+  const button = el<HTMLButtonElement>(redo ? 'redo-button' : 'undo-button');
+  if (button.disabled || button.hidden || button.hasAttribute('data-comparison-disabled')) return;
+  event.preventDefault();
+  button.click();
+});
 input('timeline-title').onchange = () => {
   if (!editable()) return;
   model!.title = input('timeline-title').value;
@@ -4077,8 +4111,7 @@ el('publish-button').onclick = () => {
         index.accepted(sent, selected?.id);
         if (patch) index.assets = patch.settings.assets;
         if (version === editVersion) {
-          history = [];
-          eventEditHistory = null;
+          clearHistory();
         }
       }
       remoteCache.clear();
@@ -4088,8 +4121,7 @@ el('publish-button').onclick = () => {
         const local = model!.document();
         model = new RemoteWorkspace(local);
         if (selected) sparseWorkspace()!.load(selected);
-        history = [];
-        eventEditHistory = null;
+        clearHistory();
       }
       window.history.replaceState(null, '', `#timeline/${result.id}`);
       heading();
@@ -4308,8 +4340,7 @@ if (desktop) {
             if (!index && version !== editVersion) local = null;
             dirty = version !== editVersion;
             if (!dirty) {
-              history = [];
-              eventEditHistory = null;
+              clearHistory();
             }
           }
           remoteCache.clear();
@@ -4433,6 +4464,7 @@ if (!offlineHtml)
           })
         : null;
       history = [];
+      future = [];
       windowController?.abort();
       remoteCache.clear();
       frameRequest++;
