@@ -3514,7 +3514,8 @@ el('event-delete').onclick = () => {
   if (selected) requestDelete(selected);
 };
 el<HTMLDialogElement>('delete-dialog').addEventListener('close', () => {
-  pendingDelete = null;
+  // The close event is queued; a delete requested after it was scheduled must survive it.
+  if (!el<HTMLDialogElement>('delete-dialog').open) pendingDelete = null;
 });
 el('delete-confirm').onclick = () => {
   flushEventEdit();

@@ -6,13 +6,11 @@ import { DEFAULT_PRESENTATION, FOCUS_ON_HOVER, parseTimestamp, Q } from '../dist
 export async function checkIssues(page, restore) {
   const imported = async (doc) => {
     await closeMomentDetails(page);
-    await page
-      .locator('#json-file')
-      .setInputFiles({
-        name: 'issues.ochx',
-        mimeType: 'application/json',
-        buffer: Buffer.from(JSON.stringify(doc)),
-      });
+    await page.locator('#json-file').setInputFiles({
+      name: 'issues.ochx',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(doc)),
+    });
     await page.waitForFunction(
       (title) => document.getElementById('timeline-title').value === title,
       doc.title,
@@ -105,7 +103,8 @@ export async function checkIssues(page, restore) {
     await page.locator('#delete-confirm').click();
     await page.locator('#inspector').waitFor({ state: 'hidden' });
     assert.equal((await exported()).events.length, 1);
-    assert.equal(await page.locator('.duration-band').count(), 0);
+    // Bands are removed by the next rendered frame.
+    await page.locator('.duration-band').first().waitFor({ state: 'detached' });
     console.log(
       'PASS issue regressions: contextual calendar, exact fractions, preview selection, unobtrusive status, linked durations and deletion confirmation.',
     );
