@@ -1938,23 +1938,23 @@ dialog button {
   flex-wrap: wrap;
   gap: 0.65rem;
 }
-#event-calendar-picker label {
+#datetime-picker label {
   flex: 1 1 5rem;
   min-width: 5rem;
 }
-#event-calendar-picker input,
-#event-calendar-picker select {
+#datetime-picker input,
+#datetime-picker select {
   width: 100%;
 }
-#event-calendar-picker details {
+#datetime-picker details {
   margin: 0.75rem 0;
 }
-#event-calendar-picker details[open] {
+#datetime-picker details[open] {
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
 }
-#event-calendar-picker summary {
+#datetime-picker summary {
   width: 100%;
 }
 .duration-band {
@@ -2031,4 +2031,27 @@ dialog button {
 .calendar-days button[aria-pressed='true'] {
   background: #2c5945;
   color: white;
+}
+
+#datetime-dialog {
+  width: min(460px, calc(100vw - 30px));
+  min-width: 0;
+}
+#datetime-dialog .calendar-day-picker {
+  max-width: none;
+}
+#datetime-text {
+  font-family: ui-monospace, monospace;
+}
+#datetime-picker summary {
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+}
+#datetime-picker .calendar-days > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+#datetime-picker .calendar-month-nav {
+  font-weight: 600;
 }

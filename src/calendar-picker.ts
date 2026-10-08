@@ -23,10 +23,7 @@ export function calendarPicker(
   const match = /^([+-]?\d+)-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(.*)$/.exec(stamp)!;
   const year = BigInt(match[1]);
   const fields = new Map<string, HTMLInputElement>();
-  const heading = document.createElement('p');
-  heading.className = 'field-hint';
-  heading.textContent = 'Calendar picker · ' + stamp + ' · hidden fields keep their current values';
-  host.append(heading);
+
   const calendar = document.createElement('div'),
     clock = document.createElement('div');
   calendar.className = clock.className = 'calendar-picker-fields';
@@ -165,6 +162,13 @@ export function calendarPicker(
   error.setAttribute('role', 'alert');
   host.append(calendar, clock, contextFields, error);
   contextFields.hidden = !hideYear && !hideDate && !hideHour && !hideMinute;
+  if (!contextFields.hidden) {
+    // Collapsed fields still contribute their current values to the chosen time.
+    const note = document.createElement('p');
+    note.className = 'field-hint';
+    note.textContent = 'Fields hidden at this zoom level keep their current values.';
+    contextFields.append(note);
+  }
   function commit() {
     refreshGrid();
     try {

@@ -58,26 +58,75 @@ export async function checkIssues(page, restore) {
       }),
       true,
     );
-    const picker = page.locator('#event-calendar-picker');
-    await picker.waitFor({ state: 'visible' });
+    // Gregorian time fields open the date/time dialog instead of an inline picker.
+    const dialog = page.locator('#datetime-dialog'),
+      picker = page.locator('#datetime-picker'),
+      apply = () => page.locator('#datetime-apply').click(),
+      closed = () => dialog.waitFor({ state: 'hidden' });
+    await page.locator('#event-time').click();
+    await dialog.waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#datetime-heading').textContent(), 'Moment date and time');
     // An hour-sized view only exposes minute/second controls until context expands.
     assert.equal(await picker.getByLabel('Calendar year', { exact: true }).isVisible(), false);
     assert(await picker.getByLabel('Calendar minute', { exact: true }).isVisible());
     await picker.getByLabel('Calendar minute', { exact: true }).fill('46');
     await picker.getByLabel('Calendar minute', { exact: true }).dispatchEvent('change');
-    // Exact fractions survive cosmetic date/time field edits.
-    assert.equal(
-      await page.locator('#event-exact').inputValue(),
-      parseTimestamp('2026-10-05T13:46:30{+1/3}Z').toString(),
-    );
+    assert.match(await page.locator('#datetime-text').inputValue(), /13:46:30/);
     await picker.locator('summary').click();
     await picker.getByLabel('Calendar year', { exact: true }).waitFor({ state: 'visible' });
     await picker.getByLabel('Pick day 6', { exact: true }).click();
+    await apply();
+    await closed();
+    // Exact fractions survive cosmetic date/time field edits.
     assert.equal(
       await page.locator('#event-exact').inputValue(),
       parseTimestamp('2026-10-06T13:46:30{+1/3}Z').toString(),
     );
-    await picker.getByLabel('Pick day 5', { exact: true }).click();
+    // Cancelling leaves the moment unchanged.
+    await page.locator('#event-time').click();
+    await dialog.waitFor({ state: 'visible' });
+    await picker.locator('summary').click();
+    await picker.getByLabel('Pick day 9', { exact: true }).click();
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await closed();
+    assert.equal(
+      await page.locator('#event-exact').inputValue(),
+      parseTimestamp('2026-10-06T13:46:30{+1/3}Z').toString(),
+    );
+    // Typed entry stays available underneath the picker.
+    await page.locator('#event-time').click();
+    await dialog.waitFor({ state: 'visible' });
+    await page.locator('#datetime-text').fill('2026-10-05T13:46:30Z');
+    await apply();
+    await closed();
+    assert.equal(
+      await page.locator('#event-exact').inputValue(),
+      parseTimestamp('2026-10-05T13:46:30Z').toString(),
+    );
+    // Bounds use the same dialog and navigate on apply.
+    await closeMomentDetails(page);
+    const before = await page.locator('#left-bound').inputValue();
+    await page.locator('#left-bound').click();
+    await dialog.waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#datetime-heading').textContent(), 'Left bound date and time');
+    await page.locator('#datetime-text').fill('2026-10-05T13:00:00Z');
+    await apply();
+    await closed();
+    await page.waitForFunction(
+      (old) => document.getElementById('left-bound').value !== old,
+      before,
+    );
+    assert.match(await page.locator('#left-bound').inputValue(), /13:00/);
+    // An inverted range is rejected inside the dialog.
+    await page.locator('#right-bound').click();
+    await dialog.waitFor({ state: 'visible' });
+    await page.locator('#datetime-text').fill('2026-10-04T00:00:00Z');
+    await apply();
+    assert.match(await page.locator('#datetime-error').textContent(), /earlier than the right/);
+    await page.keyboard.press('Escape');
+    await closed();
+    await page.locator('#markers button[aria-label="Start"]').click({ force: true });
+    await page.locator('#inspector').waitFor({ state: 'visible' });
     await page.getByRole('button', { name: 'Link to end moment', exact: true }).click();
     await page.locator('.duration-endpoints button').filter({ hasText: 'End' }).click();
     const card = page.locator('.duration-editor');
