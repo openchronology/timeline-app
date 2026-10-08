@@ -514,3 +514,18 @@ CREATE TABLE IF NOT EXISTS oc_duration_nodes (
 );
 ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS definition jsonb;
 CREATE INDEX IF NOT EXISTS oc_duration_nodes_duration_id ON oc_duration_nodes(timeline_id,(band->>'id'));
+
+-- Per-timeline text search over moments and durations, rebuilt with the rational index on save.
+-- The 'simple' configuration is language-neutral; queries match word prefixes.
+CREATE TABLE IF NOT EXISTS oc_entity_search (
+  timeline_id uuid NOT NULL REFERENCES oc_timelines(id) ON DELETE CASCADE,
+  kind text NOT NULL CHECK(kind IN ('moment','duration')),
+  entity_id text NOT NULL,
+  first_time mpq NOT NULL, last_time mpq NOT NULL,
+  title text NOT NULL, body text NOT NULL,
+  document tsvector GENERATED ALWAYS AS (
+    setweight(to_tsvector('simple', title), 'A') || setweight(to_tsvector('simple', left(body, 100000)), 'B')
+  ) STORED,
+  PRIMARY KEY(timeline_id,kind,entity_id)
+);
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS search_version integer NOT NULL DEFAULT 0;

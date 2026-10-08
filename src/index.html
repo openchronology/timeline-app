@@ -241,6 +241,7 @@ Every point has a place. Explore the spaces between them.</textarea>
                 title="Follow new server moments after 15 seconds without navigation"
                 ><input id="follow-latest" type="checkbox" /> Follow latest events</label
               >
+              <button id="search-button" title="Search moments and durations (/)">Search</button>
               <button id="presentation-button">Time display</button>
               <button id="plugins-button">Plugins</button>
               <button id="compare-button">Compare</button>
@@ -392,6 +393,31 @@ Every point has a place. Explore the spaces between them.</textarea>
         <div class="event-actions">
           <span id="event-edit-status" class="sr-only" role="status"></span>
           <button id="event-delete" class="button-danger" type="button">Delete</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="search-dialog" class="search-dialog" aria-labelledby="search-heading">
+      <form id="search-form">
+        <div class="dialog-heading">
+          <h2 id="search-heading">Search this timeline</h2>
+          <button type="button" data-close="search-dialog" aria-label="Close search">×</button>
+        </div>
+        <div class="search-row">
+          <input
+            id="search-text"
+            type="search"
+            maxlength="200"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Search titles and notes"
+            placeholder="Words in titles and notes"
+          /><button id="search-submit" class="button-primary" type="submit">Search</button>
+        </div>
+        <p id="search-status" class="field-hint" role="status" aria-live="polite"></p>
+        <ol id="search-results" class="search-results"></ol>
+        <div class="dialog-actions" hidden>
+          <button id="search-previous" type="button">Previous</button
+          ><button id="search-next" type="button">Next</button>
         </div>
       </form>
     </dialog>

@@ -56,6 +56,10 @@ pub struct Query {
     pub limit: Option<usize>,
     #[serde(default)]
     pub metadata_keys: Vec<String>,
+    #[serde(default)]
+    pub text: String,
+    #[serde(default)]
+    pub page: Option<usize>,
 }
 pub struct Snapshot {
     directory: PathBuf,
@@ -200,6 +204,9 @@ impl Snapshot {
         if q.kind == "duration" {
             let id = q.id.as_deref().ok_or("A duration lookup needs its ID")?;
             return Ok(json!({"duration": super::duration_by_id(&db, id)?}));
+        }
+        if q.kind == "search" {
+            return search(&db, &q.text, q.page.unwrap_or(1));
         }
         if db.scalar("SELECT q_cmp(q(?),q(?))", &[&q.lower, &q.upper])? == "1" {
             return Err("Reversed viewport bounds".into());
@@ -673,6 +680,53 @@ mod safety_tests {
 }
 
 #[cfg(test)]
+mod search_tests {
+    use super::*;
+    #[test]
+    fn search_matches_titles_notes_stacks_and_durations_with_pages() {
+        let mut events = vec![
+            json!({"id":"late","time":"5/1","metadata":{"title":"Harbor survey","description":"Later notes"}}),
+            json!({"id":"early","time":"1/1","metadata":{"title":"Notes","description":"A harbor visit"}}),
+            json!({"id":"stack","time":"2/1","metadata":{"title":"Parent","stack":[{"id":"c","metadata":{"title":"Nested HARBOR entry"}}]}}),
+        ];
+        for i in 0..30 {
+            events.push(json!({"id":format!("m{i:02}"),"time":format!("{}/1",10+i),"metadata":{"title":format!("Filler {i}"),"description":"routine"}}));
+        }
+        let doc:Document=serde_json::from_value(json!({"format":"openchronology","version":1,"title":"Search","description":"","events":events,"durations":[{"id":"span","start":"3/1","end":{"moment":"late"},"metadata":{"title":"Harbor works"}}]})).unwrap();
+        let snapshot = Snapshot::from_document(&doc).unwrap();
+        let search = |text: &str, page: usize| {
+            snapshot
+                .query(
+                    &serde_json::from_value(json!({"kind":"search","text":text,"page":page}))
+                        .unwrap(),
+                )
+                .unwrap()
+        };
+        let found = search("harbor", 1);
+        assert_eq!(found["total"], "4");
+        let ids: Vec<_> = found["results"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["id"].as_str().unwrap())
+            .collect();
+        // Title matches first, then earlier coordinates; nested entries count for their parent.
+        assert_eq!(ids, vec!["span", "late", "early", "stack"]);
+        assert_eq!(found["results"][0]["kind"], "duration");
+        assert_eq!(found["results"][0]["first"], "3/1");
+        assert_eq!(found["results"][0]["last"], "5/1");
+        assert_eq!(search("HARBOR survey", 1)["total"], "1");
+        assert_eq!(
+            search("routine", 1)["results"].as_array().unwrap().len(),
+            25
+        );
+        assert_eq!(search("routine", 2)["results"].as_array().unwrap().len(), 5);
+        assert_eq!(search("routine", 2)["total"], "30");
+        assert_eq!(search("  ,.; ", 1)["total"], "0");
+        assert_eq!(search("absent", 1)["total"], "0");
+    }
+}
+#[cfg(test)]
 mod duration_tests {
     use super::*;
     fn spans(snapshot: &Snapshot, query: &Query) -> Vec<(String, String, String)> {
@@ -782,4 +836,71 @@ fn anchorless(endpoint: &Value) -> Value {
     } else {
         endpoint.clone()
     }
+}
+/// Words of letters and digits, lowercased; matches the web editor's normalization.
+fn search_terms(text: &str) -> Vec<String> {
+    let mut terms: Vec<String> = Vec::new();
+    for term in text
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|t| !t.is_empty())
+    {
+        let term: String = term.chars().take(64).collect();
+        if !terms.contains(&term) {
+            terms.push(term);
+        }
+        if terms.len() == 8 {
+            break;
+        }
+    }
+    terms
+}
+/// Every term must occur in the title or notes (including nested entries such as stacks).
+/// SQLite's lower() folds ASCII only, so non-ASCII matching is case-sensitive here.
+fn search(db: &Connection, text: &str, page: usize) -> Result<Value, String> {
+    if text.len() > 800 || !(1..=4000).contains(&page) {
+        return Err("Search needs text of at most 200 characters and a page".into());
+    }
+    let terms = search_terms(text);
+    if terms.is_empty() {
+        return Ok(json!({"results":[],"total":"0","page":page}));
+    }
+    let filter = terms
+        .iter()
+        .enumerate()
+        .map(|(i, _)| format!("instr(hay,?{})>0", i + 1))
+        .collect::<Vec<_>>()
+        .join(" AND ");
+    let title_hit = terms
+        .iter()
+        .enumerate()
+        .map(|(i, _)| format!("instr(lower(title),?{})>0", i + 1))
+        .collect::<Vec<_>>()
+        .join(" AND ");
+    let offset = ((page - 1) * 25).to_string();
+    let n = terms.len();
+    let sql = format!(
+        "WITH entities AS (         SELECT 'moment' AS kind,e.id,e.time AS first,e.time AS last,coalesce(json_extract(e.metadata,'$.title'),'') AS title,         coalesce(json_extract(e.metadata,'$.description'),'')||' '||coalesce((SELECT group_concat(coalesce(json_extract(n.value,'$.metadata.title'),'')||' '||coalesce(json_extract(n.value,'$.metadata.description'),''),' ') FROM json_each(e.metadata) a,json_each(a.value) n WHERE a.type='array'),'') AS body FROM events e          UNION ALL SELECT 'duration',d.id,d.first,d.last,coalesce(json_extract(d.metadata,'$.title'),''),coalesce(json_extract(d.metadata,'$.description'),'') FROM duration_intervals d),         hits AS (SELECT *,lower(title||' '||body) AS hay FROM entities)          SELECT kind,id,q(first),q(last),title,substr(trim(body),1,300),count(*) OVER() FROM hits WHERE {filter}          ORDER BY ({title_hit}) DESC,first COLLATE RATIONAL_V1,kind,id LIMIT 25 OFFSET ?{}",
+        n + 1
+    );
+    let mut parameters: Vec<&str> = terms.iter().map(String::as_str).collect();
+    parameters.push(&offset);
+    let rows = db.query_limited(&sql, &parameters, 25, BUDGET)?;
+    let total = rows
+        .first()
+        .and_then(|r| r[6].clone())
+        .unwrap_or_else(|| "0".into());
+    let results: Vec<Value> = rows
+        .into_iter()
+        .map(|r| {
+            let body = r[5].clone().unwrap_or_default();
+            let snippet = if body.chars().count() > 240 {
+                body.chars().take(239).collect::<String>() + "…"
+            } else {
+                body
+            };
+            json!({"kind":r[0],"id":r[1],"first":r[2],"last":r[3],"title":r[4].clone().unwrap_or_default(),"snippet":snippet})
+        })
+        .collect();
+    Ok(json!({"results":results,"total":total,"page":page}))
 }

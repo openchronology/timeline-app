@@ -810,6 +810,27 @@ export function createRequestHandler({
               }),
             );
           }
+          if (input.kind === 'search') {
+            const page = input.page ?? 1;
+            if (
+              typeof input.text !== 'string' ||
+              input.text.length > 200 ||
+              !Number.isInteger(page) ||
+              page < 1 ||
+              page > 4000
+            )
+              throw new HttpError(400, 'Search needs text of at most 200 characters and a page.');
+            return response(
+              res,
+              200,
+              await store.query(id, userId, {
+                kind: 'search',
+                text: input.text,
+                page,
+                ...(input.revision ? { revision: input.revision } : {}),
+              }),
+            );
+          }
           if (input.kind === 'duration') {
             if (typeof input.id !== 'string' || !/^[A-Za-z0-9_.:-]{1,128}$/.test(input.id))
               throw new HttpError(400, 'A duration lookup needs its ID.');
