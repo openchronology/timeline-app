@@ -59,6 +59,16 @@ export type { PresentationContext, TimePresenter } from './presentation.js';
 export { planRuler, validateRulerPolicy } from './ruler.js';
 export type { RulerPolicy, RulerTick, RulerPlan } from './ruler.js';
 export { parseTimestamp, printTimestamp } from './calendar.js';
+import { validateTags, entityTags, normalizeEntityTags } from './tags.js';
+export {
+  validateTags,
+  entityTags,
+  normalizeEntityTags,
+  filterDocument,
+  tagCounts,
+  viewFilterKey,
+} from './tags.js';
+export type { ViewFilter } from './tags.js';
 export { Q, RationalMap };
 export type Metadata = { [key: string]: unknown; title?: string; description?: string };
 export interface PointEvent {
@@ -130,17 +140,6 @@ export function parseTime(text: string): Q {
   if (text.includes('T')) return parseTimestamp(text);
   return text.includes('/') ? Q.parse(text) : Q.parseDecimal(text);
 }
-export function validateTags(value: unknown): string[] {
-  if (!Array.isArray(value) || value.length > 40) throw new Error('Use at most 40 tags.');
-  const tags = value.map((tag) => {
-    if (typeof tag !== 'string') throw new Error('Tags must be text.');
-    const normalized = tag.normalize('NFC').trim().toLowerCase();
-    if (!normalized || normalized.length > 64 || /[\x00-\x1f\x7f,]/.test(normalized))
-      throw new Error('Tags must be 1–64 characters without commas or control characters.');
-    return normalized;
-  });
-  return [...new Set(tags)];
-}
 export function validateAssets(value: unknown): Record<string, string> {
   if (
     !value ||
@@ -201,6 +200,7 @@ export function validateDocument(value: unknown, partial = false): TimelineDocum
       if (metadata[field] !== undefined && typeof metadata[field] !== 'string')
         throw new Error(`Event ${field} must be text.`);
     }
+    if (metadata.tags !== undefined) metadata.tags = normalizeEntityTags(metadata.tags);
     return { id: e.id, time: parseTime(e.time).toString(), metadata };
   });
   const legacy = convertLegacyDurations(events);

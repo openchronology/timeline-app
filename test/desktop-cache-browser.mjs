@@ -3,7 +3,14 @@ import assert from 'node:assert/strict';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { Q, Viewport, TimelineIndex, searchIndex } from '../dist/core.mjs';
+import {
+  Q,
+  Viewport,
+  TimelineIndex,
+  searchIndex,
+  filterDocument,
+  tagCounts,
+} from '../dist/core.mjs';
 export async function checkDesktopCache(browser) {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
@@ -23,7 +30,11 @@ export async function checkDesktopCache(browser) {
       {
         id: 'near',
         time: '10/1',
-        metadata: { title: 'Nearby moment', description: 'SQLite inspector notes' },
+        metadata: {
+          title: 'Nearby moment',
+          description: 'SQLite inspector notes',
+          tags: ['local'],
+        },
       },
       { id: 'far', time: '10000/1', metadata: { title: 'Far away' } },
     ],
@@ -40,7 +51,8 @@ export async function checkDesktopCache(browser) {
     generation = 1,
     reads = 0,
     durationReads = 0;
-  const searches = [],
+  const filtered = [],
+    searches = [],
     overviews = [],
     details = [],
     saves = [],
@@ -65,6 +77,11 @@ export async function checkDesktopCache(browser) {
     if (command === 'desktop_query') {
       assert.equal(args.generation, generation);
       const q = args.query;
+      // Native tag views: a filtered query reads an index of one side of the separation.
+      const source = q.filter ? new TimelineIndex(filterDocument(document, q.filter)) : index;
+      if (q.filter) filtered.push(q);
+      if (q.kind === 'tags')
+        return { tags: tagCounts(index.byId.values(), index.durations.values()) };
       if (q.kind === 'search') {
         searches.push(q);
         return searchIndex(index, q.text, q.page);
@@ -75,11 +92,11 @@ export async function checkDesktopCache(browser) {
       }
       if (q.kind === 'events') {
         details.push(q);
-        return { events: index.eventsBetween(q.lower, q.upper, 100), next: null };
+        return { events: source.eventsBetween(q.lower, q.upper, 100), next: null };
       }
       overviews.push(q);
       const view = new Viewport(Q.parse(q.lower), Q.parse(q.upper).sub(Q.parse(q.lower)));
-      const frame = index.frame(
+      const frame = source.frame(
         view,
         1000,
         Q.parse(q.threshold).div(view.span).toApproximateNumber() * 1000,
@@ -234,6 +251,21 @@ export async function checkDesktopCache(browser) {
     assert.equal(reads, 0);
     assert.equal(document.events.length, 10002);
     assert(document.events.some((e) => e.id === 'far'));
+    // Separating a file queries native tag views of the saved state.
+    await page.locator('#separate-button').click();
+    await page.locator('#separate-dialog').getByLabel('local (1)').check();
+    await page.locator('#separate-submit').click();
+    await page.locator('#separation-settings').waitFor({ state: 'visible' });
+    // The marker can linger from the joined view; wait for both separated tracks' queries.
+    const queried = (mode) =>
+      filtered.some((q) => q.filter.mode === mode && q.filter.tags.join() === 'local');
+    for (let i = 0; i < 200 && !(queried('any') && queried('none')); i++)
+      await page.waitForTimeout(50);
+    assert(queried('any') && queried('none'));
+    await page.getByRole('button', { name: 'Edited SQLite moment', exact: true }).waitFor();
+    assert.equal(reads, 0, 'Separation never loads the whole file into the webview.');
+    await page.locator('#separation-rejoin').click();
+    await page.locator('#separation-settings').waitFor({ state: 'hidden' });
     const download = page.waitForEvent('download');
     await page.locator('#export-button').click();
     const exported = JSON.parse(await readFile(await (await download).path(), 'utf8'));

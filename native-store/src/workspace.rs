@@ -34,14 +34,20 @@ pub struct Patch {
     #[serde(default, rename = "durationChanges")]
     pub duration_changes: Vec<DurationChange>,
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct Cursor {
     /// Event pages use `time`; duration pages order by start and send `first`.
     #[serde(alias = "first")]
     pub time: String,
     pub id: String,
 }
-#[derive(Deserialize)]
+/// One side of a tag separation: entities with any of the tags, or with none of them.
+#[derive(Deserialize, Clone)]
+pub struct ViewFilter {
+    pub tags: Vec<String>,
+    pub mode: String,
+}
+#[derive(Deserialize, Clone)]
 pub struct Query {
     pub kind: String,
     #[serde(default)]
@@ -62,11 +68,15 @@ pub struct Query {
     pub text: String,
     #[serde(default)]
     pub page: Option<usize>,
+    #[serde(default)]
+    pub filter: Option<ViewFilter>,
 }
 pub struct Snapshot {
     directory: PathBuf,
     path: PathBuf,
     query_gate: std::sync::Mutex<()>,
+    /// Derived indexes for tag separations, built from this baseline on first use.
+    views: std::sync::Mutex<Vec<(String, std::sync::Arc<Snapshot>)>>,
 }
 impl Drop for Snapshot {
     fn drop(&mut self) {
@@ -95,6 +105,7 @@ impl Snapshot {
             path: directory.join("baseline.och"),
             directory,
             query_gate: std::sync::Mutex::new(()),
+            views: std::sync::Mutex::new(Vec::new()),
         };
         let db = Connection::open(source, false)?;
         db.execute("BEGIN", &[])?;
@@ -182,7 +193,47 @@ impl Snapshot {
         let _gate = self.query_gate.lock().map_err(|e| e.to_string())?;
         super::open(&self.path)
     }
+    /// The derived snapshot for one side of a tag separation. The baseline is immutable, so a
+    /// view stays valid for the baseline's lifetime; the two most recent are kept.
+    fn view(&self, filter: &ViewFilter) -> Result<std::sync::Arc<Snapshot>, String> {
+        let mut tags: Vec<String> = filter
+            .tags
+            .iter()
+            .map(|t| t.trim().to_lowercase())
+            .collect();
+        tags.sort();
+        tags.dedup();
+        if tags.is_empty() || tags.len() > 40 || !matches!(filter.mode.as_str(), "any" | "none") {
+            return Err("A tag filter needs one to forty tags and a mode".into());
+        }
+        let key = format!("{}:{}", filter.mode, tags.join(","));
+        if let Some((_, view)) = self
+            .views
+            .lock()
+            .map_err(|e| e.to_string())?
+            .iter()
+            .find(|(k, _)| *k == key)
+        {
+            return Ok(view.clone());
+        }
+        let document = super::filter_document(self.document()?, &tags, filter.mode == "any");
+        let view = std::sync::Arc::new(Self::from_document(&document)?);
+        let mut views = self.views.lock().map_err(|e| e.to_string())?;
+        views.retain(|(k, _)| *k != key);
+        views.push((key, view.clone()));
+        if views.len() > 2 {
+            views.remove(0);
+        }
+        Ok(view)
+    }
     pub fn query(&self, q: &Query) -> Result<Value, String> {
+        if let Some(filter) = &q.filter {
+            let view = self.view(filter)?;
+            return view.query(&Query {
+                filter: None,
+                ..q.clone()
+            });
+        }
         let _gate = self.query_gate.lock().map_err(|e| e.to_string())?;
         for value in [&q.lower, &q.upper, &q.threshold] {
             if value.len() > 65536 {
@@ -209,6 +260,14 @@ impl Snapshot {
         }
         if q.kind == "search" {
             return search(&db, &q.text, q.page.unwrap_or(1));
+        }
+        if q.kind == "tags" {
+            let rows = db.query_limited("SELECT t.value,count(*) FROM (SELECT metadata FROM events UNION ALL SELECT metadata FROM durations) e,json_each(e.metadata,'$.tags') t WHERE json_type(e.metadata,'$.tags')='array' AND t.type='text' GROUP BY t.value ORDER BY count(*) DESC,t.value LIMIT 200", &[], 200, BUDGET)?;
+            let tags: Vec<Value> = rows
+                .into_iter()
+                .map(|r| json!({"tag": r[0], "count": r[1].as_deref().unwrap_or("0").parse::<u64>().unwrap_or(0)}))
+                .collect();
+            return Ok(json!({ "tags": tags }));
         }
         if q.kind == "durations" {
             let after = q.after.as_ref();
@@ -705,6 +764,65 @@ mod safety_tests {
     }
 }
 
+#[cfg(test)]
+mod view_tests {
+    use super::*;
+    #[test]
+    fn tag_views_partition_entities_and_keep_cross_side_durations_placed() {
+        let doc: Document = serde_json::from_value(json!({
+            "format":"openchronology","version":1,"title":"Views","description":"",
+            "events":[
+                {"id":"a","time":"1/1","metadata":{"title":"A","tags":["war"]}},
+                {"id":"b","time":"2/1","metadata":{"title":"B","tags":["trade","war"]}},
+                {"id":"c","time":"3/1","metadata":{"title":"C"}},
+                {"id":"d","time":"4/1","metadata":{"title":"D","tags":["art"]}}
+            ],
+            "durations":[
+                {"id":"x","start":{"moment":"c"},"end":"9/1","metadata":{"tags":["war"]}},
+                {"id":"y","start":"0/1","end":{"moment":"a"},"metadata":{}}
+            ]
+        }))
+        .unwrap();
+        let snapshot = Snapshot::from_document(&doc).unwrap();
+        let ids = |filter: Value| -> (Vec<String>, Vec<Value>) {
+            let events = snapshot
+                .query(&serde_json::from_value(json!({"kind":"events","lower":"0/1","upper":"10/1","limit":100,"filter":filter})).unwrap())
+                .unwrap();
+            let frame = snapshot
+                .query(&serde_json::from_value(json!({"kind":"overview","lower":"0/1","upper":"10/1","threshold":"1/1024","filter":filter})).unwrap())
+                .unwrap();
+            (
+                events["events"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|e| e["id"].as_str().unwrap().to_string())
+                    .collect(),
+                frame["durations"].as_array().unwrap().clone(),
+            )
+        };
+        let (tagged, tagged_bands) = ids(json!({"tags":["War","trade"],"mode":"any"}));
+        let (rest, rest_bands) = ids(json!({"tags":["war","trade"],"mode":"none"}));
+        assert_eq!(tagged, vec!["a", "b"]);
+        assert_eq!(rest, vec!["c", "d"]);
+        // "x" follows "c", which is not tagged; it keeps c's time as a fixed start.
+        assert_eq!(tagged_bands.len(), 1);
+        assert_eq!(tagged_bands[0]["id"], "x");
+        assert_eq!(tagged_bands[0]["start"], "3/1");
+        assert_eq!(rest_bands[0]["id"], "y");
+        assert_eq!(rest_bands[0]["end"], "1/1");
+        let tags = snapshot
+            .query(&serde_json::from_value(json!({"kind":"tags"})).unwrap())
+            .unwrap();
+        assert_eq!(
+            tags["tags"],
+            json!([{"tag":"war","count":3},{"tag":"art","count":1},{"tag":"trade","count":1}])
+        );
+        assert!(snapshot
+            .query(&serde_json::from_value(json!({"kind":"events","lower":"0/1","upper":"1/1","filter":{"tags":[],"mode":"any"}})).unwrap())
+            .is_err());
+    }
+}
 #[cfg(test)]
 mod summary_tests {
     use super::*;

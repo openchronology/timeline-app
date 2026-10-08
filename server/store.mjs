@@ -10,6 +10,8 @@ import {
   durationGroups,
   searchRows,
   searchTerms,
+  filterDocument,
+  viewFilterKey,
   snippet,
   SEARCH_PAGE_SIZE,
 } from '../dist/core.mjs';
@@ -113,111 +115,11 @@ export class PostgresStore {
       [id, JSON.stringify(document.events.map((event) => event.id))],
     );
     const tree = indexedNodes(document);
-    await client.query('DELETE FROM oc_nodes WHERE timeline_id=$1', [id]);
-    // Batched inserts keep write round trips bounded; mpq keys never enter a B-tree.
-    for (let offset = 0; offset < tree.nodes.length; offset += 250) {
-      const chunk = tree.nodes.slice(offset, offset + 250),
-        parameters = [];
-      const tuples = chunk.map((n) => {
-        const start = parameters.length;
-        parameters.push(
-          id,
-          n.id,
-          n.time,
-          n.first,
-          n.last,
-          n.left,
-          n.right,
-          n.firstId,
-          n.bucketCount,
-          n.count,
-          n.distinct,
-          JSON.stringify(n.events),
-        );
-        return (
-          '(' +
-          Array.from(
-            { length: 12 },
-            (_, i) =>
-              '$' +
-              (start + i + 1) +
-              (i === 2 || i === 3 || i === 4 ? '::mpq' : i === 11 ? '::jsonb' : ''),
-          ).join(',') +
-          ')'
-        );
-      });
-      await client.query(
-        'INSERT INTO oc_nodes(timeline_id,id,time,first_time,last_time,left_id,right_id,first_id,bucket_count,event_count,distinct_count,events) VALUES ' +
-          tuples.join(','),
-        parameters,
-      );
-    }
-    await client.query('DELETE FROM oc_duration_nodes WHERE timeline_id=$1', [id]);
-    const intervals = [];
-    function flatten(node) {
-      if (!node) return null;
-      const ordinal = intervals.length + 1;
-      const row = { ordinal, node };
-      intervals.push(row);
-      row.left = flatten(node.left);
-      row.right = flatten(node.right);
-      return ordinal;
-    }
-    const times = new Map(document.events.map((e) => [e.id, e.time]));
-    flatten(durationTree(document.durations ?? [], (moment) => times.get(moment)));
-    await this.indexSearch(
-      client,
-      id,
-      document,
-      intervals.map(({ node }) => node.band),
-    );
-    for (let offset = 0; offset < intervals.length; offset += 250) {
-      const params = [];
-      const tuples = intervals.slice(offset, offset + 250).map(({ ordinal, node, left, right }) => {
-        const start = params.length;
-        params.push(
-          id,
-          ordinal,
-          left,
-          right,
-          node.min.toString(),
-          node.max.toString(),
-          node.band.first,
-          node.band.last,
-          JSON.stringify({ ...node.band, metadata: durationOverview(node.band.metadata) }),
-          JSON.stringify({
-            id: node.band.id,
-            start: node.band.start,
-            end: node.band.end,
-            metadata: node.band.metadata,
-          }),
-          node.maxFirst.toString(),
-          node.count,
-          node.minExtent.toString(),
-          node.maxExtent.toString(),
-        );
-        return (
-          '(' +
-          Array.from(
-            { length: 14 },
-            (_, i) =>
-              '$' +
-              (start + i + 1) +
-              ((i >= 4 && i <= 7) || i === 10 || i === 12 || i === 13
-                ? '::mpq'
-                : i === 8 || i === 9
-                  ? '::jsonb'
-                  : ''),
-          ).join(',') +
-          ')'
-        );
-      });
-      await client.query(
-        'INSERT INTO oc_duration_nodes(timeline_id,id,left_id,right_id,min_time,max_time,first_time,last_time,band,definition,max_first,subtree_count,min_extent,max_extent) VALUES ' +
-          tuples.join(','),
-        params,
-      );
-    }
+    await writeNodes(client, 'oc_nodes', id, tree);
+    const bands = await writeDurationNodes(client, 'oc_duration_nodes', id, document);
+    await this.indexSearch(client, id, document, bands);
+    // Saved state changed: derived separation views belong to the previous revision.
+    await client.query('DELETE FROM oc_views WHERE timeline_id=$1', [id]);
     await client.query(
       'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,tags=$8,assets=$9::jsonb,event_text=$10,comparison=$11::jsonb,storage_bytes=$12,event_generation=event_generation+CASE WHEN $13 THEN 1 ELSE 0 END,updated_at=CASE WHEN $14 THEN now() ELSE updated_at END WHERE id=$1',
       [
@@ -246,18 +148,19 @@ export class PostgresStore {
       const params = [];
       const tuples = rows.slice(offset, offset + 500).map((row) => {
         const start = params.length;
-        params.push(id, row.kind, row.id, row.first, row.last, row.title, row.body);
+        params.push(id, row.kind, row.id, row.first, row.last, row.title, row.body, row.tags);
         return (
           '(' +
           Array.from(
-            { length: 7 },
-            (_, i) => '$' + (start + i + 1) + (i === 3 || i === 4 ? '::mpq' : ''),
+            { length: 8 },
+            (_, i) =>
+              '$' + (start + i + 1) + (i === 3 || i === 4 ? '::mpq' : i === 7 ? '::text[]' : ''),
           ).join(',') +
           ')'
         );
       });
       await client.query(
-        'INSERT INTO oc_entity_search(timeline_id,kind,entity_id,first_time,last_time,title,body) VALUES ' +
+        'INSERT INTO oc_entity_search(timeline_id,kind,entity_id,first_time,last_time,title,body,tags) VALUES ' +
           tuples.join(','),
         params,
       );
@@ -473,7 +376,45 @@ export class PostgresStore {
       ...(durations.length ? { durations } : {}),
     });
   }
+  /**
+   * Returns the derived index for one side of a tag separation at the current saved revision,
+   * building it from the saved document on first use. A save discards views; each timeline
+   * keeps its eight most recent.
+   */
+  async view(id, userId, filter) {
+    const key = viewFilterKey(filter);
+    return this.transaction(async (c) => {
+      const t = await this.access(id, userId, c);
+      if (t.comparison) throw new HttpError(409, 'Comparisons cannot be separated by tags.');
+      await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+        id + '|' + t.revision + '|' + key,
+      ]);
+      const existing = await c.query(
+        'SELECT id FROM oc_views WHERE timeline_id=$1 AND revision=$2 AND filter_key=$3',
+        [id, t.revision, key],
+      );
+      if (existing.rows[0]) return existing.rows[0].id;
+      const document = filterDocument(await this.branchDocument(c, t), filter);
+      const tree = indexedNodes(document),
+        viewId = randomUUID();
+      await c.query(
+        'INSERT INTO oc_views(id,timeline_id,revision,filter_key,root,event_count) VALUES($1,$2,$3,$4,$5,$6)',
+        [viewId, id, t.revision, key, tree.root, tree.count],
+      );
+      await writeNodes(c, 'oc_view_nodes', viewId, tree);
+      await writeDurationNodes(c, 'oc_view_duration_nodes', viewId, document);
+      await c.query(
+        'DELETE FROM oc_views WHERE timeline_id=$1 AND id NOT IN (SELECT id FROM oc_views WHERE timeline_id=$1 ORDER BY created_at DESC,id LIMIT 8)',
+        [id],
+      );
+      return viewId;
+    });
+  }
   async query(id, userId, query) {
+    // Tag separations read a derived index for the filter, built on first use.
+    const view = query.filter ? await this.view(id, userId, query.filter) : null;
+    const tree = view ?? id,
+      names = treeNames(view);
     return this.transaction(async (c) => {
       await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
       const t = await this.access(id, userId, c);
@@ -484,45 +425,54 @@ export class PostgresStore {
           409,
           'The server timeline changed. Save or export your edits before reloading.',
         );
+      if (
+        view &&
+        !(
+          await c.query('SELECT 1 FROM oc_views WHERE id=$1 AND timeline_id=$2 AND revision=$3', [
+            view,
+            id,
+            t.revision,
+          ])
+        ).rows.length
+      )
+        throw new HttpError(409, 'The server timeline changed. Separate the tags again.');
       if (query.kind === 'overview') {
         const span = Q.parse(query.upper).sub(Q.parse(query.lower));
         const minimum = span.compare(Q.zero) > 0 ? span.div(Q.from(1024n)) : Q.zero;
         const threshold =
           Q.parse(query.threshold).compare(minimum) < 0 ? minimum.toString() : query.threshold;
-        const { rows } = await c.query('SELECT * FROM oc_overview_v2($1,$2::mpq,$3::mpq,$4::mpq)', [
-          id,
-          query.lower,
-          query.upper,
-          threshold,
-        ]);
+        const { rows } = await c.query(
+          `SELECT * FROM ${names.overview}($1,$2::mpq,$3::mpq,$4::mpq)`,
+          [tree, query.lower, query.upper, threshold],
+        );
         // Bands are durations at least as long as the threshold; shorter ones are summarized.
         const intervals = await c.query(
           `WITH RECURSIVE visible AS (
-          SELECT n.* FROM oc_duration_nodes n WHERE timeline_id=$1 AND id=1 AND min_time<=$3::mpq AND max_time>=$2::mpq
-          UNION ALL SELECT n.* FROM visible p JOIN oc_duration_nodes n ON n.timeline_id=p.timeline_id AND n.id IN (p.left_id,p.right_id)
+          SELECT n.* FROM ${names.durations} n WHERE timeline_id=$1 AND id=1 AND min_time<=$3::mpq AND max_time>=$2::mpq
+          UNION ALL SELECT n.* FROM visible p JOIN ${names.durations} n ON n.timeline_id=p.timeline_id AND n.id IN (p.left_id,p.right_id)
           WHERE n.min_time<=$3::mpq AND n.max_time>=$2::mpq AND NOT coalesce(n.max_extent<$4::mpq AND $4::mpq>'0'::mpq,false)
         ) SELECT band FROM visible WHERE first_time<=$3::mpq AND last_time>=$2::mpq
           AND ($4::mpq='0'::mpq OR last_time-first_time>=$4::mpq) LIMIT 257`,
-          [id, query.lower, query.upper, threshold],
+          [tree, query.lower, query.upper, threshold],
         );
         const collapsed = await c.query(
-          'SELECT first_time,last_time,duration_count,band FROM oc_duration_overview($1,$2::mpq,$3::mpq,$4::mpq)',
-          [id, query.lower, query.upper, threshold],
+          `SELECT first_time,last_time,duration_count,band FROM ${names.durationOverview}($1,$2::mpq,$3::mpq,$4::mpq)`,
+          [tree, query.lower, query.upper, threshold],
         );
         const momentGroups = rows.map((r) => ({
-            first: r.first_time,
-            last: r.last_time,
-            count: r.event_count,
-            distinct: r.distinct_count,
-            ...(r.event_id
-              ? {
-                  id: r.event_id,
-                  title: (r.title ?? '').slice(0, 512),
-                  ...((query.plugins ?? t.plugins)?.some((p) => p.enabled)
-                    ? { metadata: overviewMetadata(query.plugins ?? t.plugins, r.metadata ?? {}) }
-                    : {}),
-                }
-              : {}),
+          first: r.first_time,
+          last: r.last_time,
+          count: r.event_count,
+          distinct: r.distinct_count,
+          ...(r.event_id
+            ? {
+                id: r.event_id,
+                title: (r.title ?? '').slice(0, 512),
+                ...((query.plugins ?? t.plugins)?.some((p) => p.enabled)
+                  ? { metadata: overviewMetadata(query.plugins ?? t.plugins, r.metadata ?? {}) }
+                  : {}),
+              }
+            : {}),
         }));
         const durationClusters = durationGroups(
           collapsed.rows.map((r) => ({
@@ -543,9 +493,21 @@ export class PostgresStore {
           visitedNodes: rows.at(-1)?.visited_nodes ?? 0,
         };
       }
+      if (query.kind === 'tags') {
+        const { rows } = await c.query(
+          `SELECT tag,count(*) AS count FROM oc_entity_search,unnest(tags) AS tag
+          WHERE timeline_id=$1 GROUP BY tag ORDER BY count(*) DESC,tag COLLATE "C" LIMIT 200`,
+          [id],
+        );
+        return {
+          tags: rows.map((r) => ({ tag: r.tag, count: Number(r.count) })),
+          revision: t.revision,
+        };
+      }
       if (query.kind === 'search') {
         const terms = searchTerms(query.text);
-        if (!terms.length) return { results: [], total: '0', page: query.page, revision: t.revision };
+        if (!terms.length)
+          return { results: [], total: '0', page: query.page, revision: t.revision };
         // Terms contain only letters and digits, so they are safe tsquery prefix operands.
         const tsquery = terms.map((term) => term + ':*').join(' & ');
         const { rows } = await c.query(
@@ -572,11 +534,18 @@ export class PostgresStore {
       if (query.kind === 'durations') {
         // Durations wholly inside a summary, in start order with an exact (start, ID) cursor.
         const { rows } = await c.query(
-          `SELECT band,oc_qtext(first_time) AS first FROM oc_duration_nodes
+          `SELECT band,oc_qtext(first_time) AS first FROM ${names.durations}
           WHERE timeline_id=$1 AND first_time>=$2::mpq AND last_time<=$3::mpq
           AND ($4::mpq IS NULL OR first_time>$4::mpq OR (first_time=$4::mpq AND band->>'id' COLLATE "C">$5))
           ORDER BY first_time,band->>'id' COLLATE "C" LIMIT $6`,
-          [id, query.lower, query.upper, query.after?.first ?? null, query.after?.id ?? '', query.limit + 1],
+          [
+            tree,
+            query.lower,
+            query.upper,
+            query.after?.first ?? null,
+            query.after?.id ?? '',
+            query.limit + 1,
+          ],
         );
         const page = rows.slice(0, query.limit);
         return {
@@ -598,17 +567,17 @@ export class PostgresStore {
       if (query.id) {
         const { rows } = await c.query(
           `WITH RECURSIVE path AS (
-          SELECT n.id,n.time,n.left_id,n.right_id FROM oc_nodes n JOIN oc_timelines t ON t.id=n.timeline_id AND t.root=n.id WHERE t.id=$1
-          UNION ALL SELECT n.id,n.time,n.left_id,n.right_id FROM path p JOIN oc_nodes n ON n.timeline_id=$1 AND n.id=CASE WHEN p.time>$2::mpq THEN p.left_id WHEN p.time<$2::mpq THEN p.right_id END
-        ) SELECT event FROM path p JOIN oc_nodes n ON n.timeline_id=$1 AND n.id=p.id CROSS JOIN LATERAL jsonb_array_elements(n.events) event WHERE p.time=$2::mpq AND event->>'id'=$3 LIMIT 1`,
-          [id, query.lower, query.id],
+          SELECT n.id,n.time,n.left_id,n.right_id FROM ${names.nodes} n JOIN ${names.roots} t ON t.id=n.timeline_id AND t.root=n.id WHERE t.id=$1
+          UNION ALL SELECT n.id,n.time,n.left_id,n.right_id FROM path p JOIN ${names.nodes} n ON n.timeline_id=$1 AND n.id=CASE WHEN p.time>$2::mpq THEN p.left_id WHEN p.time<$2::mpq THEN p.right_id END
+        ) SELECT event FROM path p JOIN ${names.nodes} n ON n.timeline_id=$1 AND n.id=p.id CROSS JOIN LATERAL jsonb_array_elements(n.events) event WHERE p.time=$2::mpq AND event->>'id'=$3 LIMIT 1`,
+          [tree, query.lower, query.id],
         );
         return { events: rows.map((r) => r.event), next: null, revision: t.revision };
       }
       const { rows } = await c.query(
-        'SELECT oc_events($1,$2::mpq,$3::mpq,$4::mpq,$5,$6) AS event',
+        `SELECT ${names.events}($1,$2::mpq,$3::mpq,$4::mpq,$5,$6) AS event`,
         [
-          id,
+          tree,
           query.lower ?? null,
           query.upper ?? null,
           query.after?.time ?? null,
@@ -632,6 +601,131 @@ export class PostgresStore {
  * from the converted document stores standalone definitions; saved history is immutable and
  * converts when read. Returns the number of converted timelines.
  */
+/** Writes a balanced moment tree; batched inserts bound round trips and mpq keys stay out of B-trees. */
+async function writeNodes(client, table, id, tree) {
+  await client.query(`DELETE FROM ${table} WHERE timeline_id=$1`, [id]);
+  for (let offset = 0; offset < tree.nodes.length; offset += 250) {
+    const chunk = tree.nodes.slice(offset, offset + 250),
+      parameters = [];
+    const tuples = chunk.map((n) => {
+      const start = parameters.length;
+      parameters.push(
+        id,
+        n.id,
+        n.time,
+        n.first,
+        n.last,
+        n.left,
+        n.right,
+        n.firstId,
+        n.bucketCount,
+        n.count,
+        n.distinct,
+        JSON.stringify(n.events),
+      );
+      return (
+        '(' +
+        Array.from(
+          { length: 12 },
+          (_, i) =>
+            '$' +
+            (start + i + 1) +
+            (i === 2 || i === 3 || i === 4 ? '::mpq' : i === 11 ? '::jsonb' : ''),
+        ).join(',') +
+        ')'
+      );
+    });
+    await client.query(
+      `INSERT INTO ${table}(timeline_id,id,time,first_time,last_time,left_id,right_id,first_id,bucket_count,event_count,distinct_count,events) VALUES ` +
+        tuples.join(','),
+      parameters,
+    );
+  }
+}
+/** Writes the augmented duration interval tree; returns resolved bands in tree order. */
+async function writeDurationNodes(client, table, id, document) {
+  await client.query(`DELETE FROM ${table} WHERE timeline_id=$1`, [id]);
+  const intervals = [];
+  function flatten(node) {
+    if (!node) return null;
+    const ordinal = intervals.length + 1;
+    const row = { ordinal, node };
+    intervals.push(row);
+    row.left = flatten(node.left);
+    row.right = flatten(node.right);
+    return ordinal;
+  }
+  const times = new Map(document.events.map((e) => [e.id, e.time]));
+  flatten(durationTree(document.durations ?? [], (moment) => times.get(moment)));
+  for (let offset = 0; offset < intervals.length; offset += 250) {
+    const params = [];
+    const tuples = intervals.slice(offset, offset + 250).map(({ ordinal, node, left, right }) => {
+      const start = params.length;
+      params.push(
+        id,
+        ordinal,
+        left,
+        right,
+        node.min.toString(),
+        node.max.toString(),
+        node.band.first,
+        node.band.last,
+        JSON.stringify({ ...node.band, metadata: durationOverview(node.band.metadata) }),
+        JSON.stringify({
+          id: node.band.id,
+          start: node.band.start,
+          end: node.band.end,
+          metadata: node.band.metadata,
+        }),
+        node.maxFirst.toString(),
+        node.count,
+        node.minExtent.toString(),
+        node.maxExtent.toString(),
+      );
+      return (
+        '(' +
+        Array.from(
+          { length: 14 },
+          (_, i) =>
+            '$' +
+            (start + i + 1) +
+            ((i >= 4 && i <= 7) || i === 10 || i === 12 || i === 13
+              ? '::mpq'
+              : i === 8 || i === 9
+                ? '::jsonb'
+                : ''),
+        ).join(',') +
+        ')'
+      );
+    });
+    await client.query(
+      `INSERT INTO ${table}(timeline_id,id,left_id,right_id,min_time,max_time,first_time,last_time,band,definition,max_first,subtree_count,min_extent,max_extent) VALUES ` +
+        tuples.join(','),
+      params,
+    );
+  }
+  return intervals.map(({ node }) => node.band);
+}
+/** Main index objects, or the derived view tables and generated functions for a filter. */
+function treeNames(view) {
+  return view
+    ? {
+        nodes: 'oc_view_nodes',
+        durations: 'oc_view_duration_nodes',
+        overview: 'oc_view_overview',
+        events: 'oc_view_events',
+        durationOverview: 'oc_view_duration_overview',
+        roots: 'oc_views',
+      }
+    : {
+        nodes: 'oc_nodes',
+        durations: 'oc_duration_nodes',
+        overview: 'oc_overview_v2',
+        events: 'oc_events',
+        durationOverview: 'oc_duration_overview',
+        roots: 'oc_timelines',
+      };
+}
 /** Builds search rows for timelines saved before entity search existed. */
 export async function backfillEntitySearch(client) {
   const store = new PostgresStore(null);

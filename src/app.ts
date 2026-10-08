@@ -52,6 +52,9 @@ import {
   durationPlugins,
   momentPlugins,
   entityCount,
+  entityTags,
+  filterDocument,
+  tagCounts,
   searchIndex,
   searchTerms,
   searchText,
@@ -206,6 +209,7 @@ function flushEventEdit() {
     if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata))
       throw new Error('Additional metadata must be a JSON object.');
     validateStackMetadata(metadata, installedPlugins());
+    const tags = parseTagInput(input('event-tags').value);
     const point: PointEvent = {
       id: selected?.id ?? eventId(),
       time: readEventTime().toString(),
@@ -213,6 +217,7 @@ function flushEventEdit() {
         ...metadata,
         title: input('event-title').value,
         description: el<HTMLTextAreaElement>('event-description').value,
+        ...(tags.length ? { tags } : {}),
       },
     };
     pendingEventEdit = false;
@@ -1327,6 +1332,8 @@ function startComparison(sources: ComparisonSource[], presentation: TimePresenta
 }
 function stopComparison(restore = true) {
   if (!comparison) return;
+  separation = null;
+  el('separation-settings').hidden = true;
   comparisonController?.abort();
   comparison.dispose();
   comparison = null;
@@ -1418,7 +1425,8 @@ function heading() {
     remote.visibility !== 'public' ||
     !!comparison;
   void live?.update();
-  el('comparison-settings').hidden = !comparison;
+  el('comparison-settings').hidden = !comparison || !!separation;
+  el('separation-settings').hidden = !separation;
   for (const id of [
     'publish-button',
     'och-export',
@@ -1511,6 +1519,7 @@ function heading() {
 
   el('add-button').hidden = !editable();
   el('add-duration-button').hidden = !editable();
+  el('separate-button').hidden = !!comparison || (!model && !remote && !local);
   el('search-button').hidden = !!comparison || (!model && !remote && !local);
   el<HTMLButtonElement>('undo-button').disabled = !history.length;
   el<HTMLButtonElement>('redo-button').disabled = !future.length;
@@ -2405,13 +2414,22 @@ function eventForm(event?: PointEvent, time?: Q) {
   setEventTime(selectedTime);
   requestRender();
   el<HTMLTextAreaElement>('event-description').value = event?.metadata.description ?? '';
+  input('event-tags').value = event ? entityTags(event.metadata).join(', ') : '';
   const rest = { ...event?.metadata };
   delete rest.title;
   delete rest.description;
+  if (event && entityTags(event.metadata).length === (event.metadata.tags as unknown[])?.length)
+    delete rest.tags;
   el<HTMLTextAreaElement>('event-metadata').value = JSON.stringify(rest, null, 2);
   refreshPluginFields();
   refreshDurations();
-  for (const id of ['event-title', 'event-time', 'event-description', 'event-metadata'])
+  for (const id of [
+    'event-title',
+    'event-time',
+    'event-description',
+    'event-tags',
+    'event-metadata',
+  ])
     (el(id) as HTMLInputElement).disabled = !editable();
   text(
     'event-edit-status',
@@ -2574,12 +2592,26 @@ async function durationPage(
   group: FrameGroup,
   after: DurationCursor,
 ): Promise<{ durations: DurationBand[]; next: DurationCursor }> {
-  if (comparison) return { durations: [], next: null };
-  if (!sparseWorkspace() && model) {
+  // A tag separation lists durations from the side the group belongs to.
+  const source =
+    comparison && separation
+      ? comparison.tracks.find((t) => t.source.key === (group as ComparisonGroup).sourceKey)?.source
+      : undefined;
+  if (comparison && !source) return { durations: [], next: null };
+  if (source?.query && !source.index)
+    return source.query({
+      kind: 'durations',
+      lower: group.first,
+      upper: group.last,
+      after,
+      limit: 25,
+    }) as unknown as Promise<{ durations: DurationBand[]; next: DurationCursor }>;
+  const index = source?.index ?? (!sparseWorkspace() ? model : null);
+  if (index) {
     const lower = Q.parse(group.first),
       upper = Q.parse(group.last);
-    const inside = [...model.durations.values()]
-      .map((d) => resolveDuration(d, (id) => model!.momentTime(id)))
+    const inside = [...index.durations.values()]
+      .map((d) => resolveDuration(d, (id) => index.momentTime(id)))
       .filter(
         (b): b is DurationBand =>
           !!b &&
@@ -4907,6 +4939,15 @@ function refreshDurations() {
   };
   host.append(add);
 }
+/** Comma-separated entity tags, normalized like timeline tags. */
+function parseTagInput(value: string): string[] {
+  return validateTags(
+    value
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean),
+  );
+}
 /** "3 moments", "2 durations" or "3 moments · 2 durations". */
 function summaryName(group: FrameGroup) {
   const moments = BigInt(group.count),
@@ -4965,11 +5006,14 @@ function showDuration(duration: Duration, readOnly: boolean, edit: DurationEdit 
   text('duration-heading', edit && !edit.before ? 'New duration' : 'Duration');
   input('duration-title').value = duration.metadata.title ?? '';
   el<HTMLTextAreaElement>('duration-description').value = duration.metadata.description ?? '';
+  input('duration-tags').value = entityTags(duration.metadata).join(', ');
   const rest = { ...duration.metadata };
   delete rest.title;
   delete rest.description;
+  if (entityTags(duration.metadata).length === (duration.metadata.tags as unknown[])?.length)
+    delete rest.tags;
   el<HTMLTextAreaElement>('duration-metadata').value = JSON.stringify(rest, null, 2);
-  for (const id of ['duration-title', 'duration-description', 'duration-metadata'])
+  for (const id of ['duration-title', 'duration-description', 'duration-tags', 'duration-metadata'])
     (el(id) as HTMLInputElement).disabled = readOnly;
   el('duration-delete').hidden = readOnly;
   text('duration-error', '');
@@ -4984,6 +5028,7 @@ function durationFromForm(): Duration {
   const metadata = JSON.parse(el<HTMLTextAreaElement>('duration-metadata').value);
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata))
     throw new Error('Additional metadata must be a JSON object.');
+  const tags = parseTagInput(input('duration-tags').value);
   return validateDuration(
     {
       ...current,
@@ -4991,6 +5036,7 @@ function durationFromForm(): Duration {
         ...metadata,
         title: input('duration-title').value,
         description: el<HTMLTextAreaElement>('duration-description').value,
+        ...(tags.length ? { tags } : {}),
       },
     },
     parseTime,
@@ -5256,6 +5302,120 @@ async function listMoments(host: HTMLElement, choose: (moment: PointEvent) => vo
   more.onclick = () => void load();
   await load();
 }
+/**
+ * Tag separation: a read-only, two-track comparison of one timeline with itself. Entities
+ * carrying any selected tag move to the upper track; everything else stays below. Indexed
+ * timelines query database-built views of the saved state.
+ */
+let separation: { tags: string[] } | null = null;
+async function loadTagCounts(): Promise<{ tag: string; count: number }[]> {
+  if (!sparseWorkspace() && model) return tagCounts(model.byId.values(), model.durations.values());
+  const result = await timelineQuery<{ tags: { tag: string; count: number }[] }>({
+    kind: 'tags',
+    revision: (local ?? remote)!.revision,
+  });
+  return result.tags;
+}
+function startSeparation(tags: string[]) {
+  flushEventEdit();
+  flushDurationEdit();
+  const presentation = model?.presentation ?? remote?.presentation ?? DEFAULT_PRESENTATION;
+  const plugins = installedPlugins();
+  const label = tags.join(', ');
+  const modes = [
+    { key: 'tagged', mode: 'any' as const, title: `Tagged ${label}` },
+    { key: 'rest', mode: 'none' as const, title: 'Everything else' },
+  ];
+  let sources: ComparisonSource[];
+  if (!sparseWorkspace() && model) {
+    const document = model.document();
+    sources = modes.map(({ key, mode, title }) => {
+      const index = new TimelineIndex(filterDocument(document, { tags, mode }));
+      return {
+        key,
+        title,
+        presentation,
+        plugins,
+        index,
+        first: index.points.minKey()?.toString(),
+        last: index.points.maxKey()?.toString(),
+      };
+    });
+  } else {
+    const info = (local ?? remote)!;
+    if (sparseWorkspace()?.dirtyCount)
+      toast('Separation shows the saved version. Your unsaved edits are kept for when you rejoin.');
+    sources = modes.map(({ key, mode, title }) => ({
+      key,
+      title,
+      presentation,
+      plugins,
+      revision: info.revision,
+      first: info.first,
+      last: info.last,
+      query: (query, signal) =>
+        timelineQuery<Frame | EventPage>(
+          { ...query, filter: { tags, mode }, revision: (local ?? remote)!.revision },
+          signal,
+        ),
+    }));
+  }
+  const before = viewport.clone();
+  separation = { tags };
+  startComparison(sources, presentation);
+  // Separating keeps the current view rather than fitting both tracks.
+  viewport = before;
+  text('separation-tags', label);
+  heading();
+  requestRender();
+}
+el('separate-button').onclick = () => {
+  if (comparison) return;
+  text('separate-error', '');
+  input('separate-extra').value = '';
+  const host = el('separate-tags');
+  host.replaceChildren();
+  text('separate-error', 'Loading tags…');
+  el<HTMLDialogElement>('separate-dialog').showModal();
+  void loadTagCounts()
+    .then((counts) => {
+      text('separate-error', counts.length ? '' : 'No moments or durations have tags yet.');
+      for (const { tag, count } of counts) {
+        const label = document.createElement('label');
+        label.className = 'checkbox-label';
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.value = tag;
+        label.append(box, `${tag} (${count.toLocaleString()})`);
+        host.append(label);
+      }
+    })
+    .catch((error) =>
+      text('separate-error', error instanceof Error ? error.message : String(error)),
+    );
+};
+el<HTMLFormElement>('separate-form').onsubmit = (event) => {
+  event.preventDefault();
+  try {
+    const chosen = [
+      ...[...el('separate-tags').querySelectorAll<HTMLInputElement>('input:checked')].map(
+        (box) => box.value,
+      ),
+      ...parseTagInput(input('separate-extra').value),
+    ];
+    const tags = validateTags(chosen);
+    if (!tags.length) throw new Error('Choose at least one tag.');
+    el<HTMLDialogElement>('separate-dialog').close();
+    startSeparation(tags);
+  } catch (error) {
+    text('separate-error', error instanceof Error ? error.message : String(error));
+  }
+};
+el('separation-rejoin').onclick = () => {
+  stopComparison();
+  heading();
+  requestRender();
+};
 /** Text search shows results in a dialog; choosing one moves the view, nothing else. */
 let searchHit: { kind: SearchResult['kind']; id: string; time: Q } | null = null;
 let searchHitTimer: ReturnType<typeof setTimeout> | undefined;

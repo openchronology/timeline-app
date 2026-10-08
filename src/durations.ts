@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { Rational as Q } from 'rational-ordered-map';
 import type { PointEvent, Metadata } from './core.js';
+import { normalizeEntityTags } from './tags.js';
 /** An endpoint is an exact time, or an anchor that follows a moment's time. */
 export type DurationEndpoint = string | { moment: string };
 export interface Duration {
@@ -42,6 +43,7 @@ function durationMetadata(value: unknown): Metadata {
     if (metadata[field] !== undefined && typeof metadata[field] !== 'string')
       throw new Error('Duration titles and notes must be text.');
   if (metadata.durations !== undefined) throw new Error('Durations cannot contain durations.');
+  if (metadata.tags !== undefined) metadata.tags = normalizeEntityTags(metadata.tags);
   return metadata;
 }
 export function validateDuration(value: unknown, parse: (text: string) => Q): Duration {

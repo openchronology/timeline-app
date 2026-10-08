@@ -17,7 +17,7 @@ import { mailFromEnv, encryptionKey } from './mail.mjs';
 import { DeviceAuth } from './device-auth.mjs';
 import { TimelineFiles } from './files.mjs';
 import { HttpError, PostgresStore } from './store.mjs';
-import { Q, parseTime, validateDocument, validateDuration } from '../dist/core.mjs';
+import { Q, parseTime, validateDocument, validateDuration, validateTags } from '../dist/core.mjs';
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 async function body(req, maximum = 16 * 1024 * 1024) {
   if (!req.headers['content-type']?.startsWith('application/json'))
@@ -74,6 +74,19 @@ function document(value, partial = false) {
   } catch (error) {
     throw new HttpError(400, error.message);
   }
+}
+/** A tag separation filter: one to forty tags, entities with any of them or none. */
+function viewFilter(value) {
+  if (value === undefined || value === null) return undefined;
+  let tags;
+  try {
+    tags = validateTags(value.tags);
+  } catch {
+    tags = [];
+  }
+  if (!tags.length || (value.mode !== 'any' && value.mode !== 'none'))
+    throw new HttpError(400, 'A tag filter needs one to forty tags and a mode.');
+  return { tags, mode: value.mode };
 }
 function bound(value) {
   if (value == null) return null;
@@ -782,6 +795,9 @@ export function createRequestHandler({
             (typeof input.revision !== 'string' || !/^\d+$/.test(input.revision))
           )
             throw new HttpError(400, 'Expected a revision string.');
+          const filter = viewFilter(input.filter);
+          if (input.kind === 'tags')
+            return response(res, 200, await store.query(id, userId, { kind: 'tags' }));
           if (input.kind === 'overview') {
             const lower = bound(input.lower),
               upper = bound(input.upper),
@@ -801,6 +817,7 @@ export function createRequestHandler({
                 lower,
                 upper,
                 threshold,
+                ...(filter ? { filter } : {}),
                 ...(input.revision ? { revision: input.revision } : {}),
                 ...(input.plugins !== undefined
                   ? {
@@ -855,6 +872,7 @@ export function createRequestHandler({
                 lower,
                 upper,
                 limit,
+                ...(filter ? { filter } : {}),
                 after: input.after ? { first: bound(input.after.first), id: input.after.id } : null,
                 ...(input.revision ? { revision: input.revision } : {}),
               }),
@@ -895,6 +913,7 @@ export function createRequestHandler({
             200,
             await store.query(id, userId, {
               kind: 'events',
+              ...(filter ? { filter } : {}),
               ...(input.id !== undefined ? { id: input.id } : {}),
               ...(input.revision ? { revision: input.revision } : {}),
               lower: bound(input.lower),
