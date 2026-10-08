@@ -5155,19 +5155,30 @@ el('add-duration-button').onclick = () => {
     viewport.left.add(span.mul(Q.from(5n, 8n))).toString(),
   );
 };
+/** Band elements persist by duration so clicks and hover cards survive re-rendering. */
+const durationButtons = new Map<string, HTMLButtonElement>();
 function renderDurationBands() {
   const host = el('duration-bands');
-  host.replaceChildren();
+  host.querySelector('.duration-limit')?.remove();
   const rows = comparisonRows().rows;
   const plugins = durationPlugins(installedPlugins());
+  const shown = new Set<string>();
   (frame.durations ?? []).forEach((band, i) => {
     const left = Math.max(0, viewport.x(Q.parse(band.first), width())),
       right = Math.min(width(), viewport.x(Q.parse(band.last), width()));
     if (right < left) return;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'duration-band';
-    button.dataset.durationId = band.id;
+    const key = (band.sourceKey ?? '') + '\u0000' + band.id;
+    shown.add(key);
+    let button = durationButtons.get(key);
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'duration-band';
+      button.dataset.durationId = band.id;
+      button.onclick = () => void openDurationById(band.id).catch(fail);
+      durationButtons.set(key, button);
+      host.append(button);
+    }
     button.style.left = (48 + left) / uiScale + 'px';
     button.style.width = Math.max(6, (right - left) / uiScale) + 'px';
     button.style.top = 202 + (rows.get(band.sourceKey ?? '')?.offset ?? 0) + (i % 3) * 9 + 'px';
@@ -5181,9 +5192,12 @@ function renderDurationBands() {
       ' → ' +
       presented(Q.parse(band.last));
     hoverPreview.update(button, plugins, band.metadata);
-    button.onclick = () => void openDurationById(band.id).catch(fail);
-    host.append(button);
   });
+  for (const [key, button] of durationButtons)
+    if (!shown.has(key)) {
+      button.remove();
+      durationButtons.delete(key);
+    }
   if (frame.durationsTruncated) {
     const notice = document.createElement('span');
     notice.className = 'duration-limit';
