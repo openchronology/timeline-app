@@ -36,6 +36,8 @@ pub struct Patch {
 }
 #[derive(Deserialize)]
 pub struct Cursor {
+    /// Event pages use `time`; duration pages order by start and send `first`.
+    #[serde(alias = "first")]
     pub time: String,
     pub id: String,
 }
@@ -208,6 +210,19 @@ impl Snapshot {
         if q.kind == "search" {
             return search(&db, &q.text, q.page.unwrap_or(1));
         }
+        if q.kind == "durations" {
+            let after = q.after.as_ref();
+            if after.is_some_and(|c| c.id.len() > 128 || c.time.len() > 65536) {
+                return Err("Duration cursor exceeds query budget".into());
+            }
+            return super::duration_page(
+                &db,
+                &q.lower,
+                &q.upper,
+                after.map(|c| (c.time.as_str(), c.id.as_str())),
+                q.limit.unwrap_or(25).clamp(1, 100),
+            );
+        }
         if db.scalar("SELECT q_cmp(q(?),q(?))", &[&q.lower, &q.upper])? == "1" {
             return Err("Reversed viewport bounds".into());
         }
@@ -241,7 +256,18 @@ impl Snapshot {
                     groups.push(group);
                 }
                 {
-                    let mut result = super::duration_window(&db, &q.lower, &q.upper)?;
+                    let mut result = super::duration_window(&db, &q.lower, &q.upper, &threshold)?;
+                    let clusters = super::duration_summaries(&db, &q.lower, &q.upper, &threshold)?;
+                    if !clusters.is_empty() {
+                        for c in clusters {
+                            let mut group = json!({"first":c.first,"last":c.last,"count":"0","distinct":0,"durationCount":c.count.to_string()});
+                            if let Some(band) = c.band {
+                                group["duration"] = band;
+                            }
+                            groups.push(group);
+                        }
+                        groups = super::coalesce_groups(&db, groups, &threshold)?;
+                    }
                     result["groups"] = json!(groups);
                     result["visitedNodes"] = json!(visited);
                     result["threshold"] = json!(threshold);
@@ -679,6 +705,191 @@ mod safety_tests {
     }
 }
 
+#[cfg(test)]
+mod summary_tests {
+    use super::*;
+    fn gcd(a: i64, b: i64) -> i64 {
+        if b == 0 {
+            a.abs()
+        } else {
+            gcd(b, a % b)
+        }
+    }
+    /// Canonical text of k/8.
+    fn q(k: i64) -> String {
+        let g = gcd(k, 8).max(1);
+        format!("{}/{}", k / g, 8 / g)
+    }
+    #[derive(Debug, PartialEq)]
+    struct G {
+        first: i64,
+        last: i64,
+        count: u64,
+        distinct: u64,
+        durations: u64,
+    }
+    /// Brute-force reference: anchored spans of moments and of collapsed duration starts,
+    /// then coalescing while a merged block spans less than the threshold.
+    fn reference(
+        moments: &[i64],
+        spans: &[(i64, i64)],
+        lo: i64,
+        hi: i64,
+        t: i64,
+    ) -> (Vec<G>, Vec<usize>) {
+        let mut points: Vec<i64> = moments
+            .iter()
+            .copied()
+            .filter(|m| *m >= lo && *m <= hi)
+            .collect();
+        points.sort();
+        let mut groups: Vec<G> = Vec::new();
+        for p in points {
+            match groups.last_mut() {
+                Some(g) if p - g.first < t => {
+                    if p != g.last {
+                        g.distinct += 1;
+                    }
+                    g.last = p;
+                    g.count += 1;
+                }
+                _ => groups.push(G {
+                    first: p,
+                    last: p,
+                    count: 1,
+                    distinct: 1,
+                    durations: 0,
+                }),
+            }
+        }
+        let mut short: Vec<(i64, i64)> = spans
+            .iter()
+            .copied()
+            .filter(|(a, b)| b - a < t && *b >= lo && *a <= hi)
+            .collect();
+        short.sort();
+        let mut clusters: Vec<G> = Vec::new();
+        for (a, b) in short {
+            match clusters.last_mut() {
+                Some(c) if a - c.first < t => {
+                    c.last = c.last.max(b);
+                    c.durations += 1;
+                }
+                _ => clusters.push(G {
+                    first: a,
+                    last: b,
+                    count: 0,
+                    distinct: 0,
+                    durations: 1,
+                }),
+            }
+        }
+        let mut all: Vec<G> = groups.into_iter().chain(clusters).collect();
+        all.sort_by(|x, y| {
+            x.first
+                .cmp(&y.first)
+                .then((y.count > 0).cmp(&(x.count > 0)))
+        });
+        let mut out: Vec<G> = Vec::new();
+        for g in all {
+            match out.last_mut() {
+                Some(p) if g.first == p.first || g.last - p.first < t => {
+                    let overlap = p.distinct > 0 && g.distinct > 0 && p.last == g.first;
+                    p.last = p.last.max(g.last);
+                    p.count += g.count;
+                    p.distinct = p.distinct + g.distinct - u64::from(overlap);
+                    p.durations += g.durations;
+                }
+                _ => out.push(g),
+            }
+        }
+        let bands = spans
+            .iter()
+            .enumerate()
+            .filter(|(_, (a, b))| b - a >= t && *b >= lo && *a <= hi)
+            .map(|(i, _)| i)
+            .collect();
+        (out, bands)
+    }
+    #[test]
+    fn native_summaries_match_a_brute_force_reference() {
+        let mut seed: u64 = 20261008;
+        let mut next = |n: i64| {
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            ((seed >> 33) % n as u64) as i64
+        };
+        let mut checked = 0;
+        let mut mixed = 0;
+        for _ in 0..4 {
+            let moments: Vec<i64> = (0..60 + next(80)).map(|_| next(3000)).collect();
+            let spans: Vec<(i64, i64)> = (0..40 + next(120))
+                .map(|_| {
+                    let a = next(3000);
+                    (a, a + if next(10) < 8 { next(40) } else { next(1500) })
+                })
+                .collect();
+            let doc: Document = serde_json::from_value(json!({
+                "format":"openchronology","version":1,"title":"Oracle","description":"",
+                "events": moments.iter().enumerate().map(|(i, m)| json!({"id":format!("m{i:03}"),"time":q(*m),"metadata":{}})).collect::<Vec<_>>(),
+                "durations": spans.iter().enumerate().map(|(i, (a, b))| json!({"id":format!("d{i:03}"),"start":q(*a),"end":q(*b),"metadata":{"title":format!("D{i}")}})).collect::<Vec<_>>(),
+            })).unwrap();
+            let snapshot = Snapshot::from_document(&doc).unwrap();
+            for _ in 0..12 {
+                let lo = next(3200) - 100;
+                let hi = lo + 1 + next(3000);
+                // At least span/1024, the native minimum display threshold.
+                let t = ((hi - lo) / 1024 + 1).max(next(200) + 1);
+                let frame = snapshot
+                    .query(
+                        &serde_json::from_value(
+                            json!({"kind":"overview","lower":q(lo),"upper":q(hi),"threshold":q(t)}),
+                        )
+                        .unwrap(),
+                    )
+                    .unwrap();
+                let (expected, bands) = reference(&moments, &spans, lo, hi, t);
+                let actual: Vec<G> = frame["groups"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|g| {
+                        let k = |s: &str| -> i64 {
+                            let (n, d) = s.split_once('/').unwrap();
+                            n.parse::<i64>().unwrap() * (8 / d.parse::<i64>().unwrap())
+                        };
+                        G {
+                            first: k(g["first"].as_str().unwrap()),
+                            last: k(g["last"].as_str().unwrap()),
+                            count: g["count"].as_str().unwrap().parse().unwrap(),
+                            distinct: g["distinct"].as_u64().unwrap(),
+                            durations: g["durationCount"].as_str().unwrap_or("0").parse().unwrap(),
+                        }
+                    })
+                    .collect();
+                assert_eq!(actual, expected, "window {lo}..{hi} threshold {t}");
+                mixed += expected
+                    .iter()
+                    .filter(|g| g.count > 0 && g.durations > 0)
+                    .count();
+                let mut ids: Vec<usize> = frame["durations"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|b| b["id"].as_str().unwrap()[1..].parse().unwrap())
+                    .collect();
+                ids.sort();
+                if bands.len() <= 256 {
+                    assert_eq!(ids, bands);
+                }
+                checked += 1;
+            }
+        }
+        assert!(mixed > 0, "The oracle exercised mixed groups");
+        assert_eq!(checked, 48);
+    }
+}
 #[cfg(test)]
 mod search_tests {
     use super::*;

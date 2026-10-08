@@ -513,6 +513,62 @@ CREATE TABLE IF NOT EXISTS oc_duration_nodes (
   PRIMARY KEY(timeline_id,id)
 );
 ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS definition jsonb;
+-- Subtree summaries for collapsing short durations: largest start, entry count and extent
+-- bounds. NULL marks rows built before these columns; migrate.mjs rebuilds them.
+ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS max_first mpq;
+ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS subtree_count integer;
+ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS min_extent mpq;
+ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS max_extent mpq;
+
+-- Anchored-span summaries of durations shorter than the threshold that intersect [lo,hi],
+-- keyed by start. Mirrors src/durations.ts durationSummaries: subtrees made only of
+-- collapsed, in-window durations are consumed whole when their starts fit the open group.
+CREATE OR REPLACE FUNCTION oc_duration_overview(tid uuid, lo mpq, hi mpq, threshold mpq)
+RETURNS TABLE(first_time text,last_time text,duration_count integer,band jsonb)
+LANGUAGE plpgsql AS $$
+DECLARE ids integer[]; points boolean[] := ARRAY[false]; idx integer; nid integer; point boolean;
+  n record; anchor mpq; finish mpq; total integer := 0; single jsonb; base mpq;
+BEGIN
+  IF lo IS NULL OR hi IS NULL OR threshold IS NULL OR threshold<='0'::mpq OR lo>hi THEN RETURN; END IF;
+  ids := CASE WHEN EXISTS(SELECT 1 FROM oc_duration_nodes WHERE timeline_id=tid AND id=1) THEN ARRAY[1] ELSE ARRAY[]::integer[] END;
+  WHILE cardinality(ids)>0 LOOP
+    idx:=cardinality(ids); nid:=ids[idx]; point:=points[idx]; ids:=ids[1:idx-1]; points:=points[1:idx-1];
+    SELECT d.* INTO n FROM oc_duration_nodes d WHERE d.timeline_id=tid AND d.id=nid;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Broken duration index'; END IF;
+    IF point THEN
+      IF n.last_time<lo OR n.first_time>hi OR n.last_time-n.first_time>=threshold THEN CONTINUE; END IF;
+      IF anchor IS NOT NULL AND n.first_time-anchor>=threshold THEN
+        first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
+        band:=CASE WHEN total=1 THEN single END; RETURN NEXT; anchor:=NULL;
+      END IF;
+      IF anchor IS NULL THEN anchor:=n.first_time; finish:=n.last_time; total:=0; END IF;
+      IF n.last_time>finish THEN finish:=n.last_time; END IF;
+      total:=total+1; single:=CASE WHEN total=1 THEN n.band END;
+      CONTINUE;
+    END IF;
+    IF n.max_time<lo OR n.min_time>hi THEN CONTINUE; END IF;
+    -- No collapsed duration below. NULL summaries (pre-migration rows) fall through and descend.
+    IF n.min_extent>=threshold THEN CONTINUE; END IF;
+    base:=CASE WHEN anchor IS NOT NULL AND n.min_time-anchor<threshold THEN anchor ELSE n.min_time END;
+    IF n.max_extent<threshold AND n.min_time>=lo AND n.max_first<=hi AND n.max_first-base<threshold THEN
+      IF anchor IS NOT NULL AND n.min_time-anchor>=threshold THEN
+        first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
+        band:=CASE WHEN total=1 THEN single END; RETURN NEXT; anchor:=NULL;
+      END IF;
+      IF anchor IS NULL THEN anchor:=n.min_time; finish:=n.max_time; total:=0; END IF;
+      IF n.max_time>finish THEN finish:=n.max_time; END IF;
+      total:=total+n.subtree_count; single:=CASE WHEN total=1 THEN n.band END;
+    ELSE
+      IF n.right_id IS NOT NULL THEN ids:=array_append(ids,n.right_id); points:=array_append(points,false); END IF;
+      ids:=array_append(ids,nid); points:=array_append(points,true);
+      IF n.left_id IS NOT NULL THEN ids:=array_append(ids,n.left_id); points:=array_append(points,false); END IF;
+    END IF;
+  END LOOP;
+  IF anchor IS NOT NULL THEN
+    first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
+    band:=CASE WHEN total=1 THEN single END; RETURN NEXT;
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS oc_duration_nodes_duration_id ON oc_duration_nodes(timeline_id,(band->>'id'));
 
 -- Per-timeline text search over moments and durations, rebuilt with the rational index on save.

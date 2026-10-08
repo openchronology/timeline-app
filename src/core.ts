@@ -5,8 +5,11 @@ import {
   fixMissingAnchors,
   durationTree,
   durationWindow,
+  durationSummaries,
 } from './durations.js';
 import type { Duration, DurationBand, IntervalNode } from './durations.js';
+import { durationGroups, coalesceGroups } from './summaries.js';
+export { durationGroups, coalesceGroups, entityCount } from './summaries.js';
 export {
   anchorOf,
   durationOverview,
@@ -17,9 +20,11 @@ export {
   resolveDuration,
   durationTree,
   durationWindow,
+  durationSummaries,
+  collapses,
   MAX_DURATIONS,
 } from './durations.js';
-export type { Duration, DurationBand, DurationEndpoint } from './durations.js';
+export type { Duration, DurationBand, DurationEndpoint, DurationSummary } from './durations.js';
 export {
   searchTerms,
   searchText,
@@ -108,6 +113,10 @@ export interface FrameGroup {
   title?: string;
   id?: string;
   metadata?: Metadata;
+  /** Collapsed durations summarized in this group (durations shorter than the threshold). */
+  durationCount?: string;
+  /** The duration, when the group is exactly one collapsed duration and no moments. */
+  duration?: DurationBand;
 }
 export interface Frame {
   durations?: DurationBand[];
@@ -349,27 +358,36 @@ export class TimelineIndex {
       this.intervals = durationTree(this.durations.values(), (id) => this.momentTime(id));
       this.intervalDirty = false;
     }
-    const result = this.points.overview(
-      viewport.left,
-      viewport.right,
-      viewport.threshold(width, pixels),
-      'span',
-      { includeUpper: true },
-    );
+    const threshold = viewport.threshold(width, pixels);
+    const result = this.points.overview(viewport.left, viewport.right, threshold, 'span', {
+      includeUpper: true,
+    });
+    const collapsed = threshold.compare(Q.zero) > 0 ? threshold : null;
+    const moments = result.groups.map((group) => {
+      const first = group.firstTime.toString(),
+        only = group.entryCount === 1n ? this.points.get(group.firstTime)![0] : undefined;
+      return {
+        first,
+        last: group.lastTime.toString(),
+        count: group.entryCount.toString(),
+        distinct: group.distinctCount,
+        ...(only ? { id: only.id, title: only.metadata.title ?? '' } : {}),
+      };
+    });
     return {
-      ...durationWindow(this.intervals, viewport.left, viewport.right),
+      ...durationWindow(this.intervals, viewport.left, viewport.right, 256, collapsed),
       visitedNodes: result.stats.visitedNodes,
-      groups: result.groups.map((group) => {
-        const first = group.firstTime.toString(),
-          only = group.entryCount === 1n ? this.points.get(group.firstTime)![0] : undefined;
-        return {
-          first,
-          last: group.lastTime.toString(),
-          count: group.entryCount.toString(),
-          distinct: group.distinctCount,
-          ...(only ? { id: only.id, title: only.metadata.title ?? '' } : {}),
-        };
-      }),
+      groups: collapsed
+        ? coalesceGroups(
+            [
+              ...moments,
+              ...durationGroups(
+                durationSummaries(this.intervals, viewport.left, viewport.right, collapsed),
+              ),
+            ],
+            collapsed,
+          )
+        : moments,
     };
   }
   eventsBetween(first: string, last: string, limit = 100): PointEvent[] {

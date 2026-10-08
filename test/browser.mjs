@@ -1,5 +1,6 @@
 import { checkIssues } from './issues-browser.mjs';
 import { checkSearch } from './search-browser.mjs';
+import { checkSummaries } from './summaries-browser.mjs';
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
 import { closeMomentDetails, checkMomentDialog } from './moment-dialog-browser.mjs';
@@ -266,6 +267,7 @@ try {
   assert.deepEqual(errors, []);
   await checkIssues(page, document);
   await checkSearch(page, document);
+  await checkSummaries(page, document);
   await checkAccounts(browser);
   await checkCommunity(browser);
   await checkRemoteCache(browser);

@@ -1,6 +1,13 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { Q, TimelineIndex, Viewport, DEFAULT_PRESENTATION } from './core.js';
-import type { DurationEndpoint, Frame, FrameGroup, PointEvent, TimePresentation } from './core.js';
+import type {
+  DurationBand,
+  DurationEndpoint,
+  Frame,
+  FrameGroup,
+  PointEvent,
+  TimePresentation,
+} from './core.js';
 import type { InstalledPlugin } from './plugins.js';
 import { ViewportCache, regroup } from './remote-cache.js';
 export type Cursor = { time: string; id: string } | null;
@@ -170,6 +177,17 @@ export class ComparisonView {
     };
   }
   private mapFrame(track: Track, frame: Frame): Frame {
+    const band = (b: DurationBand): DurationBand => ({
+      ...b,
+      id: track.source.key + ':' + b.id,
+      start: mapEndpoint(track, b.start),
+      end: mapEndpoint(track, b.end),
+      sourceKey: track.source.key,
+      startTime: Q.parse(b.startTime).mul(track.scale).add(track.offset).toString(),
+      endTime: Q.parse(b.endTime).mul(track.scale).add(track.offset).toString(),
+      first: Q.parse(b.first).mul(track.scale).add(track.offset).toString(),
+      last: Q.parse(b.last).mul(track.scale).add(track.offset).toString(),
+    });
     return {
       ...frame,
       durations: frame.durations?.map((b) => ({
@@ -188,6 +206,7 @@ export class ComparisonView {
         first: Q.parse(g.first).mul(track.scale).add(track.offset).toString(),
         last: Q.parse(g.last).mul(track.scale).add(track.offset).toString(),
         ...(g.id ? { id: `${track.source.key}:${g.id}` } : {}),
+        ...(g.duration ? { duration: band(g.duration) } : {}),
         sourceKey: track.source.key,
       })),
     };

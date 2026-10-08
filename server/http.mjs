@@ -831,6 +831,35 @@ export function createRequestHandler({
               }),
             );
           }
+          if (input.kind === 'durations') {
+            const lower = bound(input.lower),
+              upper = bound(input.upper),
+              limit = input.limit ?? 25;
+            if (
+              lower === null ||
+              upper === null ||
+              !Number.isInteger(limit) ||
+              limit < 1 ||
+              limit > 100 ||
+              (input.after != null &&
+                (typeof input.after.id !== 'string' ||
+                  !/^[A-Za-z0-9_.:-]{1,128}$/.test(input.after.id) ||
+                  bound(input.after.first) === null))
+            )
+              throw new HttpError(400, 'A duration page needs bounds, a limit and a valid cursor.');
+            return response(
+              res,
+              200,
+              await store.query(id, userId, {
+                kind: 'durations',
+                lower,
+                upper,
+                limit,
+                after: input.after ? { first: bound(input.after.first), id: input.after.id } : null,
+                ...(input.revision ? { revision: input.revision } : {}),
+              }),
+            );
+          }
           if (input.kind === 'duration') {
             if (typeof input.id !== 'string' || !/^[A-Za-z0-9_.:-]{1,128}$/.test(input.id))
               throw new HttpError(400, 'A duration lookup needs its ID.');

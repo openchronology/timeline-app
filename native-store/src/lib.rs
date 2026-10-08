@@ -786,11 +786,15 @@ fn rebuild_duration_index(db: &Connection) -> Result<(), String> {
     migrate_durations(db)?;
     db.execute("DROP TABLE IF EXISTS duration_nodes", &[])?;
     db.execute("DROP TABLE IF EXISTS duration_intervals", &[])?;
-    db.execute("CREATE TABLE duration_intervals(ord INTEGER PRIMARY KEY,id TEXT NOT NULL UNIQUE,start_json TEXT NOT NULL,end_json TEXT NOT NULL,start_time TEXT NOT NULL COLLATE RATIONAL_V1,end_time TEXT NOT NULL COLLATE RATIONAL_V1,first TEXT NOT NULL COLLATE RATIONAL_V1,last TEXT NOT NULL COLLATE RATIONAL_V1,metadata TEXT NOT NULL)", &[])?;
+    db.execute("CREATE TABLE duration_intervals(ord INTEGER PRIMARY KEY,id TEXT NOT NULL UNIQUE,start_json TEXT NOT NULL,end_json TEXT NOT NULL,start_time TEXT NOT NULL COLLATE RATIONAL_V1,end_time TEXT NOT NULL COLLATE RATIONAL_V1,first TEXT NOT NULL COLLATE RATIONAL_V1,last TEXT NOT NULL COLLATE RATIONAL_V1,metadata TEXT NOT NULL,extent TEXT COLLATE RATIONAL_V1)", &[])?;
     if db.scalar("SELECT count(*) FROM durations d WHERE (d.start_moment IS NOT NULL AND NOT EXISTS(SELECT 1 FROM events e WHERE e.id=d.start_moment)) OR (d.end_moment IS NOT NULL AND NOT EXISTS(SELECT 1 FROM events e WHERE e.id=d.end_moment))", &[])? != "0" {
         return Err("Duration anchors must name existing moments".into());
     }
-    db.execute("WITH r AS (SELECT d.id,CASE WHEN d.start_moment IS NULL THEN json_quote(d.start_time) ELSE json_object('moment',d.start_moment) END AS sj,CASE WHEN d.end_moment IS NULL THEN json_quote(d.end_time) ELSE json_object('moment',d.end_moment) END AS ej,COALESCE(d.start_time,(SELECT e.time FROM events e WHERE e.id=d.start_moment)) AS s,COALESCE(d.end_time,(SELECT e.time FROM events e WHERE e.id=d.end_moment)) AS e,d.metadata FROM durations d) INSERT INTO duration_intervals SELECT row_number() OVER (ORDER BY q_min(s,e) COLLATE RATIONAL_V1,id),id,sj,ej,s,e,q_min(s,e),q_max(s,e),metadata FROM r", &[])?;
+    db.execute("WITH r AS (SELECT d.id,CASE WHEN d.start_moment IS NULL THEN json_quote(d.start_time) ELSE json_object('moment',d.start_moment) END AS sj,CASE WHEN d.end_moment IS NULL THEN json_quote(d.end_time) ELSE json_object('moment',d.end_moment) END AS ej,COALESCE(d.start_time,(SELECT e.time FROM events e WHERE e.id=d.start_moment)) AS s,COALESCE(d.end_time,(SELECT e.time FROM events e WHERE e.id=d.end_moment)) AS e,d.metadata FROM durations d) INSERT INTO duration_intervals(ord,id,start_json,end_json,start_time,end_time,first,last,metadata) SELECT row_number() OVER (ORDER BY q_min(s,e) COLLATE RATIONAL_V1,id),id,sj,ej,s,e,q_min(s,e),q_max(s,e),metadata FROM r", &[])?;
+    db.execute(
+        "UPDATE duration_intervals SET extent=q_sub(last,first)",
+        &[],
+    )?;
     if db
         .scalar("SELECT count(*) FROM duration_intervals", &[])?
         .parse::<usize>()
@@ -799,20 +803,291 @@ fn rebuild_duration_index(db: &Connection) -> Result<(), String> {
     {
         return Err("Use at most 200000 durations per timeline".into());
     }
-    db.execute("CREATE TABLE duration_nodes(id INTEGER PRIMARY KEY,left_id INTEGER,right_id INTEGER,min_time TEXT NOT NULL COLLATE RATIONAL_V1,max_time TEXT NOT NULL COLLATE RATIONAL_V1)", &[])?;
-    db.execute("WITH RECURSIVE ranges(lo,hi,mid) AS (SELECT 1,count(*),CAST((1+count(*))/2 AS INTEGER) FROM duration_intervals HAVING count(*)>0 UNION ALL SELECT r.lo,r.mid-1,CAST((r.lo+r.mid-1)/2 AS INTEGER) FROM ranges r WHERE r.lo<r.mid UNION ALL SELECT r.mid+1,r.hi,CAST((r.mid+1+r.hi)/2 AS INTEGER) FROM ranges r WHERE r.mid<r.hi) INSERT INTO duration_nodes SELECT mid,CASE WHEN lo<mid THEN CAST((lo+mid-1)/2 AS INTEGER) END,CASE WHEN mid<hi THEN CAST((mid+1+hi)/2 AS INTEGER) END,(SELECT first FROM duration_intervals WHERE ord=lo),(SELECT last FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY last COLLATE RATIONAL_V1 DESC LIMIT 1) FROM ranges", &[])?;
+    // Subtree summaries (largest start, count, extent bounds) let short durations collapse
+    // into summaries without enumerating dense clusters; see duration_summaries.
+    db.execute("CREATE TABLE duration_nodes(id INTEGER PRIMARY KEY,left_id INTEGER,right_id INTEGER,min_time TEXT NOT NULL COLLATE RATIONAL_V1,max_time TEXT NOT NULL COLLATE RATIONAL_V1,max_first TEXT NOT NULL COLLATE RATIONAL_V1,cnt INTEGER NOT NULL,min_extent TEXT NOT NULL COLLATE RATIONAL_V1,max_extent TEXT NOT NULL COLLATE RATIONAL_V1)", &[])?;
+    db.execute("WITH RECURSIVE ranges(lo,hi,mid) AS (SELECT 1,count(*),CAST((1+count(*))/2 AS INTEGER) FROM duration_intervals HAVING count(*)>0 UNION ALL SELECT r.lo,r.mid-1,CAST((r.lo+r.mid-1)/2 AS INTEGER) FROM ranges r WHERE r.lo<r.mid UNION ALL SELECT r.mid+1,r.hi,CAST((r.mid+1+r.hi)/2 AS INTEGER) FROM ranges r WHERE r.mid<r.hi) INSERT INTO duration_nodes SELECT mid,CASE WHEN lo<mid THEN CAST((lo+mid-1)/2 AS INTEGER) END,CASE WHEN mid<hi THEN CAST((mid+1+hi)/2 AS INTEGER) END,(SELECT first FROM duration_intervals WHERE ord=lo),(SELECT last FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY last COLLATE RATIONAL_V1 DESC LIMIT 1),(SELECT first FROM duration_intervals WHERE ord=hi),hi-lo+1,(SELECT extent FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY extent COLLATE RATIONAL_V1 LIMIT 1),(SELECT extent FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY extent COLLATE RATIONAL_V1 DESC LIMIT 1) FROM ranges", &[])?;
     Ok(())
 }
-/// Viewport bands carry a bounded projection: title, a notes preview, and short text fields.
-fn duration_window(db: &Connection, lower: &str, upper: &str) -> Result<Value, String> {
-    let rows=db.query_limited("WITH RECURSIVE visible AS (SELECT n.* FROM duration_nodes n WHERE id=(SELECT CAST((1+count(*))/2 AS INTEGER) FROM duration_intervals) AND min_time<=q(?) COLLATE RATIONAL_V1 AND max_time>=q(?) COLLATE RATIONAL_V1 UNION ALL SELECT n.* FROM visible p JOIN duration_nodes n ON n.id IN(p.left_id,p.right_id) WHERE n.min_time<=q(?) COLLATE RATIONAL_V1 AND n.max_time>=q(?) COLLATE RATIONAL_V1) SELECT d.id,d.start_json,d.end_json,d.first,d.last,(SELECT json_group_object(key,CASE key WHEN 'title' THEN substr(value,1,512) WHEN 'description' THEN substr(value,1,2000) ELSE value END) FROM json_each(d.metadata) WHERE type='text' AND (key IN ('title','description') OR length(value)<=256)),d.start_time,d.end_time FROM visible v JOIN duration_intervals d ON d.ord=v.id WHERE d.first<=q(?) COLLATE RATIONAL_V1 AND d.last>=q(?) COLLATE RATIONAL_V1 LIMIT 257", &[upper,lower,upper,lower,upper,lower],257,8*1024*1024)?;
+const BAND_COLUMNS: &str = "d.id,d.start_json,d.end_json,d.first,d.last,(SELECT json_group_object(key,CASE key WHEN 'title' THEN substr(value,1,512) WHEN 'description' THEN substr(value,1,2000) ELSE value END) FROM json_each(d.metadata) WHERE type='text' AND (key IN ('title','description') OR length(value)<=256)),d.start_time,d.end_time";
+fn band_json(row: &[Option<String>]) -> Result<Value, String> {
+    let parse = |text: &Option<String>| -> Result<Value, String> {
+        serde_json::from_str(text.as_deref().unwrap_or("null")).map_err(|e| e.to_string())
+    };
+    Ok(
+        serde_json::json!({"id":row[0],"start":parse(&row[1])?,"end":parse(&row[2])?,"first":row[3],"last":row[4],"metadata":parse(&Some(row[5].clone().unwrap_or_else(|| "{}".into())))?,"startTime":row[6],"endTime":row[7]}),
+    )
+}
+/// Viewport bands: durations at least as long as the threshold (shorter ones are summarized),
+/// with a bounded projection of title, a notes preview, and short text fields.
+fn duration_window(
+    db: &Connection,
+    lower: &str,
+    upper: &str,
+    threshold: &str,
+) -> Result<Value, String> {
+    let sql = format!("WITH RECURSIVE visible AS (SELECT n.* FROM duration_nodes n WHERE id=(SELECT CAST((1+count(*))/2 AS INTEGER) FROM duration_intervals) AND min_time<=q(?1) COLLATE RATIONAL_V1 AND max_time>=q(?2) COLLATE RATIONAL_V1 UNION ALL SELECT n.* FROM visible p JOIN duration_nodes n ON n.id IN(p.left_id,p.right_id) WHERE n.min_time<=q(?1) COLLATE RATIONAL_V1 AND n.max_time>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp(n.max_extent,q(?3))>=0)) SELECT {BAND_COLUMNS} FROM visible v JOIN duration_intervals d ON d.ord=v.id WHERE d.first<=q(?1) COLLATE RATIONAL_V1 AND d.last>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp(d.extent,q(?3))>=0) LIMIT 257");
+    let rows = db.query_limited(&sql, &[upper, lower, threshold], 257, 8 * 1024 * 1024)?;
     let more = rows.len() > 256;
     let mut bands = Vec::new();
     for row in rows.into_iter().take(256) {
-        let parse = |text: &Option<String>| -> Result<Value, String> {
-            serde_json::from_str(text.as_deref().unwrap_or("null")).map_err(|e| e.to_string())
-        };
-        bands.push(serde_json::json!({"id":row[0],"start":parse(&row[1])?,"end":parse(&row[2])?,"first":row[3],"last":row[4],"metadata":parse(&Some(row[5].clone().unwrap_or_else(|| "{}".into())))?,"startTime":row[6],"endTime":row[7]}));
+        bands.push(band_json(&row)?);
     }
     Ok(serde_json::json!({"durations":bands,"durationsTruncated":more}))
+}
+/// Durations wholly inside [lower, upper], in start order after an exact (start, ID) cursor.
+pub(crate) fn duration_page(
+    db: &Connection,
+    lower: &str,
+    upper: &str,
+    after: Option<(&str, &str)>,
+    limit: usize,
+) -> Result<Value, String> {
+    let take = (limit + 1).to_string();
+    let (after_first, after_id) = after.unwrap_or(("", ""));
+    let sql = format!("SELECT {BAND_COLUMNS} FROM duration_intervals d WHERE d.first>=q(?1) COLLATE RATIONAL_V1 AND d.last<=q(?2) COLLATE RATIONAL_V1 AND (?3='' OR q_cmp(d.first,q(?3))>0 OR (q_cmp(d.first,q(?3))=0 AND d.id>?4)) ORDER BY d.first COLLATE RATIONAL_V1,d.id LIMIT CAST(?5 AS INTEGER)");
+    let rows = db.query_limited(
+        &sql,
+        &[lower, upper, after_first, after_id, &take],
+        limit + 1,
+        8 * 1024 * 1024,
+    )?;
+    let more = rows.len() > limit;
+    let mut durations = Vec::new();
+    for row in rows.into_iter().take(limit) {
+        durations.push(band_json(&row)?);
+    }
+    let next = if more {
+        durations
+            .last()
+            .map(|b| serde_json::json!({"first":b["first"],"id":b["id"]}))
+    } else {
+        None
+    };
+    Ok(serde_json::json!({"durations":durations,"next":next}))
+}
+/// Exact rational helpers evaluated by the sqlite-rational extension.
+fn sign(db: &Connection, sql: &str, parameters: &[&str]) -> Result<i32, String> {
+    db.scalar(sql, parameters)?
+        .parse::<i32>()
+        .map_err(|e| e.to_string())
+}
+/// (a - b) compared with t.
+fn diff_cmp(db: &Connection, a: &str, b: &str, t: &str) -> Result<i32, String> {
+    sign(db, "SELECT q_cmp(q_sub(q(?1),q(?2)),q(?3))", &[a, b, t])
+}
+fn later(db: &Connection, a: &str, b: &str) -> Result<String, String> {
+    Ok(if sign(db, "SELECT q_cmp(q(?1),q(?2))", &[a, b])? > 0 {
+        a
+    } else {
+        b
+    }
+    .to_string())
+}
+type OpenSummary = Option<(String, String, u64, Option<Value>)>;
+/// Adds an entry or whole subtree to the open cluster, closing it first when the start no
+/// longer fits within the threshold of the cluster's anchor.
+#[allow(clippy::too_many_arguments)]
+fn join_summary(
+    db: &Connection,
+    open: &mut OpenSummary,
+    out: &mut Vec<DurationSummary>,
+    threshold: &str,
+    first: &str,
+    last: &str,
+    n: u64,
+    band: Option<Value>,
+) -> Result<(), String> {
+    if let Some((anchor, _, _, _)) = open.as_ref() {
+        if diff_cmp(db, first, anchor, threshold)? >= 0 {
+            let (first, last, count, band) = open.take().unwrap();
+            out.push(DurationSummary {
+                first,
+                last,
+                count,
+                band: if count == 1 { band } else { None },
+            });
+        }
+    }
+    match open {
+        None => {
+            *open = Some((
+                first.into(),
+                last.into(),
+                n,
+                if n == 1 { band } else { None },
+            ))
+        }
+        Some((_, end, count, single)) => {
+            *end = later(db, last, end)?;
+            *count += n;
+            *single = None;
+        }
+    }
+    Ok(())
+}
+/// One summarized cluster of collapsed durations.
+pub(crate) struct DurationSummary {
+    pub first: String,
+    pub last: String,
+    pub count: u64,
+    pub band: Option<Value>,
+}
+/// Anchored-span summaries of durations shorter than the threshold that intersect
+/// [lower, upper], keyed by start. Mirrors src/durations.ts durationSummaries and the
+/// PostgreSQL oc_duration_overview: fully collapsed, in-window subtrees whose starts fit the
+/// open group are consumed from cached counts.
+pub(crate) fn duration_summaries(
+    db: &Connection,
+    lower: &str,
+    upper: &str,
+    threshold: &str,
+) -> Result<Vec<DurationSummary>, String> {
+    let mut out = Vec::new();
+    if sign(db, "SELECT q_cmp(q(?1),q('0'))", &[threshold])? <= 0 {
+        return Ok(out);
+    }
+    let root = db.scalar(
+        "SELECT coalesce(CAST((1+count(*))/2 AS INTEGER),0) FROM duration_intervals",
+        &[],
+    )?;
+    let mut stack: Vec<(String, bool)> = if root == "0" {
+        Vec::new()
+    } else {
+        vec![(root, false)]
+    };
+    let mut open: OpenSummary = None;
+    while let Some((id, point)) = stack.pop() {
+        let row = db.query(
+            &format!("SELECT n.left_id,n.right_id,n.cnt,q(n.min_time),q(n.max_time),q(n.max_first),\
+             q_cmp(n.max_time,q(?1))<0 OR q_cmp(n.min_time,q(?2))>0,\
+             q_cmp(n.min_extent,q(?3))>=0,\
+             q_cmp(n.max_extent,q(?3))<0 AND q_cmp(n.min_time,q(?1))>=0 AND q_cmp(n.max_first,q(?2))<=0,\
+             q_cmp(d.last,q(?1))>=0 AND q_cmp(d.first,q(?2))<=0 AND q_cmp(d.extent,q(?3))<0,\
+             {BAND_COLUMNS} FROM duration_nodes n JOIN duration_intervals d ON d.ord=n.id WHERE n.id=CAST(?4 AS INTEGER)"),
+            &[lower, upper, threshold, &id],
+        )?;
+        let r = row.first().ok_or("Broken duration index")?;
+        let flag = |i: usize| r[i].as_deref() == Some("1");
+        let text = |i: usize| r[i].clone().unwrap_or_default();
+        let band = || band_json(&r[10..]);
+        if point {
+            if flag(9) {
+                join_summary(
+                    db,
+                    &mut open,
+                    &mut out,
+                    threshold,
+                    &text(13),
+                    &text(14),
+                    1,
+                    Some(band()?),
+                )?;
+            }
+            continue;
+        }
+        if flag(6) || flag(7) {
+            continue;
+        }
+        let (min, max, max_first) = (text(3), text(4), text(5));
+        let base = match &open {
+            Some((anchor, _, _, _)) if diff_cmp(db, &min, anchor, threshold)? < 0 => anchor.clone(),
+            _ => min.clone(),
+        };
+        let count: u64 = text(2).parse().map_err(|_| "Invalid duration count")?;
+        if flag(8) && diff_cmp(db, &max_first, &base, threshold)? < 0 {
+            let single = if count == 1 { Some(band()?) } else { None };
+            join_summary(
+                db, &mut open, &mut out, threshold, &min, &max, count, single,
+            )?;
+            continue;
+        }
+        if let Some(right) = &r[1] {
+            stack.push((right.clone(), false));
+        }
+        stack.push((id.clone(), true));
+        if let Some(left) = &r[0] {
+            stack.push((left.clone(), false));
+        }
+    }
+    if let Some((first, last, count, band)) = open {
+        out.push(DurationSummary {
+            first,
+            last,
+            count,
+            band: if count == 1 { band } else { None },
+        });
+    }
+    Ok(out)
+}
+/// Merges adjacent summaries while the merged block spans less than the threshold; the same
+/// rule as src/summaries.ts coalesceGroups. Groups are JSON frame groups in any order.
+pub(crate) fn coalesce_groups(
+    db: &Connection,
+    mut groups: Vec<Value>,
+    threshold: &str,
+) -> Result<Vec<Value>, String> {
+    let text = |g: &Value, k: &str| g[k].as_str().unwrap_or("0").to_string();
+    // Order by start, moments before durations at the same start.
+    let mut keyed = Vec::new();
+    for g in groups.drain(..) {
+        keyed.push(g);
+    }
+    let mut i = 1;
+    while i < keyed.len() {
+        // Insertion sort with exact comparisons; groups are already nearly ordered.
+        let mut j = i;
+        while j > 0 {
+            let order = sign(
+                db,
+                "SELECT q_cmp(q(?1),q(?2))",
+                &[&text(&keyed[j - 1], "first"), &text(&keyed[j], "first")],
+            )?;
+            let moments_first = |g: &Value| text(g, "count") != "0";
+            if order > 0
+                || (order == 0 && !moments_first(&keyed[j - 1]) && moments_first(&keyed[j]))
+            {
+                keyed.swap(j - 1, j);
+                j -= 1;
+            } else {
+                break;
+            }
+        }
+        i += 1;
+    }
+    let mut out: Vec<Value> = Vec::new();
+    for g in keyed {
+        let merge = match out.last() {
+            Some(prev) => {
+                text(&g, "first") == text(prev, "first")
+                    || diff_cmp(db, &text(&g, "last"), &text(prev, "first"), threshold)? < 0
+            }
+            None => false,
+        };
+        if !merge {
+            out.push(g);
+            continue;
+        }
+        let prev = out.pop().unwrap();
+        let num = |g: &Value, k: &str| -> Result<u128, String> {
+            text(g, k)
+                .parse::<u128>()
+                .map_err(|_| "Invalid group count".to_string())
+        };
+        let distinct = |g: &Value| g["distinct"].as_u64().unwrap_or(0);
+        let overlap =
+            distinct(&prev) > 0 && distinct(&g) > 0 && text(&prev, "last") == text(&g, "first");
+        let durations = num(&prev, "durationCount")? + num(&g, "durationCount")?;
+        let mut merged = serde_json::json!({
+            "first": prev["first"],
+            "last": later(db, &text(&g, "last"), &text(&prev, "last"))?,
+            "count": (num(&prev, "count")? + num(&g, "count")?).to_string(),
+            "distinct": distinct(&prev) + distinct(&g) - u64::from(overlap),
+        });
+        if durations > 0 {
+            merged["durationCount"] = Value::String(durations.to_string());
+        }
+        out.push(merged);
+    }
+    Ok(out)
 }

@@ -6,6 +6,8 @@ import {
   durationTree,
   durationOverview,
   fixMissingAnchors,
+  coalesceGroups,
+  durationGroups,
   searchRows,
   searchTerms,
   snippet,
@@ -189,19 +191,29 @@ export class PostgresStore {
             end: node.band.end,
             metadata: node.band.metadata,
           }),
+          node.maxFirst.toString(),
+          node.count,
+          node.minExtent.toString(),
+          node.maxExtent.toString(),
         );
         return (
           '(' +
           Array.from(
-            { length: 10 },
+            { length: 14 },
             (_, i) =>
-              '$' + (start + i + 1) + (i >= 4 && i <= 7 ? '::mpq' : i >= 8 ? '::jsonb' : ''),
+              '$' +
+              (start + i + 1) +
+              ((i >= 4 && i <= 7) || i === 10 || i === 12 || i === 13
+                ? '::mpq'
+                : i === 8 || i === 9
+                  ? '::jsonb'
+                  : ''),
           ).join(',') +
           ')'
         );
       });
       await client.query(
-        'INSERT INTO oc_duration_nodes(timeline_id,id,left_id,right_id,min_time,max_time,first_time,last_time,band,definition) VALUES ' +
+        'INSERT INTO oc_duration_nodes(timeline_id,id,left_id,right_id,min_time,max_time,first_time,last_time,band,definition,max_first,subtree_count,min_extent,max_extent) VALUES ' +
           tuples.join(','),
         params,
       );
@@ -483,20 +495,21 @@ export class PostgresStore {
           query.upper,
           threshold,
         ]);
+        // Bands are durations at least as long as the threshold; shorter ones are summarized.
         const intervals = await c.query(
           `WITH RECURSIVE visible AS (
           SELECT n.* FROM oc_duration_nodes n WHERE timeline_id=$1 AND id=1 AND min_time<=$3::mpq AND max_time>=$2::mpq
           UNION ALL SELECT n.* FROM visible p JOIN oc_duration_nodes n ON n.timeline_id=p.timeline_id AND n.id IN (p.left_id,p.right_id)
-          WHERE n.min_time<=$3::mpq AND n.max_time>=$2::mpq
-        ) SELECT band FROM visible WHERE first_time<=$3::mpq AND last_time>=$2::mpq LIMIT 257`,
-          [id, query.lower, query.upper],
+          WHERE n.min_time<=$3::mpq AND n.max_time>=$2::mpq AND NOT coalesce(n.max_extent<$4::mpq AND $4::mpq>'0'::mpq,false)
+        ) SELECT band FROM visible WHERE first_time<=$3::mpq AND last_time>=$2::mpq
+          AND ($4::mpq='0'::mpq OR last_time-first_time>=$4::mpq) LIMIT 257`,
+          [id, query.lower, query.upper, threshold],
         );
-        return {
-          durations: intervals.rows.slice(0, 256).map((r) => r.band),
-          durationsTruncated: intervals.rows.length > 256,
-          revision: t.revision,
-          threshold,
-          groups: rows.map((r) => ({
+        const collapsed = await c.query(
+          'SELECT first_time,last_time,duration_count,band FROM oc_duration_overview($1,$2::mpq,$3::mpq,$4::mpq)',
+          [id, query.lower, query.upper, threshold],
+        );
+        const momentGroups = rows.map((r) => ({
             first: r.first_time,
             last: r.last_time,
             count: r.event_count,
@@ -510,7 +523,23 @@ export class PostgresStore {
                     : {}),
                 }
               : {}),
+        }));
+        const durationClusters = durationGroups(
+          collapsed.rows.map((r) => ({
+            first: r.first_time,
+            last: r.last_time,
+            count: r.duration_count,
+            ...(r.band ? { band: r.band } : {}),
           })),
+        );
+        return {
+          durations: intervals.rows.slice(0, 256).map((r) => r.band),
+          durationsTruncated: intervals.rows.length > 256,
+          revision: t.revision,
+          threshold,
+          groups: durationClusters.length
+            ? coalesceGroups([...momentGroups, ...durationClusters], Q.parse(threshold))
+            : momentGroups,
           visitedNodes: rows.at(-1)?.visited_nodes ?? 0,
         };
       }
@@ -537,6 +566,25 @@ export class PostgresStore {
           })),
           total: rows[0]?.total ?? '0',
           page: query.page,
+          revision: t.revision,
+        };
+      }
+      if (query.kind === 'durations') {
+        // Durations wholly inside a summary, in start order with an exact (start, ID) cursor.
+        const { rows } = await c.query(
+          `SELECT band,oc_qtext(first_time) AS first FROM oc_duration_nodes
+          WHERE timeline_id=$1 AND first_time>=$2::mpq AND last_time<=$3::mpq
+          AND ($4::mpq IS NULL OR first_time>$4::mpq OR (first_time=$4::mpq AND band->>'id' COLLATE "C">$5))
+          ORDER BY first_time,band->>'id' COLLATE "C" LIMIT $6`,
+          [id, query.lower, query.upper, query.after?.first ?? null, query.after?.id ?? '', query.limit + 1],
+        );
+        const page = rows.slice(0, query.limit);
+        return {
+          durations: page.map((r) => r.band),
+          next:
+            rows.length > query.limit
+              ? { first: page.at(-1).first, id: page.at(-1).band.id }
+              : null,
           revision: t.revision,
         };
       }
@@ -608,7 +656,7 @@ export async function backfillEntitySearch(client) {
 export async function convertLegacyDurations(client) {
   const store = new PostgresStore(null);
   const { rows } = await client.query(
-    'SELECT t.* FROM oc_timelines t WHERE EXISTS(SELECT 1 FROM oc_duration_nodes n WHERE n.timeline_id=t.id AND n.definition IS NULL)',
+    'SELECT t.* FROM oc_timelines t WHERE EXISTS(SELECT 1 FROM oc_duration_nodes n WHERE n.timeline_id=t.id AND (n.definition IS NULL OR n.max_first IS NULL))',
   );
   for (const timeline of rows)
     await store.replace(client, timeline.id, await store.branchDocument(client, timeline), {

@@ -2181,3 +2181,14 @@ dialog button {
       0 0 0 8px #c59b22;
   }
 }
+
+/* A collapsed duration on the axis: a short capsule, distinct from round moment dots. */
+.event-marker.duration-point {
+  border-radius: 7px;
+  width: 30px;
+  background: #73958b;
+}
+#group-durations h3 {
+  font-size: 14px;
+  margin: 18px 0 8px;
+}
