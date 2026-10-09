@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
+import { Q, Viewport } from '../dist/core.mjs';
 /** Short durations collapse into summaries and still open as durations. */
 export async function checkSummaries(page, restore) {
   const imported = async (doc) => {
@@ -14,7 +15,17 @@ export async function checkSummaries(page, restore) {
       (title) => document.getElementById('timeline-title').value === title,
       doc.title,
     );
-    await page.evaluate(() => new Promise(requestAnimationFrame));
+    // Importing fits the view to the moments, but the bound fields only change on the next
+    // render, which can come later than one animation frame (Firefox). Wait until the
+    // render has shown the fitted view, so it cannot replace a bound the test types next.
+    const times = doc.events.map((e) => Q.parse(e.time)).sort((a, b) => a.compare(b));
+    const fitted = Viewport.fit(times[0], times.at(-1));
+    await page.waitForFunction(
+      ([left, right]) =>
+        document.getElementById('exact-left').value === left &&
+        document.getElementById('exact-right').value === right,
+      [fitted.left.toString(), fitted.right.toString()],
+    );
   };
   const bounds = async (left, right) => {
     await page.locator('#left-bound').fill(left);
