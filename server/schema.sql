@@ -551,58 +551,44 @@ UPDATE oc_timelines t SET duration_root=1 WHERE duration_root IS NULL
 CREATE INDEX IF NOT EXISTS oc_duration_nodes_start_moment ON oc_duration_nodes(timeline_id,(definition->'start'->>'moment'));
 CREATE INDEX IF NOT EXISTS oc_duration_nodes_end_moment ON oc_duration_nodes(timeline_id,(definition->'end'->>'moment'));
 
+-- Starts approximated as float8 for range scans: rounding to float8 (saturating at ±Infinity
+-- and 0) never reverses the order of two starts, so a range of approximations holds every
+-- start in the exact range, and exact mpq comparisons recheck each row. Only this small
+-- fixed-size key enters the B-tree; arbitrarily large mpq values stay payloads.
+ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS first_approx float8
+  GENERATED ALWAYS AS (first_time::float8) STORED;
+CREATE INDEX IF NOT EXISTS oc_duration_nodes_first_approx ON oc_duration_nodes(timeline_id,first_approx);
+
 -- Anchored-span summaries of durations shorter than the threshold that intersect [lo,hi],
--- keyed by start. Mirrors src/durations.ts durationSummaries: subtrees made only of
--- collapsed, in-window durations are consumed whole when their starts fit the open group.
+-- keyed by start: a group starts at the first collapsed start and takes every collapsed
+-- duration starting less than the threshold after it. Mirrors src/durations.ts
+-- durationSummaries. Each group's anchor is the first collapsed start at or after the
+-- previous anchor plus the threshold (the first search starts at lo - threshold, since a
+-- collapsed duration reaching the window starts after it), found by an index range scan, so
+-- the cost follows the durations starting in [lo - threshold, hi] and the number of groups.
 CREATE OR REPLACE FUNCTION oc_duration_overview(tid uuid, lo mpq, hi mpq, threshold mpq)
 RETURNS TABLE(first_time text,last_time text,duration_count integer,band jsonb)
-LANGUAGE plpgsql AS $$
-DECLARE ids integer[]; points boolean[] := ARRAY[false]; idx integer; nid integer; point boolean;
-  n record; anchor mpq; finish mpq; total integer := 0; single jsonb; base mpq;
+LANGUAGE plpgsql STABLE AS $$
+DECLARE anchor mpq; bound mpq; finish mpq; total integer; single jsonb;
 BEGIN
   IF lo IS NULL OR hi IS NULL OR threshold IS NULL OR threshold<='0'::mpq OR lo>hi THEN RETURN; END IF;
-  SELECT CASE WHEN duration_root IS NULL THEN ARRAY[]::integer[] ELSE ARRAY[duration_root] END INTO ids
-    FROM oc_timelines WHERE id=tid;
-  ids := coalesce(ids,ARRAY[]::integer[]);
-  WHILE cardinality(ids)>0 LOOP
-    idx:=cardinality(ids); nid:=ids[idx]; point:=points[idx]; ids:=ids[1:idx-1]; points:=points[1:idx-1];
-    SELECT d.* INTO n FROM oc_duration_nodes d WHERE d.timeline_id=tid AND d.id=nid;
-    IF NOT FOUND THEN RAISE EXCEPTION 'Broken duration index'; END IF;
-    IF point THEN
-      IF n.last_time<lo OR n.first_time>hi OR n.last_time-n.first_time>=threshold THEN CONTINUE; END IF;
-      IF anchor IS NOT NULL AND n.first_time-anchor>=threshold THEN
-        first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
-        band:=CASE WHEN total=1 THEN single END; RETURN NEXT; anchor:=NULL;
-      END IF;
-      IF anchor IS NULL THEN anchor:=n.first_time; finish:=n.last_time; total:=0; END IF;
-      IF n.last_time>finish THEN finish:=n.last_time; END IF;
-      total:=total+1; single:=CASE WHEN total=1 THEN n.band END;
-      CONTINUE;
-    END IF;
-    IF n.max_time<lo OR n.min_time>hi THEN CONTINUE; END IF;
-    -- A collapsed duration reaching the window starts after lo - threshold.
-    IF n.max_first<=lo-threshold THEN CONTINUE; END IF;
-    -- No collapsed duration below. NULL summaries (pre-migration rows) fall through and descend.
-    IF n.min_extent>=threshold THEN CONTINUE; END IF;
-    base:=CASE WHEN anchor IS NOT NULL AND n.min_time-anchor<threshold THEN anchor ELSE n.min_time END;
-    IF n.max_extent<threshold AND n.min_time>=lo AND n.max_first<=hi AND n.max_first-base<threshold THEN
-      IF anchor IS NOT NULL AND n.min_time-anchor>=threshold THEN
-        first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
-        band:=CASE WHEN total=1 THEN single END; RETURN NEXT; anchor:=NULL;
-      END IF;
-      IF anchor IS NULL THEN anchor:=n.min_time; finish:=n.max_time; total:=0; END IF;
-      IF n.max_time>finish THEN finish:=n.max_time; END IF;
-      total:=total+n.subtree_count; single:=CASE WHEN total=1 THEN n.band END;
-    ELSE
-      IF n.right_id IS NOT NULL THEN ids:=array_append(ids,n.right_id); points:=array_append(points,false); END IF;
-      ids:=array_append(ids,nid); points:=array_append(points,true);
-      IF n.left_id IS NOT NULL THEN ids:=array_append(ids,n.left_id); points:=array_append(points,false); END IF;
-    END IF;
-  END LOOP;
-  IF anchor IS NOT NULL THEN
+  bound:=lo-threshold;
+  LOOP
+    SELECT d.first_time INTO anchor FROM oc_duration_nodes d
+      WHERE d.timeline_id=tid AND d.first_approx>=bound::float8 AND d.first_approx<=hi::float8
+        AND d.first_time>=bound AND d.first_time<=hi AND d.last_time>=lo AND d.last_time-d.first_time<threshold
+      ORDER BY d.first_approx,d.first_time LIMIT 1;
+    EXIT WHEN NOT FOUND;
+    bound:=anchor+threshold;
+    SELECT count(*)::integer,max(d.last_time),(array_agg(d.band))[1] INTO total,finish,single
+      FROM oc_duration_nodes d
+      WHERE d.timeline_id=tid AND d.first_approx>=anchor::float8 AND d.first_approx<=bound::float8
+        AND d.first_time>=anchor AND d.first_time<bound AND d.first_time<=hi
+        AND d.last_time>=lo AND d.last_time-d.first_time<threshold;
     first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
-    band:=CASE WHEN total=1 THEN single END; RETURN NEXT;
-  END IF;
+    band:=CASE WHEN total=1 THEN single END;
+    RETURN NEXT;
+  END LOOP;
 END $$;
 CREATE INDEX IF NOT EXISTS oc_duration_nodes_duration_id ON oc_duration_nodes(timeline_id,(band->>'id'));
 
@@ -661,6 +647,9 @@ CREATE TABLE IF NOT EXISTS oc_view_duration_nodes (
   PRIMARY KEY(timeline_id,id)
 );
 ALTER TABLE oc_view_duration_nodes ADD COLUMN IF NOT EXISTS height integer;
+ALTER TABLE oc_view_duration_nodes ADD COLUMN IF NOT EXISTS first_approx float8
+  GENERATED ALWAYS AS (first_time::float8) STORED;
+CREATE INDEX IF NOT EXISTS oc_view_duration_nodes_first_approx ON oc_view_duration_nodes(timeline_id,first_approx);
 -- View variants of the traversal functions, generated from the originals so the summary
 -- algorithms have a single definition: only table names (and the root's table) differ.
 DO $$
