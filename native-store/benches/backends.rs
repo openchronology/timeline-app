@@ -21,9 +21,11 @@ fn query(value: Value) -> Query {
     serde_json::from_value(value).expect("query")
 }
 fn main() {
+    // Comma- or space-separated, as for the Node harness, which validates them first.
     let sizes: Vec<usize> = env("BENCH_SIZES", "1000,10000,100000,200000")
-        .split(',')
-        .filter_map(|s| s.trim().parse().ok())
+        .split(|c: char| c == ',' || c.is_whitespace())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.parse().expect("BENCH_SIZES lists whole numbers"))
         .collect();
     let time = Duration::from_millis(env("BENCH_TIME", "1000").parse().unwrap_or(1000));
     let mut criterion = Criterion::default()
