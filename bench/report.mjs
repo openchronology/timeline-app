@@ -59,6 +59,16 @@ const ms = (v) =>
     : v >= 1
       ? v.toPrecision(3) + ' ms'
       : (v * 1000).toPrecision(3) + ' µs';
+/** Compact size labels (1k, 200k); labels closer than 34 px to the previous one are skipped. */
+const sizeLabel = (n) => (n >= 1000 && n % 1000 === 0 ? `${n / 1000}k` : n.toLocaleString('en'));
+function sizeTicks(sizes, x, y) {
+  let last = -Infinity;
+  return sizes
+    .filter((s) => (x(s) - last >= 34 ? ((last = x(s)), true) : false))
+    .map(
+      (s) => `<text class="tick" x="${x(s)}" y="${y}" text-anchor="middle">${sizeLabel(s)}</text>`,
+    );
+}
 const escape = (s) =>
   String(s).replace(
     /[&<>"]/g,
@@ -88,10 +98,7 @@ function chart(operation, title, rows) {
       `<text class="tick" x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end">${ms(v)}</text>`,
     );
   }
-  for (const s of sizes)
-    parts.push(
-      `<text class="tick" x="${x(s)}" y="${H - m.b + 16}" text-anchor="middle">${s.toLocaleString('en')}</text>`,
-    );
+  parts.push(...sizeTicks(sizes, x, H - m.b + 16));
   parts.push(
     `<text class="axis" x="${(m.l + W - m.r) / 2}" y="${H - 6}" text-anchor="middle">Moments in the timeline (log)</text>`,
   );
@@ -163,12 +170,9 @@ function capacityChart(title, description, series, { unit = ms, guides = [] } = 
   for (const g of guides)
     parts.push(
       `<line class="guide" x1="${m.l}" x2="${W - m.r}" y1="${y(g.value)}" y2="${y(g.value)}"/>`,
-      `<text class="guide-label" x="${m.l + 4}" y="${y(g.value) - 4}">${escape(g.label)}</text>`,
+      `<text class="guide-label" x="${W - m.r - 4}" y="${y(g.value) - 4}" text-anchor="end">${escape(g.label)}</text>`,
     );
-  for (const size of sizes)
-    parts.push(
-      `<text class="tick" x="${x(size)}" y="${H - m.b + 16}" text-anchor="middle">${size.toLocaleString('en')}</text>`,
-    );
+  parts.push(...sizeTicks(sizes, x, H - m.b + 16));
   parts.push(
     `<text class="axis" x="${(m.l + W - m.r) / 2}" y="${H - 6}" text-anchor="middle">Moments in the timeline (log)</text>`,
   );

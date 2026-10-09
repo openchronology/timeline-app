@@ -80,6 +80,8 @@ A local run (16 cores, Node 26, PostgreSQL 16 in Docker, `BENCH_TIME=1000`) meas
 
 | Operation                         |    Size |          In-memory | SQLite | PostgreSQL |
 | --------------------------------- | ------: | -----------------: | -----: | ---------: |
+| Open a timeline                   |  10,000 |              0.7 s |  0.1 s |      18 ms |
+|                                   | 200,000 |               34 s |  1.1 s |      35 ms |
 | Viewport: whole timeline          |   1,000 |             3.3 ms | 7.1 ms |      10 ms |
 |                                   |  10,000 |              13 ms |  16 ms |      14 ms |
 |                                   | 100,000 | 292 ms (p50 50 ms) |  31 ms |      27 ms |
@@ -92,6 +94,7 @@ A local run (16 cores, Node 26, PostgreSQL 16 in Docker, `BENCH_TIME=1000`) meas
 |                                   |  10,000 |             0.1 ms | 2.3 ms |     5.0 ms |
 |                                   | 100,000 |             0.2 ms | 2.6 ms |     4.6 ms |
 
+- **Opening is where the in-memory editor runs out.** It parses and indexes the whole file, which takes 0.7 s at 10,000 moments and 34 s at 200,000 in Node (21 s in Chromium). The desktop app copies the file into a private baseline (1.1 s at 200,000), and the platform reads only metadata and the first view. The capacity charts and [Timeline size and platforms](capacity.md) turn this into guidance per platform.
 - **Reads scale well.** Pages and single moments stay flat from 1,000 to 100,000 moments on every backend. PostgreSQL's few milliseconds are mostly round trips.
 - **PostgreSQL saves are flat.** A sparse save updates only the changed rows and the tree paths they touch ([incremental saves](architecture.md#incremental-saves)), so a one-moment save costs the same at 1,000 and 100,000 moments. Before that change, every save rebuilt the timeline's derived data: 180 ms at 1,000 moments, 1.6 s at 10,000 and 18.5 s at 100,000. Once per 1,000 saves (or when patches outweigh the document), a save also writes a full snapshot for history, which takes about 2 s at 100,000 moments.
 - **SQLite saves are flat too.** They apply in place to the open file and its baseline (2.1 ms at 1,000 moments, 2.6 ms at 100,000). Previously, every save copied the whole file twice and rebuilt the duration and arc indexes: 13 ms at 1,000 moments, 105 ms at 10,000 and 1.2 s at 100,000. The benchmark saves to the opened file, as the desktop app does, and undoes each sample unmeasured.
