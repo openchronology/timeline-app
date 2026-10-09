@@ -970,6 +970,7 @@ __metadata:
     rational-ordered-map: "file:vendor/rational-ordered-map-0.1.0.tgz"
     react: "npm:19.2.8"
     react-dom: "npm:19.2.8"
+    tinybench: "npm:6.2.1"
     typescript: "npm:5.9.3"
   languageName: unknown
   linkType: soft
@@ -1314,6 +1315,13 @@ __metadata:
     minizlib: "npm:^3.1.0"
     yallist: "npm:^5.0.0"
   checksum: 10c0/4f37f3c4bd2ca2755fd736a5df1d573c1a868ec1b1e893346aeafa95ac510f9e2fd1469420bd866cc7904799e5bd4ac62b5d4f03fe27747d6e1e373b44505c5c
+  languageName: node
+  linkType: hard
+
+"tinybench@npm:6.2.1":
+  version: 6.2.1
+  resolution: "tinybench@npm:6.2.1"
+  checksum: 10c0/e8942da9d15cabec52361c87b753351f2fec6d510e997d1b7b8dea0c4b5c5b7af75e8bdc3cca95b34a6dbc5ea470ffa28f4a41d7e63b7c92ac9838149c3554b0
   languageName: node
   linkType: hard
 

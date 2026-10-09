@@ -18,3 +18,5 @@ platform/public/
 next-env.d.ts
 release-assets/
 desktop-artifacts/
+bench/data/
+bench/results/

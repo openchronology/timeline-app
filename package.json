@@ -25,7 +25,10 @@
     "test:platform": "node test/next-platform.mjs",
     "test:platform:postgres": "node test/next-postgres.mjs",
     "test:versioning:postgres": "node test/versioning-postgres.mjs",
-    "seed": "node server/seed.mjs"
+    "seed": "node server/seed.mjs",
+    "bench:seed": "node scripts/build.mjs && node bench/seed.mjs",
+    "bench": "node bench/run.mjs && cargo bench --manifest-path native-store/Cargo.toml --locked --bench backends && node bench/report.mjs",
+    "bench:report": "node bench/report.mjs"
   },
   "dependencies": {
     "next": "16.3.8",
@@ -38,6 +41,7 @@
     "@tauri-apps/cli": "2.12.1",
     "esbuild": "0.25.12",
     "playwright": "1.58.2",
+    "tinybench": "6.2.1",
     "typescript": "5.9.3"
   },
   "description": "An exact rational timeline editor for the browser and desktop",

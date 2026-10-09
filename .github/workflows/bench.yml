@@ -1,0 +1,79 @@
+name: Benchmarks
+
+# Manually triggered: hosted runners are noisy, so these numbers show trends between
+# backends and sizes rather than absolute latencies. See docs/benchmarks.md.
+on:
+  workflow_dispatch:
+    inputs:
+      sizes:
+        description: Timeline sizes (moments), comma separated
+        default: 1000,10000,50000
+      time:
+        description: Measurement time per operation and size (ms)
+        default: '1000'
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    name: PostgreSQL, SQLite and in-memory latency
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      PG_CONFIG: /usr/lib/postgresql/16/bin/pg_config
+      PGHOST: 127.0.0.1
+      PGPORT: 5433
+      PGUSER: rational_test
+      PGDATABASE: rational_app
+      BENCH_DATABASE_URL: postgresql://rational_test@127.0.0.1:5433/rational_app
+      BENCH_SIZES: ${{ inputs.sizes }}
+      BENCH_TIME: ${{ inputs.time }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: dvarrazzo/pgmp
+          ref: 1849585416f2bc3d070bf8cef6a659907687ec7f
+          path: upstream/pgmp
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install PostgreSQL and native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-16 postgresql-server-dev-16 libgmp-dev libsqlite3-dev build-essential cmake python3
+          "$PG_CONFIG" --bindir >> "$GITHUB_PATH"
+          echo "PGDATA=$RUNNER_TEMP/openchronology-postgres" >> "$GITHUB_ENV"
+      - name: Build and install real pgmp
+        working-directory: upstream/pgmp
+        run: |
+          python3 tools/unmix.py < sql/pgmp.pysql > sql/pgmp--1.1.sql
+          python3 tools/sql2extension.py --extname pgmp sql/pgmp--1.1.sql > sql/pgmp--unpackaged--1.1.sql
+          make PG_CONFIG="$PG_CONFIG" with_llvm=no -j2
+          sudo make PG_CONFIG="$PG_CONFIG" with_llvm=no install
+      - name: Start an isolated PostgreSQL instance
+        run: |
+          initdb -D "$PGDATA" -U "$PGUSER" --auth=trust
+          pg_ctl -D "$PGDATA" -l "$RUNNER_TEMP/openchronology-postgres.log" -o "-p $PGPORT -h 127.0.0.1 -k $RUNNER_TEMP" -w start
+          createdb "$PGDATABASE"
+          psql -X -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION pgmp;'
+      - run: node scripts/npm-ci.mjs
+      - name: Install Rust
+        run: |
+          rustup update stable --no-self-update
+          rustup default stable
+      - run: npm run bench:seed
+      - run: npm run bench
+      - name: Stop PostgreSQL
+        if: always()
+        run: |
+          if test -f "$PGDATA/postmaster.pid"; then pg_ctl -D "$PGDATA" -m fast -w stop; fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: benchmark-report
+          path: bench/results/
+          if-no-files-found: ignore

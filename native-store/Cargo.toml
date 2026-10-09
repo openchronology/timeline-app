@@ -9,3 +9,11 @@ build = "build.rs"
 [dependencies]
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "=1.0.151"
+
+[dev-dependencies]
+criterion = { version = "=0.8.2", default-features = false }
+
+# Latency benchmarks for the SQLite backend; see docs/benchmarks.md.
+[[bench]]
+name = "backends"
+harness = false
