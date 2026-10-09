@@ -56,7 +56,7 @@ Server and desktop timelines query saved summaries; unsaved edits move collapsed
 
 Viewport bands carry a bounded projection of metadata: the title (512 characters), a notes preview (2,000 characters) and other text fields of at most 256 characters, such as colors. Opening a duration fetches its complete definition by ID (`{"kind": "duration", "id": "…"}` on the timeline query endpoint, or the desktop native query).
 
-PostgreSQL stores each duration's definition on its interval-index row, rebuilt with the moment index on every save. Desktop `.och` files store durations in a `durations` table; each endpoint has either a canonical rational time or a moment ID, enforced by table constraints. Sparse server and desktop saves send `durationChanges` (`{id, duration}` or `{id, duration: null}`) alongside moment changes; deleting a moment in the same save pins durations that follow it at its last saved time. Merges compare durations by ID and field, like moments.
+PostgreSQL stores each duration's definition on its interval-index row; sparse saves update the rows of changed durations and of durations anchored to moved moments ([incremental saves](architecture.md#incremental-saves)). Desktop `.och` files store durations in a `durations` table; each endpoint has either a canonical rational time or a moment ID, enforced by table constraints. Sparse server and desktop saves send `durationChanges` (`{id, duration}` or `{id, duration: null}`) alongside moment changes; deleting a moment in the same save pins durations that follow it at its last saved time. Merges compare durations by ID and field, like moments.
 
 Comparisons transform each source's bands with that source's exact offset and scale. Comparison durations open read-only.
 

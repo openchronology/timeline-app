@@ -60,6 +60,24 @@ CREATE TABLE IF NOT EXISTS oc_nodes (
   event_count bigint NOT NULL, distinct_count integer NOT NULL,
   events jsonb NOT NULL, PRIMARY KEY(timeline_id,id)
 );
+-- Moments live in their own rows. The moment tree is a persistent AVL tree with stable node
+-- IDs: one node per distinct time, holding its moment IDs (sorted, "C" order) and subtree
+-- summaries, so a save rewrites only the nodes on a path and a metadata edit touches no node.
+CREATE TABLE IF NOT EXISTS oc_moments (
+  timeline_id uuid NOT NULL REFERENCES oc_timelines ON DELETE CASCADE, id text NOT NULL,
+  time mpq NOT NULL, event jsonb NOT NULL, PRIMARY KEY(timeline_id,id)
+);
+ALTER TABLE oc_nodes ADD COLUMN IF NOT EXISTS moment_ids text[];
+ALTER TABLE oc_nodes ADD COLUMN IF NOT EXISTS height integer;
+ALTER TABLE oc_nodes ALTER COLUMN events DROP NOT NULL;
+-- Older installations kept whole moments inside nodes; move them out once.
+INSERT INTO oc_moments(timeline_id,id,time,event)
+SELECT n.timeline_id,e->>'id',n.time,e FROM oc_nodes n CROSS JOIN LATERAL jsonb_array_elements(n.events) e
+WHERE n.events IS NOT NULL ON CONFLICT DO NOTHING;
+UPDATE oc_nodes SET moment_ids=ARRAY(SELECT x.e->>'id' FROM jsonb_array_elements(events) WITH ORDINALITY x(e,o) ORDER BY x.o),
+  events=NULL WHERE events IS NOT NULL;
+-- 2: AVL trees with heights and stable IDs; migrate.mjs rebuilds older indexes.
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS index_version integer NOT NULL DEFAULT 0;
 CREATE OR REPLACE FUNCTION oc_qtext(q mpq) RETURNS text LANGUAGE sql IMMUTABLE STRICT
 AS $$ SELECT num(q)::text || '/' || den(q)::text $$;
 
@@ -95,7 +113,8 @@ BEGIN
       first_time:=oc_qtext(current_a); last_time:=oc_qtext(current_b); event_count:=current_weight::text;
       distinct_count:=current_distinct; visited_nodes:=visits; title:=NULL; event_id:=NULL; metadata:=NULL;
       IF current_weight=1 THEN
-        SELECT events->0 INTO sample FROM oc_nodes WHERE timeline_id=tid AND id=current_id;
+        SELECT m.event INTO sample FROM oc_moments m WHERE m.timeline_id=tid
+          AND m.id=(SELECT node.moment_ids[1] FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=current_id);
         title:=sample->'metadata'->>'title'; event_id:=sample->>'id'; metadata:=sample->'metadata';
       END IF;
       RETURN NEXT; current_a:=NULL;
@@ -113,7 +132,8 @@ BEGIN
     first_time:=oc_qtext(current_a); last_time:=oc_qtext(current_b); event_count:=current_weight::text;
     distinct_count:=current_distinct; visited_nodes:=visits; title:=NULL; event_id:=NULL; metadata:=NULL;
     IF current_weight=1 THEN
-      SELECT events->0 INTO sample FROM oc_nodes WHERE timeline_id=tid AND id=current_id;
+      SELECT m.event INTO sample FROM oc_moments m WHERE m.timeline_id=tid
+        AND m.id=(SELECT node.moment_ids[1] FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=current_id);
       title:=sample->'metadata'->>'title'; event_id:=sample->>'id'; metadata:=sample->'metadata';
     END IF;
     RETURN NEXT;
@@ -128,19 +148,21 @@ LANGUAGE sql AS $$ SELECT g.first_time,g.last_time,g.event_count,g.distinct_coun
 CREATE OR REPLACE FUNCTION oc_events(tid uuid,lo mpq,hi mpq,after_time mpq,after_id text,max_rows integer)
 RETURNS SETOF jsonb LANGUAGE plpgsql AS $$
 DECLARE ids bigint[]; points boolean[]:=ARRAY[false]; idx integer; nid bigint; point boolean;
-  n record; e jsonb; emitted integer:=0;
+  n record; e jsonb; mid text; emitted integer:=0;
 BEGIN
   IF max_rows<1 OR max_rows>200001 THEN RAISE EXCEPTION 'Invalid event page size'; END IF;
   IF lo IS NOT NULL AND hi IS NOT NULL AND lo>hi THEN RETURN; END IF;
   SELECT ARRAY[root] INTO ids FROM oc_timelines WHERE id=tid AND root IS NOT NULL;
   WHILE cardinality(ids)>0 LOOP
     idx:=cardinality(ids); nid:=ids[idx]; point:=points[idx]; ids:=ids[1:idx-1]; points:=points[1:idx-1];
-    SELECT time,left_id,right_id,first_time,last_time INTO n FROM oc_nodes WHERE timeline_id=tid AND id=nid;
+    SELECT time,left_id,right_id,first_time,last_time,moment_ids INTO n FROM oc_nodes WHERE timeline_id=tid AND id=nid;
     IF (lo IS NOT NULL AND n.last_time<lo) OR (hi IS NOT NULL AND n.first_time>hi)
       OR (after_time IS NOT NULL AND n.last_time<after_time) THEN CONTINUE; END IF;
     IF point THEN
       IF (lo IS NOT NULL AND n.time<lo) OR (hi IS NOT NULL AND n.time>hi) OR (after_time IS NOT NULL AND n.time<after_time) THEN CONTINUE; END IF;
-      FOR e IN SELECT value FROM oc_nodes,LATERAL jsonb_array_elements(events) WHERE timeline_id=tid AND id=nid LOOP
+      -- One primary-key lookup per moment, in the node's ID order.
+      FOR mid IN SELECT unnest(n.moment_ids) LOOP
+        SELECT event INTO e FROM oc_moments WHERE timeline_id=tid AND id=mid;
         IF after_time IS NOT NULL AND n.time=after_time AND (e->>'id') COLLATE "C"<=after_id COLLATE "C" THEN CONTINUE; END IF;
         RETURN NEXT e; emitted:=emitted+1; IF emitted>=max_rows THEN RETURN; END IF;
       END LOOP;
@@ -198,10 +220,9 @@ CREATE INDEX IF NOT EXISTS oc_proposal_comments_page ON oc_proposal_comments(pro
 
 -- Existing timelines become searchable without requiring their owner to resave them.
 UPDATE oc_timelines t SET event_text=coalesce((
-  SELECT left(string_agg(left(coalesce(e->'metadata'->>'title','') || ' ' || coalesce(e->'metadata'->>'description',''),4096),' '),1048576)
-  FROM oc_nodes n CROSS JOIN LATERAL jsonb_array_elements(n.events) e
-  WHERE n.timeline_id=t.id
-),'') WHERE t.event_text='' AND EXISTS (SELECT 1 FROM oc_nodes n WHERE n.timeline_id=t.id);
+  SELECT left(string_agg(left(coalesce(m.event->'metadata'->>'title','') || ' ' || coalesce(m.event->'metadata'->>'description',''),4096),' '),1048576)
+  FROM oc_moments m WHERE m.timeline_id=t.id
+),'') WHERE t.event_text='' AND EXISTS (SELECT 1 FROM oc_moments m WHERE m.timeline_id=t.id);
 
 -- Saved documents and their ancestry are separate from the current rational index.
 CREATE TABLE IF NOT EXISTS oc_snapshots (
@@ -417,7 +438,8 @@ BEGIN
   ELSIF TG_TABLE_NAME='oc_revisions' THEN
     SELECT owner_id INTO uid FROM oc_timelines WHERE id=NEW.timeline_id;
     uid:=CASE WHEN NEW.kind IN ('proposal','rebase') THEN NEW.author_id ELSE coalesce(uid,NEW.author_id) END;
-    SELECT document_bytes INTO n FROM oc_snapshots WHERE id=NEW.snapshot_id;
+    IF NEW.snapshot_id IS NULL THEN n:=octet_length(NEW.patch::text);
+    ELSE SELECT document_bytes INTO n FROM oc_snapshots WHERE id=NEW.snapshot_id; END IF;
   ELSIF TG_TABLE_NAME='oc_proposals' THEN uid:=NEW.author_id; n:=octet_length(NEW.document::text)+octet_length(NEW.base_document::text)+octet_length(NEW.body)+octet_length(NEW.title);
   ELSIF TG_TABLE_NAME='oc_proposal_comments' THEN uid:=NEW.author_id; n:=octet_length(NEW.body);
   ELSIF TG_TABLE_NAME='oc_plugins' THEN uid:=NEW.owner_id; n:=octet_length(NEW.manifest::text); key:=NEW.id||'/'||NEW.version;
@@ -519,6 +541,15 @@ ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS max_first mpq;
 ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS subtree_count integer;
 ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS min_extent mpq;
 ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS max_extent mpq;
+-- Interval trees are AVL trees ordered by (first_time, ID in "C" order) with stable IDs;
+-- the timeline row names each root. Static builds numbered the root 1.
+ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS height integer;
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS duration_root integer;
+UPDATE oc_timelines t SET duration_root=1 WHERE duration_root IS NULL
+  AND EXISTS(SELECT 1 FROM oc_duration_nodes n WHERE n.timeline_id=t.id AND n.id=1);
+-- Durations anchored to a moment move with it.
+CREATE INDEX IF NOT EXISTS oc_duration_nodes_start_moment ON oc_duration_nodes(timeline_id,(definition->'start'->>'moment'));
+CREATE INDEX IF NOT EXISTS oc_duration_nodes_end_moment ON oc_duration_nodes(timeline_id,(definition->'end'->>'moment'));
 
 -- Anchored-span summaries of durations shorter than the threshold that intersect [lo,hi],
 -- keyed by start. Mirrors src/durations.ts durationSummaries: subtrees made only of
@@ -530,7 +561,9 @@ DECLARE ids integer[]; points boolean[] := ARRAY[false]; idx integer; nid intege
   n record; anchor mpq; finish mpq; total integer := 0; single jsonb; base mpq;
 BEGIN
   IF lo IS NULL OR hi IS NULL OR threshold IS NULL OR threshold<='0'::mpq OR lo>hi THEN RETURN; END IF;
-  ids := CASE WHEN EXISTS(SELECT 1 FROM oc_duration_nodes WHERE timeline_id=tid AND id=1) THEN ARRAY[1] ELSE ARRAY[]::integer[] END;
+  SELECT CASE WHEN duration_root IS NULL THEN ARRAY[]::integer[] ELSE ARRAY[duration_root] END INTO ids
+    FROM oc_timelines WHERE id=tid;
+  ids := coalesce(ids,ARRAY[]::integer[]);
   WHILE cardinality(ids)>0 LOOP
     idx:=cardinality(ids); nid:=ids[idx]; point:=points[idx]; ids:=ids[1:idx-1]; points:=points[1:idx-1];
     SELECT d.* INTO n FROM oc_duration_nodes d WHERE d.timeline_id=tid AND d.id=nid;
@@ -609,6 +642,14 @@ CREATE TABLE IF NOT EXISTS oc_view_nodes (
   event_count bigint NOT NULL, distinct_count integer NOT NULL,
   events jsonb NOT NULL, PRIMARY KEY(timeline_id,id)
 );
+ALTER TABLE oc_view_nodes ADD COLUMN IF NOT EXISTS moment_ids text[];
+ALTER TABLE oc_view_nodes ADD COLUMN IF NOT EXISTS height integer;
+ALTER TABLE oc_view_nodes ALTER COLUMN events DROP NOT NULL;
+ALTER TABLE oc_views ADD COLUMN IF NOT EXISTS duration_root integer;
+CREATE TABLE IF NOT EXISTS oc_view_moments (
+  timeline_id uuid NOT NULL REFERENCES oc_views ON DELETE CASCADE, id text NOT NULL,
+  time mpq NOT NULL, event jsonb NOT NULL, PRIMARY KEY(timeline_id,id)
+);
 CREATE TABLE IF NOT EXISTS oc_view_duration_nodes (
   timeline_id uuid NOT NULL REFERENCES oc_views ON DELETE CASCADE,
   id integer NOT NULL, left_id integer, right_id integer,
@@ -617,6 +658,7 @@ CREATE TABLE IF NOT EXISTS oc_view_duration_nodes (
   definition jsonb, max_first mpq, subtree_count integer, min_extent mpq, max_extent mpq,
   PRIMARY KEY(timeline_id,id)
 );
+ALTER TABLE oc_view_duration_nodes ADD COLUMN IF NOT EXISTS height integer;
 -- View variants of the traversal functions, generated from the originals so the summary
 -- algorithms have a single definition: only table names (and the root's table) differ.
 DO $$
@@ -628,11 +670,12 @@ BEGIN
     ('oc_events(uuid,mpq,mpq,mpq,text,integer)', 'oc_events(', 'oc_view_events('),
     ('oc_duration_overview(uuid,mpq,mpq,mpq)', 'oc_duration_overview(', 'oc_view_duration_overview(')
   ) AS f(signature, name, view_name) LOOP
-    EXECUTE replace(replace(replace(replace(
+    EXECUTE replace(replace(replace(replace(replace(
       pg_get_functiondef(generated.signature::regprocedure),
       generated.name, generated.view_name),
       'oc_duration_nodes', 'oc_view_duration_nodes'),
       'oc_nodes', 'oc_view_nodes'),
+      'oc_moments', 'oc_view_moments'),
       'oc_timelines', 'oc_views');
   END LOOP;
 END $$;
@@ -657,3 +700,58 @@ CREATE TABLE IF NOT EXISTS oc_edge_nodes (
   definition jsonb, max_first mpq, subtree_count integer, min_extent mpq, max_extent mpq,
   PRIMARY KEY(timeline_id,id)
 );
+ALTER TABLE oc_edge_nodes ADD COLUMN IF NOT EXISTS height integer;
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS edge_root integer;
+UPDATE oc_timelines t SET edge_root=1 WHERE edge_root IS NULL
+  AND EXISTS(SELECT 1 FROM oc_edge_nodes n WHERE n.timeline_id=t.id AND n.id=1);
+CREATE INDEX IF NOT EXISTS oc_edge_nodes_edge_id ON oc_edge_nodes(timeline_id,(band->>'id'));
+
+-- Saves store their sparse patch against the first parent instead of a whole document; a
+-- full snapshot is written periodically so reading any revision replays a bounded chain.
+ALTER TABLE oc_revisions ALTER COLUMN snapshot_id DROP NOT NULL;
+ALTER TABLE oc_revisions ADD COLUMN IF NOT EXISTS patch jsonb;
+-- Size of the revision's whole document as exported JSON (an upper-bound estimate for patches).
+ALTER TABLE oc_revisions ADD COLUMN IF NOT EXISTS document_bytes bigint CHECK(document_bytes>=0);
+ALTER TABLE oc_revisions DROP CONSTRAINT IF EXISTS oc_revisions_content;
+ALTER TABLE oc_revisions ADD CONSTRAINT oc_revisions_content CHECK((snapshot_id IS NULL)<>(patch IS NULL));
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS patch_chain integer NOT NULL DEFAULT 0;
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS patch_bytes bigint NOT NULL DEFAULT 0;
+-- Saves update the timeline row once; free space on each page keeps those updates in place
+-- (HOT), so the catalogue's GIN index over the whole timeline's text is not rewritten.
+ALTER TABLE oc_timelines SET (fillfactor=50);
+-- Catalogue text (event_text) is refreshed after incremental saves; true until then.
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS event_text_stale boolean NOT NULL DEFAULT false;
+-- Catalogue text: duration then moment titles and notes (moments in time order, each followed
+-- by its stacked entries), each part at most 4096 characters and the whole at most 1 MiB.
+-- Built in the database after incremental saves; mirrors eventSearchText in store.mjs.
+-- Moments are read in chunks, stopping once the text is full.
+DROP FUNCTION IF EXISTS oc_text_parts(jsonb,boolean);
+CREATE OR REPLACE FUNCTION oc_event_text(tid uuid) RETURNS text LANGUAGE plpgsql STABLE AS $$
+DECLARE ids text[]; chunk text; result text;
+BEGIN
+  SELECT string_agg(left(x.v,4096),' ' ORDER BY d.band->>'id' COLLATE "C",x.o) INTO result
+  FROM oc_duration_nodes d CROSS JOIN LATERAL (VALUES
+    (1,CASE WHEN jsonb_typeof(d.definition->'metadata'->'title')='string' THEN d.definition->'metadata'->>'title' END),
+    (2,CASE WHEN jsonb_typeof(d.definition->'metadata'->'description')='string' THEN d.definition->'metadata'->>'description' END)) x(o,v)
+  WHERE d.timeline_id=tid AND x.v IS NOT NULL;
+  SELECT array_agg(id ORDER BY time,id COLLATE "C") INTO ids FROM oc_moments WHERE timeline_id=tid;
+  FOR i IN 1..coalesce(cardinality(ids),0) BY 1000 LOOP
+    EXIT WHEN length(coalesce(result,''))>=1048576;
+    SELECT string_agg(left(x.v,4096),' ' ORDER BY u.ord,x.n,x.o) INTO chunk
+    FROM unnest(ids[i:i+999]) WITH ORDINALITY u(id,ord)
+    CROSS JOIN LATERAL (SELECT event->'metadata' AS meta FROM oc_moments WHERE timeline_id=tid AND id=u.id) m
+    CROSS JOIN LATERAL (
+      SELECT 0::bigint AS n,y.o,y.v FROM (VALUES
+        (1,CASE WHEN jsonb_typeof(m.meta->'title')='string' THEN m.meta->>'title' END),
+        (2,CASE WHEN jsonb_typeof(m.meta->'description')='string' THEN m.meta->>'description' END)) y(o,v)
+      UNION ALL
+      SELECT a.ord*1000000+e.ord,y.o,y.v FROM jsonb_each(m.meta) WITH ORDINALITY a(key,value,ord)
+      CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(a.value)='array' THEN a.value ELSE '[]'::jsonb END) WITH ORDINALITY e(item,ord)
+      CROSS JOIN LATERAL (VALUES
+        (1,CASE WHEN jsonb_typeof(e.item->'metadata'->'title')='string' THEN e.item->'metadata'->>'title' END),
+        (2,CASE WHEN jsonb_typeof(e.item->'metadata'->'description')='string' THEN e.item->'metadata'->>'description' END)) y(o,v)
+    ) x WHERE x.v IS NOT NULL;
+    result:=concat_ws(' ',result,chunk);
+  END LOOP;
+  RETURN left(coalesce(result,''),1048576);
+END $$;

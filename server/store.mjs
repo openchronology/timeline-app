@@ -4,7 +4,6 @@ import {
   pluginMetadata,
   validateDocument,
   durationTree,
-  durationOverview,
   fixMissingAnchors,
   coalesceGroups,
   durationGroups,
@@ -21,11 +20,42 @@ import {
 } from '../dist/core.mjs';
 import { randomUUID } from 'node:crypto';
 import { indexedNodes } from './tree.mjs';
+import { MOMENT_TREE, INTERVAL_TREE, intervalPayload, upsertRows } from './avl.mjs';
+import { applyIncrementally, incremental } from './incremental.mjs';
+/** A full snapshot is written after this many patch revisions (or patch bytes beyond the document's size). */
+const PATCH_CHAIN = 1000;
 export class HttpError extends Error {
   constructor(status, message) {
     super(message);
     this.status = status;
   }
+}
+/**
+ * The timeline row's columns except the catalogue search text and vector (up to a megabyte
+ * each), which access checks never need. Read once per process.
+ */
+let columnList = null;
+function timelineColumns(client) {
+  columnList ??= client
+    .query(
+      `SELECT string_agg('t.'||quote_ident(column_name),',' ORDER BY ordinal_position) AS list
+      FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='oc_timelines'
+      AND column_name NOT IN ('event_text','search_document')`,
+    )
+    .then(({ rows }) => rows[0].list)
+    .catch((error) => {
+      columnList = null;
+      throw error;
+    });
+  return columnList;
+}
+/** Every moment of a timeline (or view) in index order: time, then ID. */
+async function allEvents(client, table, id) {
+  const { rows } = await client.query(
+    `SELECT event FROM ${table} WHERE timeline_id=$1 ORDER BY time,id COLLATE "C"`,
+    [id],
+  );
+  return rows.map((r) => r.event);
 }
 export class PostgresStore {
   constructor(pool) {
@@ -43,8 +73,9 @@ export class PostgresStore {
     return rows[0];
   }
   async access(id, userId, client = this.pool) {
+    const columns = await timelineColumns(client);
     const { rows } = await client.query(
-      `SELECT t.*,u.username AS owner,
+      `SELECT ${columns},u.username AS owner,
       EXISTS(SELECT 1 FROM oc_timeline_stars s WHERE s.timeline_id=t.id AND s.user_id=$2::uuid) AS starred,
       CASE WHEN EXISTS(SELECT 1 FROM oc_users admin WHERE admin.id=$2::uuid AND admin.is_admin AND NOT admin.is_disabled) THEN 'admin' WHEN t.owner_id=$2::uuid THEN 'owner' ELSE m.role END AS role
       FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id
@@ -115,12 +146,14 @@ export class PostgresStore {
     ]);
     const additions = await client.query(
       `SELECT EXISTS(SELECT value FROM jsonb_array_elements_text($2::jsonb)
-        EXCEPT SELECT event->>'id' FROM oc_nodes n CROSS JOIN LATERAL jsonb_array_elements(n.events) event WHERE n.timeline_id=$1) AS added`,
+        EXCEPT SELECT id FROM oc_moments WHERE timeline_id=$1) AS added`,
       [id, JSON.stringify(document.events.map((event) => event.id))],
     );
     const tree = indexedNodes(document);
+    await writeMoments(client, 'oc_moments', id, document.events);
     await writeNodes(client, 'oc_nodes', id, tree);
-    const bands = await writeDurationNodes(client, 'oc_duration_nodes', id, document);
+    const durations = await writeDurationNodes(client, 'oc_duration_nodes', id, document);
+    const bands = durations.bands;
     await this.indexSearch(client, id, document, bands);
     await client.query('DELETE FROM oc_relationships WHERE timeline_id=$1', [id]);
     const links = document.relationships ?? [];
@@ -138,11 +171,11 @@ export class PostgresStore {
         params,
       );
     }
-    await writeEdgeNodes(client, id, document);
+    const edges = await writeEdgeNodes(client, id, document);
     // Saved state changed: derived separation views belong to the previous revision.
     await client.query('DELETE FROM oc_views WHERE timeline_id=$1', [id]);
     await client.query(
-      'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,tags=$8,assets=$9::jsonb,event_text=$10,comparison=$11::jsonb,storage_bytes=$12,event_generation=event_generation+CASE WHEN $13 THEN 1 ELSE 0 END,updated_at=CASE WHEN $14 THEN now() ELSE updated_at END WHERE id=$1',
+      'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,tags=$8,assets=$9::jsonb,event_text=$10,comparison=$11::jsonb,storage_bytes=$12,event_generation=event_generation+CASE WHEN $13 THEN 1 ELSE 0 END,updated_at=CASE WHEN $14 THEN now() ELSE updated_at END,duration_root=$15,edge_root=$16,index_version=2,event_text_stale=false WHERE id=$1',
       [
         id,
         document.title,
@@ -158,6 +191,8 @@ export class PostgresStore {
         Buffer.byteLength(JSON.stringify(document)),
         additions.rows[0].added,
         touch,
+        durations.root,
+        edges.root,
       ],
     );
   }
@@ -190,10 +225,12 @@ export class PostgresStore {
   }
   async transaction(action) {
     const c = await this.pool.connect();
+    c.afterCommit = null;
     try {
       await c.query('BEGIN');
       const result = await action(c);
       await c.query('COMMIT');
+      c.afterCommit?.();
       return result;
     } catch (e) {
       await c.query('ROLLBACK');
@@ -201,8 +238,77 @@ export class PostgresStore {
         throw new HttpError(413, e.message);
       throw e;
     } finally {
+      c.afterCommit = null;
       c.release();
     }
+  }
+  /**
+   * Rebuilds the catalogue text (event_text) after incremental saves, outside the save's
+   * transaction; rapid saves to one timeline coalesce into one more rebuild. Also drops
+   * separation views of earlier revisions.
+   */
+  refreshText(id) {
+    this.refreshing ??= new Map();
+    const running = this.refreshing.get(id);
+    if (running) {
+      running.again = true;
+      return running.done;
+    }
+    const entry = { again: false };
+    entry.done = (async () => {
+      try {
+        this.refreshCost ??= new Map();
+        do {
+          entry.again = false;
+          // Saves in quick succession share one rebuild. Large timelines, whose rebuild takes
+          // longer, wait proportionally longer so continuous editing leaves the database free.
+          const delay = Math.max(this.textDelay ?? 1000, 3 * (this.refreshCost.get(id) ?? 0));
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          if (this.pool.ending) break;
+          // The text is built in the database without locking the timeline; the update below
+          // applies only if no save committed meanwhile (that save's own refresh runs next), and
+          // rewrites event_text (recomputing the catalogue vector) only when the text changed.
+          const started = Date.now();
+          const { rows } = await this.pool.query(
+            `SELECT t.revision,x.text,t.event_text IS NOT DISTINCT FROM x.text AS same FROM oc_timelines t
+            CROSS JOIN LATERAL (SELECT oc_event_text(t.id) AS text) x WHERE t.id=$1 AND t.event_text_stale`,
+            [id],
+          );
+          if (!rows[0]) continue;
+          await this.pool.query(
+            rows[0].same
+              ? 'UPDATE oc_timelines SET event_text_stale=false WHERE id=$1 AND revision=$2'
+              : 'UPDATE oc_timelines SET event_text=$3,event_text_stale=false WHERE id=$1 AND revision=$2',
+            rows[0].same ? [id, rows[0].revision] : [id, rows[0].revision, rows[0].text],
+          );
+          if (this.refreshCost.size > 10000) this.refreshCost.clear();
+          this.refreshCost.set(id, Date.now() - started);
+          await this.pool.query('DELETE FROM oc_views WHERE timeline_id=$1 AND revision<>$2', [
+            id,
+            rows[0].revision,
+          ]);
+        } while (entry.again);
+      } catch (error) {
+        if (!this.pool.ending) console.error('Catalogue text refresh failed:', error);
+      } finally {
+        this.refreshing.delete(id);
+        // A save that arrived after the last round started its own.
+        if (entry.again && !this.pool.ending) this.refreshText(id);
+      }
+    })();
+    this.refreshing.set(id, entry);
+    return entry.done;
+  }
+  /** Refreshes catalogue text left stale (for example by a restart) and waits for pending refreshes. */
+  async refreshStale() {
+    const { rows } = await this.pool.query('SELECT id FROM oc_timelines WHERE event_text_stale');
+    await Promise.all(rows.map((r) => this.refreshText(r.id)));
+    await this.idle();
+  }
+  /** Resolves once no catalogue refresh is pending. */
+  async idle() {
+    while (this.refreshing?.size)
+      await Promise.all([...this.refreshing.values()].map((e) => e.done));
   }
   async create(userId, document) {
     document = validateDocument(document);
@@ -228,6 +334,12 @@ export class PostgresStore {
           409,
           'Someone changed this timeline. Export your edits before reloading.',
         );
+      if (patch && incremental(t, patch)) {
+        // Sparse saves update the stored index in place and record only the patch.
+        await this.saveIncrementally(c, t, userId, patch);
+        c.afterCommit = () => this.refreshText(id);
+        return this.access(id, userId, c);
+      }
       if (patch) {
         const current = await this.branchDocument(c, t);
         document = validateDocument(applyPatch(current, patch));
@@ -250,8 +362,73 @@ export class PostgresStore {
       snapshotId,
       rows[0].revision,
     );
-    await client.query('UPDATE oc_timelines SET head_revision_id=$2 WHERE id=$1', [id, revisionId]);
+    await client.query(
+      'UPDATE oc_timelines SET head_revision_id=$2,patch_chain=0,patch_bytes=0 WHERE id=$1',
+      [id, revisionId],
+    );
     return revisionId;
+  }
+  /**
+   * Applies a sparse save in place and records it as its patch against the previous head.
+   * Every PATCH_CHAIN saves, or once patches outweigh the document, the revision stores a
+   * full snapshot instead, so reading a revision replays a bounded chain. The timeline row is
+   * updated once and its indexed columns stay unchanged (updated_at advances at most once a
+   * minute), so the update stays in place (HOT) and the catalogue's GIN index is not touched.
+   */
+  async saveIncrementally(client, t, userId, patch) {
+    const { recorded, assignments, added, settings, storage } = await applyIncrementally(
+      client,
+      t,
+      patch,
+    );
+    const serialized = JSON.stringify(recorded),
+      size = Buffer.byteLength(serialized),
+      number = (BigInt(t.revision) + 1n).toString();
+    let revisionId,
+      chain = t.patch_chain + 1,
+      bytes = Number(t.patch_bytes) + size;
+    if (chain >= PATCH_CHAIN || bytes > Math.max(storage, 65536)) {
+      const current = {
+        ...t,
+        title: settings.title,
+        description: settings.description,
+        presentation: settings.presentation ?? null,
+        plugins: settings.plugins ?? null,
+        tags: settings.tags ?? null,
+        assets: settings.assets ?? null,
+      };
+      revisionId = await this.recordRevision(
+        client,
+        t.id,
+        userId,
+        await this.branchDocument(client, current),
+        'save',
+        [t.head_revision_id],
+        null,
+        number,
+      );
+      chain = 0;
+      bytes = 0;
+    } else {
+      revisionId = randomUUID();
+      await client.query(
+        'INSERT INTO oc_revisions(id,timeline_id,number,patch,author_id,kind,document_bytes) VALUES($1,$2,$3,$4::jsonb,$5,$6,$7)',
+        [revisionId, t.id, number, serialized, userId, 'save', storage],
+      );
+      await client.query(
+        'INSERT INTO oc_revision_parents(revision_id,parent_id,position) VALUES($1,$2,0)',
+        [revisionId, t.head_revision_id],
+      );
+    }
+    const fixed = 6;
+    await client.query(
+      `UPDATE oc_timelines SET revision=revision+1,head_revision_id=$2,patch_chain=$3,patch_bytes=$4,
+      event_generation=event_generation+$5,event_text_stale=true,
+      updated_at=CASE WHEN updated_at<now()-interval '1 minute' THEN now() ELSE updated_at END,
+      ${assignments.map(([column, , cast], i) => `${column}=$${fixed + i}${cast ?? ''}`).join(',')}
+      WHERE id=$1`,
+      [t.id, revisionId, chain, bytes, added ? 1 : 0, ...assignments.map(([, value]) => value)],
+    );
   }
   async recordRevision(
     client,
@@ -264,17 +441,19 @@ export class PostgresStore {
     number = null,
   ) {
     const revisionId = randomUUID();
+    let size = null;
     if (!snapshotId) {
       snapshotId = randomUUID();
       const serialized = JSON.stringify(validateDocument(document));
+      size = Buffer.byteLength(serialized);
       await client.query(
         'INSERT INTO oc_snapshots(id,document,document_bytes) VALUES($1,$2::jsonb,$3)',
-        [snapshotId, serialized, Buffer.byteLength(serialized)],
+        [snapshotId, serialized, size],
       );
     }
     await client.query(
-      'INSERT INTO oc_revisions(id,timeline_id,number,snapshot_id,author_id,kind) VALUES($1,$2,$3,$4,$5,$6)',
-      [revisionId, id, number, snapshotId, userId, kind],
+      'INSERT INTO oc_revisions(id,timeline_id,number,snapshot_id,author_id,kind,document_bytes) VALUES($1,$2,$3,$4,$5,$6,coalesce($7,(SELECT document_bytes FROM oc_snapshots WHERE id=$4)))',
+      [revisionId, id, number, snapshotId, userId, kind, size],
     );
     for (const [position, parent] of [...new Set(parents.filter(Boolean))].entries())
       await client.query(
@@ -283,13 +462,23 @@ export class PostgresStore {
       );
     return revisionId;
   }
+  /** A saved revision's document: its snapshot, or the nearest snapshot with later patches replayed. */
   async revisionDocument(client, id) {
     const { rows } = await client.query(
-      'SELECT s.document FROM oc_revisions r JOIN oc_snapshots s ON s.id=r.snapshot_id WHERE r.id=$1',
+      `WITH RECURSIVE chain(id,depth,snapshot_id,patch) AS (
+        SELECT r.id,0,r.snapshot_id,r.patch FROM oc_revisions r WHERE r.id=$1
+        UNION ALL SELECT r.id,c.depth+1,r.snapshot_id,r.patch FROM chain c
+        JOIN oc_revision_parents p ON p.revision_id=c.id AND p.position=0
+        JOIN oc_revisions r ON r.id=p.parent_id WHERE c.snapshot_id IS NULL
+      ) SELECT c.depth,c.patch,s.document FROM chain c LEFT JOIN oc_snapshots s ON s.id=c.snapshot_id ORDER BY c.depth DESC`,
       [id],
     );
-    if (!rows[0]) throw new HttpError(404, 'Saved revision unavailable.');
-    return rows[0].document;
+    if (!rows.length || !rows[0].document) throw new HttpError(404, 'Saved revision unavailable.');
+    if (rows.length === 1) return rows[0].document;
+    return replayPatches(
+      rows[0].document,
+      rows.slice(1).map((r) => r.patch),
+    );
   }
   async removeHistory(client, timelineId) {
     // Keep ancestors still needed by another fork or submitted review. Other
@@ -347,9 +536,7 @@ export class PostgresStore {
     return this.transaction(async (c) => {
       await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
       const t = await this.access(id, userId, c);
-      const { rows } = await c.query('SELECT oc_events($1,NULL,NULL,NULL,NULL,200001) AS event', [
-        id,
-      ]);
+      const events = await allEvents(c, 'oc_moments', id);
       const durations = await this.durationDefinitions(c, id);
       const relationships = await this.relationshipList(c, id);
       return {
@@ -364,7 +551,7 @@ export class PostgresStore {
           ...(t.tags === null || t.tags === undefined ? {} : { tags: t.tags }),
           ...(t.assets ? { assets: t.assets } : {}),
           ...(t.comparison ? { comparison: t.comparison } : {}),
-          events: rows.map((r) => r.event),
+          events,
           ...(durations.length ? { durations } : {}),
           ...(relationships.length ? { relationships } : {}),
         }),
@@ -387,10 +574,7 @@ export class PostgresStore {
     return rows.map((r) => r.definition);
   }
   async branchDocument(client, timeline) {
-    const { rows } = await client.query(
-      'SELECT oc_events($1,NULL,NULL,NULL,NULL,200001) AS event',
-      [timeline.id],
-    );
+    const events = await allEvents(client, 'oc_moments', timeline.id);
     const durations = await this.durationDefinitions(client, timeline.id);
     const relationships = await this.relationshipList(client, timeline.id);
     return validateDocument({
@@ -403,7 +587,7 @@ export class PostgresStore {
       ...(timeline.tags == null ? {} : { tags: timeline.tags }),
       ...(timeline.assets ? { assets: timeline.assets } : {}),
       ...(timeline.comparison ? { comparison: timeline.comparison } : {}),
-      events: rows.map((r) => r.event),
+      events,
       ...(durations.length ? { durations } : {}),
       ...(relationships.length ? { relationships } : {}),
     });
@@ -433,8 +617,10 @@ export class PostgresStore {
         'INSERT INTO oc_views(id,timeline_id,revision,filter_key,root,event_count) VALUES($1,$2,$3,$4,$5,$6)',
         [viewId, id, t.revision, key, tree.root, tree.count],
       );
+      await writeMoments(c, 'oc_view_moments', viewId, document.events);
       await writeNodes(c, 'oc_view_nodes', viewId, tree);
-      await writeDurationNodes(c, 'oc_view_duration_nodes', viewId, document);
+      const durations = await writeDurationNodes(c, 'oc_view_duration_nodes', viewId, document);
+      await c.query('UPDATE oc_views SET duration_root=$2 WHERE id=$1', [viewId, durations.root]);
       await c.query(
         'DELETE FROM oc_views WHERE timeline_id=$1 AND id NOT IN (SELECT id FROM oc_views WHERE timeline_id=$1 ORDER BY created_at DESC,id LIMIT 8)',
         [id],
@@ -480,8 +666,9 @@ export class PostgresStore {
         // Bands are durations at least as long as the threshold; shorter ones are summarized.
         const intervals = await c.query(
           `WITH RECURSIVE visible AS (
-          SELECT n.* FROM ${names.durations} n WHERE timeline_id=$1 AND id=1 AND min_time<=$3::mpq AND max_time>=$2::mpq
-          UNION ALL SELECT n.* FROM visible p JOIN ${names.durations} n ON n.timeline_id=p.timeline_id AND n.id IN (p.left_id,p.right_id)
+          SELECT n.* FROM ${names.durations} n JOIN ${names.roots} t ON t.id=n.timeline_id AND t.duration_root=n.id
+          WHERE n.timeline_id=$1 AND n.min_time<=$3::mpq AND n.max_time>=$2::mpq
+          UNION ALL SELECT n.* FROM visible p JOIN ${names.durations} n ON n.timeline_id=$1 AND n.id IN (p.left_id,p.right_id)
           WHERE n.min_time<=$3::mpq AND n.max_time>=$2::mpq AND NOT coalesce(n.max_extent<$4::mpq AND $4::mpq>'0'::mpq,false)
         ) SELECT band FROM visible WHERE first_time<=$3::mpq AND last_time>=$2::mpq
           AND ($4::mpq='0'::mpq OR last_time-first_time>=$4::mpq) LIMIT 257`,
@@ -492,8 +679,9 @@ export class PostgresStore {
           ? { rows: [] }
           : await c.query(
               `WITH RECURSIVE visible AS (
-          SELECT n.* FROM oc_edge_nodes n WHERE timeline_id=$1 AND id=1 AND min_time<=$3::mpq AND max_time>=$2::mpq
-          UNION ALL SELECT n.* FROM visible p JOIN oc_edge_nodes n ON n.timeline_id=p.timeline_id AND n.id IN (p.left_id,p.right_id)
+          SELECT n.* FROM oc_edge_nodes n JOIN oc_timelines t ON t.id=n.timeline_id AND t.edge_root=n.id
+          WHERE n.timeline_id=$1 AND n.min_time<=$3::mpq AND n.max_time>=$2::mpq
+          UNION ALL SELECT n.* FROM visible p JOIN oc_edge_nodes n ON n.timeline_id=$1 AND n.id IN (p.left_id,p.right_id)
           WHERE n.min_time<=$3::mpq AND n.max_time>=$2::mpq AND NOT coalesce(n.max_extent<$4::mpq AND $4::mpq>'0'::mpq,false)
         ) SELECT band FROM visible WHERE first_time<=$3::mpq AND last_time>=$2::mpq
           AND ($4::mpq='0'::mpq OR last_time-first_time>=$4::mpq) LIMIT 257`,
@@ -663,10 +851,7 @@ export class PostgresStore {
       }
       if (query.id) {
         const { rows } = await c.query(
-          `WITH RECURSIVE path AS (
-          SELECT n.id,n.time,n.left_id,n.right_id FROM ${names.nodes} n JOIN ${names.roots} t ON t.id=n.timeline_id AND t.root=n.id WHERE t.id=$1
-          UNION ALL SELECT n.id,n.time,n.left_id,n.right_id FROM path p JOIN ${names.nodes} n ON n.timeline_id=$1 AND n.id=CASE WHEN p.time>$2::mpq THEN p.left_id WHEN p.time<$2::mpq THEN p.right_id END
-        ) SELECT event FROM path p JOIN ${names.nodes} n ON n.timeline_id=$1 AND n.id=p.id CROSS JOIN LATERAL jsonb_array_elements(n.events) event WHERE p.time=$2::mpq AND event->>'id'=$3 LIMIT 1`,
+          `SELECT event FROM ${names.moments} WHERE timeline_id=$1 AND id=$3 AND time=$2::mpq`,
           [tree, query.lower, query.id],
         );
         return { events: rows.map((r) => r.event), next: null, revision: t.revision };
@@ -698,48 +883,31 @@ export class PostgresStore {
  * from the converted document stores standalone definitions; saved history is immutable and
  * converts when read. Returns the number of converted timelines.
  */
+/** Writes moment rows (the tree's nodes refer to them by ID). */
+async function writeMoments(client, table, id, events) {
+  await client.query(`DELETE FROM ${table} WHERE timeline_id=$1`, [id]);
+  await upsertRows(
+    client,
+    table,
+    ['timeline_id', 'id', 'time', 'event'],
+    { time: '::mpq', event: '::jsonb' },
+    events.map((e) => [id, e.id, e.time, JSON.stringify(e)]),
+    false,
+  );
+}
 /** Writes a balanced moment tree; batched inserts bound round trips and mpq keys stay out of B-trees. */
 async function writeNodes(client, table, id, tree) {
   await client.query(`DELETE FROM ${table} WHERE timeline_id=$1`, [id]);
-  for (let offset = 0; offset < tree.nodes.length; offset += 250) {
-    const chunk = tree.nodes.slice(offset, offset + 250),
-      parameters = [];
-    const tuples = chunk.map((n) => {
-      const start = parameters.length;
-      parameters.push(
-        id,
-        n.id,
-        n.time,
-        n.first,
-        n.last,
-        n.left,
-        n.right,
-        n.firstId,
-        n.bucketCount,
-        n.count,
-        n.distinct,
-        JSON.stringify(n.events),
-      );
-      return (
-        '(' +
-        Array.from(
-          { length: 12 },
-          (_, i) =>
-            '$' +
-            (start + i + 1) +
-            (i === 2 || i === 3 || i === 4 ? '::mpq' : i === 11 ? '::jsonb' : ''),
-        ).join(',') +
-        ')'
-      );
-    });
-    await client.query(
-      `INSERT INTO ${table}(timeline_id,id,time,first_time,last_time,left_id,right_id,first_id,bucket_count,event_count,distinct_count,events) VALUES ` +
-        tuples.join(','),
-      parameters,
-    );
-  }
+  await upsertRows(
+    client,
+    table,
+    MOMENT_TREE.columns,
+    MOMENT_TREE.casts,
+    tree.nodes.map((n) => MOMENT_TREE.encode(id, n)),
+    false,
+  );
 }
-/** Writes the augmented duration interval tree; returns resolved bands in tree order. */
+/** Writes the augmented duration interval tree; returns its root and resolved bands in tree order. */
 async function writeDurationNodes(client, table, id, document) {
   const times = new Map(document.events.map((e) => [e.id, e.time]));
   return writeIntervalNodes(
@@ -760,74 +928,47 @@ async function writeEdgeNodes(client, id, document) {
     edgeTree(document.relationships ?? [], (key) => places.get(key)),
   );
 }
-/** Writes an augmented interval tree (durations or arcs); returns bands in tree order. */
+/** Writes an augmented interval tree (durations or arcs); returns its root and bands in tree order. */
 async function writeIntervalNodes(client, table, id, root) {
   await client.query(`DELETE FROM ${table} WHERE timeline_id=$1`, [id]);
-  const intervals = [];
+  const rows = [];
   function flatten(node) {
     if (!node) return null;
-    const ordinal = intervals.length + 1;
-    const row = { ordinal, node };
-    intervals.push(row);
+    const row = {
+      id: rows.length + 1,
+      ...intervalPayload(node.band),
+      min: node.min.toString(),
+      max: node.max.toString(),
+      maxFirst: node.maxFirst.toString(),
+      count: node.count,
+      minExtent: node.minExtent.toString(),
+      maxExtent: node.maxExtent.toString(),
+      source: node.band,
+    };
+    rows.push(row);
     row.left = flatten(node.left);
     row.right = flatten(node.right);
-    return ordinal;
+    const height = (ordinal) => (ordinal === null ? 0 : rows[ordinal - 1].height);
+    row.height = 1 + Math.max(height(row.left), height(row.right));
+    return row.id;
   }
   flatten(root);
-  for (let offset = 0; offset < intervals.length; offset += 250) {
-    const params = [];
-    const tuples = intervals.slice(offset, offset + 250).map(({ ordinal, node, left, right }) => {
-      const start = params.length;
-      params.push(
-        id,
-        ordinal,
-        left,
-        right,
-        node.min.toString(),
-        node.max.toString(),
-        node.band.first,
-        node.band.last,
-        JSON.stringify({ ...node.band, metadata: durationOverview(node.band.metadata) }),
-        JSON.stringify({
-          id: node.band.id,
-          start: node.band.start,
-          end: node.band.end,
-          metadata: node.band.metadata,
-        }),
-        node.maxFirst.toString(),
-        node.count,
-        node.minExtent.toString(),
-        node.maxExtent.toString(),
-      );
-      return (
-        '(' +
-        Array.from(
-          { length: 14 },
-          (_, i) =>
-            '$' +
-            (start + i + 1) +
-            ((i >= 4 && i <= 7) || i === 10 || i === 12 || i === 13
-              ? '::mpq'
-              : i === 8 || i === 9
-                ? '::jsonb'
-                : ''),
-        ).join(',') +
-        ')'
-      );
-    });
-    await client.query(
-      `INSERT INTO ${table}(timeline_id,id,left_id,right_id,min_time,max_time,first_time,last_time,band,definition,max_first,subtree_count,min_extent,max_extent) VALUES ` +
-        tuples.join(','),
-      params,
-    );
-  }
-  return intervals.map(({ node }) => node.band);
+  await upsertRows(
+    client,
+    table,
+    INTERVAL_TREE.columns,
+    INTERVAL_TREE.casts,
+    rows.map((row) => INTERVAL_TREE.encode(id, row)),
+    false,
+  );
+  return { root: rows.length ? 1 : null, bands: rows.map((row) => row.source) };
 }
 /** Main index objects, or the derived view tables and generated functions for a filter. */
 function treeNames(view) {
   return view
     ? {
         nodes: 'oc_view_nodes',
+        moments: 'oc_view_moments',
         durations: 'oc_view_duration_nodes',
         overview: 'oc_view_overview',
         events: 'oc_view_events',
@@ -836,6 +977,7 @@ function treeNames(view) {
       }
     : {
         nodes: 'oc_nodes',
+        moments: 'oc_moments',
         durations: 'oc_duration_nodes',
         overview: 'oc_overview_v2',
         events: 'oc_events',
@@ -874,6 +1016,84 @@ export async function convertLegacyDurations(client) {
       touch: false,
     });
   return rows.length;
+}
+/** Rebuilds indexes stored before persistent AVL trees (index_version 2). */
+export async function rebuildIndexes(client) {
+  const store = new PostgresStore(null);
+  const { rows } = await client.query(
+    'SELECT t.* FROM oc_timelines t WHERE t.index_version<2 AND t.comparison IS NULL',
+  );
+  for (const timeline of rows)
+    await store.replace(client, timeline.id, await store.branchDocument(client, timeline), {
+      touch: false,
+    });
+  await client.query('UPDATE oc_timelines SET index_version=2 WHERE comparison IS NOT NULL');
+  return rows.length;
+}
+/**
+ * Replays recorded patches onto a snapshot in one pass. Settings come from the latest patch
+ * that changed them. Events end in time order (then ID), like a document read from the index.
+ */
+export function replayPatches(snapshot, patches) {
+  const start = validateDocument(snapshot);
+  let settings = settingsOf(start);
+  const events = new Map(start.events.map((e) => [e.id, e]));
+  const durations = new Map((start.durations ?? []).map((d) => [d.id, d]));
+  const links = new Map((start.relationships ?? []).map((r) => [relationshipKey(r), r]));
+  // Each step has applyPatch's semantics, touching only what the patch names, except that
+  // deletions rescan the durations and links that might refer to the deleted entities.
+  for (const patch of patches) {
+    if (patch.settings) settings = patch.settings;
+    const lastTimes = new Map();
+    let deletions = false;
+    for (const change of patch.changes) {
+      const previous = events.get(change.id);
+      if (previous) lastTimes.set(change.id, previous.time);
+      if (change.event) events.set(change.id, change.event);
+      else deletions = events.delete(change.id) || deletions;
+    }
+    const changed = [];
+    for (const change of patch.durationChanges ?? []) {
+      if (change.duration) {
+        durations.set(change.id, change.duration);
+        changed.push(change.duration);
+      } else deletions = durations.delete(change.id) || deletions;
+    }
+    const fixed = fixMissingAnchors(
+      deletions ? [...durations.values()] : changed,
+      (moment) => events.has(moment),
+      (moment) => lastTimes.get(moment),
+    );
+    for (const d of fixed) durations.set(d.id, d);
+    const touched = [];
+    for (const change of patch.relationshipChanges ?? []) {
+      const relationship = { a: change.a, b: change.b },
+        key = relationshipKey(relationship);
+      if (change.related) {
+        links.set(key, relationship);
+        touched.push(key);
+      } else links.delete(key);
+    }
+    const exists = (ref) =>
+      'moment' in ref ? events.has(ref.moment) : durations.has(ref.duration);
+    for (const key of deletions ? [...links.keys()] : touched) {
+      const r = links.get(key);
+      if (r && !(exists(r.a) && exists(r.b))) links.delete(key);
+    }
+  }
+  const times = new Map([...events.values()].map((e) => [e.id, Q.parse(e.time)]));
+  const order = [...events.values()].sort(
+    (a, b) => times.get(a.id).compare(times.get(b.id)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
+  return validateDocument({
+    ...settings,
+    events: order,
+    ...(durations.size ? { durations: [...durations.values()] } : {}),
+    ...(links.size ? { relationships: [...links.values()] } : {}),
+  });
+}
+function settingsOf({ events, durations, relationships, ...settings }) {
+  return settings;
 }
 /** Applies sparse moment and duration edits to the current saved document. */
 export function applyPatch(current, patch) {

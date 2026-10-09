@@ -18,6 +18,9 @@ function fixture(
     rates = [];
   const service = new BrowserForks(
     {
+      async revisionDocument(client) {
+        return (await client.query('SELECT document FROM oc_snapshots')).rows[0]?.document;
+      },
       async transaction(work) {
         return work({
           async query(sql) {

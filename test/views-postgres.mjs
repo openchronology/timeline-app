@@ -121,7 +121,7 @@ try {
       });
       assert.equal(spans.durations.length, Math.min(100, index.durations.size));
     }
-  // Repeated separations reuse cached views; a save discards them.
+  // Repeated separations reuse cached views; a save discards them (after it commits).
   const count = async () =>
     (await pool.query('SELECT count(*) FROM oc_views WHERE timeline_id=$1', [timeline.id])).rows[0]
       .count;
@@ -138,6 +138,7 @@ try {
     settings: { ...doc, events: [], durations: undefined },
     changes: [{ id: 'm0', event: { ...doc.events[0], metadata: { title: 'M0', tags: ['war'] } } }],
   });
+  await store.idle();
   assert.equal(await count(), '0');
   const fresh = await store.query(timeline.id, user, {
     kind: 'events',

@@ -105,12 +105,7 @@ try {
   const snapshot = (await store.snapshot(timeline.id, user)).document;
   assert.equal(snapshot.durations.find((d) => d.id === 'd000').end, '1/3');
   assert.deepEqual(
-    (
-      await pool.query(
-        'SELECT s.document FROM oc_revisions r JOIN oc_snapshots s ON s.id=r.snapshot_id WHERE r.id=$1',
-        [checkpoint],
-      )
-    ).rows[0].document.durations.find((d) => d.id === 'd000').end,
+    (await store.revisionDocument(pool, checkpoint)).durations.find((d) => d.id === 'd000').end,
     { moment: 'b0' },
   );
   await assert.rejects(
@@ -147,7 +142,7 @@ try {
     // Recreate the pre-migration shape: links in moment metadata, rows without definitions.
     await pool.query('UPDATE oc_duration_nodes SET definition=NULL WHERE timeline_id=$1', [old.id]);
     await pool.query(
-      `UPDATE oc_nodes SET events=(SELECT jsonb_agg(CASE WHEN e->>'id'='x' THEN jsonb_set(e,'{metadata,durations}',$2::jsonb) ELSE e END) FROM jsonb_array_elements(events) e) WHERE timeline_id=$1`,
+      `UPDATE oc_moments SET event=jsonb_set(event,'{metadata,durations}',$2::jsonb) WHERE timeline_id=$1 AND id='x'`,
       [old.id, JSON.stringify(legacy.events[0].metadata.durations)],
     );
     const before = (await pool.query('SELECT updated_at FROM oc_timelines WHERE id=$1', [old.id]))
@@ -159,7 +154,7 @@ try {
       client.release();
     }
     const after = await pool.query(
-      `SELECT t.updated_at,(SELECT count(*) FROM oc_nodes n CROSS JOIN LATERAL jsonb_array_elements(n.events) e WHERE n.timeline_id=t.id AND e->'metadata' ? 'durations') AS links FROM oc_timelines t WHERE t.id=$1`,
+      `SELECT t.updated_at,(SELECT count(*) FROM oc_moments m WHERE m.timeline_id=t.id AND m.event->'metadata' ? 'durations') AS links FROM oc_timelines t WHERE t.id=$1`,
       [old.id],
     );
     assert.equal(after.rows[0].links, '0');

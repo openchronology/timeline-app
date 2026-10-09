@@ -55,10 +55,13 @@ async function initialize() {
     featured,
     trustProxy: process.env.TRUST_PROXY === '1',
   };
+  const store = pool ? new PostgresStore(pool) : null;
+  // Catalogue text left stale by an interrupted refresh catches up in the background.
+  store?.refreshStale().catch((error) => console.error('Catalogue text refresh failed:', error));
   return {
     ...options,
     auth: pool ? new Auth(pool, origin) : null,
-    store: pool ? new PostgresStore(pool) : null,
+    store,
     handler: createRequestHandler(options),
   };
 }

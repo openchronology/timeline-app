@@ -180,7 +180,11 @@ export function durationTree(
     const band = resolveDuration(duration, timeOf);
     if (band) bands.push(band);
   }
-  bands.sort((a, b) => Q.parse(a.first).compare(Q.parse(b.first)) || a.id.localeCompare(b.id));
+  // Ties order by ID in code-unit ("C") order, which the server's incremental trees share.
+  bands.sort(
+    (a, b) =>
+      Q.parse(a.first).compare(Q.parse(b.first)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
   function build(lo: number, hi: number): IntervalNode | null {
     if (lo >= hi) return null;
     const mid = Math.floor((lo + hi) / 2),
