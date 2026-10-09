@@ -27,7 +27,8 @@
     "test:versioning:postgres": "node test/versioning-postgres.mjs",
     "seed": "node server/seed.mjs",
     "bench:seed": "node scripts/build.mjs && node bench/seed.mjs",
-    "bench": "node bench/run.mjs && cargo bench --manifest-path native-store/Cargo.toml --locked --bench backends && node bench/report.mjs",
+    "bench": "node bench/run.mjs && cargo bench --manifest-path native-store/Cargo.toml --locked --bench backends && node bench/capacity.mjs && node bench/report.mjs",
+    "bench:capacity": "node bench/capacity.mjs",
     "bench:report": "node bench/report.mjs"
   },
   "dependencies": {

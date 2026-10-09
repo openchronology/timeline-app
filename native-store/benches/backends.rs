@@ -84,6 +84,17 @@ fn main() {
         baseline = baseline
             .save_patch(&working, &patch(json!([])))
             .expect("first save");
+        // Opening copies and checks the file into a private baseline, then draws.
+        criterion
+            .benchmark_group("open")
+            .bench_function(BenchmarkId::new("sqlite", size), |b| {
+                b.iter(|| {
+                    Snapshot::open(&file)
+                        .expect("open")
+                        .query(&full)
+                        .expect("query")
+                })
+            });
         let reads: [(&str, &Query); 4] = [
             ("overview-full", &full),
             ("overview-zoomed", &zoomed),
