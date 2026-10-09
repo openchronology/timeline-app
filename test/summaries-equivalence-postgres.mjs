@@ -70,10 +70,17 @@ const random = (n) => {
   return Math.floor((seed / 2147483648) * n);
 };
 const at = (k) => Q.from(BigInt(k), 8n).toString();
-const time = () =>
-  random(12) === 0
-    ? `${1 + random(9)}123456789012345678901234567/${1 + random(7)}`
-    : Q.from(BigInt(random(3300) - 300), BigInt([1, 2, 4, 8][random(4)])).toString();
+// Beyond float8's range, approximations saturate to ±Infinity (or 0 for tiny values) and tie,
+// so only the exact comparisons tell these apart.
+const HUGE = 10n ** 400n;
+const time = () => {
+  const roll = random(16);
+  if (roll === 0) return `${1 + random(9)}123456789012345678901234567/${1 + random(7)}`;
+  if (roll === 1) return Q.from(HUGE + BigInt(random(50))).toString();
+  if (roll === 2) return Q.from(-HUGE - BigInt(random(50))).toString();
+  if (roll === 3) return Q.from(BigInt(random(50)), HUGE).toString();
+  return Q.from(BigInt(random(3300) - 300), BigInt([1, 2, 4, 8][random(4)])).toString();
+};
 /** Mostly short durations on a grid, some long, some anchored to moments or with huge times. */
 function timeline(round) {
   const events = Array.from({ length: 30 }, (_, i) => ({
@@ -179,7 +186,41 @@ try {
       groups += expected.length;
     }
   }
-  assert.equal(compared, 320);
+  // Every start beyond float8's range has the same approximation (Infinity); groups there
+  // depend on exact comparisons alone.
+  const far = {
+    format: 'openchronology',
+    version: 1,
+    title: 'Saturated',
+    description: '',
+    events: [],
+    durations: Array.from({ length: 40 }, (_, i) => ({
+      id: 'f' + i,
+      start: Q.from(HUGE + BigInt(i * 2)).toString(),
+      end: Q.from(HUGE + BigInt(i * 2 + (i % 5))).toString(),
+      metadata: { title: 'F' + i },
+    })),
+  };
+  const saturated = await store.create(user, far);
+  created.push(saturated.id);
+  for (const [lower, upper, threshold] of [
+    [HUGE, HUGE + 100n, 3n],
+    [HUGE + 7n, HUGE + 31n, 4n],
+    [-HUGE, HUGE + 1000n, 10n],
+  ]) {
+    const run = async (fn) =>
+      (
+        await pool.query(
+          `SELECT first_time,last_time,duration_count,band FROM ${fn}($1,$2::mpq,$3::mpq,$4::mpq)`,
+          [saturated.id, `${lower}/1`, `${upper}/1`, `${threshold}/1`],
+        )
+      ).rows;
+    const expected = await run('pg_temp.oc_duration_overview_previous');
+    assert(expected.length > 2, 'saturated starts form several groups');
+    assert.deepEqual(await run('oc_duration_overview'), expected);
+    compared++;
+  }
+  assert.equal(compared, 323);
   assert(groups > 500, `the windows produced summaries (${groups})`);
   console.log(
     `PASS PostgreSQL duration summaries: ${compared} windows (${groups} groups) match the previous traversal.`,
