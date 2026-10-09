@@ -1,10 +1,20 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 export async function closeMomentDetails(page) {
-  if (await page.locator('#inspector').isVisible()) {
-    if (!(await page.locator('#inspector').evaluate((node) => 'dialogClosing' in node.dataset)))
-      await page.locator('#close-inspector').click();
-    await page.locator('#inspector').waitFor({ state: 'hidden' });
+  const inspector = page.locator('#inspector');
+  // The app may close the inspector itself (e.g. while loading a timeline) between these
+  // steps, which would leave a click waiting for a button that never becomes visible again.
+  for (let attempt = 0; attempt < 5 && (await inspector.isVisible()); attempt++) {
+    const closing = await inspector.evaluate(
+      (node) => !node.open || 'dialogClosing' in node.dataset,
+    );
+    if (!closing)
+      await page
+        .locator('#close-inspector')
+        .click({ timeout: 2000 })
+        .catch(() => {});
+    await inspector.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {});
   }
+  await inspector.waitFor({ state: 'hidden' });
 }
 
 export async function checkMomentDialog(page, restoreDocument) {
