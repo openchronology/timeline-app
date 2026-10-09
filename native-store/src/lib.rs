@@ -984,7 +984,15 @@ fn rebuild_duration_index(db: &Connection) -> Result<(), String> {
     {
         return Err("Use at most 200000 durations per timeline".into());
     }
+    create_start_index(db)?;
     build_interval_nodes(db, "duration_intervals", "duration_nodes")
+}
+/// Summaries range-scan durations by start (see duration_summaries).
+pub(crate) fn create_start_index(db: &Connection) -> Result<(), String> {
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS duration_intervals_first ON duration_intervals(first COLLATE RATIONAL_V1)",
+        &[],
+    )
 }
 /// Balanced augmented nodes over an intervals table ordered by `ord`, with AVL heights. Subtree summaries
 /// (largest start, count, extent bounds) let short intervals collapse without enumerating
@@ -1077,7 +1085,7 @@ pub(crate) fn edge_window(
     }
     Ok(serde_json::json!({"edges":edges,"edgesTruncated":more}))
 }
-const BAND_COLUMNS: &str = "d.id,d.start_json,d.end_json,d.first,d.last,(SELECT json_group_object(key,CASE key WHEN 'title' THEN substr(value,1,512) WHEN 'description' THEN substr(value,1,2000) ELSE value END) FROM json_each(d.metadata) WHERE type='text' AND (key IN ('title','description') OR length(value)<=256)),d.start_time,d.end_time";
+pub(crate) const BAND_COLUMNS: &str = "d.id,d.start_json,d.end_json,d.first,d.last,(SELECT json_group_object(key,CASE key WHEN 'title' THEN substr(value,1,512) WHEN 'description' THEN substr(value,1,2000) ELSE value END) FROM json_each(d.metadata) WHERE type='text' AND (key IN ('title','description') OR length(value)<=256)),d.start_time,d.end_time";
 fn band_json(row: &[Option<String>]) -> Result<Value, String> {
     let parse = |text: &Option<String>| -> Result<Value, String> {
         serde_json::from_str(text.as_deref().unwrap_or("null")).map_err(|e| e.to_string())
@@ -1109,8 +1117,55 @@ fn duration_window(
     }
     Ok(serde_json::json!({"durations":bands,"durationsTruncated":more}))
 }
-/// Rows of an interval tree touching [lower, upper] and at least as long as the threshold.
-fn interval_window(
+/// Rows of an interval tree touching [lower, upper] and at least as long as the threshold, in
+/// start order (then ID, as the browser lists them), at most 257 (callers report truncation
+/// past 256).
+///
+/// The tree is walked in order with SQLite's ordered recursion queue: a subtree is queued at
+/// its earliest start and expanded into its children and its own node, and nodes come out
+/// in (start, ID) order. Subtrees that cannot hold a match are never queued, and the walk
+/// stops at the 257th match, so the cost follows the rows returned, not every match.
+pub(crate) fn interval_window(
+    db: &Connection,
+    intervals: &str,
+    nodes: &str,
+    lower: &str,
+    upper: &str,
+    threshold: &str,
+) -> Result<Vec<Vec<Option<String>>>, String> {
+    let fits = |n: &str| {
+        format!("{n}.min_time<=q(?1) COLLATE RATIONAL_V1 AND {n}.max_time>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp({n}.max_extent,q(?3))>=0)")
+    };
+    // kind 0: a subtree keyed by its earliest start; kind 1: one node keyed by (start, ID).
+    let walk = format!("WITH RECURSIVE walk(kind,node,start,id,hit) AS (\
+        SELECT 0,n.id,n.min_time,'',0 FROM {nodes} n WHERE n.id=(SELECT root FROM interval_roots WHERE name='{nodes}') AND {} \
+        UNION ALL SELECT 0,c.id,c.min_time,'',0 FROM walk w JOIN {nodes} p ON p.id=w.node JOIN {nodes} c ON c.id IN (p.left_id,p.right_id) WHERE w.kind=0 AND {} \
+        UNION ALL SELECT 1,d.ord,d.first,d.id,d.first<=q(?1) COLLATE RATIONAL_V1 AND d.last>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp(d.extent,q(?3))>=0) \
+          FROM walk w JOIN {intervals} d ON d.ord=w.node WHERE w.kind=0 \
+        ORDER BY 3 COLLATE RATIONAL_V1,1,4) \
+      SELECT node FROM walk WHERE kind=1 AND hit LIMIT 257",
+        fits("n"),
+        fits("c")
+    );
+    let found: Vec<String> = db
+        .query(&walk, &[upper, lower, threshold])?
+        .into_iter()
+        .filter_map(|r| r[0].clone())
+        .collect();
+    if found.is_empty() {
+        return Ok(Vec::new());
+    }
+    let ords = serde_json::to_string(&found).map_err(|e| e.to_string())?;
+    db.query_limited(
+        &format!("SELECT {BAND_COLUMNS} FROM json_each(?1) f JOIN {intervals} d ON d.ord=CAST(f.value AS INTEGER) ORDER BY f.key"),
+        &[&ords],
+        257,
+        8 * 1024 * 1024,
+    )
+}
+/// The previous single recursive query, kept as a reference for interval_window.
+#[cfg(test)]
+pub(crate) fn interval_window_query(
     db: &Connection,
     intervals: &str,
     nodes: &str,
@@ -1170,10 +1225,12 @@ fn later(db: &Connection, a: &str, b: &str) -> Result<String, String> {
     }
     .to_string())
 }
+#[cfg(test)]
 type OpenSummary = Option<(String, String, u64, Option<Value>)>;
 /// Adds an entry or whole subtree to the open cluster, closing it first when the start no
 /// longer fits within the threshold of the cluster's anchor.
 #[allow(clippy::too_many_arguments)]
+#[cfg(test)]
 fn join_summary(
     db: &Connection,
     open: &mut OpenSummary,
@@ -1220,10 +1277,60 @@ pub(crate) struct DurationSummary {
     pub band: Option<Value>,
 }
 /// Anchored-span summaries of durations shorter than the threshold that intersect
-/// [lower, upper], keyed by start. Mirrors src/durations.ts durationSummaries and the
-/// PostgreSQL oc_duration_overview: fully collapsed, in-window subtrees whose starts fit the
-/// open group are consumed from cached counts.
+/// [lower, upper], keyed by start: a group starts at the first collapsed start and takes every
+/// collapsed duration starting less than the threshold after it. Same results as
+/// src/durations.ts durationSummaries and the PostgreSQL oc_duration_overview.
+///
+/// One statement: each group's anchor is the first collapsed start at or after the previous
+/// anchor plus the threshold, found by a range scan of the `first` index, so the cost follows
+/// the durations starting in [lower − threshold, upper] and the number of groups, not the
+/// timeline. (A collapsed duration intersecting the window starts after lower − threshold.)
 pub(crate) fn duration_summaries(
+    db: &Connection,
+    lower: &str,
+    upper: &str,
+    threshold: &str,
+) -> Result<Vec<DurationSummary>, String> {
+    if sign(db, "SELECT q_cmp(q(?1),q('0'))", &[threshold])? <= 0 {
+        return Ok(Vec::new());
+    }
+    let collapsed = "q_cmp(d.extent,q(?3))<0 AND q_cmp(d.last,q(?1))>=0 AND d.first<=q(?2)";
+    let rows = db.query(
+        &format!("WITH RECURSIVE anchors(a) AS (\
+           SELECT (SELECT d.first FROM duration_intervals d WHERE d.first>=q_sub(q(?1),q(?3)) AND {collapsed} ORDER BY d.first LIMIT 1) \
+           UNION ALL SELECT (SELECT d.first FROM duration_intervals d WHERE d.first>=q_add(a,q(?3)) AND {collapsed} ORDER BY d.first LIMIT 1) \
+           FROM anchors WHERE a IS NOT NULL), \
+         groups AS (SELECT a,count(*) AS cnt,max(d.last) AS last,min(d.ord) AS one FROM anchors \
+           JOIN duration_intervals d ON d.first>=a AND d.first<q_add(a,q(?3)) AND {collapsed} \
+           WHERE a IS NOT NULL GROUP BY a) \
+         SELECT q(g.a),q(g.last),g.cnt,{BAND_COLUMNS} FROM groups g \
+         LEFT JOIN duration_intervals d ON g.cnt=1 AND d.ord=g.one ORDER BY g.a COLLATE RATIONAL_V1"),
+        &[lower, upper, threshold],
+    )?;
+    rows.into_iter()
+        .map(|r| {
+            let count: u64 = r[2]
+                .as_deref()
+                .unwrap_or("0")
+                .parse()
+                .map_err(|_| "Invalid duration count")?;
+            Ok(DurationSummary {
+                first: r[0].clone().ok_or("Missing summary start")?,
+                last: r[1].clone().ok_or("Missing summary end")?,
+                count,
+                band: if count == 1 {
+                    Some(band_json(&r[3..])?)
+                } else {
+                    None
+                },
+            })
+        })
+        .collect()
+}
+/// The previous tree walk over duration_nodes, kept as a reference for the set-based query:
+/// fully collapsed, in-window subtrees whose starts fit the open group are consumed whole.
+#[cfg(test)]
+pub(crate) fn duration_summaries_walk(
     db: &Connection,
     lower: &str,
     upper: &str,

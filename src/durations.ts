@@ -293,6 +293,9 @@ export function durationSummaries(
   const stack: { node: IntervalNode; point: boolean }[] = root
     ? [{ node: root, point: false }]
     : [];
+  // A collapsed duration that reaches the window starts after lower − threshold, so
+  // subtrees starting no later than that hold nothing to summarize.
+  const earliest = lower.sub(threshold);
   while (stack.length) {
     const { node: n, point } = stack.pop()!;
     if (point) {
@@ -307,6 +310,7 @@ export function durationSummaries(
       continue;
     }
     if (n.max.compare(lower) < 0 || n.min.compare(upper) > 0) continue;
+    if (n.maxFirst.compare(earliest) <= 0) continue;
     if (n.minExtent.compare(threshold) >= 0) continue;
     // Every entry collapses and lies inside the window, so the subtree is one block if it fits.
     const whole =
