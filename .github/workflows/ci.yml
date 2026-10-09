@@ -199,6 +199,7 @@ jobs:
       - run: node test/views-postgres.mjs
       - run: node test/relationships-postgres.mjs
       - run: node test/incremental-postgres.mjs
+      - run: node test/summaries-equivalence-postgres.mjs
       - run: node test/stars-postgres.mjs
       - run: node test/follow-postgres.mjs
       - run: node test/administration-postgres.mjs

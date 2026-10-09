@@ -162,6 +162,7 @@ impl Snapshot {
             super::rebuild_edge_index(&saved)?;
             intervals::set_layout(&saved, &format!("rebuilt-{}", intervals::token()))?;
         }
+        super::create_start_index(&saved)?;
         snapshot.header()?;
         Ok(snapshot)
     }
@@ -2129,5 +2130,258 @@ mod incremental_tests {
             }
         }
         std::fs::remove_file(path).unwrap();
+    }
+}
+#[cfg(test)]
+mod summary_equivalence_tests {
+    //! The set-based duration summaries return exactly what the previous tree walk returned.
+    use super::*;
+    struct Random(u64);
+    impl Random {
+        fn below(&mut self, n: u64) -> u64 {
+            self.0 = self
+                .0
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (self.0 >> 33) % n.max(1)
+        }
+        fn int(&mut self, lo: i64, hi: i64) -> i64 {
+            lo + self.below((hi - lo + 1) as u64) as i64
+        }
+    }
+    /// Exact times on a coarse grid (so starts, ends and thresholds coincide often), some
+    /// negative, plus occasional rationals with huge components.
+    fn time(rng: &mut Random) -> String {
+        match rng.below(12) {
+            0 => format!(
+                "{}123456789012345678901234567/{}",
+                rng.int(1, 9),
+                rng.int(1, 7)
+            ),
+            _ => format!(
+                "{}/{}",
+                rng.int(-300, 3000),
+                [1, 2, 4, 8][rng.below(4) as usize]
+            ),
+        }
+    }
+    fn timeline(rng: &mut Random) -> Document {
+        let moments: Vec<Value> = (0..20 + rng.below(60))
+            .map(|i| json!({"id":format!("m{i:03}"),"time":time(rng),"metadata":{"title":format!("M{i}")}}))
+            .collect();
+        let durations: Vec<Value> = (0..30 + rng.below(150))
+            .map(|i| {
+                let anchor = format!("m{:03}", rng.below(moments.len() as u64));
+                let k = rng.int(-2400, 24000);
+                // Mostly short spans on the grid (some sharing starts or ending where others
+                // start), some long ones, and some anchored to moments or with huge times.
+                let (start, end) = match rng.below(10) {
+                    0..=5 => (
+                        json!(format!("{k}/8")),
+                        json!(format!("{}/8", k + rng.int(0, 120))),
+                    ),
+                    6 => (json!(format!("{k}/8")), json!(format!("{}/8", k + rng.int(800, 20000)))),
+                    7 => (json!({"moment": anchor}), json!(format!("{k}/8"))),
+                    8 => (json!(time(rng)), json!({"moment": anchor})),
+                    _ => (json!(time(rng)), json!(time(rng))),
+                };
+                json!({"id":format!("d{i:03}"),"start":start,"end":end,"metadata":{"title":format!("D{i}")}})
+            })
+            .collect();
+        serde_json::from_value(json!({
+            "format":"openchronology","version":1,"title":"Equivalence","description":"",
+            "events": moments, "durations": durations,
+        }))
+        .unwrap()
+    }
+    /// Compares both methods for one window; returns the number of groups.
+    fn compare(path: &Path, lower: &str, upper: &str, threshold: &str) -> usize {
+        let db = Connection::open(path, false).unwrap();
+        let new = super::super::duration_summaries(&db, lower, upper, threshold).unwrap();
+        let old = super::super::duration_summaries_walk(&db, lower, upper, threshold).unwrap();
+        let canonical = |t: &str| db.scalar("SELECT q(?)", &[t]).unwrap();
+        let view = |list: &[super::super::DurationSummary]| {
+            list.iter()
+                .map(|g| {
+                    (
+                        canonical(&g.first),
+                        canonical(&g.last),
+                        g.count,
+                        g.band.clone(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            view(&new),
+            view(&old),
+            "window {lower}..{upper} threshold {threshold}"
+        );
+        new.len()
+    }
+    /// Window bounds and thresholds drawn from the timeline's own times hit every boundary.
+    fn windows(rng: &mut Random, path: &Path) -> Vec<(String, String, String)> {
+        let db = Connection::open(path, false).unwrap();
+        let times: Vec<String> = db
+            .query(
+                "SELECT first FROM duration_intervals UNION SELECT last FROM duration_intervals",
+                &[],
+            )
+            .unwrap()
+            .into_iter()
+            .filter_map(|r| r[0].clone())
+            .collect();
+        let extents: Vec<String> = db
+            .query("SELECT extent FROM duration_intervals", &[])
+            .unwrap()
+            .into_iter()
+            .filter_map(|r| r[0].clone())
+            .collect();
+        let mut out = Vec::new();
+        for _ in 0..40 {
+            let pick = |rng: &mut Random, list: &[String]| {
+                list[rng.below(list.len() as u64) as usize].clone()
+            };
+            let (a, b) = if rng.below(2) == 0 {
+                (pick(rng, &times), pick(rng, &times))
+            } else {
+                (time(rng), time(rng))
+            };
+            let (lower, upper) = if db.scalar("SELECT q_cmp(q(?),q(?))", &[&a, &b]).unwrap() == "1"
+            {
+                (b, a)
+            } else {
+                (a, b)
+            };
+            let threshold = match rng.below(6) {
+                0 | 1 if !extents.is_empty() => pick(rng, &extents),
+                2 => format!("1/{}", rng.int(1, 64)),
+                3 => format!("{}", rng.int(1, 4000)),
+                _ => db
+                    .scalar(
+                        "SELECT q_div(q_sub(q(?),q(?)),q(?))",
+                        &[&upper, &lower, &rng.int(1, 64).to_string()],
+                    )
+                    .unwrap(),
+            };
+            out.push((lower, upper, threshold));
+        }
+        out.push((times[0].clone(), times[0].clone(), "1".into()));
+        out.push((
+            "-100000".into(),
+            "100000000000000000000000000000".into(),
+            "0".into(),
+        ));
+        out
+    }
+    /// Bands and arcs from the in-order walk are exactly the first 257 matches in (start, ID)
+    /// order, and, when not truncated, the same rows the previous recursive query returned.
+    #[test]
+    fn band_and_arc_windows_match_the_recursive_query() {
+        let mut rng = Random(257);
+        let (mut compared, mut truncated) = (0, 0);
+        for round in 0..6 {
+            // Dense timelines, so whole views exceed 257 bands and arcs.
+            let mut document = timeline(&mut rng);
+            for i in 0..300 + rng.below(500) {
+                let k = rng.int(-2400, 24000);
+                document.durations.push(serde_json::from_value(json!({"id":format!("x{i:03}"),"start":format!("{k}/8"),"end":format!("{}/8", k + rng.int(0, 30000)),"metadata":{"title":format!("X{i}")}})).unwrap());
+            }
+            let moments = document.events.len() as u64;
+            for _ in 0..200 + rng.below(400) {
+                let a = format!("m{:03}", rng.below(moments));
+                let b = format!("x{:03}", rng.below(300));
+                document.relationships.push(
+                    serde_json::from_value(json!({"a":{"moment":a},"b":{"duration":b}})).unwrap(),
+                );
+            }
+            let path = std::env::temp_dir().join(format!("och-windows-{}.och", intervals::token()));
+            super::super::save(&path, &document).unwrap();
+            let mut snapshot = Snapshot::open(&path).unwrap();
+            for step in 0..round * 4 {
+                let id = format!("x{:03}", rng.below(300));
+                let k = rng.int(-2400, 24000);
+                let patch: Patch = serde_json::from_value(json!({
+                    "settings": snapshot.header().unwrap().document,
+                    "changes": [], "durationChanges": [{"id": id, "duration": {"id": id, "start": format!("{k}/8"), "end": format!("{}/8", k + rng.int(0, 30000)), "metadata": {"title": format!("S{step}")}}}],
+                }))
+                .unwrap();
+                snapshot = snapshot.save_patch(&path, &patch).unwrap();
+            }
+            let db = Connection::open(snapshot.path(), false).unwrap();
+            for (lower, upper, threshold) in windows(&mut rng, snapshot.path()) {
+                for (intervals, nodes) in [
+                    ("duration_intervals", "duration_nodes"),
+                    ("edge_intervals", "edge_nodes"),
+                ] {
+                    let new = super::super::interval_window(
+                        &db, intervals, nodes, &lower, &upper, &threshold,
+                    )
+                    .unwrap();
+                    // Brute force: every matching interval in (start, ID) order.
+                    let all = db.query(&format!("SELECT {} FROM {intervals} d WHERE d.first<=q(?1) COLLATE RATIONAL_V1 AND d.last>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp(d.extent,q(?3))>=0) ORDER BY d.first COLLATE RATIONAL_V1,d.id LIMIT 257", super::super::BAND_COLUMNS), &[&upper, &lower, &threshold]).unwrap();
+                    assert_eq!(
+                        new, all,
+                        "{nodes} window {lower}..{upper} threshold {threshold}"
+                    );
+                    // Untruncated results are the same rows the previous query returned.
+                    let old = super::super::interval_window_query(
+                        &db, intervals, nodes, &lower, &upper, &threshold,
+                    )
+                    .unwrap();
+                    if old.len() < 257 {
+                        let (mut a, mut b) = (new.clone(), old.clone());
+                        a.sort();
+                        b.sort();
+                        assert_eq!(
+                            a, b,
+                            "{nodes} window {lower}..{upper} threshold {threshold}"
+                        );
+                    }
+                    truncated += usize::from(old.len() == 257);
+                    compared += 1;
+                }
+            }
+            std::fs::remove_file(path).unwrap();
+        }
+        assert_eq!(compared, 6 * 42 * 2);
+        assert!(
+            truncated > 20,
+            "truncated windows were compared ({truncated})"
+        );
+    }
+    #[test]
+    fn set_based_summaries_match_the_tree_walk() {
+        let mut rng = Random(35);
+        let (mut compared, mut groups) = (0, 0);
+        for round in 0..12 {
+            let document = timeline(&mut rng);
+            let path =
+                std::env::temp_dir().join(format!("och-summaries-{}.och", intervals::token()));
+            super::super::save(&path, &document).unwrap();
+            let mut snapshot = Snapshot::open(&path).unwrap();
+            // Later rounds reshape the trees with incremental saves first.
+            for step in 0..round * 3 {
+                let id = format!("d{:03}", rng.below(document.durations.len() as u64));
+                let duration = if rng.below(4) == 0 {
+                    Value::Null
+                } else {
+                    json!({"id":id,"start":time(&mut rng),"end":format!("{}/8", rng.int(-2400, 24000)),"metadata":{"title":format!("S{step}")}})
+                };
+                let patch: Patch = serde_json::from_value(json!({
+                    "settings": snapshot.header().unwrap().document,
+                    "changes": [], "durationChanges": [{"id": id, "duration": duration}],
+                }))
+                .unwrap();
+                snapshot = snapshot.save_patch(&path, &patch).unwrap();
+            }
+            for (lower, upper, threshold) in windows(&mut rng, snapshot.path()) {
+                groups += compare(snapshot.path(), &lower, &upper, &threshold);
+                compared += 1;
+            }
+            std::fs::remove_file(path).unwrap();
+        }
+        assert_eq!(compared, 12 * 42);
+        assert!(groups > 1000, "the windows produced summaries ({groups})");
     }
 }

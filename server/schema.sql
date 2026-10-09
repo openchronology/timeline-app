@@ -580,6 +580,8 @@ BEGIN
       CONTINUE;
     END IF;
     IF n.max_time<lo OR n.min_time>hi THEN CONTINUE; END IF;
+    -- A collapsed duration reaching the window starts after lo - threshold.
+    IF n.max_first<=lo-threshold THEN CONTINUE; END IF;
     -- No collapsed duration below. NULL summaries (pre-migration rows) fall through and descend.
     IF n.min_extent>=threshold THEN CONTINUE; END IF;
     base:=CASE WHEN anchor IS NOT NULL AND n.min_time-anchor<threshold THEN anchor ELSE n.min_time END;

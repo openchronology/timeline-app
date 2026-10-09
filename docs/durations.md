@@ -39,7 +39,7 @@ Earlier files stored a duration as a link in its starting moment's metadata (`{"
 
 ## Storage and queries
 
-Durations have a separate interval query, so a period crossing the viewport is visible even when both endpoints are outside the moment cache. The browser, PostgreSQL and SQLite build augmented balanced interval trees over exact rational bounds, resolving anchors to their moments' times. Database queries prune subtrees outside the viewport and return at most 256 bands, with an explicit notice when more match. Bands use three compact visual lanes; intersecting bands can overlap.
+Durations have a separate interval query, so a period crossing the viewport is visible even when both endpoints are outside the moment cache. The browser, PostgreSQL and SQLite build augmented balanced interval trees over exact rational bounds, resolving anchors to their moments' times. Database queries prune subtrees outside the viewport and return at most 256 bands, with an explicit notice when more match. Desktop files return bands and arcs in start order and stop at the 257th match. Bands use three compact visual lanes; intersecting bands can overlap.
 
 ## Summaries
 
@@ -50,7 +50,11 @@ A duration is drawn as a band only while its extent reaches the grouping distanc
 
 Groups report moments (`count`, `distinct`) and collapsed durations (`durationCount`) separately. A group holding exactly one collapsed duration and no moments carries that duration and is drawn as a small capsule marker; clicking it opens the duration. Other summaries list their moments and the durations that lie wholly inside them, 25 at a time. Zooming in shrinks the threshold until the duration becomes a band again.
 
-Each backend computes both steps with exact rationals and without enumerating dense clusters. The interval tree is ordered by start and caches, per subtree, the largest start, the entry count and the smallest and largest extents. A subtree whose durations all collapse and lie inside the window is consumed whole when its starts fit the open cluster; subtrees with no collapsed duration are skipped. PostgreSQL runs this in `oc_duration_overview`, SQLite in the native query, and the browser in `TimelineIndex.frame`. Randomized oracle tests check that PostgreSQL matches the browser and that SQLite and the browser match a brute-force reference.
+Each backend computes both steps with exact rationals and without enumerating dense clusters. The interval tree is ordered by start and caches, per subtree, the largest start, the entry count and the smallest and largest extents. A subtree whose durations all collapse and lie inside the window is consumed whole when its starts fit the open cluster. Subtrees with no collapsed duration are skipped, and so are subtrees whose durations all start at or before `left − threshold`, since a collapsed duration reaching the window starts after that. PostgreSQL runs this in `oc_duration_overview` and the browser in `TimelineIndex.frame`.
+
+SQLite computes the same summaries set-based instead, in one statement over an index on duration starts. Each cluster's anchor is the first collapsed start at or after the previous anchor plus the threshold. The cost follows the durations starting in `[left − threshold, right]` and the number of clusters, not the timeline.
+
+Randomized oracle tests check that PostgreSQL matches the browser, and that SQLite and the browser match a brute-force reference. Equivalence tests (`summary_equivalence_tests` in `native-store`, `test/summaries-equivalence.test.mjs` and `test/summaries-equivalence-postgres.mjs`) check that each optimized summary matches the previous traversal exactly.
 
 Server and desktop timelines query saved summaries; unsaved edits move collapsed durations between summaries locally. `npm run migrate` rebuilds duration indexes saved before these subtree summaries existed.
 
