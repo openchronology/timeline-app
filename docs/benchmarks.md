@@ -46,7 +46,7 @@ The [Benchmarks workflow](../.github/workflows/bench.yml) runs the suite on dema
 | Update a moment              | Saving one changed moment (restored between samples)                            |
 | Delete a moment              | Deleting one moment (re-created between samples)                                |
 
-Every backend performs the same operations with the same inputs. Writes are sparse patches, as the editor sends them. The cleanup between samples is excluded from the measurement. SQLite writes use `save_patch`, which copies the unchanged seed file and applies the patch, so each sample starts from the same file.
+Every backend performs the same operations with the same inputs. Writes are sparse patches, as the editor sends them. The cleanup between samples is excluded from the measurement. SQLite writes save to a working copy of the seed file with `save_patch`, as the desktop app saves the open file; each sample is undone by another save, unmeasured.
 
 ## Method
 
@@ -66,11 +66,11 @@ A local run (16 cores, Node 26, PostgreSQL 16 in Docker, `BENCH_TIME=1000`) meas
 | Viewport: 1% of the timeline      | 100,000 |              34 ms | 430 ms |      49 ms |
 | Read a page of 100 moments        | 100,000 |              91 µs | 619 µs |     3.6 ms |
 | Read one moment                   | 100,000 |              23 µs | 148 µs |     0.7 ms |
-| Create, update or delete a moment |   1,000 |             0.1 ms |  13 ms |     4.4 ms |
-|                                   |  10,000 |             0.1 ms | 105 ms |     5.0 ms |
-|                                   | 100,000 |             0.2 ms |  1.2 s |     4.6 ms |
+| Create, update or delete a moment |   1,000 |             0.1 ms | 2.1 ms |     4.4 ms |
+|                                   |  10,000 |             0.1 ms | 2.3 ms |     5.0 ms |
+|                                   | 100,000 |             0.2 ms | 2.6 ms |     4.6 ms |
 
 - **Reads scale well.** Pages and single moments stay flat from 1,000 to 100,000 moments on every backend. PostgreSQL's few milliseconds are mostly round trips.
 - **PostgreSQL saves are flat.** A sparse save updates only the changed rows and the tree paths they touch ([incremental saves](architecture.md#incremental-saves)), so a one-moment save costs the same at 1,000 and 100,000 moments. Before that change, every save rebuilt the timeline's derived data: 180 ms at 1,000 moments, 1.6 s at 10,000 and 18.5 s at 100,000. Once per 1,000 saves (or when patches outweigh the document), a save also writes a full snapshot for history, which takes about 2 s at 100,000 moments.
-- **SQLite saves still grow linearly**, about 0.012 ms per thousand moments, because the store stages a full copy of the file before applying the patch.
+- **SQLite saves are flat too.** They apply in place to the open file and its baseline (2.1 ms at 1,000 moments, 2.6 ms at 100,000). Previously, every save copied the whole file twice and rebuilt the duration and arc indexes: 13 ms at 1,000 moments, 105 ms at 10,000 and 1.2 s at 100,000. The benchmark saves to the opened file, as the desktop app does, and undoes each sample unmeasured.
 - **Viewports grow with the number of summaries drawn**, even in a 1% window. SQLite is the slowest at 100,000 moments. The in-memory index has large outliers there, likely garbage collection (mean 310 ms, median 49 ms). PostgreSQL viewports used to scan every timeline's interval rows at each tree level; they now read only the timeline's own nodes.

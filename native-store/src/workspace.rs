@@ -1,6 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 //! Disk-backed immutable editing baseline. Ordinary browsing never reads all events.
-use super::{check_file, header_document, validate, Connection, Document, Duration, Event};
+use super::{
+    check_file, header_document, intervals, validate, Connection, Document, Duration, Event,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -89,17 +91,19 @@ pub struct Query {
     #[serde(default)]
     pub entity: Option<Value>,
 }
+/// A private temporary directory, removed with the last snapshot that uses it.
+struct Directory(PathBuf);
+impl Drop for Directory {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
 pub struct Snapshot {
-    directory: PathBuf,
+    directory: std::sync::Arc<Directory>,
     path: PathBuf,
     query_gate: std::sync::Mutex<()>,
     /// Derived indexes for tag separations, built from this baseline on first use.
     views: std::sync::Mutex<Vec<(String, std::sync::Arc<Snapshot>)>>,
-}
-impl Drop for Snapshot {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.directory);
-    }
 }
 impl Snapshot {
     pub fn open(source: &Path) -> Result<Self, String> {
@@ -121,7 +125,7 @@ impl Snapshot {
         builder.create(&directory).map_err(|e| e.to_string())?;
         let snapshot = Self {
             path: directory.join("baseline.och"),
-            directory,
+            directory: std::sync::Arc::new(Directory(directory)),
             query_gate: std::sync::Mutex::new(()),
             views: std::sync::Mutex::new(Vec::new()),
         };
@@ -150,8 +154,14 @@ impl Snapshot {
             "CREATE INDEX IF NOT EXISTS events_time_id ON events(time COLLATE RATIONAL_V1,id)",
             &[],
         )?;
-        super::rebuild_duration_index(&saved)?;
-        super::rebuild_edge_index(&saved)?;
+        // Files saved with the current index layout open as exact copies, so later saves can
+        // apply the same changes to the file in place. Older files get rebuilt indexes and a
+        // token no file has; their first save writes the whole file.
+        if !current_layout(&saved)? {
+            super::rebuild_duration_index(&saved)?;
+            super::rebuild_edge_index(&saved)?;
+            intervals::set_layout(&saved, &format!("rebuilt-{}", intervals::token()))?;
+        }
         snapshot.header()?;
         Ok(snapshot)
     }
@@ -187,6 +197,10 @@ impl Snapshot {
     }
     pub fn path(&self) -> &Path {
         &self.path
+    }
+    #[cfg(test)]
+    fn directory(&self) -> &Path {
+        &self.directory.0
     }
     pub fn header(&self) -> Result<Header, String> {
         let document = header_document(&self.path)?;
@@ -452,6 +466,10 @@ impl Snapshot {
         }
         Ok(result)
     }
+    /// Saves sparse changes to `target` and returns the new baseline. When `target` holds
+    /// exactly this baseline's saved state (same index layout and save token), the changes
+    /// are applied to the file and then to the baseline in place, in time proportional to
+    /// the change; otherwise a changed copy of the baseline replaces the file.
     pub fn save_patch(&self, target: &Path, patch: &Patch) -> Result<Self, String> {
         let _gate = self.query_gate.lock().map_err(|e| e.to_string())?;
         validate(&patch.settings)?;
@@ -461,145 +479,27 @@ impl Snapshot {
         {
             return Err("Invalid sparse changes".into());
         }
+        let token = intervals::token();
+        let baseline = intervals::layout(&Connection::open(&self.path, false)?)?;
+        if let Some(destination) = matching_file(target, baseline.map(|(_, t)| t))? {
+            apply(&destination, patch, &token)?;
+            drop(destination);
+            let db = Connection::open(&self.path, true)?;
+            if apply(&db, patch, &token).is_err() {
+                // The file is saved; take a fresh baseline from it.
+                drop(db);
+                return Self::open(target);
+            }
+            return Ok(Self {
+                directory: self.directory.clone(),
+                path: self.path.clone(),
+                query_gate: std::sync::Mutex::new(()),
+                views: std::sync::Mutex::new(Vec::new()),
+            });
+        }
         let staged = Self::open(&self.path)?;
         let db = Connection::open(&staged.path, true)?;
-        db.execute("BEGIN IMMEDIATE", &[])?;
-        let result = (|| {
-            let schema = db.scalar("SELECT sql FROM sqlite_schema WHERE name='events'", &[])?;
-            if schema.to_lowercase().contains("json_valid") {
-                db.execute("CREATE TABLE _och_clean_events(id TEXT PRIMARY KEY,time TEXT NOT NULL COLLATE RATIONAL_V1 CHECK(q_is_canonical(time)=1),metadata TEXT NOT NULL) STRICT",&[])?;
-                db.execute(
-                    "INSERT INTO _och_clean_events SELECT id,q(time),metadata FROM events",
-                    &[],
-                )?;
-                db.execute("DROP TABLE events", &[])?;
-                db.execute("ALTER TABLE _och_clean_events RENAME TO events", &[])?;
-                db.execute(
-                    "CREATE INDEX events_time_id ON events(time COLLATE RATIONAL_V1,id)",
-                    &[],
-                )?;
-            }
-            let mut affected = std::collections::HashSet::new();
-            let mut ids = std::collections::HashSet::new();
-            // Saved times of deleted moments; durations that followed them keep these times.
-            let mut retired = Vec::new();
-            for change in patch.changes.iter().filter(|c| c.event.is_none()) {
-                if let Some(time) = db
-                    .query("SELECT time FROM events WHERE id=?", &[&change.id])?
-                    .first()
-                    .and_then(|r| r[0].clone())
-                {
-                    retired.push((change.id.clone(), time));
-                }
-            }
-            let mut durations = std::collections::HashSet::new();
-            for change in &patch.duration_changes {
-                if !durations.insert(&change.id) {
-                    return Err("Duplicate sparse duration change".into());
-                }
-                match &change.duration {
-                    Some(duration) => {
-                        if duration.id != change.id {
-                            return Err("Mismatched sparse duration id".into());
-                        }
-                        let mut doc = patch.settings.clone();
-                        doc.events = Vec::new();
-                        doc.durations = vec![Duration {
-                            // Anchors are checked against stored moments when the index rebuilds.
-                            start: anchorless(&duration.start),
-                            end: anchorless(&duration.end),
-                            ..duration.clone()
-                        }];
-                        validate(&doc)?;
-                        super::insert_duration(&db, duration)?;
-                    }
-                    None => db.execute("DELETE FROM durations WHERE id=?", &[&change.id])?,
-                }
-            }
-            for change in &patch.changes {
-                if !ids.insert(&change.id) {
-                    return Err("Duplicate sparse change".into());
-                }
-                if let Some(old) = db
-                    .query("SELECT time FROM events WHERE id=?", &[&change.id])?
-                    .first()
-                    .and_then(|r| r[0].clone())
-                {
-                    affected.insert(old);
-                }
-                if let Some(event) = &change.event {
-                    if event.id != change.id {
-                        return Err("Mismatched sparse event id".into());
-                    }
-                    let mut doc = patch.settings.clone();
-                    doc.events = vec![event.clone()];
-                    validate(&doc)?;
-                    let time = db.scalar("SELECT q(?)", &[&event.time])?;
-                    affected.insert(time.clone());
-                    db.execute("INSERT INTO events(id,time,metadata) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET time=excluded.time,metadata=excluded.metadata",&[&event.id,&time,&serde_json::to_string(&event.metadata).map_err(|e|e.to_string())?])?;
-                } else {
-                    db.execute("DELETE FROM events WHERE id=?", &[&change.id])?;
-                }
-            }
-            for (id, time) in &retired {
-                if db.scalar("SELECT count(*) FROM events WHERE id=?", &[id])? == "0" {
-                    db.execute("UPDATE durations SET start_time=?1,start_moment=NULL WHERE start_moment=?2", &[time, id])?;
-                    db.execute(
-                        "UPDATE durations SET end_time=?1,end_moment=NULL WHERE end_moment=?2",
-                        &[time, id],
-                    )?;
-                }
-            }
-            super::rebuild_duration_index(&db)?;
-            super::create_relationship_table(&db)?;
-            for change in &patch.relationship_changes {
-                let link = super::Relationship {
-                    a: change.a.clone(),
-                    b: change.b.clone(),
-                };
-                super::relate(&db, &link, change.related)?;
-            }
-            // Also removes links to deleted entities.
-            super::rebuild_edge_index(&db)?;
-            for time in affected {
-                db.execute("DELETE FROM points WHERE time=q(?)", &[&time])?;
-                db.execute("INSERT INTO points(time,value,weight) SELECT time,time,count(*) FROM events WHERE time=q(?) COLLATE RATIONAL_V1 GROUP BY time COLLATE RATIONAL_V1",&[&time])?;
-            }
-            for table in ["timeline_settings", "timeline_plugins", "timeline_extras"] {
-                db.execute(&format!("DROP TABLE IF EXISTS {table}"), &[])?;
-            }
-            db.execute(
-                "UPDATE timeline_meta SET title=?,description=? WHERE singleton=1",
-                &[&patch.settings.title, &patch.settings.description],
-            )?;
-            db.execute("CREATE TABLE IF NOT EXISTS timeline_settings(singleton INTEGER PRIMARY KEY CHECK(singleton=1),presentation TEXT NOT NULL)",&[])?;
-            db.execute("DELETE FROM timeline_settings", &[])?;
-            if let Some(value) = &patch.settings.presentation {
-                db.execute(
-                    "INSERT INTO timeline_settings VALUES(1,?)",
-                    &[&value.to_string()],
-                )?;
-            }
-            db.execute("CREATE TABLE IF NOT EXISTS timeline_plugins(singleton INTEGER PRIMARY KEY CHECK(singleton=1),plugins TEXT NOT NULL)",&[])?;
-            db.execute("DELETE FROM timeline_plugins", &[])?;
-            if let Some(value) = &patch.settings.plugins {
-                db.execute(
-                    "INSERT INTO timeline_plugins VALUES(1,?)",
-                    &[&value.to_string()],
-                )?;
-            }
-            db.execute("CREATE TABLE IF NOT EXISTS timeline_extras(singleton INTEGER PRIMARY KEY CHECK(singleton=1),extras TEXT NOT NULL)",&[])?;
-            db.execute("DELETE FROM timeline_extras", &[])?;
-            db.execute(
-                "INSERT INTO timeline_extras VALUES(1,?)",
-                &[&json!({"tags":patch.settings.tags,"assets":patch.settings.assets}).to_string()],
-            )?;
-            db.execute("COMMIT", &[])
-        })();
-        if result.is_err() {
-            let _ = db.execute("ROLLBACK", &[]);
-        }
-        result?;
+        apply(&db, patch, &token)?;
         let destination = Connection::open(target, true)?;
         let id = destination.scalar("PRAGMA application_id", &[])?;
         if id == super::APPLICATION_ID {
@@ -617,7 +517,322 @@ impl Snapshot {
         Ok(staged)
     }
 }
-
+/// Whether a file's interval indexes use the current layout.
+fn current_layout(db: &Connection) -> Result<bool, String> {
+    Ok(intervals::layout(db)?.is_some_and(|(version, _)| version == intervals::LAYOUT)
+        && db.scalar(
+            "SELECT count(*) FROM sqlite_schema WHERE name IN ('interval_roots','duration_nodes','edge_nodes','duration_intervals','edge_intervals') AND type='table'",
+            &[],
+        )? == "5")
+}
+/// The target, opened for writing, if it is a valid timeline holding the baseline's state.
+fn matching_file(target: &Path, token: Option<String>) -> Result<Option<Connection>, String> {
+    let Some(token) = token else { return Ok(None) };
+    if token.starts_with("rebuilt-") || !target.is_file() {
+        return Ok(None);
+    }
+    let db = Connection::open(target, true)?;
+    if db.scalar("PRAGMA application_id", &[])? != super::APPLICATION_ID
+        || check_file(&db).is_err()
+        || db.scalar("SELECT count(*) FROM sqlite_schema WHERE type='trigger'", &[])? != "0"
+        || db.scalar("SELECT count(*) FROM sqlite_schema WHERE name IN ('points_nodes','points_meta') AND type='table'", &[])? != "2"
+        || !current_layout(&db)?
+        || intervals::layout(&db)?.map(|(_, t)| t) != Some(token)
+    {
+        return Ok(None);
+    }
+    Ok(Some(db))
+}
+/// Applies sparse changes in one transaction, updating the moment index per changed time
+/// and the duration and arc trees per changed interval; nothing else is rebuilt.
+fn apply(db: &Connection, patch: &Patch, token: &str) -> Result<(), String> {
+    db.execute("BEGIN IMMEDIATE", &[])?;
+    let result = apply_changes(db, patch, token).and_then(|()| db.execute("COMMIT", &[]));
+    if result.is_err() {
+        let _ = db.execute("ROLLBACK", &[]);
+    }
+    result
+}
+fn apply_changes(db: &Connection, patch: &Patch, token: &str) -> Result<(), String> {
+    use std::collections::{BTreeMap, BTreeSet};
+    let schema = db.scalar("SELECT sql FROM sqlite_schema WHERE name='events'", &[])?;
+    if schema.to_lowercase().contains("json_valid") {
+        db.execute("CREATE TABLE _och_clean_events(id TEXT PRIMARY KEY,time TEXT NOT NULL COLLATE RATIONAL_V1 CHECK(q_is_canonical(time)=1),metadata TEXT NOT NULL) STRICT",&[])?;
+        db.execute(
+            "INSERT INTO _och_clean_events SELECT id,q(time),metadata FROM events",
+            &[],
+        )?;
+        db.execute("DROP TABLE events", &[])?;
+        db.execute("ALTER TABLE _och_clean_events RENAME TO events", &[])?;
+        db.execute(
+            "CREATE INDEX events_time_id ON events(time COLLATE RATIONAL_V1,id)",
+            &[],
+        )?;
+    }
+    let mut affected = BTreeSet::new();
+    let mut ids = std::collections::HashSet::new();
+    // Moments whose time changed or that were deleted: their durations and arcs move.
+    let mut moved = BTreeSet::new();
+    // Saved times of deleted moments; durations that followed them keep these times.
+    let mut retired = Vec::new();
+    for change in patch.changes.iter().filter(|c| c.event.is_none()) {
+        if let Some(time) = db
+            .query("SELECT time FROM events WHERE id=?", &[&change.id])?
+            .first()
+            .and_then(|r| r[0].clone())
+        {
+            retired.push((change.id.clone(), time));
+        }
+    }
+    let mut durations = BTreeSet::new();
+    for change in &patch.duration_changes {
+        if !durations.insert(change.id.clone()) {
+            return Err("Duplicate sparse duration change".into());
+        }
+        match &change.duration {
+            Some(duration) => {
+                if duration.id != change.id {
+                    return Err("Mismatched sparse duration id".into());
+                }
+                let mut doc = patch.settings.clone();
+                doc.events = Vec::new();
+                doc.durations = vec![Duration {
+                    // Anchors are checked against stored moments below.
+                    start: anchorless(&duration.start),
+                    end: anchorless(&duration.end),
+                    ..duration.clone()
+                }];
+                validate(&doc)?;
+                super::insert_duration(db, duration)?;
+            }
+            None => db.execute("DELETE FROM durations WHERE id=?", &[&change.id])?,
+        }
+    }
+    for change in &patch.changes {
+        if !ids.insert(&change.id) {
+            return Err("Duplicate sparse change".into());
+        }
+        let old = db
+            .query("SELECT time FROM events WHERE id=?", &[&change.id])?
+            .first()
+            .and_then(|r| r[0].clone());
+        if let Some(old) = &old {
+            affected.insert(old.clone());
+        }
+        if let Some(event) = &change.event {
+            if event.id != change.id {
+                return Err("Mismatched sparse event id".into());
+            }
+            let mut doc = patch.settings.clone();
+            doc.events = vec![event.clone()];
+            validate(&doc)?;
+            let time = db.scalar("SELECT q(?)", &[&event.time])?;
+            affected.insert(time.clone());
+            if old.as_ref().is_some_and(|old| *old != time) {
+                moved.insert(change.id.clone());
+            }
+            db.execute("INSERT INTO events(id,time,metadata) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET time=excluded.time,metadata=excluded.metadata",&[&event.id,&time,&serde_json::to_string(&event.metadata).map_err(|e|e.to_string())?])?;
+        } else {
+            if old.is_some() {
+                moved.insert(change.id.clone());
+            }
+            db.execute("DELETE FROM events WHERE id=?", &[&change.id])?;
+        }
+    }
+    // Durations to place again: changed ones and those anchored to moved moments.
+    for moment in &moved {
+        for row in db.query(
+            "SELECT id FROM durations WHERE start_moment=?1 UNION SELECT id FROM durations WHERE end_moment=?1",
+            &[moment],
+        )? {
+            durations.insert(row[0].clone().ok_or("Missing duration ID")?);
+        }
+    }
+    for (id, time) in &retired {
+        if db.scalar("SELECT count(*) FROM events WHERE id=?", &[id])? == "0" {
+            db.execute(
+                "UPDATE durations SET start_time=?1,start_moment=NULL WHERE start_moment=?2",
+                &[time, id],
+            )?;
+            db.execute(
+                "UPDATE durations SET end_time=?1,end_moment=NULL WHERE end_moment=?2",
+                &[time, id],
+            )?;
+        }
+    }
+    let mut tree = intervals::Tree::open(db, "duration_intervals", "duration_nodes")?;
+    // Durations whose start (where their arcs attach) moved, or that were deleted.
+    let mut moved_durations = BTreeSet::new();
+    for id in &durations {
+        let before = db
+            .query(
+                "SELECT start_time FROM duration_intervals WHERE id=?1",
+                &[id],
+            )?
+            .first()
+            .and_then(|r| r[0].clone());
+        tree.remove(id)?;
+        let rows = db.query("SELECT CASE WHEN d.start_moment IS NULL THEN json_quote(d.start_time) ELSE json_object('moment',d.start_moment) END,CASE WHEN d.end_moment IS NULL THEN json_quote(d.end_time) ELSE json_object('moment',d.end_moment) END,COALESCE(d.start_time,(SELECT e.time FROM events e WHERE e.id=d.start_moment)),COALESCE(d.end_time,(SELECT e.time FROM events e WHERE e.id=d.end_moment)),d.metadata FROM durations d WHERE d.id=?1", &[id])?;
+        let after = match rows.first() {
+            Some(r) => {
+                let (Some(start), Some(end)) = (&r[2], &r[3]) else {
+                    return Err("Duration anchors must name existing moments".into());
+                };
+                let text = |i: usize| r[i].clone().ok_or("Invalid stored duration");
+                tree.insert(&intervals::Interval {
+                    id,
+                    start_json: &text(0)?,
+                    end_json: &text(1)?,
+                    start,
+                    end,
+                    metadata: &text(4)?,
+                })?;
+                Some(db.scalar(
+                    "SELECT start_time FROM duration_intervals WHERE id=?1",
+                    &[id],
+                )?)
+            }
+            None => None,
+        };
+        if before.is_some() && before != after {
+            moved_durations.insert(id.clone());
+        }
+    }
+    if tree.size()? > 200000 {
+        return Err("Use at most 200000 durations per timeline".into());
+    }
+    tree.flush()?;
+    // Links: deleted entities lose theirs, then the patch's own changes (the last one wins).
+    super::create_relationship_table(db)?;
+    let key = |a: (&str, &str), b: (&str, &str)| {
+        let side =
+            |(k, i): (&str, &str)| format!("{}:{}", if k == "moment" { "m" } else { "d" }, i);
+        format!("{}~{}", side(a), side(b))
+    };
+    let mut touched = BTreeSet::new();
+    let removed = moved
+        .iter()
+        .map(|m| ("moment", m.clone()))
+        .chain(moved_durations.iter().map(|d| ("duration", d.clone())))
+        .collect::<Vec<_>>();
+    let mut placed = BTreeMap::new();
+    for (kind, id) in &removed {
+        let exists = if *kind == "moment" {
+            db.scalar("SELECT count(*) FROM events WHERE id=?1", &[id])? != "0"
+        } else {
+            db.scalar("SELECT count(*) FROM durations WHERE id=?1", &[id])? != "0"
+        };
+        let links = db.query(
+            "SELECT a_kind,a_id,b_kind,b_id FROM relationships WHERE a_kind=?1 AND a_id=?2 UNION SELECT a_kind,a_id,b_kind,b_id FROM relationships WHERE b_kind=?1 AND b_id=?2",
+            &[kind, id],
+        )?;
+        for r in links {
+            let text = |i: usize| r[i].clone().unwrap_or_default();
+            let (a, b) = ((text(0), text(1)), (text(2), text(3)));
+            let k = key((&a.0, &a.1), (&b.0, &b.1));
+            if !exists {
+                db.execute(
+                    "DELETE FROM relationships WHERE a_kind=? AND a_id=? AND b_kind=? AND b_id=?",
+                    &[&a.0, &a.1, &b.0, &b.1],
+                )?;
+            }
+            touched.insert(k.clone());
+            placed.insert(k, (a, b));
+        }
+    }
+    for change in &patch.relationship_changes {
+        let link = super::Relationship {
+            a: change.a.clone(),
+            b: change.b.clone(),
+        };
+        let (mut a, mut b) = (super::entity_ref(&link.a)?, super::entity_ref(&link.b)?);
+        if key(a, b) > key(b, a) {
+            std::mem::swap(&mut a, &mut b);
+        }
+        // Like a full rebuild, links to entities that do not exist are dropped.
+        let exists = |(k, i): (&str, &str)| -> Result<bool, String> {
+            Ok(db.scalar(
+                if k == "moment" {
+                    "SELECT count(*) FROM events WHERE id=?1"
+                } else {
+                    "SELECT count(*) FROM durations WHERE id=?1"
+                },
+                &[i],
+            )? != "0")
+        };
+        let related = change.related && exists(a)? && exists(b)?;
+        super::relate(db, &link, related)?;
+        let k = key(a, b);
+        touched.insert(k.clone());
+        placed.insert(k, ((a.0.into(), a.1.into()), (b.0.into(), b.1.into())));
+    }
+    // Arcs of touched links are removed and, for links that remain, placed again.
+    let mut edges = intervals::Tree::open(db, "edge_intervals", "edge_nodes")?;
+    for k in &touched {
+        edges.remove(k)?;
+        let ((ak, ai), (bk, bi)) = &placed[k];
+        if db.scalar(
+            "SELECT count(*) FROM relationships WHERE a_kind=? AND a_id=? AND b_kind=? AND b_id=?",
+            &[ak, ai, bk, bi],
+        )? == "0"
+        {
+            continue;
+        }
+        let place = |kind: &str, id: &str| {
+            db.scalar(
+                if kind == "moment" {
+                    "SELECT time FROM events WHERE id=?1"
+                } else {
+                    "SELECT start_time FROM duration_intervals WHERE id=?1"
+                },
+                &[id],
+            )
+        };
+        edges.insert(&intervals::Interval {
+            id: k,
+            start_json: "null",
+            end_json: "null",
+            start: &place(ak, ai)?,
+            end: &place(bk, bi)?,
+            metadata: "{}",
+        })?;
+    }
+    edges.flush()?;
+    for time in affected {
+        db.execute("DELETE FROM points WHERE time=q(?)", &[&time])?;
+        db.execute("INSERT INTO points(time,value,weight) SELECT time,time,count(*) FROM events WHERE time=q(?) COLLATE RATIONAL_V1 GROUP BY time COLLATE RATIONAL_V1",&[&time])?;
+    }
+    for table in ["timeline_settings", "timeline_plugins", "timeline_extras"] {
+        db.execute(&format!("DROP TABLE IF EXISTS {table}"), &[])?;
+    }
+    db.execute(
+        "UPDATE timeline_meta SET title=?,description=? WHERE singleton=1",
+        &[&patch.settings.title, &patch.settings.description],
+    )?;
+    db.execute("CREATE TABLE IF NOT EXISTS timeline_settings(singleton INTEGER PRIMARY KEY CHECK(singleton=1),presentation TEXT NOT NULL)",&[])?;
+    db.execute("DELETE FROM timeline_settings", &[])?;
+    if let Some(value) = &patch.settings.presentation {
+        db.execute(
+            "INSERT INTO timeline_settings VALUES(1,?)",
+            &[&value.to_string()],
+        )?;
+    }
+    db.execute("CREATE TABLE IF NOT EXISTS timeline_plugins(singleton INTEGER PRIMARY KEY CHECK(singleton=1),plugins TEXT NOT NULL)",&[])?;
+    db.execute("DELETE FROM timeline_plugins", &[])?;
+    if let Some(value) = &patch.settings.plugins {
+        db.execute(
+            "INSERT INTO timeline_plugins VALUES(1,?)",
+            &[&value.to_string()],
+        )?;
+    }
+    db.execute("CREATE TABLE IF NOT EXISTS timeline_extras(singleton INTEGER PRIMARY KEY CHECK(singleton=1),extras TEXT NOT NULL)",&[])?;
+    db.execute("DELETE FROM timeline_extras", &[])?;
+    db.execute(
+        "INSERT INTO timeline_extras VALUES(1,?)",
+        &[&json!({"tags":patch.settings.tags,"assets":patch.settings.assets}).to_string()],
+    )?;
+    intervals::set_layout(db, token)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -696,7 +911,7 @@ mod tests {
         next.after = Some(serde_json::from_value(page["next"].clone()).unwrap());
         let page2 = snapshot.query(&next).unwrap();
         assert_ne!(page["events"][0]["id"], page2["events"][0]["id"]);
-        let directory = snapshot.directory.clone();
+        let directory = snapshot.directory().to_path_buf();
         drop(snapshot);
         assert!(!directory.exists());
         std::fs::remove_file(path).unwrap();
@@ -730,7 +945,10 @@ mod tests {
         settings.plugins = Some(json!([{"script":"kept"}]));
         let patch:Patch=serde_json::from_value(json!({"settings":settings,"changes":[{"id":"a","event":{"id":"a","time":"2/3","metadata":{"title":"moved"}}},{"id":"b","event":null},{"id":"new","event":{"id":"new","time":"2/3","metadata":{}}}]})).unwrap();
         let updated = source.save_patch(&path, &patch).unwrap();
-        assert_eq!(source.header().unwrap().document.title, "Viewport test");
+        // The file was saved with the current layout, so the save applied in place: the new
+        // baseline is the same disk copy (the desktop app discards the old handle).
+        assert_eq!(updated.path(), source.path());
+        assert_eq!(updated.header().unwrap().document.title, "Changed");
         let saved = super::super::open(&path).unwrap();
         assert_eq!(saved.title, "Changed");
         assert_eq!(saved.events.len(), 3);
@@ -745,6 +963,7 @@ mod tests {
         let bad:Patch=serde_json::from_value(json!({"settings":settings,"changes":[{"id":"a","event":{"id":"a","time":"1/0","metadata":{}}}]})).unwrap();
         assert!(updated.save_patch(&path, &bad).is_err());
         assert_eq!(super::super::open(&path).unwrap(), saved);
+        assert_eq!(updated.document().unwrap(), saved);
         std::fs::remove_file(path).unwrap();
     }
     #[test]
@@ -799,7 +1018,7 @@ mod legacy_tests {
         let header = source.header().unwrap();
         assert!(header.document.events.is_empty());
         let patch:Patch=serde_json::from_value(json!({"settings":header.document,"changes":[{"id":"a","event":{"id":"a","time":"2/7","metadata":{"title":"edited"}}}]})).unwrap();
-        let target = baseline.directory.join("saved.och");
+        let target = baseline.directory().join("saved.och");
         let saved = source.save_patch(&target, &patch).unwrap();
         assert_eq!(saved.document().unwrap().events[0].time, "2/7");
         drop(saved);
@@ -941,7 +1160,7 @@ mod relationship_tests {
         );
         // Sparse saves add and remove links; deleting an entity removes its links.
         let settings = snapshot.header().unwrap().document;
-        let target = snapshot.directory.join("updated.och");
+        let target = snapshot.directory().join("updated.och");
         let patch: Patch = serde_json::from_value(json!({"settings":settings,"changes":[{"id":"b","event":null}],"relationshipChanges":[{"a":{"moment":"lone"},"b":{"moment":"c"},"related":true},{"a":{"duration":"x"},"b":{"moment":"a"},"related":false}]})).unwrap();
         let updated = snapshot.save_patch(&target, &patch).unwrap();
         let mut links: Vec<String> = updated
@@ -1307,7 +1526,7 @@ mod duration_tests {
         );
         let settings = snapshot.header().unwrap().document;
         let patch:Patch=serde_json::from_value(json!({"settings":settings,"changes":[{"id":"b","event":{"id":"b","time":"1/3","metadata":{}}}]})).unwrap();
-        let target = snapshot.directory.join("updated.och");
+        let target = snapshot.directory().join("updated.och");
         let moved = snapshot.save_patch(&target, &patch).unwrap();
         assert_eq!(moved.query(&query).unwrap()["durations"][0]["last"], "1/3");
         // Deleting a moment pins the duration at the moment's last saved time.
@@ -1342,7 +1561,7 @@ mod duration_tests {
         );
         assert_eq!(snapshot.document().unwrap().durations, doc.durations);
         let settings = snapshot.header().unwrap().document;
-        let target = snapshot.directory.join("updated.och");
+        let target = snapshot.directory().join("updated.och");
         let patch:Patch=serde_json::from_value(json!({"settings":settings,"changes":[],"durationChanges":[{"id":"fixed","duration":null},{"id":"new","duration":{"id":"new","start":"1/2","end":{"moment":"a"},"metadata":{"title":"New"}}}]})).unwrap();
         let updated = snapshot.save_patch(&target, &patch).unwrap();
         assert_eq!(
@@ -1489,4 +1708,426 @@ fn related(
         result["direct"] = json!(direct.parse::<u64>().unwrap_or(0));
     }
     Ok(result)
+}
+#[cfg(test)]
+mod incremental_tests {
+    //! Oracle: random sparse saves applied in place match a model of the document and a
+    //! rebuild of the saved document, and leave both interval trees valid AVL trees.
+    use super::*;
+    use std::collections::{BTreeMap, BTreeSet};
+    struct Random(u64);
+    impl Random {
+        fn next(&mut self) -> u64 {
+            self.0 = self
+                .0
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            self.0 >> 33
+        }
+        fn below(&mut self, n: usize) -> usize {
+            (self.next() % n as u64) as usize
+        }
+        fn time(&mut self) -> String {
+            format!("{}/{}", self.below(600), 1 + self.below(3))
+        }
+    }
+    fn link_key(r: &Value) -> String {
+        let side = |v: &Value| {
+            let (k, i) = super::super::entity_ref(v).unwrap();
+            format!("{}:{}", if k == "moment" { "m" } else { "d" }, i)
+        };
+        let (a, b) = (side(&r["a"]), side(&r["b"]));
+        if a < b {
+            format!("{a}~{b}")
+        } else {
+            format!("{b}~{a}")
+        }
+    }
+    /// A document independent of storage order.
+    fn normal(doc: &Document) -> Value {
+        let mut events = doc.events.clone();
+        events.sort_by(|a, b| a.id.cmp(&b.id));
+        let mut durations = doc.durations.clone();
+        durations.sort_by(|a, b| a.id.cmp(&b.id));
+        let links: BTreeSet<String> = doc
+            .relationships
+            .iter()
+            .map(|r| link_key(&serde_json::to_value(r).unwrap()))
+            .collect();
+        let canon = |db: &Connection, t: &str| db.scalar("SELECT q(?)", &[t]).unwrap();
+        let db = Connection::open(Path::new(":memory:"), true).unwrap();
+        let endpoint = |v: &Value| match v {
+            Value::String(t) => json!(canon(&db, t)),
+            other => other.clone(),
+        };
+        json!({
+            "title": doc.title,
+            "events": events.iter().map(|e| json!([e.id, canon(&db, &e.time), e.metadata])).collect::<Vec<_>>(),
+            "durations": durations.iter().map(|d| json!([d.id, endpoint(&d.start), endpoint(&d.end), d.metadata])).collect::<Vec<_>>(),
+            "links": links,
+        })
+    }
+    /// Recomputes every node from its children and checks balance, order and orphans.
+    fn check_tree(path: &Path, intervals: &str, nodes: &str) {
+        let db = Connection::open(path, false).unwrap();
+        let rows = db.query(&format!("SELECT n.id,n.left_id,n.right_id,n.height,d.id,d.first,d.last,d.extent,n.min_time,n.max_time,n.max_first,n.cnt,n.min_extent,n.max_extent FROM {nodes} n JOIN {intervals} d ON d.ord=n.id"), &[]).unwrap();
+        let count: usize = db
+            .scalar(&format!("SELECT count(*) FROM {nodes}"), &[])
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert_eq!(rows.len(), count, "{nodes} rows pair with intervals");
+        let byid: BTreeMap<String, Vec<Option<String>>> = rows
+            .into_iter()
+            .map(|r| (r[0].clone().unwrap(), r))
+            .collect();
+        let root = db
+            .query("SELECT root FROM interval_roots WHERE name=?", &[nodes])
+            .unwrap()
+            .first()
+            .and_then(|r| r[0].clone());
+        let cmp = |a: &str, b: &str| -> i32 {
+            db.scalar("SELECT q_cmp(q(?),q(?))", &[a, b])
+                .unwrap()
+                .parse()
+                .unwrap()
+        };
+        let same = |a: &str, b: &str| cmp(a, b) == 0;
+        struct Summary {
+            min: String,
+            max: String,
+            max_first: String,
+            cnt: usize,
+            min_extent: String,
+            max_extent: String,
+            height: usize,
+        }
+        let mut seen = 0;
+        let mut last: Option<(String, String)> = None;
+        fn walk(
+            id: Option<String>,
+            byid: &BTreeMap<String, Vec<Option<String>>>,
+            cmp: &dyn Fn(&str, &str) -> i32,
+            seen: &mut usize,
+            last: &mut Option<(String, String)>,
+        ) -> Option<Summary> {
+            let id = id?;
+            let r = &byid[&id];
+            *seen += 1;
+            let text = |i: usize| r[i].clone().unwrap();
+            let l = walk(r[1].clone(), byid, cmp, seen, last);
+            let key = (text(5), text(4));
+            if let Some((first, kid)) = last.as_ref() {
+                let c = cmp(first, &key.0);
+                assert!(c < 0 || (c == 0 && *kid < key.1), "interval order");
+            }
+            *last = Some(key);
+            let r2 = walk(r[2].clone(), byid, cmp, seen, last);
+            let pick = |a: String, b: Option<&String>, larger: bool| match b {
+                Some(b) if (cmp(b, &a) > 0) == larger && cmp(b, &a) != 0 => b.clone(),
+                _ => a,
+            };
+            let (lh, rh) = (
+                l.as_ref().map_or(0, |s| s.height),
+                r2.as_ref().map_or(0, |s| s.height),
+            );
+            assert!(lh.abs_diff(rh) <= 1, "AVL balance");
+            let max = pick(text(6), l.as_ref().map(|s| &s.max), true);
+            let s = Summary {
+                min: l.as_ref().map_or(text(5), |s| s.min.clone()),
+                max: pick(max, r2.as_ref().map(|s| &s.max), true),
+                max_first: r2.as_ref().map_or(text(5), |s| s.max_first.clone()),
+                cnt: 1 + l.as_ref().map_or(0, |s| s.cnt) + r2.as_ref().map_or(0, |s| s.cnt),
+                min_extent: pick(
+                    pick(text(7), l.as_ref().map(|s| &s.min_extent), false),
+                    r2.as_ref().map(|s| &s.min_extent),
+                    false,
+                ),
+                max_extent: pick(
+                    pick(text(7), l.as_ref().map(|s| &s.max_extent), true),
+                    r2.as_ref().map(|s| &s.max_extent),
+                    true,
+                ),
+                height: 1 + lh.max(rh),
+            };
+            assert_eq!(text(3).parse::<usize>().unwrap(), s.height, "height");
+            assert_eq!(text(11).parse::<usize>().unwrap(), s.cnt, "count");
+            for (stored, expected) in [
+                (text(8), &s.min),
+                (text(9), &s.max),
+                (text(10), &s.max_first),
+                (text(12), &s.min_extent),
+                (text(13), &s.max_extent),
+            ] {
+                assert_eq!(cmp(&stored, expected), 0, "summary");
+            }
+            Some(s)
+        }
+        walk(root, &byid, &cmp, &mut seen, &mut last);
+        assert_eq!(seen, count, "no orphaned {nodes}");
+        let _ = same;
+    }
+    /// What a reader sees, independent of the tree's shape.
+    fn observe(snapshot: &Snapshot) -> Vec<Value> {
+        let mut out = Vec::new();
+        for (lower, upper, threshold) in [
+            ("-10", "700", "0"),
+            ("-10", "700", "7"),
+            ("100", "300", "1"),
+            ("0", "600", "61"),
+        ] {
+            let mut r = snapshot
+                .query(&serde_json::from_value(json!({"kind":"overview","lower":lower,"upper":upper,"threshold":threshold})).unwrap())
+                .unwrap();
+            for list in ["durations", "edges"] {
+                if let Some(items) = r[list].as_array_mut() {
+                    items.sort_by_key(|v| v["id"].as_str().unwrap_or_default().to_string());
+                }
+            }
+            if let Some(o) = r.as_object_mut() {
+                o.remove("visitedNodes");
+            }
+            out.push(r);
+        }
+        for q in [
+            json!({"kind":"durations","lower":"-10","upper":"700","limit":500}),
+            json!({"kind":"events","lower":"50","upper":"450","limit":500}),
+            json!({"kind":"search","text":"note","page":1}),
+        ] {
+            out.push(snapshot.query(&serde_json::from_value(q).unwrap()).unwrap());
+        }
+        out
+    }
+    #[test]
+    fn random_sparse_saves_match_a_model_and_a_rebuild() {
+        let mut rng = Random(32);
+        let path = std::env::temp_dir().join(format!("och-incremental-{}.och", intervals::token()));
+        let mut events: BTreeMap<String, Event> = BTreeMap::new();
+        for i in 0..200 {
+            let t = rng.time();
+            events.insert(
+                format!("m{i}"),
+                Event {
+                    id: format!("m{i}"),
+                    time: t,
+                    metadata: serde_json::from_value(
+                        json!({"title": format!("Moment {i}"), "description": "A note"}),
+                    )
+                    .unwrap(),
+                },
+            );
+        }
+        let mut durations: BTreeMap<String, Duration> = BTreeMap::new();
+        for i in 0..30 {
+            let start = rng.time();
+            durations.insert(
+                format!("d{i}"),
+                Duration {
+                    id: format!("d{i}"),
+                    start: if i % 4 == 0 {
+                        json!({"moment": format!("m{i}")})
+                    } else {
+                        json!(start)
+                    },
+                    end: if i % 6 == 0 {
+                        json!({"moment": format!("m{}", i + 50)})
+                    } else {
+                        json!(format!("{}/1", 600 + i))
+                    },
+                    metadata: serde_json::from_value(json!({"title": format!("Span {i} note")}))
+                        .unwrap(),
+                },
+            );
+        }
+        let mut links: BTreeMap<String, Value> = BTreeMap::new();
+        for i in 0..40 {
+            let r = json!({"a":{"moment":format!("m{i}")},"b": if i % 3 == 0 { json!({"duration": format!("d{}", i % 30)}) } else { json!({"moment": format!("m{}", i + 100)}) }});
+            links.insert(link_key(&r), r);
+        }
+        let document = |events: &BTreeMap<String, Event>,
+                        durations: &BTreeMap<String, Duration>,
+                        links: &BTreeMap<String, Value>,
+                        title: &str|
+         -> Document {
+            serde_json::from_value(json!({
+                "format":"openchronology","version":1,"title":title,"description":"",
+                "events": events.values().collect::<Vec<_>>(),
+                "durations": durations.values().collect::<Vec<_>>(),
+                "relationships": links.values().collect::<Vec<_>>(),
+            }))
+            .unwrap()
+        };
+        super::super::save(&path, &document(&events, &durations, &links, "Incremental")).unwrap();
+        let mut baseline = Snapshot::open(&path).unwrap();
+        let mut title = "Incremental".to_string();
+        for step in 1..=80 {
+            let mut changes = Vec::new();
+            let mut duration_changes = Vec::new();
+            let mut link_changes = Vec::new();
+            let mut next_events = events.clone();
+            let mut next_durations = durations.clone();
+            let mut next_links = links.clone();
+            let mut touched = BTreeSet::new();
+            for i in 0..1 + rng.below(5) {
+                let ids: Vec<String> = next_events.keys().cloned().collect();
+                let pick = ids[rng.below(ids.len())].clone();
+                if touched.contains(&pick) {
+                    continue;
+                }
+                match rng.below(10) {
+                    0..=2 => {
+                        let mut e = next_events[&pick].clone();
+                        e.metadata
+                            .insert("title".into(), json!(format!("Renamed {step}.{i}")));
+                        touched.insert(pick.clone());
+                        changes.push(json!({"id":pick,"event":e}));
+                        next_events.insert(pick, e);
+                    }
+                    3..=4 => {
+                        let mut e = next_events[&pick].clone();
+                        e.time = if rng.below(3) == 0 {
+                            next_events[&ids[rng.below(ids.len())]].time.clone()
+                        } else {
+                            rng.time()
+                        };
+                        touched.insert(pick.clone());
+                        changes.push(json!({"id":pick,"event":e}));
+                        next_events.insert(pick, e);
+                    }
+                    5 => {
+                        // Durations following a deleted moment keep its last saved time.
+                        let last = events.get(&pick).map(|e| e.time.clone());
+                        touched.insert(pick.clone());
+                        changes.push(json!({"id":pick,"event":null}));
+                        next_events.remove(&pick);
+                        for d in next_durations.values_mut() {
+                            for side in [&mut d.start, &mut d.end] {
+                                if side["moment"] == json!(pick) {
+                                    *side = json!(last.clone().unwrap());
+                                }
+                            }
+                        }
+                    }
+                    6 => {
+                        let id = format!("n{step}x{i}");
+                        let e = Event {
+                            id: id.clone(),
+                            time: rng.time(),
+                            metadata: serde_json::from_value(json!({"title": format!("New {id}")}))
+                                .unwrap(),
+                        };
+                        touched.insert(id.clone());
+                        changes.push(json!({"id":id,"event":e}));
+                        next_events.insert(id, e);
+                    }
+                    7 => {
+                        let id = if rng.below(2) == 0 && !next_durations.is_empty() {
+                            next_durations
+                                .keys()
+                                .nth(rng.below(next_durations.len()))
+                                .unwrap()
+                                .clone()
+                        } else {
+                            format!("d{step}x{i}")
+                        };
+                        let anchors: Vec<String> = next_events.keys().cloned().collect();
+                        let start = if rng.below(3) == 0 {
+                            json!({"moment": anchors[rng.below(anchors.len())]})
+                        } else {
+                            json!(rng.time())
+                        };
+                        let d = Duration {
+                            id: id.clone(),
+                            start,
+                            end: json!(format!("{}/1", 600 + rng.below(90))),
+                            metadata: serde_json::from_value(
+                                json!({"title": format!("Span {id} note")}),
+                            )
+                            .unwrap(),
+                        };
+                        duration_changes.retain(|c: &Value| c["id"] != json!(id));
+                        duration_changes.push(json!({"id":id,"duration":d}));
+                        next_durations.insert(id, d);
+                    }
+                    8 if !next_durations.is_empty() => {
+                        let id = next_durations
+                            .keys()
+                            .nth(rng.below(next_durations.len()))
+                            .unwrap()
+                            .clone();
+                        duration_changes.retain(|c: &Value| c["id"] != json!(id));
+                        duration_changes.push(json!({"id":id,"duration":null}));
+                        next_durations.remove(&id);
+                    }
+                    _ => {
+                        let mut entities: Vec<Value> =
+                            next_events.keys().map(|m| json!({"moment": m})).collect();
+                        entities.extend(next_durations.keys().map(|d| json!({"duration": d})));
+                        let (a, b) = (
+                            entities[rng.below(entities.len())].clone(),
+                            entities[rng.below(entities.len())].clone(),
+                        );
+                        if a != b {
+                            let r = json!({"a":a,"b":b});
+                            let related =
+                                !(rng.below(3) == 0 && next_links.contains_key(&link_key(&r)));
+                            link_changes.push(json!({"a":a,"b":b,"related":related}));
+                            if related {
+                                next_links.insert(link_key(&r), r);
+                            } else {
+                                next_links.remove(&link_key(&r));
+                            }
+                        }
+                    }
+                }
+            }
+            // Deleting an entity removes its links.
+            next_links.retain(|_, r| {
+                [&r["a"], &r["b"]]
+                    .iter()
+                    .all(|v| match (v.get("moment"), v.get("duration")) {
+                        (Some(m), _) => next_events.contains_key(m.as_str().unwrap()),
+                        (_, Some(d)) => next_durations.contains_key(d.as_str().unwrap()),
+                        _ => false,
+                    })
+            });
+            if step % 7 == 3 {
+                title = format!("Incremental {step}");
+            }
+            let mut settings =
+                document(&BTreeMap::new(), &BTreeMap::new(), &BTreeMap::new(), &title);
+            settings.durations.clear();
+            let patch: Patch = serde_json::from_value(json!({"settings":settings,"changes":changes,"durationChanges":duration_changes,"relationshipChanges":link_changes})).unwrap();
+            let before = baseline.path().to_path_buf();
+            baseline = baseline.save_patch(&path, &patch).unwrap();
+            assert_eq!(baseline.path(), before, "saved in place at step {step}");
+            events = next_events;
+            durations = next_durations;
+            links = next_links;
+            let expected = document(&events, &durations, &links, &title);
+            let saved = super::super::open(&path).unwrap();
+            assert_eq!(normal(&saved), normal(&expected), "file after step {step}");
+            assert_eq!(
+                normal(&baseline.document().unwrap()),
+                normal(&expected),
+                "baseline after step {step}"
+            );
+            if step % 10 == 0 {
+                for (intervals, nodes) in [
+                    ("duration_intervals", "duration_nodes"),
+                    ("edge_intervals", "edge_nodes"),
+                ] {
+                    check_tree(&path, intervals, nodes);
+                    check_tree(baseline.path(), intervals, nodes);
+                }
+                let rebuilt = Snapshot::from_document(&saved).unwrap();
+                assert_eq!(
+                    observe(&baseline),
+                    observe(&rebuilt),
+                    "queries after step {step}"
+                );
+            }
+        }
+        std::fs::remove_file(path).unwrap();
+    }
 }
