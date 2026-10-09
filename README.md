@@ -89,7 +89,7 @@ npm start
 
 The migration account needs permission to install pgmp and create objects. A production runtime account needs CRUD access to the `oc_*` tables and sequence-free IDs; it does not need to install extensions. The supplied Compose configuration uses one database account for a straightforward initial deployment.
 
-Saving uses an atomic snapshot replacement with revision checks. Conflicting saves return HTTP 409 instead of silently overwriting another editor. This version permits 200,000 events per document and 16 MiB per HTTP request. Viewer queries only fetch the visible summaries and bounded event pages. An editor currently downloads the full document and rebuilds its browser map; saves rebuild the balanced database index. Incremental editing and streaming very large imports are future work.
+Saving uses an atomic snapshot replacement with revision checks. Conflicting saves return HTTP 409 instead of silently overwriting another editor. This version permits 200,000 events per document and 16 MiB per HTTP request. Viewer queries only fetch the visible summaries and bounded event pages. An editor currently downloads the full document and rebuilds its browser map. Sparse saves update the database index in place, at a cost that grows with the logarithm of the timeline's size ([incremental saves](docs/architecture.md#incremental-saves)). Streaming very large imports is future work.
 
 ## Offline desktop and SQLite files
 

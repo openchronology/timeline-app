@@ -85,10 +85,15 @@ const owner = randomUUID(),
     `INSERT INTO oc_users(id,username,password_hash) VALUES(${value(owner)},'sql-oracle','unused');`,
     `INSERT INTO oc_timelines(id,owner_id,title,root,event_count,presentation,plugins) VALUES(${value(id)},${value(owner)},'Oracle',${tree.root},${tree.count},${value(JSON.stringify(document.presentation))}::jsonb,${value(JSON.stringify(document.plugins))}::jsonb);`,
   ];
-for (const n of tree.nodes)
-  sql.push(
-    `INSERT INTO oc_nodes VALUES(${[id, n.id, n.time, n.first, n.last, n.left, n.right, n.firstId, n.bucketCount, n.count, n.distinct, JSON.stringify(n.events)].map(value).join(',')});`,
-  );
+// Tree nodes name their moments, which live in their own rows.
+const nodeRow = (timeline, n) =>
+  `(${[timeline, n.id, n.time, n.first, n.last, n.left, n.right, n.firstId, n.bucketCount, n.count, n.distinct, null].map(value).join(',')},ARRAY[${n.ids.map(value).join(',')}]::text[],${n.height})`;
+const momentRows = (timeline, list) =>
+  list
+    .map((e) => `(${[timeline, e.id, e.time, JSON.stringify(e)].map(value).join(',')})`)
+    .join(',');
+for (const n of tree.nodes) sql.push(`INSERT INTO oc_nodes VALUES ${nodeRow(id, n)};`);
+sql.push(`INSERT INTO oc_moments VALUES ${momentRows(id, document.events)};`);
 sql.push('CREATE TEMP TABLE oracle_results(id integer,answer jsonb);');
 const trials = [];
 for (let i = 0; i < 80; i++)
@@ -138,30 +143,11 @@ for (let start = 0; start < dense.nodes.length; start += 250)
     'INSERT INTO oc_nodes VALUES ' +
       dense.nodes
         .slice(start, start + 250)
-        .map(
-          (n) =>
-            '(' +
-            [
-              denseId,
-              n.id,
-              n.time,
-              n.first,
-              n.last,
-              n.left,
-              n.right,
-              n.firstId,
-              n.bucketCount,
-              n.count,
-              n.distinct,
-              JSON.stringify(n.events),
-            ]
-              .map(value)
-              .join(',') +
-            ')',
-        )
+        .map((n) => nodeRow(denseId, n))
         .join(',') +
       ';',
   );
+sql.push(`INSERT INTO oc_moments VALUES ${momentRows(denseId, denseDoc.events)};`);
 const community = validatePluginManifest({
   ...PLUGIN_EXAMPLE,
   id: 'u-' + owner.replaceAll('-', '') + '-status-symbols',

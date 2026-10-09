@@ -14,6 +14,6 @@ Indexed (server and desktop) timelines search the saved version. Unsaved edits r
 
 ## Storage and API
 
-PostgreSQL keeps one `oc_entity_search` row per moment and duration with a stored, weighted `tsvector`. Rows are rebuilt with the rational index on every save, and `npm run migrate` builds them once for existing timelines (`oc_timelines.search_version`). Queries are scoped to one timeline through the table's primary key.
+PostgreSQL keeps one `oc_entity_search` row per moment and duration with a stored, weighted `tsvector`. Sparse saves update the rows of changed entities; whole-document saves rebuild them with the rational index, and `npm run migrate` builds them once for existing timelines (`oc_timelines.search_version`). Queries are scoped to one timeline through the table's primary key.
 
 `POST /api/timelines/:id/query` accepts `{"kind": "search", "text": "harbor", "page": 1}` (at most 200 characters; pages 1–4,000) and returns `{results: [{kind, id, first, last, title, snippet}], total, page}`. The desktop uses the same request through its native query. Search terms are lowercased words of letters and digits (at most eight), so punctuation and query operators are never interpreted as syntax.

@@ -60,16 +60,17 @@ A local run (16 cores, Node 26, PostgreSQL 16 in Docker, `BENCH_TIME=1000`) meas
 
 | Operation                         |    Size |          In-memory | SQLite | PostgreSQL |
 | --------------------------------- | ------: | -----------------: | -----: | ---------: |
-| Viewport: whole timeline          |   1,000 |             3.5 ms |  16 ms |      61 ms |
-|                                   |  10,000 |              14 ms | 105 ms |      95 ms |
-|                                   | 100,000 | 283 ms (p50 47 ms) | 922 ms |     331 ms |
-| Viewport: 1% of the timeline      | 100,000 |              30 ms | 427 ms |     252 ms |
-| Read a page of 100 moments        | 100,000 |              87 µs | 616 µs |     7.6 ms |
-| Read one moment                   | 100,000 |              14 µs | 150 µs |     5.4 ms |
-| Create, update or delete a moment |   1,000 |             0.1 ms |  12 ms |     180 ms |
-|                                   |  10,000 |             0.1 ms |  97 ms |      1.6 s |
-|                                   | 100,000 |             0.2 ms |  1.2 s |     18.5 s |
+| Viewport: whole timeline          |   1,000 |             3.1 ms |  16 ms |     7.0 ms |
+|                                   |  10,000 |              12 ms | 106 ms |      21 ms |
+|                                   | 100,000 | 310 ms (p50 49 ms) | 945 ms |      99 ms |
+| Viewport: 1% of the timeline      | 100,000 |              34 ms | 430 ms |      49 ms |
+| Read a page of 100 moments        | 100,000 |              91 µs | 619 µs |     3.6 ms |
+| Read one moment                   | 100,000 |              23 µs | 148 µs |     0.7 ms |
+| Create, update or delete a moment |   1,000 |             0.1 ms |  13 ms |     4.4 ms |
+|                                   |  10,000 |             0.1 ms | 105 ms |     5.0 ms |
+|                                   | 100,000 |             0.2 ms |  1.2 s |     4.6 ms |
 
-- **Reads scale well.** Pages and single moments stay flat from 1,000 to 100,000 moments on every backend; PostgreSQL's few milliseconds are mostly round trips.
-- **Saves grow linearly on both persistent backends.** A one-moment save costs about 0.18 ms per thousand moments on PostgreSQL and 0.012 ms per thousand on SQLite, so the slope is 1 on the log-log charts. PostgreSQL rebuilds the timeline's derived data (index, snapshot, search and arcs) on every save. SQLite stages a full copy of the file before applying the patch. Saves that touch only the changed rows would make both flat. Until then, timelines of 100,000 moments save too slowly for interactive editing on the server.
-- **Viewports grow too, even in a 1% window.** SQLite is the slowest at 100,000 moments, and the in-memory index has large outliers there, likely garbage collection (mean 283 ms, median 47 ms).
+- **Reads scale well.** Pages and single moments stay flat from 1,000 to 100,000 moments on every backend. PostgreSQL's few milliseconds are mostly round trips.
+- **PostgreSQL saves are flat.** A sparse save updates only the changed rows and the tree paths they touch ([incremental saves](architecture.md#incremental-saves)), so a one-moment save costs the same at 1,000 and 100,000 moments. Before that change, every save rebuilt the timeline's derived data: 180 ms at 1,000 moments, 1.6 s at 10,000 and 18.5 s at 100,000. Once per 1,000 saves (or when patches outweigh the document), a save also writes a full snapshot for history, which takes about 2 s at 100,000 moments.
+- **SQLite saves still grow linearly**, about 0.012 ms per thousand moments, because the store stages a full copy of the file before applying the patch.
+- **Viewports grow with the number of summaries drawn**, even in a 1% window. SQLite is the slowest at 100,000 moments. The in-memory index has large outliers there, likely garbage collection (mean 310 ms, median 49 ms). PostgreSQL viewports used to scan every timeline's interval rows at each tree level; they now read only the timeline's own nodes.

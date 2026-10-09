@@ -25,9 +25,9 @@ export class BrowserForks {
         // Read only counters, ACL and precomputed size; never decompress a large
         // document to decide whether it is safe to copy.
         const { rows } = await client.query(
-          `SELECT t.id,t.comparison,t.revision,t.head_revision_id,t.event_count,r.snapshot_id,s.document_bytes
+          `SELECT t.id,t.comparison,t.revision,t.head_revision_id,t.event_count,coalesce(r.document_bytes,s.document_bytes) AS document_bytes
            FROM oc_timelines t JOIN oc_revisions r ON r.id=t.head_revision_id
-           JOIN oc_snapshots s ON s.id=r.snapshot_id
+           LEFT JOIN oc_snapshots s ON s.id=r.snapshot_id
            WHERE t.id=$1 AND t.visibility='public'`,
           [id],
         );
@@ -50,10 +50,7 @@ export class BrowserForks {
           BigInt(timeline.document_bytes) > BigInt(BROWSER_FORK_LIMITS.bytes - 8192)
         )
           throw tooLarge();
-        const snapshot = await client.query('SELECT document FROM oc_snapshots WHERE id=$1', [
-          timeline.snapshot_id,
-        ]);
-        const document = snapshot.rows[0]?.document;
+        const document = await this.store.revisionDocument(client, timeline.head_revision_id);
         if (!document || browserEntryCount(document) > BROWSER_FORK_LIMITS.events) throw tooLarge();
         const result = {
           document,

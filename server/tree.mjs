@@ -1,6 +1,9 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { TimelineIndex } from '../dist/core.mjs';
-/** Build one immutable balanced tree for a revision. Saves are atomic snapshot replacements. */
+/**
+ * Builds a perfectly balanced moment tree, which is also a valid AVL tree: incremental saves
+ * (server/avl.mjs) continue from it. Node IDs are in-order positions only initially.
+ */
 export function indexedNodes(document) {
   const index = new TimelineIndex(document),
     entries = [...index.points],
@@ -22,6 +25,8 @@ export function indexedNodes(document) {
         bucketCount: bucket.length,
         count: (left?.count ?? 0) + bucket.length + (right?.count ?? 0),
         distinct: (left?.distinct ?? 0) + 1 + (right?.distinct ?? 0),
+        height: 1 + Math.max(left?.height ?? 0, right?.height ?? 0),
+        ids: bucket.map((e) => e.id),
         events: bucket,
       };
     nodes.push(n);
