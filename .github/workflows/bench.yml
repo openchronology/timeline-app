@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
     inputs:
       sizes:
-        description: Timeline sizes (moments), comma separated
-        default: 1000,10000,50000
+        description: Timeline sizes in moments (1 to 200000), separated by commas or spaces
+        default: '1000,10000,50000'
       time:
         description: Measurement time per operation and size (ms)
         default: '1000'

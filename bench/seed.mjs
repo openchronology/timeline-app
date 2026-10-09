@@ -10,11 +10,18 @@ import { Viewport, Q } from '../dist/core.mjs';
 
 const exec = promisify(execFile);
 export const DATA = resolve(process.env.BENCH_DATA_DIR ?? 'bench/data');
+/** Timeline sizes from BENCH_SIZES, separated by commas or spaces. */
 export function sizes() {
-  return (process.env.BENCH_SIZES ?? DEFAULT_SIZES.join(','))
-    .split(',')
-    .map((n) => Number(n.trim()))
-    .filter((n) => Number.isInteger(n) && n > 0);
+  const list = (process.env.BENCH_SIZES || DEFAULT_SIZES.join(','))
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .map(Number);
+  // Documents hold at most 200,000 moments.
+  if (!list.length || list.some((n) => !Number.isInteger(n) || n < 1 || n > 200000))
+    throw new Error(
+      `BENCH_SIZES must list sizes from 1 to 200,000 moments, e.g. 1000,10000; got "${process.env.BENCH_SIZES}".`,
+    );
+  return list;
 }
 const exists = (path) =>
   access(path).then(

@@ -18,7 +18,7 @@ npm run bench:report   # rebuild the report from existing results
 
 | Variable             | Default                    | Meaning                                                           |
 | -------------------- | -------------------------- | ----------------------------------------------------------------- |
-| `BENCH_SIZES`        | `1000,10000,100000,200000` | Timeline sizes, in moments                                        |
+| `BENCH_SIZES`        | `1000,10000,100000,200000` | Sizes in moments (up to 200,000), separated by commas or spaces   |
 | `BENCH_TIME`         | `1000`                     | Measurement time per operation and size, in milliseconds          |
 | `BENCH_DATABASE_URL` | unset                      | PostgreSQL database with `pgmp`; without it PostgreSQL is skipped |
 | `BENCH_DATA_DIR`     | `bench/data`               | Seeds; relative paths resolve from the repository root            |
