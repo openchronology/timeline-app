@@ -181,9 +181,16 @@ imports over 2,048 moments are also staged after their initial JavaScript import
 Saving a local indexed timeline sends settings plus sparse additions, edits and
 deletions, never cached summaries as if they were all the events. Native SQLite
 updates affected coordinate weights and preserves every untouched hidden event.
-Settings include time-display scripts, custom plugins, tags, and assets. Work is
-prepared in a separate disk baseline and the destination is replaced through a
-transactional SQLite backup, so invalid patches leave the original untouched.
+Settings include time-display scripts, custom plugins, tags, and assets. Duration and
+arc indexes are AVL interval trees with stable node IDs (`native-store/src/intervals.rs`),
+so a save rewrites only the nodes on the changed intervals' paths; durations anchored to
+a moved moment and arcs of moved entities are placed again. Each file records its index
+layout and a save token. When the destination holds exactly the open baseline's saved
+state (same token), the changes apply to the file in one SQLite transaction and then to
+the baseline, in time proportional to the change. Otherwise (the first save of a file
+from an older version, or Save As) a patched copy of the baseline replaces the
+destination through a transactional SQLite backup. Either way, invalid patches leave the
+original untouched.
 Save As preserves the original file. Generation checks reject stale commands;
 file and WAL modification stamps detect external changes and require Save As.
 As with other file editors, avoid simultaneous editing by another application.
@@ -191,9 +198,9 @@ As with other file editors, avoid simultaneous editing by another application.
 Successful saves rebase edits made while saving and evict clean inspector reads.
 Exporting full JSON or initially publishing a local file to the server remains an
 explicit full-document operation and can temporarily consume more memory; normal
-local saves, browsing, grouping and inspector pagination do not. Preparing and
-copying disk baselines costs disk space and file-size-proportional I/O during open
-and save, traded for bounded UI data and atomic file persistence. Existing JSON
+local saves, browsing, grouping and inspector pagination do not. Preparing a
+disk baseline costs disk space and file-size-proportional I/O when a file opens (and on
+a copying save), traded for bounded UI data and atomic file persistence. Existing JSON
 export/document size limits still apply.
 
 Gregorian presentation uses historical BCE/CE year numbering (1 BCE is astronomical

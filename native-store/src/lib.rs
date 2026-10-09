@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+mod intervals;
 mod sqlite;
 mod workspace;
 use serde::{Deserialize, Serialize};
@@ -333,6 +334,7 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
             relate(&db, r, true)?;
         }
         rebuild_edge_index(&db)?;
+        intervals::set_layout(&db, &intervals::token())?;
         db.execute("PRAGMA application_id=1329812556", &[])?;
         db.execute("PRAGMA user_version=1", &[])?;
         db.execute("COMMIT", &[])
@@ -488,7 +490,16 @@ fn read_document(path: &Path, include_events: bool) -> Result<Document, String> 
 }
 fn create_duration_table(db: &Connection) -> Result<(), String> {
     // Exactly one of time/moment per endpoint; fixed times are canonical exact rationals.
-    db.execute("CREATE TABLE IF NOT EXISTS durations(id TEXT PRIMARY KEY,start_time TEXT COLLATE RATIONAL_V1 CHECK(start_time IS NULL OR q_is_canonical(start_time)=1),start_moment TEXT,end_time TEXT COLLATE RATIONAL_V1 CHECK(end_time IS NULL OR q_is_canonical(end_time)=1),end_moment TEXT,metadata TEXT NOT NULL,CHECK((start_time IS NULL)<>(start_moment IS NULL)),CHECK((end_time IS NULL)<>(end_moment IS NULL))) STRICT", &[])
+    db.execute("CREATE TABLE IF NOT EXISTS durations(id TEXT PRIMARY KEY,start_time TEXT COLLATE RATIONAL_V1 CHECK(start_time IS NULL OR q_is_canonical(start_time)=1),start_moment TEXT,end_time TEXT COLLATE RATIONAL_V1 CHECK(end_time IS NULL OR q_is_canonical(end_time)=1),end_moment TEXT,metadata TEXT NOT NULL,CHECK((start_time IS NULL)<>(start_moment IS NULL)),CHECK((end_time IS NULL)<>(end_moment IS NULL))) STRICT", &[])?;
+    // Durations anchored to a moment move with it.
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS durations_start_moment ON durations(start_moment)",
+        &[],
+    )?;
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS durations_end_moment ON durations(end_moment)",
+        &[],
+    )
 }
 pub(crate) fn insert_duration(db: &Connection, d: &Duration) -> Result<(), String> {
     let (start_time, start_moment) = endpoint(&d.start)?;
@@ -953,6 +964,7 @@ mod tests {
 /// Rebuild the interval index entirely in SQLite; anchored endpoints resolve to moment times.
 fn rebuild_duration_index(db: &Connection) -> Result<(), String> {
     migrate_durations(db)?;
+    create_duration_table(db)?;
     db.execute("DROP TABLE IF EXISTS duration_nodes", &[])?;
     db.execute("DROP TABLE IF EXISTS duration_intervals", &[])?;
     db.execute("CREATE TABLE duration_intervals(ord INTEGER PRIMARY KEY,id TEXT NOT NULL UNIQUE,start_json TEXT NOT NULL,end_json TEXT NOT NULL,start_time TEXT NOT NULL COLLATE RATIONAL_V1,end_time TEXT NOT NULL COLLATE RATIONAL_V1,first TEXT NOT NULL COLLATE RATIONAL_V1,last TEXT NOT NULL COLLATE RATIONAL_V1,metadata TEXT NOT NULL,extent TEXT COLLATE RATIONAL_V1)", &[])?;
@@ -974,20 +986,28 @@ fn rebuild_duration_index(db: &Connection) -> Result<(), String> {
     }
     build_interval_nodes(db, "duration_intervals", "duration_nodes")
 }
-/// Balanced augmented nodes over an intervals table ordered by `ord`. Subtree summaries
+/// Balanced augmented nodes over an intervals table ordered by `ord`, with AVL heights. Subtree summaries
 /// (largest start, count, extent bounds) let short intervals collapse without enumerating
 /// dense clusters; see duration_summaries.
-fn build_interval_nodes(db: &Connection, intervals: &str, nodes: &str) -> Result<(), String> {
+fn build_interval_nodes(
+    db: &Connection,
+    intervals: &'static str,
+    nodes: &'static str,
+) -> Result<(), String> {
     db.execute(&format!("DROP TABLE IF EXISTS {nodes}"), &[])?;
-    let sql = "CREATE TABLE duration_nodes(id INTEGER PRIMARY KEY,left_id INTEGER,right_id INTEGER,min_time TEXT NOT NULL COLLATE RATIONAL_V1,max_time TEXT NOT NULL COLLATE RATIONAL_V1,max_first TEXT NOT NULL COLLATE RATIONAL_V1,cnt INTEGER NOT NULL,min_extent TEXT NOT NULL COLLATE RATIONAL_V1,max_extent TEXT NOT NULL COLLATE RATIONAL_V1)";
+    let sql = "CREATE TABLE duration_nodes(id INTEGER PRIMARY KEY,left_id INTEGER,right_id INTEGER,min_time TEXT NOT NULL COLLATE RATIONAL_V1,max_time TEXT NOT NULL COLLATE RATIONAL_V1,max_first TEXT NOT NULL COLLATE RATIONAL_V1,cnt INTEGER NOT NULL,min_extent TEXT NOT NULL COLLATE RATIONAL_V1,max_extent TEXT NOT NULL COLLATE RATIONAL_V1,height INTEGER NOT NULL)";
     db.execute(&sql.replace("duration_nodes", nodes), &[])?;
-    let sql = "WITH RECURSIVE ranges(lo,hi,mid) AS (SELECT 1,count(*),CAST((1+count(*))/2 AS INTEGER) FROM duration_intervals HAVING count(*)>0 UNION ALL SELECT r.lo,r.mid-1,CAST((r.lo+r.mid-1)/2 AS INTEGER) FROM ranges r WHERE r.lo<r.mid UNION ALL SELECT r.mid+1,r.hi,CAST((r.mid+1+r.hi)/2 AS INTEGER) FROM ranges r WHERE r.mid<r.hi) INSERT INTO duration_nodes SELECT mid,CASE WHEN lo<mid THEN CAST((lo+mid-1)/2 AS INTEGER) END,CASE WHEN mid<hi THEN CAST((mid+1+hi)/2 AS INTEGER) END,(SELECT first FROM duration_intervals WHERE ord=lo),(SELECT last FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY last COLLATE RATIONAL_V1 DESC LIMIT 1),(SELECT first FROM duration_intervals WHERE ord=hi),hi-lo+1,(SELECT extent FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY extent COLLATE RATIONAL_V1 LIMIT 1),(SELECT extent FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY extent COLLATE RATIONAL_V1 DESC LIMIT 1) FROM ranges";
+    let sql = "WITH RECURSIVE ranges(lo,hi,mid) AS (SELECT 1,count(*),CAST((1+count(*))/2 AS INTEGER) FROM duration_intervals HAVING count(*)>0 UNION ALL SELECT r.lo,r.mid-1,CAST((r.lo+r.mid-1)/2 AS INTEGER) FROM ranges r WHERE r.lo<r.mid UNION ALL SELECT r.mid+1,r.hi,CAST((r.mid+1+r.hi)/2 AS INTEGER) FROM ranges r WHERE r.mid<r.hi) INSERT INTO duration_nodes SELECT mid,CASE WHEN lo<mid THEN CAST((lo+mid-1)/2 AS INTEGER) END,CASE WHEN mid<hi THEN CAST((mid+1+hi)/2 AS INTEGER) END,(SELECT first FROM duration_intervals WHERE ord=lo),(SELECT last FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY last COLLATE RATIONAL_V1 DESC LIMIT 1),(SELECT first FROM duration_intervals WHERE ord=hi),hi-lo+1,(SELECT extent FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY extent COLLATE RATIONAL_V1 LIMIT 1),(SELECT extent FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY extent COLLATE RATIONAL_V1 DESC LIMIT 1),HEIGHT FROM ranges";
     db.execute(
-        &sql.replace("duration_nodes", nodes)
+        &sql.replace("HEIGHT", &intervals::balanced_height("(hi-lo+1)"))
+            .replace("duration_nodes", nodes)
             .replace("duration_intervals", intervals),
         &[],
     )?;
-    Ok(())
+    // A balanced build is also a valid AVL tree; saves continue from it (see intervals.rs).
+    let count = db.scalar(&format!("SELECT count(*) FROM {intervals}"), &[])?;
+    let count = count.parse::<i64>().map_err(|e| e.to_string())?;
+    intervals::set_root(db, nodes, (count > 0).then_some((1 + count) / 2))
 }
 pub(crate) fn create_relationship_table(db: &Connection) -> Result<(), String> {
     db.execute("CREATE TABLE IF NOT EXISTS relationships(a_kind TEXT NOT NULL CHECK(a_kind IN ('moment','duration')),a_id TEXT NOT NULL,b_kind TEXT NOT NULL CHECK(b_kind IN ('moment','duration')),b_id TEXT NOT NULL,PRIMARY KEY(a_kind,a_id,b_kind,b_id),CHECK(a_kind<>b_kind OR a_id<>b_id)) STRICT", &[])?;
@@ -1098,7 +1118,7 @@ fn interval_window(
     upper: &str,
     threshold: &str,
 ) -> Result<Vec<Vec<Option<String>>>, String> {
-    let sql = format!("WITH RECURSIVE visible AS (SELECT n.* FROM {nodes} n WHERE id=(SELECT CAST((1+count(*))/2 AS INTEGER) FROM {intervals}) AND min_time<=q(?1) COLLATE RATIONAL_V1 AND max_time>=q(?2) COLLATE RATIONAL_V1 UNION ALL SELECT n.* FROM visible p JOIN {nodes} n ON n.id IN(p.left_id,p.right_id) WHERE n.min_time<=q(?1) COLLATE RATIONAL_V1 AND n.max_time>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp(n.max_extent,q(?3))>=0)) SELECT {BAND_COLUMNS} FROM visible v JOIN {intervals} d ON d.ord=v.id WHERE d.first<=q(?1) COLLATE RATIONAL_V1 AND d.last>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp(d.extent,q(?3))>=0) LIMIT 257");
+    let sql = format!("WITH RECURSIVE visible AS (SELECT n.* FROM {nodes} n WHERE id=(SELECT root FROM interval_roots WHERE name='{nodes}') AND min_time<=q(?1) COLLATE RATIONAL_V1 AND max_time>=q(?2) COLLATE RATIONAL_V1 UNION ALL SELECT n.* FROM visible p JOIN {nodes} n ON n.id IN(p.left_id,p.right_id) WHERE n.min_time<=q(?1) COLLATE RATIONAL_V1 AND n.max_time>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp(n.max_extent,q(?3))>=0)) SELECT {BAND_COLUMNS} FROM visible v JOIN {intervals} d ON d.ord=v.id WHERE d.first<=q(?1) COLLATE RATIONAL_V1 AND d.last>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp(d.extent,q(?3))>=0) LIMIT 257");
     db.query_limited(&sql, &[upper, lower, threshold], 257, 8 * 1024 * 1024)
 }
 /// Durations wholly inside [lower, upper], in start order after an exact (start, ID) cursor.
@@ -1214,7 +1234,7 @@ pub(crate) fn duration_summaries(
         return Ok(out);
     }
     let root = db.scalar(
-        "SELECT coalesce(CAST((1+count(*))/2 AS INTEGER),0) FROM duration_intervals",
+        "SELECT coalesce((SELECT root FROM interval_roots WHERE name='duration_nodes'),0)",
         &[],
     )?;
     let mut stack: Vec<(String, bool)> = if root == "0" {

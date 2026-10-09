@@ -7,7 +7,10 @@
 use criterion::{BenchmarkId, Criterion};
 use openchronology_store::{Header, Patch, Query, Snapshot};
 use serde_json::{json, Value};
-use std::{path::PathBuf, time::Duration};
+use std::{
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 fn env(name: &str, default: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| default.into())
@@ -61,7 +64,8 @@ fn main() {
         let read = query(
             json!({"kind":"events","id":target["id"],"lower":target["time"],"upper":target["time"]}),
         );
-        // Saves write a patched copy of the immutable baseline, as the desktop app does.
+        // Saves go to the open file, as the desktop app does: after the first save, changes
+        // apply to the file and the baseline in place. Each sample is undone, unmeasured.
         let patch = |changes: Value| -> Patch {
             serde_json::from_value(json!({"settings":settings,"changes":changes})).expect("patch")
         };
@@ -72,7 +76,14 @@ fn main() {
         updated_target["metadata"]["title"] = json!("Updated");
         let updated = patch(json!([{"id":target["id"],"event":updated_target}]));
         let deleted = patch(json!([{"id":target["id"],"event":null}]));
-        let output = scratch.join(format!("saved-{size}.och"));
+        let restored = patch(json!([{"id":target["id"],"event":target}]));
+        let uncreated = patch(json!([{"id":"bench-new","event":null}]));
+        let working = scratch.join(format!("working-{size}.och"));
+        std::fs::copy(&file, &working).expect("working copy");
+        let mut baseline = Snapshot::open(&working).expect("open working copy");
+        baseline = baseline
+            .save_patch(&working, &patch(json!([])))
+            .expect("first save");
         let reads: [(&str, &Query); 4] = [
             ("overview-full", &full),
             ("overview-zoomed", &zoomed),
@@ -86,17 +97,26 @@ fn main() {
                 |b, q| b.iter(|| snapshot.query(q).expect("query")),
             );
         }
-        let writes: [(&str, &Patch); 3] = [
-            ("create", &created),
-            ("update", &updated),
-            ("delete", &deleted),
+        let writes: [(&str, &Patch, &Patch); 3] = [
+            ("create", &created, &uncreated),
+            ("update", &updated, &restored),
+            ("delete", &deleted, &restored),
         ];
-        for (name, p) in writes {
-            criterion.benchmark_group(name).bench_with_input(
-                BenchmarkId::new("sqlite", size),
-                p,
-                |b, p| b.iter(|| snapshot.save_patch(&output, p).expect("save")),
-            );
+        for (name, p, undo) in writes {
+            criterion
+                .benchmark_group(name)
+                .bench_function(BenchmarkId::new("sqlite", size), |b| {
+                    b.iter_custom(|iterations| {
+                        let mut total = Duration::ZERO;
+                        for _ in 0..iterations {
+                            let start = Instant::now();
+                            baseline = baseline.save_patch(&working, p).expect("save");
+                            total += start.elapsed();
+                            baseline = baseline.save_patch(&working, undo).expect("undo");
+                        }
+                        total
+                    })
+                });
         }
     }
     let _ = std::fs::remove_dir_all(&scratch);
