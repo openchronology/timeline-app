@@ -34,7 +34,9 @@ export function generateTimeline(size, seed = 27) {
   );
   const tags = () => TAGS.filter(() => random() < 0.12);
   const events = [];
-  for (let i = 0; i < size; i++) {
+  // A timeline holds at most 200,000 moments; leave room for the create benchmark.
+  const count = Math.min(size, 199999);
+  for (let i = 0; i < count; i++) {
     const base =
       random() < 2 / 3
         ? pick(clusters) + Math.floor((random() - 0.5) * 200000)
@@ -58,17 +60,17 @@ export function generateTimeline(size, seed = 27) {
     durations.push({
       id: 'd' + i,
       start:
-        random() < 1 / 3 ? { moment: 'm' + Math.floor(random() * size) } : String(start) + '/1',
+        random() < 1 / 3 ? { moment: 'm' + Math.floor(random() * count) } : String(start) + '/1',
       end: String(start + length) + '/1',
       metadata: { title: `${pick(WORDS)} period ${i}`, ...(t.length ? { tags: t } : {}) },
     });
   }
   const relationships = [];
   for (let i = 0; i < Math.floor(size / 10); i++) {
-    const a = { moment: 'm' + Math.floor(random() * size) };
+    const a = { moment: 'm' + Math.floor(random() * count) };
     const b =
       random() < 0.8
-        ? { moment: 'm' + Math.floor(random() * size) }
+        ? { moment: 'm' + Math.floor(random() * count) }
         : { duration: 'd' + Math.floor(random() * Math.max(1, durations.length)) };
     if (JSON.stringify(a) !== JSON.stringify(b) && durations.length) relationships.push({ a, b });
   }

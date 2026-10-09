@@ -9,6 +9,7 @@ import { Q, TimelineIndex, Viewport, validateDocument } from '../dist/core.mjs';
 import { DATA, sizes } from './seed.mjs';
 
 export const OPERATIONS = [
+  ['open', 'Open a timeline'],
   ['overview-full', 'Viewport: whole timeline'],
   ['overview-zoomed', 'Viewport: 1% of the timeline'],
   ['events-page', 'Read a page of 100 moments'],
@@ -28,11 +29,15 @@ function summary(task) {
   const l = result.latency;
   return { mean: l.mean, sd: l.sd, p50: l.p50, p99: l.p99, rme: l.rme, samples: l.samplesCount };
 }
-/** Each backend implements the same operations over the same seeded inputs. */
-function memoryBackend(document, work) {
+/**
+ * Each backend implements the same operations over the same seeded inputs. Opening is what
+ * each platform does before it can draw: the browser parses and indexes the whole file.
+ */
+function memoryBackend(text, document, work) {
   const index = new TimelineIndex(document);
-  const frame = ({ lower, upper }) =>
-    index.frame(new Viewport(Q.parse(lower), Q.parse(upper).sub(Q.parse(lower))), 1000, 24);
+  const view = ({ lower, upper }) =>
+    new Viewport(Q.parse(lower), Q.parse(upper).sub(Q.parse(lower)));
+  const frame = (window) => index.frame(view(window), 1000, 24);
   let counter = 0;
   const fresh = () => ({
     id: 'bench-' + counter++,
@@ -41,6 +46,10 @@ function memoryBackend(document, work) {
   });
   let created, doomed;
   return {
+    open: {
+      fn: () =>
+        new TimelineIndex(validateDocument(JSON.parse(text))).frame(view(work.full), 1000, 24),
+    },
     'overview-full': { fn: () => frame(work.full) },
     'overview-zoomed': { fn: () => frame(work.zoomed) },
     'events-page': { fn: () => index.eventsBetween(work.page.lower, work.page.upper, 100) },
@@ -96,6 +105,8 @@ async function postgresBackend(size, work) {
   return {
     close: () => pool.end(),
     tasks: {
+      // The editor reads the timeline's metadata, then the first viewport.
+      open: { fn: () => store.metadata(id, user).then(() => overview(work.full)) },
       'overview-full': { fn: () => overview(work.full) },
       'overview-zoomed': { fn: () => overview(work.zoomed) },
       'events-page': {
@@ -143,30 +154,37 @@ async function postgresBackend(size, work) {
   };
 }
 async function measure(backend, size, tasks, async = false) {
-  const bench = new Bench({
-    name: `${backend} ${size}`,
-    time,
-    iterations: 10,
-    warmupIterations: 2,
-  });
-  for (const [operation] of OPERATIONS) {
-    const { fn, beforeEach, afterEach } = tasks[operation];
-    // tinybench detects asynchronous tasks by declaration, so database tasks are declared async.
-    const wrap = (f) => f && (async ? async () => await f() : f);
-    bench.add(operation, wrap(fn), { beforeEach: wrap(beforeEach), afterEach: wrap(afterEach) });
+  const rows = [];
+  // Opening a large timeline in memory takes seconds, so it gets fewer, separate samples.
+  for (const operations of [OPERATIONS.filter(([o]) => o !== 'open'), [['open']]]) {
+    const open = operations[0][0] === 'open';
+    const bench = new Bench({
+      name: `${backend} ${size}`,
+      time: open ? 0 : time,
+      iterations: open ? 5 : 10,
+      warmupIterations: open ? 1 : 2,
+    });
+    for (const [operation] of operations) {
+      const { fn, beforeEach, afterEach } = tasks[operation];
+      // tinybench detects asynchronous tasks by declaration, so database tasks are declared async.
+      const wrap = (f) => f && (async ? async () => await f() : f);
+      bench.add(operation, wrap(fn), { beforeEach: wrap(beforeEach), afterEach: wrap(afterEach) });
+    }
+    await bench.run();
+    rows.push(
+      ...bench.tasks.map((task) => ({ backend, size, operation: task.name, ...summary(task) })),
+    );
   }
-  await bench.run();
-  return bench.tasks.map((task) => ({ backend, size, operation: task.name, ...summary(task) }));
+  return rows;
 }
 if (import.meta.url === `file://${process.argv[1]}`) {
   await mkdir(RESULTS, { recursive: true });
   const rows = [];
   for (const size of sizes()) {
-    const document = validateDocument(
-      JSON.parse(await readFile(`${DATA}/timeline-${size}.ochx`, 'utf8')),
-    );
+    const text = await readFile(`${DATA}/timeline-${size}.ochx`, 'utf8');
+    const document = validateDocument(JSON.parse(text));
     const work = JSON.parse(await readFile(`${DATA}/workload-${size}.json`, 'utf8'));
-    rows.push(...(await measure('memory', size, memoryBackend(document, work))));
+    rows.push(...(await measure('memory', size, memoryBackend(text, document, work))));
     console.log(`memory ${size}: done`);
     const postgres = await postgresBackend(size, work);
     if (postgres) {

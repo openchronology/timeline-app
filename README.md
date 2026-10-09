@@ -168,7 +168,7 @@ DATABASE_URL='postgresql://...' npm run test:platform:postgres
 
 The [GitHub workflow](.github/workflows/ci.yml) runs Node 22/24 tests, Chromium/Firefox/WebKit interactions for both the served app and standalone HTML, native PostgreSQL tests including accounts and sharing, SQLite persistence tests, and a Linux desktop package build. Chromium tests include touch pan, pinch, and tap. Browser screenshots, the offline HTML, and the Debian package are retained as artifacts. pgmp compilation and installation both set `with_llvm=no`, avoiding a dependency on the runner's configured Clang version.
 
-[Benchmarks](docs/benchmarks.md) compare PostgreSQL, SQLite and in-memory latency as timelines grow: `npm run bench:seed`, then `npm run bench` writes an HTML report to `bench/results/`. The manually triggered Benchmarks workflow runs them in CI.
+[Benchmarks](docs/benchmarks.md) compare PostgreSQL, SQLite and in-memory latency as timelines grow: `npm run bench:seed`, then `npm run bench` writes an HTML report to `bench/results/`. The manually triggered Benchmarks workflow runs them in CI. [Timeline size and platforms](docs/capacity.md) explains which platform suits which timeline size.
 
 This directory is self-contained and can be the root of its own GitHub repository. The two independent rational libraries are pinned under `vendor/`; no build depends on adjacent checkouts. [vendor/versions.json](vendor/versions.json) records their source commits. Their independent upstream CI and the separate `rational-conformance` project remain responsible for library-level conformance. This app adds timeline-level tests.
 

@@ -13,6 +13,7 @@ The report draws one chart per operation, with timeline size on the x axis, late
 ```sh
 npm run bench:seed     # build the editor, generate seeds (once per size)
 npm run bench          # measure, then write bench/results/report.html
+npm run bench:capacity # only the in-browser capacity measurements
 npm run bench:report   # rebuild the report from existing results
 ```
 
@@ -22,11 +23,12 @@ npm run bench:report   # rebuild the report from existing results
 | `BENCH_TIME`         | `1000`                     | Measurement time per operation and size, in milliseconds          |
 | `BENCH_DATABASE_URL` | unset                      | PostgreSQL database with `pgmp`; without it PostgreSQL is skipped |
 | `BENCH_DATA_DIR`     | `bench/data`               | Seeds; relative paths resolve from the repository root            |
-| `BENCH_RESULTS_DIR`  | `bench/results`            | `node.json`, `results.json` and `report.html`                     |
+| `BENCH_RESULTS_DIR`  | `bench/results`            | `node.json`, `capacity.json`, `results.json` and `report.html`    |
+| `BENCH_THROTTLES`    | `1,4`                      | CPU slowdowns for the in-browser measurements                     |
 
-Use a dedicated database. Seeding creates a `bench` user (with quota bypass) and replaces that user's timelines; nothing else is touched. Saving at large sizes is slow on PostgreSQL (see the findings below), so a run at the default sizes takes more than an hour. `BENCH_SIZES=1000,10000` finishes in a few minutes.
+Use a dedicated database. Seeding creates a `bench` user (with quota bypass) and replaces that user's timelines; nothing else is touched. Opening 200,000-moment timelines in a throttled browser takes minutes per sample, so a run at the default sizes takes about an hour. `BENCH_SIZES=1000,10000` finishes in a few minutes. The capacity measurements need Chromium (`npx playwright install chromium`); without it they are skipped.
 
-The [Benchmarks workflow](../.github/workflows/bench.yml) runs the suite on demand (**Actions → Benchmarks → Run workflow**) at 1,000, 10,000 and 50,000 moments by default, against a fresh PostgreSQL 16 with native `pgmp`, and uploads `bench/results/` as the `benchmark-report` artifact. Hosted runners share hardware, so compare backends and sizes within one run rather than absolute numbers across runs.
+The [Benchmarks workflow](../.github/workflows/bench.yml) runs the suite on demand (**Actions → Benchmarks → Run workflow**) at 1,000, 10,000, 50,000, 100,000 and 200,000 moments by default, against a fresh PostgreSQL 16 with native `pgmp`, and uploads `bench/results/` as the `benchmark-report` artifact. Hosted runners share hardware, so compare backends and sizes within one run rather than absolute numbers across runs.
 
 ## Seeds
 
@@ -38,6 +40,7 @@ The [Benchmarks workflow](../.github/workflows/bench.yml) runs the suite on dema
 
 | Operation                    | What is measured                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------- |
+| Open a timeline              | What each platform does before it can draw (see below)                          |
 | Viewport: whole timeline     | The overview frame for the whole timeline: summaries, bands and arcs            |
 | Viewport: 1% of the timeline | The frame for a window of 1% of the span, centred on the middle                 |
 | Read a page of 100 moments   | The first 100 moments from the middle to the end, as the moment list loads them |
@@ -47,6 +50,23 @@ The [Benchmarks workflow](../.github/workflows/bench.yml) runs the suite on dema
 | Delete a moment              | Deleting one moment (re-created between samples)                                |
 
 Every backend performs the same operations with the same inputs. Writes are sparse patches, as the editor sends them. The cleanup between samples is excluded from the measurement. SQLite writes save to a working copy of the seed file with `save_patch`, as the desktop app saves the open file; each sample is undone by another save, unmeasured.
+
+Opening differs by platform:
+
+- **Browser:** parses and validates the whole file, builds the in-memory index and draws the first frame.
+- **Desktop:** copies and checks the file into a private baseline, then queries the first view.
+- **Platform:** reads the timeline's metadata and the first view.
+
+## Capacity
+
+`bench/capacity.mjs` measures the in-browser editor itself, in Chromium through Playwright. Each measurement runs at full speed and with the CPU throttled 4× through the DevTools protocol; the throttled run roughly approximates a mid-range phone. For each size it records:
+
+- **Open:** from importing the file until the editor has drawn the fitted view (the median of three fresh pages, two at 100,000 moments and more).
+- **Redraw:** from applying new bounds until the view is drawn (the median of five).
+- **Pause after an edit:** the longest gap between animation frames in the three seconds after renaming the timeline. It is measured while signed in with a timeline kept only in the browser, so it includes the redraw and the draft saved 0.7 s later. Guests keep no draft, so for them only the redraw remains.
+- **Memory:** the JavaScript heap held after opening, after garbage collection.
+
+It also records the SQLite file size and the PostgreSQL rows a timeline occupies (its moments, indexes, search and links, excluding B-tree indexes and history). The report's capacity charts place these beside the equivalent desktop and platform measurements, with reference lines at 100 ms (responses feel instant) and 1 s (users keep their attention). Where a line crosses them shows where that platform stops feeling responsive.
 
 ## Method
 
@@ -60,6 +80,8 @@ A local run (16 cores, Node 26, PostgreSQL 16 in Docker, `BENCH_TIME=1000`) meas
 
 | Operation                         |    Size |          In-memory | SQLite | PostgreSQL |
 | --------------------------------- | ------: | -----------------: | -----: | ---------: |
+| Open a timeline                   |  10,000 |              0.7 s |  0.1 s |      18 ms |
+|                                   | 200,000 |               34 s |  1.1 s |      35 ms |
 | Viewport: whole timeline          |   1,000 |             3.3 ms | 7.1 ms |      10 ms |
 |                                   |  10,000 |              13 ms |  16 ms |      14 ms |
 |                                   | 100,000 | 292 ms (p50 50 ms) |  31 ms |      27 ms |
@@ -72,6 +94,7 @@ A local run (16 cores, Node 26, PostgreSQL 16 in Docker, `BENCH_TIME=1000`) meas
 |                                   |  10,000 |             0.1 ms | 2.3 ms |     5.0 ms |
 |                                   | 100,000 |             0.2 ms | 2.6 ms |     4.6 ms |
 
+- **Opening is where the in-memory editor runs out.** It parses and indexes the whole file, which takes 0.7 s at 10,000 moments and 34 s at 200,000 in Node (21 s in Chromium). The desktop app copies the file into a private baseline (1.1 s at 200,000), and the platform reads only metadata and the first view. The capacity charts and [Timeline size and platforms](capacity.md) turn this into guidance per platform.
 - **Reads scale well.** Pages and single moments stay flat from 1,000 to 100,000 moments on every backend. PostgreSQL's few milliseconds are mostly round trips.
 - **PostgreSQL saves are flat.** A sparse save updates only the changed rows and the tree paths they touch ([incremental saves](architecture.md#incremental-saves)), so a one-moment save costs the same at 1,000 and 100,000 moments. Before that change, every save rebuilt the timeline's derived data: 180 ms at 1,000 moments, 1.6 s at 10,000 and 18.5 s at 100,000. Once per 1,000 saves (or when patches outweigh the document), a save also writes a full snapshot for history, which takes about 2 s at 100,000 moments.
 - **SQLite saves are flat too.** They apply in place to the open file and its baseline (2.1 ms at 1,000 moments, 2.6 ms at 100,000). Previously, every save copied the whole file twice and rebuilt the duration and arc indexes: 13 ms at 1,000 moments, 105 ms at 10,000 and 1.2 s at 100,000. The benchmark saves to the opened file, as the desktop app does, and undoes each sample unmeasured.

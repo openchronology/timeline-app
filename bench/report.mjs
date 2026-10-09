@@ -59,6 +59,16 @@ const ms = (v) =>
     : v >= 1
       ? v.toPrecision(3) + ' ms'
       : (v * 1000).toPrecision(3) + ' µs';
+/** Compact size labels (1k, 200k); labels closer than 34 px to the previous one are skipped. */
+const sizeLabel = (n) => (n >= 1000 && n % 1000 === 0 ? `${n / 1000}k` : n.toLocaleString('en'));
+function sizeTicks(sizes, x, y) {
+  let last = -Infinity;
+  return sizes
+    .filter((s) => (x(s) - last >= 34 ? ((last = x(s)), true) : false))
+    .map(
+      (s) => `<text class="tick" x="${x(s)}" y="${y}" text-anchor="middle">${sizeLabel(s)}</text>`,
+    );
+}
 const escape = (s) =>
   String(s).replace(
     /[&<>"]/g,
@@ -88,10 +98,7 @@ function chart(operation, title, rows) {
       `<text class="tick" x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end">${ms(v)}</text>`,
     );
   }
-  for (const s of sizes)
-    parts.push(
-      `<text class="tick" x="${x(s)}" y="${H - m.b + 16}" text-anchor="middle">${s.toLocaleString('en')}</text>`,
-    );
+  parts.push(...sizeTicks(sizes, x, H - m.b + 16));
   parts.push(
     `<text class="axis" x="${(m.l + W - m.r) / 2}" y="${H - 6}" text-anchor="middle">Moments in the timeline (log)</text>`,
   );
@@ -127,6 +134,146 @@ function chart(operation, title, rows) {
   return `<figure class="chart"><figcaption>${escape(title)}</figcaption>
 <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${escape(title)}: latency by timeline size">${parts.join('')}</svg></figure>`;
 }
+const bytes = (v) =>
+  v >= 1e9
+    ? (v / 1e9).toPrecision(3) + ' GB'
+    : v >= 1e6
+      ? (v / 1e6).toPrecision(3) + ' MB'
+      : (v / 1e3).toPrecision(3) + ' kB';
+/**
+ * A capacity chart: medians against timeline size on log axes, a line per platform (the
+ * throttled browser dashed in the browser's color), and reference lines such as the 100 ms
+ * and 1 s responsiveness limits, so crossings are visible.
+ */
+function capacityChart(title, description, series, { unit = ms, guides = [] } = {}) {
+  const W = 440,
+    H = 260,
+    m = { l: 58, r: 124, t: 14, b: 40 };
+  const points = series.flatMap((s) => s.points);
+  if (!points.length) return '';
+  const sizes = [...new Set(points.map((p) => p.size))].sort((a, b) => a - b);
+  const values = [...points.map((p) => p.value), ...guides.map((g) => g.value)].filter(
+    (v) => v > 0,
+  );
+  const y0 = Math.floor(Math.log10(Math.min(...values))),
+    y1 = Math.ceil(Math.log10(Math.max(...values)));
+  const x0 = Math.log10(sizes[0]) - 0.15,
+    x1 = Math.log10(sizes.at(-1)) + 0.15;
+  const x = (v) => m.l + ((Math.log10(v) - x0) / (x1 - x0 || 1)) * (W - m.l - m.r);
+  const y = (v) => m.t + (1 - (Math.log10(v) - y0) / (y1 - y0 || 1)) * (H - m.t - m.b);
+  const parts = [];
+  for (let e = y0; e <= y1; e++)
+    parts.push(
+      `<line class="grid" x1="${m.l}" x2="${W - m.r}" y1="${y(10 ** e)}" y2="${y(10 ** e)}"/>`,
+      `<text class="tick" x="${m.l - 6}" y="${y(10 ** e) + 4}" text-anchor="end">${unit(10 ** e)}</text>`,
+    );
+  for (const g of guides)
+    parts.push(
+      `<line class="guide" x1="${m.l}" x2="${W - m.r}" y1="${y(g.value)}" y2="${y(g.value)}"/>`,
+      `<text class="guide-label" x="${W - m.r - 4}" y="${y(g.value) - 4}" text-anchor="end">${escape(g.label)}</text>`,
+    );
+  parts.push(...sizeTicks(sizes, x, H - m.b + 16));
+  parts.push(
+    `<text class="axis" x="${(m.l + W - m.r) / 2}" y="${H - 6}" text-anchor="middle">Moments in the timeline (log)</text>`,
+  );
+  const labels = [];
+  for (const s of series) {
+    const line = [...s.points].sort((a, b) => a.size - b.size);
+    if (!line.length) continue;
+    parts.push(
+      `<path class="line s${s.slot}${s.dashed ? ' dashed' : ''}" d="${line.map((p, i) => `${i ? 'L' : 'M'}${x(p.size)},${y(p.value)}`).join(' ')}"/>`,
+    );
+    for (const p of line)
+      parts.push(
+        `<circle class="dot s${s.slot}" cx="${x(p.size)}" cy="${y(p.value)}" r="4"/>`,
+        `<circle class="hit" cx="${x(p.size)}" cy="${y(p.value)}" r="12" tabindex="0" data-tip="${escape(`${s.name} · ${p.size.toLocaleString('en')} moments\n${p.tip ?? unit(p.value)}`)}"/>`,
+      );
+    labels.push({ y: y(line.at(-1).value), name: s.name, slot: s.slot, dashed: s.dashed });
+  }
+  labels.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < labels.length; i++) labels[i].y = Math.max(labels[i].y, labels[i - 1].y + 14);
+  for (const l of labels)
+    parts.push(
+      `<text class="label" x="${W - m.r + 8}" y="${l.y + 4}"><tspan class="key s${l.slot}">${l.dashed ? '◌' : '●'}</tspan> ${escape(l.name)}</text>`,
+    );
+  return `<figure class="chart"><figcaption>${escape(title)}</figcaption><p class="note">${escape(description)}</p>
+<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${escape(title)} by timeline size">${parts.join('')}</svg></figure>`;
+}
+/** The capacity section: in-browser measurements beside the other platforms' equivalents. */
+function capacity(capacityRows, rows) {
+  const browser = (metric, throttle) =>
+    capacityRows
+      .filter((r) => r.platform === 'browser' && r.metric === metric && r.throttle === throttle)
+      .map((r) => ({
+        size: r.size,
+        value: r.value,
+        tip: `median ${metric === 'memory' ? bytes(r.value) : ms(r.value)} of ${r.samples.length}`,
+      }));
+  const measured = (backend, operation) =>
+    rows
+      .filter((r) => r.backend === backend && r.operation === operation)
+      .map((r) => ({ size: r.size, value: r.p50, tip: `median ${ms(r.p50)}` }));
+  const stored = (platform) =>
+    capacityRows
+      .filter((r) => r.platform === platform && r.metric === 'storage')
+      .map((r) => ({ size: r.size, value: r.value }));
+  const throttles = [...new Set(capacityRows.map((r) => r.throttle))].filter((t) => t > 1);
+  const inBrowser = (metric) => [
+    { name: 'Browser', slot: 3, points: browser(metric, 1) },
+    ...throttles.map((t) => ({
+      name: `Browser, ${t}× slower CPU`,
+      slot: 3,
+      dashed: true,
+      points: browser(metric, t),
+    })),
+  ];
+  const responsive = [
+    { value: 100, label: '100 ms: feels instant' },
+    { value: 1000, label: '1 s: keeps attention' },
+  ];
+  return [
+    capacityChart(
+      'Open a timeline',
+      'Browser: import the file until the first view is drawn. Desktop: copy and check the file, then draw. Platform: metadata and the first view.',
+      [
+        ...inBrowser('open'),
+        { name: 'SQLite (desktop)', slot: 2, points: measured('sqlite', 'open') },
+        { name: 'PostgreSQL', slot: 1, points: measured('postgres', 'open') },
+      ],
+      { guides: responsive },
+    ),
+    capacityChart(
+      'Redraw after navigating',
+      'Browser: from applying new bounds to the drawn view. Desktop and platform: the whole-timeline viewport query.',
+      [
+        ...inBrowser('redraw'),
+        { name: 'SQLite (desktop)', slot: 2, points: measured('sqlite', 'overview-full') },
+        { name: 'PostgreSQL', slot: 1, points: measured('postgres', 'overview-full') },
+      ],
+      { guides: responsive },
+    ),
+    capacityChart(
+      'Pause after an edit',
+      'Browser: the longest gap between frames after renaming a browser-only timeline while signed in (redraw and draft save). Desktop and platform: saving one changed moment.',
+      [
+        ...inBrowser('edit'),
+        { name: 'SQLite (desktop)', slot: 2, points: measured('sqlite', 'update') },
+        { name: 'PostgreSQL', slot: 1, points: measured('postgres', 'update') },
+      ],
+      { guides: responsive },
+    ),
+    capacityChart(
+      'Memory and storage',
+      'Browser: JavaScript heap held by the open timeline. Desktop: the .och file. Platform: the timeline’s rows (excluding indexes and history).',
+      [
+        { name: 'Browser memory', slot: 3, points: browser('memory', 1) },
+        { name: 'SQLite file', slot: 2, points: stored('sqlite') },
+        { name: 'PostgreSQL rows', slot: 1, points: stored('postgres') },
+      ],
+      { unit: bytes },
+    ),
+  ].join('\n');
+}
 function table(rows) {
   const body = [...rows]
     .sort(
@@ -147,10 +294,16 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const node = JSON.parse(
     await readFile(join(RESULTS, 'node.json'), 'utf8').catch(() => '{"rows":[]}'),
   );
+  const capacityRows = JSON.parse(
+    await readFile(join(RESULTS, 'capacity.json'), 'utf8').catch(() => '{"rows":[]}'),
+  ).rows;
   const rows = [...node.rows, ...(await criterionRows())];
   if (!rows.length) throw new Error('No results; run node bench/run.mjs and cargo bench first.');
   await mkdir(RESULTS, { recursive: true });
-  await writeFile(join(RESULTS, 'results.json'), JSON.stringify({ ...node, rows }, null, 2));
+  await writeFile(
+    join(RESULTS, 'results.json'),
+    JSON.stringify({ ...node, rows, capacity: capacityRows }, null, 2),
+  );
   const charts = OPERATIONS.filter(([o]) => rows.some((r) => r.operation === o))
     .map(([o, title]) =>
       chart(
@@ -170,7 +323,8 @@ main{max-width:1440px;margin:0 auto}h1{font:400 30px Georgia,serif;margin:0 0 6p
 .grid-charts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,440px),1fr));gap:16px;margin:20px 0}
 .chart{margin:0;background:var(--surface);border-radius:12px;padding:12px}.chart figcaption{font-weight:600;margin:0 0 4px}
 svg{width:100%;height:auto;overflow:visible}.grid{stroke:var(--grid);stroke-width:1}.tick,.axis,.label{fill:var(--muted);font-size:11px}.label{fill:var(--ink)}
-.line{fill:none;stroke-width:2}.whisker{stroke-width:1.5;opacity:.55}.whisker.clipped{stroke-dasharray:3 3}.dot{stroke:var(--surface);stroke-width:2}
+.line{fill:none;stroke-width:2}.line.dashed{stroke-dasharray:6 4}.guide{stroke:var(--muted);stroke-width:1;stroke-dasharray:2 4}.guide-label{fill:var(--muted);font-size:10px}.chart .note{font-size:12px;margin:0 0 6px}
+h2{font:400 22px Georgia,serif;margin:28px 0 4px}.whisker{stroke-width:1.5;opacity:.55}.whisker.clipped{stroke-dasharray:3 3}.dot{stroke:var(--surface);stroke-width:2}
 .s1{stroke:var(--s1);fill:var(--s1)}.s2{stroke:var(--s2);fill:var(--s2)}.s3{stroke:var(--s3);fill:var(--s3)}.line.s1,.line.s2,.line.s3{fill:none}.key{stroke:none}
 .hit{fill:transparent;cursor:default}.hit:focus{outline:none;stroke:var(--ink);stroke-width:1.5;fill:transparent}
 #tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--grid);border-radius:8px;padding:8px 10px;white-space:pre;font-size:12px;box-shadow:0 6px 20px #0003;display:none}
@@ -182,6 +336,11 @@ table{border-collapse:collapse;width:100%;margin-top:10px;font-variant-numeric:t
 <p>Mean latency with ±1 standard deviation by timeline size. Both axes are logarithmic. Where the standard deviation exceeds the mean, the lower whisker is dashed and stops at a tenth of the mean. Hover or focus a point for the median, p99 and sample count.</p>
 <p>${escape(node.platform ?? '')} · Node ${escape(node.node ?? '')} · ${escape(node.finished ?? '')} · in-memory and PostgreSQL measured with tinybench, SQLite with criterion</p>
 <div class="legend">${BACKENDS.map(([, name, slot]) => `<span><i style="background:var(--s${slot})"></i>${escape(name)}</span>`).join('')}</div>
+${
+  capacityRows.length
+    ? `<h2>Capacity</h2><p>Where each platform stops feeling responsive. In-browser figures are medians measured in Chromium (${escape(node.platform ?? '')}), at full speed and with the CPU throttled, which roughly approximates a mid-range phone. Dotted lines mark common responsiveness limits.</p><div class="grid-charts">${capacity(capacityRows, rows)}</div><h2>Latency by operation</h2>`
+    : ''
+}
 <div class="grid-charts">${charts}</div>
 <details><summary>All measurements</summary>${table(rows)}</details>
 </main><div id="tip" role="tooltip"></div><script>

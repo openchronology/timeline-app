@@ -7,7 +7,7 @@ on:
     inputs:
       sizes:
         description: Timeline sizes in moments (1 to 200000), separated by commas or spaces
-        default: '1000,10000,50000'
+        default: '1000,10000,50000,100000,200000'
       time:
         description: Measurement time per operation and size (ms)
         default: '1000'
@@ -17,9 +17,9 @@ permissions:
 
 jobs:
   bench:
-    name: PostgreSQL, SQLite and in-memory latency
+    name: PostgreSQL, SQLite and in-browser latency and capacity
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 240
     env:
       PG_CONFIG: /usr/lib/postgresql/16/bin/pg_config
       PGHOST: 127.0.0.1
@@ -61,6 +61,8 @@ jobs:
           createdb "$PGDATABASE"
           psql -X -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION pgmp;'
       - run: node scripts/npm-ci.mjs
+      # Capacity measurements run the editor in Chromium.
+      - run: npx playwright install --with-deps chromium
       - name: Install Rust
         run: |
           rustup update stable --no-self-update
