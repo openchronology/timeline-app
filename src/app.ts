@@ -16,6 +16,8 @@ import { renderPluginMarker, renderPluginFields, renderPluginShape } from './plu
 import { attachRichText } from './rich-text.js';
 import { pluginRichText } from './plugins.js';
 import { dismissOnBackdrop } from './dialogs.js';
+import { advise, record as recordSample, LIMIT } from './capacity.js';
+import type { Advice, Measurements, Platform } from './capacity.js';
 import { createHoverPreview } from './hover-preview.js';
 import {
   Q,
@@ -166,6 +168,11 @@ let model: TimelineIndex | null = new TimelineIndex(
       : demo(sampleTimeline),
   ),
   viewport = Viewport.fit(model.points.minKey(), model.points.maxKey());
+/** This device's recent measurements for the open timeline (see capacity.ts). */
+let capacity: Measurements = { redraws: [], edits: [], views: [] },
+  capacityKey = '',
+  openStarted: number | null = null,
+  pendingOpenStart: number | null = null;
 let remote: RemoteTimeline | null = null,
   session: Session = { user: null, csrf: null, server: false },
   dirty = false,
@@ -185,6 +192,7 @@ function setDashboard(show: boolean) {
   el('dashboard').hidden = !show;
   document.body.dataset.dashboard = String(show);
   el('memory-notice').hidden = show || !memoryOnly() || !!remote || !!comparison || !model;
+  updateCapacity();
   if (!show) requestRender();
 }
 function hasDashboard() {
@@ -535,7 +543,11 @@ function requestRender(refreshFrame = true) {
     const refresh = pendingFrameRefresh;
     pendingFrameRefresh = false;
     // Hidden dashboards and documents have no usable geometry. Draw after they become visible.
-    if (stage.clientWidth <= 96 || stage.clientHeight === 0) return;
+    if (stage.clientWidth <= 96 || stage.clientHeight === 0) {
+      // An open drawn later than this measures the wait, not the device.
+      openStarted = null;
+      return;
+    }
     render(refresh);
   });
 }
@@ -1024,9 +1036,19 @@ function render(refreshFrame = true) {
     renderedUiScale = uiScale;
   }
   if (model && !sparseWorkspace()) {
+    const started = performance.now();
     if (refreshFrame) frame = model.frame(viewport, width(), pixels());
     el('loading-window').hidden = true;
     drawFrame();
+    // The first draw after opening ends the open measurement; later full redraws are samples.
+    if (openStarted !== null) {
+      capacity.open = performance.now() - openStarted;
+      openStarted = null;
+      updateCapacity();
+    } else if (refreshFrame) {
+      recordSample(capacity.redraws, performance.now() - started);
+      updateCapacity();
+    }
   } else if (remote || local) {
     const source = local ?? remote!;
     const key = source.id + ':' + source.revision + ':' + JSON.stringify(activePlugins());
@@ -1066,6 +1088,7 @@ function render(refreshFrame = true) {
       if (windowInFlight || comparisonInFlight) return;
       windowInFlight = true;
       const controller = (windowController = new AbortController());
+      const started = performance.now();
       void timelineQuery<Frame>(
         {
           kind: 'overview',
@@ -1084,6 +1107,10 @@ function render(refreshFrame = true) {
           )
             return;
           remoteCache.store(query, result);
+          if (local) {
+            recordSample(capacity.views, performance.now() - started);
+            updateCapacity();
+          }
           animateLiveFrame = liveTransitionPending;
           liveTransitionPending = false;
           requestRender(false);
@@ -1422,6 +1449,124 @@ function renderComparison(refresh: boolean) {
       });
   }, 70);
 }
+/** Moments in the open timeline, including unsaved additions and deletions. */
+function momentCount(): bigint {
+  const sparse = sparseWorkspace();
+  const delta = sparse
+    ? [...sparse.changes.values()].reduce(
+        (n, c) => n + (c.after ? 1n : 0n) - (c.before ? 1n : 0n),
+        0n,
+      )
+    : 0n;
+  return sparse
+    ? BigInt((local ?? remote)?.event_count ?? 0) + delta
+    : (model?.points.entryCount ?? BigInt(remote?.event_count ?? 0));
+}
+const DESKTOP_DOWNLOADS = 'https://github.com/openchronology/timeline-app/releases/latest';
+const HOSTED_PLATFORM = 'https://timescale.info';
+/** Where the open timeline lives, for capacity advice; null when there is nothing to advise on. */
+function capacityPlatform(): Platform | null {
+  if (comparison || !model || document.body.dataset.dashboard === 'true') return null;
+  if (remote) return 'platform';
+  return desktop ? 'desktop' : 'browser';
+}
+/** Identifies the open timeline, so measurements and dismissals belong to it. */
+function capacityTimeline() {
+  return remote ? 'remote:' + remote.id : local ? 'local:' + local.path : 'memory:' + model?.title;
+}
+function capacityDismissed(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem('och-capacity-dismissed') ?? '[]');
+  } catch {
+    return [];
+  }
+}
+/** Shows or hides the capacity notice for the open timeline. */
+function updateCapacity() {
+  const notice = el('capacity-notice');
+  const platform = capacityPlatform();
+  const key = capacityTimeline();
+  if (key !== capacityKey) {
+    capacityKey = key;
+    capacity = { redraws: [], edits: [], views: [] };
+  }
+  const advice = platform
+    ? advise(platform, capacity, {
+        moments: Number(momentCount()),
+        ...(model && !sparseWorkspace()
+          ? { durations: model.durations.size, relationships: model.relationships.size }
+          : {}),
+      })
+    : [];
+  const id = key + '|' + advice.map((a) => a.kind).join(',');
+  const dismissed = capacityDismissed().includes(id);
+  notice.hidden = !advice.length || dismissed;
+  if (notice.hidden || notice.dataset.advice === JSON.stringify(advice)) return;
+  notice.dataset.advice = JSON.stringify(advice);
+  notice.dataset.dismissal = id;
+  el('capacity-text').textContent = advice.map(capacityMessage).join(' ');
+  const actions = el('capacity-actions');
+  actions.replaceChildren();
+  const action = (label: string, run: () => void) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.onclick = run;
+    actions.append(button);
+  };
+  const link = (label: string, href: string) => {
+    const a = document.createElement('a');
+    a.href = href;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = label;
+    actions.append(a);
+  };
+  if (advice.some((a) => a.kind === 'browser')) {
+    if (session.user && !el('publish-button').hidden)
+      action('Save to server', () => el('publish-button').click());
+    else if (session.server && !session.user) action('Sign in', () => el('account-button').click());
+    action('Export', () => el('export-button').click());
+    link('Get the desktop app', DESKTOP_DOWNLOADS);
+    if (offlineHtml) link('Open the platform', HOSTED_PLATFORM);
+  }
+  if (advice.some((a) => a.kind === 'desktop')) {
+    if (!el('publish-button').hidden) action('Save to server', () => el('publish-button').click());
+    else action('Server connection', () => el('server-button').click());
+  }
+}
+const seconds = (ms: number) => (ms / 1000).toFixed(ms < 10000 ? 1 : 0) + ' s';
+function capacityMessage(advice: Advice): string {
+  if (advice.kind === 'limit')
+    return `This timeline has ${advice.count.toLocaleString()} ${advice.entity}; a timeline holds at most ${LIMIT.toLocaleString()}. Consider splitting it into several timelines.`;
+  if (advice.kind === 'desktop')
+    return `Views of this timeline take about ${seconds(capacity.views.at(-1) ?? 0)} on this computer. Saved to a server, the server does that work, and others can view and edit it too.`;
+  const elsewhere = offlineHtml
+    ? 'Large timelines are faster in the desktop app or on the OpenChronology platform.'
+    : session.server
+      ? 'Large timelines are faster in the desktop app, or saved to your account on this server.'
+      : 'Large timelines are faster in the desktop app.';
+  const cause = {
+    open: `This timeline took ${seconds(capacity.open ?? 0)} to open in this browser.`,
+    redraw: `Redrawing this timeline takes about ${Math.round(capacity.redraws.at(-1) ?? 0)} ms in this browser.`,
+    edit: `Keeping a draft of this timeline in this browser takes about ${Math.round(capacity.edits.at(-1) ?? 0)} ms after each change.`,
+    size: `This timeline has ${momentCount().toLocaleString()} moments, which is a lot to edit in a browser.`,
+  }[advice.reason];
+  return `${cause} ${elsewhere}`;
+}
+el('capacity-dismiss').onclick = () => {
+  const id = el('capacity-notice').dataset.dismissal;
+  if (!id) return;
+  try {
+    localStorage.setItem(
+      'och-capacity-dismissed',
+      JSON.stringify([...capacityDismissed(), id].slice(-50)),
+    );
+  } catch {
+    // Without storage the notice stays dismissed until the next change.
+  }
+  el('capacity-notice').hidden = true;
+};
 function heading() {
   updateFollowControl();
   el('memory-notice').hidden =
@@ -1467,16 +1612,7 @@ function heading() {
     model?.description ?? remote?.description ?? '';
   input('timeline-title').disabled = !editable();
   el<HTMLTextAreaElement>('timeline-description').disabled = !editable();
-  const sparse = sparseWorkspace();
-  const delta = sparse
-    ? [...sparse.changes.values()].reduce(
-        (n, c) => n + (c.after ? 1n : 0n) - (c.before ? 1n : 0n),
-        0n,
-      )
-    : 0n;
-  const count = sparse
-    ? BigInt((local ?? remote)?.event_count ?? 0) + delta
-    : (model?.points.entryCount ?? BigInt(remote?.event_count ?? 0));
+  const count = momentCount();
   text(
     'event-count',
     comparison
@@ -1564,6 +1700,7 @@ function heading() {
           ? 'In memory only'
           : 'Stored in this browser',
   );
+  updateCapacity();
 }
 async function draftDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -1718,13 +1855,20 @@ function persistDraft() {
   clearTimeout(draftTimer);
   draftTimer = setTimeout(() => {
     if (memoryOnly() || remote || !model) return;
+    const started = performance.now();
     const doc = model.document();
+    let built = performance.now() - started;
     void draftDb()
       .then(
         (db) =>
           new Promise<void>((resolve, reject) => {
             const tx = db.transaction('drafts', 'readwrite');
+            // Storing structured-clones the whole document on this thread; both pause the page.
+            const put = performance.now();
             tx.objectStore('drafts').put(doc, 'current');
+            built += performance.now() - put;
+            recordSample(capacity.edits, built);
+            updateCapacity();
             tx.oncomplete = () => {
               db.close();
               resolve();
@@ -1751,6 +1895,10 @@ function changed() {
   persistDraft();
 }
 function loadDocument(doc: TimelineDocument) {
+  // Imports start timing when the file is read; other opens start here, before indexing.
+  openStarted = pendingOpenStart ?? performance.now();
+  pendingOpenStart = null;
+  capacity = { redraws: [], edits: [], views: [] };
   cancelZoomAnimation();
   if (doc.comparison)
     throw new Error(
@@ -3952,6 +4100,7 @@ input('json-file').onchange = () => {
   input('json-file').value = '';
   if (!file || !mayReplace()) return;
   const workspace = documentRequest;
+  const started = performance.now();
   void file
     .text()
     .then((value) => {
@@ -3959,6 +4108,7 @@ input('json-file').onchange = () => {
       if (workspace !== documentRequest) return;
       historyReplace();
       sqlitePath = null;
+      pendingOpenStart = started;
       loadDocument(doc);
       toast('JSON timeline imported.');
     })

@@ -15,6 +15,22 @@ Why the browser is different: guest editing and the offline HTML file keep the w
 
 Signed-in users who edit a timeline kept only in the browser (imported, and not yet saved to their account) also wait after each edit while a draft is saved. Saving the timeline to the account avoids this; [#40](https://github.com/openchronology/timeline-app/issues/40) tracks making drafts incremental.
 
+## Advice in the app
+
+The editor suggests another platform when a timeline outgrows the one in use. The advice appears as a notice under the header; it never blocks editing, and dismissing it holds for that timeline.
+
+- **Browser:** The notice appears when this device measured the timeline as slow:
+  - opening took more than 1.5 s;
+  - the median of recent redraws exceeded 150 ms;
+  - keeping a draft took more than 100 ms after each change (signed in, for a timeline kept only in the browser).
+
+  Without such measurements it appears from 20,000 moments. It offers **Export** (to open the file in the desktop app), **Save to server** or **Sign in** where the browser is connected to a server, a link to the desktop app, and, in the offline HTML file, a link to the platform.
+
+- **Desktop app:** The notice appears when views of the timeline consistently take more than a second on this computer. It suggests saving the timeline to a server.
+- **Every platform:** The notice appears from 150,000 moments, durations or relationships, since a timeline holds at most 200,000 and no platform lifts that limit. It suggests splitting the timeline. On the platform and in the desktop app the count covers moments; in the browser it also covers durations and relationships.
+
+These rules live in `src/capacity.ts`.
+
 ## Data
 
 Medians from `npm run bench` on a 16-core Linux desktop, with Chromium for the browser. "4× slower CPU" throttles Chromium's processor 4×, roughly a mid-range phone.

@@ -1,6 +1,7 @@
 import { checkIssues } from './issues-browser.mjs';
 import { checkSearch } from './search-browser.mjs';
 import { checkSummaries } from './summaries-browser.mjs';
+import { checkCapacity } from './capacity-browser.mjs';
 import { checkTags } from './tags-browser.mjs';
 import { checkRelationships } from './relationships-browser.mjs';
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
@@ -177,6 +178,7 @@ try {
   await checkIssues(page, document);
   await checkSearch(page, document);
   await checkSummaries(page, document);
+  await checkCapacity(page, document, { offline: true });
   await checkTags(page, document);
   await checkRelationships(page, document);
   await closeMomentDetails(page);

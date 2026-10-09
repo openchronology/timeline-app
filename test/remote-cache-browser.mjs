@@ -29,6 +29,7 @@ export async function checkRemoteCache(browser) {
   let index = new TimelineIndex(document),
     revision = '1',
     documentReads = 0;
+  let reportedCount = null;
   let holdOverview = false,
     releaseOverview;
   const overviews = [],
@@ -46,7 +47,7 @@ export async function checkRemoteCache(browser) {
     canWrite: true,
     canPropose: true,
     canShare: true,
-    event_count: String(document.events.length),
+    event_count: reportedCount ?? String(document.events.length),
     first: '0/1',
     last: '10000/1',
   });
@@ -137,6 +138,8 @@ export async function checkRemoteCache(browser) {
     assert.equal(documentReads, 0);
     assert.equal(details.length, 0);
     assert(overviews.length >= 1);
+    // Server timelines of ordinary size get no capacity advice.
+    assert(await page.locator('#capacity-notice').isHidden());
     assert((await page.locator('.event-marker.group').count()) > 0);
     await bounds('0', '20');
     await page.getByRole('button', { name: 'Nearby moment', exact: true }).waitFor();
@@ -207,6 +210,15 @@ export async function checkRemoteCache(browser) {
     assert.equal(document.events.length, 10002);
     assert(document.events.some((e) => e.id === 'far'));
     assert.deepEqual(errors, []);
+    // Near the per-timeline limit, even the platform warns (it cannot lift the limit).
+    reportedCount = '160000';
+    await page.reload();
+    await page.locator('#capacity-notice').waitFor();
+    assert.match(
+      await page.locator('#capacity-text').textContent(),
+      /This timeline has 160,000 moments; a timeline holds at most 200,000\./,
+    );
+    assert.equal(await page.locator('#capacity-actions').locator('button, a').count(), 0);
   } finally {
     await context.close();
   }
