@@ -170,7 +170,7 @@ Image effects must match a URL explicitly entered in a declared image field, eve
 
 `POST /api/plugins/publish` accepts a full manifest including `source`. It returns HTTP 201 with the published manifest, whose ID is `u-<account UUID without hyphens>-<slug>`. The initial slug is limited to 29 characters. Keep the returned ID when releasing later versions; increment `version`. Reusing a version returns 409. Another account cannot overwrite this namespace; built-in/operator IDs are also protected. Search lists the newest version, while old detail URLs remain available. Installed snapshots never update automatically.
 
-Community plugins are discoverable immediately, with no moderation queue in this version. Capabilities remain restricted even after publication; the library does not distribute arbitrary executable JavaScript. Run the server migration before using the community catalogue. Tauri uses the same authoring, publication and discovery APIs through its configured server.
+Community plugins are discoverable immediately, with no moderation queue in this version. Publishing asks for a quick human check, except for administrators (see [human verification](authentication.md#human-verification)). Capabilities remain restricted even after publication; the library does not distribute arbitrary executable JavaScript. Run the server migration before using the community catalogue. Tauri uses the same authoring, publication and discovery APIs through its configured server.
 
 ## Official definitions and offline portability
 

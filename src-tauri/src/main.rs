@@ -38,8 +38,9 @@ async fn desktop_request(
     method: String,
     data: Option<serde_json::Value>,
     csrf: Option<String>,
+    challenge: Option<String>,
 ) -> Result<server::Reply, String> {
-    state.request(&path, &method, data, csrf).await
+    state.request(&path, &method, data, csrf, challenge).await
 }
 #[tauri::command]
 async fn desktop_auth_start(

@@ -36,6 +36,11 @@ CREATE TABLE IF NOT EXISTS oc_auth_attempts (
   key text PRIMARY KEY, count integer NOT NULL, expires_at timestamptz NOT NULL
 );
 CREATE INDEX IF NOT EXISTS oc_attempts_expiry ON oc_auth_attempts(expires_at);
+-- Spent human-verification answers (hashed salts), kept until their challenge expires.
+CREATE TABLE IF NOT EXISTS oc_challenge_uses (
+  id text PRIMARY KEY, expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS oc_challenge_uses_expiry ON oc_challenge_uses(expires_at);
 CREATE TABLE IF NOT EXISTS oc_timelines (
   id uuid PRIMARY KEY, owner_id uuid NOT NULL REFERENCES oc_users,
   title text NOT NULL, description text NOT NULL DEFAULT '', visibility text NOT NULL DEFAULT 'private'
