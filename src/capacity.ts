@@ -22,6 +22,38 @@ export const THRESHOLDS = {
   /** Every platform: entities of one kind at which to warn about the limit. */
   nearLimit: 150000,
 };
+/**
+ * How quickly interactions must respond, checked by the UI benchmarks (bench/ui.mjs). They
+ * follow the thresholds above: within a platform's comfortable size every interaction meets
+ * its budget, and past it the advice above must already be showing.
+ */
+export const BUDGETS = {
+  /** A click, key or tap until its result is painted: feels instant. */
+  response: THRESHOLDS.edit,
+  /** Zooming, panning or fitting until the new view is drawn. */
+  view: THRESHOLDS.redraw,
+  /**
+   * The longest frame during a continuous gesture (drag, wheel, pinch): the view may drop
+   * frames while it redraws, but never stalls longer than one redraw may take.
+   */
+  frame: THRESHOLDS.redraw,
+  /** Search results, separations and lists: users keep their attention for about 1 s. */
+  results: 1000,
+  /** Opening a timeline. */
+  open: THRESHOLDS.open,
+  /** Desktop: a whole-view query. */
+  desktopView: THRESHOLDS.view,
+};
+/**
+ * The largest timelines (in moments) each platform handles comfortably (docs/capacity.md).
+ * `slowBrowser` is a phone or slower computer, measured with the CPU throttled 4×.
+ */
+export const COMFORTABLE = {
+  browser: 4000,
+  slowBrowser: 1000,
+  desktop: LIMIT,
+  platform: LIMIT,
+};
 /** Recent measurements on this device for the open timeline. */
 export interface Measurements {
   open?: number;

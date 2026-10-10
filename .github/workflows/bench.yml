@@ -29,6 +29,8 @@ jobs:
       BENCH_DATABASE_URL: postgresql://rational_test@127.0.0.1:5433/rational_app
       BENCH_SIZES: ${{ inputs.sizes }}
       BENCH_TIME: ${{ inputs.time }}
+      # Interaction benchmarks (bench/ui.mjs): include 4,000, the browser's comfortable size.
+      UI_SIZES: 1000,4000,10000,100000,200000
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -67,6 +69,8 @@ jobs:
         run: |
           rustup update stable --no-self-update
           rustup default stable
+      # The platform interaction runs drive the production Next.js server.
+      - run: npm run build
       - run: npm run bench:seed
       - run: npm run bench
       - name: Stop PostgreSQL
