@@ -1349,6 +1349,12 @@ dialog h3 {
 .event-actions #event-edit-status {
   margin: 0;
 }
+/* Cancel and Save sit at the end of the row, after any destructive action. */
+.dialog-commit {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
 .plugin-actions {
   display: flex;
   gap: 6px;

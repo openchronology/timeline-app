@@ -59,6 +59,71 @@ export async function checkMomentDialog(page, restoreDocument) {
   await page.getByRole('button', { name: 'Edited through modal', exact: true }).click();
   await page.mouse.click(4, 4);
   await input('inspector').waitFor({ state: 'hidden' });
+  // Save applies edits typed just now and closes.
+  const marker = (name) => page.getByRole('button', { name, exact: true });
+  const applied = () =>
+    page.waitForFunction(() =>
+      document.getElementById('event-edit-status').textContent.startsWith('Applied'),
+    );
+  await marker('Edited through modal').click();
+  await input('event-title').fill('Saved through modal');
+  await input('event-save').click();
+  await input('inspector').waitFor({ state: 'hidden' });
+  await marker('Saved through modal').waitFor();
+  // Cancel restores the moment as it was opened, without an undo step of its own.
+  await marker('Saved through modal').click();
+  await input('event-title').fill('Discarded title');
+  await input('event-time').fill('5/1');
+  await applied();
+  await marker('Discarded title').waitFor();
+  await input('event-cancel').click();
+  await input('inspector').waitFor({ state: 'hidden' });
+  await marker('Saved through modal').waitFor();
+  assert.equal(await marker('Discarded title').count(), 0);
+  await input('undo-button').click();
+  await marker('Edited through modal').waitFor();
+  await input('redo-button').click();
+  await marker('Saved through modal').waitFor();
+  // Cancelling a new moment removes it; saving one creates it even if nothing was typed.
+  const events = () => input('event-count').textContent();
+  const before = await events();
+  await input('add-button').click();
+  await input('event-title').fill('Never created');
+  await applied();
+  await input('event-cancel').click();
+  await input('inspector').waitFor({ state: 'hidden' });
+  assert.equal(await marker('Never created').count(), 0);
+  assert.equal(await events(), before);
+  await input('add-button').click();
+  await input('event-save').click();
+  await input('inspector').waitFor({ state: 'hidden' });
+  assert.notEqual(await events(), before);
+  // The same for durations: a new one is removed by Cancel and kept by Save.
+  const bands = () => page.locator('.duration-band').count();
+  const durationDialog = input('duration-dialog');
+  const spans = await bands();
+  await input('add-duration-button').click();
+  await durationDialog.waitFor({ state: 'visible' });
+  await input('duration-title').fill('Cancelled span');
+  await input('duration-cancel').click();
+  await durationDialog.waitFor({ state: 'hidden' });
+  assert.equal(await bands(), spans);
+  await input('add-duration-button').click();
+  await input('duration-title').fill('Saved span');
+  await input('duration-save').click();
+  await durationDialog.waitFor({ state: 'hidden' });
+  await page.waitForFunction((n) => document.querySelectorAll('.duration-band').length > n, spans);
+  const saved = page.locator('.duration-band').last();
+  await saved.click({ position: { x: 4, y: 4 } });
+  await durationDialog.waitFor({ state: 'visible' });
+  assert.equal(await input('duration-title').inputValue(), 'Saved span');
+  await input('duration-title').fill('Renamed span');
+  await input('duration-cancel').click();
+  await durationDialog.waitFor({ state: 'hidden' });
+  await saved.click({ position: { x: 4, y: 4 } });
+  assert.equal(await input('duration-title').inputValue(), 'Saved span');
+  await input('duration-cancel').click();
+  await durationDialog.waitFor({ state: 'hidden' });
   await input('new-button').click();
   assert.equal(
     await input('timeline-description').inputValue(),

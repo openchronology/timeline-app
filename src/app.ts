@@ -2688,6 +2688,7 @@ function eventForm(event?: PointEvent, time?: Q) {
         : 'Read-only moment.',
   );
   el('event-delete').hidden = !event || !editable();
+  el('event-cancel').parentElement!.hidden = !editable();
   text('event-error', '');
   showMomentDetails(event ? 'Moment details' : 'New moment');
 }
@@ -5260,10 +5261,12 @@ const durationEditable = () => editable() && !!openDuration && !openDuration.rea
 function createDuration(start: DurationEndpoint, end: DurationEndpoint) {
   if (!editable() || !model) return;
   const duration: Duration = { id: eventId(), start, end, metadata: { title: '' } };
-  record({ duration: true, after: duration });
+  // The dialog session extends (or cancels) this same undo step.
+  const edit: DurationEdit = { duration: true, after: duration };
+  record(edit);
   model.putDuration(duration);
   changed();
-  showDuration(duration, false, { duration: true, after: duration });
+  showDuration(duration, false, edit);
 }
 /** Full metadata is local for complete timelines and fetched for indexed ones. */
 async function openDurationById(id: string, known?: DurationBand) {
@@ -5299,6 +5302,7 @@ function showDuration(duration: Duration, readOnly: boolean, edit: DurationEdit 
   for (const id of ['duration-title', 'duration-description', 'duration-tags', 'duration-metadata'])
     (el(id) as HTMLInputElement).disabled = readOnly;
   el('duration-delete').hidden = readOnly;
+  el('duration-cancel').parentElement!.hidden = readOnly;
   text('duration-error', '');
   renderDurationEndpoints();
   renderDurationPluginFields();
@@ -5367,6 +5371,53 @@ el<HTMLDialogElement>('duration-dialog').addEventListener('close', () => {
   openDuration = null;
   if (selected && !el('event-form').hidden) refreshDurations();
 });
+/** Removes one dialog session's undo step, whichever stack it is on. */
+function forgetEdit(edit: HistoryEntry) {
+  history = history.filter((e) => e !== edit);
+  future = future.filter((e) => e !== edit);
+}
+// Save applies what the dialog shows (edits also apply as you type) and closes it; Cancel
+// restores what the dialog opened with, including removing a new moment or duration.
+el('event-save').onclick = () => {
+  // Saving a new moment creates it even if nothing was typed: its time is already set.
+  if (!selected) pendingEventEdit = true;
+  flushEventEdit();
+  if (!pendingEventEdit && !el('event-error').textContent)
+    el<HTMLDialogElement>('inspector').close();
+};
+el('event-cancel').onclick = () => {
+  clearTimeout(eventEditTimer);
+  pendingEventEdit = false;
+  const edit = eventEditHistory;
+  if (edit && model) {
+    if (edit.after) model.delete(edit.after.id);
+    if (edit.before) model.put(edit.before);
+    forgetEdit(edit);
+    eventEditHistory = null;
+    selected = edit.before ?? null;
+    changed();
+  }
+  el<HTMLDialogElement>('inspector').close();
+};
+el('duration-save').onclick = () => {
+  flushDurationEdit();
+  if (!el('duration-error').textContent) el<HTMLDialogElement>('duration-dialog').close();
+};
+el('duration-cancel').onclick = () => {
+  clearTimeout(durationTimer);
+  durationTimer = undefined;
+  const current = openDuration;
+  // Cleared first, so closing does not apply the form.
+  openDuration = null;
+  const edit = current?.edit;
+  if (edit && model) {
+    if (edit.before) model.putDuration(edit.before);
+    else if (edit.after) model.deleteDuration(edit.after.id);
+    forgetEdit(edit);
+    changed();
+  }
+  el<HTMLDialogElement>('duration-dialog').close();
+};
 el('duration-delete').onclick = () => requestDurationDelete();
 /** Asks to delete the open duration. */
 function requestDurationDelete() {

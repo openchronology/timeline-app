@@ -666,7 +666,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     assert.equal(await cards.count(), 3);
     await cards.nth(2).getByLabel('Title', { exact: true }).fill('From child menu');
     assert.equal((await exported()).events.find((e) => e.id === 'icon').metadata.stack.length, 3);
-    assert.equal(await input('event-save').count(), 0);
+    assert.equal(await input('event-save').isVisible(), true);
     await imported({
       ...stacked,
       title: 'Color plugin UI',
