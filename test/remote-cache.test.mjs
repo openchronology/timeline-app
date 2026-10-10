@@ -202,3 +202,23 @@ test('confirmed windows reconcile IDs, replace summaries and remove absent momen
   assert.equal(result.groups[2].count, '99');
   assert.notEqual(result.groups[2], summary);
 });
+
+test('a writable server timeline opens when its metadata reports unset settings as null', () => {
+  // GET /api/timelines/<id> returns null for settings a timeline never had (for example
+  // one created through the API); the editor builds its workspace from that metadata.
+  const workspace = new RemoteWorkspace({
+    format: 'openchronology',
+    version: 1,
+    title: 'Created through the API',
+    description: '',
+    presentation: null,
+    plugins: null,
+    tags: null,
+    assets: null,
+    events: [],
+  });
+  assert.equal(workspace.tags, undefined);
+  assert.equal(workspace.assets, undefined);
+  assert.equal(workspace.plugins, undefined);
+  assert.equal(workspace.presentation, undefined);
+});

@@ -296,15 +296,16 @@ export class TimelineIndex {
   tags?: string[];
   assets?: Record<string, string>;
   constructor(document: TimelineDocument) {
-    this.tags = document.tags === undefined ? undefined : validateTags(document.tags);
-    this.assets = document.assets === undefined ? undefined : validateAssets(document.assets);
+    // Server metadata reports unset settings as null; treat them as absent.
+    this.tags = document.tags == null ? undefined : validateTags(document.tags);
+    this.assets = document.assets == null ? undefined : validateAssets(document.assets);
     this.title = document.title;
     this.description = document.description;
     this.presentation = document.presentation
       ? validatePresentation(document.presentation)
       : undefined;
     this.plugins =
-      document.plugins === undefined ? undefined : validateInstalledPlugins(document.plugins);
+      document.plugins == null ? undefined : validateInstalledPlugins(document.plugins);
     // Bulk-load coincident events once; copying/sorting a growing bucket per event is quadratic.
     const buckets = new Map<string, PointEvent[]>();
     for (const event of document.events) {
