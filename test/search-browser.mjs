@@ -97,11 +97,13 @@ export async function checkSearch(page, restore) {
     await results.first().waitFor();
     await results.first().click();
     await page.locator('.duration-band.search-hit').waitFor();
+    await page.waitForFunction(() => !document.getElementById('search-dialog').open);
     console.log(
       'PASS search: dialog results, pages, unchanged view while searching, navigation and highlight.',
     );
   } finally {
     if (await dialog.isVisible()) await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.getElementById('search-dialog').open);
     await imported(restore);
   }
 }

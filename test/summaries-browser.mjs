@@ -6,6 +6,9 @@ import { Q, Viewport } from '../dist/core.mjs';
 export async function checkSummaries(page, restore) {
   const imported = async (doc) => {
     await closeMomentDetails(page);
+    // A dialog still closing from an earlier check would return focus to its opener later,
+    // away from a bound field being typed into.
+    await page.waitForFunction(() => !document.querySelector('dialog[open]'));
     await page.locator('#json-file').setInputFiles({
       name: 'summaries.ochx',
       mimeType: 'application/json',
@@ -35,7 +38,17 @@ export async function checkSummaries(page, restore) {
       window.dispatchEvent(new Event('resize'));
       return new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
     });
-    assert.equal(await page.locator('#left-bound').inputValue(), left);
+    assert.equal(
+      await page.locator('#left-bound').inputValue(),
+      left,
+      await page.evaluate(() =>
+        JSON.stringify({
+          focused: document.activeElement?.id,
+          open: [...document.querySelectorAll('dialog[open]')].map((d) => d.id),
+          exact: document.getElementById('exact-left').value,
+        }),
+      ),
+    );
     await page.locator('#apply-bounds').click();
     await page.waitForFunction(
       ([l, r]) =>
@@ -62,6 +75,8 @@ export async function checkSummaries(page, restore) {
   };
   const dialog = page.locator('#duration-dialog');
   try {
+    // Importing while a bound field has focus must not later replace bounds typed afterwards.
+    await page.locator('#left-bound').focus();
     await imported(doc);
     await bounds('0', '1000');
     // At this zoom the one-unit durations collapse; the long one stays a band.
