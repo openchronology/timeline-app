@@ -8,6 +8,11 @@ export interface PresentationContext {
   readonly widthPixels: number;
   readonly purpose: 'axis' | 'event' | 'input' | 'tooltip';
   readonly spacingPixels?: number;
+  /**
+   * How large the timeline's text appears on screen relative to its normal size (1). Ruler
+   * labels need room for their apparent size, not a fixed number of pixels.
+   */
+  readonly textScale?: number;
 }
 export function validateContext(context?: PresentationContext): PresentationContext | undefined {
   if (context === undefined) return undefined;
@@ -32,6 +37,11 @@ export function validateContext(context?: PresentationContext): PresentationCont
       context.spacingPixels > 1000000)
   )
     throw new Error('Invalid presentation label spacing.');
+  if (
+    context.textScale !== undefined &&
+    (!Number.isFinite(context.textScale) || context.textScale < 0.1 || context.textScale > 10)
+  )
+    throw new Error('Invalid presentation text scale.');
   return context;
 }
 export function unitsPerPixel(context: PresentationContext): Q {

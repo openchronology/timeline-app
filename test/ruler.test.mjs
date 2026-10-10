@@ -279,3 +279,15 @@ test('fade weights stay meaningful for huge coordinates, tiny scales and nearly 
     );
   }
 });
+
+test('smaller text on screen fits more labelled marks, with minor marks kept apart', () => {
+  const labelled = (plan) => plan.ticks.filter((tick) => tick.labelOpacity > 0.5).length;
+  const normal = planRuler(context(0n, 30n, 300)),
+    small = planRuler({ ...context(0n, 30n, 300), textScale: 0.5 }),
+    tiny = planRuler({ ...context(0n, 30n, 300), textScale: 0.1 });
+  assert(labelled(small) > labelled(normal), `${labelled(small)} <= ${labelled(normal)}`);
+  // At 10 px per unit, marks 6 px apart are 3/5 of a unit apart.
+  for (let i = 1; i < tiny.ticks.length; i++)
+    assert(tiny.ticks[i].time.sub(tiny.ticks[i - 1].time).compare(Q.from(3n, 5n)) >= 0);
+  assert.throws(() => planRuler({ ...context(0n, 30n, 300), textScale: 0 }), /text scale/);
+});

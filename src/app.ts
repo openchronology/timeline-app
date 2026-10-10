@@ -453,8 +453,30 @@ let pluginSearchTimer: ReturnType<typeof setTimeout> | undefined;
 let pluginPage = 1;
 const memoryOnly = () => !desktop && (offlineHtml || !session.user);
 const editable = () => !comparison && !!model && (!remote || remote.canEdit);
-const width = () => Math.max(1, stage.clientWidth - 96),
-  pixels = () => Number(input('density').value);
+/**
+ * Room beside the ruler for markers at the bounds. Narrow stages, such as phones held upright,
+ * keep less so the timeline itself gets the width.
+ */
+let currentInset = 48;
+// Measured once per frame: reading layout while markers are created would start their
+// position transitions from wherever the browser first placed them.
+const inset = () => currentInset;
+/**
+ * The content scale a timeline opens at. Phone screens, in either orientation, are seen up
+ * close, so smaller markers and labels stay legible there and fit more of a timeline.
+ */
+const compactScreen = matchMedia('(max-width: 650px), (max-height: 500px)');
+const baseScale = () => (compactScreen.matches ? 0.75 : 1);
+/** Opens the contents at the stage's base scale, with the axis where it sits at full size. */
+function resetScale() {
+  uiScale = scaledFor = baseScale();
+  verticalOffset = 192 * (1 - uiScale);
+}
+/** The base scale last applied; turning a phone moves an unscaled timeline to the new base. */
+let scaledFor = 1;
+const width = () => Math.max(1, stage.clientWidth - 2 * inset()),
+  // Grouping follows marker size, which is smaller at a compact base scale.
+  pixels = () => Math.round(Number(input('density').value) * baseScale());
 function toast(message: string) {
   text('toast', message);
   el('toast').hidden = false;
@@ -556,6 +578,13 @@ function requestRender(refreshFrame = true) {
       openStarted = null;
       return;
     }
+    currentInset = stage.clientWidth < 600 ? 20 : 48;
+    // Turning a phone moves a timeline the reader has not rescaled to the new base scale.
+    if (uiScale === scaledFor && baseScale() !== scaledFor && !comparison) {
+      resetScale();
+      render(true);
+      return;
+    }
     render(refresh);
   });
 }
@@ -578,6 +607,7 @@ function viewContext(
     span: viewport.span,
     widthPixels: width(),
     purpose,
+    ...(purpose === 'axis' ? { textScale: uiScale } : {}),
     ...(spacingPixels === undefined ? {} : { spacingPixels }),
   };
 }
@@ -643,8 +673,8 @@ function renderAxis() {
   axis.replaceChildren();
   const baseline = document.createElement('div');
   baseline.className = 'axis-baseline';
-  baseline.style.left = `${48 / uiScale}px`;
-  baseline.style.right = `${48 / uiScale}px`;
+  baseline.style.left = `${inset() / uiScale}px`;
+  baseline.style.right = `${inset() / uiScale}px`;
   baseline.style.top = `${192 + (comparison && !comparison.combined ? (rowPlan.rows.get(comparison.tracks[0].source.key)?.offset ?? 0) : 0)}px`;
   axis.append(baseline);
   const rulerPresenter = timelinePresenter();
@@ -666,7 +696,7 @@ function renderAxis() {
     tick.className = 'axis-tick ' + rule.level;
     tick.dataset.time = time.toString();
     tick.dataset.opacity = rule.opacity.toString();
-    tick.style.left = `${(48 + viewport.x(time, width())) / uiScale}px`;
+    tick.style.left = `${(inset() + viewport.x(time, width())) / uiScale}px`;
     const guide = document.createElement('span');
     guide.className = 'tick-guide';
     guide.style.opacity = rule.majorOpacity.toString();
@@ -760,7 +790,7 @@ function drawFrame() {
   const cursorX = selectedTime ? viewport.x(selectedTime, width()) : -1;
   cursor.hidden = !selectedTime || cursorX < 0 || cursorX > width();
   el('clear-selection').hidden = !selectedTime;
-  cursor.style.left = `${48 + cursorX}px`;
+  cursor.style.left = `${inset() + cursorX}px`;
   if (selectedTime) {
     cursor.dataset.time = selectedTime.toString();
     cursor.setAttribute('aria-label', `Selected time: ${presented(selectedTime, 'input')}`);
@@ -845,7 +875,7 @@ function drawFrame() {
         ? ' selected'
         : '') +
       (searchHighlights(group) ? ' search-hit' : '');
-    button.style.left = `${(48 + x) / uiScale}px`;
+    button.style.left = `${(inset() + x) / uiScale}px`;
     markerGroups.set(button, group);
     summaryExpansion.update(button, group, expandSummaries);
     button.dataset.first = group.first;
@@ -875,10 +905,10 @@ function drawFrame() {
       labelTop = rowOffset + (top < 2 ? 128 - top * 43 : 234 + (top - 2) * 43);
     button.style.top = '';
     button.style.translate = `0 ${rowOffset}px`;
-    stem.style.left = `${(48 + x) / uiScale}px`;
+    stem.style.left = `${(inset() + x) / uiScale}px`;
     stem.style.top = `${top < 2 ? labelTop + 32 : rowOffset + 201}px`;
     stem.style.height = `${top < 2 ? rowOffset + 181 - labelTop - 32 : labelTop - rowOffset - 201}px`;
-    caption.style.left = `${(48 + x) / uiScale}px`;
+    caption.style.left = `${(inset() + x) / uiScale}px`;
     caption.style.top = `${labelTop}px`;
     label.title.textContent =
       count > 1n ? summaryName(group) : span ? (span.metadata.title ?? '') : (group.title ?? '');
@@ -950,7 +980,7 @@ function drawFrame() {
           const y = window.start + window.step * index;
           const previous = index === 0 ? rowOffset + 192 : y - window.step;
           const title = typeof entry.metadata.title === 'string' ? entry.metadata.title : '';
-          child.button.style.left = `${(48 + x) / uiScale}px`;
+          child.button.style.left = `${(inset() + x) / uiScale}px`;
           const size = pluginSize(activePlugins(), entry.metadata);
           child.button.dataset.size = size;
           child.button.style.top = `${y - { small: 16, medium: 22, large: 32 }[size] / 2}px`;
@@ -971,11 +1001,11 @@ function drawFrame() {
           child.button.style.backgroundColor = color ?? '';
           child.button.style.borderColor = '';
           renderPluginShape(child.button, pluginShape(activePlugins(), entry.metadata));
-          child.caption.style.left = `${(48 + x) / uiScale}px`;
+          child.caption.style.left = `${(inset() + x) / uiScale}px`;
           child.caption.style.top = `${direction < 0 ? y - 45 : y + 16}px`;
           child.title.textContent = title;
           child.caption.hidden = !title.trim();
-          child.stem.style.left = `${(48 + x) / uiScale}px`;
+          child.stem.style.left = `${(inset() + x) / uiScale}px`;
           child.stem.style.top = `${Math.min(y, previous)}px`;
           child.stem.style.height = `${Math.abs(y - previous)}px`;
           child.button.onclick = () => {
@@ -3101,14 +3131,16 @@ function fit() {
   if (comparison) {
     viewport = comparison.fit();
     uiScale = comparison.combined
-      ? 1
-      : Math.min(1, Math.max(0.25, (stage.clientHeight - 48) / (comparison.tracks.length * 340)));
+      ? baseScale()
+      : Math.min(
+          baseScale(),
+          Math.max(0.25, (stage.clientHeight - 48) / (comparison.tracks.length * 340)),
+        );
     verticalOffset = 0;
     requestRender();
     return;
   }
-  uiScale = 1;
-  verticalOffset = 0;
+  resetScale();
   const source = local ?? remote;
   let first = source?.first ? Q.parse(source.first) : undefined,
     last = source?.last ? Q.parse(source.last) : undefined;
@@ -3138,11 +3170,10 @@ function resetTimeSelection() {
   remoteCache.clear();
   windowController?.abort();
   clearTimeout(frameTimer);
-  uiScale = 1;
+  resetScale();
   clearTimeout(eventEditTimer);
   pendingEventEdit = false;
   eventEditHistory = null;
-  verticalOffset = 0;
   pluginSearchRequest++;
   clearTimeout(pluginSearchTimer);
   el<HTMLDialogElement>('plugins-dialog').close();
@@ -3425,7 +3456,7 @@ let gesture: {
   moved = false,
   suppressClickUntil = 0;
 function localX(clientX: number) {
-  return clientX - stage.getBoundingClientRect().left - 48;
+  return clientX - stage.getBoundingClientRect().left - inset();
 }
 function metrics() {
   const p = [...pointers.values()];
@@ -3664,7 +3695,7 @@ el<HTMLDialogElement>('inspector').addEventListener('close', () => {
   requestRender();
 });
 input('density').oninput = () => {
-  text('density-value', `${pixels()} px`);
+  text('density-value', `${input('density').value} px`);
   requestRender();
 };
 el('apply-bounds').onclick = () => {
@@ -5110,8 +5141,11 @@ el<HTMLInputElement>('compare-combined').onchange = () => {
   el<HTMLDialogElement>('inspector').close();
   comparison.combined = input('compare-combined').checked;
   uiScale = comparison.combined
-    ? 1
-    : Math.min(1, Math.max(0.25, (stage.clientHeight - 48) / (comparison.tracks.length * 340)));
+    ? baseScale()
+    : Math.min(
+        baseScale(),
+        Math.max(0.25, (stage.clientHeight - 48) / (comparison.tracks.length * 340)),
+      );
   verticalOffset = 0;
   requestRender();
 };
@@ -6220,8 +6254,8 @@ function renderEdgeArcs() {
   const name = (ref: EntityRef) =>
     describe(refKey(ref))?.title || ('moment' in ref ? 'Moment' : 'Duration');
   for (const edge of frame.edges ?? []) {
-    const xa = (48 + viewport.x(Q.parse(edge.aTime), width())) / uiScale,
-      xb = (48 + viewport.x(Q.parse(edge.bTime), width())) / uiScale;
+    const xa = (inset() + viewport.x(Q.parse(edge.aTime), width())) / uiScale,
+      xb = (inset() + viewport.x(Q.parse(edge.bTime), width())) / uiScale;
     const distance = Math.abs(xb - xa);
     const lift = Math.min(150, 18 + distance * 0.3);
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -6235,7 +6269,7 @@ function renderEdgeArcs() {
   }
   if (frame.edgesTruncated) {
     const note = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    note.setAttribute('x', '48');
+    note.setAttribute('x', String(inset()));
     note.setAttribute('y', '14');
     note.setAttribute('class', 'edge-limit');
     note.textContent = 'Showing the first 256 relationships in this window. Zoom in to see more.';
@@ -6270,7 +6304,7 @@ function renderDurationBands() {
       'search-hit',
       searchHit?.kind === 'duration' && searchHit.id === band.id && !band.sourceKey,
     );
-    button.style.left = (48 + left) / uiScale + 'px';
+    button.style.left = (inset() + left) / uiScale + 'px';
     button.style.width = Math.max(6, (right - left) / uiScale) + 'px';
     button.style.top = 202 + (rows.get(band.sourceKey ?? '')?.offset ?? 0) + (i % 3) * 9 + 'px';
     button.style.backgroundColor = pluginColor(plugins, band.metadata) ?? '';
