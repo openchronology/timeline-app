@@ -798,9 +798,9 @@ export class PostgresStore {
         const { rows } = await c.query(
           `SELECT kind,entity_id,oc_qtext(first_time) AS first,oc_qtext(last_time) AS last,title,left(body,300) AS body,count(*) OVER() AS total
           FROM oc_entity_search, to_tsquery('simple',$2) AS q
-          WHERE timeline_id=$1 AND document @@ q
+          WHERE timeline_id=$1 AND document @@ q AND ($5::text IS NULL OR kind=$5)
           ORDER BY ts_rank(document,q) DESC,first_time,kind,entity_id COLLATE "C" LIMIT $3 OFFSET $4`,
-          [id, tsquery, SEARCH_PAGE_SIZE, (query.page - 1) * SEARCH_PAGE_SIZE],
+          [id, tsquery, SEARCH_PAGE_SIZE, (query.page - 1) * SEARCH_PAGE_SIZE, query.only ?? null],
         );
         return {
           results: rows.map((r) => ({

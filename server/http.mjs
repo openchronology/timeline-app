@@ -905,7 +905,8 @@ export function createRequestHandler({
               input.text.length > 200 ||
               !Number.isInteger(page) ||
               page < 1 ||
-              page > 4000
+              page > 4000 ||
+              (input.only !== undefined && input.only !== 'moment')
             )
               throw new HttpError(400, 'Search needs text of at most 200 characters and a page.');
             return response(
@@ -915,6 +916,7 @@ export function createRequestHandler({
                 kind: 'search',
                 text: input.text,
                 page,
+                ...(input.only ? { only: input.only } : {}),
                 ...(input.revision ? { revision: input.revision } : {}),
               }),
             );

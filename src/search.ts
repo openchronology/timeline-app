@@ -59,6 +59,7 @@ export function searchIndex(
   text: string,
   page = 1,
   pageSize = SEARCH_PAGE_SIZE,
+  only?: 'moment',
 ): SearchPage {
   const terms = searchTerms(text);
   if (!terms.length) return { results: [], total: '0', page };
@@ -86,7 +87,7 @@ export function searchIndex(
   };
   for (const event of index.byId.values())
     consider('moment', event.id, event.time, event.time, event.metadata);
-  for (const duration of index.durations.values()) {
+  for (const duration of only ? [] : index.durations.values()) {
     const band = resolveDuration(duration, (id) => index.momentTime(id));
     if (band) consider('duration', duration.id, band.first, band.last, duration.metadata);
   }

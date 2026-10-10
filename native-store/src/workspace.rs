@@ -90,6 +90,9 @@ pub struct Query {
     /// The entity of a `related` query.
     #[serde(default)]
     pub entity: Option<Value>,
+    /// Restricts a search to one kind of entity ("moment").
+    #[serde(default)]
+    pub only: Option<String>,
 }
 /// A private temporary directory, removed with the last snapshot that uses it.
 struct Directory(PathBuf);
@@ -318,7 +321,12 @@ impl Snapshot {
             return Ok(json!({"duration": super::duration_by_id(&db, id)?}));
         }
         if q.kind == "search" {
-            return search(&db, &q.text, q.page.unwrap_or(1));
+            let moments = match q.only.as_deref() {
+                None => false,
+                Some("moment") => true,
+                Some(_) => return Err("A search can only be restricted to moments".into()),
+            };
+            return search(&db, &q.text, q.page.unwrap_or(1), moments);
         }
         if q.kind == "tags" {
             let rows = db.query_limited("SELECT t.value,count(*) FROM (SELECT metadata FROM events UNION ALL SELECT metadata FROM durations) e,json_each(e.metadata,'$.tags') t WHERE json_type(e.metadata,'$.tags')='array' AND t.type='text' GROUP BY t.value ORDER BY count(*) DESC,t.value LIMIT 200", &[], 200, BUDGET)?;
@@ -1476,6 +1484,25 @@ mod search_tests {
         assert_eq!(search("routine", 2)["total"], "30");
         assert_eq!(search("  ,.; ", 1)["total"], "0");
         assert_eq!(search("absent", 1)["total"], "0");
+        // Duration endpoints pick from moments only.
+        let moments = snapshot
+            .query(
+                &serde_json::from_value(
+                    json!({"kind":"search","text":"harbor","page":1,"only":"moment"}),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(moments["total"], "3");
+        assert_eq!(moments["results"][0]["id"], "late");
+        assert!(snapshot
+            .query(
+                &serde_json::from_value(
+                    json!({"kind":"search","text":"harbor","page":1,"only":"duration"}),
+                )
+                .unwrap(),
+            )
+            .is_err());
     }
 }
 #[cfg(test)]
@@ -1609,7 +1636,7 @@ fn search_terms(text: &str) -> Vec<String> {
 }
 /// Every term must occur in the title or notes (including nested entries such as stacks).
 /// SQLite's lower() folds ASCII only, so non-ASCII matching is case-sensitive here.
-fn search(db: &Connection, text: &str, page: usize) -> Result<Value, String> {
+fn search(db: &Connection, text: &str, page: usize, moments: bool) -> Result<Value, String> {
     if text.len() > 800 || !(1..=4000).contains(&page) {
         return Err("Search needs text of at most 200 characters and a page".into());
     }
@@ -1631,8 +1658,13 @@ fn search(db: &Connection, text: &str, page: usize) -> Result<Value, String> {
         .join(" AND ");
     let offset = ((page - 1) * 25).to_string();
     let n = terms.len();
+    let durations = if moments {
+        ""
+    } else {
+        "UNION ALL SELECT 'duration',d.id,d.first,d.last,coalesce(json_extract(d.metadata,'$.title'),''),coalesce(json_extract(d.metadata,'$.description'),'') FROM duration_intervals d"
+    };
     let sql = format!(
-        "WITH entities AS (         SELECT 'moment' AS kind,e.id,e.time AS first,e.time AS last,coalesce(json_extract(e.metadata,'$.title'),'') AS title,         coalesce(json_extract(e.metadata,'$.description'),'')||' '||coalesce((SELECT group_concat(coalesce(json_extract(n.value,'$.metadata.title'),'')||' '||coalesce(json_extract(n.value,'$.metadata.description'),''),' ') FROM json_each(e.metadata) a,json_each(a.value) n WHERE a.type='array'),'') AS body FROM events e          UNION ALL SELECT 'duration',d.id,d.first,d.last,coalesce(json_extract(d.metadata,'$.title'),''),coalesce(json_extract(d.metadata,'$.description'),'') FROM duration_intervals d),         hits AS (SELECT *,lower(title||' '||body) AS hay FROM entities)          SELECT kind,id,q(first),q(last),title,substr(trim(body),1,300),count(*) OVER() FROM hits WHERE {filter}          ORDER BY ({title_hit}) DESC,first COLLATE RATIONAL_V1,kind,id LIMIT 25 OFFSET ?{}",
+        "WITH entities AS (         SELECT 'moment' AS kind,e.id,e.time AS first,e.time AS last,coalesce(json_extract(e.metadata,'$.title'),'') AS title,         coalesce(json_extract(e.metadata,'$.description'),'')||' '||coalesce((SELECT group_concat(coalesce(json_extract(n.value,'$.metadata.title'),'')||' '||coalesce(json_extract(n.value,'$.metadata.description'),''),' ') FROM json_each(e.metadata) a,json_each(a.value) n WHERE a.type='array'),'') AS body FROM events e          {durations}),         hits AS (SELECT *,lower(title||' '||body) AS hay FROM entities)          SELECT kind,id,q(first),q(last),title,substr(trim(body),1,300),count(*) OVER() FROM hits WHERE {filter}          ORDER BY ({title_hit}) DESC,first COLLATE RATIONAL_V1,kind,id LIMIT 25 OFFSET ?{}",
         n + 1
     );
     let mut parameters: Vec<&str> = terms.iter().map(String::as_str).collect();

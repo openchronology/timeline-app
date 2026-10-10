@@ -92,6 +92,7 @@ test('query validation rejects bad bounds, search text and duration IDs before a
     { kind: 'search', text: 'x'.repeat(201) },
     { kind: 'search', text: 'harbor', page: 0 },
     { kind: 'search', text: 'harbor', page: 1.5 },
+    { kind: 'search', text: 'harbor', page: 1, only: 'duration' },
     { kind: 'duration' },
     { kind: 'duration', id: 'bad id' },
   ])

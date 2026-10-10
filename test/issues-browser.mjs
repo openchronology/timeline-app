@@ -134,8 +134,11 @@ export async function checkIssues(page, restore) {
     assert.equal(await page.locator('#duration-heading').textContent(), 'New duration');
     await page.locator('#duration-title').fill('Linked span');
     const endpoint = durationDialog.locator('[data-endpoint="end"]');
+    // A fixed end shows only its time; following a moment opens the moment selector.
+    assert.equal(await endpoint.getByRole('button').count(), 0);
     await endpoint.locator('select').selectOption('moment');
-    await endpoint.locator('.duration-moments button').filter({ hasText: 'End' }).click();
+    await page.locator('#moment-picker-results button').filter({ hasText: 'End' }).click();
+    await page.locator('#moment-picker').waitFor({ state: 'hidden' });
     await endpoint.locator('.duration-anchor').filter({ hasText: 'End' }).waitFor();
     const durationOf = async () => (await exported()).durations?.[0];
     await page.waitForFunction(() => !document.querySelector('#duration-error').textContent);

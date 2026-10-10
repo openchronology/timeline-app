@@ -65,6 +65,11 @@ test('complete timelines rank title matches first, then earlier entities, with p
   assert.equal(second.results.length, 5);
   assert.equal(second.total, '30');
   assert.equal(searchIndex(index, 'absent').total, '0');
+  // The duration endpoint selector searches moments only.
+  assert.deepEqual(
+    searchIndex(index, 'harbor', 1, 25, 'moment').results.map((r) => r.id),
+    ['late', 'early', 'stack'],
+  );
   // Anchored durations report their current extent after a moment moves.
   index.put({ ...index.byId.get('late'), time: '9/1' });
   assert.equal(searchIndex(index, 'works').results[0].last, '9/1');
