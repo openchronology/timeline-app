@@ -85,6 +85,11 @@
         closing it loses your changes. Export an .ochx file to keep them.</span
       >
     </aside>
+    <aside id="capacity-notice" class="memory-notice capacity-notice" role="status" hidden>
+      <span id="capacity-text"></span>
+      <span id="capacity-actions" class="capacity-actions"></span>
+      <button id="capacity-dismiss" type="button" aria-label="Dismiss this advice">×</button>
+    </aside>
     <p id="guest-fork-status" class="guest-fork-status" role="alert" hidden></p>
     <a id="guest-fork-original" class="guest-fork-original" hidden>View original timeline</a>
     <section id="dashboard" class="dashboard" hidden>
@@ -434,10 +439,7 @@ Every point has a place. Explore the spaces between them.</textarea>
         </p>
         <div id="separate-tags" class="separate-tags" role="group" aria-label="Tags"></div>
         <label
-          >Other tags<input
-            id="separate-extra"
-            spellcheck="false"
-            placeholder="Comma-separated"
+          >Other tags<input id="separate-extra" spellcheck="false" placeholder="Comma-separated"
         /></label>
         <p id="separate-error" class="form-error" role="alert"></p>
         <div class="dialog-actions">

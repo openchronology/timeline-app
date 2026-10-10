@@ -48,6 +48,7 @@ export async function checkDesktopCache(browser) {
     ],
   };
   let index = new TimelineIndex(document),
+    slowViews = false,
     generation = 1,
     reads = 0,
     durationReads = 0;
@@ -96,6 +97,8 @@ export async function checkDesktopCache(browser) {
         return { events: source.eventsBetween(q.lower, q.upper, 100), next: null };
       }
       overviews.push(q);
+      // A slow computer: whole views take over a second.
+      if (slowViews) await new Promise((done) => setTimeout(done, 1100));
       const view = new Viewport(Q.parse(q.lower), Q.parse(q.upper).sub(Q.parse(q.lower)));
       const frame = source.frame(
         view,
@@ -277,6 +280,37 @@ export async function checkDesktopCache(browser) {
     );
     assert.equal(exported.durations[0].metadata.title, 'Edited period');
     assert.deepEqual(exported.durations[0].end, { moment: 'near' });
+    // Fast views give no advice; consistently slow ones suggest a server.
+    assert(await page.locator('#capacity-notice').isHidden());
+    slowViews = true;
+    const viewsBefore = overviews.length;
+    // Zoom levels far apart, so the viewport cache cannot answer them.
+    for (const [left, right] of [
+      ['2000', '2050'],
+      ['8000', '8002'],
+      ['500', '501'],
+      ['9500', '9530'],
+    ]) {
+      // Each view is queried after a short delay; wait for the query, then for its answer.
+      const before = overviews.length;
+      await bounds(left, right);
+      for (let i = 0; i < 100 && overviews.length === before; i++) await page.waitForTimeout(50);
+      await page.waitForFunction(() => document.getElementById('loading-window').hidden);
+    }
+    assert(overviews.length >= viewsBefore + 3);
+    await page.locator('#capacity-notice').waitFor();
+    assert.match(
+      await page.locator('#capacity-text').textContent(),
+      /Views of this timeline take about 1\.\d s on this computer/,
+    );
+    assert.equal(
+      await page
+        .locator('#capacity-actions')
+        .getByRole('button', { name: 'Server connection' })
+        .count(),
+      1,
+    );
+    slowViews = false;
     assert.deepEqual(errors, []);
   } finally {
     await context.close();
