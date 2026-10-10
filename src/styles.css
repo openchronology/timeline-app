@@ -1147,6 +1147,56 @@ dialog h3 {
   .brand-mark {
     font-size: 27px;
   }
+  /* The timeline spans the screen, and its controls scroll in one row instead of wrapping. */
+  .timeline-card {
+    margin: 0 -15px;
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+  }
+  .view-toolbar {
+    padding: 8px 10px;
+  }
+  .view-toolbar .view-controls {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    max-width: 100%;
+  }
+  .view-toolbar .view-controls > * {
+    flex: none;
+  }
+  .timeline-stage {
+    height: max(330px, 52svh);
+  }
+}
+/* Phones held sideways: the timeline takes the screen's height, less its controls. */
+@media (max-height: 500px) and (orientation: landscape) {
+  main {
+    padding: 0 12px;
+  }
+  .timeline-card {
+    margin: 0 -12px;
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+  }
+  .timeline-card .view-toolbar {
+    padding: 6px 10px;
+    flex-wrap: nowrap;
+  }
+  .view-toolbar .view-controls {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    min-width: 0;
+  }
+  .view-toolbar .view-controls > * {
+    flex: none;
+  }
+  .timeline-stage {
+    height: max(240px, calc(100svh - 56px));
+  }
 }
 
 #provider-buttons {

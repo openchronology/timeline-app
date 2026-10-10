@@ -293,13 +293,22 @@ export function planRuler(
   if (!Number.isInteger(offsetMinutes) || Math.abs(offsetMinutes) > 1439)
     throw new Error('Invalid ruler timezone offset.');
   const pixel = unitsPerPixel(context);
+  // Labels need room for how large they appear, so smaller text fits more of them. Minor marks
+  // stay at least 6 pixels apart to remain distinguishable lines.
+  const text = context.textScale ?? 1;
   const majorTarget = pixel.mul(
     Q.parseDecimal(
-      Math.max(checked.kind === 'gregorian' ? 70 : 90, context.widthPixels / 32).toString(),
+      Math.max(
+        (checked.kind === 'gregorian' ? 70 : 90) * text,
+        40,
+        context.widthPixels / 32,
+      ).toFixed(3),
     ),
   );
   // Reserve room for both spatial layers, including non-nested calendar marks.
-  const minorTarget = pixel.mul(Q.parseDecimal(Math.max(9, context.widthPixels / 192).toString()));
+  const minorTarget = pixel.mul(
+    Q.parseDecimal(Math.max(9 * text, 6, context.widthPixels / 192).toFixed(3)),
+  );
   const fine = planLevel(context, checked, offsetMinutes, majorTarget, minorTarget);
   const start =
     fine.previous.compare(fine.major.div(Q.from(2n))) > 0
