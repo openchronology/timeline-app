@@ -100,5 +100,28 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+  # Optional syslog receiver (docs/syslog.md): docker compose --profile syslog up -d
+  syslog:
+    profiles: ['syslog']
+    restart: unless-stopped
+    init: true
+    image: openchronology-app:local
+    build: *app-build
+    environment:
+      OCH_API_URL: ${SYSLOG_API_URL:-http://app:5173}
+      OCH_API_KEY: ${SYSLOG_API_KEY:-}
+      SYSLOG_ROUTES: /config/syslog-routes.json
+      SYSLOG_HOST: 0.0.0.0
+      SYSLOG_PORT: 5514
+    volumes:
+      - ${SYSLOG_ROUTES_FILE:-./syslog-routes.json}:/config/syslog-routes.json:ro
+    # Loopback only, like the app; publish more widely only behind a firewall.
+    ports:
+      - '127.0.0.1:${SYSLOG_HOST_PORT:-5514}:5514/udp'
+      - '127.0.0.1:${SYSLOG_HOST_PORT:-5514}:5514/tcp'
+    command: ['node', 'server/syslog-receiver.mjs']
+    depends_on:
+      app:
+        condition: service_started
 volumes:
   timelines:

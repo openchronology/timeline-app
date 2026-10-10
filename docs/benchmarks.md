@@ -69,6 +69,21 @@ Opening differs by platform:
 
 It also records the SQLite file size and the PostgreSQL rows a timeline occupies (its moments, indexes, search and links, excluding B-tree indexes and history). The report's capacity charts place these beside the equivalent desktop and platform measurements, with reference lines at 100 ms (responses feel instant) and 1 s (users keep their attention). Where a line crosses them shows where that platform stops feeling responsive.
 
+## Realtime updates
+
+`npm run bench:realtime` (or `test/syslog-live-postgres.mjs` with `SOAK_RATE` and `SOAK_SECONDS`) streams syslog messages at a steady rate through the [syslog receiver](syslog.md), the API, PostgreSQL and the live event stream to an editor open in Chromium. For each message it measures the time from sending it until the open editor's moment count includes it. Afterwards it checks that every message is stored exactly once. Messages alternate between UDP and TCP; the receiver saves every 200 ms (the default `SYSLOG_FLUSH_MS` of 1 s adds up to a second).
+
+Measured on an AMD Ryzen 7 7730U laptop (16 threads), with PostgreSQL in Docker and the production Next.js server:
+
+| Rate      | Messages | Viewer latency p50 |    p95 |    Max | Stored         |
+| --------- | -------: | -----------------: | -----: | -----: | -------------- |
+| 20/s (CI) |      200 |             125 ms | 225 ms | 234 ms | all, once each |
+| 100/s     |    6,000 |             128 ms | 220 ms | 254 ms | all, once each |
+| 500/s     |   15,000 |             151 ms | 242 ms | 360 ms | all, once each |
+| 1,000/s   |   20,000 |             177 ms | 482 ms | 801 ms | all, once each |
+
+Latency stays near the save interval up to 500 messages a second; at 1,000 a second the slowest messages wait longer (p95 482 ms, max 801 ms), with each save carrying about 200 moments. Nothing was lost or duplicated at any rate. Each save is one API request, so a single timeline needs about 300 requests a minute at a 200 ms interval and 60 at the default. `API_KEY_REQUESTS_PER_MINUTE` (default 120) must allow this.
+
 ## Method
 
 - **In-memory and PostgreSQL** use [tinybench](https://github.com/tinylibs/tinybench) in Node. Each task runs at least 10 iterations and for at least `BENCH_TIME`, after 2 warm-up iterations. The report shows the mean and standard deviation of individual calls, plus the median, p99, sample count and relative margin of error.

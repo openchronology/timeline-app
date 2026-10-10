@@ -212,7 +212,7 @@ This loads a complete in-memory copy without creating a database timeline.
 Copies are limited to 5,000 entries (moments and stack entries) and 4 MiB; oversized timelines remain viewable
 through the bounded server cache. See [guest editing and copy limits](docs/guest-editing.md).
 
-Site operators can bootstrap an administrator from `.env`, configure default and per-user data quotas, and manage users/timelines at `/admin`. Accounts support scoped API keys for unattended ingestion, avatar settings, and social-account unlinking. See [administration, quotas and automation](docs/administration.md) for setup and security details.
+Site operators can bootstrap an administrator from `.env`, configure default and per-user data quotas, and manage users/timelines at `/admin`. Accounts support scoped API keys for unattended ingestion, avatar settings, and social-account unlinking. See [administration, quotas and automation](docs/administration.md) for setup and security details. A bundled [syslog receiver](docs/syslog.md) uses one to turn log messages into moments, routed to timelines by host, application, facility and severity; viewers see them arrive live.
 
 Build identity and downloads
 
