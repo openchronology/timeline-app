@@ -74,6 +74,8 @@ Open http://localhost:5173 after startup. See [the deployment guide](docs/docker
 
 The database has a persistent volume and no published database port. A migration service creates the extension and schema before the application starts. The app binds to `127.0.0.1:5173` on the host. For public hosting, put an HTTPS reverse proxy in front of that port and set `APP_ORIGIN` to the exact external origin, `https://timescale.info`. Secure session cookies are selected from that origin. `APP_ORIGIN` has no trailing slash or path.
 
+**Set `TRUST_PROXY=1` behind that proxy, or anonymous visitors share one rate limit.** The Next.js server cannot see the connecting address, so without a trusted `X-Forwarded-For` every request appears to come from the same address. Limits that are meant per address (about ten attempts a minute) then apply to everyone at once: password sign-in and registration, social and desktop sign-in starts, email verification and password-reset links, two-factor completion, and guests loading or copying a public timeline into their browser. SQLite downloads are also limited per address, so signed-in users share that limit too. A single busy or abusive client can make these fail for everyone with "Too many sign-in attempts. Please wait a minute." Other signed-in actions are limited per account and are unaffected. Enable it only when the proxy overwrites `X-Forwarded-For` with the one client address and the app port is not reachable directly; otherwise anyone could choose their own address. See [Docker deployment](docs/docker.md) and [authentication](docs/authentication.md).
+
 Compose also builds and installs the isolated SQLite file converter. For an existing PostgreSQL installation with pgmp available:
 
 ```sh
