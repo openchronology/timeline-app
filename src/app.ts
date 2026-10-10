@@ -5607,83 +5607,185 @@ function endpointEditor(which: 'start' | 'end') {
     };
     box.append(summary, open);
   }
-  const chooser = document.createElement('div');
-  chooser.className = 'duration-moments';
-  if (durationEditable()) {
+  const follow = (cancelled?: () => void) =>
+    pickMoment((moment) => setEndpoint({ moment: moment.id }), cancelled);
+  if (typeof endpoint !== 'string' && durationEditable()) {
     const choose = document.createElement('button');
     choose.type = 'button';
-    choose.textContent =
-      typeof endpoint === 'string' ? 'Follow a moment…' : 'Choose another moment…';
-    choose.onclick = () =>
-      void listMoments(chooser, (moment) => setEndpoint({ moment: moment.id }));
-    box.append(choose, chooser);
+    choose.textContent = 'Choose another moment…';
+    choose.onclick = () => follow();
+    box.append(choose);
   }
   mode.onchange = () => {
     if (mode.value === 'time') {
       const time = endpointTime(openDuration!.duration, which) ?? viewMiddle();
       setEndpoint(time.toString());
-    } else void listMoments(chooser, (moment) => setEndpoint({ moment: moment.id }));
+    } else
+      // Following needs a moment: choose one now, or stay fixed.
+      follow(() => (mode.value = 'time'));
   };
   return box;
 }
-/** Pages through moments 25 at a time so a choice never loads the whole timeline. */
-async function listMoments(host: HTMLElement, choose: (moment: PointEvent) => void) {
-  let cursor: { time: string; id: string } | null = null;
-  const generation = documentRequest;
-  const more = document.createElement('button');
-  more.type = 'button';
-  more.textContent = 'Next 25 moments';
-  const load = async () => {
-    more.disabled = true;
-    try {
-      const page: { events: PointEvent[]; next: { time: string; id: string } | null } =
-        !sparseWorkspace() && model
-          ? model.points.size
-            ? await groupPage(
-                {
-                  first: model.points.minKey()!.toString(),
-                  last: model.points.maxKey()!.toString(),
-                  count: '0',
-                  distinct: 0,
-                },
-                cursor,
-              )
-            : { events: [], next: null }
-          : await timelineQuery({
-              kind: 'events',
-              lower: local?.first ?? null,
-              upper: local?.last ?? null,
-              limit: 25,
-              after: cursor,
-              revision: (local ?? remote)!.revision,
-            });
-      if (generation !== documentRequest || !host.isConnected) return;
-      host.replaceChildren();
-      for (const moment of page.events) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.textContent =
-          (moment.metadata.title || 'Unnamed moment') +
-          ' · ' +
-          presented(Q.parse(moment.time), 'event');
-        button.onclick = () => {
-          sparseWorkspace()?.load(moment);
-          choose(moment);
-        };
-        host.append(button);
-      }
-      if (!page.events.length) host.textContent = 'This timeline has no moments yet.';
-      cursor = page.next;
-      if (cursor) host.append(more);
-    } catch (error) {
-      fail(error);
-    } finally {
-      more.disabled = false;
-    }
-  };
-  more.onclick = () => void load();
-  await load();
+/**
+ * The moment selector browses moments in time order, or searches their titles and notes, 25
+ * at a time, so choosing one never loads a whole timeline of many thousands.
+ */
+type PickedMoment = { id: string; time: string; title: string };
+let momentPicker: {
+  choose: (moment: PointEvent) => void;
+  cancelled?: () => void;
+  chosen: boolean;
+  request: number;
+  page: number;
+  /** Browsing pages start after these cursors; `cursors[0]` is the first page. */
+  cursors: ({ time: string; id: string } | null)[];
+} | null = null;
+let momentPickerTimer: ReturnType<typeof setTimeout> | undefined;
+function pickMoment(choose: (moment: PointEvent) => void, cancelled?: () => void) {
+  momentPicker = { choose, cancelled, chosen: false, request: 0, page: 1, cursors: [null] };
+  input('moment-picker-text').value = '';
+  el('moment-picker-results').replaceChildren();
+  text('moment-picker-status', 'Loading moments…');
+  el<HTMLDialogElement>('moment-picker').showModal();
+  input('moment-picker-text').focus();
+  void loadMomentPicker(1);
 }
+async function loadMomentPicker(page: number) {
+  const picker = momentPicker;
+  if (!picker) return;
+  const request = ++picker.request;
+  const generation = documentRequest;
+  const words = input('moment-picker-text').value;
+  const previous = el<HTMLButtonElement>('moment-picker-previous'),
+    next = el<HTMLButtonElement>('moment-picker-next');
+  previous.disabled = next.disabled = true;
+  try {
+    let moments: PickedMoment[], status: string, more: boolean;
+    if (searchTerms(words).length) {
+      const result = await searchPage(words, page, 'moment');
+      moments = result.results.map((r) => ({ id: r.id, time: r.first, title: r.title }));
+      const total = BigInt(result.total);
+      const pages = (total + BigInt(SEARCH_PAGE_SIZE) - 1n) / BigInt(SEARCH_PAGE_SIZE);
+      more = BigInt(page) < pages;
+      status =
+        total === 0n && !moments.length
+          ? 'No moments match.'
+          : `${total} ${total === 1n ? 'moment matches' : 'moments match'}` +
+            (pages > 1n ? ` · page ${page} of ${pages}` : '');
+    } else {
+      const result = await browseMoments(picker.cursors[page - 1] ?? null);
+      moments = result.events.map((e) => ({
+        id: e.id,
+        time: e.time,
+        title: e.metadata.title ?? '',
+      }));
+      picker.cursors[page] = result.next;
+      more = !!result.next;
+      const count = BigInt(momentCount());
+      const pages = (count + BigInt(SEARCH_PAGE_SIZE) - 1n) / BigInt(SEARCH_PAGE_SIZE);
+      status = !moments.length
+        ? 'This timeline has no moments yet.'
+        : `${count} ${count === 1n ? 'moment' : 'moments'} in time order` +
+          (pages > 1n ? ` · page ${page} of ${pages}` : '');
+    }
+    if (picker !== momentPicker || request !== picker.request || generation !== documentRequest)
+      return;
+    picker.page = page;
+    renderMomentPicker(moments);
+    text('moment-picker-status', status);
+    previous.disabled = page <= 1;
+    next.disabled = !more;
+    previous.parentElement!.hidden = page <= 1 && !more;
+  } catch (error) {
+    if (picker === momentPicker && request === picker.request)
+      text('moment-picker-status', error instanceof Error ? error.message : String(error));
+  }
+}
+/** One page of moments in time order, after a (time, ID) cursor. */
+function browseMoments(cursor: { time: string; id: string } | null) {
+  if (!sparseWorkspace() && model)
+    return model.points.size
+      ? groupPage(
+          {
+            first: model.points.minKey()!.toString(),
+            last: model.points.maxKey()!.toString(),
+            count: '0',
+            distinct: 0,
+          },
+          cursor,
+          SEARCH_PAGE_SIZE,
+        )
+      : Promise.resolve({ events: [] as PointEvent[], next: null });
+  return timelineQuery<{ events: PointEvent[]; next: { time: string; id: string } | null }>({
+    kind: 'events',
+    lower: local?.first ?? null,
+    upper: local?.last ?? null,
+    limit: SEARCH_PAGE_SIZE,
+    after: cursor,
+    revision: (local ?? remote)!.revision,
+  });
+}
+function renderMomentPicker(moments: PickedMoment[]) {
+  const list = el('moment-picker-results');
+  list.replaceChildren();
+  for (const moment of moments) {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'search-result';
+    const title = document.createElement('strong');
+    title.textContent = moment.title || 'Unnamed moment';
+    const meta = document.createElement('span');
+    meta.className = 'search-meta';
+    meta.textContent = presented(Q.parse(moment.time), 'event');
+    button.append(title, meta);
+    button.onclick = () => void chooseMoment(moment).catch(fail);
+    item.append(button);
+    list.append(item);
+  }
+}
+async function chooseMoment(moment: PickedMoment) {
+  const picker = momentPicker;
+  if (!picker) return;
+  // Search results carry only a title; load the moment so the duration can resolve it.
+  const [point] = (
+    await groupPage({
+      id: moment.id,
+      first: moment.time,
+      last: moment.time,
+      count: '1',
+      distinct: 1,
+    })
+  ).events;
+  if (picker !== momentPicker) return;
+  if (!point) throw new Error('That moment no longer exists.');
+  sparseWorkspace()?.load(point);
+  picker.chosen = true;
+  el<HTMLDialogElement>('moment-picker').close();
+  picker.choose(point);
+}
+el<HTMLFormElement>('moment-picker-form').onsubmit = (event) => {
+  event.preventDefault();
+  clearTimeout(momentPickerTimer);
+  if (momentPicker) momentPicker.cursors = [null];
+  void loadMomentPicker(1);
+};
+input('moment-picker-text').oninput = () => {
+  clearTimeout(momentPickerTimer);
+  momentPickerTimer = setTimeout(
+    () => el<HTMLFormElement>('moment-picker-form').requestSubmit(),
+    250,
+  );
+};
+el('moment-picker-previous').onclick = () =>
+  void loadMomentPicker(Math.max(1, (momentPicker?.page ?? 1) - 1));
+el('moment-picker-next').onclick = () => void loadMomentPicker((momentPicker?.page ?? 0) + 1);
+el('moment-picker').addEventListener('close', () => {
+  clearTimeout(momentPickerTimer);
+  const picker = momentPicker;
+  momentPicker = null;
+  if (picker && !picker.chosen) picker.cancelled?.();
+});
 /**
  * Tag separation: a read-only, two-track comparison of one timeline with itself. Entities
  * carrying any selected tag move to the upper track; everything else stays below. Indexed
@@ -5864,6 +5966,28 @@ function unsavedMatches(text: string) {
   }
   return { changed, hits };
 }
+/** One page of matches, with unsaved edits on indexed timelines overlaid on the saved ones. */
+async function searchPage(words: string, page: number, only?: 'moment'): Promise<SearchPage> {
+  if (!sparseWorkspace() && model) return searchIndex(model, words, page, SEARCH_PAGE_SIZE, only);
+  const result = await timelineQuery<SearchPage>({
+    kind: 'search',
+    text: words,
+    page,
+    ...(only ? { only } : {}),
+    revision: (local ?? remote)!.revision,
+  });
+  const { changed, hits } = unsavedMatches(words);
+  const saved = result.results.filter((r) => !changed.has(r.kind + ':' + r.id));
+  const added = page === 1 ? hits.filter((hit) => !only || hit.kind === only) : [];
+  // Saved matches hidden by unsaved edits are only known for this page; the total adjusts for them.
+  return {
+    ...result,
+    results: [...added, ...saved],
+    total: String(
+      BigInt(result.total) - BigInt(result.results.length - saved.length) + BigInt(added.length),
+    ),
+  };
+}
 async function runSearch(page: number) {
   const words = input('search-text').value;
   const request = ++searchState.request;
@@ -5878,29 +6002,7 @@ async function runSearch(page: number) {
   }
   text('search-status', 'Searching…');
   try {
-    let result: SearchPage;
-    if (!sparseWorkspace() && model) result = searchIndex(model, words, page);
-    else {
-      result = await timelineQuery<SearchPage>({
-        kind: 'search',
-        text: words,
-        page,
-        revision: (local ?? remote)!.revision,
-      });
-      const { changed, hits } = unsavedMatches(words);
-      const saved = result.results.filter((r) => !changed.has(r.kind + ':' + r.id));
-      const added = page === 1 ? hits : [];
-      // Saved matches hidden by unsaved edits are only known for this page; the total adjusts for them.
-      result = {
-        ...result,
-        results: [...added, ...saved],
-        total: String(
-          BigInt(result.total) -
-            BigInt(result.results.length - saved.length) +
-            BigInt(added.length),
-        ),
-      };
-    }
+    const result = await searchPage(words, page);
     if (request !== searchState.request) return;
     searchState.total = BigInt(result.total);
     renderSearchResults(result.results);

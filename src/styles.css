@@ -2100,22 +2100,6 @@ dialog button {
   font-size: 13px;
   overflow-wrap: anywhere;
 }
-.duration-moments {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 220px;
-  overflow: auto;
-}
-.duration-moments:empty {
-  display: none;
-}
-.duration-moments button {
-  display: block;
-  text-align: left;
-  white-space: normal;
-  padding: 8px 10px;
-}
 #event-durations {
   display: flex;
   flex-direction: column;
@@ -2193,7 +2177,8 @@ dialog button {
   font-weight: 600;
 }
 
-#search-dialog {
+#search-dialog,
+#moment-picker {
   width: min(620px, calc(100vw - 30px));
   min-width: 0;
 }

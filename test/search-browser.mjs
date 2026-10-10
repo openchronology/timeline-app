@@ -98,12 +98,66 @@ export async function checkSearch(page, restore) {
     await results.first().click();
     await page.locator('.duration-band.search-hit').waitFor();
     await page.waitForFunction(() => !document.getElementById('search-dialog').open);
+    // Duration endpoints follow a moment chosen from a paged, searchable selector.
+    const picker = page.locator('#moment-picker'),
+      choices = page.locator('#moment-picker-results .search-result'),
+      status = (pattern) =>
+        page.waitForFunction(
+          (source) =>
+            new RegExp(source).test(document.getElementById('moment-picker-status').textContent),
+          pattern,
+        );
+    await page.locator('#add-duration-button').click();
+    const durationDialog = page.locator('#duration-dialog');
+    await durationDialog.waitFor({ state: 'visible' });
+    const start = durationDialog.locator('[data-endpoint="start"]'),
+      end = durationDialog.locator('[data-endpoint="end"]');
+    // Cancelling the selector leaves the endpoint fixed.
+    await start.locator('select').selectOption('moment');
+    await picker.waitFor({ state: 'visible' });
+    await page.keyboard.press('Escape');
+    // The dialog's close event, which resets the kind, follows hiding it.
+    await page.waitForFunction(
+      () => document.querySelector('[data-endpoint="start"] select').value === 'time',
+    );
+    assert.equal(await start.locator('.duration-time').count(), 1);
+    await end.locator('select').selectOption('moment');
+    await picker.waitFor({ state: 'visible' });
+    await status('^32 moments in time order · page 1 of 2$');
+    assert.equal(await choices.count(), 25);
+    assert(await page.locator('#moment-picker-previous').isDisabled());
+    await page.locator('#moment-picker-next').click();
+    await status('page 2 of 2');
+    assert.equal(await choices.count(), 7);
+    assert(await page.locator('#moment-picker-next').isDisabled());
+    // Typing searches moments only: "Harbor works" is a duration.
+    await page.locator('#moment-picker-text').fill('harbor');
+    await status('^2 moments match$');
+    assert.deepEqual(await choices.locator('strong').allTextContents(), [
+      'Harbor survey',
+      'Lighthouse',
+    ]);
+    await choices.nth(1).click();
+    await picker.waitFor({ state: 'hidden' });
+    await end.locator('.duration-anchor').filter({ hasText: 'Lighthouse' }).waitFor();
+    // Choosing again starts from a fresh, unsearched list; closing it keeps the moment.
+    await end.getByRole('button', { name: 'Choose another moment…' }).click();
+    await status('in time order');
+    assert.equal(await page.locator('#moment-picker-text').inputValue(), '');
+    await page.getByRole('button', { name: 'Close moment selector' }).click();
+    await picker.waitFor({ state: 'hidden' });
+    await end.locator('.duration-anchor').filter({ hasText: 'Lighthouse' }).waitFor();
+    assert.equal(await end.locator('select').inputValue(), 'moment');
+    await durationDialog.getByRole('button', { name: 'Close duration details' }).click();
+    await durationDialog.waitFor({ state: 'hidden' });
     console.log(
-      'PASS search: dialog results, pages, unchanged view while searching, navigation and highlight.',
+      'PASS search: dialog results, pages, unchanged view while searching, navigation, highlight and the moment selector.',
     );
   } finally {
-    if (await dialog.isVisible()) await page.keyboard.press('Escape');
-    await page.waitForFunction(() => !document.getElementById('search-dialog').open);
+    for (const open of ['#moment-picker', '#search-dialog', '#duration-dialog'])
+      if (await page.locator(open).isVisible()) await page.keyboard.press('Escape');
+    // Closing dialogs return focus to their openers; let that finish before the next check.
+    await page.waitForFunction(() => !document.querySelector('dialog[open]'));
     await imported(restore);
   }
 }

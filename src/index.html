@@ -511,6 +511,33 @@ Every point has a place. Explore the spaces between them.</textarea>
         </div>
       </form>
     </dialog>
+    <dialog id="moment-picker" class="search-dialog" aria-labelledby="moment-picker-heading">
+      <form id="moment-picker-form">
+        <div class="dialog-heading">
+          <h2 id="moment-picker-heading">Choose a moment</h2>
+          <button type="button" data-close="moment-picker" aria-label="Close moment selector">
+            ×
+          </button>
+        </div>
+        <div class="search-row">
+          <input
+            id="moment-picker-text"
+            type="search"
+            maxlength="200"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Search moments"
+            placeholder="Words in titles and notes, or leave empty to browse"
+          />
+        </div>
+        <p id="moment-picker-status" class="field-hint" role="status" aria-live="polite"></p>
+        <ol id="moment-picker-results" class="search-results"></ol>
+        <div class="dialog-actions">
+          <button id="moment-picker-previous" type="button">Previous</button
+          ><button id="moment-picker-next" type="button">Next</button>
+        </div>
+      </form>
+    </dialog>
     <input id="json-file" type="file" accept=".ochx,.json,application/json" hidden />
     <input id="och-file" type="file" accept=".och,application/vnd.openchronology.sqlite" hidden />
     <dialog id="pull-dialog">

@@ -57,6 +57,17 @@ try {
   );
   assert.equal((await search('harbo')).total, '4', 'Prefix matching includes "harbour".');
   assert.equal((await search('HARBOR SURVEY')).total, '1');
+  const moments = await store.query(timeline.id, user, {
+    kind: 'search',
+    text: 'harbor',
+    page: 1,
+    only: 'moment',
+  });
+  assert.deepEqual(
+    moments.results.map((r) => r.kind),
+    ['moment', 'moment'],
+    'The endpoint selector searches moments only.',
+  );
   assert.equal((await search('routine')).results.length, 25);
   assert.equal((await search('routine', 2)).results.length, 5);
   assert.equal((await search(" ' & | ! :* ")).total, '0', 'Operators are not query syntax.');
