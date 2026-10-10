@@ -3173,6 +3173,10 @@ function resetTimeSelection() {
   pendingDelete = null;
   el<HTMLDialogElement>('delete-dialog').close();
 }
+/** The open moment's card for a stack entry. */
+function stackCard(id: string) {
+  return el('plugin-event-fields').querySelector<HTMLElement>(`[data-stack-id="${id}"]`);
+}
 function addStackEntry(point: PointEvent) {
   flushEventEdit();
   const field = pluginFields(activePlugins()).find((f) => f.kind === 'stack');
@@ -3186,7 +3190,7 @@ function addStackEntry(point: PointEvent) {
   refreshPluginFields();
   queueEventEdit();
   flushEventEdit();
-  const card = el('plugin-event-fields').querySelector<HTMLElement>(`[data-stack-id="${id}"]`);
+  const card = stackCard(id);
   card?.scrollIntoView({ block: 'nearest' });
   card?.querySelector('input')?.focus({ preventScroll: true });
 }
@@ -3230,10 +3234,7 @@ function showTimelineMenu(
     add('Edit', () => {
       flushEventEdit();
       eventForm(model?.byId.get(point.id) ?? point);
-      if (childId)
-        el('plugin-event-fields')
-          .querySelector<HTMLElement>(`[data-stack-id="${childId}"]`)
-          ?.scrollIntoView({ block: 'nearest' });
+      if (childId) stackCard(childId)?.scrollIntoView({ block: 'nearest' });
     });
     if (pluginFields(activePlugins()).some((f) => f.kind === 'stack'))
       add('Add entry to stack', () => addStackEntry(point));
@@ -3241,9 +3242,7 @@ function showTimelineMenu(
       if (!childId) requestDelete(point);
       else {
         eventForm(model?.byId.get(point.id) ?? point);
-        const card = el('plugin-event-fields').querySelector<HTMLElement>(
-          `[data-stack-id="${childId}"]`,
-        );
+        const card = stackCard(childId);
         [...(card?.querySelectorAll('button') ?? [])]
           .find((b) => b.textContent === 'Delete')
           ?.click();
