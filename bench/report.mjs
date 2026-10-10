@@ -274,6 +274,71 @@ function capacity(capacityRows, rows) {
     ),
   ].join('\n');
 }
+const SCENARIO_NAMES = {
+  open: 'Open',
+  'drag-pan': 'Drag to pan (longest frame)',
+  'wheel-zoom': 'Wheel zoom',
+  'wheel-zoom-frames': 'Wheel zooming (longest frame)',
+  'keyboard-pan': 'Arrow-key pan',
+  'keyboard-zoom': 'Plus-key zoom',
+  'fit-all': 'Fit all',
+  'pinch-zoom': 'Pinch zoom (longest frame)',
+  'vertical-pinch': 'Vertical pinch (longest frame)',
+  'open-moment': 'Open a moment',
+  typing: 'Typing (per key)',
+  'save-moment': 'Save a moment',
+  'cancel-moment': 'Cancel a moment',
+  'undo-redo': 'Undo and redo',
+  'delete-moment': 'Delete (ask, then remove)',
+  'new-duration': 'New duration',
+  'endpoint-picker': 'Endpoint moment picker',
+  search: 'Search results',
+  'open-search': 'Open search',
+  'group-summary': 'Group summary',
+  'separate-by-tags': 'Separate by tags and rejoin',
+  'separate-connected': 'Separate connected',
+  export: 'Export',
+  'edit-pause': 'Pause after an edit',
+  'save-to-server': 'Save to server',
+  'live-update': 'Live update from another writer',
+};
+/**
+ * The UI section: each interaction's median against its budget, per platform and size.
+ * Status is spelled out (not only coloured): within budget, over budget, or over budget
+ * where the app advises another platform.
+ */
+function interactions(ui) {
+  const label = (r) => `${r.platform}${r.throttle > 1 ? ` ×${r.throttle}` : ''}`;
+  const columns = [...new Set(ui.rows.map((r) => `${label(r)}|${r.size}`))];
+  const scenarios = [...new Set(ui.rows.map((r) => r.scenario))];
+  const cell = (r) => {
+    if (!r) return '<td>–</td>';
+    const status = r.pass ? 'within' : r.comfortable ? 'over' : r.advised ? 'advised' : 'gap';
+    const words = {
+      within: '✓',
+      over: 'over budget',
+      advised: 'over, advised',
+      gap: 'over, no advice',
+    };
+    const value = r.error ? 'failed' : ms(r.value);
+    return `<td class="ui-${status}" title="${escape(`${r.samples?.length ?? 0} samples; budget ${r.limit} ms${r.comfortable ? '' : ' (beyond the comfortable size)'}`)}">${value} <small>${words[status]}</small></td>`;
+  };
+  const head = columns
+    .map((c) => {
+      const [platform, size] = c.split('|');
+      return `<th>${escape(platform)}<br>${Number(size).toLocaleString('en')}</th>`;
+    })
+    .join('');
+  const body = scenarios
+    .map((s) => {
+      const first = ui.rows.find((r) => r.scenario === s);
+      return `<tr><td>${escape(SCENARIO_NAMES[s] ?? s)}</td><td>${first.budget} ≤ ${first.limit} ms</td>${columns
+        .map((c) => cell(ui.rows.find((r) => r.scenario === s && `${label(r)}|${r.size}` === c)))
+        .join('')}</tr>`;
+    })
+    .join('');
+  return `<div class="ui-table"><table><thead><tr><th>Interaction</th><th>Budget</th>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
 function table(rows) {
   const body = [...rows]
     .sort(
@@ -297,12 +362,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const capacityRows = JSON.parse(
     await readFile(join(RESULTS, 'capacity.json'), 'utf8').catch(() => '{"rows":[]}'),
   ).rows;
+  const ui = JSON.parse(
+    await readFile(join(RESULTS, 'ui.json'), 'utf8').catch(() => '{"rows":[]}'),
+  );
   const rows = [...node.rows, ...(await criterionRows())];
   if (!rows.length) throw new Error('No results; run node bench/run.mjs and cargo bench first.');
   await mkdir(RESULTS, { recursive: true });
   await writeFile(
     join(RESULTS, 'results.json'),
-    JSON.stringify({ ...node, rows, capacity: capacityRows }, null, 2),
+    JSON.stringify({ ...node, rows, capacity: capacityRows, ui: ui.rows }, null, 2),
   );
   const charts = OPERATIONS.filter(([o]) => rows.some((r) => r.operation === o))
     .map(([o, title]) =>
@@ -330,6 +398,7 @@ h2{font:400 22px Georgia,serif;margin:28px 0 4px}.whisker{stroke-width:1.5;opaci
 #tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--grid);border-radius:8px;padding:8px 10px;white-space:pre;font-size:12px;box-shadow:0 6px 20px #0003;display:none}
 details{background:var(--surface);border-radius:12px;padding:12px}summary{cursor:pointer;font-weight:600}
 table{border-collapse:collapse;width:100%;margin-top:10px;font-variant-numeric:tabular-nums;font-size:12px}th,td{text-align:right;padding:4px 8px;border-bottom:1px solid var(--grid)}th:nth-child(-n+2),td:nth-child(-n+2){text-align:left}
+.ui-table{overflow-x:auto;background:var(--surface);border-radius:12px;padding:12px;margin:12px 0}.ui-table td small{color:var(--muted)}.ui-over,.ui-gap{font-weight:600}.ui-over small,.ui-gap small{color:var(--s2)}
 .legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:10px}.legend span{display:flex;gap:6px;align-items:center}.legend i{width:16px;height:3px;border-radius:2px}
 </style></head><body><main>
 <h1>OpenChronology benchmarks</h1>
@@ -339,6 +408,11 @@ table{border-collapse:collapse;width:100%;margin-top:10px;font-variant-numeric:t
 ${
   capacityRows.length
     ? `<h2>Capacity</h2><p>Where each platform stops feeling responsive. In-browser figures are medians measured in Chromium (${escape(node.platform ?? '')}), at full speed and with the CPU throttled, which roughly approximates a mid-range phone. Dotted lines mark common responsiveness limits.</p><div class="grid-charts">${capacity(capacityRows, rows)}</div><h2>Latency by operation</h2>`
+    : ''
+}
+${
+  ui.rows.length
+    ? `<h2>Interactions</h2><p>Real input in the editor, timed from the input event to the frame that shows its result (gestures: their longest frame), as medians against the budgets in <code>src/capacity.ts</code>. Within each platform's comfortable size every interaction should be within budget; beyond it, the app should already be advising another platform. Hover a cell for its sample count.</p>${interactions(ui)}`
     : ''
 }
 <div class="grid-charts">${charts}</div>

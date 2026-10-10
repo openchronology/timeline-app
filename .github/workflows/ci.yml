@@ -211,6 +211,13 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           node test/syslog-live-postgres.mjs
+      # Interactions within the budgets in src/capacity.ts, browser and platform, small sizes.
+      - name: UI interactions within budget
+        run: node bench/ui.mjs --gate
+        env:
+          UI_SIZES: '1000'
+          UI_THROTTLES: '1'
+          UI_SAMPLES: '3'
       - run: npm run test:versioning:postgres
       - run: node test/seed-postgres.mjs
       - run: node test/browser-fork-postgres.mjs

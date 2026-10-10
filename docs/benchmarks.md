@@ -6,7 +6,7 @@ The benchmark suite measures how operation latency grows with timeline size on e
 - **SQLite (desktop)**: the native store (`native-store`), through the same API the desktop app calls. Tauri IPC is not included.
 - **In-memory (browser)**: the editor's `TimelineIndex`, which serves offline HTML files and opened `.ochx` documents.
 
-The report draws one chart per operation, with timeline size on the x axis, latency on a shared y axis, and one line per backend. User-interface benchmarks (rendering and interaction) are not included yet.
+The report draws one chart per operation, with timeline size on the x axis, latency on a shared y axis, and one line per backend. [Interaction benchmarks](#interactions) time real input in the editor against the responsiveness budgets these measurements define.
 
 ## Running
 
@@ -14,6 +14,7 @@ The report draws one chart per operation, with timeline size on the x axis, late
 npm run bench:seed     # build the editor, generate seeds (once per size)
 npm run bench          # measure, then write bench/results/report.html
 npm run bench:capacity # only the in-browser capacity measurements
+npm run bench:ui       # only the interaction benchmarks
 npm run bench:report   # rebuild the report from existing results
 ```
 
@@ -83,6 +84,71 @@ Measured on an AMD Ryzen 7 7730U laptop (16 threads), with PostgreSQL in Docker 
 | 1,000/s   |   20,000 |             177 ms | 482 ms | 801 ms | all, once each |
 
 Latency stays near the save interval up to 500 messages a second; at 1,000 a second the slowest messages wait longer (p95 482 ms, max 801 ms), with each save carrying about 200 moments. Nothing was lost or duplicated at any rate. Each save is one API request, so a single timeline needs about 300 requests a minute at a 200 ms interval and 60 at the default. `API_KEY_REQUESTS_PER_MINUTE` (default 120) must allow this.
+
+## Interactions
+
+`bench/ui.mjs` drives the editor with real input, Playwright mouse, keyboard and touch in Chromium, and times each interaction. Timing runs from the input event's own timestamp to the frame in which the result is painted. For continuous gestures it records the longest frame while the gesture runs. An injected probe (`bench/ui/probe.js`) does the timing in the page without browser-specific APIs, so the desktop app's WebKit can be measured the same way.
+
+It checks the results against two rules, both from `src/capacity.ts`:
+
+1. **Within a platform's comfortable size** (`COMFORTABLE`, from the capacity data above), every interaction meets its budget.
+2. **Wherever an interaction misses its budget,** the editor is already advising another platform. A miss without that advice is reported as an _advice gap_.
+
+| Budget     |  Limit | Applies to                                                                                                                                                              |
+| ---------- | -----: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `response` | 100 ms | A click, key or tap until its result shows: opening a moment, typing, Save and Cancel, the delete confirmation, a new duration, opening search, the pause after an edit |
+| `view`     | 150 ms | Zooming, panning, Fit all, undo and redo, until the new view is drawn                                                                                                   |
+| `frame`    | 150 ms | The longest frame during a drag, wheel zooming or a pinch: frames may drop while the view redraws, but it never stalls longer than one redraw may take                  |
+| `results`  |    1 s | Search results, group summaries, the endpoint picker, separations, export, saving to the server, a live update arriving                                                 |
+| `open`     |  1.5 s | Opening a timeline                                                                                                                                                      |
+
+The budgets follow the advice thresholds (`response` is `THRESHOLDS.edit`, `view` and `frame` are `THRESHOLDS.redraw`, `open` is `THRESHOLDS.open`), and `results` is the 1 s line in the capacity charts.
+
+The runs cover:
+
+- the in-memory browser editor, at full speed and with the CPU throttled 4×, whose comfortable sizes are 4,000 and 1,000 moments;
+- the platform: the production Next.js server with PostgreSQL, signed in as a `bench_ui` user, whose comfortable size is the 200,000-moment limit.
+
+Each interaction is measured `UI_SAMPLES` times (default 5) and judged by its median.
+
+| Variable                               | Default                                            | Meaning                                                                   |
+| -------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------- |
+| `UI_PLATFORMS`                         | `browser,platform` with a database, else `browser` | Which editors to drive                                                    |
+| `UI_SIZES`                             | `1000,4000,10000`                                  | Timeline sizes in moments                                                 |
+| `UI_THROTTLES`                         | `1,4`                                              | CPU slowdowns for the browser runs                                        |
+| `UI_SAMPLES`                           | `5`                                                | Samples per interaction                                                   |
+| `UI_SCENARIOS`                         | all                                                | Only these interactions, e.g. `open-moment,search`                        |
+| `DATABASE_URL` or `BENCH_DATABASE_URL` | unset                                              | PostgreSQL for the platform runs; the platform also needs `npm run build` |
+
+`node bench/ui.mjs --gate` exits with an error on any budget missed within a comfortable size, and on any advice gap. CI runs it at 1,000 moments for the browser and the platform, allowing 1.5× the budgets (`UI_TOLERANCE`) for slower shared runners. The Benchmarks workflow runs the full set of sizes and adds an **Interactions** table to the report.
+
+### Results
+
+Medians from one run on an AMD Ryzen 7 7730U laptop (16 threads), headless Chromium, PostgreSQL in Docker. "×4" throttles the CPU 4×. Budgets: open 1.5 s, view and frame 150 ms, response 100 ms, results 1 s. **Bold** marks a miss.
+
+| Interaction                 | Browser 1,000 | Browser 4,000 | Browser 10,000 |   ×4 1,000 |   ×4 4,000 | Platform 1,000 | Platform 10,000 | Platform 100,000 |
+| --------------------------- | ------------: | ------------: | -------------: | ---------: | ---------: | -------------: | --------------: | ---------------: |
+| Open                        |        208 ms |        436 ms |         838 ms |     699 ms | **1.70 s** |         482 ms |          272 ms |           276 ms |
+| Wheel zoom                  |        135 ms |    **215 ms** |     **279 ms** | **350 ms** | **766 ms** |         141 ms |      **316 ms** |            44 ms |
+| Drag to pan (longest frame) |         83 ms |        150 ms |     **217 ms** | **350 ms** | **617 ms** |          67 ms |      **183 ms** |            17 ms |
+| Pinch zoom (longest frame)  |         83 ms |    **233 ms** |     **300 ms** | **367 ms** | **900 ms** |          50 ms |      **233 ms** |            17 ms |
+| Fit all                     |         63 ms |        100 ms |         129 ms | **217 ms** | **363 ms** |          33 ms |           35 ms |            53 ms |
+| Open a moment               |         14 ms |         11 ms |          19 ms |      29 ms |      30 ms |          27 ms |           30 ms |       **103 ms** |
+| Typing (per key)            |         38 ms |         46 ms |          46 ms |      41 ms |      40 ms |          45 ms |           39 ms |            46 ms |
+| New duration                |         52 ms |         93 ms |     **135 ms** | **193 ms** | **387 ms** |          55 ms |           82 ms |            89 ms |
+| Delete (ask, then remove)   |         81 ms |         98 ms |     **152 ms** | **104 ms** | **146 ms** |          15 ms |           77 ms |       **132 ms** |
+| Search results              |         24 ms |         31 ms |          91 ms |      49 ms |     132 ms |          70 ms |           65 ms |           112 ms |
+| Separate by tags and rejoin |        115 ms |        233 ms |         341 ms |     478 ms |     955 ms |          39 ms |           36 ms |            84 ms |
+| Save to server              |               |               |                |            |            |          33 ms |          100 ms |           151 ms |
+| Live update arriving        |               |               |                |            |            |          31 ms |           30 ms |           837 ms |
+
+What this shows:
+
+- **Navigation is the bottleneck.** Discrete actions (opening a moment, typing, saving, searching) stay well within budget almost everywhere. Zooming, panning and pinching miss it as soon as many moments are drawn individually. Each zoom step redraws the labels, which costs 70–80 ms at 1,000 moments; a 50 ms frame budget is out of reach until that drawing is cheaper (#68).
+- **The comfortable sizes are optimistic for gestures.** Navigation misses its budget in the browser at 4,000 moments (the documented comfortable size), and on a throttled CPU already at 1,000. The platform misses it at 10,000 moments but not at 100,000, where the view collapses into summaries. So the cost follows how many moments are drawn, not how many are stored.
+- **The advice shows too late.** Beyond the comfortable sizes, most misses happen without the advice showing ("advice gaps"). The advice compares the editor's own drawing time with 150 ms; users wait longer than that, from input to paint (#69).
+
+CI checks 1,000 moments, where every interaction meets its budget on both the browser and the platform.
 
 ## Method
 
