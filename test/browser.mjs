@@ -16,6 +16,7 @@ import { checkLabelMotion } from './label-motion-browser.mjs';
 import { checkPlugins } from './plugins-browser.mjs';
 import { checkCommunity } from './community-browser.mjs';
 import { checkAccounts } from './accounts-browser.mjs';
+import { checkChallenges } from './challenge-browser.mjs';
 import { checkRemoteCache } from './remote-cache-browser.mjs';
 import { checkDrafts } from './drafts-browser.mjs';
 import { checkFollowLatest } from './follow-browser.mjs';
@@ -276,6 +277,7 @@ try {
   await checkTags(page, document);
   await checkRelationships(page, document);
   await checkAccounts(browser);
+  await checkChallenges(browser);
   await checkCommunity(browser);
   await checkRemoteCache(browser);
   await checkDrafts(browser);

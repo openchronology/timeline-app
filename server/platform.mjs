@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { BUILTIN_PLUGINS } from '../dist/core.mjs';
 import { createRequestHandler } from './http.mjs';
+import { Challenges } from './challenge.mjs';
 import { Auth } from './auth.mjs';
 import { PostgresStore } from './store.mjs';
 import { providersFromEnv } from './oauth.mjs';
@@ -54,6 +55,7 @@ async function initialize() {
     providers,
     featured,
     trustProxy: process.env.TRUST_PROXY === '1',
+    challenges: Challenges.settings(process.env),
   };
   const store = pool ? new PostgresStore(pool) : null;
   // Catalogue text left stale by an interrupted refresh catches up in the background.

@@ -138,6 +138,7 @@ impl Server {
         method: &str,
         data: Option<Value>,
         csrf: Option<String>,
+        challenge: Option<String>,
     ) -> Result<Reply, String> {
         if path.starts_with("auth/")
             && !matches!(
@@ -151,7 +152,17 @@ impl Server {
         {
             return Err("Use native browser sign-in for provider authentication".into());
         }
-        self.request_inner(path, method, data, csrf, None).await
+        // A human-verification answer (base64url JSON) for an action the server challenged.
+        if challenge.as_ref().is_some_and(|value| {
+            value.len() > 4096
+                || !value
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        }) {
+            return Err("Invalid verification answer".into());
+        }
+        self.request_inner(path, method, data, csrf, challenge, None)
+            .await
     }
     async fn request_inner(
         &self,
@@ -159,6 +170,7 @@ impl Server {
         method: &str,
         data: Option<Value>,
         csrf: Option<String>,
+        challenge: Option<String>,
         expected: Option<u64>,
     ) -> Result<Reply, String> {
         api_path(path)?;
@@ -194,6 +206,9 @@ impl Server {
         }
         if let Some(value) = csrf {
             request = request.header("X-CSRF-Token", value);
+        }
+        if let Some(value) = challenge {
+            request = request.header("X-Challenge", value);
         }
         if let Some(value) = data {
             if serde_json::to_vec(&value).map_err(|e| e.to_string())?.len() > 16 * 1024 * 1024 {
@@ -265,6 +280,7 @@ impl Server {
                 "POST",
                 Some(json!({})),
                 None,
+                None,
                 Some(epoch),
             )
             .await?;
@@ -318,6 +334,7 @@ impl Server {
                 "auth/device/poll",
                 "POST",
                 Some(json!({ "deviceCode": device })),
+                None,
                 None,
                 Some(epoch),
             )
@@ -484,8 +501,13 @@ mod tests {
         server.configure(None).unwrap();
         assert!(server.configured().unwrap().is_none());
         for path in ["auth/device/start", "auth/device/poll", "auth/google/start"] {
-            let result =
-                tauri::async_runtime::block_on(server.request(path, "POST", Some(json!({})), None));
+            let result = tauri::async_runtime::block_on(server.request(
+                path,
+                "POST",
+                Some(json!({})),
+                None,
+                None,
+            ));
             assert_eq!(
                 result.err().as_deref(),
                 Some("Use native browser sign-in for provider authentication")

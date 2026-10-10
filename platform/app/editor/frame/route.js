@@ -11,12 +11,14 @@ export async function GET() {
     .replace('src="./app.js"', 'src="/app.js"')
     .replace('href="legal.html"', 'href="/legal"')
     .replace('href="openchronology-web-source.tar.gz"', 'href="/openchronology-web-source.tar.gz"');
+  // Cloudflare Turnstile, when it is the human-verification provider, loads a script and frame.
+  const turnstile =
+    process.env.CHALLENGE_PROVIDER === 'turnstile' ? ' https://challenges.cloudflare.com' : '';
   return new Response(html, {
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store',
-      'Content-Security-Policy':
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'",
+      'Content-Security-Policy': `default-src 'self'; script-src 'self'${turnstile}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-src 'self'${turnstile}; frame-ancestors 'self'; base-uri 'none'; form-action 'self'`,
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'no-referrer',
     },

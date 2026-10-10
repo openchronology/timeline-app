@@ -456,3 +456,22 @@ dialog {
 .download-menu > div a:hover {
   background: #f0f3eb;
 }
+
+/* Human-verification check (src/challenge.ts), shown when the server asks for one. */
+.challenge-dialog {
+  width: min(420px, calc(100vw - 32px));
+}
+.challenge-dialog progress {
+  display: block;
+  width: 100%;
+}
+.challenge-widget {
+  margin: 12px 0;
+}
+.challenge-status:empty {
+  display: none;
+}
+.challenge-actions {
+  display: flex;
+  justify-content: flex-end;
+}

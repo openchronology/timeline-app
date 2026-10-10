@@ -12,6 +12,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { isIP } from 'node:net';
 import { Auth } from './auth.mjs';
+import { Challenges } from './challenge.mjs';
 import { OAuth, providersFromEnv } from './oauth.mjs';
 import { mailFromEnv, encryptionKey } from './mail.mjs';
 import { DeviceAuth } from './device-auth.mjs';
@@ -137,6 +138,8 @@ export function createRequestHandler({
   trustProxy = false,
   plugins,
   featured = [],
+  // Human-verification settings (see challenge.mjs); none disables challenges.
+  challenges: challengeSettings = null,
 } = {}) {
   const library = createPluginLibrary(plugins, pool);
   const store = pool ? new PostgresStore(pool) : null,
@@ -148,6 +151,13 @@ export function createRequestHandler({
         })
       : null,
     oauth = auth ? new OAuth(auth, providers, fetcher) : null,
+    challenges = new Challenges({
+      ...(challengeSettings ?? { provider: 'off' }),
+      pool,
+      key: securityKey,
+      fetcher,
+      origin,
+    }),
     devices = auth ? new DeviceAuth(auth) : null;
   const administration = store ? new Administration(store, auth) : null;
   const collaboration = store ? new Collaboration(store) : null;
@@ -256,13 +266,26 @@ export function createRequestHandler({
           const previous = await auth.session(req);
           if (previous) auth.require(previous, req);
           else auth.requireLogin(req);
-          const result = await auth.signIn(
-            await body(req, 8192),
-            pathname.endsWith('/register'),
-            req.clientAddress,
-            req.headers['x-oc-client'] === 'desktop' ? 'desktop' : 'web',
-            req,
-          );
+          const register = pathname.endsWith('/register'),
+            input = await body(req, 8192),
+            username = typeof input.username === 'string' ? input.username.toLowerCase() : '';
+          if (register) await challenges.require(req, 'register', previous);
+          else if (await challenges.signInNeeded(req.clientAddress, username))
+            await challenges.require(req, 'sign-in', previous);
+          let result;
+          try {
+            result = await auth.signIn(
+              input,
+              register,
+              req.clientAddress,
+              req.headers['x-oc-client'] === 'desktop' ? 'desktop' : 'web',
+              req,
+            );
+          } catch (error) {
+            if (!register && error.status === 401)
+              await challenges.signInFailed(req.clientAddress, username);
+            throw error;
+          }
           if (previous && result.user)
             await pool.query('DELETE FROM oc_sessions WHERE token_hash=$1', [previous.token_hash]);
           const { cookie, proofCookie, challengeCookie, ...publicResult } = result;
@@ -394,6 +417,9 @@ export function createRequestHandler({
           await auth.rateLimit('security:' + req.clientAddress);
           const input = await body(req, 8192),
             security = auth.security;
+          // These send email to an address the requester types.
+          if (securityAction === 'email/enroll' || securityAction === 'password/forgot')
+            await challenges.require(req, 'email', session);
           let result;
           if (securityAction === 'mfa/complete')
             result = await security.complete(req, input.code, req.clientAddress);
@@ -437,6 +463,7 @@ export function createRequestHandler({
           auth.require(session, req);
           await requireDataProvider(pool, userId);
           await auth.rateLimit('plugin-publish:' + userId);
+          if (!session.is_admin) await challenges.require(req, 'plugin', session);
           const manifest = await library.publish(userId, await body(req, 32768));
           return response(res, 201, manifest);
         }
@@ -609,6 +636,12 @@ export function createRequestHandler({
           auth.require(session, req);
           await auth.rateLimit('proposals:' + userId);
           const input = await body(req);
+          if (
+            method === 'POST' &&
+            (!pid || sub === 'comments') &&
+            (await challenges.contributionNeeded(userId, tid))
+          )
+            await challenges.require(req, 'contribution', session);
           if (!pid && method === 'POST')
             return response(res, 201, await collaboration.create(tid, userId, input));
           if (pid && !sub && method === 'PUT')
@@ -1122,6 +1155,7 @@ export function createRequestHandler({
       if (status === 500) console.error(error);
       response(res, status, {
         error: status === 500 ? 'Server request failed.' : error.message,
+        ...(status === 428 && error.challenge ? { challenge: error.challenge } : {}),
         ...(status === 409 && Array.isArray(error.conflicts)
           ? { conflicts: error.conflicts.slice(0, 100), conflictCount: error.conflicts.length }
           : {}),

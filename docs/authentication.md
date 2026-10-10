@@ -40,6 +40,25 @@ Passwords use salted scrypt with `N=131072`, `r=8`, `p=1` and constant-time comp
 
 Sign-in, social starts and device approvals share database-backed throttles (ten attempts per minute per client address) across instances, with an additional local memory cap. File conversion has a separate per-user throttle. By default the client address is the direct TCP peer. Set `TRUST_PROXY=1` only when a trusted proxy overwrites `X-Forwarded-For` with one validated client IP and direct access to the Node port is blocked; chains and malformed headers are ignored. The Compose port is bound to host loopback. Configure the proxy's request-body limit to at least 32 MiB for `.och` uploads.
 
+## Human verification
+
+Actions spam would use ask for a quick check first. The server refuses them with `428` and a challenge; the web editor, website and desktop app show it in a small dialog and retry with the answer in an `X-Challenge` header. Each answer works once, for the action it was issued for.
+
+| Action                                                     | When it asks                                                                                                                                   |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Registration, **Forgot password**, adding an email address | Always: these send email to an address the requester types.                                                                                    |
+| Password sign-in                                           | After three failures in fifteen minutes from the client address or for the account, instead of locking the account out.                        |
+| Opening a pull request or commenting on one                | When the account is newer than `CHALLENGE_TRUST_DAYS` (default 7) and is not the timeline's owner or a member. Administrators are never asked. |
+| Publishing a plugin                                        | Always, except for administrators.                                                                                                             |
+
+`CHALLENGE_PROVIDER` chooses the check:
+
+- `pow` (default) is self-hosted proof of work. The browser finds a number whose SHA-256 with a server-signed salt matches, trying up to `CHALLENGE_DIFFICULTY` (default 150,000) hashes, which takes under a second on a typical computer and a few seconds on a phone. Nothing is sent to a third party and the strict content security policy is unchanged. Answers expire after ten minutes and are recorded in `oc_challenge_uses` so they cannot be replayed. Proof of work makes each submission cost a bot CPU time and slows bulk scripts, but a determined attacker with native code can still answer quickly; the rate limits above still apply.
+- `turnstile` uses [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/). Create a widget for your hostname and set `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. The server checks each token with Cloudflare's siteverify API, including its action and hostname, and the content security policy then allows `https://challenges.cloudflare.com` scripts and frames. Visitors' browsers contact Cloudflare. Signed-in desktop and API-key sessions, which cannot show the widget, are given proof of work; signing up or signing in from the desktop app is not possible with Turnstile, so use **Sign in using your browser**.
+- `off` disables checks, for example behind another bot filter.
+
+Challenges are signed with a key derived from `AUTH_ENCRYPTION_KEY`; without it, each process signs its own, which only suits a single development server. Without `TRUST_PROXY=1` behind Next.js, every anonymous visitor shares one client address, so after three sign-in failures from anyone, every sign-in asks for a check until the window passes (rather than being locked out).
+
 ## Resend and verified registration
 
 Set `RESEND_API_KEY`, `AUTH_EMAIL_FROM` (for example `OpenChronology <accounts@timescale.info>`), and `AUTH_ENCRYPTION_KEY` in your server environment. Generate the encryption key once with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`. Keep it secret and back it up separately from the database: losing it prevents decrypting enrolled authenticator secrets. Do not regenerate it on container rebuilds.
