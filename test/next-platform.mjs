@@ -163,7 +163,11 @@ try {
           const stage = document.getElementById('timeline-stage'),
             axis = document.getElementById('axis');
           return (
-            stage.clientWidth > 96 && Math.abs(parseFloat(axis.style.width) - stage.clientWidth) < 1
+            stage.clientWidth > 96 &&
+            // The axis layer is drawn at the content scale, smaller on phones.
+            Math.abs(
+              parseFloat(axis.style.width) * Number(stage.dataset.uiScale) - stage.clientWidth,
+            ) < 1
           );
         });
         assert(
