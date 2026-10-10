@@ -15,6 +15,11 @@ export async function closeMomentDetails(page) {
     await inspector.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {});
   }
   await inspector.waitFor({ state: 'hidden' });
+  // The dialog's close event, which also closes the timeline menu, follows hiding it. Let it
+  // run so a menu the caller opens next is not closed by it.
+  await page.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => setTimeout(done, 0))),
+  );
 }
 
 export async function checkMomentDialog(page, restoreDocument) {
