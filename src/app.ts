@@ -3782,7 +3782,13 @@ attachTimeDialog(input('event-time'), {
     queueEventEdit();
   },
 });
-for (const id of ['left-bound', 'right-bound'] as const)
+for (const id of ['left-bound', 'right-bound'] as const) {
+  // Typing answers the view as it is now, even if it changed while the field had focus:
+  // renders keep the typed text until the view moves again.
+  input(id).addEventListener('input', () => {
+    const time = id === 'left-bound' ? viewport.left : viewport.right;
+    displayedBounds.set(id, { text: presented(time, 'input'), time });
+  });
   attachTimeDialog(input(id), {
     heading: id === 'left-bound' ? 'Left bound date and time' : 'Right bound date and time',
     editable: () => true,
@@ -3799,6 +3805,7 @@ for (const id of ['left-bound', 'right-bound'] as const)
       viewport = new Viewport(left, right.sub(left));
     },
   });
+}
 input('datetime-text').oninput = () => {
   if (!timeDraft) return;
   try {
