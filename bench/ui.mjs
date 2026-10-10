@@ -623,6 +623,13 @@ const SCENARIOS = [
   },
 ];
 
+/** Waits until the editor shows the fitted timeline, or reports the error it showed instead. */
+async function opened(d, t) {
+  const fitted = `${value('#exact-left')} === ${JSON.stringify(t.fitted.left.toString())}`;
+  await d.wait(`${fitted} || ${visible('#toast')}`, 15 * 60000);
+  if (!(await d.eval(fitted)))
+    throw new Error(`The editor did not open the timeline: ${await d.eval(text('#toast'))}`);
+}
 /** Serves the built editor for the in-memory browser runs (as bench/capacity.mjs does). */
 async function browserPage(browser, size, document, throttle) {
   const context = await browser.newContext({
@@ -659,10 +666,7 @@ async function browserPage(browser, size, document, throttle) {
   const t = targets(document);
   const started = Date.now();
   await d.setFile('#json-file', `timeline-${size}.ochx`, JSON.stringify(document));
-  await d.wait(
-    `${value('#exact-left')} === ${JSON.stringify(t.fitted.left.toString())}`,
-    15 * 60000,
-  );
+  await opened(d, t);
   return { context, d, t, open: Date.now() - started };
 }
 
@@ -759,10 +763,7 @@ async function platformPage(browser, platform, size, document) {
   const started = Date.now();
   await page.goto(`${platform.origin}/editor/frame#timeline/${id}`);
 
-  await d.wait(
-    `${value('#exact-left')} === ${JSON.stringify(t.fitted.left.toString())}`,
-    15 * 60000,
-  );
+  await opened(d, t);
   return {
     context,
     d,
