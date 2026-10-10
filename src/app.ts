@@ -1104,7 +1104,7 @@ function render(refreshFrame = true) {
     frame =
       sparseWorkspace()?.overlay(base, viewport, displayThreshold) ??
       regroup(base, displayThreshold);
-    sparseWorkspace()?.evict(selected?.id, openDuration?.duration.id);
+    sparseWorkspace()?.evict(selected?.id, openDuration?.duration.id, historyEntities());
     drawFrame();
     if (!refreshFrame || cached) {
       if (cached) {
@@ -4121,6 +4121,17 @@ el('delete-confirm').onclick = () => {
   el<HTMLDialogElement>('inspector').close();
   changed();
 };
+/** Moments and durations the undo and redo history can still change. */
+function historyEntities() {
+  const moments = new Set<string>(),
+    durations = new Set<string>();
+  for (const entry of [...history, ...future]) {
+    if ('link' in entry) continue;
+    const id = (entry.before ?? entry.after)?.id;
+    if (id) ('duration' in entry ? durations : moments).add(id);
+  }
+  return { moments, durations };
+}
 /** Records a new edit; any redoable edits branch away and are discarded. */
 function record(edit: HistoryEntry) {
   history.push(edit);

@@ -222,3 +222,24 @@ test('a writable server timeline opens when its metadata reports unset settings 
   assert.equal(workspace.plugins, undefined);
   assert.equal(workspace.presentation, undefined);
 });
+
+test('redoing an undone edit stays an edit when the history retains the moment', () => {
+  // Undo puts the original back (no change remains); the inspector is closed, so a render
+  // evicts the moment. Redo must still find its saved original, or the edit would count as
+  // an addition and the server's copy would show beside it.
+  const replay = (retained) => {
+    const index = new RemoteWorkspace(doc());
+    const original = point('a', '1', 'Original'),
+      edited = point('a', '1', 'Edited');
+    index.load(original);
+    index.put(edited);
+    index.put(original);
+    assert.equal(index.changes.has('a'), false);
+    index.evict(undefined, undefined, retained);
+    index.put(edited);
+    return index.changes.get('a');
+  };
+  assert.equal(replay({ moments: new Set(['a']) }).before.metadata.title, 'Original');
+  // Without the history's moments the original is gone: the redo looks like an addition.
+  assert.equal(replay({}).before, undefined);
+});
