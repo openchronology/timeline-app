@@ -34,15 +34,21 @@ export async function stageDesktop(target, tag = '', root = '.') {
   await cp(join(dir, files[0]), join(output, spec.asset));
   await writeFile(join(output, target + '-build-info.json'), JSON.stringify(info, null, 2) + '\n');
   if (process.env.OCH_VCPKG_ROOT)
-    await nativeSources(process.env.OCH_VCPKG_ROOT, output, target, root);
+    await nativeSources(
+      process.env.OCH_VCPKG_ROOT,
+      process.env.OCH_VCPKG_DOWNLOADS ?? join(process.env.OCH_VCPKG_ROOT, 'downloads'),
+      output,
+      target,
+      root,
+    );
 }
-async function nativeSources(vcpkg, output, target, project) {
+async function nativeSources(vcpkg, downloads, output, target, project) {
   const exec = promisify(execFile),
     temp = await mkdtemp(join(tmpdir(), 'och-native-source-'));
   try {
     const root = join(temp, 'native-dependencies');
     await mkdir(root);
-    const archives = (await readdir(join(vcpkg, 'downloads'))).filter(
+    const archives = (await readdir(downloads)).filter(
       (name) => /(gmp|sqlite)/i.test(name) && /\.(zip|tar\.(xz|gz|bz2))$/.test(name),
     );
     if (
@@ -50,7 +56,7 @@ async function nativeSources(vcpkg, output, target, project) {
       !archives.some((name) => /sqlite/i.test(name))
     )
       throw Error('Missing GMP or SQLite preferred source archive');
-    for (const name of archives) await cp(join(vcpkg, 'downloads', name), join(root, name));
+    for (const name of archives) await cp(join(downloads, name), join(root, name));
     for (const name of ['gmp', 'sqlite3'])
       await cp(join(vcpkg, 'ports', name), join(root, 'ports', name), { recursive: true });
     if (target === 'windows-amd64')
