@@ -66,6 +66,23 @@ export async function checkSummaries(page, restore) {
     await bounds('0', '1000');
     // At this zoom the one-unit durations collapse; the long one stays a band.
     await page.locator('.duration-band[data-duration-id="long"]').waitFor();
+    // A duration's menu offers Edit, which opens it, and Delete.
+    const menu = page.locator('#timeline-menu');
+    // Near its start: markers may cover the middle of the band.
+    await page
+      .locator('.duration-band[data-duration-id="long"]')
+      .click({ button: 'right', position: { x: 8, y: 4 } });
+    assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), [
+      '+Event',
+      'Fit all',
+      'Edit',
+      'Delete',
+    ]);
+    await menu.getByRole('menuitem', { name: 'Edit', exact: true }).click();
+    await dialog.waitFor();
+    assert.equal(await page.locator('#duration-title').inputValue(), 'Long');
+    await page.locator('[data-close="duration-dialog"]').click();
+    await dialog.waitFor({ state: 'hidden' });
     assert.equal(await page.locator('.duration-band[data-duration-id="alone"]').count(), 0);
     const alone = page.locator('.event-marker.duration-point[aria-label="Duration: Alone"]');
     await alone.waitFor();

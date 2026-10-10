@@ -45,10 +45,13 @@ export async function checkSelection(page, restoreDocument) {
   const box = await stage.boundingBox();
   const x = box.x + 150,
     y = box.y + 50;
+  // A click on empty space marks a time; it does not create a moment.
   await page.mouse.click(x, y);
-  assert(await input('event-form').isVisible());
   await input('time-cursor').waitFor({ state: 'visible' });
+  assert(await input('inspector').isHidden());
   const exact = await input('time-cursor').getAttribute('data-time');
+  await input('add-button').click();
+  assert(await input('event-form').isVisible());
   assert.equal(await input('event-time').inputValue(), exact + ' ticks');
   assert.equal(await input('event-exact').inputValue(), exact);
   // The cursor follows its coordinate when the view moves rather than a fixed screen pixel.
@@ -76,6 +79,20 @@ export async function checkSelection(page, restoreDocument) {
   assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), ['+Event', 'Fit all']);
   await page.keyboard.press('Escape');
   assert(await menu.isHidden());
+  // A moment's menu offers Edit, which opens it.
+  const marker = page.locator('.event-marker:not(.group)').first();
+  const markerTitle = await marker.getAttribute('aria-label');
+  await marker.click({ button: 'right' });
+  assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), [
+    '+Event',
+    'Fit all',
+    'Edit',
+    'Delete',
+  ]);
+  await menu.getByRole('menuitem', { name: 'Edit', exact: true }).click();
+  await input('event-form').waitFor();
+  assert.equal(await input('event-title').inputValue(), markerTitle);
+  await closeMomentDetails(page);
   await page.mouse.click(x, y, { button: 'right' });
   await menu.getByRole('menuitem', { name: '+Event', exact: true }).click();
   assert.equal(await input('event-exact').inputValue(), contextTime);

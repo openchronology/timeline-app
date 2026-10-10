@@ -3197,6 +3197,7 @@ function showTimelineMenu(
   point?: PointEvent,
   group?: FrameGroup,
   childId?: string,
+  duration?: string,
 ) {
   hoverPreview.hide();
   summaryExpansion.hide();
@@ -3226,6 +3227,14 @@ function showTimelineMenu(
     details.close();
   });
   if (point && editable()) {
+    add('Edit', () => {
+      flushEventEdit();
+      eventForm(model?.byId.get(point.id) ?? point);
+      if (childId)
+        el('plugin-event-fields')
+          .querySelector<HTMLElement>(`[data-stack-id="${childId}"]`)
+          ?.scrollIntoView({ block: 'nearest' });
+    });
     if (pluginFields(activePlugins()).some((f) => f.kind === 'stack'))
       add('Add entry to stack', () => addStackEntry(point));
     add('Delete', () => {
@@ -3240,6 +3249,16 @@ function showTimelineMenu(
           ?.click();
       }
     });
+  }
+  if (duration && editable()) {
+    add('Edit', () => void openDurationById(duration).catch(fail));
+    add(
+      'Delete',
+      () =>
+        void openDurationById(duration)
+          .then(() => requestDurationDelete())
+          .catch(fail),
+    );
   }
   if (group && BigInt(group.count) > 1n)
     add('View events', () => {
@@ -3283,6 +3302,17 @@ function openStageMenu(target: HTMLElement, x: number, y: number) {
   }
   const group = markerGroups.get(target.closest<HTMLElement>('.event-marker')!);
   const time = viewport.at(Math.max(0, Math.min(width(), localX(x))), width());
+  // Duration bands, and markers standing for one collapsed duration, get duration actions.
+  const band = target.closest<HTMLElement>('.duration-band');
+  const duration =
+    band?.dataset.durationId ??
+    (group && group.count === '0' && group.duration && !group.duration.sourceKey
+      ? group.duration.id
+      : undefined);
+  if (duration) {
+    showTimelineMenu(x, y, time, undefined, undefined, undefined, duration);
+    return;
+  }
   if (!group) {
     selectedTime = time;
     requestRender();
@@ -3512,10 +3542,9 @@ function releasePointer(event: PointerEvent, cancel = false) {
     button.click();
     suppressClickUntil = Date.now() + 500;
   } else if (tap) {
-    eventForm(
-      undefined,
-      viewport.at(Math.max(0, Math.min(width(), localX(event.clientX))), width()),
-    );
+    // A click on empty space marks a time (for + Event and the menu); it creates nothing.
+    selectedTime = viewport.at(Math.max(0, Math.min(width(), localX(event.clientX))), width());
+    requestRender();
   }
   if (!pointers.size) {
     press = null;
@@ -5339,7 +5368,9 @@ el<HTMLDialogElement>('duration-dialog').addEventListener('close', () => {
   openDuration = null;
   if (selected && !el('event-form').hidden) refreshDurations();
 });
-el('duration-delete').onclick = () => {
+el('duration-delete').onclick = () => requestDurationDelete();
+/** Asks to delete the open duration. */
+function requestDurationDelete() {
   const current = openDuration;
   if (!current || !durationEditable()) return;
   flushDurationEdit();
@@ -5364,7 +5395,7 @@ el('duration-delete').onclick = () => {
   );
   el<HTMLDialogElement>('delete-dialog').showModal();
   el('delete-cancel').focus();
-};
+}
 function renderDurationPluginFields() {
   const current = openDuration;
   if (!current) return;
