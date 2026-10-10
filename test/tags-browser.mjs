@@ -74,6 +74,17 @@ export async function checkTags(page, restore) {
     const band = await page.locator('.duration-band', { hasText: 'Siege' }).boundingBox();
     assert(band.y < (await top('Market')));
     assert.equal(await page.locator('#add-button').isVisible(), false, 'Separation is read-only.');
+    // Read-only moments and durations open without Save or Cancel.
+    await page.getByRole('button', { name: 'Market', exact: true }).first().click();
+    await page.locator('#inspector').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#event-save').isVisible(), false);
+    assert.equal(await page.locator('#event-cancel').isVisible(), false);
+    await closeMomentDetails(page);
+    await page.locator('.duration-band', { hasText: 'Siege' }).click({ force: true });
+    await page.locator('#duration-dialog').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#duration-save').isVisible(), false);
+    await page.getByRole('button', { name: 'Close duration details' }).click();
+    await page.locator('#duration-dialog').waitFor({ state: 'hidden' });
     await page.locator('#separation-rejoin').click();
     await page.locator('#separation-settings').waitFor({ state: 'hidden' });
     await page.locator('#add-button').waitFor({ state: 'visible' });
