@@ -17,6 +17,14 @@ import { attachRichText } from './rich-text.js';
 import { pluginRichText } from './plugins.js';
 import { dismissOnBackdrop } from './dialogs.js';
 import { advise, record as recordSample, LIMIT } from './capacity.js';
+import {
+  DRAFT_STORES,
+  draftWrites,
+  allDraftWrites,
+  draftSettings,
+  draftDocument,
+} from './drafts.js';
+import type { DraftWrite } from './drafts.js';
 import type { Advice, Measurements, Platform } from './capacity.js';
 import { createHoverPreview } from './hover-preview.js';
 import {
@@ -1702,10 +1710,19 @@ function heading() {
   );
   updateCapacity();
 }
+/**
+ * Version 1 kept one whole document under "drafts/current". Version 2 keeps a draft record
+ * by record (see drafts.ts): its settings under "drafts/settings", embedded assets under
+ * "drafts/assets", and one store per kind of entity.
+ */
 async function draftDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('openchronology', 1);
-    request.onupgradeneeded = () => request.result.createObjectStore('drafts');
+    const request = indexedDB.open('openchronology', 2);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      for (const name of ['drafts', ...DRAFT_STORES])
+        if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
+    };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
@@ -1714,10 +1731,89 @@ async function loadDraft(): Promise<TimelineDocument | null> {
   const db = await draftDb();
   try {
     return await new Promise((resolve, reject) => {
-      const r = db.transaction('drafts').objectStore('drafts').get('current');
-      r.onsuccess = () => resolve(r.result ?? null);
-      r.onerror = () => reject(r.error);
+      const tx = db.transaction(['drafts', ...DRAFT_STORES]);
+      const drafts = tx.objectStore('drafts');
+      const settings = drafts.get('settings'),
+        assets = drafts.get('assets'),
+        legacy = drafts.get('current');
+      const all = Object.fromEntries(
+        DRAFT_STORES.map((name) => {
+          const store = tx.objectStore(name);
+          return [name, { keys: store.getAllKeys(), values: store.getAll() }];
+        }),
+      );
+      tx.oncomplete = () => {
+        if (!settings.result) return resolve(legacy.result ?? null);
+        const retired = all['draft-retired'];
+        resolve(
+          draftDocument({
+            settings: settings.result,
+            ...(assets.result === undefined ? {} : { assets: assets.result }),
+            moments: all['draft-moments'].values.result,
+            durations: all['draft-durations'].values.result,
+            links: all['draft-links'].values.result,
+            retired: (retired.keys.result as string[]).map((id, i) => [
+              id,
+              retired.values.result[i] as string,
+            ]),
+          }),
+        );
+      };
+      tx.onabort = tx.onerror = () => reject(tx.error);
     });
+  } finally {
+    db.close();
+  }
+}
+/** The index whose records the stored draft holds, and the assets it last stored. */
+let draftIndex: TimelineIndex | null = null,
+  draftAssets: unknown = null;
+/**
+ * Stores the open timeline's draft in one transaction: every record when a different
+ * timeline was stored last, otherwise only the records its journal names. Returns the
+ * time spent on this thread (building and cloning records), which pauses the page.
+ */
+async function storeDraft(index: TimelineIndex): Promise<number> {
+  const db = await draftDb();
+  try {
+    let busy = 0;
+    await new Promise<void>((resolve, reject) => {
+      const started = performance.now();
+      const tx = db.transaction(['drafts', ...DRAFT_STORES], 'readwrite');
+      const drafts = tx.objectStore('drafts');
+      const full = draftIndex !== index;
+      let writes: DraftWrite[];
+      if (full) {
+        index.takeChanges();
+        for (const name of DRAFT_STORES) tx.objectStore(name).clear();
+        drafts.delete('current');
+        writes = allDraftWrites(index);
+      } else writes = draftWrites(index, index.takeChanges());
+      for (const { store, key, value } of writes)
+        if (value === undefined) tx.objectStore(store).delete(key);
+        else tx.objectStore(store).put(value, key);
+      drafts.put(draftSettings(index), 'settings');
+      // Embedded images can be megabytes; store them again only when they change.
+      if (full || index.assets !== draftAssets) {
+        if (index.assets === undefined) drafts.delete('assets');
+        else drafts.put(index.assets, 'assets');
+      }
+      // Later saves queue behind this transaction (IndexedDB runs writers in order), so they
+      // can write only their changes as soon as this one is queued.
+      draftIndex = index;
+      draftAssets = index.assets;
+      busy = performance.now() - started;
+      // Visible to performance tooling (and the capacity benchmarks).
+      if (!full)
+        performance.measure('openchronology:draft-changes', { start: started, duration: busy });
+      tx.oncomplete = () => resolve();
+      tx.onabort = tx.onerror = () => {
+        // The journal was consumed; the next save rewrites the whole draft.
+        draftIndex = null;
+        reject(tx.error);
+      };
+    });
+    return busy;
   } finally {
     db.close();
   }
@@ -1854,32 +1950,15 @@ function persistDraft() {
   if (memoryOnly() || remote || desktop || !model) return;
   clearTimeout(draftTimer);
   draftTimer = setTimeout(() => {
-    if (memoryOnly() || remote || !model) return;
-    const started = performance.now();
-    const doc = model.document();
-    let built = performance.now() - started;
-    void draftDb()
-      .then(
-        (db) =>
-          new Promise<void>((resolve, reject) => {
-            const tx = db.transaction('drafts', 'readwrite');
-            // Storing structured-clones the whole document on this thread; both pause the page.
-            const put = performance.now();
-            tx.objectStore('drafts').put(doc, 'current');
-            built += performance.now() - put;
-            recordSample(capacity.edits, built);
-            updateCapacity();
-            tx.oncomplete = () => {
-              db.close();
-              resolve();
-            };
-            tx.onerror = () => {
-              db.close();
-              reject(tx.error);
-            };
-          }),
-      )
-      .then(() => {
+    if (memoryOnly() || remote || !model || sparseWorkspace()) return;
+    const full = draftIndex !== model;
+    void storeDraft(model)
+      .then((busy) => {
+        // The first save of a timeline writes every record; later saves are what edits cost.
+        if (!full) {
+          recordSample(capacity.edits, busy);
+          updateCapacity();
+        }
         if (!remote) text('save-status', 'Saved in this browser');
       })
       .catch(() => {

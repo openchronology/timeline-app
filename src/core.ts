@@ -69,6 +69,7 @@ import { validateInstalledPlugins, validateStackMetadata, imageURL } from './plu
 import type { InstalledPlugin } from './plugins.js';
 export * from './plugins.js';
 export * from './capacity.js';
+export * from './drafts.js';
 export { stackWindow, scaleTimeline } from './stack-layout.js';
 import { parseTimestamp } from './calendar.js';
 import { validatePresentation } from './presentation.js';
@@ -282,6 +283,12 @@ export class TimelineIndex {
   readonly durations = new Map<string, Duration>();
   /** Last times of deleted moments; anchored durations stay put until saved or re-anchored. */
   protected retired = new Map<string, string>();
+  /**
+   * Entities changed since takeChanges() was last called, as "m:<moment>", "d:<duration>",
+   * "l:<link key>" and "r:<moment>" (a deleted moment's last time), so drafts can store
+   * only what changed.
+   */
+  protected journal = new Set<string>();
   title: string;
   description: string;
   presentation?: TimePresentation;
@@ -331,6 +338,7 @@ export class TimelineIndex {
   relate(a: EntityRef, b: EntityRef): Relationship {
     const relationship = canonicalRelationship(a, b);
     this.relationships.set(relationshipKey(relationship), relationship);
+    this.journal.add('l:' + relationshipKey(relationship));
     this.graph = null;
     this.intervalDirty = true;
     return relationship;
@@ -338,7 +346,9 @@ export class TimelineIndex {
   unrelate(a: EntityRef, b: EntityRef): boolean {
     this.graph = null;
     this.intervalDirty = true;
-    return this.relationships.delete(relationshipKey(canonicalRelationship(a, b)));
+    const key = relationshipKey(canonicalRelationship(a, b));
+    this.journal.add('l:' + key);
+    return this.relationships.delete(key);
   }
   /** Undirected links among existing entities. */
   protected liveRelationships(): Relationship[] {
@@ -358,12 +368,14 @@ export class TimelineIndex {
   putDuration(duration: Duration): void {
     const normalized = validateDuration(duration, parseTime);
     this.durations.set(normalized.id, Object.freeze(normalized));
+    this.journal.add('d:' + normalized.id);
     this.intervalDirty = true;
     this.graph = null;
   }
   deleteDuration(id: string): boolean {
     this.intervalDirty = true;
     this.graph = null;
+    this.journal.add('d:' + id);
     return this.durations.delete(id);
   }
   /** Durations whose start or end follows this moment. */
@@ -384,7 +396,8 @@ export class TimelineIndex {
   put(event: PointEvent): void {
     this.intervalDirty = true;
     this.graph = null;
-    this.retired.delete(event.id);
+    if (this.retired.delete(event.id)) this.journal.add('r:' + event.id);
+    this.journal.add('m:' + event.id);
     const time = parseTime(event.time),
       normalized = Object.freeze({
         ...event,
@@ -400,7 +413,11 @@ export class TimelineIndex {
   }
   delete(id: string): boolean {
     const event = this.byId.get(id);
-    if (event) this.retired.set(id, event.time);
+    if (event) {
+      this.retired.set(id, event.time);
+      this.journal.add('r:' + id);
+    }
+    this.journal.add('m:' + id);
     return this.remove(id);
   }
   /** Removes a moment from the index without treating it as deleted (replacement or eviction). */
@@ -415,6 +432,30 @@ export class TimelineIndex {
     else this.points.delete(key);
     this.byId.delete(id);
     return true;
+  }
+  /** The journal of changes since the last call, which it clears. */
+  takeChanges(): string[] {
+    const changes = [...this.journal];
+    this.journal.clear();
+    return changes;
+  }
+  /** A deleted moment's last time, which anchored durations still follow until saved. */
+  retiredTime(id: string): string | undefined {
+    return this.retired.get(id);
+  }
+  /** Every deleted moment's last time. */
+  retiredTimes(): [string, string][] {
+    return [...this.retired];
+  }
+  /**
+   * Rebuilds an index from stored parts, including links and anchors to deleted entities
+   * (see drafts.ts); its document() equals the original's.
+   */
+  static fromParts(settings: TimelineDocument, retired: Iterable<[string, string]>): TimelineIndex {
+    const index = new TimelineIndex(settings);
+    for (const [id, time] of retired) if (!index.byId.has(id)) index.retired.set(id, time);
+    index.journal.clear();
+    return index;
   }
   protected relationshipList(): Relationship[] {
     return this.liveRelationships().sort((a, b) =>

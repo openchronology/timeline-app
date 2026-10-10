@@ -17,6 +17,7 @@ import { checkPlugins } from './plugins-browser.mjs';
 import { checkCommunity } from './community-browser.mjs';
 import { checkAccounts } from './accounts-browser.mjs';
 import { checkRemoteCache } from './remote-cache-browser.mjs';
+import { checkDrafts } from './drafts-browser.mjs';
 import { checkFollowLatest } from './follow-browser.mjs';
 import { checkComparison } from './comparison-browser.mjs';
 import { checkDesktopCache } from './desktop-cache-browser.mjs';
@@ -277,6 +278,7 @@ try {
   await checkAccounts(browser);
   await checkCommunity(browser);
   await checkRemoteCache(browser);
+  await checkDrafts(browser);
   await checkFollowLatest(browser);
   await checkDesktopCache(browser);
   await checkComparison(browser);

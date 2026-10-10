@@ -13,7 +13,7 @@ A timeline holds at most **200,000 moments** (and at most 200,000 durations and 
 
 Why the browser is different: guest editing and the offline HTML file keep the whole timeline in the page. Opening parses and indexes every moment, and every redraw summarizes them in JavaScript. The desktop app and the platform keep timelines in a database and read only what is on screen, so their costs grow far more slowly. Memory is rarely the problem: an open timeline takes about 0.6 KB of browser memory per moment (about 115 MB at 200,000).
 
-Signed-in users who edit a timeline kept only in the browser (imported, and not yet saved to their account) also wait after each edit while a draft is saved. Saving the timeline to the account avoids this; [#40](https://github.com/openchronology/timeline-app/issues/40) tracks making drafts incremental.
+Signed-in users who edit a timeline kept only in the browser (imported, and not yet saved to their account) have a draft kept in the browser. Opening such a timeline stores the whole draft once; after that, each change stores only the records it touched, in under 1 ms even at 200,000 moments. The pause after an edit is the redraw.
 
 ## Advice in the app
 
@@ -51,13 +51,13 @@ Medians from `npm run bench` on a 16-core Linux desktop, with Chromium for the b
 | 100,000 |         0.23 s |                        0.89 s |        31 ms |         27 ms |
 | 200,000 |         0.21 s |                         1.0 s |        46 ms |         36 ms |
 
-| Moments | Pause after an edit (browser, signed in) | Same, 4× slower CPU | Desktop save | Platform save |
-| ------: | ---------------------------------------: | ------------------: | -----------: | ------------: |
-|   1,000 |                                    33 ms |              0.15 s |       2.1 ms |        3.7 ms |
-|  10,000 |                                    67 ms |              0.30 s |       2.3 ms |        3.7 ms |
-|  50,000 |                                   0.10 s |              0.42 s |       2.5 ms |        3.8 ms |
-| 100,000 |                                   0.15 s |              0.65 s |       2.8 ms |        3.9 ms |
-| 200,000 |                                   0.35 s |               1.4 s |       2.6 ms |        3.8 ms |
+| Moments | Pause after an edit (browser) | Same, 4× slower CPU | Of which draft save | Desktop save | Platform save |
+| ------: | ----------------------------: | ------------------: | ------------------: | -----------: | ------------: |
+|   1,000 |                         33 ms |              0.15 s |              0.1 ms |       2.1 ms |        3.7 ms |
+|  10,000 |                         67 ms |              0.33 s |              0.2 ms |       2.3 ms |        3.7 ms |
+|  50,000 |                        0.10 s |              0.43 s |              0.1 ms |       2.5 ms |        3.8 ms |
+| 100,000 |                        0.15 s |              0.72 s |              0.1 ms |       2.8 ms |        3.9 ms |
+| 200,000 |                        0.30 s |               1.3 s |              0.2 ms |       2.6 ms |        3.8 ms |
 
 | Moments | Browser memory | Desktop file | Platform rows |
 | ------: | -------------: | -----------: | ------------: |

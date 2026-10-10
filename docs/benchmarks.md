@@ -64,6 +64,7 @@ Opening differs by platform:
 - **Open:** from importing the file until the editor has drawn the fitted view (the median of three fresh pages, two at 100,000 moments and more).
 - **Redraw:** from applying new bounds until the view is drawn (the median of five).
 - **Pause after an edit:** the longest gap between animation frames in the three seconds after renaming the timeline. It is measured while signed in with a timeline kept only in the browser, so it includes the redraw and the draft saved 0.7 s later. Guests keep no draft, so for them only the redraw remains.
+- **Draft save:** the time the editor spends on the main thread storing each change to the draft, from its `openchronology:draft-changes` performance measures.
 - **Memory:** the JavaScript heap held after opening, after garbage collection.
 
 It also records the SQLite file size and the PostgreSQL rows a timeline occupies (its moments, indexes, search and links, excluding B-tree indexes and history). The report's capacity charts place these beside the equivalent desktop and platform measurements, with reference lines at 100 ms (responses feel instant) and 1 s (users keep their attention). Where a line crosses them shows where that platform stops feeling responsive.

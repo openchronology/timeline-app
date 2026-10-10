@@ -171,10 +171,21 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         record('browser', size, 'memory', heaps, throttle);
         // Signed-in editors save a draft of a browser-only timeline after each edit.
         const { ctx, page } = await open(browser, throttle, size, text, fitted, true);
+        // Opening stores the whole draft once; measure edits after that.
+        await page.waitForFunction(
+          () => document.getElementById('save-status').textContent === 'Saved in this browser',
+          null,
+          { timeout: 15 * 60 * 1000 },
+        );
         const pauses = [];
         for (let i = 0; i < 3; i++) pauses.push(await editPause(page));
+        // The draft save alone, as the editor measures it.
+        const drafts = await page.evaluate(() =>
+          performance.getEntriesByName('openchronology:draft-changes').map((e) => e.duration),
+        );
         await ctx.close();
         record('browser', size, 'edit', pauses, throttle);
+        if (drafts.length) record('browser', size, 'draft', drafts, throttle);
       }
       const file = await stat(`${DATA}/timeline-${size}.och`).catch(() => null);
       if (file) record('sqlite', size, 'storage', file.size);
