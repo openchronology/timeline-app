@@ -216,36 +216,44 @@ export class RemoteWorkspace extends TimelineIndex {
     }
     return deleted;
   }
-  evict(selectedId?: string, openDurationId?: string) {
+  /**
+   * Drops loaded moments and durations nothing needs any more. `retained` lists entities the
+   * editor may still change (those in its undo and redo history): they keep their saved
+   * originals, so undoing an edit and redoing it is still an edit rather than an addition.
+   */
+  evict(
+    selectedId?: string,
+    openDurationId?: string,
+    retained: { moments?: ReadonlySet<string>; durations?: ReadonlySet<string> } = {},
+  ) {
     // Moments anchoring edited durations stay loaded so their bands can be placed locally.
     const endpoints = new Set(
       [...this.durationChanges.values()].flatMap((c) =>
         c.after ? [anchorOf(c.after.start), anchorOf(c.after.end)].filter((a) => a !== null) : [],
       ),
     );
+    const keepMoment = (id: string) =>
+      id === selectedId ||
+      endpoints.has(id) ||
+      this.changes.has(id) ||
+      this.savingIds.has(id) ||
+      !!retained.moments?.has(id);
     for (const [id] of this.byId)
-      if (
-        id !== selectedId &&
-        !endpoints.has(id) &&
-        !this.changes.has(id) &&
-        !this.savingIds.has(id)
-      ) {
+      if (!keepMoment(id)) {
         super.remove(id);
         this.originals.delete(id);
       }
     for (const [id] of this.durations)
-      if (id !== openDurationId && !this.durationChanges.has(id) && !this.savingDurations.has(id)) {
+      if (
+        id !== openDurationId &&
+        !this.durationChanges.has(id) &&
+        !this.savingDurations.has(id) &&
+        !retained.durations?.has(id)
+      ) {
         super.deleteDuration(id);
         this.durationOriginals.delete(id);
       }
-    for (const [id] of this.originals)
-      if (
-        id !== selectedId &&
-        !endpoints.has(id) &&
-        !this.changes.has(id) &&
-        !this.savingIds.has(id)
-      )
-        this.originals.delete(id);
+    for (const [id] of this.originals) if (!keepMoment(id)) this.originals.delete(id);
   }
   beginSave(): SavingChanges {
     this.savingIds = new Set(this.changes.keys());
