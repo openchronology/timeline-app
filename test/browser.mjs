@@ -18,6 +18,7 @@ import { checkCommunity } from './community-browser.mjs';
 import { checkAccounts } from './accounts-browser.mjs';
 import { checkChallenges } from './challenge-browser.mjs';
 import { checkRemoteCache } from './remote-cache-browser.mjs';
+import { checkViewportStore } from './viewport-store-browser.mjs';
 import { checkDrafts } from './drafts-browser.mjs';
 import { checkFollowLatest } from './follow-browser.mjs';
 import { checkComparison } from './comparison-browser.mjs';
@@ -280,6 +281,7 @@ try {
   await checkChallenges(browser);
   await checkCommunity(browser);
   await checkRemoteCache(browser);
+  await checkViewportStore(browser);
   await checkDrafts(browser);
   await checkFollowLatest(browser);
   await checkDesktopCache(browser);
