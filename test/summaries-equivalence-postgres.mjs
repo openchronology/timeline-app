@@ -70,8 +70,8 @@ const random = (n) => {
   return Math.floor((seed / 2147483648) * n);
 };
 const at = (k) => Q.from(BigInt(k), 8n).toString();
-// Beyond float8's range, approximations saturate to ±Infinity (or 0 for tiny values) and tie,
-// so only the exact comparisons tell these apart.
+// Times far beyond float8's range, some closer together than the start key's 30 significant
+// digits (oc_qkey), so only the exact comparisons tell these apart.
 const HUGE = 10n ** 400n;
 const time = () => {
   const roll = random(16);
@@ -186,12 +186,12 @@ try {
       groups += expected.length;
     }
   }
-  // Every start beyond float8's range has the same approximation (Infinity); groups there
-  // depend on exact comparisons alone.
+  // Starts 400 digits apart in significance share one key; groups there depend on exact
+  // comparisons alone.
   const far = {
     format: 'openchronology',
     version: 1,
-    title: 'Saturated',
+    title: 'Clustered',
     description: '',
     events: [],
     durations: Array.from({ length: 40 }, (_, i) => ({
@@ -201,8 +201,8 @@ try {
       metadata: { title: 'F' + i },
     })),
   };
-  const saturated = await store.create(user, far);
-  created.push(saturated.id);
+  const clustered = await store.create(user, far);
+  created.push(clustered.id);
   for (const [lower, upper, threshold] of [
     [HUGE, HUGE + 100n, 3n],
     [HUGE + 7n, HUGE + 31n, 4n],
@@ -212,15 +212,91 @@ try {
       (
         await pool.query(
           `SELECT first_time,last_time,duration_count,band FROM ${fn}($1,$2::mpq,$3::mpq,$4::mpq)`,
-          [saturated.id, `${lower}/1`, `${upper}/1`, `${threshold}/1`],
+          [clustered.id, `${lower}/1`, `${upper}/1`, `${threshold}/1`],
         )
       ).rows;
     const expected = await run('pg_temp.oc_duration_overview_previous');
-    assert(expected.length > 2, 'saturated starts form several groups');
+    assert(expected.length > 2, 'clustered starts form several groups');
     assert.deepEqual(await run('oc_duration_overview'), expected);
     compared++;
   }
-  assert.equal(compared, 323);
+  // Starts spread over magnitudes float8 cannot hold (where every float8 approximation was
+  // ±Infinity or 0) keep distinct keys, so each group's range scan reads only that group.
+  const magnitudes = [
+    ...Array.from({ length: 30 }, (_, i) => -900 + i * 7),
+    ...Array.from({ length: 30 }, (_, i) => 400 + i * 7),
+  ];
+  const power = (k) => (k >= 0 ? Q.from(10n ** BigInt(k)) : Q.from(1n, 10n ** BigInt(-k)));
+  // ±1, 2 and 5 times each power of ten, lasting 40 orders of magnitude less than that.
+  const spread = await store.create(user, {
+    format: 'openchronology',
+    version: 1,
+    title: 'Beyond float8',
+    description: '',
+    events: [],
+    durations: magnitudes.flatMap((k) =>
+      [1n, 2n, 5n, -1n, -2n, -5n].map((m) => {
+        const start = power(k).mul(Q.from(m));
+        return {
+          id: `s${k}_${m}`,
+          start: start.toString(),
+          end: start.add(power(k - 40)).toString(),
+          metadata: {},
+        };
+      }),
+    ),
+  });
+  created.push(spread.id);
+  const {
+    rows: [keys],
+  } = await pool.query(
+    'SELECT count(*)::integer AS starts, count(DISTINCT first_key)::integer AS keys FROM oc_duration_nodes WHERE timeline_id=$1',
+    [spread.id],
+  );
+  assert.equal(keys.keys, keys.starts, 'starts beyond float8 range keep distinct keys');
+  for (const [lower, upper, threshold] of [
+    [power(700).neg(), power(700), power(450)],
+    [power(-500).neg(), power(-500), power(-750)],
+    [Q.zero, power(1000), power(600)],
+  ]) {
+    const run = async (fn) =>
+      (
+        await pool.query(
+          `SELECT first_time,last_time,duration_count,band FROM ${fn}($1,$2::mpq,$3::mpq,$4::mpq)`,
+          [spread.id, lower.toString(), upper.toString(), threshold.toString()],
+        )
+      ).rows;
+    const expected = await run('pg_temp.oc_duration_overview_previous');
+    assert(expected.length > 2, 'spread starts form several groups');
+    assert.deepEqual(await run('oc_duration_overview'), expected);
+    compared++;
+  }
+  // The key never orders two values against their exact order, and separates values that
+  // differ within 30 significant digits: around powers of ten (where the exponent changes),
+  // far outside float8's range, signed, and fractions with long expansions.
+  const values = ['0', '1/3', '-1/3', '2/3', '-1/7', '123456789012345678901234567/7'];
+  for (const k of [-10000, -400, -309, -308, -30, -1, 0, 1, 29, 30, 308, 309, 400, 10000]) {
+    const p = (e) => (e >= 0 ? Q.from(10n ** BigInt(e)) : Q.from(1n, 10n ** BigInt(-e)));
+    for (const v of [
+      p(k),
+      p(k).add(p(k - 29)),
+      p(k).sub(p(k - 29)),
+      p(k).add(p(k - 30)),
+      p(k).sub(p(k - 400)),
+    ])
+      values.push(v.toString(), v.neg().toString());
+  }
+  for (let i = 0; i < 300; i++) values.push(time());
+  const { rows: order } = await pool.query(
+    `SELECT count(*) FILTER (WHERE previous_key>key AND previous<>value)::integer AS inversions,
+       count(*) FILTER (WHERE previous_key=key AND previous<>value
+         AND abs(value-previous)>abs(value)/'1${'0'.repeat(28)}'::mpq)::integer AS merged
+     FROM (SELECT value, oc_qkey(value) AS key, lag(value) OVER w AS previous, lag(oc_qkey(value)) OVER w AS previous_key
+       FROM (SELECT DISTINCT v::mpq AS value FROM unnest($1::text[]) v) x WINDOW w AS (ORDER BY value)) y`,
+    [values],
+  );
+  assert.deepEqual(order[0], { inversions: 0, merged: 0 });
+  assert.equal(compared, 326);
   assert(groups > 500, `the windows produced summaries (${groups})`);
   console.log(
     `PASS PostgreSQL duration summaries: ${compared} windows (${groups} groups) match the previous traversal.`,

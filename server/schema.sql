@@ -556,13 +556,34 @@ UPDATE oc_timelines t SET duration_root=1 WHERE duration_root IS NULL
 CREATE INDEX IF NOT EXISTS oc_duration_nodes_start_moment ON oc_duration_nodes(timeline_id,(definition->'start'->>'moment'));
 CREATE INDEX IF NOT EXISTS oc_duration_nodes_end_moment ON oc_duration_nodes(timeline_id,(definition->'end'->>'moment'));
 
--- Starts approximated as float8 for range scans: rounding to float8 (saturating at ±Infinity
--- and 0) never reverses the order of two starts, so a range of approximations holds every
--- start in the exact range, and exact mpq comparisons recheck each row. Only this small
--- fixed-size key enters the B-tree; arbitrarily large mpq values stay payloads.
-ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS first_approx float8
-  GENERATED ALWAYS AS (first_time::float8) STORED;
-CREATE INDEX IF NOT EXISTS oc_duration_nodes_first_approx ON oc_duration_nodes(timeline_id,first_approx);
+-- Sort keys for exact rationals, small enough for B-trees: ±((2^40 + e)·10^30 + m), where
+-- e is the decimal exponent and m the leading 30 significant digits, truncated. Truncation
+-- never reverses the order of two values, and unlike a float8 the key never saturates: values
+-- beyond float8's range (or below it) keep distinct keys and 30 digits of relative precision.
+-- Text lengths bound the exponent to within one; one exact comparison settles it.
+CREATE OR REPLACE FUNCTION oc_qkey(q mpq) RETURNS numeric
+LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE AS $$
+DECLARE n mpz := abs(num(q)); d mpz := den(q); e integer; m mpz;
+BEGIN
+  IF n=0 THEN RETURN 0; END IF;
+  e:=length(n::text)-length(d::text);
+  IF e>=0 THEN
+    IF n<d*('1'||repeat('0',e))::mpz THEN e:=e-1; END IF;
+  ELSIF n*('1'||repeat('0',-e))::mpz<d THEN e:=e-1;
+  END IF;
+  m:=CASE WHEN e<=29 THEN n*('1'||repeat('0',29-e))::mpz/d ELSE n/(d*('1'||repeat('0',e-29))::mpz) END;
+  RETURN sgn(num(q))*((1099511627776+e)*1e30+m::text::numeric);
+END $$;
+
+-- Starts keyed for range scans (see oc_qkey): a range of keys holds every start in the exact
+-- range, and exact mpq comparisons recheck each row. Only this small key enters the B-tree;
+-- arbitrarily large mpq values stay payloads. Earlier versions keyed a float8, which
+-- saturates: every start beyond ±1.8e308 shared one key and each summary scanned them all.
+DROP INDEX IF EXISTS oc_duration_nodes_first_approx;
+ALTER TABLE oc_duration_nodes DROP COLUMN IF EXISTS first_approx;
+ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS first_key numeric
+  GENERATED ALWAYS AS (oc_qkey(first_time)) STORED;
+CREATE INDEX IF NOT EXISTS oc_duration_nodes_first_key ON oc_duration_nodes(timeline_id,first_key);
 
 -- Anchored-span summaries of durations shorter than the threshold that intersect [lo,hi],
 -- keyed by start: a group starts at the first collapsed start and takes every collapsed
@@ -580,14 +601,16 @@ BEGIN
   bound:=lo-threshold;
   LOOP
     SELECT d.first_time INTO anchor FROM oc_duration_nodes d
-      WHERE d.timeline_id=tid AND d.first_approx>=bound::float8 AND d.first_approx<=hi::float8
+      WHERE d.timeline_id=tid
+        AND d.first_key>=oc_qkey(bound) AND d.first_key<=oc_qkey(hi)
         AND d.first_time>=bound AND d.first_time<=hi AND d.last_time>=lo AND d.last_time-d.first_time<threshold
-      ORDER BY d.first_approx,d.first_time LIMIT 1;
+      ORDER BY d.first_key,d.first_time LIMIT 1;
     EXIT WHEN NOT FOUND;
     bound:=anchor+threshold;
     SELECT count(*)::integer,max(d.last_time),(array_agg(d.band))[1] INTO total,finish,single
       FROM oc_duration_nodes d
-      WHERE d.timeline_id=tid AND d.first_approx>=anchor::float8 AND d.first_approx<=bound::float8
+      WHERE d.timeline_id=tid
+        AND d.first_key>=oc_qkey(anchor) AND d.first_key<=oc_qkey(bound)
         AND d.first_time>=anchor AND d.first_time<bound AND d.first_time<=hi
         AND d.last_time>=lo AND d.last_time-d.first_time<threshold;
     first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
@@ -652,9 +675,11 @@ CREATE TABLE IF NOT EXISTS oc_view_duration_nodes (
   PRIMARY KEY(timeline_id,id)
 );
 ALTER TABLE oc_view_duration_nodes ADD COLUMN IF NOT EXISTS height integer;
-ALTER TABLE oc_view_duration_nodes ADD COLUMN IF NOT EXISTS first_approx float8
-  GENERATED ALWAYS AS (first_time::float8) STORED;
-CREATE INDEX IF NOT EXISTS oc_view_duration_nodes_first_approx ON oc_view_duration_nodes(timeline_id,first_approx);
+DROP INDEX IF EXISTS oc_view_duration_nodes_first_approx;
+ALTER TABLE oc_view_duration_nodes DROP COLUMN IF EXISTS first_approx;
+ALTER TABLE oc_view_duration_nodes ADD COLUMN IF NOT EXISTS first_key numeric
+  GENERATED ALWAYS AS (oc_qkey(first_time)) STORED;
+CREATE INDEX IF NOT EXISTS oc_view_duration_nodes_first_key ON oc_view_duration_nodes(timeline_id,first_key);
 -- View variants of the traversal functions, generated from the originals so the summary
 -- algorithms have a single definition: only table names (and the root's table) differ.
 DO $$
