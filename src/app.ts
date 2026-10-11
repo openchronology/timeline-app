@@ -3372,8 +3372,8 @@ function fit() {
     localLast = model?.points.maxKey();
   if (localFirst && (!first || localFirst.compare(first) < 0)) first = localFirst;
   if (localLast && (!last || localLast.compare(last) > 0)) last = localLast;
-  // Durations held in this page count too, so a timeline of durations alone fits them.
-  if (model && !sparseWorkspace())
+  // A timeline of durations alone fits its durations.
+  if (!first && model && !sparseWorkspace())
     for (const duration of model.durations.values()) {
       const band = resolveDuration(duration, (id) => model!.momentTime(id));
       if (!band) continue;
