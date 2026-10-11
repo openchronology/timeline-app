@@ -52,7 +52,8 @@ export async function checkChallenges(browser) {
           remove() {},
         };
       });
-    let user = null;
+    let user = null,
+      unsolvable = false;
     await context.route(origin + '/**', async (route) => {
       const request = route.request(),
         path = new URL(request.url()).pathname;
@@ -83,9 +84,15 @@ export async function checkChallenges(browser) {
           null,
         );
       } catch (error) {
+        // A real check can be solved within milliseconds when its random answer is small,
+        // closing the dialog before the test sees it.
+        const challenge =
+          unsolvable && error.challenge?.provider === 'pow'
+            ? { ...error.challenge, challenge: '0'.repeat(64) }
+            : error.challenge;
         return route.fulfill({
           status: error.status,
-          json: { error: error.message, challenge: error.challenge },
+          json: { error: error.message, challenge },
         });
       }
       user = { id: 'u', username: 'checked' };
@@ -103,9 +110,10 @@ export async function checkChallenges(browser) {
       };
       const dialog = page.locator('dialog.challenge-dialog');
       if (provider === 'pow') {
-        // Cancelling refuses the request; nothing is retried. A hard check stays open long
-        // enough to cancel.
+        // Cancelling refuses the request; nothing is retried. A long check with no answer
+        // stays open until cancelled.
         challenges.difficulty = 10000000;
+        unsolvable = true;
         await signIn();
         await dialog.waitFor();
         assert.match(await dialog.textContent(), /Quick check/);
@@ -113,6 +121,7 @@ export async function checkChallenges(browser) {
         await dialog.waitFor({ state: 'detached' });
         assert.deepEqual(logins, [null]);
         challenges.difficulty = 5000;
+        unsolvable = false;
         assert.notEqual(await page.locator('#account-button').textContent(), '@checked');
         await page.keyboard.press('Escape');
       }
