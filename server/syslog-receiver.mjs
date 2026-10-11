@@ -18,14 +18,15 @@ import {
   syslogMoment,
   MAX_MESSAGE_BYTES,
 } from './syslog.mjs';
+import { parseZone } from './log-time.mjs';
+import { TimelineWriter, BATCH_LIMIT, temporary } from './timeline-writer.mjs';
 
-/** The changes endpoint accepts at most 5000 moments per save. */
-const BATCH_LIMIT = 5000;
 const sleep = (ms) => new Promise((resume) => setTimeout(resume, ms));
 
 /**
  * One queue per timeline. Moments are sent in batches through `PUT /changes` with the
- * timeline's current revision; a 409 (someone else saved) refetches it and resends.
+ * timeline's current revision (timeline-writer.mjs); a 409 (someone else saved) refetches
+ * it and resends.
  */
 export class SyslogIngest {
   constructor({
@@ -36,14 +37,12 @@ export class SyslogIngest {
     flushMs = 1000,
     queueLimit = 10000,
     log = console,
+    timezone = 'UTC',
   }) {
-    if (!/^https?:\/\//.test(api ?? '')) throw new Error('OCH_API_URL must be an http(s) origin.');
-    if (!/^och_key_[a-f0-9]{32}_[a-f0-9]{64}$/.test(key ?? ''))
-      throw new Error('OCH_API_KEY must be an OpenChronology API key (och_key_...).');
-    this.api = api.replace(/\/+$/, '');
-    this.key = key;
+    this.writer = new TimelineWriter({ api, key, fetcher });
     this.routes = routes;
-    this.fetcher = fetcher;
+    // Classic BSD timestamps carry no zone: read them in this one (UTC unless set).
+    this.zone = parseZone(timezone);
     this.flushMs = flushMs;
     this.queueLimit = queueLimit;
     this.log = log;
@@ -59,7 +58,7 @@ export class SyslogIngest {
       rejected: 0,
     };
     this.queues = new Map(
-      routes.timelines.map((id) => [id, { moments: [], state: null, busy: false, timer: null }]),
+      routes.timelines.map((id) => [id, { moments: [], busy: false, timer: null }]),
     );
     this.closed = false;
   }
@@ -68,7 +67,7 @@ export class SyslogIngest {
     this.stats.received++;
     let entry;
     try {
-      entry = parseSyslog(text, received);
+      entry = parseSyslog(text, received, { zone: this.zone });
     } catch {
       this.stats.invalid++;
       return [];
@@ -99,28 +98,6 @@ export class SyslogIngest {
       void this.flush(timeline);
     }, delay);
   }
-  async request(path, options = {}) {
-    const response = await this.fetcher(this.api + '/api/' + path, {
-      ...options,
-      redirect: 'error',
-      signal: AbortSignal.timeout(30000),
-      headers: {
-        Authorization: 'Bearer ' + this.key,
-        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      },
-    });
-    const value = await response.json().catch(() => ({}));
-    return { status: response.status, value, retryAfter: response.headers?.get?.('retry-after') };
-  }
-  /** The timeline's revision and settings, which a save must send back unchanged. */
-  async load(timeline) {
-    const { status, value } = await this.request('timelines/' + timeline);
-    if (status !== 200) return { status, value };
-    const settings = { format: 'openchronology', version: 1 };
-    for (const key of ['title', 'description', 'presentation', 'plugins', 'tags', 'assets'])
-      if (value[key] !== null && value[key] !== undefined) settings[key] = value[key];
-    return { status, state: { revision: value.revision, settings } };
-  }
   async flush(timeline) {
     const queue = this.queues.get(timeline);
     if (queue.busy || !queue.moments.length) return;
@@ -128,42 +105,17 @@ export class SyslogIngest {
     const batch = queue.moments.splice(0, BATCH_LIMIT);
     let delay = 0;
     try {
-      for (let attempt = 0; ; attempt++) {
-        if (!queue.state) {
-          const loaded = await this.load(timeline);
-          if (!loaded.state) throw Object.assign(new Error('load'), loaded);
-          queue.state = loaded.state;
-        }
-        const { status, value, retryAfter } = await this.request(`timelines/${timeline}/changes`, {
-          method: 'PUT',
-          body: JSON.stringify({
-            revision: queue.state.revision,
-            settings: queue.state.settings,
-            changes: batch.map((event) => ({ id: event.id, event })),
-          }),
-        });
-        if (status === 200) {
-          queue.state.revision = value.revision;
-          this.stats.sent += batch.length;
-          break;
-        }
-        // Someone else saved: fetch the new revision (and settings) and send again.
-        if (status === 409 && attempt < 5) {
-          queue.state = null;
-          continue;
-        }
-        throw Object.assign(new Error('save'), { status, value, retryAfter });
-      }
+      await this.writer.send(timeline, { moments: batch });
+      this.stats.sent += batch.length;
     } catch (error) {
       const status = error.status;
-      if (status === 429 || status === 409 || status === undefined || status >= 500) {
+      if (temporary(status)) {
         // Temporary: keep the batch at the front and try again later.
         queue.moments.unshift(...batch);
         while (queue.moments.length > this.queueLimit) {
           queue.moments.shift();
           this.stats.dropped++;
         }
-        queue.state = null;
         queue.failures = (queue.failures ?? 0) + 1;
         delay =
           status === 429 && Number(error.retryAfter) > 0
@@ -264,6 +216,7 @@ export async function main(env = process.env) {
     routes: compileRoutes(config),
     flushMs: env.SYSLOG_FLUSH_MS ? Number(env.SYSLOG_FLUSH_MS) : undefined,
     queueLimit: env.SYSLOG_QUEUE_LIMIT ? Number(env.SYSLOG_QUEUE_LIMIT) : undefined,
+    timezone: env.SYSLOG_TIMEZONE || 'UTC',
   });
   const listening = await listenSyslog(ingest, {
     host: env.SYSLOG_HOST || '127.0.0.1',

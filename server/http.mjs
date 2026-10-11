@@ -559,6 +559,20 @@ export function createRequestHandler({
           await pool.query('DELETE FROM oc_sessions WHERE token_hash=$1', [session.token_hash]);
           return response(res, 200, { ok: true }, { 'Set-Cookie': auth.cookie('', true) });
         }
+        // Storage used and allowed for the account (or API key owner), so that importers can
+        // check that an import fits before writing; quotaBytes is null when none applies.
+        if (pathname === '/api/timelines/usage' && method === 'GET') {
+          if (!userId) throw new HttpError(401, 'Sign in to see storage use.');
+          const account = await usage(pool, userId);
+          const { rows } = await pool.query(
+            'SELECT enforce_quotas FROM oc_site_settings WHERE singleton',
+          );
+          const limited = rows[0]?.enforce_quotas && !account.quota_bypass && !account.is_admin;
+          return response(res, 200, {
+            usedBytes: Number(account.used_bytes),
+            quotaBytes: limited ? Number(account.effective_quota_bytes) : null,
+          });
+        }
         if (pathname === '/api/timelines/search' && method === 'POST')
           return response(
             res,

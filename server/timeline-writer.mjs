@@ -1,0 +1,117 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+/**
+ * Adds moments (and durations) to timelines through the API with an API key, shared by the
+ * syslog receiver and the log importer. Each save sends the timeline's current revision and
+ * settings to `PUT /api/timelines/<id>/changes`; a 409 (someone else saved) fetches the new
+ * revision and sends again. Other failures are thrown with their status for the caller to
+ * retry (429, 5xx, unreachable) or give up (anything else).
+ */
+
+/** The changes endpoint accepts at most 5000 moments and durations per save. */
+export const BATCH_LIMIT = 5000;
+/** Requests are limited to 16 MiB; batches stay well under it. */
+export const BATCH_BYTES = 12 * 1024 * 1024;
+const KEY = /^och_key_[a-f0-9]{32}_[a-f0-9]{64}$/;
+
+/** Whether a failed save is worth retrying later. */
+export const temporary = (status) =>
+  status === undefined || status === 409 || status === 429 || status >= 500;
+
+export class TimelineWriter {
+  constructor({ api, key, fetcher = fetch }) {
+    if (!/^https?:\/\//.test(api ?? '')) throw new Error('OCH_API_URL must be an http(s) origin.');
+    if (!KEY.test(key ?? ''))
+      throw new Error('OCH_API_KEY must be an OpenChronology API key (och_key_...).');
+    this.api = api.replace(/\/+$/, '');
+    this.key = key;
+    this.fetcher = fetcher;
+    this.states = new Map();
+  }
+  async request(path, options = {}) {
+    const response = await this.fetcher(this.api + '/api/' + path, {
+      ...options,
+      redirect: 'error',
+      signal: AbortSignal.timeout(60000),
+      headers: {
+        Authorization: 'Bearer ' + this.key,
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      },
+    });
+    const value = await response.json().catch(() => ({}));
+    return { status: response.status, value, retryAfter: response.headers?.get?.('retry-after') };
+  }
+  /** The timeline's revision and settings, which a save must send back unchanged. */
+  async load(timeline) {
+    const { status, value } = await this.request('timelines/' + timeline);
+    if (status !== 200) return { status, value };
+    const settings = { format: 'openchronology', version: 1 };
+    for (const key of ['title', 'description', 'presentation', 'plugins', 'tags', 'assets'])
+      if (value[key] !== null && value[key] !== undefined) settings[key] = value[key];
+    return {
+      status,
+      state: {
+        revision: value.revision,
+        settings,
+        // Its size, which decides how large a save the server applies in place.
+        eventCount: Number(value.event_count ?? 0),
+        storageBytes: Number(value.storage_bytes ?? 0),
+      },
+    };
+  }
+  /** The timeline's moment count and document size as last seen (loading it if needed). */
+  async size(timeline) {
+    let state = this.states.get(timeline);
+    if (!state) {
+      const loaded = await this.load(timeline);
+      if (!loaded.state) throw Object.assign(new Error('load'), loaded);
+      state = loaded.state;
+      this.states.set(timeline, state);
+    }
+    return { count: state.eventCount, bytes: state.storageBytes };
+  }
+  /** Forgets a timeline's revision, so the next save fetches it again. */
+  forget(timeline) {
+    this.states.delete(timeline);
+  }
+  /**
+   * Saves one batch. Resolves when saved; otherwise throws an error carrying `status` (none
+   * when the server could not be reached), the response `value` and `retryAfter`.
+   */
+  async send(timeline, { moments = [], durations = [] }) {
+    for (let attempt = 0; ; attempt++) {
+      let state = this.states.get(timeline);
+      if (!state) {
+        const loaded = await this.load(timeline);
+        if (!loaded.state) throw Object.assign(new Error('load'), loaded);
+        state = loaded.state;
+        this.states.set(timeline, state);
+      }
+      const { status, value, retryAfter } = await this.request(`timelines/${timeline}/changes`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          revision: state.revision,
+          settings: state.settings,
+          changes: moments.map((event) => ({ id: event.id, event })),
+          ...(durations.length
+            ? { durationChanges: durations.map((duration) => ({ id: duration.id, duration })) }
+            : {}),
+        }),
+      });
+      if (status === 200) {
+        state.revision = value.revision;
+        state.eventCount = Number(value.event_count ?? state.eventCount + moments.length);
+        state.storageBytes = Number(value.storage_bytes ?? state.storageBytes);
+        return value;
+      }
+      this.forget(timeline);
+      // Someone else saved: fetch the new revision (and settings) and send again.
+      if (status === 409 && attempt < 5) continue;
+      throw Object.assign(new Error('save'), { status, value, retryAfter });
+    }
+  }
+  /** The key owner's storage use and quota (`GET /api/timelines/usage`), or null if unknown. */
+  async usage() {
+    const { status, value } = await this.request('timelines/usage');
+    return status === 200 ? value : null;
+  }
+}

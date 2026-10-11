@@ -42,6 +42,8 @@ COPY --from=build --chown=node:node /app/platform/public platform/public
 COPY --from=build --chown=node:node /app/dist dist
 COPY --chown=node:node package.json ./
 COPY --chown=node:node server server
+# The log importer (docs/log-import.md) as a command, e.g. beside the Compose syslog service.
+RUN ln -s /app/server/import-logs.mjs /usr/local/bin/och-import-logs
 COPY LICENSE NOTICE THIRD_PARTY.md ./
 COPY legal legal
 COPY LICENSE NOTICE THIRD_PARTY.md /usr/local/share/openchronology/

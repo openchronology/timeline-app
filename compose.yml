@@ -114,6 +114,7 @@ services:
       SYSLOG_ROUTES: /config/syslog-routes.json
       SYSLOG_HOST: 0.0.0.0
       SYSLOG_PORT: 5514
+      SYSLOG_TIMEZONE: ${SYSLOG_TIMEZONE:-UTC}
     volumes:
       - ${SYSLOG_ROUTES_FILE:-./syslog-routes.json}:/config/syslog-routes.json:ro
     # Loopback only, like the app; publish more widely only behind a firewall.

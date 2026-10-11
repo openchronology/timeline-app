@@ -53,6 +53,9 @@ The syslog receiver (syslog.md) is configured in /etc/openchronology/syslog.env 
 in /etc/openchronology/syslog-routes.json; then
 `sudo systemctl enable --now openchronology-syslog`.
 
+`och-import-logs` imports historic log files (log-import.md), with OCH_API_URL and
+OCH_API_KEY from the environment or syslog.env: `och-import-logs --help`.
+
 Upgrade
 -------
 

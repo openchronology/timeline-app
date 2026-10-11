@@ -125,6 +125,22 @@ export async function applyIncrementally(c, t, patch) {
       )
     ).rows.map((r) => [r.id, r.event]),
   );
+  // Changes identical to what is stored (a resent batch, a log imported again) are neither
+  // applied nor recorded.
+  for (const [momentId, event] of momentChanges) {
+    const before = saved.get(momentId);
+    if (event && before && canonical(before) === canonical(event)) momentChanges.delete(momentId);
+  }
+  if (durationChanges.size) {
+    const { rows } = await c.query(
+      `SELECT k.id,n.definition FROM unnest($2::text[]) k(id) CROSS JOIN LATERAL
+        (SELECT definition FROM oc_duration_nodes WHERE timeline_id=$1 AND band->>'id'=k.id) n`,
+      [id, [...durationChanges].filter(([, d]) => d).map(([k]) => k)],
+    );
+    for (const row of rows)
+      if (row.definition && canonical(row.definition) === canonical(durationChanges.get(row.id)))
+        durationChanges.delete(row.id);
+  }
   let storage = Number(t.storage_bytes) - bytes(previousSettings) + bytes(settings);
   let added = false;
   const moved = new Set(); // moments whose time changed or that were deleted
