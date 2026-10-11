@@ -58,7 +58,9 @@ export async function checkDesktopCache(browser) {
     details = [],
     saves = [],
     errors = [],
-    prefetches = [];
+    prefetches = [],
+    // Server requests: with no server connected, there should be none.
+    requests = [];
   const header = () => ({
     document: { ...document, events: [], durations: [] },
     generation,
@@ -135,6 +137,7 @@ export async function checkDesktopCache(browser) {
       generation++;
       return header();
     }
+    if (command === 'desktop_request') requests.push(args.path);
     throw new Error('Unexpected desktop cache command ' + command);
   });
   await context.addInitScript(() => {
@@ -191,6 +194,20 @@ export async function checkDesktopCache(browser) {
     // Desktop files are predicted too, while the view is settled.
     for (let i = 0; i < 200 && !prefetches.length; i++) await page.waitForTimeout(25);
     assert(prefetches.length > 0);
+    // With no server, the plugin library lists the official plugins included with the app.
+    await page.locator('#plugins-button').click();
+    await page.locator('#plugins-add').click();
+    await page.waitForFunction(() =>
+      document
+        .getElementById('plugin-library-status')
+        .textContent.includes('official plugins included with this app'),
+    );
+    assert((await page.locator('.library-plugin').count()) > 0);
+    assert(await page.locator('#plugin-sort').isHidden());
+    assert.deepEqual(requests, []);
+    await page.getByRole('button', { name: 'Close plugin library', exact: true }).click();
+    await page.getByRole('button', { name: 'Close plugins', exact: true }).click();
+    await page.locator('#plugins-dialog').waitFor({ state: 'hidden' });
     await page.getByRole('button', { name: 'Nearby moment', exact: true }).click();
     await page.locator('#event-description').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#event-description').inputValue(), 'SQLite inspector notes');

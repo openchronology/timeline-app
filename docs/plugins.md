@@ -69,7 +69,7 @@ Read-only server overview queries return the requested plugin metadata for indiv
 
 ## Library API and publishing
 
-The main server supplies a public searchable library. Built-ins remain available without a database; community publications are stored in PostgreSQL:
+The main server supplies a public searchable library. Built-ins remain available without a database; community publications are stored in PostgreSQL. The official (built-in) plugins also ship with every build: the offline HTML file and a desktop app with no server search them locally, with no request, using the same rules (`searchPluginLibrary`), and a server that cannot be reached or fails (or a static site with none) falls back to them. Community plugins need the server's library:
 
 - `GET /api/plugins?search=icons&page=1&limit=12`
 - `POST /api/plugins/search` with `{"search":"icons","page":1,"limit":12}`. Desktop clients use this route to keep their native path allowlist free of arbitrary query strings.
