@@ -106,6 +106,32 @@ test('server comparison inversely transforms bounds, reuses windows and discards
   view.dispose();
   assert.equal(view.cached(viewport, 1000, 24), null);
 });
+test('a fetched comparison window replaces the stand-in drawn while it loaded', async () => {
+  // Each answer names the resolution it was asked for.
+  const remote = (key) => ({
+    key,
+    title: key,
+    query: async (query) => ({
+      groups: [
+        { first: '10/1', last: '10/1', count: '1', distinct: 1, id: 'w', title: query.threshold },
+      ],
+      visitedNodes: 1,
+    }),
+  });
+  const view = new ComparisonView([remote('a'), remote('b')]);
+  const titles = (frame) => [...new Set(frame.groups.map((g) => g.title))];
+  const near = new Viewport(Q.zero, Q.from(20n)),
+    out = new Viewport(Q.zero, Q.from(400n));
+  await view.frame(near, 1000, 24);
+  // Zooming out draws the nearer windows while the coarser ones load...
+  assert.equal(view.cached(out, 1000, 24), null);
+  const standIn = titles(view.visible(out, 1000, 24));
+  // ...and the loaded ones, not the stand-ins, are what the zoomed view shows.
+  const loaded = titles(await view.frame(out, 1000, 24));
+  assert.equal(loaded.length, 1);
+  assert.notDeepEqual(loaded, standIn);
+  assert.deepEqual(titles(view.cached(out, 1000, 24)), loaded);
+});
 test('plugin union deduplicates IDs, preserves order, reports incompatible definitions and does not mutate sources', () => {
   const plugin = { manifest: BUILTIN_PLUGINS[0], enabled: false };
   const result = unionPlugins([

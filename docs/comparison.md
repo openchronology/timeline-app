@@ -41,7 +41,8 @@ the conflict. Distinct plugin IDs remain distinct. No plugin code runs on the
 server. Plugins continue to use the restricted interpreter and existing host
 components, with editing disabled in this view.
 
-Each indexed source retains only one bounded, overscanned cache. Inverse affine
+Each indexed source has its own bounded viewport cache (see
+[architecture](architecture.md)), without prefetching. Inverse affine
 transforms produce database query bounds and grouping thresholds in source
 coordinates. Changing alignment clears that source's cache. Viewport requests
 are debounced, serial, and discard stale results. Browser-created and imported

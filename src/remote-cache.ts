@@ -51,83 +51,258 @@ export interface WindowQuery {
   threshold: string;
 }
 const EMPTY = (): Frame => ({ groups: [], visitedNodes: 0 });
-/** A single overscanned window, rather than a growing history of visited windows. */
+/** The most recent change of view: what to fetch ahead of the reader. */
+export type Motion = 'pan' | 'zoom-in' | 'zoom-out' | null;
+interface Entry {
+  lower: Q;
+  upper: Q;
+  threshold: Q;
+  frame: Frame;
+  /** When the window was fetched, and when it last answered or was stored. */
+  fetched: number;
+  used: number;
+  bytes: number;
+}
+/** The power of two at or below a positive rational. */
+function dyadic(value: Q): Q {
+  let exponent = value.numerator.toString(2).length - value.denominator.toString(2).length;
+  const power = (e: number) => (e >= 0 ? Q.from(1n << BigInt(e)) : Q.from(1n, 1n << BigInt(-e)));
+  if (power(exponent).compare(value) > 0) exponent--;
+  return power(exponent);
+}
+/** log2 of a positive ratio, to the nearest integer below or at it; enough to rank levels. */
+function octaves(a: Q, b: Q): number {
+  const ratio = a.div(b);
+  return Math.abs(ratio.numerator.toString(2).length - ratio.denominator.toString(2).length);
+}
+const covers = (e: { lower: Q; upper: Q }, lower: Q, upper: Q) =>
+  e.lower.compare(lower) <= 0 && e.upper.compare(upper) >= 0;
+/**
+ * A running cache of overscanned windows at several resolutions, for timelines whose saved
+ * head lives on the server or in a desktop file. Views are answered from any fresh window
+ * of their resolution that covers them; `predict` names the windows to fetch ahead of the
+ * reader (around the view, and one level coarser and finer), and windows far from the view,
+ * in position or resolution, are released first when the budget is reached.
+ */
 export class ViewportCache {
-  private entry?: { lower: Q; upper: Q; threshold: Q; frame: Frame; fetched: number };
+  private entries: Entry[] = [];
+  private focus?: { view: Viewport; threshold: Q };
+  /** The window last drawn, which keeps the screen steady while the next one is fetched. */
+  private shown?: Entry;
+  /** One response's limits; a response beyond them is refused. */
   readonly maxGroups = 2048;
   readonly maxBytes = 8 * 1024 * 1024;
+  /** The whole cache's limits. */
+  readonly maxEntries = 16;
+  readonly totalBytes = 24 * 1024 * 1024;
+  /** A window answers views for 30 seconds; it is kept, for display while refetching, for five minutes. */
+  readonly freshFor = 30000;
+  readonly keepFor = 300000;
   constructor(private clock: () => number = Date.now) {}
   clear() {
-    this.entry = undefined;
+    this.entries = [];
+    this.shown = undefined;
   }
+  get size() {
+    return this.entries.length;
+  }
+  get bytes() {
+    return this.entries.reduce((total, e) => total + e.bytes, 0);
+  }
+  /** The resolution and window to fetch for a view; dyadic levels let nearby zooms share one. */
   plan(view: Viewport, width: number, pixels: number): WindowQuery {
     const margin = view.span.div(Q.from(4n));
-    let threshold = view.threshold(width, Math.max(1, pixels));
-    const minimum = view.span.mul(Q.from(3n, 2n)).div(Q.from(1024n));
-    if (threshold.compare(minimum) < 0) threshold = minimum;
-    // Dyadic levels make neighboring zoom positions share an exact, bounded resolution.
-    let exponent =
-      threshold.numerator.toString(2).length - threshold.denominator.toString(2).length;
-    let level =
-      exponent >= 0 ? Q.from(1n << BigInt(exponent)) : Q.from(1n, 1n << BigInt(-exponent));
-    if (level.compare(threshold) > 0) {
-      exponent--;
-      level = exponent >= 0 ? Q.from(1n << BigInt(exponent)) : Q.from(1n, 1n << BigInt(-exponent));
-    }
-    if (level.compare(minimum) < 0) level = minimum;
+    const threshold = this.level(view, width, pixels);
     return {
       lower: view.left.sub(margin).toString(),
       upper: view.right.add(margin).toString(),
-      threshold: level.toString(),
+      threshold: threshold.toString(),
     };
   }
+  private level(view: Viewport, width: number, pixels: number): Q {
+    let threshold = view.threshold(width, Math.max(1, pixels));
+    const minimum = view.span.mul(Q.from(3n, 2n)).div(Q.from(1024n));
+    if (threshold.compare(minimum) < 0) threshold = minimum;
+    const level = dyadic(threshold);
+    return level.compare(minimum) < 0 ? minimum : level;
+  }
   get(view: Viewport, query: WindowQuery): Frame | null {
-    const e = this.entry;
-    // A cache miss schedules a fetch; it does not invalidate the last confirmed window.
-    if (
-      !e ||
-      e.threshold.compare(Q.parse(query.threshold)) !== 0 ||
-      e.lower.compare(view.left) > 0 ||
-      e.upper.compare(view.right) < 0 ||
-      this.clock() - e.fetched > 30000
-    ) {
-      return null;
-    }
-    return this.visible(view);
+    const threshold = Q.parse(query.threshold),
+      now = this.clock();
+    this.focus = { view, threshold };
+    // A cache miss schedules a fetch; it does not invalidate confirmed windows.
+    const entry = this.entries
+      .filter(
+        (e) =>
+          e.threshold.compare(threshold) === 0 &&
+          covers(e, view.left, view.right) &&
+          now - e.fetched <= this.freshFor,
+      )
+      .sort((a, b) => b.fetched - a.fetched)[0];
+    if (!entry) return null;
+    entry.used = now;
+    this.shown = entry;
+    return this.cut(entry.frame, view);
   }
   store(query: WindowQuery, frame: Frame) {
-    if (frame.groups.length > this.maxGroups || JSON.stringify(frame).length * 2 > this.maxBytes)
+    const bytes = JSON.stringify(frame).length * 2;
+    if (frame.groups.length > this.maxGroups || bytes > this.maxBytes)
       throw new Error('Viewport response exceeds the browser cache budget.');
     // Preserve unchanged singleton objects by their stable moment IDs. Summaries are
     // authoritative for this response and never added to old summary counts.
-    const previous = new Map(this.entry?.frame.groups.filter((g) => g.id).map((g) => [g.id, g]));
+    const previous = new Map(
+      this.entries.flatMap((e) => e.frame.groups.filter((g) => g.id).map((g) => [g.id, g])),
+    );
     const groups = frame.groups.map((group) => {
       const old = group.id ? previous.get(group.id) : undefined;
       return old && JSON.stringify(old) === JSON.stringify(group) ? old : group;
     });
-    this.entry = {
-      lower: Q.parse(query.lower),
-      upper: Q.parse(query.upper),
-      threshold: Q.parse(query.threshold),
-      frame: { ...frame, groups },
-      fetched: this.clock(),
-    };
+    const now = this.clock(),
+      entry: Entry = {
+        lower: Q.parse(query.lower),
+        upper: Q.parse(query.upper),
+        threshold: Q.parse(query.threshold),
+        frame: { ...frame, groups },
+        fetched: now,
+        used: now,
+        bytes,
+      };
+    // A window replaces the windows of its resolution that it contains.
+    this.entries = this.entries.filter(
+      (e) => e.threshold.compare(entry.threshold) !== 0 || !covers(entry, e.lower, e.upper),
+    );
+    this.entries.push(entry);
+    this.evict(entry);
   }
+  /** The confirmed data to show for a view while its own window is fetched. */
   visible(view: Viewport): Frame {
-    const frame = this.entry?.frame;
-    return frame
-      ? {
-          ...frame,
-          durations: frame.durations?.filter(
-            (b) =>
-              Q.parse(b.last).compare(view.left) >= 0 && Q.parse(b.first).compare(view.right) <= 0,
-          ),
-          groups: frame.groups.filter(
-            (g) =>
-              Q.parse(g.last).compare(view.left) >= 0 && Q.parse(g.first).compare(view.right) <= 0,
-          ),
-        }
-      : EMPTY();
+    return this.nearest(view)?.frame ?? EMPTY();
+  }
+  /**
+   * The best stand-in for a view while its own window is fetched: the window last drawn,
+   * if it overlaps the view, so that visible moments and their grouping stay put; else a
+   * window covering the view (or overlapping it most), at the resolution closest to
+   * `threshold`, finer before coarser, newest first.
+   */
+  nearest(view: Viewport, threshold?: Q): { frame: Frame; threshold: Q } | null {
+    const overlap = (e: Entry) => {
+      const lower = e.lower.compare(view.left) > 0 ? e.lower : view.left,
+        upper = e.upper.compare(view.right) < 0 ? e.upper : view.right;
+      return upper.compare(lower) > 0 ? upper.sub(lower).div(view.span).toApproximateNumber() : 0;
+    };
+    const rank = (e: Entry) => [
+      covers(e, view.left, view.right) ? 0 : 1 - overlap(e),
+      threshold ? octaves(e.threshold, threshold) : 0,
+      threshold && e.threshold.compare(threshold) > 0 ? 1 : 0,
+      -e.fetched,
+    ];
+    const shown = this.shown;
+    const best =
+      shown && this.entries.includes(shown) && overlap(shown) > 0
+        ? shown
+        : [...this.entries].sort((a, b) => {
+            const x = rank(a),
+              y = rank(b);
+            for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] - y[i];
+            return 0;
+          })[0];
+    if (!best) return null;
+    this.shown = best;
+    return { frame: this.cut(best.frame, view), threshold: best.threshold };
+  }
+  /**
+   * Windows worth fetching ahead of the reader, most likely first: a wide window at the
+   * view's resolution for panning, and windows one level coarser and finer for zooming,
+   * ordered by the latest motion. Windows already fresh in the cache are left out; each
+   * stays within the server's limit of about 1,024 groups (width / 1,024 ≤ threshold).
+   */
+  predict(view: Viewport, width: number, pixels: number, motion: Motion = null): WindowQuery[] {
+    const level = this.level(view, width, pixels),
+      span = view.span,
+      now = this.clock();
+    const around = (threshold: Q, margin: Q): WindowQuery | null => {
+      // Narrow the margin to fit the response limit; a window must still cover the view.
+      const widest = threshold.mul(Q.from(1024n)),
+        room = widest.sub(span).div(Q.from(2n));
+      if (room.compare(Q.zero) < 0) return null;
+      const side = margin.compare(room) > 0 ? room : margin;
+      return {
+        lower: view.left.sub(side).toString(),
+        upper: view.right.add(side).toString(),
+        threshold: threshold.toString(),
+      };
+    };
+    const pan = around(level, span.mul(Q.from(2n))),
+      out = around(level.mul(Q.from(2n)), span.mul(Q.from(2n))),
+      zoomIn = around(level.div(Q.from(2n)), span.div(Q.from(2n)));
+    const order =
+      motion === 'zoom-in'
+        ? [zoomIn, pan, out]
+        : motion === 'zoom-out'
+          ? [out, pan, zoomIn]
+          : [pan, out, zoomIn];
+    return order.filter(
+      (q): q is WindowQuery =>
+        !!q &&
+        !this.entries.some(
+          (e) =>
+            e.threshold.compare(Q.parse(q.threshold)) === 0 &&
+            covers(e, Q.parse(q.lower), Q.parse(q.upper)) &&
+            now - e.fetched <= this.freshFor,
+        ),
+    );
+  }
+  /** Releases every window but those covering `view` (all of them without one). */
+  release(view?: Viewport) {
+    this.entries = view ? this.entries.filter((e) => covers(e, view.left, view.right)) : [];
+  }
+  /**
+   * Drops windows past their keeping time, then the windows farthest from the view while
+   * over budget: by resolution (in octaves), position (in widths of the view or window) and
+   * time since last use (in minutes). The window serving the view and `kept` stay.
+   */
+  private evict(kept: Entry) {
+    const now = this.clock();
+    this.entries = this.entries.filter((e) => e === kept || now - e.used <= this.keepFor);
+    const focus = this.focus;
+    const distance = (e: Entry) => {
+      if (!focus) return (now - e.used) / 60000;
+      const { view, threshold } = focus;
+      const gap =
+        e.upper.compare(view.left) < 0
+          ? view.left.sub(e.upper)
+          : e.lower.compare(view.right) > 0
+            ? e.lower.sub(view.right)
+            : Q.zero;
+      const scale = e.upper.sub(e.lower).compare(view.span) > 0 ? e.upper.sub(e.lower) : view.span;
+      return (
+        octaves(e.threshold, threshold) +
+        gap.div(scale).toApproximateNumber() +
+        (now - e.used) / 60000
+      );
+    };
+    const serving = (e: Entry) =>
+      e === kept ||
+      (!!focus &&
+        e.threshold.compare(focus.threshold) === 0 &&
+        covers(e, focus.view.left, focus.view.right));
+    while (this.entries.length > this.maxEntries || this.bytes > this.totalBytes) {
+      const candidates = this.entries.filter((e) => !serving(e));
+      if (!candidates.length) break;
+      const farthest = candidates.reduce((a, b) => (distance(b) > distance(a) ? b : a));
+      this.entries = this.entries.filter((e) => e !== farthest);
+    }
+  }
+  private cut(frame: Frame, view: Viewport): Frame {
+    return {
+      ...frame,
+      durations: frame.durations?.filter(
+        (b) => Q.parse(b.last).compare(view.left) >= 0 && Q.parse(b.first).compare(view.right) <= 0,
+      ),
+      groups: frame.groups.filter(
+        (g) => Q.parse(g.last).compare(view.left) >= 0 && Q.parse(g.first).compare(view.right) <= 0,
+      ),
+    };
   }
 }
 
