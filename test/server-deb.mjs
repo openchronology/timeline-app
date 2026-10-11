@@ -87,7 +87,7 @@ try {
   assert.match(await sh('och-import-logs --help'), /^Usage: och-import-logs/);
   const dry = JSON.parse(
     await sh(
-      "printf 'Oct  9 08:15:01 host sshd[1]: Accepted\\n' > /tmp/syslog && och-import-logs --format syslog --timezone UTC --year 2026 --dry-run --quiet /tmp/syslog",
+      "printf 'Oct  9 08:15:01 host sshd[1]: Accepted\\n' > /tmp/syslog && och-import-logs --format syslog --timezone UTC --year 2026 --dry-run --quiet /tmp/syslog 2>/dev/null",
     ),
   );
   assert.equal(dry.entries, 1);

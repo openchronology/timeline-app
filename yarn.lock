@@ -972,6 +972,8 @@ __metadata:
     react-dom: "npm:19.2.8"
     tinybench: "npm:6.2.1"
     typescript: "npm:5.9.3"
+  bin:
+    och-import-logs: server/import-logs.mjs
   languageName: unknown
   linkType: soft
 
