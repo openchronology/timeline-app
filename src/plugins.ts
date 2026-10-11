@@ -718,6 +718,42 @@ export const BUILTIN_PLUGINS: readonly PluginManifest[] = [
   EXPAND_ON_HOVER,
 ];
 
+/** A page of a plugin library: the newest version of each plugin matching a search. */
+export interface PluginLibraryPage {
+  plugins: PluginManifest[];
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+  apiVersion: 1;
+}
+/**
+ * Searches a fixed plugin library: the newest version of each plugin, in name order, whose
+ * name, description or ID contains the search. The server's built-in library and apps with
+ * no server (offline HTML, desktop) answer from the same definitions this way.
+ */
+export function searchPluginLibrary(
+  manifests: readonly PluginManifest[],
+  { search = '', page = 1, limit = 12 }: { search?: string; page?: number; limit?: number } = {},
+): PluginLibraryPage {
+  const latest = new Map<string, PluginManifest>();
+  for (const p of manifests) {
+    const known = latest.get(p.id);
+    if (!known || known.version < p.version) latest.set(p.id, p);
+  }
+  const needle = search.trim().toLowerCase();
+  const matching = [...latest.values()]
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : a.id.localeCompare(b.id)))
+    .filter((p) => (p.name + ' ' + p.description + ' ' + p.id).toLowerCase().includes(needle));
+  return {
+    plugins: matching.slice((page - 1) * limit, page * limit),
+    page,
+    limit,
+    total: matching.length,
+    pages: Math.ceil(matching.length / limit),
+    apiVersion: 1,
+  };
+}
 export function isOfficialPlugin(manifest: PluginManifest): boolean {
   return BUILTIN_PLUGINS.some((official) => JSON.stringify(official) === JSON.stringify(manifest));
 }

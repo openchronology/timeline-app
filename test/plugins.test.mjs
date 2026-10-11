@@ -32,6 +32,9 @@ import {
   TimelineIndex,
   validateDocument,
   demo,
+  searchPluginLibrary,
+  isOfficialPlugin,
+  BUILTIN_PLUGINS,
 } from '../dist/core.mjs';
 import { createPluginLibrary } from '../server/plugins.mjs';
 import { createApplication } from '../server/http.mjs';
@@ -591,4 +594,27 @@ test('rich notes are an opt-in host capability preserved with Markdown in saved 
   });
   assert.equal(projection.title, title);
   assert.deepEqual(projection.sources, ['https://example.org']);
+});
+test('apps without a server search the official plugins exactly as the built-in server library', () => {
+  const server = createPluginLibrary();
+  for (const query of [
+    {},
+    { search: 'moment' },
+    { search: '  HOVER ' },
+    { search: 'nothing like this' },
+    { limit: 4, page: 2 },
+    { limit: 4, page: 9 },
+  ])
+    assert.deepEqual(searchPluginLibrary(BUILTIN_PLUGINS, query), server.search(query));
+  // The newest version of each official plugin, in name order, each one official.
+  const all = searchPluginLibrary(BUILTIN_PLUGINS, { limit: 50 }).plugins;
+  assert.equal(all.length, new Set(BUILTIN_PLUGINS.map((p) => p.id)).size);
+  for (const plugin of all) {
+    assert(isOfficialPlugin(plugin));
+    assert(BUILTIN_PLUGINS.every((p) => p.id !== plugin.id || p.version <= plugin.version));
+  }
+  assert.deepEqual(
+    all.map((p) => p.name),
+    [...all.map((p) => p.name)].sort(),
+  );
 });

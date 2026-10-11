@@ -48,6 +48,8 @@ import {
   validateTags,
   validateAssets,
   isOfficialPlugin,
+  searchPluginLibrary,
+  BUILTIN_PLUGINS,
   pluginFields,
   stackWindow,
   scaleTimeline,
@@ -2438,7 +2440,7 @@ function showInstalledPlugins() {
   text(
     'plugins-note',
     offlineHtml
-      ? 'Saved official and custom plugins run locally. You can create or import definitions here; the online library is unavailable. External icons need embedded copies.'
+      ? 'Plugins run locally. The official plugins are included; choose Custom to create or import others. External icons need embedded copies.'
       : 'Applied from top to bottom. Later plugins override matching fields and marker effects. Removing a plugin keeps all moment metadata.',
   );
   el('plugins-add').hidden = !editable();
@@ -2495,8 +2497,12 @@ function showInstalledPlugins() {
     list.append(item);
   });
 }
+/**
+ * The official plugins ship with every build, so the library works without a server: the
+ * offline file and a desktop app with no server search them here, with no request, and a
+ * server that cannot be reached (or a static site with none) falls back to them.
+ */
 async function searchPlugins() {
-  if (offlineHtml) return;
   const request = ++pluginSearchRequest,
     doc = documentRequest;
   text('plugin-library-error', '');
@@ -2504,18 +2510,26 @@ async function searchPlugins() {
   el('plugin-library-results').replaceChildren();
   el<HTMLButtonElement>('plugin-previous').disabled = true;
   el<HTMLButtonElement>('plugin-next').disabled = true;
+  const query = { search: input('plugin-search').value, page: pluginPage, limit: 12 };
+  let bundled = offlineHtml || (desktop && !session.server),
+    unreachable = false;
   try {
-    const result = await api<{
-      plugins: PluginManifest[];
-      total: number;
-      pages: number;
-      page: number;
-    }>('plugins/search', 'POST', {
-      search: input('plugin-search').value,
-      sort: input('plugin-sort').value,
-      page: pluginPage,
-      limit: 12,
-    });
+    let result: { plugins: PluginManifest[]; total: number; pages: number; page: number };
+    if (bundled) result = searchPluginLibrary(BUILTIN_PLUGINS, query);
+    else
+      try {
+        result = await api('plugins/search', 'POST', {
+          ...query,
+          sort: input('plugin-sort').value,
+        });
+      } catch (error) {
+        if (request !== pluginSearchRequest || doc !== documentRequest) return;
+        // A refused search is reported; a server that cannot be reached, or fails, is skipped.
+        const status = (error as { status?: number }).status;
+        if (status && status < 500) throw error;
+        result = searchPluginLibrary(BUILTIN_PLUGINS, query);
+        bundled = unreachable = true;
+      }
     if (request !== pluginSearchRequest || doc !== documentRequest) return;
     if (
       !Array.isArray(result.plugins) ||
@@ -2529,7 +2543,11 @@ async function searchPlugins() {
     const plugins = result.plugins.map(validatePluginManifest);
     text(
       'plugin-library-status',
-      `${result.total} available · Page ${pluginPage} of ${Math.max(1, result.pages)}`,
+      (unreachable ? 'The server’s library is unreachable. ' : '') +
+        (bundled
+          ? `${result.total} official plugins included with this app`
+          : `${result.total} available`) +
+        ` · Page ${pluginPage} of ${Math.max(1, result.pages)}`,
     );
     el<HTMLButtonElement>('plugin-previous').disabled = pluginPage <= 1;
     el<HTMLButtonElement>('plugin-next').disabled = pluginPage >= result.pages;
@@ -2707,12 +2725,8 @@ el('plugins-add').onclick = () => {
   if (!editable()) return;
   pluginPage = 1;
   input('plugin-search').value = '';
-  input('plugin-search').closest('label')!.hidden = offlineHtml;
-  input('plugin-sort').closest('label')!.hidden = offlineHtml;
-  el('plugin-previous').hidden = offlineHtml;
-  el('plugin-next').hidden = offlineHtml;
-  if (offlineHtml)
-    text('plugin-library-status', 'Offline: choose Custom to create or import a definition.');
+  // Included plugins list by name; popularity and age come from a server's library.
+  input('plugin-sort').closest('label')!.hidden = offlineHtml || (desktop && !session.server);
   el<HTMLDialogElement>('plugin-library-dialog').showModal();
   void searchPlugins();
 };

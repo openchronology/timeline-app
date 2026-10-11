@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-import { BUILTIN_PLUGINS, validatePluginManifest } from '../dist/core.mjs';
+import { BUILTIN_PLUGINS, validatePluginManifest, searchPluginLibrary } from '../dist/core.mjs';
 import { HttpError } from './store.mjs';
 export function createPluginLibrary(definitions = BUILTIN_PLUGINS, pool = null) {
   if (!Array.isArray(definitions) || definitions.length > 10000)
@@ -12,12 +12,6 @@ export function createPluginLibrary(definitions = BUILTIN_PLUGINS, pool = null) 
     identities.add(key);
   }
   // Search shows the newest published version; detail URLs retain pinned older versions.
-  const latest = new Map();
-  for (const p of manifests)
-    if (!latest.has(p.id) || latest.get(p.id).version < p.version) latest.set(p.id, p);
-  const listed = [...latest.values()].sort((a, b) =>
-    a.name < b.name ? -1 : a.name > b.name ? 1 : a.id.localeCompare(b.id),
-  );
   const local = {
     search(value = {}) {
       if (
@@ -40,18 +34,8 @@ export function createPluginLibrary(definitions = BUILTIN_PLUGINS, pool = null) 
         !['popularity', 'alphabetical', 'age'].includes(sort)
       )
         throw new HttpError(400, 'Invalid plugin search or pagination.');
-      const needle = search.trim().toLowerCase();
-      const matching = listed.filter((p) =>
-        (p.name + ' ' + p.description + ' ' + p.id).toLowerCase().includes(needle),
-      );
-      return {
-        plugins: matching.slice((page - 1) * limit, page * limit),
-        page,
-        limit,
-        total: matching.length,
-        pages: Math.ceil(matching.length / limit),
-        apiVersion: 1,
-      };
+      // The same search the apps run on their bundled official plugins.
+      return searchPluginLibrary(manifests, { search, page, limit });
     },
     get(id, version) {
       const plugin = manifests.find((p) => p.id === id && p.version === Number(version));

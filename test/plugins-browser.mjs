@@ -17,8 +17,12 @@ import {
   TimelineIndex,
   Viewport,
   Q,
+  BUILTIN_PLUGINS,
+  searchPluginLibrary,
 } from '../dist/core.mjs';
 import { createPluginLibrary } from '../server/plugins.mjs';
+// The official plugins every build includes (the newest version of each).
+const official = searchPluginLibrary(BUILTIN_PLUGINS, { limit: 50 }).total;
 const source = 'https://images.example/icon.png';
 const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMIWJDwHwAE5AJQGRSfFgAAAABJRU5ErkJggg==',
@@ -290,6 +294,30 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     assert.match(await input('plugins-note').textContent(), /run locally/);
     assert(await input('plugins-add').isVisible());
     assert(await input('plugins-create').isVisible());
+    // The official plugins are included: the library lists them without a network.
+    await input('plugins-add').click();
+    await page.waitForFunction(
+      (count) =>
+        document
+          .getElementById('plugin-library-status')
+          .textContent.includes(`${count} official plugins included with this app`),
+      official,
+    );
+    assert.equal(await page.locator('.library-plugin').count(), official);
+    await input('plugin-search').fill('geolog');
+    await page.waitForFunction(() => document.querySelectorAll('.library-plugin').length === 1);
+    assert.match(
+      await page.locator('.library-plugin strong').textContent(),
+      /^Geological ages · v1 · Official$/,
+    );
+    assert(
+      await page
+        .locator('.library-plugin')
+        .getByRole('button', { name: 'Add to timeline', exact: true })
+        .isEnabled(),
+    );
+    await page.getByRole('button', { name: 'Close plugin library', exact: true }).click();
+    await input('plugin-library-dialog').waitFor({ state: 'hidden' });
     assert(await page.getByRole('checkbox', { name: 'Enable Moment icons' }).isEnabled());
     await page.getByRole('button', { name: 'Close plugins', exact: true }).click();
     await input('plugins-dialog').waitFor({ state: 'hidden' });
@@ -431,6 +459,27 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
       .click();
     await input('plugin-library-dialog').waitFor({ state: 'hidden' });
     assert.equal(await input('event-title').inputValue(), 'Unsaved title survives install');
+    // A library that cannot be reached still offers the official plugins included.
+    const unreachable = (route) => route.abort();
+    await page.route(catalogue, unreachable);
+    await input('plugins-add').click();
+    await page.waitForFunction(() =>
+      document.getElementById('plugin-library-status').textContent.includes('unreachable'),
+    );
+    assert.match(
+      await input('plugin-library-status').textContent(),
+      new RegExp(`${official} official plugins included`),
+    );
+    assert.equal(await page.locator('.library-plugin').count(), official);
+    assert(
+      await page
+        .locator('.library-plugin', { hasText: 'Moment icons' })
+        .getByRole('button', { name: 'Installed', exact: true })
+        .isDisabled(),
+    );
+    await page.getByRole('button', { name: 'Close plugin library', exact: true }).click();
+    await input('plugin-library-dialog').waitFor({ state: 'hidden' });
+    await page.unroute(catalogue, unreachable);
     await page.getByRole('button', { name: 'Close plugins', exact: true }).click();
     await input('plugins-dialog').waitFor({ state: 'hidden' });
     await page.waitForFunction(
