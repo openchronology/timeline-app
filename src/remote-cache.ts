@@ -51,6 +51,13 @@ export interface WindowQuery {
   threshold: string;
 }
 const EMPTY = (): Frame => ({ groups: [], visitedNodes: 0 });
+/** A cached window in storable form (see snapshot and restore). */
+export interface StoredWindow {
+  lower: string;
+  upper: string;
+  threshold: string;
+  frame: Frame;
+}
 /** The most recent change of view: what to fetch ahead of the reader. */
 export type Motion = 'pan' | 'zoom-in' | 'zoom-out' | null;
 interface Entry {
@@ -251,6 +258,45 @@ export class ViewportCache {
             now - e.fetched <= this.freshFor,
         ),
     );
+  }
+  /** The cached windows, newest first, for storage outside the page. */
+  snapshot(): StoredWindow[] {
+    return [...this.entries]
+      .sort((a, b) => b.fetched - a.fetched)
+      .map((e) => ({
+        lower: e.lower.toString(),
+        upper: e.upper.toString(),
+        threshold: e.threshold.toString(),
+        frame: e.frame,
+      }));
+  }
+  /**
+   * Adds stored windows of the same timeline revision. They count as fetched now: a
+   * revision's windows never change, and the caller has just confirmed the revision.
+   * Windows already cached, or beyond one response's limits, are skipped.
+   */
+  restore(windows: readonly StoredWindow[]) {
+    const now = this.clock();
+    for (const w of windows) {
+      const threshold = Q.parse(w.threshold),
+        lower = Q.parse(w.lower),
+        upper = Q.parse(w.upper);
+      const bytes = JSON.stringify(w.frame).length * 2;
+      if (w.frame.groups.length > this.maxGroups || bytes > this.maxBytes) continue;
+      if (this.entries.some((e) => e.threshold.compare(threshold) === 0 && covers(e, lower, upper)))
+        continue;
+      this.entries.push({
+        lower,
+        upper,
+        threshold,
+        frame: w.frame,
+        fetched: now,
+        used: now,
+        bytes,
+      });
+    }
+    while (this.entries.length > this.maxEntries || this.bytes > this.totalBytes)
+      this.entries.pop();
   }
   /** Releases every window but those covering `view` (all of them without one). */
   release(view?: Viewport) {

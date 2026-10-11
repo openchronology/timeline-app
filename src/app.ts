@@ -94,6 +94,13 @@ import type {
 } from './core.js';
 import { ViewportCache, RemoteWorkspace, regroup, applyChanges } from './remote-cache.js';
 import type { Motion } from './remote-cache.js';
+import {
+  WindowStore,
+  fingerprint,
+  storeScope,
+  timelinePrefix,
+  versionPrefix,
+} from './viewport-store.js';
 import { requestApi, importSqlite, exportSqlite } from './transport.js';
 declare const __OFFLINE_HTML__: boolean;
 const offlineHtml = typeof __OFFLINE_HTML__ !== 'undefined' && __OFFLINE_HTML__;
@@ -544,6 +551,7 @@ function prefetchWindow() {
       )
         return;
       remoteCache.store(query, result);
+      persistWindows();
       schedulePrefetch(50);
     })
     // A failed prediction costs nothing; the view's own request reports errors.
@@ -556,11 +564,58 @@ function prefetchWindow() {
       }
     });
 }
-// A hidden page keeps only the windows covering its view.
+/** What the viewport cache holds now: a source, its revision and the plugins applied. */
+function cacheKey(source: { id: string; revision: string }) {
+  return source.id + ':' + source.revision + ':' + JSON.stringify(activePlugins());
+}
+// Server timelines' windows also outlive the page (see viewport-store.ts). Desktop files
+// have no revision that survives the app, so only the page keeps theirs.
+const windowStore = new WindowStore();
+let persistTimer: ReturnType<typeof setTimeout> | undefined;
+function storedVersion() {
+  if (!remote || local || offlineHtml || remoteCacheKey !== cacheKey(remote)) return null;
+  const scope = storeScope(serverOrigin, session.user?.id ?? null);
+  return {
+    timeline: timelinePrefix(scope, remote.id),
+    version: versionPrefix(
+      scope,
+      remote.id,
+      remote.revision,
+      fingerprint(JSON.stringify(activePlugins())),
+    ),
+  };
+}
+function restoreWindows(key: string) {
+  const stored = storedVersion();
+  if (!stored) return;
+  void windowStore
+    .load(stored.version)
+    .then((windows) => {
+      if (remoteCacheKey !== key || !windows.length) return;
+      remoteCache.restore(windows);
+      requestRender();
+    })
+    // Storage may be unavailable (private windows, quota); the server answers instead.
+    .catch(() => {});
+}
+function persistWindows(delay = 2000) {
+  clearTimeout(persistTimer);
+  const save = () => {
+    const stored = storedVersion();
+    if (stored)
+      void windowStore
+        .save(stored.timeline, stored.version, remoteCache.snapshot())
+        .catch(() => {});
+  };
+  if (delay) persistTimer = setTimeout(save, delay);
+  else save();
+}
+// A hidden page stores its windows, then keeps only those covering its view.
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) return;
   clearTimeout(prefetchTimer);
   prefetchController?.abort();
+  persistWindows(0);
   remoteCache.release(viewport);
 });
 function sparseWorkspace(): RemoteWorkspace | null {
@@ -1145,10 +1200,12 @@ function render(refreshFrame = true) {
     }
   } else if (remote || local) {
     const source = local ?? remote!;
-    const key = source.id + ':' + source.revision + ':' + JSON.stringify(activePlugins());
+    const key = cacheKey(source);
     if (remoteCacheKey !== key) {
+      clearTimeout(persistTimer);
       remoteCache.clear();
       remoteCacheKey = key;
+      restoreWindows(key);
     }
     if (lastView) {
       const zoom = viewport.span.compare(lastView.span);
@@ -1223,6 +1280,7 @@ function render(refreshFrame = true) {
           )
             return;
           remoteCache.store(query, result);
+          persistWindows();
           if (local) {
             recordSample(capacity.views, performance.now() - started);
             updateCapacity();
@@ -1233,6 +1291,11 @@ function render(refreshFrame = true) {
           el('loading-window').hidden = true;
         })
         .catch((error) => {
+          // Refused access also forgets the windows stored for the timeline.
+          if (remote?.id === id && [401, 403, 404].includes(error?.status))
+            void windowStore
+              .forget(timelinePrefix(storeScope(serverOrigin, session.user?.id ?? null), id))
+              .catch(() => {});
           if (request === frameRequest && !controller.signal.aborted) {
             if (local && saving) return;
             el('loading-window').hidden = true;
@@ -4603,6 +4666,9 @@ el('logout-button').onclick = () => {
   void api('auth/logout', 'POST', {})
     .then(() => {
       session = { ...session, user: null, csrf: null };
+      // Signing out leaves no timeline windows in this browser.
+      clearTimeout(persistTimer);
+      void windowStore.clear().catch(() => {});
       desktopLoginAttempt++;
       accountHeading();
       el('timeline-list').replaceChildren();
