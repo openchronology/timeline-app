@@ -2,7 +2,8 @@
 /**
  * Viewport windows of server timelines kept across page loads, so that reopening a timeline
  * shows its last views without asking the server. A record holds one window of one
- * timeline revision, keyed by scope (server and user), timeline, revision, plugins and the
+ * timeline revision of a signed-in user, keyed by scope (server and user), timeline, revision,
+ * plugins and the
  * window itself: a revision's windows never change, so restored ones are exact. Saving
  * writes only new windows and deletes those the page released or that belong to an older
  * revision; past the stored budget or the keeping time, the least recently saved windows of
@@ -28,9 +29,12 @@ export function fingerprint(text: string): string {
   h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
-/** Server origin and user ("guest" when signed out): whose windows these are. */
-export function storeScope(origin: string, user: string | null): string {
-  return origin + SEPARATOR + (user ?? 'guest');
+/**
+ * Server origin and signed-in user: whose windows these are. Guests' windows stay in the
+ * page, like their drafts.
+ */
+export function storeScope(origin: string, user: string): string {
+  return origin + SEPARATOR + user;
 }
 /** Every revision of a timeline, for forgetting it. */
 export function timelinePrefix(scope: string, timeline: string): string {

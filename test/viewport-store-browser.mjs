@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Q, Viewport, TimelineIndex } from '../dist/core.mjs';
-/** Server timeline windows survive a reload, are not reused across revisions, and go on sign-out. */
+/** Signed-in users' timeline windows survive a reload, stay per revision, and go on sign-out. */
 export async function checkViewportStore(browser) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const id = '22222222-2222-4222-8222-222222222222';
@@ -166,10 +166,19 @@ export async function checkViewportStore(browser) {
     await page.locator('#logout-button').click();
     for (let i = 0; i < 200 && (await stored(page)).length; i++) await page.waitForTimeout(50);
     assert.deepEqual(await stored(page), []);
+    // A guest's views are not stored, like a guest's drafts.
+    await page.goto(`http://localhost:5173/#timeline/${id}`);
+    await page.waitForFunction(
+      () => document.getElementById('timeline-title').value === 'Stored windows',
+    );
+    await bounds(page, '0', '20');
+    await page.getByRole('button', { name: 'Nearby moment', exact: true }).waitFor();
+    await page.waitForTimeout(2500);
+    assert.deepEqual(await stored(page), []);
   } finally {
     await context.close();
   }
   console.log(
-    'PASS stored windows: a reload shows earlier views without the server, revisions are kept apart, sign-out clears them.',
+    'PASS stored windows: a reload shows earlier views without the server, revisions are kept apart, sign-out clears them, guests store none.',
   );
 }

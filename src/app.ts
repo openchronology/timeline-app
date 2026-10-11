@@ -573,8 +573,10 @@ function cacheKey(source: { id: string; revision: string }) {
 const windowStore = new WindowStore();
 let persistTimer: ReturnType<typeof setTimeout> | undefined;
 function storedVersion() {
-  if (!remote || local || offlineHtml || remoteCacheKey !== cacheKey(remote)) return null;
-  const scope = storeScope(serverOrigin, session.user?.id ?? null);
+  // Guests' windows stay in the page, like their drafts.
+  if (!remote || local || offlineHtml || !session.user || remoteCacheKey !== cacheKey(remote))
+    return null;
+  const scope = storeScope(serverOrigin, session.user.id);
   return {
     timeline: timelinePrefix(scope, remote.id),
     version: versionPrefix(
@@ -1292,9 +1294,9 @@ function render(refreshFrame = true) {
         })
         .catch((error) => {
           // Refused access also forgets the windows stored for the timeline.
-          if (remote?.id === id && [401, 403, 404].includes(error?.status))
+          if (remote?.id === id && session.user && [401, 403, 404].includes(error?.status))
             void windowStore
-              .forget(timelinePrefix(storeScope(serverOrigin, session.user?.id ?? null), id))
+              .forget(timelinePrefix(storeScope(serverOrigin, session.user.id), id))
               .catch(() => {});
           if (request === frameRequest && !controller.signal.aborted) {
             if (local && saving) return;

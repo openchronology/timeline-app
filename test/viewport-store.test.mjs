@@ -28,7 +28,7 @@ const timeline = timelinePrefix(scope, 't1'),
 test('keys separate servers, users, timelines, revisions and plugin sets', () => {
   const keys = [
     versionPrefix(storeScope('https://a', 'alice'), 't', '1', 'p'),
-    versionPrefix(storeScope('https://a', null), 't', '1', 'p'),
+    versionPrefix(storeScope('https://a', 'bob'), 't', '1', 'p'),
     versionPrefix(storeScope('https://b', 'alice'), 't', '1', 'p'),
     versionPrefix(storeScope('https://a', 'alice'), 't2', '1', 'p'),
     versionPrefix(storeScope('https://a', 'alice'), 't', '12', 'p'),
