@@ -60,6 +60,31 @@ test('Next handlers retain guest sessions, origin restrictions and non-disclosin
   assert.equal(health.status, 503);
   assert.deepEqual(await health.json(), { status: 'unavailable' });
 });
+test('platform startup failures answer JSON, and plain HTTP is allowed only when opted in', async (t) => {
+  const names = ['NODE_ENV', 'APP_ORIGIN', 'ALLOW_INSECURE_ORIGIN', 'DATABASE_URL', 'PGDATABASE'];
+  const saved = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+  const services = Symbol.for('openchronology.platform.services');
+  t.after(() => {
+    for (const name of names)
+      if (saved[name] === undefined) delete process.env[name];
+      else process.env[name] = saved[name];
+    delete globalThis[services];
+  });
+  t.mock.method(console, 'error', () => {});
+  delete process.env.DATABASE_URL;
+  delete process.env.PGDATABASE;
+  delete process.env.ALLOW_INSECURE_ORIGIN;
+  process.env.NODE_ENV = 'production';
+  process.env.APP_ORIGIN = 'http://timeline.lan:5173';
+  const request = () => new Request('http://timeline.lan:5173/api/session');
+  const refused = await dispatchNextRequest(request());
+  assert.equal(refused.status, 503);
+  assert.match((await refused.json()).error, /^Server misconfigured: .*ALLOW_INSECURE_ORIGIN=1/);
+  process.env.ALLOW_INSECURE_ORIGIN = '1';
+  const allowed = await dispatchNextRequest(request());
+  assert.equal(allowed.status, 200);
+  assert.equal((await allowed.json()).user, null);
+});
 test('Next handlers preserve binary responses and omit HEAD and no-content bodies', async () => {
   const bytes = Uint8Array.from([83, 81, 76, 105, 116, 101]);
   const binary = await dispatchNextRequest(

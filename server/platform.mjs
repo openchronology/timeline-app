@@ -10,6 +10,9 @@ import { PostgresStore } from './store.mjs';
 import { providersFromEnv } from './oauth.mjs';
 const key = Symbol.for('openchronology.platform.services');
 
+/** A deployment setting the platform cannot start with; its message is safe to show users. */
+export class ConfigurationError extends Error {}
+
 export async function platformServices() {
   if (!globalThis[key])
     globalThis[key] = initialize().catch((error) => {
@@ -18,19 +21,36 @@ export async function platformServices() {
     });
   return globalThis[key];
 }
+async function pluginLibrary(path) {
+  let plugins;
+  try {
+    plugins = JSON.parse(await readFile(path, 'utf8'));
+  } catch (error) {
+    throw new ConfigurationError('PLUGIN_LIBRARY must name a readable JSON file.', {
+      cause: error,
+    });
+  }
+  if (!Array.isArray(plugins))
+    throw new ConfigurationError('PLUGIN_LIBRARY must contain a JSON array of plugins.');
+  return plugins;
+}
 async function initialize() {
   const origin = process.env.APP_ORIGIN ?? `http://localhost:${process.env.PORT ?? 5173}`;
   const address = new URL(origin);
   if (address.origin !== origin || !['http:', 'https:'].includes(address.protocol))
-    throw new Error('APP_ORIGIN must be an HTTP(S) origin without a path.');
+    throw new ConfigurationError('APP_ORIGIN must be an HTTP(S) origin without a path.');
   if (process.env.NODE_ENV === 'production' && !process.env.APP_ORIGIN)
-    throw new Error('Set APP_ORIGIN in production.');
+    throw new ConfigurationError('Set APP_ORIGIN in production.');
+  // ALLOW_INSECURE_ORIGIN=1 permits plain HTTP on a trusted private network.
   if (
     process.env.NODE_ENV === 'production' &&
     address.protocol !== 'https:' &&
-    !['localhost', '127.0.0.1', '[::1]'].includes(address.hostname)
+    !['localhost', '127.0.0.1', '[::1]'].includes(address.hostname) &&
+    process.env.ALLOW_INSECURE_ORIGIN !== '1'
   )
-    throw new Error('Public production deployments require HTTPS.');
+    throw new ConfigurationError(
+      'Public production deployments require HTTPS: set APP_ORIGIN to an https:// origin, or ALLOW_INSECURE_ORIGIN=1 for a trusted private network.',
+    );
   const pool =
     process.env.DATABASE_URL || process.env.PGDATABASE
       ? new pg.Pool({
@@ -41,7 +61,7 @@ async function initialize() {
         })
       : null;
   const plugins = process.env.PLUGIN_LIBRARY
-    ? [...BUILTIN_PLUGINS, ...JSON.parse(await readFile(process.env.PLUGIN_LIBRARY, 'utf8'))]
+    ? [...BUILTIN_PLUGINS, ...(await pluginLibrary(process.env.PLUGIN_LIBRARY))]
     : BUILTIN_PLUGINS;
   const providers = providersFromEnv();
   const featured = (process.env.FEATURED_TIMELINES ?? '')

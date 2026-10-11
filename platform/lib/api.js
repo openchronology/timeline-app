@@ -15,7 +15,11 @@ export async function api(path, { method = 'GET', data, csrf, signal } = {}) {
         },
         ...(data !== undefined ? { body: JSON.stringify(data) } : {}),
       });
-      return { status: response.status, body: await response.json() };
+      // A proxy or crashed server can answer without JSON; report its status instead.
+      const body = await response.json().catch(() => ({
+        error: `Request failed (HTTP ${response.status}).`,
+      }));
+      return { status: response.status, body };
     },
     ({ status, body }) => {
       if (status < 200 || status >= 300) throw new Error(body.error ?? 'Request failed.');

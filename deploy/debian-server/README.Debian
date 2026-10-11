@@ -24,7 +24,11 @@ Configure
 
 Edit /etc/openchronology/openchronology.env, then `sudo systemctl restart openchronology`:
 
-  - APP_ORIGIN: the public HTTPS origin users reach, without a trailing slash.
+  - APP_ORIGIN: the public HTTPS origin users reach, without a trailing slash. The server
+    refuses a plain http:// origin other than localhost; on a trusted private network
+    without a proxy, set ALLOW_INSECURE_ORIGIN=1 and HOST=0.0.0.0 to serve
+    http://<name>:5173 directly. If the website reports "Server misconfigured", the reason
+    is also in `journalctl -u openchronology`.
   - RESEND_API_KEY and AUTH_EMAIL_FROM for account email, then
     `sudo systemctl enable --now openchronology-mail`.
   - ADMIN_USERNAME, ADMIN_EMAIL and ADMIN_INITIAL_PASSWORD for the first administrator,

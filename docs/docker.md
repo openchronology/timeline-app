@@ -30,7 +30,7 @@ docker compose up --wait
 
 ## Public hosting
 
-Set `APP_ORIGIN=https://timescale.info` and put an HTTPS reverse proxy on the same host in front of `127.0.0.1:5173`. The origin must exactly match the browser URL, without a trailing slash or path. Register OAuth providers and set their server-side variables following [authentication.md](authentication.md). Desktop clients can connect to that same public origin.
+Set `APP_ORIGIN=https://timescale.info` and put an HTTPS reverse proxy on the same host in front of `127.0.0.1:5173`. The origin must exactly match the browser URL, without a trailing slash or path. A plain `http://` origin other than localhost is refused unless `ALLOW_INSECURE_ORIGIN=1`, which is meant only for trusted private networks: sessions and passwords then travel unencrypted. Register OAuth providers and set their server-side variables following [authentication.md](authentication.md). Desktop clients can connect to that same public origin.
 
 Set `TRUST_PROXY=1` only when the proxy overwrites `X-Forwarded-For` with a single client IP and the application port cannot be accessed directly. Next route handlers do not expose the socket peer address: without this trusted proxy, anonymous authentication attempts share a conservative rate-limit bucket. A proxy running in another container needs a Compose override connecting it to the app's network and forwarding to `app:5173`; its own loopback will not reach the host-bound port.
 
