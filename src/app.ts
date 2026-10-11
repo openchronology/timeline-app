@@ -93,6 +93,7 @@ import type {
   PluginManifest,
 } from './core.js';
 import { ViewportCache, RemoteWorkspace, regroup, applyChanges } from './remote-cache.js';
+import type { Motion } from './remote-cache.js';
 import { requestApi, importSqlite, exportSqlite } from './transport.js';
 declare const __OFFLINE_HTML__: boolean;
 const offlineHtml = typeof __OFFLINE_HTML__ !== 'undefined' && __OFFLINE_HTML__;
@@ -507,6 +508,61 @@ const remoteCache = new ViewportCache();
 let remoteCacheKey = '',
   windowController: AbortController | undefined;
 let windowInFlight = false;
+// Windows fetched ahead of the reader, one at a time, after the view settles (see predict).
+let prefetchTimer: ReturnType<typeof setTimeout> | undefined,
+  prefetchController: AbortController | undefined,
+  prefetching = false,
+  // A view's own request waited for a desktop prefetch, which cannot be interrupted.
+  windowWaiting = false,
+  lastView: Viewport | undefined,
+  motion: Motion = null;
+function schedulePrefetch(delay = 400) {
+  clearTimeout(prefetchTimer);
+  if (comparison || !(remote || local)) return;
+  prefetchTimer = setTimeout(prefetchWindow, delay);
+}
+function prefetchWindow() {
+  const source = local ?? remote;
+  if (!source || comparison || saving || document.hidden) return;
+  if (windowInFlight || comparisonInFlight || prefetching) return;
+  const [query] = remoteCache.predict(viewport, width(), pixels(), motion);
+  if (!query) return;
+  const key = remoteCacheKey,
+    { id, revision } = source;
+  prefetching = true;
+  const controller = (prefetchController = new AbortController());
+  void timelineQuery<Frame>(
+    { kind: 'overview', ...query, revision, plugins: activePlugins(), prefetch: true },
+    controller.signal,
+  )
+    .then((result) => {
+      if (
+        controller.signal.aborted ||
+        remoteCacheKey !== key ||
+        (local ?? remote)?.id !== id ||
+        (local ?? remote)?.revision !== revision
+      )
+        return;
+      remoteCache.store(query, result);
+      schedulePrefetch(50);
+    })
+    // A failed prediction costs nothing; the view's own request reports errors.
+    .catch(() => {})
+    .finally(() => {
+      prefetching = false;
+      if (windowWaiting) {
+        windowWaiting = false;
+        requestRender();
+      }
+    });
+}
+// A hidden page keeps only the windows covering its view.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) return;
+  clearTimeout(prefetchTimer);
+  prefetchController?.abort();
+  remoteCache.release(viewport);
+});
 function sparseWorkspace(): RemoteWorkspace | null {
   return model instanceof RemoteWorkspace ? model : null;
 }
@@ -1094,9 +1150,20 @@ function render(refreshFrame = true) {
       remoteCache.clear();
       remoteCacheKey = key;
     }
+    if (lastView) {
+      const zoom = viewport.span.compare(lastView.span);
+      if (zoom || viewport.left.compare(lastView.left))
+        motion = zoom < 0 ? 'zoom-in' : zoom > 0 ? 'zoom-out' : 'pan';
+    }
+    lastView = viewport.clone();
     const query = remoteCache.plan(viewport, width(), pixels());
     const cached = remoteCache.get(viewport, query);
-    const base = cached ?? (liveTransitionPending ? frame : remoteCache.visible(viewport));
+    const base =
+      cached ??
+      (liveTransitionPending
+        ? frame
+        : (remoteCache.nearest(viewport, Q.parse(query.threshold))?.frame ??
+          remoteCache.visible(viewport)));
     const threshold = viewport.threshold(width(), pixels());
     // Pending requests keep the last confirmed grouping until the server supplies
     // its replacement; otherwise zooming would hide singleton markers prematurely.
@@ -1111,11 +1178,13 @@ function render(refreshFrame = true) {
         clearTimeout(frameTimer);
         ++frameRequest;
         windowController?.abort();
+        schedulePrefetch();
       }
       el('loading-window').hidden = !!cached;
       return;
     }
     clearTimeout(frameTimer);
+    clearTimeout(prefetchTimer);
     const request = ++frameRequest,
       id = source.id,
       revision = source.revision;
@@ -1124,6 +1193,15 @@ function render(refreshFrame = true) {
     frameTimer = setTimeout(() => {
       // Native HTTP requests cannot be interrupted by AbortController: keep one active request.
       if (windowInFlight || comparisonInFlight) return;
+      // The view's own window goes before predictions: a browser prefetch is cancelled, and
+      // a desktop one (not interruptible) is waited for.
+      if (prefetching) {
+        if (local) {
+          windowWaiting = true;
+          return;
+        }
+        prefetchController?.abort();
+      }
       windowInFlight = true;
       const controller = (windowController = new AbortController());
       const started = performance.now();

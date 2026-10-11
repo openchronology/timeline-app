@@ -57,7 +57,8 @@ export async function checkDesktopCache(browser) {
     overviews = [],
     details = [],
     saves = [],
-    errors = [];
+    errors = [],
+    prefetches = [];
   const header = () => ({
     document: { ...document, events: [], durations: [] },
     generation,
@@ -96,7 +97,9 @@ export async function checkDesktopCache(browser) {
         details.push(q);
         return { events: source.eventsBetween(q.lower, q.upper, 100), next: null };
       }
-      overviews.push(q);
+      // Windows fetched ahead of the reader are counted apart from the views' own.
+      if (q.prefetch) prefetches.push(q);
+      else overviews.push(q);
       // A slow computer: whole views take over a second.
       if (slowViews) await new Promise((done) => setTimeout(done, 1100));
       const view = new Viewport(Q.parse(q.lower), Q.parse(q.upper).sub(Q.parse(q.lower)));
@@ -185,6 +188,9 @@ export async function checkDesktopCache(browser) {
       () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
     );
     assert.equal(overviews.length, fetched);
+    // Desktop files are predicted too, while the view is settled.
+    for (let i = 0; i < 200 && !prefetches.length; i++) await page.waitForTimeout(25);
+    assert(prefetches.length > 0);
     await page.getByRole('button', { name: 'Nearby moment', exact: true }).click();
     await page.locator('#event-description').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#event-description').inputValue(), 'SQLite inspector notes');

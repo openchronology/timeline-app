@@ -23,7 +23,7 @@ const group = (first, last, count, id) => ({
   distinct: Number(count),
   ...(id ? { id } : {}),
 });
-test('one bounded viewport window prefetches nearby space, reuses neighboring pan/zoom, and retains confirmed data until replacement', () => {
+test('an overscanned window answers nearby pans and zooms, and confirmed data stays shown until replaced', () => {
   let now = 0;
   const cache = new ViewportCache(() => now),
     view = new Viewport(Q.zero, Q.from(100n));
@@ -89,6 +89,161 @@ test('viewport budgets stay bounded at zero grouping and extreme rational magnit
     /budget/,
   );
   assert.equal(cache.get(view, plan), null);
+});
+test('the running cache keeps windows of several places and resolutions to return to', () => {
+  let now = 0;
+  const cache = new ViewportCache(() => now);
+  const answer = (view) => {
+    const plan = cache.plan(view, 1000, 24);
+    cache.store(plan, {
+      groups: [group(view.left.toString(), view.left.toString(), 1)],
+      visitedNodes: 1,
+    });
+    return plan;
+  };
+  const home = new Viewport(Q.zero, Q.from(100n)),
+    far = new Viewport(Q.from(5000n), Q.from(100n)),
+    wide = new Viewport(Q.zero, Q.from(800n));
+  answer(home);
+  answer(far);
+  answer(wide);
+  now = 10000;
+  for (const view of [home, far, wide]) assert(cache.get(view, cache.plan(view, 1000, 24)));
+  assert.equal(cache.size, 3);
+  // A wider window of the same resolution replaces the windows it contains.
+  const homePlan = cache.plan(home, 1000, 24);
+  cache.store(
+    { ...homePlan, lower: '-1000/1', upper: '1000/1' },
+    { groups: [group('-900', '-900', 1, 'wide')], visitedNodes: 1 },
+  );
+  assert.equal(cache.size, 3);
+  const pan = new Viewport(Q.from(-600n), Q.from(100n));
+  assert.deepEqual(
+    cache.get(pan, cache.plan(pan, 1000, 24)).groups.map((g) => g.id),
+    [],
+  );
+  assert(cache.get(home, homePlan));
+  // Releasing keeps every window covering the view: here its own and the coarser one.
+  cache.release(home);
+  assert.equal(cache.size, 2);
+  cache.release();
+  assert.equal(cache.size, 0);
+});
+test('predicted windows follow the motion, stay within the server limit, and stop once fetched', () => {
+  const cache = new ViewportCache(() => 0),
+    view = new Viewport(Q.zero, Q.from(100n)),
+    level = Q.parse(cache.plan(view, 1000, 24).threshold);
+  const levels = (motion) =>
+    cache.predict(view, 1000, 24, motion).map((q) => Q.parse(q.threshold).div(level).toString());
+  assert.deepEqual(levels(null), ['1/1', '2/1', '1/2']);
+  assert.deepEqual(levels('pan'), ['1/1', '2/1', '1/2']);
+  assert.deepEqual(levels('zoom-in'), ['1/2', '1/1', '2/1']);
+  assert.deepEqual(levels('zoom-out'), ['2/1', '1/1', '1/2']);
+  for (const q of cache.predict(view, 1000, 24)) {
+    const lower = Q.parse(q.lower),
+      upper = Q.parse(q.upper);
+    // Every window covers the view and asks for at most 1,024 groups.
+    assert(lower.compare(view.left) <= 0 && upper.compare(view.right) >= 0);
+    assert(upper.sub(lower).compare(Q.parse(q.threshold).mul(Q.from(1024n))) <= 0);
+  }
+  const [pan] = cache.predict(view, 1000, 24, 'pan');
+  assert.equal(pan.lower, '-200/1');
+  assert.equal(pan.upper, '300/1');
+  cache.store(pan, { groups: [], visitedNodes: 1 });
+  assert.deepEqual(levels(null), ['2/1', '1/2']);
+  // Panning anywhere within the prefetched window is answered without a request.
+  for (const left of [-200n, -50n, 120n, 200n]) {
+    const moved = new Viewport(Q.from(left), Q.from(100n));
+    assert(cache.get(moved, cache.plan(moved, 1000, 24)));
+  }
+  // At zero grouping the limit narrows the margin, and the finer level cannot cover the view.
+  const tight = cache.predict(view, 1000, 0);
+  for (const q of tight)
+    assert(
+      Q.parse(q.upper)
+        .sub(Q.parse(q.lower))
+        .compare(Q.parse(q.threshold).mul(Q.from(1024n))) <= 0,
+    );
+  assert(!tight.some((q) => Q.parse(q.threshold).compare(level) < 0 && q.lower === '-50/1'));
+});
+test('over budget, the windows farthest from the view are released first', () => {
+  let now = 0;
+  const cache = new ViewportCache(() => now),
+    view = new Viewport(Q.zero, Q.from(100n)),
+    plan = cache.plan(view, 1000, 24);
+  cache.store(plan, { groups: [], visitedNodes: 1 });
+  cache.get(view, plan);
+  // Windows ever farther away, then one next to the view.
+  for (let i = 1; i <= cache.maxEntries; i++) {
+    now += 10;
+    const away = new Viewport(Q.from(BigInt(i * 1000)), Q.from(100n));
+    cache.store(cache.plan(away, 1000, 24), { groups: [], visitedNodes: 1 });
+  }
+  const near = new Viewport(Q.from(150n), Q.from(100n));
+  cache.store(cache.plan(near, 1000, 24), { groups: [], visitedNodes: 1 });
+  assert.equal(cache.size, cache.maxEntries);
+  assert(cache.get(view, plan), 'the window serving the view stays');
+  assert(cache.get(near, cache.plan(near, 1000, 24)), 'a nearby window stays');
+  const farthest = new Viewport(Q.from(BigInt(cache.maxEntries * 1000)), Q.from(100n));
+  assert.equal(cache.nearest(farthest)?.frame.groups.length ?? 0, 0);
+  assert.equal(
+    cache.get(farthest, cache.plan(farthest, 1000, 24)),
+    null,
+    'the farthest window went first',
+  );
+  // Windows unused for five minutes are released on the next store.
+  now += cache.keepFor + 1;
+  cache.store(plan, { groups: [], visitedNodes: 1 });
+  assert.equal(cache.size, 1);
+});
+test('while a window is fetched, the last drawn one stands in, else the closest covering one', () => {
+  const cache = new ViewportCache(() => 0),
+    fine = new Viewport(Q.zero, Q.from(100n)),
+    coarse = new Viewport(Q.zero, Q.from(200n));
+  const finePlan = cache.plan(fine, 1000, 24),
+    coarsePlan = cache.plan(coarse, 1000, 24);
+  cache.store(
+    { ...finePlan, lower: '-100/1', upper: '300/1' },
+    { groups: [group('10', '10', 1, 'a'), group('12', '12', 1, 'b')], visitedNodes: 1 },
+  );
+  cache.store(
+    { ...coarsePlan, lower: '150/1', upper: '400/1' },
+    { groups: [group('160', '160', 2)], visitedNodes: 1 },
+  );
+  const stand = cache.nearest(coarse, Q.parse(coarsePlan.threshold));
+  assert.equal(stand.threshold.toString(), finePlan.threshold, 'covering beats partial');
+  assert.deepEqual(
+    regroup(stand.frame, Q.parse(coarsePlan.threshold)).groups.map((g) => g.count),
+    ['2'],
+  );
+  assert.equal(
+    cache
+      .nearest(new Viewport(Q.from(300n), Q.from(50n)), Q.parse(coarsePlan.threshold))
+      .threshold.toString(),
+    coarsePlan.threshold,
+  );
+});
+test('zooming out keeps the window last drawn on screen rather than a coarser covering one', () => {
+  const cache = new ViewportCache(() => 0),
+    start = new Viewport(Q.zero, Q.from(1000n)),
+    near = new Viewport(Q.zero, Q.from(20n)),
+    out = new Viewport(Q.zero, Q.from(40n));
+  cache.store(cache.plan(start, 1000, 24), { groups: [group('0', '10', 2)], visitedNodes: 1 });
+  const nearPlan = cache.plan(near, 1000, 24);
+  cache.store(nearPlan, { groups: [group('10', '10', 1, 'near')], visitedNodes: 1 });
+  assert(cache.get(near, nearPlan));
+  const outPlan = cache.plan(out, 1000, 24);
+  assert.equal(cache.get(out, outPlan), null);
+  assert.deepEqual(
+    cache.nearest(out, Q.parse(outPlan.threshold)).frame.groups.map((g) => g.id),
+    ['near'],
+  );
+  // Far from what was drawn, the covering window stands in.
+  const away = new Viewport(Q.from(500n), Q.from(40n));
+  assert.equal(
+    cache.nearest(away, Q.parse(outPlan.threshold)).threshold.toString(),
+    cache.plan(start, 1000, 24).threshold,
+  );
 });
 test('inspector reads evict while unsaved moved, added and deleted events stay pinned', () => {
   const index = new RemoteWorkspace(doc());

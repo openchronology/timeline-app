@@ -32,6 +32,10 @@ export async function checkRemoteCache(browser) {
   let reportedCount = null;
   let holdOverview = false,
     releaseOverview;
+  // Windows fetched ahead of the reader wait until the test lets them through.
+  let holdPrefetch = true;
+  const prefetches = [],
+    heldPrefetches = [];
   const overviews = [],
     details = [],
     saves = [],
@@ -82,8 +86,11 @@ export async function checkRemoteCache(browser) {
           json: { events: index.eventsBetween(data.lower, data.upper, 100), next: null, revision },
         });
       }
-      overviews.push(data);
-      if (holdOverview)
+      if (data.prefetch) {
+        prefetches.push(data);
+        if (holdPrefetch) await new Promise((resolve) => heldPrefetches.push(resolve));
+      } else overviews.push(data);
+      if (holdOverview && !data.prefetch)
         await new Promise((resolve) => {
           releaseOverview = resolve;
         });
@@ -93,7 +100,10 @@ export async function checkRemoteCache(browser) {
         1000,
         Q.parse(data.threshold).div(view.span).toApproximateNumber() * 1000,
       );
-      return route.fulfill({ json: { ...frame, revision } });
+      // An aborted prefetch may be released after the page stopped waiting for it.
+      return route.fulfill({ json: { ...frame, revision } }).catch((error) => {
+        if (!data.prefetch) throw error;
+      });
     }
     if (path === `/api/timelines/${id}/changes`) {
       saves.push(data);
@@ -195,9 +205,31 @@ export async function checkRemoteCache(browser) {
     await bounds('9000', '11000');
     await page.getByRole('button', { name: 'Far away', exact: true }).waitFor();
     assert.equal(await page.locator('.event-marker[aria-label="Edited nearby moment"]').count(), 0);
+    // The running cache kept the earlier window: returning needs no request.
+    const away = overviews.length;
     await bounds('0', '20');
     await page.getByRole('button', { name: 'Edited nearby moment', exact: true }).waitFor();
-    assert(overviews.length > fetched);
+    assert(away > fetched);
+    assert.equal(overviews.length, away);
+    // Once the view settles, windows ahead of the reader are fetched one at a time: around
+    // the view, then one level coarser and one finer. Pans and zooms into them need no request.
+    holdPrefetch = false;
+    for (const release of heldPrefetches.splice(0)) release();
+    await page.waitForFunction(() => document.getElementById('loading-window').hidden);
+    for (let i = 0; i < 200 && prefetches.length < 3; i++) await page.waitForTimeout(25);
+    assert(prefetches.length >= 3, `prefetched ${prefetches.length} windows`);
+    assert(prefetches.every((q) => q.kind === 'overview' && q.revision === '1'));
+    await page.waitForTimeout(100);
+    const predicted = overviews.length;
+    for (const [left, right] of [
+      ['30', '50'],
+      ['-30', '-10'],
+      ['0', '40'],
+      ['5', '15'],
+    ]) {
+      await bounds(left, right);
+      assert.equal(overviews.length, predicted, `${left}..${right} was predicted`);
+    }
     assert.equal(documentReads, 0);
     await page.locator('#publish-button').click();
     await page.waitForFunction(
