@@ -127,7 +127,7 @@ Each interaction is measured `UI_SAMPLES` times (default 5) and judged by its me
 `node bench/ui.mjs --gate` exits with an error on any budget missed within a comfortable size, and on any advice gap, apart from the known misses. In CI, the gate allows 1.5× the budgets (`UI_TOLERANCE`) for slower shared runners:
 
 - the browser and the platform at 1,000 moments;
-- the desktop app at 1,000 moments (in memory) and 10,000 moments (SQLite), under Xvfb. Navigation and new durations are known misses there (#68).
+- the desktop app at 1,000 moments (in memory) and 10,000 moments (SQLite), under Xvfb, allowing 3×: software rendering on shared runners is slow and varies widely (opening search took 96 ms on a laptop and 140–173 ms in CI). This gate guards against breakage, such as an interaction that fails or never finishes, and gross regressions. Navigation and new durations are known misses there (#68).
 
 The Benchmarks workflow runs the browser and platform at the full set of sizes and adds an **Interactions** table to the report.
 

@@ -75,6 +75,8 @@ export async function webdriverSession(url, application) {
     /** Evaluates an expression in the page; promises are awaited (W3C execute). */
     eval: (expression) => run(`return (${expression});`),
     async click(selector, options = {}) {
+      // As Playwright does, wait for the element to exist (moments in a new view load later).
+      await driver.wait(`!!document.querySelector(${JSON.stringify(selector)})`, 15000);
       const { x, y } = await centre(selector, !!options.force);
       await pointer([
         move(x, y),

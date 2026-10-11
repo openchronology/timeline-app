@@ -150,12 +150,13 @@ const hidden = (selector) => `!${visible(selector)}`;
 const closing = (selector) =>
   `(() => { const n = document.querySelector(${JSON.stringify(selector)}); return !n.open || 'dialogClosing' in n.dataset; })()`;
 /**
- * `condition` holds and the view has finished loading for it: the loading note shows a frame
- * or two after a change, so wait until it has come and gone (or three frames pass without it,
- * when the result was cached). Call `resetLoaded` before each measurement.
+ * `condition` holds and the view has finished loading for it: the loading note can show up to
+ * ~100 ms after a change (the editor waits 70 ms before fetching), so wait until it has come
+ * and gone, or 150 ms and three frames pass without it (a cached view). Call `resetLoaded`
+ * before each measurement.
  */
 const loaded = (condition) =>
-  `(() => { const s = (window.__loaded ??= { seen: false, frames: 0 }); if (!(${condition})) return false; const loading = ${visible('#loading-window')}; s.frames++; if (loading) s.seen = true; return !loading && (s.seen || s.frames > 3); })()`;
+  `(() => { const s = (window.__loaded ??= { seen: false, frames: 0, start: performance.now() }); if (!(${condition})) return false; const loading = ${visible('#loading-window')}; s.frames++; if (loading) s.seen = true; return !loading && (s.seen || (s.frames > 3 && performance.now() - s.start > 150)); })()`;
 const resetLoaded = (d) => d.eval('delete window.__loaded');
 const value = (selector) => `document.querySelector(${JSON.stringify(selector)}).value`;
 const text = (selector) => `document.querySelector(${JSON.stringify(selector)}).textContent`;
@@ -169,9 +170,13 @@ async function show(d, left, right) {
     document.getElementById('exact-right').value = ${JSON.stringify(right.toString())};
     document.getElementById('apply-exact-bounds').click();
   })()`);
-  await d.wait(`${value('#exact-left')} === ${JSON.stringify(left.toString())}`);
+  const there = `${value('#exact-left')} === ${JSON.stringify(left.toString())}`;
+  await d.wait(there);
   await resetLoaded(d);
   await d.wait(loaded('true'));
+  // An animation still running from an earlier step (Fit all) may move the view on.
+  await delay(50);
+  if (!(await d.eval(there))) return show(d, left, right);
 }
 async function closeDialogs(d) {
   for (let i = 0; i < 4; i++) {
@@ -294,7 +299,10 @@ const SCENARIOS = [
       const [left, right] = t.near(t.alone);
       await show(d, left, right);
       const before = await d.eval(BOUNDS);
-      return timed(d, changedFrom(before), () => d.click('#fit-button'));
+      const ms = await timed(d, changedFrom(before), () => d.click('#fit-button'));
+      // Fit all animates; let it land before the next step sets its own view.
+      await d.wait(`${value('#exact-left')} === ${JSON.stringify(t.fitted.left.toString())}`);
+      return ms;
     },
   },
   {

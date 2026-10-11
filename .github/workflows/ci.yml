@@ -267,3 +267,8 @@ jobs:
           UI_SIZES: '1000,10000'
           UI_SAMPLES: '3'
           UI_KNOWN: navigation,new-duration
+          # Software rendering on shared runners is slow and varies widely: opening search took
+          # 96 ms on a laptop and 140-173 ms here. The desktop gate guards against breakage
+          # (an interaction that fails or never finishes) and gross regressions.
+          UI_TOLERANCE: '3'
+          UI_DEBUG: '1'
