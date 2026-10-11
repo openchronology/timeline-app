@@ -588,65 +588,96 @@ CREATE INDEX IF NOT EXISTS oc_duration_nodes_first_key ON oc_duration_nodes(time
 -- Anchored-span summaries of durations shorter than the threshold that intersect [lo,hi],
 -- keyed by start: a group starts at the first collapsed start and takes every collapsed
 -- duration starting less than the threshold after it. Mirrors src/durations.ts
--- durationSummaries. Each group's anchor is the first collapsed start at or after the
--- previous anchor plus the threshold (the first search starts at lo - threshold, since a
--- collapsed duration reaching the window starts after it), found by an index range scan, so
--- the cost follows the durations starting in [lo - threshold, hi] and the number of groups.
--- Starts that share a key are read once per view, however many groups they form.
+-- durationSummaries: an in-order walk of the interval tree that takes a subtree's totals
+-- (count, latest end) when all of it collapses, lies in the window and joins one group, so
+-- a timeline of short durations costs about the groups times the tree's height, however
+-- many durations they hold. Long durations among short ones defeat those totals; a subtree
+-- of at most 256 entries that mixes them is read by one range scan over its starts instead
+-- of node by node. The scan's bounds are the subtree's: its nearest ancestors on either
+-- side in (start, ID) order, carried down the walk, compared by ID only where a start ties.
 CREATE OR REPLACE FUNCTION oc_duration_overview(tid uuid, lo mpq, hi mpq, threshold mpq)
 RETURNS TABLE(first_time text,last_time text,duration_count integer,band jsonb)
--- PostgreSQL cannot estimate the exact mpq filters and, expecting few matches, would read a
--- whole key range through a bitmap to find the first match the ordered index scan reaches.
+-- PostgreSQL cannot estimate the exact mpq filters; an ordered index scan suits them.
 LANGUAGE plpgsql STABLE SET enable_bitmapscan=off AS $$
-DECLARE anchor mpq; bound mpq; finish mpq; total integer; single jsonb; block numeric; r record;
-  more integer; later mpq; done numeric:='-Infinity'; limit_ mpq;
+DECLARE ids integer[]; points boolean[]:=ARRAY[false]; lows integer[]:=ARRAY[NULL::integer];
+  highs integer[]:=ARRAY[NULL::integer]; idx integer; nid integer; point boolean; low integer; high integer;
+  n record; r record; earliest mpq; fits mpq; anchor mpq; reach mpq; finish mpq; total integer:=0;
+  single jsonb; low_first mpq; low_id text; high_first mpq; high_id text;
 BEGIN
   IF lo IS NULL OR hi IS NULL OR threshold IS NULL OR threshold<='0'::mpq OR lo>hi THEN RETURN; END IF;
-  bound:=lo-threshold;
-  LOOP
-    -- The next start key holding a collapsed start at or after the bound. Starts sharing a key
-    -- (equal in their first 30 significant digits) are grouped from one exact-ordered read of
-    -- the block, so a large block costs one pass instead of one scan per group.
-    SELECT d.first_key INTO block FROM oc_duration_nodes d
-      WHERE d.timeline_id=tid
-        AND d.first_key>=oc_qkey(bound) AND d.first_key>done AND d.first_key<=oc_qkey(hi)
-        AND d.first_time>=bound AND d.first_time<=hi AND d.last_time>=lo AND d.last_time-d.first_time<threshold
-      ORDER BY d.first_key LIMIT 1;
-    EXIT WHEN NOT FOUND;
-    anchor:=NULL;
-    FOR r IN SELECT d.first_time AS f,d.last_time AS l,d.band AS b FROM oc_duration_nodes d
-        WHERE d.timeline_id=tid AND d.first_key=block
-          AND d.first_time>=bound AND d.first_time<=hi AND d.last_time>=lo AND d.last_time-d.first_time<threshold
-        -- Offsets from the bound in thresholds order the block like its starts but, unlike
-        -- the starts' keys, differ at the scale of the groups, so few exact comparisons of
-        -- long rationals remain (rounding to float8 never reverses an order).
-        ORDER BY ((d.first_time-bound)/threshold)::float8,d.first_time LOOP
-      IF anchor IS NOT NULL AND r.f>=limit_ THEN
+  -- A collapsed duration that reaches the window starts after lo - threshold.
+  earliest:=lo-threshold;
+  SELECT CASE WHEN duration_root IS NULL THEN ARRAY[]::integer[] ELSE ARRAY[duration_root] END INTO ids
+    FROM oc_timelines WHERE id=tid;
+  ids:=coalesce(ids,ARRAY[]::integer[]);
+  WHILE cardinality(ids)>0 LOOP
+    idx:=cardinality(ids); nid:=ids[idx]; point:=points[idx]; low:=lows[idx]; high:=highs[idx];
+    ids:=ids[1:idx-1]; points:=points[1:idx-1]; lows:=lows[1:idx-1]; highs:=highs[1:idx-1];
+    SELECT d.left_id,d.right_id,d.min_time,d.max_time,d.max_first,d.subtree_count,d.min_extent,
+        d.max_extent,d.first_time,d.last_time,d.band
+      INTO n FROM oc_duration_nodes d WHERE d.timeline_id=tid AND d.id=nid;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Broken duration index'; END IF;
+    IF point THEN
+      IF n.last_time<lo OR n.first_time>hi OR n.last_time-n.first_time>=threshold THEN CONTINUE; END IF;
+      IF anchor IS NOT NULL AND n.first_time>=reach THEN
         first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
-        band:=CASE WHEN total=1 THEN single END;
-        RETURN NEXT;
-        anchor:=NULL;
+        band:=CASE WHEN total=1 THEN single END; RETURN NEXT; anchor:=NULL;
       END IF;
-      IF anchor IS NULL THEN anchor:=r.f; limit_:=anchor+threshold; finish:=r.l; total:=0;
-      ELSIF r.l>finish THEN finish:=r.l;
-      END IF;
-      total:=total+1; single:=CASE WHEN total=1 THEN r.b END;
-    END LOOP;
-    -- The block's last group takes starts from later keys below its anchor plus the threshold
-    -- (a later key's starts all exceed this block's). The whole block now lies below the bound.
-    bound:=limit_; done:=block;
-    SELECT count(*)::integer,max(d.last_time) INTO more,later FROM oc_duration_nodes d
-      WHERE d.timeline_id=tid
-        AND d.first_key>block AND d.first_key<=oc_qkey(bound)
-        AND d.first_time<bound AND d.first_time<=hi AND d.last_time>=lo AND d.last_time-d.first_time<threshold;
-    IF more>0 THEN
-      total:=total+more;
-      IF later>finish THEN finish:=later; END IF;
+      IF anchor IS NULL THEN anchor:=n.first_time; reach:=anchor+threshold; finish:=n.last_time; total:=0;
+      ELSIF n.last_time>finish THEN finish:=n.last_time; END IF;
+      total:=total+1; single:=CASE WHEN total=1 THEN n.band END;
+      CONTINUE;
     END IF;
-    first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
-    band:=CASE WHEN total=1 THEN single END;
-    RETURN NEXT;
+    IF n.max_time<lo OR n.min_time>hi OR n.max_first<=earliest OR n.min_extent>=threshold THEN CONTINUE; END IF;
+    -- The subtree joins the open group if it starts before the group's reach, else opens one.
+    fits:=CASE WHEN anchor IS NOT NULL AND n.min_time<reach THEN reach ELSE n.min_time+threshold END;
+    IF n.max_extent<threshold AND n.min_time>=lo AND n.max_first<=hi AND n.max_first<fits THEN
+      IF anchor IS NOT NULL AND n.min_time>=reach THEN
+        first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
+        band:=CASE WHEN total=1 THEN single END; RETURN NEXT; anchor:=NULL;
+      END IF;
+      IF anchor IS NULL THEN anchor:=n.min_time; reach:=anchor+threshold; finish:=n.max_time; total:=0;
+      ELSIF n.max_time>finish THEN finish:=n.max_time; END IF;
+      total:=total+n.subtree_count; single:=CASE WHEN total=1 THEN n.band END;
+    ELSIF n.max_extent>=threshold AND n.subtree_count<=256 THEN
+      low_first:=NULL; high_first:=NULL;
+      IF low IS NOT NULL THEN
+        SELECT d.first_time,d.band->>'id' INTO low_first,low_id FROM oc_duration_nodes d WHERE d.timeline_id=tid AND d.id=low;
+        IF low_first<n.min_time THEN low_first:=NULL; END IF;
+      END IF;
+      IF high IS NOT NULL THEN
+        SELECT d.first_time,d.band->>'id' INTO high_first,high_id FROM oc_duration_nodes d WHERE d.timeline_id=tid AND d.id=high;
+        IF high_first>n.max_first THEN high_first:=NULL; END IF;
+      END IF;
+      FOR r IN SELECT d.first_time AS f,d.last_time AS l,d.band AS b FROM oc_duration_nodes d
+          WHERE d.timeline_id=tid AND d.first_key>=oc_qkey(n.min_time) AND d.first_key<=oc_qkey(n.max_first)
+            AND d.first_time>=n.min_time AND d.first_time<=n.max_first
+            AND (low_first IS NULL OR d.first_time>low_first OR (d.band->>'id') COLLATE "C">low_id COLLATE "C")
+            AND (high_first IS NULL OR d.first_time<high_first OR (d.band->>'id') COLLATE "C"<high_id COLLATE "C")
+            AND d.last_time>=lo AND d.first_time<=hi AND d.last_time-d.first_time<threshold
+          ORDER BY d.first_key,d.first_time LOOP
+        IF anchor IS NOT NULL AND r.f>=reach THEN
+          first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
+          band:=CASE WHEN total=1 THEN single END; RETURN NEXT; anchor:=NULL;
+        END IF;
+        IF anchor IS NULL THEN anchor:=r.f; reach:=anchor+threshold; finish:=r.l; total:=0;
+        ELSIF r.l>finish THEN finish:=r.l; END IF;
+        total:=total+1; single:=CASE WHEN total=1 THEN r.b END;
+      END LOOP;
+    ELSE
+      IF n.right_id IS NOT NULL THEN
+        ids:=ids||n.right_id; points:=points||false; lows:=lows||nid; highs:=highs||high;
+      END IF;
+      ids:=ids||nid; points:=points||true; lows:=lows||NULL::integer; highs:=highs||NULL::integer;
+      IF n.left_id IS NOT NULL THEN
+        ids:=ids||n.left_id; points:=points||false; lows:=lows||low; highs:=highs||nid;
+      END IF;
+    END IF;
   END LOOP;
+  IF anchor IS NOT NULL THEN
+    first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
+    band:=CASE WHEN total=1 THEN single END; RETURN NEXT;
+  END IF;
 END $$;
 CREATE INDEX IF NOT EXISTS oc_duration_nodes_duration_id ON oc_duration_nodes(timeline_id,(band->>'id'));
 
