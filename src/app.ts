@@ -6101,6 +6101,22 @@ document.addEventListener('keydown', (event) => {
   event.preventDefault();
   el('search-button').click();
 });
+// Escape in an empty search field closes its dialog. WebKit (the desktop app) keeps Escape
+// in search fields, even empty ones, so search and the moment picker never closed with it.
+// With text in the field, Escape still clears the text first.
+document.addEventListener(
+  'keydown',
+  (event) => {
+    if (event.key !== 'Escape' || event.defaultPrevented) return;
+    const field = event.target;
+    if (!(field instanceof HTMLInputElement) || field.type !== 'search' || field.value) return;
+    const dialog = field.closest('dialog');
+    if (!dialog?.open) return;
+    event.preventDefault();
+    dialog.close();
+  },
+  true,
+);
 el('add-duration-button').onclick = () => {
   const span = viewport.span;
   createDuration(
