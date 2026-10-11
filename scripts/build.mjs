@@ -31,6 +31,7 @@ await Promise.all([
 await build({
   entryPoints: [
     'src/remote-cache.ts',
+    'src/viewport-store.ts',
     'src/comparison.ts',
     'src/live-updates.ts',
     'src/follow-latest.ts',
