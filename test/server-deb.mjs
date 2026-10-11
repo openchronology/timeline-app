@@ -83,6 +83,15 @@ try {
   assert.match(await sh('curl -s http://127.0.0.1:5173/'), /<html/i);
   // The SQLite converter finds its libraries on this distribution.
   assert.doesNotMatch(await sh('ldd /usr/lib/openchronology/bin/och-convert'), /not found/);
+  // The log importer runs as a command with the bundled Node.js.
+  assert.match(await sh('och-import-logs --help'), /^Usage: och-import-logs/);
+  const dry = JSON.parse(
+    await sh(
+      "printf 'Oct  9 08:15:01 host sshd[1]: Accepted\\n' > /tmp/syslog && och-import-logs --format syslog --timezone UTC --year 2026 --dry-run --quiet /tmp/syslog 2>/dev/null",
+    ),
+  );
+  assert.equal(dry.entries, 1);
+  assert.equal(dry.samples[0].moment.time, `${Date.UTC(2026, 9, 9, 8, 15, 1) / 1000}/1`);
   await sh('kill "$(cat /tmp/server.pid)" || true');
 
   // Reinstalling takes the upgrade path: configuration and database are kept, and the

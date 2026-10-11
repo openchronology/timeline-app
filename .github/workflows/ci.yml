@@ -40,6 +40,12 @@ jobs:
       - run: node test/docker-smoke.mjs
       - name: Verify the SQLite converter inside the web image
         run: docker compose run --rm --no-deps --volume "$PWD/test:/app/test:ro" app node test/files.mjs
+      - name: Verify the log importer command inside the web image
+        run: |
+          printf 'Oct  9 08:15:01 host sshd[1]: Accepted\n' > "$RUNNER_TEMP/syslog"
+          docker compose run --rm --no-deps --volume "$RUNNER_TEMP:/logs:ro" app \
+            och-import-logs --format syslog --timezone UTC --year 2026 --dry-run --quiet /logs/syslog \
+            | node -e 'const p = JSON.parse(require("fs").readFileSync(0, "utf8")); if (p.entries !== 1) process.exit(1)'
       - name: Verify migrations can run again
         run: |
           docker compose run --rm migrate
@@ -200,6 +206,7 @@ jobs:
       - run: node test/relationships-postgres.mjs
       - run: node test/incremental-postgres.mjs
       - run: node test/summaries-equivalence-postgres.mjs
+      - run: node test/log-import-postgres.mjs
       - run: node test/stars-postgres.mjs
       - run: node test/follow-postgres.mjs
       - run: node test/administration-postgres.mjs

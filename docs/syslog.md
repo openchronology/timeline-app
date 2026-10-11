@@ -1,6 +1,6 @@
 # Syslog to timelines
 
-`server/syslog-receiver.mjs` listens for syslog over UDP and TCP and adds each message as a moment to the timelines chosen by your routing rules. It uses the public API with an [API key](administration.md#api-keys), so it can run beside the platform or on another machine, and viewers with the timeline open see new messages as they arrive ([live refresh](comparison.md#live-refresh)).
+`server/syslog-receiver.mjs` listens for syslog over UDP and TCP and adds each message as a moment to the timelines chosen by your routing rules. To import historic log files (syslog, Apache, nginx, JSON lines, journald), use the [log importer](log-import.md) instead of replaying them into the receiver. It uses the public API with an [API key](administration.md#api-keys), so it can run beside the platform or on another machine, and viewers with the timeline open see new messages as they arrive ([live refresh](comparison.md#live-refresh)).
 
 ## Set up
 
@@ -28,6 +28,7 @@ OCH_API_URL=https://timescale.info OCH_API_KEY=och_key_... \
 | `SYSLOG_HOST`, `SYSLOG_PORT` | `127.0.0.1`, `5514`  | Address and port for both UDP and TCP.                                                                                                   |
 | `SYSLOG_FLUSH_MS`            | `1000`               | How long messages gather before they are saved; 500 queued messages save at once.                                                        |
 | `SYSLOG_QUEUE_LIMIT`         | `10000`              | Messages kept per timeline while the server is unreachable; beyond it the oldest are dropped.                                            |
+| `SYSLOG_TIMEZONE`            | `UTC`                | Time zone of BSD timestamps, which carry none: `UTC`, `+02:00` or an IANA name such as `Europe/Berlin`.                                  |
 
 The receiver has no TLS or sender authentication: keep it on a trusted network (Compose publishes it on host loopback only) and relay remote logs to it with a syslog daemon that provides TLS.
 
@@ -56,7 +57,7 @@ A message goes to the first route that matches. If that route sets `"continue": 
 
 Both [RFC 5424](https://www.rfc-editor.org/rfc/rfc5424) and the BSD format of [RFC 3164](https://www.rfc-editor.org/rfc/rfc3164) are read; TCP accepts octet-counted and newline-separated framing ([RFC 6587](https://www.rfc-editor.org/rfc/rfc6587)). Messages up to 64 KiB are accepted.
 
-- **Time** is the message's timestamp in exact Unix seconds, including RFC 5424 fractions of a second and time-zone offsets. BSD timestamps have no year or zone: they are read as UTC, in the year that puts them nearest to when they arrived. Messages without a timestamp use the time they arrived.
+- **Time** is the message's timestamp in exact Unix seconds, including RFC 5424 fractions of a second and time-zone offsets. rsyslog's ISO lines (`2026-10-09T08:15:01.123+02:00 host app[pid]: …`, which some relays forward) keep their time. BSD timestamps have no year or zone: they are read in `SYSLOG_TIMEZONE` (UTC unless set), in the year that puts them nearest to when they arrived. Messages without a timestamp use the time they arrived.
 - **Title** is the first line of the message (up to 200 characters); longer or multi-line messages keep the full text, up to 16 KiB, as notes.
 - **Tags** are `syslog`, `severity:<level>`, `facility:<name>`, `host:<host>` and `app:<app>`, so **Separate by tags** and search can pick out a host, an application or the errors.
 - **Additional metadata** keeps the parsed fields under `syslog`: format, facility, severity, host, app, process ID, message ID and RFC 5424 structured data.
