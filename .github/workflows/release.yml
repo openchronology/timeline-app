@@ -14,6 +14,10 @@ jobs:
     uses: ./.github/workflows/desktop.yml
     with:
       tag: ${{ github.event.release.tag_name || github.ref_name }}
+  server:
+    uses: ./.github/workflows/server-packages.yml
+    with:
+      tag: ${{ github.event.release.tag_name || github.ref_name }}
   web:
     name: Offline HTML and matching source
     runs-on: ubuntu-24.04
@@ -57,7 +61,7 @@ jobs:
           if-no-files-found: error
   publish:
     name: Publish all runner-built release targets
-    needs: [desktop, web]
+    needs: [desktop, server, web]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

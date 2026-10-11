@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { stageDesktop, targets } from '../scripts/desktop/packages.mjs';
+import { serverPackage, serverTargets } from '../scripts/server-targets.mjs';
 const exec = promisify(execFile);
 test('release assembly refuses missing targets and mixed desktop commits', async () => {
   const root = await mkdtemp(join(tmpdir(), 'och-release-check-'));
@@ -37,9 +38,15 @@ test('release assembly refuses missing targets and mixed desktop commits', async
     await writeFile(windowsInfo, JSON.stringify({ ...info, commit: 'b'.repeat(40) }));
     await assert.rejects(assemble(), /Mismatched desktop identity/);
     await writeFile(windowsInfo, JSON.stringify(info));
+    // A release also needs the server package for each distribution.
+    await assert.rejects(assemble(), /openchronology-server-debian13-amd64\.deb/);
+    for (const target of Object.keys(serverTargets))
+      await writeFile(join(root, serverPackage(target)), 'test server package fixture');
     await assemble();
     const sums = await readFile(join(root, 'SHA256SUMS.txt'), 'utf8');
     for (const spec of Object.values(targets)) assert(sums.includes('  ' + spec.asset + '\n'));
+    for (const target of Object.keys(serverTargets))
+      assert(sums.includes('  ' + serverPackage(target) + '\n'));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

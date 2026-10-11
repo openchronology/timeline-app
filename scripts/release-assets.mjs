@@ -3,6 +3,7 @@ import { readFile, writeFile, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { releaseVersion } from './build-info.mjs';
 import { targets } from './desktop/packages.mjs';
+import { serverPackage, serverTargets } from './server-targets.mjs';
 const tag = process.argv[2];
 if (!tag || !releaseVersion.test(tag)) throw new Error('Supply the release version tag');
 const dir = process.argv[3] || 'release-assets';
@@ -25,6 +26,8 @@ for (const [target, spec] of Object.entries(targets)) {
   if (target.startsWith('macos') || target.startsWith('windows'))
     required.push('openchronology-native-source-' + target + '.tar.gz');
 }
+// Server packages for each distribution (scripts/server-deb.mjs).
+for (const target of Object.keys(serverTargets)) required.push(serverPackage(target));
 for (const name of required)
   if (!(await readFile(`${dir}/${name}`)).length) throw new Error('Empty release asset: ' + name);
 const lines = [];

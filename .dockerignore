@@ -33,3 +33,4 @@ platform/public
 !.git/objects/**
 release-assets
 desktop-artifacts
+server-artifacts
