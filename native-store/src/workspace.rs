@@ -1445,7 +1445,8 @@ mod search_tests {
     #[test]
     fn search_matches_titles_notes_stacks_and_durations_with_pages() {
         let mut events = vec![
-            json!({"id":"late","time":"5/1","metadata":{"title":"Harbor survey","description":"Later notes"}}),
+            // Tags (an array of strings) sit beside stacks (arrays of entries) in metadata.
+            json!({"id":"late","time":"5/1","metadata":{"title":"Harbor survey","description":"Later notes","tags":["survey","ports"]}}),
             json!({"id":"early","time":"1/1","metadata":{"title":"Notes","description":"A harbor visit"}}),
             json!({"id":"stack","time":"2/1","metadata":{"title":"Parent","stack":[{"id":"c","metadata":{"title":"Nested HARBOR entry"}}]}}),
         ];
@@ -1664,7 +1665,7 @@ fn search(db: &Connection, text: &str, page: usize, moments: bool) -> Result<Val
         "UNION ALL SELECT 'duration',d.id,d.first,d.last,coalesce(json_extract(d.metadata,'$.title'),''),coalesce(json_extract(d.metadata,'$.description'),'') FROM duration_intervals d"
     };
     let sql = format!(
-        "WITH entities AS (         SELECT 'moment' AS kind,e.id,e.time AS first,e.time AS last,coalesce(json_extract(e.metadata,'$.title'),'') AS title,         coalesce(json_extract(e.metadata,'$.description'),'')||' '||coalesce((SELECT group_concat(coalesce(json_extract(n.value,'$.metadata.title'),'')||' '||coalesce(json_extract(n.value,'$.metadata.description'),''),' ') FROM json_each(e.metadata) a,json_each(a.value) n WHERE a.type='array'),'') AS body FROM events e          {durations}),         hits AS (SELECT *,lower(title||' '||body) AS hay FROM entities)          SELECT kind,id,q(first),q(last),title,substr(trim(body),1,300),count(*) OVER() FROM hits WHERE {filter}          ORDER BY ({title_hit}) DESC,first COLLATE RATIONAL_V1,kind,id LIMIT 25 OFFSET ?{}",
+        "WITH entities AS (         SELECT 'moment' AS kind,e.id,e.time AS first,e.time AS last,coalesce(json_extract(e.metadata,'$.title'),'') AS title,         coalesce(json_extract(e.metadata,'$.description'),'')||' '||coalesce((SELECT group_concat(coalesce(json_extract(n.value,'$.metadata.title'),'')||' '||coalesce(json_extract(n.value,'$.metadata.description'),''),' ') FROM json_each(e.metadata) a,json_each(a.value) n WHERE a.type='array' AND n.type='object'),'') AS body FROM events e          {durations}),         hits AS (SELECT *,lower(title||' '||body) AS hay FROM entities)          SELECT kind,id,q(first),q(last),title,substr(trim(body),1,300),count(*) OVER() FROM hits WHERE {filter}          ORDER BY ({title_hit}) DESC,first COLLATE RATIONAL_V1,kind,id LIMIT 25 OFFSET ?{}",
         n + 1
     );
     let mut parameters: Vec<&str> = terms.iter().map(String::as_str).collect();

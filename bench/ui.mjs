@@ -10,8 +10,12 @@
 // Usage: node bench/ui.mjs [--gate]
 //   UI_PLATFORMS=browser,platform  UI_SIZES=1000,4000  UI_THROTTLES=1,4  UI_SAMPLES=5
 //   UI_SCENARIOS=open-moment,search  UI_TOLERANCE=1.5 (CI gate only)
+//   UI_KNOWN=navigation,new-duration: known misses (scenarios or groups), reported only
 //   The platform runs need DATABASE_URL (or BENCH_DATABASE_URL) and a built Next.js server
 //   (npm run build).
+//   The desktop runs (UI_PLATFORMS=desktop) need tauri-driver and, on Linux, WebKitWebDriver
+//   and a display (xvfb-run), plus the app built with npx tauri build --debug --no-bundle;
+//   UI_DESKTOP_APP overrides its path.
 // --gate exits non-zero on a budget missed within a comfortable size, or an advice gap.
 // UI_DEBUG=1 prints the page's state when an interaction fails.
 import { spawn } from 'node:child_process';
@@ -21,6 +25,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { BUDGETS, COMFORTABLE, Q, Viewport } from '../dist/core.mjs';
 import { generateTimeline } from './generate.mjs';
+import { webdriverSession } from './ui/webdriver.mjs';
 
 const env = process.env;
 const list = (value, fallback) => (value || fallback).split(/[\s,]+/).filter(Boolean);
@@ -31,6 +36,7 @@ const SIZES = list(env.UI_SIZES, '1000,4000,10000').map(Number);
 const THROTTLES = list(env.UI_THROTTLES, '1,4').map(Number);
 const SAMPLES = Number(env.UI_SAMPLES ?? 5);
 const ONLY = env.UI_SCENARIOS ? new Set(list(env.UI_SCENARIOS)) : null;
+const KNOWN = new Set(env.UI_KNOWN ? list(env.UI_KNOWN) : []);
 const GATE = process.argv.includes('--gate');
 // CI runners are slower and noisier than the machines the budgets describe.
 const TOLERANCE = GATE ? Number(env.UI_TOLERANCE ?? 1.5) : 1;
@@ -44,6 +50,8 @@ function playwrightDriver(page, cdp) {
     engine: 'chromium',
     eval: (expression) => page.evaluate(expression),
     click: (selector, options = {}) => page.locator(selector).first().click(options),
+    clickText: (container, name) =>
+      page.locator(container).getByRole('button', { name, exact: true }).first().click(),
     clickAt: (x, y) => page.mouse.click(x, y),
     async drag(x1, y1, x2, y2, steps = 20) {
       await page.mouse.move(x1, y1);
@@ -141,17 +149,34 @@ const hidden = (selector) => `!${visible(selector)}`;
 /** A dialog closing: its exit animation has started (the visible response) or it is shut. */
 const closing = (selector) =>
   `(() => { const n = document.querySelector(${JSON.stringify(selector)}); return !n.open || 'dialogClosing' in n.dataset; })()`;
+/**
+ * `condition` holds and the view has finished loading for it: the loading note can show up to
+ * ~100 ms after a change (the editor waits 70 ms before fetching), so wait until it has come
+ * and gone, or 150 ms and three frames pass without it (a cached view). Call `resetLoaded`
+ * before each measurement.
+ */
+const loaded = (condition) =>
+  `(() => { const s = (window.__loaded ??= { seen: false, frames: 0, start: performance.now() }); if (!(${condition})) return false; const loading = ${visible('#loading-window')}; s.frames++; if (loading) s.seen = true; return !loading && (s.seen || (s.frames > 3 && performance.now() - s.start > 150)); })()`;
+const resetLoaded = (d) => d.eval('delete window.__loaded');
 const value = (selector) => `document.querySelector(${JSON.stringify(selector)}).value`;
 const text = (selector) => `document.querySelector(${JSON.stringify(selector)}).textContent`;
-/** Shows the exact view [left, right] and waits until it is drawn. */
+/**
+ * Shows the exact view [left, right] and waits until it is drawn and loaded: on the desktop
+ * and the platform, the moments in a new view arrive after the view itself.
+ */
 async function show(d, left, right) {
   await d.eval(`(() => {
     document.getElementById('exact-left').value = ${JSON.stringify(left.toString())};
     document.getElementById('exact-right').value = ${JSON.stringify(right.toString())};
     document.getElementById('apply-exact-bounds').click();
   })()`);
-  await d.wait(`${value('#exact-left')} === ${JSON.stringify(left.toString())}`);
-  await delay(100);
+  const there = `${value('#exact-left')} === ${JSON.stringify(left.toString())}`;
+  await d.wait(there);
+  await resetLoaded(d);
+  await d.wait(loaded('true'));
+  // An animation still running from an earlier step (Fit all) may move the view on.
+  await delay(50);
+  if (!(await d.eval(there))) return show(d, left, right);
 }
 async function closeDialogs(d) {
   for (let i = 0; i < 4; i++) {
@@ -274,7 +299,10 @@ const SCENARIOS = [
       const [left, right] = t.near(t.alone);
       await show(d, left, right);
       const before = await d.eval(BOUNDS);
-      return timed(d, changedFrom(before), () => d.click('#fit-button'));
+      const ms = await timed(d, changedFrom(before), () => d.click('#fit-button'));
+      // Fit all animates; let it land before the next step sets its own view.
+      await d.wait(`${value('#exact-left')} === ${JSON.stringify(t.fitted.left.toString())}`);
+      return ms;
     },
   },
   {
@@ -531,10 +559,12 @@ const SCENARIOS = [
         () => d.click('#separate-button'),
       );
       await d.click('#separate-dialog .checkbox-label input');
-      const separate = await timed(d, visible('#separation-settings'), () =>
+      await resetLoaded(d);
+      const separate = await timed(d, loaded(visible('#separation-settings')), () =>
         d.click('#separate-submit'),
       );
-      const rejoin = await timed(d, hidden('#separation-settings'), () =>
+      await resetLoaded(d);
+      const rejoin = await timed(d, loaded(hidden('#separation-settings')), () =>
         d.click('#separation-rejoin'),
       );
       return [dialog, separate, rejoin];
@@ -554,12 +584,14 @@ const SCENARIOS = [
       await d.wait(
         `[...document.querySelectorAll('#event-related button')].some((b) => b.textContent === 'Separate related')`,
       );
-      const ms = await timed(d, visible('#separation-settings'), () =>
+      await resetLoaded(d);
+      const ms = await timed(d, loaded(visible('#separation-settings')), () =>
         // "Separate related" (direct links) is always offered; "all connected" only with more.
-        d.click('#event-related button:has-text("Separate related")'),
+        d.clickText('#event-related', 'Separate related'),
       );
       await d.click('#separation-rejoin');
-      await d.wait(hidden('#separation-settings'));
+      await resetLoaded(d);
+      await d.wait(loaded(hidden('#separation-settings')));
       return ms;
     },
   },
@@ -623,12 +655,23 @@ const SCENARIOS = [
   },
 ];
 
-/** Waits until the editor shows the fitted timeline, or reports the error it showed instead. */
-async function opened(d, t) {
+/**
+ * Waits until the editor shows the fitted timeline. If it shows a message instead and still
+ * has not opened 30 s later, reports that message (success notes such as "JSON timeline
+ * imported." also use the toast, so a toast alone is not an error).
+ */
+async function opened(d, t, timeout = 15 * 60000) {
   const fitted = `${value('#exact-left')} === ${JSON.stringify(t.fitted.left.toString())}`;
-  await d.wait(`${fitted} || ${visible('#toast')}`, 15 * 60000);
-  if (!(await d.eval(fitted)))
-    throw new Error(`The editor did not open the timeline: ${await d.eval(text('#toast'))}`);
+  const until = Date.now() + timeout;
+  let toastSince = null;
+  while (!(await d.eval(fitted))) {
+    const toast = (await d.eval(visible('#toast'))) ? await d.eval(text('#toast')) : null;
+    toastSince = toast ? (toastSince ?? Date.now()) : null;
+    if (toast && Date.now() - toastSince > 30000)
+      throw new Error(`The editor did not open the timeline: ${toast}`);
+    if (Date.now() > until) throw new Error(`The editor did not open the timeline in time.`);
+    await delay(50);
+  }
 }
 /** Serves the built editor for the in-memory browser runs (as bench/capacity.mjs does). */
 async function browserPage(browser, size, document, throttle) {
@@ -842,6 +885,11 @@ async function suite(label, platform, throttle, size, opened) {
             groups: document.querySelectorAll('#markers .event-marker.group').length,
             focus: document.activeElement?.id,
             bounds: ${BOUNDS},
+            inputs: window.__ui?.recent(),
+            empty: !document.getElementById('empty-window').hidden,
+            loading: !document.getElementById('loading-window').hidden,
+            durations: document.querySelectorAll('.duration-band').length,
+            messages: ['#search-status', '#moment-picker-status', '#toast'].map((id) => document.querySelector(id)?.textContent),
             labels: [...document.querySelectorAll('#markers .event-marker')].slice(0, 8).map((m) => m.getAttribute('aria-label')),
             title: document.getElementById('event-title').value,
             status: document.getElementById('save-status').textContent,
@@ -859,11 +907,58 @@ async function suite(label, platform, throttle, size, opened) {
     row.advised = shown;
 }
 
+/**
+ * The desktop app through tauri-driver (which forwards to WebKitWebDriver on Linux). Build
+ * the app first: npx tauri build --debug --no-bundle (embeds dist/).
+ */
+async function startDesktop() {
+  const port = Number(env.UI_WEBDRIVER_PORT ?? 4444),
+    url = `http://127.0.0.1:${port}`;
+  const app = resolve(
+    env.UI_DESKTOP_APP ??
+      `${env.CARGO_TARGET_DIR ?? 'src-tauri/target'}/debug/openchronology-desktop`,
+  );
+  const driver = spawn(env.TAURI_DRIVER ?? 'tauri-driver', ['--port', String(port)], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let logs = '';
+  for (const s of [driver.stdout, driver.stderr])
+    s.on('data', (c) => (logs = (logs + c).slice(-8000)));
+  for (let i = 0; ; i++) {
+    if (driver.exitCode !== null) throw new Error('tauri-driver exited:\n' + logs);
+    try {
+      if ((await fetch(url + '/status', { signal: AbortSignal.timeout(500) })).ok) break;
+    } catch {}
+    if (i > 100) throw new Error('tauri-driver did not start:\n' + logs);
+    await delay(100);
+  }
+  return { url, app, close: () => driver.kill() };
+}
+/**
+ * A fresh app per timeline. Timelines over 2,048 moments move into the native SQLite store
+ * after opening, as for desktop users; smaller ones stay in memory.
+ */
+async function desktopPage(desktop, size, document) {
+  const d = await webdriverSession(desktop.url, desktop.app);
+  await d.wait(`!!document.getElementById('json-file')`, 60000);
+  await d.inject(PROBE);
+  const t = targets(document);
+  await d.setFile('#json-file', `timeline-${size}.ochx`, JSON.stringify(document));
+  await opened(d, t);
+  // Timed in the page, from handing over the file: not the WebDriver transfer before it.
+  const open = await d.eval('performance.now() - window.__uiFileStart');
+  if (document.events.length > 2048)
+    await d.wait(`document.documentElement.dataset.storage === 'sqlite'`, 15 * 60000);
+  return { d, t, open, close: () => d.close() };
+}
+
 await mkdir(RESULTS, { recursive: true });
-const browser = await chromium.launch(
-  env.BROWSER_EXECUTABLE ? { executablePath: env.BROWSER_EXECUTABLE } : {},
-);
-let platform = null;
+// Chromium drives the browser and platform runs; the desktop runs need only tauri-driver.
+const browser = PLATFORMS.some((p) => p !== 'desktop')
+  ? await chromium.launch(env.BROWSER_EXECUTABLE ? { executablePath: env.BROWSER_EXECUTABLE } : {})
+  : null;
+let platform = null,
+  desktop = null;
 try {
   for (const size of SIZES) {
     const document = generateTimeline(size);
@@ -891,13 +986,27 @@ try {
         await opened.context.close();
       }
     }
+    if (PLATFORMS.includes('desktop')) {
+      desktop ??= await startDesktop();
+      const opened = await desktopPage(desktop, size, document);
+      try {
+        await suite('desktop', 'desktop', 1, size, opened);
+      } finally {
+        await opened.close();
+      }
+    }
   }
 } finally {
-  await browser.close();
+  await browser?.close();
   await platform?.close();
+  desktop?.close();
 }
-const failures = rows.filter((r) => !r.pass && r.comfortable);
-const gaps = rows.filter((r) => !r.pass && !r.comfortable && !r.advised);
+// Known misses (scenario or group names, e.g. "navigation") are reported but do not fail the
+// gate: they are tracked elsewhere (#68), and the gate guards everything else against them.
+const known = (r) => KNOWN.has(r.scenario) || KNOWN.has(r.group);
+const failures = rows.filter((r) => !r.pass && r.comfortable && !known(r));
+const gaps = rows.filter((r) => !r.pass && !r.comfortable && !r.advised && !known(r));
+const knownMisses = rows.filter((r) => !r.pass && known(r));
 await writeFile(
   `${RESULTS}/ui.json`,
   JSON.stringify(
@@ -913,8 +1022,12 @@ await writeFile(
   ),
 );
 console.log(
-  `UI benchmarks: ${rows.length} measurements; ${failures.length} over budget within a comfortable size; ${gaps.length} over budget without advice.`,
+  `UI benchmarks: ${rows.length} measurements; ${failures.length} over budget within a comfortable size; ${gaps.length} over budget without advice${knownMisses.length ? `; ${knownMisses.length} known` : ''}.`,
 );
+for (const r of knownMisses)
+  console.log(
+    `  known: ${r.platform}${r.throttle > 1 ? ` ×${r.throttle}` : ''} ${r.size} ${r.scenario} ${r.error ?? Math.round(r.value) + ' ms'} (≤ ${r.limit * TOLERANCE} ms)`,
+  );
 for (const r of [...failures, ...gaps])
   console.log(
     `  ${r.comfortable ? 'over budget' : 'advice gap'}: ${r.platform}${r.throttle > 1 ? ` ×${r.throttle}` : ''} ${r.size} ${r.scenario} ${r.error ?? Math.round(r.value) + ' ms'} (≤ ${r.limit * TOLERANCE} ms)`,

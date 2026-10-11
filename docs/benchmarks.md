@@ -87,7 +87,7 @@ Latency stays near the save interval up to 500 messages a second; at 1,000 a sec
 
 ## Interactions
 
-`bench/ui.mjs` drives the editor with real input, Playwright mouse, keyboard and touch in Chromium, and times each interaction. Timing runs from the input event's own timestamp to the frame in which the result is painted. For continuous gestures it records the longest frame while the gesture runs. An injected probe (`bench/ui/probe.js`) does the timing in the page without browser-specific APIs, so the desktop app's WebKit can be measured the same way.
+`bench/ui.mjs` drives the editor with real input and times each interaction. In Chromium the input comes from Playwright's mouse, keyboard and touch. In the desktop app it comes from W3C WebDriver actions, through `tauri-driver` and WebKitWebDriver. Timing runs from the input event that triggers the result (a click on release, a key on its press, each wheel step) to the frame in which the result is painted. This is how Event Timing measures interactions, so the time a button is held down is not counted. For continuous gestures it records the longest frame while the gesture runs. An injected probe (`bench/ui/probe.js`) does the timing in the page, with no browser-specific APIs and no `eval`, so it works the same in both engines and under the editor's content security policy.
 
 It checks the results against two rules, both from `src/capacity.ts`:
 
@@ -107,48 +107,70 @@ The budgets follow the advice thresholds (`response` is `THRESHOLDS.edit`, `view
 The runs cover:
 
 - the in-memory browser editor, at full speed and with the CPU throttled 4×, whose comfortable sizes are 4,000 and 1,000 moments;
-- the platform: the production Next.js server with PostgreSQL, signed in as a `bench_ui` user, whose comfortable size is the 200,000-moment limit.
+- the platform: the production Next.js server with PostgreSQL, signed in as a `bench_ui` user, whose comfortable size is the 200,000-moment limit;
+- the desktop app (WebKitGTK on Linux), whose comfortable size is also the limit. Timelines over 2,048 moments move into the native SQLite store after opening, as for desktop users; smaller ones stay in memory. Pinch gestures are measured in Chromium only, through its DevTools touch input; the desktop driver sends mouse, keyboard and wheel input.
 
 Each interaction is measured `UI_SAMPLES` times (default 5) and judged by its median.
 
-| Variable                               | Default                                            | Meaning                                                                   |
-| -------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------- |
-| `UI_PLATFORMS`                         | `browser,platform` with a database, else `browser` | Which editors to drive                                                    |
-| `UI_SIZES`                             | `1000,4000,10000`                                  | Timeline sizes in moments                                                 |
-| `UI_THROTTLES`                         | `1,4`                                              | CPU slowdowns for the browser runs                                        |
-| `UI_SAMPLES`                           | `5`                                                | Samples per interaction                                                   |
-| `UI_SCENARIOS`                         | all                                                | Only these interactions, e.g. `open-moment,search`                        |
-| `DATABASE_URL` or `BENCH_DATABASE_URL` | unset                                              | PostgreSQL for the platform runs; the platform also needs `npm run build` |
+| Variable                               | Default                                            | Meaning                                                                                        |
+| -------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `UI_PLATFORMS`                         | `browser,platform` with a database, else `browser` | Which editors to drive                                                                         |
+| `UI_SIZES`                             | `1000,4000,10000`                                  | Timeline sizes in moments                                                                      |
+| `UI_THROTTLES`                         | `1,4`                                              | CPU slowdowns for the browser runs                                                             |
+| `UI_SAMPLES`                           | `5`                                                | Samples per interaction                                                                        |
+| `UI_SCENARIOS`                         | all                                                | Only these interactions, e.g. `open-moment,search`                                             |
+| `UI_KNOWN`                             | none                                               | Known misses (interactions or groups such as `navigation`): reported, but not failing `--gate` |
+| `UI_DESKTOP_APP`                       | the debug build                                    | The desktop app to drive (`npx tauri build --debug --no-bundle` builds it)                     |
+| `UI_DEBUG`                             | unset                                              | Print the page's state, recent inputs and messages when an interaction fails                   |
+| `DATABASE_URL` or `BENCH_DATABASE_URL` | unset                                              | PostgreSQL for the platform runs; the platform also needs `npm run build`                      |
 
-`node bench/ui.mjs --gate` exits with an error on any budget missed within a comfortable size, and on any advice gap. CI runs it at 1,000 moments for the browser and the platform, allowing 1.5× the budgets (`UI_TOLERANCE`) for slower shared runners. The Benchmarks workflow runs the full set of sizes and adds an **Interactions** table to the report.
+`node bench/ui.mjs --gate` exits with an error on any budget missed within a comfortable size, and on any advice gap, apart from the known misses. In CI, the gate allows 1.5× the budgets (`UI_TOLERANCE`) for slower shared runners:
+
+- the browser and the platform at 1,000 moments;
+- the desktop app at 1,000 moments (in memory) and 10,000 moments (SQLite), under Xvfb, allowing 3×: software rendering on shared runners is slow and varies widely (opening search took 96 ms on a laptop and 140–173 ms in CI). This gate guards against breakage, such as an interaction that fails or never finishes, and gross regressions. Navigation and new durations are known misses there (#68).
+
+The Benchmarks workflow runs the browser and platform at the full set of sizes and adds an **Interactions** table to the report.
+
+#### Desktop
+
+The desktop runs need `tauri-driver`, WebKitWebDriver (Ubuntu's `webkit2gtk-driver`) and a display. On systems that don't package WebKitWebDriver, such as Arch or macOS, use the container in `bench/ui/desktop.Dockerfile`:
+
+```sh
+docker build -t och-desktop-ui -f bench/ui/desktop.Dockerfile bench/ui
+docker run --rm -v "$PWD":/repo -v och-desktop-target:/home/ubuntu/target och-desktop-ui \
+  bash -c 'node scripts/build.mjs && npx tauri build --debug --no-bundle &&
+           UI_PLATFORMS=desktop UI_SIZES=1000,10000 xvfb-run -a node bench/ui.mjs'
+```
+
+Xvfb renders in software, so drawing is slower than on a desktop with a GPU; compare desktop results with each other rather than with the Chromium runs.
 
 ### Results
 
-Medians from one run on an AMD Ryzen 7 7730U laptop (16 threads), headless Chromium, PostgreSQL in Docker. "×4" throttles the CPU 4×. Budgets: open 1.5 s, view and frame 150 ms, response 100 ms, results 1 s. **Bold** marks a miss.
+Medians from one run on an AMD Ryzen 7 7730U laptop (16 threads): headless Chromium, PostgreSQL in Docker, and the desktop app under Xvfb in Ubuntu 24.04. "×4" throttles the CPU 4×. Budgets: open 1.5 s, view and frame 150 ms, response 100 ms, results 1 s. **Bold** marks a miss.
 
-| Interaction                 | Browser 1,000 | Browser 4,000 | Browser 10,000 |   ×4 1,000 |   ×4 4,000 | Platform 1,000 | Platform 10,000 | Platform 100,000 |
-| --------------------------- | ------------: | ------------: | -------------: | ---------: | ---------: | -------------: | --------------: | ---------------: |
-| Open                        |        208 ms |        436 ms |         838 ms |     699 ms | **1.70 s** |         482 ms |          272 ms |           276 ms |
-| Wheel zoom                  |        135 ms |    **215 ms** |     **279 ms** | **350 ms** | **766 ms** |         141 ms |      **316 ms** |            44 ms |
-| Drag to pan (longest frame) |         83 ms |        150 ms |     **217 ms** | **350 ms** | **617 ms** |          67 ms |      **183 ms** |            17 ms |
-| Pinch zoom (longest frame)  |         83 ms |    **233 ms** |     **300 ms** | **367 ms** | **900 ms** |          50 ms |      **233 ms** |            17 ms |
-| Fit all                     |         63 ms |        100 ms |         129 ms | **217 ms** | **363 ms** |          33 ms |           35 ms |            53 ms |
-| Open a moment               |         14 ms |         11 ms |          19 ms |      29 ms |      30 ms |          27 ms |           30 ms |       **103 ms** |
-| Typing (per key)            |         38 ms |         46 ms |          46 ms |      41 ms |      40 ms |          45 ms |           39 ms |            46 ms |
-| New duration                |         52 ms |         93 ms |     **135 ms** | **193 ms** | **387 ms** |          55 ms |           82 ms |            89 ms |
-| Delete (ask, then remove)   |         81 ms |         98 ms |     **152 ms** | **104 ms** | **146 ms** |          15 ms |           77 ms |       **132 ms** |
-| Search results              |         24 ms |         31 ms |          91 ms |      49 ms |     132 ms |          70 ms |           65 ms |           112 ms |
-| Separate by tags and rejoin |        115 ms |        233 ms |         341 ms |     478 ms |     955 ms |          39 ms |           36 ms |            84 ms |
-| Save to server              |               |               |                |            |            |          33 ms |          100 ms |           151 ms |
-| Live update arriving        |               |               |                |            |            |          31 ms |           30 ms |           837 ms |
+| Interaction                 | Browser 1,000 | Browser 4,000 | Browser 10,000 |   ×4 1,000 |   ×4 4,000 | Platform 1,000 | Platform 10,000 | Platform 100,000 | Desktop 1,000 | Desktop 10,000 |
+| --------------------------- | ------------: | ------------: | -------------: | ---------: | ---------: | -------------: | --------------: | ---------------: | ------------: | -------------: |
+| Open                        |        154 ms |        481 ms |         817 ms |     693 ms |     1.26 s |         392 ms |          266 ms |           278 ms |    **1.61 s** |         1.16 s |
+| Wheel zoom                  |        114 ms |    **228 ms** |     **285 ms** | **380 ms** | **722 ms** |         109 ms |      **228 ms** |       **274 ms** |        111 ms |     **368 ms** |
+| Drag to pan (longest frame) |         83 ms |    **167 ms** |     **217 ms** | **333 ms** | **600 ms** |          50 ms |      **183 ms** |       **217 ms** |        144 ms |     **393 ms** |
+| Pinch zoom (longest frame)  |         83 ms |    **250 ms** |     **300 ms** | **400 ms** | **900 ms** |          50 ms |      **200 ms** |       **217 ms** |               |                |
+| Fit all                     |         62 ms |        102 ms |         129 ms | **226 ms** | **343 ms** |          30 ms |           48 ms |           139 ms |         87 ms |          23 ms |
+| Open a moment               |         12 ms |         11 ms |          20 ms |      46 ms |      36 ms |          28 ms |           28 ms |            93 ms |         29 ms |          29 ms |
+| Typing (per key)            |         43 ms |         44 ms |          58 ms |      51 ms |      53 ms |          45 ms |           38 ms |            44 ms |         19 ms |          18 ms |
+| New duration                |         54 ms |         94 ms |     **136 ms** | **264 ms** | **381 ms** |          48 ms |           79 ms |       **104 ms** |         72 ms |     **278 ms** |
+| Delete (ask, then remove)   |         85 ms |        100 ms |          48 ms |      55 ms |      84 ms |          15 ms |           15 ms |            52 ms |         27 ms |          28 ms |
+| Search results              |         22 ms |         38 ms |         111 ms |      54 ms |     117 ms |          61 ms |           65 ms |           110 ms |        106 ms |          86 ms |
+| Separate by tags and rejoin |        146 ms |        278 ms |         386 ms |     601 ms |     930 ms |         185 ms |          324 ms |           464 ms |        223 ms |         413 ms |
+| Save to server              |               |               |                |            |            |          34 ms |           99 ms |           151 ms |               |                |
+| Live update arriving        |               |               |                |            |            |          30 ms |           29 ms |            31 ms |               |                |
 
 What this shows:
 
-- **Navigation is the bottleneck.** Discrete actions (opening a moment, typing, saving, searching) stay well within budget almost everywhere. Zooming, panning and pinching miss it as soon as many moments are drawn individually. Each zoom step redraws the labels, which costs 70–80 ms at 1,000 moments; a 50 ms frame budget is out of reach until that drawing is cheaper (#68).
-- **The comfortable sizes are optimistic for gestures.** Navigation misses its budget in the browser at 4,000 moments (the documented comfortable size), and on a throttled CPU already at 1,000. The platform misses it at 10,000 moments but not at 100,000, where the view collapses into summaries. So the cost follows how many moments are drawn, not how many are stored.
-- **The advice shows too late.** Beyond the comfortable sizes, most misses happen without the advice showing ("advice gaps"). The advice compares the editor's own drawing time with 150 ms; users wait longer than that, from input to paint (#69).
+- **Navigation is the bottleneck on every platform.** Discrete actions (opening a moment, typing, saving, deleting, searching) stay within budget almost everywhere. Zooming, panning and pinching miss it once a few thousand moments are in view. At 1,000 moments each zoom step costs 70–80 ms of drawing, so a 50 ms frame budget is out of reach until that drawing is cheaper (#68). Opening a new duration redraws too, and misses at 10,000 moments.
+- **The comfortable sizes are optimistic for gestures.** Navigation misses its budget in the browser at 4,000 moments (the documented comfortable size), and on a throttled CPU already at 1,000. The platform and the desktop app, documented as comfortable up to the 200,000 limit, miss it from 10,000.
+- **The advice shows too late.** Beyond the comfortable sizes, the browser misses its budgets without the advice showing ("advice gaps"). The advice compares the editor's own drawing time with 150 ms, while users wait longer, from input to paint (#69).
 
-CI checks 1,000 moments, where every interaction meets its budget on both the browser and the platform.
+CI checks 1,000 moments in the browser and the platform, and 1,000 and 10,000 moments in the desktop app. Every interaction except the known navigation misses meets its budget there.
 
 ## Method
 
