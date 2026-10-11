@@ -1,11 +1,34 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { Readable } from 'node:stream';
-import { platformServices } from './platform.mjs';
+import { platformServices, ConfigurationError } from './platform.mjs';
+
+/** Starts the platform, or answers with JSON why it cannot (instead of an empty 500). */
+export async function servicesOrUnavailable() {
+  try {
+    return { services: await platformServices() };
+  } catch (error) {
+    console.error('OpenChronology could not start:', error);
+    const message =
+      error instanceof ConfigurationError
+        ? `Server misconfigured: ${error.message}`
+        : 'The server is unavailable.';
+    return {
+      unavailable: Response.json(
+        { error: message },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } },
+      ),
+    };
+  }
+}
 
 // Stream the incoming Next request directly through the existing bounded service
 // controller. No localhost proxy or second HTTP listener is involved.
 export async function dispatchNextRequest(request, handler) {
-  handler ??= (await platformServices()).handler;
+  if (!handler) {
+    const { services, unavailable } = await servicesOrUnavailable();
+    if (unavailable) return unavailable;
+    handler = services.handler;
+  }
   const url = new URL(request.url);
   const req = request.body ? Readable.fromWeb(request.body) : Readable.from([]);
   Object.assign(req, {
