@@ -271,6 +271,46 @@ try {
     assert.deepEqual(await run('oc_duration_overview'), expected);
     compared++;
   }
+  // Thousands of durations, five per start and one in three long, so that batch reads of
+  // subtrees mixing long durations in have neighbours outside them with the same start.
+  const tiedDocument = {
+    format: 'openchronology',
+    version: 1,
+    title: 'Tied starts',
+    description: '',
+    events: [],
+    durations: Array.from({ length: 3000 }, (_, i) => {
+      const start = Math.floor(i / 5);
+      return {
+        id: 'd' + ((i * 7919) % 3000),
+        start: `${start}/1`,
+        end: random(3) ? `${start * 4 + random(8)}/4` : `${start + 50 + random(400)}/1`,
+        metadata: { title: 'T' + i },
+      };
+    }),
+  };
+  const tied = await store.create(user, tiedDocument);
+  created.push(tied.id);
+  for (let w = 0; w < 30; w++) {
+    let [a, b] = [random(700) - 50, random(700) - 50];
+    if (a > b) [a, b] = [b, a];
+    const threshold = Q.from(BigInt(1 + random(120)), BigInt(1 + random(3))).toString();
+    const run = async (fn) =>
+      (
+        await pool.query(
+          `SELECT first_time,last_time,duration_count,band FROM ${fn}($1,$2::mpq,$3::mpq,$4::mpq)`,
+          [tied.id, `${a}/1`, `${b}/1`, threshold],
+        )
+      ).rows;
+    const expected = await run('pg_temp.oc_duration_overview_previous');
+    assert.deepEqual(
+      await run('oc_duration_overview'),
+      expected,
+      `tied ${a}..${b} by ${threshold}`,
+    );
+    compared++;
+    groups += expected.length;
+  }
   // The key never orders two values against their exact order, and separates values that
   // differ within 30 significant digits: around powers of ten (where the exponent changes),
   // far outside float8's range, signed, and fractions with long expansions.
@@ -296,7 +336,7 @@ try {
     [values],
   );
   assert.deepEqual(order[0], { inversions: 0, merged: 0 });
-  assert.equal(compared, 326);
+  assert.equal(compared, 356);
   assert(groups > 500, `the windows produced summaries (${groups})`);
   console.log(
     `PASS PostgreSQL duration summaries: ${compared} windows (${groups} groups) match the previous traversal.`,
