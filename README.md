@@ -93,6 +93,20 @@ The migration account needs permission to install pgmp and create objects. A pro
 
 Saving uses an atomic snapshot replacement with revision checks. Conflicting saves return HTTP 409 instead of silently overwriting another editor. This version permits 200,000 events per document and 16 MiB per HTTP request. Viewer queries only fetch the visible summaries and bounded event pages. An editor currently downloads the full document and rebuilds its browser map. Sparse saves update the database index in place, at a cost that grows with the logarithm of the timeline's size ([incremental saves](docs/architecture.md#incremental-saves)). Streaming very large imports is future work.
 
+## Debian and Ubuntu packages
+
+The whole server also installs as one package, for Debian 13 (PostgreSQL 17) or Ubuntu 24.04 (PostgreSQL 16). It contains the platform, its Node.js runtime, the SQLite converter and the `pgmp` extension, and uses the distribution's PostgreSQL:
+
+```sh
+sudo apt install ./openchronology-server-debian13-amd64.deb      # or -ubuntu24.04-
+```
+
+(`dpkg -i` doesn't install dependencies; after it, run `sudo apt -f install`.) The first installation creates the PostgreSQL role and database with `pgmp`, writes `/etc/openchronology/openchronology.env` with a new `AUTH_ENCRYPTION_KEY`, migrates and starts the `openchronology` service on `127.0.0.1:5173`. Edit the configuration and restart, and put an HTTPS reverse proxy in front.
+
+Upgrades keep the configuration and database, stop the server, and list the settings that are new in this version's template. Review them, back up, then run `sudo openchronology-migrate`, which migrates and starts the server again. `/usr/share/doc/openchronology-server/README.Debian` covers configuration, email, the syslog receiver, upgrades and removal.
+
+Releases attach both packages. Every push to `main` builds them as artifacts of the CI run. Build them yourself with Docker (`node scripts/server-deb.mjs [debian13|ubuntu24.04]`, into `server-artifacts/`), and check one with `node test/server-deb.mjs server-artifacts/openchronology-server-debian13-amd64.deb`. That test installs, runs, upgrades and purges it in a fresh container.
+
 ## Offline desktop and SQLite files
 
 On Linux, install Rust, CMake, a C compiler, pkg-config, GMP/SQLite development packages, GTK 3, WebKitGTK 4.1, and the Tauri Linux dependencies. On Ubuntu 24.04:

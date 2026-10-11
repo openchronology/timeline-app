@@ -1,0 +1,21 @@
+Package: openchronology-server
+Version: @VERSION@
+Architecture: amd64
+Maintainer: Athan Clark <athan.clark@gmail.com>
+Section: web
+Priority: optional
+Installed-Size: @INSTALLED_SIZE@
+Depends: postgresql-@PG_MAJOR@, postgresql-common, adduser, libgmp10, libsqlite3-0, ca-certificates
+Recommends: systemd
+Suggests: nginx | caddy | apache2
+Homepage: https://github.com/openchronology/timeline-app
+Description: OpenChronology timeline platform server
+ The OpenChronology platform: accounts, shared and public timelines, collaboration,
+ search and live updates, served by Next.js with PostgreSQL storage. Times are exact
+ rationals, stored with the bundled pgmp extension for PostgreSQL @PG_MAJOR@.
+ .
+ The first installation creates a local PostgreSQL database, migrates it and starts
+ the openchronology service on 127.0.0.1:5173. Configuration is in
+ /etc/openchronology/openchronology.env. After an upgrade, run openchronology-migrate.
+ .
+ This package bundles the Node.js @NODE_VERSION@ runtime it is tested with.

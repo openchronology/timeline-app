@@ -1,0 +1,41 @@
+name: Server packages
+# Builds the server .deb for each distribution (scripts/server-deb.mjs), installs it in a fresh
+# container of that distribution (test/server-deb.mjs) and uploads it.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        default: ''
+permissions:
+  contents: read
+jobs:
+  deb:
+    name: Server / ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [debian13, ubuntu24.04]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+          # The build identity and development versions read the commit and its tags.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Build the package
+        run: node scripts/server-deb.mjs "${{ matrix.target }}"
+      - name: Install, run, upgrade and purge it in a fresh container
+        run: node test/server-deb.mjs "server-artifacts/openchronology-server-${{ matrix.target }}-amd64.deb"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: server-${{ matrix.target }}
+          path: server-artifacts/openchronology-server-${{ matrix.target }}-amd64.deb
+          if-no-files-found: error
