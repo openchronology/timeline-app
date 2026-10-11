@@ -592,27 +592,51 @@ CREATE INDEX IF NOT EXISTS oc_duration_nodes_first_key ON oc_duration_nodes(time
 -- previous anchor plus the threshold (the first search starts at lo - threshold, since a
 -- collapsed duration reaching the window starts after it), found by an index range scan, so
 -- the cost follows the durations starting in [lo - threshold, hi] and the number of groups.
+-- Starts that share a key are read once per view, however many groups they form.
 CREATE OR REPLACE FUNCTION oc_duration_overview(tid uuid, lo mpq, hi mpq, threshold mpq)
 RETURNS TABLE(first_time text,last_time text,duration_count integer,band jsonb)
 LANGUAGE plpgsql STABLE AS $$
-DECLARE anchor mpq; bound mpq; finish mpq; total integer; single jsonb;
+DECLARE anchor mpq; bound mpq; finish mpq; total integer; single jsonb; block numeric; r record;
+  more integer; later mpq;
 BEGIN
   IF lo IS NULL OR hi IS NULL OR threshold IS NULL OR threshold<='0'::mpq OR lo>hi THEN RETURN; END IF;
   bound:=lo-threshold;
   LOOP
-    SELECT d.first_time INTO anchor FROM oc_duration_nodes d
+    -- The next start key holding a collapsed start at or after the bound. Starts sharing a key
+    -- (equal in their first 30 significant digits) are grouped from one exact-ordered read of
+    -- the block, so a large block costs one pass instead of one scan per group.
+    SELECT d.first_key INTO block FROM oc_duration_nodes d
       WHERE d.timeline_id=tid
         AND d.first_key>=oc_qkey(bound) AND d.first_key<=oc_qkey(hi)
         AND d.first_time>=bound AND d.first_time<=hi AND d.last_time>=lo AND d.last_time-d.first_time<threshold
-      ORDER BY d.first_key,d.first_time LIMIT 1;
+      ORDER BY d.first_key LIMIT 1;
     EXIT WHEN NOT FOUND;
+    anchor:=NULL;
+    FOR r IN SELECT d.first_time AS f,d.last_time AS l,d.band AS b FROM oc_duration_nodes d
+        WHERE d.timeline_id=tid AND d.first_key=block
+          AND d.first_time>=bound AND d.first_time<=hi AND d.last_time>=lo AND d.last_time-d.first_time<threshold
+        ORDER BY d.first_time LOOP
+      IF anchor IS NOT NULL AND r.f>=anchor+threshold THEN
+        first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
+        band:=CASE WHEN total=1 THEN single END;
+        RETURN NEXT;
+        anchor:=NULL;
+      END IF;
+      IF anchor IS NULL THEN anchor:=r.f; finish:=r.l; total:=0; END IF;
+      IF r.l>finish THEN finish:=r.l; END IF;
+      total:=total+1; single:=CASE WHEN total=1 THEN r.b END;
+    END LOOP;
+    -- The block's last group takes starts from later keys below its anchor plus the threshold
+    -- (a later key's starts all exceed this block's).
     bound:=anchor+threshold;
-    SELECT count(*)::integer,max(d.last_time),(array_agg(d.band))[1] INTO total,finish,single
-      FROM oc_duration_nodes d
+    SELECT count(*)::integer,max(d.last_time) INTO more,later FROM oc_duration_nodes d
       WHERE d.timeline_id=tid
-        AND d.first_key>=oc_qkey(anchor) AND d.first_key<=oc_qkey(bound)
-        AND d.first_time>=anchor AND d.first_time<bound AND d.first_time<=hi
-        AND d.last_time>=lo AND d.last_time-d.first_time<threshold;
+        AND d.first_key>block AND d.first_key<=oc_qkey(bound)
+        AND d.first_time<bound AND d.first_time<=hi AND d.last_time>=lo AND d.last_time-d.first_time<threshold;
+    IF more>0 THEN
+      total:=total+more;
+      IF later>finish THEN finish:=later; END IF;
+    END IF;
     first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
     band:=CASE WHEN total=1 THEN single END;
     RETURN NEXT;
