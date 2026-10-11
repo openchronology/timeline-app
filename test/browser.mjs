@@ -87,7 +87,7 @@ try {
   await page.locator('.event-marker:not(.group)').first().click();
   await input('event-title').fill('A renamed moment');
   await page.waitForFunction(() =>
-    document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+    document.getElementById('event-edit-status').textContent.startsWith('Shown on the timeline'),
   );
   assert.equal(await input('event-title').inputValue(), 'A renamed moment');
   await closeMomentDetails(page);
@@ -99,11 +99,13 @@ try {
   await input('add-button').click();
   await input('event-title').fill('A new exact event');
   await input('event-time').fill('-17/23');
+  // A new moment is added by Save, not as it is typed.
   await page.waitForFunction(() =>
-    document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+    document.getElementById('event-edit-status').textContent.startsWith('Not on the timeline'),
   );
-  assert.match(await input('event-count').textContent(), /11 events/);
+  assert.match(await input('event-count').textContent(), /10 events/);
   await closeMomentDetails(page);
+  assert.match(await input('event-count').textContent(), /11 events/);
   await input('undo-button').click();
   const stage = input('timeline-stage');
   await stage.scrollIntoViewIfNeeded();

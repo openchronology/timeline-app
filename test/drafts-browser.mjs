@@ -112,9 +112,9 @@ export async function checkDrafts(browser) {
     await page.locator('#event-title').fill('Added in a draft');
     await page.locator('#event-time').fill('15/1');
     await page.waitForFunction(() =>
-      document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+      document.getElementById('event-edit-status').textContent.startsWith('Not on the timeline'),
     );
-    await page.keyboard.press('Escape');
+    await page.locator('#event-save').click();
     await page.locator('#inspector').waitFor({ state: 'hidden' });
     await page.locator('#timeline-title').fill('Edited draft');
     await page.locator('#timeline-title').press('Tab');

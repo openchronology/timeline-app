@@ -43,7 +43,7 @@ export async function checkTags(page, restore) {
     await page.getByRole('button', { name: 'Market', exact: true }).click({ force: true });
     await page.locator('#event-tags').fill('Trade,  Ports ');
     await page.waitForFunction(() =>
-      document.getElementById('event-edit-status').textContent.startsWith('Applied'),
+      document.getElementById('event-edit-status').textContent.startsWith('Shown on the timeline'),
     );
     assert.equal(await page.locator('#event-metadata').inputValue(), '{}');
     await closeMomentDetails(page);
