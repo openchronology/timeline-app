@@ -159,7 +159,8 @@ export class ComparisonView {
           frame = (await track.source.query!({ kind: 'overview', ...query }, signal)) as Frame;
           if (signal?.aborted) throw new DOMException('Comparison cancelled', 'AbortError');
           track.cache.store(query, frame);
-          frame = track.cache.visible(sourceView);
+          // The window just stored answers its own query (and becomes the one drawn).
+          frame = track.cache.get(sourceView, query) ?? track.cache.visible(sourceView);
         }
       }
       frames.push(this.mapFrame(track, frame));
