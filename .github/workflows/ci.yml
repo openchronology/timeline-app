@@ -234,3 +234,36 @@ jobs:
   desktop:
     name: Desktop packages
     uses: ./.github/workflows/desktop.yml
+  desktop-ui:
+    name: Desktop app / UI interactions within budget
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Desktop build dependencies, WebKitWebDriver and a virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake pkg-config libgmp-dev libsqlite3-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev webkit2gtk-driver xvfb
+      - name: Stable Rust and tauri-driver
+        run: |
+          rustup update stable --no-self-update
+          rustup default stable
+          cargo install tauri-driver --locked
+      - run: node scripts/npm-ci.mjs
+      - run: npm run build:editor
+      # A debug app with the editor embedded (no installer packages).
+      - run: npx tauri build --debug --no-bundle
+      # 1,000 moments stay in memory; 10,000 move into the native SQLite store. Navigation and
+      # new durations miss their budgets on the desktop, more so with Xvfb's software rendering
+      # (#68): they are reported, and everything else must meet its budget.
+      - name: UI interactions within budget
+        run: xvfb-run -a node bench/ui.mjs --gate
+        env:
+          UI_PLATFORMS: desktop
+          UI_SIZES: '1000,10000'
+          UI_SAMPLES: '3'
+          UI_KNOWN: navigation,new-duration

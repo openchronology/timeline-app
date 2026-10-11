@@ -1607,6 +1607,9 @@ el('capacity-dismiss').onclick = () => {
 };
 function heading() {
   updateFollowControl();
+  // Where the open timeline lives, for tests and benchmarks (bench/ui.mjs).
+  document.documentElement.dataset.storage =
+    local?.id === 'local-sqlite' ? 'sqlite' : remote ? 'server' : 'memory';
   el('memory-notice').hidden =
     !memoryOnly() ||
     !!remote ||
