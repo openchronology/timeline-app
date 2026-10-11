@@ -595,9 +595,11 @@ CREATE INDEX IF NOT EXISTS oc_duration_nodes_first_key ON oc_duration_nodes(time
 -- Starts that share a key are read once per view, however many groups they form.
 CREATE OR REPLACE FUNCTION oc_duration_overview(tid uuid, lo mpq, hi mpq, threshold mpq)
 RETURNS TABLE(first_time text,last_time text,duration_count integer,band jsonb)
-LANGUAGE plpgsql STABLE AS $$
+-- PostgreSQL cannot estimate the exact mpq filters and, expecting few matches, would read a
+-- whole key range through a bitmap to find the first match the ordered index scan reaches.
+LANGUAGE plpgsql STABLE SET enable_bitmapscan=off AS $$
 DECLARE anchor mpq; bound mpq; finish mpq; total integer; single jsonb; block numeric; r record;
-  more integer; later mpq;
+  more integer; later mpq; done numeric:='-Infinity'; limit_ mpq;
 BEGIN
   IF lo IS NULL OR hi IS NULL OR threshold IS NULL OR threshold<='0'::mpq OR lo>hi THEN RETURN; END IF;
   bound:=lo-threshold;
@@ -607,7 +609,7 @@ BEGIN
     -- the block, so a large block costs one pass instead of one scan per group.
     SELECT d.first_key INTO block FROM oc_duration_nodes d
       WHERE d.timeline_id=tid
-        AND d.first_key>=oc_qkey(bound) AND d.first_key<=oc_qkey(hi)
+        AND d.first_key>=oc_qkey(bound) AND d.first_key>done AND d.first_key<=oc_qkey(hi)
         AND d.first_time>=bound AND d.first_time<=hi AND d.last_time>=lo AND d.last_time-d.first_time<threshold
       ORDER BY d.first_key LIMIT 1;
     EXIT WHEN NOT FOUND;
@@ -615,20 +617,24 @@ BEGIN
     FOR r IN SELECT d.first_time AS f,d.last_time AS l,d.band AS b FROM oc_duration_nodes d
         WHERE d.timeline_id=tid AND d.first_key=block
           AND d.first_time>=bound AND d.first_time<=hi AND d.last_time>=lo AND d.last_time-d.first_time<threshold
-        ORDER BY d.first_time LOOP
-      IF anchor IS NOT NULL AND r.f>=anchor+threshold THEN
+        -- Offsets from the bound in thresholds order the block like its starts but, unlike
+        -- the starts' keys, differ at the scale of the groups, so few exact comparisons of
+        -- long rationals remain (rounding to float8 never reverses an order).
+        ORDER BY ((d.first_time-bound)/threshold)::float8,d.first_time LOOP
+      IF anchor IS NOT NULL AND r.f>=limit_ THEN
         first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
         band:=CASE WHEN total=1 THEN single END;
         RETURN NEXT;
         anchor:=NULL;
       END IF;
-      IF anchor IS NULL THEN anchor:=r.f; finish:=r.l; total:=0; END IF;
-      IF r.l>finish THEN finish:=r.l; END IF;
+      IF anchor IS NULL THEN anchor:=r.f; limit_:=anchor+threshold; finish:=r.l; total:=0;
+      ELSIF r.l>finish THEN finish:=r.l;
+      END IF;
       total:=total+1; single:=CASE WHEN total=1 THEN r.b END;
     END LOOP;
     -- The block's last group takes starts from later keys below its anchor plus the threshold
-    -- (a later key's starts all exceed this block's).
-    bound:=anchor+threshold;
+    -- (a later key's starts all exceed this block's). The whole block now lies below the bound.
+    bound:=limit_; done:=block;
     SELECT count(*)::integer,max(d.last_time) INTO more,later FROM oc_duration_nodes d
       WHERE d.timeline_id=tid
         AND d.first_key>block AND d.first_key<=oc_qkey(bound)
