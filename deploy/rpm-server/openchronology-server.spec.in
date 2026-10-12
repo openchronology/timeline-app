@@ -1,0 +1,95 @@
+# Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+# The OpenChronology server for Rocky Linux, RHEL and Fedora (#116). deploy/rpm-server/Dockerfile
+# stages the files (as the Debian package lays them out) and builds this with --define staged.
+Name:           openchronology-server
+Version:        @VERSION@
+Release:        @RELEASE@
+Summary:        OpenChronology timeline platform server
+License:        GPL-3.0-only
+URL:            https://github.com/openchronology/timeline-app
+ExclusiveArch:  x86_64
+# The pgmp extension is built for this PostgreSQL major version.
+Requires:       postgresql-server(:MODULE_COMPAT_@PG_MAJOR@)
+Requires:       postgresql
+Requires:       gmp
+Requires:       sqlite-libs
+Requires:       util-linux
+Requires:       ca-certificates
+Requires(pre):  shadow-utils
+Recommends:     systemd
+
+# The files are built already: no stripping, debug packages or byte compilation, and the
+# bundled Node.js runtime and its modules bring their own dependencies.
+%global debug_package %{nil}
+%global __os_install_post %{nil}
+%define _build_id_links none
+%global __requires_exclude_from ^/usr/lib/openchronology/.*$
+%global __provides_exclude_from ^/usr/lib/openchronology/.*$
+
+%description
+The OpenChronology platform: accounts, shared and public timelines, collaboration, search
+and live updates, served by Next.js with PostgreSQL storage. Times are exact rationals,
+stored with the bundled pgmp extension for PostgreSQL @PG_MAJOR@.
+
+The first installation initializes PostgreSQL if it is not yet, creates a local database,
+migrates it and starts the openchronology service on 127.0.0.1:5173. Configuration is in
+/etc/openchronology/openchronology.env. After an upgrade, run openchronology-migrate.
+
+This package bundles the Node.js @NODE_VERSION@ runtime it is tested with.
+
+%install
+cp -a %{staged}/. %{buildroot}/
+
+%pre
+getent group openchronology >/dev/null || groupadd -r openchronology
+getent passwd openchronology >/dev/null ||
+  useradd -r -g openchronology -d /var/lib/openchronology -s /sbin/nologin \
+    -c "OpenChronology server" openchronology
+# An upgrade stops the server; it starts again once openchronology-migrate has run.
+if [ "$1" -ge 2 ] && [ -d /run/systemd/system ]; then
+  systemctl stop openchronology.service openchronology-mail.service \
+    openchronology-syslog.service >/dev/null 2>&1 || true
+fi
+exit 0
+
+%post
+/usr/sbin/openchronology-setup "$([ "$1" -ge 2 ] && echo upgrade || echo install)" || true
+
+%preun
+if [ "$1" -eq 0 ] && [ -d /run/systemd/system ]; then
+  systemctl disable --now openchronology.service openchronology-mail.service \
+    openchronology-syslog.service >/dev/null 2>&1 || true
+fi
+exit 0
+
+%postun
+[ -d /run/systemd/system ] && systemctl daemon-reload >/dev/null 2>&1
+if [ "$1" -eq 0 ]; then
+  cat <<'MSG'
+
+OpenChronology was removed. Its configuration (/etc/openchronology, including
+AUTH_ENCRYPTION_KEY), the PostgreSQL database and the openchronology system user remain.
+To delete them as well:
+
+  sudo rm -rf /etc/openchronology /var/lib/openchronology
+  sudo -u postgres dropdb openchronology
+  sudo -u postgres dropuser openchronology
+  sudo userdel openchronology
+
+MSG
+fi
+exit 0
+
+%files
+/usr/lib/openchronology
+/usr/lib64/pgsql/pgmp.so
+/usr/share/pgsql/extension/pgmp*
+/usr/share/pgsql/pgmp
+/usr/lib/systemd/system/openchronology.service
+/usr/lib/systemd/system/openchronology-mail.service
+/usr/lib/systemd/system/openchronology-syslog.service
+/usr/sbin/openchronology-migrate
+/usr/sbin/openchronology-setup
+/usr/bin/och-import-logs
+/usr/share/openchronology
+%doc /usr/share/doc/openchronology-server

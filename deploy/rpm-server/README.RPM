@@ -1,0 +1,99 @@
+OpenChronology server for Rocky Linux, RHEL and Fedora
+======================================================
+
+Install
+-------
+
+    sudo dnf install ./openchronology-server-<target>-amd64.rpm
+
+dnf installs the PostgreSQL @PG_MAJOR@ server this package needs. The first installation:
+
+  - creates the `openchronology` system user;
+  - initializes PostgreSQL if it is not yet (RPM distributions leave this to the
+    administrator: `postgresql-setup --initdb`), and starts and enables it;
+  - writes /etc/openchronology/openchronology.env, with a new AUTH_ENCRYPTION_KEY;
+  - creates the `openchronology` PostgreSQL role and database, with the bundled pgmp
+    extension;
+  - migrates the database (openchronology-migrate) and starts openchronology.service,
+    which listens on 127.0.0.1:5173.
+
+If PostgreSQL could not be started at that point, start it and finish the setup with
+`sudo openchronology-setup`, which is safe to run again.
+
+Configure
+---------
+
+Edit /etc/openchronology/openchronology.env, then `sudo systemctl restart openchronology`:
+
+  - APP_ORIGIN: the public HTTPS origin users reach, without a trailing slash. The server
+    refuses a plain http:// origin other than localhost; on a trusted private network
+    without a proxy, set ALLOW_INSECURE_ORIGIN=1 and HOST=0.0.0.0 to serve
+    http://<name>:5173 directly (and open the port: sudo firewall-cmd --add-port=5173/tcp
+    --permanent && sudo firewall-cmd --reload). If the website reports "Server
+    misconfigured", the reason is also in `journalctl -u openchronology`.
+  - RESEND_API_KEY and AUTH_EMAIL_FROM for account email, then
+    `sudo systemctl enable --now openchronology-mail`.
+  - ADMIN_USERNAME, ADMIN_EMAIL and ADMIN_INITIAL_PASSWORD for the first administrator,
+    created by `sudo openchronology-migrate`.
+  - Sign-in providers, human verification, quotas: see the comments in the file and
+    authentication.md, administration.md in this directory.
+
+Back up AUTH_ENCRYPTION_KEY apart from the database: without it, enrolled authenticator
+secrets cannot be decrypted. Do not change it once accounts exist.
+
+Serve it publicly through an HTTPS reverse proxy. With Caddy:
+
+    timescale.example {
+        reverse_proxy 127.0.0.1:5173
+    }
+
+SELinux keeps web servers from connecting to other ports; allow it once with
+`sudo setsebool -P httpd_can_network_connect 1`. Caddy 2.5 and later replace an incoming
+X-Forwarded-For with the client address, so set TRUST_PROXY=1 (with another proxy, only if
+it does the same; see README.md). Proxies should allow request bodies of at least 32 MiB
+and streaming responses (live updates).
+
+The syslog receiver (syslog.md) is configured in /etc/openchronology/syslog.env with routes
+in /etc/openchronology/syslog-routes.json; then
+`sudo systemctl enable --now openchronology-syslog`.
+
+`och-import-logs` imports historic log files (log-import.md), with OCH_API_URL and
+OCH_API_KEY from the environment or syslog.env: `och-import-logs --help`.
+
+Upgrade
+-------
+
+Installing a newer package (`sudo dnf upgrade ./openchronology-server-<target>-amd64.rpm`)
+stops the server and leaves the database and configuration as they are. It then lists:
+
+  1. Settings this version's template has that /etc/openchronology/openchronology.env
+     lacks. Compare with:
+         diff -u /etc/openchronology/openchronology.env \
+                 /usr/share/openchronology/openchronology.env.example
+  2. A backup:  sudo -u postgres pg_dump openchronology > openchronology.sql
+  3. sudo openchronology-migrate, which migrates the database and starts the server.
+
+openchronology-migrate is safe to run more than once. `--no-restart` migrates only.
+
+Remove
+------
+
+`sudo dnf remove openchronology-server` stops and removes the server. The configuration
+(/etc/openchronology, including AUTH_ENCRYPTION_KEY), the database and the system user
+remain; delete them with:
+
+    sudo rm -rf /etc/openchronology /var/lib/openchronology
+    sudo -u postgres dropdb openchronology
+    sudo -u postgres dropuser openchronology
+    sudo userdel openchronology
+
+Layout
+------
+
+  /usr/lib/openchronology            the application, its Node.js runtime and och-convert
+  /usr/sbin/openchronology-migrate   database migration
+  /usr/sbin/openchronology-setup     first-time setup (run by the package)
+  /etc/openchronology                configuration (created on first install)
+  /usr/share/openchronology          configuration templates of the installed version
+  /usr/lib/systemd/system            openchronology, openchronology-mail, openchronology-syslog
+  /usr/lib64/pgsql, /usr/share/pgsql/extension   pgmp for PostgreSQL @PG_MAJOR@
