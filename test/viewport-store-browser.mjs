@@ -124,10 +124,17 @@ export async function checkViewportStore(browser) {
     await page.getByRole('button', { name: 'Nearby moment', exact: true }).waitFor();
     await bounds(page, '9000', '11000');
     await page.getByRole('button', { name: 'Far away', exact: true }).waitFor();
-    // Windows are stored two seconds after they arrive.
-    for (let i = 0; i < 200 && (await stored(page)).length < 2; i++) await page.waitForTimeout(50);
-    const keys = await stored(page);
-    assert(keys.length >= 2, `stored ${keys.length} windows`);
+    // Windows are stored two seconds after the last arrives, and prefetches keep arriving
+    // for a while: wait until storage has settled, not for an earlier save of some of them.
+    let keys = [],
+      settled = 0;
+    for (let i = 0; i < 400 && settled < 3000; i++) {
+      await page.waitForTimeout(100);
+      const now = await stored(page);
+      settled = now.length >= 2 && now.join() === keys.join() ? settled + 100 : 0;
+      keys = now;
+    }
+    assert(settled >= 3000, `stored windows kept changing: ${keys.length}`);
     assert(keys.every((key) => key.includes('alice-id') && key.includes(id)));
     // Reopened without a server answer, both earlier views come from storage.
     await page.close();
