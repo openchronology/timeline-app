@@ -17,6 +17,8 @@ export interface PluginManifest {
   hover?: { kind: 'card' };
   summary?: { kind: 'radial' };
   notes?: { kind: 'markdown' };
+  /** An image behind the timeline where a duration lies (durations only). */
+  background?: { kind: 'image'; metadataKey: string };
   /** Entities the plugin applies to; omitted means moments, plus durations for colors/cards. */
   targets?: PluginTarget[];
   source?: string;
@@ -257,6 +259,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     'hover',
     'summary',
     'notes',
+    'background',
     'targets',
     'source',
   ]);
@@ -312,6 +315,11 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     const notes = object(p.notes, ['kind']);
     if (notes.kind !== 'markdown') throw new Error('Unsupported notes component.');
     result.notes = { kind: 'markdown' };
+  }
+  if (p.background !== undefined) {
+    const background = object(p.background, ['kind', 'metadataKey']);
+    if (background.kind !== 'image') throw new Error('Unsupported background component.');
+    result.background = { kind: 'image', metadataKey: key(background.metadataKey) };
   }
   if (p.targets !== undefined) {
     if (
@@ -425,16 +433,27 @@ export const GEOLOGICAL_AGES: PluginManifest = validatePluginManifest({
   source: 'function render(moment: string, api: PluginAPI): string { return api.none(); }',
 });
 /**
- * Colors and hover cards apply to durations by default; stacks, shapes, sizes, icons and
- * summary expansion are moment-only. Older saved manifests have no targets and follow this.
+ * Colors and hover cards apply to durations by default, and backgrounds only to them; stacks,
+ * shapes, sizes, icons and summary expansion are moment-only. Older saved manifests have no
+ * targets and follow this.
  */
 export function pluginTargets(manifest: PluginManifest): PluginTarget[] {
   return (
     manifest.targets ??
-    (manifest.marker?.kind === 'color' || manifest.hover ? ['moments', 'durations'] : ['moments'])
+    (manifest.background
+      ? ['durations']
+      : manifest.marker?.kind === 'color' || manifest.hover
+        ? ['moments', 'durations']
+        : ['moments'])
   );
 }
-const DURATION_FIELDS = new Set<PluginField['kind']>(['text', 'multiline', 'color', 'links']);
+const DURATION_FIELDS = new Set<PluginField['kind']>([
+  'text',
+  'multiline',
+  'color',
+  'links',
+  'image-url',
+]);
 /** The subset of each plugin that applies to duration bands and their editor. */
 export function durationPlugins(plugins: readonly InstalledPlugin[] = []): InstalledPlugin[] {
   return plugins
@@ -457,6 +476,24 @@ export function durationPlugins(plugins: readonly InstalledPlugin[] = []): Insta
       };
     });
 }
+/**
+ * A duration's background image: the last enabled background plugin's valid image URL. Bands
+ * carry string metadata of at most 256 characters, so a longer URL shows no background.
+ */
+export function pluginBackground(
+  plugins: readonly InstalledPlugin[] = [],
+  metadata: Record<string, unknown> = {},
+): string | null {
+  let image: string | null = null;
+  for (const { manifest, enabled } of plugins)
+    if (enabled && manifest.background) {
+      const candidate = imageURL(metadata[manifest.background.metadataKey]);
+      if (candidate) image = candidate;
+    }
+  return image;
+}
+/** The longest background URL a duration band carries (see durationOverview). */
+export const BACKGROUND_URL_LIMIT = 256;
 /** Moment rendering ignores plugins that explicitly target only durations. */
 export function momentPlugins(plugins: readonly InstalledPlugin[] = []): InstalledPlugin[] {
   return plugins.filter((p) => pluginTargets(p.manifest).includes('moments'));
@@ -499,6 +536,7 @@ export function pluginMetadata(
       for (const name of [
         ...manifest.fields.map((f) => f.metadataKey),
         ...(manifest.marker ? [manifest.marker.metadataKey] : []),
+        ...(manifest.background ? [manifest.background.metadataKey] : []),
       ])
         if (typeof metadata[name] === 'string')
           result[name] = (metadata[name] as string).slice(0, 10000);
@@ -698,6 +736,17 @@ export const PLUGIN_EXAMPLE = {
   source:
     'function render(moment: string, api: PluginAPI): string { const status = api.lower(api.get("status")); return status === "blocked" ? api.merge(api.shape("diamond"), api.color("#bc6663")) : api.merge(api.shape("circle"), api.color("#5f8b67")); }',
 };
+export const DURATION_BACKGROUNDS: PluginManifest = validatePluginManifest({
+  apiVersion: 1,
+  id: 'duration-backgrounds',
+  version: 1,
+  name: 'Duration backgrounds',
+  description:
+    'Show an image behind the timeline where a duration lies, centered between its visible start and end and filling the timeline. Smaller durations show above larger ones, and edges blend into each other.',
+  fields: [{ kind: 'image-url', metadataKey: 'backgroundUrl', label: 'Background image URL' }],
+  background: { kind: 'image', metadataKey: 'backgroundUrl' },
+  targets: ['durations'],
+});
 // Keep previously published declarative versions available at their original detail URLs.
 const LEGACY_PLUGINS = [MOMENT_ICONS, MOMENT_STACKS, MOMENT_COLORS, FOCUS_ON_HOVER].map(
   ({ source, ...manifest }) => validatePluginManifest({ ...manifest, version: 1 }),
@@ -716,6 +765,7 @@ export const BUILTIN_PLUGINS: readonly PluginManifest[] = [
   GEOLOGICAL_AGES,
   RICH_TEXT_NOTES,
   EXPAND_ON_HOVER,
+  DURATION_BACKGROUNDS,
 ];
 
 /** A page of a plugin library: the newest version of each plugin matching a search. */

@@ -13,6 +13,11 @@ import {
   pluginSize,
   PLUGIN_EXAMPLE,
   MOMENT_ICONS,
+  DURATION_BACKGROUNDS,
+  pluginBackground,
+  pluginTargets,
+  durationPlugins,
+  momentPlugins,
   MOMENT_STACKS,
   MOMENT_COLORS,
   COLOR_SWATCHES,
@@ -283,6 +288,7 @@ test('public plugin API works without accounts or PostgreSQL and validates its i
     (await request(app, '/api/plugins')).body.plugins.map((p) => p.id),
     [
       'dating-context',
+      'duration-backgrounds',
       'expand-on-hover',
       'focus-on-hover',
       'geological-ages',
@@ -617,4 +623,47 @@ test('apps without a server search the official plugins exactly as the built-in 
     all.map((p) => p.name),
     [...all.map((p) => p.name)].sort(),
   );
+});
+
+test('duration backgrounds: an image behind durations only, the last valid one winning', () => {
+  assert(isOfficialPlugin(DURATION_BACKGROUNDS));
+  assert.deepEqual(pluginTargets(DURATION_BACKGROUNDS), ['durations']);
+  // Without targets, a background still applies to durations only.
+  const { targets: _targets, ...untargeted } = DURATION_BACKGROUNDS;
+  assert.deepEqual(pluginTargets(validatePluginManifest(untargeted)), ['durations']);
+  for (const background of [{ kind: 'video', metadataKey: 'x' }, { kind: 'image' }, 'image'])
+    assert.throws(() => validatePluginManifest({ ...DURATION_BACKGROUNDS, background }));
+  const installed = [{ manifest: DURATION_BACKGROUNDS, enabled: true }];
+  // The duration editor gets its image URL field; moments get nothing from it.
+  const [forDurations] = durationPlugins(installed);
+  assert.deepEqual(
+    forDurations.manifest.fields.map((f) => f.kind),
+    ['image-url'],
+  );
+  assert.deepEqual(forDurations.manifest.background, {
+    kind: 'image',
+    metadataKey: 'backgroundUrl',
+  });
+  assert.deepEqual(momentPlugins(installed), []);
+  const image = 'https://images.example/age.jpg';
+  assert.equal(pluginBackground(installed, { backgroundUrl: image }), image);
+  for (const bad of ['http://images.example/a.jpg', 'javascript:alert(1)', '', 3])
+    assert.equal(pluginBackground(installed, { backgroundUrl: bad }), null);
+  assert.equal(
+    pluginBackground([{ ...installed[0], enabled: false }], { backgroundUrl: image }),
+    null,
+  );
+  const other = validatePluginManifest({
+    ...DURATION_BACKGROUNDS,
+    id: 'other-backgrounds',
+    fields: [{ kind: 'image-url', metadataKey: 'otherUrl', label: 'Other' }],
+    background: { kind: 'image', metadataKey: 'otherUrl' },
+  });
+  const both = [...installed, { manifest: other, enabled: true }];
+  assert.equal(
+    pluginBackground(both, { backgroundUrl: image, otherUrl: image + '?2' }),
+    image + '?2',
+  );
+  // An invalid later one falls back to the earlier.
+  assert.equal(pluginBackground(both, { backgroundUrl: image, otherUrl: 'nope' }), image);
 });
