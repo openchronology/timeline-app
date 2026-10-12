@@ -149,6 +149,19 @@ export async function checkComparison(browser) {
     await page.waitForFunction(() =>
       [...document.querySelectorAll('.event-marker')].some((n) => n.dataset.first === '20/1'),
     );
+    // Offsets are read in the units of the comparison's time display: plain coordinates here.
+    const second = page.locator('.comparison-track').nth(1),
+      offset = page.getByRole('textbox', { name: 'Offset for Compare source 1' });
+    assert.match(await page.locator('#comparison-offset-units').textContent(), /coordinates/);
+    await offset.fill('5 days');
+    await second.getByRole('button', { name: 'Apply alignment' }).click();
+    await second.getByRole('status').filter({ hasText: 'no units' }).waitFor();
+    await offset.fill('-5/2');
+    await second.getByRole('button', { name: 'Apply alignment' }).click();
+    await second.getByRole('status').filter({ hasText: 'Shifted earlier by 2.5.' }).waitFor();
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll('.event-marker')].some((n) => n.dataset.first === '35/2'),
+    );
     await page.locator('#compare-combined').check();
     await page.waitForFunction(
       () =>

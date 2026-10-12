@@ -12,6 +12,7 @@ import {
   compileCustom,
   parseNumber,
   printNumber,
+  createDifference,
 } from '../dist/core.mjs';
 import { PostgresStore } from '../server/store.mjs';
 
@@ -292,5 +293,104 @@ test('Postgres snapshot replacements bind presentation as JSON data and preserve
   assert.equal(
     queries.find((q) => q.sql.startsWith('UPDATE oc_timelines SET title=')).values[5],
     null,
+  );
+});
+
+test('time differences use the units of their time display', () => {
+  const gregorian = createDifference(options({ mode: 'gregorian' }));
+  const roundTrip = (difference, text, stored, printed) => {
+    const value = difference.parse(text);
+    assert.equal(value.toString(), stored, text);
+    assert.equal(difference.print(value), printed, text);
+  };
+  // Years and months are the Gregorian calendar's means (365.2425 days and a twelfth of it).
+  roundTrip(gregorian, '2 years 3 days', '63373104/1', '2 years 3 days');
+  roundTrip(gregorian, '1 year', '31556952/1', '1 year');
+  roundTrip(gregorian, '12 months', '31556952/1', '1 year');
+  roundTrip(gregorian, '-1 h 30 min', '-5400/1', '-1 h 30 min');
+  roundTrip(gregorian, '1.5 weeks', '907200/1', '10 days 12 h');
+  roundTrip(gregorian, '2 Days, 4 hours', '187200/1', '2 days 4 h');
+  roundTrip(gregorian, '90', '90/1', '1 min 30 s');
+  roundTrip(gregorian, '250 ms', '1/4', '250 ms');
+  roundTrip(gregorian, '3 ps', '3/1000000000000', '3 ps');
+  roundTrip(gregorian, '1/3 s', '1/3', '1000/3 ms');
+  roundTrip(gregorian, '+1e3 as', '1/1000000000000000', '1 fs');
+  assert.equal(gregorian.print(Q.zero), '0 s');
+  for (const [text, message] of [
+    ['3 parsecs', /Unknown unit “parsecs”; use years, months, weeks, days, h, min, s/],
+    ['1 day 3', /Give a unit for every amount/],
+    ['', /Enter a time difference/],
+    ['2 days later', /Unexpected “later”|Unknown unit “later”/],
+  ])
+    assert.throws(() => gregorian.parse(text), message);
+  // Units are in stored coordinates: a display of milliseconds scales them.
+  const millis = createDifference(options({ mode: 'gregorian', scale: '1/1000' }));
+  assert.equal(millis.parse('1 s').toString(), '1/1000');
+  assert.equal(millis.print(Q.parse('1/1000')), '1 s');
+
+  // Rational coordinates take plain rational offsets; a unit label is optional.
+  const rational = createDifference(DEFAULT_PRESENTATION);
+  assert.deepEqual(rational.units, []);
+  roundTrip(rational, '-3/2', '-3/2', '-1.5');
+  roundTrip(rational, '1/3', '1/3', '1/3');
+  assert.throws(() => rational.parse('2 days'), /no units/);
+  const labelled = createDifference(
+    options({ mode: 'float', unit: 'million years', scale: '31557600000000' }),
+  );
+  roundTrip(labelled, '2.5 million years', '78894000000000/1', '2.5 million years');
+  assert.equal(labelled.parse('3').toString(), '94672800000000/1');
+  // A display unit that is a fixed time unit brings the others.
+  const minutes = createDifference(options({ mode: 'float', unit: 'minutes', scale: '60' }));
+  roundTrip(minutes, '1 h 30 min 30 s', '5430/1', '1 h 30 min 30 s');
+  assert.equal(minutes.parse('2').toString(), '120/1');
+  assert.throws(() => minutes.parse('1 year'), /Unknown unit “year”/);
+
+  // SI displays take prefixed units, case-sensitively.
+  const si = createDifference(options({ mode: 'si', unit: 's' }));
+  roundTrip(si, '5 ms', '1/200', '5 ms');
+  roundTrip(si, '3 ks', '3000/1', '50 min');
+  assert.equal(si.parse('4 Ms').toString(), '4000000/1');
+  assert.equal(si.parse('2 h').toString(), '7200/1');
+  assert.equal(si.parse('7 us').toString(), '7/1000000');
+  const metres = createDifference(options({ mode: 'si', unit: 'm' }));
+  roundTrip(metres, '3 km 20 m', '3020/1', '3.02 km');
+  assert.equal(metres.parse('2 mm').toString(), '1/500');
+  assert.equal(metres.parse('2 Mm').toString(), '2000000/1');
+});
+
+test('custom time displays may define their own differences', () => {
+  const custom = (source) => createDifference(options({ mode: 'custom', source }));
+  // Without difference functions, offsets are plain stored coordinates.
+  const plain = custom(CUSTOM_EXAMPLE);
+  assert.equal(plain.parse('120').toString(), '120/1');
+  assert.equal(plain.print(Q.parse('1/3')), '1/3');
+  const days = custom(
+    CUSTOM_EXAMPLE +
+      `
+function printDifference(difference: Rational, api: TimeAPI): string {
+  return api.exact(api.div(difference, api.rational("86400"))) + " sols";
+}
+function parseDifference(text: string, api: TimeAPI): Rational {
+  return api.mul(api.parseNumber(api.stripSuffix(text, " sols")), api.rational("86400"));
+}`,
+  );
+  assert.equal(days.parse('3 sols').toString(), '259200/1');
+  assert.equal(days.print(Q.parse('129600')), '3/2 sols');
+  assert.equal(days.plain, null);
+  assert.throws(() => days.parse('3 days'), /Expected suffix/);
+  // Each function is defined at most once, with its own types.
+  assert.throws(
+    () =>
+      compileCustom(
+        CUSTOM_EXAMPLE + 'function printDifference(d: string, api: TimeAPI): string { return d; }',
+      ),
+    /Unsupported type annotation/,
+  );
+  assert.throws(
+    () =>
+      compileCustom(
+        CUSTOM_EXAMPLE + 'function offset(d: Rational, api: TimeAPI): string { return "x"; }',
+      ),
+    /optionally printDifference and parseDifference/,
   );
 });

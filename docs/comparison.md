@@ -16,9 +16,14 @@ to return to the original timeline, including its unsaved edits and viewport.
 Alignment and display controls affect the comparison only.
 
 Each track uses `shared time = original time × scale + offset`, with exact
-rational arithmetic. Scale must be positive to preserve chronology. The inputs
-accept exact rationals or finite decimals; offsets are shared coordinates,
-not screen pixels. Fit all includes transformed bounds. One horizontal viewport
+rational arithmetic. Scale must be positive to preserve chronology and accepts
+exact rationals or finite decimals. Offsets are
+[time differences](time-presentation.md#time-differences) in the units of the
+comparison's time display: `2 years 3 days` or `-1 h 30 min` with a Gregorian
+display, `2.5 million years` with that unit; a plain number is in the display's
+unit, or in shared coordinates when it has none, never in screen pixels. The
+panel lists the units the display reads, and applying an offset reports it as
+the display prints it. Fit all includes transformed bounds. One horizontal viewport
 controls every track; vertical pan and Ctrl-scroll scaling remain available.
 
 Stacked mode has separate axes and source labels. **Combine into one timeline**
