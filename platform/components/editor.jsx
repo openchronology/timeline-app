@@ -41,6 +41,12 @@ export default function Editor({
           : null,
       settings: canShare ? '/timelines/' + id + '/settings' : null,
     });
+  // The frame can finish loading before this page's script runs (and misses onLoad).
+  useEffect(() => {
+    const document = frame.current?.contentDocument;
+    if (document?.readyState === 'complete' && document.location.pathname === '/editor/frame')
+      setActions(document.getElementById('platform-timeline-actions'));
+  }, []);
   useEffect(() => {
     function message(event) {
       if (event.origin !== location.origin || event.source !== frame.current?.contentWindow) return;
