@@ -118,23 +118,69 @@ export async function checkViewportStore(browser) {
     );
     return page;
   };
+  /**
+   * The stored windows once storage settles: windows are stored two seconds after the last
+   * arrives, and prefetches keep arriving for a while, so an earlier save may hold some only.
+   */
+  const settled = async (page) => {
+    let keys = [],
+      quiet = 0;
+    for (let i = 0; i < 400 && quiet < 3000; i++) {
+      await page.waitForTimeout(100);
+      const now = await stored(page);
+      quiet = now.length >= 2 && now.join() === keys.join() ? quiet + 100 : 0;
+      keys = now;
+    }
+    assert(quiet >= 3000, `stored windows kept changing: ${keys.length}`);
+    return keys;
+  };
+  /** Waits for the view to come from storage; says what was stored and shown if it does not. */
+  const shownFromStorage = async (page, saved) => {
+    try {
+      await page.waitForFunction(() => document.getElementById('loading-window').hidden, null, {
+        timeout: 15000,
+      });
+    } catch (error) {
+      const view = await page.evaluate(() => ({
+        left: document.getElementById('exact-left').value,
+        right: document.getElementById('exact-right').value,
+        width: document.getElementById('timeline-stage').clientWidth,
+        density: document.getElementById('density').value,
+      }));
+      const window = (key) => key.split('\u0001').slice(-3).join(' ');
+      throw new Error(
+        `The view did not come from storage. View ${JSON.stringify(view)}; stored before closing: ${saved.map(window).join(', ')}; stored now: ${(await stored(page)).map(window).join(', ')}`,
+        { cause: error },
+      );
+    }
+  };
   let page = await open();
   try {
     await bounds(page, '0', '20');
     await page.getByRole('button', { name: 'Nearby moment', exact: true }).waitFor();
     await bounds(page, '9000', '11000');
     await page.getByRole('button', { name: 'Far away', exact: true }).waitFor();
-    // Windows are stored two seconds after the last arrives, and prefetches keep arriving
-    // for a while: wait until storage has settled, not for an earlier save of some of them.
-    let keys = [],
-      settled = 0;
-    for (let i = 0; i < 400 && settled < 3000; i++) {
-      await page.waitForTimeout(100);
-      const now = await stored(page);
-      settled = now.length >= 2 && now.join() === keys.join() ? settled + 100 : 0;
-      keys = now;
-    }
-    assert(settled >= 3000, `stored windows kept changing: ${keys.length}`);
+    let keys = await settled(page);
+    // Hiding the page lets go of windows it does not show; storage keeps them, and showing it
+    // again takes them back before anything more is stored.
+    const visibility = (hidden) =>
+      page.evaluate((hidden) => {
+        Object.defineProperty(document, 'hidden', { value: hidden, configurable: true });
+        Object.defineProperty(document, 'visibilityState', {
+          value: hidden ? 'hidden' : 'visible',
+          configurable: true,
+        });
+        document.dispatchEvent(new Event('visibilitychange'));
+      }, hidden);
+    await visibility(true);
+    await visibility(false);
+    await bounds(page, '20000', '22000');
+    await page.waitForFunction(() => document.getElementById('loading-window').hidden);
+    keys = await settled(page);
+    assert(
+      keys.some((key) => key.endsWith('\u0001-5/1\u000125/1')),
+      'the first view was not kept after hiding the page',
+    );
     assert(keys.every((key) => key.includes('alice-id') && key.includes(id)));
     // Reopened without a server answer, both earlier views come from storage.
     await page.close();
@@ -143,7 +189,7 @@ export async function checkViewportStore(browser) {
     page = await open();
     await bounds(page, '0', '20');
     await page.getByRole('button', { name: 'Nearby moment', exact: true }).waitFor();
-    await page.waitForFunction(() => document.getElementById('loading-window').hidden);
+    await shownFromStorage(page, keys);
     await bounds(page, '9000', '11000');
     await page.getByRole('button', { name: 'Far away', exact: true }).waitFor();
     assert.equal(answered, before);

@@ -5,9 +5,23 @@ import { notFound } from 'next/navigation';
 import { currentSession } from '../../../lib/session.js';
 import { searchTimelines } from '../../../../server/collaboration.mjs';
 import TimelineList from '../../../components/timeline-list.jsx';
+import { SITE_NAME } from '../../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
 const pageNumber = (n) =>
   Math.max(1, Math.min(10000, Number.isSafeInteger(Number(n)) ? Number(n) : 1));
+export async function generateMetadata({ params }) {
+  const { username } = await params;
+  const title = '@' + username,
+    description = `Public timelines and favorites of @${username} on ${SITE_NAME}.`,
+    url = '/users/' + encodeURIComponent(username);
+  return {
+    title: `${title} · ${SITE_NAME}`,
+    description,
+    alternates: { canonical: url },
+    openGraph: { type: 'profile', siteName: SITE_NAME, title, description, url, username },
+    twitter: { card: 'summary', title, description },
+  };
+}
 export default async function Profile({ params, searchParams }) {
   const { username } = await params,
     query = await searchParams,

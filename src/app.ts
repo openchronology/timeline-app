@@ -104,7 +104,9 @@ import {
   timelinePrefix,
   versionPrefix,
 } from './viewport-store.js';
-import { requestApi, importSqlite, exportSqlite } from './transport.js';
+import { requestApi, importSqlite, exportSqlite, anonymousRequests } from './transport.js';
+import { parseLink, linkFragment, sharePath } from './links.js';
+import type { TimelineLink } from './links.js';
 declare const __OFFLINE_HTML__: boolean;
 const offlineHtml = typeof __OFFLINE_HTML__ !== 'undefined' && __OFFLINE_HTML__;
 declare global {
@@ -167,6 +169,17 @@ const sampleTimeline =
   platformEditor && new URLSearchParams(location.search).get('demo') === 'dense';
 const freshTimeline = platformEditor && new URLSearchParams(location.search).get('new') === '1';
 if (platformEditor) document.body.dataset.platformEditor = 'true';
+// A public timeline embedded in another site (/embed/<id>): read-only and anonymous, so a
+// visitor's own session never applies there, and without the editor's controls.
+const embedded =
+  offlineHtml || desktop
+    ? null
+    : (/^\/embed\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i.exec(location.pathname)?.[1] ??
+      null);
+if (embedded) {
+  document.body.dataset.embed = 'true';
+  anonymousRequests();
+}
 if (desktop) {
   for (const link of document.querySelectorAll<HTMLAnchorElement>('.download-menu a'))
     link.onclick = (event) => {
@@ -508,7 +521,7 @@ let pluginSearchRequest = 0;
 let pluginSearchTimer: ReturnType<typeof setTimeout> | undefined;
 let pluginPage = 1;
 const memoryOnly = () => !desktop && (offlineHtml || !session.user);
-const editable = () => !comparison && !!model && (!remote || remote.canEdit);
+const editable = () => !embedded && !comparison && !!model && (!remote || remote.canEdit);
 /**
  * Room beside the ruler for markers at the bounds. Narrow stages, such as phones held upright,
  * keep less so the timeline itself gets the width.
@@ -651,6 +664,9 @@ function restoreWindows(key: string) {
 function persistWindows(delay = 2000) {
   clearTimeout(persistTimer);
   const save = () => {
+    // A hidden page has let go of the windows it does not show (below), and storage keeps
+    // the page's windows only: saving then would drop them. Hiding saves just before.
+    if (delay && document.hidden) return;
     const stored = storedVersion();
     if (stored)
       void windowStore
@@ -660,9 +676,13 @@ function persistWindows(delay = 2000) {
   if (delay) persistTimer = setTimeout(save, delay);
   else save();
 }
-// A hidden page stores its windows, then keeps only those covering its view.
+// A hidden page stores its windows, then keeps only those covering its view; shown again, it
+// takes the others back from storage before storing anything more.
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) return;
+  if (!document.hidden) {
+    if (remoteCacheKey) restoreWindows(remoteCacheKey);
+    return;
+  }
   clearTimeout(prefetchTimer);
   prefetchController?.abort();
   persistWindows(0);
@@ -2347,6 +2367,11 @@ async function openRemote(id: string) {
   const info = await api<RemoteTimeline>(`timelines/${id}`);
   if (request !== documentRequest) return;
   remote = info;
+  reportedLink = null;
+  if (embedded) {
+    el<HTMLAnchorElement>('embed-open').href = sharePath(id, null);
+    el('embed-open').hidden = false;
+  }
   if (info.presentation) info.presentation = validatePresentation(info.presentation);
   if (info.plugins) info.plugins = validateInstalledPlugins(info.plugins);
   if (info.assets) info.assets = validateAssets(info.assets);
@@ -2491,11 +2516,20 @@ async function route(force = false) {
     if (request === documentRequest) await comparisons.start(sources);
     return;
   }
-  const match = /^#timeline\/([a-f0-9-]+)$/i.exec(location.hash);
+  if (embedded) {
+    if (remote?.id !== embedded) await openRemote(embedded);
+    await followLink(parseLink(location.hash));
+    return;
+  }
+  const match = /^#timeline\/([a-f0-9-]+)(?:\/(.+))?$/i.exec(location.hash);
   if (match) {
+    // What to look at: the frame's own link (followed once), or the platform page's fragment.
+    const link = parseLink(match[2] ?? '') ?? parentLink();
+    if (match[2]) window.history.replaceState(null, '', '#timeline/' + match[1]);
     if (remote?.id === match[1] && !force) {
       setDashboard(false);
       requestRender();
+      await followLink(link);
       return;
     }
     if (!mayReplace()) {
@@ -2503,6 +2537,7 @@ async function route(force = false) {
       return;
     }
     await openRemote(match[1]);
+    await followLink(link);
   } else if (hasDashboard() && !desktop && !platformEditor) {
     if (dirty && model) {
       setDashboard(false);
@@ -2967,8 +3002,11 @@ function eventForm(event?: PointEvent, time?: Q) {
   );
   el('event-delete').hidden = !event || !editable();
   el('event-cancel').parentElement!.hidden = !editable();
+  // Only what the server keeps can be shared: not unsaved moments or edits.
+  el('moment-share').hidden = !event || !shareable() || !!sparseWorkspace()?.changes.has(event.id);
   text('event-error', '');
   showMomentDetails(event ? 'Moment details' : 'New moment');
+  if (event && !comparison) reportLink({ kind: 'moment', id: event.id });
 }
 async function groupPage(
   group: FrameGroup,
@@ -3554,6 +3592,10 @@ function showTimelineMenu(
     add('View events', () => {
       void selectGroup(group).catch(fail);
     });
+  if (shareable())
+    add('Share this view', () =>
+      requestShare({ kind: 'view', left: viewport.left, right: viewport.right }, remote!.title),
+    );
   menu.hidden = false;
   menu.popover = 'manual';
   menu.showPopover();
@@ -3938,6 +3980,7 @@ el('clear-selection').onclick = () => {
 el('close-inspector').onclick = () => el<HTMLDialogElement>('inspector').close();
 el<HTMLDialogElement>('inspector').addEventListener('close', () => {
   if (el<HTMLDialogElement>('inspector').open) return;
+  forgetLink('moment');
   closeTimelineMenu();
   // Closed other than by Save: nothing typed since it opened is kept.
   discardMomentEdits();
@@ -5457,7 +5500,7 @@ input('compare-file').onchange = async () => {
     input('compare-file').value = '';
   }
 };
-if (!desktop && !offlineHtml && !platformEditor) setDashboard(true);
+if (!desktop && !offlineHtml && !platformEditor && !embedded) setDashboard(true);
 heading();
 accountHeading();
 requestRender();
@@ -5475,7 +5518,9 @@ void (async () => {
       /* The desktop keeps working with local files while disconnected. */
     }
   }
-  if (!desktop && !offlineHtml) {
+  // An embedded timeline is shown as a guest sees it, whoever is signed in.
+  if (embedded) session = { user: null, csrf: null, server: true };
+  else if (!desktop && !offlineHtml) {
     try {
       await refreshSession();
       if (session.user) {
@@ -5604,6 +5649,15 @@ async function openDurationById(id: string, known?: DurationBand) {
     sparseWorkspace()!.loadDuration(result.duration);
     duration = sparseWorkspace()!.durations.get(id);
   }
+  // Guests have no workspace: they read the duration as the server keeps it.
+  if (!duration && !model && remote && !local) {
+    const result = await timelineQuery<{ duration: Duration | null }>({
+      kind: 'duration',
+      id,
+      revision: remote.revision,
+    });
+    if (result.duration) return showDuration(result.duration, true);
+  }
   if (!duration) throw new Error('This duration is no longer available.');
   showDuration(duration, !editable());
 }
@@ -5634,8 +5688,11 @@ function showDuration(duration: Duration, readOnly: boolean, isNew = false) {
     readOnly && comparison ? null : { duration: duration.id },
     readOnly,
   );
+  el('duration-share').hidden =
+    isNew || !shareable() || !!sparseWorkspace()?.durationChanges.has(duration.id);
   const dialog = el<HTMLDialogElement>('duration-dialog');
   if (!dialog.open) dialog.showModal();
+  if (!isNew && !comparison) reportLink({ kind: 'duration', id: duration.id });
 }
 /** Reads the form into a duration; throws with a user-facing message when incomplete. */
 function durationFromForm(): Duration {
@@ -5712,6 +5769,7 @@ function discardDurationEdits() {
 }
 el<HTMLDialogElement>('duration-dialog').addEventListener('close', () => {
   if (el<HTMLDialogElement>('duration-dialog').open) return;
+  forgetLink('duration');
   // Closed other than by Save: nothing typed since it opened is kept.
   discardDurationEdits();
   if (selected && !el('event-form').hidden) refreshDurations();
@@ -6319,6 +6377,8 @@ async function runSearch(page: number) {
     if (request !== searchState.request) return;
     searchState.total = BigInt(result.total);
     renderSearchResults(result.results);
+    el('search-share').hidden = !shareable();
+    reportLink({ kind: 'search', text: words });
     const pages = (searchState.total + BigInt(SEARCH_PAGE_SIZE) - 1n) / BigInt(SEARCH_PAGE_SIZE);
     text(
       'search-status',
@@ -6382,6 +6442,140 @@ function goToSearchResult(result: SearchResult) {
     requestRender(false);
   }, 2600);
 }
+/** Whether links into this timeline can be shared: a server timeline in the platform's page. */
+function shareable(): boolean {
+  return platformEditor && window.parent !== window && !!remote && !local && !comparison;
+}
+/** The platform page's link fragment (`/timelines/<id>#moment/…`), if any. */
+function parentLink(): TimelineLink | null {
+  if (!platformEditor || window.parent === window) return null;
+  try {
+    return parseLink(window.parent.location.hash);
+  } catch {
+    return null;
+  }
+}
+let reportedLink: TimelineLink | null = null;
+/** Tells the page what is open, so its address links to it (see links.ts). */
+function reportLink(link: TimelineLink | null) {
+  if (!remote || local || comparison) return;
+  reportedLink = link;
+  const fragment = link ? linkFragment(link) : null;
+  if (platformEditor && window.parent !== window)
+    window.parent.postMessage(
+      { type: 'openchronology:link', timeline: remote.id, fragment },
+      location.origin,
+    );
+  else if (embedded) {
+    window.history.replaceState(null, '', fragment ? '#' + fragment : location.pathname);
+    el<HTMLAnchorElement>('embed-open').href = sharePath(remote.id, link);
+  }
+}
+/** Closing what a link names leaves the page's address at the timeline. */
+function forgetLink(kind: TimelineLink['kind']) {
+  if (reportedLink?.kind === kind) reportLink(null);
+}
+/** Asks the platform page to offer a link to share (its share dialog). */
+function requestShare(link: TimelineLink | null, title: string) {
+  if (!shareable()) return;
+  window.parent.postMessage(
+    {
+      type: 'openchronology:share',
+      timeline: remote!.id,
+      fragment: link ? linkFragment(link) : null,
+      title,
+    },
+    location.origin,
+  );
+}
+/** Opens what a link names, in the open server timeline. */
+async function followLink(link: TimelineLink | null) {
+  if (!link || !remote || local) return;
+  const request = documentRequest,
+    revision = remote.revision;
+  if (link.kind === 'view') {
+    navigate(new Viewport(link.left, link.right.sub(link.left)));
+    return;
+  }
+  if (comparison) return;
+  if (link.kind === 'search') {
+    input('search-text').value = link.text;
+    const dialog = el<HTMLDialogElement>('search-dialog');
+    if (!dialog.open) dialog.showModal();
+    await runSearch(1);
+    return;
+  }
+  if (link.kind === 'moment') {
+    const event =
+      model?.byId.get(link.id) ??
+      (await timelineQuery<{ event: PointEvent | null }>({ kind: 'moment', id: link.id, revision }))
+        .event;
+    if (request !== documentRequest) return;
+    if (!event) {
+      toast('This moment is no longer on the timeline.');
+      return;
+    }
+    goToSearchResult({
+      kind: 'moment',
+      id: event.id,
+      first: event.time,
+      last: event.time,
+      title: '',
+      snippet: '',
+    });
+    selectedGroup = null;
+    eventForm(event);
+    return;
+  }
+  const known = model && !sparseWorkspace() ? model.durations.get(link.id) : undefined;
+  const band = known
+    ? resolveDuration(known, (id) => model!.momentTime(id))
+    : (
+        await timelineQuery<{ band: DurationBand | null }>({
+          kind: 'duration',
+          id: link.id,
+          revision,
+        })
+      ).band;
+  if (request !== documentRequest) return;
+  if (!band) {
+    toast('This duration is no longer on the timeline.');
+    return;
+  }
+  goToSearchResult({
+    kind: 'duration',
+    id: link.id,
+    first: band.first,
+    last: band.last,
+    title: '',
+    snippet: '',
+  });
+  await openDurationById(link.id);
+}
+if (platformEditor && window.parent !== window)
+  try {
+    // Following an address with another fragment on the platform page.
+    window.parent.addEventListener('hashchange', () => void followLink(parentLink()).catch(fail));
+  } catch {
+    /* A page of another origin is not the platform. */
+  }
+el('moment-share').onclick = () => {
+  if (selected)
+    requestShare({ kind: 'moment', id: selected.id }, selected.metadata.title || 'Moment');
+};
+el('duration-share').onclick = () => {
+  if (openDuration)
+    requestShare(
+      { kind: 'duration', id: openDuration.duration.id },
+      openDuration.duration.metadata.title || 'Duration',
+    );
+};
+el('search-share').onclick = () =>
+  requestShare(
+    { kind: 'search', text: searchState.text },
+    `“${searchState.text}” in ${remote?.title ?? 'a timeline'}`,
+  );
+el('search-dialog').addEventListener('close', () => forgetLink('search'));
 el('search-button').onclick = () => {
   if (comparison) return;
   el<HTMLDialogElement>('search-dialog').showModal();

@@ -209,6 +209,9 @@
             rows="1"
           >
 Every point has a place. Explore the spaces between them.</textarea>
+          <a id="embed-open" class="embed-open" target="_blank" rel="noopener" hidden
+            >Open on OpenChronology ↗</a
+          >
           <div id="timeline-actions" class="timeline-actions">
             <button id="timeline-star-button" hidden>☆ Star · 0</button>
             <button id="share-button" hidden>Sharing</button>
@@ -360,7 +363,8 @@ Every point has a place. Explore the spaces between them.</textarea>
     <dialog id="inspector" class="moment-dialog" aria-labelledby="moment-heading">
       <div class="inspector-heading">
         <h2 id="moment-heading">Moment details</h2>
-        <button id="close-inspector" aria-label="Close moment details">×</button>
+        <button id="moment-share" class="share-entity" type="button" hidden>Share</button
+        ><button id="close-inspector" aria-label="Close moment details">×</button>
       </div>
       <div id="group-details" hidden>
         <h2 id="group-title"></h2>
@@ -475,6 +479,7 @@ Every point has a place. Explore the spaces between them.</textarea>
           /><button id="search-submit" class="button-primary" type="submit">Search</button>
         </div>
         <p id="search-status" class="field-hint" role="status" aria-live="polite"></p>
+        <button id="search-share" type="button" hidden>Share these results</button>
         <ol id="search-results" class="search-results"></ol>
         <div class="dialog-actions" hidden>
           <button id="search-previous" type="button">Previous</button
@@ -485,7 +490,8 @@ Every point has a place. Explore the spaces between them.</textarea>
     <dialog id="duration-dialog" class="moment-dialog" aria-labelledby="duration-heading">
       <div class="inspector-heading">
         <h2 id="duration-heading">Duration</h2>
-        <button data-close="duration-dialog" aria-label="Close duration details">×</button>
+        <button id="duration-share" class="share-entity" type="button" hidden>Share</button
+        ><button data-close="duration-dialog" aria-label="Close duration details">×</button>
       </div>
       <form id="duration-form">
         <label>Title<input id="duration-title" maxlength="1000" placeholder="Optional" /></label>

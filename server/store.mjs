@@ -844,10 +844,22 @@ export class PostgresStore {
       }
       if (query.kind === 'duration') {
         const { rows } = await c.query(
-          "SELECT definition FROM oc_duration_nodes WHERE timeline_id=$1 AND band->>'id'=$2 AND definition IS NOT NULL LIMIT 1",
+          "SELECT definition,band FROM oc_duration_nodes WHERE timeline_id=$1 AND band->>'id'=$2 AND definition IS NOT NULL LIMIT 1",
           [id, query.id],
         );
-        return { duration: rows[0]?.definition ?? null, revision: t.revision };
+        return {
+          duration: rows[0]?.definition ?? null,
+          band: rows[0]?.band ?? null,
+          revision: t.revision,
+        };
+      }
+      // A moment by its ID alone, for links to it.
+      if (query.kind === 'moment') {
+        const { rows } = await c.query(
+          `SELECT event FROM ${names.moments} WHERE timeline_id=$1 AND id=$2`,
+          [tree, query.id],
+        );
+        return { event: rows[0]?.event ?? null, revision: t.revision };
       }
       if (query.id) {
         const { rows } = await c.query(

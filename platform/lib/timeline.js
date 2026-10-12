@@ -2,12 +2,19 @@
 import 'server-only';
 import { notFound } from 'next/navigation';
 import { currentSession } from './session.js';
-export async function accessibleTimeline(id) {
+/** A timeline the visitor may open; with `bounds`, also its first and last times. */
+export async function accessibleTimeline(id, { bounds = false } = {}) {
   if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id)) notFound();
   const current = await currentSession();
   if (!current.services.store) notFound();
   try {
-    return { ...current, timeline: await current.services.store.access(id, current.user?.id) };
+    const { store } = current.services;
+    return {
+      ...current,
+      timeline: await (bounds
+        ? store.metadata(id, current.user?.id)
+        : store.access(id, current.user?.id)),
+    };
   } catch (e) {
     if (e.status === 403 || e.status === 404) notFound();
     throw e;

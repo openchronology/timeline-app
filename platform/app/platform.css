@@ -475,3 +475,68 @@ dialog {
   display: flex;
   justify-content: flex-end;
 }
+
+/* Text for screen readers and search engines beside an interactive picture of it. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.share-dialog {
+  width: min(560px, calc(100vw - 30px));
+}
+.share-dialog .dialog-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.share-dialog h2 {
+  margin: 0;
+}
+.share-title {
+  margin: 4px 0 16px;
+  font-weight: 600;
+}
+.share-dialog label {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.share-row {
+  display: flex;
+  gap: 8px;
+}
+.share-row input {
+  flex: 1;
+  min-width: 0;
+}
+.share-sites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+}
+.share-sites a,
+.share-sites button {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height);
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-decoration: none;
+}
+.share-embed textarea {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}

@@ -34,6 +34,8 @@ Set `APP_ORIGIN=https://timescale.info` and put an HTTPS reverse proxy on the sa
 
 Set `TRUST_PROXY=1` only when the proxy overwrites `X-Forwarded-For` with a single client IP and the application port cannot be accessed directly. Next route handlers do not expose the socket peer address: without this trusted proxy, anonymous authentication attempts share a conservative rate-limit bucket. A proxy running in another container needs a Compose override connecting it to the app's network and forwarding to `app:5173`; its own loopback will not reach the host-bound port.
 
+Public timelines can be [embedded](sharing.md#embedding) in any site. Set `EMBED_FRAME_ANCESTORS` to a space-separated list of origins (`https://example.org https://*.example.net`) to allow only those, or `'none'` to allow none.
+
 To supply an additional plugin catalogue, bind-mount its JSON file into `app` read-only and set `PLUGIN_LIBRARY` to its container path. See [plugins.md](plugins.md). Setting a host path without mounting it is insufficient.
 
 ## Upgrades and backups

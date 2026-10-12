@@ -3,10 +3,18 @@ import './platform.css';
 import Downloads from '../components/downloads.jsx';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-export const metadata = {
-  title: 'OpenChronology · timescale.info',
-  description: 'Exact timelines, shared on your terms.',
-};
+import { siteOrigin, SITE_NAME } from '../lib/sharing.js';
+export function generateMetadata() {
+  const description = 'Exact timelines, shared on your terms.';
+  return {
+    // Relative addresses in pages' metadata (link previews, canonical links) are on this site.
+    metadataBase: new URL(siteOrigin()),
+    title: 'OpenChronology · timescale.info',
+    description,
+    openGraph: { type: 'website', siteName: SITE_NAME, locale: 'en_US', description },
+    twitter: { card: 'summary_large_image' },
+  };
+}
 export default async function RootLayout({ children }) {
   const build = JSON.parse(
     await readFile(

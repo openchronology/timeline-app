@@ -18,3 +18,5 @@ export async function exportSqlite(
 ): Promise<Blob> {
   throw new Error('This offline file exchanges .ochx JSON timelines only.');
 }
+/** The offline page makes no requests, so there are no cookies to leave out. */
+export function anonymousRequests() {}
