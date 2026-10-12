@@ -603,7 +603,21 @@ export class Viewport {
   at(pixel: number, width: number): Q {
     return this.left.add(this.span.mul(screenQ(pixel).div(screenQ(width))));
   }
+  #spanNumber = 0;
+  #spanOf?: Q;
+  /**
+   * A time's position in pixels. Dividing exactly by the span reduces large fractions for
+   * every marker, every frame (#68); a span well inside a double's range divides as a double
+   * with the same result to far below a pixel. Only the difference from the left is exact.
+   */
   x(time: Q, width: number): number {
+    if (this.#spanOf !== this.span) {
+      this.#spanNumber = this.span.toApproximateNumber();
+      this.#spanOf = this.span;
+    }
+    const span = this.#spanNumber;
+    if (span > 1e-280 && span < 1e280)
+      return (time.sub(this.left).toApproximateNumber() / span) * width;
     return time.sub(this.left).div(this.span).toApproximateNumber() * width;
   }
   threshold(width: number, pixels: number): Q {

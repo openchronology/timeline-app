@@ -353,10 +353,39 @@ const hoverPreview = createHoverPreview(
   () => uiScale,
   (button) => button.click(),
 );
+/** Changes whenever what the timeline shows may have: another document, an edit, a revision. */
+const contentGeneration = () =>
+  `${documentRequest}:${editVersion}:${remote?.revision ?? local?.revision ?? ''}:${comparison?.tracks.map((t) => t.source.revision).join(',') ?? ''}`;
+/**
+ * Exact times parsed from the strings frames carry, kept across frames: a view redraws the
+ * same groups, bands and links many times while it moves (#68).
+ */
+const parsedTimes = new Map<string, Q>();
+const middles = new Map<string, Q>();
+/** The exact middle of two times, kept like parsed times. */
+function middleTime(first: string, last: string): Q {
+  if (first === last) return parsedTime(first);
+  const key = first + '\u0000' + last;
+  let middle = middles.get(key);
+  if (!middle) {
+    if (middles.size >= 50000) middles.clear();
+    middle = parsedTime(first).add(parsedTime(last)).div(Q.from(2n));
+    middles.set(key, middle);
+  }
+  return middle;
+}
+function parsedTime(text: string): Q {
+  let time = parsedTimes.get(text);
+  if (!time) {
+    if (parsedTimes.size >= 50000) parsedTimes.clear();
+    time = Q.parse(text);
+    parsedTimes.set(text, time);
+  }
+  return time;
+}
 const summaryExpansion = createSummaryExpansion(stage, {
   scale: () => uiScale,
-  generation: () =>
-    `${documentRequest}:${editVersion}:${remote?.revision ?? local?.revision ?? ''}:${comparison?.tracks.map((t) => t.source.revision).join(',') ?? ''}`,
+  generation: contentGeneration,
   load: (group, signal) => groupPage(group, null, 5, signal),
   decorate(button, event) {
     renderPluginMarker(button, imageSource(pluginMarker(activePlugins(), event.metadata)), 1n);
@@ -1058,7 +1087,7 @@ function drawFrame() {
   let visible = 0n;
   // Remote summary metadata is itself ordered in a RationalMap. It is never mistaken for a complete event cache.
   const groups = new RationalMap<FrameGroup>((g) => entityCount(g));
-  for (const group of frame.groups) groups.set(Q.parse(group.first), group);
+  for (const group of frame.groups) groups.set(parsedTime(group.first), group);
   let lane = 0;
   const orderedGroups = comparison
     ? [...frame.groups].sort((a, b) => Q.parse(a.first).compare(Q.parse(b.first)))
@@ -1070,9 +1099,9 @@ function drawFrame() {
     const sourceKey = (group as ComparisonGroup).sourceKey;
     const rowOffset = sourceKey ? (rowPlan.rows.get(sourceKey)?.offset ?? 0) : 0;
 
-    const first = Q.parse(group.first),
-      last = Q.parse(group.last),
-      mid = first.add(last).div(Q.from(2n)),
+    const first = parsedTime(group.first),
+      last = parsedTime(group.last),
+      mid = middleTime(group.first, group.last),
       x = viewport.x(mid, width());
     if (x < 0 || x > width()) continue;
     visible += BigInt(group.count);
@@ -6974,27 +7003,48 @@ function describeLabel(ref: EntityRef) {
   return entry?.title || ('moment' in ref ? 'this moment' : 'this duration');
 }
 /** Relationship arcs between endpoint times; arcs to off-screen entities run off the edge. */
+/** Arc elements persist by relationship: a moving view only reshapes them (#68). */
+const edgeArcs = new Map<string, { path: SVGPathElement; title: SVGTitleElement; named: string }>();
 function renderEdgeArcs() {
   const svg = el('edge-arcs');
-  svg.replaceChildren();
-  if (comparison) return;
-  const axis = 192;
+  svg.querySelector('.edge-limit')?.remove();
+  const axis = 192,
+    generation = contentGeneration(),
+    shown = new Set<string>();
   const name = (ref: EntityRef) =>
     describe(refKey(ref))?.title || ('moment' in ref ? 'Moment' : 'Duration');
-  for (const edge of frame.edges ?? []) {
-    const xa = (inset() + viewport.x(Q.parse(edge.aTime), width())) / uiScale,
-      xb = (inset() + viewport.x(Q.parse(edge.bTime), width())) / uiScale;
+  for (const edge of comparison ? [] : (frame.edges ?? [])) {
+    const xa = (inset() + viewport.x(parsedTime(edge.aTime), width())) / uiScale,
+      xb = (inset() + viewport.x(parsedTime(edge.bTime), width())) / uiScale;
     const distance = Math.abs(xb - xa);
     const lift = Math.min(150, 18 + distance * 0.3);
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', `M ${xa} ${axis} Q ${(xa + xb) / 2} ${axis - 2 * lift} ${xb} ${axis}`);
-    path.setAttribute('class', 'edge-arc');
-    path.dataset.edgeId = edge.id;
-    const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-    title.textContent = `${name(edge.a)} ↔ ${name(edge.b)}`;
-    path.append(title);
-    svg.append(path);
+    let arc = edgeArcs.get(edge.id);
+    if (!arc) {
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('class', 'edge-arc');
+      path.dataset.edgeId = edge.id;
+      const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+      path.append(title);
+      svg.append(path);
+      arc = { path, title, named: '' };
+      edgeArcs.set(edge.id, arc);
+    }
+    shown.add(edge.id);
+    arc.path.setAttribute(
+      'd',
+      `M ${xa} ${axis} Q ${(xa + xb) / 2} ${axis - 2 * lift} ${xb} ${axis}`,
+    );
+    // Names change only with the timeline's content, not as the view moves.
+    if (arc.named !== generation) {
+      arc.title.textContent = `${name(edge.a)} ↔ ${name(edge.b)}`;
+      arc.named = generation;
+    }
   }
+  for (const [id, arc] of edgeArcs)
+    if (!shown.has(id)) {
+      arc.path.remove();
+      edgeArcs.delete(id);
+    }
   if (frame.edgesTruncated) {
     const note = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     note.setAttribute('x', String(inset()));
@@ -7005,7 +7055,8 @@ function renderEdgeArcs() {
   }
 }
 /** Band elements persist by duration so clicks and hover cards survive re-rendering. */
-const durationButtons = new Map<string, HTMLButtonElement>();
+const durationButtons = new Map<string, HTMLButtonElement>(),
+  bandContent = new WeakMap<HTMLButtonElement, string>();
 function renderDurationBands() {
   const host = el('duration-bands');
   host.querySelector('.duration-limit')?.remove();
@@ -7013,8 +7064,8 @@ function renderDurationBands() {
   const plugins = durationPlugins(installedPlugins());
   const shown = new Set<string>();
   (frame.durations ?? []).forEach((band, i) => {
-    const left = Math.max(0, viewport.x(Q.parse(band.first), width())),
-      right = Math.min(width(), viewport.x(Q.parse(band.last), width()));
+    const left = Math.max(0, viewport.x(parsedTime(band.first), width())),
+      right = Math.min(width(), viewport.x(parsedTime(band.last), width()));
     if (right < left) return;
     const key = (band.sourceKey ?? '') + '\u0000' + band.id;
     shown.add(key);
@@ -7035,15 +7086,19 @@ function renderDurationBands() {
     button.style.left = (inset() + left) / uiScale + 'px';
     button.style.width = Math.max(6, (right - left) / uiScale) + 'px';
     button.style.top = 202 + (rows.get(band.sourceKey ?? '')?.offset ?? 0) + (i % 3) * 9 + 'px';
+    // What a band says changes with its content, not as the view moves (#68).
+    const content = `${contentGeneration()}\u0000${band.first}\u0000${band.last}`;
+    if (bandContent.get(button) === content) return;
+    bandContent.set(button, content);
     button.style.backgroundColor = pluginColor(plugins, band.metadata) ?? '';
     button.textContent = band.metadata.title ?? '';
     button.setAttribute('aria-label', 'Duration: ' + (band.metadata.title || 'Unnamed duration'));
     button.title =
       (band.metadata.title || 'Duration') +
       ' · ' +
-      presented(Q.parse(band.first)) +
+      presented(parsedTime(band.first)) +
       ' → ' +
-      presented(Q.parse(band.last));
+      presented(parsedTime(band.last));
     hoverPreview.update(button, plugins, band.metadata);
   });
   for (const [key, button] of durationButtons)
