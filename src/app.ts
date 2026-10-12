@@ -62,6 +62,8 @@ import {
   resolveDuration,
   validateDuration,
   durationPlugins,
+  pluginBackground,
+  BACKGROUND_URL_LIMIT,
   momentPlugins,
   refKey,
   refFromKey,
@@ -1136,6 +1138,7 @@ function drawFrame() {
   el('markers').dataset.view = `${viewport.left.toString()} ${viewport.right.toString()}`;
   renderEdgeArcs();
   renderDurationBands();
+  renderDurationBackgrounds();
   const cursor = el('time-cursor');
   stage.style.setProperty('--timeline-scale', String(uiScale));
   stage.dataset.uiScale = String(uiScale);
@@ -6390,6 +6393,17 @@ function renderDurationPluginFields() {
     },
     (title, remove) => remove(),
   );
+  // Bands carry short metadata only: a longer background address would show nothing.
+  for (const { manifest, enabled } of durationPlugins(installedPlugins())) {
+    const value = manifest.background && current.duration.metadata[manifest.background.metadataKey];
+    if (enabled && typeof value === 'string' && value.length > BACKGROUND_URL_LIMIT) {
+      const note = document.createElement('p');
+      note.className = 'form-error';
+      note.textContent = `Background image addresses longer than ${BACKGROUND_URL_LIMIT} characters are not shown. Use a shorter address.`;
+      el('plugin-duration-fields').append(note);
+      break;
+    }
+  }
 }
 /** Time an endpoint resolves to, from loaded moments or the saved band. */
 function endpointTime(duration: Duration, which: 'start' | 'end'): Q | null {
@@ -7435,6 +7449,87 @@ function renderEdgeArcs() {
     note.textContent = 'Showing the first 256 relationships in this window. Zoom in to see more.';
     svg.append(note);
   }
+}
+/**
+ * Duration backgrounds (#94): each duration with a background image shows it behind the
+ * timeline over the part of the duration in view. The image fills the stage, keeping its
+ * aspect ratio, centered vertically and horizontally between the duration's visible start
+ * and end (a view's edge standing in for an end beyond it). Smaller durations show above
+ * larger ones, and edges inside the view fade out so backgrounds blend. Collapsed durations
+ * are summaries, not bands, so they show none. Elements persist by duration, so images keep
+ * loading while the view moves.
+ */
+const durationBackgrounds = new Map<
+  string,
+  { box: HTMLDivElement; img: HTMLImageElement; source: string; mask: string }
+>();
+function renderDurationBackgrounds() {
+  const host = el('duration-backgrounds');
+  const plugins = durationPlugins(installedPlugins());
+  const shown = new Set<string>();
+  const full = stageWidth();
+  const stacked: { box: HTMLDivElement; extent: Q }[] = [];
+  if (plugins.some((p) => p.enabled && p.manifest.background))
+    for (const band of frame.durations ?? []) {
+      const source = imageSource(pluginBackground(plugins, band.metadata));
+      if (!source) continue;
+      const start = inset() + viewport.x(parsedTime(band.first), width()),
+        end = inset() + viewport.x(parsedTime(band.last), width());
+      const left = Math.max(0, start),
+        right = Math.min(full, end);
+      if (right <= left) continue;
+      const key = (band.sourceKey ?? '') + '\u0000' + band.id;
+      shown.add(key);
+      let entry = durationBackgrounds.get(key);
+      if (!entry || entry.source !== source) {
+        entry?.box.remove();
+        const box = document.createElement('div');
+        box.className = 'duration-background';
+        box.dataset.durationId = band.id;
+        const img = document.createElement('img');
+        img.alt = '';
+        img.crossOrigin = 'anonymous';
+        img.referrerPolicy = 'no-referrer';
+        img.decoding = 'async';
+        img.onload = () => img.classList.add('loaded');
+        img.onerror = () => img.classList.remove('loaded');
+        img.src = source;
+        box.append(img);
+        host.append(box);
+        entry = { box, img, source, mask: '' };
+        durationBackgrounds.set(key, entry);
+      }
+      const { box, img } = entry;
+      box.style.left = left + 'px';
+      box.style.width = right - left + 'px';
+      img.style.width = full + 'px';
+      img.style.left = (left + right) / 2 - full / 2 - left + 'px';
+      // Edges in view fade to transparency; an edge where the duration goes on does not.
+      const fade = Math.min(64, (right - left) / 4),
+        from = start > 0 ? fade : 0,
+        to = end < full ? fade : 0;
+      const mask =
+        from || to
+          ? `linear-gradient(to right, transparent 0, #000 ${from}px, #000 calc(100% - ${to}px), transparent 100%)`
+          : 'none';
+      if (entry.mask !== mask) {
+        entry.mask = mask;
+        box.style.setProperty('mask-image', mask);
+        box.style.setProperty('-webkit-mask-image', mask);
+      }
+      stacked.push({ box, extent: parsedTime(band.last).sub(parsedTime(band.first)) });
+    }
+  // Smaller (more specific) durations above larger ones.
+  stacked
+    .sort((a, b) => b.extent.compare(a.extent))
+    .forEach(({ box }, index) => {
+      if (box.style.zIndex !== String(index + 1)) box.style.zIndex = String(index + 1);
+    });
+  for (const [key, entry] of durationBackgrounds)
+    if (!shown.has(key)) {
+      entry.box.remove();
+      durationBackgrounds.delete(key);
+    }
 }
 /** Band elements persist by duration so clicks and hover cards survive re-rendering. */
 const durationButtons = new Map<string, HTMLButtonElement>(),

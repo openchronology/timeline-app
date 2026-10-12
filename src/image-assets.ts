@@ -22,6 +22,12 @@ export async function embedImages(
     p.manifest.fields.filter((f) => f.kind === 'image-url').map((f) => f.metadataKey),
   );
   const urls = new Set<string>();
+  // Durations' images too, such as their backgrounds.
+  for (const d of document.durations ?? [])
+    for (const key of fields) {
+      const url = imageURL(d.metadata[key]);
+      if (url) urls.add(url);
+    }
   for (const e of document.events) {
     const entries = [
       e.metadata,

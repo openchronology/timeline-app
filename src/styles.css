@@ -580,6 +580,32 @@ main {
 .timeline-stage.dragging {
   cursor: grabbing;
 }
+/* Duration backgrounds (#94): images behind everything else on the stage. */
+.duration-backgrounds {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.duration-background {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+.duration-background img {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.duration-background img.loaded {
+  opacity: 1;
+}
 .axis,
 .markers {
   position: absolute;

@@ -18,6 +18,23 @@ Single moments display circular image markers. Hover or keyboard focus enlarges 
 
 Use public HTTPS image URLs without embedded credentials. Image requests have no referrer and use anonymous cross-origin mode. The host must permit cross-origin image access, typically with `Access-Control-Allow-Origin: *`. Cross-origin authentication cookies are not sent. Image links use `noopener noreferrer` and open a new browser tab; Tauri opens the system browser through an HTTPS-only native command. HTTP, `javascript:`, `data:`, `file:`, relative URLs and credential-bearing URLs are not loaded. URL previews debounce typing; marker images retain their DOM nodes across pan/zoom to avoid restarting image loads. Removing or disabling the plugin leaves metadata intact.
 
+## Duration backgrounds
+
+Install **Duration backgrounds** to show an image behind the timeline wherever a [duration](durations.md) lies. Its duration field is `backgroundUrl`, a public HTTPS image URL, as for moment icons:
+
+```json
+{ "title": "The Bronze Age", "backgroundUrl": "https://images.example/bronze.jpg" }
+```
+
+- **Size:** the image is scaled, keeping its aspect ratio, until it covers the whole timeline, and it is centered vertically. It follows the timeline's size as the window is resized or a phone is turned.
+- **Placement:** the background covers the part of the duration in view. Horizontally, the image is centered between the duration's start and end.
+  - If an end lies beyond the view, the view's edge stands in for it.
+  - If both ends lie beyond the view, the image fills the timeline.
+- **Collapsed durations:** a duration too short to draw as a band is summarized, and it shows no background.
+- **Stacking:** smaller durations show above larger ones. An edge inside the view fades to transparency, so backgrounds blend into each other; an edge where the duration continues past the view does not fade.
+- **Address length:** duration bands carry string metadata of at most 256 characters, so a longer image address shows nothing, and the duration dialog says so.
+- **Offline:** exports embed copies of background images, as for icons, so the offline edition can show them.
+
 ## UI capability API v1
 
 Plugins combine **JSON host component declarations** and an optional restricted script. Their source is interpreted locally, without arbitrary JavaScript execution, HTML, CSS, imports, event handlers or application API endpoints. They cannot obtain account credentials, access the DOM, call the server, or execute arbitrary code. The host is responsible for rendering, validating URLs, field input and lifecycle cleanup. API v1 supports:
@@ -25,7 +42,7 @@ Plugins combine **JSON host component declarations** and an optional restricted 
 - Inspector fields: `text`, `multiline`, `image-url`, `stack`, `shape`, `size`, `color`, and `links`, each bound to one top-level moment metadata key.
 - Marker effects: an `image`, `color`, or `shape` bound to metadata, plus hover cards and restricted scripted effects.
 - Ordering: later enabled definitions replace earlier inspector fields with the same key; later marker hooks with a valid, populated image URL take precedence. Empty or invalid URLs fall back to the preceding valid marker effect, or the normal dot.
-- Targets: an optional `targets` array of `"moments"` and/or `"durations"`. Without it, color markers and hover cards apply to moments and [durations](durations.md); every other plugin applies to moments only. Durations use only text, notes, color and link fields, color markers and hover cards; stacks, shapes, sizes, icons and summary expansion are moment-only.
+- Targets: an optional `targets` array of `"moments"` and/or `"durations"`. Without it, color markers and hover cards apply to moments and [durations](durations.md); every other plugin applies to moments only. Durations use text, notes, color, link and image URL fields, color markers, hover cards and backgrounds (`background.kind: "image"`, which applies to durations only); stacks, shapes, sizes, icons and summary expansion are moment-only.
 
 A plugin can define fields without a marker effect, or an effect without a new editor field. Additional component kinds require an implementation and security review in the host; they are not arbitrary downloaded UI programs. New capabilities will use versioned contracts.
 
