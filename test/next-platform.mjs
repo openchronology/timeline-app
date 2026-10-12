@@ -3,6 +3,26 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { createServer } from 'node:http';
+// GitHub's latest release, as the download page reads it (#111).
+const assetBase = 'https://github.com/openchronology/timeline-app/releases/download/v9.8.7/';
+const github = createServer((req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.end(
+    JSON.stringify({
+      tag_name: 'v9.8.7',
+      name: 'v9.8.7',
+      published_at: '2026-09-30T12:00:00Z',
+      html_url: 'https://github.com/openchronology/timeline-app/releases/tag/v9.8.7',
+      assets: [
+        'openchronology-desktop-windows-amd64-setup.exe',
+        'openchronology-desktop-macos-arm64.dmg',
+        'openchronology-server-ubuntu24.04-amd64.deb',
+      ].map((name) => ({ name, browser_download_url: assetBase + name, size: 12 * 1048576 })),
+    }),
+  );
+});
+await new Promise((resolve) => github.listen(0, '127.0.0.1', resolve));
 const port = Number(process.env.PLATFORM_TEST_PORT ?? 5199),
   origin = `http://127.0.0.1:${port}`;
 const env = {
@@ -21,6 +41,7 @@ for (const key of Object.keys(env))
     delete env[key];
 // A named platform with Google Analytics (#100, #101); next-postgres checks neither is set.
 env.PLATFORM_NAME = 'timescale.test';
+env.RELEASES_API_URL = `http://127.0.0.1:${github.address().port}/latest`;
 env.GOOGLE_ANALYTICS_ID = 'G-TEST12345';
 env.PORT = String(port);
 env.HOSTNAME = '127.0.0.1';
@@ -60,8 +81,37 @@ try {
   assert.equal(dashboard.status, 200);
   assert.match(html, /Explore timelines/);
   assert.match(html, /Build: /);
-  assert.match(html, /releases\/latest\/download\/openchronology-offline\.html/);
-  assert.match(html, /releases\/latest\/download\/openchronology-desktop-linux-amd64\.deb/);
+  assert.match(html, /<a href="\/download">Download<\/a>/);
+  // The download page puts the visitor's system first, with the latest release's files.
+  const download = async (agent) => {
+    const r = await fetch(origin + '/download', { headers: { 'User-Agent': agent } });
+    assert.equal(r.status, 200);
+    return r.text();
+  };
+  const windows = await download('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0');
+  assert.match(windows, /Version <strong>v9\.8\.7<\/strong>/);
+  assert.match(windows, /Desktop app for Windows/);
+  assert.match(
+    windows,
+    new RegExp(
+      `class="button primary download-primary" href="${assetBase}openchronology-desktop-windows-amd64-setup\\.exe"`,
+    ),
+  );
+  assert.match(windows, /12\.0 MB/);
+  // Files the release lacks link to the latest release by name.
+  assert.match(windows, /releases\/latest\/download\/openchronology-desktop-linux-amd64\.AppImage/);
+  const ubuntu = await download('Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:143.0) Firefox/143.0');
+  assert.match(ubuntu, /Desktop app for Linux/);
+  assert.match(ubuntu, /data-server="ubuntu24\.04"[^>]*>.{0,200}Your system/s);
+  assert.match(
+    ubuntu,
+    new RegExp(
+      `curl -fLO ${assetBase}openchronology-server-ubuntu24\\.04-amd64\\.deb &amp;&amp; sudo apt install \\./openchronology-server-ubuntu24\\.04-amd64\\.deb`,
+    ),
+  );
+  assert.match(ubuntu, /docker compose up --build --wait/);
+  const phone = await download('Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X)');
+  assert.match(phone, /Use OpenChronology in your browser/);
   assert.match(html, /id="dashboard-browser"/);
   assert.match(html, /Sort timelines/);
   assert.doesNotMatch(html, /id="dashboard-favorites"/);
@@ -84,6 +134,7 @@ try {
     '/login',
     '/account',
     '/plugins',
+    '/download',
     '/legal',
     '/editor',
     '/?search=history&page=2',
@@ -240,6 +291,21 @@ try {
       await page.getByRole('link', { name: 'Account', exact: true }).click();
       await page.waitForURL(origin + '/account');
       await page.getByText('Server accounts are unavailable.').waitFor();
+      // The header's Download goes to the download page; its commands can be copied.
+      await page.getByRole('link', { name: 'Download', exact: true }).click();
+      await page.waitForURL(origin + '/download');
+      await page.getByRole('heading', { name: 'Download OpenChronology' }).waitFor();
+      const copy = page.locator('[data-server="debian13"] .copy-command button');
+      await copy.click();
+      await page.waitForFunction(
+        () =>
+          document.querySelector('[data-server="debian13"] .copy-command button').textContent !==
+          'Copy',
+      );
+      assert(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+        'The download page overflows',
+      );
       assert.deepEqual(errors, [], 'Next pages or embedded editor raised browser errors');
       console.log(
         'PASS Next.js ' +
@@ -257,6 +323,7 @@ try {
   console.error(logs);
   throw error;
 } finally {
+  github.close();
   if (!exited) {
     const closed = new Promise((done) => child.once('exit', done));
     child.kill('SIGTERM');

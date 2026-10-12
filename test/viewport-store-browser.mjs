@@ -161,6 +161,7 @@ export async function checkViewportStore(browser) {
     await bounds(page, '9000', '11000');
     await page.getByRole('button', { name: 'Far away', exact: true }).waitFor();
     let keys = await settled(page);
+    const earlier = { keys, answered };
     // Hiding the page lets go of windows it does not show; storage keeps them, and showing it
     // again takes them back before anything more is stored.
     const visibility = (hidden) =>
@@ -180,9 +181,24 @@ export async function checkViewportStore(browser) {
     await visibility(true);
     await visibility(false);
     keys = await settled(page);
+    // The windows covering the first view (0 to 20): which ones depends on what the page
+    // fetched on its way there (going to bounds animates through views between), so any.
+    const window = (key) => key.split('\u0001').slice(-2).join('..');
+    const first = (list) =>
+      list.filter((key) => {
+        const [lower, upper] = key
+          .split('\u0001')
+          .slice(-2)
+          .map((time) => {
+            const [numerator, denominator = '1'] = time.split('/');
+            return Number(numerator) / Number(denominator);
+          });
+        return lower <= 0 && upper >= 20;
+      });
+    const kept = first(keys);
     assert(
-      keys.some((key) => key.endsWith('\u0001-5/1\u000125/1')),
-      'the first view was not kept after hiding the page',
+      first(earlier.keys).length && first(earlier.keys).every((key) => kept.includes(key)),
+      `the first view was not kept after hiding the page: stored before ${earlier.keys.map(window).join(', ')}; after ${keys.map(window).join(', ')}; ${answered - earlier.answered} queries meanwhile`,
     );
     assert(keys.every((key) => key.includes('alice-id') && key.includes(id)));
     // Reopened without a server answer, both earlier views come from storage.

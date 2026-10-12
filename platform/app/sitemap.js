@@ -12,6 +12,7 @@ export default async function sitemap() {
   const pages = [
     { url: origin + '/', changeFrequency: 'daily' },
     { url: origin + '/plugins', changeFrequency: 'weekly' },
+    { url: origin + '/download', changeFrequency: 'weekly' },
   ];
   let pool;
   try {

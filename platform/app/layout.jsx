@@ -1,6 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import './platform.css';
-import Downloads from '../components/downloads.jsx';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import Analytics, { AnalyticsSettings } from '../components/analytics.jsx';
@@ -40,7 +39,7 @@ export default async function RootLayout({ children }) {
             <a href="/editor?new=1">＋ New timeline</a>
             <a href="/plugins">Plugin library</a>
             <a href="/account">Account</a>
-            <Downloads />
+            <a href="/download">Download</a>
           </nav>
         </header>
         {children}
