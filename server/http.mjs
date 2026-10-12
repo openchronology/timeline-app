@@ -8,7 +8,7 @@ import { BrowserForks } from './browser-forks.mjs';
 import { queryPlugins } from './query-plugins.mjs';
 import { Collaboration, searchTimelines } from './collaboration.mjs';
 import { Versioning } from './versioning.mjs';
-import { createPluginLibrary } from './plugins.mjs';
+import { createPluginLibrary, createSuiteLibrary } from './plugins.mjs';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
@@ -153,6 +153,7 @@ export function createRequestHandler({
   compareLimits: limits = compareLimitsFromEnv(),
 } = {}) {
   const library = createPluginLibrary(plugins, pool);
+  const suites = createSuiteLibrary(undefined, pool);
   const store = pool ? new PostgresStore(pool, { compareLimits: limits }) : null,
     auth = pool
       ? new Auth(pool, origin, {
@@ -200,7 +201,7 @@ export function createRequestHandler({
         try {
           if (pool)
             await pool.query(
-              'SELECT t.tags,t.assets,t.search_document,t.head_revision_id,p.source_revision_id FROM oc_timelines t LEFT JOIN oc_proposals p ON false LEFT JOIN oc_plugins l ON false LEFT JOIN oc_revisions r ON false LEFT JOIN oc_snapshots s ON false LIMIT 0',
+              'SELECT t.tags,t.assets,t.search_document,t.head_revision_id,p.source_revision_id FROM oc_timelines t LEFT JOIN oc_proposals p ON false LEFT JOIN oc_plugins l ON false LEFT JOIN oc_plugin_suites ps ON false LEFT JOIN oc_revisions r ON false LEFT JOIN oc_snapshots s ON false LIMIT 0',
             );
           return response(res, 200, { status: 'ok', storage: pool ? 'postgresql' : 'browser' });
         } catch {
@@ -221,6 +222,29 @@ export function createRequestHandler({
             sort: query.get('sort') ?? 'popularity',
           }),
         );
+      }
+      // Plugin suites (#78): searched and read by anyone, like plugins.
+      if (pathname === '/api/plugins/suites' && method === 'GET') {
+        const query = new URL(req.url, origin).searchParams;
+        return response(
+          res,
+          200,
+          await suites.search({
+            search: query.get('search') ?? '',
+            page: Number(query.get('page') ?? 1),
+            limit: Number(query.get('limit') ?? 12),
+          }),
+        );
+      }
+      if (pathname === '/api/plugins/suites/search' && method === 'POST')
+        return response(res, 200, await suites.search(await body(req, 4096)));
+      const suitePath = /^\/api\/plugins\/suites\/([a-z][a-z0-9-]{0,63})\/([1-9][0-9]{0,15})$/.exec(
+        pathname,
+      );
+      if (suitePath && method === 'GET') {
+        if (!Number.isSafeInteger(Number(suitePath[2])))
+          throw new HttpError(400, 'Invalid suite version.');
+        return response(res, 200, await suites.get(suitePath[1], suitePath[2]));
       }
       if (pathname === '/api/plugins/search' && method === 'POST') {
         return response(res, 200, await library.search(await body(req, 4096)));
@@ -471,6 +495,14 @@ export function createRequestHandler({
             ...(cookie ? [auth.nonceCookie('login', '', true)] : []),
           ].filter(Boolean);
           return response(res, 200, publicResult, cookies.length ? { 'Set-Cookie': cookies } : {});
+        }
+        if (pathname === '/api/plugins/suites/publish' && method === 'POST') {
+          auth.require(session, req);
+          await requireDataProvider(pool, userId);
+          await auth.rateLimit('plugin-publish:' + userId);
+          if (!session.is_admin) await challenges.require(req, 'plugin', session);
+          const suite = await suites.publish(userId, await body(req, 262144));
+          return response(res, 201, suite);
         }
         if (pathname === '/api/plugins/publish' && method === 'POST') {
           auth.require(session, req);

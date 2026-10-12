@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import Form from 'next/form';
 import { platformServices } from '../../../server/platform.mjs';
-import { createPluginLibrary } from '../../../server/plugins.mjs';
+import { createPluginLibrary, createSuiteLibrary } from '../../../server/plugins.mjs';
 export const dynamic = 'force-dynamic';
 export default async function Plugins({ searchParams }) {
   const params = await searchParams;
@@ -14,10 +14,14 @@ export default async function Plugins({ searchParams }) {
     1,
     Math.min(10000, Number.isSafeInteger(Number(params.page)) ? Number(params.page) : 1),
   );
-  let result, error;
+  let result, suites, error;
   try {
     const s = await platformServices();
-    result = await createPluginLibrary(s.plugins, s.pool).search({ search, page, limit: 12, sort });
+    // Suites matching the search, on the first page of plugins only.
+    [result, suites] = await Promise.all([
+      createPluginLibrary(s.plugins, s.pool).search({ search, page, limit: 12, sort }),
+      page === 1 ? createSuiteLibrary(undefined, s.pool).search({ search, limit: 12 }) : null,
+    ]);
   } catch {
     error = 'The plugin library is temporarily unavailable.';
   }
@@ -49,6 +53,28 @@ export default async function Plugins({ searchParams }) {
         <button>Search</button>
       </Form>
       {error && <p role="status">{error}</p>}
+      {suites?.suites.length ? (
+        <section aria-labelledby="suites-heading">
+          <h2 id="suites-heading">Plugin suites</h2>
+          <p className="muted">
+            A suite adds several plugins at once. Open a timeline’s Plugins menu and choose Add
+            suite, or Create suite to package a timeline’s plugins.
+          </p>
+          <div className="timeline-grid">
+            {suites.suites.map((suite) => (
+              <article className="timeline-card" key={suite.id}>
+                <h3>{suite.name}</h3>
+                <p className="muted">
+                  {suite.id} · Version {suite.version}
+                </p>
+                <p>{suite.description}</p>
+                <p className="muted">Plugins: {suite.plugins.map((p) => p.name).join(', ')}</p>
+              </article>
+            ))}
+          </div>
+          <h2>Plugins</h2>
+        </section>
+      ) : null}
       <div className="timeline-grid">
         {result?.plugins.map((p) => (
           <article className="timeline-card" key={p.id}>

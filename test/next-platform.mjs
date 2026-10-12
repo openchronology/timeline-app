@@ -92,6 +92,11 @@ try {
     const r = await fetch(origin + path);
     assert.equal(r.status, 200, path);
   }
+  // The plugin library page lists the official plugin suites (#78) above the plugins.
+  const plugins = await (await fetch(origin + '/plugins')).text();
+  assert.match(plugins, /Plugin suites/);
+  assert.match(plugins, /History education/);
+  assert.match(plugins, /Causal factor analysis/);
   const editor = await fetch(origin + '/editor/frame'),
     markup = await editor.text();
   assert.equal(editor.status, 200);

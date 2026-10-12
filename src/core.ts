@@ -68,6 +68,7 @@ import { Rational as Q, RationalMap } from 'rational-ordered-map';
 import { validateInstalledPlugins, validateStackMetadata, imageURL } from './plugins.js';
 import type { InstalledPlugin } from './plugins.js';
 export * from './plugins.js';
+export * from './suites.js';
 export * from './capacity.js';
 export * from './drafts.js';
 export { stackWindow, scaleTimeline } from './stack-layout.js';

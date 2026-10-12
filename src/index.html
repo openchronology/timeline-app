@@ -620,6 +620,59 @@ Every point has a place. Explore the spaces between them.</textarea>
       <div id="installed-plugins"></div>
       <button id="plugins-add" class="button-primary">Add plugin</button>
       <button id="plugins-create">Create / import plugin</button>
+      <button id="suites-add">Add suite</button>
+      <button id="suites-create">Create suite</button>
+    </dialog>
+    <dialog id="suite-library-dialog" aria-labelledby="suite-library-heading">
+      <div class="dialog-heading">
+        <h2 id="suite-library-heading">Plugin suites</h2>
+        <button data-close="suite-library-dialog" aria-label="Close plugin suites">×</button>
+      </div>
+      <p class="field-hint">
+        A suite adds several plugins at once. Plugins this timeline already has stay as they are.
+      </p>
+      <label
+        >Search suites<input id="suite-search" type="search" maxlength="200" autocomplete="off"
+      /></label>
+      <p id="suite-library-status" role="status"></p>
+      <div id="suite-library-results"></div>
+      <div class="dialog-actions">
+        <button id="suite-previous">Previous page</button><button id="suite-next">Next page</button
+        ><button id="suite-import">Import suite file…</button>
+      </div>
+      <input id="suite-file" type="file" accept=".json,application/json" hidden />
+      <div id="suite-library-error" class="form-error" role="alert"></div>
+    </dialog>
+    <dialog id="suite-author-dialog" aria-labelledby="suite-author-heading">
+      <form id="suite-author-form">
+        <div class="dialog-heading">
+          <h2 id="suite-author-heading">Create a suite</h2>
+          <button type="button" data-close="suite-author-dialog" aria-label="Close">×</button>
+        </div>
+        <p class="field-hint">
+          Package this timeline's plugins to add them to other timelines at once. The suite carries
+          each plugin's definition, custom plugins included.
+        </p>
+        <label>Name<input id="suite-name" maxlength="100" required /></label>
+        <label
+          >Description<textarea id="suite-description" maxlength="2000" rows="2"></textarea>
+        </label>
+        <fieldset>
+          <legend>Plugins</legend>
+          <div id="suite-plugins"></div>
+        </fieldset>
+        <label
+          >Version<input id="suite-version" type="number" min="1" step="1" value="1" required
+        /></label>
+        <p id="suite-author-status" class="field-hint" role="status"></p>
+        <div id="suite-author-error" class="form-error" role="alert"></div>
+        <div class="dialog-actions">
+          <button type="button" id="suite-export">Export suite file</button
+          ><button type="button" id="suite-publish" class="button-primary">
+            Publish to library
+          </button>
+        </div>
+      </form>
     </dialog>
     <dialog id="plugin-author-dialog" aria-labelledby="plugin-author-heading">
       <div class="dialog-heading">
