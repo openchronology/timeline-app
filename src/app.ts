@@ -223,6 +223,37 @@ let pendingDelete: { id: string; document: number; remove?: () => void } | null 
 let eventEditTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingEventEdit = false;
 let eventEditHistory: { before?: PointEvent; after?: PointEvent } | null = null;
+/**
+ * The moment dialog's session. Edits to a moment show on the timeline as they are typed, but
+ * only Save keeps them: Cancel, Escape, the close button, clicking outside or opening another
+ * entity restores what the dialog opened with. A new moment is added only by Save.
+ */
+let momentSession: { document: number; isNew: boolean; draft: PointEvent | null } | null = null;
+/** While a dialog previews unkept edits, browser drafts are not stored. */
+let previewing = false;
+/** Ends a preview, storing the result when it belongs to the open timeline. */
+function endPreview(current = true) {
+  if (!previewing) return;
+  previewing = false;
+  if (current) persistDraft();
+}
+/** Restores what the moment dialog opened with (within the same timeline) and ends its session. */
+function discardMomentEdits() {
+  clearTimeout(eventEditTimer);
+  pendingEventEdit = false;
+  const session = momentSession,
+    edit = eventEditHistory;
+  momentSession = null;
+  eventEditHistory = null;
+  if (edit && model && session?.document === documentRequest) {
+    if (edit.after) model.delete(edit.after.id);
+    if (edit.before) model.put(edit.before);
+    forgetEdit(edit);
+    selected = edit.before ?? null;
+    changed();
+  }
+  endPreview(session?.document === documentRequest);
+}
 function queueEventEdit() {
   if (!editable() || el('event-form').hidden) return;
   pendingEventEdit = true;
@@ -242,7 +273,7 @@ function flushEventEdit() {
     validateStackMetadata(metadata, installedPlugins());
     const tags = parseTagInput(input('event-tags').value);
     const point: PointEvent = {
-      id: selected?.id ?? eventId(),
+      id: selected?.id ?? momentSession?.draft?.id ?? eventId(),
       time: readEventTime().toString(),
       metadata: {
         ...metadata,
@@ -252,7 +283,18 @@ function flushEventEdit() {
       },
     };
     pendingEventEdit = false;
+    // A new moment stays in the dialog until Save adds it.
+    if (momentSession?.isNew) {
+      momentSession.draft = point;
+      // The time cursor shows where Save will add it.
+      selectedTime = Q.parse(point.time);
+      requestRender(false);
+      text('event-error', '');
+      text('event-edit-status', 'Not on the timeline yet: Save adds it.');
+      return;
+    }
     if (JSON.stringify(point) !== JSON.stringify(selected)) {
+      previewing = true;
       if (!eventEditHistory) {
         eventEditHistory = { before: selected ?? undefined, after: point };
         record(eventEditHistory);
@@ -268,7 +310,10 @@ function flushEventEdit() {
       changed();
     }
     text('event-error', '');
-    text('event-edit-status', 'Applied to timeline. Save or export the timeline to keep it.');
+    text(
+      'event-edit-status',
+      'Shown on the timeline: Save keeps these edits, Cancel discards them.',
+    );
   } catch (error) {
     text('event-error', error instanceof Error ? error.message : String(error));
     text('event-edit-status', 'Incomplete edits — the last valid event is retained.');
@@ -1175,6 +1220,11 @@ function drawFrame() {
   });
   text('visible-count', `${visible.toLocaleString()} visible · ${frame.groups.length} points`);
   el('empty-window').hidden = frame.groups.length > 0 || !!frame.durations?.length;
+  // Fit has nothing to show on an empty timeline: say so instead of offering it.
+  const nothing = !fittable();
+  el('fit-button').hidden = nothing;
+  el('empty-fit').hidden = nothing;
+  text('empty-message', nothing ? emptyTimelineText : 'No moments in this window.');
   summaryExpansion.refresh();
   hoverPreview.refresh();
   animateLiveFrame = false;
@@ -1631,6 +1681,14 @@ function renderComparison(refresh: boolean) {
         if (request !== frameRequest && (comparison || remote || local)) requestRender();
       });
   }, 70);
+}
+/** The empty state's text for a timeline with nothing on it yet. */
+let emptyTimelineText = 'This timeline has no moments yet.';
+/** Whether Fit has anything to show: moments, or durations held in this page. */
+function fittable(): boolean {
+  if (comparison) return true;
+  if (momentCount() > 0n) return true;
+  return !!model && model.durations.size > 0;
 }
 /** Moments in the open timeline, including unsaved additions and deletions. */
 function momentCount(): bigint {
@@ -2125,10 +2183,11 @@ async function restoreAfterSignIn() {
   }
 }
 function persistDraft() {
-  if (memoryOnly() || remote || desktop || !model) return;
+  // A dialog's unkept preview is not stored; Save or discarding stores the result.
+  if (memoryOnly() || remote || desktop || !model || previewing) return;
   clearTimeout(draftTimer);
   draftTimer = setTimeout(() => {
-    if (memoryOnly() || remote || !model || sparseWorkspace()) return;
+    if (memoryOnly() || remote || !model || sparseWorkspace() || previewing) return;
     const full = draftIndex !== model;
     void storeDraft(model)
       .then((busy) => {
@@ -2831,7 +2890,8 @@ function showMomentDetails(title: string) {
 }
 function eventForm(event?: PointEvent, time?: Q) {
   if (comparison && !event) return;
-  flushEventEdit();
+  // Opening another entity ends the current session without keeping it.
+  discardMomentEdits();
   if (event && !comparison) {
     sparseWorkspace()?.load(event);
     event = model?.byId.get(event.id) ?? event;
@@ -2841,6 +2901,8 @@ function eventForm(event?: PointEvent, time?: Q) {
   selectionRequest++;
   clearGroupPage();
   selected = event ?? null;
+  momentSession =
+    editable() && !comparison ? { document: documentRequest, isNew: !event, draft: null } : null;
   if (!event) selectedGroup = null;
   el('event-form').hidden = false;
   el('group-details').hidden = true;
@@ -2874,7 +2936,9 @@ function eventForm(event?: PointEvent, time?: Q) {
     comparison
       ? `Read-only comparison · ${event?.metadata.comparisonSource ?? ''} · original coordinate ${event?.metadata.originalTime ?? ''}`
       : editable()
-        ? 'Edits apply to the timeline automatically.'
+        ? event
+          ? 'Edits show on the timeline as you type; Save keeps them.'
+          : 'Save adds this moment to the timeline.'
         : 'Read-only moment.',
   );
   el('event-delete').hidden = !event || !editable();
@@ -3308,6 +3372,15 @@ function fit() {
     localLast = model?.points.maxKey();
   if (localFirst && (!first || localFirst.compare(first) < 0)) first = localFirst;
   if (localLast && (!last || localLast.compare(last) > 0)) last = localLast;
+  // A timeline of durations alone fits its durations.
+  if (!first && model && !sparseWorkspace())
+    for (const duration of model.durations.values()) {
+      const band = resolveDuration(duration, (id) => model!.momentTime(id));
+      if (!band) continue;
+      const [start, end] = [Q.parse(band.first), Q.parse(band.last)];
+      if (!first || start.compare(first) < 0) first = start;
+      if (!last || end.compare(last) > 0) last = end;
+    }
   viewport = Viewport.fit(first, last);
   requestRender();
 }
@@ -3418,10 +3491,12 @@ function showTimelineMenu(
       selectedGroup = null;
       eventForm(undefined, time);
     });
-  add('Fit all', () => {
-    fit();
-    details.close();
-  });
+  // Nothing to fit on an empty timeline.
+  if (fittable())
+    add('Fit all', () => {
+      fit();
+      details.close();
+    });
   if (point && editable()) {
     add('Edit', () => {
       flushEventEdit();
@@ -3827,8 +3902,7 @@ el('center-vertical').onclick = () => {
 el('empty-fit').onclick = fit;
 el('add-button').onclick = () => eventForm(undefined, selectedTime ?? undefined);
 el('clear-selection').onclick = () => {
-  flushEventEdit();
-  pendingEventEdit = false;
+  discardMomentEdits();
   selectedTime = null;
   selected = null;
   selectedGroup = null;
@@ -3837,15 +3911,12 @@ el('clear-selection').onclick = () => {
   el<HTMLDialogElement>('inspector').close();
   requestRender();
 };
-el('close-inspector').onclick = () => {
-  flushEventEdit();
-  el<HTMLDialogElement>('inspector').close();
-};
+el('close-inspector').onclick = () => el<HTMLDialogElement>('inspector').close();
 el<HTMLDialogElement>('inspector').addEventListener('close', () => {
   if (el<HTMLDialogElement>('inspector').open) return;
   closeTimelineMenu();
-  flushEventEdit();
-  pendingEventEdit = false;
+  // Closed other than by Save: nothing typed since it opened is kept.
+  discardMomentEdits();
   selected = null;
   selectedGroup = null;
   selectionRequest++;
@@ -4256,14 +4327,16 @@ el<HTMLDialogElement>('delete-dialog').addEventListener('close', () => {
   if (!el<HTMLDialogElement>('delete-dialog').open) pendingDelete = null;
 });
 el('delete-confirm').onclick = () => {
-  flushEventEdit();
   const pending = pendingDelete;
   if (!pending || pending.document !== documentRequest || !editable()) return;
   if (pending.remove) {
+    flushEventEdit();
     pending.remove();
     el<HTMLDialogElement>('delete-dialog').close();
     return;
   }
+  // Deleting the open moment drops its unkept edits first, so undo restores it as it was.
+  if (selected?.id === pending.id) discardMomentEdits();
   const point = model!.byId.get(pending.id);
   if (!point) {
     el<HTMLDialogElement>('delete-dialog').close();
@@ -4303,12 +4376,16 @@ function clearHistory() {
   eventEditHistory = null;
 }
 function applyEdit(redo: boolean) {
+  // An open dialog's preview is one undo step: undo removes it, and the dialog then closes.
   flushEventEdit();
   clearTimeout(eventEditTimer);
   pendingEventEdit = false;
   eventEditHistory = null;
+  momentSession = null;
   flushDurationEdit();
   if (openDuration) openDuration.edit = null;
+  openDuration = null;
+  previewing = false;
   const edit = (redo ? future : history).pop();
   if (!edit || !model) return;
   if ('link' in edit) {
@@ -5163,8 +5240,7 @@ if (offlineHtml) {
     'propose-button',
   ])
     el(id).hidden = true;
-  document.querySelector('#empty-window')!.firstChild!.textContent =
-    'Import a timeline or add your first event.';
+  emptyTimelineText = 'Import a timeline or add your first event.';
 }
 if (!offlineHtml)
   live = liveUpdates({
@@ -5469,19 +5545,24 @@ function durationLabel(duration: Duration) {
 }
 
 type DurationEdit = { duration: true; before?: Duration; after?: Duration };
-let openDuration: { duration: Duration; readOnly: boolean; edit: DurationEdit | null } | null =
-  null;
+/**
+ * The duration dialog's session, like the moment dialog's: edits preview as they are typed,
+ * only Save keeps them, and a new duration (`isNew`) is added only by Save.
+ */
+let openDuration: {
+  duration: Duration;
+  readOnly: boolean;
+  edit: DurationEdit | null;
+  isNew: boolean;
+  document: number;
+} | null = null;
 let durationTimer: ReturnType<typeof setTimeout> | undefined;
 const durationEditable = () => editable() && !!openDuration && !openDuration.readOnly;
 function createDuration(start: DurationEndpoint, end: DurationEndpoint) {
   if (!editable() || !model) return;
   const duration: Duration = { id: eventId(), start, end, metadata: { title: '' } };
-  // The dialog session extends (or cancels) this same undo step.
-  const edit: DurationEdit = { duration: true, after: duration };
-  record(edit);
-  model.putDuration(duration);
-  changed();
-  showDuration(duration, false, edit);
+  // Not added until Save.
+  showDuration(duration, false, true);
 }
 /** Full metadata is local for complete timelines and fetched for indexed ones. */
 async function openDurationById(id: string, known?: DurationBand) {
@@ -5501,10 +5582,11 @@ async function openDurationById(id: string, known?: DurationBand) {
   if (!duration) throw new Error('This duration is no longer available.');
   showDuration(duration, !editable());
 }
-function showDuration(duration: Duration, readOnly: boolean, edit: DurationEdit | null = null) {
-  flushDurationEdit();
-  openDuration = { duration, readOnly, edit };
-  text('duration-heading', edit && !edit.before ? 'New duration' : 'Duration');
+function showDuration(duration: Duration, readOnly: boolean, isNew = false) {
+  // Opening another entity ends the current session without keeping it.
+  discardDurationEdits();
+  openDuration = { duration, readOnly, edit: null, isNew, document: documentRequest };
+  text('duration-heading', isNew ? 'New duration' : 'Duration');
   input('duration-title').value = duration.metadata.title ?? '';
   el<HTMLTextAreaElement>('duration-description').value = duration.metadata.description ?? '';
   input('duration-tags').value = entityTags(duration.metadata).join(', ');
@@ -5516,7 +5598,8 @@ function showDuration(duration: Duration, readOnly: boolean, edit: DurationEdit 
   el<HTMLTextAreaElement>('duration-metadata').value = JSON.stringify(rest, null, 2);
   for (const id of ['duration-title', 'duration-description', 'duration-tags', 'duration-metadata'])
     (el(id) as HTMLInputElement).disabled = readOnly;
-  el('duration-delete').hidden = readOnly;
+  // A new duration is not on the timeline yet: Cancel is how to drop it.
+  el('duration-delete').hidden = readOnly || isNew;
   el('duration-cancel').parentElement!.hidden = readOnly;
   text('duration-error', '');
   renderDurationEndpoints();
@@ -5552,6 +5635,13 @@ function durationFromForm(): Duration {
 function applyDuration(next: Duration) {
   if (!openDuration || !model || !durationEditable()) return;
   if (JSON.stringify(next) === JSON.stringify(openDuration.duration)) return;
+  // A new duration stays in the dialog until Save adds it.
+  if (openDuration.isNew) {
+    openDuration.duration = next;
+    text('duration-error', '');
+    return;
+  }
+  previewing = true;
   // One dialog session is one undo step.
   if (!openDuration.edit) {
     openDuration.edit = { duration: true, before: openDuration.duration, after: next };
@@ -5580,10 +5670,25 @@ el('duration-form').addEventListener('input', (event) => {
   if (!(event.target as HTMLElement).closest('#duration-endpoints')) queueDurationEdit();
 });
 el('duration-form').addEventListener('submit', (event) => event.preventDefault());
+/** Restores what the duration dialog opened with (within the same timeline) and ends its session. */
+function discardDurationEdits() {
+  clearTimeout(durationTimer);
+  durationTimer = undefined;
+  const current = openDuration;
+  openDuration = null;
+  const edit = current?.edit;
+  if (edit && model && current?.document === documentRequest) {
+    if (edit.before) model.putDuration(edit.before);
+    else if (edit.after) model.deleteDuration(edit.after.id);
+    forgetEdit(edit);
+    changed();
+  }
+  endPreview(current?.document === documentRequest);
+}
 el<HTMLDialogElement>('duration-dialog').addEventListener('close', () => {
   if (el<HTMLDialogElement>('duration-dialog').open) return;
-  flushDurationEdit();
-  openDuration = null;
+  // Closed other than by Save: nothing typed since it opened is kept.
+  discardDurationEdits();
   if (selected && !el('event-form').hidden) refreshDurations();
 });
 /** Removes one dialog session's undo step, whichever stack it is on. */
@@ -5591,46 +5696,51 @@ function forgetEdit(edit: HistoryEntry) {
   history = history.filter((e) => e !== edit);
   future = future.filter((e) => e !== edit);
 }
-// Save applies what the dialog shows (edits also apply as you type) and closes it; Cancel
-// restores what the dialog opened with, including removing a new moment or duration.
+// Save keeps what the dialog shows (edits preview as you type) and closes it; any other way
+// of closing restores what the dialog opened with, and a new moment or duration is not added.
 el('event-save').onclick = () => {
   // Saving a new moment creates it even if nothing was typed: its time is already set.
-  if (!selected) pendingEventEdit = true;
+  if (momentSession?.isNew) pendingEventEdit = true;
   flushEventEdit();
-  if (!pendingEventEdit && !el('event-error').textContent)
-    el<HTMLDialogElement>('inspector').close();
-};
-el('event-cancel').onclick = () => {
-  clearTimeout(eventEditTimer);
-  pendingEventEdit = false;
-  const edit = eventEditHistory;
-  if (edit && model) {
-    if (edit.after) model.delete(edit.after.id);
-    if (edit.before) model.put(edit.before);
-    forgetEdit(edit);
-    eventEditHistory = null;
-    selected = edit.before ?? null;
+  if (pendingEventEdit || el('event-error').textContent) return;
+  const session = momentSession;
+  momentSession = null;
+  if (session?.isNew && session.draft && model && session.document === documentRequest) {
+    const point = session.draft;
+    record({ after: point });
+    model.put(point);
+    selected = point;
     changed();
   }
+  eventEditHistory = null;
+  endPreview();
+  el<HTMLDialogElement>('inspector').close();
+};
+el('event-cancel').onclick = () => {
+  discardMomentEdits();
   el<HTMLDialogElement>('inspector').close();
 };
 el('duration-save').onclick = () => {
   flushDurationEdit();
-  if (!el('duration-error').textContent) el<HTMLDialogElement>('duration-dialog').close();
-};
-el('duration-cancel').onclick = () => {
-  clearTimeout(durationTimer);
-  durationTimer = undefined;
+  if (el('duration-error').textContent) return;
   const current = openDuration;
-  // Cleared first, so closing does not apply the form.
   openDuration = null;
-  const edit = current?.edit;
-  if (edit && model) {
-    if (edit.before) model.putDuration(edit.before);
-    else if (edit.after) model.deleteDuration(edit.after.id);
-    forgetEdit(edit);
+  if (
+    current?.isNew &&
+    model &&
+    current.document === documentRequest &&
+    editable() &&
+    !current.readOnly
+  ) {
+    record({ duration: true, after: current.duration });
+    model.putDuration(current.duration);
     changed();
   }
+  endPreview();
+  el<HTMLDialogElement>('duration-dialog').close();
+};
+el('duration-cancel').onclick = () => {
+  discardDurationEdits();
   el<HTMLDialogElement>('duration-dialog').close();
 };
 el('duration-delete').onclick = () => requestDurationDelete();
@@ -5643,9 +5753,13 @@ function requestDurationDelete() {
     id: current.duration.id,
     document: documentRequest,
     remove: () => {
-      const duration = model?.durations.get(current.duration.id) ?? current.duration;
-      record({ duration: true, before: duration });
-      model?.deleteDuration(duration.id);
+      // Its unkept edits go first, so undo restores the duration as the dialog opened it.
+      if (openDuration === current) discardDurationEdits();
+      const duration = model?.durations.get(current.duration.id);
+      if (duration) {
+        record({ duration: true, before: duration });
+        model?.deleteDuration(duration.id);
+      }
       openDuration = null;
       el<HTMLDialogElement>('delete-dialog').close();
       el<HTMLDialogElement>('duration-dialog').close();

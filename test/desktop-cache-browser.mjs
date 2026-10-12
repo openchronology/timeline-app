@@ -252,7 +252,7 @@ export async function checkDesktopCache(browser) {
     assert.equal(await page.locator('#duration-title').inputValue(), 'Cached period');
     await page.locator('#duration-title').fill('Edited period');
     await band.filter({ hasText: 'Edited period' }).waitFor();
-    await page.getByRole('button', { name: 'Close duration details' }).click();
+    await page.locator('#duration-save').click();
     await page.locator('#duration-dialog').waitFor({ state: 'hidden' });
     await page.locator('#sqlite-save').click();
     await page.waitForFunction(

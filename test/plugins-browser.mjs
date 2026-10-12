@@ -165,7 +165,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
   assert.equal(await reference.getAttribute('rel'), 'noopener noreferrer');
   await sourcesInput.fill('https://example.org/history\nhttps://example.org/research');
   await page.waitForFunction(() =>
-    document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+    document.getElementById('event-edit-status').textContent.startsWith('Shown on the timeline'),
   );
   assert.deepEqual((await exported()).events[0].metadata.sources, [
     'https://example.org/history',
@@ -238,7 +238,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
   assert(await input('event-description').isHidden());
   await rootEditor.fill('Replacement notes');
   await page.waitForFunction(() =>
-    document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+    document.getElementById('event-edit-status').textContent.startsWith('Shown on the timeline'),
   );
   let richSaved = await exported();
   assert.equal(richSaved.events[0].metadata.description, 'Replacement notes');
@@ -253,7 +253,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
   assert.equal(await childEditor.locator('strong').textContent(), 'Child bold');
   await childEditor.fill('Changed child notes');
   await page.waitForFunction(() =>
-    document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+    document.getElementById('event-edit-status').textContent.startsWith('Shown on the timeline'),
   );
   richSaved = await exported();
   assert.equal(richSaved.events[0].metadata.stack[0].metadata.description, 'Changed child notes');
@@ -486,7 +486,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
       () => document.querySelector('.event-marker.icon img')?.naturalWidth > 0,
     );
     await page.waitForFunction(() =>
-      document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+      document.getElementById('event-edit-status').textContent.startsWith('Shown on the timeline'),
     );
     const marker = page.getByRole('button', {
       name: 'Unsaved title survives install',
@@ -511,7 +511,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     await url.fill('https://images.example/changed.png');
     await input('event-title').fill('Icon updated');
     await page.waitForFunction(() =>
-      document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+      document.getElementById('event-edit-status').textContent.startsWith('Shown on the timeline'),
     );
     await page.waitForFunction(
       () =>
@@ -667,7 +667,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     await input('delete-confirm').click();
     assert.equal(await cards.count(), 1);
     await page.waitForFunction(() =>
-      document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+      document.getElementById('event-edit-status').textContent.startsWith('Shown on the timeline'),
     );
     const stacked = await exported();
     assert.equal(stacked.events.length, document.events.length);
@@ -705,7 +705,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     assert.equal(await cards.count(), 2);
     await cards.nth(1).getByLabel('Title', { exact: true }).fill('From parent menu');
     await page.waitForFunction(() =>
-      document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+      document.getElementById('event-edit-status').textContent.startsWith('Shown on the timeline'),
     );
     await closeMomentDetails(page);
     await page.locator('.stack-marker').first().click({ button: 'right' });
@@ -726,7 +726,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     const rootColor = input('plugin-event-fields').locator(':scope > [data-metadata-key="color"]');
     await rootColor.getByRole('button', { name: 'Bad', exact: true }).click();
     await page.waitForFunction(() =>
-      document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+      document.getElementById('event-edit-status').textContent.startsWith('Shown on the timeline'),
     );
     assert.equal(await parentDot.evaluate((b) => b.style.backgroundColor), 'rgb(188, 102, 99)');
     assert.equal(
@@ -934,12 +934,12 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     assert.equal((await exported()).events[0].metadata.title, '');
     await input('event-title').fill('Visible title');
     await page.waitForFunction(() =>
-      document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+      document.getElementById('event-edit-status').textContent.startsWith('Shown on the timeline'),
     );
     await page.locator('#markers .event-label').waitFor({ state: 'visible' });
     await input('event-title').fill('   ');
     await page.waitForFunction(() =>
-      document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+      document.getElementById('event-edit-status').textContent.startsWith('Shown on the timeline'),
     );
     await page.locator('#markers .event-label').waitFor({ state: 'hidden' });
     await closeMomentDetails(page);

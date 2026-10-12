@@ -142,17 +142,15 @@ export async function checkIssues(page, restore) {
     await endpoint.locator('.duration-anchor').filter({ hasText: 'End' }).waitFor();
     const durationOf = async () => (await exported()).durations?.[0];
     await page.waitForFunction(() => !document.querySelector('#duration-error').textContent);
-    let saved = await durationOf();
-    for (let i = 0; i < 20 && saved?.metadata.title !== 'Linked span'; i++) {
-      await page.waitForTimeout(100);
-      saved = await durationOf();
-    }
+    // A new duration is added by Save, not as it is edited.
+    assert.equal(await durationOf(), undefined);
+    await page.locator('#duration-save').click();
+    await durationDialog.waitFor({ state: 'hidden' });
+    const saved = await durationOf();
     assert.deepEqual(saved.start, { moment: 'start' });
     assert.deepEqual(saved.end, { moment: 'end' });
     assert.equal(saved.metadata.title, 'Linked span');
     assert.equal((await exported()).events[0].metadata.durations, undefined);
-    await durationDialog.getByRole('button', { name: 'Close duration details' }).click();
-    await durationDialog.waitFor({ state: 'hidden' });
     // The moment lists durations that follow it.
     await page
       .locator('#event-durations .duration-link')

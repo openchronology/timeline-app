@@ -100,11 +100,12 @@ try {
   await input('event-title').fill('An exact offline moment');
   await input('event-time').fill('1/3');
   await page.waitForFunction(() =>
-    document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+    document.getElementById('event-edit-status').textContent.startsWith('Not on the timeline'),
   );
-  assert.match(await input('event-count').textContent(), /1 events/);
   assert.equal(await input('event-exact').inputValue(), '1/3');
+  // Save adds it.
   await closeMomentDetails(page);
+  assert.match(await input('event-count').textContent(), /1 events/);
   await input('fit-button').click();
   await poll(async () => (await markers.count()) === 1);
   const box = await input('timeline-stage').boundingBox(),

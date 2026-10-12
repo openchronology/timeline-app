@@ -52,7 +52,7 @@ export async function checkPresentation(page, restoreDocument) {
   assert.match(await input('event-time').inputValue(), /minutes$/);
   await input('event-title').fill('Renamed without rounding');
   await page.waitForFunction(() =>
-    document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+    document.getElementById('event-edit-status').textContent.startsWith('Shown on the timeline'),
   );
   assert.equal(await input('event-exact').inputValue(), '1/3');
   let document = await exported();
@@ -83,7 +83,7 @@ export async function checkPresentation(page, restoreDocument) {
   await input('event-time').fill('1.5 minutes');
   assert.equal(await input('event-exact').inputValue(), '90/1');
   await page.waitForFunction(() =>
-    document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+    document.getElementById('event-edit-status').textContent.startsWith('Shown on the timeline'),
   );
   assert.equal((await exported()).events[0].time, '90/1');
 

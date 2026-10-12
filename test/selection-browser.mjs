@@ -99,14 +99,19 @@ export async function checkSelection(page, restoreDocument) {
   assert.equal(await input('event-time').inputValue(), contextTime + ' ticks');
   await input('event-title').fill('From context menu');
   await input('event-time').fill('4/7 ticks');
+  // A new moment is added by Save; then it can be opened and deleted.
   await page.waitForFunction(() =>
-    document.getElementById('event-edit-status').textContent.startsWith('Applied to timeline'),
+    document.getElementById('event-edit-status').textContent.startsWith('Not on the timeline'),
   );
+  assert(await input('event-delete').isHidden());
+  await input('event-save').click();
+  await input('inspector').waitFor({ state: 'hidden' });
   assert(
     (await exported()).events.some(
       (e) => e.time === '4/7' && e.metadata.title === 'From context menu',
     ),
   );
+  await page.getByRole('button', { name: 'From context menu', exact: true }).click();
   await input('event-delete').click();
   assert(await input('delete-dialog').isVisible());
   assert.equal((await exportedAfterCancel()).events.length, 3);
