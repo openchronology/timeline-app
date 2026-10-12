@@ -151,40 +151,8 @@ jobs:
           if-no-files-found: ignore
   # The browser's capacity advice (src/capacity.ts, docs/capacity.md): within the comfortable
   # sizes every interaction meets its budget, and just past them the advice is showing
-  # wherever one misses. The browser at full speed, comfortable at 1,000 moments, is gated
-  # in the PostgreSQL job with the platform.
-  # TEMPORARY (#68): navigation by size on hosted runners, to raise the comfortable sizes.
-  # Not a gate; removed before merging.
-  ui-calibration:
-    name: UI calibration / ${{ matrix.run.name }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 150
-    strategy:
-      fail-fast: false
-      matrix:
-        run:
-          - { name: full speed, throttle: '1', sizes: '1000,2000,4000,10000,20000' }
-          - { name: x4, throttle: '4', sizes: '250,500,1000,2000' }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-          cache: npm
-      - run: node scripts/npm-ci.mjs
-      - run: npx playwright install --with-deps chromium
-      - run: npm run build:editor
-      - run: node bench/ui.mjs
-        env:
-          UI_PLATFORMS: browser
-          UI_SIZES: ${{ matrix.run.sizes }}
-          UI_THROTTLES: ${{ matrix.run.throttle }}
-          UI_SAMPLES: '5'
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always()
-        with:
-          name: ui-calibration-${{ matrix.run.throttle }}
-          path: bench/results/ui.json
+  # wherever one misses. The browser at full speed, comfortable up to 10,000 moments, is
+  # gated in the PostgreSQL job with the platform.
   ui-capacity:
     name: UI capacity advice
     runs-on: ubuntu-24.04
@@ -198,29 +166,27 @@ jobs:
       - run: node scripts/npm-ci.mjs
       - run: npx playwright install --with-deps chromium
       - run: npm run build:editor
-      # A slow device (CPU throttled 4×) at its comfortable size. Zooming and panning miss
-      # their budget there at any size (#68): reported, not failing.
+      # A slow device (CPU throttled 4×) at its comfortable size.
       - name: Slow device, comfortable size
         run: node bench/ui.mjs --gate
         env:
           UI_PLATFORMS: browser
           UI_THROTTLES: '4'
-          UI_SIZES: '500'
+          UI_SIZES: '1000'
           UI_SAMPLES: '3'
-          UI_KNOWN: navigation
       - name: Past the comfortable size, at full speed
         run: node bench/ui.mjs --gate
         env:
           UI_PLATFORMS: browser
           UI_THROTTLES: '1'
-          UI_SIZES: '2000'
+          UI_SIZES: '20000'
           UI_SAMPLES: '3'
       - name: Past the comfortable size, on a slow device
         run: node bench/ui.mjs --gate
         env:
           UI_PLATFORMS: browser
           UI_THROTTLES: '4'
-          UI_SIZES: '1000'
+          UI_SIZES: '2000'
           UI_SAMPLES: '3'
   postgres:
     name: PostgreSQL 16 / native pgmp / accounts and sharing
@@ -293,11 +259,12 @@ jobs:
           node test/syslog-live-postgres.mjs
       - name: Sharing, link previews and embeds in a live browser
         run: node test/sharing-postgres.mjs
-      # Interactions within the budgets in src/capacity.ts, browser and platform, small sizes.
+      # Interactions within the budgets in src/capacity.ts: the browser (comfortable up to
+      # 10,000 moments) and the platform (up to the limit) at 1,000 and 10,000.
       - name: UI interactions within budget
         run: node bench/ui.mjs --gate
         env:
-          UI_SIZES: '1000'
+          UI_SIZES: '1000,10000'
           UI_THROTTLES: '1'
           UI_SAMPLES: '3'
       - run: npm run test:versioning:postgres
@@ -344,16 +311,13 @@ jobs:
       - run: npm run build:editor
       # A debug app with the editor embedded (no installer packages).
       - run: npx tauri build --debug --no-bundle
-      # 1,000 moments stay in memory; 10,000 move into the native SQLite store. Navigation and
-      # new durations miss their budgets on the desktop, more so with Xvfb's software rendering
-      # (#68): they are reported, and everything else must meet its budget.
+      # 1,000 moments stay in memory; 10,000 move into the native SQLite store.
       - name: UI interactions within budget
         run: xvfb-run -a node bench/ui.mjs --gate
         env:
           UI_PLATFORMS: desktop
           UI_SIZES: '1000,10000'
           UI_SAMPLES: '3'
-          UI_KNOWN: navigation,new-duration
           # Software rendering on shared runners is slow and varies widely: opening search took
           # 96 ms on a laptop and 140-173 ms here. The desktop gate guards against breakage
           # (an interaction that fails or never finishes) and gross regressions.

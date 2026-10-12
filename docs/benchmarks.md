@@ -106,7 +106,7 @@ The budgets follow the advice thresholds (`response` is `THRESHOLDS.edit`, `view
 
 The runs cover:
 
-- the in-memory browser editor, at full speed and with the CPU throttled 4×, whose comfortable sizes are 1,000 and 500 moments (throttled, zooming and panning miss their budget at any size, #68);
+- the in-memory browser editor, at full speed and with the CPU throttled 4×, whose comfortable sizes are 10,000 and 1,000 moments;
 - the platform: the production Next.js server with PostgreSQL, signed in as a `bench_ui` user, whose comfortable size is the 200,000-moment limit;
 - the desktop app (WebKitGTK on Linux), whose comfortable size is also the limit. Timelines over 2,048 moments move into the native SQLite store after opening, as for desktop users; smaller ones stay in memory. Pinch gestures are measured in Chromium only, through its DevTools touch input; the desktop driver sends mouse, keyboard and wheel input.
 
@@ -126,10 +126,10 @@ Each interaction is measured `UI_SAMPLES` times (default 5) and judged by its me
 
 `node bench/ui.mjs --gate` exits with an error on any budget missed within a comfortable size, and on any advice gap, apart from the known misses. In CI, the gate allows 1.5× the budgets (`UI_TOLERANCE`) for slower shared runners:
 
-- the browser and the platform at 1,000 moments;
-- the browser throttled 4× at 500 moments, its comfortable size there, with navigation a known miss (#68);
-- the browser past its comfortable sizes, at 2,000 moments and at 1,000 throttled 4×: wherever an interaction misses its budget, the advice must be showing;
-- the desktop app at 1,000 moments (in memory) and 10,000 moments (SQLite), under Xvfb, allowing 3×: software rendering on shared runners is slow and varies widely (opening search took 96 ms on a laptop and 140–173 ms in CI). This gate guards against breakage, such as an interaction that fails or never finishes, and gross regressions. Navigation and new durations are known misses there (#68).
+- the browser and the platform at 1,000 and 10,000 moments;
+- the browser throttled 4× at 1,000 moments, its comfortable size there;
+- the browser past its comfortable sizes, at 20,000 moments and at 2,000 throttled 4×: wherever an interaction misses its budget, the advice must be showing;
+- the desktop app at 1,000 moments (in memory) and 10,000 moments (SQLite), under Xvfb, allowing 3×: software rendering on shared runners is slow and varies widely (opening search took 96 ms on a laptop and 140–173 ms in CI). This gate guards against breakage, such as an interaction that fails or never finishes, and gross regressions.
 
 The Benchmarks workflow runs the browser and platform at the full set of sizes and adds an **Interactions** table to the report.
 
@@ -168,27 +168,32 @@ Medians from one run on an AMD Ryzen 7 7730U laptop (16 threads): headless Chrom
 
 What this shows:
 
-- **Navigation is the bottleneck on every platform.** Discrete actions (opening a moment, typing, saving, deleting, searching) stay within budget almost everywhere. Zooming, panning and pinching miss it once a few thousand moments are in view. At 1,000 moments each zoom step costs 70–80 ms of drawing, so a 50 ms frame budget is out of reach until that drawing is cheaper (#68). Opening a new duration redraws too, and misses at 10,000 moments.
+- **Navigation was the bottleneck on every platform.** Discrete actions (opening a moment, typing, saving, deleting, searching) stayed within budget almost everywhere. Zooming, panning and pinching missed it once a few thousand moments were in view, and opening a new duration missed at 10,000 moments. Drawing has since become several times faster (#68, [below](#comfortable-sizes)).
 - **The comfortable sizes were optimistic for gestures.** Navigation missed its budget in the browser at 4,000 moments, then the documented comfortable size, and on a throttled CPU already at 1,000. The platform and the desktop app, documented as comfortable up to the 200,000 limit, miss it from 10,000.
 - **The advice showed too late.** Beyond the comfortable sizes, the browser missed its budgets without the advice showing ("advice gaps"): the advice compared the editor's own drawing time with 150 ms, while users wait longer, from input to paint. The advice now times those waits (#69), and the comfortable sizes come from the runs below.
 
-This run timed zooming until the bounds fields changed, which can be a frame before the moments are drawn, so its zoom times are somewhat low.
+This run predates #68's faster drawing, and timed zooming until the bounds fields changed, a frame before the moments were drawn.
 
 #### Comfortable sizes
 
-The comfortable sizes in `src/capacity.ts` come from the browser runs on GitHub's hosted runners (`ubuntu-24.04`), about 1.3× slower than the laptop above. Medians in ms, two runs at full speed and one throttled 4×; **bold** misses the 150 ms budget:
+The comfortable sizes in `src/capacity.ts` come from the browser runs on GitHub's hosted runners (`ubuntu-24.04`), about 1.3× slower than the laptop above. Medians in ms; **bold** misses its budget (150 ms for views and frames, 100 ms for Cancel and Delete, 1.5 s for opening):
 
-| Interaction           |    250 |    500 |   1,000 |       2,000 |       4,000 |  ×4 250 |  ×4 500 | ×4 1,000 |  ×4 2,000 |
-| --------------------- | -----: | -----: | ------: | ----------: | ----------: | ------: | ------: | -------: | --------: |
-| Wheel zoom            |  70–86 | 93–122 | 110–136 | **165–206** | **213–270** | **257** | **419** |  **528** |   **819** |
-| Drag (longest frame)  |     33 |  34–67 |   67–83 |     100–133 | **167–217** | **217** | **300** |  **500** |   **600** |
-| Pinch (longest frame) |     33 | 67–100 |  83–117 | **183–233** | **250–317** | **217** | **433** |  **583** | **1,000** |
-| Keyboard zoom         |  36–43 |  36–55 |   57–83 |     112–149 | 123–**200** | **190** | **238** |  **257** |   **283** |
-| Open                  | 80–101 | 99–130 | 144–189 |     287–341 |     462–550 |     607 |     528 |      764 |     1,108 |
+| Interaction           | 1,000 | 2,000 | 4,000 | 10,000 |    20,000 | ×4 250 | ×4 500 | ×4 1,000 | ×4 2,000 |
+| --------------------- | ----: | ----: | ----: | -----: | --------: | -----: | -----: | -------: | -------: |
+| Wheel zoom            |    52 |    58 |    64 |     73 |        78 |     78 |     94 |      106 |      137 |
+| Drag (longest frame)  |    17 |    33 |    34 |     50 |        50 |     50 |     50 |      100 |      150 |
+| Pinch (longest frame) |    33 |    33 |    50 |     67 |        67 |     50 |     83 |      100 |      117 |
+| Keyboard zoom         |    35 |    40 |    44 |     55 |        56 |     59 |     61 |      135 |  **173** |
+| Cancel a moment edit  |    50 |    53 |    40 |     98 |   **216** |     47 |     50 |       63 |       89 |
+| Delete (ask, remove)  |    83 |    81 |    45 |     82 |   **248** |     34 |     71 |       73 |       41 |
+| Undo and redo         |    21 |    29 |    35 |    105 |   **231** |     26 |     31 |       48 |       63 |
+| Open                  |   201 |   213 |   360 |    854 | **1,600** |    252 |    302 |      431 |      710 |
 
-At full speed every interaction meets its budget up to 1,000 moments, and zooming and pinching miss it from 2,000. Throttled 4×, navigation misses at every size, as each frame redraws the view; apart from navigation, every interaction meets its budget up to 500 moments (at 1,000 the delete confirmation takes 137 ms).
+At full speed every interaction meets its budget up to 10,000 moments; at 20,000 opening, edits and undo miss it, and the advice shows from the timeline's size. Throttled 4×, every interaction meets it up to 1,000 moments, and zooming misses it from 2,000.
 
-CI checks the browser and the platform at 1,000 moments, the browser around its comfortable sizes (above), and the desktop app at 1,000 and 10,000 moments. Every interaction except the known navigation misses meets its budget there, and past the comfortable sizes the advice shows wherever one misses.
+Before #68, navigation was the bottleneck: on the same runners wheel zoom took 136 ms at 1,000 moments and 270 ms at 4,000, and throttled 4× it missed even at 250 moments (257 ms), so the comfortable sizes were 1,000 and 500. Drawing each frame read the stage's width once per marker, and asked for every label's animations and style; each read after drawing changed the page made the browser lay it out or restyle it again. The editor now keeps the stage's size from a ResizeObserver and tracks the animations it starts; duration bands and relationship arcs reshape rather than rebuild, and an edit rebuilds the duration and arc trees only when a moment they name moves.
+
+CI checks the browser and the platform at 1,000 and 10,000 moments, the browser throttled 4× at 1,000, the advice just past the comfortable sizes (20,000, and 2,000 throttled), and the desktop app at 1,000 and 10,000 moments. Every interaction meets its budget there, and past the comfortable sizes the advice shows wherever one misses.
 
 ## Method
 

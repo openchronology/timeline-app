@@ -19,8 +19,8 @@ export const THRESHOLDS = {
   navigation: 150,
   /**
    * Browser: moments from which slow navigation is advised. Below this, zooming and panning
-   * cost mostly the per-frame drawing every platform does in the browser (#68): on a slow
-   * device it is over 150 ms at any size, and another platform would not help.
+   * cost mostly the drawing every platform does in the browser, so another platform would
+   * not be faster: a device slow there is slow everywhere.
    */
   navigationMoments: 1000,
   /** Browser: median pause after an edit (redraw and draft save) longer than this, in ms. */
@@ -57,12 +57,11 @@ export const BUDGETS = {
 /**
  * The largest timelines (in moments) each platform handles comfortably (docs/capacity.md),
  * from the UI benchmarks on hosted runners: every interaction meets its budget there.
- * `slowBrowser` is a phone or slower computer, measured with the CPU throttled 4×; there
- * zooming and panning miss their budget at any size (#68), and are not counted.
+ * `slowBrowser` is a phone or slower computer, measured with the CPU throttled 4×.
  */
 export const COMFORTABLE = {
-  browser: 1000,
-  slowBrowser: 500,
+  browser: 10000,
+  slowBrowser: 1000,
   desktop: LIMIT,
   platform: LIMIT,
 };
