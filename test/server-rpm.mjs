@@ -35,7 +35,10 @@ try {
   await run('docker', ['cp', rpm, `${name}:${file}`]);
   // A server without systemd, like a container: the package initializes and starts
   // PostgreSQL itself.
-  const install = await sh(`dnf install -y -q ${file} 2>&1`);
+  // dnf 5 (Fedora) prints the package scripts' output; dnf 4 (Rocky, RHEL) logs it.
+  const install = await sh(
+    `dnf install -y -q ${file} 2>&1; cat /var/log/dnf.rpm.log 2>/dev/null || true`,
+  );
   assert.match(install, /OpenChronology is installed and ready/, install.slice(-3000));
   assert.match(install, /OpenChronology schema installed\./);
 
