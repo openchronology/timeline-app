@@ -28,6 +28,7 @@ export const config = {
     '/account',
     '/admin',
     '/plugins',
+    '/download',
     '/legal',
     '/editor',
     '/timelines/:path*',

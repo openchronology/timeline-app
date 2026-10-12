@@ -236,7 +236,15 @@ Build identity and downloads
 
 Every platform, desktop and standalone HTML footer displays the exact version tag at the built commit, or its full Git hash when no version tag points at it. Local modifications are marked `modified`. The identity is baked into the assets, not taken from the server's runtime environment. Matching source archives include `build-info.json`, so rebuilding an archive without `.git` preserves its identity. Builds from unrelated source directories display `unversioned source` rather than inventing a version. `OCH_BUILD_COMMIT` and `OCH_BUILD_VERSION` can supply an explicit identity for external build systems.
 
-The **Download** menu links to the latest stable GitHub release of `openchronology/timeline-app`. GitHub's fixed `releases/latest/download/<asset-name>` URLs resolve to the current release without application updates or background API requests. Prereleases remain available through the release listing.
+The website's **Download** page (`/download`) offers the latest stable GitHub release of `openchronology/timeline-app`.
+
+- **Layout:** it puts the visitor's system first, detected from their browser, with a large download button. It then lists every desktop file by operating system, the offline file, and the server packages.
+- **Server packages:** each package (Debian 13, Ubuntu 24.04) has a one-line `curl … && sudo apt install ./…deb` command to copy, and Docker Compose is offered for other systems.
+- **Release data:** the page reads the release's version, sizes and asset addresses from GitHub's API on the server, at most every ten minutes. `RELEASES_API_URL` overrides the address, for mirrors and tests.
+- **Fallback:** while there is no release, or GitHub cannot be reached, it links to GitHub's fixed `releases/latest/download/<asset-name>` addresses instead.
+- **Adding platforms:** asset names follow the release workflow (`platform/lib/releases.js`; a test keeps them in step), so a new server platform is added to its `SERVERS` list.
+
+The editor's own **Download** menu, in the offline file and the desktop app, uses the fixed addresses. Prereleases remain available through the release listing.
 
 Pushing a semantic version tag such as `v1.2.3` runs `.github/workflows/release.yml`. The desktop reusable workflow builds on GitHub runners for Ubuntu 24.04 (.deb and AppImage), Windows 2025, macOS 15 (Apple silicon), macOS 15 Intel, and a Rocky Linux 10 container on Ubuntu. It publishes `.deb`, portable `.AppImage`, `.rpm`, `.dmg` (both architectures), and Windows NSIS `.exe` installers alongside the standalone offline HTML. Each package records the same tagged commit; publication waits for every target and verifies their identities before generating checksums. Stable releases update the download links; prereleases appear in the release listing.
 

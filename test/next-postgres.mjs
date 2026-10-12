@@ -29,6 +29,8 @@ for (const key of Object.keys(env))
     ['PLUGIN_LIBRARY', 'FEATURED_TIMELINES', 'PLATFORM_NAME', 'GOOGLE_ANALYTICS_ID'].includes(key)
   )
     delete env[key];
+// GitHub cannot be reached: the download page links to the latest release by name.
+env.RELEASES_API_URL = 'http://127.0.0.1:9/latest';
 env.PORT = String(port);
 env.HOSTNAME = '127.0.0.1';
 const child = spawn(
@@ -105,6 +107,15 @@ try {
   assert.match(homeHtml, /<title>OpenChronology<\/title>/);
   assert.doesNotMatch(homeHtml, /Powered by OpenChronology|Analytics settings/);
   assert.doesNotMatch(home.headers.get('content-security-policy'), /google/);
+  const download = await (
+    await fetch(origin + '/download', { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh)' } })
+  ).text();
+  assert.match(download, /The latest release/);
+  assert.match(download, /Desktop app for macOS/);
+  assert.match(
+    download,
+    /href="https:\/\/github\.com\/openchronology\/timeline-app\/releases\/latest\/download\/openchronology-desktop-macos-arm64\.dmg"/,
+  );
   const suffix = Date.now().toString(36),
     term = 'next' + suffix;
   for (const [client, username] of [

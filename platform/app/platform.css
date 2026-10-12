@@ -405,58 +405,6 @@ dialog {
 .build-identity {
   overflow-wrap: anywhere;
 }
-.download-menu {
-  position: relative;
-  font-size: 13px;
-}
-.download-menu summary {
-  cursor: pointer;
-  list-style: none;
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--control-height);
-  border: 1px solid #46614e;
-  border-radius: var(--radius);
-  padding: 0 12px;
-  font-weight: 500;
-}
-.download-menu summary::-webkit-details-marker {
-  display: none;
-}
-.download-menu summary::after {
-  content: '▾';
-  margin-left: 6px;
-  font-size: 10px;
-  opacity: 0.7;
-}
-.download-menu summary:hover {
-  background: #294333;
-}
-.download-menu > div {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
-  z-index: 100;
-  background: #fff;
-  color: #285742;
-  border: 1px solid #d7dfd3;
-  border-radius: 8px;
-  padding: 8px;
-  min-width: 240px;
-  max-width: calc(100vw - 32px);
-  box-shadow: 0 8px 24px #20372c20;
-}
-.platform-header .download-menu > div a {
-  display: block;
-  padding: 8px 10px;
-  border-radius: 6px;
-  color: #285742;
-  text-decoration: none;
-}
-.download-menu > div a:hover {
-  background: #f0f3eb;
-}
-
 /* Human-verification check (src/challenge.ts), shown when the server asks for one. */
 .challenge-dialog {
   width: min(420px, calc(100vw - 32px));
@@ -579,4 +527,121 @@ dialog {
 .link-button:hover {
   background: none;
   color: var(--green-hover);
+}
+
+/* The download page (#111): the visitor's system first, then every desktop and server file. */
+.download-page h2 {
+  margin-top: 36px;
+}
+.download-release strong {
+  color: var(--ink);
+}
+.download-recommended {
+  margin: 24px 0 8px;
+  padding: 24px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f4f8ef, #ffffff);
+}
+.download-recommended h2 {
+  margin: 0 0 6px;
+}
+.download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin-top: 14px;
+}
+.download-primary {
+  min-height: 52px;
+  padding: 0 22px;
+  gap: 12px;
+  font-size: 16px;
+}
+.download-primary small {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.85;
+}
+.download-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 14px;
+}
+.download-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  min-width: 0;
+}
+.download-card.current {
+  border-color: var(--green);
+  box-shadow: 0 0 0 1px var(--green);
+}
+.download-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+.download-card p {
+  margin: 0;
+}
+.download-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e6efdf;
+  color: var(--green);
+}
+.download-file {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.download-size {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.copy-command {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+}
+.copy-command pre {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 10px;
+  overflow-x: auto;
+  border-radius: 6px;
+  background: #1d3528;
+  color: #eef4eb;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.download-more li {
+  margin: 6px 0;
+}
+.download-file .download-size {
+  display: inline-block;
+}
+.download-file:has(.download-size) {
+  text-decoration: none;
+}
+.download-file:has(.download-size) > span:first-child {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.download-primary .download-size {
+  color: #ffffffcc;
 }
