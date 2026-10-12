@@ -129,7 +129,7 @@ Each interaction is measured `UI_SAMPLES` times (default 5) and judged by its me
 - the browser and the platform at 1,000 and 10,000 moments;
 - the browser throttled 4× at 1,000 moments, its comfortable size there;
 - the browser past its comfortable sizes, at 20,000 moments and at 2,000 throttled 4×: wherever an interaction misses its budget, the advice must be showing;
-- the desktop app at 1,000 moments (in memory) and 10,000 moments (SQLite), under Xvfb, allowing 3×: software rendering on shared runners is slow and varies widely (opening search took 96 ms on a laptop and 140–173 ms in CI). This gate guards against breakage, such as an interaction that fails or never finishes, and gross regressions.
+- the desktop app at 1,000 moments (in memory) and 10,000 moments (SQLite), under Xvfb, allowing 3×: software rendering on shared runners is slow and varies widely (opening search took 96 ms on a laptop and 140–173 ms in CI). This gate guards against breakage, such as an interaction that fails or never finishes, and gross regressions. Navigation and new durations are reported there, not gated: in software they vary severalfold between runners, and the WebDriver path now and then loses a wheel or key input.
 
 The Benchmarks workflow runs the browser and platform at the full set of sizes and adds an **Interactions** table to the report.
 
@@ -193,7 +193,7 @@ At full speed every interaction meets its budget up to 10,000 moments; at 20,000
 
 Before #68, navigation was the bottleneck: on the same runners wheel zoom took 136 ms at 1,000 moments and 270 ms at 4,000, and throttled 4× it missed even at 250 moments (257 ms), so the comfortable sizes were 1,000 and 500. Drawing each frame read the stage's width once per marker, and asked for every label's animations and style; each read after drawing changed the page made the browser lay it out or restyle it again. The editor now keeps the stage's size from a ResizeObserver and tracks the animations it starts; duration bands and relationship arcs reshape rather than rebuild, and an edit rebuilds the duration and arc trees only when a moment they name moves.
 
-CI checks the browser and the platform at 1,000 and 10,000 moments, the browser throttled 4× at 1,000, the advice just past the comfortable sizes (20,000, and 2,000 throttled), and the desktop app at 1,000 and 10,000 moments. Every interaction meets its budget there, and past the comfortable sizes the advice shows wherever one misses.
+CI checks the browser and the platform at 1,000 and 10,000 moments, the browser throttled 4× at 1,000, the advice just past the comfortable sizes (20,000, and 2,000 throttled), and the desktop app at 1,000 and 10,000 moments. Every interaction meets its budget there (on the desktop app, apart from navigation and new durations, which are only reported), and past the comfortable sizes the advice shows wherever one misses.
 
 ## Method
 
