@@ -803,10 +803,12 @@ function storedVersion() {
     ),
   };
 }
+/** Windows being taken back from storage; hiding the page waits for them (see below). */
+let restoring: Promise<void> = Promise.resolve();
 function restoreWindows(key: string) {
   const stored = storedVersion();
   if (!stored) return;
-  void windowStore
+  restoring = windowStore
     .load(stored.version)
     .then((windows) => {
       if (remoteCacheKey !== key || !windows.length) return;
@@ -832,7 +834,8 @@ function persistWindows(delay = 2000) {
   else save();
 }
 // A hidden page stores its windows, then keeps only those covering its view; shown again, it
-// takes the others back from storage before storing anything more.
+// takes the others back from storage before storing anything more. Hidden again before they
+// are back, it waits for them: storing first would delete the windows still on their way.
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
     if (remoteCacheKey) restoreWindows(remoteCacheKey);
@@ -840,8 +843,13 @@ document.addEventListener('visibilitychange', () => {
   }
   clearTimeout(prefetchTimer);
   prefetchController?.abort();
-  persistWindows(0);
-  remoteCache.release(viewport);
+  const view = viewport;
+  void restoring.then(() => {
+    // Shown again meanwhile: it keeps everything, and takes back what storage has.
+    if (!document.hidden) return;
+    persistWindows(0);
+    remoteCache.release(view);
+  });
 });
 function sparseWorkspace(): RemoteWorkspace | null {
   return model instanceof RemoteWorkspace ? model : null;
