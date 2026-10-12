@@ -44,7 +44,10 @@ export async function checkRangeDelete(page, restore) {
   await page.locator('#left-bound').fill('100');
   await page.locator('#right-bound').fill('190');
   await page.locator('#apply-bounds').click();
-  await page.waitForFunction(() => document.querySelectorAll('.event-marker').length > 0);
+  // Going to bounds animates; a menu opened meanwhile closes when the animation lands.
+  await page.waitForFunction(
+    () => document.getElementById('markers').dataset.view === '100/1 190/1',
+  );
   const stage = await page.locator('#timeline-stage').boundingBox();
   await page.mouse.click(stage.x + stage.width / 2, stage.y + 60, { button: 'right' });
   await page
