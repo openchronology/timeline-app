@@ -81,6 +81,20 @@ blocked. Deleting a timeline can retain historical ancestors required by forks
 or pull requests, so usage may not drop to zero. History is intentionally
 immutable; saving checkpoints consumes quota even if edits are small.
 
+## Name and analytics
+
+`PLATFORM_NAME` (for example `timescale.info`) replaces "openchronology" in the platform's header. It is also used as the site name in page titles, link previews and oEmbed responses, and the footer then adds "Powered by OpenChronology". When it is empty, OpenChronology's name is shown. The name is at most 60 characters, and the server refuses to start if it is longer.
+
+`GOOGLE_ANALYTICS_ID` enables Google Analytics 4 with a measurement ID such as `G-ABC123DEF4`. When it is empty, nothing changes: pages load no analytics, and the content security policy allows no Google hosts. When it is set:
+
+- The content security policy allows Google's tag script and measurement endpoints.
+- Each visitor is first asked in a small banner, and Google's script loads only for visitors who choose **Allow analytics**.
+- The choice is kept in the visitor's browser. **Analytics settings** in the footer asks again; declining after accepting stops analytics from that page on.
+- Analytics run with Google signals and ad personalization turned off.
+- Embedded timelines (`/embed/…`) and the editor's frame never load analytics.
+
+An ID that is not a measurement ID is refused at startup. Mention analytics in your privacy notice; `legal/PRIVACY.md` describes the default.
+
 ## Account settings
 
 `/account` includes password changes, verified email changes, MFA/recovery codes,

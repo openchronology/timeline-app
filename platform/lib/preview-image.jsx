@@ -16,7 +16,7 @@ import {
   momentTitle,
   presentTime,
   publicTimeline,
-  SITE_NAME,
+  siteName,
   timelineFacts,
   timelineTitle,
 } from './sharing.js';
@@ -162,7 +162,7 @@ function Card({ eyebrow, title, facts, notes, groups, mark }) {
 /** The site's own card, for anything that is not public. */
 function siteCard() {
   return new ImageResponse(
-    <Card title={SITE_NAME} facts="Exact timelines, shared on your terms." groups={[]} />,
+    <Card title={siteName()} facts="Exact timelines, shared on your terms." groups={[]} />,
     size,
   );
 }

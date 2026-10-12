@@ -11,7 +11,7 @@ import {
   entityParam,
   publicTimeline,
   siteOrigin,
-  SITE_NAME,
+  siteName,
   timelineTitle,
 } from '../../../lib/sharing.js';
 export const runtime = 'nodejs';
@@ -54,7 +54,7 @@ export async function GET(request) {
     {
       version: '1.0',
       type: 'rich',
-      provider_name: SITE_NAME,
+      provider_name: siteName(),
       provider_url: origin,
       title,
       author_name: timeline.owner,

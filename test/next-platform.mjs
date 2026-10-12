@@ -19,6 +19,9 @@ for (const key of Object.keys(env))
     ['DATABASE_URL', 'PLUGIN_LIBRARY', 'FEATURED_TIMELINES'].includes(key)
   )
     delete env[key];
+// A named platform with Google Analytics (#100, #101); next-postgres checks neither is set.
+env.PLATFORM_NAME = 'timescale.test';
+env.GOOGLE_ANALYTICS_ID = 'G-TEST12345';
 env.PORT = String(port);
 env.HOSTNAME = '127.0.0.1';
 const child = spawn(
@@ -65,7 +68,12 @@ try {
   assert.doesNotMatch(html, /id="dashboard-mine"/);
   assert.doesNotMatch(html, /id="timeline-stage"/);
   assert.match(html, /href="\/editor\?new=1"/);
+  assert.match(html, /◷ <!-- -->timescale\.test<\/a>|◷ timescale\.test<\/a>/);
+  assert.match(html, /<title>timescale\.test · OpenChronology<\/title>/);
+  assert.match(html, /Powered by OpenChronology/);
   const csp = dashboard.headers.get('content-security-policy');
+  assert.match(csp, /script-src [^;]*https:\/\/www\.googletagmanager\.com/);
+  assert.match(csp, /connect-src [^;]*https:\/\/\*\.google-analytics\.com/);
   assert.match(csp, /'nonce-[^']+'/);
   assert.match(csp, /frame-ancestors 'none'/);
   const nonce = csp.match(/'nonce-([^']+)'/)[1];
@@ -117,7 +125,38 @@ try {
       const page = await browser.newPage({ viewport: { width: 1440, height: 960 } }),
         errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
+      // Google Analytics loads only once a visitor allows it, and stops when they decline.
+      const tags = [];
+      await page.route('https://www.googletagmanager.com/**', (route) => {
+        tags.push(route.request().url());
+        return route.fulfill({ contentType: 'text/javascript', body: 'window.tagLoaded = true;' });
+      });
       await page.goto(origin);
+      const consent = page.locator('.analytics-consent');
+      await consent.waitFor();
+      await consent.getByRole('button', { name: 'Decline' }).click();
+      await consent.waitFor({ state: 'hidden' });
+      await page.reload();
+      await page.locator('#dashboard-browser').waitFor();
+      await page.waitForTimeout(300);
+      assert.equal(await consent.count(), 0);
+      assert.deepEqual(tags, []);
+      await page.getByRole('button', { name: 'Analytics settings' }).click();
+      await consent.getByRole('button', { name: 'Allow analytics' }).click();
+      await page.waitForFunction(() => window.tagLoaded === true);
+      assert.deepEqual(tags, ['https://www.googletagmanager.com/gtag/js?id=G-TEST12345']);
+      const config = await page.evaluate(() =>
+        window.dataLayer.map((entry) => Array.from(entry)).find((entry) => entry[0] === 'config'),
+      );
+      assert.deepEqual(config, [
+        'config',
+        'G-TEST12345',
+        { allow_google_signals: false, allow_ad_personalization_signals: false },
+      ]);
+      // Remembered: the next page loads it without asking.
+      await page.reload();
+      await page.waitForFunction(() => window.tagLoaded === true);
+      assert.equal(await consent.count(), 0);
       await page.locator('#dashboard-browser').waitFor();
       assert.equal(await page.locator('#dashboard-mine').count(), 0);
       await page.getByLabel('Search timelines').fill('history');

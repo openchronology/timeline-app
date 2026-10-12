@@ -24,7 +24,10 @@ const env = {
   NEXT_TELEMETRY_DISABLED: '1',
 };
 for (const key of Object.keys(env))
-  if (key.startsWith('OAUTH_') || ['PLUGIN_LIBRARY', 'FEATURED_TIMELINES'].includes(key))
+  if (
+    key.startsWith('OAUTH_') ||
+    ['PLUGIN_LIBRARY', 'FEATURED_TIMELINES', 'PLATFORM_NAME', 'GOOGLE_ANALYTICS_ID'].includes(key)
+  )
     delete env[key];
 env.PORT = String(port);
 env.HOSTNAME = '127.0.0.1';
@@ -95,6 +98,13 @@ try {
     await delay(200);
   }
   assert(ready, logs);
+  // Unnamed and without analytics: OpenChronology's name, and no Google hosts allowed.
+  const home = await fetch(origin + '/'),
+    homeHtml = await home.text();
+  assert.match(homeHtml, /◷ <!-- -->openchronology<\/a>|◷ openchronology<\/a>/);
+  assert.match(homeHtml, /<title>OpenChronology<\/title>/);
+  assert.doesNotMatch(homeHtml, /Powered by OpenChronology|Analytics settings/);
+  assert.doesNotMatch(home.headers.get('content-security-policy'), /google/);
   const suffix = Date.now().toString(36),
     term = 'next' + suffix;
   for (const [client, username] of [

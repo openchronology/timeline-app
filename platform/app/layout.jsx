@@ -3,15 +3,18 @@ import './platform.css';
 import Downloads from '../components/downloads.jsx';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { siteOrigin, SITE_NAME } from '../lib/sharing.js';
+import Analytics, { AnalyticsSettings } from '../components/analytics.jsx';
+import { headers } from 'next/headers';
+import { siteOrigin } from '../lib/sharing.js';
+import { analyticsId, platformName, siteName } from '../../server/site.mjs';
 export function generateMetadata() {
   const description = 'Exact timelines, shared on your terms.';
   return {
     // Relative addresses in pages' metadata (link previews, canonical links) are on this site.
     metadataBase: new URL(siteOrigin()),
-    title: 'OpenChronology · timescale.info',
+    title: platformName() ? `${platformName()} · OpenChronology` : 'OpenChronology',
     description,
-    openGraph: { type: 'website', siteName: SITE_NAME, locale: 'en_US', description },
+    openGraph: { type: 'website', siteName: siteName(), locale: 'en_US', description },
     twitter: { card: 'summary_large_image' },
   };
 }
@@ -22,12 +25,16 @@ export default async function RootLayout({ children }) {
       'utf8',
     ),
   );
+  // A platform's own name replaces OpenChronology's in its header (PLATFORM_NAME).
+  const name = platformName();
+  const analytics = analyticsId();
+  const nonce = analytics ? (await headers()).get('x-nonce') : null;
   return (
     <html lang="en">
       <body>
         <header className="platform-header">
           <a href="/" className="brand">
-            ◷ openchronology
+            ◷ {name ?? 'openchronology'}
           </a>
           <nav aria-label="Platform navigation">
             <a href="/editor?new=1">＋ New timeline</a>
@@ -45,7 +52,15 @@ export default async function RootLayout({ children }) {
           </a>
           {' · '}
           <span className="build-identity">Build: {build.label}</span>
+          {name ? ' · Powered by OpenChronology' : ''}
+          {analytics ? (
+            <>
+              {' · '}
+              <AnalyticsSettings />
+            </>
+          ) : null}
         </footer>
+        {analytics ? <Analytics id={analytics} nonce={nonce} /> : null}
       </body>
     </html>
   );

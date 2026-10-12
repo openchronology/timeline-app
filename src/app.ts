@@ -188,6 +188,15 @@ if (embedded) {
   document.body.dataset.embed = 'true';
   anonymousRequests();
 }
+// Which edition this is, beside the brand: the offline file or the desktop app.
+if (offlineHtml || desktop) {
+  const edition = el('edition-chip');
+  edition.textContent = offlineHtml ? 'Offline' : 'Desktop';
+  edition.title = offlineHtml
+    ? 'This file works without a network: timelines stay on this device.'
+    : 'The desktop app: local .och files, and the servers you connect to.';
+  edition.hidden = false;
+}
 if (desktop) {
   for (const link of document.querySelectorAll<HTMLAnchorElement>('.download-menu a'))
     link.onclick = (event) => {
