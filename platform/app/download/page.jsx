@@ -153,8 +153,7 @@ export default async function Download() {
           Run your own OpenChronology server for your organization or community. The package
           installs PostgreSQL, sets up the database and starts the service on port 5173; put an
           HTTPS proxy in front of it and set your address in{' '}
-          <code>/etc/openchronology/openchronology.env</code>.{' '}
-          <a href={`${DOCS}/deploy/debian-server/README.Debian`}>Setup guide</a>
+          <code>/etc/openchronology/openchronology.env</code>.
         </p>
         <div className="download-grid">
           {servers.map((server) => (
@@ -176,8 +175,14 @@ export default async function Download() {
               />
               <File
                 release={release}
-                file={{ ...server, detail: 'Server package (.deb), amd64' }}
+                file={{
+                  ...server,
+                  detail: `Server package (.${server.asset.split('.').pop()}), amd64`,
+                }}
               />
+              <a className="download-file" href={`${DOCS}/${server.guide}`}>
+                Setup guide
+              </a>
             </article>
           ))}
           <article className="download-card" data-server="docker">

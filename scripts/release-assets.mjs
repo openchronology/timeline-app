@@ -26,7 +26,7 @@ for (const [target, spec] of Object.entries(targets)) {
   if (target.startsWith('macos') || target.startsWith('windows'))
     required.push('openchronology-native-source-' + target + '.tar.gz');
 }
-// Server packages for each distribution (scripts/server-deb.mjs).
+// Server packages for each distribution (scripts/server-package.mjs).
 for (const target of Object.keys(serverTargets)) required.push(serverPackage(target));
 for (const name of required)
   if (!(await readFile(`${dir}/${name}`)).length) throw new Error('Empty release asset: ' + name);

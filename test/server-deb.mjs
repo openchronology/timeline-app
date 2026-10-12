@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// Installs a server .deb (scripts/server-deb.mjs) in a fresh container of its distribution and
+// Installs a server .deb (scripts/server-package.mjs) in a fresh container of its distribution and
 // checks the first install, the running server, an upgrade and a purge.
 // Usage: node test/server-deb.mjs server-artifacts/openchronology-server-<target>-amd64.deb
 import assert from 'node:assert/strict';
@@ -11,8 +11,8 @@ import { serverPackage, serverTargets } from '../scripts/server-targets.mjs';
 const run = promisify(execFile);
 const deb = resolve(process.argv[2] ?? '');
 const target = Object.keys(serverTargets).find((t) => basename(deb) === serverPackage(t));
-const base = target && serverTargets[target].base;
-if (!base) throw new Error('Pass a server .deb built by scripts/server-deb.mjs.');
+const base = target && serverTargets[target].format === 'deb' && serverTargets[target].base;
+if (!base) throw new Error('Pass a server .deb built by scripts/server-package.mjs.');
 const name = 'och-server-deb-' + process.pid;
 const sh = async (script, { allowFailure = false } = {}) => {
   try {

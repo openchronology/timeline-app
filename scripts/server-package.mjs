@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// Builds the server .deb packages (deploy/debian-server) with Docker, into server-artifacts/
-// as openchronology-server-<target>-amd64.deb.
-// Usage: node scripts/server-deb.mjs [debian13|ubuntu24.04 ...]
+// Builds the server packages with Docker, into server-artifacts/ as
+// openchronology-server-<target>-amd64.<deb|rpm>: .deb from deploy/debian-server, .rpm from
+// deploy/rpm-server (#116).
+// Usage: node scripts/server-package.mjs [debian13|ubuntu24.04|rocky10|fedora44 ...]
 //   RELEASE_TAG=v1.2.3 builds a release version (the checkout must be that tag).
 import { execFile, spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises';
@@ -32,29 +33,41 @@ const upstream = tag ? upstreamVersion(tag) : `${version}~dev.${stamp}.${commit.
 await mkdir('server-artifacts', { recursive: true });
 for (const name of chosen.length ? chosen : Object.keys(serverTargets)) {
   const target = serverTargets[name];
-  const debVersion = `${upstream}-1~${target.suffix}`;
   const out = await mkdtemp(join('server-artifacts', '.build-'));
-  console.log(
-    `Building openchronology-server ${debVersion} (${target.base}, PostgreSQL ${target.pg})`,
-  );
+  // Debian: <upstream>-1~deb13, PostgreSQL named by the target. RPM: version <upstream> and
+  // release 1.el10, PostgreSQL as the distribution ships it.
+  const formatArgs =
+    target.format === 'rpm'
+      ? [
+          '--file',
+          'deploy/rpm-server/Dockerfile',
+          '--build-arg',
+          `RPM_VERSION=${upstream}`,
+          '--build-arg',
+          `RPM_RELEASE=1.${target.dist}`,
+        ]
+      : [
+          '--file',
+          'deploy/debian-server/Dockerfile',
+          '--build-arg',
+          `PG_MAJOR=${target.pg}`,
+          '--build-arg',
+          `DEB_VERSION=${upstream}-1~${target.suffix}`,
+        ];
+  console.log(`Building openchronology-server ${upstream} for ${name} (${target.base})`);
   await new Promise((done, fail) => {
     const build = spawn(
       'docker',
       [
         'buildx',
         'build',
-        '--file',
-        'deploy/debian-server/Dockerfile',
+        ...formatArgs,
         '--target',
         'export',
         '--output',
         `type=local,dest=${out}`,
         '--build-arg',
         `BASE=${target.base}`,
-        '--build-arg',
-        `PG_MAJOR=${target.pg}`,
-        '--build-arg',
-        `DEB_VERSION=${debVersion}`,
         '--build-arg',
         `OCH_BUILD_COMMIT=${commit}`,
         '--build-arg',
@@ -66,7 +79,7 @@ for (const name of chosen.length ? chosen : Object.keys(serverTargets)) {
     build.on('error', fail);
     build.on('exit', (code) => (code === 0 ? done() : fail(new Error(`Building ${name} failed`))));
   });
-  // Docker exports the Debian-named file; it is published under the target's asset name.
+  // Docker exports the distribution-named file; it is published under the target's asset name.
   const [built] = await readdir(out);
   await rename(join(out, built), join('server-artifacts', serverPackage(name)));
   await rm(out, { recursive: true });

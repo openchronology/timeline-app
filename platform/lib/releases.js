@@ -56,19 +56,37 @@ export const DESKTOP = [
 /** The editor in one HTML file, for any browser and without a network. */
 export const OFFLINE = { asset: 'openchronology-offline.html' };
 /**
- * Server packages: each distribution's .deb, installed with apt (which also installs
- * PostgreSQL). More platforms join this list as they are supported.
+ * Server packages: each distribution's .deb or .rpm, installed with apt or dnf (which also
+ * install PostgreSQL). More platforms join this list as they are supported.
  */
 export const SERVERS = [
   {
     key: 'debian13',
     name: 'Debian 13 (trixie)',
     asset: 'openchronology-server-debian13-amd64.deb',
+    installer: 'apt',
+    guide: 'deploy/debian-server/README.Debian',
   },
   {
     key: 'ubuntu24.04',
     name: 'Ubuntu 24.04 LTS',
     asset: 'openchronology-server-ubuntu24.04-amd64.deb',
+    installer: 'apt',
+    guide: 'deploy/debian-server/README.Debian',
+  },
+  {
+    key: 'rocky10',
+    name: 'Rocky Linux and RHEL 10',
+    asset: 'openchronology-server-rocky10-amd64.rpm',
+    installer: 'dnf',
+    guide: 'deploy/rpm-server/README.RPM',
+  },
+  {
+    key: 'fedora44',
+    name: 'Fedora 44',
+    asset: 'openchronology-server-fedora44-amd64.rpm',
+    installer: 'dnf',
+    guide: 'deploy/rpm-server/README.RPM',
   },
 ];
 export const OTHER_ASSETS = {
@@ -89,11 +107,13 @@ export function detectPlatform(userAgent = '', hintPlatform = '') {
   if (hint === 'linux' || ua.includes('linux') || ua.includes('x11')) return 'linux';
   return null;
 }
-/** Whether a Linux visitor's browser says it runs on Debian or Ubuntu (some do). */
+/** Which distribution a Linux visitor's browser says it runs on (some do). */
 export function detectDistribution(userAgent = '') {
   const ua = userAgent.toLowerCase();
   if (ua.includes('ubuntu')) return 'ubuntu24.04';
   if (ua.includes('debian')) return 'debian13';
+  if (ua.includes('fedora')) return 'fedora44';
+  if (ua.includes('rocky') || ua.includes('red hat') || ua.includes('rhel')) return 'rocky10';
   return null;
 }
 
@@ -127,7 +147,7 @@ export function assetSize(release, asset) {
     ? `${(bytes / 1048576).toFixed(bytes >= 104857600 ? 0 : 1)} MB`
     : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
-/** The one line that downloads a server package and installs it with apt. */
+/** The one line that downloads a server package and installs it with apt or dnf. */
 export function installCommand(release, server) {
-  return `curl -fLO ${assetLink(release, server.asset)} && sudo apt install ./${server.asset}`;
+  return `curl -fLO ${assetLink(release, server.asset)} && sudo ${server.installer} install ./${server.asset}`;
 }

@@ -45,6 +45,7 @@ test('the visitor’s system comes from their browser', () => {
   assert.equal(detectDistribution(agents.linux), 'ubuntu24.04');
   assert.equal(detectDistribution('Mozilla/5.0 (X11; Debian; Linux x86_64)'), 'debian13');
   assert.equal(detectDistribution('Mozilla/5.0 (X11; Linux x86_64)'), null);
+  assert.equal(detectDistribution('Mozilla/5.0 (X11; Fedora; Linux x86_64; rv:143.0)'), 'fedora44');
 });
 
 test('links come from the latest release, or by name before there is one', () => {
@@ -81,4 +82,12 @@ test('links come from the latest release, or by name before there is one', () =>
     /releases\/download\/v1\.2\.0\/openchronology-server/,
   );
   assert.equal(releaseFrom({ message: 'Not Found' }), null);
+  // RPM distributions install with dnf.
+  assert.equal(
+    installCommand(
+      null,
+      SERVERS.find((s) => s.key === 'fedora44'),
+    ),
+    'curl -fLO https://github.com/openchronology/timeline-app/releases/latest/download/openchronology-server-fedora44-amd64.rpm && sudo dnf install ./openchronology-server-fedora44-amd64.rpm',
+  );
 });

@@ -1,6 +1,7 @@
 name: Server packages
-# Builds the server .deb for each distribution (scripts/server-deb.mjs), installs it in a fresh
-# container of that distribution (test/server-deb.mjs) and uploads it.
+# Builds the server package for each distribution (scripts/server-package.mjs): .deb for
+# Debian and Ubuntu, .rpm for Rocky/RHEL and Fedora. Each is installed in a fresh container of
+# its distribution (test/server-deb.mjs, test/server-rpm.mjs) and uploaded.
 on:
   workflow_call:
     inputs:
@@ -10,12 +11,16 @@ on:
 permissions:
   contents: read
 jobs:
-  deb:
+  package:
     name: Server / ${{ matrix.target }}
     strategy:
       fail-fast: false
       matrix:
-        target: [debian13, ubuntu24.04]
+        include:
+          - { target: debian13, format: deb }
+          - { target: ubuntu24.04, format: deb }
+          - { target: rocky10, format: rpm }
+          - { target: fedora44, format: rpm }
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -31,11 +36,11 @@ jobs:
         with:
           node-version: 24
       - name: Build the package
-        run: node scripts/server-deb.mjs "${{ matrix.target }}"
-      - name: Install, run, upgrade and purge it in a fresh container
-        run: node test/server-deb.mjs "server-artifacts/openchronology-server-${{ matrix.target }}-amd64.deb"
+        run: node scripts/server-package.mjs "${{ matrix.target }}"
+      - name: Install, run, upgrade and remove it in a fresh container
+        run: node "test/server-${{ matrix.format }}.mjs" "server-artifacts/openchronology-server-${{ matrix.target }}-amd64.${{ matrix.format }}"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: server-${{ matrix.target }}
-          path: server-artifacts/openchronology-server-${{ matrix.target }}-amd64.deb
+          path: server-artifacts/openchronology-server-${{ matrix.target }}-amd64.${{ matrix.format }}
           if-no-files-found: error
