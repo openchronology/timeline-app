@@ -404,8 +404,30 @@ function panVertical(value: number) {
   requestRender(false);
 }
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+/**
+ * Animations started on label nodes, kept so they can be cancelled without asking the browser:
+ * getAnimations() and getComputedStyle() make it recompute every style first, and a frame
+ * called them once per label (#68).
+ */
+const labelAnimations = new WeakMap<Element, Animation[]>();
+function animateLabel(
+  node: Element,
+  keyframes: Keyframe[],
+  options: KeyframeAnimationOptions,
+): Animation {
+  const animation = node.animate(keyframes, options);
+  const running = (labelAnimations.get(node) ?? []).filter((a) => a.playState !== 'finished');
+  running.push(animation);
+  labelAnimations.set(node, running);
+  return animation;
+}
+function cancelLabelAnimations(node: Element) {
+  for (const animation of labelAnimations.get(node) ?? []) animation.cancel();
+  labelAnimations.delete(node);
+}
 function finishTimeFade(label: MomentLabel) {
-  for (const animation of label.coordinate.getAnimations({ subtree: true })) animation.cancel();
+  cancelLabelAnimations(label.current);
+  if (label.outgoing) cancelLabelAnimations(label.outgoing);
   label.outgoing?.remove();
   label.outgoing = undefined;
 }
@@ -415,7 +437,9 @@ function updateMomentTime(label: MomentLabel, value: string) {
     label.current.textContent = value;
     return;
   }
-  const opacity = Number(getComputedStyle(label.current).opacity);
+  // Where the current text's fade-in has got to: its opacity, without asking for its style.
+  const fadeIn = labelAnimations.get(label.current)?.find((a) => a.playState === 'running');
+  const opacity = fadeIn ? (fadeIn.effect?.getComputedTiming().progress ?? 1) : 1;
   finishTimeFade(label);
   if (reducedMotion.matches) {
     label.current.textContent = value;
@@ -430,7 +454,7 @@ function updateMomentTime(label: MomentLabel, value: string) {
   label.current = current;
   label.outgoing = outgoing;
   label.coordinate.append(current);
-  const fade = outgoing.animate([{ opacity }, { opacity: 0 }], {
+  const fade = animateLabel(outgoing, [{ opacity }, { opacity: 0 }], {
     duration: 200,
     easing: 'ease-out',
   });
@@ -438,12 +462,12 @@ function updateMomentTime(label: MomentLabel, value: string) {
     outgoing.remove();
     if (label.outgoing === outgoing) label.outgoing = undefined;
   };
-  current.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' });
+  animateLabel(current, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' });
 }
 function removeMomentLabel(label: MomentLabel, fade = false) {
   finishTimeFade(label);
   for (const node of [label.caption, label.stem, label.button]) {
-    for (const animation of node.getAnimations({ subtree: true })) animation.cancel();
+    cancelLabelAnimations(node);
     if (!fade || reducedMotion.matches) {
       node.remove();
       continue;
@@ -455,7 +479,7 @@ function removeMomentLabel(label: MomentLabel, fade = false) {
       old.remove();
       retiringNodes.delete(old);
     }
-    const animation = node.animate([{ opacity: 1 }, { opacity: 0 }], {
+    const animation = animateLabel(node, [{ opacity: 1 }, { opacity: 0 }], {
       duration: 220,
       easing: 'ease-out',
       fill: 'forwards',
@@ -543,7 +567,21 @@ function resetScale() {
 }
 /** The base scale last applied; turning a phone moves an unscaled timeline to the new base. */
 let scaledFor = 1;
-const width = () => Math.max(1, stage.clientWidth - 2 * inset()),
+/**
+ * The stage's size, kept by a ResizeObserver. Drawing must not read it from the DOM: each
+ * read after drawing changed something makes the browser lay out the page again, and a
+ * frame read it once per marker (#68). Until first observed, it is read directly.
+ */
+let stageSize: { width: number; height: number } | null = null;
+new ResizeObserver(() => {
+  const next = { width: stage.clientWidth, height: stage.clientHeight };
+  if (stageSize && next.width === stageSize.width && next.height === stageSize.height) return;
+  stageSize = next;
+  requestRender();
+}).observe(stage);
+const stageWidth = () => stageSize?.width ?? stage.clientWidth,
+  stageHeight = () => stageSize?.height ?? stage.clientHeight;
+const width = () => Math.max(1, stageWidth() - 2 * inset()),
   // Grouping follows marker size, which is smaller at a compact base scale.
   pixels = () => Math.round(Number(input('density').value) * baseScale());
 function toast(message: string) {
@@ -785,12 +823,12 @@ function requestRender(refreshFrame = true) {
     const refresh = pendingFrameRefresh;
     pendingFrameRefresh = false;
     // Hidden dashboards and documents have no usable geometry. Draw after they become visible.
-    if (stage.clientWidth <= 96 || stage.clientHeight === 0) {
+    if (stageWidth() <= 96 || stageHeight() === 0) {
       // An open drawn later than this measures the wait, not the device.
       openStarted = null;
       return;
     }
-    currentInset = stage.clientWidth < 600 ? 20 : 48;
+    currentInset = stageWidth() < 600 ? 20 : 48;
     // Turning a phone moves a timeline the reader has not rescaled to the new base scale.
     if (uiScale === scaledFor && baseScale() !== scaledFor && !comparison) {
       resetScale();
@@ -1014,7 +1052,7 @@ function drawFrame() {
   const branches = el('stack-markers');
   const stackRetained = new Set<string>();
   let topExtent = 0,
-    bottomExtent = stage.clientHeight / uiScale;
+    bottomExtent = stageHeight() / uiScale;
   const retained = new Set<string>();
   const ordered: HTMLElement[] = [];
   let visible = 0n;
@@ -1072,7 +1110,10 @@ function drawFrame() {
       container.append(stem, caption, button);
       if (animateLiveFrame && !reducedMotion.matches)
         for (const node of [stem, caption, button])
-          node.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' });
+          animateLabel(node, [{ opacity: 0 }, { opacity: 1 }], {
+            duration: 220,
+            easing: 'ease-out',
+          });
     }
     const { button, caption, stem, coordinate } = label;
     const count = entityCount(group);
@@ -1150,7 +1191,7 @@ function drawFrame() {
           labelTop,
           direction,
           verticalOffset / uiScale,
-          stage.clientHeight / uiScale,
+          stageHeight() / uiScale,
           branchDepth,
         );
         const far = window.start + window.step * (branchDepth - 1);
@@ -1186,7 +1227,7 @@ function drawFrame() {
             branches.append(stem, caption, button);
             if (animateLiveFrame && !reducedMotion.matches)
               for (const node of [stem, caption, button])
-                node.animate([{ opacity: 0 }, { opacity: 1 }], {
+                animateLabel(node, [{ opacity: 0 }, { opacity: 1 }], {
                   duration: 220,
                   easing: 'ease-out',
                 });
@@ -1249,7 +1290,7 @@ function drawFrame() {
       stackLabels.delete(key);
     }
   const centeredOffset = 192 * (1 - uiScale);
-  verticalMinimum = Math.min(centeredOffset, stage.clientHeight - bottomExtent * uiScale - 24);
+  verticalMinimum = Math.min(centeredOffset, stageHeight() - bottomExtent * uiScale - 24);
   verticalMaximum = Math.max(centeredOffset, -topExtent * uiScale + 24);
   const clamped = Math.max(verticalMinimum, Math.min(verticalMaximum, verticalOffset));
   if (clamped !== verticalOffset) {
@@ -1257,8 +1298,8 @@ function drawFrame() {
     requestRender(false);
   }
   for (const layer of [el('axis'), el('edge-arcs'), el('duration-bands'), container, branches]) {
-    layer.style.width = `${stage.clientWidth / uiScale}px`;
-    layer.style.height = `${stage.clientHeight / uiScale}px`;
+    layer.style.width = `${stageWidth() / uiScale}px`;
+    layer.style.height = `${stageHeight() / uiScale}px`;
     layer.style.transformOrigin = '0 0';
     layer.style.transform = `translateY(${verticalOffset}px) scale(${uiScale})`;
   }
@@ -3453,7 +3494,7 @@ function animateView(destination: Viewport, automatic = false) {
     if (model && !sparseWorkspace()) frame = model.frame(viewport, width(), pixels());
     // Draw the moments in this frame, with the axis: a frame later they would trail it.
     // Reuse confirmed server data; fetch the final window once.
-    if (stage.clientWidth > 96 && stage.clientHeight > 0) render(false);
+    if (stageWidth() > 96 && stageHeight() > 0) render(false);
     else requestRender(false);
     zoomAnimation = requestAnimationFrame(tick);
   };
