@@ -187,6 +187,14 @@ CREATE TABLE IF NOT EXISTS oc_plugins (
   PRIMARY KEY(id,version), CHECK(octet_length(manifest::text)<=32768)
 );
 CREATE INDEX IF NOT EXISTS oc_plugins_owner ON oc_plugins(owner_id);
+-- Plugin suites (#78) accounts publish: packages of plugin definitions, versioned like plugins.
+CREATE TABLE IF NOT EXISTS oc_plugin_suites (
+  id text NOT NULL, version bigint NOT NULL CHECK(version>0),
+  owner_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE,
+  suite jsonb NOT NULL, published_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(id,version), CHECK(octet_length(suite::text)<=262144)
+);
+CREATE INDEX IF NOT EXISTS oc_plugin_suites_owner ON oc_plugin_suites(owner_id);
 
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS tags text[];
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS assets jsonb;
@@ -459,6 +467,13 @@ BEGIN
   INSERT INTO oc_storage_entries(kind,entry_id,user_id,bytes) VALUES('oc_plugins',NEW.id||'/'||NEW.version,NEW.owner_id,octet_length(NEW.manifest::text)) ON CONFLICT(kind,entry_id) DO UPDATE SET bytes=excluded.bytes;
   RETURN NEW;
 END $$;
+-- Published suites count toward their account's storage, like published plugins.
+CREATE OR REPLACE FUNCTION oc_track_suite_storage() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP='DELETE' THEN DELETE FROM oc_storage_entries WHERE kind='oc_plugin_suites' AND entry_id=OLD.id||'/'||OLD.version; RETURN OLD; END IF;
+  INSERT INTO oc_storage_entries(kind,entry_id,user_id,bytes) VALUES('oc_plugin_suites',NEW.id||'/'||NEW.version,NEW.owner_id,octet_length(NEW.suite::text)) ON CONFLICT(kind,entry_id) DO UPDATE SET bytes=excluded.bytes;
+  RETURN NEW;
+END $$;
 DROP TRIGGER IF EXISTS oc_track_storage ON oc_timelines;
 CREATE TRIGGER oc_track_storage AFTER INSERT OR UPDATE OF storage_bytes OR DELETE ON oc_timelines FOR EACH ROW EXECUTE FUNCTION oc_track_storage();
 DROP TRIGGER IF EXISTS oc_track_storage ON oc_revisions;
@@ -469,6 +484,8 @@ DROP TRIGGER IF EXISTS oc_track_storage ON oc_proposal_comments;
 CREATE TRIGGER oc_track_storage AFTER INSERT OR DELETE ON oc_proposal_comments FOR EACH ROW EXECUTE FUNCTION oc_track_storage();
 DROP TRIGGER IF EXISTS oc_track_storage ON oc_plugins;
 CREATE TRIGGER oc_track_storage AFTER INSERT OR DELETE ON oc_plugins FOR EACH ROW EXECUTE FUNCTION oc_track_plugin_storage();
+DROP TRIGGER IF EXISTS oc_track_storage ON oc_plugin_suites;
+CREATE TRIGGER oc_track_storage AFTER INSERT OR DELETE ON oc_plugin_suites FOR EACH ROW EXECUTE FUNCTION oc_track_suite_storage();
 INSERT INTO oc_storage_entries SELECT 'oc_timelines',id::text,owner_id,storage_bytes FROM oc_timelines ON CONFLICT(kind,entry_id) DO UPDATE SET bytes=excluded.bytes;
 INSERT INTO oc_storage_entries SELECT 'oc_revisions',r.id::text,CASE WHEN r.kind IN ('proposal','rebase') THEN r.author_id ELSE coalesce(t.owner_id,r.author_id) END,s.document_bytes FROM oc_revisions r JOIN oc_snapshots s ON s.id=r.snapshot_id LEFT JOIN oc_timelines t ON t.id=r.timeline_id WHERE (CASE WHEN r.kind IN ('proposal','rebase') THEN r.author_id ELSE coalesce(t.owner_id,r.author_id) END) IN(SELECT id FROM oc_users) ON CONFLICT(kind,entry_id) DO NOTHING;
 INSERT INTO oc_storage_entries SELECT 'oc_proposals',id::text,author_id,octet_length(document::text)+octet_length(base_document::text)+octet_length(body)+octet_length(title) FROM oc_proposals ON CONFLICT(kind,entry_id) DO NOTHING;

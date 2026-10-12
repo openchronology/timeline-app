@@ -5,6 +5,7 @@ import { checkCapacity } from './capacity-browser.mjs';
 import { checkRangeDelete } from './range-delete-browser.mjs';
 import { checkDurationBackgrounds } from './duration-backgrounds-browser.mjs';
 import { checkHeadings } from './headings-browser.mjs';
+import { checkSuites } from './suites-browser.mjs';
 import { checkTags } from './tags-browser.mjs';
 import { checkRelationships } from './relationships-browser.mjs';
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
@@ -283,6 +284,7 @@ try {
   await checkRangeDelete(page, document);
   await checkDurationBackgrounds(page, document);
   await checkHeadings(page, document);
+  await checkSuites(page, document);
   await checkTags(page, document);
   await checkRelationships(page, document);
   await checkAccounts(browser);

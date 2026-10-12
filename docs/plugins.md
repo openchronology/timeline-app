@@ -197,6 +197,46 @@ Scripts support `const` locals, ternary conditionals, string concatenation and c
 
 Image effects must match a URL explicitly entered in a declared image field, even if a script returns a literal effect string. A script cannot build an image URL from private notes to transmit them. Host images use anonymous HTTPS requests with no referrer. Enabling an image field still permits fetching the configured URL; review a plugin's fields and source before using it.
 
+## Plugin suites
+
+A suite is a named package of plugins that are added to a timeline together. In **Plugins**, choose **Add suite** to browse suites, or **Create suite** to package this timeline's plugins.
+
+Two official suites are included in every build, so they are available offline and on a desktop without a server:
+
+- **Causal factor analysis**: Moment stacks, Moment shapes and Moment colors, to stack contributing factors on a moment and tell kinds of factor apart.
+- **History education**: Moment icons, Duration backgrounds, Expand on hover, Rich text notes and Headings.
+
+**Adding a suite** appends the plugins of the suite that the timeline does not have yet, enabled, in the suite's order. A plugin the timeline already has stays as it is, with its version and whether it is enabled, so adding a suite never changes an installed plugin. A timeline still holds at most 32 plugins. Save the timeline to keep the result, as with any plugin change.
+
+**Creating a suite** takes a name, a description, a version and a choice of the timeline's plugins. A suite carries each plugin's full definition, custom plugins included, so it installs the same anywhere. You can then:
+
+- **Export suite file** downloads a `.suite.json` file. **Import suite file…** in Add suite adds one to any timeline, also offline.
+- **Publish to library** (signed in) makes the suite public in the server's library, with the same rules as publishing a plugin:
+  - Its ID is namespaced as `u-<account>-<slug>`, and versions are immutable; keep publishing with the returned ID and a higher version.
+  - Each account may publish 200 suite versions, and published suites count toward its storage.
+  - Publishing asks for a quick human check, except for administrators.
+
+A suite definition:
+
+```json
+{
+  "apiVersion": 1,
+  "id": "history-education",
+  "version": 1,
+  "name": "History education",
+  "description": "…",
+  "plugins": [{ "apiVersion": 1, "id": "moment-icons", "version": 2, "…": "…" }]
+}
+```
+
+It holds one to 32 distinct plugins, and at most 128 KiB serialized. The server's API mirrors plugins:
+
+- `GET /api/plugins/suites?search=&page=&limit=` and `POST /api/plugins/suites/search` search the newest version of each suite by name, description, ID and plugin names.
+- `GET /api/plugins/suites/<id>/<version>` reads one version.
+- `POST /api/plugins/suites/publish` publishes.
+
+The website's **Plugin library** page lists matching suites above the plugins. Run the server migration before publishing suites.
+
 ## Community publication
 
 **Publish to library** requires an authenticated account and publicly publishes the definition, not the timeline or its metadata. The server checks session/CSRF or the desktop bearer, rate limits publication, validates syntax without executing source, and stores immutable versions in `oc_plugins`. A published definition requires a script. The JSON request limit is 32 KiB, and each account may publish at most 200 versions; the quota is enforced under a transaction lock.

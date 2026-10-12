@@ -11,6 +11,7 @@ import {
   DEFAULT_PRESENTATION,
   CUSTOM_EXAMPLE,
   PLUGIN_EXAMPLE,
+  suiteFromPlugins,
   MOMENT_SHAPES,
   TimelineIndex,
 } from '../dist/core.mjs';
@@ -186,6 +187,38 @@ try {
   });
   assert(combined.plugins.some((p) => p.id === 'moment-shapes'));
   assert(combined.plugins.some((p) => p.id === published.id));
+  // Plugin suites (#78) publish like plugins: signed in, namespaced, immutable versions,
+  // counted toward storage, and listed with the official suites.
+  const suite = suiteFromPlugins({ name: 'Status lab', description: 'Ours' }, [
+    published,
+    MOMENT_SHAPES,
+  ]);
+  await anonymous.request('plugins/suites/publish', 'POST', suite, 401);
+  await owner.request('plugins/suites/publish', 'POST', suite, 403, false);
+  const usedBefore = (
+    await pool.query('SELECT used_bytes FROM oc_users WHERE id=$1', [accounts[0]])
+  ).rows[0].used_bytes;
+  const publishedSuite = await owner.request('plugins/suites/publish', 'POST', suite, 201);
+  assert.equal(publishedSuite.id, 'u-' + accounts[0].replaceAll('-', '') + '-status-lab');
+  assert(
+    BigInt(
+      (await pool.query('SELECT used_bytes FROM oc_users WHERE id=$1', [accounts[0]])).rows[0]
+        .used_bytes,
+    ) > BigInt(usedBefore),
+    'published suites count toward storage',
+  );
+  await owner.request('plugins/suites/publish', 'POST', publishedSuite, 409);
+  // Another account cannot publish into this one's namespace.
+  await viewer.request('plugins/suites/publish', 'POST', publishedSuite, 400);
+  await owner.request('plugins/suites/publish', 'POST', { ...publishedSuite, version: 2 }, 201);
+  await owner.request('plugins/suites/publish', 'POST', { ...suite, plugins: [] }, 400);
+  const suites = await anonymous.request('plugins/suites/search', 'POST', { search: '' });
+  assert(suites.suites.some((s) => s.id === 'history-education'));
+  assert.equal(suites.suites.find((s) => s.id === publishedSuite.id).version, 2);
+  assert.equal(
+    (await anonymous.request('plugins/suites/' + publishedSuite.id + '/1')).plugins[0].id,
+    published.id,
+  );
   const document = demo(true);
   document.plugins = [
     { manifest: published, enabled: true },

@@ -580,6 +580,16 @@ main {
 .timeline-stage.dragging {
   cursor: grabbing;
 }
+/* Choosing a suite's plugins. */
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+.checkbox-row input {
+  width: auto;
+}
 /* Duration backgrounds (#94): images behind everything else on the stage. */
 .duration-backgrounds {
   position: absolute;

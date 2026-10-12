@@ -9,6 +9,7 @@ import { ComparisonView } from './comparison.js';
 import type { ComparisonSource, ComparisonGroup, EventPage } from './comparison.js';
 import { comparisonUI } from './comparison-ui.js';
 import { createCommunityUI } from './community-ui.js';
+import { createSuiteUI } from './suite-ui.js';
 import type { Proposal } from './community-ui.js';
 import { configureImages, imageSource, embedImages } from './image-assets.js';
 import './styles.css';
@@ -802,10 +803,12 @@ function storedVersion() {
     ),
   };
 }
+/** Windows being taken back from storage; hiding the page waits for them (see below). */
+let restoring: Promise<void> = Promise.resolve();
 function restoreWindows(key: string) {
   const stored = storedVersion();
   if (!stored) return;
-  void windowStore
+  restoring = windowStore
     .load(stored.version)
     .then((windows) => {
       if (remoteCacheKey !== key || !windows.length) return;
@@ -831,7 +834,8 @@ function persistWindows(delay = 2000) {
   else save();
 }
 // A hidden page stores its windows, then keeps only those covering its view; shown again, it
-// takes the others back from storage before storing anything more.
+// takes the others back from storage before storing anything more. Hidden again before they
+// are back, it waits for them: storing first would delete the windows still on their way.
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
     if (remoteCacheKey) restoreWindows(remoteCacheKey);
@@ -839,8 +843,13 @@ document.addEventListener('visibilitychange', () => {
   }
   clearTimeout(prefetchTimer);
   prefetchController?.abort();
-  persistWindows(0);
-  remoteCache.release(viewport);
+  const view = viewport;
+  void restoring.then(() => {
+    // Shown again meanwhile: it keeps everything, and takes back what storage has.
+    if (!document.hidden) return;
+    persistWindows(0);
+    remoteCache.release(view);
+  });
 });
 function sparseWorkspace(): RemoteWorkspace | null {
   return model instanceof RemoteWorkspace ? model : null;
@@ -2866,6 +2875,8 @@ function showInstalledPlugins() {
   );
   el('plugins-add').hidden = !editable();
   el('plugins-create').hidden = !editable();
+  el('suites-add').hidden = !editable();
+  el('suites-create').hidden = !editable() || !installed.length;
   if (!installed.length) {
     const note = document.createElement('p');
     note.textContent = 'No plugins installed on this timeline.';
@@ -3065,6 +3076,23 @@ function authorError(error: unknown) {
   text('plugin-author-error', error instanceof Error ? error.message : String(error));
 }
 el('plugins-create').onclick = () => openPluginAuthor();
+// Plugin suites (#78): several plugins added at once, and made from a timeline's plugins.
+createSuiteUI({
+  editable,
+  installed: installedPlugins,
+  change: changePlugins,
+  library: () =>
+    offlineHtml || (desktop && !session.server)
+      ? null
+      : (path, method, body) => api(path, method, body),
+  publish: () =>
+    session.user && session.server && !offlineHtml
+      ? (suite) => api('plugins/suites/publish', 'POST', suite)
+      : null,
+  chip: () => (severalServers() ? serverChip(serverOrigin) : null),
+  download,
+  toast,
+});
 el('plugin-author-install').onclick = () => {
   try {
     const manifest = authoredPlugin();
