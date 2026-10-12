@@ -12,7 +12,12 @@ import { createCommunityUI } from './community-ui.js';
 import type { Proposal } from './community-ui.js';
 import { configureImages, imageSource, embedImages } from './image-assets.js';
 import './styles.css';
-import { renderPluginMarker, renderPluginFields, renderPluginShape } from './plugin-ui.js';
+import {
+  renderPluginMarker,
+  renderPluginFields,
+  renderPluginShape,
+  renderPluginHeading,
+} from './plugin-ui.js';
 import { attachRichText } from './rich-text.js';
 import { pluginRichText } from './plugins.js';
 import { dismissOnBackdrop } from './dialogs.js';
@@ -43,6 +48,7 @@ import {
   pluginMarker,
   pluginColor,
   pluginShape,
+  pluginHeading,
   pluginSize,
   PLUGIN_EXAMPLE,
   validateTags,
@@ -459,10 +465,18 @@ const summaryExpansion = createSummaryExpansion(stage, {
   generation: contentGeneration,
   load: (group, signal) => groupPage(group, null, 5, signal),
   decorate(button, event) {
-    renderPluginMarker(button, imageSource(pluginMarker(activePlugins(), event.metadata)), 1n);
-    button.style.backgroundColor = pluginColor(activePlugins(), event.metadata) ?? '';
-    button.dataset.size = pluginSize(activePlugins(), event.metadata);
-    renderPluginShape(button, pluginShape(activePlugins(), event.metadata));
+    const heading = pluginHeading(activePlugins(), event.metadata);
+    if (heading) {
+      renderPluginShape(button, 'circle');
+      renderPluginHeading(button, heading, event.metadata.title ?? '');
+      button.classList.add('heading-marker');
+    } else {
+      renderPluginHeading(button, null, '');
+      renderPluginMarker(button, imageSource(pluginMarker(activePlugins(), event.metadata)), 1n);
+      button.style.backgroundColor = pluginColor(activePlugins(), event.metadata) ?? '';
+      button.dataset.size = pluginSize(activePlugins(), event.metadata);
+      renderPluginShape(button, pluginShape(activePlugins(), event.metadata));
+    }
     button.title = `${event.metadata.title || 'Unnamed moment'} · ${presented(Q.parse(event.time))}`;
     hoverPreview.update(button, activePlugins(), event.metadata);
     markerGroups.set(button, {
@@ -1246,12 +1260,23 @@ function drawFrame() {
     const name = span
       ? 'Duration: ' + (span.metadata.title?.trim() || 'Unnamed duration')
       : group.title?.trim() || 'Unnamed moment';
-    renderPluginMarker(button, imageSource(pluginMarker(plugins, metadata)), count);
-    const color = count === 1n ? pluginColor(plugins, metadata) : null;
-    button.style.backgroundColor = color ?? '';
+    // A heading moment (#110) shows only its title, which is what is clicked.
+    const heading = count === 1n && !span ? pluginHeading(plugins, metadata) : null;
+    if (heading) {
+      renderPluginShape(button, 'circle');
+      button.style.backgroundColor = '';
+      button.dataset.size = 'medium';
+      renderPluginHeading(button, heading, group.title ?? '');
+      button.classList.add('heading-marker');
+    } else {
+      renderPluginHeading(button, null, '');
+      renderPluginMarker(button, imageSource(pluginMarker(plugins, metadata)), count);
+      const color = count === 1n ? pluginColor(plugins, metadata) : null;
+      button.style.backgroundColor = color ?? '';
+      button.dataset.size = count === 1n && !span ? pluginSize(plugins, metadata) : 'medium';
+      renderPluginShape(button, count === 1n && !span ? pluginShape(plugins, metadata) : 'circle');
+    }
     button.style.borderColor = '';
-    button.dataset.size = count === 1n && !span ? pluginSize(plugins, metadata) : 'medium';
-    renderPluginShape(button, count === 1n && !span ? pluginShape(plugins, metadata) : 'circle');
     button.setAttribute(
       'aria-label',
       count > 1n ? `${summaryName(group)} near ${presented(first)}` : name,
@@ -1270,7 +1295,8 @@ function drawFrame() {
     caption.style.top = `${labelTop}px`;
     label.title.textContent =
       count > 1n ? summaryName(group) : span ? (span.metadata.title ?? '') : (group.title ?? '');
-    caption.hidden = count === 1n && !(span ? span.metadata.title : group.title)?.trim();
+    caption.hidden =
+      !!heading || (count === 1n && !(span ? span.metadata.title : group.title)?.trim());
     stem.hidden = caption.hidden;
     updateMomentTime(label, axisLabel(mid, 'event'));
     coordinate.title = presented(mid) + '\nExact: ' + mid.toString();

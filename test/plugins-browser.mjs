@@ -22,7 +22,9 @@ import {
 } from '../dist/core.mjs';
 import { createPluginLibrary } from '../server/plugins.mjs';
 // The official plugins every build includes (the newest version of each).
-const official = searchPluginLibrary(BUILTIN_PLUGINS, { limit: 50 }).total;
+const official = searchPluginLibrary(BUILTIN_PLUGINS, { limit: 50 }).total,
+  // The library shows twelve to a page.
+  firstPage = Math.min(official, 12);
 const source = 'https://images.example/icon.png';
 const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMIWJDwHwAE5AJQGRSfFgAAAABJRU5ErkJggg==',
@@ -303,7 +305,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
           .textContent.includes(`${count} official plugins included with this app`),
       official,
     );
-    assert.equal(await page.locator('.library-plugin').count(), official);
+    assert.equal(await page.locator('.library-plugin').count(), firstPage);
     await input('plugin-search').fill('geolog');
     await page.waitForFunction(() => document.querySelectorAll('.library-plugin').length === 1);
     assert.match(
@@ -470,7 +472,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
       await input('plugin-library-status').textContent(),
       new RegExp(`${official} official plugins included`),
     );
-    assert.equal(await page.locator('.library-plugin').count(), official);
+    assert.equal(await page.locator('.library-plugin').count(), firstPage);
     assert(
       await page
         .locator('.library-plugin', { hasText: 'Moment icons' })

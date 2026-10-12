@@ -14,6 +14,10 @@ import {
   PLUGIN_EXAMPLE,
   MOMENT_ICONS,
   DURATION_BACKGROUNDS,
+  MOMENT_HEADINGS,
+  pluginHeading,
+  fontValue,
+  DEFAULT_HEADING_FONT,
   pluginBackground,
   pluginTargets,
   durationPlugins,
@@ -292,14 +296,19 @@ test('public plugin API works without accounts or PostgreSQL and validates its i
       'expand-on-hover',
       'focus-on-hover',
       'geological-ages',
+      'moment-headings',
       'historical-dates',
       'moment-colors',
       'moment-icons',
       'moment-shapes',
       'moment-stacks',
       'rich-text-notes',
-      'moment-sources',
     ],
+  );
+  // Twelve to a page: the thirteenth is on the next.
+  assert.deepEqual(
+    (await request(app, '/api/plugins?page=2')).body.plugins.map((p) => p.id),
+    ['moment-sources'],
   );
   assert.equal((await request(app, '/api/plugins?search=absent&page=1&limit=1')).body.total, 0);
   const response = await request(app, '/api/plugins/search', 'POST', {
@@ -666,4 +675,59 @@ test('duration backgrounds: an image behind durations only, the last valid one w
   );
   // An invalid later one falls back to the earlier.
   assert.equal(pluginBackground(both, { backgroundUrl: image, otherUrl: 'nope' }), image);
+});
+
+test('headings: a level makes a moment a heading, in its font or Times New Roman', () => {
+  assert(isOfficialPlugin(MOMENT_HEADINGS));
+  assert.deepEqual(pluginTargets(MOMENT_HEADINGS), ['moments']);
+  const installed = [{ manifest: MOMENT_HEADINGS, enabled: true }];
+  assert.equal(pluginHeading(installed, { title: 'Moment' }), null);
+  assert.equal(pluginHeading(installed, { headingLevel: 'h7' }), null);
+  assert.equal(pluginHeading(installed, { headingLevel: '' }), null);
+  assert.deepEqual(pluginHeading(installed, { headingLevel: 'h2' }), {
+    level: 'h2',
+    font: DEFAULT_HEADING_FONT,
+  });
+  assert.deepEqual(
+    pluginHeading(installed, { headingLevel: 'h1', headingFont: 'Georgia, serif' }),
+    {
+      level: 'h1',
+      font: 'Georgia, serif',
+    },
+  );
+  // A font that is not a family list falls back to the default.
+  assert.equal(
+    pluginHeading(installed, { headingLevel: 'h1', headingFont: 'x; color: red' }).font,
+    DEFAULT_HEADING_FONT,
+  );
+  assert.equal(pluginHeading([{ ...installed[0], enabled: false }], { headingLevel: 'h1' }), null);
+  assert.deepEqual(momentPlugins(installed), installed);
+  assert.deepEqual(durationPlugins(installed), []);
+  for (const font of [
+    'Baskerville, serif',
+    '"EB Garamond", serif',
+    "'Fira Sans', sans-serif",
+    'cursive',
+  ])
+    assert.equal(fontValue(font), font);
+  for (const font of [
+    'url(https://evil.example/font.woff)',
+    'serif; background: red',
+    'a, , b',
+    '"unterminated, serif',
+    '',
+    'x'.repeat(201),
+    3,
+  ])
+    assert.equal(fontValue(font), null, String(font));
+  // Field and marker kinds validate.
+  assert.throws(() =>
+    validatePluginManifest({ ...MOMENT_HEADINGS, marker: { kind: 'headline', metadataKey: 'x' } }),
+  );
+  assert.throws(() =>
+    validatePluginManifest({
+      ...MOMENT_HEADINGS,
+      fields: [{ kind: 'typeface', metadataKey: 'x', label: 'x' }],
+    }),
+  );
 });

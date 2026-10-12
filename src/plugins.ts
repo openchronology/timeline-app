@@ -2,7 +2,17 @@
 import { compilePluginScript } from './custom-time.js';
 /** Versioned host components and optional source interpreted by our bounded language. */
 export interface PluginField {
-  kind: 'text' | 'multiline' | 'image-url' | 'stack' | 'color' | 'shape' | 'size' | 'links';
+  kind:
+    | 'text'
+    | 'multiline'
+    | 'image-url'
+    | 'stack'
+    | 'color'
+    | 'shape'
+    | 'size'
+    | 'links'
+    | 'heading'
+    | 'font';
   metadataKey: string;
   label: string;
 }
@@ -13,7 +23,7 @@ export interface PluginManifest {
   name: string;
   description: string;
   fields: PluginField[];
-  marker?: { kind: 'image' | 'color' | 'shape' | 'size'; metadataKey: string };
+  marker?: { kind: 'image' | 'color' | 'shape' | 'size' | 'heading'; metadataKey: string };
   hover?: { kind: 'card' };
   summary?: { kind: 'radial' };
   notes?: { kind: 'markdown' };
@@ -55,6 +65,37 @@ export function sizeValue(value: unknown): MomentSize | null {
     ? (value as MomentSize)
     : null;
 }
+/** Heading levels a moment can take (#110): shown as its title alone, sized by level. */
+export const HEADING_LEVELS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const;
+export type HeadingLevel = (typeof HEADING_LEVELS)[number];
+export function headingValue(value: unknown): HeadingLevel | null {
+  return typeof value === 'string' && (HEADING_LEVELS as readonly string[]).includes(value)
+    ? (value as HeadingLevel)
+    : null;
+}
+/** Heading fonts offered by name; any installed family can be entered too. */
+export const HEADING_FONTS = [
+  { label: 'Times New Roman (serif)', value: '"Times New Roman", Times, serif' },
+  { label: 'Georgia', value: 'Georgia, serif' },
+  { label: 'Garamond', value: 'Garamond, "EB Garamond", serif' },
+  { label: 'Palatino', value: 'Palatino, "Palatino Linotype", "Book Antiqua", serif' },
+  { label: 'Helvetica (sans-serif)', value: 'Helvetica, Arial, sans-serif' },
+  { label: 'System interface', value: 'system-ui, sans-serif' },
+  { label: 'Courier (monospace)', value: '"Courier New", Courier, monospace' },
+  { label: 'Cursive', value: 'cursive' },
+] as const;
+export const DEFAULT_HEADING_FONT = HEADING_FONTS[0].value;
+/**
+ * A CSS font family list: names of installed fonts, optionally quoted, separated by commas.
+ * Nothing else (no URLs, functions or other properties), and no web font is downloaded.
+ */
+export function fontValue(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  if (!text || text.length > 200) return null;
+  const family = /^(?:"[A-Za-z0-9 _-]{1,60}"|'[A-Za-z0-9 _-]{1,60}'|[A-Za-z][A-Za-z0-9 _-]{0,59})$/;
+  return text.split(',').every((part) => family.test(part.trim())) ? text : null;
+}
 type Effects = {
   size?: MomentSize;
   shape?: MomentShape;
@@ -62,6 +103,7 @@ type Effects = {
   icon?: string;
   card?: boolean;
   expand?: boolean;
+  heading?: { level: HeadingLevel; font: string };
 };
 const compiledScripts = new Map<string, ReturnType<typeof compilePluginScript>>();
 function manifestEffects(manifest: PluginManifest, metadata: Record<string, unknown>): Effects {
@@ -197,10 +239,26 @@ function scriptEffects(
         const icon = imageURL(metadata[manifest.marker.metadataKey]);
         if (icon) effects.icon = icon;
       }
+      if (manifest.marker?.kind === 'heading') {
+        const level = headingValue(metadata[manifest.marker.metadataKey]);
+        const font = manifest.fields.find((f) => f.kind === 'font');
+        if (level)
+          effects.heading = {
+            level,
+            font: (font && fontValue(metadata[font.metadataKey])) || DEFAULT_HEADING_FONT,
+          };
+      }
       if (manifest.hover) effects.card = true;
       Object.assign(effects, manifestEffects(manifest, metadata));
     }
   return effects;
+}
+/** A moment shown as a heading: its level and font, or null for an ordinary moment. */
+export function pluginHeading(
+  plugins: readonly InstalledPlugin[] = [],
+  metadata: Record<string, unknown> = {},
+): { level: HeadingLevel; font: string } | null {
+  return scriptEffects(plugins, metadata).heading ?? null;
 }
 export function pluginShape(
   plugins: readonly InstalledPlugin[] = [],
@@ -277,9 +335,18 @@ export function validatePluginManifest(value: unknown): PluginManifest {
   const fields = p.fields.map((value) => {
     const f = object(value, ['kind', 'metadataKey', 'label']);
     if (
-      !['text', 'multiline', 'image-url', 'stack', 'color', 'shape', 'size', 'links'].includes(
-        f.kind as string,
-      )
+      ![
+        'text',
+        'multiline',
+        'image-url',
+        'stack',
+        'color',
+        'shape',
+        'size',
+        'links',
+        'heading',
+        'font',
+      ].includes(f.kind as string)
     )
       throw new Error('Unsupported plugin component.');
     const metadataKey = key(f.metadataKey);
@@ -297,7 +364,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
   };
   if (p.marker !== undefined) {
     const m = object(p.marker, ['kind', 'metadataKey']);
-    if (m.kind !== 'image' && m.kind !== 'color' && m.kind !== 'shape')
+    if (m.kind !== 'image' && m.kind !== 'color' && m.kind !== 'shape' && m.kind !== 'heading')
       throw new Error('Unsupported marker component.');
     result.marker = { kind: m.kind, metadataKey: key(m.metadataKey) };
   }
@@ -736,6 +803,20 @@ export const PLUGIN_EXAMPLE = {
   source:
     'function render(moment: string, api: PluginAPI): string { const status = api.lower(api.get("status")); return status === "blocked" ? api.merge(api.shape("diamond"), api.color("#bc6663")) : api.merge(api.shape("circle"), api.color("#5f8b67")); }',
 };
+export const MOMENT_HEADINGS: PluginManifest = validatePluginManifest({
+  apiVersion: 1,
+  id: 'moment-headings',
+  version: 1,
+  name: 'Headings',
+  description:
+    'Let a moment act as a heading or marker: only its title shows, sized as a heading from level 1 to 6, and the title is what you click. Choose its font (Times New Roman by default). Headings still group into summaries with other moments.',
+  fields: [
+    { kind: 'heading', metadataKey: 'headingLevel', label: 'Heading level' },
+    { kind: 'font', metadataKey: 'headingFont', label: 'Heading font' },
+  ],
+  marker: { kind: 'heading', metadataKey: 'headingLevel' },
+  targets: ['moments'],
+});
 export const DURATION_BACKGROUNDS: PluginManifest = validatePluginManifest({
   apiVersion: 1,
   id: 'duration-backgrounds',
@@ -766,6 +847,7 @@ export const BUILTIN_PLUGINS: readonly PluginManifest[] = [
   RICH_TEXT_NOTES,
   EXPAND_ON_HOVER,
   DURATION_BACKGROUNDS,
+  MOMENT_HEADINGS,
 ];
 
 /** A page of a plugin library: the newest version of each plugin matching a search. */
