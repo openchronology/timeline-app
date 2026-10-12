@@ -17,6 +17,12 @@ export const THRESHOLDS = {
    * longer than this, in ms.
    */
   navigation: 150,
+  /**
+   * Browser: moments from which slow navigation is advised. Below this, zooming and panning
+   * cost mostly the per-frame drawing every platform does in the browser (#68): on a slow
+   * device it is over 150 ms at any size, and another platform would not help.
+   */
+  navigationMoments: 1000,
   /** Browser: median pause after an edit (redraw and draft save) longer than this, in ms. */
   edit: 100,
   /** Browser: moments at which to advise even without measurements. */
@@ -49,12 +55,14 @@ export const BUDGETS = {
   desktopView: THRESHOLDS.view,
 };
 /**
- * The largest timelines (in moments) each platform handles comfortably (docs/capacity.md).
- * `slowBrowser` is a phone or slower computer, measured with the CPU throttled 4×.
+ * The largest timelines (in moments) each platform handles comfortably (docs/capacity.md),
+ * from the UI benchmarks on hosted runners: every interaction meets its budget there.
+ * `slowBrowser` is a phone or slower computer, measured with the CPU throttled 4×; there
+ * zooming and panning miss their budget at any size (#68), and are not counted.
  */
 export const COMFORTABLE = {
-  browser: 4000,
-  slowBrowser: 1000,
+  browser: 1000,
+  slowBrowser: 500,
   desktop: LIMIT,
   platform: LIMIT,
 };
@@ -65,6 +73,12 @@ export interface Measurements {
   navigation: number[];
   edits: number[];
   views: number[];
+  /**
+   * What this device last measured as slow for the timeline, if anything: the advice holds
+   * once measurements were consistently slow, though later quick ones (a small pan after
+   * slow zooming) bring the median down.
+   */
+  slow?: { reason: 'open' | 'navigation' | 'edit'; ms: number };
 }
 export interface Counts {
   moments: number;
@@ -99,16 +113,18 @@ export function advise(platform: Platform, m: Measurements, counts: Counts): Adv
   if (platform === 'browser') {
     const navigation = median(m.navigation, 3),
       edit = median(m.edits, 2);
-    const reason =
+    const measured =
       m.open !== undefined && m.open > THRESHOLDS.open
-        ? 'open'
-        : navigation !== undefined && navigation > THRESHOLDS.navigation
-          ? 'navigation'
+        ? { reason: 'open' as const, ms: m.open }
+        : navigation !== undefined &&
+            navigation > THRESHOLDS.navigation &&
+            counts.moments >= THRESHOLDS.navigationMoments
+          ? { reason: 'navigation' as const, ms: navigation }
           : edit !== undefined && edit > THRESHOLDS.edit
-            ? 'edit'
-            : counts.moments >= THRESHOLDS.moments
-              ? 'size'
-              : null;
+            ? { reason: 'edit' as const, ms: edit }
+            : null;
+    if (measured) m.slow = measured;
+    const reason = m.slow?.reason ?? (counts.moments >= THRESHOLDS.moments ? 'size' : null);
     if (reason) advice.push({ kind: 'browser', reason });
   }
   if (platform === 'desktop') {

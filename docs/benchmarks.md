@@ -87,7 +87,7 @@ Latency stays near the save interval up to 500 messages a second; at 1,000 a sec
 
 ## Interactions
 
-`bench/ui.mjs` drives the editor with real input and times each interaction. In Chromium the input comes from Playwright's mouse, keyboard and touch. In the desktop app it comes from W3C WebDriver actions, through `tauri-driver` and WebKitWebDriver. Timing runs from the input event that triggers the result (a click on release, a key on its press, each wheel step) to the frame in which the result is painted. This is how Event Timing measures interactions, so the time a button is held down is not counted. For continuous gestures it records the longest frame while the gesture runs. An injected probe (`bench/ui/probe.js`) does the timing in the page, with no browser-specific APIs and no `eval`, so it works the same in both engines and under the editor's content security policy.
+`bench/ui.mjs` drives the editor with real input and times each interaction. In Chromium the input comes from Playwright's mouse, keyboard and touch. In the desktop app it comes from W3C WebDriver actions, through `tauri-driver` and WebKitWebDriver. Timing runs from the input event that triggers the result (a click on release, a key on its press, each wheel step) to the frame in which the result is painted. For zooming and panning, that is the frame showing the moments at the new view, which the editor records on `#markers` as it draws them; the axis and the bounds fields can move a frame earlier. The editor's capacity advice times navigation the same way. This is how Event Timing measures interactions, so the time a button is held down is not counted. For continuous gestures it records the longest frame while the gesture runs. An injected probe (`bench/ui/probe.js`) does the timing in the page, with no browser-specific APIs and no `eval`, so it works the same in both engines and under the editor's content security policy.
 
 It checks the results against two rules, both from `src/capacity.ts`:
 
@@ -102,11 +102,11 @@ It checks the results against two rules, both from `src/capacity.ts`:
 | `results`  |    1 s | Search results, group summaries, the endpoint picker, separations, export, saving to the server, a live update arriving                                                 |
 | `open`     |  1.5 s | Opening a timeline                                                                                                                                                      |
 
-The budgets follow the advice thresholds (`response` is `THRESHOLDS.edit`, `view` and `frame` are `THRESHOLDS.redraw`, `open` is `THRESHOLDS.open`), and `results` is the 1 s line in the capacity charts.
+The budgets follow the advice thresholds (`response` is `THRESHOLDS.edit`, `view` and `frame` are `THRESHOLDS.navigation`, `open` is `THRESHOLDS.open`), and `results` is the 1 s line in the capacity charts.
 
 The runs cover:
 
-- the in-memory browser editor, at full speed and with the CPU throttled 4×, whose comfortable sizes are 4,000 and 1,000 moments;
+- the in-memory browser editor, at full speed and with the CPU throttled 4×, whose comfortable sizes are 1,000 and 500 moments (throttled, zooming and panning miss their budget at any size, #68);
 - the platform: the production Next.js server with PostgreSQL, signed in as a `bench_ui` user, whose comfortable size is the 200,000-moment limit;
 - the desktop app (WebKitGTK on Linux), whose comfortable size is also the limit. Timelines over 2,048 moments move into the native SQLite store after opening, as for desktop users; smaller ones stay in memory. Pinch gestures are measured in Chromium only, through its DevTools touch input; the desktop driver sends mouse, keyboard and wheel input.
 
@@ -127,6 +127,8 @@ Each interaction is measured `UI_SAMPLES` times (default 5) and judged by its me
 `node bench/ui.mjs --gate` exits with an error on any budget missed within a comfortable size, and on any advice gap, apart from the known misses. In CI, the gate allows 1.5× the budgets (`UI_TOLERANCE`) for slower shared runners:
 
 - the browser and the platform at 1,000 moments;
+- the browser throttled 4× at 500 moments, its comfortable size there, with navigation a known miss (#68);
+- the browser past its comfortable sizes, at 2,000 moments and at 1,000 throttled 4×: wherever an interaction misses its budget, the advice must be showing;
 - the desktop app at 1,000 moments (in memory) and 10,000 moments (SQLite), under Xvfb, allowing 3×: software rendering on shared runners is slow and varies widely (opening search took 96 ms on a laptop and 140–173 ms in CI). This gate guards against breakage, such as an interaction that fails or never finishes, and gross regressions. Navigation and new durations are known misses there (#68).
 
 The Benchmarks workflow runs the browser and platform at the full set of sizes and adds an **Interactions** table to the report.
@@ -167,10 +169,26 @@ Medians from one run on an AMD Ryzen 7 7730U laptop (16 threads): headless Chrom
 What this shows:
 
 - **Navigation is the bottleneck on every platform.** Discrete actions (opening a moment, typing, saving, deleting, searching) stay within budget almost everywhere. Zooming, panning and pinching miss it once a few thousand moments are in view. At 1,000 moments each zoom step costs 70–80 ms of drawing, so a 50 ms frame budget is out of reach until that drawing is cheaper (#68). Opening a new duration redraws too, and misses at 10,000 moments.
-- **The comfortable sizes are optimistic for gestures.** Navigation misses its budget in the browser at 4,000 moments (the documented comfortable size), and on a throttled CPU already at 1,000. The platform and the desktop app, documented as comfortable up to the 200,000 limit, miss it from 10,000.
-- **The advice shows too late.** Beyond the comfortable sizes, the browser misses its budgets without the advice showing ("advice gaps"). The advice compares the editor's own drawing time with 150 ms, while users wait longer, from input to paint (#69).
+- **The comfortable sizes were optimistic for gestures.** Navigation missed its budget in the browser at 4,000 moments, then the documented comfortable size, and on a throttled CPU already at 1,000. The platform and the desktop app, documented as comfortable up to the 200,000 limit, miss it from 10,000.
+- **The advice showed too late.** Beyond the comfortable sizes, the browser missed its budgets without the advice showing ("advice gaps"): the advice compared the editor's own drawing time with 150 ms, while users wait longer, from input to paint. The advice now times those waits (#69), and the comfortable sizes come from the runs below.
 
-CI checks 1,000 moments in the browser and the platform, and 1,000 and 10,000 moments in the desktop app. Every interaction except the known navigation misses meets its budget there.
+This run timed zooming until the bounds fields changed, which can be a frame before the moments are drawn, so its zoom times are somewhat low.
+
+#### Comfortable sizes
+
+The comfortable sizes in `src/capacity.ts` come from the browser runs on GitHub's hosted runners (`ubuntu-24.04`), about 1.3× slower than the laptop above. Medians in ms, two runs at full speed and one throttled 4×; **bold** misses the 150 ms budget:
+
+| Interaction           |    250 |    500 |   1,000 |       2,000 |       4,000 |  ×4 250 |  ×4 500 | ×4 1,000 |  ×4 2,000 |
+| --------------------- | -----: | -----: | ------: | ----------: | ----------: | ------: | ------: | -------: | --------: |
+| Wheel zoom            |  70–86 | 93–122 | 110–136 | **165–206** | **213–270** | **257** | **419** |  **528** |   **819** |
+| Drag (longest frame)  |     33 |  34–67 |   67–83 |     100–133 | **167–217** | **217** | **300** |  **500** |   **600** |
+| Pinch (longest frame) |     33 | 67–100 |  83–117 | **183–233** | **250–317** | **217** | **433** |  **583** | **1,000** |
+| Keyboard zoom         |  36–43 |  36–55 |   57–83 |     112–149 | 123–**200** | **190** | **238** |  **257** |   **283** |
+| Open                  | 80–101 | 99–130 | 144–189 |     287–341 |     462–550 |     607 |     528 |      764 |     1,108 |
+
+At full speed every interaction meets its budget up to 1,000 moments, and zooming and pinching miss it from 2,000. Throttled 4×, navigation misses at every size, as each frame redraws the view; apart from navigation, every interaction meets its budget up to 500 moments (at 1,000 the delete confirmation takes 137 ms).
+
+CI checks the browser and the platform at 1,000 moments, the browser around its comfortable sizes (above), and the desktop app at 1,000 and 10,000 moments. Every interaction except the known navigation misses meets its budget there, and past the comfortable sizes the advice shows wherever one misses.
 
 ## Method
 

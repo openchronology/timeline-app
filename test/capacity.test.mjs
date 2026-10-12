@@ -13,15 +13,15 @@ test('the browser is advised by its own measurements, then by size', () => {
   // Navigation waits and draft saves need consistent medians, not one slow sample.
   const slow = THRESHOLDS.navigation + 50;
   assert.deepEqual(
-    advise('browser', { ...none(), navigation: [slow, slow] }, { moments: 100 }),
+    advise('browser', { ...none(), navigation: [slow, slow] }, { moments: 1000 }),
     [],
   );
   assert.deepEqual(
-    advise('browser', { ...none(), navigation: [slow, 10, slow] }, { moments: 100 }),
+    advise('browser', { ...none(), navigation: [slow, 10, slow] }, { moments: 1000 }),
     [{ kind: 'browser', reason: 'navigation' }],
   );
   assert.deepEqual(
-    advise('browser', { ...none(), navigation: [slow, 10, 10] }, { moments: 100 }),
+    advise('browser', { ...none(), navigation: [slow, 10, 10] }, { moments: 1000 }),
     [],
   );
   assert.deepEqual(
@@ -60,6 +60,34 @@ test('the limit warning covers moments, durations and relationships, before plat
       { kind: 'browser', reason: 'size' },
     ],
   );
+});
+test('slow navigation is advised from the size where another platform helps', () => {
+  const slow = THRESHOLDS.navigation + 100;
+  const m = () => ({ ...none(), navigation: [slow, slow, slow] });
+  // Below it, the per-frame cost every platform shares (#68): nothing to advise.
+  assert.deepEqual(advise('browser', m(), { moments: THRESHOLDS.navigationMoments - 1 }), []);
+  assert.deepEqual(advise('browser', m(), { moments: THRESHOLDS.navigationMoments }), [
+    { kind: 'browser', reason: 'navigation' },
+  ]);
+  // Opening and edits are advised at any size.
+  assert.deepEqual(advise('browser', { ...none(), open: THRESHOLDS.open + 1 }, { moments: 10 }), [
+    { kind: 'browser', reason: 'open' },
+  ]);
+});
+test('once measured slow, the advice holds for the timeline', () => {
+  const m = none();
+  const slow = THRESHOLDS.navigation + 100,
+    moments = THRESHOLDS.navigationMoments;
+  for (const wait of [slow, slow, slow]) record(m.navigation, wait);
+  assert.deepEqual(advise('browser', m, { moments }), [{ kind: 'browser', reason: 'navigation' }]);
+  assert.deepEqual(m.slow, { reason: 'navigation', ms: slow });
+  // Quick views later (a small pan after slow zooming) do not make it fast.
+  for (let i = 0; i < SAMPLES; i++) record(m.navigation, 20);
+  assert.deepEqual(advise('browser', m, { moments }), [{ kind: 'browser', reason: 'navigation' }]);
+  // A slow open is reported over navigation.
+  m.open = THRESHOLDS.open + 1;
+  assert.deepEqual(advise('browser', m, { moments }), [{ kind: 'browser', reason: 'open' }]);
+  assert.deepEqual(m.slow, { reason: 'open', ms: THRESHOLDS.open + 1 });
 });
 test('only the most recent samples count', () => {
   const samples = [];

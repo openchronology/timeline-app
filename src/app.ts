@@ -1818,8 +1818,11 @@ function updateCapacity() {
   const notice = el('capacity-notice');
   const platform = capacityPlatform();
   const key = capacityTimeline();
-  if (key !== capacityKey) {
-    capacityKey = key;
+  // Measurements belong to the open document: renaming a timeline kept in the browser
+  // changes its key (by title, so dismissals survive reopening it) but not its speed.
+  const measuring = remote || local ? key : 'memory:' + documentRequest;
+  if (measuring !== capacityKey) {
+    capacityKey = measuring;
     capacity = { navigation: [], edits: [], views: [] };
   }
   const advice = platform
@@ -1878,10 +1881,12 @@ function capacityMessage(advice: Advice): string {
     : session.server
       ? 'Large timelines are faster in the desktop app, or saved to your account on this server.'
       : 'Large timelines are faster in the desktop app.';
+  // The measurement that found the timeline slow.
+  const slowMs = capacity.slow?.ms ?? 0;
   const cause = {
-    open: `This timeline took ${seconds(capacity.open ?? 0)} to open in this browser.`,
-    navigation: `Zooming and panning this timeline take about ${Math.round(capacity.navigation.at(-1) ?? 0)} ms to show in this browser.`,
-    edit: `Keeping a draft of this timeline in this browser takes about ${Math.round(capacity.edits.at(-1) ?? 0)} ms after each change.`,
+    open: `This timeline took ${seconds(slowMs)} to open in this browser.`,
+    navigation: `Zooming and panning this timeline take about ${Math.round(slowMs)} ms to show in this browser.`,
+    edit: `Keeping a draft of this timeline in this browser takes about ${Math.round(slowMs)} ms after each change.`,
     size: `This timeline has ${momentCount().toLocaleString()} moments, which is a lot to edit in a browser.`,
   }[advice.reason];
   return `${cause} ${elsewhere}`;

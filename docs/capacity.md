@@ -4,12 +4,16 @@ A timeline holds at most **200,000 moments** (and at most 200,000 durations and 
 
 ## Which platform to use
 
-| Platform                                                     | Comfortable                    | Noticeably slow                                                                    | Recommendation beyond that                                                                                               |
-| ------------------------------------------------------------ | ------------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **Browser** on a fast computer (guest editing, offline HTML) | up to ~4,000 moments           | ~15,000 moments and more: opening takes over a second, and each redraw over 100 ms | Open the timeline in the **desktop app**, or save it to your account and edit it on the **platform**                     |
-| **Browser** on a phone or slower computer                    | up to ~1,000 moments           | a few thousand moments and more                                                    | Edit on the **platform** (signed in); there is no desktop app for phones                                                 |
-| **Desktop app** (`.och` files)                               | up to the 200,000-moment limit | Opening takes about a second from ~100,000 moments; views and saves stay fast      | The **platform** for sharing and collaboration, or on a slow computer. It is not faster for one person on a fast machine |
-| **Platform** (signed in, server timelines)                   | up to the 200,000-moment limit | —                                                                                  | Split timelines that approach the limit                                                                                  |
+| Platform                                                     | Comfortable                    | Noticeably slow                                                               | Recommendation beyond that                                                                                               |
+| ------------------------------------------------------------ | ------------------------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Browser** on a fast computer (guest editing, offline HTML) | up to ~1,000 moments           | ~2,000 moments and more: zooming and pinching take over 150 ms to show        | Open the timeline in the **desktop app**, or save it to your account and edit it on the **platform**                     |
+| **Browser** on a phone or slower computer                    | up to ~500 moments\*           | 1,000 moments and more                                                        | Edit on the **platform** (signed in); there is no desktop app for phones                                                 |
+| **Desktop app** (`.och` files)                               | up to the 200,000-moment limit | Opening takes about a second from ~100,000 moments; views and saves stay fast | The **platform** for sharing and collaboration, or on a slow computer. It is not faster for one person on a fast machine |
+| **Platform** (signed in, server timelines)                   | up to the 200,000-moment limit | —                                                                             | Split timelines that approach the limit                                                                                  |
+
+\* Apart from zooming and panning, which on a phone or slower computer take over 150 ms to show at any size, since each frame redraws the view ([#68](https://github.com/openchronology/timeline-app/issues/68)). The platform and the desktop app draw in the browser too, so they would not be faster for a small timeline.
+
+The comfortable sizes come from the [UI benchmarks](benchmarks.md#interactions) on GitHub's runners: up to them, every interaction meets its budget.
 
 Why the browser is different: guest editing and the offline HTML file keep the whole timeline in the page. Opening parses and indexes every moment, and every redraw summarizes them in JavaScript. The desktop app and the platform keep timelines in a database and read only what is on screen, so their costs grow far more slowly. Memory is rarely the problem: an open timeline takes about 0.6 KB of browser memory per moment (about 115 MB at 200,000).
 
@@ -19,12 +23,12 @@ Signed-in users who edit a timeline kept only in the browser (imported, and not 
 
 The editor suggests another platform when a timeline outgrows the one in use. The advice appears as a notice under the header; it never blocks editing, and dismissing it holds for that timeline.
 
-- **Browser:** The notice appears when this device measured the timeline as slow:
-  - opening took more than 1.5 s;
-  - the median of recent redraws exceeded 150 ms;
+- **Browser:** The notice appears when this device measured the timeline as slow, timing what its user waits for, from an input until its result is painted:
+  - opening took more than 1.5 s, until the timeline was painted;
+  - zooming, panning and pinching, from 1,000 moments: the median of the last five waits from an input until its view was painted exceeded 150 ms. Below 1,000 moments the time goes on drawing each frame, which another platform would not save;
   - keeping a draft took more than 100 ms after each change (signed in, for a timeline kept only in the browser).
 
-  Without such measurements it appears from 20,000 moments. It offers **Export** (to open the file in the desktop app), **Save to server** or **Sign in** where the browser is connected to a server, a link to the desktop app, and, in the offline HTML file, a link to the platform.
+  Once measured slow, the notice stays for that timeline, even if later views are quick (a small pan after slow zooming). Without such measurements it appears from 20,000 moments. It offers **Export** (to open the file in the desktop app), **Save to server** or **Sign in** where the browser is connected to a server, a link to the desktop app, and, in the offline HTML file, a link to the platform.
 
 - **Desktop app:** The notice appears when views of the timeline consistently take more than a second on this computer. It suggests saving the timeline to a server.
 - **Every platform:** The notice appears from 150,000 moments, durations or relationships, since a timeline holds at most 200,000 and no platform lifts that limit. It suggests splitting the timeline. On the platform and in the desktop app the count covers moments; in the browser it also covers durations and relationships.
