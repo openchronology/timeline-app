@@ -10,7 +10,7 @@ Set these values in the operator's private `.env` before starting Compose:
 ADMIN_USERNAME=admin
 ADMIN_EMAIL=operator@example.org
 ADMIN_INITIAL_PASSWORD=use-a-unique-password-of-at-least-15-characters
-DEFAULT_USER_STORAGE_BYTES=104857600
+DEFAULT_USER_STORAGE_BYTES=500MiB
 API_KEY_REQUESTS_PER_MINUTE=120
 ```
 
@@ -46,9 +46,16 @@ state instead of trusting a browser-supplied role.
 
 ## Data quotas
 
-The installation default is **100 MiB per user**. `DEFAULT_USER_STORAGE_BYTES`
-initializes it once; subsequent changes are made in `/admin` and persist across
-restarts. A user's quota can inherit the site default, override it with an exact
+The default quota per user comes from the environment file or from `/admin`:
+
+- **Set in the environment file:** `DEFAULT_USER_STORAGE_BYTES` (a byte count, or a size
+  such as `500MiB` or `2GB`; decimal units are powers of 1000, binary ones of 1024) applies
+  at every start. `/admin` shows it, and changes it only when the variable is removed.
+- **Unset or empty:** the default starts at **100 MiB** and is changed in `/admin`, where it
+  persists across restarts.
+
+An invalid value stops the server at startup with a message saying why. A user's quota can
+inherit the site default, override it with an exact
 byte count, or bypass the limit. Administrators and the reserved, non-login seed
 account are exempt. Set the default to **0** for a read-only installation, then
 grant exemptions or positive limits to designated data suppliers. Reading public

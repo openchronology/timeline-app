@@ -31,7 +31,7 @@ function useSelection() {
     },
   ];
 }
-export function CompareCheckbox({ id, title }) {
+export function CompareCheckbox({ id, title, limit = 8 }) {
   const [ids, setIds] = useSelection();
   return (
     <label className="compare-checkbox">
@@ -39,7 +39,7 @@ export function CompareCheckbox({ id, title }) {
         type="checkbox"
         aria-label={'Compare ' + title}
         checked={ids.includes(id)}
-        disabled={ids.length >= 8 && !ids.includes(id)}
+        disabled={ids.length >= limit && !ids.includes(id)}
         onChange={(e) =>
           setIds(e.target.checked ? [...ids, id] : ids.filter((value) => value !== id))
         }
@@ -48,12 +48,15 @@ export function CompareCheckbox({ id, title }) {
     </label>
   );
 }
-export function CompareTray() {
+export function CompareTray({ limit = 8, signedIn = true }) {
   const [ids, setIds] = useSelection();
   return (
     <div className="compare-tray">
-      <span>{ids.length} selected for comparison (up to 8)</span>
-      {ids.length >= 2 && (
+      <span>
+        {ids.length} selected for comparison (up to {limit}
+        {!signedIn && limit < 8 ? '; sign in to compare up to 8' : ''})
+      </span>
+      {ids.length >= 2 && ids.length <= limit && (
         <a className="button primary" href={'/compare?timelines=' + ids.join(',')}>
           Compare timelines
         </a>

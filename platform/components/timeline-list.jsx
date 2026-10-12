@@ -14,6 +14,7 @@ export default function TimelineList({
   favorites = false,
   basePath = '/',
   pageKey: customPageKey,
+  compareLimit = 8,
 }) {
   const pageKey = customPageKey ?? (mine ? 'minePage' : favorites ? 'favoritePage' : 'page');
   return (
@@ -21,7 +22,11 @@ export default function TimelineList({
       <div className="timeline-grid">
         {result.timelines.map((t) => (
           <article className="timeline-card" key={t.id}>
-            <CompareCheckbox id={t.id} title={t.title || 'Untitled timeline'} />
+            <CompareCheckbox
+              id={t.id}
+              title={t.title || 'Untitled timeline'}
+              limit={compareLimit}
+            />
             <h3>
               <Link href={'/timelines/' + t.id}>{t.title || 'Untitled timeline'}</Link>
             </h3>

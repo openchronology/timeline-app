@@ -18,6 +18,8 @@ interface Host {
   start(sources: ComparisonSource[], presentation: TimePresentation): void;
   fail(error: unknown): void;
   generation(): number;
+  /** How many timelines this account may compare at once (2 to 8; the server decides). */
+  limit(): number;
 }
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 export function comparisonUI(host: Host) {
@@ -27,7 +29,8 @@ export function comparisonUI(host: Host) {
   const selected = new Map<string, string>();
   const input = el<HTMLInputElement>('compare-search');
   function selection() {
-    el('compare-selected').textContent = `${selected.size} selected (two to eight timelines)`;
+    el('compare-selected').textContent =
+      `${selected.size} selected (two to ${host.limit()} timelines)`;
     el<HTMLButtonElement>('compare-start').disabled = selected.size < 2;
     el('compare-chosen').replaceChildren();
     for (const [key, title] of selected) {
@@ -44,7 +47,7 @@ export function comparisonUI(host: Host) {
     }
     for (const checkbox of el('compare-results').querySelectorAll<HTMLInputElement>('input')) {
       checkbox.checked = selected.has(checkbox.dataset.timelineId!);
-      checkbox.disabled = selected.size >= 8 && !checkbox.checked;
+      checkbox.disabled = selected.size >= host.limit() && !checkbox.checked;
     }
   }
   async function refresh() {
@@ -67,13 +70,14 @@ export function comparisonUI(host: Host) {
         checkbox.type = 'checkbox';
         checkbox.dataset.timelineId = timeline.id;
         checkbox.checked = selected.has(timeline.id);
-        checkbox.disabled = selected.size >= 8 && !checkbox.checked;
+        checkbox.disabled = selected.size >= host.limit() && !checkbox.checked;
         checkbox.onchange = () => {
-          if (checkbox.checked && selected.size < 8) selected.set(timeline.id, timeline.title);
+          if (checkbox.checked && selected.size < host.limit())
+            selected.set(timeline.id, timeline.title);
           else selected.delete(timeline.id);
           selection();
           for (const box of el('compare-results').querySelectorAll<HTMLInputElement>('input'))
-            box.disabled = selected.size >= 8 && !box.checked;
+            box.disabled = selected.size >= host.limit() && !box.checked;
         };
         label.append(
           checkbox,
@@ -189,7 +193,8 @@ export function comparisonUI(host: Host) {
   return {
     start,
     addFile(source: ComparisonSource) {
-      if (selected.size >= 8) throw new Error('At most eight timelines can be compared.');
+      if (selected.size >= host.limit())
+        throw new Error(`At most ${host.limit()} timelines can be compared.`);
       files.set(source.key, source);
       selected.set(source.key, source.title);
       selection();

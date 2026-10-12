@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { quotaValue, avatarValue } from '../server/administration.mjs';
 import { keyInput, authorizeKey } from '../server/api-keys.mjs';
-test('quotas accept exact bounded whole bytes only', () => {
+test('quotas accept bounded whole bytes or sizes with units only', () => {
   for (const v of [0, '104857600', 10_000_000_000_000]) assert.equal(quotaValue(v), String(v));
+  assert.equal(quotaValue('01'), '1');
+  assert.equal(quotaValue('2GiB'), '2147483648');
   assert.equal(quotaValue(null, true), null);
-  for (const v of [null, undefined, -1, 1.5, Infinity, '01', '1e6', '100;DROP', 10_000_000_000_001])
+  for (const v of [null, undefined, -1, 1.5, Infinity, '1e6', '100;DROP', 10_000_000_000_001])
     assert.throws(() => quotaValue(v));
 });
 test('avatar uploads cannot introduce executable formats or unbounded data', () => {

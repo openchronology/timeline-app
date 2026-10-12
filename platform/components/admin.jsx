@@ -73,18 +73,25 @@ export default function Admin() {
         }}
       >
         <label>
-          Default per-user quota (bytes; zero makes accounts read-only)
+          Default per-user quota (bytes, or a size such as 500MiB or 2GB; zero makes accounts
+          read-only)
           <input
             name="quota"
             key={result?.settings.default_quota_bytes}
             defaultValue={result?.settings.default_quota_bytes}
-            type="number"
-            min="0"
-            max="10000000000000"
+            pattern="\s*\d+(\.\d+)?\s*([kKmMgGtT][iI]?)?[bB]?\s*"
+            disabled={result?.settings.default_quota_from_env}
             required
           />
         </label>
-        <button disabled={busy}>Apply site default</button>
+        {result?.settings.default_quota_from_env ? (
+          <p className="field-hint">
+            Set by <code>DEFAULT_USER_STORAGE_BYTES</code> in the environment file; change it there
+            and restart.
+          </p>
+        ) : (
+          <button disabled={busy}>Apply site default</button>
+        )}
       </form>
       <section className="notice">
         <h2>Confirm administrative changes</h2>
@@ -166,12 +173,10 @@ export default function Admin() {
                     </label>
                   ))}
                   <label>
-                    Custom quota in bytes (blank inherits site default)
+                    Custom quota in bytes or a size such as 2GiB (blank inherits site default)
                     <input
                       name="quota_bytes"
-                      type="number"
-                      min="0"
-                      max="10000000000000"
+                      pattern="\s*\d+(\.\d+)?\s*([kKmMgGtT][iI]?)?[bB]?\s*"
                       defaultValue={item.quota_bytes ?? ''}
                     />
                   </label>

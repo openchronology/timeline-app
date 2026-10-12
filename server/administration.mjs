@@ -2,15 +2,30 @@
 import { randomUUID } from 'node:crypto';
 import { passwordHash } from './auth.mjs';
 import { HttpError } from './store.mjs';
+import { defaultQuota, storageBytes } from './limits.mjs';
+/** A quota in bytes, as a string: a byte count or a size such as 500MiB or 2GB, up to 10 TB. */
 export function quotaValue(value, nullable = false) {
   if (nullable && value === null) return null;
-  if (
-    !['string', 'number'].includes(typeof value) ||
-    !/^(0|[1-9][0-9]{0,13})$/.test(String(value)) ||
-    BigInt(value) > 10_000_000_000_000n
-  )
-    throw new HttpError(400, 'Quota must be a whole number of bytes from 0 to 10 TB.');
-  return String(value);
+  if (!['string', 'number'].includes(typeof value) || String(value).length > 32)
+    throw new HttpError(400, 'Quota must be a size from 0 to 10 TB, such as 104857600 or 2GiB.');
+  try {
+    return String(storageBytes(value));
+  } catch {
+    throw new HttpError(400, 'Quota must be a size from 0 to 10 TB, such as 104857600 or 2GiB.');
+  }
+}
+/**
+ * The default quota DEFAULT_USER_STORAGE_BYTES sets, applied at every start: when it is set,
+ * the environment file decides the default, and /admin shows it rather than changing it.
+ */
+export async function applyEnvironmentQuota(client, env = process.env) {
+  const quota = defaultQuota(env);
+  if (quota === null) return false;
+  await client.query(
+    'UPDATE oc_site_settings SET initialized=true,default_quota_bytes=$1 WHERE singleton',
+    [String(quota)],
+  );
+  return true;
 }
 export async function bootstrapInstallation(client, env = process.env) {
   await client.query('SELECT singleton FROM oc_site_settings WHERE singleton FOR UPDATE');
@@ -18,8 +33,9 @@ export async function bootstrapInstallation(client, env = process.env) {
   if (!settings.initialized)
     await client.query(
       'UPDATE oc_site_settings SET initialized=true,default_quota_bytes=$1 WHERE singleton',
-      [quotaValue(env.DEFAULT_USER_STORAGE_BYTES ?? '104857600')],
+      [String(defaultQuota(env) ?? 104857600n)],
     );
+  else await applyEnvironmentQuota(client, env);
   if (!env.ADMIN_INITIAL_PASSWORD || settings.bootstrap_admin_id) return;
   const username = (env.ADMIN_USERNAME ?? 'admin').toLowerCase(),
     email = env.ADMIN_EMAIL || null;
@@ -76,10 +92,11 @@ export async function requireDataProvider(pool, id) {
     );
 }
 export class Administration {
-  constructor(store, auth) {
+  constructor(store, auth, env = process.env) {
     this.store = store;
     this.pool = store.pool;
     this.auth = auth;
+    this.env = env;
   }
   async require(session) {
     if (
@@ -110,9 +127,13 @@ export class Administration {
     return {
       ...result.rows[0],
       page,
-      settings: (
-        await this.pool.query('SELECT default_quota_bytes FROM oc_site_settings WHERE singleton')
-      ).rows[0],
+      settings: {
+        ...(
+          await this.pool.query('SELECT default_quota_bytes FROM oc_site_settings WHERE singleton')
+        ).rows[0],
+        // Set by the environment file, which /admin does not change.
+        default_quota_from_env: defaultQuota(this.env) !== null,
+      },
     };
   }
   async change(session, kind, id, value) {
@@ -169,6 +190,11 @@ export class Administration {
           await c.query('DELETE FROM oc_device_logins WHERE user_id=$1', [id]);
         }
       } else if (kind === 'settings') {
+        if (defaultQuota(this.env) !== null)
+          throw new HttpError(
+            409,
+            'DEFAULT_USER_STORAGE_BYTES in the environment file sets the default quota; change it there.',
+          );
         changes.default_quota_bytes = quotaValue(value.default_quota_bytes);
         await c.query('UPDATE oc_site_settings SET default_quota_bytes=$1 WHERE singleton', [
           changes.default_quota_bytes,

@@ -249,6 +249,7 @@ jobs:
       - run: node test/stars-postgres.mjs
       - run: node test/follow-postgres.mjs
       - run: node test/administration-postgres.mjs
+      - run: node test/limits-postgres.mjs
       - run: node test/account-security-postgres.mjs
       - run: node test/challenge-postgres.mjs
       - run: npm run test:postgres

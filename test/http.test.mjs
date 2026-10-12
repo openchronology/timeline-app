@@ -63,6 +63,7 @@ test('server deployments expose a guest dashboard without database storage and r
     csrf: null,
     providers: [],
     fileExchange: false,
+    compareLimit: 4,
   });
   const write = await request(app, '/api/timelines', 'POST', {
     origin: 'https://attacker.example',

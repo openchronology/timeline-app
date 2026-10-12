@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+import { compareLimits as compareLimitsFromEnv, compareLimit } from './limits.mjs';
 import { setTimelineStar } from './stars.mjs';
 import { Administration, usage, requireDataProvider, avatarValue } from './administration.mjs';
 import { authorizeKey, keyRequestRead } from './api-keys.mjs';
@@ -140,9 +141,11 @@ export function createRequestHandler({
   featured = [],
   // Human-verification settings (see challenge.mjs); none disables challenges.
   challenges: challengeSettings = null,
+  // How many timelines each kind of account may compare (limits.mjs).
+  compareLimits: limits = compareLimitsFromEnv(),
 } = {}) {
   const library = createPluginLibrary(plugins, pool);
-  const store = pool ? new PostgresStore(pool) : null,
+  const store = pool ? new PostgresStore(pool, { compareLimits: limits }) : null,
     auth = pool
       ? new Auth(pool, origin, {
           mailer,
@@ -252,6 +255,8 @@ export function createRequestHandler({
                 }
               : {}),
             fileExchange: !!pool && converter.enabled,
+            // How many timelines this account may compare at once.
+            compareLimit: compareLimit(limits, session),
           },
           nonce ? { 'Set-Cookie': auth.nonceCookie('login', nonce) } : {},
         );
