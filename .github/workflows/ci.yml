@@ -153,6 +153,38 @@ jobs:
   # sizes every interaction meets its budget, and just past them the advice is showing
   # wherever one misses. The browser at full speed, comfortable at 1,000 moments, is gated
   # in the PostgreSQL job with the platform.
+  # TEMPORARY (#68): navigation by size on hosted runners, to raise the comfortable sizes.
+  # Not a gate; removed before merging.
+  ui-calibration:
+    name: UI calibration / ${{ matrix.run.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        run:
+          - { name: full speed, throttle: '1', sizes: '1000,2000,4000,10000,20000' }
+          - { name: x4, throttle: '4', sizes: '250,500,1000,2000' }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: node scripts/npm-ci.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:editor
+      - run: node bench/ui.mjs
+        env:
+          UI_PLATFORMS: browser
+          UI_SIZES: ${{ matrix.run.sizes }}
+          UI_THROTTLES: ${{ matrix.run.throttle }}
+          UI_SAMPLES: '5'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: ui-calibration-${{ matrix.run.throttle }}
+          path: bench/results/ui.json
   ui-capacity:
     name: UI capacity advice
     runs-on: ubuntu-24.04
