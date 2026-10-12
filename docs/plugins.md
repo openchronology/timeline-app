@@ -18,6 +18,22 @@ Single moments display circular image markers. Hover or keyboard focus enlarges 
 
 Use public HTTPS image URLs without embedded credentials. Image requests have no referrer and use anonymous cross-origin mode. The host must permit cross-origin image access, typically with `Access-Control-Allow-Origin: *`. Cross-origin authentication cookies are not sent. Image links use `noopener noreferrer` and open a new browser tab; Tauri opens the system browser through an HTTPS-only native command. HTTP, `javascript:`, `data:`, `file:`, relative URLs and credential-bearing URLs are not loaded. URL previews debounce typing; marker images retain their DOM nodes across pan/zoom to avoid restarting image loads. Removing or disabling the plugin leaves metadata intact.
 
+## Headings
+
+Install **Headings** to let a moment act as a heading or marker, such as "Part One" or "Chapter 2", rather than as part of the subject matter. Its moment fields are `headingLevel` and `headingFont`:
+
+```json
+{ "title": "Part One", "headingLevel": "h1", "headingFont": "Georgia, serif" }
+```
+
+- **Appearance:** a moment with a heading level from `h1` to `h6` shows only its title, centered on the axis where its dot would be, sized by its level. There is no dot, label or stem. The title is what you click, focus and hover.
+- **Font:** the default is Times New Roman (serif). The details panel offers named fonts (Georgia, Garamond, Palatino, Helvetica, the system font, Courier and cursive) and **Custom…**, which accepts any fonts installed on the viewer's device, as a comma-separated family list such as `Baskerville, serif`. Only font names are accepted, so no web font is downloaded.
+- **Not a heading:** choosing **Not a heading**, or leaving the level empty, keeps the moment an ordinary one.
+- **Summaries:** headings still group into summaries with other moments and count as moments there; only a heading shown on its own looks different.
+- **Disabling:** disabling or removing the plugin shows headings as ordinary moments again; their metadata is kept.
+
+The plugin's marker is `{ "kind": "heading", "metadataKey": "headingLevel" }`, and its font comes from the manifest's `font` field. Both the `heading` and `font` field kinds are available to other plugins.
+
 ## Duration backgrounds
 
 Install **Duration backgrounds** to show an image behind the timeline wherever a [duration](durations.md) lies. Its duration field is `backgroundUrl`, a public HTTPS image URL, as for moment icons:
@@ -39,8 +55,8 @@ Install **Duration backgrounds** to show an image behind the timeline wherever a
 
 Plugins combine **JSON host component declarations** and an optional restricted script. Their source is interpreted locally, without arbitrary JavaScript execution, HTML, CSS, imports, event handlers or application API endpoints. They cannot obtain account credentials, access the DOM, call the server, or execute arbitrary code. The host is responsible for rendering, validating URLs, field input and lifecycle cleanup. API v1 supports:
 
-- Inspector fields: `text`, `multiline`, `image-url`, `stack`, `shape`, `size`, `color`, and `links`, each bound to one top-level moment metadata key.
-- Marker effects: an `image`, `color`, or `shape` bound to metadata, plus hover cards and restricted scripted effects.
+- Inspector fields: `text`, `multiline`, `image-url`, `stack`, `shape`, `size`, `color`, `links`, `heading` and `font`, each bound to one top-level moment metadata key.
+- Marker effects: an `image`, `color`, `shape` or `heading` bound to metadata, plus hover cards and restricted scripted effects.
 - Ordering: later enabled definitions replace earlier inspector fields with the same key; later marker hooks with a valid, populated image URL take precedence. Empty or invalid URLs fall back to the preceding valid marker effect, or the normal dot.
 - Targets: an optional `targets` array of `"moments"` and/or `"durations"`. Without it, color markers and hover cards apply to moments and [durations](durations.md); every other plugin applies to moments only. Durations use text, notes, color, link and image URL fields, color markers, hover cards and backgrounds (`background.kind: "image"`, which applies to durations only); stacks, shapes, sizes, icons and summary expansion are moment-only.
 

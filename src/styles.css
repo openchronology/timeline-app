@@ -2387,6 +2387,57 @@ dialog button {
   }
 }
 
+/* A moment shown as a heading (#110): its title alone, centered on the axis, sized by level. */
+.event-marker.heading-marker,
+.event-marker.heading-marker:hover,
+.event-marker.heading-marker:focus-visible {
+  top: 192px;
+  width: auto;
+  height: auto;
+  max-width: 420px;
+  padding: 0.12em 0.45em;
+  border: 0;
+  border-radius: 4px;
+  background: #fbfcf9e6;
+  box-shadow: none;
+  color: #1d3528;
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+.event-marker.heading-marker:hover,
+.event-marker.heading-marker:focus-visible {
+  color: #0f2a1c;
+  box-shadow: 0 0 0 2px #c4d8b2;
+  z-index: 5;
+}
+.event-marker.heading-marker.selected {
+  background: #fbfcf9e6;
+  box-shadow: 0 0 0 2px #173c28;
+}
+.event-marker.heading-marker[data-heading='h1'] {
+  font-size: 30px;
+}
+.event-marker.heading-marker[data-heading='h2'] {
+  font-size: 25px;
+}
+.event-marker.heading-marker[data-heading='h3'] {
+  font-size: 21px;
+}
+.event-marker.heading-marker[data-heading='h4'] {
+  font-size: 18px;
+}
+.event-marker.heading-marker[data-heading='h5'] {
+  font-size: 15px;
+}
+.event-marker.heading-marker[data-heading='h6'] {
+  font-size: 13px;
+  font-weight: 600;
+}
 /* A collapsed duration on the axis: a short capsule, distinct from round moment dots. */
 .event-marker.duration-point {
   border-radius: 7px;

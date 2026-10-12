@@ -13,7 +13,13 @@ import {
   shapeValue,
   MOMENT_SIZES,
   sizeValue,
+  HEADING_LEVELS,
+  headingValue,
+  HEADING_FONTS,
+  DEFAULT_HEADING_FONT,
+  fontValue,
 } from './plugins.js';
+import type { HeadingLevel } from './plugins.js';
 import type { InstalledPlugin, StackEntry } from './plugins.js';
 
 function image(alt: string) {
@@ -159,6 +165,72 @@ export function renderPluginFields(
       select.onchange = () => onChange(field.metadataKey, select.value);
       label.append(select);
       section.append(label);
+      container.append(section);
+      continue;
+    }
+    if (field.kind === 'heading') {
+      const label = document.createElement('label');
+      label.textContent = field.label;
+      const select = document.createElement('select');
+      select.setAttribute('aria-label', field.label);
+      select.disabled = !editable;
+      select.dataset.pluginKey = field.metadataKey;
+      select.append(new Option('Not a heading', ''));
+      for (const level of HEADING_LEVELS)
+        select.append(new Option(`Heading ${level.slice(1)}`, level));
+      select.value = headingValue(metadata[field.metadataKey]) ?? '';
+      select.onchange = () => onChange(field.metadataKey, select.value);
+      label.append(select);
+      section.append(label);
+      container.append(section);
+      continue;
+    }
+    if (field.kind === 'font') {
+      // Named fonts, or any installed family list; nothing is downloaded.
+      const label = document.createElement('label');
+      label.textContent = field.label;
+      const select = document.createElement('select');
+      select.setAttribute('aria-label', field.label);
+      select.disabled = !editable;
+      select.dataset.pluginKey = field.metadataKey;
+      for (const font of HEADING_FONTS) select.append(new Option(font.label, font.value));
+      select.append(new Option('Custom…', 'custom'));
+      const custom = document.createElement('input');
+      custom.type = 'text';
+      custom.maxLength = 200;
+      custom.spellcheck = false;
+      custom.disabled = !editable;
+      custom.placeholder = 'Font names, such as Baskerville, serif';
+      custom.setAttribute('aria-label', field.label + ' (custom)');
+      const hint = document.createElement('p');
+      hint.className = 'field-hint';
+      const current = fontValue(metadata[field.metadataKey]) ?? DEFAULT_HEADING_FONT;
+      const preset = HEADING_FONTS.some((f) => f.value === current);
+      select.value = preset ? current : 'custom';
+      custom.value = preset ? '' : current;
+      const show = () => {
+        custom.hidden = select.value !== 'custom';
+        hint.textContent = custom.hidden
+          ? ''
+          : 'Fonts installed on this device, separated by commas. End with serif or sans-serif for devices without them.';
+      };
+      show();
+      select.onchange = () => {
+        show();
+        if (select.value !== 'custom')
+          onChange(field.metadataKey, select.value === DEFAULT_HEADING_FONT ? '' : select.value);
+        else custom.focus();
+      };
+      custom.onchange = () => {
+        const value = fontValue(custom.value);
+        custom.setCustomValidity(
+          value || !custom.value.trim() ? '' : 'Use font names separated by commas.',
+        );
+        hint.textContent = custom.validationMessage || hint.textContent;
+        if (value || !custom.value.trim()) onChange(field.metadataKey, value ?? '');
+      };
+      label.append(select);
+      section.append(label, custom, hint);
       container.append(section);
       continue;
     }
@@ -541,6 +613,32 @@ const SHAPE_PATHS: Record<string, string> = {
   document: 'M2 3 H22 V19 Q17 15 12 19 Q7 23 2 19 Z',
   parallelogram: 'M7 4 H23 L17 20 H1 Z',
 };
+/**
+ * A moment shown as a heading (#110): its marker is its title, at the heading's level and in
+ * its font; null restores the ordinary marker. Returns whether it is a heading.
+ */
+export function renderPluginHeading(
+  button: HTMLButtonElement,
+  heading: { level: HeadingLevel; font: string } | null,
+  title: string,
+): boolean {
+  // The marker's class is rewritten as it renders; its data attribute says what it was.
+  if (!heading) {
+    if (button.dataset.heading) {
+      button.classList.remove('heading-marker');
+      delete button.dataset.heading;
+      button.style.fontFamily = '';
+      button.textContent = '';
+    }
+    return false;
+  }
+  button.classList.add('heading-marker');
+  button.dataset.heading = heading.level;
+  if (button.style.fontFamily !== heading.font) button.style.fontFamily = heading.font;
+  const text = title.trim() || 'Untitled heading';
+  if (button.textContent !== text || button.children.length) button.textContent = text;
+  return true;
+}
 export function renderPluginShape(button: HTMLButtonElement, shape: string) {
   button.dataset.shape = shape;
   const clips: Record<string, string> = {
