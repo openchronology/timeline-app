@@ -151,8 +151,8 @@ jobs:
           if-no-files-found: ignore
   # The browser's capacity advice (src/capacity.ts, docs/capacity.md): within the comfortable
   # sizes every interaction meets its budget, and just past them the advice is showing
-  # wherever one misses. The browser at full speed, comfortable at 1,000 moments, is gated
-  # in the PostgreSQL job with the platform.
+  # wherever one misses. The browser at full speed, comfortable up to 10,000 moments, is
+  # gated in the PostgreSQL job with the platform.
   ui-capacity:
     name: UI capacity advice
     runs-on: ubuntu-24.04
@@ -166,29 +166,27 @@ jobs:
       - run: node scripts/npm-ci.mjs
       - run: npx playwright install --with-deps chromium
       - run: npm run build:editor
-      # A slow device (CPU throttled 4×) at its comfortable size. Zooming and panning miss
-      # their budget there at any size (#68): reported, not failing.
+      # A slow device (CPU throttled 4×) at its comfortable size.
       - name: Slow device, comfortable size
         run: node bench/ui.mjs --gate
         env:
           UI_PLATFORMS: browser
           UI_THROTTLES: '4'
-          UI_SIZES: '500'
+          UI_SIZES: '1000'
           UI_SAMPLES: '3'
-          UI_KNOWN: navigation
       - name: Past the comfortable size, at full speed
         run: node bench/ui.mjs --gate
         env:
           UI_PLATFORMS: browser
           UI_THROTTLES: '1'
-          UI_SIZES: '2000'
+          UI_SIZES: '20000'
           UI_SAMPLES: '3'
       - name: Past the comfortable size, on a slow device
         run: node bench/ui.mjs --gate
         env:
           UI_PLATFORMS: browser
           UI_THROTTLES: '4'
-          UI_SIZES: '1000'
+          UI_SIZES: '2000'
           UI_SAMPLES: '3'
   postgres:
     name: PostgreSQL 16 / native pgmp / accounts and sharing
@@ -261,11 +259,12 @@ jobs:
           node test/syslog-live-postgres.mjs
       - name: Sharing, link previews and embeds in a live browser
         run: node test/sharing-postgres.mjs
-      # Interactions within the budgets in src/capacity.ts, browser and platform, small sizes.
+      # Interactions within the budgets in src/capacity.ts: the browser (comfortable up to
+      # 10,000 moments) and the platform (up to the limit) at 1,000 and 10,000.
       - name: UI interactions within budget
         run: node bench/ui.mjs --gate
         env:
-          UI_SIZES: '1000'
+          UI_SIZES: '1000,10000'
           UI_THROTTLES: '1'
           UI_SAMPLES: '3'
       - run: npm run test:versioning:postgres
@@ -313,8 +312,9 @@ jobs:
       # A debug app with the editor embedded (no installer packages).
       - run: npx tauri build --debug --no-bundle
       # 1,000 moments stay in memory; 10,000 move into the native SQLite store. Navigation and
-      # new durations miss their budgets on the desktop, more so with Xvfb's software rendering
-      # (#68): they are reported, and everything else must meet its budget.
+      # new durations are reported, not gated: under Xvfb they render in software, varying
+      # severalfold between runners, and WebKitWebDriver now and then loses a wheel or key
+      # input, so the view never changes. Everything else must meet its budget.
       - name: UI interactions within budget
         run: xvfb-run -a node bench/ui.mjs --gate
         env:

@@ -7,7 +7,7 @@ import {
   durationWindow,
   durationSummaries,
 } from './durations.js';
-import type { Duration, DurationBand, IntervalNode } from './durations.js';
+import type { Duration, DurationBand, DurationEndpoint, IntervalNode } from './durations.js';
 import { durationGroups, coalesceGroups } from './summaries.js';
 import {
   validateRelationships,
@@ -398,10 +398,29 @@ export class TimelineIndex {
       (id) => this.retired.get(id),
     ).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   }
+  /**
+   * Whether a duration's endpoint or a relationship names this moment: their trees follow its
+   * time and existence. Edits to other moments, or to a moment's title, leave the trees as
+   * they are, rather than rebuilding them at every edit (#68).
+   */
+  private anchored(id: string): boolean {
+    const names = (end: DurationEndpoint) => typeof end !== 'string' && end.moment === id;
+    for (const duration of this.durations.values())
+      if (names(duration.start) || names(duration.end)) return true;
+    for (const link of this.relationships.values())
+      if (
+        ('moment' in link.a && link.a.moment === id) ||
+        ('moment' in link.b && link.b.moment === id)
+      )
+        return true;
+    return false;
+  }
   put(event: PointEvent): void {
-    this.intervalDirty = true;
-    this.graph = null;
-    if (this.retired.delete(event.id)) this.journal.add('r:' + event.id);
+    const previous = this.byId.get(event.id);
+    if (this.retired.delete(event.id)) {
+      this.journal.add('r:' + event.id);
+      this.intervalDirty = true;
+    }
     this.journal.add('m:' + event.id);
     const time = parseTime(event.time),
       normalized = Object.freeze({
@@ -409,7 +428,14 @@ export class TimelineIndex {
         time: time.toString(),
         metadata: Object.freeze({ ...event.metadata }),
       });
-    this.remove(event.id);
+    // A moment that keeps its time leaves durations and relationships where they were.
+    if (!previous || previous.time !== normalized.time) {
+      if (this.anchored(event.id)) {
+        this.intervalDirty = true;
+        this.graph = null;
+      }
+    }
+    this.remove(event.id, true);
     const bucket = [...(this.points.get(time) ?? []), normalized].sort((a, b) =>
       a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
     );
@@ -426,11 +452,13 @@ export class TimelineIndex {
     return this.remove(id);
   }
   /** Removes a moment from the index without treating it as deleted (replacement or eviction). */
-  protected remove(id: string): boolean {
-    this.intervalDirty = true;
-    this.graph = null;
+  protected remove(id: string, replacing = false): boolean {
     const event = this.byId.get(id);
     if (!event) return false;
+    if (!replacing && this.anchored(id)) {
+      this.intervalDirty = true;
+      this.graph = null;
+    }
     const key = Q.parse(event.time),
       bucket = this.points.get(key)!.filter((e) => e.id !== id);
     if (bucket.length) this.points.set(key, Object.freeze(bucket));
@@ -603,7 +631,21 @@ export class Viewport {
   at(pixel: number, width: number): Q {
     return this.left.add(this.span.mul(screenQ(pixel).div(screenQ(width))));
   }
+  #spanNumber = 0;
+  #spanOf?: Q;
+  /**
+   * A time's position in pixels. Dividing exactly by the span reduces large fractions for
+   * every marker, every frame (#68); a span well inside a double's range divides as a double
+   * with the same result to far below a pixel. Only the difference from the left is exact.
+   */
   x(time: Q, width: number): number {
+    if (this.#spanOf !== this.span) {
+      this.#spanNumber = this.span.toApproximateNumber();
+      this.#spanOf = this.span;
+    }
+    const span = this.#spanNumber;
+    if (span > 1e-280 && span < 1e280)
+      return (time.sub(this.left).toApproximateNumber() / span) * width;
     return time.sub(this.left).div(this.span).toApproximateNumber() * width;
   }
   threshold(width: number, pixels: number): Q {

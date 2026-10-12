@@ -278,3 +278,42 @@ test('colors and hover cards apply to durations; moment-only plugins do not', ()
   assert.equal(momentPlugins([custom(['moments'])]).length, 1);
   assert.equal(durationPlugins([custom(['moments'])]).length, 0);
 });
+test('durations and arcs follow the moments they name, whatever else is edited', () => {
+  const index = new TimelineIndex({
+    format: 'openchronology',
+    version: 1,
+    title: 'Anchors',
+    description: '',
+    events: [
+      { id: 'start', time: '0/1', metadata: { title: 'Start' } },
+      { id: 'end', time: '10/1', metadata: { title: 'End' } },
+      { id: 'other', time: '5/1', metadata: { title: 'Other' } },
+    ],
+    durations: [{ id: 'span', start: { moment: 'start' }, end: { moment: 'end' }, metadata: {} }],
+    relationships: [{ a: { moment: 'start' }, b: { moment: 'other' } }],
+  });
+  // Moments a few units apart stay separate (arcs join separate markers).
+  const view = new Viewport(Q.from(-5n), Q.from(50n));
+  const band = () => index.frame(view, 1000).durations.find((d) => d.id === 'span');
+  const arc = () => index.frame(view, 1000).edges.map((e) => `${e.first} ${e.last}`);
+  assert.equal(band().last, '10/1');
+  assert.deepEqual(arc(), ['0/1 5/1']);
+  // Renaming an anchor, or moving a moment nothing names, changes neither.
+  index.put({ id: 'end', time: '10/1', metadata: { title: 'Renamed' } });
+  index.put({ id: 'unnamed', time: '7/1', metadata: {} });
+  index.put({ id: 'unnamed', time: '8/1', metadata: {} });
+  assert.equal(band().last, '10/1');
+  // Moving a named moment moves its duration and its arcs.
+  index.put({ id: 'end', time: '20/1', metadata: { title: 'Renamed' } });
+  assert.equal(band().last, '20/1');
+  index.put({ id: 'other', time: '30/1', metadata: { title: 'Other' } });
+  assert.deepEqual(arc(), ['0/1 30/1']);
+  // A deleted anchor's time stays with what names it, until the moment returns elsewhere.
+  index.delete('end');
+  assert.equal(band().last, '20/1');
+  index.put({ id: 'end', time: '40/1', metadata: {} });
+  assert.equal(band().last, '40/1');
+  // Deleting a moment ends its arcs.
+  index.delete('other');
+  assert.deepEqual(arc(), []);
+});

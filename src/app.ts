@@ -353,10 +353,39 @@ const hoverPreview = createHoverPreview(
   () => uiScale,
   (button) => button.click(),
 );
+/** Changes whenever what the timeline shows may have: another document, an edit, a revision. */
+const contentGeneration = () =>
+  `${documentRequest}:${editVersion}:${remote?.revision ?? local?.revision ?? ''}:${comparison?.tracks.map((t) => t.source.revision).join(',') ?? ''}`;
+/**
+ * Exact times parsed from the strings frames carry, kept across frames: a view redraws the
+ * same groups, bands and links many times while it moves (#68).
+ */
+const parsedTimes = new Map<string, Q>();
+const middles = new Map<string, Q>();
+/** The exact middle of two times, kept like parsed times. */
+function middleTime(first: string, last: string): Q {
+  if (first === last) return parsedTime(first);
+  const key = first + '\u0000' + last;
+  let middle = middles.get(key);
+  if (!middle) {
+    if (middles.size >= 50000) middles.clear();
+    middle = parsedTime(first).add(parsedTime(last)).div(Q.from(2n));
+    middles.set(key, middle);
+  }
+  return middle;
+}
+function parsedTime(text: string): Q {
+  let time = parsedTimes.get(text);
+  if (!time) {
+    if (parsedTimes.size >= 50000) parsedTimes.clear();
+    time = Q.parse(text);
+    parsedTimes.set(text, time);
+  }
+  return time;
+}
 const summaryExpansion = createSummaryExpansion(stage, {
   scale: () => uiScale,
-  generation: () =>
-    `${documentRequest}:${editVersion}:${remote?.revision ?? local?.revision ?? ''}:${comparison?.tracks.map((t) => t.source.revision).join(',') ?? ''}`,
+  generation: contentGeneration,
   load: (group, signal) => groupPage(group, null, 5, signal),
   decorate(button, event) {
     renderPluginMarker(button, imageSource(pluginMarker(activePlugins(), event.metadata)), 1n);
@@ -404,8 +433,30 @@ function panVertical(value: number) {
   requestRender(false);
 }
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+/**
+ * Animations started on label nodes, kept so they can be cancelled without asking the browser:
+ * getAnimations() and getComputedStyle() make it recompute every style first, and a frame
+ * called them once per label (#68).
+ */
+const labelAnimations = new WeakMap<Element, Animation[]>();
+function animateLabel(
+  node: Element,
+  keyframes: Keyframe[],
+  options: KeyframeAnimationOptions,
+): Animation {
+  const animation = node.animate(keyframes, options);
+  const running = (labelAnimations.get(node) ?? []).filter((a) => a.playState !== 'finished');
+  running.push(animation);
+  labelAnimations.set(node, running);
+  return animation;
+}
+function cancelLabelAnimations(node: Element) {
+  for (const animation of labelAnimations.get(node) ?? []) animation.cancel();
+  labelAnimations.delete(node);
+}
 function finishTimeFade(label: MomentLabel) {
-  for (const animation of label.coordinate.getAnimations({ subtree: true })) animation.cancel();
+  cancelLabelAnimations(label.current);
+  if (label.outgoing) cancelLabelAnimations(label.outgoing);
   label.outgoing?.remove();
   label.outgoing = undefined;
 }
@@ -415,7 +466,9 @@ function updateMomentTime(label: MomentLabel, value: string) {
     label.current.textContent = value;
     return;
   }
-  const opacity = Number(getComputedStyle(label.current).opacity);
+  // Where the current text's fade-in has got to: its opacity, without asking for its style.
+  const fadeIn = labelAnimations.get(label.current)?.find((a) => a.playState === 'running');
+  const opacity = fadeIn ? (fadeIn.effect?.getComputedTiming().progress ?? 1) : 1;
   finishTimeFade(label);
   if (reducedMotion.matches) {
     label.current.textContent = value;
@@ -430,7 +483,7 @@ function updateMomentTime(label: MomentLabel, value: string) {
   label.current = current;
   label.outgoing = outgoing;
   label.coordinate.append(current);
-  const fade = outgoing.animate([{ opacity }, { opacity: 0 }], {
+  const fade = animateLabel(outgoing, [{ opacity }, { opacity: 0 }], {
     duration: 200,
     easing: 'ease-out',
   });
@@ -438,12 +491,12 @@ function updateMomentTime(label: MomentLabel, value: string) {
     outgoing.remove();
     if (label.outgoing === outgoing) label.outgoing = undefined;
   };
-  current.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' });
+  animateLabel(current, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' });
 }
 function removeMomentLabel(label: MomentLabel, fade = false) {
   finishTimeFade(label);
   for (const node of [label.caption, label.stem, label.button]) {
-    for (const animation of node.getAnimations({ subtree: true })) animation.cancel();
+    cancelLabelAnimations(node);
     if (!fade || reducedMotion.matches) {
       node.remove();
       continue;
@@ -455,7 +508,7 @@ function removeMomentLabel(label: MomentLabel, fade = false) {
       old.remove();
       retiringNodes.delete(old);
     }
-    const animation = node.animate([{ opacity: 1 }, { opacity: 0 }], {
+    const animation = animateLabel(node, [{ opacity: 1 }, { opacity: 0 }], {
       duration: 220,
       easing: 'ease-out',
       fill: 'forwards',
@@ -543,7 +596,21 @@ function resetScale() {
 }
 /** The base scale last applied; turning a phone moves an unscaled timeline to the new base. */
 let scaledFor = 1;
-const width = () => Math.max(1, stage.clientWidth - 2 * inset()),
+/**
+ * The stage's size, kept by a ResizeObserver. Drawing must not read it from the DOM: each
+ * read after drawing changed something makes the browser lay out the page again, and a
+ * frame read it once per marker (#68). Until first observed, it is read directly.
+ */
+let stageSize: { width: number; height: number } | null = null;
+new ResizeObserver(() => {
+  const next = { width: stage.clientWidth, height: stage.clientHeight };
+  if (stageSize && next.width === stageSize.width && next.height === stageSize.height) return;
+  stageSize = next;
+  requestRender();
+}).observe(stage);
+const stageWidth = () => stageSize?.width ?? stage.clientWidth,
+  stageHeight = () => stageSize?.height ?? stage.clientHeight;
+const width = () => Math.max(1, stageWidth() - 2 * inset()),
   // Grouping follows marker size, which is smaller at a compact base scale.
   pixels = () => Math.round(Number(input('density').value) * baseScale());
 function toast(message: string) {
@@ -785,12 +852,12 @@ function requestRender(refreshFrame = true) {
     const refresh = pendingFrameRefresh;
     pendingFrameRefresh = false;
     // Hidden dashboards and documents have no usable geometry. Draw after they become visible.
-    if (stage.clientWidth <= 96 || stage.clientHeight === 0) {
+    if (stageWidth() <= 96 || stageHeight() === 0) {
       // An open drawn later than this measures the wait, not the device.
       openStarted = null;
       return;
     }
-    currentInset = stage.clientWidth < 600 ? 20 : 48;
+    currentInset = stageWidth() < 600 ? 20 : 48;
     // Turning a phone moves a timeline the reader has not rescaled to the new base scale.
     if (uiScale === scaledFor && baseScale() !== scaledFor && !comparison) {
       resetScale();
@@ -1014,13 +1081,13 @@ function drawFrame() {
   const branches = el('stack-markers');
   const stackRetained = new Set<string>();
   let topExtent = 0,
-    bottomExtent = stage.clientHeight / uiScale;
+    bottomExtent = stageHeight() / uiScale;
   const retained = new Set<string>();
   const ordered: HTMLElement[] = [];
   let visible = 0n;
   // Remote summary metadata is itself ordered in a RationalMap. It is never mistaken for a complete event cache.
   const groups = new RationalMap<FrameGroup>((g) => entityCount(g));
-  for (const group of frame.groups) groups.set(Q.parse(group.first), group);
+  for (const group of frame.groups) groups.set(parsedTime(group.first), group);
   let lane = 0;
   const orderedGroups = comparison
     ? [...frame.groups].sort((a, b) => Q.parse(a.first).compare(Q.parse(b.first)))
@@ -1032,9 +1099,9 @@ function drawFrame() {
     const sourceKey = (group as ComparisonGroup).sourceKey;
     const rowOffset = sourceKey ? (rowPlan.rows.get(sourceKey)?.offset ?? 0) : 0;
 
-    const first = Q.parse(group.first),
-      last = Q.parse(group.last),
-      mid = first.add(last).div(Q.from(2n)),
+    const first = parsedTime(group.first),
+      last = parsedTime(group.last),
+      mid = middleTime(group.first, group.last),
       x = viewport.x(mid, width());
     if (x < 0 || x > width()) continue;
     visible += BigInt(group.count);
@@ -1072,7 +1139,10 @@ function drawFrame() {
       container.append(stem, caption, button);
       if (animateLiveFrame && !reducedMotion.matches)
         for (const node of [stem, caption, button])
-          node.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' });
+          animateLabel(node, [{ opacity: 0 }, { opacity: 1 }], {
+            duration: 220,
+            easing: 'ease-out',
+          });
     }
     const { button, caption, stem, coordinate } = label;
     const count = entityCount(group);
@@ -1150,7 +1220,7 @@ function drawFrame() {
           labelTop,
           direction,
           verticalOffset / uiScale,
-          stage.clientHeight / uiScale,
+          stageHeight() / uiScale,
           branchDepth,
         );
         const far = window.start + window.step * (branchDepth - 1);
@@ -1186,7 +1256,7 @@ function drawFrame() {
             branches.append(stem, caption, button);
             if (animateLiveFrame && !reducedMotion.matches)
               for (const node of [stem, caption, button])
-                node.animate([{ opacity: 0 }, { opacity: 1 }], {
+                animateLabel(node, [{ opacity: 0 }, { opacity: 1 }], {
                   duration: 220,
                   easing: 'ease-out',
                 });
@@ -1249,7 +1319,7 @@ function drawFrame() {
       stackLabels.delete(key);
     }
   const centeredOffset = 192 * (1 - uiScale);
-  verticalMinimum = Math.min(centeredOffset, stage.clientHeight - bottomExtent * uiScale - 24);
+  verticalMinimum = Math.min(centeredOffset, stageHeight() - bottomExtent * uiScale - 24);
   verticalMaximum = Math.max(centeredOffset, -topExtent * uiScale + 24);
   const clamped = Math.max(verticalMinimum, Math.min(verticalMaximum, verticalOffset));
   if (clamped !== verticalOffset) {
@@ -1257,8 +1327,8 @@ function drawFrame() {
     requestRender(false);
   }
   for (const layer of [el('axis'), el('edge-arcs'), el('duration-bands'), container, branches]) {
-    layer.style.width = `${stage.clientWidth / uiScale}px`;
-    layer.style.height = `${stage.clientHeight / uiScale}px`;
+    layer.style.width = `${stageWidth() / uiScale}px`;
+    layer.style.height = `${stageHeight() / uiScale}px`;
     layer.style.transformOrigin = '0 0';
     layer.style.transform = `translateY(${verticalOffset}px) scale(${uiScale})`;
   }
@@ -3453,7 +3523,7 @@ function animateView(destination: Viewport, automatic = false) {
     if (model && !sparseWorkspace()) frame = model.frame(viewport, width(), pixels());
     // Draw the moments in this frame, with the axis: a frame later they would trail it.
     // Reuse confirmed server data; fetch the final window once.
-    if (stage.clientWidth > 96 && stage.clientHeight > 0) render(false);
+    if (stageWidth() > 96 && stageHeight() > 0) render(false);
     else requestRender(false);
     zoomAnimation = requestAnimationFrame(tick);
   };
@@ -6933,27 +7003,48 @@ function describeLabel(ref: EntityRef) {
   return entry?.title || ('moment' in ref ? 'this moment' : 'this duration');
 }
 /** Relationship arcs between endpoint times; arcs to off-screen entities run off the edge. */
+/** Arc elements persist by relationship: a moving view only reshapes them (#68). */
+const edgeArcs = new Map<string, { path: SVGPathElement; title: SVGTitleElement; named: string }>();
 function renderEdgeArcs() {
   const svg = el('edge-arcs');
-  svg.replaceChildren();
-  if (comparison) return;
-  const axis = 192;
+  svg.querySelector('.edge-limit')?.remove();
+  const axis = 192,
+    generation = contentGeneration(),
+    shown = new Set<string>();
   const name = (ref: EntityRef) =>
     describe(refKey(ref))?.title || ('moment' in ref ? 'Moment' : 'Duration');
-  for (const edge of frame.edges ?? []) {
-    const xa = (inset() + viewport.x(Q.parse(edge.aTime), width())) / uiScale,
-      xb = (inset() + viewport.x(Q.parse(edge.bTime), width())) / uiScale;
+  for (const edge of comparison ? [] : (frame.edges ?? [])) {
+    const xa = (inset() + viewport.x(parsedTime(edge.aTime), width())) / uiScale,
+      xb = (inset() + viewport.x(parsedTime(edge.bTime), width())) / uiScale;
     const distance = Math.abs(xb - xa);
     const lift = Math.min(150, 18 + distance * 0.3);
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', `M ${xa} ${axis} Q ${(xa + xb) / 2} ${axis - 2 * lift} ${xb} ${axis}`);
-    path.setAttribute('class', 'edge-arc');
-    path.dataset.edgeId = edge.id;
-    const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-    title.textContent = `${name(edge.a)} ↔ ${name(edge.b)}`;
-    path.append(title);
-    svg.append(path);
+    let arc = edgeArcs.get(edge.id);
+    if (!arc) {
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('class', 'edge-arc');
+      path.dataset.edgeId = edge.id;
+      const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+      path.append(title);
+      svg.append(path);
+      arc = { path, title, named: '' };
+      edgeArcs.set(edge.id, arc);
+    }
+    shown.add(edge.id);
+    arc.path.setAttribute(
+      'd',
+      `M ${xa} ${axis} Q ${(xa + xb) / 2} ${axis - 2 * lift} ${xb} ${axis}`,
+    );
+    // Names change only with the timeline's content, not as the view moves.
+    if (arc.named !== generation) {
+      arc.title.textContent = `${name(edge.a)} ↔ ${name(edge.b)}`;
+      arc.named = generation;
+    }
   }
+  for (const [id, arc] of edgeArcs)
+    if (!shown.has(id)) {
+      arc.path.remove();
+      edgeArcs.delete(id);
+    }
   if (frame.edgesTruncated) {
     const note = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     note.setAttribute('x', String(inset()));
@@ -6964,7 +7055,8 @@ function renderEdgeArcs() {
   }
 }
 /** Band elements persist by duration so clicks and hover cards survive re-rendering. */
-const durationButtons = new Map<string, HTMLButtonElement>();
+const durationButtons = new Map<string, HTMLButtonElement>(),
+  bandContent = new WeakMap<HTMLButtonElement, string>();
 function renderDurationBands() {
   const host = el('duration-bands');
   host.querySelector('.duration-limit')?.remove();
@@ -6972,8 +7064,8 @@ function renderDurationBands() {
   const plugins = durationPlugins(installedPlugins());
   const shown = new Set<string>();
   (frame.durations ?? []).forEach((band, i) => {
-    const left = Math.max(0, viewport.x(Q.parse(band.first), width())),
-      right = Math.min(width(), viewport.x(Q.parse(band.last), width()));
+    const left = Math.max(0, viewport.x(parsedTime(band.first), width())),
+      right = Math.min(width(), viewport.x(parsedTime(band.last), width()));
     if (right < left) return;
     const key = (band.sourceKey ?? '') + '\u0000' + band.id;
     shown.add(key);
@@ -6994,15 +7086,19 @@ function renderDurationBands() {
     button.style.left = (inset() + left) / uiScale + 'px';
     button.style.width = Math.max(6, (right - left) / uiScale) + 'px';
     button.style.top = 202 + (rows.get(band.sourceKey ?? '')?.offset ?? 0) + (i % 3) * 9 + 'px';
+    // What a band says changes with its content, not as the view moves (#68).
+    const content = `${contentGeneration()}\u0000${band.first}\u0000${band.last}`;
+    if (bandContent.get(button) === content) return;
+    bandContent.set(button, content);
     button.style.backgroundColor = pluginColor(plugins, band.metadata) ?? '';
     button.textContent = band.metadata.title ?? '';
     button.setAttribute('aria-label', 'Duration: ' + (band.metadata.title || 'Unnamed duration'));
     button.title =
       (band.metadata.title || 'Duration') +
       ' · ' +
-      presented(Q.parse(band.first)) +
+      presented(parsedTime(band.first)) +
       ' → ' +
-      presented(Q.parse(band.last));
+      presented(parsedTime(band.last));
     hoverPreview.update(button, plugins, band.metadata);
   });
   for (const [key, button] of durationButtons)

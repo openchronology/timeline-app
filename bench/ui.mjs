@@ -1004,7 +1004,7 @@ try {
   desktop?.close();
 }
 // Known misses (scenario or group names, e.g. "navigation") are reported but do not fail the
-// gate: they are tracked elsewhere (#68), and the gate guards everything else against them.
+// gate: for misses tracked in an issue, while the gate guards everything else.
 const known = (r) => KNOWN.has(r.scenario) || KNOWN.has(r.group);
 const failures = rows.filter((r) => !r.pass && r.comfortable && !known(r));
 const gaps = rows.filter((r) => !r.pass && !r.comfortable && !r.advised && !known(r));
