@@ -73,6 +73,31 @@ export async function checkCapacity(page, restore, { offline = false } = {}) {
         await cdp.detach();
       }
       await page.locator('#capacity-dismiss').click();
+      // Opened quickly, it follows how long this device takes to show each new view: from
+      // the input until the view is painted.
+      await imported(timeline('Slow navigation capacity', 1000));
+      await page.evaluate(() => new Promise((done) => setTimeout(done, 300)));
+      assert(await notice.isHidden());
+      // Slow enough for views to take over 150 ms, yet each well under the 5 s that still
+      // counts as one interaction's wait.
+      const throttle = await page.context().newCDPSession(page);
+      await throttle.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+      try {
+        await page.locator('#timeline-stage').focus();
+        for (let i = 0; i < 12 && (await notice.isHidden()); i++) {
+          await page.keyboard.press(i % 2 ? '-' : '+');
+          await page.evaluate(() => new Promise((done) => setTimeout(done, 400)));
+        }
+        await notice.waitFor({ timeout: 60000 });
+        assert.match(
+          await page.locator('#capacity-text').textContent(),
+          /Zooming and panning this timeline take about \d+ ms to show in this browser/,
+        );
+      } finally {
+        await throttle.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+        await throttle.detach();
+      }
+      await page.locator('#capacity-dismiss').click();
       measured = true;
     }
     // Small timelines never show it.
@@ -80,7 +105,7 @@ export async function checkCapacity(page, restore, { offline = false } = {}) {
     await page.evaluate(() => new Promise((done) => setTimeout(done, 300)));
     assert(await notice.isHidden());
     console.log(
-      `PASS capacity advice: large in-memory timelines, actions, dismissal${measured ? ', a throttled open' : ''}, small timelines.`,
+      `PASS capacity advice: large in-memory timelines, actions, dismissal${measured ? ', a throttled open and navigation' : ''}, small timelines.`,
     );
   } finally {
     await imported(restore);

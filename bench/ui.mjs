@@ -141,7 +141,9 @@ async function longestFrame(d, action, settle = 300) {
   const gaps = await d.eval('__ui.stopFrames()');
   return gaps.length ? Math.max(...gaps) : 0;
 }
-const BOUNDS = `document.getElementById('exact-left').value + ' ' + document.getElementById('exact-right').value`;
+// The view the moments are drawn at (src/app.ts sets it as it draws them): a view counts as
+// shown once its moments are, not when the bounds fields or axis change ahead of them.
+const BOUNDS = `document.getElementById('markers').dataset.view`;
 const changedFrom = (before) => `${BOUNDS} !== ${JSON.stringify(before)}`;
 const visible = (selector) =>
   `(() => { const n = document.querySelector(${JSON.stringify(selector)}); return !!n && !n.hidden && n.getClientRects().length > 0; })()`;

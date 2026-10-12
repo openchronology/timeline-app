@@ -1,18 +1,28 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 /**
  * When to suggest another platform for a timeline. Thresholds come from the capacity
- * benchmarks (docs/capacity.md): in the browser, opening, redrawing and the pause after an
+ * benchmarks (docs/capacity.md): in the browser, opening, navigating and the pause after an
  * edit grow with the timeline, and cross the 100 ms and 1 s responsiveness limits at sizes
- * that depend on the device. So the browser advice follows this device's own measurements,
+ * that depend on the device. So the browser advice follows this device's own measurements
+ * of what its user waits for (from an input to the frame that shows its result),
  * with a moment count as a fallback. The desktop app and the platform stay fast up to the
  * per-timeline limit; the desktop advice only follows measurements on a slow computer.
  */
 export const LIMIT = 200000;
 export const THRESHOLDS = {
-  /** Browser: opening (reading, indexing and drawing) slower than this, in ms. */
+  /** Browser: opening (reading, indexing and drawing) until painted, slower than this, in ms. */
   open: 1500,
-  /** Browser: median redraw slower than this, in ms. */
-  redraw: 150,
+  /**
+   * Browser: the median wait from a zoom, pan or pinch input until its view is painted,
+   * longer than this, in ms.
+   */
+  navigation: 150,
+  /**
+   * Browser: moments from which slow navigation is advised. Below this, zooming and panning
+   * cost mostly the per-frame drawing every platform does in the browser (#68): on a slow
+   * device it is over 150 ms at any size, and another platform would not help.
+   */
+  navigationMoments: 1000,
   /** Browser: median pause after an edit (redraw and draft save) longer than this, in ms. */
   edit: 100,
   /** Browser: moments at which to advise even without measurements. */
@@ -31,12 +41,12 @@ export const BUDGETS = {
   /** A click, key or tap until its result is painted: feels instant. */
   response: THRESHOLDS.edit,
   /** Zooming, panning or fitting until the new view is drawn. */
-  view: THRESHOLDS.redraw,
+  view: THRESHOLDS.navigation,
   /**
    * The longest frame during a continuous gesture (drag, wheel, pinch): the view may drop
-   * frames while it redraws, but never stalls longer than one redraw may take.
+   * frames while it redraws, but never stalls longer than one view may take.
    */
-  frame: THRESHOLDS.redraw,
+  frame: THRESHOLDS.navigation,
   /** Search results, separations and lists: users keep their attention for about 1 s. */
   results: 1000,
   /** Opening a timeline. */
@@ -45,21 +55,30 @@ export const BUDGETS = {
   desktopView: THRESHOLDS.view,
 };
 /**
- * The largest timelines (in moments) each platform handles comfortably (docs/capacity.md).
- * `slowBrowser` is a phone or slower computer, measured with the CPU throttled 4×.
+ * The largest timelines (in moments) each platform handles comfortably (docs/capacity.md),
+ * from the UI benchmarks on hosted runners: every interaction meets its budget there.
+ * `slowBrowser` is a phone or slower computer, measured with the CPU throttled 4×; there
+ * zooming and panning miss their budget at any size (#68), and are not counted.
  */
 export const COMFORTABLE = {
-  browser: 4000,
-  slowBrowser: 1000,
+  browser: 1000,
+  slowBrowser: 500,
   desktop: LIMIT,
   platform: LIMIT,
 };
 /** Recent measurements on this device for the open timeline. */
 export interface Measurements {
   open?: number;
-  redraws: number[];
+  /** Waits from navigation inputs until their views were painted. */
+  navigation: number[];
   edits: number[];
   views: number[];
+  /**
+   * What this device last measured as slow for the timeline, if anything: the advice holds
+   * once measurements were consistently slow, though later quick ones (a small pan after
+   * slow zooming) bring the median down.
+   */
+  slow?: { reason: 'open' | 'navigation' | 'edit'; ms: number };
 }
 export interface Counts {
   moments: number;
@@ -69,7 +88,7 @@ export interface Counts {
 export type Platform = 'browser' | 'desktop' | 'platform';
 export type Advice =
   | { kind: 'limit'; entity: 'moments' | 'durations' | 'relationships'; count: number }
-  | { kind: 'browser'; reason: 'open' | 'redraw' | 'edit' | 'size' }
+  | { kind: 'browser'; reason: 'open' | 'navigation' | 'edit' | 'size' }
   | { kind: 'desktop'; reason: 'view' };
 /** Recent samples kept, and the samples needed before a median counts as consistent. */
 export const SAMPLES = 5;
@@ -92,18 +111,20 @@ export function advise(platform: Platform, m: Measurements, counts: Counts): Adv
       advice.push({ kind: 'limit', entity, count });
   }
   if (platform === 'browser') {
-    const redraw = median(m.redraws, 3),
+    const navigation = median(m.navigation, 3),
       edit = median(m.edits, 2);
-    const reason =
+    const measured =
       m.open !== undefined && m.open > THRESHOLDS.open
-        ? 'open'
-        : redraw !== undefined && redraw > THRESHOLDS.redraw
-          ? 'redraw'
+        ? { reason: 'open' as const, ms: m.open }
+        : navigation !== undefined &&
+            navigation > THRESHOLDS.navigation &&
+            counts.moments >= THRESHOLDS.navigationMoments
+          ? { reason: 'navigation' as const, ms: navigation }
           : edit !== undefined && edit > THRESHOLDS.edit
-            ? 'edit'
-            : counts.moments >= THRESHOLDS.moments
-              ? 'size'
-              : null;
+            ? { reason: 'edit' as const, ms: edit }
+            : null;
+    if (measured) m.slow = measured;
+    const reason = m.slow?.reason ?? (counts.moments >= THRESHOLDS.moments ? 'size' : null);
     if (reason) advice.push({ kind: 'browser', reason });
   }
   if (platform === 'desktop') {

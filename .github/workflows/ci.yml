@@ -149,6 +149,47 @@ jobs:
           name: browser-${{ matrix.browser }}
           path: artifacts/
           if-no-files-found: ignore
+  # The browser's capacity advice (src/capacity.ts, docs/capacity.md): within the comfortable
+  # sizes every interaction meets its budget, and just past them the advice is showing
+  # wherever one misses. The browser at full speed, comfortable at 1,000 moments, is gated
+  # in the PostgreSQL job with the platform.
+  ui-capacity:
+    name: UI capacity advice
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: node scripts/npm-ci.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:editor
+      # A slow device (CPU throttled 4×) at its comfortable size. Zooming and panning miss
+      # their budget there at any size (#68): reported, not failing.
+      - name: Slow device, comfortable size
+        run: node bench/ui.mjs --gate
+        env:
+          UI_PLATFORMS: browser
+          UI_THROTTLES: '4'
+          UI_SIZES: '500'
+          UI_SAMPLES: '3'
+          UI_KNOWN: navigation
+      - name: Past the comfortable size, at full speed
+        run: node bench/ui.mjs --gate
+        env:
+          UI_PLATFORMS: browser
+          UI_THROTTLES: '1'
+          UI_SIZES: '2000'
+          UI_SAMPLES: '3'
+      - name: Past the comfortable size, on a slow device
+        run: node bench/ui.mjs --gate
+        env:
+          UI_PLATFORMS: browser
+          UI_THROTTLES: '4'
+          UI_SIZES: '1000'
+          UI_SAMPLES: '3'
   postgres:
     name: PostgreSQL 16 / native pgmp / accounts and sharing
     runs-on: ubuntu-24.04
