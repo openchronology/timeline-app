@@ -80,6 +80,9 @@ try {
   // The fragment deliberately resembles a server link; the standalone file must ignore it.
   await page.goto(url + '#timeline/00000000-0000-0000-0000-000000000001');
   assert.equal(await page.locator('#calendar-mode').count(), 0);
+  // The offline file says so beside the brand (#101).
+  assert.equal(await page.locator('#edition-chip').textContent(), 'Offline');
+  assert(await page.locator('#edition-chip').isVisible());
   await poll(async () => (await input('storage-badge').textContent()) === 'Offline HTML');
   assert(await input('memory-notice').isVisible());
   assert.match(await input('memory-notice').textContent(), /Export an .ochx/);

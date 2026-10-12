@@ -6,10 +6,13 @@
  */
 import 'server-only';
 import { createPresenter, Q } from '../../dist/core.mjs';
+import { siteName } from '../../server/site.mjs';
+
+/** The platform's name in titles and link previews (PLATFORM_NAME, or OpenChronology). */
+export { siteName };
 
 export const TIMELINE_ID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 export const ENTITY_ID = /^[A-Za-z0-9_.:-]{1,128}$/;
-export const SITE_NAME = 'OpenChronology';
 
 /** The platform's public origin, for absolute links. */
 export function siteOrigin() {
@@ -122,7 +125,7 @@ export function pageMetadata(timeline, path, title, description) {
     url = origin + path,
     shown = timeline.visibility === 'public';
   return {
-    title: `${title} · ${SITE_NAME}`,
+    title: `${title} · ${siteName()}`,
     description,
     alternates: {
       canonical: url,
@@ -136,7 +139,7 @@ export function pageMetadata(timeline, path, title, description) {
     },
     // Private pages are for their members: not for search engines.
     ...(shown ? {} : { robots: { index: false, follow: false } }),
-    openGraph: { type: 'website', siteName: SITE_NAME, locale: 'en_US', title, description, url },
+    openGraph: { type: 'website', siteName: siteName(), locale: 'en_US', title, description, url },
     twitter: { card: 'summary_large_image', title, description },
   };
 }

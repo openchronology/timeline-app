@@ -10,6 +10,7 @@ import { PostgresStore } from './store.mjs';
 import { startRetention } from './retention.mjs';
 import { providersFromEnv } from './oauth.mjs';
 import { compareLimits, defaultQuota, LimitError } from './limits.mjs';
+import { analyticsId, platformName, SiteError } from './site.mjs';
 import { applyEnvironmentQuota } from './administration.mjs';
 const key = Symbol.for('openchronology.platform.services');
 
@@ -68,8 +69,11 @@ async function initialize() {
   try {
     limits = compareLimits();
     defaultQuota();
+    platformName();
+    analyticsId();
   } catch (error) {
-    if (error instanceof LimitError) throw new ConfigurationError(error.message);
+    if (error instanceof LimitError || error instanceof SiteError)
+      throw new ConfigurationError(error.message);
     throw error;
   }
   // DEFAULT_USER_STORAGE_BYTES, when set, is the default quota from every start.

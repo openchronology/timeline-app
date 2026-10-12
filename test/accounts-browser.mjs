@@ -103,6 +103,8 @@ export async function checkAccounts(browser) {
   page.on('dialog', (dialog) => dialog.accept());
   try {
     await page.goto(origin);
+    // The website is not an edition of its own: no chip beside the brand.
+    assert(await page.locator('#edition-chip').isHidden());
     await page.locator('#dashboard-new').click();
     assert(await page.locator('#och-import').isHidden());
     assert.equal(await page.locator('#calendar-mode').count(), 0);
@@ -320,6 +322,8 @@ export async function checkAccounts(browser) {
   try {
     await nativePage.goto(origin);
     await poll(() => nativePage.locator('#server-button').isVisible());
+    // The desktop app says so beside the brand (#101).
+    assert.equal(await nativePage.locator('#edition-chip').textContent(), 'Desktop');
     await nativePage.locator('#account-button').click();
     assert(await nativePage.locator('#desktop-login').isVisible());
     for (const provider of ['google', 'github', 'facebook'])

@@ -57,6 +57,12 @@ expiry and become invalid after one day of inactivity. Users can revoke sessions
 The browser keeps editing drafts and authentication-return state in local storage
 facilities. Clearing site storage removes local drafts and can sign you out.
 The application does not include advertising cookies or cross-site tracking code.
+If the operator enables Google Analytics, the site first asks whether you allow
+analytics cookies. Only if you accept does your browser load Google's script, which
+sets Google Analytics cookies and sends Google the pages you visit, with network and
+device information. Google signals and ad personalization are turned off, and
+timeline content is never sent. Your choice is kept in your browser; "Analytics
+settings" in the footer changes it.
 
 The standalone HTML edition processes timelines on your device and blocks network
 connections. It includes embedded assets and legal notices. It cannot use the

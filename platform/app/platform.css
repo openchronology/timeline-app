@@ -540,3 +540,43 @@ dialog {
   font-family: ui-monospace, monospace;
   font-size: 12px;
 }
+/* Asking for analytics consent (GOOGLE_ANALYTICS_ID): over the page, never shifting it. */
+.analytics-consent {
+  position: fixed;
+  z-index: 50;
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
+  max-width: 560px;
+  margin-left: auto;
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 8px 28px #20372c26;
+}
+.analytics-consent p {
+  margin: 0 0 10px;
+}
+.analytics-consent .actions {
+  justify-content: flex-end;
+}
+.link-button {
+  display: inline;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--green);
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link-button:hover {
+  background: none;
+  color: var(--green-hover);
+}
