@@ -78,15 +78,23 @@ export async function checkCapacity(page, restore, { offline = false } = {}) {
       await imported(timeline('Slow navigation capacity', 1000));
       await page.evaluate(() => new Promise((done) => setTimeout(done, 300)));
       assert(await notice.isHidden());
-      // Slow enough for views to take over 150 ms, yet each well under the 5 s that still
-      // counts as one interaction's wait.
+      // Slow enough for views to take over 150 ms (a 4× slower CPU now zooms 1,000 moments
+      // within it), yet each well under the 5 s that still counts as one interaction's wait.
       const throttle = await page.context().newCDPSession(page);
-      await throttle.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+      await throttle.send('Emulation.setCPUThrottlingRate', { rate: 20 });
       try {
         await page.locator('#timeline-stage').focus();
+        // One zoom at a time: each waits for the last one's view, so none queues behind another.
+        const view = () => page.evaluate(() => document.getElementById('markers').dataset.view);
         for (let i = 0; i < 12 && (await notice.isHidden()); i++) {
+          const before = await view();
           await page.keyboard.press(i % 2 ? '-' : '+');
-          await page.evaluate(() => new Promise((done) => setTimeout(done, 400)));
+          await page.waitForFunction(
+            (before) => document.getElementById('markers').dataset.view !== before,
+            before,
+            { timeout: 20000 },
+          );
+          await page.evaluate(() => new Promise((done) => setTimeout(done, 300)));
         }
         await notice.waitFor({ timeout: 60000 });
         assert.match(
