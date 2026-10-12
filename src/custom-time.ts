@@ -117,6 +117,8 @@ function tokenize(source: string): Token[] {
   return tokens;
 }
 
+/** A custom presentation's functions: print and parse, and how it writes time differences. */
+const FUNCTIONS = ['print', 'parse', 'printDifference', 'parseDifference'];
 function compile(source: string, plugin = false, methods = arities): Map<string, Body> {
   const tokens = tokenize(source);
   let at = 0,
@@ -204,19 +206,22 @@ function compile(source: string, plugin = false, methods = arities): Map<string,
   while (at < tokens.length) {
     take('function');
     const name = identifier();
-    if (!(plugin ? ['render'] : ['print', 'parse']).includes(name) || bodies.has(name))
+    if (!(plugin ? ['render'] : FUNCTIONS).includes(name) || bodies.has(name))
       throw new Error(
-        plugin ? 'Define render exactly once.' : 'Define print and parse exactly once.',
+        plugin
+          ? 'Define render exactly once.'
+          : 'Define print and parse exactly once, and optionally printDifference and parseDifference.',
       );
+    const printing = name === 'print' || name === 'printDifference';
     take('(');
     const parameter = identifier();
     if (['api', 'true', 'false'].includes(parameter)) throw new Error('Invalid parameter name.');
-    annotation(plugin ? ['string'] : name === 'print' ? ['Rational'] : ['string']);
+    annotation(plugin ? ['string'] : printing ? ['Rational'] : ['string']);
     take(',');
     take('api');
     annotation(plugin ? ['PluginAPI'] : ['TimeAPI']);
     take(')');
-    annotation(plugin || name === 'print' ? ['string'] : ['Rational']);
+    annotation(plugin || printing ? ['string'] : ['Rational']);
     take('{');
     const names = new Set([parameter]);
     const locals: Body['locals'] = [];
@@ -451,6 +456,20 @@ export function compileCustom(source: string): {
   return {
     print: (time, context) => string(run(program.get('print')!, time, validateContext(context))),
     parse: (text, context) => rational(run(program.get('parse')!, text, validateContext(context))),
+  };
+}
+
+/** A custom presentation's optional difference functions, which work in stored coordinates. */
+export function compileCustomDifference(source: string): {
+  print?(difference: Q): string;
+  parse?(text: string): Q;
+} {
+  const program = compile(source),
+    print = program.get('printDifference'),
+    parse = program.get('parseDifference');
+  return {
+    ...(print ? { print: (difference: Q) => string(run(print, difference)) } : {}),
+    ...(parse ? { parse: (text: string) => rational(run(parse, text)) } : {}),
   };
 }
 

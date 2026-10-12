@@ -75,6 +75,7 @@ import {
   searchText,
   snippet,
   SEARCH_PAGE_SIZE,
+  createDifference,
 } from './core.js';
 import type {
   EntityRef,
@@ -1520,6 +1521,24 @@ async function comparisonSources(ids: string[]): Promise<ComparisonSource[]> {
   if (sources.length > 8) throw new Error('Choose at most eight distinct source timelines.');
   return sources;
 }
+/** Tells comparison offsets' units, which the comparison's time display defines. */
+function describeOffsetUnits() {
+  if (!comparison) return;
+  let units: string;
+  try {
+    const difference = createDifference(comparison.presentation),
+      names = difference.units.map((u) => u.plural ?? u.name);
+    units = names.length
+      ? `Offsets take ${names.length > 14 ? names.slice(0, 14).join(', ') + ', …' : names.join(', ')}` +
+        (difference.plain ? `; a plain number is ${difference.plain}.` : '.')
+      : `Offsets are ${difference.plain ?? 'written as this time display reads them'}.`;
+  } catch (error) {
+    units = error instanceof Error ? error.message : String(error);
+  }
+  text('comparison-offset-units', units);
+  for (const field of document.querySelectorAll<HTMLInputElement>('.comparison-offset'))
+    field.title = units;
+}
 function startComparison(sources: ComparisonSource[], presentation: TimePresentation) {
   cancelZoomAnimation();
   flushEventEdit();
@@ -1552,10 +1571,11 @@ function startComparison(sources: ComparisonSource[], presentation: TimePresenta
     const fields: HTMLInputElement[] = [];
     for (const name of ['Scale', 'Offset']) {
       const label = document.createElement('label');
-      label.textContent = name + (name === 'Offset' ? ' (shared coordinates)' : '');
+      label.textContent = name;
       const field = document.createElement('input');
       field.value = name === 'Scale' ? '1' : '0';
       field.setAttribute('aria-label', `${name} for ${track.source.title}`);
+      if (name === 'Offset') field.classList.add('comparison-offset');
       fields.push(field);
       label.append(field);
       row.append(label);
@@ -1571,7 +1591,8 @@ function startComparison(sources: ComparisonSource[], presentation: TimePresenta
       event.preventDefault();
       try {
         const scale = Q.parse(fields[0].value),
-          offset = Q.parse(fields[1].value);
+          difference = createDifference(view.presentation),
+          offset = difference.parse(fields[1].value);
         comparisonController?.abort();
         clearTimeout(frameTimer);
         frameRequest++;
@@ -1584,7 +1605,9 @@ function startComparison(sources: ComparisonSource[], presentation: TimePresenta
         el('event-form').hidden = true;
         el('group-details').hidden = true;
         el<HTMLDialogElement>('inspector').close();
-        error.textContent = '';
+        error.textContent = offset.numerator
+          ? `Shifted ${offset.numerator < 0n ? 'earlier' : 'later'} by ${difference.print(offset.abs())}.`
+          : '';
         frame = { groups: [], visitedNodes: 0 };
         requestRender();
       } catch (e) {
@@ -1593,6 +1616,7 @@ function startComparison(sources: ComparisonSource[], presentation: TimePresenta
     };
     el('comparison-tracks').append(row);
   }
+  describeOffsetUnits();
   text(
     'comparison-conflicts',
     view.conflicts.length
@@ -4224,6 +4248,7 @@ el<HTMLFormElement>('presentation-form').onsubmit = (event) => {
   try {
     if (comparison) {
       comparison.presentation = displaySettings();
+      describeOffsetUnits();
       el<HTMLDialogElement>('presentation-dialog').close();
       requestRender();
       return;

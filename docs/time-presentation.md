@@ -96,7 +96,7 @@ SQLite saves add `timeline_settings` inside the version-1 file transaction. Old 
 
 Saved custom source is retained when you switch to a built-in mode, so switching back does not discard your printer/parser. Retained source is still syntax-validated; it executes only in custom mode. Desktop file selection becomes the active save target only after the frontend accepts the document and its presentation settings.
 
-Custom code uses a small interpreted language with JavaScript syntax. Optional TypeScript annotations are supported; this is not the full JavaScript runtime or TypeScript compiler. Define exactly two functions with semicolons and a final return:
+Custom code uses a small interpreted language with JavaScript syntax. Optional TypeScript annotations are supported; this is not the full JavaScript runtime or TypeScript compiler. Define `print` and `parse` exactly once (and optionally the [difference functions](#time-differences)), each with semicolons and a final return:
 
 ```typescript
 function print(time: Rational, api: TimeAPI): string {
@@ -161,6 +161,34 @@ function parse(text: string, api: TimeAPI): Rational {
 ```
 
 Transform raw coordinate helpers yourself for custom units. Prefer exact/absolute editing output when labels depend on the view: context describes the viewport at each call, so panning before parsing a relative label changes its reference.
+
+## Time differences
+
+Each time display also defines the units it reads **time differences** in, such as the offset that aligns a track when [comparing timelines](comparison.md). A difference is one or more amounts with units, `2 years 3 days`, `1 h 30 min` or `1.5 weeks`; amounts are exact rationals or decimals (`1/3 s`, `2.5e3 ms`) and may be separated by commas. A leading sign applies to the whole difference: `-1 h 30 min` is ninety minutes earlier. Differences are kept exact, in stored coordinates, so a display's scale applies to them.
+
+| Display                                                            | Units                                                                                                                                                                                                                                                             | A plain number is                             |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| Gregorian                                                          | `years`, `months`, `weeks`, `days`, `h`, `min`, `s`, `ms`, `µs` (`us`), `ns`, `ps`, `fs`, `as`; words also read singular, abbreviated (`yr`, `wk`, `d`, `hr`, `sec`) and in any case. A year is the calendar's mean year, 365.2425 days; a month a twelfth of it. | seconds                                       |
+| Rational, float or scientific, with no unit                        | none                                                                                                                                                                                                                                                              | stored coordinates                            |
+| … with a unit of fixed length (`s`, `minutes`, `hours`, `days`, …) | that unit and the other fixed time units, `weeks` to `as`                                                                                                                                                                                                         | the display's unit                            |
+| … with another unit (`million years`, `m`)                         | that unit, read whole                                                                                                                                                                                                                                             | the display's unit                            |
+| SI                                                                 | the unit with every SI prefix, case-sensitive (`ms` is a millisecond, `Ms` a megasecond); with a time unit also `weeks`, `days`, `h` and `min`                                                                                                                    | the display's unit                            |
+| Custom                                                             | what its `parseDifference` reads                                                                                                                                                                                                                                  | stored coordinates, without `parseDifference` |
+
+Differences print in the same units: Gregorian ones as years, days, hours, minutes and seconds (`2 years 3 days`) or one unit below a second (`250 ms`), fixed time units without years, and others as an exact amount of the display's unit. Months and weeks are read but not printed, since a year is no whole number of either.
+
+Custom code may define how its differences are written, with two optional functions that work in stored coordinates and receive no view context:
+
+```typescript
+function printDifference(difference: Rational, api: TimeAPI): string {
+  return api.exact(api.div(difference, api.rational('86400'))) + ' sols';
+}
+function parseDifference(text: string, api: TimeAPI): Rational {
+  return api.mul(api.parseNumber(api.stripSuffix(text, ' sols')), api.rational('86400'));
+}
+```
+
+`parseDifference` reads the whole text, sign included. Without these functions a custom display reads differences as stored coordinates and prints them exactly.
 
 ## Execution boundary
 
