@@ -118,6 +118,26 @@ export async function checkViewportStore(browser) {
     );
     return page;
   };
+  /** Waits for the view to come from storage; says what was stored and shown if it does not. */
+  const shownFromStorage = async (page, saved) => {
+    try {
+      await page.waitForFunction(() => document.getElementById('loading-window').hidden, null, {
+        timeout: 15000,
+      });
+    } catch (error) {
+      const view = await page.evaluate(() => ({
+        left: document.getElementById('exact-left').value,
+        right: document.getElementById('exact-right').value,
+        width: document.getElementById('timeline-stage').clientWidth,
+        density: document.getElementById('density').value,
+      }));
+      const window = (key) => key.split('\u0001').slice(-3).join(' ');
+      throw new Error(
+        `The view did not come from storage. View ${JSON.stringify(view)}; stored before closing: ${saved.map(window).join(', ')}; stored now: ${(await stored(page)).map(window).join(', ')}`,
+        { cause: error },
+      );
+    }
+  };
   let page = await open();
   try {
     await bounds(page, '0', '20');
@@ -143,7 +163,7 @@ export async function checkViewportStore(browser) {
     page = await open();
     await bounds(page, '0', '20');
     await page.getByRole('button', { name: 'Nearby moment', exact: true }).waitFor();
-    await page.waitForFunction(() => document.getElementById('loading-window').hidden);
+    await shownFromStorage(page, keys);
     await bounds(page, '9000', '11000');
     await page.getByRole('button', { name: 'Far away', exact: true }).waitFor();
     assert.equal(answered, before);
