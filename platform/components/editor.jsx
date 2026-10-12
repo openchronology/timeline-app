@@ -5,6 +5,15 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import StarButton from './star-button.jsx';
 import VersionActions from './version-actions.jsx';
+import ShareDialog from './share-dialog.jsx';
+/** The page to share for a link fragment of the editor (see src/links.ts). */
+function sharedAddress(id, fragment) {
+  const base = location.origin + '/timelines/' + id;
+  const [kind, rest] = fragment ? [fragment.slice(0, fragment.indexOf('/')), fragment] : [];
+  if (kind === 'moment' || kind === 'duration')
+    return `${base}/${kind}s/${rest.slice(kind.length + 1)}`;
+  return fragment ? base + '#' + fragment : base;
+}
 export default function Editor({
   id,
   canShare = false,
@@ -15,11 +24,23 @@ export default function Editor({
   comparisonIds,
   comparisonSources = [],
   forkId,
+  focus,
 }) {
   const frame = useRef(null),
     router = useRouter(),
     [local, setLocal] = useState(false),
-    [actions, setActions] = useState(null);
+    [actions, setActions] = useState(null),
+    [share, setShare] = useState(null);
+  const offer = (fragment, title) =>
+    setShare({
+      url: sharedAddress(id, fragment),
+      title,
+      embed:
+        timeline?.visibility === 'public'
+          ? `${location.origin}/embed/${id}${fragment ? '#' + fragment : ''}`
+          : null,
+      settings: canShare ? '/timelines/' + id + '/settings' : null,
+    });
   useEffect(() => {
     function message(event) {
       if (event.origin !== location.origin || event.source !== frame.current?.contentWindow) return;
@@ -27,6 +48,20 @@ export default function Editor({
         setLocal(true);
         window.history.replaceState(null, '', '/editor');
       }
+      // The address follows what is open in the timeline, so it can be copied as a link.
+      if (event.data?.type === 'openchronology:link' && id && event.data.timeline === id) {
+        const fragment = typeof event.data.fragment === 'string' ? event.data.fragment : '';
+        window.history.replaceState(
+          window.history.state,
+          '',
+          '/timelines/' + id + (fragment ? '#' + fragment : ''),
+        );
+      }
+      if (event.data?.type === 'openchronology:share' && id && event.data.timeline === id)
+        offer(
+          typeof event.data.fragment === 'string' ? event.data.fragment : null,
+          String(event.data.title ?? timeline?.title ?? 'Timeline').slice(0, 300),
+        );
       if (
         event.data?.type === 'openchronology:published' &&
         /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(event.data.id)
@@ -35,7 +70,7 @@ export default function Editor({
     }
     window.addEventListener('message', message);
     return () => window.removeEventListener('message', message);
-  }, [router]);
+  }, [router, id, timeline?.visibility, canShare]);
   return (
     <>
       {id &&
@@ -67,6 +102,9 @@ export default function Editor({
                 </a>
               </>
             )}
+            <button type="button" onClick={() => offer(null, timeline?.title || 'Timeline')}>
+              Share
+            </button>
             {canShare && (
               <a target="_top" href={'/timelines/' + id + '/settings'}>
                 Sharing &amp; settings
@@ -104,10 +142,11 @@ export default function Editor({
             : comparisonIds
               ? '#compare/' + comparisonIds.join(',')
               : id
-                ? '#timeline/' + id
+                ? '#timeline/' + id + (focus ? '/' + focus : '')
                 : '')
         }
       />
+      {id && <ShareDialog share={share} onClose={() => setShare(null)} />}
     </>
   );
 }

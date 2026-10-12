@@ -800,6 +800,16 @@ dialog.moment-dialog {
   background: var(--hover);
   color: var(--ink);
 }
+/* Share, beside a dialog's close button: a labelled button, not a round icon. */
+.inspector-heading .share-entity {
+  width: auto;
+  margin-left: auto;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  white-space: nowrap;
+  font-size: 14px;
+}
 .moment-dialog h2 {
   font-family: Georgia, serif;
   font-size: 24px;
@@ -1912,6 +1922,57 @@ body[data-platform-editor] .app-header {
 }
 .timeline-actions a:hover {
   background: var(--hover);
+}
+/* An embedded timeline (/embed/<id>) is the timeline itself, its title and a link to open it. */
+body[data-embed] .app-header,
+body[data-embed] .memory-notice,
+body[data-embed] .guest-fork-status,
+body[data-embed] .guest-fork-original,
+body[data-embed] .document-toolbar,
+body[data-embed] .document-tags,
+body[data-embed] .timeline-actions,
+body[data-embed] .document-meta,
+body[data-embed] .window-bounds,
+body[data-embed] .presented-bounds,
+body[data-embed] #separate-button,
+body[data-embed] #presentation-button,
+body[data-embed] #plugins-button,
+body[data-embed] #compare-button,
+body[data-embed] #center-vertical,
+body[data-embed] #add-duration-button,
+body[data-embed] #add-button,
+body[data-embed] .density-control {
+  display: none !important;
+}
+body[data-embed] main {
+  padding: 0 8px;
+}
+body[data-embed] .app-layout {
+  min-height: 0;
+}
+body[data-embed] .document-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  padding: 8px 0;
+}
+body[data-embed] .title-input {
+  flex: 1 1 12em;
+  font-size: 22px;
+}
+body[data-embed] .description-input {
+  display: none;
+}
+/* Embeds keep the license notice and source offer, compactly. */
+body[data-embed] .legal-notices {
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.embed-open {
+  font-size: 13px;
+  white-space: nowrap;
 }
 body[data-platform-editor] #share-button,
 body[data-platform-editor] #pull-button,

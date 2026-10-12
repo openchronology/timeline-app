@@ -1,6 +1,11 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { boundedJSON } from './browser-copy.js';
 import { withChallenges } from './challenge.js';
+let credentials: RequestCredentials = 'same-origin';
+/** Requests carry no cookies from here on: an embedded timeline is seen as a guest sees it. */
+export function anonymousRequests() {
+  credentials = 'omit';
+}
 export async function requestApi<T>(
   path: string,
   method = 'GET',
@@ -27,7 +32,7 @@ export async function requestApi<T>(
     const response = await fetch('/api/' + path, {
       method,
       signal,
-      credentials: 'same-origin',
+      credentials,
       headers: {
         ...(data !== undefined ? { 'Content-Type': 'application/json' } : {}),
         ...(csrf ? { 'X-CSRF-Token': csrf } : {}),

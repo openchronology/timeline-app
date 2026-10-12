@@ -998,14 +998,14 @@ export function createRequestHandler({
               }),
             );
           }
-          if (input.kind === 'duration') {
+          if (input.kind === 'duration' || input.kind === 'moment') {
             if (typeof input.id !== 'string' || !/^[A-Za-z0-9_.:-]{1,128}$/.test(input.id))
-              throw new HttpError(400, 'A duration lookup needs its ID.');
+              throw new HttpError(400, `A ${input.kind} lookup needs its ID.`);
             return response(
               res,
               200,
               await store.query(id, userId, {
-                kind: 'duration',
+                kind: input.kind,
                 id: input.id,
                 ...(input.revision ? { revision: input.revision } : {}),
               }),

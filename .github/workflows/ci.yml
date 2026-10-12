@@ -218,6 +218,8 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           node test/syslog-live-postgres.mjs
+      - name: Sharing, link previews and embeds in a live browser
+        run: node test/sharing-postgres.mjs
       # Interactions within the budgets in src/capacity.ts, browser and platform, small sizes.
       - name: UI interactions within budget
         run: node bench/ui.mjs --gate
