@@ -664,6 +664,9 @@ function restoreWindows(key: string) {
 function persistWindows(delay = 2000) {
   clearTimeout(persistTimer);
   const save = () => {
+    // A hidden page has let go of the windows it does not show (below), and storage keeps
+    // the page's windows only: saving then would drop them. Hiding saves just before.
+    if (delay && document.hidden) return;
     const stored = storedVersion();
     if (stored)
       void windowStore
@@ -673,9 +676,13 @@ function persistWindows(delay = 2000) {
   if (delay) persistTimer = setTimeout(save, delay);
   else save();
 }
-// A hidden page stores its windows, then keeps only those covering its view.
+// A hidden page stores its windows, then keeps only those covering its view; shown again, it
+// takes the others back from storage before storing anything more.
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) return;
+  if (!document.hidden) {
+    if (remoteCacheKey) restoreWindows(remoteCacheKey);
+    return;
+  }
   clearTimeout(prefetchTimer);
   prefetchController?.abort();
   persistWindows(0);
