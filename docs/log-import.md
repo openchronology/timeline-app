@@ -109,6 +109,10 @@ Routes are the [receiver's](syslog.md#routing), generalised to any field: each c
 - **Storage.** When the account has a quota, the importer first reads everything to estimate the storage the import adds, as the server charges it (the timeline's growth, each save's patch and the snapshots the server keeps), and writes nothing if it does not fit (exit code 3). The estimate starts from each timeline's current size.
 - **Speed** follows the API key's rate limit (`API_KEY_REQUESTS_PER_MINUTE`, default 120): a million entries take about 500 saves. Raise the limit for large imports.
 
+## Keeping recent logs
+
+Log timelines grow without end. Set **Keep only the last** (say `90 days`) in a timeline's **Sharing & settings**, and the server deletes older moments and history about once an hour, freeing storage; see [data retention](retention.md).
+
 ## Dry run
 
 `--dry-run` reads and maps everything without writing, and prints JSON to standard output: entries per timeline, skipped, filtered, unrouted and refused counts, the storage estimate, and, with `OCH_API_URL` and `OCH_API_KEY` set, the account's usage, quota and whether the import fits; then the first problems and the first moments (`--sample`).

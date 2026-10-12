@@ -71,6 +71,10 @@ The receiver logs its counts every minute: received, invalid, unmatched, queued,
 
 API keys are rate-limited per key (`API_KEY_REQUESTS_PER_MINUTE`, default 120). The receiver makes about one save per second per busy timeline, so the default fits one or two busy timelines; raise the limit for more.
 
+## Keeping recent logs
+
+Log timelines grow without end. Set **Keep only the last** (say `90 days`) in a timeline's **Sharing & settings**, and the server deletes older moments and history about once an hour, freeing storage; see [data retention](retention.md).
+
 ## Realtime testing
 
 `test/syslog-live-postgres.mjs` runs the whole path against PostgreSQL and the production Next.js server: syslog over UDP and TCP, the receiver, the API, the live event stream and an open editor in Chromium. It checks that:

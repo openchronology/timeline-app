@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { compareLimits as compareLimitsFromEnv, compareLimit } from './limits.mjs';
+import { deleteWhere, parseRetention, printRetention } from './retention.mjs';
 import { setTimelineStar } from './stars.mjs';
 import { Administration, usage, requireDataProvider, avatarValue } from './administration.mjs';
 import { authorizeKey, keyRequestRead } from './api-keys.mjs';
@@ -125,6 +126,13 @@ function response(res, status, value, headers = {}) {
     ...headers,
   });
   res.end(JSON.stringify(value));
+}
+/** A timeline's metadata with its retention period as its display writes it. */
+async function retentionInfo(t) {
+  return {
+    ...t,
+    retention: t.retention_seconds ? printRetention(t.retention_seconds, t.presentation) : null,
+  };
 }
 export function createRequestHandler({
   pool = null,
@@ -744,7 +752,7 @@ export function createRequestHandler({
           );
         }
         const match =
-          /^\/api\/timelines\/([^/]+)(?:\/(document|query|members|settings|file|changes|revision|recent))?$/.exec(
+          /^\/api\/timelines\/([^/]+)(?:\/(document|query|members|settings|file|changes|delete-range|revision|recent))?$/.exec(
             pathname,
           );
         if (!match || !uuid.test(match[1])) throw new HttpError(404, 'Unknown endpoint.');
@@ -784,6 +792,25 @@ export function createRequestHandler({
           await auth.rateLimit('file-download:' + req.clientAddress);
           const snapshot = await store.snapshot(id, userId);
           return fileResponse(res, await converter.convert('write', snapshot.document));
+        }
+        // Deletes every moment in a range, and the durations inside it, as one save (#91).
+        if (action === 'delete-range' && method === 'POST') {
+          auth.require(session, req);
+          const input = await body(req);
+          const lower = bound(input.lower),
+            upper = bound(input.upper);
+          if (
+            typeof input.revision !== 'string' ||
+            !/^\d+$/.test(input.revision) ||
+            lower === null ||
+            upper === null ||
+            Q.parse(lower).compare(Q.parse(upper)) > 0
+          )
+            throw new HttpError(400, 'Give a revision and a range from lower to upper.');
+          const t = await store.access(id, userId);
+          if (!t.canWrite) throw new HttpError(403, 'Only writers can delete moments.');
+          const result = await deleteWhere(store, t, userId, input.revision, { lower, upper });
+          return response(res, 200, result);
         }
         if (action === 'changes' && method === 'PUT') {
           auth.require(session, req);
@@ -1067,12 +1094,20 @@ export function createRequestHandler({
           const input = await body(req);
           if (
             !input ||
-            Object.keys(input).some((k) => !['visibility', 'allowPrivateForks'].includes(k)) ||
+            Object.keys(input).some(
+              (k) => !['visibility', 'allowPrivateForks', 'retention'].includes(k),
+            ) ||
             !Object.keys(input).length ||
+            (input.retention !== undefined &&
+              input.retention !== null &&
+              (typeof input.retention !== 'string' || input.retention.length > 200)) ||
             (input.visibility !== undefined && !['private', 'public'].includes(input.visibility)) ||
             (input.allowPrivateForks !== undefined && typeof input.allowPrivateForks !== 'boolean')
           )
-            throw new HttpError(400, 'Choose visibility and/or a private forking policy.');
+            throw new HttpError(
+              400,
+              'Choose visibility, a private forking policy and/or a retention period.',
+            );
           await store.transaction(async (c) => {
             await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [id]);
             const current = await store.access(id, userId, c);
@@ -1090,16 +1125,24 @@ export function createRequestHandler({
             }
             if (input.visibility === 'public' && current.publication_restricted)
               throw new HttpError(403, 'Copies of private upstream timelines must remain private.');
+            // Keeping only the last of a calendar timeline: expired on the next run.
+            const retention =
+              input.retention === undefined
+                ? current.retention_seconds
+                : input.retention === null || !input.retention.trim()
+                  ? null
+                  : parseRetention(input.retention, current.presentation);
             await c.query(
-              'UPDATE oc_timelines SET visibility=$2,allow_private_forks=$3,revision=revision+1,updated_at=now() WHERE id=$1',
+              'UPDATE oc_timelines SET visibility=$2,allow_private_forks=$3,retention_seconds=$4,retention_applied_at=CASE WHEN retention_seconds IS DISTINCT FROM $4 THEN NULL ELSE retention_applied_at END,revision=revision+1,updated_at=now() WHERE id=$1',
               [
                 id,
                 input.visibility ?? current.visibility,
                 input.allowPrivateForks ?? current.allow_private_forks,
+                retention,
               ],
             );
           });
-          return response(res, 200, await store.metadata(id, userId));
+          return response(res, 200, await retentionInfo(await store.metadata(id, userId)));
         }
         if (action === 'members' && method === 'GET') {
           const { rows } = await pool.query(

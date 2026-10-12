@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { accessibleTimeline } from '../../../../lib/timeline.js';
 import TimelineSettings from '../../../../components/timeline-settings.jsx';
+import { calendar, printRetention } from '../../../../../server/retention.mjs';
 export const dynamic = 'force-dynamic';
 export default async function Settings({ params }) {
   const { id } = await params,
@@ -15,7 +16,16 @@ export default async function Settings({ params }) {
   return (
     <main className="platform">
       <Link href={'/timelines/' + id}>← {timeline.title || 'Untitled timeline'}</Link>
-      <TimelineSettings initial={timeline} initialMembers={rows} />
+      <TimelineSettings
+        initial={{
+          ...timeline,
+          retention: timeline.retention_seconds
+            ? printRetention(timeline.retention_seconds, timeline.presentation)
+            : null,
+        }}
+        initialMembers={rows}
+        calendar={!!calendar(timeline.presentation) && !timeline.comparison}
+      />
     </main>
   );
 }

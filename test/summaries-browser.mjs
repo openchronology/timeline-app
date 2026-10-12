@@ -92,6 +92,7 @@ export async function checkSummaries(page, restore) {
       'Fit all',
       'Edit',
       'Delete',
+      'Delete everything in this view…',
     ]);
     await menu.getByRole('menuitem', { name: 'Edit', exact: true }).click();
     await dialog.waitFor();

@@ -76,7 +76,11 @@ export async function checkSelection(page, restoreDocument) {
   const contextTime = await input('time-cursor').getAttribute('data-time');
   const cursorBox = await input('time-cursor').boundingBox();
   assert(Math.abs(cursorBox.x + cursorBox.width / 2 - x) < 2);
-  assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), ['+Event', 'Fit all']);
+  assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), [
+    '+Event',
+    'Fit all',
+    'Delete everything in this view…',
+  ]);
   await page.keyboard.press('Escape');
   assert(await menu.isHidden());
   // A moment's menu offers Edit, which opens it.
@@ -88,6 +92,7 @@ export async function checkSelection(page, restoreDocument) {
     'Fit all',
     'Edit',
     'Delete',
+    'Delete everything in this view…',
   ]);
   await menu.getByRole('menuitem', { name: 'Edit', exact: true }).click();
   await input('event-form').waitFor();

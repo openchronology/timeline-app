@@ -837,3 +837,10 @@ BEGIN
   END LOOP;
   RETURN left(coalesce(result,''),1048576);
 END $$;
+-- Data retention (#91): a Gregorian timeline can keep only its last retention_seconds of
+-- moments; the server expires older ones, and history saved before then, on a schedule.
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS retention_seconds text;
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS retention_applied_at timestamptz;
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS retention_removed bigint;
+CREATE INDEX IF NOT EXISTS oc_timelines_retention ON oc_timelines(retention_applied_at NULLS FIRST)
+  WHERE retention_seconds IS NOT NULL;
