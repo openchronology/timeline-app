@@ -8,6 +8,8 @@ import { Challenges } from './challenge.mjs';
 import { Auth } from './auth.mjs';
 import { PostgresStore } from './store.mjs';
 import { providersFromEnv } from './oauth.mjs';
+import { compareLimits, defaultQuota, LimitError } from './limits.mjs';
+import { applyEnvironmentQuota } from './administration.mjs';
 const key = Symbol.for('openchronology.platform.services');
 
 /** A deployment setting the platform cannot start with; its message is safe to show users. */
@@ -60,6 +62,21 @@ async function initialize() {
           connectionTimeoutMillis: 10000,
         })
       : null;
+  // Limits from the environment file: refused at startup rather than misapplied.
+  let limits;
+  try {
+    limits = compareLimits();
+    defaultQuota();
+  } catch (error) {
+    if (error instanceof LimitError) throw new ConfigurationError(error.message);
+    throw error;
+  }
+  // DEFAULT_USER_STORAGE_BYTES, when set, is the default quota from every start.
+  if (pool)
+    await applyEnvironmentQuota(pool).catch((error) => {
+      // Before the first migration there are no settings yet; the migration applies it.
+      if (error.code !== '42P01') throw error;
+    });
   const plugins = process.env.PLUGIN_LIBRARY
     ? [...BUILTIN_PLUGINS, ...(await pluginLibrary(process.env.PLUGIN_LIBRARY))]
     : BUILTIN_PLUGINS;
@@ -76,8 +93,9 @@ async function initialize() {
     featured,
     trustProxy: process.env.TRUST_PROXY === '1',
     challenges: Challenges.settings(process.env),
+    compareLimits: limits,
   };
-  const store = pool ? new PostgresStore(pool) : null;
+  const store = pool ? new PostgresStore(pool, { compareLimits: limits }) : null;
   // Catalogue text left stale by an interrupted refresh catches up in the background.
   store?.refreshStale().catch((error) => console.error('Catalogue text refresh failed:', error));
   return {

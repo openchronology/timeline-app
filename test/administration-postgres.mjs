@@ -86,7 +86,6 @@ try {
   await bootstrapInstallation(pool, {
     ADMIN_USERNAME: 'admin_' + suffix,
     ADMIN_INITIAL_PASSWORD: 'a different initial password',
-    DEFAULT_USER_STORAGE_BYTES: '0',
   });
   assert(
     await passwordMatches(
@@ -100,6 +99,14 @@ try {
       .default_quota_bytes,
     '104857600',
   );
+  // Set in the environment file, the default quota applies at every start.
+  await bootstrapInstallation(pool, { DEFAULT_USER_STORAGE_BYTES: '50MiB' });
+  assert.equal(
+    (await pool.query('SELECT default_quota_bytes FROM oc_site_settings')).rows[0]
+      .default_quota_bytes,
+    '52428800',
+  );
+  await bootstrapInstallation(pool, { DEFAULT_USER_STORAGE_BYTES: '104857600' });
   const admin = await login(adminUser),
     owner = await user('owner'),
     stranger = await user('stranger'),

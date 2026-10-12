@@ -160,6 +160,8 @@ interface Session {
   dashboard?: boolean;
   providers?: string[];
   fileExchange?: boolean;
+  /** How many timelines this account may compare at once. */
+  compareLimit?: number;
 }
 const el = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
 const desktop = !offlineHtml && !!window.__TAURI__,
@@ -2626,12 +2628,15 @@ async function route(force = false) {
   if (compared) {
     if (comparison) return;
     const ids = [...new Set(compared[1].split(','))];
+    const limit = Math.min(8, Math.max(2, session.compareLimit ?? 8));
     if (
       ids.length < 2 ||
-      ids.length > 8 ||
+      ids.length > limit ||
       ids.some((id) => !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id))
     )
-      throw new Error('Select two to eight valid timelines.');
+      throw new Error(
+        `Select two to ${limit} valid timelines${!session.user && limit < 8 ? '; signed in, you can compare more' : ''}.`,
+      );
     setDashboard(false);
     const request = documentRequest;
     const sources = await comparisonSources(ids);
@@ -5549,6 +5554,8 @@ window.addEventListener('pageshow', () => {
   void live?.update();
 });
 const comparisons = comparisonUI({
+  // Without a server (offline, desktop on its own) every comparison may hold up to eight.
+  limit: () => Math.min(8, Math.max(2, session.compareLimit ?? 8)),
   available: () => !offlineHtml && !!session.server,
   current: currentComparisonSource,
   sources: comparisonSources,

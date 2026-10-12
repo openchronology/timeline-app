@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+import { compareLimit } from './limits.mjs';
 import {
   Q,
   pluginMetadata,
@@ -58,8 +59,10 @@ async function allEvents(client, table, id) {
   return rows.map((r) => r.event);
 }
 export class PostgresStore {
-  constructor(pool) {
+  /** `compareLimits` caps saved comparisons by their owner's account (limits.mjs). */
+  constructor(pool, { compareLimits = null } = {}) {
     this.pool = pool;
+    this.compareLimits = compareLimits;
   }
   async liveState(id, userId, client = this.pool) {
     const { rows } = await client.query(
@@ -124,8 +127,15 @@ export class PostgresStore {
     document = validateDocument(document);
     if (document.comparison) {
       const parent = (
-        await client.query('SELECT owner_id,visibility FROM oc_timelines WHERE id=$1', [id])
+        await client.query(
+          'SELECT t.owner_id,t.visibility,u.is_admin FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id WHERE t.id=$1',
+          [id],
+        )
       ).rows[0];
+      const limit =
+        this.compareLimits && compareLimit(this.compareLimits, { isAdmin: parent.is_admin });
+      if (limit && document.comparison.sources.length > limit)
+        throw new HttpError(400, `This account can compare at most ${limit} timelines.`);
       const sources = await client.query(
         `SELECT t.id FROM oc_timelines t
         WHERE t.id=ANY($1::uuid[]) AND t.id<>$2::uuid AND t.comparison IS NULL

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import Link from 'next/link';
 import TimelineSearch from '../components/timeline-search.jsx';
-import { currentSession } from '../lib/session.js';
+import { accountCompareLimit, currentSession } from '../lib/session.js';
 import { searchTimelines } from '../../server/collaboration.mjs';
 import { CompareTray } from '../components/compare-selection.jsx';
 import TimelineList from '../components/timeline-list.jsx';
@@ -27,6 +27,7 @@ export default async function Dashboard({ searchParams }) {
         : 'featured',
   };
   let user = null,
+    compareLimit = 8,
     mine,
     publicResults,
     favorites,
@@ -34,6 +35,7 @@ export default async function Dashboard({ searchParams }) {
   try {
     const current = await currentSession();
     user = current.user;
+    compareLimit = accountCompareLimit(current);
     if (!current.services.pool)
       error = 'Server storage is unavailable. You can create or import a local timeline.';
     else
@@ -74,18 +76,20 @@ export default async function Dashboard({ searchParams }) {
       <div className="page-heading">
         <h1>Timelines</h1>
       </div>
-      <CompareTray />
+      <CompareTray limit={compareLimit} signedIn={!!user} />
       {user && (
         <section id="dashboard-mine">
           <h2>Your timelines</h2>
-          {mine && <TimelineList result={mine} query={query} mine />}
+          {mine && <TimelineList compareLimit={compareLimit} result={mine} query={query} mine />}
         </section>
       )}
       {user && (
         <section id="dashboard-favorites">
           <h2>Your favorites</h2>
           <Link href={'/users/' + encodeURIComponent(user.username)}>Your public profile</Link>
-          {favorites && <TimelineList result={favorites} query={query} favorites />}
+          {favorites && (
+            <TimelineList compareLimit={compareLimit} result={favorites} query={query} favorites />
+          )}
         </section>
       )}
       <section className="dashboard-introduction">
@@ -109,7 +113,14 @@ export default async function Dashboard({ searchParams }) {
             {error}
           </p>
         ) : (
-          publicResults && <TimelineList result={publicResults} query={query} guest={!user} />
+          publicResults && (
+            <TimelineList
+              compareLimit={compareLimit}
+              result={publicResults}
+              query={query}
+              guest={!user}
+            />
+          )
         )}
       </section>
     </main>

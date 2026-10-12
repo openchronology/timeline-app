@@ -2,6 +2,7 @@
 import 'server-only';
 import { headers } from 'next/headers';
 import { platformServices } from '../../server/platform.mjs';
+import { compareLimit, compareLimits } from '../../server/limits.mjs';
 export async function currentSession() {
   const services = await platformServices();
   const values = Object.fromEntries(await headers());
@@ -22,4 +23,8 @@ export async function currentSession() {
         }
       : null,
   };
+}
+/** How many timelines the visitor may compare at once (COMPARE_TIMELINES_* settings). */
+export function accountCompareLimit(current) {
+  return compareLimit(current.services.compareLimits ?? compareLimits(), current.user);
 }

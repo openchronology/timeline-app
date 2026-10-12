@@ -6,7 +6,10 @@ Select timeline cards in the dashboard and use **Compare timelines**. Selection
 persists across search pages in the current browser tab. Alternatively, **Compare**
 in an open editor presents a searchable list of timelines visible to you,
 including private timelines you own or have collaborator access to. Select two
-to eight sources. The currently open working timeline can be included. JSON
+or more sources, up to your account's limit: by default four for guests and eight
+for signed-in users and administrators. Operators set these limits, from 2 to 8, with
+`COMPARE_TIMELINES_GUEST`, `COMPARE_TIMELINES_USER` and `COMPARE_TIMELINES_ADMIN`;
+a saved comparison holds at most as many sources as its owner may compare. The currently open working timeline can be included. JSON
 `.ochx` files can also be added, including in the standalone offline HTML build.
 Desktop can compare its current SQLite timeline with server timelines or JSON files.
 
