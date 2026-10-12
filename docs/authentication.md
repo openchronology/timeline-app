@@ -1,6 +1,27 @@
 # Accounts, sessions and deployment
 
-The official desktop default is `https://timescale.info`. In **Server connection**, choose another HTTPS origin or disconnect and continue working locally. HTTP is accepted only for loopback development origins. Only the selected origin is persisted; desktop credentials live in native process memory and a restart requires signing in again.
+The official desktop default is `https://timescale.info`. In **Server connection**, connect to other HTTPS origins as well, or disconnect from all of them and continue working locally. HTTP is accepted only for loopback development origins. Only the connected origins are persisted; desktop credentials live in native process memory and a restart requires signing in again.
+
+## Several servers on the desktop
+
+The desktop connects to up to eight servers at once, each with its own sign-in. Signing in to one server, signing out of it or disconnecting from it leaves the others as they are. Once more than one server is connected, the dialog is named **Servers (n)**. It lists each server with its account and offers **Use**, **Sign in**, **Sign out** and **Disconnect**.
+
+One server is _in use_ at a time:
+
+- The account button shows its account.
+- New timelines are saved to it.
+- Comparisons are of its timelines.
+- The plugin library opens on it.
+
+When a server timeline is open, the server in use is always that timeline's server. Opening a timeline from another server switches to that server without signing in again. **Use** is unavailable while a server timeline is open. The server in use is listed first and is used again at the next start.
+
+When several servers are connected, the desktop shows which server each item comes from with a chip naming it:
+
+- The dashboard lists your timelines and favorites from every server you are signed in to, and public timelines from every reachable server.
+- The open timeline shows a chip with its server.
+- The plugin library can browse any connected server's plugins.
+
+Desktop timeline links name their server too: `#server/<origin>/timeline/<id>`. Disconnecting from the server in use keeps its open timeline as an unsaved local copy and switches to the next server.
 
 Accounts support username/password and Google, GitHub and Facebook sign-in. Private timelines and explicit viewer/contributor/writer memberships apply equally to browser and desktop requests. Public timelines can be viewed without signing in. Open **Your OpenChronology account** to see active sessions and sign out every other session. Social accounts initially receive a generated username, shown in the account button and usable for sharing.
 

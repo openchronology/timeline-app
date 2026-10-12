@@ -6,12 +6,18 @@ let credentials: RequestCredentials = 'same-origin';
 export function anonymousRequests() {
   credentials = 'omit';
 }
+/** The desktop's server in use: its requests go there unless they name another. */
+let nativeServer = '';
+export function useNativeServer(origin: string) {
+  nativeServer = origin;
+}
 export async function requestApi<T>(
   path: string,
   method = 'GET',
   data?: unknown,
   csrf?: string | null,
   signal?: AbortSignal,
+  server?: string,
 ): Promise<T> {
   signal?.throwIfAborted();
   const send = async (challenge?: string) => {
@@ -20,6 +26,7 @@ export async function requestApi<T>(
         status: number;
         body: { error?: string; challenge?: unknown };
       }>('desktop_request', {
+        server: server ?? nativeServer,
         path,
         method,
         data: data ?? null,

@@ -11,10 +11,35 @@ struct Credentials {
     login_cookie: Option<String>,
     device_code: Option<String>,
 }
-struct State {
-    origin: Option<Url>,
+/** One server the desktop is connected to, signed in or not. */
+struct Connection {
+    origin: Url,
     credentials: Credentials,
+    /** Changes whenever the connection's credentials do, so stale replies are dropped. */
     generation: u64,
+}
+/** At most this many servers at once. */
+pub const SERVERS: usize = 8;
+struct State {
+    /** The connected servers, the one in use first. */
+    connections: Vec<Connection>,
+    /** The last generation handed out, across every connection. */
+    generation: u64,
+}
+impl State {
+    fn find(&self, origin: &Url) -> Option<usize> {
+        self.connections
+            .iter()
+            .position(|c| c.origin.origin() == origin.origin())
+    }
+    fn connection(&mut self, origin: &Url) -> Result<&mut Connection, String> {
+        let index = self.find(origin).ok_or("Connect to this server first")?;
+        Ok(&mut self.connections[index])
+    }
+    fn next(&mut self) -> u64 {
+        self.generation += 1;
+        self.generation
+    }
 }
 fn device_destination(target: &Url, configured: &Url, code: &str) -> bool {
     code.len() == 10
@@ -91,11 +116,7 @@ fn api_path(path: &str) -> Result<(), String> {
 }
 impl Server {
     pub fn new() -> Result<Self, String> {
-        let configured = Some(origin(
-            option_env!("OPENCHRONOLOGY_SERVER_ORIGIN")
-                .filter(|s| !s.is_empty())
-                .unwrap_or("https://timescale.info"),
-        )?);
+        origin(Self::default_origin())?;
         Ok(Self {
             client: Client::builder()
                 .https_only(false)
@@ -106,34 +127,66 @@ impl Server {
                 .build()
                 .map_err(|e| e.to_string())?,
             state: Mutex::new(State {
-                origin: configured,
-                credentials: Credentials::default(),
+                connections: Vec::new(),
                 generation: 0,
             }),
         })
     }
-    pub fn configured(&self) -> Result<Option<String>, String> {
+    /** The server a new installation connects to. */
+    pub fn default_origin() -> &'static str {
+        option_env!("OPENCHRONOLOGY_SERVER_ORIGIN")
+            .filter(|s| !s.is_empty())
+            .unwrap_or("https://timescale.info")
+    }
+    /** The connected servers' origins, the one in use first. */
+    pub fn servers(&self) -> Result<Vec<String>, String> {
         Ok(self
             .state
             .lock()
             .map_err(|e| e.to_string())?
-            .origin
-            .as_ref()
-            .map(|url| url.origin().ascii_serialization()))
+            .connections
+            .iter()
+            .map(|c| c.origin.origin().ascii_serialization())
+            .collect())
     }
-    pub fn configure(&self, value: Option<String>) -> Result<(), String> {
-        let url = value
-            .filter(|v| !v.is_empty())
-            .map(|text| origin(&text))
-            .transpose()?;
+    /**
+     * Connects to a server, keeping the others and their sign-ins, and puts it first (in
+     * use). Connecting to a server again keeps its sign-in.
+     */
+    pub fn connect(&self, text: &str) -> Result<(), String> {
+        let url = origin(text)?;
         let mut state = self.state.lock().map_err(|e| e.to_string())?;
-        state.generation += 1;
-        state.origin = url;
-        state.credentials = Credentials::default();
+        let connection = match state.find(&url) {
+            Some(index) => state.connections.remove(index),
+            None => {
+                if state.connections.len() >= SERVERS {
+                    return Err(format!(
+                        "Connect to at most {SERVERS} servers; disconnect one first."
+                    ));
+                }
+                let generation = state.next();
+                Connection {
+                    origin: url,
+                    credentials: Credentials::default(),
+                    generation,
+                }
+            }
+        };
+        state.connections.insert(0, connection);
+        Ok(())
+    }
+    /** Disconnects from a server, forgetting its credentials and any reply in flight. */
+    pub fn disconnect(&self, text: &str) -> Result<(), String> {
+        let url = origin(text)?;
+        let mut state = self.state.lock().map_err(|e| e.to_string())?;
+        if let Some(index) = state.find(&url) {
+            state.connections.remove(index);
+        }
         Ok(())
     }
     pub async fn request(
         &self,
+        server: &str,
         path: &str,
         method: &str,
         data: Option<Value>,
@@ -161,11 +214,13 @@ impl Server {
         }) {
             return Err("Invalid verification answer".into());
         }
-        self.request_inner(path, method, data, csrf, challenge, None)
+        self.request_inner(&origin(server)?, path, method, data, csrf, challenge, None)
             .await
     }
+    #[allow(clippy::too_many_arguments)]
     async fn request_inner(
         &self,
+        server: &Url,
         path: &str,
         method: &str,
         data: Option<Value>,
@@ -178,15 +233,16 @@ impl Server {
             return Err("Invalid API method".into());
         }
         let (epoch, url, token, cookie) = {
-            let state = self.state.lock().map_err(|e| e.to_string())?;
-            if expected.is_some_and(|n| n != state.generation) {
+            let mut state = self.state.lock().map_err(|e| e.to_string())?;
+            let connection = state.connection(server)?;
+            if expected.is_some_and(|n| n != connection.generation) {
                 return Err("The server connection changed".into());
             }
             (
-                state.generation,
-                state.origin.clone().ok_or("Connect to a server first")?,
-                state.credentials.token.clone(),
-                state.credentials.login_cookie.clone(),
+                connection.generation,
+                connection.origin.clone(),
+                connection.credentials.token.clone(),
+                connection.credentials.login_cookie.clone(),
             )
         };
         let mut request = self
@@ -244,12 +300,18 @@ impl Server {
         }
         let mut body: Value =
             serde_json::from_slice(&bytes).map_err(|_| "Server returned an invalid response")?;
-        // Discard a response if the configured server changed while it was in flight.
+        // Discard a response if its connection changed while it was in flight.
         let mut state = self.state.lock().map_err(|e| e.to_string())?;
-        if state.generation != epoch || state.origin.as_ref() != Some(&url) {
+        let next = state.generation + 1;
+        let Some(connection) = state
+            .find(&url)
+            .map(|index| &mut state.connections[index])
+            .filter(|c| c.generation == epoch)
+        else {
             return Err("The server connection changed".into());
-        }
-        let credentials = &mut state.credentials;
+        };
+        let mut renewed = false;
+        let credentials = &mut connection.credentials;
         if let Some(cookie) = login_cookie {
             credentials.login_cookie = Some(cookie);
         }
@@ -258,24 +320,32 @@ impl Server {
             capture_token(&mut body, credentials)?;
             if path == "auth/logout" {
                 *credentials = Credentials::default();
-                state.generation += 1;
+                renewed = true;
             } else if signed_in {
-                state.generation += 1;
+                renewed = true;
             }
         } else if status == 401 {
             credentials.token = None;
         }
+        if renewed {
+            connection.generation = next;
+            state.generation = next;
+        }
         Ok(Reply { status, body })
     }
-    pub async fn start_login(&self) -> Result<Value, String> {
+    pub async fn start_login(&self, server: &str) -> Result<Value, String> {
+        let server = origin(server)?;
         let epoch = {
             let mut state = self.state.lock().map_err(|e| e.to_string())?;
-            state.generation += 1;
-            state.credentials.device_code = None;
-            state.generation
+            let generation = state.next();
+            let connection = state.connection(&server)?;
+            connection.generation = generation;
+            connection.credentials.device_code = None;
+            generation
         };
         let reply = self
             .request_inner(
+                &server,
                 "auth/device/start",
                 "POST",
                 Some(json!({})),
@@ -303,26 +373,28 @@ impl Server {
         )
         .map_err(|_| "Invalid sign-in URL")?;
         let mut state = self.state.lock().map_err(|e| e.to_string())?;
-        if state.generation != epoch {
+        let connection = state.connection(&server)?;
+        if connection.generation != epoch {
             return Err("The server connection changed".into());
         }
-        let configured = state.origin.clone().ok_or("Connect to a server first")?;
         let user_code = body["userCode"].as_str().ok_or("Missing desktop code")?;
-        if !device_destination(&target, &configured, user_code) {
+        if !device_destination(&target, &connection.origin, user_code) {
             return Err("Invalid sign-in destination".into());
         }
-        state.credentials.device_code = Some(device);
+        connection.credentials.device_code = Some(device);
         drop(state);
         let opened = open_browser(target.as_str()).is_ok();
         body["browserOpened"] = Value::Bool(opened);
         Ok(body)
     }
-    pub async fn poll_login(&self) -> Result<Value, String> {
+    pub async fn poll_login(&self, server: &str) -> Result<Value, String> {
+        let server = origin(server)?;
         let (epoch, device) = {
-            let state = self.state.lock().map_err(|e| e.to_string())?;
+            let mut state = self.state.lock().map_err(|e| e.to_string())?;
+            let connection = state.connection(&server)?;
             (
-                state.generation,
-                state
+                connection.generation,
+                connection
                     .credentials
                     .device_code
                     .clone()
@@ -331,6 +403,7 @@ impl Server {
         };
         let reply = self
             .request_inner(
+                &server,
                 "auth/device/poll",
                 "POST",
                 Some(json!({ "deviceCode": device })),
@@ -347,8 +420,10 @@ impl Server {
         }
         if reply.body["pending"] != true {
             let mut state = self.state.lock().map_err(|e| e.to_string())?;
-            if state.generation == epoch {
-                state.credentials.device_code = None;
+            if let Ok(connection) = state.connection(&server) {
+                if connection.generation == epoch {
+                    connection.credentials.device_code = None;
+                }
             }
         }
         Ok(reply.body)
@@ -478,30 +553,61 @@ mod tests {
         assert!(malformed.get("token").is_none());
     }
     #[test]
-    fn changing_or_disconnecting_a_server_clears_credentials_and_pending_requests() {
+    fn servers_keep_their_own_sign_ins_and_disconnecting_clears_them() {
         let server = Server::new().unwrap();
+        server.connect("https://timescale.info").unwrap();
+        server.connect("https://another.example").unwrap();
+        assert_eq!(
+            server.servers().unwrap(),
+            ["https://another.example", "https://timescale.info"]
+        );
+        let official = Url::parse("https://timescale.info").unwrap();
         {
             let mut state = server.state.lock().unwrap();
-            state.credentials.token = Some("secret".into());
-            state.credentials.device_code = Some("pending".into());
+            let connection = state.connection(&official).unwrap();
+            connection.credentials.token = Some("secret".into());
+            connection.credentials.device_code = Some("pending".into());
         }
-        assert!(server
-            .configure(Some("http://untrusted.example".into()))
-            .is_err());
-        assert!(server.state.lock().unwrap().credentials.token.is_some());
-        let generation = server.state.lock().unwrap().generation;
-        server
-            .configure(Some("https://another.example".into()))
-            .unwrap();
-        let state = server.state.lock().unwrap();
-        assert!(state.credentials.token.is_none());
-        assert!(state.credentials.device_code.is_none());
-        assert!(state.generation > generation);
+        assert!(server.connect("http://untrusted.example").is_err());
+        // Using a server again keeps its sign-in, and puts it first.
+        server.connect("https://timescale.info/").unwrap();
+        assert_eq!(server.servers().unwrap()[0], "https://timescale.info");
+        let generation = {
+            let mut state = server.state.lock().unwrap();
+            let connection = state.connection(&official).unwrap();
+            assert_eq!(connection.credentials.token.as_deref(), Some("secret"));
+            connection.generation
+        };
+        server.disconnect("https://timescale.info").unwrap();
+        assert_eq!(server.servers().unwrap(), ["https://another.example"]);
+        server.connect("https://timescale.info").unwrap();
+        let mut state = server.state.lock().unwrap();
+        let connection = state.connection(&official).unwrap();
+        assert!(connection.credentials.token.is_none());
+        assert!(connection.credentials.device_code.is_none());
+        assert!(connection.generation > generation);
         drop(state);
-        server.configure(None).unwrap();
-        assert!(server.configured().unwrap().is_none());
+        for n in 0..SERVERS - 2 {
+            server
+                .connect(&format!("https://server{n}.example"))
+                .unwrap();
+        }
+        assert!(server.connect("https://one-too-many.example").is_err());
+        let unknown = tauri::async_runtime::block_on(server.request(
+            "https://unknown.example",
+            "session",
+            "GET",
+            None,
+            None,
+            None,
+        ));
+        assert_eq!(
+            unknown.err().as_deref(),
+            Some("Connect to this server first")
+        );
         for path in ["auth/device/start", "auth/device/poll", "auth/google/start"] {
             let result = tauri::async_runtime::block_on(server.request(
+                "https://timescale.info",
                 path,
                 "POST",
                 Some(json!({})),

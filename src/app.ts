@@ -104,7 +104,13 @@ import {
   timelinePrefix,
   versionPrefix,
 } from './viewport-store.js';
-import { requestApi, importSqlite, exportSqlite, anonymousRequests } from './transport.js';
+import {
+  requestApi,
+  importSqlite,
+  exportSqlite,
+  anonymousRequests,
+  useNativeServer,
+} from './transport.js';
 import { parseLink, linkFragment, sharePath } from './links.js';
 import type { TimelineLink } from './links.js';
 declare const __OFFLINE_HTML__: boolean;
@@ -189,7 +195,59 @@ if (desktop) {
       void window.__TAURI__!.core.invoke('desktop_open_image', { url: link.href }).catch(fail);
     };
 }
-let serverOrigin = desktop ? 'https://timescale.info' : location.origin;
+let serverOrigin = desktop ? '' : location.origin;
+/**
+ * The desktop's connected servers, the one in use first (#85). Each keeps its own sign-in;
+ * the one in use is the open server timeline's, and new timelines are saved there.
+ */
+let connected: string[] = [];
+/** The sessions of connected servers other than the one in use (that one is `session`). */
+const sessions = new Map<string, Session>();
+const DISCONNECTED: Session = { user: null, csrf: null, server: false };
+function sessionOf(origin: string): Session {
+  return origin === serverOrigin ? session : (sessions.get(origin) ?? DISCONNECTED);
+}
+/** Whether items say which server they come from: on a desktop connected to several. */
+function severalServers() {
+  return desktop && connected.length > 1;
+}
+function serverHost(origin: string) {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return origin;
+  }
+}
+/** A chip naming a server, in a hue of its own. */
+function serverChip(origin: string, element: HTMLElement = document.createElement('span')) {
+  element.className = 'server-chip';
+  element.textContent = serverHost(origin);
+  element.title = origin;
+  let hue = 0;
+  for (const c of origin) hue = (hue * 31 + c.charCodeAt(0)) % 360;
+  element.style.setProperty('--server-hue', String(hue));
+  return element;
+}
+/** Uses a connected server (or none): its session applies, and requests go there. */
+function useServer(origin: string | null) {
+  if (origin === serverOrigin) return;
+  if (serverOrigin && connected.includes(serverOrigin)) sessions.set(serverOrigin, session);
+  serverOrigin = origin ?? '';
+  session = (origin && sessions.get(origin)) || { ...DISCONNECTED };
+  if (origin) sessions.delete(origin);
+  useNativeServer(serverOrigin);
+}
+function safeDecode(text: string) {
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return text;
+  }
+}
+/** A server timeline's address in the editor; the desktop's also names its server. */
+function timelineHash(id: string, origin = serverOrigin) {
+  return desktop ? `#server/${encodeURIComponent(origin)}/timeline/${id}` : `#timeline/${id}`;
+}
 let model: TimelineIndex | null = new TimelineIndex(
     offlineHtml || freshTimeline
       ? {
@@ -1989,6 +2047,10 @@ function heading() {
     !!comparison ||
     !model ||
     document.body.dataset.dashboard === 'true';
+  // Which server the open timeline is on, when the desktop is connected to several.
+  const server = el('timeline-server');
+  server.hidden = !remote || !severalServers();
+  if (!server.hidden) serverChip(serverOrigin, server);
   el('guest-fork-button').hidden =
     offlineHtml ||
     desktop ||
@@ -2338,7 +2400,7 @@ async function restoreAfterSignIn() {
             revision: saved.remote.revision,
             head_revision_id: saved.remote.head_revision_id ?? metadata.head_revision_id,
           };
-        if (!location.hash) window.history.replaceState(null, '', `#timeline/${remote.id}`);
+        if (!location.hash) window.history.replaceState(null, '', timelineHash(remote.id));
       } catch {
         remote = null;
         workingProposal = null;
@@ -2456,7 +2518,7 @@ async function directory() {
         if (mayReplace()) window.parent.location.href = `/timelines/${t.id}`;
         return;
       }
-      location.hash = `timeline/${t.id}`;
+      location.hash = timelineHash(t.id).slice(1);
     });
     list.append(button);
   }
@@ -2650,20 +2712,29 @@ async function route(force = false) {
     await followLink(parseLink(location.hash));
     return;
   }
-  const match = /^#timeline\/([a-f0-9-]+)(?:\/(.+))?$/i.exec(location.hash);
+  // The desktop's links also name the timeline's server: #server/<origin>/timeline/<id>.
+  const match = /^#(?:server\/([^/]+)\/)?timeline\/([a-f0-9-]+)(?:\/(.+))?$/i.exec(location.hash);
   if (match) {
+    const origin = desktop && match[1] ? safeDecode(match[1]) : serverOrigin;
+    match.splice(1, 1);
+    if (desktop && !connected.includes(origin))
+      throw new Error(`Connect to ${serverHost(origin)} to open this timeline.`);
     // What to look at: the frame's own link (followed once), or the platform page's fragment.
     const link = parseLink(match[2] ?? '') ?? parentLink();
-    if (match[2]) window.history.replaceState(null, '', '#timeline/' + match[1]);
-    if (remote?.id === match[1] && !force) {
+    if (match[2]) window.history.replaceState(null, '', timelineHash(match[1], origin));
+    if (remote?.id === match[1] && origin === serverOrigin && !force) {
       setDashboard(false);
       requestRender();
       await followLink(link);
       return;
     }
     if (!mayReplace()) {
-      window.history.replaceState(null, '', remote ? `#timeline/${remote.id}` : location.pathname);
+      window.history.replaceState(null, '', remote ? timelineHash(remote.id) : location.pathname);
       return;
+    }
+    if (origin !== serverOrigin) {
+      useServer(origin);
+      accountHeading();
     }
     await openRemote(match[1]);
     await followLink(link);
@@ -2823,17 +2894,22 @@ async function searchPlugins() {
   el<HTMLButtonElement>('plugin-previous').disabled = true;
   el<HTMLButtonElement>('plugin-next').disabled = true;
   const query = { search: input('plugin-search').value, page: pluginPage, limit: 12 };
-  let bundled = offlineHtml || (desktop && !session.server),
+  const origin = pluginServer();
+  let bundled = offlineHtml || (desktop && !sessionOf(origin).server),
     unreachable = false;
   try {
     let result: { plugins: PluginManifest[]; total: number; pages: number; page: number };
     if (bundled) result = searchPluginLibrary(BUILTIN_PLUGINS, query);
     else
       try {
-        result = await api('plugins/search', 'POST', {
-          ...query,
-          sort: input('plugin-sort').value,
-        });
+        result = await requestApi(
+          'plugins/search',
+          'POST',
+          { ...query, sort: input('plugin-sort').value },
+          sessionOf(origin).csrf,
+          undefined,
+          desktop ? origin : undefined,
+        );
       } catch (error) {
         if (request !== pluginSearchRequest || doc !== documentRequest) return;
         // A refused search is reported; a server that cannot be reached, or fails, is skipped.
@@ -2866,6 +2942,8 @@ async function searchPlugins() {
     for (const manifest of plugins) {
       const item = document.createElement('section');
       item.className = 'library-plugin';
+      // Where it comes from, when the desktop is connected to several servers.
+      if (severalServers() && !bundled) item.append(serverChip(origin));
       const name = document.createElement('strong');
       name.textContent = `${manifest.name} · v${manifest.version} · ${isOfficialPlugin(manifest) ? 'Official' : 'Custom'}`;
       const description = document.createElement('p');
@@ -3028,6 +3106,21 @@ el('plugins-button').onclick = () => {
   el<HTMLDialogElement>('plugins-dialog').showModal();
 };
 el('plugin-library-custom').onclick = () => openPluginAuthor();
+/** Included plugins list by name; popularity and age come from a server's library. */
+function pluginSortShown() {
+  input('plugin-sort').closest('label')!.hidden =
+    offlineHtml || (desktop && !sessionOf(pluginServer()).server);
+}
+/** The server whose library is shown: on a desktop, the one chosen there. */
+function pluginServer() {
+  return (desktop && el<HTMLSelectElement>('plugin-server').value) || serverOrigin;
+}
+el<HTMLSelectElement>('plugin-server').onchange = () => {
+  clearTimeout(pluginSearchTimer);
+  pluginPage = 1;
+  pluginSortShown();
+  void searchPlugins();
+};
 input('plugin-sort').onchange = () => {
   clearTimeout(pluginSearchTimer);
   pluginPage = 1;
@@ -3037,8 +3130,15 @@ el('plugins-add').onclick = () => {
   if (!editable()) return;
   pluginPage = 1;
   input('plugin-search').value = '';
-  // Included plugins list by name; popularity and age come from a server's library.
-  input('plugin-sort').closest('label')!.hidden = offlineHtml || (desktop && !session.server);
+  // A desktop connected to several servers can browse each one's library.
+  const servers = el<HTMLSelectElement>('plugin-server');
+  servers.closest('label')!.hidden = !severalServers();
+  servers.replaceChildren(
+    ...connected.map(
+      (origin) => new Option(serverHost(origin), origin, false, origin === serverOrigin),
+    ),
+  );
+  pluginSortShown();
   el<HTMLDialogElement>('plugin-library-dialog').showModal();
   void searchPlugins();
 };
@@ -4938,11 +5038,31 @@ el('account-button').onclick = () => {
       el<HTMLDialogElement>('account-dialog').showModal();
   })().catch(fail);
 };
-async function refreshSession() {
-  session = await api<Session>('session');
+/** Lists timelines again, if the dashboard is shown: who is signed in where changed. */
+function refreshDashboard() {
+  if (document.body.dataset.dashboard === 'true') void community.dashboard().catch(fail);
+}
+/** Reads a server's session: the one in use's by default, or another connected server's. */
+async function refreshSession(origin = serverOrigin) {
+  const fresh = await requestApi<Session>(
+    'session',
+    'GET',
+    undefined,
+    null,
+    undefined,
+    desktop ? origin : undefined,
+  );
+  if (origin !== serverOrigin) {
+    if (connected.includes(origin)) sessions.set(origin, fresh);
+    renderServers();
+    refreshDashboard();
+    return;
+  }
+  session = fresh;
+  renderServers();
   accountHeading();
   heading();
-  if (document.body.dataset.dashboard === 'true') void community.dashboard().catch(fail);
+  refreshDashboard();
 }
 async function accountSessions() {
   const result = await api<{
@@ -4975,39 +5095,46 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('[data-provide
       .catch((error) => text('account-error', error.message));
   };
 let desktopLoginAttempt = 0;
-el('desktop-login').onclick = () => {
-  if (!desktop) return;
+/** Signs the desktop in to a connected server through the system browser. */
+function desktopLogin(origin: string, status: string) {
   const attempt = ++desktopLoginAttempt;
   void (async () => {
     const result = await window.__TAURI__!.core.invoke<{
       userCode: string;
       verificationUri: string;
-    }>('desktop_auth_start');
-    text(
-      'desktop-login-status',
-      `Confirm code ${result.userCode} in your browser. ${result.verificationUri}`,
-    );
+    }>('desktop_auth_start', { server: origin });
+    text(status, `Confirm code ${result.userCode} in your browser. ${result.verificationUri}`);
     const deadline = Date.now() + 600000;
     const poll = async () => {
       if (attempt !== desktopLoginAttempt || Date.now() > deadline) return;
       try {
         const result = await window.__TAURI__!.core.invoke<{ pending?: boolean }>(
           'desktop_auth_poll',
+          { server: origin },
         );
         if (result.pending) {
           setTimeout(() => void poll(), 3500);
           return;
         }
-        await refreshSession();
-        el<HTMLDialogElement>('account-dialog').close();
+        if (!connected.includes(origin)) return;
+        await refreshSession(origin);
+        text(status, '');
+        if (origin === serverOrigin) el<HTMLDialogElement>('account-dialog').close();
         await directory();
-        toast('Desktop connected to your account.');
+        toast(
+          severalServers()
+            ? `Desktop connected to your account on ${serverHost(origin)}.`
+            : 'Desktop connected to your account.',
+        );
       } catch (error) {
         fail(error);
       }
     };
     setTimeout(() => void poll(), 3500);
   })().catch(fail);
+}
+el('desktop-login').onclick = () => {
+  if (desktop) desktopLogin(serverOrigin, 'desktop-login-status');
 };
 el('desktop-approve').onclick = () => {
   void api('auth/device/approve', 'POST', { userCode: el('desktop-approval-code').textContent })
@@ -5052,7 +5179,9 @@ el<HTMLFormElement>('account-form').onsubmit = (event) => {
     .catch((error) => text('account-error', error.message));
 };
 function accountHeading() {
-  text('account-button', session.user ? `@${session.user.username}` : 'Sign in');
+  // On a desktop connected to several servers, the account is the server in use's.
+  const where = severalServers() ? ` · ${serverHost(serverOrigin)}` : '';
+  text('account-button', (session.user ? `@${session.user.username}` : 'Sign in') + where);
   el('logout-button').hidden = !session.user;
   el('account-button').hidden = offlineHtml;
   // The desktop can only sign in through a reachable server connection.
@@ -5060,18 +5189,22 @@ function accountHeading() {
   el<HTMLButtonElement>('account-button').disabled = disconnected;
   el('account-button').title = disconnected ? 'Connect to a server to sign in' : '';
   el('server-button').hidden = !desktop;
+  text('server-button', severalServers() ? `Servers (${connected.length})` : 'Server connection');
 }
 el('logout-button').onclick = () => {
   if (comparison) stopComparison();
   if (!mayReplace()) return;
   void api('auth/logout', 'POST', {})
     .then(() => {
+      const user = session.user;
       session = { ...session, user: null, csrf: null };
-      // Signing out leaves no timeline windows in this browser.
+      // Signing out leaves no timeline windows in this browser (on a desktop, of this server).
       clearTimeout(persistTimer);
-      void windowStore.clear().catch(() => {});
+      if (!desktop) void windowStore.clear().catch(() => {});
+      else if (user) void windowStore.forget(storeScope(serverOrigin, user.id)).catch(() => {});
       desktopLoginAttempt++;
       accountHeading();
+      renderServers();
       el('timeline-list').replaceChildren();
       if (remote) {
         historyReplace();
@@ -5090,7 +5223,22 @@ el('logout-button').onclick = () => {
     .catch(fail);
 };
 const community = createCommunityUI({
-  api,
+  api: (path, method, data, origin) =>
+    desktop && origin
+      ? requestApi(path, method, data, sessionOf(origin).csrf, undefined, origin)
+      : api(path, method, data),
+  // A desktop lists the timelines of every server it is connected to.
+  sources: () =>
+    desktop
+      ? connected.map((origin) => ({
+          origin,
+          signedIn: !!sessionOf(origin).user,
+          reachable: sessionOf(origin).server,
+          inUse: origin === serverOrigin,
+        }))
+      : undefined,
+  chip: (origin) => (origin && severalServers() ? serverChip(origin) : null),
+  link: (id, origin) => timelineHash(id, origin ?? serverOrigin),
   user: () => session.user,
   server: () => session.server,
   guestCopies: () => !desktop && !offlineHtml,
@@ -5277,7 +5425,7 @@ el('publish-button').onclick = () => {
         if (selected) sparseWorkspace()!.load(selected);
         clearHistory();
       }
-      window.history.replaceState(null, '', `#timeline/${result.id}`);
+      window.history.replaceState(null, '', timelineHash(result.id));
       heading();
       await directory();
       toast('Timeline saved. It is ' + result.visibility + '.');
@@ -5354,57 +5502,164 @@ el<HTMLFormElement>('member-form').onsubmit = (event) => {
     })
     .catch((error) => text('sharing-error', error.message));
 };
+/** Keeps the open server timeline as an unsaved local copy, as its server goes. */
+async function keepAsLocal() {
+  if (comparison) stopComparison();
+  if (remote && (!model || sparseWorkspace())) {
+    try {
+      const snapshot = await api<{ document: TimelineDocument }>(`timelines/${remote.id}/document`);
+      model = new TimelineIndex(
+        validateDocument(sparseWorkspace()?.apply(snapshot.document) ?? snapshot.document),
+      );
+    } catch {
+      model = new TimelineIndex({
+        format: 'openchronology',
+        version: 1,
+        title: 'Untitled timeline',
+        description: 'A short description for your timeline',
+        events: [],
+      });
+      toast('The remote snapshot was unavailable. Open a local file or reconnect to view it.');
+    }
+  }
+  if (remote) {
+    remote = null;
+    dirty = true;
+    sqlitePath = null;
+    sqliteSavedVersion = null;
+    historyReplace();
+  }
+  documentRequest++;
+}
+/** Whether a timeline of the server in use is open, which keeps that server in use. */
+function serverTimelineOpen() {
+  return !!remote || !!comparison;
+}
+/** The desktop's connected servers, each with its sign-in and what can be done with it. */
+function renderServers() {
+  if (!desktop) return;
+  const list = el('server-list');
+  list.replaceChildren();
+  list.hidden = !connected.length;
+  const ordered = [serverOrigin, ...connected.filter((o) => o !== serverOrigin)].filter((o) =>
+    connected.includes(o),
+  );
+  for (const origin of ordered) {
+    const current = sessionOf(origin);
+    const row = document.createElement('div');
+    row.className = 'server-row';
+    row.dataset.server = origin;
+    const status = document.createElement('span');
+    status.className = 'server-status';
+    status.textContent =
+      (origin === serverOrigin ? 'In use · ' : '') +
+      (current.user
+        ? `@${current.user.username}`
+        : current.server
+          ? 'Not signed in'
+          : 'Not reachable');
+    row.append(serverChip(origin), status);
+    const action = (label: string, run: () => Promise<void>, disabled = '') => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = label;
+      button.dataset.action = label.toLowerCase().replace(/\s+/g, '-');
+      button.disabled = !!disabled;
+      button.title = disabled;
+      button.onclick = () => {
+        text('connection-error', '');
+        void run().catch((error) => text('connection-error', error.message));
+      };
+      row.append(button);
+    };
+    if (origin !== serverOrigin)
+      action(
+        'Use',
+        () => useConnected(origin),
+        serverTimelineOpen() ? 'A timeline from the server in use is open.' : '',
+      );
+    if (current.user) action('Sign out', () => signOutServer(origin));
+    else
+      action(
+        'Sign in',
+        async () => desktopLogin(origin, 'connection-status'),
+        current.server ? '' : 'This server could not be reached.',
+      );
+    action('Disconnect', () => disconnectServer(origin));
+    list.append(row);
+  }
+}
+async function nativeServers() {
+  connected = await window.__TAURI__!.core.invoke<string[]>('desktop_servers');
+}
+/** Uses another connected server: new timelines are saved there, and the account is its. */
+async function useConnected(origin: string) {
+  if (serverTimelineOpen()) return;
+  // Connecting again puts the server first, so the next start uses it too.
+  await window.__TAURI__!.core.invoke('desktop_connect', { origin });
+  await nativeServers();
+  useServer(origin);
+  accountHeading();
+  heading();
+  renderServers();
+  refreshDashboard();
+}
+/** Connects to one more server, keeping the others; it is used unless a timeline is open. */
+async function connectServer(address: string) {
+  await window.__TAURI__!.core.invoke('desktop_connect', { origin: address });
+  const origin = new URL(address).origin;
+  await nativeServers();
+  if (!serverTimelineOpen()) useServer(origin);
+  accountHeading();
+  heading();
+  renderServers();
+  input('server-origin').value = '';
+  try {
+    await refreshSession(origin);
+  } catch {
+    throw new Error(`${serverHost(origin)} could not be reached; it stays in the list.`);
+  }
+  await directory();
+}
+/** Disconnects from a server; its open timeline stays as an unsaved local copy. */
+async function disconnectServer(origin: string) {
+  if (origin === serverOrigin) await keepAsLocal();
+  desktopLoginAttempt++;
+  await window.__TAURI__!.core.invoke('desktop_disconnect', { origin });
+  await nativeServers();
+  sessions.delete(origin);
+  if (origin === serverOrigin) useServer(connected[0] ?? null);
+  accountHeading();
+  heading();
+  renderServers();
+  refreshDashboard();
+  await directory();
+}
+/** Signs out of a connected server; the others stay signed in. */
+async function signOutServer(origin: string) {
+  if (origin === serverOrigin) {
+    el('logout-button').click();
+    return;
+  }
+  const current = sessionOf(origin);
+  await requestApi('auth/logout', 'POST', {}, current.csrf, undefined, origin);
+  if (current.user) void windowStore.forget(storeScope(origin, current.user.id)).catch(() => {});
+  await refreshSession(origin);
+  await directory();
+}
 if (desktop) {
   el('server-button').onclick = () => {
     text('connection-error', '');
+    text('connection-status', '');
+    renderServers();
     el<HTMLDialogElement>('connection-dialog').showModal();
-  };
-  const connect = async (origin: string | null) => {
-    if (remote && (!model || sparseWorkspace())) {
-      try {
-        const snapshot = await api<{ document: TimelineDocument }>(
-          `timelines/${remote.id}/document`,
-        );
-        model = new TimelineIndex(
-          validateDocument(sparseWorkspace()?.apply(snapshot.document) ?? snapshot.document),
-        );
-      } catch {
-        model = new TimelineIndex({
-          format: 'openchronology',
-          version: 1,
-          title: 'Untitled timeline',
-          description: 'A short description for your timeline',
-          events: [],
-        });
-        toast('The remote snapshot was unavailable. Open a local file or reconnect to view it.');
-      }
-    }
-    if (remote) {
-      remote = null;
-      dirty = true;
-      sqlitePath = null;
-      sqliteSavedVersion = null;
-      historyReplace();
-    }
-    documentRequest++;
-    desktopLoginAttempt++;
-    await window.__TAURI__!.core.invoke('desktop_connect', { origin });
-    if (origin) serverOrigin = new URL(origin).origin;
-    session = { user: null, csrf: null, server: false };
-    el('timeline-list').replaceChildren();
-    accountHeading();
-    heading();
-    if (origin) await refreshSession();
-    el<HTMLDialogElement>('connection-dialog').close();
   };
   el<HTMLFormElement>('connection-form').onsubmit = (event) => {
     event.preventDefault();
-    void connect(input('server-origin').value).catch((error) =>
+    text('connection-error', '');
+    void connectServer(input('server-origin').value).catch((error) =>
       text('connection-error', error.message),
     );
-  };
-  el('server-disconnect').onclick = () => {
-    void connect(null).catch((error) => text('connection-error', error.message));
   };
   for (const id of ['sqlite-open', 'sqlite-save', 'sqlite-save-as']) el(id).hidden = false;
   const adoptNative = async (
@@ -5749,13 +6004,14 @@ requestRender();
 void (async () => {
   if (desktop) {
     try {
-      const origin = await window.__TAURI__!.core.invoke<string | null>('desktop_server');
-      if (origin) serverOrigin = origin;
-      input('server-origin').value = origin ?? 'https://timescale.info';
-      if (origin) {
-        await refreshSession();
-        if (session.user) await directory();
-      }
+      await nativeServers();
+      useServer(connected[0] ?? null);
+      input('server-origin').value = connected.length ? '' : 'https://timescale.info';
+      // Each server's sign-in, at once; one that cannot be reached leaves the others.
+      await Promise.all(connected.map((origin) => refreshSession(origin).catch(() => {})));
+      accountHeading();
+      heading();
+      await directory();
     } catch {
       /* The desktop keeps working with local files while disconnected. */
     }

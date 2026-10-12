@@ -358,6 +358,45 @@ label {
   margin-top: 5px;
   font-size: 11px;
 }
+/* The server a desktop item comes from, when several are connected; each its own hue. */
+.server-chip {
+  display: inline-block;
+  max-width: 18em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+  font-size: 10.5px;
+  line-height: 1.6;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid hsl(var(--server-hue, 110) 30% 78%);
+  background: hsl(var(--server-hue, 110) 45% 93%);
+  color: hsl(var(--server-hue, 110) 35% 26%);
+}
+.timeline-list button .server-chip,
+.library-plugin .server-chip {
+  margin: 0 0 5px;
+}
+.server-list {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 14px;
+}
+.server-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+.server-row .server-status {
+  flex: 1;
+  min-width: 8em;
+  color: var(--muted);
+  font-size: 12px;
+}
 .workspace-note {
   font-size: 11px;
   line-height: 1.8;

@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { MOMENT_ICONS } from '../dist/core.mjs';
 const origin = 'http://localhost:5173';
 const document = {
   format: 'openchronology',
@@ -148,32 +149,45 @@ export async function checkAccounts(browser) {
     await context.close();
   }
   // Mock only the native boundary: the actual frontend must route all cloud traffic through it.
+  // The native process keeps one connection per server, each with its own sign-in (#85).
   const desktop = await browser.newContext();
-  await desktop.addInitScript(() => {
+  await desktop.addInitScript((plugin) => {
     window.nativeCalls = [];
-    let user = null;
-    let origin = 'https://timescale.info';
+    let servers = ['https://timescale.info'];
+    const users = {};
     let serverDocument;
+    const second = 'https://second.example',
+      secondTimeline = '00000000-0000-0000-0000-000000000002';
     window.__TAURI__ = {
       core: {
         async invoke(command, args) {
           window.nativeCalls.push({ command, args });
-          if (command === 'desktop_server') return origin;
+          if (command === 'desktop_servers') return [...servers];
           if (command === 'desktop_connect') {
-            origin = args.origin;
-            user = null;
+            const origin = new URL(args.origin).origin;
+            servers = [origin, ...servers.filter((s) => s !== origin)];
             return;
           }
+          if (command === 'desktop_disconnect') {
+            servers = servers.filter((s) => s !== args.origin);
+            delete users[args.origin];
+            return;
+          }
+          if (!['desktop_save'].includes(command) && !servers.includes(args.server))
+            throw new Error('Connect to this server first');
           if (command === 'desktop_auth_start')
             return {
               userCode: 'ABCDEFGH23',
-              verificationUri: 'https://timescale.info/#desktop/ABCDEFGH23',
+              verificationUri: args.server + '/#desktop/ABCDEFGH23',
               expiresIn: 600,
               browserOpened: true,
             };
           if (command === 'desktop_auth_poll') {
-            user = { id: 'u', username: 'account' };
-            return { user, csrf: 'test-csrf' };
+            users[args.server] =
+              args.server === second
+                ? { id: 'v', username: 'elsewhere' }
+                : { id: 'u', username: 'account' };
+            return { user: users[args.server], csrf: 'test-csrf' };
           }
           if (command === 'desktop_save')
             return {
@@ -183,7 +197,19 @@ export async function checkAccounts(browser) {
               document: { ...args.document, events: [] },
             };
           if (command === 'desktop_request') {
-            const { path, method, data } = args;
+            const { server, path, method, data } = args;
+            const user = users[server] ?? null;
+            const metadata = (id, title) => ({
+              id,
+              title,
+              description: '',
+              revision: '1',
+              event_count: '0',
+              owner: user?.username,
+              visibility: 'private',
+              canEdit: true,
+              canShare: true,
+            });
             if (path === 'timelines' && method === 'POST') serverDocument = data;
             const body =
               path === 'session'
@@ -194,38 +220,86 @@ export async function checkAccounts(browser) {
                     providers: ['google', 'github', 'facebook'],
                     fileExchange: true,
                   }
-                : path === 'timelines' && method === 'GET'
-                  ? { timelines: [] }
-                  : path === 'timelines'
+                : path === 'auth/logout'
+                  ? ((users[server] = null), { ok: true })
+                  : path === 'timelines/search'
                     ? {
-                        id: '00000000-0000-0000-0000-000000000001',
-                        title: data.title,
-                        description: data.description,
-                        presentation: data.presentation,
-                        revision: '1',
-                        event_count: String(data.events.length),
-                        owner: 'account',
-                        visibility: 'private',
-                        canEdit: true,
-                        canShare: true,
+                        timelines:
+                          data.scope === 'mine' && user
+                            ? [
+                                {
+                                  id:
+                                    server === second
+                                      ? secondTimeline
+                                      : '00000000-0000-0000-0000-000000000001',
+                                  title:
+                                    server === second
+                                      ? 'Second server notes'
+                                      : 'First server notes',
+                                  description: '',
+                                  owner: user.username,
+                                  featured: false,
+                                  visibility: 'private',
+                                  event_count: '0',
+                                },
+                              ]
+                            : [],
+                        pages: data.scope === 'mine' && user ? 1 : 0,
+                        total: data.scope === 'mine' && user ? 1 : 0,
                       }
-                    : path.endsWith('/revision')
-                      ? { id: path.split('/')[1], revision: '1' }
-                      : path.endsWith('/document')
-                        ? { document: serverDocument }
-                        : path.endsWith('/query')
-                          ? { groups: [], visitedNodes: 0 }
-                          : path.endsWith('/members')
-                            ? { members: [] }
-                            : null;
-            if (!body) throw new Error('Unexpected native API ' + path);
+                    : path === 'plugins/search'
+                      ? { plugins: [plugin], total: 1, pages: 1, page: 1 }
+                      : path === 'timelines' && method === 'GET'
+                        ? {
+                            timelines:
+                              server === second && user
+                                ? [
+                                    {
+                                      id: secondTimeline,
+                                      title: 'Second server notes',
+                                      visibility: 'private',
+                                      role: 'owner',
+                                    },
+                                  ]
+                                : [],
+                          }
+                        : path === 'timelines'
+                          ? {
+                              ...metadata('00000000-0000-0000-0000-000000000001', data.title),
+                              description: data.description,
+                              presentation: data.presentation,
+                              event_count: String(data.events.length),
+                            }
+                          : path === 'timelines/' + secondTimeline && server === second
+                            ? metadata(secondTimeline, 'Second server notes')
+                            : path.endsWith('/revision')
+                              ? { id: path.split('/')[1], revision: '1' }
+                              : path.endsWith('/document')
+                                ? {
+                                    document:
+                                      server === second
+                                        ? {
+                                            format: 'openchronology',
+                                            version: 1,
+                                            title: 'Second server notes',
+                                            description: '',
+                                            events: [],
+                                          }
+                                        : serverDocument,
+                                  }
+                                : path.endsWith('/query')
+                                  ? { groups: [], visitedNodes: 0 }
+                                  : path.endsWith('/members')
+                                    ? { members: [] }
+                                    : null;
+            if (!body) throw new Error('Unexpected native API ' + server + ' ' + path);
             return { status: method === 'POST' ? 201 : 200, body };
           }
           throw new Error('Unexpected native command ' + command);
         },
       },
     };
-  });
+  }, MOMENT_ICONS);
   await desktop.route(origin + '/**', async (route) => {
     assert(
       !new URL(route.request().url()).pathname.startsWith('/api/'),
@@ -235,6 +309,14 @@ export async function checkAccounts(browser) {
   });
   const nativePage = await desktop.newPage();
   nativePage.on('pageerror', (error) => errors.push(error.message));
+  const requestsTo = (server) =>
+    nativePage.evaluate(
+      (server) =>
+        window.nativeCalls
+          .filter((c) => c.command === 'desktop_request' && c.args.server === server)
+          .map((c) => c.args.path),
+      server,
+    );
   try {
     await nativePage.goto(origin);
     await poll(() => nativePage.locator('#server-button').isVisible());
@@ -259,6 +341,8 @@ export async function checkAccounts(browser) {
     );
     await nativePage.locator('[data-close="sharing-dialog"]').click();
     await nativePage.locator('#sharing-dialog').waitFor({ state: 'hidden' });
+    // With one server, nothing says which server items come from.
+    assert(await nativePage.locator('#timeline-server').isHidden());
     await nativePage.locator('#timeline-title').fill('Edited locally and remotely');
     await nativePage.locator('#timeline-title').dispatchEvent('change');
     await nativePage.locator('#sqlite-save').click();
@@ -266,19 +350,110 @@ export async function checkAccounts(browser) {
       nativePage.evaluate(() => window.nativeCalls.some((c) => c.command === 'desktop_save')),
     );
     assert.equal(await nativePage.locator('#save-status').textContent(), 'Unsaved server changes');
+
+    // A second server, signed in to as well: the first keeps its sign-in.
     await nativePage.locator('#server-button').click();
-    assert.equal(await nativePage.locator('#server-origin').inputValue(), 'https://timescale.info');
-    await nativePage.locator('#server-disconnect').click();
-    await poll(async () => await nativePage.locator('#publish-button').isHidden());
+    const official = nativePage.locator('.server-row[data-server="https://timescale.info"]');
+    assert.match(await official.textContent(), /In use · @account/);
+    // The open timeline is the server in use's, so that one stays in use.
+    await nativePage.locator('#server-origin').fill('https://second.example');
+    await nativePage.locator('#connection-form [type="submit"]').click();
+    const secondRow = nativePage.locator('.server-row[data-server="https://second.example"]');
+    await poll(async () => /Not signed in/.test(await secondRow.textContent()));
+    assert(await secondRow.locator('[data-action="use"]').isDisabled());
+    await secondRow.locator('[data-action="sign-in"]').click();
+    await poll(async () => /@elsewhere/.test(await secondRow.textContent()));
+    assert.match(await official.textContent(), /In use · @account/);
     assert.equal(
-      await nativePage.locator('#timeline-title').inputValue(),
-      'Edited locally and remotely',
+      await nativePage.locator('#account-button').textContent(),
+      '@account · timescale.info',
     );
+    assert.equal(await nativePage.locator('#server-button').textContent(), 'Servers (2)');
+    assert.equal(await nativePage.locator('#timeline-server').textContent(), 'timescale.info');
+    await nativePage.locator('[data-close="connection-dialog"]').click();
+    // The dashboard lists the timelines of every server signed in to, each with its server.
+    // Replacing the edited timeline asks first.
+    nativePage.on('dialog', (dialog) => dialog.accept());
+    await nativePage.locator('#dashboard-home').click();
+    const mine = nativePage.locator('#dashboard-mine-list article');
+    await poll(async () => (await mine.count()) === 2);
+    const listed = mine.filter({ hasText: 'Second server notes' }),
+      first = mine.filter({ hasText: 'First server notes' });
+    assert.equal(await listed.locator('.server-chip').textContent(), 'second.example');
+    assert.equal(await first.locator('.server-chip').textContent(), 'timescale.info');
+    assert.equal(
+      await nativePage.locator('#dashboard-mine-status').textContent(),
+      '2 timelines · Page 1 of 1',
+    );
+    // Comparisons are of the server in use's timelines.
+    assert(await first.locator('input[type="checkbox"]').isEnabled());
+    assert(await listed.locator('input[type="checkbox"]').isDisabled());
+    // Opening one there uses that server: its requests go there, with its own sign-in.
+    await nativePage.evaluate(() => {
+      window.nativeCalls = [];
+    });
+    await listed.locator('a', { hasText: 'Second server notes' }).click();
+    await poll(
+      async () =>
+        (await nativePage.locator('#timeline-title').inputValue()) === 'Second server notes',
+    );
+    assert.match(
+      await nativePage.evaluate(() => location.hash),
+      /^#server\/https%3A%2F%2Fsecond\.example\/timeline\/00000000-0000-0000-0000-000000000002$/,
+    );
+    assert.equal(await nativePage.locator('#timeline-server').textContent(), 'second.example');
+    assert.equal(
+      await nativePage.locator('#account-button').textContent(),
+      '@elsewhere · second.example',
+    );
+    assert.deepEqual(await requestsTo('https://timescale.info'), []);
+    assert(
+      (await requestsTo('https://second.example')).includes(
+        'timelines/00000000-0000-0000-0000-000000000002',
+      ),
+    );
+    // Each server's plugin library, its plugins marked with their server.
+    await nativePage.locator('#plugins-button').click();
+    await nativePage.locator('#plugins-add').click();
+    const pluginServer = nativePage.locator('#plugin-server');
+    assert(await pluginServer.isVisible());
+    assert.equal(await pluginServer.inputValue(), 'https://second.example');
+    const chip = nativePage.locator('#plugin-library-results .server-chip');
+    await chip.waitFor();
+    assert.equal(await chip.textContent(), 'second.example');
+    await pluginServer.selectOption('https://timescale.info');
+    await poll(async () => (await chip.textContent()) === 'timescale.info');
+    assert((await requestsTo('https://timescale.info')).includes('plugins/search'));
+    await nativePage.locator('[data-close="plugin-library-dialog"]').click();
+    await nativePage.locator('[data-close="plugins-dialog"]').click();
+
+    // Signing out of one server leaves the other signed in.
+    await nativePage.locator('#server-button').click();
+    await official.locator('[data-action="sign-out"]').click();
+    await poll(async () => /Not signed in/.test(await official.textContent()));
+    assert.match(await secondRow.textContent(), /In use · @elsewhere/);
+    // Disconnecting the server in use keeps its timeline as a local copy and uses the other.
+    await secondRow.locator('[data-action="disconnect"]').click();
+    await poll(async () => (await nativePage.locator('.server-row').count()) === 1);
+    await poll(
+      async () =>
+        (await nativePage.evaluate(() => document.documentElement.dataset.storage)) === 'memory',
+    );
+    assert.equal(await nativePage.locator('#timeline-title').inputValue(), 'Second server notes');
+    assert.equal(await nativePage.locator('#server-button').textContent(), 'Server connection');
+    assert.equal(await nativePage.locator('#account-button').textContent(), 'Sign in');
+    assert(await nativePage.locator('#timeline-server').isHidden());
+    assert.equal(await nativePage.locator('#timeline-list .server-chip').count(), 0);
+    // And with none left, local files go on working.
+    await official.locator('[data-action="disconnect"]').click();
+    await poll(async () => await nativePage.locator('#publish-button').isHidden());
+    assert.equal(await nativePage.locator('#timeline-title').inputValue(), 'Second server notes');
+    assert(await nativePage.locator('#account-button').isDisabled());
     assert.deepEqual(errors, []);
   } finally {
     await desktop.close();
   }
   console.log(
-    'PASS account UI: providers, CSRF, revocation, server-mediated .och exchange, native sign-in/transport and independent local/cloud saves.',
+    'PASS account UI: providers, CSRF, revocation, server-mediated .och exchange, native sign-in/transport, independent local/cloud saves, and several servers signed in at once with their items marked.',
   );
 }

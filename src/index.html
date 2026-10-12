@@ -221,7 +221,8 @@ Every point has a place. Explore the spaces between them.</textarea>
             <div id="platform-timeline-actions"></div>
           </div>
           <div class="document-meta">
-            <span id="event-count">10 events</span><span class="meta-separator">·</span
+            <span id="timeline-server" class="server-chip" hidden></span
+            ><span id="event-count">10 events</span><span class="meta-separator">·</span
             ><span id="save-status">A local draft, ready to explore</span>
           </div>
         </section>
@@ -659,6 +660,7 @@ Every point has a place. Explore the spaces between them.</textarea>
         <button data-close="plugin-library-dialog" aria-label="Close plugin library">×</button>
       </div>
       <button id="plugin-library-custom">Custom…</button>
+      <label hidden>Library of<select id="plugin-server"></select></label>
       <label
         >Sort plugins<select id="plugin-sort">
           <option value="popularity">By popularity</option>
@@ -871,11 +873,12 @@ Every point has a place. Explore the spaces between them.</textarea>
     <dialog id="connection-dialog">
       <form id="connection-form">
         <div class="dialog-heading">
-          <h2>Server connection</h2>
+          <h2>Servers</h2>
           <button type="button" data-close="connection-dialog">×</button>
         </div>
+        <div id="server-list" class="server-list"></div>
         <label
-          >Server address<input
+          >Connect to a server<input
             id="server-origin"
             type="url"
             value="https://timescale.info"
@@ -883,13 +886,14 @@ Every point has a place. Explore the spaces between them.</textarea>
             spellcheck="false"
         /></label>
         <p class="field-hint">
-          The official server is https://timescale.info. You can connect to your own HTTPS server.
-          Local .och files work without a connection.
+          The official server is https://timescale.info. You can connect to your own HTTPS servers
+          too, and sign in to several at once: your timelines from each are listed together. Local
+          .och files work without a connection.
         </p>
+        <p id="connection-status" class="field-hint" role="status"></p>
         <div id="connection-error" class="form-error" role="alert"></div>
         <div class="dialog-actions">
-          <button type="button" id="server-disconnect">Disconnect</button
-          ><button type="submit" class="button-primary">Connect</button>
+          <button type="submit" class="button-primary">Connect</button>
         </div>
       </form>
     </dialog>
