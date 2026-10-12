@@ -17,8 +17,23 @@ interface Proposal {
   canClose: boolean;
   upstreamRevision: string;
 }
+/** A server whose timelines the dashboard lists; null is the only one (in a browser). */
+interface Source {
+  origin: string | null;
+  signedIn: boolean;
+  reachable: boolean;
+  /** The server in use, whose timelines can be compared and whose account is shown. */
+  inUse: boolean;
+}
 interface Host {
-  api<T>(path: string, method?: string, body?: unknown): Promise<T>;
+  /** A request to the server in use, or to another connected server. */
+  api<T>(path: string, method?: string, body?: unknown, origin?: string | null): Promise<T>;
+  /** The servers listed: a desktop's connected servers, or this one. */
+  sources?(): Source[] | undefined;
+  /** What marks a timeline's server, when several are listed. */
+  chip?(origin: string | null): HTMLElement | null;
+  /** The editor's address of a timeline on a server. */
+  link?(id: string, origin: string | null): string;
   user(): { id: string; username: string } | null;
   server(): boolean;
   guestCopies?(): boolean;
@@ -72,6 +87,10 @@ export function createCommunityUI(host: Host) {
     compareSelection();
   };
   const error = (id: string, e: unknown) => text(id, e instanceof Error ? e.message : String(e));
+  const sources = (): Source[] =>
+    host.sources?.() ?? [
+      { origin: null, signedIn: !!host.user(), reachable: host.server(), inUse: true },
+    ];
   async function search(scope: 'mine' | 'public' | 'starred') {
     const page = scope === 'mine' ? minePage : scope === 'starred' ? favoritePage : browserPage,
       id =
@@ -84,39 +103,65 @@ export function createCommunityUI(host: Host) {
     el(id + '-list').replaceChildren();
     text(id + '-status', 'Loading…');
     text('dashboard-error', '');
-    const response = await host.api<{
-      timelines: {
-        id: string;
-        title: string;
-        description: string;
-        owner: string;
-        tags?: string[];
-        featured: boolean;
-        visibility: string;
-        event_count: string;
-        star_count?: string;
-        starred?: boolean;
-      }[];
-      pages: number;
-      total: number;
-    }>('timelines/search', 'POST', {
-      scope,
-      page,
-      limit: 12,
-      sort: scope === 'public' ? el<HTMLSelectElement>('dashboard-sort').value : 'age',
-      search: scope !== 'public' ? '' : el<HTMLInputElement>('dashboard-search').value,
-      tag: scope !== 'public' ? '' : el<HTMLInputElement>('dashboard-tag').value,
-    });
+    type Listed = {
+      id: string;
+      title: string;
+      description: string;
+      owner: string;
+      tags?: string[];
+      featured: boolean;
+      visibility: string;
+      event_count: string;
+      star_count?: string;
+      starred?: boolean;
+    };
+    // Each server listed is searched; their pages are shown together, a server at a time.
+    const listed = sources().filter((s) => (scope === 'public' ? s.reachable : s.signedIn));
+    const results = await Promise.allSettled(
+      listed.map((source) =>
+        host.api<{ timelines: Listed[]; pages: number; total: number }>(
+          'timelines/search',
+          'POST',
+          {
+            scope,
+            page,
+            limit: 12,
+            sort: scope === 'public' ? el<HTMLSelectElement>('dashboard-sort').value : 'age',
+            search: scope !== 'public' ? '' : el<HTMLInputElement>('dashboard-search').value,
+            tag: scope !== 'public' ? '' : el<HTMLInputElement>('dashboard-tag').value,
+          },
+          source.origin,
+        ),
+      ),
+    );
     if (epoch !== request) return;
+    const failed = results.find((r) => r.status === 'rejected');
+    if (failed && results.every((r) => r.status === 'rejected')) throw failed.reason;
+    if (failed) error('dashboard-error', failed.reason);
+    const response = { timelines: [] as (Listed & { source: Source })[], pages: 0, total: 0 };
+    results.forEach((result, n) => {
+      if (result.status !== 'fulfilled') return;
+      response.timelines.push(...result.value.timelines.map((t) => ({ ...t, source: listed[n] })));
+      response.pages = Math.max(response.pages, result.value.pages);
+      response.total += result.value.total;
+    });
     for (const t of response.timelines) {
       const card = document.createElement('article');
       card.className = 'dashboard-timeline';
+      const chip = host.chip?.(t.source.origin);
+      if (chip) card.append(chip);
       const label = document.createElement('label'),
         checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.dataset.compareId = t.id;
       checkbox.checked = compared.has(t.id);
       checkbox.disabled = compared.size >= 8 && !checkbox.checked;
+      // Comparisons are of one server's timelines: the server in use's.
+      if (!t.source.inUse) {
+        checkbox.disabled = true;
+        checkbox.removeAttribute('data-compare-id');
+        label.title = 'Use this timeline’s server to compare its timelines.';
+      }
       checkbox.onchange = () => {
         if (checkbox.checked && compared.size < 8) compared.add(t.id);
         else compared.delete(t.id);
@@ -125,7 +170,7 @@ export function createCommunityUI(host: Host) {
       label.append(checkbox, document.createTextNode('Compare'));
       card.append(label);
       const link = document.createElement('a');
-      link.href = '#timeline/' + t.id;
+      link.href = host.link?.(t.id, t.source.origin) ?? '#timeline/' + t.id;
       link.textContent = t.title || 'Untitled timeline';
       const details = paragraph(
         '@' +
@@ -142,17 +187,20 @@ export function createCommunityUI(host: Host) {
       const star = button(`${t.starred ? '★ Starred' : '☆ Star'} · ${t.star_count ?? '0'}`, () => {
         star.disabled = true;
         void host
-          .api<{ starred: boolean; star_count: string }>(`timelines/${t.id}/star`, 'POST', {
-            starred: !t.starred,
-          })
+          .api<{ starred: boolean; star_count: string }>(
+            `timelines/${t.id}/star`,
+            'POST',
+            { starred: !t.starred },
+            t.source.origin,
+          )
           .then(() => dashboard())
           .catch((e) => {
             error('dashboard-error', e);
             star.disabled = false;
           });
       });
-      star.disabled = !host.user();
-      star.title = host.user() ? 'Toggle favorite' : 'Sign in to star timelines';
+      star.disabled = !t.source.signedIn;
+      star.title = t.source.signedIn ? 'Toggle favorite' : 'Sign in to star timelines';
       star.setAttribute('aria-pressed', String(!!t.starred));
       card.append(star);
       if (!host.user() && (host.guestCopies?.() ?? true) && t.visibility === 'public') {
@@ -197,11 +245,12 @@ export function createCommunityUI(host: Host) {
   }
   async function dashboard() {
     request++;
-    el('dashboard-mine').hidden = !host.user();
-    el('dashboard-favorites').hidden = !host.user();
-    el('dashboard-signin').hidden = !!host.user();
+    const signedIn = sources().some((s) => s.signedIn);
+    el('dashboard-mine').hidden = !signedIn;
+    el('dashboard-favorites').hidden = !signedIn;
+    el('dashboard-signin').hidden = signedIn;
     text('dashboard-error', '');
-    if (!host.server()) {
+    if (!sources().some((s) => s.reachable)) {
       text(
         'dashboard-browser-status',
         'The server is unavailable. You can create, import and edit a local timeline.',
@@ -210,7 +259,7 @@ export function createCommunityUI(host: Host) {
     }
     const results = await Promise.allSettled([
       search('public'),
-      ...(host.user() ? [search('mine'), search('starred')] : []),
+      ...(signedIn ? [search('mine'), search('starred')] : []),
     ]);
     for (const result of results)
       if (result.status === 'rejected') error('dashboard-error', result.reason);

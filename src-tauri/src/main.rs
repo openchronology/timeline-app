@@ -13,46 +13,64 @@ fn desktop_open_image(url: String) -> Result<(), String> {
     server::open_image(&url)
 }
 #[tauri::command]
-fn desktop_server(state: tauri::State<'_, server::Server>) -> Result<Option<String>, String> {
-    state.configured()
+fn desktop_servers(state: tauri::State<'_, server::Server>) -> Result<Vec<String>, String> {
+    state.servers()
+}
+/** Remembers the connected servers (not their sign-ins) for the next start. */
+fn remember_servers(app: &tauri::AppHandle, state: &server::Server) -> Result<(), String> {
+    let directory = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    std::fs::write(
+        directory.join("servers.json"),
+        serde_json::to_vec(&state.servers()?).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())
 }
 #[tauri::command]
 fn desktop_connect(
     app: tauri::AppHandle,
     state: tauri::State<'_, server::Server>,
-    origin: Option<String>,
+    origin: String,
 ) -> Result<(), String> {
-    state.configure(origin)?;
-    let directory = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-    std::fs::write(
-        directory.join("server.json"),
-        serde_json::to_vec(&state.configured()?).map_err(|e| e.to_string())?,
-    )
-    .map_err(|e| e.to_string())
+    state.connect(&origin)?;
+    remember_servers(&app, &state)
+}
+#[tauri::command]
+fn desktop_disconnect(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, server::Server>,
+    origin: String,
+) -> Result<(), String> {
+    state.disconnect(&origin)?;
+    remember_servers(&app, &state)
 }
 #[tauri::command]
 async fn desktop_request(
     state: tauri::State<'_, server::Server>,
+    server: String,
     path: String,
     method: String,
     data: Option<serde_json::Value>,
     csrf: Option<String>,
     challenge: Option<String>,
 ) -> Result<server::Reply, String> {
-    state.request(&path, &method, data, csrf, challenge).await
+    state
+        .request(&server, &path, &method, data, csrf, challenge)
+        .await
 }
 #[tauri::command]
 async fn desktop_auth_start(
     state: tauri::State<'_, server::Server>,
+    server: String,
 ) -> Result<serde_json::Value, String> {
-    state.start_login().await
+    state.start_login(&server).await
 }
 #[tauri::command]
 async fn desktop_auth_poll(
     state: tauri::State<'_, server::Server>,
+    server: String,
 ) -> Result<serde_json::Value, String> {
-    state.poll_login().await
+    state.poll_login(&server).await
 }
 #[derive(serde::Serialize)]
 struct Opened {
@@ -306,12 +324,28 @@ fn main() {
         .manage(Mutex::new(Files::default()))
         .manage(server::Server::new().expect("Invalid server configuration"))
         .setup(|app| {
-            if let Ok(directory) = app.path().app_config_dir() {
-                if let Ok(bytes) = std::fs::read(directory.join("server.json")) {
-                    if let Ok(origin) = serde_json::from_slice::<Option<String>>(&bytes) {
-                        let _ = app.state::<server::Server>().configure(origin);
-                    }
-                }
+            // The servers connected last time; before several, the one server (or none).
+            let directory = app.path().app_config_dir().ok();
+            let read = |name: &str| {
+                directory
+                    .as_ref()
+                    .and_then(|d| std::fs::read(d.join(name)).ok())
+            };
+            let servers = match read("servers.json") {
+                Some(bytes) => serde_json::from_slice::<Vec<String>>(&bytes).unwrap_or_default(),
+                None => match read("server.json") {
+                    Some(bytes) => serde_json::from_slice::<Option<String>>(&bytes)
+                        .ok()
+                        .flatten()
+                        .into_iter()
+                        .collect(),
+                    None => vec![server::Server::default_origin().to_owned()],
+                },
+            };
+            let state = app.state::<server::Server>();
+            // Connecting puts a server first, so the one in use is connected last.
+            for origin in servers.iter().take(server::SERVERS).rev() {
+                let _ = state.connect(origin);
             }
             Ok(())
         })
@@ -324,8 +358,9 @@ fn main() {
             desktop_query,
             desktop_document,
             desktop_save,
-            desktop_server,
+            desktop_servers,
             desktop_connect,
+            desktop_disconnect,
             desktop_request,
             desktop_auth_start,
             desktop_auth_poll
