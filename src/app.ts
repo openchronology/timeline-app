@@ -554,7 +554,9 @@ function clearGroupPage() {
 }
 type EventEdit = { before?: PointEvent; after?: PointEvent };
 type LinkEdit = { link: Relationship; related: boolean };
-type HistoryEntry = EventEdit | DurationEdit | LinkEdit;
+/** Several edits undone and redone as one, such as deleting everything in a view. */
+type GroupEdit = { group: (EventEdit | DurationEdit)[] };
+type HistoryEntry = EventEdit | DurationEdit | LinkEdit | GroupEdit;
 let history: HistoryEntry[] = [],
   future: HistoryEntry[] = [],
   frameRequest = 0,
@@ -3722,6 +3724,9 @@ function showTimelineMenu(
     add('View events', () => {
       void selectGroup(group).catch(fail);
     });
+  // Only when the view shows something to delete.
+  if (rangeDeletable() && (frame.groups.length || frame.durations?.length))
+    add('Delete everything in this view…', requestRangeDelete);
   if (shareable())
     add('Share this view', () =>
       requestShare({ kind: 'view', left: viewport.left, right: viewport.right }, remote!.title),
@@ -4556,12 +4561,112 @@ el('delete-confirm').onclick = () => {
 function historyEntities() {
   const moments = new Set<string>(),
     durations = new Set<string>();
-  for (const entry of [...history, ...future]) {
+  for (const entry of [...history, ...future].flatMap((e) => ('group' in e ? e.group : [e]))) {
     if ('link' in entry) continue;
     const id = (entry.before ?? entry.after)?.id;
     if (id) ('duration' in entry ? durations : moments).add(id);
   }
   return { moments, durations };
+}
+/**
+ * Whether everything in the view can be deleted at once: a timeline in this page (undoable),
+ * or a server timeline this account writes (on the server, at once). Not a desktop file.
+ */
+function rangeDeletable(): boolean {
+  if (comparison || !editable()) return false;
+  if (!sparseWorkspace()) return true;
+  return !!remote && !local && !!remote.canWrite;
+}
+/** Asks, then deletes every moment in the view and the durations wholly inside it (#91). */
+function requestRangeDelete() {
+  if (!rangeDeletable() || !model) return;
+  closeTimelineMenu();
+  const lower = viewport.left,
+    upper = viewport.right,
+    request = documentRequest;
+  const between = `between ${presented(lower, 'input')} and ${presented(upper, 'input')}`;
+  const durations = (index: TimelineIndex) =>
+    [...index.durations.values()].filter((duration) => {
+      const band = resolveDuration(duration, (id) => index.momentTime(id));
+      return (
+        !!band && Q.parse(band.first).compare(lower) >= 0 && Q.parse(band.last).compare(upper) <= 0
+      );
+    });
+  if (!sparseWorkspace()) {
+    const count = model.points.countRange(lower, upper, { includeUpper: true });
+    const spans = durations(model);
+    text('delete-heading', 'Delete everything in this view?');
+    text('delete-confirm', 'Delete them');
+    text(
+      'delete-description',
+      count || spans.length
+        ? `Delete ${count.toLocaleString()} ${count === 1n ? 'moment' : 'moments'} and ${spans.length.toLocaleString()} ${spans.length === 1 ? 'duration' : 'durations'} ${between}? Durations that follow a deleted moment keep its time. You can undo this.`
+        : `Nothing to delete ${between}.`,
+    );
+    pendingDelete = {
+      id: '',
+      document: request,
+      remove: () => {
+        if (!model || request !== documentRequest) return;
+        const group: GroupEdit['group'] = [];
+        for (const [, bucket] of [...model.points.range(lower, upper, { includeUpper: true })])
+          for (const point of bucket) {
+            group.push({ before: point });
+            model.delete(point.id);
+          }
+        for (const duration of spans) {
+          group.push({ duration: true, before: duration });
+          model.deleteDuration(duration.id);
+        }
+        if (!group.length) return;
+        record({ group });
+        selected = null;
+        selectedGroup = null;
+        el('event-form').hidden = true;
+        el<HTMLDialogElement>('inspector').close();
+        changed();
+        toast(
+          `Deleted ${group.length.toLocaleString()} moments and durations. Undo restores them.`,
+        );
+      },
+    };
+  } else {
+    // On the server: the deletion is saved there at once, as a revision of its own.
+    if (dirty) {
+      toast('Save your changes first: deleting on the server saves at once.');
+      return;
+    }
+    const id = remote!.id,
+      revision = remote!.revision;
+    text('delete-heading', 'Delete everything in this view?');
+    text('delete-confirm', 'Delete on the server');
+    text(
+      'delete-description',
+      `Delete every moment ${between}, and the durations wholly inside that range? This is saved on the server at once and cannot be undone here; the timeline's history keeps the version before it.`,
+    );
+    pendingDelete = {
+      id: '',
+      document: request,
+      remove: () =>
+        void (async () => {
+          const result = await api<{ removed: { moments: number; durations: number } }>(
+            `timelines/${id}/delete-range`,
+            'POST',
+            { revision, lower: lower.toString(), upper: upper.toString() },
+          );
+          if (remote?.id !== id || request !== documentRequest) return;
+          const view = viewport.clone();
+          await openRemote(id);
+          viewport = view;
+          requestRender();
+          toast(
+            `Deleted ${result.removed.moments.toLocaleString()} moments and ${result.removed.durations.toLocaleString()} durations.`,
+          );
+        })().catch(fail),
+    };
+  }
+  el<HTMLDialogElement>('delete-dialog').showModal();
+  el('delete-cancel').focus();
 }
 /** Records a new edit; any redoable edits branch away and are discarded. */
 function record(edit: HistoryEntry) {
@@ -4586,21 +4691,26 @@ function applyEdit(redo: boolean) {
   previewing = false;
   const edit = (redo ? future : history).pop();
   if (!edit || !model) return;
-  if ('link' in edit) {
-    // Undo applies the opposite of the recorded state; redo reapplies it.
-    if (edit.related === redo) model.relate(edit.link.a, edit.link.b);
-    else model.unrelate(edit.link.a, edit.link.b);
-    el<HTMLDialogElement>('duration-dialog').close();
-  } else if ('duration' in edit) {
-    const [from, to] = redo ? [edit.before, edit.after] : [edit.after, edit.before];
-    if (to) model.putDuration(to);
-    else if (from) model.deleteDuration(from.id);
-    el<HTMLDialogElement>('duration-dialog').close();
-  } else {
-    const [from, to] = redo ? [edit.before, edit.after] : [edit.after, edit.before];
-    if (from) model.delete(from.id);
-    if (to) model.put(to);
-  }
+  const index = model;
+  const apply = (edit: Exclude<HistoryEntry, GroupEdit>) => {
+    if ('link' in edit) {
+      // Undo applies the opposite of the recorded state; redo reapplies it.
+      if (edit.related === redo) index.relate(edit.link.a, edit.link.b);
+      else index.unrelate(edit.link.a, edit.link.b);
+      el<HTMLDialogElement>('duration-dialog').close();
+    } else if ('duration' in edit) {
+      const [from, to] = redo ? [edit.before, edit.after] : [edit.after, edit.before];
+      if (to) index.putDuration(to);
+      else if (from) index.deleteDuration(from.id);
+      el<HTMLDialogElement>('duration-dialog').close();
+    } else {
+      const [from, to] = redo ? [edit.before, edit.after] : [edit.after, edit.before];
+      if (from) index.delete(from.id);
+      if (to) index.put(to);
+    }
+  };
+  if ('group' in edit) for (const one of redo ? edit.group : [...edit.group].reverse()) apply(one);
+  else apply(edit);
   (redo ? history : future).push(edit);
   selected = null;
   selectedGroup = null;

@@ -216,6 +216,8 @@ after the stack starts, or `npm run seed` / `pnpm seed` / `yarn seed` with a mig
 PostgreSQL database. See [seeding instructions](docs/seeding.md) for the six
 featured timelines, source/date conventions, and secure management access.
 
+Timelines that keep growing, such as log timelines, can [keep only their last year, month or week](docs/retention.md): the server expires older moments and history on a schedule, freeing storage, and **Delete everything in this view…** clears a stretch of time at once.
+
 Public timelines, and the moments and durations in them, can be [shared](docs/sharing.md): every moment, duration, search and view has a link, **Share** offers the link, social sites and an embed code, link previews show a card with a picture of the timeline, and other sites can embed a timeline (or discover it through oEmbed). Search engines get a sitemap and a text version of each public timeline.
 
 The dashboard and editor support [read-only comparison and live viewing](docs/comparison.md):

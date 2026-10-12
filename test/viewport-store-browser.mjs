@@ -174,8 +174,11 @@ export async function checkViewportStore(browser) {
       }, hidden);
     await visibility(true);
     await visibility(false);
-    await bounds(page, '20000', '22000');
-    await page.waitForFunction(() => document.getElementById('loading-window').hidden);
+    // Hiding again stores what the page holds then, without adding windows (a new view would,
+    // and the cache's limit may then fairly let go of the farthest): every window it took back.
+    await page.waitForTimeout(1000);
+    await visibility(true);
+    await visibility(false);
     keys = await settled(page);
     assert(
       keys.some((key) => key.endsWith('\u0001-5/1\u000125/1')),

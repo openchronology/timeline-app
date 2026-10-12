@@ -7,6 +7,7 @@ import { createRequestHandler } from './http.mjs';
 import { Challenges } from './challenge.mjs';
 import { Auth } from './auth.mjs';
 import { PostgresStore } from './store.mjs';
+import { startRetention } from './retention.mjs';
 import { providersFromEnv } from './oauth.mjs';
 import { compareLimits, defaultQuota, LimitError } from './limits.mjs';
 import { applyEnvironmentQuota } from './administration.mjs';
@@ -98,6 +99,8 @@ async function initialize() {
   const store = pool ? new PostgresStore(pool, { compareLimits: limits }) : null;
   // Catalogue text left stale by an interrupted refresh catches up in the background.
   store?.refreshStale().catch((error) => console.error('Catalogue text refresh failed:', error));
+  // Timelines that keep only their last months or years expire older data on a schedule.
+  if (store) startRetention(store);
   return {
     ...options,
     auth: pool ? new Auth(pool, origin) : null,

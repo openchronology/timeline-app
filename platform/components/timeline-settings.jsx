@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { dismissOnBackdrop } from '../../src/dialogs.ts';
 import { api } from '../lib/api.js';
-export default function TimelineSettings({ initial, initialMembers }) {
+export default function TimelineSettings({ initial, initialMembers, calendar = false }) {
   const router = useRouter(),
     dialog = useRef(null),
     [timeline, setTimeline] = useState(initial),
@@ -75,6 +75,60 @@ export default function TimelineSettings({ initial, initialMembers }) {
         <p className="muted">
           Forks have independent owners and collaborators. Revoking access stops future upstream
           reads and syncs, but cannot erase copies already made.
+        </p>
+      </section>
+      <section>
+        <h2>Data retention</h2>
+        {calendar ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void mutate('/settings', 'PATCH', {
+                retention: new FormData(e.currentTarget).get('retention'),
+              });
+            }}
+          >
+            <label>
+              Keep only the last
+              <input
+                name="retention"
+                key={timeline.retention ?? ''}
+                defaultValue={timeline.retention ?? ''}
+                placeholder="for example 1 year or 90 days"
+                maxLength={200}
+                required
+              />
+            </label>
+            <button disabled={busy}>Keep only this period</button>
+            {timeline.retention && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => mutate('/settings', 'PATCH', { retention: null })}
+              >
+                Keep everything
+              </button>
+            )}
+          </form>
+        ) : (
+          <p className="muted">
+            Only timelines shown as a calendar (Gregorian time display) can keep a period: the
+            server needs to know what time it is in them.
+          </p>
+        )}
+        <p className="muted">
+          About once an hour the server deletes moments and durations older than this, and the saved
+          history from before then, apart from what forks, pull requests and newer history still
+          need. That frees storage; deleted data cannot be restored.
+          {timeline.retention && timeline.retention_applied_at && (
+            <>
+              {' '}
+              Last applied {new Date(timeline.retention_applied_at).toLocaleString()}
+              {timeline.retention_removed != null &&
+                `, deleting ${Number(timeline.retention_removed).toLocaleString()} moments and durations`}
+              .
+            </>
+          )}
         </p>
       </section>
       <section>

@@ -150,6 +150,8 @@ try {
   await guest.request(base, { status: 404 });
   await guest.request(api + '/document', { status: 404 });
   await contributor.request(base + '/settings', { status: 404 });
+  // Owners see data retention, which needs a calendar display (this timeline has none).
+  assert.match(await owner.request(base + '/settings'), /Data retention[\s\S]*shown as a calendar/);
   // Private forking is explicitly owner-authorized; a copied timeline remains private.
   const contributorName = 'nextcontrib_' + suffix;
   await owner.request(api + '/members', {
