@@ -201,7 +201,7 @@ let model: TimelineIndex | null = new TimelineIndex(
   ),
   viewport = Viewport.fit(model.points.minKey(), model.points.maxKey());
 /** This device's recent measurements for the open timeline (see capacity.ts). */
-let capacity: Measurements = { redraws: [], edits: [], views: [] },
+let capacity: Measurements = { navigation: [], edits: [], views: [] },
   capacityKey = '',
   openStarted: number | null = null,
   pendingOpenStart: number | null = null;
@@ -744,6 +744,37 @@ async function completeDocument(): Promise<TimelineDocument> {
     new Map(index!.relationshipChanges),
   );
 }
+/**
+ * Runs once the frame being drawn is painted. Called while drawing (in requestAnimationFrame):
+ * a message posted there is handled after the frame renders, as the UI benchmarks' probe
+ * times it. Waiting for a later frame would count that frame's drawing too.
+ */
+const paints = new MessageChannel(),
+  painted: (() => void)[] = [];
+paints.port1.onmessage = () => painted.shift()?.();
+function afterPaint(run: () => void) {
+  painted.push(run);
+  paints.port2.postMessage(0);
+}
+/**
+ * The latest input that may move the view (wheel, drag, touch, key or click), by its event
+ * time, until a view is drawn: the advice measures how long users wait for their views.
+ */
+let navigationInput: number | null = null,
+  drawnView = '';
+const viewKey = () =>
+  `${viewport.left.toString()}|${viewport.span.toString()}|${uiScale}|${verticalOffset}`;
+for (const type of ['wheel', 'pointermove', 'touchmove', 'keydown', 'click'] as const)
+  document.addEventListener(
+    type,
+    (event) => {
+      if (!event.isTrusted) return;
+      // Pointer moves count while dragging.
+      if (type === 'pointermove' && !(event as PointerEvent).buttons) return;
+      navigationInput = event.timeStamp;
+    },
+    { capture: true, passive: true },
+  );
 let pendingFrameRefresh = false;
 function requestRender(refreshFrame = true) {
   pendingFrameRefresh ||= refreshFrame;
@@ -963,6 +994,8 @@ function renderAxis() {
     }
 }
 function drawFrame() {
+  // The view these markers show, for the UI benchmarks to time what users wait for.
+  el('markers').dataset.view = `${viewport.left.toString()} ${viewport.right.toString()}`;
   renderEdgeArcs();
   renderDurationBands();
   const cursor = el('time-cursor');
@@ -1260,19 +1293,33 @@ function render(refreshFrame = true) {
     renderedUiScale = uiScale;
   }
   if (model && !sparseWorkspace()) {
-    const started = performance.now();
     if (refreshFrame) frame = model.frame(viewport, width(), pixels());
     el('loading-window').hidden = true;
     drawFrame();
-    // The first draw after opening ends the open measurement; later full redraws are samples.
+    // Opening is measured until its first view is painted; then each new view from a
+    // navigation input, from that input until the view is painted.
+    const view = viewKey();
     if (openStarted !== null) {
-      capacity.open = performance.now() - openStarted;
+      const started = openStarted;
       openStarted = null;
-      updateCapacity();
-    } else if (refreshFrame) {
-      recordSample(capacity.redraws, performance.now() - started);
-      updateCapacity();
+      afterPaint(() => {
+        capacity.open = performance.now() - started;
+        updateCapacity();
+      });
+    } else if (navigationInput !== null && view !== drawnView) {
+      // An input's view may come frames later (zooming animates): it counts once drawn.
+      const input = navigationInput;
+      navigationInput = null;
+      afterPaint(() => {
+        const wait = performance.now() - input;
+        // A page hidden meanwhile was not painted, and a view seconds after the last input
+        // did not come from it (following the latest moments, say): neither is a wait.
+        if (document.hidden || wait > 5000) return;
+        recordSample(capacity.navigation, wait);
+        updateCapacity();
+      });
     }
+    drawnView = view;
   } else if (remote || local) {
     const source = local ?? remote!;
     const key = cacheKey(source);
@@ -1773,7 +1820,7 @@ function updateCapacity() {
   const key = capacityTimeline();
   if (key !== capacityKey) {
     capacityKey = key;
-    capacity = { redraws: [], edits: [], views: [] };
+    capacity = { navigation: [], edits: [], views: [] };
   }
   const advice = platform
     ? advise(platform, capacity, {
@@ -1833,7 +1880,7 @@ function capacityMessage(advice: Advice): string {
       : 'Large timelines are faster in the desktop app.';
   const cause = {
     open: `This timeline took ${seconds(capacity.open ?? 0)} to open in this browser.`,
-    redraw: `Redrawing this timeline takes about ${Math.round(capacity.redraws.at(-1) ?? 0)} ms in this browser.`,
+    navigation: `Zooming and panning this timeline take about ${Math.round(capacity.navigation.at(-1) ?? 0)} ms to show in this browser.`,
     edit: `Keeping a draft of this timeline in this browser takes about ${Math.round(capacity.edits.at(-1) ?? 0)} ms after each change.`,
     size: `This timeline has ${momentCount().toLocaleString()} moments, which is a lot to edit in a browser.`,
   }[advice.reason];
@@ -2258,7 +2305,7 @@ function loadDocument(doc: TimelineDocument) {
   // Imports start timing when the file is read; other opens start here, before indexing.
   openStarted = pendingOpenStart ?? performance.now();
   pendingOpenStart = null;
-  capacity = { redraws: [], edits: [], views: [] };
+  capacity = { navigation: [], edits: [], views: [] };
   cancelZoomAnimation();
   if (doc.comparison)
     throw new Error(
@@ -3399,7 +3446,10 @@ function animateView(destination: Viewport, automatic = false) {
     ).rasterize(width());
     renderAxis();
     if (model && !sparseWorkspace()) frame = model.frame(viewport, width(), pixels());
-    requestRender(false); // Reuse confirmed server data; fetch the final window once.
+    // Draw the moments in this frame, with the axis: a frame later they would trail it.
+    // Reuse confirmed server data; fetch the final window once.
+    if (stage.clientWidth > 96 && stage.clientHeight > 0) render(false);
+    else requestRender(false);
     zoomAnimation = requestAnimationFrame(tick);
   };
   zoomAnimation = requestAnimationFrame(tick);

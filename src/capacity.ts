@@ -1,18 +1,22 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 /**
  * When to suggest another platform for a timeline. Thresholds come from the capacity
- * benchmarks (docs/capacity.md): in the browser, opening, redrawing and the pause after an
+ * benchmarks (docs/capacity.md): in the browser, opening, navigating and the pause after an
  * edit grow with the timeline, and cross the 100 ms and 1 s responsiveness limits at sizes
- * that depend on the device. So the browser advice follows this device's own measurements,
+ * that depend on the device. So the browser advice follows this device's own measurements
+ * of what its user waits for (from an input to the frame that shows its result),
  * with a moment count as a fallback. The desktop app and the platform stay fast up to the
  * per-timeline limit; the desktop advice only follows measurements on a slow computer.
  */
 export const LIMIT = 200000;
 export const THRESHOLDS = {
-  /** Browser: opening (reading, indexing and drawing) slower than this, in ms. */
+  /** Browser: opening (reading, indexing and drawing) until painted, slower than this, in ms. */
   open: 1500,
-  /** Browser: median redraw slower than this, in ms. */
-  redraw: 150,
+  /**
+   * Browser: the median wait from a zoom, pan or pinch input until its view is painted,
+   * longer than this, in ms.
+   */
+  navigation: 150,
   /** Browser: median pause after an edit (redraw and draft save) longer than this, in ms. */
   edit: 100,
   /** Browser: moments at which to advise even without measurements. */
@@ -31,12 +35,12 @@ export const BUDGETS = {
   /** A click, key or tap until its result is painted: feels instant. */
   response: THRESHOLDS.edit,
   /** Zooming, panning or fitting until the new view is drawn. */
-  view: THRESHOLDS.redraw,
+  view: THRESHOLDS.navigation,
   /**
    * The longest frame during a continuous gesture (drag, wheel, pinch): the view may drop
-   * frames while it redraws, but never stalls longer than one redraw may take.
+   * frames while it redraws, but never stalls longer than one view may take.
    */
-  frame: THRESHOLDS.redraw,
+  frame: THRESHOLDS.navigation,
   /** Search results, separations and lists: users keep their attention for about 1 s. */
   results: 1000,
   /** Opening a timeline. */
@@ -57,7 +61,8 @@ export const COMFORTABLE = {
 /** Recent measurements on this device for the open timeline. */
 export interface Measurements {
   open?: number;
-  redraws: number[];
+  /** Waits from navigation inputs until their views were painted. */
+  navigation: number[];
   edits: number[];
   views: number[];
 }
@@ -69,7 +74,7 @@ export interface Counts {
 export type Platform = 'browser' | 'desktop' | 'platform';
 export type Advice =
   | { kind: 'limit'; entity: 'moments' | 'durations' | 'relationships'; count: number }
-  | { kind: 'browser'; reason: 'open' | 'redraw' | 'edit' | 'size' }
+  | { kind: 'browser'; reason: 'open' | 'navigation' | 'edit' | 'size' }
   | { kind: 'desktop'; reason: 'view' };
 /** Recent samples kept, and the samples needed before a median counts as consistent. */
 export const SAMPLES = 5;
@@ -92,13 +97,13 @@ export function advise(platform: Platform, m: Measurements, counts: Counts): Adv
       advice.push({ kind: 'limit', entity, count });
   }
   if (platform === 'browser') {
-    const redraw = median(m.redraws, 3),
+    const navigation = median(m.navigation, 3),
       edit = median(m.edits, 2);
     const reason =
       m.open !== undefined && m.open > THRESHOLDS.open
         ? 'open'
-        : redraw !== undefined && redraw > THRESHOLDS.redraw
-          ? 'redraw'
+        : navigation !== undefined && navigation > THRESHOLDS.navigation
+          ? 'navigation'
           : edit !== undefined && edit > THRESHOLDS.edit
             ? 'edit'
             : counts.moments >= THRESHOLDS.moments
