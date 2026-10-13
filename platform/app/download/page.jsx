@@ -53,8 +53,8 @@ export default async function Download() {
   const platform = detectPlatform(userAgent, request.get('sec-ch-ua-platform') ?? '');
   // FreeBSD browsers do not say which release; the newest is marked. A Mac's is Homebrew's.
   const distribution =
-    platform === 'macos'
-      ? 'macos'
+    platform === 'macos' || platform === 'windows'
+      ? platform
       : platform === 'linux'
         ? detectDistribution(userAgent)
         : platform === 'freebsd'
@@ -181,7 +181,9 @@ export default async function Download() {
                   ? 'Download and install in one line, as root:'
                   : server.installer === 'brew'
                     ? 'Install with Homebrew, Apple silicon or Intel:'
-                    : 'Download and install in one line:'}
+                    : server.installer === 'exe'
+                      ? 'Download and run the installer, in PowerShell (it asks for administrator rights):'
+                      : 'Download and install in one line:'}
               </p>
               <CopyCommand
                 command={installCommand(release, server)}
@@ -192,7 +194,10 @@ export default async function Download() {
                   release={release}
                   file={{
                     ...server,
-                    detail: `Server package (.${server.asset.split('.').pop()}), amd64`,
+                    detail:
+                      server.installer === 'exe'
+                        ? 'Installer (.exe), 64-bit, with PostgreSQL 17'
+                        : `Server package (.${server.asset.split('.').pop()}), amd64`,
                   }}
                 />
               )}

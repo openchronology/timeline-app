@@ -83,6 +83,14 @@ test('links come from the latest release, or by name before there is one', () =>
     /releases\/download\/v1\.2\.0\/openchronology-server/,
   );
   assert.equal(releaseFrom({ message: 'Not Found' }), null);
+  // Windows downloads and runs the installer, elevated.
+  assert.equal(
+    installCommand(
+      null,
+      SERVERS.find((s) => s.key === 'windows'),
+    ),
+    'Invoke-WebRequest https://github.com/openchronology/timeline-app/releases/latest/download/openchronology-server-windows-amd64-setup.exe -OutFile "$env:TEMP\\openchronology-server-windows-amd64-setup.exe"; Start-Process -Wait -Verb RunAs "$env:TEMP\\openchronology-server-windows-amd64-setup.exe"',
+  );
   // macOS installs with Homebrew, from the tap.
   assert.equal(
     installCommand(

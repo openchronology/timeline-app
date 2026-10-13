@@ -16,6 +16,9 @@ export const serverTargets = {
   // Homebrew's formula, in the openchronology/homebrew-tap repository (deploy/homebrew): built
   // on the Mac from the platform; releases attach the platform, not a package.
   macos: { format: 'brew', pg: 17 },
+  // A self-contained installer with its own PostgreSQL 17, built on Windows from the platform
+  // (deploy/windows-server/build.ps1).
+  windows: { format: 'exe', pg: 17 },
 };
 /** The platform-independent part FreeBSD's package and Homebrew's formula build from. */
 export const PLATFORM = 'openchronology-server-platform.tar.gz';
@@ -23,7 +26,9 @@ export const PLATFORM = 'openchronology-server-platform.tar.gz';
 export const serverPackage = (target) =>
   serverTargets[target]?.format === 'brew'
     ? PLATFORM
-    : `openchronology-server-${target}-amd64.${serverTargets[target]?.format ?? 'deb'}`;
+    : serverTargets[target]?.format === 'exe'
+      ? `openchronology-server-${target}-amd64-setup.exe`
+      : `openchronology-server-${target}-amd64.${serverTargets[target]?.format ?? 'deb'}`;
 /**
  * The upstream version of a release tag (Debian and RPM alike): without its "v", and with a
  * pre-release ("-rc.1") marked "~rc.1" so that it sorts before the release.

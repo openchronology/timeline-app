@@ -186,3 +186,52 @@ jobs:
       - run: brew test openchronology/local/openchronology-server
       - name: Set it up, run it and remove it
         run: node test/server-homebrew.mjs
+  # Windows (#116): the self-contained installer, with its own PostgreSQL 17 and pgmp built for
+  # it with MSVC, built from the platform and installed, run, upgraded and removed unattended.
+  windows:
+    name: Server / windows
+    needs: platform
+    runs-on: windows-2025
+    timeout-minutes: 120
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.1
+        with:
+          name: server-platform
+          path: server-artifacts/
+      # GMP and SQLite for MSVC, as the desktop's Windows build has them.
+      - name: Cache pinned native dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/och-vcpkg-cache
+          key: vcpkg-windows-amd64-${{ hashFiles('scripts/desktop/*-dependencies.*', 'scripts/desktop/triplets/**') }}
+      - name: Native dependencies
+        shell: pwsh
+        run: ./scripts/desktop/windows-dependencies.ps1
+      - name: Stable Rust and NSIS
+        shell: pwsh
+        run: |
+          rustup update stable --no-self-update
+          rustup default stable
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue) -and -not (Test-Path "${env:ProgramFiles(x86)}\NSIS\makensis.exe")) { choco install nsis -y --no-progress }
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          $version = if ($env:RELEASE_TAG) { $env:RELEASE_TAG.TrimStart('v') } else { 'dev-' + (git rev-parse --short=7 HEAD) }
+          ./deploy/windows-server/build.ps1 -Version $version
+      - name: Install, run, upgrade and remove it
+        run: node test/server-windows.mjs server-artifacts/openchronology-server-windows-amd64-setup.exe
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: server-windows
+          path: server-artifacts/openchronology-server-windows-amd64-setup.exe
+          if-no-files-found: error

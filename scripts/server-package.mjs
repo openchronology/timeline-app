@@ -55,8 +55,9 @@ for (const name of chosen.length ? chosen : Object.keys(serverTargets)) {
     await freebsdPlatform(name, target);
     continue;
   }
-  // Homebrew builds from the platform on the Mac (deploy/homebrew, scripts/homebrew-formula.mjs).
-  if (target.format === 'brew') {
+  // Homebrew builds from the platform on the Mac (deploy/homebrew, scripts/homebrew-formula.mjs),
+  // and the Windows installer on Windows (deploy/windows-server/build.ps1).
+  if (target.format === 'brew' || target.format === 'exe') {
     await platformTarball();
     continue;
   }
