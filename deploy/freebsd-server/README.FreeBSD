@@ -1,0 +1,99 @@
+OpenChronology server for FreeBSD
+=================================
+
+Install
+-------
+
+As root:
+
+    pkg install -y ./openchronology-server-freebsd<release>-amd64.pkg
+
+pkg installs what the package needs from FreeBSD's repositories: Node.js 24 (node24),
+PostgreSQL @PG_MAJOR@, GMP and SQLite. The first installation:
+
+  - creates the `openchronology` system user;
+  - initializes PostgreSQL @PG_MAJOR@ if it is not yet (/var/db/postgres/data@PG_MAJOR@, with
+    peer authentication on its local socket), and enables and starts it;
+  - writes /usr/local/etc/openchronology/openchronology.env, with a new
+    AUTH_ENCRYPTION_KEY;
+  - creates the `openchronology` PostgreSQL role and database, with the bundled pgmp
+    extension;
+  - migrates the database (openchronology-migrate), and enables and starts the
+    `openchronology` service, which listens on 127.0.0.1:5173.
+
+If PostgreSQL could not be started at that point, start it and finish the setup with
+`openchronology-setup`, which is safe to run again.
+
+Configure
+---------
+
+Edit /usr/local/etc/openchronology/openchronology.env, then `service openchronology restart`:
+
+  - APP_ORIGIN: the public HTTPS origin users reach, without a trailing slash. The server
+    refuses a plain http:// origin other than localhost; on a trusted private network
+    without a proxy, set ALLOW_INSECURE_ORIGIN=1 and HOST=0.0.0.0 to serve
+    http://<name>:5173 directly. The services log to syslog (/var/log/messages); if the
+    website reports "Server misconfigured", the reason is there.
+  - RESEND_API_KEY and AUTH_EMAIL_FROM for account email, then
+    `sysrc openchronology_mail_enable=YES && service openchronology_mail start`.
+  - ADMIN_USERNAME, ADMIN_EMAIL and ADMIN_INITIAL_PASSWORD for the first administrator,
+    created by `openchronology-migrate`.
+  - Sign-in providers, human verification, quotas: see the comments in the file and
+    authentication.md, administration.md in this directory.
+
+Back up AUTH_ENCRYPTION_KEY apart from the database: without it, enrolled authenticator
+secrets cannot be decrypted. Do not change it once accounts exist.
+
+Serve it publicly through an HTTPS reverse proxy (www/caddy, www/nginx). With Caddy:
+
+    timescale.example {
+        reverse_proxy 127.0.0.1:5173
+    }
+
+Caddy 2.5 and later replace an incoming X-Forwarded-For with the client address, so set
+TRUST_PROXY=1 (with another proxy, only if it does the same; see README.md). Proxies
+should allow request bodies of at least 32 MiB and streaming responses (live updates).
+
+The syslog receiver (syslog.md) is configured in /usr/local/etc/openchronology/syslog.env
+with routes in /usr/local/etc/openchronology/syslog-routes.json; then
+`sysrc openchronology_syslog_enable=YES && service openchronology_syslog start`.
+
+`och-import-logs` imports historic log files (log-import.md), with OCH_API_URL and
+OCH_API_KEY from the environment or syslog.env: `och-import-logs --help`.
+
+Upgrade
+-------
+
+Installing a newer package (`pkg install -y ./openchronology-server-...pkg`) stops the server
+and leaves the database and configuration as they are. It then lists:
+
+  1. Settings this version's template has that the configuration lacks. Compare with:
+         diff -u /usr/local/etc/openchronology/openchronology.env \
+                 /usr/local/share/openchronology/openchronology.env.example
+  2. A backup:  su -l postgres -c 'pg_dump openchronology' > openchronology.sql
+  3. openchronology-migrate, which migrates the database and starts the server.
+
+openchronology-migrate is safe to run more than once. `--no-restart` migrates only.
+
+Remove
+------
+
+`pkg delete openchronology-server` stops and removes the server. The configuration
+(including AUTH_ENCRYPTION_KEY), the database and the system user remain; delete them with:
+
+    sysrc -x openchronology_enable openchronology_mail_enable openchronology_syslog_enable
+    rm -rf /usr/local/etc/openchronology /var/db/openchronology
+    su -l postgres -c 'dropdb openchronology && dropuser openchronology'
+    pw userdel openchronology
+
+Layout
+------
+
+  /usr/local/lib/openchronology           the application and och-convert
+  /usr/local/sbin/openchronology-migrate  database migration
+  /usr/local/sbin/openchronology-setup    first-time setup (run by the package)
+  /usr/local/etc/openchronology           configuration (created on first install)
+  /usr/local/share/openchronology         configuration templates of the installed version
+  /usr/local/etc/rc.d                     openchronology, openchronology_mail,
+                                          openchronology_syslog
+  /usr/local/lib/postgresql, /usr/local/share/postgresql/extension   pgmp

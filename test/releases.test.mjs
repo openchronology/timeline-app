@@ -22,10 +22,7 @@ test('the download page offers every file the release workflow attaches', () => 
       .map((t) => t.asset)
       .sort(),
   );
-  assert.deepEqual(
-    SERVERS.map((s) => s.key),
-    Object.keys(serverTargets),
-  );
+  assert.deepEqual(SERVERS.map((s) => s.key).sort(), Object.keys(serverTargets).sort());
   for (const server of SERVERS) assert.equal(server.asset, serverPackage(server.key));
 });
 
@@ -41,6 +38,10 @@ test('the visitor’s system comes from their browser', () => {
   for (const [platform, agent] of Object.entries(agents))
     assert.equal(detectPlatform(agent), platform, platform);
   assert.equal(detectPlatform('', '"macOS"'), 'macos');
+  assert.equal(
+    detectPlatform('Mozilla/5.0 (X11; FreeBSD amd64; rv:143.0) Firefox/143.0'),
+    'freebsd',
+  );
   assert.equal(detectPlatform('curl/8.5'), null);
   assert.equal(detectDistribution(agents.linux), 'ubuntu24.04');
   assert.equal(detectDistribution('Mozilla/5.0 (X11; Debian; Linux x86_64)'), 'debian13');
@@ -82,6 +83,14 @@ test('links come from the latest release, or by name before there is one', () =>
     /releases\/download\/v1\.2\.0\/openchronology-server/,
   );
   assert.equal(releaseFrom({ message: 'Not Found' }), null);
+  // FreeBSD installs with its own fetch and pkg, as root.
+  assert.equal(
+    installCommand(
+      null,
+      SERVERS.find((s) => s.key === 'freebsd15'),
+    ),
+    'fetch https://github.com/openchronology/timeline-app/releases/latest/download/openchronology-server-freebsd15-amd64.pkg && pkg install -y ./openchronology-server-freebsd15-amd64.pkg',
+  );
   // RPM distributions install with dnf.
   assert.equal(
     installCommand(

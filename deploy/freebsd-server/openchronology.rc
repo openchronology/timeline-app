@@ -1,0 +1,34 @@
+#!/bin/sh
+# Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+#
+# PROVIDE: openchronology
+# REQUIRE: LOGIN postgresql
+# KEYWORD: shutdown
+#
+# The OpenChronology platform, on 127.0.0.1:5173. Enable it in /etc/rc.conf with sysrc openchronology_enable=YES (openchronology-setup does).
+# Its configuration is /usr/local/etc/openchronology/openchronology.env (or openchronology_config).
+
+. /etc/rc.subr
+
+name=openchronology
+rcvar=openchronology_enable
+load_rc_config $name
+
+: ${openchronology_enable:="NO"}
+: ${openchronology_config:="/usr/local/etc/openchronology/openchronology.env"}
+
+# daemon(8) runs it as the openchronology user, restarts it if it fails and sends its
+# output to syslog.
+pidfile="/var/run/openchronology/openchronology.pid"
+procname="daemon"
+command="/usr/sbin/daemon"
+command_args="-r -S -T openchronology -P ${pidfile} -u openchronology /usr/bin/env NODE_ENV=production /usr/local/bin/node --env-file=${openchronology_config} /usr/local/lib/openchronology/openchronology-server.mjs"
+openchronology_chdir="/usr/local/lib/openchronology"
+start_precmd="openchronology_prestart"
+
+openchronology_prestart()
+{
+	install -d -o openchronology -g openchronology -m 0755 /var/run/openchronology
+}
+
+run_rc_command "$1"

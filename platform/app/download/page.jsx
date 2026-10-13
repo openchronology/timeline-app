@@ -51,7 +51,13 @@ export default async function Download() {
   const request = await headers();
   const userAgent = request.get('user-agent') ?? '';
   const platform = detectPlatform(userAgent, request.get('sec-ch-ua-platform') ?? '');
-  const distribution = platform === 'linux' ? detectDistribution(userAgent) : null;
+  // FreeBSD browsers do not say which release; the newest is marked.
+  const distribution =
+    platform === 'linux'
+      ? detectDistribution(userAgent)
+      : platform === 'freebsd'
+        ? 'freebsd15'
+        : null;
   const release = await latestRelease();
   const desktop = Object.keys(NAMES).includes(platform) ? platform : null;
   const yours = DESKTOP.filter((file) => file.os === desktop);
@@ -168,7 +174,11 @@ export default async function Download() {
                   <span className="download-badge">Your system</span>
                 ) : null}
               </h3>
-              <p className="muted">Download and install in one line:</p>
+              <p className="muted">
+                {server.installer === 'pkg'
+                  ? 'Download and install in one line, as root:'
+                  : 'Download and install in one line:'}
+              </p>
               <CopyCommand
                 command={installCommand(release, server)}
                 label={`Install on ${server.name}`}

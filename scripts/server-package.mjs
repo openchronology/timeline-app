@@ -1,15 +1,22 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Builds the server packages with Docker, into server-artifacts/ as
 // openchronology-server-<target>-amd64.<deb|rpm>: .deb from deploy/debian-server, .rpm from
-// deploy/rpm-server (#116).
-// Usage: node scripts/server-package.mjs [debian13|ubuntu24.04|rocky10|fedora44 ...]
+// deploy/rpm-server (#116). FreeBSD targets build their platform-independent part here, into
+// server-artifacts/freebsd/; deploy/freebsd-server/build.sh makes the .pkg on FreeBSD.
+// Usage: node scripts/server-package.mjs [debian13|ubuntu24.04|rocky10|fedora44|freebsd14 ...]
 //   RELEASE_TAG=v1.2.3 builds a release version (the checkout must be that tag).
 import { execFile, spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { releaseVersion } from './build-info.mjs';
-import { serverPackage, serverTargets, upstreamVersion } from './server-targets.mjs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import {
+  freebsdVersion,
+  serverPackage,
+  serverTargets,
+  upstreamVersion,
+} from './server-targets.mjs';
 
 const exec = promisify(execFile);
 const chosen = process.argv.slice(2);
@@ -33,6 +40,10 @@ const upstream = tag ? upstreamVersion(tag) : `${version}~dev.${stamp}.${commit.
 await mkdir('server-artifacts', { recursive: true });
 for (const name of chosen.length ? chosen : Object.keys(serverTargets)) {
   const target = serverTargets[name];
+  if (target.format === 'pkg') {
+    await freebsdPlatform(name, target);
+    continue;
+  }
   const out = await mkdtemp(join('server-artifacts', '.build-'));
   // Debian: <upstream>-1~deb13, PostgreSQL named by the target. RPM: version <upstream> and
   // release 1.el10, PostgreSQL as the distribution ships it.
@@ -84,4 +95,41 @@ for (const name of chosen.length ? chosen : Object.keys(serverTargets)) {
   await rename(join(out, built), join('server-artifacts', serverPackage(name)));
   await rm(out, { recursive: true });
   console.log(`Wrote server-artifacts/${serverPackage(name)} (${built})`);
+}
+
+/** The FreeBSD package's platform-independent part, and what build.sh needs to finish it. */
+async function freebsdPlatform(name, target) {
+  const dir = join('server-artifacts', 'freebsd');
+  mkdirSync(dir, { recursive: true });
+  console.log(`Building the platform for openchronology-server ${upstream} on ${name}`);
+  await new Promise((done, fail) => {
+    const build = spawn(
+      'docker',
+      [
+        'buildx',
+        'build',
+        '--file',
+        'deploy/freebsd-server/Dockerfile',
+        '--target',
+        'export',
+        '--output',
+        `type=local,dest=${dir}`,
+        '--build-arg',
+        `OCH_BUILD_COMMIT=${commit}`,
+        '--build-arg',
+        `OCH_BUILD_VERSION=${tag}`,
+        '.',
+      ],
+      { stdio: 'inherit' },
+    );
+    build.on('error', fail);
+    build.on('exit', (code) => (code === 0 ? done() : fail(new Error(`Building ${name} failed`))));
+  });
+  writeFileSync(
+    join(dir, 'build.env'),
+    `VERSION=${freebsdVersion(upstream)}\nPG_MAJOR=${target.pg}\nASSET=${serverPackage(name)}\n`,
+  );
+  console.log(
+    `Wrote ${dir}/openchronology-app.tar.gz. On FreeBSD ${target.release}, as root: sh deploy/freebsd-server/build.sh`,
+  );
 }

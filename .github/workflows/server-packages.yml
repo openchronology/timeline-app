@@ -44,3 +44,76 @@ jobs:
           name: server-${{ matrix.target }}
           path: server-artifacts/openchronology-server-${{ matrix.target }}-amd64.${{ matrix.format }}
           if-no-files-found: error
+  # FreeBSD (#116): the platform is built on Linux, then a FreeBSD virtual machine builds
+  # och-convert and pgmp and makes the package (deploy/freebsd-server/build.sh).
+  freebsd:
+    name: Server / ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: freebsd14, release: '14' }
+          - { target: freebsd15, release: '15' }
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Build the platform
+        run: node scripts/server-package.mjs "${{ matrix.target }}"
+      - name: Build the package on FreeBSD ${{ matrix.release }}
+        uses: vmactions/freebsd-vm@4469451fe39bee80be4066836c5170362e9349f3 # v1.5.7
+        with:
+          release: ${{ matrix.release }}
+          usesh: true
+          cpu: 4
+          mem: 8192
+          sync: rsync
+          copyback: true
+          run: sh deploy/freebsd-server/build.sh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: server-${{ matrix.target }}
+          path: server-artifacts/openchronology-server-${{ matrix.target }}-amd64.pkg
+          if-no-files-found: error
+  # A fresh FreeBSD system installs it as the README says, and runs it.
+  freebsd-test:
+    name: Server / ${{ matrix.target }} install
+    needs: freebsd
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: freebsd14, release: '14' }
+          - { target: freebsd15, release: '15' }
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.1
+        with:
+          name: server-${{ matrix.target }}
+          path: server-artifacts/
+      - name: Install, run, upgrade and remove it on FreeBSD ${{ matrix.release }}
+        uses: vmactions/freebsd-vm@4469451fe39bee80be4066836c5170362e9349f3 # v1.5.7
+        with:
+          release: ${{ matrix.release }}
+          usesh: true
+          cpu: 2
+          mem: 4096
+          sync: rsync
+          copyback: false
+          # Node.js runs the test; the package brings the rest.
+          prepare: env ASSUME_ALWAYS_YES=yes pkg install -y node24
+          run: node test/server-freebsd.mjs server-artifacts/openchronology-server-${{ matrix.target }}-amd64.pkg
