@@ -1,6 +1,21 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { validateDocument } from './core.js';
-import type { TimelineDocument } from './core.js';
+import type { TimelineDocument, PointEvent } from './core.js';
+/** A moment a pull request adds, removes or changes, with its versions. */
+interface MomentChange {
+  change: 'added' | 'removed' | 'changed';
+  before: PointEvent | null;
+  after: PointEvent | null;
+}
+/** What a pull request changes from its base (computed by the server). */
+interface ProposalChanges {
+  settings: string[];
+  moments: { added: number; removed: number; changed: number };
+  durations: { added: number; removed: number; changed: number };
+  relationships: { added: number; removed: number };
+  /** The first changed moments of each kind. */
+  examples: MomentChange[];
+}
 interface Proposal {
   id: string;
   title: string;
@@ -8,8 +23,10 @@ interface Proposal {
   status: string;
   base_revision: string;
   revision: string;
-  document: TimelineDocument;
-  base_document: TimelineDocument;
+  changes?: ProposalChanges;
+  /** Servers before pull requests kept no documents sent both with every pull request. */
+  document?: TimelineDocument;
+  base_document?: TimelineDocument;
   author: string;
   canMerge: boolean;
   canUpdate: boolean;
@@ -40,7 +57,7 @@ interface Host {
   timeline(): { id: string; revision: string; canWrite?: boolean; canPropose?: boolean } | null;
   document(): Promise<TimelineDocument>;
   working(): Proposal | null;
-  edit(proposal: Proposal): void;
+  edit(proposal: Proposal, document: TimelineDocument): void;
   reload(): Promise<void>;
   compare?(ids: string[]): void;
   published(proposal: Proposal): void;
@@ -60,6 +77,34 @@ function paragraph(text: string) {
   const p = document.createElement('p');
   p.textContent = text;
   return p;
+}
+/** What `after` changes from `base`, as the server summarizes it (for older servers). */
+function summarize(base: TimelineDocument, after: TimelineDocument): ProposalChanges {
+  const before = new Map(base.events.map((e) => [e.id, e])),
+    proposed = new Map(after.events.map((e) => [e.id, e]));
+  const examples: MomentChange[] = [
+    ...after.events
+      .filter((e) => !before.has(e.id))
+      .map((e) => ({ change: 'added' as const, before: null, after: e })),
+    ...base.events
+      .filter((e) => !proposed.has(e.id))
+      .map((e) => ({ change: 'removed' as const, before: e, after: null })),
+    ...after.events
+      .filter((e) => before.has(e.id) && JSON.stringify(before.get(e.id)) !== JSON.stringify(e))
+      .map((e) => ({ change: 'changed' as const, before: before.get(e.id)!, after: e })),
+  ];
+  const count = (change: MomentChange['change']) =>
+    examples.filter((e) => e.change === change).length;
+  const settings = (
+    ['title', 'description', 'tags', 'presentation', 'plugins', 'assets'] as const
+  ).filter((key) => JSON.stringify(base[key]) !== JSON.stringify(after[key]));
+  return {
+    settings,
+    moments: { added: count('added'), removed: count('removed'), changed: count('changed') },
+    durations: { added: 0, removed: 0, changed: 0 },
+    relationships: { added: 0, removed: 0 },
+    examples,
+  };
 }
 export function createCommunityUI(host: Host) {
   let browserPage = 1,
@@ -381,46 +426,44 @@ export function createCommunityUI(host: Host) {
         p.upstreamRevision,
     );
     text('pull-detail-error', '');
-    const base = new Map(p.base_document.events.map((e) => [e.id, e])),
-      proposed = new Map(p.document.events.map((e) => [e.id, e]));
-    const added = p.document.events.filter((e) => !base.has(e.id));
-    const removed = p.base_document.events.filter((e) => !proposed.has(e.id));
-    const changed = p.document.events.filter(
-      (e) => base.has(e.id) && JSON.stringify(base.get(e.id)) !== JSON.stringify(e),
-    );
+    const changes = p.changes ?? summarize(p.base_document!, p.document!);
+    const { moments, durations, relationships } = changes;
     el('pull-diff').replaceChildren(
       paragraph(
-        `${added.length} added, ${removed.length} removed, ${changed.length} changed moments.`,
+        `${moments.added} added, ${moments.removed} removed, ${moments.changed} changed moments.`,
       ),
     );
-    for (const key of [
-      'title',
-      'description',
-      'tags',
-      'presentation',
-      'plugins',
-      'assets',
+    if (durations.added + durations.removed + durations.changed)
+      el('pull-diff').append(
+        paragraph(
+          `${durations.added} added, ${durations.removed} removed, ${durations.changed} changed durations.`,
+        ),
+      );
+    if (relationships.added + relationships.removed)
+      el('pull-diff').append(
+        paragraph(`${relationships.added} added, ${relationships.removed} removed relationships.`),
+      );
+    for (const key of changes.settings)
+      el('pull-diff').append(paragraph('Changed timeline ' + key + '.'));
+    for (const [label, change] of [
+      ['Added', 'added'],
+      ['Removed', 'removed'],
+      ['Changed', 'changed'],
     ] as const)
-      if (JSON.stringify(p.base_document[key]) !== JSON.stringify(p.document[key]))
-        el('pull-diff').append(paragraph('Changed timeline ' + key + '.'));
-    for (const [label, events] of [
-      ['Added', added],
-      ['Removed', removed],
-      ['Changed', changed],
-    ] as const)
-      for (const e of events.slice(0, 30)) {
+      for (const { before, after } of changes.examples
+        .filter((e) => e.change === change)
+        .slice(0, 30)) {
+        const e = (after ?? before)!;
         el('pull-diff').append(
           paragraph(
             label + ': ' + (e.metadata.title || 'Unnamed moment') + ' (' + e.id + ') at ' + e.time,
           ),
         );
-        if (label === 'Changed') {
-          const before = base.get(e.id);
+        if (label === 'Changed')
           el('pull-diff').append(
             paragraph('Before: ' + JSON.stringify(before).slice(0, 1800)),
-            paragraph('After: ' + JSON.stringify(e).slice(0, 1800)),
+            paragraph('After: ' + JSON.stringify(after).slice(0, 1800)),
           );
-        }
       }
     el('pull-edit').hidden = !p.canUpdate || !!p.from_fork;
     el('pull-merge').hidden = !p.canMerge;
@@ -458,30 +501,46 @@ export function createCommunityUI(host: Host) {
     pullPage++;
     void pulls().catch((e) => error('pull-error', e));
   };
+  /** The selected pull request's proposed timeline, read only when it is opened. */
+  async function proposed(p: Proposal) {
+    const t = host.timeline();
+    if (p.document) return p.document;
+    if (!t) throw new Error('Open the timeline first.');
+    const result = await host.api<{ document: TimelineDocument }>(
+      `timelines/${t.id}/proposals/${p.id}/document`,
+    );
+    return validateDocument(result.document);
+  }
+  function open(p: Proposal) {
+    void proposed(p)
+      .then((document) => {
+        if (selected?.id !== p.id) return;
+        host.edit(p, document);
+        el<HTMLDialogElement>('pull-detail-dialog').close();
+        el<HTMLDialogElement>('pull-dialog').close();
+      })
+      .catch((e) => error('pull-detail-error', e));
+  }
   el('pull-view').onclick = () => {
-    if (selected) {
-      host.edit({ ...selected, canUpdate: false });
-      el<HTMLDialogElement>('pull-detail-dialog').close();
-      el<HTMLDialogElement>('pull-dialog').close();
-    }
+    if (selected) open({ ...selected, canUpdate: false });
   };
   el('pull-edit').onclick = () => {
-    if (selected) {
-      host.edit(selected);
-      el<HTMLDialogElement>('pull-detail-dialog').close();
-      el<HTMLDialogElement>('pull-dialog').close();
-    }
+    if (selected) open(selected);
   };
   el('pull-export').onclick = () => {
     if (!selected) return;
-    const url = URL.createObjectURL(
-      new Blob([JSON.stringify(selected.document, null, 2)], { type: 'application/json' }),
-    );
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'proposal.ochx';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    void proposed(selected)
+      .then((document) => {
+        const url = URL.createObjectURL(
+          new Blob([JSON.stringify(document, null, 2)], { type: 'application/json' }),
+        );
+        const a = window.document.createElement('a');
+        a.href = url;
+        a.download = 'proposal.ochx';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      })
+      .catch((e) => error('pull-detail-error', e));
   };
   for (const actionName of ['merge', 'reject', 'close', 'rebase'])
     el('pull-' + actionName).onclick = () => {

@@ -595,8 +595,13 @@ try {
     'POST',
     { action: 'rebase', revision: proposal.revision },
   );
-  assert.equal(rebased.document.description, changedUpstream.description);
-  assert.equal(rebased.document.title, proposedDocument.title);
+  const rebasedDocument = (
+    await editor.request(`timelines/${custody.id}/proposals/${proposal.id}/document`)
+  ).document;
+  assert.equal(rebasedDocument.description, changedUpstream.description);
+  assert.equal(rebasedDocument.title, proposedDocument.title);
+  assert.deepEqual(rebased.changes.settings, ['title']);
+  assert.deepEqual(rebased.changes.moments, { added: 1, removed: 0, changed: 0 });
   const merged = await viewer.request(
     `timelines/${custody.id}/proposals/${proposal.id}/resolve`,
     'POST',
@@ -608,7 +613,7 @@ try {
     new TimelineIndex(
       (await owner.request(`timelines/${custody.id}/document`)).document,
     ).document(),
-    new TimelineIndex(rebased.document).document(),
+    new TimelineIndex(rebasedDocument).document(),
   );
   await viewer.request(
     `timelines/${custody.id}/proposals/${proposal.id}/resolve`,

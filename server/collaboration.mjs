@@ -1,9 +1,10 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { rebaseDocument } from './merge.mjs';
 import { randomUUID } from 'node:crypto';
-import { HttpError, documentJson } from './store.mjs';
-import { validateDocument } from '../dist/core.mjs';
+import { HttpError } from './store.mjs';
+import { validateDocument, relationshipKey } from '../dist/core.mjs';
 import { commonAncestor, lockTimelines, revisionId } from './versioning.mjs';
+import { differences } from './history.mjs';
 export function searchInput(value = {}) {
   if (
     !value ||
@@ -156,6 +157,37 @@ function proposalInput(value) {
     baseRevision: revision(value.baseRevision),
   };
 }
+/** A pull request's columns: its base and source are revisions, read when needed. */
+const PROPOSAL = `p.id,p.timeline_id,p.author_id,p.title,p.body,p.status,p.base_revision,p.revision,
+p.created_at,p.updated_at,p.resolved_by,p.merged_revision,p.base_revision_id,p.source_revision_id,
+p.source_timeline_id,p.merged_revision_id,p.from_fork`;
+/** How many changed moments of each kind a pull request's summary shows. */
+const EXAMPLES = 30;
+/**
+ * What differs between two whole documents, in the pages `differences` (history.mjs) gives:
+ * for revisions saved before history was kept as rows.
+ */
+async function* documentDifferences(before, after) {
+  const settings = (d) => {
+    const { events, durations, relationships, ...rest } = d;
+    return rest;
+  };
+  if (JSON.stringify(settings(before)) !== JSON.stringify(settings(after)))
+    yield [{ kind: 'settings', key: null, before: settings(before), after: settings(after) }];
+  const kinds = {
+    moments: (d) => d.events.map((e) => [e.id, e]),
+    durations: (d) => (d.durations ?? []).map((x) => [x.id, x]),
+    relationships: (d) => (d.relationships ?? []).map((r) => [relationshipKey(r), true]),
+  };
+  for (const [kind, entries] of Object.entries(kinds)) {
+    const [a, b] = [new Map(entries(before)), new Map(entries(after))];
+    const page = [];
+    for (const key of new Set([...a.keys(), ...b.keys()]))
+      if (JSON.stringify(a.get(key)) !== JSON.stringify(b.get(key)))
+        page.push({ kind, key, before: a.get(key) ?? null, after: b.get(key) ?? null });
+    if (page.length) yield page;
+  }
+}
 export class Collaboration {
   constructor(store) {
     this.store = store;
@@ -189,12 +221,7 @@ export class Collaboration {
   }
   async get(timelineId, id, userId) {
     const t = await this.store.access(timelineId, userId);
-    const { rows } = await this.pool.query(
-      'SELECT p.*,u.username AS author FROM oc_proposals p JOIN oc_users u ON u.id=p.author_id WHERE p.timeline_id=$1 AND p.id=$2',
-      [timelineId, id],
-    );
-    const p = rows[0];
-    if (!p) throw new HttpError(404, 'Pull request unavailable.');
+    const p = await this.proposal(timelineId, id);
     let source = null;
     if (p.source_timeline_id) {
       try {
@@ -205,6 +232,7 @@ export class Collaboration {
     }
     return {
       ...p,
+      changes: await this.changes(p.base_revision_id, p.source_revision_id),
       canMerge: t.canWrite && p.status === 'open',
       canUpdate: !!t.canPropose && p.author_id === userId && p.status === 'open',
       canClose: p.status === 'open' && (t.canWrite || p.author_id === userId),
@@ -219,6 +247,56 @@ export class Collaboration {
         : null,
     };
   }
+  async proposal(timelineId, id) {
+    const { rows } = await this.pool.query(
+      `SELECT ${PROPOSAL},u.username AS author FROM oc_proposals p JOIN oc_users u ON u.id=p.author_id
+      WHERE p.timeline_id=$1 AND p.id=$2`,
+      [timelineId, id],
+    );
+    if (!rows[0]) throw new HttpError(404, 'Pull request unavailable.');
+    return rows[0];
+  }
+  /** The pull request's proposed timeline, as a whole document (to view, edit or export). */
+  async document(timelineId, id, userId) {
+    await this.store.access(timelineId, userId);
+    const p = await this.proposal(timelineId, id);
+    return { document: await this.store.revisionDocument(this.pool, p.source_revision_id) };
+  }
+  /**
+   * What a pull request changes from its base: the settings that differ, how many moments,
+   * durations and relationships it adds, removes and changes, and the first moments of each.
+   * Computed from saved history, so it costs what changed, not the timeline's size.
+   */
+  async changes(baseId, sourceId) {
+    const summary = {
+      settings: [],
+      moments: { added: 0, removed: 0, changed: 0 },
+      durations: { added: 0, removed: 0, changed: 0 },
+      relationships: { added: 0, removed: 0 },
+      examples: [],
+    };
+    const pages =
+      (await differences(this.pool, baseId, sourceId)) ??
+      documentDifferences(
+        await this.store.revisionDocument(this.pool, baseId),
+        await this.store.revisionDocument(this.pool, sourceId),
+      );
+    const shown = { added: 0, removed: 0, changed: 0 };
+    for await (const page of pages)
+      for (const { kind, before, after } of page) {
+        if (kind === 'settings') {
+          for (const key of new Set([...Object.keys(before), ...Object.keys(after)]))
+            if (JSON.stringify(before[key]) !== JSON.stringify(after[key]))
+              summary.settings.push(key);
+          continue;
+        }
+        const change = before === null ? 'added' : after === null ? 'removed' : 'changed';
+        summary[kind][change]++;
+        if (kind === 'moments' && shown[change]++ < EXAMPLES)
+          summary.examples.push({ change, before, after });
+      }
+    return summary;
+  }
   async forkInput(client, timeline, userId, input) {
     const source = await this.store.access(input.sourceTimelineId, userId, client);
     if (!source.canWrite) throw new HttpError(403, 'Write access to the source fork is required.');
@@ -229,12 +307,9 @@ export class Collaboration {
       [input.sourceRevisionId, source.id],
     );
     if (!rows.length) throw new HttpError(404, 'Saved fork revision unavailable.');
-    const baseId = await commonAncestor(client, input.sourceRevisionId, timeline.head_revision_id);
     return {
-      baseId,
+      baseId: await commonAncestor(client, input.sourceRevisionId, timeline.head_revision_id),
       sourceId: input.sourceRevisionId,
-      base: await this.store.revisionDocument(client, baseId),
-      document: await this.store.revisionDocument(client, input.sourceRevisionId),
     };
   }
   async create(timelineId, userId, value) {
@@ -265,19 +340,18 @@ export class Collaboration {
         ? await this.forkInput(c, t, userId, input)
         : {
             baseId: t.head_revision_id,
-            base: await this.store.branchDocument(c, t),
-            document: input.document,
-            sourceId: await this.store.recordRevision(
+            sourceId: await this.store.recordDetached(
               c,
               timelineId,
               userId,
               input.document,
               'proposal',
               [t.head_revision_id],
+              t.head_revision_id,
             ),
           };
       await c.query(
-        'INSERT INTO oc_proposals(id,timeline_id,author_id,title,body,base_revision,base_document,document,base_revision_id,source_revision_id,source_timeline_id,from_fork) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,$12)',
+        'INSERT INTO oc_proposals(id,timeline_id,author_id,title,body,base_revision,base_revision_id,source_revision_id,source_timeline_id,from_fork) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
         [
           id,
           timelineId,
@@ -285,8 +359,6 @@ export class Collaboration {
           input.title,
           input.body,
           t.revision,
-          documentJson(pinned.base),
-          documentJson(pinned.document),
           pinned.baseId,
           pinned.sourceId,
           input.sourceTimelineId ?? null,
@@ -306,7 +378,7 @@ export class Collaboration {
       ]);
       const t = await this.store.access(timelineId, userId, c);
       const { rows } = await c.query(
-        'SELECT * FROM oc_proposals WHERE timeline_id=$1 AND id=$2 FOR UPDATE',
+        `SELECT ${PROPOSAL} FROM oc_proposals p WHERE p.timeline_id=$1 AND p.id=$2 FOR UPDATE`,
         [timelineId, id],
       );
       const p = rows[0];
@@ -332,28 +404,25 @@ export class Collaboration {
         ? await this.forkInput(c, t, userId, input)
         : {
             baseId: p.base_revision_id,
-            base: p.base_document,
-            document: input.document,
-            sourceId: await this.store.recordRevision(
+            sourceId: await this.store.recordDetached(
               c,
               timelineId,
               userId,
               input.document,
               'proposal',
               [p.source_revision_id ?? p.base_revision_id],
+              p.base_revision_id,
             ),
           };
       await c.query(
-        'UPDATE oc_proposals SET title=$3,body=$4,document=$5::jsonb,source_revision_id=$6,base_revision_id=$7,base_document=$8::jsonb,base_revision=$9,revision=revision+1,updated_at=now() WHERE timeline_id=$1 AND id=$2',
+        'UPDATE oc_proposals SET title=$3,body=$4,source_revision_id=$5,base_revision_id=$6,base_revision=$7,revision=revision+1,updated_at=now() WHERE timeline_id=$1 AND id=$2',
         [
           timelineId,
           id,
           input.title,
           input.body,
-          documentJson(pinned.document),
           pinned.sourceId,
           pinned.baseId,
-          documentJson(pinned.base),
           p.from_fork ? t.revision : p.base_revision,
         ],
       );
@@ -368,7 +437,7 @@ export class Collaboration {
       await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [timelineId]);
       const t = await this.store.access(timelineId, userId, c);
       const { rows } = await c.query(
-        'SELECT * FROM oc_proposals WHERE timeline_id=$1 AND id=$2 FOR UPDATE',
+        `SELECT ${PROPOSAL} FROM oc_proposals p WHERE p.timeline_id=$1 AND p.id=$2 FOR UPDATE`,
         [timelineId, id],
       );
       const p = rows[0];
@@ -378,27 +447,23 @@ export class Collaboration {
       if (value.action === 'rebase') {
         if (!t.canPropose || p.author_id !== userId)
           throw new HttpError(403, 'Only the author can rebase.');
-        const upstream = await this.store.branchDocument(c, t);
-        const rebased = rebaseDocument(p.base_document, p.document, upstream);
-        const sourceId = await this.store.recordRevision(
+        const rebased = rebaseDocument(
+          await this.store.revisionDocument(c, p.base_revision_id),
+          await this.store.revisionDocument(c, p.source_revision_id),
+          await this.store.branchDocument(c, t),
+        );
+        const sourceId = await this.store.recordDetached(
           c,
           p.source_timeline_id ?? timelineId,
           userId,
           rebased,
           'rebase',
           [p.source_revision_id, t.head_revision_id],
+          t.head_revision_id,
         );
         await c.query(
-          'UPDATE oc_proposals SET base_revision=$3,base_document=$4::jsonb,document=$5::jsonb,base_revision_id=$6,source_revision_id=$7,revision=revision+1,updated_at=now() WHERE timeline_id=$1 AND id=$2',
-          [
-            timelineId,
-            id,
-            t.revision,
-            documentJson(upstream),
-            documentJson(rebased),
-            t.head_revision_id,
-            sourceId,
-          ],
+          'UPDATE oc_proposals SET base_revision=$3,base_revision_id=$4,source_revision_id=$5,revision=revision+1,updated_at=now() WHERE timeline_id=$1 AND id=$2',
+          [timelineId, id, t.revision, t.head_revision_id, sourceId],
         );
         return;
       }
@@ -409,9 +474,14 @@ export class Collaboration {
       if (value.action === 'merge') {
         if (!p.from_fork && t.revision !== p.base_revision)
           throw new HttpError(409, 'Upstream changed. The author must rebase before merging.');
+        const source = await this.store.revisionDocument(c, p.source_revision_id);
         const document = p.from_fork
-          ? rebaseDocument(p.base_document, p.document, await this.store.branchDocument(c, t))
-          : validateDocument(p.document);
+          ? rebaseDocument(
+              await this.store.revisionDocument(c, p.base_revision_id),
+              source,
+              await this.store.branchDocument(c, t),
+            )
+          : validateDocument(source);
         await this.store.replace(c, timelineId, document);
         await c.query('UPDATE oc_timelines SET revision=revision+1 WHERE id=$1', [timelineId]);
         mergedRevision = (BigInt(t.revision) + 1n).toString();

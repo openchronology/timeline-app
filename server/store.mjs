@@ -23,7 +23,13 @@ import { randomUUID } from 'node:crypto';
 import { indexedNodes } from './tree.mjs';
 import { MOMENT_TREE, INTERVAL_TREE, intervalPayload, upsertRows } from './avl.mjs';
 import { applyIncrementally, incremental } from './incremental.mjs';
-import { recordHistory, historyDocument, pruneHistoryRows, settingsOf } from './history.mjs';
+import {
+  recordHistory,
+  recordDetached,
+  historyDocument,
+  pruneHistoryRows,
+  settingsOf,
+} from './history.mjs';
 /**
  * The largest whole document stored (pull requests keep them), as JSON. PostgreSQL stores it
  * as jsonb, whose arrays hold at most 268,435,455 bytes and take 1.2 to 1.3 times the size
@@ -396,6 +402,29 @@ export class PostgresStore {
     await client.query('UPDATE oc_timelines SET head_revision_id=$2 WHERE id=$1', [id, revisionId]);
     return revisionId;
   }
+  /**
+   * A revision outside a timeline's numbered history (a pull request's source or a rebase of
+   * one, a validated document), with `parents`: kept as rows that read through to `baseId` and charged what
+   * `document` changes from it, or, when that base is not kept as rows, stored as a document
+   * of `timelineId`.
+   */
+  async recordDetached(client, timelineId, userId, document, kind, parents, baseId) {
+    const revisionId = randomUUID();
+    const stored = await recordDetached(client, revisionId, baseId, document);
+    if (stored === null)
+      return this.recordRevision(client, timelineId, userId, document, kind, parents);
+    await client.query(
+      `INSERT INTO oc_revisions(id,timeline_id,number,author_id,kind,history_rows,document_bytes,stored_bytes)
+      VALUES($1,$1,1,$2,$3,true,$4,$5)`,
+      [revisionId, userId, kind, Buffer.byteLength(JSON.stringify(document)), stored],
+    );
+    for (const [position, parent] of [...new Set(parents.filter(Boolean))].entries())
+      await client.query(
+        'INSERT INTO oc_revision_parents(revision_id,parent_id,position) VALUES($1,$2,$3)',
+        [revisionId, parent, position],
+      );
+    return revisionId;
+  }
   /** A numbered revision kept as rows, charged the bytes of the versions it wrote. */
   async recordRows(client, id, userId, kind, parents, { number, documentBytes, stored }) {
     const revisionId = randomUUID();
@@ -503,6 +532,27 @@ export class PostgresStore {
     );
   }
   async removeHistory(client, timelineId) {
+    // Once a timeline is deleted, so are its pull requests: the revisions they kept outside
+    // any timeline's history (their own ID as timeline), reading through to its revisions,
+    // go first, with their links to other revisions.
+    if (!(await client.query('SELECT 1 FROM oc_timelines WHERE id=$1', [timelineId])).rows.length) {
+      const { rows: detached } = await client.query(
+        `SELECT d.id FROM oc_revisions d JOIN oc_history_bases b ON b.timeline_id=d.id
+        JOIN oc_revisions r ON r.id=b.base_revision_id
+        WHERE d.timeline_id=d.id AND r.timeline_id=$1 AND NOT EXISTS(SELECT 1 FROM oc_proposals p
+          WHERE p.base_revision_id=d.id OR p.source_revision_id=d.id OR p.merged_revision_id=d.id)`,
+        [timelineId],
+      );
+      const ids = detached.map((row) => row.id);
+      if (ids.length) {
+        await client.query(
+          'DELETE FROM oc_revision_parents WHERE revision_id=ANY($1::uuid[]) OR parent_id=ANY($1::uuid[])',
+          [ids],
+        );
+        await client.query('DELETE FROM oc_revisions WHERE id=ANY($1::uuid[])', [ids]);
+        for (const id of ids) await pruneHistoryRows(client, id);
+      }
+    }
     // Keep ancestors still needed by another fork or submitted review, and the revisions
     // copies read through to. Other timelines' private history is never exposed through
     // the history API.

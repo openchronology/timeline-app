@@ -10,7 +10,8 @@ import pg from 'pg';
 import { PostgresStore, applyPatch } from '../server/store.mjs';
 import { Versioning } from '../server/versioning.mjs';
 import { pruneHistory } from '../server/retention.mjs';
-import { validateDocument } from '../dist/core.mjs';
+import { differences } from '../server/history.mjs';
+import { validateDocument, relationshipKey } from '../dist/core.mjs';
 import { randomEdits } from './random-edits.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
@@ -40,6 +41,57 @@ async function rowsOf(id) {
       (await pool.query(`SELECT count(*) AS n FROM ${table} WHERE timeline_id=$1`, [id])).rows[0].n,
     );
   return counts;
+}
+/** What differs between two documents, as `differences` reports it (the oracle). */
+function documentChanges(before, after) {
+  const changes = new Map();
+  const settings = ({ events, durations, relationships, ...rest }) => rest;
+  if (JSON.stringify(sorted(settings(before))) !== JSON.stringify(sorted(settings(after))))
+    changes.set('settings', [sorted(settings(before)), sorted(settings(after))]);
+  const kinds = {
+    moments: (d) => d.events.map((e) => [e.id, e]),
+    durations: (d) => (d.durations ?? []).map((x) => [x.id, x]),
+    relationships: (d) => (d.relationships ?? []).map((r) => [relationshipKey(r), true]),
+  };
+  for (const [kind, entries] of Object.entries(kinds)) {
+    const [a, b] = [new Map(entries(before)), new Map(entries(after))];
+    for (const key of new Set([...a.keys(), ...b.keys()])) {
+      const [x, y] = [sorted(a.get(key) ?? null), sorted(b.get(key) ?? null)];
+      if (JSON.stringify(x) !== JSON.stringify(y)) changes.set(kind + ' ' + key, [x, y]);
+    }
+  }
+  return changes;
+}
+/** A value with its object keys in order, to compare JSON. */
+const sorted = (value) =>
+  value === null || typeof value !== 'object'
+    ? value
+    : Array.isArray(value)
+      ? value.map(sorted)
+      : Object.fromEntries(
+          Object.keys(value)
+            .sort()
+            .map((k) => [k, sorted(value[k])]),
+        );
+/** `differences` between two revisions, keyed as documentChanges keys them. */
+async function rowChanges(from, to) {
+  const changes = new Map();
+  for await (const page of await differences(pool, from, to))
+    for (const { kind, key, before, after } of page) {
+      const name =
+        kind === 'settings'
+          ? 'settings'
+          : kind === 'relationships'
+            ? 'relationships ' +
+              relationshipKey({
+                a: { [key.a_kind]: key.a_id },
+                b: { [key.b_kind]: key.b_id },
+              })
+            : kind + ' ' + key;
+      assert(!changes.has(name), `${name} reported once`);
+      changes.set(name, [sorted(before), sorted(after)]);
+    }
+  return changes;
 }
 const charged = async (revision) =>
   Number(
@@ -152,6 +204,19 @@ try {
   };
   const read = await readBack('after saving');
   assert.equal(read, revisions.size);
+  // Comparing two revisions from rows finds exactly what differs between their documents,
+  // within a timeline, across copies, and down the chain.
+  const saved = [...revisions];
+  for (let n = 0; n < 80; n++) {
+    const [[from, before], [to, after]] = [0, 1].map(
+      () => saved[Math.floor(random() * saved.length)],
+    );
+    assert.deepEqual(
+      await rowChanges(from, to),
+      documentChanges(validateDocument(before), validateDocument(after)),
+      `differences ${from} → ${to}`,
+    );
+  }
   // Copies are charged what they changed, not what they read through to.
   for (const { timeline } of copies.slice(1, 4)) {
     const { rows } = await pool.query(

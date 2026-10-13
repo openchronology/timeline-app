@@ -36,6 +36,7 @@ export async function checkCommunity(browser) {
     last: '0/1',
   };
   let proposal = null,
+    proposed_document = null,
     guest = true,
     storage = true,
     oversizedFork = false,
@@ -139,15 +140,24 @@ export async function checkCommunity(browser) {
     const prefix = `/api/timelines/${id}/proposals`;
     if (path === prefix && method === 'POST') {
       requests.push(value);
+      // The server keeps the proposed document as a revision and sends a summary of it.
+      const { document: proposed, ...fields } = value;
+      proposed_document = proposed;
       proposal = {
-        ...value,
+        ...fields,
         id: pid,
         author: 'alice',
         author_id: '33333333-3333-4333-8333-333333333333',
         status: 'open',
         revision: '1',
         base_revision: value.baseRevision,
-        base_document: document,
+        changes: {
+          settings: ['title', 'tags'],
+          moments: { added: 0, removed: 0, changed: 0 },
+          durations: { added: 0, removed: 0, changed: 0 },
+          relationships: { added: 0, removed: 0 },
+          examples: [],
+        },
         canMerge: false,
         canUpdate: true,
         canClose: true,
@@ -160,6 +170,8 @@ export async function checkCommunity(browser) {
         json: { proposals: proposal ? [proposal] : [], total: proposal ? 1 : 0, pages: 1, page: 1 },
       });
     if (path === prefix + '/' + pid) return route.fulfill({ json: proposal });
+    if (path === prefix + '/' + pid + '/document')
+      return route.fulfill({ json: { document: proposed_document } });
     if (path === prefix + '/' + pid + '/comments/search')
       return route.fulfill({ json: { comments, next: null } });
     if (path === prefix + '/' + pid + '/comments') {
@@ -312,6 +324,7 @@ export async function checkCommunity(browser) {
     assert.equal(document.title, 'Featured timeline');
     assert(await page.locator('#pull-merge').isHidden());
     assert(await page.locator('#pull-edit').isVisible());
+    await page.locator('#pull-diff').getByText('Changed timeline tags.').waitFor();
     await page.locator('#pull-comment').fill('<script>plain text</script>');
     await page
       .locator('#pull-comment-form')

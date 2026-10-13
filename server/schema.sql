@@ -454,7 +454,7 @@ BEGIN
     IF NEW.history_rows THEN n:=NEW.stored_bytes;
     ELSIF NEW.snapshot_id IS NULL THEN n:=octet_length(NEW.patch::text);
     ELSE SELECT document_bytes INTO n FROM oc_snapshots WHERE id=NEW.snapshot_id; END IF;
-  ELSIF TG_TABLE_NAME='oc_proposals' THEN uid:=NEW.author_id; n:=octet_length(NEW.document::text)+octet_length(NEW.base_document::text)+octet_length(NEW.body)+octet_length(NEW.title);
+  ELSIF TG_TABLE_NAME='oc_proposals' THEN uid:=NEW.author_id; n:=coalesce(octet_length(NEW.document::text),0)+coalesce(octet_length(NEW.base_document::text),0)+octet_length(NEW.body)+octet_length(NEW.title);
   ELSIF TG_TABLE_NAME='oc_proposal_comments' THEN uid:=NEW.author_id; n:=octet_length(NEW.body);
   ELSIF TG_TABLE_NAME='oc_plugins' THEN uid:=NEW.owner_id; n:=octet_length(NEW.manifest::text); key:=NEW.id||'/'||NEW.version;
   END IF;
@@ -489,7 +489,7 @@ DROP TRIGGER IF EXISTS oc_track_storage ON oc_plugin_suites;
 CREATE TRIGGER oc_track_storage AFTER INSERT OR DELETE ON oc_plugin_suites FOR EACH ROW EXECUTE FUNCTION oc_track_suite_storage();
 INSERT INTO oc_storage_entries SELECT 'oc_timelines',id::text,owner_id,storage_bytes FROM oc_timelines ON CONFLICT(kind,entry_id) DO UPDATE SET bytes=excluded.bytes;
 INSERT INTO oc_storage_entries SELECT 'oc_revisions',r.id::text,CASE WHEN r.kind IN ('proposal','rebase') THEN r.author_id ELSE coalesce(t.owner_id,r.author_id) END,s.document_bytes FROM oc_revisions r JOIN oc_snapshots s ON s.id=r.snapshot_id LEFT JOIN oc_timelines t ON t.id=r.timeline_id WHERE (CASE WHEN r.kind IN ('proposal','rebase') THEN r.author_id ELSE coalesce(t.owner_id,r.author_id) END) IN(SELECT id FROM oc_users) ON CONFLICT(kind,entry_id) DO NOTHING;
-INSERT INTO oc_storage_entries SELECT 'oc_proposals',id::text,author_id,octet_length(document::text)+octet_length(base_document::text)+octet_length(body)+octet_length(title) FROM oc_proposals ON CONFLICT(kind,entry_id) DO NOTHING;
+INSERT INTO oc_storage_entries SELECT 'oc_proposals',id::text,author_id,coalesce(octet_length(document::text),0)+coalesce(octet_length(base_document::text),0)+octet_length(body)+octet_length(title) FROM oc_proposals ON CONFLICT(kind,entry_id) DO NOTHING;
 INSERT INTO oc_storage_entries SELECT 'oc_proposal_comments',id::text,author_id,octet_length(body) FROM oc_proposal_comments ON CONFLICT(kind,entry_id) DO NOTHING;
 INSERT INTO oc_storage_entries SELECT 'oc_plugins',id||'/'||version,owner_id,octet_length(manifest::text) FROM oc_plugins ON CONFLICT(kind,entry_id) DO NOTHING;
 -- AFTER triggers charge only the committed insert/update branch of an upsert.
@@ -947,3 +947,20 @@ DROP TRIGGER IF EXISTS oc_history_immutable ON oc_history_duration_overrides;
 CREATE TRIGGER oc_history_immutable BEFORE UPDATE ON oc_history_duration_overrides FOR EACH ROW EXECUTE FUNCTION oc_immutable_revision();
 DROP TRIGGER IF EXISTS oc_history_immutable ON oc_history_relationship_overrides;
 CREATE TRIGGER oc_history_immutable BEFORE UPDATE ON oc_history_relationship_overrides FOR EACH ROW EXECUTE FUNCTION oc_immutable_revision();
+-- Comparing two revisions (differences in history.mjs) finds what a timeline saved between
+-- them: versions that started or ended in between, and overrides made in between.
+CREATE INDEX IF NOT EXISTS oc_history_relationships_since ON oc_history_relationships(timeline_id,since);
+CREATE INDEX IF NOT EXISTS oc_history_moments_until ON oc_history_moments(timeline_id,until) WHERE until IS NOT NULL;
+CREATE INDEX IF NOT EXISTS oc_history_durations_until ON oc_history_durations(timeline_id,until) WHERE until IS NOT NULL;
+CREATE INDEX IF NOT EXISTS oc_history_relationships_until ON oc_history_relationships(timeline_id,until) WHERE until IS NOT NULL;
+CREATE INDEX IF NOT EXISTS oc_history_moment_overrides_since ON oc_history_moment_overrides(timeline_id,since);
+CREATE INDEX IF NOT EXISTS oc_history_duration_overrides_since ON oc_history_duration_overrides(timeline_id,since);
+CREATE INDEX IF NOT EXISTS oc_history_relationship_overrides_since ON oc_history_relationship_overrides(timeline_id,since);
+-- Pull requests keep no documents of their own: their base and source are saved revisions
+-- (a submitted source is kept as rows that read through to its base). Documents stored by
+-- earlier versions are copies of those revisions, read from there instead.
+ALTER TABLE oc_proposals ALTER COLUMN base_document DROP NOT NULL;
+ALTER TABLE oc_proposals ALTER COLUMN document DROP NOT NULL;
+UPDATE oc_proposals SET base_document=NULL,document=NULL
+WHERE (base_document IS NOT NULL OR document IS NOT NULL)
+  AND base_revision_id IS NOT NULL AND source_revision_id IS NOT NULL;

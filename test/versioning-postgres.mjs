@@ -173,7 +173,15 @@ try {
   fork = await store.save(fork.id, contributor, fork.revision, later);
   proposal = await pulls.get(upstream.id, proposal.id, owner);
   assert.equal(proposal.source_revision_id, submitted);
-  assert.equal(proposal.document.title, doc.title);
+  // A pull request carries a summary of its changes, not documents; its proposed timeline
+  // is read when asked for.
+  assert.equal(proposal.document, undefined);
+  assert.equal(proposal.base_document, undefined);
+  assert.deepEqual(proposal.changes.moments, { added: 0, removed: 0, changed: 1 });
+  assert.deepEqual(proposal.changes.settings, []);
+  assert.equal(proposal.changes.examples[0].after.metadata.title, 'Fork change');
+  assert.equal(proposal.changes.examples[0].before.metadata.title, doc.events[0].metadata.title);
+  assert.equal((await pulls.document(upstream.id, proposal.id, owner)).document.title, doc.title);
   await rejected(
     () =>
       pulls.update(upstream.id, proposal.id, owner, {
@@ -240,7 +248,8 @@ try {
     sourceRevisionId: fork.head_revision_id,
   });
   assert.equal(second.base_revision_id, current.timeline.head_revision_id);
-  assert.equal(second.base_document.title, 'Later title');
+  assert.equal((await store.revisionDocument(pool, second.base_revision_id)).title, 'Later title');
+  assert.deepEqual(second.changes.settings, ['description']);
   // Conflicting edits roll back index, head, and history together.
   upstream = await store.access(upstream.id, owner);
   upstream = await store.save(upstream.id, owner, upstream.revision, {
