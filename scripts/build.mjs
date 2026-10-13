@@ -35,6 +35,7 @@ await build({
     'src/comparison.ts',
     'src/live-updates.ts',
     'src/follow-latest.ts',
+    'src/view-state.ts',
     'src/browser-copy.ts',
     'src/summary-expansion.ts',
     'src/image-assets.ts',

@@ -62,6 +62,7 @@ export async function checkFollowLatest(browser) {
     }
     if (path === `/api/timelines/${id}/query`) {
       const data = route.request().postDataJSON();
+      if (data.kind === 'tags') return route.fulfill({ json: { tags: [], revision } });
       const view = new Viewport(Q.parse(data.lower), Q.parse(data.upper).sub(Q.parse(data.lower)));
       return route.fulfill({
         json: {
@@ -121,6 +122,53 @@ export async function checkFollowLatest(browser) {
     await page.goto(`http://localhost:5173/editor/frame#timeline/${id}`);
     await page.waitForFunction(() => document.querySelector('.event-marker') && window.testStream);
     await page.locator('#follow-latest').check();
+    const whole = await bounds();
+    // A reload keeps the view (#128): bounds, follow, grouping distance and separation.
+    const loaded = () =>
+      page.waitForFunction(() => document.querySelector('.event-marker') && window.testStream);
+    await page.locator('#zoom-in').click();
+    await page.locator('#density').fill('36');
+    await page.waitForTimeout(800);
+    const zoomed = (await bounds()).map((q) => q.toString());
+    assert.notDeepEqual(
+      zoomed,
+      whole.map((q) => q.toString()),
+    );
+    await page.reload();
+    await loaded();
+    assert.deepEqual(
+      (await bounds()).map((q) => q.toString()),
+      zoomed,
+    );
+    assert.equal(await page.locator('#follow-latest').isChecked(), true);
+    assert.equal(await page.locator('#density').inputValue(), '36');
+    await page.locator('#separate-button').click();
+    await page.locator('#separate-extra').fill('ops');
+    await page.locator('#separate-submit').click();
+    await page.locator('#separation-settings').waitFor();
+    await page.waitForTimeout(500);
+    await page.reload();
+    await page.locator('#separation-settings').waitFor();
+    assert.equal(await page.locator('#separation-tags').textContent(), 'ops');
+    assert.deepEqual(
+      (await bounds()).map((q) => q.toString()),
+      zoomed,
+    );
+    await page.locator('#separation-rejoin').click();
+    await page.waitForTimeout(500);
+    await page.reload();
+    await loaded();
+    assert.equal(await page.locator('#separation-settings').isHidden(), true);
+    // Another tab starts from the whole timeline.
+    const other = await context.newPage();
+    await other.goto(`http://localhost:5173/editor/frame#timeline/${id}`);
+    await other.waitForFunction(() => document.querySelector('.event-marker'));
+    assert.equal(
+      Q.parse(await other.locator('#left-bound').inputValue()).toString(),
+      whole[0].toString(),
+    );
+    assert.equal(await other.locator('#follow-latest').isChecked(), false);
+    await other.close();
     const initial = await bounds();
     // An external edit alone must not fetch a follow target.
     revision = '2';

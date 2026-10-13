@@ -121,6 +121,8 @@ import {
   useNativeServer,
 } from './transport.js';
 import { parseLink, linkFragment, sharePath } from './links.js';
+import { readViewState, viewStorageKey, VIEW_PREFIX } from './view-state.js';
+import type { ViewState } from './view-state.js';
 import type { TimelineLink } from './links.js';
 declare const __OFFLINE_HTML__: boolean;
 const offlineHtml = typeof __OFFLINE_HTML__ !== 'undefined' && __OFFLINE_HTML__;
@@ -963,6 +965,7 @@ function requestRender(refreshFrame = true) {
       return;
     }
     render(refresh);
+    saveView();
   });
 }
 let presenterSettings: TimePresentation | undefined,
@@ -2578,7 +2581,8 @@ async function directory() {
     list.append(p);
   }
 }
-async function openRemote(id: string) {
+async function openRemote(id: string, restoreSeparation = true) {
+  saveView(0);
   stopComparison(false);
   setDashboard(false);
   workingProposal = null;
@@ -2619,6 +2623,7 @@ async function openRemote(id: string) {
     startComparison(sources, info.presentation ?? sources[0].presentation ?? DEFAULT_PRESENTATION);
     comparison!.combined = info.comparison.combined;
     el<HTMLInputElement>('compare-combined').checked = info.comparison.combined;
+    restoreView();
     dirty = false;
     heading();
     requestRender();
@@ -2643,8 +2648,10 @@ async function openRemote(id: string) {
     (sparseWorkspace() ? undefined : model?.points.maxKey()) ??
       (info.last ? Q.parse(info.last) : undefined),
   );
+  const separated = restoreView().separation;
   dirty = false;
   heading();
+  if (separated && restoreSeparation) startSeparation(separated);
   requestRender();
 }
 let browserForkBusy = false;
@@ -2754,6 +2761,10 @@ async function route(force = false) {
     const request = documentRequest;
     const sources = await comparisonSources(ids);
     if (request === documentRequest) await comparisons.start(sources);
+    if (request === documentRequest && comparison) {
+      restoreView();
+      requestRender();
+    }
     return;
   }
   if (embedded) {
@@ -2785,7 +2796,8 @@ async function route(force = false) {
       useServer(origin);
       accountHeading();
     }
-    await openRemote(match[1]);
+    // A link names what to show, which a stored separation would hide.
+    await openRemote(match[1], !link || link.kind === 'view');
     await followLink(link);
   } else if (hasDashboard() && !desktop && !platformEditor) {
     if (dirty && model) {
@@ -3551,20 +3563,88 @@ function zoomGroup(group: FrameGroup) {
   requestRender();
 }
 let followScope = '';
+/** A comparison of saved server timelines, by its sources; none for others. */
+function comparisonScope() {
+  return comparison?.tracks.every((t) => !t.source.working && /^[a-f0-9-]{36}$/i.test(t.source.key))
+    ? 'compare:' +
+        comparison.tracks
+          .map((t) => t.source.key)
+          .sort()
+          .join(',')
+    : '';
+}
 function currentFollowScope() {
   if (!platformEditor || desktop || offlineHtml || !session.server) return '';
-  if (comparison)
-    return comparison.tracks.every(
-      (t) => !t.source.working && /^[a-f0-9-]{36}$/i.test(t.source.key),
-    )
-      ? 'compare:' +
-          comparison.tracks
-            .map((t) => t.source.key)
-            .sort()
-            .join(',')
-      : '';
+  if (comparison) return comparisonScope();
   return remote ? remote.id : '';
 }
+/**
+ * Whose view a reload restores (#128, view-state.ts): a server timeline, separated or not, or
+ * a comparison of server timelines.
+ */
+function viewScope() {
+  if (offlineHtml || local) return '';
+  if (separation) return remote?.id ?? '';
+  if (comparison) return comparisonScope();
+  return remote?.id ?? '';
+}
+function storedView(scope = viewScope()): ViewState {
+  if (!scope) return {};
+  try {
+    return readViewState(sessionStorage.getItem(viewStorageKey(serverOrigin, scope)));
+  } catch {
+    return {};
+  }
+}
+function storeView(scope: string, change: ViewState) {
+  if (!scope) return;
+  try {
+    sessionStorage.setItem(
+      viewStorageKey(serverOrigin, scope),
+      JSON.stringify({ ...storedView(scope), ...change }),
+    );
+  } catch {
+    // Without storage a reload shows the whole timeline.
+  }
+}
+let viewTimer: ReturnType<typeof setTimeout> | undefined;
+/** Keeps the view once it settles (or at once, before something else opens). */
+function saveView(delay = 300) {
+  clearTimeout(viewTimer);
+  const save = () =>
+    storeView(viewScope(), {
+      left: viewport.left.toString(),
+      right: viewport.left.add(viewport.span).toString(),
+      density: Number(input('density').value),
+      separation: separation ?? undefined,
+    });
+  if (delay) viewTimer = setTimeout(save, delay);
+  else save();
+}
+/** Shows what opened as it was last seen in this tab; returns what was stored. */
+function restoreView(): ViewState {
+  const state = storedView();
+  if (state.density) {
+    input('density').value = String(state.density);
+    text('density-value', `${state.density} px`);
+  }
+  if (state.left && state.right) {
+    const left = Q.parse(state.left);
+    viewport = new Viewport(left, Q.parse(state.right).sub(left));
+  }
+  return state;
+}
+/** Signing out leaves no views of timelines in this tab. */
+function forgetViews() {
+  clearTimeout(viewTimer);
+  try {
+    for (const key of Object.keys(sessionStorage))
+      if (key.startsWith(VIEW_PREFIX)) sessionStorage.removeItem(key);
+  } catch {
+    // Nothing was stored.
+  }
+}
+window.addEventListener('pagehide', () => saveView(0));
 const follow = followLatest<Viewport>({
   blocked: () =>
     !currentFollowScope() ||
@@ -3620,9 +3700,7 @@ function updateFollowControl() {
     followScope = scope;
     input('follow-latest').checked = false;
     if (scope) {
-      try {
-        input('follow-latest').checked = sessionStorage.getItem('och:follow:' + scope) === 'true';
-      } catch {}
+      input('follow-latest').checked = storedView(scope).follow === true;
       follow.setEnabled(input('follow-latest').checked);
     }
   }
@@ -3643,9 +3721,7 @@ window.addEventListener('resize', () => follow.navigation());
 input('follow-latest').onchange = () => {
   if (!followScope) return;
   follow.setEnabled(input('follow-latest').checked);
-  try {
-    sessionStorage.setItem('och:follow:' + followScope, String(input('follow-latest').checked));
-  } catch {}
+  storeView(followScope, { follow: input('follow-latest').checked });
 };
 let zoomAnimation: number | undefined, zoomTarget: Viewport | undefined;
 function cancelZoomAnimation() {
@@ -5270,6 +5346,7 @@ el('logout-button').onclick = () => {
       session = { ...session, user: null, csrf: null };
       // Signing out leaves no timeline windows in this browser (on a desktop, of this server).
       clearTimeout(persistTimer);
+      forgetViews();
       if (!desktop) void windowStore.clear().catch(() => {});
       else if (user) void windowStore.forget(storeScope(serverOrigin, user.id)).catch(() => {});
       desktopLoginAttempt++;
