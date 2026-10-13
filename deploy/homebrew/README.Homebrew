@@ -1,0 +1,91 @@
+OpenChronology server for macOS (Homebrew)
+==========================================
+
+Install
+-------
+
+    brew install openchronology/tap/openchronology-server
+    openchronology-setup
+
+Homebrew installs what the server needs: Node.js 24 (node@24), PostgreSQL 17, GMP and SQLite,
+and builds the SQLite converter and the pgmp extension for this Mac (Rust and CMake are needed
+only while building). Homebrew's PostgreSQL and the server run as you. openchronology-setup:
+
+  - starts PostgreSQL 17 with `brew services` if it is not running;
+  - writes $(brew --prefix)/etc/openchronology/openchronology.env (readable only by you), with
+    a new AUTH_ENCRYPTION_KEY and the database at postgresql://<you>@/openchronology;
+  - creates the openchronology database, with the bundled pgmp extension;
+  - migrates it (openchronology-migrate) and starts the `openchronology-server` service,
+    which listens on 127.0.0.1:5173 and starts again when you log in.
+
+openchronology-setup is safe to run again.
+
+Configure
+---------
+
+Edit $(brew --prefix)/etc/openchronology/openchronology.env, then
+`brew services restart openchronology-server`:
+
+  - APP_ORIGIN: the public HTTPS origin users reach, without a trailing slash. The server
+    refuses a plain http:// origin other than localhost; on a trusted private network
+    without a proxy, set ALLOW_INSECURE_ORIGIN=1 and HOST=0.0.0.0 to serve
+    http://<name>:5173 directly. The server logs to $(brew --prefix)/var/log/openchronology.log;
+    if the website reports "Server misconfigured", the reason is there.
+  - RESEND_API_KEY and AUTH_EMAIL_FROM for account email, delivered by `openchronology-mail`
+    while it runs (in a terminal, or your own launchd agent).
+  - ADMIN_USERNAME, ADMIN_EMAIL and ADMIN_INITIAL_PASSWORD for the first administrator,
+    created by `openchronology-migrate`. The password is used once; to sign in with it again
+    (or with a new one written there), run `openchronology-reset-admin-password`.
+  - Sign-in providers, human verification, quotas: see the comments in the file and
+    authentication.md, administration.md in this directory.
+
+Back up AUTH_ENCRYPTION_KEY apart from the database: without it, enrolled authenticator
+secrets cannot be decrypted. Do not change it once accounts exist.
+
+Serve it publicly through an HTTPS reverse proxy (brew install caddy). With Caddy:
+
+    timescale.example {
+        reverse_proxy 127.0.0.1:5173
+    }
+
+Caddy 2.5 and later replace an incoming X-Forwarded-For with the client address, so set
+TRUST_PROXY=1 (with another proxy, only if it does the same; see README.md).
+
+The syslog receiver (syslog.md), `openchronology-syslog`, reads
+$(brew --prefix)/etc/openchronology/syslog.env. `och-import-logs` imports historic log files
+(log-import.md): `och-import-logs --help`.
+
+Upgrade
+-------
+
+`brew upgrade openchronology-server` keeps the configuration and the database. Then:
+
+  1. Compare the configuration with this version's template:
+         diff -u $(brew --prefix)/etc/openchronology/openchronology.env \
+                 $(brew --prefix)/share/openchronology/openchronology.env.example
+  2. Back up:  $(brew --prefix postgresql@17)/bin/pg_dump -h /tmp openchronology > openchronology.sql
+  3. openchronology-migrate, which migrates the database and restarts the server.
+
+Remove
+------
+
+Homebrew installed PostgreSQL 17 for the server, so uninstalling the server removes it too,
+unless you ask Homebrew to keep it (its databases, in $(brew --prefix)/var/postgresql@17,
+remain either way). To keep PostgreSQL and the database running:
+
+    brew install postgresql@17
+    brew services stop openchronology-server
+    brew uninstall openchronology-server
+
+The configuration (including AUTH_ENCRYPTION_KEY) and the database remain; delete them with:
+
+    rm -rf $(brew --prefix)/etc/openchronology $(brew --prefix)/var/openchronology
+    $(brew --prefix postgresql@17)/bin/dropdb -h /tmp openchronology
+
+Layout
+------
+
+  $(brew --prefix)/opt/openchronology-server/libexec   the application and och-convert
+  $(brew --prefix)/etc/openchronology                  configuration (created by setup)
+  $(brew --prefix)/share/openchronology                configuration templates of this version
+  $(brew --prefix)/lib/postgresql@17, share/postgresql@17   pgmp

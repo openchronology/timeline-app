@@ -50,7 +50,7 @@ test('the visitor’s system comes from their browser', () => {
 });
 
 test('links come from the latest release, or by name before there is one', () => {
-  const server = SERVERS[0];
+  const server = SERVERS.find((s) => s.key === 'debian13');
   assert.equal(
     assetLink(null, OFFLINE.asset),
     'https://github.com/openchronology/timeline-app/releases/latest/download/openchronology-offline.html',
@@ -83,6 +83,14 @@ test('links come from the latest release, or by name before there is one', () =>
     /releases\/download\/v1\.2\.0\/openchronology-server/,
   );
   assert.equal(releaseFrom({ message: 'Not Found' }), null);
+  // macOS installs with Homebrew, from the tap.
+  assert.equal(
+    installCommand(
+      null,
+      SERVERS.find((s) => s.key === 'macos'),
+    ),
+    'brew install openchronology/tap/openchronology-server && openchronology-setup',
+  );
   // FreeBSD installs with its own fetch and pkg, as root.
   assert.equal(
     installCommand(

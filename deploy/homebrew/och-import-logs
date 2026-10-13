@@ -1,0 +1,9 @@
+#!/bin/sh
+# Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+# Imports log files into OpenChronology timelines: och-import-logs --help, and log-import.md.
+# OCH_API_URL and OCH_API_KEY come from the environment or, when it has none, syslog.env.
+CONFIG=@HOMEBREW_PREFIX@/etc/openchronology/syslog.env
+if [ -z "${OCH_API_KEY:-}" ] && [ -r "$CONFIG" ]; then
+  OCH_CONFIG="$CONFIG" exec "@NODE@" "@LIBEXEC@/server/import-logs.mjs" "$@"
+fi
+exec "@NODE@" "@LIBEXEC@/server/import-logs.mjs" "$@"

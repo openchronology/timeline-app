@@ -1,0 +1,137 @@
+# Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+# The OpenChronology server for macOS (#116), published to openchronology/homebrew-tap by
+# releases (scripts/homebrew-formula.mjs renders this template).
+class OpenchronologyServer < Formula
+  desc "Exact timelines, shared on your terms: the OpenChronology platform server"
+  homepage "https://github.com/openchronology/timeline-app"
+  url "@URL@"
+  version "@VERSION@"
+  sha256 "@SHA256@"
+  license "GPL-3.0-only"
+
+  depends_on "cmake" => :build
+  depends_on "pkgconf" => :build
+  depends_on "rust" => :build
+  depends_on "gmp"
+  depends_on "node@24"
+  depends_on "postgresql@17"
+  depends_on "sqlite"
+
+  uses_from_macos "python" => :build
+
+  # The exact-rational type for PostgreSQL, pinned as the other packages pin it.
+  resource "pgmp" do
+    url "https://codeload.github.com/dvarrazzo/pgmp/tar.gz/1849585416f2bc3d070bf8cef6a659907687ec7f"
+    version "1.1-1849585"
+    sha256 "@PGMP_SHA256@"
+  end
+
+  def postgresql
+    Formula["postgresql@17"]
+  end
+
+  def node
+    Formula["node@24"].opt_bin/"node"
+  end
+
+  def install
+    # The SQLite converter, from the crates vendored in the platform archive.
+    cd "native" do
+      system "cargo", "build", "--manifest-path", "native-store/Cargo.toml", "--release",
+             "--locked", "--offline", "--bin", "och-convert"
+    end
+    # The platform (Next.js and the editor), laid out as the other packages lay it out.
+    libexec.mkpath
+    cp_r "lib/openchronology/.", libexec
+    (libexec/"bin").install "native/native-store/target/release/och-convert"
+
+    # pgmp, installed where Homebrew's postgresql@17 finds extensions (as pgvector is).
+    resource("pgmp").stage do
+      system "sh", "-c", "python3 tools/unmix.py < sql/pgmp.pysql > sql/pgmp--1.1.sql"
+      system "sh", "-c", "python3 tools/sql2extension.py --extname pgmp sql/pgmp--1.1.sql " \
+                         "> sql/pgmp--unpackaged--1.1.sql"
+      pg_config = "PG_CONFIG=#{postgresql.opt_bin}/pg_config"
+      system "make", pg_config, "with_llvm=no"
+      system "make", "install", pg_config, "with_llvm=no",
+             "pkglibdir=#{lib/postgresql.name}",
+             "datadir=#{share/postgresql.name}",
+             "docdir=#{doc}/pgmp"
+      (doc/"pgmp").install "COPYING"
+    end
+
+    # Configuration templates, with this Mac's paths.
+    (share/"openchronology").install "homebrew/openchronology.env" => "openchronology.env.example",
+                                     "homebrew/syslog.env"         => "syslog.env.example"
+    inreplace share.glob("openchronology/*.example") do |s|
+      s.gsub! "/etc/openchronology", "#{etc}/openchronology", audit_result: false
+      s.gsub! "sudo systemctl restart openchronology", "brew services restart openchronology-server",
+              audit_result: false
+      s.gsub! "sudo openchronology-", "openchronology-", audit_result: false
+    end
+
+    # The commands, pointing at this installation.
+    commands = %w[openchronology-setup openchronology-migrate openchronology-reset-admin-password
+                  och-import-logs openchronology-mail openchronology-syslog]
+    commands.each { |command| bin.install "homebrew/#{command}" }
+    # Not every command names every path.
+    inreplace commands.map { |command| bin/command } do |s|
+      s.gsub! "@HOMEBREW_PREFIX@", HOMEBREW_PREFIX.to_s, audit_result: false
+      s.gsub! "@LIBEXEC@", opt_libexec.to_s, audit_result: false
+      s.gsub! "@NODE@", node.to_s, audit_result: false
+      s.gsub! "@PG_BIN@", postgresql.opt_bin.to_s, audit_result: false
+      s.gsub! "@PG_MAJOR@", postgresql.version.major.to_s, audit_result: false
+    end
+
+    doc.install Dir["doc/*"], "homebrew/README.Homebrew"
+  end
+
+  def post_install
+    (var/"openchronology").mkpath
+    (var/"log").mkpath
+  end
+
+  def caveats
+    <<~EOS
+      To finish the installation, run:
+        openchronology-setup
+      It starts PostgreSQL 17 (brew services) if it is not running, creates the openchronology
+      database, and starts the server on http://localhost:5173.
+
+      Configuration: #{etc}/openchronology/openchronology.env
+      After upgrading, migrate the database: openchronology-migrate
+      More: #{HOMEBREW_PREFIX}/share/doc/openchronology-server/README.Homebrew
+    EOS
+  end
+
+  service do
+    run [Formula["node@24"].opt_bin/"node", opt_libexec/"openchronology-server.mjs"]
+    environment_variables OCH_CONFIG: etc/"openchronology/openchronology.env",
+                          NODE_ENV:   "production"
+    keep_alive true
+    working_dir opt_libexec
+    log_path var/"log/openchronology.log"
+    error_log_path var/"log/openchronology.log"
+  end
+
+  test do
+    assert_match "Usage: och-import-logs", shell_output("#{bin}/och-import-logs --help")
+    assert_path_exists libexec/"bin/och-convert"
+    # pgmp loads in a scratch PostgreSQL 17 cluster.
+    ENV["LC_ALL"] = "C"
+    pg_ctl = postgresql.opt_bin/"pg_ctl"
+    port = free_port
+    system pg_ctl, "initdb", "-D", testpath/"data"
+    (testpath/"data/postgresql.conf").write <<~EOS, mode: "a+"
+      port = #{port}
+      unix_socket_directories = '#{testpath}'
+    EOS
+    system pg_ctl, "start", "-D", testpath/"data", "-l", testpath/"log"
+    begin
+      output = shell_output("#{postgresql.opt_bin}/psql -h #{testpath} -p #{port} -Atc " \
+                            "\"CREATE EXTENSION pgmp; SELECT '1/3'::mpq + '1/6'::mpq\" postgres")
+      assert_match "1/2", output
+    ensure
+      system pg_ctl, "stop", "-D", testpath/"data"
+    end
+  end
+end

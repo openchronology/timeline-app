@@ -1,0 +1,19 @@
+#!/bin/sh
+# Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+# Brings the OpenChronology database up to this version's schema, then restarts the
+# openchronology-server service when it runs. Safe to run more than once.
+# Usage: openchronology-migrate [--no-restart]
+set -eu
+PREFIX=@HOMEBREW_PREFIX@
+CONFIG=$PREFIX/etc/openchronology/openchronology.env
+if [ ! -r "$CONFIG" ]; then
+  echo "$CONFIG is missing: run openchronology-setup." >&2
+  exit 1
+fi
+# The configuration is read as systemd reads it (OCH_CONFIG, #118).
+OCH_CONFIG="$CONFIG" "@NODE@" "@LIBEXEC@/server/migrate.mjs"
+if [ "${1:-}" != "--no-restart" ] &&
+  "$PREFIX/bin/brew" services list 2>/dev/null | grep -q '^openchronology-server .*started'; then
+  "$PREFIX/bin/brew" services restart openchronology-server >/dev/null
+  echo "OpenChronology restarted."
+fi

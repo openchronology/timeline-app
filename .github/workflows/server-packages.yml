@@ -44,10 +44,35 @@ jobs:
           name: server-${{ matrix.target }}
           path: server-artifacts/openchronology-server-${{ matrix.target }}-amd64.${{ matrix.format }}
           if-no-files-found: error
-  # FreeBSD (#116): the platform is built on Linux, then a FreeBSD virtual machine builds
-  # och-convert and pgmp and makes the package (deploy/freebsd-server/build.sh).
+  # The server's platform-independent part (deploy/platform), built once: FreeBSD's packages
+  # and Homebrew's formula build from it, and releases attach it.
+  platform:
+    name: Server / platform
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Build the platform
+        run: node scripts/server-package.mjs platform
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: server-platform
+          path: server-artifacts/openchronology-server-platform.tar.gz
+          if-no-files-found: error
+  # FreeBSD (#116): a FreeBSD virtual machine builds och-convert and pgmp from the platform and
+  # makes the package (deploy/freebsd-server/build.sh).
   freebsd:
     name: Server / ${{ matrix.target }}
+    needs: platform
     strategy:
       fail-fast: false
       matrix:
@@ -67,7 +92,11 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-      - name: Build the platform
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.1
+        with:
+          name: server-platform
+          path: server-artifacts/
+      - name: Prepare the FreeBSD build
         run: node scripts/server-package.mjs "${{ matrix.target }}"
       - name: Build the package on FreeBSD ${{ matrix.release }}
         uses: vmactions/freebsd-vm@4469451fe39bee80be4066836c5170362e9349f3 # v1.5.7
@@ -117,3 +146,43 @@ jobs:
           # Node.js runs the test; the package brings the rest.
           prepare: env ASSUME_ALWAYS_YES=yes pkg install -y node24
           run: node test/server-freebsd.mjs server-artifacts/openchronology-server-${{ matrix.target }}-amd64.pkg
+  # macOS (#116): Homebrew installs the formula (deploy/homebrew) from a local tap, building
+  # och-convert and pgmp from the platform, and the server is set up and checked.
+  macos:
+    name: Server / macos
+    needs: platform
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+      HOMEBREW_NO_ENV_HINTS: 1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.1
+        with:
+          name: server-platform
+          path: server-artifacts/
+      - name: Tap the formula locally
+        run: |
+          brew tap-new --no-git openchronology/local
+          tap="$(brew --repository openchronology/local)"
+          node scripts/homebrew-formula.mjs \
+            --tarball server-artifacts/openchronology-server-platform.tar.gz \
+            --url "file://$PWD/server-artifacts/openchronology-server-platform.tar.gz" \
+            --out "$tap/Formula/openchronology-server.rb"
+      # A PostgreSQL the runner may run already would hold the socket PostgreSQL 17 needs.
+      - name: Stop other PostgreSQL servers
+        run: brew services list | awk '/^postgresql/ {print $1}' | xargs -n1 brew services stop || true
+      - name: Install it as users do
+        run: brew install --build-from-source openchronology/local/openchronology-server
+      - run: brew test openchronology/local/openchronology-server
+      - name: Set it up, run it and remove it
+        run: node test/server-homebrew.mjs

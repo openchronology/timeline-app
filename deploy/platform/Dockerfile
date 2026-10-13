@@ -1,7 +1,9 @@
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-# The FreeBSD server package's platform-independent part (#116): the editor and the Next.js
-# platform, built on Linux. deploy/freebsd-server/build.sh then builds och-convert and pgmp on
-# FreeBSD and makes the package. Use scripts/server-package.mjs freebsd14 (or freebsd15).
+# The server's platform-independent part (#116), openchronology-server-platform.tar.gz: the
+# editor and the Next.js platform built on Linux, the converter's sources with their Rust
+# crates (to build offline), the documentation and the Homebrew commands. The FreeBSD package
+# (deploy/freebsd-server/build.sh) and the Homebrew formula (deploy/homebrew) build och-convert
+# and pgmp for their systems from it. Use scripts/server-package.mjs platform.
 #   OCH_BUILD_COMMIT, OCH_BUILD_VERSION
 
 # The Rust crates of och-convert, vendored into the platform's source archive.
@@ -46,7 +48,7 @@ RUN --mount=type=bind,target=/build-context \
 
 # The application, laid out as the Linux packages do, without their Linux-only image library
 # (the platform does not optimize images) and without a Node.js runtime: FreeBSD's node24
-# package provides it.
+# package and Homebrew's node@24 provide it.
 FROM debian:bookworm-slim AS tree
 COPY --from=app /app/platform/.next/standalone /out/lib/openchronology/
 COPY --from=app /app/platform/.next/static /out/lib/openchronology/platform/.next/static
@@ -58,8 +60,17 @@ COPY --from=app /app/legal /out/lib/openchronology/legal
 COPY deploy/debian-server/openchronology-server.mjs /out/lib/openchronology/openchronology-server.mjs
 COPY LICENSE NOTICE THIRD_PARTY.md README.md /out/doc/
 COPY docs /out/doc/
-RUN rm -rf /out/lib/openchronology/node_modules/@img \
-    && tar -C /out -czf /openchronology-app.tar.gz lib doc
+# och-convert's sources and crates, with cargo set to build from them offline.
+COPY native-store /out/native/native-store
+COPY vendor/sqlite-rational /out/native/vendor/sqlite-rational
+COPY --from=native /build/rust-dependencies /out/native/rust-dependencies
+COPY deploy/homebrew/cargo-config.toml /out/native/.cargo/config.toml
+# The Homebrew formula's commands and configuration templates (deploy/homebrew).
+COPY deploy/homebrew /out/homebrew
+COPY deploy/debian-server/openchronology.env deploy/debian-server/syslog.env /out/homebrew/
+RUN rm -rf /out/lib/openchronology/node_modules/@img /out/homebrew/cargo-config.toml \
+    /out/homebrew/*.rb.in /out/homebrew/tap-README.md \
+    && tar -C /out -czf /openchronology-server-platform.tar.gz lib doc native homebrew
 
 FROM scratch AS export
-COPY --from=tree /openchronology-app.tar.gz /
+COPY --from=tree /openchronology-server-platform.tar.gz /

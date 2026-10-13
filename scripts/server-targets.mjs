@@ -13,10 +13,17 @@ export const serverTargets = {
   // on Linux; packages are tied to a FreeBSD major version.
   freebsd14: { format: 'pkg', release: '14', pg: 17 },
   freebsd15: { format: 'pkg', release: '15', pg: 17 },
+  // Homebrew's formula, in the openchronology/homebrew-tap repository (deploy/homebrew): built
+  // on the Mac from the platform; releases attach the platform, not a package.
+  macos: { format: 'brew', pg: 17 },
 };
+/** The platform-independent part FreeBSD's package and Homebrew's formula build from. */
+export const PLATFORM = 'openchronology-server-platform.tar.gz';
 /** A target's package file, as built and as attached to releases (its version is inside). */
 export const serverPackage = (target) =>
-  `openchronology-server-${target}-amd64.${serverTargets[target]?.format ?? 'deb'}`;
+  serverTargets[target]?.format === 'brew'
+    ? PLATFORM
+    : `openchronology-server-${target}-amd64.${serverTargets[target]?.format ?? 'deb'}`;
 /**
  * The upstream version of a release tag (Debian and RPM alike): without its "v", and with a
  * pre-release ("-rc.1") marked "~rc.1" so that it sorts before the release.

@@ -61,6 +61,14 @@ export const OFFLINE = { asset: 'openchronology-offline.html' };
  */
 export const SERVERS = [
   {
+    key: 'macos',
+    name: 'macOS (Homebrew)',
+    // Homebrew builds it from this release's platform archive; there is no file to download.
+    asset: 'openchronology-server-platform.tar.gz',
+    installer: 'brew',
+    guide: 'deploy/homebrew/README.Homebrew',
+  },
+  {
     key: 'debian13',
     name: 'Debian 13 (trixie)',
     asset: 'openchronology-server-debian13-amd64.deb',
@@ -168,6 +176,8 @@ export function assetSize(release, asset) {
  * (FreeBSD packages start nothing themselves).
  */
 export function installCommand(release, server) {
+  if (server.installer === 'brew')
+    return 'brew install openchronology/tap/openchronology-server && openchronology-setup';
   const url = assetLink(release, server.asset);
   return server.installer === 'pkg'
     ? `fetch ${url} && pkg install -y ./${server.asset} && openchronology-setup`
