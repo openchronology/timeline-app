@@ -62,11 +62,15 @@ export interface SavePlan {
   put: { key: string; value: StoredWindow; bytes: number }[];
   remove: string[];
 }
+/** A revision keeps at most this many stored windows, the most recently saved. */
+export const STORED_PER_REVISION = 64;
 /**
  * What to write for a timeline's cached windows: windows not stored yet, and the removal of
- * this timeline's other stored windows (released by the page, or of other revisions or
- * plugins). Then, over the budget or past the keeping time, other stored windows from the
- * least recently saved. The windows being saved are never removed.
+ * this timeline's windows of other revisions or plugins. Windows of this revision the page no
+ * longer holds stay stored: a page lets go of windows (when hidden, or over its own limits),
+ * and a save must not lose what a later visit could show, whenever it happens. Then, beyond
+ * the revision's window count, over the budget or past the keeping time, other stored windows
+ * go from the least recently saved. The windows being saved are never removed.
  */
 export function planSave(
   catalog: readonly Catalogued[],
@@ -83,8 +87,15 @@ export function planSave(
     .filter(([key]) => !stored.has(key))
     .map(([key, value]) => ({ key, value, bytes: JSON.stringify(value.frame).length * 2 }));
   const remove = new Set(
-    catalog.filter((c) => c.key.startsWith(timeline) && !current.has(c.key)).map((c) => c.key),
+    catalog
+      .filter((c) => c.key.startsWith(timeline) && !c.key.startsWith(version))
+      .map((c) => c.key),
   );
+  const revision = catalog
+    .filter((c) => c.key.startsWith(version) && !current.has(c.key))
+    .sort((a, b) => b.saved - a.saved);
+  for (const c of revision.slice(Math.max(0, STORED_PER_REVISION - current.size)))
+    remove.add(c.key);
   for (const c of catalog) if (now - c.saved > keepFor && !current.has(c.key)) remove.add(c.key);
   let total =
     put.reduce((sum, p) => sum + p.bytes, 0) +

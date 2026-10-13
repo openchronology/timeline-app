@@ -5,6 +5,7 @@ import { Q, Viewport } from '../dist/core.mjs';
 import { ViewportCache } from '../dist/remote-cache.mjs';
 import {
   planSave,
+  STORED_PER_REVISION,
   storeScope,
   timelinePrefix,
   versionPrefix,
@@ -42,7 +43,7 @@ test('keys separate servers, users, timelines, revisions and plugin sets', () =>
   assert.equal(fingerprint('[{"id":"a"}]'), fingerprint('[{"id":"a"}]'));
   assert.notEqual(fingerprint('[{"id":"a"}]'), fingerprint('[{"id":"b"}]'));
 });
-test('saving writes new windows and removes released ones and other revisions', () => {
+test('saving writes new windows, keeps released ones and removes other revisions', () => {
   const kept = win(0, 10),
     released = win(10, 20),
     added = win(20, 30);
@@ -57,7 +58,8 @@ test('saving writes new windows and removes released ones and other revisions', 
     plan.put.map((p) => p.key),
     [windowKey(r1, added)],
   );
-  assert.deepEqual(plan.remove.sort(), [catalog[1].key, catalog[2].key].sort());
+  // A window the page let go of stays stored, for a later visit; another revision's goes.
+  assert.deepEqual(plan.remove, [catalog[2].key]);
   // A new revision replaces every window of the timeline, and leaves other timelines alone.
   const next = planSave(catalog, timeline, r2, [added], 1000);
   assert.deepEqual(
@@ -67,6 +69,24 @@ test('saving writes new windows and removes released ones and other revisions', 
       .map((c) => c.key)
       .sort(),
   );
+});
+test('a revision keeps its most recently saved windows, up to its count', () => {
+  const stored = Array.from({ length: STORED_PER_REVISION + 3 }, (_, i) => ({
+    key: windowKey(r1, win(i * 10, i * 10 + 10)),
+    bytes: 10,
+    saved: i,
+  }));
+  const current = [win(-20, -10), win(-10, 0)];
+  const plan = planSave(stored, timeline, r1, current, 1000);
+  // Room for the page's two windows and the revision's newest others: the five oldest go.
+  assert.deepEqual(
+    plan.remove.sort(),
+    stored
+      .slice(0, 5)
+      .map((c) => c.key)
+      .sort(),
+  );
+  assert.equal(plan.put.length, 2);
 });
 test('past the budget or keeping time, the least recently saved other windows go first', () => {
   const other = (name, saved, bytes = 1000) => ({
