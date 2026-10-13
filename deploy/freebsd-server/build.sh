@@ -49,13 +49,14 @@ install -m 0755 native-store/target/release/och-convert "$APP/bin/och-convert"
 install -m 0644 "$WORK/pgmp/COPYING" "$DOC/pgmp/COPYING"
 sed "s/@PG_MAJOR@/$PG_MAJOR/g" "$HERE/README.FreeBSD" >"$DOC/README.FreeBSD"
 # The Linux packages' templates, with FreeBSD's paths: configuration under /usr/local/etc,
-# PostgreSQL's socket in /tmp, and rc.d services.
+# PostgreSQL's socket in /tmp, and rc.d services. The database user is named: FreeBSD's su -m
+# keeps the caller's USER, which the PostgreSQL client would otherwise connect as.
 freebsd_paths() {
   sed -e 's|/etc/openchronology|/usr/local/etc/openchronology|g' \
     -e 's|/usr/lib/openchronology|/usr/local/lib/openchronology|g' \
     -e 's|sudo systemctl restart openchronology|service openchronology restart|g' \
     -e 's|systemctl enable --now openchronology-\([a-z]*\)|sysrc openchronology_\1_enable=YES \&\& service openchronology_\1 start|g' \
-    -e 's|postgresql:///openchronology?host=/var/run/postgresql|postgresql:///openchronology?host=/tmp|' \
+    -e 's|postgresql:///openchronology?host=/var/run/postgresql|postgresql://openchronology@/openchronology?host=/tmp|' \
     -e 's|README.Debian|README.FreeBSD|g' "$@"
 }
 mkdir -p "$ROOT/share/openchronology"

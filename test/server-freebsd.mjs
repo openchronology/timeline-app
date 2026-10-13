@@ -55,7 +55,7 @@ const configFile = '/usr/local/etc/openchronology/openchronology.env';
 const config = await sh(`stat -f '%Lp %Su %Sg' ${configFile} && cat ${configFile}`);
 assert.match(config, /^640 root openchronology/);
 assert.match(config, /^AUTH_ENCRYPTION_KEY=[a-f0-9]{64}$/m);
-assert.match(config, /^DATABASE_URL=postgresql:\/\/\/openchronology\?host=\/tmp$/m);
+assert.match(config, /^DATABASE_URL=postgresql:\/\/openchronology@\/openchronology\?host=\/tmp$/m);
 
 // The rc.d service runs the server, which answers.
 assert.match(await sh('sysrc -n openchronology_enable'), /YES/);
