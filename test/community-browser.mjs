@@ -336,7 +336,10 @@ export async function checkCommunity(browser) {
       .waitFor();
     assert.equal(await page.locator('#pull-comments script').count(), 0);
     await page.locator('#pull-view').click();
-    await page.locator('#timeline-title').waitFor();
+    // The proposed timeline is read from the server, then opened read-only.
+    await page.waitForFunction(
+      () => document.querySelector('#timeline-title')?.value === 'Proposed title',
+    );
     assert(await page.locator('#timeline-title').isDisabled());
     assert.equal(await page.locator('#timeline-title').inputValue(), 'Proposed title');
     assert.deepEqual(errors, []);
