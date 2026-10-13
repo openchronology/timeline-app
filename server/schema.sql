@@ -920,3 +920,30 @@ DROP TRIGGER IF EXISTS oc_history_immutable ON oc_history_relationships;
 CREATE TRIGGER oc_history_immutable BEFORE UPDATE ON oc_history_relationships FOR EACH ROW EXECUTE FUNCTION oc_history_immutable();
 DROP TRIGGER IF EXISTS oc_history_immutable ON oc_history_settings;
 CREATE TRIGGER oc_history_immutable BEFORE UPDATE ON oc_history_settings FOR EACH ROW EXECUTE FUNCTION oc_history_immutable();
+-- Copies share history (history.mjs): a fork or duplicate reads through to the revision it
+-- was copied from (its base) for every entity it has not saved itself. Overrides record,
+-- per entity, the revision from which the copy keeps its own versions instead; one without
+-- a version is an entity the copy removed. Neither table refers to oc_timelines: a deleted
+-- timeline's kept revisions still read through to their base.
+CREATE TABLE IF NOT EXISTS oc_history_bases (
+  timeline_id uuid PRIMARY KEY, base_revision_id uuid NOT NULL REFERENCES oc_revisions
+);
+CREATE INDEX IF NOT EXISTS oc_history_bases_revision ON oc_history_bases(base_revision_id);
+CREATE TABLE IF NOT EXISTS oc_history_moment_overrides (
+  timeline_id uuid NOT NULL, id text NOT NULL, since bigint NOT NULL, PRIMARY KEY(timeline_id,id)
+);
+CREATE TABLE IF NOT EXISTS oc_history_duration_overrides (
+  timeline_id uuid NOT NULL, id text NOT NULL, since bigint NOT NULL, PRIMARY KEY(timeline_id,id)
+);
+CREATE TABLE IF NOT EXISTS oc_history_relationship_overrides (
+  timeline_id uuid NOT NULL, a_kind text NOT NULL, a_id text NOT NULL, b_kind text NOT NULL,
+  b_id text NOT NULL, since bigint NOT NULL, PRIMARY KEY(timeline_id,a_kind,a_id,b_kind,b_id)
+);
+DROP TRIGGER IF EXISTS oc_history_immutable ON oc_history_bases;
+CREATE TRIGGER oc_history_immutable BEFORE UPDATE ON oc_history_bases FOR EACH ROW EXECUTE FUNCTION oc_immutable_revision();
+DROP TRIGGER IF EXISTS oc_history_immutable ON oc_history_moment_overrides;
+CREATE TRIGGER oc_history_immutable BEFORE UPDATE ON oc_history_moment_overrides FOR EACH ROW EXECUTE FUNCTION oc_immutable_revision();
+DROP TRIGGER IF EXISTS oc_history_immutable ON oc_history_duration_overrides;
+CREATE TRIGGER oc_history_immutable BEFORE UPDATE ON oc_history_duration_overrides FOR EACH ROW EXECUTE FUNCTION oc_immutable_revision();
+DROP TRIGGER IF EXISTS oc_history_immutable ON oc_history_relationship_overrides;
+CREATE TRIGGER oc_history_immutable BEFORE UPDATE ON oc_history_relationship_overrides FOR EACH ROW EXECUTE FUNCTION oc_immutable_revision();

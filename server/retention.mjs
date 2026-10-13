@@ -101,9 +101,9 @@ export async function deleteWhere(
 /**
  * Removes the timeline's saved revisions from before `before`, apart from what is still
  * needed: the head, revisions forks, proposals or other timelines refer to (with their
- * ancestry), and the revisions newer ones are stored against (a patch replays its first
- * parent, back to a snapshot; revisions kept as rows need none). Returns how many
- * revisions went.
+ * ancestry), revisions copies read through to, and the revisions newer ones are stored
+ * against (a patch replays its first parent, back to a snapshot; revisions kept as rows
+ * need none). Returns how many revisions went.
  */
 export async function pruneHistory(client, timelineId, before) {
   const { rows } = await client.query(
@@ -118,6 +118,7 @@ export async function pruneHistory(client, timelineId, before) {
     ), needed(id) AS (
       SELECT r.id FROM oc_revisions r WHERE r.timeline_id=$1 AND (r.created_at>=$2
         OR r.id IN (SELECT id FROM shared)
+        OR EXISTS(SELECT 1 FROM oc_history_bases b WHERE b.base_revision_id=r.id)
         OR r.id=(SELECT head_revision_id FROM oc_timelines WHERE id=$1))
       UNION SELECT p.parent_id FROM needed n JOIN oc_revisions c ON c.id=n.id
         JOIN oc_revision_parents p ON p.revision_id=n.id AND p.position=0 WHERE c.patch IS NOT NULL

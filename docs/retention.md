@@ -19,9 +19,10 @@ then:
   the timeline's history records it;
 - deletes saved revisions from before the period, and the versions of moments, durations and
   relationships that only those revisions saw, which frees the storage they used. It keeps
-  what is still needed: the current revision, anything forks or pull requests refer to, and
-  revisions saved before history was kept as rows that newer ones are stored against
-  ([saved history](architecture.md#saved-history)).
+  what is still needed: the current revision, anything forks or pull requests refer to
+  (including the revision a fork or duplicate was copied from, whose history it reads
+  through to), and revisions saved before history was kept as rows that newer ones are
+  stored against ([saved history](architecture.md#saved-history)).
 
 Retention needs a calendar (Gregorian) time display, so that the server knows what time it
 is in the timeline; the period runs from the present. It keeps at least an hour and at most

@@ -140,6 +140,14 @@ Upgrading copies each timeline's current state into its saved history once, duri
 `openchronology-migrate`: about 14 s for 200,000 moments and 45 s for a million. Earlier
 revisions keep the form they were saved in.
 
+**Forks and duplicates share saved history** with the timeline they copy, instead of
+copying it: a new copy keeps no history beyond its settings, and its saves keep only what
+they change. At 200,000 moments, a fork used to add 37 MB of history and now adds a few
+hundred bytes. A copy still builds its own index of the whole timeline, which took about
+2 minutes at that size. Reading one of the copy's saved revisions takes about a third
+longer than reading the original's (6 s rather than 4.6 s), because it reads through to
+the original.
+
 **Pull requests still store whole timelines.** PostgreSQL stores each as one `jsonb` value,
 which cannot exceed about 256 MB, so the server refuses a pull request on a timeline over
 200 MB as JSON (HTTP 413) and asks to split it. With content like the benchmark's, that is

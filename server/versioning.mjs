@@ -2,6 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { HttpError } from './store.mjs';
 import { rebaseDocument } from './merge.mjs';
+import { shareHistory } from './history.mjs';
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 export function expectedRevision(value) {
   if (
@@ -75,6 +76,8 @@ export class Versioning {
         ],
       );
       await this.store.replace(c, newId, document);
+      // Its history reads through to the revision it copies, instead of copying it.
+      await shareHistory(c, newId, upstream.head_revision_id);
       await this.store.checkpoint(
         c,
         newId,
