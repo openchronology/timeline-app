@@ -31,13 +31,14 @@ permissions.
 
 An administrator who cannot sign in can have their password set back to `ADMIN_INITIAL_PASSWORD` from the configuration. To choose a new password, write it there first. The command needs access to the server and its configuration:
 
-| Installation                                    | Command                                                                |
-| ----------------------------------------------- | ---------------------------------------------------------------------- |
-| Debian, Ubuntu, Rocky, RHEL and Fedora packages | `sudo openchronology-reset-admin-password`                             |
-| FreeBSD package                                 | `openchronology-reset-admin-password`, as root                         |
-| macOS (Homebrew)                                | `openchronology-reset-admin-password`                                  |
-| Docker Compose                                  | `docker compose run --rm migrate node server/reset-admin-password.mjs` |
-| From the source                                 | `npm run reset-admin-password` (reads `.env`)                          |
+| Installation                                    | Command                                                                               |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Debian, Ubuntu, Rocky, RHEL and Fedora packages | `sudo openchronology-reset-admin-password`                                            |
+| FreeBSD package                                 | `openchronology-reset-admin-password`, as root                                        |
+| macOS (Homebrew)                                | `openchronology-reset-admin-password`                                                 |
+| Windows                                         | `openchronology-reset-admin-password` in the installation folder, as an administrator |
+| Docker Compose                                  | `docker compose run --rm migrate node server/reset-admin-password.mjs`                |
+| From the source                                 | `npm run reset-admin-password` (reads `.env`)                                         |
 
 It resets the `ADMIN_USERNAME` account, or the administrator the installation created first if `ADMIN_USERNAME` is empty:
 

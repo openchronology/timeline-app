@@ -93,18 +93,19 @@ The migration account needs permission to install pgmp and create objects. A pro
 
 Saving uses an atomic snapshot replacement with revision checks. Conflicting saves return HTTP 409 instead of silently overwriting another editor. This version permits 200,000 events per document and 16 MiB per HTTP request. Viewer queries only fetch the visible summaries and bounded event pages. An editor currently downloads the full document and rebuilds its browser map. Sparse saves update the database index in place, at a cost that grows with the logarithm of the timeline's size ([incremental saves](docs/architecture.md#incremental-saves)). Streaming very large imports is future work.
 
-## Server packages: Debian, Ubuntu, Rocky Linux, RHEL, Fedora, FreeBSD and macOS
+## Server packages: Debian, Ubuntu, Rocky Linux, RHEL, Fedora, FreeBSD, macOS and Windows
 
 The whole server also installs as one package. It contains the platform, its Node.js runtime, the SQLite converter and the `pgmp` extension, and uses the distribution's PostgreSQL:
 
-| Distribution            | Package                                                      | PostgreSQL |
-| ----------------------- | ------------------------------------------------------------ | ---------- |
-| Debian 13               | `openchronology-server-debian13-amd64.deb`                   | 17         |
-| Ubuntu 24.04            | `openchronology-server-ubuntu24.04-amd64.deb`                | 16         |
-| Rocky Linux and RHEL 10 | `openchronology-server-rocky10-amd64.rpm`                    | 16         |
-| Fedora 44               | `openchronology-server-fedora44-amd64.rpm`                   | 18         |
-| FreeBSD 14 and 15       | `openchronology-server-freebsd15-amd64.pkg` (or `freebsd14`) | 17         |
-| macOS (Homebrew)        | `brew install openchronology/tap/openchronology-server`      | 17         |
+| Distribution            | Package                                                      | PostgreSQL  |
+| ----------------------- | ------------------------------------------------------------ | ----------- |
+| Debian 13               | `openchronology-server-debian13-amd64.deb`                   | 17          |
+| Ubuntu 24.04            | `openchronology-server-ubuntu24.04-amd64.deb`                | 16          |
+| Rocky Linux and RHEL 10 | `openchronology-server-rocky10-amd64.rpm`                    | 16          |
+| Fedora 44               | `openchronology-server-fedora44-amd64.rpm`                   | 18          |
+| FreeBSD 14 and 15       | `openchronology-server-freebsd15-amd64.pkg` (or `freebsd14`) | 17          |
+| macOS (Homebrew)        | `brew install openchronology/tap/openchronology-server`      | 17          |
+| Windows                 | `openchronology-server-windows-amd64-setup.exe`              | 17, bundled |
 
 ```sh
 sudo apt install ./openchronology-server-debian13-amd64.deb      # Debian and Ubuntu
@@ -119,9 +120,9 @@ brew install openchronology/tap/openchronology-server && openchronology-setup   
 - writes `/etc/openchronology/openchronology.env` with a new `AUTH_ENCRYPTION_KEY`;
 - migrates and starts the `openchronology` service on `127.0.0.1:5173`.
 
-RPM distributions and FreeBSD don't initialize PostgreSQL themselves, so those packages do it when it hasn't been done (`openchronology-setup`, which can also be run again by hand). Like FreeBSD's ports, the FreeBSD package starts nothing itself: run `openchronology-setup` after installing it. On macOS, Homebrew builds the converter and `pgmp` for the Mac from the release's `openchronology-server-platform.tar.gz`; there, `openchronology-setup` runs as you (Homebrew's PostgreSQL does too), and the server is the `openchronology-server` service of `brew services`. Stable releases publish the formula to [openchronology/homebrew-tap](https://github.com/openchronology/homebrew-tap). The FreeBSD package uses FreeBSD's own Node.js (`node24`) and runs as rc.d services (`openchronology`, `openchronology_mail`, `openchronology_syslog`), with its configuration in `/usr/local/etc/openchronology`. Edit the configuration and restart, and put an HTTPS reverse proxy in front; on SELinux systems, let the proxy connect with `setsebool -P httpd_can_network_connect 1`.
+RPM distributions and FreeBSD don't initialize PostgreSQL themselves, so those packages do it when it hasn't been done (`openchronology-setup`, which can also be run again by hand). Like FreeBSD's ports, the FreeBSD package starts nothing itself: run `openchronology-setup` after installing it. On macOS, Homebrew builds the converter and `pgmp` for the Mac from the release's `openchronology-server-platform.tar.gz`; there, `openchronology-setup` runs as you (Homebrew's PostgreSQL does too), and the server is the `openchronology-server` service of `brew services`. Stable releases publish the formula to [openchronology/homebrew-tap](https://github.com/openchronology/homebrew-tap). On Windows, the installer is self-contained: it brings its own PostgreSQL 17 (EDB's binaries, with `pgmp` built for it), Node.js and WinSW, runs PostgreSQL and the server as Windows services, keeps the configuration and database in `C:\ProgramData\OpenChronology`, and migrates the database on upgrades ([README.Windows.txt](deploy/windows-server/README.Windows.txt)). The FreeBSD package uses FreeBSD's own Node.js (`node24`) and runs as rc.d services (`openchronology`, `openchronology_mail`, `openchronology_syslog`), with its configuration in `/usr/local/etc/openchronology`. Edit the configuration and restart, and put an HTTPS reverse proxy in front; on SELinux systems, let the proxy connect with `setsebool -P httpd_can_network_connect 1`.
 
-Upgrades keep the configuration and database, stop the server, and list the settings that are new in this version's template. Review them, back up, then run `sudo openchronology-migrate`, which migrates and starts the server again. `/usr/share/doc/openchronology-server/README.Debian` (or `README.RPM`, `README.FreeBSD`, `README.Homebrew`) covers configuration, email, the syslog receiver, upgrades and removal.
+Upgrades keep the configuration and database, stop the server, and list the settings that are new in this version's template. Review them, back up, then run `sudo openchronology-migrate`, which migrates and starts the server again. `/usr/share/doc/openchronology-server/README.Debian` (or `README.RPM`, `README.FreeBSD`, `README.Homebrew`, `README.Windows.txt`) covers configuration, email, the syslog receiver, upgrades and removal.
 
 Releases attach every package, and every push to `main` builds them as artifacts of the CI run. Build them yourself with Docker (`node scripts/server-package.mjs [debian13|ubuntu24.04|rocky10|fedora44]`, into `server-artifacts/`). For FreeBSD, `node scripts/server-package.mjs freebsd15` builds the platform, and `sh deploy/freebsd-server/build.sh` on FreeBSD (as root) makes the package. CI does both in a FreeBSD virtual machine, then installs the package on a fresh one (`test/server-freebsd.mjs`). Check one with `node test/server-deb.mjs` or `node test/server-rpm.mjs` and the package's path. Those tests install, run, upgrade and remove it in a fresh container.
 

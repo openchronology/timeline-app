@@ -61,6 +61,14 @@ export const OFFLINE = { asset: 'openchronology-offline.html' };
  */
 export const SERVERS = [
   {
+    key: 'windows',
+    name: 'Windows',
+    // A self-contained installer: its own PostgreSQL 17, run as Windows services.
+    asset: 'openchronology-server-windows-amd64-setup.exe',
+    installer: 'exe',
+    guide: 'deploy/windows-server/README.Windows.txt',
+  },
+  {
     key: 'macos',
     name: 'macOS (Homebrew)',
     // Homebrew builds it from this release's platform archive; there is no file to download.
@@ -178,6 +186,8 @@ export function assetSize(release, asset) {
 export function installCommand(release, server) {
   if (server.installer === 'brew')
     return 'brew install openchronology/tap/openchronology-server && openchronology-setup';
+  if (server.installer === 'exe')
+    return `Invoke-WebRequest ${assetLink(release, server.asset)} -OutFile "$env:TEMP\\${server.asset}"; Start-Process -Wait -Verb RunAs "$env:TEMP\\${server.asset}"`;
   const url = assetLink(release, server.asset);
   return server.installer === 'pkg'
     ? `fetch ${url} && pkg install -y ./${server.asset} && openchronology-setup`

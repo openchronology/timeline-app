@@ -1,0 +1,32 @@
+<!-- Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only -->
+<!-- The OpenChronology server as a Windows service (#116), run by WinSW
+     (openchronology-service.exe, beside this file): Node.js runs the platform's launcher with
+     the configuration in ProgramData, as the low-privilege LocalService account, after the
+     bundled PostgreSQL service. -->
+<service>
+  <id>OpenChronology</id>
+  <name>OpenChronology</name>
+  <description>The OpenChronology timeline platform server, on 127.0.0.1:5173.</description>
+  <executable>%BASE%\..\node\node.exe</executable>
+  <arguments>"%BASE%\..\app\openchronology-server.mjs"</arguments>
+  <workingdirectory>%BASE%\..\app</workingdirectory>
+  <env name="OCH_CONFIG" value="%ProgramData%\OpenChronology\openchronology.env"/>
+  <env name="OCH_CONVERTER" value="%BASE%\..\app\bin\och-convert.exe"/>
+  <env name="NODE_ENV" value="production"/>
+  <depend>OpenChronologyPostgreSQL</depend>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <onfailure action="restart" delay="5 sec"/>
+  <resetfailure>1 hour</resetfailure>
+  <stoptimeout>10 sec</stoptimeout>
+  <logpath>%ProgramData%\OpenChronology\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>5</keepFiles>
+  </log>
+  <serviceaccount>
+    <domain>NT AUTHORITY</domain>
+    <user>LocalService</user>
+    <allowservicelogon>true</allowservicelogon>
+  </serviceaccount>
+</service>
