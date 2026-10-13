@@ -35,6 +35,8 @@ import type { Advice, Measurements, Platform } from './capacity.js';
 import { createHoverPreview } from './hover-preview.js';
 import {
   Q,
+  entryLimit,
+  setEntryLimit,
   RationalMap,
   TimelineIndex,
   Viewport,
@@ -179,6 +181,8 @@ interface Session {
   fileExchange?: boolean;
   /** How many timelines this account may compare at once. */
   compareLimit?: number;
+  /** How many moments (durations, relationships) a timeline may hold; null for no limit. */
+  entryLimit?: number | null;
 }
 const el = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
 const desktop = !offlineHtml && !!window.__TAURI__,
@@ -254,6 +258,7 @@ function useServer(origin: string | null) {
   if (serverOrigin && connected.includes(serverOrigin)) sessions.set(serverOrigin, session);
   serverOrigin = origin ?? '';
   session = (origin && sessions.get(origin)) || { ...DISCONNECTED };
+  setEntryLimit(sessionEntryLimit(session));
   if (origin) sessions.delete(origin);
   useNativeServer(serverOrigin);
 }
@@ -1997,6 +2002,15 @@ function capacityDismissed(): string[] {
     return [];
   }
 }
+/** A server's entry limit from its session: Infinity for none, the default if unsaid. */
+function sessionEntryLimit(s: Session): number {
+  if (s.entryLimit === null) return Infinity;
+  return Number.isSafeInteger(s.entryLimit) && s.entryLimit! >= 1 ? s.entryLimit! : LIMIT;
+}
+/** How many entries of each kind the open timeline may hold: its server's limit, if any. */
+function timelineEntryLimit(): number {
+  return remote && !local ? sessionEntryLimit(session) : entryLimit();
+}
 /** Shows or hides the capacity notice for the open timeline. */
 function updateCapacity() {
   const notice = el('capacity-notice');
@@ -2012,6 +2026,7 @@ function updateCapacity() {
   const advice = platform
     ? advise(platform, capacity, {
         moments: Number(momentCount()),
+        limit: timelineEntryLimit(),
         ...(model && !sparseWorkspace()
           ? { durations: model.durations.size, relationships: model.relationships.size }
           : {}),
@@ -2057,7 +2072,7 @@ function updateCapacity() {
 const seconds = (ms: number) => (ms / 1000).toFixed(ms < 10000 ? 1 : 0) + ' s';
 function capacityMessage(advice: Advice): string {
   if (advice.kind === 'limit')
-    return `This timeline has ${advice.count.toLocaleString()} ${advice.entity}; a timeline holds at most ${LIMIT.toLocaleString()}. Consider splitting it into several timelines.`;
+    return `This timeline has ${advice.count.toLocaleString()} ${advice.entity}; a timeline holds at most ${timelineEntryLimit().toLocaleString()}. Consider splitting it into several timelines.`;
   if (advice.kind === 'desktop')
     return `Views of this timeline take about ${seconds(capacity.views.at(-1) ?? 0)} on this computer. Saved to a server, the server does that work, and others can view and edit it too.`;
   const elsewhere = offlineHtml
@@ -5205,6 +5220,8 @@ async function refreshSession(origin = serverOrigin) {
     return;
   }
   session = fresh;
+  // Pages follow their server's limit, for its timelines and browser drafts alike.
+  setEntryLimit(sessionEntryLimit(fresh));
   renderServers();
   accountHeading();
   heading();

@@ -1,8 +1,9 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 /**
  * Limits operators set in the environment: how many timelines each kind of account may
- * compare at once, and the default storage quota.
+ * compare at once, how many entries a timeline holds, and the default storage quota.
  */
+import { DEFAULT_ENTRY_LIMIT } from '../dist/core.mjs';
 
 /** No comparison holds more than this: live updates, layouts and saved views assume it. */
 export const COMPARE_CEILING = 8;
@@ -70,4 +71,21 @@ export function storageBytes(text) {
 export function defaultQuota(env = process.env) {
   const text = env.DEFAULT_USER_STORAGE_BYTES?.trim();
   return text ? storageBytes(text) : null;
+}
+
+/**
+ * How many moments a timeline may hold, and as many durations and relationships, from
+ * TIMELINE_ENTRY_LIMIT: a whole number from 1,000, or "unlimited" (Infinity). Unset or
+ * empty, 200,000.
+ */
+export function entryLimit(env = process.env) {
+  const text = env.TIMELINE_ENTRY_LIMIT?.trim().replaceAll(/[_,]/g, '');
+  if (!text) return DEFAULT_ENTRY_LIMIT;
+  if (text.toLowerCase() === 'unlimited') return Infinity;
+  const value = /^\d+$/.test(text) ? Number(text) : NaN;
+  if (!Number.isSafeInteger(value) || value < 1000)
+    throw new LimitError(
+      'TIMELINE_ENTRY_LIMIT must be a whole number of at least 1000, or unlimited.',
+    );
+  return value;
 }

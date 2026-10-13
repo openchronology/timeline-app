@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { rebaseDocument } from './merge.mjs';
 import { randomUUID } from 'node:crypto';
-import { HttpError } from './store.mjs';
+import { HttpError, documentJson } from './store.mjs';
 import { validateDocument } from '../dist/core.mjs';
 import { commonAncestor, lockTimelines, revisionId } from './versioning.mjs';
 export function searchInput(value = {}) {
@@ -285,8 +285,8 @@ export class Collaboration {
           input.title,
           input.body,
           t.revision,
-          JSON.stringify(pinned.base),
-          JSON.stringify(pinned.document),
+          documentJson(pinned.base),
+          documentJson(pinned.document),
           pinned.baseId,
           pinned.sourceId,
           input.sourceTimelineId ?? null,
@@ -350,10 +350,10 @@ export class Collaboration {
           id,
           input.title,
           input.body,
-          JSON.stringify(pinned.document),
+          documentJson(pinned.document),
           pinned.sourceId,
           pinned.baseId,
-          JSON.stringify(pinned.base),
+          documentJson(pinned.base),
           p.from_fork ? t.revision : p.base_revision,
         ],
       );
@@ -394,8 +394,8 @@ export class Collaboration {
             timelineId,
             id,
             t.revision,
-            JSON.stringify(upstream),
-            JSON.stringify(rebased),
+            documentJson(upstream),
+            documentJson(rebased),
             t.head_revision_id,
             sourceId,
           ],

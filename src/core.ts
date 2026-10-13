@@ -34,7 +34,6 @@ export {
   edgeTree,
   edgeBand,
   arcFromBand,
-  MAX_RELATIONSHIPS,
 } from './relationships.js';
 export type { EdgeBand, EntityRef, Relationship } from './relationships.js';
 export { durationGroups, coalesceGroups, entityCount } from './summaries.js';
@@ -50,8 +49,14 @@ export {
   durationWindow,
   durationSummaries,
   collapses,
-  MAX_DURATIONS,
 } from './durations.js';
+export {
+  DEFAULT_ENTRY_LIMIT,
+  entryLimit,
+  entryLimitText,
+  setEntryLimit,
+  withinEntryLimit,
+} from './entry-limit.js';
 export type { Duration, DurationBand, DurationEndpoint, DurationSummary } from './durations.js';
 export {
   searchTerms,
@@ -95,6 +100,7 @@ export { planRuler, validateRulerPolicy } from './ruler.js';
 export type { RulerPolicy, RulerTick, RulerPlan } from './ruler.js';
 export { parseTimestamp, printTimestamp } from './calendar.js';
 import { validateTags, entityTags, normalizeEntityTags } from './tags.js';
+import { entryLimitText, withinEntryLimit } from './entry-limit.js';
 export {
   validateTags,
   entityTags,
@@ -216,8 +222,8 @@ export function validateDocument(value: unknown, partial = false): TimelineDocum
     doc.description.length > 20000
   )
     throw new Error('The timeline needs a title and description.');
-  if (!Array.isArray(doc.events) || doc.events.length > 200000)
-    throw new Error('Expected at most 200,000 point events.');
+  if (!Array.isArray(doc.events) || !withinEntryLimit(doc.events.length))
+    throw new Error(`Expected at most ${entryLimitText()} point events.`);
   const comparison = doc.comparison === undefined ? undefined : validateComparison(doc.comparison);
   if (comparison && (doc.events.length || (Array.isArray(doc.durations) && doc.durations.length)))
     throw new Error('Saved comparisons reference sources instead of storing events.');

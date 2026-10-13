@@ -179,8 +179,12 @@ try {
   ).rows[0];
   assert(row.retention_applied_at);
   assert.equal(Number(row.retention_removed), 3);
-  // Applied within the hour, it is not due again; expiring again removes nothing.
+  // Applied within the hour, it is not due again. Expiring again removes no entries; the
+  // revision that was the head before the expiry's own save is now older history too.
   await expireDue(store, now);
+  const again = await expire(store, id, now);
+  assert.deepEqual({ ...again, history: 0 }, { history: 0, moments: 0, durations: 0 });
+  assert(again.history <= 1);
   assert.deepEqual(await expire(store, id, now), { history: 0, moments: 0, durations: 0 });
 
   // Quick deletion: everything in a range, by a writer, as one save.

@@ -11,11 +11,12 @@ import {
   refKey,
   searchRows,
   parseTime,
+  withinEntryLimit,
+  entryLimitText,
 } from '../dist/core.mjs';
 import { HttpError } from './store.mjs';
 import { PersistentTree, MOMENT_TREE, INTERVAL_TREE, intervalPayload, upsertRows } from './avl.mjs';
 
-const LIMIT = 200000;
 const bytes = (value) => Buffer.byteLength(JSON.stringify(value));
 /** JSON with sorted keys, for comparing stored and submitted settings. */
 export function canonical(value) {
@@ -167,7 +168,7 @@ export async function applyIncrementally(c, t, patch) {
     });
   for (const i of insertions) await moments.insert(i, i);
   const momentCount = await moments.size;
-  if (momentCount > LIMIT) fail('Expected at most 200,000 point events.');
+  if (!withinEntryLimit(momentCount)) fail(`Expected at most ${entryLimitText()} point events.`);
   const upserted = [...momentChanges].filter(([, e]) => e);
   const deleted = [...momentChanges].filter(([k, e]) => !e && saved.has(k)).map(([k]) => k);
   if (deleted.length)
@@ -275,7 +276,8 @@ export async function applyIncrementally(c, t, patch) {
         await durations.insert({ first: band.first, id: durationId }, intervalPayload(band));
     }
   }
-  if ((await durations.size) > LIMIT) fail('Use at most 200,000 durations per timeline.');
+  if (!withinEntryLimit(await durations.size))
+    fail(`Use at most ${entryLimitText()} durations per timeline.`);
   // Where an entity sits for arcs: a moment's time or a duration's start.
   const placedBefore = (durationId) => savedDurations.get(durationId)?.band.startTime;
   const movedDurations = [...bands]
@@ -418,7 +420,8 @@ export async function applyIncrementally(c, t, patch) {
   for (const arc of savedArcs) await edges.remove(arc);
   for (const band of arcs)
     await edges.insert({ first: band.first, id: band.id }, intervalPayload(band));
-  if ((await edges.size) > LIMIT) fail('Use at most 200,000 relationships per timeline.');
+  if (!withinEntryLimit(await edges.size))
+    fail(`Use at most ${entryLimitText()} relationships per timeline.`);
 
   // Search rows for changed entities.
   const searchDeletes = [
@@ -477,7 +480,22 @@ export async function applyIncrementally(c, t, patch) {
       related,
     })),
   };
-  return { recorded, assignments, added, settings, storage: Math.max(storage, 0) };
+  // What saved history must look at (history.mjs): the changed moments, the durations whose
+  // definitions or bands changed, and the links added or removed (as stored).
+  const touched = {
+    moments: [...momentChanges.keys()],
+    durations: [...bands.keys()],
+    relationships: [
+      ...unlinked,
+      ...relationshipChanges.map((r) => ({
+        a_kind: kindOf(r.a),
+        a_id: refId(r.a),
+        b_kind: kindOf(r.b),
+        b_id: refId(r.b),
+      })),
+    ],
+  };
+  return { recorded, assignments, added, settings, storage: Math.max(storage, 0), touched };
 }
 
 /** Inserts or replaces entity search rows. */

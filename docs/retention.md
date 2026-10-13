@@ -17,11 +17,11 @@ then:
   followed a deleted moment keep its time as a fixed endpoint, and relationships of deleted
   moments and durations go. This is saved like any other change, so viewers see it live and
   the timeline's history records it;
-- deletes saved revisions from before the period, which frees the storage they used. It keeps
-  what is still needed: the current revision and the history newer revisions are stored
-  against, and anything forks or pull requests refer to. A timeline whose saves are small
-  patches stores a full copy every 1,000 saves (or once its patches outweigh it), and history
-  before such a copy is what goes.
+- deletes saved revisions from before the period, and the versions of moments, durations and
+  relationships that only those revisions saw, which frees the storage they used. It keeps
+  what is still needed: the current revision, anything forks or pull requests refer to, and
+  revisions saved before history was kept as rows that newer ones are stored against
+  ([saved history](architecture.md#saved-history)).
 
 Retention needs a calendar (Gregorian) time display, so that the server knows what time it
 is in the timeline; the period runs from the present. It keeps at least an hour and at most

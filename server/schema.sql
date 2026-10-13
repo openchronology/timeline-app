@@ -451,7 +451,8 @@ BEGIN
   ELSIF TG_TABLE_NAME='oc_revisions' THEN
     SELECT owner_id INTO uid FROM oc_timelines WHERE id=NEW.timeline_id;
     uid:=CASE WHEN NEW.kind IN ('proposal','rebase') THEN NEW.author_id ELSE coalesce(uid,NEW.author_id) END;
-    IF NEW.snapshot_id IS NULL THEN n:=octet_length(NEW.patch::text);
+    IF NEW.history_rows THEN n:=NEW.stored_bytes;
+    ELSIF NEW.snapshot_id IS NULL THEN n:=octet_length(NEW.patch::text);
     ELSE SELECT document_bytes INTO n FROM oc_snapshots WHERE id=NEW.snapshot_id; END IF;
   ELSIF TG_TABLE_NAME='oc_proposals' THEN uid:=NEW.author_id; n:=octet_length(NEW.document::text)+octet_length(NEW.base_document::text)+octet_length(NEW.body)+octet_length(NEW.title);
   ELSIF TG_TABLE_NAME='oc_proposal_comments' THEN uid:=NEW.author_id; n:=octet_length(NEW.body);
@@ -811,8 +812,8 @@ ALTER TABLE oc_revisions ALTER COLUMN snapshot_id DROP NOT NULL;
 ALTER TABLE oc_revisions ADD COLUMN IF NOT EXISTS patch jsonb;
 -- Size of the revision's whole document as exported JSON (an upper-bound estimate for patches).
 ALTER TABLE oc_revisions ADD COLUMN IF NOT EXISTS document_bytes bigint CHECK(document_bytes>=0);
+-- Which content a revision has is checked below, once revisions can also be kept as rows.
 ALTER TABLE oc_revisions DROP CONSTRAINT IF EXISTS oc_revisions_content;
-ALTER TABLE oc_revisions ADD CONSTRAINT oc_revisions_content CHECK((snapshot_id IS NULL)<>(patch IS NULL));
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS patch_chain integer NOT NULL DEFAULT 0;
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS patch_bytes bigint NOT NULL DEFAULT 0;
 -- Saves update the timeline row once; free space on each page keeps those updates in place
@@ -861,3 +862,61 @@ ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS retention_applied_at timestamp
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS retention_removed bigint;
 CREATE INDEX IF NOT EXISTS oc_timelines_retention ON oc_timelines(retention_applied_at NULLS FIRST)
   WHERE retention_seconds IS NOT NULL;
+
+-- Saved history as rows (history.mjs): each version of a timeline's moments, durations,
+-- relationships and settings is valid from the revision number that saved it (since) until
+-- the one that changed or removed it (until, null while current). Saves write only what
+-- changed; revision n is the rows with since<=n<until. A timeline starts at its first
+-- numbered revision from here on (history_since); earlier revisions keep their snapshots
+-- and patches.
+CREATE TABLE IF NOT EXISTS oc_history_moments (
+  timeline_id uuid NOT NULL, id text NOT NULL, since bigint NOT NULL, until bigint,
+  time mpq NOT NULL, event jsonb NOT NULL,
+  PRIMARY KEY(timeline_id,id,since), CHECK(until>since)
+);
+CREATE TABLE IF NOT EXISTS oc_history_durations (
+  timeline_id uuid NOT NULL, id text NOT NULL, since bigint NOT NULL, until bigint,
+  definition jsonb NOT NULL,
+  PRIMARY KEY(timeline_id,id,since), CHECK(until>since)
+);
+CREATE TABLE IF NOT EXISTS oc_history_relationships (
+  timeline_id uuid NOT NULL, a_kind text NOT NULL, a_id text NOT NULL,
+  b_kind text NOT NULL, b_id text NOT NULL, since bigint NOT NULL, until bigint,
+  PRIMARY KEY(timeline_id,a_kind,a_id,b_kind,b_id,since), CHECK(until>since)
+);
+CREATE TABLE IF NOT EXISTS oc_history_settings (
+  timeline_id uuid NOT NULL, since bigint NOT NULL, until bigint, settings jsonb NOT NULL,
+  PRIMARY KEY(timeline_id,since), CHECK(until>since)
+);
+-- One current version of each entity; saves find it by ID.
+CREATE UNIQUE INDEX IF NOT EXISTS oc_history_moments_current ON oc_history_moments(timeline_id,id) WHERE until IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS oc_history_durations_current ON oc_history_durations(timeline_id,id) WHERE until IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS oc_history_relationships_current ON oc_history_relationships(timeline_id,a_kind,a_id,b_kind,b_id) WHERE until IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS oc_history_settings_current ON oc_history_settings(timeline_id) WHERE until IS NULL;
+-- Reading a revision scans one timeline's versions by when they started.
+CREATE INDEX IF NOT EXISTS oc_history_moments_since ON oc_history_moments(timeline_id,since);
+CREATE INDEX IF NOT EXISTS oc_history_durations_since ON oc_history_durations(timeline_id,since);
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS history_since bigint;
+-- A revision is a snapshot, a patch against its first parent, or kept as rows (numbered).
+ALTER TABLE oc_revisions ADD COLUMN IF NOT EXISTS history_rows boolean NOT NULL DEFAULT false;
+-- Bytes of the versions a revision kept as rows wrote: what it is charged.
+ALTER TABLE oc_revisions ADD COLUMN IF NOT EXISTS stored_bytes bigint CHECK(stored_bytes>=0);
+ALTER TABLE oc_revisions DROP CONSTRAINT IF EXISTS oc_revisions_content;
+ALTER TABLE oc_revisions ADD CONSTRAINT oc_revisions_content
+  CHECK(num_nonnulls(snapshot_id,patch)+history_rows::int=1 AND (NOT history_rows OR number IS NOT NULL));
+-- History is immutable like revisions: a version only ends, once.
+CREATE OR REPLACE FUNCTION oc_history_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD.until IS NOT NULL OR NEW.until IS NULL OR to_jsonb(NEW)-'until' IS DISTINCT FROM to_jsonb(OLD)-'until' THEN
+    RAISE EXCEPTION 'Saved history is immutable';
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS oc_history_immutable ON oc_history_moments;
+CREATE TRIGGER oc_history_immutable BEFORE UPDATE ON oc_history_moments FOR EACH ROW EXECUTE FUNCTION oc_history_immutable();
+DROP TRIGGER IF EXISTS oc_history_immutable ON oc_history_durations;
+CREATE TRIGGER oc_history_immutable BEFORE UPDATE ON oc_history_durations FOR EACH ROW EXECUTE FUNCTION oc_history_immutable();
+DROP TRIGGER IF EXISTS oc_history_immutable ON oc_history_relationships;
+CREATE TRIGGER oc_history_immutable BEFORE UPDATE ON oc_history_relationships FOR EACH ROW EXECUTE FUNCTION oc_history_immutable();
+DROP TRIGGER IF EXISTS oc_history_immutable ON oc_history_settings;
+CREATE TRIGGER oc_history_immutable BEFORE UPDATE ON oc_history_settings FOR EACH ROW EXECUTE FUNCTION oc_history_immutable();

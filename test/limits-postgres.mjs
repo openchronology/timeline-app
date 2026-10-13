@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Comparison limits (#86): a saved comparison holds at most as many sources as its owner's
-// kind of account may compare, and sessions report each account's limit.
+// kind of account may compare, and sessions report each account's limit. Entry limits
+// (#129): a timeline grows to the server's TIMELINE_ENTRY_LIMIT, or without one when unlimited.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -70,8 +71,46 @@ try {
     handler({ url: '/api/session', method: 'GET', headers: {}, socket: {} }, res);
   });
   assert.equal(session.compareLimit, 2);
+  assert.equal(session.entryLimit, 200000);
+
+  // A server's entry limit: incremental saves (the editor's, log ingestion's) stop at it.
+  const settings = { format: 'openchronology', version: 1, title: 'Entries', description: '' };
+  const moment = (i) => ({ id: 'e' + i, time: `${i}/1`, metadata: { title: 'Entry ' + i } });
+  const sessionOf = (h) =>
+    new Promise((resolve) =>
+      h(
+        { url: '/api/session', method: 'GET', headers: {}, socket: {} },
+        {
+          setHeader() {},
+          writeHead() {},
+          end: (body) => resolve(JSON.parse(String(body))),
+        },
+      ),
+    );
+  assert.equal((await sessionOf(createRequestHandler({ pool, entryLimit: 5 }))).entryLimit, 5);
+  let grown = await store.create(owner, {
+    ...settings,
+    events: Array.from({ length: 5 }, (_, i) => moment(i)),
+  });
+  timelines.push(grown.id);
+  const add = (i) =>
+    store.save(grown.id, owner, grown.revision, undefined, {
+      settings: { ...settings, events: [] },
+      changes: [{ id: 'e' + i, event: moment(i) }],
+    });
+  await assert.rejects(
+    add(5),
+    (error) => error.status === 400 && /at most 5 point events/.test(error.message),
+  );
+  // Unlimited: sessions say null, and the timeline grows past the default.
+  assert.equal(
+    (await sessionOf(createRequestHandler({ pool, entryLimit: Infinity }))).entryLimit,
+    null,
+  );
+  grown = await add(5);
+  assert.equal(grown.event_count, '6');
   console.log(
-    'PASS comparison limits: saved comparisons capped by their owner, administrators apart, sessions report the limit.',
+    'PASS limits: saved comparisons capped by their owner, administrators apart, timelines grow to the entry limit or without one, sessions report both.',
   );
 } finally {
   await pool.query('DELETE FROM oc_timelines WHERE id=ANY($1::uuid[])', [timelines.reverse()]);

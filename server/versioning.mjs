@@ -75,9 +75,6 @@ export class Versioning {
         ],
       );
       await this.store.replace(c, newId, document);
-      const { rows } = await c.query('SELECT snapshot_id FROM oc_revisions WHERE id=$1', [
-        upstream.head_revision_id,
-      ]);
       await this.store.checkpoint(
         c,
         newId,
@@ -85,7 +82,6 @@ export class Versioning {
         document,
         duplicate ? 'duplicate' : 'fork',
         duplicate ? [] : [upstream.head_revision_id],
-        rows[0].snapshot_id,
       );
     });
     return this.store.access(newId, userId);

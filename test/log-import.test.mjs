@@ -414,34 +414,19 @@ test('batches grow with the timeline, and the estimate follows the server', () =
   assert.equal(batchLimit(0), 64);
   assert.equal(batchLimit(800), 100);
   assert.equal(batchLimit(1e9), 4999);
-  // Saves too large to apply in place each store a full snapshot.
-  const large = storageEstimate(
-    new Map([
-      [
-        't',
-        {
-          start: { count: 0, bytes: 0 },
-          batches: [
-            { entries: 5000, moments: 5000, bytes: 1e6 },
-            { entries: 5000, moments: 5000, bytes: 1e6 },
-          ],
-        },
-      ],
-    ]),
+  // Each save is charged the versions it keeps, as well as the timeline's growth.
+  const estimate = (start, batches) => storageEstimate(new Map([['t', { start, batches }]]));
+  const batch = { entries: 1000, moments: 1000, bytes: 1e5 };
+  assert.equal(
+    estimate({ count: 0, bytes: 0, history: true }, [batch, batch]),
+    Math.round(2 * 1e5 * 2.1),
   );
-  assert.equal(large, 1e6 + 2e6 + 2e6);
-  const small = storageEstimate(
-    new Map([
-      [
-        't',
-        {
-          start: { count: 100000, bytes: 5e6 },
-          batches: [{ entries: 1000, moments: 1000, bytes: 1e5 }],
-        },
-      ],
-    ]),
+  // A timeline whose history is not kept as rows yet is copied once, by its first save.
+  assert.equal(
+    estimate({ count: 100000, bytes: 5e6, history: false }, [batch]),
+    Math.round(5e6 * 1.1 + 1e5 * 2.1),
   );
-  assert.equal(small, Math.round(1e5 + 1e5 * 1.17));
+  assert.equal(estimate({ count: 100000, bytes: 5e6, history: false }, []), 0);
 });
 
 test('progress redraws on a terminal, summarizes elsewhere, and is silent when quiet', () => {

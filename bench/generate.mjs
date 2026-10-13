@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Deterministic benchmark timelines: the same size and seed always produce the same document.
-import { Q, validateDocument } from '../dist/core.mjs';
+import { Q, validateDocument, entryLimit } from '../dist/core.mjs';
 
 export const DEFAULT_SIZES = [1000, 10000, 100000, 200000];
 const TAGS = ['war', 'trade', 'science', 'art', 'religion', 'politics', 'migration', 'climate'];
@@ -34,8 +34,8 @@ export function generateTimeline(size, seed = 27) {
   );
   const tags = () => TAGS.filter(() => random() < 0.12);
   const events = [];
-  // A timeline holds at most 200,000 moments; leave room for the create benchmark.
-  const count = Math.min(size, 199999);
+  // A timeline holds at most entryLimit() moments; leave room for the create benchmark.
+  const count = Math.min(size, entryLimit() - 1);
   for (let i = 0; i < count; i++) {
     const base =
       random() < 2 / 3

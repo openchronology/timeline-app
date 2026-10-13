@@ -2,6 +2,7 @@
 import { Rational as Q } from 'rational-ordered-map';
 import type { PointEvent, Metadata } from './core.js';
 import { normalizeEntityTags } from './tags.js';
+import { entryLimitText, withinEntryLimit } from './entry-limit.js';
 /** An endpoint is an exact time, or an anchor that follows a moment's time. */
 export type DurationEndpoint = string | { moment: string };
 export interface Duration {
@@ -17,7 +18,6 @@ export interface DurationBand extends Duration {
   last: string;
   sourceKey?: string;
 }
-export const MAX_DURATIONS = 200000;
 const identifier = (v: unknown): v is string =>
   typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v);
 export function anchorOf(endpoint: DurationEndpoint): string | null {
@@ -68,8 +68,8 @@ export function validateDurations(
   parse: (text: string) => Q,
 ): Duration[] {
   if (value === undefined) return [];
-  if (!Array.isArray(value) || value.length > MAX_DURATIONS)
-    throw new Error('Use at most 200,000 durations per timeline.');
+  if (!Array.isArray(value) || !withinEntryLimit(value.length))
+    throw new Error(`Use at most ${entryLimitText()} durations per timeline.`);
   const ids = new Set<string>();
   return value.map((raw) => {
     const duration = validateDuration(raw, parse);

@@ -23,8 +23,26 @@ import { randomUUID } from 'node:crypto';
 import { indexedNodes } from './tree.mjs';
 import { MOMENT_TREE, INTERVAL_TREE, intervalPayload, upsertRows } from './avl.mjs';
 import { applyIncrementally, incremental } from './incremental.mjs';
-/** A full snapshot is written after this many patch revisions (or patch bytes beyond the document's size). */
-const PATCH_CHAIN = 1000;
+import { recordHistory, historyDocument, pruneHistoryRows, settingsOf } from './history.mjs';
+/**
+ * The largest whole document stored (pull requests keep them), as JSON. PostgreSQL stores it
+ * as jsonb, whose arrays hold at most 268,435,455 bytes and take 1.2 to 1.3 times the size
+ * of the JSON.
+ */
+export const SNAPSHOT_BYTES = 200_000_000;
+/**
+ * A whole document as JSON to store, refused with a reason rather than by the database when
+ * it is too large (TIMELINE_ENTRY_LIMIT=unlimited reaches that).
+ */
+export function documentJson(document) {
+  const serialized = JSON.stringify(document);
+  if (Buffer.byteLength(serialized) > SNAPSHOT_BYTES)
+    throw new HttpError(
+      413,
+      'Pull requests store whole timelines, and this one is too large (over 200 MB). Split it into several timelines.',
+    );
+  return serialized;
+}
 export class HttpError extends Error {
   constructor(status, message) {
     super(message);
@@ -360,84 +378,66 @@ export class PostgresStore {
       return this.access(id, userId, c);
     });
   }
-  async checkpoint(client, id, userId, document, kind, parents = [], snapshotId = null) {
-    const { rows } = await client.query('SELECT revision FROM oc_timelines WHERE id=$1', [id]);
-    const revisionId = await this.recordRevision(
-      client,
-      id,
-      userId,
-      document,
-      kind,
-      parents,
-      snapshotId,
-      rows[0].revision,
+  /**
+   * Records the timeline's current state (just written from `document`) as its next numbered
+   * revision, kept as rows (history.mjs).
+   */
+  async checkpoint(client, id, userId, document, kind, parents = []) {
+    const { rows } = await client.query(
+      'SELECT revision,storage_bytes FROM oc_timelines WHERE id=$1',
+      [id],
     );
+    const stored = await recordHistory(client, id, rows[0].revision, settingsOf(document));
+    const revisionId = await this.recordRows(client, id, userId, kind, parents, {
+      number: rows[0].revision,
+      documentBytes: rows[0].storage_bytes,
+      stored,
+    });
+    await client.query('UPDATE oc_timelines SET head_revision_id=$2 WHERE id=$1', [id, revisionId]);
+    return revisionId;
+  }
+  /** A numbered revision kept as rows, charged the bytes of the versions it wrote. */
+  async recordRows(client, id, userId, kind, parents, { number, documentBytes, stored }) {
+    const revisionId = randomUUID();
     await client.query(
-      'UPDATE oc_timelines SET head_revision_id=$2,patch_chain=0,patch_bytes=0 WHERE id=$1',
-      [id, revisionId],
+      `INSERT INTO oc_revisions(id,timeline_id,number,author_id,kind,history_rows,document_bytes,stored_bytes)
+      VALUES($1,$2,$3,$4,$5,true,$6,$7)`,
+      [revisionId, id, number, userId, kind, documentBytes, stored],
     );
+    for (const [position, parent] of [...new Set(parents.filter(Boolean))].entries())
+      await client.query(
+        'INSERT INTO oc_revision_parents(revision_id,parent_id,position) VALUES($1,$2,$3)',
+        [revisionId, parent, position],
+      );
     return revisionId;
   }
   /**
-   * Applies a sparse save in place and records it as its patch against the previous head.
-   * Every PATCH_CHAIN saves, or once patches outweigh the document, the revision stores a
-   * full snapshot instead, so reading a revision replays a bounded chain. The timeline row is
-   * updated once and its indexed columns stay unchanged (updated_at advances at most once a
-   * minute), so the update stays in place (HOT) and the catalogue's GIN index is not touched.
+   * Applies a sparse save in place and records, as rows, the versions of what it changed:
+   * its cost follows the change, not the timeline's size. The timeline row is updated once
+   * and its indexed columns stay unchanged (updated_at advances at most once a minute), so
+   * the update stays in place (HOT) and the catalogue's GIN index is not touched.
    */
   async saveIncrementally(client, t, userId, patch) {
-    const { recorded, assignments, added, settings, storage } = await applyIncrementally(
+    const { assignments, added, settings, storage, touched } = await applyIncrementally(
       client,
       t,
       patch,
     );
-    const serialized = JSON.stringify(recorded),
-      size = Buffer.byteLength(serialized),
-      number = (BigInt(t.revision) + 1n).toString();
-    let revisionId,
-      chain = t.patch_chain + 1,
-      bytes = Number(t.patch_bytes) + size;
-    if (chain >= PATCH_CHAIN || bytes > Math.max(storage, 65536)) {
-      const current = {
-        ...t,
-        title: settings.title,
-        description: settings.description,
-        presentation: settings.presentation ?? null,
-        plugins: settings.plugins ?? null,
-        tags: settings.tags ?? null,
-        assets: settings.assets ?? null,
-      };
-      revisionId = await this.recordRevision(
-        client,
-        t.id,
-        userId,
-        await this.branchDocument(client, current),
-        'save',
-        [t.head_revision_id],
-        null,
-        number,
-      );
-      chain = 0;
-      bytes = 0;
-    } else {
-      revisionId = randomUUID();
-      await client.query(
-        'INSERT INTO oc_revisions(id,timeline_id,number,patch,author_id,kind,document_bytes) VALUES($1,$2,$3,$4::jsonb,$5,$6,$7)',
-        [revisionId, t.id, number, serialized, userId, 'save', storage],
-      );
-      await client.query(
-        'INSERT INTO oc_revision_parents(revision_id,parent_id,position) VALUES($1,$2,0)',
-        [revisionId, t.head_revision_id],
-      );
-    }
-    const fixed = 6;
+    const number = (BigInt(t.revision) + 1n).toString();
+    const stored = await recordHistory(client, t.id, number, settings, touched);
+    const revisionId = await this.recordRows(client, t.id, userId, 'save', [t.head_revision_id], {
+      number,
+      documentBytes: storage,
+      stored,
+    });
+    const fixed = 4;
     await client.query(
-      `UPDATE oc_timelines SET revision=revision+1,head_revision_id=$2,patch_chain=$3,patch_bytes=$4,
-      event_generation=event_generation+$5,event_text_stale=true,
+      `UPDATE oc_timelines SET revision=revision+1,head_revision_id=$2,
+      event_generation=event_generation+$3,event_text_stale=true,
       updated_at=CASE WHEN updated_at<now()-interval '1 minute' THEN now() ELSE updated_at END,
       ${assignments.map(([column, , cast], i) => `${column}=$${fixed + i}${cast ?? ''}`).join(',')}
       WHERE id=$1`,
-      [t.id, revisionId, chain, bytes, added ? 1 : 0, ...assignments.map(([, value]) => value)],
+      [t.id, revisionId, added ? 1 : 0, ...assignments.map(([, value]) => value)],
     );
   }
   async recordRevision(
@@ -454,7 +454,7 @@ export class PostgresStore {
     let size = null;
     if (!snapshotId) {
       snapshotId = randomUUID();
-      const serialized = JSON.stringify(validateDocument(document));
+      const serialized = documentJson(validateDocument(document));
       size = Buffer.byteLength(serialized);
       await client.query(
         'INSERT INTO oc_snapshots(id,document,document_bytes) VALUES($1,$2::jsonb,$3)',
@@ -472,8 +472,20 @@ export class PostgresStore {
       );
     return revisionId;
   }
-  /** A saved revision's document: its snapshot, or the nearest snapshot with later patches replayed. */
+  /**
+   * A saved revision's document: read from rows (history.mjs), or its snapshot, or the
+   * nearest snapshot with later patches replayed.
+   */
   async revisionDocument(client, id) {
+    const kept = await client.query(
+      'SELECT timeline_id,number FROM oc_revisions WHERE id=$1 AND history_rows',
+      [id],
+    );
+    if (kept.rows[0]) {
+      const document = await historyDocument(client, kept.rows[0].timeline_id, kept.rows[0].number);
+      if (!document) throw new HttpError(404, 'Saved revision unavailable.');
+      return document;
+    }
     const { rows } = await client.query(
       `WITH RECURSIVE chain(id,depth,snapshot_id,patch) AS (
         SELECT r.id,0,r.snapshot_id,r.patch FROM oc_revisions r WHERE r.id=$1
@@ -503,14 +515,19 @@ export class PostgresStore {
     ) SELECT r.id,r.snapshot_id FROM oc_revisions r WHERE r.timeline_id=$1 AND r.id NOT IN (SELECT id FROM kept)`,
       [timelineId],
     );
-    if (!rows.length) return;
     const ids = rows.map((r) => r.id);
-    await client.query('DELETE FROM oc_revision_parents WHERE revision_id=ANY($1::uuid[])', [ids]);
-    await client.query('DELETE FROM oc_revisions WHERE id=ANY($1::uuid[])', [ids]);
-    await client.query(
-      'DELETE FROM oc_snapshots s WHERE s.id=ANY($1::uuid[]) AND NOT EXISTS(SELECT 1 FROM oc_revisions r WHERE r.snapshot_id=s.id)',
-      [rows.map((r) => r.snapshot_id)],
-    );
+    if (ids.length) {
+      await client.query('DELETE FROM oc_revision_parents WHERE revision_id=ANY($1::uuid[])', [
+        ids,
+      ]);
+      await client.query('DELETE FROM oc_revisions WHERE id=ANY($1::uuid[])', [ids]);
+      await client.query(
+        'DELETE FROM oc_snapshots s WHERE s.id=ANY($1::uuid[]) AND NOT EXISTS(SELECT 1 FROM oc_revisions r WHERE r.snapshot_id=s.id)',
+        [rows.map((r) => r.snapshot_id)],
+      );
+    }
+    // Versions only the removed revisions saw go with them.
+    await pruneHistoryRows(client, timelineId);
   }
   async metadata(id, userId) {
     return this.transaction(async (c) => {
@@ -1113,9 +1130,6 @@ export function replayPatches(snapshot, patches) {
     ...(durations.size ? { durations: [...durations.values()] } : {}),
     ...(links.size ? { relationships: [...links.values()] } : {}),
   });
-}
-function settingsOf({ events, durations, relationships, ...settings }) {
-  return settings;
 }
 /** Applies sparse moment and duration edits to the current saved document. */
 export function applyPatch(current, patch) {
