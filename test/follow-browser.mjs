@@ -141,8 +141,12 @@ export async function checkFollowLatest(browser) {
     const shows = async (expected) => {
       let shown;
       for (let i = 0; i < 100; i++) {
-        shown = (await bounds()).map((q) => q.toString());
-        if (shown.join() === expected.join()) return;
+        try {
+          shown = (await bounds()).map((q) => q.toString());
+          if (shown.join() === expected.join()) return;
+        } catch {
+          // Not drawn yet: the bounds are empty.
+        }
         await page.waitForTimeout(50);
       }
       assert.deepEqual(shown, expected);
