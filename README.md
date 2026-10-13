@@ -93,20 +93,22 @@ The migration account needs permission to install pgmp and create objects. A pro
 
 Saving uses an atomic snapshot replacement with revision checks. Conflicting saves return HTTP 409 instead of silently overwriting another editor. This version permits 200,000 events per document and 16 MiB per HTTP request. Viewer queries only fetch the visible summaries and bounded event pages. An editor currently downloads the full document and rebuilds its browser map. Sparse saves update the database index in place, at a cost that grows with the logarithm of the timeline's size ([incremental saves](docs/architecture.md#incremental-saves)). Streaming very large imports is future work.
 
-## Server packages: Debian, Ubuntu, Rocky Linux, RHEL and Fedora
+## Server packages: Debian, Ubuntu, Rocky Linux, RHEL, Fedora and FreeBSD
 
 The whole server also installs as one package. It contains the platform, its Node.js runtime, the SQLite converter and the `pgmp` extension, and uses the distribution's PostgreSQL:
 
-| Distribution            | Package                                       | PostgreSQL |
-| ----------------------- | --------------------------------------------- | ---------- |
-| Debian 13               | `openchronology-server-debian13-amd64.deb`    | 17         |
-| Ubuntu 24.04            | `openchronology-server-ubuntu24.04-amd64.deb` | 16         |
-| Rocky Linux and RHEL 10 | `openchronology-server-rocky10-amd64.rpm`     | 16         |
-| Fedora 44               | `openchronology-server-fedora44-amd64.rpm`    | 18         |
+| Distribution            | Package                                                      | PostgreSQL |
+| ----------------------- | ------------------------------------------------------------ | ---------- |
+| Debian 13               | `openchronology-server-debian13-amd64.deb`                   | 17         |
+| Ubuntu 24.04            | `openchronology-server-ubuntu24.04-amd64.deb`                | 16         |
+| Rocky Linux and RHEL 10 | `openchronology-server-rocky10-amd64.rpm`                    | 16         |
+| Fedora 44               | `openchronology-server-fedora44-amd64.rpm`                   | 18         |
+| FreeBSD 14 and 15       | `openchronology-server-freebsd15-amd64.pkg` (or `freebsd14`) | 17         |
 
 ```sh
 sudo apt install ./openchronology-server-debian13-amd64.deb      # Debian and Ubuntu
 sudo dnf install ./openchronology-server-fedora44-amd64.rpm      # Rocky, RHEL and Fedora
+pkg install -y ./openchronology-server-freebsd15-amd64.pkg && openchronology-setup   # FreeBSD, as root
 ```
 
 (`dpkg -i` doesn't install dependencies; after it, run `sudo apt -f install`.) The first installation:
@@ -115,11 +117,11 @@ sudo dnf install ./openchronology-server-fedora44-amd64.rpm      # Rocky, RHEL a
 - writes `/etc/openchronology/openchronology.env` with a new `AUTH_ENCRYPTION_KEY`;
 - migrates and starts the `openchronology` service on `127.0.0.1:5173`.
 
-RPM distributions don't initialize PostgreSQL themselves, so the RPM package does it when it hasn't been done (`openchronology-setup`, which can also be run again by hand). Edit the configuration and restart, and put an HTTPS reverse proxy in front; on SELinux systems, let the proxy connect with `setsebool -P httpd_can_network_connect 1`.
+RPM distributions and FreeBSD don't initialize PostgreSQL themselves, so those packages do it when it hasn't been done (`openchronology-setup`, which can also be run again by hand). Like FreeBSD's ports, the FreeBSD package starts nothing itself: run `openchronology-setup` after installing it. The FreeBSD package uses FreeBSD's own Node.js (`node24`) and runs as rc.d services (`openchronology`, `openchronology_mail`, `openchronology_syslog`), with its configuration in `/usr/local/etc/openchronology`. Edit the configuration and restart, and put an HTTPS reverse proxy in front; on SELinux systems, let the proxy connect with `setsebool -P httpd_can_network_connect 1`.
 
-Upgrades keep the configuration and database, stop the server, and list the settings that are new in this version's template. Review them, back up, then run `sudo openchronology-migrate`, which migrates and starts the server again. `/usr/share/doc/openchronology-server/README.Debian` (or `README.RPM`) covers configuration, email, the syslog receiver, upgrades and removal.
+Upgrades keep the configuration and database, stop the server, and list the settings that are new in this version's template. Review them, back up, then run `sudo openchronology-migrate`, which migrates and starts the server again. `/usr/share/doc/openchronology-server/README.Debian` (or `README.RPM`, `README.FreeBSD`) covers configuration, email, the syslog receiver, upgrades and removal.
 
-Releases attach every package, and every push to `main` builds them as artifacts of the CI run. Build them yourself with Docker (`node scripts/server-package.mjs [debian13|ubuntu24.04|rocky10|fedora44]`, into `server-artifacts/`). Check one with `node test/server-deb.mjs` or `node test/server-rpm.mjs` and the package's path. Those tests install, run, upgrade and remove it in a fresh container.
+Releases attach every package, and every push to `main` builds them as artifacts of the CI run. Build them yourself with Docker (`node scripts/server-package.mjs [debian13|ubuntu24.04|rocky10|fedora44]`, into `server-artifacts/`). For FreeBSD, `node scripts/server-package.mjs freebsd15` builds the platform, and `sh deploy/freebsd-server/build.sh` on FreeBSD (as root) makes the package. CI does both in a FreeBSD virtual machine, then installs the package on a fresh one (`test/server-freebsd.mjs`). Check one with `node test/server-deb.mjs` or `node test/server-rpm.mjs` and the package's path. Those tests install, run, upgrade and remove it in a fresh container.
 
 ## Offline desktop and SQLite files
 
@@ -253,7 +255,7 @@ Every platform, desktop and standalone HTML footer displays the exact version ta
 The website's **Download** page (`/download`) offers the latest stable GitHub release of `openchronology/timeline-app`.
 
 - **Layout:** it puts the visitor's system first, detected from their browser, with a large download button. It then lists every desktop file by operating system, the offline file, and the server packages.
-- **Server packages:** each package (Debian 13, Ubuntu 24.04, Rocky Linux and RHEL 10, Fedora 44) has a one-line `curl … && sudo apt install ./…deb` (or `dnf install ./…rpm`) command to copy, and Docker Compose is offered for other systems.
+- **Server packages:** each package (Debian 13, Ubuntu 24.04, Rocky Linux and RHEL 10, Fedora 44, FreeBSD 14 and 15) has a one-line `curl … && sudo apt install ./…deb` (or `dnf install ./…rpm`, or FreeBSD's `fetch … && pkg install -y ./…pkg && openchronology-setup`) command to copy, and Docker Compose is offered for other systems.
 - **Release data:** the page reads the release's version, sizes and asset addresses from GitHub's API on the server, at most every ten minutes. `RELEASES_API_URL` overrides the address, for mirrors and tests.
 - **Fallback:** while there is no release, or GitHub cannot be reached, it links to GitHub's fixed `releases/latest/download/<asset-name>` addresses instead.
 - **Adding platforms:** asset names follow the release workflow (`platform/lib/releases.js`; a test keeps them in step), so a new server platform is added to its `SERVERS` list.

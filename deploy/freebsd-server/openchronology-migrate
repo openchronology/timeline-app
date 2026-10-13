@@ -1,0 +1,24 @@
+#!/bin/sh
+# Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+# Brings the OpenChronology database up to this package's schema, then (re)starts the server
+# when it is enabled. Safe to run more than once. Usage, as root: openchronology-migrate
+# [--no-restart]
+set -eu
+APP=/usr/local/lib/openchronology
+CONFIG=/usr/local/etc/openchronology/openchronology.env
+if [ "$(id -u)" -ne 0 ]; then
+  echo "Run as root: openchronology-migrate" >&2
+  exit 1
+fi
+if [ ! -r "$CONFIG" ]; then
+  echo "$CONFIG is missing; reinstall openchronology-server or restore it from a backup." >&2
+  exit 1
+fi
+# Node reads the same KEY=value file the services use, as the openchronology user, and as
+# systemd reads it (OCH_CONFIG: a # inside a value is part of it, #118).
+cd /
+su -m openchronology -c "env OCH_CONFIG=$CONFIG /usr/local/bin/node $APP/server/migrate.mjs"
+if [ "${1:-}" != "--no-restart" ] && service openchronology enabled; then
+  service openchronology restart >/dev/null 2>&1 || service openchronology start >/dev/null
+  echo "OpenChronology restarted."
+fi

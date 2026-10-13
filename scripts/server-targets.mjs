@@ -1,14 +1,18 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 /**
- * Server package targets (#116): each distribution's package format and base image. Debian
- * packages name their PostgreSQL major version; RPM packages take the one the distribution
- * ships (pg_config, when they are built).
+ * Server package targets (#116): each system's package format and base image. Debian and
+ * FreeBSD packages name their PostgreSQL major version; RPM packages take the one the
+ * distribution ships (pg_config, when they are built).
  */
 export const serverTargets = {
   debian13: { format: 'deb', base: 'debian:trixie', pg: 17, suffix: 'deb13' },
   'ubuntu24.04': { format: 'deb', base: 'ubuntu:24.04', pg: 16, suffix: 'ubuntu24.04' },
   rocky10: { format: 'rpm', base: 'rockylinux/rockylinux:10', dist: 'el10' },
   fedora44: { format: 'rpm', base: 'fedora:44', dist: 'fc44' },
+  // Built in a FreeBSD virtual machine (deploy/freebsd-server/build.sh) from the platform built
+  // on Linux; packages are tied to a FreeBSD major version.
+  freebsd14: { format: 'pkg', release: '14', pg: 17 },
+  freebsd15: { format: 'pkg', release: '15', pg: 17 },
 };
 /** A target's package file, as built and as attached to releases (its version is inside). */
 export const serverPackage = (target) =>
@@ -18,3 +22,8 @@ export const serverPackage = (target) =>
  * pre-release ("-rc.1") marked "~rc.1" so that it sorts before the release.
  */
 export const upstreamVersion = (tag) => tag.replace(/^v/, '').replace(/^([0-9.]+)-/, '$1~');
+/**
+ * A FreeBSD package version: pkg compares dotted parts, so a pre-release or development
+ * suffix becomes one more part (1.2.0.rc.1, 0.1.0.dev.202610121205.abcdef1).
+ */
+export const freebsdVersion = (upstream) => upstream.replace(/[~-]/g, '.');

@@ -56,8 +56,8 @@ export const DESKTOP = [
 /** The editor in one HTML file, for any browser and without a network. */
 export const OFFLINE = { asset: 'openchronology-offline.html' };
 /**
- * Server packages: each distribution's .deb or .rpm, installed with apt or dnf (which also
- * install PostgreSQL). More platforms join this list as they are supported.
+ * Server packages: each system's .deb, .rpm or FreeBSD .pkg, installed with apt, dnf or pkg
+ * (which also install PostgreSQL). More platforms join this list as they are supported.
  */
 export const SERVERS = [
   {
@@ -88,6 +88,20 @@ export const SERVERS = [
     installer: 'dnf',
     guide: 'deploy/rpm-server/README.RPM',
   },
+  {
+    key: 'freebsd15',
+    name: 'FreeBSD 15',
+    asset: 'openchronology-server-freebsd15-amd64.pkg',
+    installer: 'pkg',
+    guide: 'deploy/freebsd-server/README.FreeBSD',
+  },
+  {
+    key: 'freebsd14',
+    name: 'FreeBSD 14',
+    asset: 'openchronology-server-freebsd14-amd64.pkg',
+    installer: 'pkg',
+    guide: 'deploy/freebsd-server/README.FreeBSD',
+  },
 ];
 export const OTHER_ASSETS = {
   checksums: 'SHA256SUMS.txt',
@@ -104,6 +118,7 @@ export function detectPlatform(userAgent = '', hintPlatform = '') {
   if (hint === 'windows' || ua.includes('windows')) return 'windows';
   if (hint === 'macos' || ua.includes('mac os x') || ua.includes('macintosh')) return 'macos';
   if (hint === 'chrome os' || ua.includes('cros')) return 'chromeos';
+  if (hint === 'freebsd' || ua.includes('freebsd')) return 'freebsd';
   if (hint === 'linux' || ua.includes('linux') || ua.includes('x11')) return 'linux';
   return null;
 }
@@ -147,7 +162,14 @@ export function assetSize(release, asset) {
     ? `${(bytes / 1048576).toFixed(bytes >= 104857600 ? 0 : 1)} MB`
     : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
-/** The one line that downloads a server package and installs it with apt or dnf. */
+/**
+ * The one line that downloads a server package and installs it: with curl and sudo apt or
+ * dnf, or on FreeBSD (run as root) with its own fetch and pkg, then openchronology-setup
+ * (FreeBSD packages start nothing themselves).
+ */
 export function installCommand(release, server) {
-  return `curl -fLO ${assetLink(release, server.asset)} && sudo ${server.installer} install ./${server.asset}`;
+  const url = assetLink(release, server.asset);
+  return server.installer === 'pkg'
+    ? `fetch ${url} && pkg install -y ./${server.asset} && openchronology-setup`
+    : `curl -fLO ${url} && sudo ${server.installer} install ./${server.asset}`;
 }
