@@ -90,10 +90,17 @@ try {
   }
   Start-Service $pgService
   $env:PGPASSWORD = $superuser
+  # Notices (such as "already exists, skipping") would reach stderr, which Windows
+  # PowerShell 5.1 turns into errors; psql's exit code says whether SQL failed.
+  $env:PGOPTIONS = '-c client_min_messages=warning'
   function Invoke-Sql([string]$Database, [string]$Sql) {
-    $out = & (Join-Path $pg 'psql.exe') -X -q -At -v ON_ERROR_STOP=1 -h 127.0.0.1 -p $port -U postgres -d $Database -c $Sql 2>&1
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+      $out = & (Join-Path $pg 'psql.exe') -X -q -At -v ON_ERROR_STOP=1 -h 127.0.0.1 -p $port -U postgres -d $Database -c $Sql 2>&1
+    } finally { $ErrorActionPreference = $previous }
     if ($LASTEXITCODE -ne 0) { throw "SQL failed: $Sql`n$out" }
-    return $out
+    return ($out | Where-Object { $_ -isnot [Management.Automation.ErrorRecord] })
   }
   for ($i = 0; $i -lt 60; $i++) {
     & (Join-Path $pg 'pg_isready.exe') -q -h 127.0.0.1 -p $port
@@ -108,7 +115,7 @@ try {
   }
   # pgmp is not a trusted extension: the superuser creates it once for the application's role.
   Invoke-Sql openchronology 'CREATE EXTENSION IF NOT EXISTS pgmp' | Out-Null
-  Remove-Item Env:\PGPASSWORD
+  Remove-Item Env:\PGPASSWORD, Env:\PGOPTIONS
 
   # The schema: created, or migrated to this version.
   $env:OCH_CONFIG = $config
