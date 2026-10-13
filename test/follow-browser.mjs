@@ -149,6 +149,7 @@ export async function checkFollowLatest(browser) {
     await page.waitForTimeout(500);
     await page.reload();
     await page.locator('#separation-settings').waitFor();
+    await page.waitForFunction(() => document.getElementById('left-bound').value);
     assert.equal(await page.locator('#separation-tags').textContent(), 'ops');
     assert.deepEqual(
       (await bounds()).map((q) => q.toString()),
