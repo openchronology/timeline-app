@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advise, record, THRESHOLDS, LIMIT, SAMPLES } from '../dist/core.mjs';
+import { advise, record, nearLimit, THRESHOLDS, LIMIT, SAMPLES } from '../dist/core.mjs';
 
 const none = () => ({ navigation: [], edits: [], views: [] });
 test('the browser is advised by its own measurements, then by size', () => {
@@ -94,4 +94,17 @@ test('only the most recent samples count', () => {
   for (let i = 0; i < SAMPLES + 3; i++) record(samples, i < 3 ? 1000 : 1);
   assert.equal(samples.length, SAMPLES);
   assert.deepEqual(advise('browser', { ...none(), navigation: samples }, { moments: 1 }), []);
+});
+
+test("the limit warning follows the server's limit, and none without one", () => {
+  assert.equal(nearLimit(), THRESHOLDS.nearLimit);
+  assert.equal(nearLimit(1000000), 750000);
+  assert.deepEqual(advise('platform', none(), { moments: 190000, limit: 1000000 }), []);
+  assert.deepEqual(advise('platform', none(), { moments: 750000, limit: 1000000 }), [
+    { kind: 'limit', entity: 'moments', count: 750000 },
+  ]);
+  assert.deepEqual(advise('platform', none(), { moments: 5e7, limit: Infinity }), []);
+  assert.deepEqual(advise('platform', none(), { moments: 800, limit: 1000 }), [
+    { kind: 'limit', entity: 'moments', count: 800 },
+  ]);
 });

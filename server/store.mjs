@@ -25,6 +25,11 @@ import { MOMENT_TREE, INTERVAL_TREE, intervalPayload, upsertRows } from './avl.m
 import { applyIncrementally, incremental } from './incremental.mjs';
 /** A full snapshot is written after this many patch revisions (or patch bytes beyond the document's size). */
 const PATCH_CHAIN = 1000;
+/**
+ * The largest saved revision, as JSON. PostgreSQL stores it as jsonb, whose arrays hold at
+ * most 268,435,455 bytes and take 1.2 to 1.3 times the size of the JSON.
+ */
+export const SNAPSHOT_BYTES = 200_000_000;
 export class HttpError extends Error {
   constructor(status, message) {
     super(message);
@@ -456,6 +461,12 @@ export class PostgresStore {
       snapshotId = randomUUID();
       const serialized = JSON.stringify(validateDocument(document));
       size = Buffer.byteLength(serialized);
+      // Say so rather than fail in the database (TIMELINE_ENTRY_LIMIT=unlimited reaches it).
+      if (size > SNAPSHOT_BYTES)
+        throw new HttpError(
+          413,
+          'This timeline is too large to save a revision of (over 200 MB). Split it into several timelines.',
+        );
       await client.query(
         'INSERT INTO oc_snapshots(id,document,document_bytes) VALUES($1,$2::jsonb,$3)',
         [snapshotId, serialized, size],

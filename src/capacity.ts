@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+import { DEFAULT_ENTRY_LIMIT } from './entry-limit.js';
 /**
  * When to suggest another platform for a timeline. Thresholds come from the capacity
  * benchmarks (docs/capacity.md): in the browser, opening, navigating and the pause after an
@@ -7,8 +8,9 @@
  * of what its user waits for (from an input to the frame that shows its result),
  * with a moment count as a fallback. The desktop app and the platform stay fast up to the
  * per-timeline limit; the desktop advice only follows measurements on a slow computer.
+ * LIMIT is the default limit, which a server may change (entry-limit.ts).
  */
-export const LIMIT = 200000;
+export const LIMIT = DEFAULT_ENTRY_LIMIT;
 export const THRESHOLDS = {
   /** Browser: opening (reading, indexing and drawing) until painted, slower than this, in ms. */
   open: 1500,
@@ -29,7 +31,7 @@ export const THRESHOLDS = {
   moments: 20000,
   /** Desktop: median whole-view query slower than this, in ms. */
   view: 1000,
-  /** Every platform: entities of one kind at which to warn about the limit. */
+  /** Every platform: entities of one kind at which to warn about the default limit. */
   nearLimit: 150000,
 };
 /**
@@ -83,6 +85,12 @@ export interface Counts {
   moments: number;
   durations?: number;
   relationships?: number;
+  /** The timeline's entry limit, when not the default (a server's; Infinity for none). */
+  limit?: number;
+}
+/** Entities of one kind at which to warn about a limit: the same share of it as by default. */
+export function nearLimit(limit = LIMIT): number {
+  return Number.isFinite(limit) ? Math.ceil((limit * THRESHOLDS.nearLimit) / LIMIT) : Infinity;
 }
 export type Platform = 'browser' | 'desktop' | 'platform';
 export type Advice =
@@ -106,7 +114,7 @@ export function advise(platform: Platform, m: Measurements, counts: Counts): Adv
   const advice: Advice[] = [];
   for (const entity of ['moments', 'durations', 'relationships'] as const) {
     const count = counts[entity];
-    if (count !== undefined && count >= THRESHOLDS.nearLimit)
+    if (count !== undefined && count >= nearLimit(counts.limit))
       advice.push({ kind: 'limit', entity, count });
   }
   if (platform === 'browser') {

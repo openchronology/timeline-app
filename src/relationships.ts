@@ -3,6 +3,7 @@ import { Rational as Q } from 'rational-ordered-map';
 import { durationTree, resolveDuration } from './durations.js';
 import type { Duration, DurationBand, IntervalNode } from './durations.js';
 import type { PointEvent } from './core.js';
+import { entryLimitText, withinEntryLimit } from './entry-limit.js';
 
 /** A moment or a duration. Their ID spaces are separate, so references name the kind. */
 export type EntityRef = { moment: string } | { duration: string };
@@ -22,7 +23,6 @@ export interface EdgeBand {
   bTime: string;
   sourceKey?: string;
 }
-export const MAX_RELATIONSHIPS = 200000;
 const identifier = (v: unknown): v is string =>
   typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v);
 /** "m:<id>" or "d:<id>": a total order and a map key for references. */
@@ -64,8 +64,8 @@ export function validateRelationships(
   exists: ((key: string) => boolean) | null,
 ): Relationship[] {
   if (value === undefined) return [];
-  if (!Array.isArray(value) || value.length > MAX_RELATIONSHIPS)
-    throw new Error('Use at most 200,000 relationships per timeline.');
+  if (!Array.isArray(value) || !withinEntryLimit(value.length))
+    throw new Error(`Use at most ${entryLimitText()} relationships per timeline.`);
   const seen = new Map<string, Relationship>();
   for (const raw of value) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw))

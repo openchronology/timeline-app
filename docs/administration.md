@@ -102,6 +102,53 @@ blocked. Deleting a timeline can retain historical ancestors required by forks
 or pull requests, so usage may not drop to zero. History is intentionally
 immutable; saving checkpoints consumes quota even if edits are small.
 
+## Timeline size
+
+A timeline holds at most **200,000 moments**, and at most as many durations and as many
+relationships. `TIMELINE_ENTRY_LIMIT` in the environment file changes this for the server:
+a whole number of at least 1000 (such as `1000000`), or `unlimited`. Empty or unset is
+200,000. An invalid value stops the server at startup with a message saying why. The server
+tells its pages the limit, and they warn when a timeline reaches three quarters of it.
+
+The default suits a public platform, where the server is shared. Most work on a timeline
+reads or changes only part of it, at a cost that grows slowly with its size. Some work handles
+the whole timeline at once, and that cost grows with it:
+
+- **Saved revisions:** a save stores only what changed. Every 1,000 saves, or once the
+  changes since the last full copy add up to the timeline's size, the save also stores a full
+  copy of the timeline. This keeps history quick to replay, and each copy counts towards the
+  owner's storage quota. While it is written, other saves to that timeline wait.
+- **Exporting** to `.ochx`, **forking**, and **pull requests** read the whole timeline into
+  the server's memory.
+
+These figures come from an 8-core virtual machine with PostgreSQL 17, using the
+[benchmark timelines](benchmarks.md) (moments with titles, descriptions and tags, plus one
+duration and one relationship for every ten moments):
+
+| Moments   | Saving 5,000 new moments | Saving with a full copy | Exporting | Full copy | Server memory |
+| --------- | -----------------------: | ----------------------: | --------: | --------: | ------------: |
+| 200,000   |                      6 s |                    10 s |       4 s |     35 MB |        0.4 GB |
+| 500,000   |                     15 s |                    22 s |      11 s |     87 MB |        0.7 GB |
+| 1,000,000 |                     20 s |                    49 s |      19 s |    173 MB |        1.3 GB |
+
+**`unlimited` still has a ceiling.** PostgreSQL stores each full copy as one `jsonb` value,
+which cannot exceed about 256 MB. The server refuses a save whose full copy would exceed
+200 MB as JSON, with HTTP 413 and a message to split the timeline. With content like the
+benchmark's, that is about 1.1 million moments. Short titles without descriptions reach it
+later.
+
+Some limits stay the same whatever this setting is:
+
+- The offline HTML file and the desktop app's `.och` files hold 200,000 moments. The
+  platform's pages follow the server's limit, including timelines kept in the browser, but
+  the browser is slow well before that: past about 10,000 moments, save the timeline to the
+  server (see [Timeline size and platforms](capacity.md)).
+- An HTTP request carries at most 16 MiB, so creating or importing a whole timeline in one
+  request stays below roughly 100,000 moments. Larger timelines grow through saves: the
+  platform's editor, the [log importer](log-import.md) and the [syslog receiver](syslog.md)
+  all save in batches.
+- `.och` files exchanged with the server are at most 32 MiB.
+
 ## Name and analytics
 
 `PLATFORM_NAME` (for example `timescale.info`) replaces "openchronology" in the platform's header. It is also used as the site name in page titles, link previews and oEmbed responses, and the footer then adds "Powered by OpenChronology". When it is empty, OpenChronology's name is shown. The name is at most 60 characters, and the server refuses to start if it is longer.

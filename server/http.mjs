@@ -1,5 +1,9 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-import { compareLimits as compareLimitsFromEnv, compareLimit } from './limits.mjs';
+import {
+  compareLimits as compareLimitsFromEnv,
+  compareLimit,
+  entryLimit as entryLimitFromEnv,
+} from './limits.mjs';
 import { deleteWhere, parseRetention, printRetention } from './retention.mjs';
 import { setTimelineStar } from './stars.mjs';
 import { Administration, usage, requireDataProvider, avatarValue } from './administration.mjs';
@@ -28,6 +32,7 @@ import {
   validateTags,
   validateRef,
   canonicalRelationship,
+  setEntryLimit,
 } from '../dist/core.mjs';
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 async function body(req, maximum = 16 * 1024 * 1024) {
@@ -151,7 +156,10 @@ export function createRequestHandler({
   challenges: challengeSettings = null,
   // How many timelines each kind of account may compare (limits.mjs).
   compareLimits: limits = compareLimitsFromEnv(),
+  // How many entries of each kind a timeline holds (TIMELINE_ENTRY_LIMIT); Infinity for none.
+  entryLimit: entries = entryLimitFromEnv(),
 } = {}) {
+  setEntryLimit(entries);
   const library = createPluginLibrary(plugins, pool);
   const suites = createSuiteLibrary(undefined, pool);
   const store = pool ? new PostgresStore(pool, { compareLimits: limits }) : null,
@@ -289,6 +297,8 @@ export function createRequestHandler({
             fileExchange: !!pool && converter.enabled,
             // How many timelines this account may compare at once.
             compareLimit: compareLimit(limits, session),
+            // Moments (and durations, relationships) a timeline may hold; null for no limit.
+            entryLimit: Number.isFinite(entries) ? entries : null,
           },
           nonce ? { 'Set-Cookie': auth.nonceCookie('login', nonce) } : {},
         );

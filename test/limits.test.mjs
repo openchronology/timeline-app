@@ -6,6 +6,7 @@ import {
   compareLimit,
   storageBytes,
   defaultQuota,
+  entryLimit,
   LimitError,
 } from '../server/limits.mjs';
 import { quotaValue } from '../server/administration.mjs';
@@ -62,4 +63,19 @@ test('the environment sets the default quota only when given', () => {
   assert.equal(quotaValue(null, true), null);
   assert.throws(() => quotaValue('20TB'), /from 0 to 10 TB/);
   assert.throws(() => quotaValue({}), /from 0 to 10 TB/);
+});
+
+test('the entry limit comes from TIMELINE_ENTRY_LIMIT: a number from 1000, or unlimited', () => {
+  assert.equal(entryLimit({}), 200000);
+  assert.equal(entryLimit({ TIMELINE_ENTRY_LIMIT: ' ' }), 200000);
+  assert.equal(entryLimit({ TIMELINE_ENTRY_LIMIT: '1000000' }), 1000000);
+  assert.equal(entryLimit({ TIMELINE_ENTRY_LIMIT: '1_000_000' }), 1000000);
+  assert.equal(entryLimit({ TIMELINE_ENTRY_LIMIT: '50,000' }), 50000);
+  assert.equal(entryLimit({ TIMELINE_ENTRY_LIMIT: 'Unlimited' }), Infinity);
+  for (const value of ['999', '0', '-5', '2.5', '1e6', 'none', '9007199254740993'])
+    assert.throws(
+      () => entryLimit({ TIMELINE_ENTRY_LIMIT: value }),
+      (error) => error instanceof LimitError && /TIMELINE_ENTRY_LIMIT/.test(error.message),
+      value,
+    );
 });

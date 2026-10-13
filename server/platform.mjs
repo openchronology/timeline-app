@@ -9,7 +9,7 @@ import { Auth } from './auth.mjs';
 import { PostgresStore } from './store.mjs';
 import { startRetention } from './retention.mjs';
 import { providersFromEnv } from './oauth.mjs';
-import { compareLimits, defaultQuota, LimitError } from './limits.mjs';
+import { compareLimits, defaultQuota, entryLimit, LimitError } from './limits.mjs';
 import { analyticsId, platformName, SiteError } from './site.mjs';
 import { applyEnvironmentQuota } from './administration.mjs';
 const key = Symbol.for('openchronology.platform.services');
@@ -65,9 +65,10 @@ async function initialize() {
         })
       : null;
   // Limits from the environment file: refused at startup rather than misapplied.
-  let limits;
+  let limits, entries;
   try {
     limits = compareLimits();
+    entries = entryLimit();
     defaultQuota();
     platformName();
     analyticsId();
@@ -99,6 +100,7 @@ async function initialize() {
     trustProxy: process.env.TRUST_PROXY === '1',
     challenges: Challenges.settings(process.env),
     compareLimits: limits,
+    entryLimit: entries,
   };
   const store = pool ? new PostgresStore(pool, { compareLimits: limits }) : null;
   // Catalogue text left stale by an interrupted refresh catches up in the background.
