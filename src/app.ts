@@ -338,7 +338,9 @@ function discardMomentEdits() {
   momentSession = null;
   eventEditHistory = null;
   if (edit && model && session?.document === documentRequest) {
-    if (edit.after) model.delete(edit.after.id);
+    // The moment as it opened replaces the edited one: deleting it first would count as
+    // removing a moment durations or relationships follow, and rebuild their indexes (#68).
+    if (edit.after && edit.after.id !== edit.before?.id) model.delete(edit.after.id);
     if (edit.before) model.put(edit.before);
     forgetEdit(edit);
     selected = edit.before ?? null;
@@ -4871,7 +4873,9 @@ function applyEdit(redo: boolean) {
       el<HTMLDialogElement>('duration-dialog').close();
     } else {
       const [from, to] = redo ? [edit.before, edit.after] : [edit.after, edit.before];
-      if (from) index.delete(from.id);
+      // Replacing a moment in place keeps duration and relationship indexes (see
+      // discardMomentEdits); only a moment going away is deleted.
+      if (from && from.id !== to?.id) index.delete(from.id);
       if (to) index.put(to);
     }
   };
