@@ -674,7 +674,13 @@ try {
     tag: 'astronomy',
   });
   assert(publicSearch.timelines.some((t) => t.id === custody.id));
-  const noteSearch = await anonymous.request('timelines/search', 'POST', { search: 'calibration' });
+  // Moment text reaches the catalogue just after a merge commits, as after any sparse save.
+  let noteSearch;
+  for (let tries = 0; tries < 40; tries++) {
+    noteSearch = await anonymous.request('timelines/search', 'POST', { search: 'calibration' });
+    if (noteSearch.timelines.some((t) => t.id === custody.id)) break;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
   assert(noteSearch.timelines.some((t) => t.id === custody.id));
   await anonymous.request('timelines/search', 'POST', { scope: 'mine' }, 401);
   await viewer.request(`timelines/${custody.id}`, 'DELETE', {}, 403);

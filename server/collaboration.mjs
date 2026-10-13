@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-import { rebaseDocument } from './merge.mjs';
+import { rebaseDocument, mergePatch } from './merge.mjs';
 import { randomUUID } from 'node:crypto';
 import { HttpError } from './store.mjs';
 import { validateDocument, relationshipKey } from '../dist/core.mjs';
@@ -447,20 +447,38 @@ export class Collaboration {
       if (value.action === 'rebase') {
         if (!t.canPropose || p.author_id !== userId)
           throw new HttpError(403, 'Only the author can rebase.');
-        const rebased = rebaseDocument(
-          await this.store.revisionDocument(c, p.base_revision_id),
-          await this.store.revisionDocument(c, p.source_revision_id),
-          await this.store.branchDocument(c, t),
-        );
-        const sourceId = await this.store.recordDetached(
-          c,
-          p.source_timeline_id ?? timelineId,
-          userId,
-          rebased,
-          'rebase',
-          [p.source_revision_id, t.head_revision_id],
-          t.head_revision_id,
-        );
+        const parents = [p.source_revision_id, t.head_revision_id];
+        // The proposal's changes merged into upstream's head, entity by entity, and kept as
+        // that head changed; or, from revisions saved before history was kept as rows, as
+        // merged documents.
+        const patch = await mergePatch(c, timelineId, {
+          baseId: p.base_revision_id,
+          otherId: p.source_revision_id,
+          headId: t.head_revision_id,
+        });
+        const sourceId = patch
+          ? await this.store.recordDetachedPatch(
+              c,
+              t,
+              userId,
+              patch,
+              'rebase',
+              parents,
+              t.head_revision_id,
+            )
+          : await this.store.recordDetached(
+              c,
+              p.source_timeline_id ?? timelineId,
+              userId,
+              rebaseDocument(
+                await this.store.revisionDocument(c, p.base_revision_id),
+                await this.store.revisionDocument(c, p.source_revision_id),
+                await this.store.branchDocument(c, t),
+              ),
+              'rebase',
+              parents,
+              t.head_revision_id,
+            );
         await c.query(
           'UPDATE oc_proposals SET base_revision=$3,base_revision_id=$4,source_revision_id=$5,revision=revision+1,updated_at=now() WHERE timeline_id=$1 AND id=$2',
           [timelineId, id, t.revision, t.head_revision_id, sourceId],
@@ -474,21 +492,29 @@ export class Collaboration {
       if (value.action === 'merge') {
         if (!p.from_fork && t.revision !== p.base_revision)
           throw new HttpError(409, 'Upstream changed. The author must rebase before merging.');
-        const source = await this.store.revisionDocument(c, p.source_revision_id);
-        const document = p.from_fork
-          ? rebaseDocument(
-              await this.store.revisionDocument(c, p.base_revision_id),
-              source,
-              await this.store.branchDocument(c, t),
-            )
-          : validateDocument(source);
-        await this.store.replace(c, timelineId, document);
-        await c.query('UPDATE oc_timelines SET revision=revision+1 WHERE id=$1', [timelineId]);
+        const parents = [t.head_revision_id, p.source_revision_id];
+        // What the proposal changed, merged into upstream entity by entity and applied as a
+        // save; or, from revisions saved before history was kept as rows, as documents.
+        const patch = await mergePatch(c, timelineId, {
+          baseId: p.base_revision_id,
+          otherId: p.source_revision_id,
+          headId: t.head_revision_id,
+        });
+        if (patch) mergedId = await this.store.applyMerge(c, t, userId, patch, 'merge', parents);
+        else {
+          const source = await this.store.revisionDocument(c, p.source_revision_id);
+          const document = p.from_fork
+            ? rebaseDocument(
+                await this.store.revisionDocument(c, p.base_revision_id),
+                source,
+                await this.store.branchDocument(c, t),
+              )
+            : validateDocument(source);
+          await this.store.replace(c, timelineId, document);
+          await c.query('UPDATE oc_timelines SET revision=revision+1 WHERE id=$1', [timelineId]);
+          mergedId = await this.store.checkpoint(c, timelineId, userId, document, 'merge', parents);
+        }
         mergedRevision = (BigInt(t.revision) + 1n).toString();
-        mergedId = await this.store.checkpoint(c, timelineId, userId, document, 'merge', [
-          t.head_revision_id,
-          p.source_revision_id,
-        ]);
       }
       const status = { merge: 'merged', reject: 'rejected', close: 'closed' }[value.action];
       await c.query(
