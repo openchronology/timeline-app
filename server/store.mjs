@@ -26,6 +26,7 @@ import { applyIncrementally, incremental } from './incremental.mjs';
 import {
   recordHistory,
   recordDetached,
+  recordDetachedPatch,
   historyDocument,
   pruneHistoryRows,
   settingsOf,
@@ -425,6 +426,41 @@ export class PostgresStore {
       );
     return revisionId;
   }
+  /**
+   * Like recordDetached, a revision that is `baseId` (the head of `t`) changed by a merge's
+   * patch (merge.mjs), kept as rows and charged what the patch changes.
+   */
+  async recordDetachedPatch(client, t, userId, patch, kind, parents, baseId) {
+    const revisionId = randomUUID();
+    const stored = await recordDetachedPatch(client, revisionId, baseId, patch);
+    await client.query(
+      `INSERT INTO oc_revisions(id,timeline_id,number,author_id,kind,history_rows,document_bytes,stored_bytes)
+      VALUES($1,$1,1,$2,$3,true,$4,$5)`,
+      [revisionId, userId, kind, t.storage_bytes, stored],
+    );
+    for (const [position, parent] of [...new Set(parents.filter(Boolean))].entries())
+      await client.query(
+        'INSERT INTO oc_revision_parents(revision_id,parent_id,position) VALUES($1,$2,$3)',
+        [revisionId, parent, position],
+      );
+    return revisionId;
+  }
+  /**
+   * Applies a merge's patch (merge.mjs) to timeline `t` (locked by the caller) as its next
+   * revision, of `kind` with `parents`: in place like a sparse save when it is small enough,
+   * otherwise rebuilt from the patched document. Returns the revision's ID.
+   */
+  async applyMerge(client, t, userId, patch, kind, parents) {
+    if (incremental(t, patch)) {
+      const revisionId = await this.saveIncrementally(client, t, userId, patch, kind, parents);
+      client.afterCommit = () => this.refreshText(t.id);
+      return revisionId;
+    }
+    const document = validateDocument(applyPatch(await this.branchDocument(client, t), patch));
+    await this.replace(client, t.id, document);
+    await client.query('UPDATE oc_timelines SET revision=revision+1 WHERE id=$1', [t.id]);
+    return this.checkpoint(client, t.id, userId, document, kind, parents);
+  }
   /** A numbered revision kept as rows, charged the bytes of the versions it wrote. */
   async recordRows(client, id, userId, kind, parents, { number, documentBytes, stored }) {
     const revisionId = randomUUID();
@@ -446,7 +482,7 @@ export class PostgresStore {
    * and its indexed columns stay unchanged (updated_at advances at most once a minute), so
    * the update stays in place (HOT) and the catalogue's GIN index is not touched.
    */
-  async saveIncrementally(client, t, userId, patch) {
+  async saveIncrementally(client, t, userId, patch, kind = 'save', parents = [t.head_revision_id]) {
     const { assignments, added, settings, storage, touched } = await applyIncrementally(
       client,
       t,
@@ -454,7 +490,7 @@ export class PostgresStore {
     );
     const number = (BigInt(t.revision) + 1n).toString();
     const stored = await recordHistory(client, t.id, number, settings, touched);
-    const revisionId = await this.recordRows(client, t.id, userId, 'save', [t.head_revision_id], {
+    const revisionId = await this.recordRows(client, t.id, userId, kind, parents, {
       number,
       documentBytes: storage,
       stored,
@@ -468,6 +504,7 @@ export class PostgresStore {
       WHERE id=$1`,
       [t.id, revisionId, added ? 1 : 0, ...assignments.map(([, value]) => value)],
     );
+    return revisionId;
   }
   async recordRevision(
     client,

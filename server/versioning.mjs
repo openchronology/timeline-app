@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { randomUUID } from 'node:crypto';
 import { HttpError } from './store.mjs';
-import { rebaseDocument } from './merge.mjs';
+import { rebaseDocument, mergePatch } from './merge.mjs';
 import { shareHistory } from './history.mjs';
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 export function expectedRevision(value) {
@@ -107,20 +107,30 @@ export class Versioning {
         throw new HttpError(403, 'Private upstream data cannot be synced into a public fork.');
       const base = await commonAncestor(c, fork.head_revision_id, upstream.head_revision_id);
       if (base === upstream.head_revision_id) return this.store.access(id, userId, c);
-      const document = rebaseDocument(
-        await this.store.revisionDocument(c, base),
-        await this.store.revisionDocument(c, fork.head_revision_id),
-        await this.store.revisionDocument(c, upstream.head_revision_id),
-      );
-      await this.store.replace(c, id, document);
+      const parents = [fork.head_revision_id, upstream.head_revision_id];
+      // What upstream changed since the common ancestor, merged into the fork entity by
+      // entity and applied as a save; or, from revisions saved before history was kept as
+      // rows, as merged documents.
+      const patch = await mergePatch(c, id, {
+        baseId: base,
+        otherId: upstream.head_revision_id,
+        headId: fork.head_revision_id,
+      });
+      if (patch) await this.store.applyMerge(c, fork, userId, patch, 'sync', parents);
+      else {
+        const document = rebaseDocument(
+          await this.store.revisionDocument(c, base),
+          await this.store.revisionDocument(c, fork.head_revision_id),
+          await this.store.revisionDocument(c, upstream.head_revision_id),
+        );
+        await this.store.replace(c, id, document);
+        await c.query('UPDATE oc_timelines SET revision=revision+1 WHERE id=$1', [id]);
+        await this.store.checkpoint(c, id, userId, document, 'sync', parents);
+      }
       await c.query(
-        'UPDATE oc_timelines SET revision=revision+1,publication_restricted=publication_restricted OR $2 WHERE id=$1',
+        'UPDATE oc_timelines SET publication_restricted=publication_restricted OR $2 WHERE id=$1',
         [id, upstream.visibility === 'private' || upstream.publication_restricted],
       );
-      await this.store.checkpoint(c, id, userId, document, 'sync', [
-        fork.head_revision_id,
-        upstream.head_revision_id,
-      ]);
       return this.store.access(id, userId, c);
     });
   }

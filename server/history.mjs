@@ -194,14 +194,57 @@ const STAGED_KINDS = Object.fromEntries(
  * (then the revision stores the document).
  */
 export async function recordDetached(client, revisionId, baseRevisionId, document) {
+  if (!(await startDetached(client, revisionId, baseRevisionId))) return null;
+  await stage(client, revisionId, document);
+  const bytes =
+    (await recordSettings(client, revisionId, 1, settingsOf(document))) +
+    (await recordEntities(client, STAGED_KINDS, revisionId, 1, false, null));
+  await unstage(client, revisionId);
+  return bytes;
+}
+/**
+ * Records, like recordDetached, a revision that is its base changed by `patch` (as saves
+ * take it: settings, changes, durationChanges, relationshipChanges): only what the patch
+ * names is compared, so it costs what it changes.
+ */
+export async function recordDetachedPatch(client, revisionId, baseRevisionId, patch) {
+  // A patch only exists against a base kept as rows (mergePatch).
+  if (!(await startDetached(client, revisionId, baseRevisionId))) return null;
+  const relationships = (patch.relationshipChanges ?? []).map((r) => ({ a: r.a, b: r.b }));
+  await stage(client, revisionId, {
+    events: patch.changes.filter((c) => c.event).map((c) => c.event),
+    durations: (patch.durationChanges ?? []).filter((c) => c.duration).map((c) => c.duration),
+    relationships: relationships.filter((_, i) => patch.relationshipChanges[i].related),
+  });
+  const link = (r) => {
+    const [a_kind, a_id] = reference(r.a),
+      [b_kind, b_id] = reference(r.b);
+    return { a_kind, a_id, b_kind, b_id };
+  };
+  const bytes =
+    (await recordSettings(client, revisionId, 1, patch.settings)) +
+    (await recordEntities(client, STAGED_KINDS, revisionId, 1, false, {
+      moments: patch.changes.map((c) => c.id),
+      durations: (patch.durationChanges ?? []).map((c) => c.id),
+      relationships: relationships.map(link),
+    }));
+  await unstage(client, revisionId);
+  return bytes;
+}
+/** A detached revision's history reads through to its base, which must be kept as rows. */
+async function startDetached(client, revisionId, baseRevisionId) {
   const base = await client.query('SELECT 1 FROM oc_revisions WHERE id=$1 AND history_rows', [
     baseRevisionId,
   ]);
-  if (!base.rows.length) return null;
+  if (!base.rows.length) return false;
   await client.query('INSERT INTO oc_history_bases(timeline_id,base_revision_id) VALUES($1,$2)', [
     revisionId,
     baseRevisionId,
   ]);
+  return true;
+}
+/** Stages a document's entities (see STAGED) for `id`, until the transaction ends. */
+async function stage(client, id, document) {
   for (const stage of Object.values(STAGED)) {
     await client.query(
       `CREATE TEMPORARY TABLE IF NOT EXISTS ${stage.table}(${stage.definition}) ON COMMIT DROP`,
@@ -211,19 +254,17 @@ export async function recordDetached(client, revisionId, baseRevisionId, documen
       await client.query(
         `INSERT INTO ${stage.table}(${stage.columns}) SELECT $1,${stage.values}
         FROM jsonb_array_elements($2::jsonb) e`,
-        [revisionId, JSON.stringify(items.slice(i, i + STAGE_BATCH))],
+        [id, JSON.stringify(items.slice(i, i + STAGE_BATCH))],
       );
   }
   // Statistics of their keys, so comparisons with the base read the staged rows by key.
   await client.query(
     `ANALYZE ${Object.entries(STAGED).map(([name, stage]) => `${stage.table}(timeline_id,${KINDS[name].key})`)}`,
   );
-  const bytes =
-    (await recordSettings(client, revisionId, 1, settingsOf(document))) +
-    (await recordEntities(client, STAGED_KINDS, revisionId, 1, false, null));
+}
+async function unstage(client, id) {
   for (const stage of Object.values(STAGED))
-    await client.query(`DELETE FROM ${stage.table} WHERE timeline_id=$1`, [revisionId]);
-  return bytes;
+    await client.query(`DELETE FROM ${stage.table} WHERE timeline_id=$1`, [id]);
 }
 
 const keyOf = (kind) => (value) =>
@@ -637,4 +678,50 @@ async function compareKeys(client, kind, from, to, keys) {
     kind.key.map((_, c) => keys.map((k) => k[c])),
   );
   return rows;
+}
+
+/**
+ * The versions of entities of one kind ('moments', 'durations' or 'relationships') at a
+ * revision kept as rows, by key (as `differences` gives keys): a Map from keyName to the
+ * event, definition or true. Keys the revision does not hold are absent.
+ */
+export async function valuesAt(client, revisionId, name, keys) {
+  const kind = KINDS[name];
+  const { rows: found } = await client.query(
+    'SELECT timeline_id,number::text FROM oc_revisions WHERE id=$1 AND history_rows',
+    [revisionId],
+  );
+  if (!found[0]) throw new Error('Expected a revision kept as rows.');
+  const levels = await lineage(client, found[0].timeline_id, found[0].number);
+  const values = new Map();
+  const columnsOf = (key) => (kind.key.length === 1 ? [key] : kind.key.map((c) => key[c]));
+  for (let i = 0; i < keys.length; i += PAGE) {
+    const page = keys.slice(i, i + PAGE).map(columnsOf);
+    const { rows } = await client.query(
+      `WITH k AS (SELECT * FROM unnest(${kind.key.map((_, c) => `$${c + 1}::text[]`)}) AS k(${kind.key}))
+      ${visible(kind, levels, (alias) => `AND (${columns(alias, kind.key)}) IN (SELECT ${kind.key} FROM k)`)}`,
+      kind.key.map((_, c) => page.map((key) => key[c])),
+    );
+    for (const row of rows)
+      values.set(
+        keyName(
+          kind.key.length === 1
+            ? row[kind.key[0]]
+            : Object.fromEntries(kind.key.map((c) => [c, row[c]])),
+        ),
+        kind.same ? row[kind.same] : true,
+      );
+  }
+  return values;
+}
+/** A key as `differences` gives it, as a string to look values up by. */
+export const keyName = (key) => (typeof key === 'string' ? key : JSON.stringify(key));
+/** The settings of a revision kept as rows. */
+export async function settingsAt(client, revisionId) {
+  const { rows } = await client.query(
+    `SELECT s.settings FROM oc_revisions r JOIN oc_history_settings s ON s.timeline_id=r.timeline_id
+    AND s.since<=r.number AND (s.until IS NULL OR s.until>r.number) WHERE r.id=$1 AND r.history_rows`,
+    [revisionId],
+  );
+  return rows[0]?.settings ?? null;
 }
