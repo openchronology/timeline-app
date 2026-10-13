@@ -7,6 +7,7 @@
  */
 import { Q, createDifference, validateDocument, validatePresentation } from '../dist/core.mjs';
 import { HttpError } from './store.mjs';
+import { pruneHistoryRows } from './history.mjs';
 
 /** Retention runs at most this often per timeline. */
 export const RETENTION_EVERY = 60 * 60 * 1000;
@@ -101,7 +102,8 @@ export async function deleteWhere(
  * Removes the timeline's saved revisions from before `before`, apart from what is still
  * needed: the head, revisions forks, proposals or other timelines refer to (with their
  * ancestry), and the revisions newer ones are stored against (a patch replays its first
- * parent, back to a snapshot). Returns how many revisions went.
+ * parent, back to a snapshot; revisions kept as rows need none). Returns how many
+ * revisions went.
  */
 export async function pruneHistory(client, timelineId, before) {
   const { rows } = await client.query(
@@ -118,7 +120,7 @@ export async function pruneHistory(client, timelineId, before) {
         OR r.id IN (SELECT id FROM shared)
         OR r.id=(SELECT head_revision_id FROM oc_timelines WHERE id=$1))
       UNION SELECT p.parent_id FROM needed n JOIN oc_revisions c ON c.id=n.id
-        JOIN oc_revision_parents p ON p.revision_id=n.id AND p.position=0 WHERE c.snapshot_id IS NULL
+        JOIN oc_revision_parents p ON p.revision_id=n.id AND p.position=0 WHERE c.patch IS NOT NULL
     ) SELECT r.id,r.snapshot_id FROM oc_revisions r WHERE r.timeline_id=$1 AND r.created_at<$2
       AND r.id NOT IN (SELECT id FROM needed)`,
     [timelineId, before],
@@ -135,6 +137,8 @@ export async function pruneHistory(client, timelineId, before) {
     'DELETE FROM oc_snapshots s WHERE s.id=ANY($1::uuid[]) AND NOT EXISTS(SELECT 1 FROM oc_revisions r WHERE r.snapshot_id=s.id)',
     [rows.map((r) => r.snapshot_id).filter(Boolean)],
   );
+  // Versions kept as rows that no remaining revision sees.
+  await pruneHistoryRows(client, timelineId);
   return ids.length;
 }
 /**

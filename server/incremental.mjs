@@ -480,7 +480,22 @@ export async function applyIncrementally(c, t, patch) {
       related,
     })),
   };
-  return { recorded, assignments, added, settings, storage: Math.max(storage, 0) };
+  // What saved history must look at (history.mjs): the changed moments, the durations whose
+  // definitions or bands changed, and the links added or removed (as stored).
+  const touched = {
+    moments: [...momentChanges.keys()],
+    durations: [...bands.keys()],
+    relationships: [
+      ...unlinked,
+      ...relationshipChanges.map((r) => ({
+        a_kind: kindOf(r.a),
+        a_id: refId(r.a),
+        b_kind: kindOf(r.b),
+        b_id: refId(r.b),
+      })),
+    ],
+  };
+  return { recorded, assignments, added, settings, storage: Math.max(storage, 0), touched };
 }
 
 /** Inserts or replaces entity search rows. */

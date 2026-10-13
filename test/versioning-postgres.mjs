@@ -92,14 +92,11 @@ try {
       .rows[0].n,
     '0',
   );
+  // The fork keeps its own history as rows, from a copy made in the database.
   assert.equal(
-    (
-      await pool.query(
-        'SELECT count(DISTINCT snapshot_id) AS n FROM oc_revisions WHERE id=ANY($1::uuid[])',
-        [[fork.head_revision_id, upstream.head_revision_id]],
-      )
-    ).rows[0].n,
-    '1',
+    (await pool.query('SELECT history_rows FROM oc_revisions WHERE id=$1', [fork.head_revision_id]))
+      .rows[0].history_rows,
+    true,
   );
   const duplicate = await versions.copy(
     upstream.id,
@@ -120,10 +117,18 @@ try {
   fork = await store.save(fork.id, contributor, fork.revision, changed);
   assert.notEqual(fork.head_revision_id, originalFork);
   assert.deepEqual((await versions.historical(fork.id, originalFork, contributor)).document, doc);
+  // Saved versions cannot be rewritten, nor ended again.
   await assert.rejects(
     pool.query(
-      "UPDATE oc_snapshots SET document='{}'::jsonb WHERE id=(SELECT snapshot_id FROM oc_revisions WHERE id=$1)",
-      [originalFork],
+      `UPDATE oc_history_moments SET event='{}'::jsonb WHERE timeline_id=$1 AND since=(SELECT number FROM oc_revisions WHERE id=$2)`,
+      [fork.id, originalFork],
+    ),
+    /immutable/,
+  );
+  await assert.rejects(
+    pool.query(
+      'UPDATE oc_history_moments SET until=until+1 WHERE timeline_id=$1 AND until IS NOT NULL',
+      [fork.id],
     ),
     /immutable/,
   );
