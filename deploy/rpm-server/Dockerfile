@@ -114,6 +114,7 @@ RUN set -eu; \
       install -D -m 0644 "/root/$unit.service" "$ROOT/usr/lib/systemd/system/$unit.service"; \
     done; \
     install -D -m 0755 /root/shared/openchronology-migrate "$ROOT/usr/sbin/openchronology-migrate"; \
+    install -D -m 0755 /root/shared/openchronology-reset-admin-password "$ROOT/usr/sbin/openchronology-reset-admin-password"; \
     install -D -m 0755 /root/rpm/openchronology-setup "$ROOT/usr/sbin/openchronology-setup"; \
     install -D -m 0755 /root/shared/och-import-logs "$ROOT/usr/bin/och-import-logs"; \
     find "$ROOT" -type d -exec chmod 0755 {} +; \

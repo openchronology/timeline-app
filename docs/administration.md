@@ -25,8 +25,26 @@ Configure `RESEND_API_KEY`, `AUTH_EMAIL_FROM` and a persistent
 After first login, change the password in **Account**, enable authenticator MFA,
 and store recovery codes. Remove `ADMIN_INITIAL_PASSWORD` from the environment
 after successful setup. Keep `.env` out of source control and restrict its file
-permissions. Losing all administrator credentials requires an operator-assisted
-database recovery; changing the bootstrap password is not a recovery mechanism.
+permissions.
+
+### Resetting the administrator's password
+
+An administrator who cannot sign in can have their password set back to `ADMIN_INITIAL_PASSWORD` from the configuration. To choose a new password, write it there first. The command needs access to the server and its configuration:
+
+| Installation                                    | Command                                                                |
+| ----------------------------------------------- | ---------------------------------------------------------------------- |
+| Debian, Ubuntu, Rocky, RHEL and Fedora packages | `sudo openchronology-reset-admin-password`                             |
+| Docker Compose                                  | `docker compose run --rm migrate node server/reset-admin-password.mjs` |
+| From the source                                 | `npm run reset-admin-password` (reads `.env`)                          |
+
+It resets the `ADMIN_USERNAME` account, or the administrator the installation created first if `ADMIN_USERNAME` is empty:
+
+- Its sessions, pending desktop sign-ins and password-reset links end, and the reset is recorded in the administration audit.
+- Its API keys and authenticator stay. If two-factor authentication is on, signing in still asks for the code.
+
+Changing the configuration alone, or restarting, does not change an existing password.
+
+The configuration is read the way systemd and Docker Compose read it: `#` starts a comment only at the beginning of a line, so a password may contain `#` (#118). Releases before this one read it in `openchronology-migrate` with Node's `--env-file`, which ends a value at an unquoted `#`. An administrator created that way has a password cut off at the `#`. Sign in with the part before it, or run the reset command after upgrading.
 
 Open `/account`, sign in, and follow **Site administration** to `/admin`.
 Administrators can search and paginate users and timelines, grant/revoke admin

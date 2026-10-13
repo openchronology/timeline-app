@@ -18,6 +18,7 @@ import { pipeline } from 'node:stream/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
+import { loadConfiguration } from './env-file.mjs';
 import { pathToFileURL } from 'node:url';
 import { BUILTIN_FORMATS, compileFormat, parseZone, isoTime } from './log-formats.mjs';
 import { compileMapping, checkMoment, EntryIds } from './log-mapping.mjs';
@@ -630,7 +631,9 @@ const invoked = (() => {
     return null;
   }
 })();
-if (import.meta.url === invoked)
+if (import.meta.url === invoked) {
+  // och-import-logs passes syslog.env as OCH_CONFIG when the environment has no API key.
+  loadConfiguration();
   main().then(
     (code) => process.exit(code),
     (error) => {
@@ -638,3 +641,4 @@ if (import.meta.url === invoked)
       process.exit(EXIT.usage);
     },
   );
+}

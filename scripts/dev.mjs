@@ -7,11 +7,9 @@ import { buildHtml } from './html.mjs';
 import { syncPlatformAssets } from './platform-assets.mjs';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
-try {
-  process.loadEnvFile?.('.env');
-} catch (error) {
-  if (error.code !== 'ENOENT') throw error;
-}
+import { loadEnvFile } from '../server/env-file.mjs';
+// Read as systemd and Compose read it: a # inside a value is part of it (#118).
+loadEnvFile('.env');
 await import('./build.mjs');
 await syncPlatformAssets();
 await mkdir('dist', { recursive: true });

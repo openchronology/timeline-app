@@ -1,11 +1,9 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
-try {
-  process.loadEnvFile?.('.env');
-} catch (error) {
-  if (error.code !== 'ENOENT') throw error;
-}
+import { loadEnvFile } from '../server/env-file.mjs';
+// Read as systemd and Compose read it: a # inside a value is part of it (#118).
+loadEnvFile('.env');
 const child = spawn(process.execPath, [resolve('platform/.next/standalone/platform/server.cjs')], {
   stdio: 'inherit',
   env: {

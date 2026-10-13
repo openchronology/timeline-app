@@ -6,6 +6,6 @@
 APP=/usr/lib/openchronology
 CONFIG=/etc/openchronology/syslog.env
 if [ -z "${OCH_API_KEY:-}" ] && [ -r "$CONFIG" ]; then
-  exec "$APP/node/bin/node" --env-file="$CONFIG" "$APP/server/import-logs.mjs" "$@"
+  exec env OCH_CONFIG="$CONFIG" "$APP/node/bin/node" "$APP/server/import-logs.mjs" "$@"
 fi
 exec "$APP/node/bin/node" "$APP/server/import-logs.mjs" "$@"

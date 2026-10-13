@@ -1,14 +1,12 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Starts the platform from the installed package. systemd passes the configuration through
-// EnvironmentFile; started any other way, it is read here (without overriding the environment).
+// EnvironmentFile; started any other way, it is read here (without overriding the environment),
+// as systemd reads it (#118). OCH_CONFIG names another file.
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-try {
-  process.loadEnvFile('/etc/openchronology/openchronology.env');
-} catch (error) {
-  if (error.code !== 'ENOENT') throw error;
-}
+import { loadEnvFile } from './server/env-file.mjs';
 const app = dirname(fileURLToPath(import.meta.url));
+loadEnvFile(process.env.OCH_CONFIG || '/etc/openchronology/openchronology.env');
 // The configuration names the listening address HOST; Next.js reads HOSTNAME, which shells
 // also set to the machine's name.
 process.env.HOSTNAME = process.env.HOST || '127.0.0.1';

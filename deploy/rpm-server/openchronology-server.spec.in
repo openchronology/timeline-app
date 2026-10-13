@@ -89,6 +89,7 @@ exit 0
 /usr/lib/systemd/system/openchronology-mail.service
 /usr/lib/systemd/system/openchronology-syslog.service
 /usr/sbin/openchronology-migrate
+/usr/sbin/openchronology-reset-admin-password
 /usr/sbin/openchronology-setup
 /usr/bin/och-import-logs
 /usr/share/openchronology
