@@ -106,6 +106,7 @@ RUN set -eu; \
       install -D -m 0644 "/root/debian/$unit.service" "$ROOT/usr/lib/systemd/system/$unit.service"; \
     done; \
     install -D -m 0755 /root/debian/openchronology-migrate "$ROOT/usr/sbin/openchronology-migrate"; \
+    install -D -m 0755 /root/debian/openchronology-reset-admin-password "$ROOT/usr/sbin/openchronology-reset-admin-password"; \
     install -D -m 0755 /root/debian/och-import-logs "$ROOT/usr/bin/och-import-logs"; \
     mkdir -p "$ROOT/DEBIAN"; \
     for script in postinst prerm postrm; do \
