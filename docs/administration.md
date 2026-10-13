@@ -111,31 +111,39 @@ a whole number of at least 1000 (such as `1000000`), or `unlimited`. Empty or un
 tells its pages the limit, and they warn when a timeline reaches three quarters of it.
 
 The default suits a public platform, where the server is shared. Most work on a timeline
-reads or changes only part of it, at a cost that grows slowly with its size. Some work handles
-the whole timeline at once, and that cost grows with it:
+reads or changes only part of it, at a cost that grows slowly with its size:
 
-- **Saved revisions:** a save stores only what changed. Every 1,000 saves, or once the
-  changes since the last full copy add up to the timeline's size, the save also stores a full
-  copy of the timeline. This keeps history quick to replay, and each copy counts towards the
-  owner's storage quota. While it is written, other saves to that timeline wait.
-- **Exporting** to `.ochx`, **forking**, and **pull requests** read the whole timeline into
-  the server's memory.
+- **Saving** changes the timeline's index in place and keeps, in its
+  [saved history](architecture.md#saved-history), only the versions of what changed. A
+  save's time and its storage charge follow the change, not the timeline's size.
+- **Viewing** reads only what is on screen.
+
+Some work handles the whole timeline at once, and that cost grows with it: **exporting** to
+`.ochx`, **reading a saved revision** (history pages), **forking**, and **pull requests**
+and syncing forks, which also merge whole timelines in the server's memory.
 
 These figures come from an 8-core virtual machine with PostgreSQL 17, using the
 [benchmark timelines](benchmarks.md) (moments with titles, descriptions and tags, plus one
 duration and one relationship for every ten moments):
 
-| Moments   | Saving 5,000 new moments | Saving with a full copy | Exporting | Full copy | Server memory |
-| --------- | -----------------------: | ----------------------: | --------: | --------: | ------------: |
-| 200,000   |                      6 s |                    10 s |       4 s |     35 MB |        0.4 GB |
-| 500,000   |                     15 s |                    22 s |      11 s |     87 MB |        0.7 GB |
-| 1,000,000 |                     20 s |                    49 s |      19 s |    173 MB |        1.3 GB |
+| Moments   | Saving 10 moments | Saving 5,000 new moments | History it keeps | Reading a saved revision | Exporting | Server memory |
+| --------- | ----------------: | -----------------------: | ---------------: | -----------------------: | --------: | ------------: |
+| 200,000   |            0.05 s |                    7–9 s |           0.4 MB |                    4.6 s |       4 s |        0.4 GB |
+| 1,000,000 |         0.1–0.2 s |                  21–25 s |           0.4 MB |                     21 s |      19 s |        1.3 GB |
 
-**`unlimited` still has a ceiling.** PostgreSQL stores each full copy as one `jsonb` value,
-which cannot exceed about 256 MB. The server refuses a save whose full copy would exceed
-200 MB as JSON, with HTTP 413 and a message to split the timeline. With content like the
-benchmark's, that is about 1.1 million moments. Short titles without descriptions reach it
-later.
+At a million moments, most of a 5,000-moment save is one statement updating the moment
+index (about 16 s), and the server stops any statement after 30 s. The log importer and the
+syslog receiver save at most 5,000 entries at a time; well beyond a million moments, keep
+batches smaller (the syslog receiver saves whatever arrived each second).
+
+Upgrading copies each timeline's current state into its saved history once, during
+`openchronology-migrate`: about 14 s for 200,000 moments and 45 s for a million. Earlier
+revisions keep the form they were saved in.
+
+**Pull requests still store whole timelines.** PostgreSQL stores each as one `jsonb` value,
+which cannot exceed about 256 MB, so the server refuses a pull request on a timeline over
+200 MB as JSON (HTTP 413) and asks to split it. With content like the benchmark's, that is
+about 1.1 million moments.
 
 Some limits stay the same whatever this setting is:
 

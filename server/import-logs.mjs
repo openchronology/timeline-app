@@ -28,12 +28,11 @@ import { MAX_MESSAGE_BYTES } from './syslog.mjs';
 
 /** Exit codes: success, some entries not saved, a usage or configuration error, over quota. */
 export const EXIT = { ok: 0, partial: 1, usage: 2, quota: 3 };
-const PATCH_CHAIN = 1000;
-// A save's recorded patch wraps each change ({"id", "event"}): as compact JSON, which
-// decides when patches outweigh the document, it measures 1.095 times the document growth
-// it causes, and as stored (PostgreSQL's jsonb text, which is charged) 1.17 times.
-const PATCH_RULE = 1.095,
-  PATCH_CHARGED = 1.17;
+/**
+ * Bytes charged for a moment's version in saved history (PostgreSQL's jsonb as text) per
+ * byte of its JSON.
+ */
+const VERSION_RATIO = 1.1;
 const sleep = (ms) => new Promise((resume) => setTimeout(resume, ms));
 
 export const HELP = `Usage: och-import-logs [options] <file | file.gz | -> ...
@@ -232,38 +231,23 @@ async function* entries(path, multiline, onBytes) {
 
 /**
  * The most entries (moments and durations) one save may carry for the server to apply it in
- * place: max(64, the timeline's moments ÷ 8). Larger saves rebuild the timeline and store
- * a full snapshot each, so a large log saved in large batches would keep a copy of the
- * whole growing timeline per save; batches grow with the timeline instead.
+ * place: max(64, the timeline's moments ÷ 8). Larger saves rebuild the timeline's whole
+ * index, so a large log saved in large batches would rebuild the growing timeline per save;
+ * batches grow with the timeline instead.
  */
 export const batchLimit = (count) => Math.min(BATCH_LIMIT - 1, Math.max(64, Math.floor(count / 8)));
 /**
- * Storage an import adds, as the server charges it: the document's growth, and per save
- * either its patch or, every 1000 saves, once patches outweigh the document or when the
- * save is too large to apply in place, a full snapshot of the document. `timelines` maps
- * each timeline to its starting size ({ count, bytes }) and its batches
- * ({ entries, moments, bytes }).
+ * Storage an import adds, as the server charges it: the document's growth, and per save the
+ * versions it keeps in history (the batch, as stored), plus one copy of the timeline when
+ * its first save starts keeping history as rows. `timelines` maps each timeline to its
+ * starting size ({ count, bytes, history }, history false until it keeps rows) and its
+ * batches ({ entries, moments, bytes }).
  */
 export function storageEstimate(timelines) {
   let total = 0;
   for (const { start, batches } of timelines.values()) {
-    let count = start.count,
-      document = start.bytes,
-      patches = 0,
-      chain = 0;
-    for (const batch of batches) {
-      const inPlace = batch.entries <= Math.max(64, count / 8);
-      document += batch.bytes;
-      count += batch.moments;
-      chain++;
-      patches += batch.bytes * PATCH_RULE;
-      if (!inPlace || chain >= PATCH_CHAIN || patches > Math.max(document, 65536)) {
-        total += document;
-        chain = 0;
-        patches = 0;
-      } else total += batch.bytes * PATCH_CHARGED;
-    }
-    total += document - start.bytes;
+    if (start.history === false && batches.length) total += start.bytes * VERSION_RATIO;
+    for (const batch of batches) total += batch.bytes * (1 + VERSION_RATIO);
   }
   return Math.round(total);
 }

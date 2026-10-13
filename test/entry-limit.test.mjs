@@ -46,7 +46,7 @@ test('validation follows the entry limit a server sets (#129)', (t) => {
     assert.throws(() => setEntryLimit(value), RangeError, String(value));
 });
 
-test('a revision too large for PostgreSQL is refused with a reason, before the database', async () => {
+test('a whole document too large for PostgreSQL is refused with a reason, before the database', async () => {
   const { PostgresStore, SNAPSHOT_BYTES } = await import('../server/store.mjs');
   const store = new PostgresStore(null),
     queries = [];
@@ -56,7 +56,7 @@ test('a revision too large for PostgreSQL is refused with a reason, before the d
   for (const event of big.events) event.metadata.description = note;
   await assert.rejects(
     store.recordRevision(client, 'timeline', 'user', big, 'save'),
-    (error) => error.status === 413 && /too large to save a revision/.test(error.message),
+    (error) => error.status === 413 && /too large \(over 200 MB\)/.test(error.message),
   );
   assert.equal(queries.length, 0);
   await store.recordRevision(client, 'timeline', 'user', document(3), 'save');

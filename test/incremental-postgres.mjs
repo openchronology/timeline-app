@@ -302,6 +302,8 @@ try {
   created.push(timeline.id);
   let patches = 0,
     replays = 0;
+  // Each saved revision and the document it saved, to read back from history at the end.
+  const revisions = new Map([[timeline.head_revision_id, expected]]);
   for (let step = 1; step <= 120; step++) {
     const patch = randomPatch(expected, step);
     let next;
@@ -314,6 +316,7 @@ try {
     }
     timeline = await store.save(timeline.id, user, timeline.revision, undefined, patch);
     expected = next;
+    revisions.set(timeline.head_revision_id, expected);
     patches++;
     const saved = (await store.snapshot(timeline.id, user)).document;
     assert.deepEqual(normal(saved), normal(expected), `document after step ${step}`);
@@ -336,12 +339,24 @@ try {
       );
     }
   }
-  // Every saved revision replays to the document it recorded.
+  // Every saved revision reads back, from rows, as the document it saved.
+  for (const [revision, document] of revisions)
+    assert.deepEqual(
+      normal(await store.revisionDocument(pool, revision)),
+      normal(document),
+      `saved revision ${revision}`,
+    );
   const { rows: kinds } = await pool.query(
-    'SELECT count(*) FILTER (WHERE patch IS NOT NULL) AS patches,count(*) FILTER (WHERE snapshot_id IS NOT NULL) AS snapshots FROM oc_revisions WHERE timeline_id=$1',
+    `SELECT count(*) FILTER (WHERE history_rows) AS kept,count(*) AS total,
+    max(stored_bytes) FILTER (WHERE kind='save' AND number>1) AS largest FROM oc_revisions WHERE timeline_id=$1`,
     [timeline.id],
   );
-  assert(Number(kinds[0].patches) > 50, 'saves record patches');
+  assert.equal(kinds[0].kept, kinds[0].total, 'every revision is kept as rows');
+  // A save is charged the versions it wrote, far less than the whole timeline.
+  assert(
+    Number(kinds[0].largest) < Buffer.byteLength(JSON.stringify(expected)) / 4,
+    `largest save ${kinds[0].largest} bytes`,
+  );
   // Catalogue text catches up after the saves commit.
   await store.idle();
   const text = (
@@ -367,7 +382,7 @@ try {
   );
   assert.deepEqual(after.rows, before.rows, 'metadata edits leave tree rows untouched');
   console.log(
-    `PASS incremental saves: ${patches} random patches match full rebuilds (documents, queries, search, links, arcs; ${replays} history replays) and keep AVL invariants.`,
+    `PASS incremental saves: ${patches} random patches match full rebuilds (documents, queries, search, links, arcs; ${replays} history replays, every revision read back from rows) and keep AVL invariants.`,
   );
 } finally {
   await store?.idle();

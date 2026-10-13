@@ -4,6 +4,7 @@ import { bootstrapInstallation } from './administration.mjs';
 import { readFile } from 'node:fs/promises';
 import { convertLegacyDurations, backfillEntitySearch, rebuildIndexes } from './store.mjs';
 import { loadConfiguration } from './env-file.mjs';
+import { startHistory } from './history.mjs';
 // The packages pass their configuration file as OCH_CONFIG (#118).
 loadConfiguration();
 if (!process.env.DATABASE_URL && !process.env.PGDATABASE)
@@ -20,6 +21,9 @@ try {
   if (indexed) console.log(`Built text search for ${indexed} timeline(s).`);
   const rebuilt = await rebuildIndexes(client);
   if (rebuilt) console.log(`Rebuilt incremental indexes for ${rebuilt} timeline(s).`);
+  // After the conversions above, so history starts from the timelines as they are now.
+  const started = await startHistory(client);
+  if (started) console.log(`Started saved history as rows for ${started} timeline(s).`);
   await client.query('COMMIT');
   console.log('OpenChronology schema installed.');
 } finally {
