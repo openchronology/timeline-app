@@ -97,7 +97,20 @@ export async function checkFollowLatest(browser) {
   });
   const page = await context.newPage(),
     errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  // A reload cancels the old page's requests; WebKit reports those as errors of the page.
+  let reloading = false;
+  page.on('pageerror', (e) => {
+    if (!(reloading && /access control checks|cancelled|Load failed/i.test(e.message)))
+      errors.push(e.message);
+  });
+  const reload = async () => {
+    reloading = true;
+    try {
+      await page.reload();
+    } finally {
+      reloading = false;
+    }
+  };
   const push = () =>
     page.evaluate(
       ({ id, revision }) =>
@@ -124,6 +137,16 @@ export async function checkFollowLatest(browser) {
     await page.locator('#follow-latest').check();
     const whole = await bounds();
     // A reload keeps the view (#128): bounds, follow, grouping distance and separation.
+    // The view as shown once it settles: the first drawn bounds can precede the restored view.
+    const shows = async (expected) => {
+      let shown;
+      for (let i = 0; i < 100; i++) {
+        shown = (await bounds()).map((q) => q.toString());
+        if (shown.join() === expected.join()) return;
+        await page.waitForTimeout(50);
+      }
+      assert.deepEqual(shown, expected);
+    };
     const loaded = () =>
       page.waitForFunction(() => document.querySelector('.event-marker') && window.testStream);
     await page.locator('#zoom-in').click();
@@ -134,12 +157,9 @@ export async function checkFollowLatest(browser) {
       zoomed,
       whole.map((q) => q.toString()),
     );
-    await page.reload();
+    await reload();
     await loaded();
-    assert.deepEqual(
-      (await bounds()).map((q) => q.toString()),
-      zoomed,
-    );
+    await shows(zoomed);
     assert.equal(await page.locator('#follow-latest').isChecked(), true);
     assert.equal(await page.locator('#density').inputValue(), '36');
     await page.locator('#separate-button').click();
@@ -147,17 +167,13 @@ export async function checkFollowLatest(browser) {
     await page.locator('#separate-submit').click();
     await page.locator('#separation-settings').waitFor();
     await page.waitForTimeout(500);
-    await page.reload();
+    await reload();
     await page.locator('#separation-settings').waitFor();
-    await page.waitForFunction(() => document.getElementById('left-bound').value);
     assert.equal(await page.locator('#separation-tags').textContent(), 'ops');
-    assert.deepEqual(
-      (await bounds()).map((q) => q.toString()),
-      zoomed,
-    );
+    await shows(zoomed);
     await page.locator('#separation-rejoin').click();
     await page.waitForTimeout(500);
-    await page.reload();
+    await reload();
     await loaded();
     assert.equal(await page.locator('#separation-settings').isHidden(), true);
     // Another tab starts from the whole timeline.
