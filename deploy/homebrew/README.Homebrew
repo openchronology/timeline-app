@@ -69,6 +69,11 @@ Upgrade
 Remove
 ------
 
+Homebrew installed PostgreSQL 17 for the server, so uninstalling the server removes it too,
+unless you ask Homebrew to keep it (its databases, in $(brew --prefix)/var/postgresql@17,
+remain either way). To keep PostgreSQL and the database running:
+
+    brew install postgresql@17
     brew services stop openchronology-server
     brew uninstall openchronology-server
 

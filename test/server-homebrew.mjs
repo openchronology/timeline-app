@@ -94,7 +94,9 @@ assert.match(again, /set up already/, again);
 assert.match(again, /openchronology-migrate/);
 assert.match(await sh(`cat "${configFile}"`), new RegExp('^' + key + '$', 'm'));
 
-// Removing it keeps the configuration and the database.
+// Removing it keeps the configuration and the database. Homebrew would remove PostgreSQL 17
+// with it too (as an unneeded dependency) unless asked to keep it, as README.Homebrew says.
+await sh('brew install postgresql@17 2>&1');
 await sh('brew services stop openchronology-server && brew uninstall openchronology-server');
 assert.match(await sh(`test -e "${configFile}" && echo present || echo gone`), /present/);
 assert.equal(await psql("SELECT count(*) FROM oc_users WHERE username='admin'"), '1');
