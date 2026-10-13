@@ -7,9 +7,12 @@ Install
 As root:
 
     pkg install -y ./openchronology-server-freebsd<release>-amd64.pkg
+    openchronology-setup
 
 pkg installs what the package needs from FreeBSD's repositories: Node.js 24 (node24),
-PostgreSQL @PG_MAJOR@, GMP and SQLite. The first installation:
+PostgreSQL @PG_MAJOR@, GMP and SQLite. Like FreeBSD's ports, the package starts nothing
+itself (pkg ends whatever its scripts leave running); openchronology-setup finishes the
+first installation:
 
   - creates the `openchronology` system user;
   - initializes PostgreSQL @PG_MAJOR@ if it is not yet (/var/db/postgres/data@PG_MAJOR@, with
@@ -21,8 +24,8 @@ PostgreSQL @PG_MAJOR@, GMP and SQLite. The first installation:
   - migrates the database (openchronology-migrate), and enables and starts the
     `openchronology` service, which listens on 127.0.0.1:5173.
 
-If PostgreSQL could not be started at that point, start it and finish the setup with
-`openchronology-setup`, which is safe to run again.
+openchronology-setup is safe to run again, for example if PostgreSQL could not be started
+the first time.
 
 Configure
 ---------

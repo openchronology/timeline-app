@@ -108,7 +108,7 @@ The whole server also installs as one package. It contains the platform, its Nod
 ```sh
 sudo apt install ./openchronology-server-debian13-amd64.deb      # Debian and Ubuntu
 sudo dnf install ./openchronology-server-fedora44-amd64.rpm      # Rocky, RHEL and Fedora
-pkg install -y ./openchronology-server-freebsd15-amd64.pkg       # FreeBSD, as root
+pkg install -y ./openchronology-server-freebsd15-amd64.pkg && openchronology-setup   # FreeBSD, as root
 ```
 
 (`dpkg -i` doesn't install dependencies; after it, run `sudo apt -f install`.) The first installation:
@@ -117,7 +117,7 @@ pkg install -y ./openchronology-server-freebsd15-amd64.pkg       # FreeBSD, as r
 - writes `/etc/openchronology/openchronology.env` with a new `AUTH_ENCRYPTION_KEY`;
 - migrates and starts the `openchronology` service on `127.0.0.1:5173`.
 
-RPM distributions and FreeBSD don't initialize PostgreSQL themselves, so those packages do it when it hasn't been done (`openchronology-setup`, which can also be run again by hand). The FreeBSD package uses FreeBSD's own Node.js (`node24`) and runs as rc.d services (`openchronology`, `openchronology_mail`, `openchronology_syslog`), with its configuration in `/usr/local/etc/openchronology`. Edit the configuration and restart, and put an HTTPS reverse proxy in front; on SELinux systems, let the proxy connect with `setsebool -P httpd_can_network_connect 1`.
+RPM distributions and FreeBSD don't initialize PostgreSQL themselves, so those packages do it when it hasn't been done (`openchronology-setup`, which can also be run again by hand). Like FreeBSD's ports, the FreeBSD package starts nothing itself: run `openchronology-setup` after installing it. The FreeBSD package uses FreeBSD's own Node.js (`node24`) and runs as rc.d services (`openchronology`, `openchronology_mail`, `openchronology_syslog`), with its configuration in `/usr/local/etc/openchronology`. Edit the configuration and restart, and put an HTTPS reverse proxy in front; on SELinux systems, let the proxy connect with `setsebool -P httpd_can_network_connect 1`.
 
 Upgrades keep the configuration and database, stop the server, and list the settings that are new in this version's template. Review them, back up, then run `sudo openchronology-migrate`, which migrates and starts the server again. `/usr/share/doc/openchronology-server/README.Debian` (or `README.RPM`, `README.FreeBSD`) covers configuration, email, the syslog receiver, upgrades and removal.
 
@@ -255,7 +255,7 @@ Every platform, desktop and standalone HTML footer displays the exact version ta
 The website's **Download** page (`/download`) offers the latest stable GitHub release of `openchronology/timeline-app`.
 
 - **Layout:** it puts the visitor's system first, detected from their browser, with a large download button. It then lists every desktop file by operating system, the offline file, and the server packages.
-- **Server packages:** each package (Debian 13, Ubuntu 24.04, Rocky Linux and RHEL 10, Fedora 44, FreeBSD 14 and 15) has a one-line `curl … && sudo apt install ./…deb` (or `dnf install ./…rpm`, or FreeBSD's `fetch … && pkg install -y ./…pkg`) command to copy, and Docker Compose is offered for other systems.
+- **Server packages:** each package (Debian 13, Ubuntu 24.04, Rocky Linux and RHEL 10, Fedora 44, FreeBSD 14 and 15) has a one-line `curl … && sudo apt install ./…deb` (or `dnf install ./…rpm`, or FreeBSD's `fetch … && pkg install -y ./…pkg && openchronology-setup`) command to copy, and Docker Compose is offered for other systems.
 - **Release data:** the page reads the release's version, sizes and asset addresses from GitHub's API on the server, at most every ten minutes. `RELEASES_API_URL` overrides the address, for mirrors and tests.
 - **Fallback:** while there is no release, or GitHub cannot be reached, it links to GitHub's fixed `releases/latest/download/<asset-name>` addresses instead.
 - **Adding platforms:** asset names follow the release workflow (`platform/lib/releases.js`; a test keeps them in step), so a new server platform is added to its `SERVERS` list.

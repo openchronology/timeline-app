@@ -89,7 +89,7 @@ test('links come from the latest release, or by name before there is one', () =>
       null,
       SERVERS.find((s) => s.key === 'freebsd15'),
     ),
-    'fetch https://github.com/openchronology/timeline-app/releases/latest/download/openchronology-server-freebsd15-amd64.pkg && pkg install -y ./openchronology-server-freebsd15-amd64.pkg',
+    'fetch https://github.com/openchronology/timeline-app/releases/latest/download/openchronology-server-freebsd15-amd64.pkg && pkg install -y ./openchronology-server-freebsd15-amd64.pkg && openchronology-setup',
   );
   // RPM distributions install with dnf.
   assert.equal(

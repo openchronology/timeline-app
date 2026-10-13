@@ -1,10 +1,12 @@
 #!/bin/sh
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-# Sets up OpenChronology after the FreeBSD package is installed (#116), as the Linux packages
-# do: the configuration, PostgreSQL (initialized and enabled when it is not yet), the role and
-# database with pgmp, the migration and the service. An installation that has its
-# configuration and database already (an upgrade) is left alone, with advice.
-# Usage, as root: openchronology-setup   (the package runs it; safe to run again)
+# Sets up OpenChronology after the FreeBSD package is installed (#116), as the Linux packages'
+# installation does: the configuration, PostgreSQL (initialized and enabled when it is not
+# yet), the role and database with pgmp, the migration and the service. An installation that
+# has its configuration and database already (an upgrade) is left alone, with advice.
+# Usage, as root: openchronology-setup   (safe to run again)
+# The package runs it with "upgrade" when upgrading, to advise only: it starts nothing then,
+# since pkg ends what its scripts leave running.
 set -e
 PG_MAJOR=@PG_MAJOR@
 CONFIG_DIR=/usr/local/etc/openchronology
@@ -18,6 +20,8 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 existing=
 if [ -e "$CONFIG" ]; then existing=1; fi
+advise_only=
+if [ "${1:-}" = upgrade ]; then advise_only=1; fi
 
 install -d -m 0750 -o openchronology -g openchronology /var/db/openchronology
 install -d -m 0750 -o root -g openchronology "$CONFIG_DIR"
@@ -42,7 +46,7 @@ pg() {
   printf '%s\n' "$*" | su -l postgres -c "psql -X -q -At -v ON_ERROR_STOP=1 -d $db"
 }
 reachable() { pg postgres 'SELECT 1' >/dev/null 2>&1; }
-if ! reachable; then
+if [ -z "$advise_only" ] && ! reachable; then
   if [ ! -s "$PGDATA/PG_VERSION" ]; then
     su -l postgres -c "initdb -D $PGDATA -E UTF8 --locale=C --auth-local=peer --auth-host=scram-sha-256" \
       >/dev/null
@@ -61,6 +65,8 @@ if [ -n "$existing" ] && [ -n "$running" ] &&
   [ -n "$(pg postgres "SELECT 1 FROM pg_database WHERE datname='openchronology'")" ]; then
   installed=1
 fi
+# Upgrading with PostgreSQL stopped: the same advice, without looking at the database.
+if [ -n "$advise_only" ] && [ -n "$existing" ]; then installed=1; fi
 if [ -n "$installed" ]; then
   # Settings the new template has that this installation's configuration does not.
   missing=$(sed -n 's/^\([A-Z][A-Z0-9_]*\)=.*/\1/p' "$EXAMPLES/openchronology.env.example" |
@@ -88,6 +94,7 @@ MSG
   exit 0
 fi
 
+if [ -n "$advise_only" ]; then exit 0; fi
 if [ -z "$running" ]; then
   cat <<MSG
 

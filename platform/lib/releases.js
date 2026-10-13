@@ -164,11 +164,12 @@ export function assetSize(release, asset) {
 }
 /**
  * The one line that downloads a server package and installs it: with curl and sudo apt or
- * dnf, or on FreeBSD (run as root) with its own fetch and pkg.
+ * dnf, or on FreeBSD (run as root) with its own fetch and pkg, then openchronology-setup
+ * (FreeBSD packages start nothing themselves).
  */
 export function installCommand(release, server) {
   const url = assetLink(release, server.asset);
   return server.installer === 'pkg'
-    ? `fetch ${url} && pkg install -y ./${server.asset}`
+    ? `fetch ${url} && pkg install -y ./${server.asset} && openchronology-setup`
     : `curl -fLO ${url} && sudo ${server.installer} install ./${server.asset}`;
 }

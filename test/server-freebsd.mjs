@@ -37,8 +37,15 @@ const healthy = async () => {
   throw new Error('The server did not answer:\n' + (await sh('tail -50 /var/log/messages')));
 };
 
-// Installed as the README says: pkg resolves its dependencies from FreeBSD's repositories.
-const install = await sh(`env ASSUME_ALWAYS_YES=yes pkg install -y ${file} 2>&1`);
+// Installed as the README says: pkg resolves its dependencies from FreeBSD's repositories,
+// starts nothing, and says to finish with openchronology-setup.
+const installed = await sh(`env ASSUME_ALWAYS_YES=yes pkg install -y ${file} 2>&1`);
+assert.match(installed, /To finish, as root:\s+openchronology-setup/, installed.slice(-4000));
+assert.doesNotMatch(
+  await sh('service postgresql onestatus 2>&1', { allowFailure: true }),
+  /is running/,
+);
+const install = await sh('openchronology-setup 2>&1');
 assert.match(install, /OpenChronology is installed and running/, install.slice(-4000));
 assert.match(install, /OpenChronology schema installed\./);
 
