@@ -1,8 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Saved history kept as rows (server/history.mjs): a timeline saved before keeps its old
 // revisions readable and starts rows at its next save; saves are charged what they change;
-// versions are immutable; deleting a timeline keeps what a fork still refers to and removes
-// the rest.
+// versions are immutable; deleting a timeline keeps what a fork still reads through to, and
+// removes the rest once the fork is gone.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -178,10 +178,17 @@ try {
   assert.deepEqual(await store.revisionDocument(pool, base), validateDocument(renamed));
   // The fork's base stays, with every version it sees.
   assert.equal(await versionsOf(t.id), 402);
-  // Once nothing refers to it, nothing of its history is left.
-  await pool.query('UPDATE oc_timelines SET fork_base_revision_id=NULL WHERE id=$1', [fork.id]);
-  await pool.query('DELETE FROM oc_revision_parents WHERE parent_id=$1', [base]);
-  await store.transaction((c) => store.removeHistory(c, t.id));
+  // The fork reads through to it.
+  assert.deepEqual(
+    await store.revisionDocument(pool, fork.head_revision_id),
+    validateDocument(renamed),
+  );
+  // Once the fork is gone too, nothing of either history is left.
+  await store.transaction(async (c) => {
+    await c.query('DELETE FROM oc_timelines WHERE id=$1', [fork.id]);
+    await store.removeHistory(c, fork.id);
+  });
+  assert.equal(await versionsOf(fork.id), 0);
   assert.equal(await versionsOf(t.id), 0);
   assert.equal(
     (await pool.query('SELECT count(*) AS n FROM oc_revisions WHERE timeline_id=$1', [t.id]))

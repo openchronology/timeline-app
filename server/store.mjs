@@ -503,8 +503,9 @@ export class PostgresStore {
     );
   }
   async removeHistory(client, timelineId) {
-    // Keep ancestors still needed by another fork or submitted review. Other
-    // timelines' private history is never exposed through the history API.
+    // Keep ancestors still needed by another fork or submitted review, and the revisions
+    // copies read through to. Other timelines' private history is never exposed through
+    // the history API.
     const { rows } = await client.query(
       `WITH RECURSIVE kept(id) AS (
       SELECT r.id FROM oc_revisions r WHERE r.timeline_id=$1 AND (
@@ -512,22 +513,31 @@ export class PostgresStore {
         OR EXISTS(SELECT 1 FROM oc_proposals p WHERE p.base_revision_id=r.id OR p.source_revision_id=r.id OR p.merged_revision_id=r.id)
         OR EXISTS(SELECT 1 FROM oc_revision_parents p JOIN oc_revisions child ON child.id=p.revision_id WHERE p.parent_id=r.id AND child.timeline_id<>$1))
       UNION SELECT p.parent_id FROM oc_revision_parents p JOIN kept k ON k.id=p.revision_id
-    ) SELECT r.id,r.snapshot_id FROM oc_revisions r WHERE r.timeline_id=$1 AND r.id NOT IN (SELECT id FROM kept)`,
+    ) SELECT r.id,r.snapshot_id FROM oc_revisions r WHERE r.timeline_id=$1 AND r.id NOT IN (SELECT id FROM kept)
+      AND NOT EXISTS(SELECT 1 FROM oc_history_bases b WHERE b.base_revision_id=r.id)`,
       [timelineId],
     );
     const ids = rows.map((r) => r.id);
     if (ids.length) {
-      await client.query('DELETE FROM oc_revision_parents WHERE revision_id=ANY($1::uuid[])', [
-        ids,
-      ]);
+      // A kept revision a copy reads through to keeps no link to removed parents.
+      await client.query(
+        'DELETE FROM oc_revision_parents WHERE revision_id=ANY($1::uuid[]) OR parent_id=ANY($1::uuid[])',
+        [ids],
+      );
       await client.query('DELETE FROM oc_revisions WHERE id=ANY($1::uuid[])', [ids]);
       await client.query(
         'DELETE FROM oc_snapshots s WHERE s.id=ANY($1::uuid[]) AND NOT EXISTS(SELECT 1 FROM oc_revisions r WHERE r.snapshot_id=s.id)',
         [rows.map((r) => r.snapshot_id)],
       );
     }
-    // Versions only the removed revisions saw go with them.
-    await pruneHistoryRows(client, timelineId);
+    // Versions only the removed revisions saw go with them. Once a copy's history is gone,
+    // a deleted timeline it read through to may have nothing else keeping its own.
+    const released = await pruneHistoryRows(client, timelineId);
+    if (
+      released &&
+      !(await client.query('SELECT 1 FROM oc_timelines WHERE id=$1', [released])).rows.length
+    )
+      await this.removeHistory(client, released);
   }
   async metadata(id, userId) {
     return this.transaction(async (c) => {

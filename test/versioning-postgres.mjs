@@ -92,11 +92,17 @@ try {
       .rows[0].n,
     '0',
   );
-  // The fork keeps its own history as rows, from a copy made in the database.
-  assert.equal(
-    (await pool.query('SELECT history_rows FROM oc_revisions WHERE id=$1', [fork.head_revision_id]))
-      .rows[0].history_rows,
-    true,
+  // The fork's history is kept as rows that read through to the upstream's, not a copy.
+  assert.deepEqual(
+    (
+      await pool.query(
+        `SELECT r.history_rows,b.base_revision_id,
+        (SELECT count(*) FROM oc_history_moments WHERE timeline_id=r.timeline_id)::int AS moments
+        FROM oc_revisions r JOIN oc_history_bases b ON b.timeline_id=r.timeline_id WHERE r.id=$1`,
+        [fork.head_revision_id],
+      )
+    ).rows[0],
+    { history_rows: true, base_revision_id: upstream.head_revision_id, moments: 0 },
   );
   const duplicate = await versions.copy(
     upstream.id,
@@ -114,6 +120,12 @@ try {
       i === 0 ? { ...e, metadata: { ...e.metadata, title: 'Fork change' } } : e,
     ),
   });
+  // Changed twice, so the fork has a version of its own that ended.
+  const briefly = validateDocument({
+    ...changed,
+    events: changed.events.map((e, i) => (i === 0 ? { ...e, metadata: { title: 'Briefly' } } : e)),
+  });
+  fork = await store.save(fork.id, contributor, fork.revision, briefly);
   fork = await store.save(fork.id, contributor, fork.revision, changed);
   assert.notEqual(fork.head_revision_id, originalFork);
   assert.deepEqual((await versions.historical(fork.id, originalFork, contributor)).document, doc);
@@ -121,7 +133,7 @@ try {
   await assert.rejects(
     pool.query(
       `UPDATE oc_history_moments SET event='{}'::jsonb WHERE timeline_id=$1 AND since=(SELECT number FROM oc_revisions WHERE id=$2)`,
-      [fork.id, originalFork],
+      [fork.id, fork.head_revision_id],
     ),
     /immutable/,
   );
@@ -134,6 +146,20 @@ try {
   );
   await assert.rejects(
     pool.query("UPDATE oc_revisions SET kind='save' WHERE id=$1", [originalFork]),
+    /immutable/,
+  );
+  // Nor can what it reads through to, or where it keeps its own versions.
+  await assert.rejects(
+    pool.query('UPDATE oc_history_bases SET base_revision_id=$2 WHERE timeline_id=$1', [
+      fork.id,
+      originalFork,
+    ]),
+    /immutable/,
+  );
+  await assert.rejects(
+    pool.query('UPDATE oc_history_moment_overrides SET since=since+1 WHERE timeline_id=$1', [
+      fork.id,
+    ]),
     /immutable/,
   );
   let proposal = await pulls.create(upstream.id, contributor, {
