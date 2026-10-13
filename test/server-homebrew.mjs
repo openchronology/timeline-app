@@ -53,7 +53,9 @@ assert.match(
   config,
   new RegExp(`^DATABASE_URL=postgresql://${user}@/openchronology\\?host=/tmp$`, 'm'),
 );
-assert.match(await sh('brew services list'), /^openchronology-server\s+started/m);
+// brew colors its status even when piped; the words are what matter.
+const services = (await sh('brew services list')).replace(/\x1B\[[0-9;]*m/g, '');
+assert.match(services, /^openchronology-server\s+started/m, services);
 assert.deepEqual(await healthy(), { status: 'ok', storage: 'postgresql' });
 const session = await (await fetch('http://127.0.0.1:5173/api/session')).json();
 assert.equal(session.server, true, 'The server reaches its database.');
