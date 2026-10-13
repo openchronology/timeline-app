@@ -992,9 +992,11 @@ dialog {
   overflow-wrap: anywhere;
   box-shadow: 0 20px 100px #152b3540;
 }
+/* A plain scrim: a blurred backdrop re-blurs the whole window whenever the timeline under
+   it redraws (cancelling a moment reverts its preview while the dialog closes), which without
+   a fast GPU delays that frame by hundreds of milliseconds. */
 dialog::backdrop {
-  background: #17271d66;
-  backdrop-filter: blur(4px);
+  background: #17271d73;
 }
 dialog form {
   display: flex;
