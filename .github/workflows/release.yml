@@ -95,3 +95,48 @@ jobs:
           else
             gh release edit "$RELEASE_TAG" --draft=false --latest
           fi
+  # Stable releases publish the Homebrew formula (#116) to openchronology/homebrew-tap, for the
+  # platform archive this release attached; pre-releases leave the tap as it is.
+  homebrew:
+    name: Publish the Homebrew formula
+    needs: publish
+    if: ${{ !contains(github.event.release.tag_name || github.ref_name, '-') }}
+    runs-on: ubuntu-24.04
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref_name }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Render the formula for this release's platform archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release download "$RELEASE_TAG" --pattern openchronology-server-platform.tar.gz --dir release
+          node scripts/homebrew-formula.mjs \
+            --tarball release/openchronology-server-platform.tar.gz \
+            --url "https://github.com/${GH_REPO}/releases/download/${RELEASE_TAG}/openchronology-server-platform.tar.gz" \
+            --out openchronology-server.rb
+      - name: Push it to the tap
+        env:
+          TAP_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+        run: |
+          install -m 0700 -d ~/.ssh
+          printf '%s\n' "$TAP_KEY" > ~/.ssh/tap && chmod 0600 ~/.ssh/tap
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/tap -o IdentitiesOnly=yes"
+          git clone git@github.com:openchronology/homebrew-tap.git tap
+          mkdir -p tap/Formula
+          cp openchronology-server.rb tap/Formula/
+          cp deploy/homebrew/tap-README.md tap/README.md
+          cd tap
+          git add Formula/openchronology-server.rb README.md
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name="OpenChronology releases" -c user.email="releases@openchronology.invalid" \
+            commit -m "openchronology-server ${RELEASE_TAG#v}"
+          git push origin HEAD:main

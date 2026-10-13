@@ -51,13 +51,15 @@ export default async function Download() {
   const request = await headers();
   const userAgent = request.get('user-agent') ?? '';
   const platform = detectPlatform(userAgent, request.get('sec-ch-ua-platform') ?? '');
-  // FreeBSD browsers do not say which release; the newest is marked.
+  // FreeBSD browsers do not say which release; the newest is marked. A Mac's is Homebrew's.
   const distribution =
-    platform === 'linux'
-      ? detectDistribution(userAgent)
-      : platform === 'freebsd'
-        ? 'freebsd15'
-        : null;
+    platform === 'macos'
+      ? 'macos'
+      : platform === 'linux'
+        ? detectDistribution(userAgent)
+        : platform === 'freebsd'
+          ? 'freebsd15'
+          : null;
   const release = await latestRelease();
   const desktop = Object.keys(NAMES).includes(platform) ? platform : null;
   const yours = DESKTOP.filter((file) => file.os === desktop);
@@ -177,19 +179,23 @@ export default async function Download() {
               <p className="muted">
                 {server.installer === 'pkg'
                   ? 'Download and install in one line, as root:'
-                  : 'Download and install in one line:'}
+                  : server.installer === 'brew'
+                    ? 'Install with Homebrew, Apple silicon or Intel:'
+                    : 'Download and install in one line:'}
               </p>
               <CopyCommand
                 command={installCommand(release, server)}
                 label={`Install on ${server.name}`}
               />
-              <File
-                release={release}
-                file={{
-                  ...server,
-                  detail: `Server package (.${server.asset.split('.').pop()}), amd64`,
-                }}
-              />
+              {server.installer === 'brew' ? null : (
+                <File
+                  release={release}
+                  file={{
+                    ...server,
+                    detail: `Server package (.${server.asset.split('.').pop()}), amd64`,
+                  }}
+                />
+              )}
               <a className="download-file" href={`${DOCS}/${server.guide}`}>
                 Setup guide
               </a>

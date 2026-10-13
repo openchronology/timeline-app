@@ -1,0 +1,133 @@
+#!/bin/sh
+# Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+# Sets up OpenChronology after Homebrew installs it (#116), as the other packages' setup does:
+# the configuration, PostgreSQL @PG_MAJOR@ (started with brew services when it is not running),
+# the database with pgmp, the migration and the openchronology-server service. Homebrew's
+# PostgreSQL runs as you, so the server does too. An installation that has its configuration
+# and database already (an upgrade) is left alone, with advice. Safe to run again.
+# Usage: openchronology-setup
+set -e
+PREFIX=@HOMEBREW_PREFIX@
+CONFIG_DIR=$PREFIX/etc/openchronology
+CONFIG=$CONFIG_DIR/openchronology.env
+EXAMPLES=$PREFIX/share/openchronology
+PG=@PG_BIN@
+BREW=$PREFIX/bin/brew
+DOCS=$PREFIX/share/doc/openchronology-server/README.Homebrew
+if [ "$(id -u)" -eq 0 ]; then
+  echo "Run openchronology-setup as yourself, not root: Homebrew's PostgreSQL runs as you." >&2
+  exit 1
+fi
+existing=
+if [ -e "$CONFIG" ]; then existing=1; fi
+
+mkdir -p "$CONFIG_DIR" "$PREFIX/var/openchronology" "$PREFIX/var/log"
+chmod 0700 "$CONFIG_DIR"
+# Configuration files are created once and then belong to you: upgrades never rewrite them
+# (each version's templates stay in $EXAMPLES to compare).
+new_config() {
+  [ -e "$1" ] && return 0
+  sed "$2" "$3" >"$1.new"
+  chmod 0600 "$1.new"
+  mv "$1.new" "$1"
+}
+key=$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')
+user=$(id -un)
+new_config "$CONFIG" \
+  "s|^AUTH_ENCRYPTION_KEY=\$|AUTH_ENCRYPTION_KEY=$key|; s|^DATABASE_URL=.*|DATABASE_URL=postgresql://$user@/openchronology?host=/tmp|" \
+  "$EXAMPLES/openchronology.env.example"
+new_config "$CONFIG_DIR/syslog.env" "" "$EXAMPLES/syslog.env.example"
+
+# SQL as you, Homebrew's PostgreSQL superuser, over its socket in /tmp.
+pg() { "$PG/psql" -X -q -At -v ON_ERROR_STOP=1 -h /tmp -d "$1" -c "$2"; }
+reachable() { pg postgres 'SELECT 1' >/dev/null 2>&1; }
+if ! reachable; then
+  "$BREW" services start postgresql@@PG_MAJOR@ >/dev/null 2>&1 || true
+  for _ in $(seq 30); do
+    reachable && break
+    sleep 1
+  done
+fi
+running=
+if reachable; then running=1; fi
+# pgmp is built for PostgreSQL @PG_MAJOR@: another version answering on the same socket cannot
+# load it.
+if [ -n "$running" ]; then
+  major=$(pg postgres 'SHOW server_version_num' | cut -c1-2)
+  if [ "$major" != @PG_MAJOR@ ]; then
+    cat <<MSG >&2
+
+PostgreSQL $major is running on /tmp, port 5432; OpenChronology needs PostgreSQL @PG_MAJOR@ there.
+Stop the other one (or move it to another port), then run this again:
+
+  brew services stop postgresql@$major
+  brew services start postgresql@@PG_MAJOR@
+  openchronology-setup
+
+MSG
+    exit 1
+  fi
+fi
+installed=
+if [ -n "$existing" ] && [ -n "$running" ] &&
+  [ -n "$(pg postgres "SELECT 1 FROM pg_database WHERE datname='openchronology'")" ]; then
+  installed=1
+fi
+if [ -n "$installed" ]; then
+  missing=$(sed -n 's/^\([A-Z][A-Z0-9_]*\)=.*/\1/p' "$EXAMPLES/openchronology.env.example" |
+    while read -r name; do grep -q "^$name=" "$CONFIG" || echo "  $name"; done)
+  cat <<MSG
+
+OpenChronology is set up already (its configuration and database are kept). After an
+upgrade, the database is migrated to the new version with:
+
+  1. Review the configuration in $CONFIG against this version's template:
+       diff -u $CONFIG $EXAMPLES/openchronology.env.example
+MSG
+  if [ -n "$missing" ]; then
+    echo "     New settings to consider (their defaults apply until you add them):"
+    echo "$missing" | sed 's/^/     /'
+  fi
+  cat <<MSG
+  2. Back up the database:   $PG/pg_dump -h /tmp openchronology > openchronology.sql
+  3. Migrate and restart:    openchronology-migrate
+
+See $DOCS.
+
+MSG
+  exit 0
+fi
+if [ -z "$running" ]; then
+  cat <<MSG
+
+PostgreSQL @PG_MAJOR@ is not running, so the database was not created. Start it, then run this
+again:
+
+  brew services start postgresql@@PG_MAJOR@
+  openchronology-setup
+
+See $DOCS.
+
+MSG
+  exit 1
+fi
+if [ -z "$(pg postgres "SELECT 1 FROM pg_database WHERE datname='openchronology'")" ]; then
+  "$PG/createdb" -h /tmp openchronology
+fi
+pg openchronology 'CREATE EXTENSION IF NOT EXISTS pgmp'
+"$PREFIX/bin/openchronology-migrate" --no-restart
+"$BREW" services restart openchronology-server >/dev/null
+origin=$(sed -n 's/^APP_ORIGIN=//p' "$CONFIG")
+cat <<MSG
+
+OpenChronology is installed and running at $origin.
+
+Next steps:
+  - Set APP_ORIGIN, email, an administrator and sign-in providers in $CONFIG,
+    then: openchronology-migrate (creates the administrator, and restarts the server)
+  - Put an HTTPS reverse proxy in front of it for public use.
+  - Back up AUTH_ENCRYPTION_KEY from $CONFIG separately from the database.
+
+See $DOCS.
+
+MSG

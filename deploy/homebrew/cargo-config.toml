@@ -1,0 +1,6 @@
+# och-convert builds from the crates vendored beside it (rust-dependencies), offline.
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "rust-dependencies"

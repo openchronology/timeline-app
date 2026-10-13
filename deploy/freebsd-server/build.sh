@@ -1,7 +1,7 @@
 #!/bin/sh
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 # Makes the FreeBSD server package (#116) from the platform built on Linux
-# (node scripts/server-package.mjs freebsd14, into server-artifacts/freebsd/): builds
+# (node scripts/server-package.mjs freebsd14, into server-artifacts/): builds
 # och-convert and pgmp against FreeBSD's own libraries and PostgreSQL, lays the server out
 # under /usr/local with rc.d services, and writes server-artifacts/<asset>.pkg.
 # Usage, as root on FreeBSD, from the repository: sh deploy/freebsd-server/build.sh
@@ -41,7 +41,7 @@ tar -xzf "$WORK/pgmp.tar.gz" -C "$WORK/pgmp" --strip-components=1
 
 # The platform, its converter, documentation and configuration templates.
 mkdir -p "$ROOT/lib" "$ROOT/share/doc"
-tar -xzf "$REPO/server-artifacts/freebsd/openchronology-app.tar.gz" -C "$WORK"
+tar -xzf "$REPO/server-artifacts/openchronology-server-platform.tar.gz" -C "$WORK"
 mv "$WORK/lib/openchronology" "$APP"
 mv "$WORK/doc" "$DOC"
 mkdir -p "$APP/bin" "$DOC/pgmp"

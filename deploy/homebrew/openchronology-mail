@@ -1,0 +1,6 @@
+#!/bin/sh
+# Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+# Delivers account email (Resend) with the server's configuration, until stopped: run it under
+# your own launchd agent or terminal session (README.Homebrew).
+OCH_CONFIG=@HOMEBREW_PREFIX@/etc/openchronology/openchronology.env NODE_ENV=production \
+  exec "@NODE@" --import="@LIBEXEC@/server/load-configuration.mjs" "@LIBEXEC@/server/mail-worker.mjs"

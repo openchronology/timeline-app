@@ -35,6 +35,7 @@ An administrator who cannot sign in can have their password set back to `ADMIN_I
 | ----------------------------------------------- | ---------------------------------------------------------------------- |
 | Debian, Ubuntu, Rocky, RHEL and Fedora packages | `sudo openchronology-reset-admin-password`                             |
 | FreeBSD package                                 | `openchronology-reset-admin-password`, as root                         |
+| macOS (Homebrew)                                | `openchronology-reset-admin-password`                                  |
 | Docker Compose                                  | `docker compose run --rm migrate node server/reset-admin-password.mjs` |
 | From the source                                 | `npm run reset-admin-password` (reads `.env`)                          |
 
