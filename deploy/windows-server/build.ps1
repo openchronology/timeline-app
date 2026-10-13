@@ -85,7 +85,10 @@ $compile = "cl /nologo /O2 /MD /LD /W1 /DWIN32 /D_WINDOWS /D_CRT_SECURE_NO_WARNI
 cmd /c "call `"$vcvars`" >nul && $compile"
 if ($LASTEXITCODE -ne 0) { throw 'Building pgmp failed' }
 Copy-Item pgmp.dll "$stage\pgsql\lib\"
-Copy-Item pgmp.control, sql\pgmp--1.1.sql, sql\pgmp--unpackaged--1.1.sql "$stage\pgsql\share\extension\"
+# The control file names its scripts' directory: share\pgmp, as PGXS installs them.
+Copy-Item pgmp.control "$stage\pgsql\share\extension\"
+New-Item -ItemType Directory -Force -Path "$stage\pgsql\share\pgmp" | Out-Null
+Copy-Item sql\pgmp--1.1.sql, sql\pgmp--unpackaged--1.1.sql "$stage\pgsql\share\pgmp\"
 New-Item -ItemType Directory -Force -Path "$stage\doc\pgmp" | Out-Null
 Copy-Item COPYING "$stage\doc\pgmp\"
 Pop-Location
