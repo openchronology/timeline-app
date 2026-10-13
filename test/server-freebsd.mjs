@@ -69,6 +69,26 @@ assert.match(await (await fetch('http://127.0.0.1:5173/')).text(), /<html/i);
 assert.doesNotMatch(await sh('ldd /usr/local/lib/openchronology/bin/och-convert'), /not found/);
 assert.match(await sh('och-import-logs --help'), /^Usage: och-import-logs/);
 
+// The administrator (#118): its password is read whole from the configuration, # and all,
+// and openchronology-reset-admin-password sets it again.
+const adminPassword = 'Abc!def#ghi@jkl-mno';
+await sh(
+  `sed -i '' -e 's/^ADMIN_USERNAME=.*/ADMIN_USERNAME=admin/' -e 's/^ADMIN_INITIAL_PASSWORD=.*/ADMIN_INITIAL_PASSWORD=${adminPassword}/' ${configFile}`,
+);
+await sh('openchronology-migrate --no-restart');
+const { passwordMatches } = await import('/usr/local/lib/openchronology/server/auth.mjs');
+const adminMatches = async () =>
+  passwordMatches(
+    adminPassword,
+    await psql("SELECT password_hash FROM oc_users WHERE username='admin'"),
+  );
+assert.equal(await adminMatches(), true, 'the administrator has the whole password');
+await psql("UPDATE oc_users SET password_hash=NULL WHERE username='admin'");
+assert.equal(await adminMatches(), false);
+const reset = await sh('openchronology-reset-admin-password 2>&1');
+assert.match(reset, /The password of admin \(administrator\) is now ADMIN_INITIAL_PASSWORD/, reset);
+assert.equal(await adminMatches(), true);
+
 // Reinstalling takes the upgrade path: configuration and database are kept, and the
 // administrator is told what to review and to run openchronology-migrate.
 await psql(

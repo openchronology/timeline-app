@@ -37,7 +37,8 @@ Edit /usr/local/etc/openchronology/openchronology.env, then `service openchronol
   - RESEND_API_KEY and AUTH_EMAIL_FROM for account email, then
     `sysrc openchronology_mail_enable=YES && service openchronology_mail start`.
   - ADMIN_USERNAME, ADMIN_EMAIL and ADMIN_INITIAL_PASSWORD for the first administrator,
-    created by `openchronology-migrate`.
+    created by `openchronology-migrate`. The password is used once; to sign in with it
+    again (or with a new one written there), run `openchronology-reset-admin-password`.
   - Sign-in providers, human verification, quotas: see the comments in the file and
     authentication.md, administration.md in this directory.
 
@@ -92,6 +93,10 @@ Layout
   /usr/local/lib/openchronology           the application and och-convert
   /usr/local/sbin/openchronology-migrate  database migration
   /usr/local/sbin/openchronology-setup    first-time setup (run by the package)
+  /usr/local/sbin/openchronology-reset-admin-password   the administrator's password, from
+                                          the configuration
+  /usr/local/sbin/openchronology-reset-admin-password   the administrator's password, from
+                                          the configuration
   /usr/local/etc/openchronology           configuration (created on first install)
   /usr/local/share/openchronology         configuration templates of the installed version
   /usr/local/etc/rc.d                     openchronology, openchronology_mail,

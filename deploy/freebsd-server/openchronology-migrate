@@ -14,9 +14,10 @@ if [ ! -r "$CONFIG" ]; then
   echo "$CONFIG is missing; reinstall openchronology-server or restore it from a backup." >&2
   exit 1
 fi
-# Node reads the same KEY=value file the services use, as the openchronology user.
+# Node reads the same KEY=value file the services use, as the openchronology user, and as
+# systemd reads it (OCH_CONFIG: a # inside a value is part of it, #118).
 cd /
-su -m openchronology -c "/usr/local/bin/node --env-file=$CONFIG $APP/server/migrate.mjs"
+su -m openchronology -c "env OCH_CONFIG=$CONFIG /usr/local/bin/node $APP/server/migrate.mjs"
 if [ "${1:-}" != "--no-restart" ] && service openchronology enabled; then
   service openchronology restart >/dev/null 2>&1 || service openchronology start >/dev/null
   echo "OpenChronology restarted."

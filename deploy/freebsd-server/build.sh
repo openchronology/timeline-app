@@ -69,6 +69,8 @@ done
 sed "s/@PG_MAJOR@/$PG_MAJOR/g" "$HERE/openchronology-setup" >"$ROOT/sbin/openchronology-setup"
 chmod 0755 "$ROOT/sbin/openchronology-setup"
 install -m 0755 "$HERE/openchronology-migrate" "$ROOT/sbin/openchronology-migrate"
+install -m 0755 "$HERE/openchronology-reset-admin-password" \
+  "$ROOT/sbin/openchronology-reset-admin-password"
 freebsd_paths "$SHARED/och-import-logs" |
   sed 's|"\$APP/node/bin/node"|/usr/local/bin/node|g' >"$ROOT/bin/och-import-logs"
 chmod 0755 "$ROOT/bin/och-import-logs"
