@@ -122,11 +122,13 @@ try {
   & $node (Join-Path $app 'server\migrate.mjs') | Out-Host
   if ($LASTEXITCODE -ne 0) { throw 'Migrating the database failed' }
 
-  # The server's service (WinSW): installed once, refreshed and started.
+  # The server's service (WinSW): installed once. It runs the same wrapper, which reads its
+  # settings (openchronology-service.xml) each time it starts, so an upgrade only restarts it.
   $wrapper = Join-Path $InstallDir 'service\openchronology-service.exe'
-  if (Get-Service $service -ErrorAction SilentlyContinue) { & $wrapper refresh | Out-Host }
-  else { & $wrapper install | Out-Host }
-  if ($LASTEXITCODE -ne 0) { throw 'Installing the OpenChronology service failed' }
+  if (-not (Get-Service $service -ErrorAction SilentlyContinue)) {
+    & $wrapper install | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw 'Installing the OpenChronology service failed' }
+  }
   Restart-Service $service -Force
   $origin = ((Select-String -Path $config -Pattern '^APP_ORIGIN=(.*)$').Matches[0].Groups[1].Value)
   $healthy = $false
