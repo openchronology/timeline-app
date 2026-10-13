@@ -110,6 +110,21 @@ export async function checkViewportStore(browser) {
     await page.locator('#right-bound').fill(right);
     await page.locator('#apply-bounds').click();
   };
+  /**
+   * Going to bounds animates, and a coarse window fetched on the way can already show the
+   * view's moments. A view is the page's (and so storage's) once the animation has landed on
+   * it and its own window answers it: moving on sooner cancels that window's request.
+   */
+  const visit = async (page, left, right) => {
+    await bounds(page, left, right);
+    await page.waitForFunction(
+      (view) =>
+        document.getElementById('markers').dataset.view === view &&
+        document.getElementById('loading-window').hidden,
+      `${left}/1 ${right}/1`,
+      { timeout: 15000 },
+    );
+  };
   const open = async () => {
     const page = await context.newPage();
     await page.goto(`http://localhost:5173/#timeline/${id}`);
@@ -156,9 +171,9 @@ export async function checkViewportStore(browser) {
   };
   let page = await open();
   try {
-    await bounds(page, '0', '20');
+    await visit(page, '0', '20');
     await page.getByRole('button', { name: 'Nearby moment', exact: true }).waitFor();
-    await bounds(page, '9000', '11000');
+    await visit(page, '9000', '11000');
     await page.getByRole('button', { name: 'Far away', exact: true }).waitFor();
     let keys = await settled(page);
     const earlier = { keys, answered };
