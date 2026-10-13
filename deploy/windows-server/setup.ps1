@@ -127,7 +127,15 @@ try {
     try { $healthy = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 'http://127.0.0.1:5173/healthz').StatusCode -eq 200 }
     catch { Start-Sleep -Seconds 1 }
   }
-  if (-not $healthy) { throw "The server did not answer; see $logs" }
+  if (-not $healthy) {
+    # What went wrong: the service's state and the last of its logs (WinSW's and the server's).
+    Get-Service $service | Format-List Name, Status, StartType | Out-Host
+    Get-ChildItem $logs -Filter *.log -ErrorAction SilentlyContinue | ForEach-Object {
+      Write-Host "--- $($_.Name)"
+      Get-Content -Tail 40 $_.FullName | Out-Host
+    }
+    throw "The server did not answer; see $logs"
+  }
   if ($existing) { Write-Host "`nOpenChronology is upgraded: its configuration and database are kept, and the database is migrated to this version." }
   Write-Host @"
 

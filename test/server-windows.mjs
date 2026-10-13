@@ -35,7 +35,7 @@ const install = async () => {
     await ps(`(Start-Process -Wait -PassThru -FilePath '${installer}' -ArgumentList '/S').ExitCode`)
   ).trim();
   const log = await ps(`Get-Content -Raw '${data}\\setup.log'`, { allowFailure: true });
-  assert.equal(code, '0', `The installer exited with ${code}:\n${log.slice(-4000)}`);
+  assert.equal(code, '0', `The installer exited with ${code}:\n${log.slice(-12000)}`);
   return log;
 };
 const status = async (name) =>
