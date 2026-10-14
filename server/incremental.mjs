@@ -66,6 +66,12 @@ export function incremental(t, patch) {
   return size <= Math.max(64, Number(t.event_count) / 8);
 }
 
+/*
+ * Rows are looked up by key in lateral subqueries ending in OFFSET 0, which keeps each a
+ * lookup per key: right after a timeline is written in one go (a fork, an import) the
+ * planner's statistics can still count its rows as none, and a join would read all of them.
+ */
+
 /**
  * Applies `patch` to timeline `t` (locked by the caller). Returns the normalized patch to
  * record as the revision and the timeline row's new values, or throws an HttpError.
@@ -121,7 +127,7 @@ export async function applyIncrementally(c, t, patch) {
     (
       await c.query(
         `SELECT m.id,oc_qtext(m.time) AS time,m.event FROM unnest($2::text[]) k(id)
-        CROSS JOIN LATERAL (SELECT * FROM oc_moments WHERE timeline_id=$1 AND id=k.id) m`,
+        CROSS JOIN LATERAL (SELECT * FROM oc_moments WHERE timeline_id=$1 AND id=k.id OFFSET 0) m`,
         [id, [...momentChanges.keys()]],
       )
     ).rows.map((r) => [r.id, r.event]),
@@ -135,7 +141,7 @@ export async function applyIncrementally(c, t, patch) {
   if (durationChanges.size) {
     const { rows } = await c.query(
       `SELECT k.id,n.definition FROM unnest($2::text[]) k(id) CROSS JOIN LATERAL
-        (SELECT definition FROM oc_duration_nodes WHERE timeline_id=$1 AND band->>'id'=k.id) n`,
+        (SELECT definition FROM oc_duration_nodes WHERE timeline_id=$1 AND band->>'id'=k.id OFFSET 0) n`,
       [id, [...durationChanges].filter(([, d]) => d).map(([k]) => k)],
     );
     for (const row of rows)
@@ -190,7 +196,7 @@ export async function applyIncrementally(c, t, patch) {
     if (missing.length) {
       const { rows } = await c.query(
         `SELECT m.id,oc_qtext(m.time) AS time FROM unnest($2::text[]) k(id)
-        CROSS JOIN LATERAL (SELECT id,time FROM oc_moments WHERE timeline_id=$1 AND id=k.id) m`,
+        CROSS JOIN LATERAL (SELECT id,time FROM oc_moments WHERE timeline_id=$1 AND id=k.id OFFSET 0) m`,
         [id, missing],
       );
       for (const r of rows) momentTimes.set(r.id, r.time);
@@ -201,11 +207,11 @@ export async function applyIncrementally(c, t, patch) {
   const { rows: durationRows } = await c.query(
     `SELECT DISTINCT ON (d.band->>'id') oc_qtext(d.first_time) AS first,oc_qtext(d.last_time) AS last,d.band,d.definition FROM (
       SELECT n.* FROM unnest($2::text[]) k(id) CROSS JOIN LATERAL
-        (SELECT * FROM oc_duration_nodes WHERE timeline_id=$1 AND band->>'id'=k.id) n
+        (SELECT * FROM oc_duration_nodes WHERE timeline_id=$1 AND band->>'id'=k.id OFFSET 0) n
       UNION ALL SELECT n.* FROM unnest($3::text[]) k(id) CROSS JOIN LATERAL
-        (SELECT * FROM oc_duration_nodes WHERE timeline_id=$1 AND definition->'start'->>'moment'=k.id) n
+        (SELECT * FROM oc_duration_nodes WHERE timeline_id=$1 AND definition->'start'->>'moment'=k.id OFFSET 0) n
       UNION ALL SELECT n.* FROM unnest($3::text[]) k(id) CROSS JOIN LATERAL
-        (SELECT * FROM oc_duration_nodes WHERE timeline_id=$1 AND definition->'end'->>'moment'=k.id) n) d`,
+        (SELECT * FROM oc_duration_nodes WHERE timeline_id=$1 AND definition->'end'->>'moment'=k.id OFFSET 0) n) d`,
     [id, [...durationChanges.keys()], [...moved]],
   );
   const savedDurations = new Map(durationRows.map((r) => [r.band.id, r]));
@@ -321,7 +327,7 @@ export async function applyIncrementally(c, t, patch) {
   if (unknown.length) {
     const { rows } = await c.query(
       `SELECT 'm:'||m.id AS key FROM unnest($2::text[]) k(id)
-        CROSS JOIN LATERAL (SELECT id FROM oc_moments WHERE timeline_id=$1 AND id=k.id) m
+        CROSS JOIN LATERAL (SELECT id FROM oc_moments WHERE timeline_id=$1 AND id=k.id OFFSET 0) m
       UNION ALL SELECT 'd:'||k.id FROM unnest($3::text[]) k(id)
         WHERE EXISTS(SELECT 1 FROM oc_duration_nodes WHERE timeline_id=$1 AND band->>'id'=k.id)`,
       [
@@ -366,9 +372,9 @@ export async function applyIncrementally(c, t, patch) {
   if (movedEntities.length) {
     const { rows } = await c.query(
       `SELECT r.a_kind,r.a_id,r.b_kind,r.b_id FROM unnest($2::text[],$3::text[]) AS x(kind,id) CROSS JOIN LATERAL
-        (SELECT * FROM oc_relationships WHERE timeline_id=$1 AND a_kind=x.kind AND a_id=x.id) r
+        (SELECT * FROM oc_relationships WHERE timeline_id=$1 AND a_kind=x.kind AND a_id=x.id OFFSET 0) r
       UNION SELECT r.a_kind,r.a_id,r.b_kind,r.b_id FROM unnest($2::text[],$3::text[]) AS x(kind,id) CROSS JOIN LATERAL
-        (SELECT * FROM oc_relationships WHERE timeline_id=$1 AND b_kind=x.kind AND b_id=x.id) r`,
+        (SELECT * FROM oc_relationships WHERE timeline_id=$1 AND b_kind=x.kind AND b_id=x.id OFFSET 0) r`,
       [id, movedEntities.map(([k]) => k), movedEntities.map(([, v]) => v)],
     );
     replaced = rows
@@ -382,7 +388,7 @@ export async function applyIncrementally(c, t, patch) {
     ? (
         await c.query(
           `SELECT oc_qtext(e.first_time) AS first,e.band->>'id' AS id FROM unnest($2::text[]) k(id)
-          CROSS JOIN LATERAL (SELECT * FROM oc_edge_nodes WHERE timeline_id=$1 AND band->>'id'=k.id) e`,
+          CROSS JOIN LATERAL (SELECT * FROM oc_edge_nodes WHERE timeline_id=$1 AND band->>'id'=k.id OFFSET 0) e`,
           [id, arcsOut],
         )
       ).rows
@@ -402,7 +408,7 @@ export async function applyIncrementally(c, t, patch) {
   if (unplaced.length) {
     const { rows } = await c.query(
       `SELECT d.band->>'id' AS id,d.band->>'startTime' AS start FROM unnest($2::text[]) k(id)
-      CROSS JOIN LATERAL (SELECT band FROM oc_duration_nodes WHERE timeline_id=$1 AND band->>'id'=k.id) d`,
+      CROSS JOIN LATERAL (SELECT band FROM oc_duration_nodes WHERE timeline_id=$1 AND band->>'id'=k.id OFFSET 0) d`,
       [id, [...new Set(unplaced)]],
     );
     for (const r of rows) starts.set(r.id, r.start);
