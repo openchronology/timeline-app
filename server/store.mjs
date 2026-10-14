@@ -83,15 +83,49 @@ async function allEvents(client, table, id) {
   );
   return rows.map((r) => r.event);
 }
-/** The tables holding timelines' indexes, whose statistics large writes leave behind. */
-const LIVE_TABLES = [
+/** The tables holding a timeline's index (what copyIndex copies). */
+const INDEX_TABLES = [
   'oc_moments',
   'oc_nodes',
   'oc_duration_nodes',
   'oc_edge_nodes',
   'oc_relationships',
   'oc_entity_search',
-].join(',');
+];
+/** The same tables, whose statistics large writes leave behind. */
+const LIVE_TABLES = INDEX_TABLES.join(',');
+/** The timeline's own columns that describe its index (as replace writes them). */
+const TIMELINE_INDEX = [
+  'title',
+  'description',
+  'presentation',
+  'plugins',
+  'tags',
+  'assets',
+  'comparison',
+  'root',
+  'event_count',
+  'duration_root',
+  'edge_root',
+  'index_version',
+  'search_version',
+  'event_text',
+  'event_text_stale',
+];
+const copied = new Map();
+/** A table's columns a copy writes: all but the timeline and generated ones. */
+async function copiedColumns(client, table) {
+  if (!copied.has(table)) {
+    const { rows } = await client.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema()
+      AND table_name=$1 AND column_name<>'timeline_id' AND is_generated='NEVER'
+      ORDER BY ordinal_position`,
+      [table],
+    );
+    copied.set(table, rows.map((r) => r.column_name).join(','));
+  }
+  return copied.get(table);
+}
 /** How many moments and durations written in one go make their statistics worth refreshing. */
 const ANALYZE_AFTER = 20000;
 export class PostgresStore {
@@ -158,6 +192,42 @@ export class PostgresStore {
           ['owner', 'admin'].includes(timeline.role) ||
           timeline.allow_private_forks),
     };
+  }
+  /**
+   * Gives timeline `to` (just created, empty) the index of timeline `from` as it stands, copied
+   * row by row in the database rather than rebuilt from a document: what a fork or duplicate
+   * of `from`'s head needs, at a cost that stays in PostgreSQL. Only for an index in the
+   * current form: returns false, copying nothing, for a comparison (its sources are checked
+   * for the new owner when rebuilt) or an index a startup repair still has to rebuild.
+   */
+  async copyIndex(client, from, to) {
+    const { rows } = await client.query(
+      `SELECT event_count+(SELECT count(*) FROM oc_duration_nodes WHERE timeline_id=$1) AS entities
+      FROM oc_timelines t WHERE id=$1 AND comparison IS NULL AND index_version>=2 AND search_version>=1
+      AND NOT EXISTS(SELECT 1 FROM oc_duration_nodes n WHERE n.timeline_id=t.id
+        AND (n.definition IS NULL OR n.max_first IS NULL))`,
+      [from],
+    );
+    if (!rows[0]) return false;
+    // The copy is charged like a rebuild, before anything is written.
+    await client.query(
+      'UPDATE oc_timelines t SET storage_bytes=s.storage_bytes FROM oc_timelines s WHERE t.id=$2 AND s.id=$1',
+      [from, to],
+    );
+    for (const table of INDEX_TABLES) {
+      const columns = await copiedColumns(client, table);
+      await client.query(
+        `INSERT INTO ${table}(timeline_id,${columns}) SELECT $2,${columns} FROM ${table} WHERE timeline_id=$1`,
+        [from, to],
+      );
+    }
+    await client.query(
+      `UPDATE oc_timelines t SET ${TIMELINE_INDEX.map((c) => `${c}=s.${c}`)}
+      FROM oc_timelines s WHERE t.id=$2 AND s.id=$1`,
+      [from, to],
+    );
+    if (Number(rows[0].entities) >= ANALYZE_AFTER) client.analyze = true;
+    return true;
   }
   async replace(client, id, document, { touch = true } = {}) {
     document = validateDocument(document);

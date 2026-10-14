@@ -60,6 +60,15 @@ try {
   assert.equal((await store.access(legacyId, owner)).head_revision_id, legacyId);
   assert.deepEqual((await versions.historical(legacyId, legacyId, owner)).document, doc);
   assert((await pulls.get(legacyId, legacyPull, owner)).source_revision_id);
+  // A copy of a head saved as a document (not kept as rows) rebuilds its index from it.
+  const legacyCopy = await versions.copy(
+    legacyId,
+    owner,
+    { revision: (await store.access(legacyId, owner)).revision },
+    true,
+  );
+  timelines.push(legacyCopy.id);
+  assert.deepEqual((await store.snapshot(legacyCopy.id, owner)).document, doc);
   let upstream = await store.create(owner, doc);
   timelines.push(upstream.id);
   await pool.query("INSERT INTO oc_members(timeline_id,user_id,role) VALUES($1,$2,'viewer')", [
