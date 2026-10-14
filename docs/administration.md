@@ -119,8 +119,9 @@ reads or changes only part of it, at a cost that grows slowly with its size:
 - **Viewing** reads only what is on screen.
 
 Some work handles the whole timeline at once, and that cost grows with it: **exporting** to
-`.ochx`, **reading a saved revision** (history pages), **forking**, and **pull requests**
-and syncing forks, which also merge whole timelines in the server's memory.
+`.ochx`, **reading a saved revision** (history pages), and **forking**, which copies the
+timeline's index inside the database. Pull requests, merges and syncs read only what
+changed.
 
 These figures come from an 8-core virtual machine with PostgreSQL 17, using the
 [benchmark timelines](benchmarks.md) (moments with titles, descriptions and tags, plus one
@@ -143,8 +144,9 @@ revisions keep the form they were saved in.
 **Forks and duplicates share saved history** with the timeline they copy, instead of
 copying it: a new copy keeps no history beyond its settings, and its saves keep only what
 they change. At 200,000 moments, a fork used to add 37 MB of history and now adds a few
-hundred bytes. A copy still builds its own index of the whole timeline, which took about
-2 minutes at that size. Reading one of the copy's saved revisions takes about a third
+hundred bytes. A copy still has its own index of the whole timeline, copied row by row
+inside the database: about 25 s at that size, where rebuilding it from the timeline's
+document in the server took about 2 minutes. Reading one of the copy's saved revisions takes about a third
 longer than reading the original's (6 s rather than 4.6 s), because it reads through to
 the original.
 

@@ -715,6 +715,23 @@ CREATE TABLE IF NOT EXISTS oc_entity_search (
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS search_version integer NOT NULL DEFAULT 0;
 -- Entity tags (metadata.tags of moments and durations), listed for tag separation.
 ALTER TABLE oc_entity_search ADD COLUMN IF NOT EXISTS tags text[] NOT NULL DEFAULT '{}';
+-- The search vector is kept by a trigger rather than generated, so that a timeline's index
+-- copied for a fork or duplicate (copyIndex in store.mjs) takes the vectors as they are
+-- instead of reading every entity's text again: computed on insert unless given, and when
+-- the text changes. Existing vectors are kept as they are.
+ALTER TABLE oc_entity_search ALTER COLUMN document DROP EXPRESSION IF EXISTS;
+CREATE OR REPLACE FUNCTION oc_entity_search_document() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF (TG_OP='INSERT' AND NEW.document IS NULL) OR (TG_OP='UPDATE' AND
+      (NEW.title IS DISTINCT FROM OLD.title OR NEW.body IS DISTINCT FROM OLD.body)) THEN
+    NEW.document:=setweight(to_tsvector('simple', NEW.title), 'A')
+      || setweight(to_tsvector('simple', left(NEW.body, 100000)), 'B');
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS oc_entity_search_document ON oc_entity_search;
+CREATE TRIGGER oc_entity_search_document BEFORE INSERT OR UPDATE ON oc_entity_search
+  FOR EACH ROW EXECUTE FUNCTION oc_entity_search_document();
 
 -- Derived indexes for tag separation: one saved revision filtered to entities with any of a
 -- set of tags, or none of them. Built on first use and cached per revision; a save discards

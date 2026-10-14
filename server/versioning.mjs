@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { HttpError } from './store.mjs';
 import { rebaseDocument, mergePatch } from './merge.mjs';
-import { shareHistory } from './history.mjs';
+import { shareHistory, settingsAt } from './history.mjs';
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 export function expectedRevision(value) {
   if (
@@ -62,27 +62,35 @@ export class Versioning {
         throw new HttpError(403, 'The owner must enable forking for this private timeline.');
       if (upstream.revision !== input.revision)
         throw new HttpError(409, 'Timeline changed. Reload before copying.');
-      const document = await this.store.revisionDocument(c, upstream.head_revision_id);
       await c.query(
         `INSERT INTO oc_timelines(id,owner_id,title,upstream_id,fork_base_revision_id,publication_restricted)
         VALUES($1,$2,$3,$4,$5,$6)`,
         [
           newId,
           userId,
-          document.title,
+          upstream.title,
           duplicate ? null : id,
           duplicate ? null : upstream.head_revision_id,
           upstream.visibility === 'private' || upstream.publication_restricted,
         ],
       );
-      await this.store.replace(c, newId, document);
+      // The copy's index is upstream's (its head), copied in the database; its settings are
+      // the head's as saved. Otherwise it is rebuilt from the head's document.
+      const settings = await settingsAt(c, upstream.head_revision_id);
+      let document;
+      if (settings && (await this.store.copyIndex(c, id, newId)))
+        c.afterCommit = () => this.store.refreshText(newId);
+      else {
+        document = await this.store.revisionDocument(c, upstream.head_revision_id);
+        await this.store.replace(c, newId, document);
+      }
       // Its history reads through to the revision it copies, instead of copying it.
       await shareHistory(c, newId, upstream.head_revision_id);
       await this.store.checkpoint(
         c,
         newId,
         userId,
-        document,
+        document ?? settings,
         duplicate ? 'duplicate' : 'fork',
         duplicate ? [] : [upstream.head_revision_id],
       );

@@ -93,6 +93,41 @@ async function rowChanges(from, to) {
     }
   return changes;
 }
+/**
+ * A copy's index is its source's, row for row (copied in the database, not rebuilt): every
+ * index table and the timeline's own index columns.
+ */
+async function sameIndex(source, copy) {
+  for (const table of [
+    'oc_moments',
+    'oc_nodes',
+    'oc_duration_nodes',
+    'oc_edge_nodes',
+    'oc_relationships',
+    'oc_entity_search',
+  ]) {
+    const rows = (id) =>
+      `SELECT to_jsonb(x)-'timeline_id' AS row FROM ${table} x WHERE timeline_id='${id}'`;
+    const { rows: differing } = await pool.query(
+      `(${rows(source)} EXCEPT ${rows(copy)}) UNION ALL (${rows(copy)} EXCEPT ${rows(source)})`,
+    );
+    assert.equal(differing.length, 0, `${table} copied row for row`);
+    assert(
+      Number(
+        (await pool.query(`SELECT count(*) AS n FROM ${table} WHERE timeline_id=$1`, [copy]))
+          .rows[0].n,
+      ) > 0 || table === 'oc_relationships',
+      `${table} has rows`,
+    );
+  }
+  const columns =
+    'title,description,presentation,plugins,tags,assets,root,event_count,duration_root,edge_root,index_version,search_version,event_text,storage_bytes';
+  const { rows } = await pool.query(
+    `SELECT ${columns} FROM oc_timelines WHERE id=ANY($1::uuid[]) ORDER BY id=$2`,
+    [[source, copy], copy],
+  );
+  assert.deepEqual(rows[1], rows[0], 'the timeline index columns are copied');
+}
 const charged = async (revision) =>
   Number(
     (await pool.query('SELECT stored_bytes FROM oc_revisions WHERE id=$1', [revision])).rows[0]
@@ -127,6 +162,7 @@ try {
     );
     created.push(timeline.id);
     copies.push(track(timeline, source.document));
+    await sameIndex(source.timeline.id, timeline.id);
     const rows = await rowsOf(timeline.id);
     const bytes = await charged(timeline.head_revision_id);
     if (shares) {
