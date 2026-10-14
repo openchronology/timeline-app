@@ -73,7 +73,7 @@ API keys are rate-limited per key (`API_KEY_REQUESTS_PER_MINUTE`, default 120). 
 
 ## Keeping recent logs
 
-Log timelines grow without end. Set **Keep only the last** (say `90 days`) in a timeline's **Sharing & settings**, and the server deletes older moments and history about once an hour, freeing storage; see [data retention](retention.md).
+Log timelines grow without end. Set **Keep only the last** (say `90 days`) in a timeline's **Sharing & settings**, and the server deletes older moments and history about once an hour, freeing storage; see [data retention](retention.md). Turn off **Keep saved history** there too: nobody reviews a log's past revisions, and without them it takes about half the storage ([timelines without saved history](collaboration.md#timelines-without-saved-history)).
 
 ## Realtime testing
 

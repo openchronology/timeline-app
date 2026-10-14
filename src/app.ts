@@ -903,7 +903,14 @@ async function completeDocument(): Promise<TimelineDocument> {
         }),
       }
     : index && savedId
-      ? await api<{ document: TimelineDocument }>(`timelines/${remote!.id}/history/${savedId}`)
+      ? // The revision the edits were made against; once a timeline that keeps no saved
+        // history has moved on it is not kept (409), and its current state is read instead.
+        await api<{ document: TimelineDocument }>(
+          `timelines/${remote!.id}/history/${savedId}`,
+        ).catch((error: { status?: number }) => {
+          if (error.status !== 409) throw error;
+          return api<{ document: TimelineDocument }>(`timelines/${remote!.id}/document`);
+        })
       : await api<{ document: TimelineDocument }>(`timelines/${remote!.id}/document`);
   if (workspace !== documentRequest) throw new Error('The open timeline changed.');
   // Saved snapshots may predate standalone durations; validation converts legacy links.

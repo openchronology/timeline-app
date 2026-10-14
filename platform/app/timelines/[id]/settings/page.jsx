@@ -22,6 +22,9 @@ export default async function Settings({ params }) {
           retention: timeline.retention_seconds
             ? printRetention(timeline.retention_seconds, timeline.presentation)
             : null,
+          history_bytes: timeline.keep_history
+            ? await services.store.historyBytes(services.pool, id)
+            : 0,
         }}
         initialMembers={rows}
         calendar={!!calendar(timeline.presentation) && !timeline.comparison}

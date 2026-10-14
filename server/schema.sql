@@ -914,8 +914,10 @@ ALTER TABLE oc_revisions ADD COLUMN IF NOT EXISTS history_rows boolean NOT NULL 
 -- Bytes of the versions a revision kept as rows wrote: what it is charged.
 ALTER TABLE oc_revisions ADD COLUMN IF NOT EXISTS stored_bytes bigint CHECK(stored_bytes>=0);
 ALTER TABLE oc_revisions DROP CONSTRAINT IF EXISTS oc_revisions_content;
+-- A revision with none of them is one whose content is not kept (a timeline that keeps no
+-- saved history, below): only its place in the history remains.
 ALTER TABLE oc_revisions ADD CONSTRAINT oc_revisions_content
-  CHECK(num_nonnulls(snapshot_id,patch)+history_rows::int=1 AND (NOT history_rows OR number IS NOT NULL));
+  CHECK(num_nonnulls(snapshot_id,patch)+history_rows::int<=1 AND (NOT history_rows OR number IS NOT NULL));
 -- History is immutable like revisions: a version only ends, once.
 CREATE OR REPLACE FUNCTION oc_history_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
@@ -1318,3 +1320,25 @@ BEGIN
   src:=pg_get_functiondef('oc_event_text(uuid)'::regprocedure);
   EXECUTE regexp_replace(src,E'\nBEGIN\n',E'\nBEGIN\n  IF EXISTS(SELECT 1 FROM oc_timelines WHERE id=tid AND index_bases<>''{}'') THEN RETURN oc_event_text_lineage(tid); END IF;\n');
 END $do$;
+
+-- Optional saved history (#136). A timeline that does not keep saved history (keep_history
+-- false) records each save's revision (author, time, parents) without its content, and is
+-- charged nothing for it; its head is read from its live index. Turning it off forgets the
+-- content of its past revisions, apart from those forks, copies and pull requests still
+-- read: the one change a revision allows (oc_revision_forget), which also refunds what it
+-- was charged.
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS keep_history boolean NOT NULL DEFAULT true;
+CREATE OR REPLACE FUNCTION oc_revision_forget() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE content text[]:=ARRAY['snapshot_id','patch','history_rows','stored_bytes'];
+BEGIN
+  IF NEW.snapshot_id IS NULL AND NEW.patch IS NULL AND NOT NEW.history_rows AND NEW.stored_bytes IS NULL
+    AND to_jsonb(NEW)-content=to_jsonb(OLD)-content THEN
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION 'Saved history is immutable';
+END $$;
+DROP TRIGGER IF EXISTS oc_revision_immutable ON oc_revisions;
+CREATE TRIGGER oc_revision_immutable BEFORE UPDATE ON oc_revisions FOR EACH ROW EXECUTE FUNCTION oc_revision_forget();
+DROP TRIGGER IF EXISTS oc_track_storage ON oc_revisions;
+CREATE TRIGGER oc_track_storage AFTER INSERT OR UPDATE OF snapshot_id,patch,history_rows,stored_bytes OR DELETE
+  ON oc_revisions FOR EACH ROW EXECUTE FUNCTION oc_track_storage();

@@ -20,12 +20,25 @@ export default async function History({ params, searchParams }) {
         Each server save, sync and merge creates an immutable checkpoint. Earlier history from
         before this upgrade is unavailable.
       </p>
+      {!history.keepHistory && (
+        <p className="notice">
+          This timeline doesn&apos;t keep saved history. Saves are listed with who made them and
+          when, but only the latest revision, and those forks and pull requests still use, can be
+          opened.
+        </p>
+      )}
       {history.revisions.map((r) => (
         <article className="timeline-card" key={r.id}>
           <h2>
-            <Link href={'/timelines/' + id + '/history/' + r.id}>
-              Revision {r.number} · {r.kind}
-            </Link>
+            {r.available ? (
+              <Link href={'/timelines/' + id + '/history/' + r.id}>
+                Revision {r.number} · {r.kind}
+              </Link>
+            ) : (
+              <>
+                Revision {r.number} · {r.kind} <span className="muted">· not kept</span>
+              </>
+            )}
           </h2>
           <p>
             {r.author ? '@' + r.author : 'Former account'} · {new Date(r.created_at).toISOString()}

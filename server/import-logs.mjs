@@ -239,15 +239,17 @@ export const batchLimit = (count) => Math.min(BATCH_LIMIT - 1, Math.max(64, Math
 /**
  * Storage an import adds, as the server charges it: the document's growth, and per save the
  * versions it keeps in history (the batch, as stored), plus one copy of the timeline when
- * its first save starts keeping history as rows. `timelines` maps each timeline to its
- * starting size ({ count, bytes, history }, history false until it keeps rows) and its
- * batches ({ entries, moments, bytes }).
+ * its first save starts keeping history as rows; only the growth for a timeline that keeps
+ * no saved history. `timelines` maps each timeline to its starting size ({ count, bytes,
+ * history, keepHistory }, history false until it keeps rows, keepHistory false when it keeps
+ * none) and its batches ({ entries, moments, bytes }).
  */
 export function storageEstimate(timelines) {
   let total = 0;
   for (const { start, batches } of timelines.values()) {
-    if (start.history === false && batches.length) total += start.bytes * VERSION_RATIO;
-    for (const batch of batches) total += batch.bytes * (1 + VERSION_RATIO);
+    const versions = start.keepHistory === false ? 0 : VERSION_RATIO;
+    if (versions && start.history === false && batches.length) total += start.bytes * versions;
+    for (const batch of batches) total += batch.bytes * (1 + versions);
   }
   return Math.round(total);
 }

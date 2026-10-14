@@ -91,6 +91,7 @@ export default function PullReview({ timelineId, initial, initialComments, signe
       )}
       <section>
         <h2>Changes</h2>
+        {p.changes.unavailable && <p className="notice">{p.changes.unavailable}</p>}
         <p>
           {moments.added} added, {moments.removed} removed, {moments.changed} changed moments.
         </p>

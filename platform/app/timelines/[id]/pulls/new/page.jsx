@@ -3,6 +3,10 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { accessibleTimeline, versionInfo } from '../../../../../lib/timeline.js';
 import ForkOperation from '../../../../../components/fork-operation.jsx';
+import {
+  PULLS_UNAVAILABLE,
+  FORK_PULLS_UNAVAILABLE,
+} from '../../../../../../server/collaboration.mjs';
 export const dynamic = 'force-dynamic';
 export default async function NewPull({ params }) {
   const { id } = await params;
@@ -13,7 +17,17 @@ export default async function NewPull({ params }) {
   return (
     <main className="platform">
       <Link href={'/timelines/' + id}>← Your fork</Link>
-      <ForkOperation fork={versionInfo(timeline)} upstream={versionInfo(upstream)} />
+      <ForkOperation
+        fork={versionInfo(timeline)}
+        upstream={versionInfo(upstream)}
+        blocked={
+          !upstream.keep_history
+            ? PULLS_UNAVAILABLE
+            : !timeline.keep_history
+              ? FORK_PULLS_UNAVAILABLE
+              : null
+        }
+      />
     </main>
   );
 }

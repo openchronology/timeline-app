@@ -141,6 +141,13 @@ Upgrading copies each timeline's current state into its saved history once, duri
 `openchronology-migrate`: about 14 s for 200,000 moments and 45 s for a million. Earlier
 revisions keep the form they were saved in.
 
+**A timeline can stop keeping saved history** (**Keep saved history** in its settings), for
+logs and other timelines whose past revisions nobody reviews. History roughly doubles what a
+timeline is charged: at 200,000 moments, a 38 MB timeline was charged 78 MB with it and
+38 MB without. Turning it off took 1 s; turning it on again copies the current state once,
+as upgrading does (15 s). Upgrades start no history for timelines without it. See
+[timelines without saved history](collaboration.md#timelines-without-saved-history).
+
 **Forks and duplicates share saved history** with the timeline they copy, instead of
 copying it: a new copy keeps no history beyond its settings, and its saves keep only what
 they change. At 200,000 moments, a fork used to add 37 MB of history and now adds a few

@@ -481,10 +481,12 @@ async function copyKeys(client, kind, timelineId, number, keys, index) {
 
 /**
  * Starts history as rows for every timeline saved before it was kept so (when migrating):
- * their state at their current revision, copied in the database. Returns how many started.
+ * their state at their current revision, copied in the database. Timelines that keep no
+ * saved history are left without. Returns how many started.
  */
 export async function startHistory(client) {
-  const starting = 'JOIN oc_timelines t ON t.id=x.timeline_id WHERE t.history_since IS NULL';
+  const starting =
+    'JOIN oc_timelines t ON t.id=x.timeline_id WHERE t.history_since IS NULL AND t.keep_history';
   await client.query(
     `INSERT INTO oc_history_moments(timeline_id,id,since,time,event)
     SELECT x.timeline_id,x.id,t.revision,x.time,x.event FROM oc_moments x ${starting}
@@ -509,13 +511,25 @@ export async function startHistory(client) {
       'title',t.title,'description',t.description)
       ||${optional('presentation')}||${optional('plugins')}||${optional('tags', 'to_jsonb(t.tags)')}
       ||${optional('assets')}||${optional('comparison')}
-    FROM oc_timelines t WHERE t.history_since IS NULL ON CONFLICT DO NOTHING`,
+    FROM oc_timelines t WHERE t.history_since IS NULL AND t.keep_history ON CONFLICT DO NOTHING`,
   );
   const { rowCount } = await client.query(
-    'UPDATE oc_timelines SET history_since=revision WHERE history_since IS NULL',
+    'UPDATE oc_timelines SET history_since=revision WHERE history_since IS NULL AND keep_history',
   );
   if (rowCount) await client.query(`ANALYZE ${TABLES.join(',')}`);
   return rowCount;
+}
+
+/**
+ * Ends the timeline's current versions at revision `until`: what its saved revisions see
+ * stays, and nothing from `until` on sees them (its saved history stops).
+ */
+export async function endHistory(client, timelineId, until) {
+  for (const table of TABLES)
+    await client.query(`UPDATE ${table} SET until=$2 WHERE timeline_id=$1 AND until IS NULL`, [
+      timelineId,
+      until,
+    ]);
 }
 
 /** Revision `number` of a timeline kept as rows, as a document. */

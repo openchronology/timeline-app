@@ -1,8 +1,12 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { randomUUID } from 'node:crypto';
 import { HttpError } from './store.mjs';
+import { timelineSettings } from './incremental.mjs';
 import { rebaseDocument, mergePatch } from './merge.mjs';
-import { shareHistory, settingsAt } from './history.mjs';
+import { shareHistory, settingsAt, settingsOf } from './history.mjs';
+/** Why a fork cannot be synced with an upstream that keeps no saved history. */
+export const SYNC_UNAVAILABLE =
+  'Upstream does not keep saved history, so the revision this fork last shared with it is gone and the two cannot be merged. Fork upstream again to start from its current state.';
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 export function expectedRevision(value) {
   if (
@@ -62,9 +66,10 @@ export class Versioning {
         throw new HttpError(403, 'The owner must enable forking for this private timeline.');
       if (upstream.revision !== input.revision)
         throw new HttpError(409, 'Timeline changed. Reload before copying.');
+      // A copy keeps saved history if its source does.
       await c.query(
-        `INSERT INTO oc_timelines(id,owner_id,title,upstream_id,fork_base_revision_id,publication_restricted)
-        VALUES($1,$2,$3,$4,$5,$6)`,
+        `INSERT INTO oc_timelines(id,owner_id,title,upstream_id,fork_base_revision_id,publication_restricted,keep_history)
+        VALUES($1,$2,$3,$4,$5,$6,$7)`,
         [
           newId,
           userId,
@@ -72,14 +77,18 @@ export class Versioning {
           duplicate ? null : id,
           duplicate ? null : upstream.head_revision_id,
           upstream.visibility === 'private' || upstream.publication_restricted,
+          upstream.keep_history,
         ],
       );
       // Its history reads through to the revision it copies, instead of copying it.
-      await shareHistory(c, newId, upstream.head_revision_id);
+      if (upstream.keep_history) await shareHistory(c, newId, upstream.head_revision_id);
       // Its index is upstream's (its head), read through to (past INDEX_LEVELS, partly
       // copied: for many rows after answering, while the copy is marked as being prepared).
-      // Its settings are the head's as saved. Otherwise it is rebuilt from the head's document.
-      const settings = await settingsAt(c, upstream.head_revision_id);
+      // Its settings are the head's as saved (as they stand, when upstream keeps no saved
+      // history). Otherwise it is rebuilt from the head's document.
+      const settings = upstream.keep_history
+        ? await settingsAt(c, upstream.head_revision_id)
+        : settingsOf(timelineSettings(upstream));
       let document;
       if (settings && (await this.store.shareIndex(c, id, newId, upstream.head_revision_id)))
         c.afterCommit ??= () => this.store.refreshText(newId);
@@ -116,6 +125,7 @@ export class Versioning {
         throw new HttpError(403, 'Private upstream data cannot be synced into a public fork.');
       const base = await commonAncestor(c, fork.head_revision_id, upstream.head_revision_id);
       if (base === upstream.head_revision_id) return this.store.access(id, userId, c);
+      if (!(await this.store.readable(c, base))) throw new HttpError(409, SYNC_UNAVAILABLE);
       const parents = [fork.head_revision_id, upstream.head_revision_id];
       // What upstream changed since the common ancestor, merged into the fork entity by
       // entity and applied as a save; or, from revisions saved before history was kept as
@@ -143,18 +153,47 @@ export class Versioning {
       return this.store.access(id, userId, c);
     });
   }
+  /**
+   * Why fork `id` cannot be synced with its upstream now, or null when it can (or has nothing
+   * to sync): the revision they last shared is not kept, because upstream keeps no saved
+   * history.
+   */
+  async syncBlocked(id, userId) {
+    const fork = await this.store.access(id, userId);
+    if (!fork.upstream_id) return null;
+    const upstream = await this.store.access(fork.upstream_id, userId);
+    let base;
+    try {
+      base = await commonAncestor(this.pool, fork.head_revision_id, upstream.head_revision_id);
+    } catch {
+      return null;
+    }
+    if (base === upstream.head_revision_id || (await this.store.readable(this.pool, base)))
+      return null;
+    return SYNC_UNAVAILABLE;
+  }
+  /**
+   * A page of timeline `id`'s saved revisions, newest first. `available` says whether one
+   * can be read: not a past one whose content is not kept (see Store.stopHistory).
+   */
   async history(id, userId, page = 1) {
     if (!Number.isSafeInteger(page) || page < 1 || page > 10000)
       throw new HttpError(400, 'Invalid history page.');
-    await this.store.access(id, userId);
+    const t = await this.store.access(id, userId);
     const { rows } = await this.pool.query(
       `SELECT r.id,r.number,r.kind,r.created_at,u.username AS author,
-      coalesce((SELECT jsonb_agg(p.parent_id ORDER BY p.position) FROM oc_revision_parents p WHERE p.revision_id=r.id),'[]'::jsonb) AS parents
+      coalesce((SELECT jsonb_agg(p.parent_id ORDER BY p.position) FROM oc_revision_parents p WHERE p.revision_id=r.id),'[]'::jsonb) AS parents,
+      num_nonnulls(r.snapshot_id,r.patch)+r.history_rows::int>0 OR r.id=$3 AS available
       FROM oc_revisions r LEFT JOIN oc_users u ON u.id=r.author_id
       WHERE r.timeline_id=$1 AND r.number IS NOT NULL ORDER BY r.number DESC LIMIT 21 OFFSET $2`,
-      [id, (page - 1) * 20],
+      [id, (page - 1) * 20, t.head_revision_id],
     );
-    return { revisions: rows.slice(0, 20), page, more: rows.length > 20 };
+    return {
+      revisions: rows.slice(0, 20),
+      page,
+      more: rows.length > 20,
+      keepHistory: t.keep_history,
+    };
   }
   async historical(id, savedId, userId) {
     revisionId(savedId);

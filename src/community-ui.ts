@@ -15,6 +15,8 @@ interface ProposalChanges {
   relationships: { added: number; removed: number };
   /** The first changed moments of each kind. */
   examples: MomentChange[];
+  /** Why nothing could be counted: a revision it compares is no longer kept. */
+  unavailable?: string;
 }
 interface Proposal {
   id: string;
@@ -433,6 +435,7 @@ export function createCommunityUI(host: Host) {
         `${moments.added} added, ${moments.removed} removed, ${moments.changed} changed moments.`,
       ),
     );
+    if (changes.unavailable) el('pull-diff').prepend(paragraph(changes.unavailable));
     if (durations.added + durations.removed + durations.changed)
       el('pull-diff').append(
         paragraph(

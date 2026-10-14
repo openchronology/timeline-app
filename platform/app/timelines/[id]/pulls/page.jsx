@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import Link from 'next/link';
 import { accessibleTimeline } from '../../../../lib/timeline.js';
-import { Collaboration } from '../../../../../server/collaboration.mjs';
+import { Collaboration, PULLS_UNAVAILABLE } from '../../../../../server/collaboration.mjs';
 export const dynamic = 'force-dynamic';
 export default async function Pulls({ params, searchParams }) {
   const { id } = await params,
@@ -21,6 +21,7 @@ export default async function Pulls({ params, searchParams }) {
         Recommend changes from the timeline editor. Only owners and writers can merge changes into
         upstream.
       </p>
+      {!timeline.keep_history && <p className="notice">{PULLS_UNAVAILABLE}</p>}
       <div className="timeline-grid">
         {result.proposals.map((p) => (
           <article className="timeline-card" key={p.id}>
