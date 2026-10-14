@@ -25,6 +25,7 @@ import { MOMENT_TREE, INTERVAL_TREE, intervalPayload, upsertRows } from './avl.m
 import { applyIncrementally, incremental } from './incremental.mjs';
 import {
   beginIndexWrite,
+  copyLevel,
   indexReader,
   lineageOf,
   INDEX_LEVELS,
@@ -34,8 +35,6 @@ import {
   recordHistory,
   recordDetached,
   recordDetachedPatch,
-  differences,
-  settingsAt,
   historyDocument,
   pruneHistoryRows,
   settingsOf,
@@ -92,7 +91,7 @@ async function allEvents(client, rows, id) {
   );
   return events.map((r) => r.event);
 }
-/** The tables holding a timeline's index (what copyIndex copies). */
+/** The tables holding a timeline's index. */
 const INDEX_TABLES = VERSIONED_TABLES;
 /** Their retired versions (index-versions.mjs). */
 const RETIRED_TABLES = INDEX_TABLES.map((table) => table + '_retired');
@@ -117,11 +116,7 @@ const TIMELINE_INDEX = [
   'event_text_stale',
 ];
 const copied = new Map();
-/**
- * A table's columns a copy writes (all but the timeline, its version and generated ones), and
- * the rest of
- * its primary key, to copy it a page at a time.
- */
+/** A table's columns a copy of its rows writes (all but the timeline, its version and generated ones). */
 async function copiedColumns(client, table) {
   if (!copied.has(table)) {
     const columns = await client.query(
@@ -130,20 +125,11 @@ async function copiedColumns(client, table) {
       ORDER BY ordinal_position`,
       [table],
     );
-    const key = await client.query(
-      `SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid=i.indrelid
-      AND a.attnum=ANY(i.indkey) WHERE i.indrelid=$1::regclass AND i.indisprimary
-      AND a.attname<>'timeline_id' ORDER BY array_position(i.indkey::int2[],a.attnum)`,
-      [table],
-    );
-    copied.set(table, {
-      columns: columns.rows.map((r) => r.column_name).join(','),
-      key: key.rows.map((r) => r.attname),
-    });
+    copied.set(table, { columns: columns.rows.map((r) => r.column_name).join(',') });
   }
   return copied.get(table);
 }
-/** Rows copied per statement, so no statement grows with the timeline. */
+/** Rows compaction copies per statement, so no statement grows with the timeline. */
 const COPY_PAGE = 50000;
 /**
  * The share of what a fork reads that it must have rewritten (its own moment rows, against
@@ -151,7 +137,7 @@ const COPY_PAGE = 50000;
  * through to it, and it releases the versions its levels keep for it.
  */
 const COMPACT_SHARE = 0.5;
-/** How many moments and durations make a copy worth preparing after answering. */
+/** How many moments and durations to copy make a fork worth preparing after answering. */
 const PREPARE_AFTER = 20000;
 /** How many moments and durations written in one go make their statistics worth refreshing. */
 const ANALYZE_AFTER = 20000;
@@ -239,7 +225,7 @@ export class PostgresStore {
   }
   /**
    * How many moments and durations timeline `from`'s index holds, if it can be copied or
-   * shared as it stands (copyIndex, shareIndex): null for a comparison (its sources are
+   * shared as it stands (shareIndex): null for a comparison (its sources are
    * checked for the new owner when rebuilt) or an index a startup repair still has to rebuild.
    */
   async copyable(client, from) {
@@ -255,94 +241,87 @@ export class PostgresStore {
     return found[0] ? Number(found[0].entities) : null;
   }
   /**
-   * Gives timeline `to` (just created, empty) the index of timeline `from` as it stands by
-   * reading through to it (index-versions.mjs): `from` is pinned at its clock, so it keeps
-   * the versions `to` sees as it changes, and `to` reads `from`'s levels after it. Nothing is
-   * copied, so it is ready at once whatever its size. Charged like a copy. Returns false,
-   * doing nothing, when the index cannot be shared: it is not copyable, or `from` already
-   * reads through as many levels as a fork may (INDEX_LEVELS).
+   * Gives timeline `to` (just created, empty) the index of timeline `from` as it stands, its
+   * head revision `revisionId`, by reading through to it (index-versions.mjs): `from` is
+   * pinned at its clock, so it keeps the versions `to` sees as it changes, and `to` reads
+   * `from`'s levels after it. Nothing is copied, so it is ready at once whatever its size.
+   * Charged like a copy. One that would read through more levels than a fork may
+   * (this.indexLevels, INDEX_LEVELS) copies what it reads of the nearest ones instead
+   * (takeLevels), so it costs what `from` has changed rather than its whole index: now, or
+   * for many rows (PREPARE_AFTER) after answering, while it is marked as being prepared. The
+   * pin keeps `from` as forked meanwhile, whatever happens to it. Returns false, doing
+   * nothing, when the index cannot be shared (it is not copyable).
    */
-  async shareIndex(client, from, to) {
+  async shareIndex(client, from, to, revisionId) {
     if ((await this.copyable(client, from)) === null) return false;
-    const { rows } = await client.query(
-      `UPDATE oc_timelines SET index_pinned=greatest(index_pinned,index_clock)
-      WHERE id=$1 AND cardinality(index_bases)<$2 RETURNING id`,
-      [from, INDEX_LEVELS],
-    );
-    if (!rows[0]) return false;
     await client.query(
+      'UPDATE oc_timelines SET index_pinned=greatest(index_pinned,index_clock) WHERE id=$1',
+      [from],
+    );
+    const { rows } = await client.query(
       `UPDATE oc_timelines t SET index_bases=array_prepend(s.id,s.index_bases),
       index_clocks=array_prepend(s.index_clock,s.index_clocks),storage_bytes=s.storage_bytes,
-      ${TIMELINE_INDEX.map((c) => `${c}=s.${c}`)} FROM oc_timelines s WHERE t.id=$2 AND s.id=$1`,
+      ${TIMELINE_INDEX.map((c) => `${c}=s.${c}`)} FROM oc_timelines s WHERE t.id=$2 AND s.id=$1
+      RETURNING cardinality(t.index_bases) AS depth`,
       [from, to],
     );
-    return true;
-  }
-  /**
-   * Gives timeline `to` (just created, empty) the index of timeline `from` as it stands, copied
-   * row by row in the database rather than rebuilt from a document, a page of rows per
-   * statement: what a fork or duplicate of `from`'s head needs, at a cost that stays in
-   * PostgreSQL. Returns false, copying nothing, when it is not copyable.
-   */
-  async copyIndex(client, from, to) {
-    const entities = await this.copyable(client, from);
-    if (entities === null) return false;
-    // The copy is charged like a rebuild, before anything is written.
-    await client.query(
-      'UPDATE oc_timelines t SET storage_bytes=s.storage_bytes FROM oc_timelines s WHERE t.id=$2 AND s.id=$1',
-      [from, to],
+    if (rows[0].depth <= this.levels()) return true;
+    // What it copies is mostly `from`'s own rows, counted up to what is enough.
+    const { rows: own } = await client.query(
+      `SELECT (SELECT count(*) FROM (SELECT 1 FROM oc_moments WHERE timeline_id=$1 LIMIT $2) m)
+        +(SELECT count(*) FROM (SELECT 1 FROM oc_duration_nodes WHERE timeline_id=$1 LIMIT $2) d) AS n`,
+      [from, PREPARE_AFTER],
     );
-    // Its rows are written at the copy's clock, not the source's; a source that reads
-    // through to others is copied as it reads.
-    await beginIndexWrite(client, to);
-    const source = await indexReader(client, await lineageOf(client, from));
-    for (const table of INDEX_TABLES) {
-      const { columns, key } = await copiedColumns(client, table);
-      let cursor = null;
-      for (;;) {
-        const after = cursor ? `AND (${key})>(${key.map((_, i) => `$${i + 3}`)})` : '';
-        const { rows } = await client.query(
-          `WITH page AS (SELECT ${columns} FROM ${source(table, '$1', { scan: true })} x WHERE true ${after}
-            ORDER BY ${key} LIMIT ${COPY_PAGE}),
-          copied AS (INSERT INTO ${table}(timeline_id,${columns}) SELECT $2,${columns} FROM page)
-          SELECT ${key},(SELECT count(*) FROM page) AS rows FROM page ORDER BY ${key.map((k) => k + ' DESC')} LIMIT 1`,
-          [from, to, ...(cursor ?? [])],
-        );
-        if (!rows[0] || Number(rows[0].rows) < COPY_PAGE) break;
-        cursor = key.map((k) => rows[0][k]);
-      }
+    if (Number(own[0].n) < PREPARE_AFTER) {
+      await this.takeLevels(client, to);
+      return true;
     }
-    await client.query(
-      `UPDATE oc_timelines t SET ${TIMELINE_INDEX.map((c) => `${c}=s.${c}`)}
-      FROM oc_timelines s WHERE t.id=$2 AND s.id=$1`,
-      [from, to],
-    );
-    if (entities >= ANALYZE_AFTER) client.analyze = true;
-    return true;
-  }
-  /**
-   * Leaves timeline `to` (just created, its history reading through to `revisionId`, the head
-   * of `from`) to have its index copied in the background (prepare), when that index is large
-   * and can be copied: charged now, and marked as being prepared until then. Returns whether
-   * it does; otherwise the caller copies or rebuilds the index now.
-   */
-  async copyIndexLater(client, from, to, revisionId) {
-    const entities = await this.copyable(client, from);
-    if (entities === null || entities < PREPARE_AFTER) return false;
-    await client.query(
-      `UPDATE oc_timelines t SET storage_bytes=s.storage_bytes,preparing_revision_id=$3,
-      ${['title', 'description', 'presentation', 'plugins', 'tags', 'assets'].map((c) => `${c}=s.${c}`)}
-      FROM oc_timelines s WHERE t.id=$2 AND s.id=$1`,
-      [from, to, revisionId],
-    );
+    await client.query('UPDATE oc_timelines SET preparing_revision_id=$2 WHERE id=$1', [
+      to,
+      revisionId,
+    ]);
     client.afterCommit = () => this.prepare(to);
     return true;
   }
+  /** How many levels a fork reads through at most (INDEX_LEVELS, unless a test sets fewer). */
+  levels() {
+    return this.indexLevels ?? INDEX_LEVELS;
+  }
   /**
-   * Prepares a copy whose index was left for later (copyIndexLater), outside the request
-   * that made it, in one transaction: a crash leaves nothing behind, and the next start tries
-   * again (prepareStale). Copies of one timeline are prepared once at a time, across server
-   * processes too. Resolves when done.
+   * Has timeline `id` (locked) read through to no more levels than a fork may: it copies what
+   * it reads of its nearest levels into rows of its own (copyLevel) and releases them. One
+   * left reading through to nothing has its index whole and drops its hidden rows.
+   */
+  async takeLevels(client, id) {
+    const { index_bases: bases, index_clocks: clocks } = await lineageOf(client, id);
+    const taken = bases.length - this.levels();
+    if (taken <= 0) return;
+    await beginIndexWrite(client, id);
+    let entities = 0;
+    for (let level = 0; level < taken; level++) {
+      const copied = await copyLevel(client, id, bases[level], clocks[level]);
+      entities += copied.oc_moments + copied.oc_duration_nodes;
+    }
+    if (taken === bases.length)
+      for (const table of INDEX_TABLES)
+        await client.query(`DELETE FROM ${table} WHERE timeline_id=$1 AND hidden`, [id]);
+    await client.query(
+      'UPDATE oc_timelines SET index_bases=index_bases[$2:],index_clocks=index_clocks[$2:] WHERE id=$1',
+      [id, taken + 1],
+    );
+    await client.query('SELECT oc_release_index($1::uuid[],$2::bigint[])', [
+      bases.slice(0, taken),
+      clocks.slice(0, taken),
+    ]);
+    // Rows of its own the statistics have yet to count, as after a large save to a fork (in
+    // the live tables only: it retired nothing).
+    if (entities >= ANALYZE_VERSIONS_AFTER) client.analyze ||= INDEX_TABLES;
+  }
+  /**
+   * Prepares a copy left for later (shareIndex), outside the request that made it, in one
+   * transaction: a crash leaves nothing behind, and the next start tries again
+   * (prepareStale). Each copy is prepared once at a time, across server processes too.
+   * Resolves when done.
    */
   prepare(id) {
     this.preparing ??= new Map();
@@ -359,72 +338,21 @@ export class PostgresStore {
   }
   async prepareNow(id) {
     await this.transaction(async (c) => {
-      // One snapshot of the source throughout.
-      await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
       const { rows } = await c.query(
-        `SELECT t.preparing_revision_id AS base,r.timeline_id AS source,s.head_revision_id AS head
-        FROM oc_timelines t JOIN oc_revisions r ON r.id=t.preparing_revision_id
-        LEFT JOIN oc_timelines s ON s.id=r.timeline_id WHERE t.id=$1 FOR UPDATE OF t SKIP LOCKED`,
+        `SELECT preparing_revision_id AS base,cardinality(index_bases) AS depth FROM oc_timelines
+        WHERE id=$1 AND preparing_revision_id IS NOT NULL FOR UPDATE SKIP LOCKED`,
         [id],
       );
       // Ready, deleted, or being prepared elsewhere.
       if (!rows[0]) return;
-      const { base, source, head } = rows[0];
-      // The source as it stands, brought back to the revision copied if it saved since;
-      // otherwise (deleted, or too changed) rebuilt from that revision's document.
-      const copied =
-        head &&
-        (await this.copyIndex(c, source, id)) &&
-        (head === base || (await this.revertCopy(c, id, head, base)));
-      if (!copied)
-        await this.replace(c, id, await this.revisionDocument(c, base), { touch: false });
-      await c.query(
-        `UPDATE oc_timelines SET preparing_revision_id=NULL,
-        storage_bytes=coalesce((SELECT document_bytes FROM oc_revisions WHERE id=$2),storage_bytes)
-        WHERE id=$1`,
-        [id, base],
-      );
+      if (rows[0].depth > this.levels()) await this.takeLevels(c, id);
+      // A copy left by an earlier version, its index not yet written: rebuilt from the
+      // revision it copies.
+      else
+        await this.replace(c, id, await this.revisionDocument(c, rows[0].base), { touch: false });
+      await c.query('UPDATE oc_timelines SET preparing_revision_id=NULL WHERE id=$1', [id]);
       c.afterCommit = () => this.refreshText(id);
     });
-  }
-  /**
-   * Brings a copied index from revision `head` of its source back to revision `base`, which
-   * the copy was made from, by saving their differences into it in place (no revision is
-   * recorded: its history already reads through to `base`). False when they differ too much
-   * to apply in place.
-   */
-  async revertCopy(client, id, head, base) {
-    const pages = await differences(client, head, base);
-    if (!pages) return false;
-    const patch = {
-      settings: await settingsAt(client, base),
-      changes: [],
-      durationChanges: [],
-      relationshipChanges: [],
-    };
-    const reference = (kind, value) =>
-      kind === 'moment' ? { moment: value } : { duration: value };
-    for await (const page of pages)
-      for (const { kind, key, after } of page) {
-        if (kind === 'moments') patch.changes.push({ id: key, event: after });
-        else if (kind === 'durations') patch.durationChanges.push({ id: key, duration: after });
-        else if (kind === 'relationships')
-          patch.relationshipChanges.push({
-            a: reference(key.a_kind, key.a_id),
-            b: reference(key.b_kind, key.b_id),
-            related: after !== null,
-          });
-      }
-    const t = (await client.query('SELECT * FROM oc_timelines WHERE id=$1', [id])).rows[0];
-    if (!patch.settings || !incremental(t, patch)) return false;
-    const { assignments } = await applyIncrementally(client, t, patch);
-    await client.query(
-      `UPDATE oc_timelines SET event_text_stale=true${assignments
-        .map(([column, , cast], i) => `,${column}=$${i + 2}${cast ?? ''}`)
-        .join('')} WHERE id=$1`,
-      [id, ...assignments.map(([, value]) => value)],
-    );
-    return true;
   }
   /**
    * Compacts fork `id` in the background once it has rewritten most of what it reads

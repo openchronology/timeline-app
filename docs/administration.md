@@ -154,12 +154,15 @@ are deleted, saved as whole documents, or compacted: a fork that has rewritten h
 moments copies the rest of its index in the background after saving and stops reading
 through. A deleted timeline's index is kept while forks read through to it, then removed.
 Upgrading removes the versions earlier releases kept after a fork was deleted. A copy of a copy of a copy of a copy (four levels) reads through
-to all of them; a copy one level deeper copies its index instead, inside the database. A
-copy of 20,000 moments and durations or more is then answered at once and its index copied
-afterwards, while its page says it is being prepared (about 30 s at 200,000 moments). Until
-it is ready, the API answers HTTP 409 for its index, and only its metadata, sharing,
-settings and deletion are available. A copy left unprepared by a restart is prepared when the
-server starts. Reading one of the copy's saved revisions takes about a third longer than
+to all of them; a copy one level deeper copies only what its source changed itself, inside the
+database, and reads through to the rest, so it costs what its source changed rather than the
+whole timeline. When that is 20,000 moments and durations or more, the copy is answered at once
+and made afterwards, while its page says it is being prepared. At 200,000 moments, a copy
+whose source changed 1,000 moments took 5.5 s (most of it refreshing the planner's statistics,
+as after a save of 1,000 changes to a fork), and one whose source changed 26,000 was
+answered in 0.4 s and ready in 9 s (a whole copy used to take about 30 s). Until it is ready,
+the API answers HTTP 409 for its index, and only its metadata, sharing, settings and deletion
+are available. A copy left unprepared by a restart is prepared when the server starts. Reading one of the copy's saved revisions takes about a third longer than
 reading the original's (6 s rather than 4.6 s), because it reads through to the original.
 
 **Pull requests keep no whole timelines.** A pull request refers to saved revisions, and a
