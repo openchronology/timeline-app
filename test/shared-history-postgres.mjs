@@ -94,8 +94,8 @@ async function rowChanges(from, to) {
   return changes;
 }
 /**
- * A copy's index is its source's, row for row (copied in the database, not rebuilt): every
- * index table and the timeline's own index columns.
+ * A copy's index is its source's, row for row (copied in the database, not rebuilt; only the
+ * clock that wrote each row differs): every index table and the timeline's own index columns.
  */
 async function sameIndex(source, copy) {
   for (const table of [
@@ -107,7 +107,7 @@ async function sameIndex(source, copy) {
     'oc_entity_search',
   ]) {
     const rows = (id) =>
-      `SELECT to_jsonb(x)-'timeline_id' AS row FROM ${table} x WHERE timeline_id='${id}'`;
+      `SELECT to_jsonb(x)-'timeline_id'-'since' AS row FROM ${table} x WHERE timeline_id='${id}'`;
     const { rows: differing } = await pool.query(
       `(${rows(source)} EXCEPT ${rows(copy)}) UNION ALL (${rows(copy)} EXCEPT ${rows(source)})`,
     );

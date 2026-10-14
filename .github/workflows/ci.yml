@@ -250,6 +250,7 @@ jobs:
       - run: node test/merge-postgres.mjs
       - run: node test/statistics-postgres.mjs
       - run: node test/fork-preparing-postgres.mjs
+      - run: node test/index-versions-postgres.mjs
       - run: node test/retention-postgres.mjs
       - run: node test/summaries-equivalence-postgres.mjs
       - run: node test/log-import-postgres.mjs

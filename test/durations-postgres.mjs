@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import pg from 'pg';
+import { beginIndexWrite } from '../server/index-versions.mjs';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
@@ -140,16 +141,23 @@ try {
   const old = await store.create(user, legacy);
   try {
     // Recreate the pre-migration shape: links in moment metadata, rows without definitions.
-    await pool.query('UPDATE oc_duration_nodes SET definition=NULL WHERE timeline_id=$1', [old.id]);
-    await pool.query(
-      `UPDATE oc_moments SET event=jsonb_set(event,'{metadata,durations}',$2::jsonb) WHERE timeline_id=$1 AND id='x'`,
-      [old.id, JSON.stringify(legacy.events[0].metadata.durations)],
-    );
+    // Index writes record a clock (index-versions.mjs), even ones faking older data.
+    await store.transaction(async (c) => {
+      await beginIndexWrite(c, old.id);
+      await c.query('UPDATE oc_duration_nodes SET definition=NULL WHERE timeline_id=$1', [old.id]);
+      await c.query(
+        `UPDATE oc_moments SET event=jsonb_set(event,'{metadata,durations}',$2::jsonb) WHERE timeline_id=$1 AND id='x'`,
+        [old.id, JSON.stringify(legacy.events[0].metadata.durations)],
+      );
+    });
     const before = (await pool.query('SELECT updated_at FROM oc_timelines WHERE id=$1', [old.id]))
       .rows[0].updated_at;
     const client = await pool.connect();
     try {
+      // As migrate.mjs runs it: in one transaction, whose clock its index writes record.
+      await client.query('BEGIN');
       assert((await convertLegacyDurations(client)) >= 1);
+      await client.query('COMMIT');
     } finally {
       client.release();
     }

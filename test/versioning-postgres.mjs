@@ -50,7 +50,7 @@ try {
     owner,
     doc.title,
   ]);
-  await store.replace(pool, legacyId, doc);
+  await store.transaction((c) => store.replace(c, legacyId, doc));
   await pool.query(
     'INSERT INTO oc_proposals(id,timeline_id,author_id,title,base_revision,base_document,document) VALUES($1,$2,$3,$4,1,$5::jsonb,$5::jsonb)',
     [legacyPull, legacyId, owner, 'Old review', JSON.stringify(doc)],

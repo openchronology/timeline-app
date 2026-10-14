@@ -94,7 +94,10 @@ try {
   await pool.query('UPDATE oc_timelines SET search_version=0 WHERE id=$1', [timeline.id]);
   const client = await pool.connect();
   try {
+    // As migrate.mjs runs it: in one transaction, whose clock its index writes record.
+    await client.query('BEGIN');
     assert((await backfillEntitySearch(client)) >= 1);
+    await client.query('COMMIT');
   } finally {
     client.release();
   }

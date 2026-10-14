@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Oracle: PostgreSQL summaries of moments and collapsed durations match the browser index.
 import pg from 'pg';
+import { beginIndexWrite } from '../server/index-versions.mjs';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
@@ -127,13 +128,20 @@ try {
   ).rows[0].count;
   assert.equal(String(listed), total);
   // Index rows built before subtree summaries existed are rebuilt by the migration.
-  await pool.query(
-    'UPDATE oc_duration_nodes SET max_first=NULL,subtree_count=NULL,min_extent=NULL,max_extent=NULL WHERE timeline_id=$1',
-    [id],
-  );
+  // Index writes record a clock (index-versions.mjs), even ones faking older data.
+  await store.transaction(async (c) => {
+    await beginIndexWrite(c, id);
+    await c.query(
+      'UPDATE oc_duration_nodes SET max_first=NULL,subtree_count=NULL,min_extent=NULL,max_extent=NULL WHERE timeline_id=$1',
+      [id],
+    );
+  });
   const client = await pool.connect();
   try {
+    // As migrate.mjs runs it: in one transaction, whose clock its index writes record.
+    await client.query('BEGIN');
     assert((await convertLegacyDurations(client)) >= 1);
+    await client.query('COMMIT');
   } finally {
     client.release();
   }

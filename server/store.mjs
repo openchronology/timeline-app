@@ -23,6 +23,7 @@ import { randomUUID } from 'node:crypto';
 import { indexedNodes } from './tree.mjs';
 import { MOMENT_TREE, INTERVAL_TREE, intervalPayload, upsertRows } from './avl.mjs';
 import { applyIncrementally, incremental } from './incremental.mjs';
+import { beginIndexWrite, VERSIONED_TABLES } from './index-versions.mjs';
 import {
   recordHistory,
   recordDetached,
@@ -86,14 +87,7 @@ async function allEvents(client, table, id) {
   return rows.map((r) => r.event);
 }
 /** The tables holding a timeline's index (what copyIndex copies). */
-const INDEX_TABLES = [
-  'oc_moments',
-  'oc_nodes',
-  'oc_duration_nodes',
-  'oc_edge_nodes',
-  'oc_relationships',
-  'oc_entity_search',
-];
+const INDEX_TABLES = VERSIONED_TABLES;
 /** The same tables, whose statistics large writes leave behind. */
 const LIVE_TABLES = INDEX_TABLES.join(',');
 /** The timeline's own columns that describe its index (as replace writes them). */
@@ -116,14 +110,15 @@ const TIMELINE_INDEX = [
 ];
 const copied = new Map();
 /**
- * A table's columns a copy writes (all but the timeline and generated ones), and the rest of
+ * A table's columns a copy writes (all but the timeline, its version and generated ones), and
+ * the rest of
  * its primary key, to copy it a page at a time.
  */
 async function copiedColumns(client, table) {
   if (!copied.has(table)) {
     const columns = await client.query(
       `SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema()
-      AND table_name=$1 AND column_name<>'timeline_id' AND is_generated='NEVER'
+      AND table_name=$1 AND column_name NOT IN ('timeline_id','since') AND is_generated='NEVER'
       ORDER BY ordinal_position`,
       [table],
     );
@@ -251,6 +246,8 @@ export class PostgresStore {
       'UPDATE oc_timelines t SET storage_bytes=s.storage_bytes FROM oc_timelines s WHERE t.id=$2 AND s.id=$1',
       [from, to],
     );
+    // Its rows are written at the copy's clock, not the source's.
+    await beginIndexWrite(client, to);
     for (const table of INDEX_TABLES) {
       const { columns, key } = await copiedColumns(client, table);
       let cursor = null;
@@ -414,6 +411,9 @@ export class PostgresStore {
           'Comparison sources must be accessible ordinary timelines; public comparisons require public sources.',
         );
     }
+    // Index writes record the clock of their transaction (index-versions.mjs), so replace
+    // runs inside one.
+    await beginIndexWrite(client, id);
     // Reject over-quota document growth before rebuilding the rational index.
     await client.query('UPDATE oc_timelines SET storage_bytes=$2 WHERE id=$1', [
       id,
@@ -897,6 +897,10 @@ export class PostgresStore {
         [rows.map((r) => r.snapshot_id)],
       );
     }
+    // A deleted timeline's retired index versions go with it.
+    if (!(await client.query('SELECT 1 FROM oc_timelines WHERE id=$1', [timelineId])).rows.length)
+      for (const table of VERSIONED_TABLES)
+        await client.query(`DELETE FROM ${table}_retired WHERE timeline_id=$1`, [timelineId]);
     // Versions only the removed revisions saw go with them. Once a copy's history is gone,
     // a deleted timeline it read through to may have nothing else keeping its own.
     const released = await pruneHistoryRows(client, timelineId);
@@ -1419,6 +1423,7 @@ export async function backfillEntitySearch(client) {
       walk(node.right);
     };
     walk(durationTree(document.durations ?? [], (moment) => times.get(moment)));
+    await beginIndexWrite(client, timeline.id);
     await store.indexSearch(client, timeline.id, document, bands);
   }
   return rows.length;
