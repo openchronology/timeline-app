@@ -987,3 +987,63 @@ WHERE (base_document IS NOT NULL OR document IS NOT NULL)
 -- refuses reads and writes of its index.
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS preparing_revision_id uuid REFERENCES oc_revisions;
 CREATE INDEX IF NOT EXISTS oc_timelines_preparing ON oc_timelines(id) WHERE preparing_revision_id IS NOT NULL;
+-- Versioned index rows (#145, phase 1): forks will read their source's index as it was when
+-- forked instead of copying it. Each timeline's index has a clock, advanced by every
+-- transaction that writes it (beginIndexWrite in index-versions.mjs); each live index row
+-- records the clock that wrote it (since; null for rows written before this). A fork pins
+-- the clock it read its source at (index_pinned: the highest). Changing or deleting a row
+-- a pin can see first copies it, with the clock that ended it (until), into the table's
+-- _retired twin; rows nothing pins are changed in place, as before. Live tables keep only
+-- current rows, so reading them is unchanged.
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS index_clock bigint NOT NULL DEFAULT 0;
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS index_pinned bigint;
+DO $do$
+DECLARE live text; col record; names text; olds text; retire text;
+BEGIN
+  FOREACH live IN ARRAY ARRAY['oc_moments','oc_nodes','oc_duration_nodes','oc_edge_nodes',
+    'oc_relationships','oc_entity_search'] LOOP
+    -- Added without a default (no rewrite of existing rows), then defaulted to the clock:
+    -- a write outside beginIndexWrite fails rather than recording no version.
+    EXECUTE format('ALTER TABLE %I ADD COLUMN IF NOT EXISTS since bigint', live);
+    EXECUTE format($f$ALTER TABLE %I ALTER COLUMN since SET DEFAULT current_setting('oc.clock')::bigint$f$, live);
+    EXECUTE format('CREATE TABLE IF NOT EXISTS %I (timeline_id uuid NOT NULL, until bigint NOT NULL)',
+      live || '_retired');
+    -- The twin has every column of the live table (generated ones stored as values).
+    FOR col IN SELECT a.attname,format_type(a.atttypid,a.atttypmod) AS type FROM pg_attribute a
+      WHERE a.attrelid=live::regclass AND a.attnum>0 AND NOT a.attisdropped ORDER BY a.attnum LOOP
+      EXECUTE format('ALTER TABLE %I ADD COLUMN IF NOT EXISTS %I %s', live || '_retired', col.attname, col.type);
+    END LOOP;
+    EXECUTE format('CREATE INDEX IF NOT EXISTS %I ON %I(timeline_id,until)', live || '_retired_until', live || '_retired');
+    -- Per table, so retiring a row is one static insert of its columns. Regenerated on every
+    -- run, so columns added to the live table are retired too.
+    SELECT string_agg(quote_ident(a.attname),',' ORDER BY a.attnum),
+      string_agg('OLD.'||quote_ident(a.attname),',' ORDER BY a.attnum) INTO names,olds
+    FROM pg_attribute a WHERE a.attrelid=live::regclass AND a.attnum>0 AND NOT a.attisdropped;
+    retire:=format('INSERT INTO %I(%s,until) VALUES(%s,current_setting(''oc.clock'')::bigint);',
+      live || '_retired', names, olds);
+    -- Every change records the clock that made it, retiring the version a pin can still see.
+    EXECUTE format($f$CREATE OR REPLACE FUNCTION %I() RETURNS trigger LANGUAGE plpgsql AS $b$
+      BEGIN
+        NEW.since:=current_setting('oc.clock')::bigint;
+        IF OLD.timeline_id::text=current_setting('oc.timeline',true)
+          AND coalesce(OLD.since,0)<=nullif(current_setting('oc.pinned',true),'')::bigint THEN
+          %s
+        END IF;
+        RETURN NEW;
+      END $b$$f$, live || '_versioned', retire);
+    EXECUTE format($f$CREATE OR REPLACE FUNCTION %I() RETURNS trigger LANGUAGE plpgsql AS $b$
+      BEGIN %s RETURN OLD; END $b$$f$, live || '_retire', retire);
+    EXECUTE format('DROP TRIGGER IF EXISTS oc_index_update ON %I', live);
+    EXECUTE format('CREATE TRIGGER oc_index_update BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION %I()',
+      live, live || '_versioned');
+    EXECUTE format('DROP TRIGGER IF EXISTS oc_index_delete ON %I', live);
+    -- Deleting a row only calls a function when a pin can see it.
+    EXECUTE format($f$CREATE TRIGGER oc_index_delete BEFORE DELETE ON %I FOR EACH ROW
+      WHEN (OLD.timeline_id::text=current_setting('oc.timeline',true)
+        AND coalesce(OLD.since,0)<=nullif(current_setting('oc.pinned',true),'')::bigint)
+      EXECUTE FUNCTION %I()$f$, live, live || '_retire');
+  END LOOP;
+END $do$;
+DROP FUNCTION IF EXISTS oc_index_update();
+DROP FUNCTION IF EXISTS oc_index_retire();
+DROP FUNCTION IF EXISTS oc_index_retire_row(text,jsonb);

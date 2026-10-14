@@ -361,7 +361,9 @@ test('Postgres persists plugin settings and projects metadata in overview querie
             ]
           : sql.includes('AS added')
             ? [{ added: true }]
-            : [],
+            : sql.includes('index_clock')
+              ? [{ clock: '1', pinned: '' }]
+              : [],
       };
     },
     release() {},

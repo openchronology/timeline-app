@@ -274,7 +274,9 @@ test('Postgres snapshot replacements bind presentation as JSON data and preserve
           ? [{ event: document.events[0] }]
           : sql.includes('AS added')
             ? [{ added: true }]
-            : [],
+            : sql.includes('index_clock')
+              ? [{ clock: '1', pinned: '' }]
+              : [],
       };
     },
     release() {},

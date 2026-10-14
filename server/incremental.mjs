@@ -3,6 +3,7 @@
 // moment rows, the moment tree, the duration and arc interval trees, relationships and
 // search rows change only where the patch reaches. The result matches rebuilding the index
 // from applyPatch(current, patch); test/incremental-postgres.mjs checks this.
+import { beginIndexWrite } from './index-versions.mjs';
 import {
   validateDocument,
   validateDuration,
@@ -78,6 +79,8 @@ export function incremental(t, patch) {
  */
 export async function applyIncrementally(c, t, patch) {
   const id = t.id;
+  // Index writes record the clock of this transaction (index-versions.mjs).
+  await beginIndexWrite(c, id);
   const fail = (message) => {
     throw new HttpError(400, message);
   };
