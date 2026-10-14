@@ -83,6 +83,17 @@ async function allEvents(client, table, id) {
   );
   return rows.map((r) => r.event);
 }
+/** The tables holding timelines' indexes, whose statistics large writes leave behind. */
+const LIVE_TABLES = [
+  'oc_moments',
+  'oc_nodes',
+  'oc_duration_nodes',
+  'oc_edge_nodes',
+  'oc_relationships',
+  'oc_entity_search',
+].join(',');
+/** How many moments and durations written in one go make their statistics worth refreshing. */
+const ANALYZE_AFTER = 20000;
 export class PostgresStore {
   /** `compareLimits` caps saved comparisons by their owner's account (limits.mjs). */
   constructor(pool, { compareLimits = null } = {}) {
@@ -184,6 +195,9 @@ export class PostgresStore {
         EXCEPT SELECT id FROM oc_moments WHERE timeline_id=$1) AS added`,
       [id, JSON.stringify(document.events.map((event) => event.id))],
     );
+    // A timeline this large written in one go leaves the planner's statistics behind.
+    if (document.events.length + (document.durations?.length ?? 0) >= ANALYZE_AFTER)
+      client.analyze = true;
     const tree = indexedNodes(document);
     await writeMoments(client, 'oc_moments', id, document.events);
     await writeNodes(client, 'oc_nodes', id, tree);
@@ -261,11 +275,14 @@ export class PostgresStore {
   async transaction(action) {
     const c = await this.pool.connect();
     c.afterCommit = null;
+    c.analyze = false;
     try {
       await c.query('BEGIN');
       const result = await action(c);
       await c.query('COMMIT');
       c.afterCommit?.();
+      // Before answering, so the next request plans with the written timeline counted.
+      if (c.analyze) await this.analyze();
       return result;
     } catch (e) {
       await c.query('ROLLBACK');
@@ -334,6 +351,36 @@ export class PostgresStore {
     this.refreshing.set(id, entry);
     return entry.done;
   }
+  /**
+   * Refreshes the statistics of the timelines' index tables, after a commit that wrote a large
+   * timeline in one go (replace): until then the planner counts its rows as none, so it may
+   * read a key through any index starting with the timeline and filter every row (the save
+   * path's lookups only stay one per key). ANALYZE runs after the writing transaction, which
+   * would otherwise hold its lock until committing; writes in quick succession share one more
+   * run.
+   */
+  analyze() {
+    if (this.analyzing) {
+      this.analyzing.again = true;
+      return this.analyzing.done;
+    }
+    const entry = { again: false };
+    entry.done = (async () => {
+      try {
+        do {
+          entry.again = false;
+          if (this.pool.ending) break;
+          await this.pool.query(`ANALYZE ${LIVE_TABLES}`);
+        } while (entry.again);
+      } catch (error) {
+        if (!this.pool.ending) console.error('Refreshing statistics failed:', error);
+      } finally {
+        this.analyzing = null;
+      }
+    })();
+    this.analyzing = entry;
+    return entry.done;
+  }
   /** Refreshes catalogue text left stale (for example by a restart) and waits for pending refreshes. */
   async refreshStale() {
     const { rows } = await this.pool.query('SELECT id FROM oc_timelines WHERE event_text_stale');
@@ -342,8 +389,11 @@ export class PostgresStore {
   }
   /** Resolves once no catalogue refresh is pending. */
   async idle() {
-    while (this.refreshing?.size)
-      await Promise.all([...this.refreshing.values()].map((e) => e.done));
+    while (this.refreshing?.size || this.analyzing)
+      await Promise.all([
+        ...[...(this.refreshing?.values() ?? [])].map((e) => e.done),
+        this.analyzing?.done,
+      ]);
   }
   async create(userId, document) {
     document = validateDocument(document);

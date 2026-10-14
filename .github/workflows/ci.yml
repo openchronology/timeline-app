@@ -248,6 +248,7 @@ jobs:
       - run: node test/shared-history-postgres.mjs
       - run: node test/pull-history-postgres.mjs
       - run: node test/merge-postgres.mjs
+      - run: node test/statistics-postgres.mjs
       - run: node test/retention-postgres.mjs
       - run: node test/summaries-equivalence-postgres.mjs
       - run: node test/log-import-postgres.mjs

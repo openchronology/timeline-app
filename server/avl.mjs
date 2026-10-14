@@ -31,6 +31,18 @@ export async function upsertRows(client, table, columns, casts, rows, conflict =
   }
 }
 
+/**
+ * The node with ID `id` (SQL), as a subquery looked up by its key. OFFSET 0 keeps it a lookup
+ * per node: right after a timeline is written (a fork, an import) the planner's statistics
+ * can still count its nodes as none, and a join would then read all of them at every step.
+ */
+const node = (table, id) => `(SELECT * FROM ${table} WHERE timeline_id=$1 AND id=${id} OFFSET 0)`;
+/** The nodes on the paths (`visited`) and their children, each read by its key. */
+const pathNodes = (table) => `SELECT n.* FROM (
+      SELECT id FROM visited UNION SELECT x FROM visited v CROSS JOIN LATERAL ${node(table, 'v.id')} c,
+      unnest(ARRAY[c.left_id,c.right_id]) x WHERE x IS NOT NULL
+    ) ids(node_id) CROSS JOIN LATERAL ${node(table, 'ids.node_id')} n`;
+
 /** One node per distinct moment time, holding its moment IDs in "C" order. */
 export const MOMENT_TREE = {
   columns: [
@@ -101,11 +113,9 @@ export const MOMENT_TREE = {
   path: (table) => `WITH RECURSIVE path(key,id) AS (
       SELECT k,$3::bigint FROM unnest($2::text[]) k
       UNION SELECT p.key,CASE WHEN p.key::mpq<n.time THEN n.left_id WHEN p.key::mpq>n.time THEN n.right_id END
-      FROM path p JOIN ${table} n ON n.timeline_id=$1 AND n.id=p.id
+      FROM path p CROSS JOIN LATERAL ${node(table, 'p.id')} n
     ), visited AS (SELECT DISTINCT id FROM path WHERE id IS NOT NULL)
-    SELECT n.* FROM ${table} n WHERE n.timeline_id=$1 AND n.id IN (
-      SELECT id FROM visited UNION SELECT c.left_id FROM ${table} c JOIN visited v ON c.timeline_id=$1 AND c.id=v.id
-      UNION SELECT c.right_id FROM ${table} c JOIN visited v ON c.timeline_id=$1 AND c.id=v.id)`,
+    ${pathNodes(table)}`,
   pathParams: (keys) => [keys.map((k) => k.time)],
 };
 
@@ -207,11 +217,9 @@ export const INTERVAL_TREE = {
       UNION SELECT p.first,p.eid,CASE
         WHEN p.first::mpq<n.first_time OR (p.first::mpq=n.first_time AND p.eid COLLATE "C"<(n.band->>'id') COLLATE "C") THEN n.left_id
         WHEN p.first::mpq>n.first_time OR (p.first::mpq=n.first_time AND p.eid COLLATE "C">(n.band->>'id') COLLATE "C") THEN n.right_id END
-      FROM path p JOIN ${table} n ON n.timeline_id=$1 AND n.id=p.id
+      FROM path p CROSS JOIN LATERAL ${node(table, 'p.id')} n
     ), visited AS (SELECT DISTINCT id FROM path WHERE id IS NOT NULL)
-    SELECT n.* FROM ${table} n WHERE n.timeline_id=$1 AND n.id IN (
-      SELECT id FROM visited UNION SELECT c.left_id FROM ${table} c JOIN visited v ON c.timeline_id=$1 AND c.id=v.id
-      UNION SELECT c.right_id FROM ${table} c JOIN visited v ON c.timeline_id=$1 AND c.id=v.id)`,
+    ${pathNodes(table)}`,
   pathParams: (keys) => [keys.map((k) => k.first), keys.map((k) => k.id)],
 };
 
@@ -262,7 +270,8 @@ export class PersistentTree {
   async #newId() {
     if (this.next === null) {
       const { rows } = await this.client.query(
-        `SELECT coalesce(max(id),0) AS id FROM ${this.table} WHERE timeline_id=$1`,
+        // The last ID read backwards from the index, whatever the statistics say.
+        `SELECT coalesce((SELECT id FROM ${this.table} WHERE timeline_id=$1 ORDER BY id DESC LIMIT 1),0) AS id`,
         [this.owner],
       );
       this.next = Number(rows[0].id);

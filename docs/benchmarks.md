@@ -85,6 +85,19 @@ Measured on an AMD Ryzen 7 7730U laptop (16 threads), with PostgreSQL in Docker 
 
 Latency stays near the save interval up to 500 messages a second; at 1,000 a second the slowest messages wait longer (p95 482 ms, max 801 ms), with each save carrying about 200 moments. Nothing was lost or duplicated at any rate. Each save is one API request, so a single timeline needs about 300 requests a minute at a 200 ms interval and 60 at the default. `API_KEY_REQUESTS_PER_MINUTE` (default 120) must allow this.
 
+## Saves after large writes
+
+`node bench/fork-save.mjs [moments]` (with `BENCH_DATABASE_URL`) creates a timeline, forks it, and times a 10-moment save to the fork straight away and again after an `ANALYZE`. A timeline written in one go (created, imported, forked, or rebuilt by a large save or merge) leaves PostgreSQL's statistics counting its rows as none until they are refreshed, and the planner can then read a key through any index that starts with the timeline, filtering every row. The server refreshes the index tables' statistics after such a write of 20,000 moments and durations or more, before answering, and the save path's lookups by key are written to stay one lookup per key whatever the statistics say (#139).
+
+Measured at 200,000 moments on an 8-core virtual machine with PostgreSQL 17:
+
+| Saving 10 moments       | Before |         Now |
+| ----------------------- | -----: | ----------: |
+| Right after forking     | 5.29 s |      0.16 s |
+| With current statistics | 0.28 s | 0.18–0.54 s |
+
+Before, the catalogue text refresh after a large save to a new fork could also exceed the 30 s statement limit; it now takes about 5 s at this size.
+
 ## Interactions
 
 `bench/ui.mjs` drives the editor with real input and times each interaction. In Chromium the input comes from Playwright's mouse, keyboard and touch. In the desktop app it comes from W3C WebDriver actions, through `tauri-driver` and WebKitWebDriver. Timing runs from the input event that triggers the result (a click on release, a key on its press, each wheel step) to the frame in which the result is painted. For zooming and panning, that is the frame showing the moments at the new view, which the editor records on `#markers` as it draws them; the axis and the bounds fields can move a frame earlier. The editor's capacity advice times navigation the same way. This is how Event Timing measures interactions, so the time a button is held down is not counted. For continuous gestures it records the longest frame while the gesture runs. An injected probe (`bench/ui/probe.js`) does the timing in the page, with no browser-specific APIs and no `eval`, so it works the same in both engines and under the editor's content security policy.

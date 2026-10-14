@@ -839,7 +839,8 @@ BEGIN
     EXIT WHEN length(coalesce(result,''))>=1048576;
     SELECT string_agg(left(x.v,4096),' ' ORDER BY u.ord,x.n,x.o) INTO chunk
     FROM unnest(ids[i:i+999]) WITH ORDINALITY u(id,ord)
-    CROSS JOIN LATERAL (SELECT event->'metadata' AS meta FROM oc_moments WHERE timeline_id=tid AND id=u.id) m
+    -- OFFSET 0 keeps it a lookup per moment, whatever the statistics say of a timeline just written.
+    CROSS JOIN LATERAL (SELECT event->'metadata' AS meta FROM oc_moments WHERE timeline_id=tid AND id=u.id OFFSET 0) m
     CROSS JOIN LATERAL (
       SELECT 0::bigint AS n,y.o,y.v FROM (VALUES
         (1,CASE WHEN jsonb_typeof(m.meta->'title')='string' THEN m.meta->>'title' END),
