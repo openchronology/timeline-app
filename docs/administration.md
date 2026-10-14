@@ -129,13 +129,15 @@ duration and one relationship for every ten moments):
 
 | Moments   | Saving 10 moments | Saving 5,000 new moments | History it keeps | Reading a saved revision | Exporting | Server memory |
 | --------- | ----------------: | -----------------------: | ---------------: | -----------------------: | --------: | ------------: |
-| 200,000   |            0.05 s |                    7–9 s |           0.4 MB |                    4.6 s |       4 s |        0.4 GB |
-| 1,000,000 |         0.1–0.2 s |                  21–25 s |           0.4 MB |                     21 s |      19 s |        1.3 GB |
+| 200,000   |            0.05 s |                    2–3 s |           0.4 MB |                    4.6 s |       4 s |        0.4 GB |
+| 1,000,000 |         0.1–0.2 s |                    4–6 s |           0.4 MB |                     21 s |      19 s |        1.3 GB |
 
-At a million moments, most of a 5,000-moment save is one statement updating the moment
-index (about 16 s), and the server stops any statement after 30 s. The log importer and the
-syslog receiver save at most 5,000 entries at a time; well beyond a million moments, keep
-batches smaller (the syslog receiver saves whatever arrived each second).
+A save reads the index nodes it changes in one statement, which follows the nodes on the
+paths to its moments rather than the moments themselves: appended log moments share nearly
+their whole path. `bench/save-size.mjs` measures saves against timeline size. The server
+stops any statement after 30 s and answers 503; the log importer and the syslog receiver
+save at most 5,000 entries at a time, and halve their saves when one takes 8 s or more or is
+stopped, so they keep working as timelines grow.
 
 Upgrading copies each timeline's current state into its saved history once, during
 `openchronology-migrate`: about 14 s for 200,000 moments and 45 s for a million. Earlier

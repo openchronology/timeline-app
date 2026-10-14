@@ -425,10 +425,10 @@ async function recordKeys(client, kind, timelineId, number, keys, levels, index)
 /**
  * Every entity of a kind, a page of keys at a time: the live ones, then those each level
  * sees that are no longer live. A timeline starting history has no versions yet: its live
- * entities are copied as they are, without looking for versions the planner cannot yet
- * estimate.
+ * entities are copied as they are (copyAll).
  */
 async function recordAll(client, kind, timelineId, number, starting, levels, index) {
+  if (starting) return copyAll(client, kind, timelineId, number, index);
   const total = { bytes: 0, count: 0 };
   const key = (alias) => `(${columns(alias, kind.key)})`;
   const after = (alias, cursor) =>
@@ -437,15 +437,13 @@ async function recordAll(client, kind, timelineId, number, starting, levels, ind
     (cursor) =>
       `SELECT ${columns('l', kind.key)} FROM (${kind.live(index, true)}) l WHERE true ${after('l', cursor)}
       ORDER BY ${kind.key} LIMIT ${PAGE}`,
-    ...(starting
-      ? []
-      : levels.map(
-          ([id, n]) =>
-            (cursor) =>
-              `SELECT ${columns('h', kind.key)} FROM ${kind.table} h WHERE ${seen('h', [id, n])}
-              AND NOT EXISTS(SELECT 1 FROM (${kind.live(index, true)}) l WHERE ${key('l')}=${key('h')})
-              ${after('h', cursor)} ORDER BY ${kind.key} LIMIT ${PAGE}`,
-        )),
+    ...levels.map(
+      ([id, n]) =>
+        (cursor) =>
+          `SELECT ${columns('h', kind.key)} FROM ${kind.table} h WHERE ${seen('h', [id, n])}
+          AND NOT EXISTS(SELECT 1 FROM (${kind.live(index, true)}) l WHERE ${key('l')}=${key('h')})
+          ${after('h', cursor)} ORDER BY ${kind.key} LIMIT ${PAGE}`,
+    ),
   ];
   for (const page of pages) {
     let cursor = null;
@@ -453,9 +451,7 @@ async function recordAll(client, kind, timelineId, number, starting, levels, ind
       const { rows } = await client.query(page(cursor), [timelineId, ...(cursor ?? [])]);
       if (!rows.length) break;
       const keys = rows.map((row) => kind.key.map((column) => row[column]));
-      const result = starting
-        ? await copyKeys(client, kind, timelineId, number, keys, index)
-        : await recordKeys(client, kind, timelineId, number, keys, levels, index);
+      const result = await recordKeys(client, kind, timelineId, number, keys, levels, index);
       total.bytes += result.bytes;
       total.count += result.count;
       if (rows.length < PAGE) break;
@@ -464,19 +460,38 @@ async function recordAll(client, kind, timelineId, number, starting, levels, ind
   }
   return total;
 }
-/** Live entities as their first versions. */
-async function copyKeys(client, kind, timelineId, number, keys, index) {
-  const { rows } = await client.query(
-    `WITH added AS (
-      INSERT INTO ${kind.table}(timeline_id,${kind.key},since${kind.values.map((v) => ',' + v).join('')})
-      SELECT $1,${columns('l', kind.key)},$2${kind.values.map((v) => ',l.' + v).join('')}
-      FROM unnest(${kind.key.map((_, c) => `$${c + 3}::text[]`)}) AS k(${kind.key})
-      CROSS JOIN LATERAL ${liveAt(kind, 'k', index)} l
-      RETURNING ${kind.bytes} AS bytes
-    ) SELECT coalesce(sum(bytes),0) AS bytes,count(*) AS count FROM added`,
-    [timelineId, number, ...kind.key.map((_, c) => keys.map((key) => key[c]))],
-  );
-  return { bytes: Number(rows[0].bytes), count: Number(rows[0].count) };
+/**
+ * Live entities as their first versions, a page at a time in key order, each page copied in
+ * the statement that reads it: no entity is looked up again by its key, which, right after a
+ * timeline is written and before its statistics count its rows, can read all of them for
+ * each key (durations, looked up by an expression).
+ */
+async function copyAll(client, kind, timelineId, number, index) {
+  const total = { bytes: 0, count: 0 };
+  const names = [...kind.key, ...kind.values];
+  let cursor = null;
+  for (;;) {
+    const after = cursor
+      ? `AND (${columns('l', kind.key)})>(${kind.key.map((_, c) => `$${c + 3}`)})`
+      : '';
+    const { rows } = await client.query(
+      `WITH page AS (
+        SELECT ${columns('l', names)} FROM (${kind.live(index, true)}) l WHERE true ${after}
+        ORDER BY ${kind.key} LIMIT ${PAGE}
+      ), added AS (
+        INSERT INTO ${kind.table}(timeline_id,${names},since)
+        SELECT $1,${names},$2 FROM page RETURNING ${kind.bytes} AS bytes
+      ) SELECT (SELECT count(*) FROM added) AS count,(SELECT coalesce(sum(bytes),0) FROM added) AS bytes,
+        last.* FROM (SELECT ${kind.key} FROM page ORDER BY ${kind.key.map((k) => k + ' DESC')} LIMIT 1) last`,
+      [timelineId, number, ...(cursor ?? [])],
+    );
+    if (!rows.length) break;
+    total.bytes += Number(rows[0].bytes);
+    total.count += Number(rows[0].count);
+    if (Number(rows[0].count) < PAGE) break;
+    cursor = kind.key.map((column) => rows[0][column]);
+  }
+  return total;
 }
 
 /**

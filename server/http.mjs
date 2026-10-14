@@ -132,6 +132,9 @@ function response(res, status, value, headers = {}) {
   });
   res.end(JSON.stringify(value));
 }
+/** What a request that ran past the statement timeout is told (see the error handler). */
+export const TOO_SLOW =
+  'The server took too long to answer. Try again, or send less at a time (for example fewer moments per save).';
 /**
  * A timeline's metadata with its retention period as its display writes it, and the storage
  * turning its saved history off would free (`history_bytes`).
@@ -1261,6 +1264,9 @@ export function createRequestHandler({
         (error.code === 'P0001' && error.message.startsWith('Account storage limit')
           ? 413
           : undefined) ??
+        // A statement that ran past the server's statement_timeout: temporary, and smaller
+        // saves avoid it (the log writers halve their batches on it).
+        (error.code === '57014' ? 503 : undefined) ??
         (error.code === 'ENOENT'
           ? 404
           : error instanceof SyntaxError ||
@@ -1268,9 +1274,14 @@ export function createRequestHandler({
               error instanceof TypeError
             ? 400
             : 500);
-      if (status === 500) console.error(error);
+      if (status === 500 || error.code === '57014') console.error(error);
       response(res, status, {
-        error: status === 500 ? 'Server request failed.' : error.message,
+        error:
+          status === 500
+            ? 'Server request failed.'
+            : error.code === '57014'
+              ? TOO_SLOW
+              : error.message,
         ...(status === 428 && error.challenge ? { challenge: error.challenge } : {}),
         ...(status === 409 && Array.isArray(error.conflicts)
           ? { conflicts: error.conflicts.slice(0, 100), conflictCount: error.conflicts.length }
