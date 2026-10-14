@@ -8,6 +8,7 @@
 import { Q, createDifference, validateDocument, validatePresentation } from '../dist/core.mjs';
 import { HttpError } from './store.mjs';
 import { pruneHistoryRows } from './history.mjs';
+import { indexReader } from './index-versions.mjs';
 
 /** Retention runs at most this often per timeline. */
 export const RETENTION_EVERY = 60 * 60 * 1000;
@@ -73,15 +74,16 @@ export async function deleteWhere(
   { lower = null, upper = null, before = null },
 ) {
   if (t.comparison) throw new HttpError(409, 'Delete moments in comparison sources instead.');
+  const index = await indexReader(store.pool, t);
   const [moments, durations] = await Promise.all([
     store.pool.query(
-      `SELECT id FROM oc_moments WHERE timeline_id=$1 AND ($2::mpq IS NULL OR time>=$2::mpq)
+      `SELECT id FROM ${index('oc_moments', '$1', { scan: true })} x WHERE ($2::mpq IS NULL OR time>=$2::mpq)
       AND ($3::mpq IS NULL OR time<=$3::mpq) AND ($4::mpq IS NULL OR time<$4::mpq) LIMIT $5`,
       [t.id, lower, upper, before, BATCH],
     ),
     store.pool.query(
-      `SELECT DISTINCT band->>'id' AS id FROM oc_duration_nodes WHERE timeline_id=$1
-      AND definition IS NOT NULL AND ($2::mpq IS NULL OR (band->>'first')::mpq>=$2::mpq)
+      `SELECT DISTINCT band->>'id' AS id FROM ${index('oc_duration_nodes', '$1', { scan: true })} x
+      WHERE definition IS NOT NULL AND ($2::mpq IS NULL OR (band->>'first')::mpq>=$2::mpq)
       AND ($3::mpq IS NULL OR (band->>'last')::mpq<=$3::mpq)
       AND ($4::mpq IS NULL OR (band->>'last')::mpq<$4::mpq)`,
       [t.id, lower, upper, before],

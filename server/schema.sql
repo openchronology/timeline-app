@@ -102,8 +102,7 @@ BEGIN
   SELECT ARRAY[root] INTO ids FROM oc_timelines WHERE id=tid AND root IS NOT NULL;
   WHILE cardinality(ids)>0 LOOP
     idx:=cardinality(ids); nid:=ids[idx]; point:=points[idx]; ids:=ids[1:idx-1]; points:=points[1:idx-1];
-    SELECT node.time,node.left_id,node.right_id,node.first_id,node.first_time,node.last_time,node.bucket_count,node.event_count,node.distinct_count INTO n
-      FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=nid;
+    SELECT node.time,node.left_id,node.right_id,node.first_id,node.first_time,node.last_time,node.bucket_count,node.event_count,node.distinct_count INTO n FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=nid;
     IF NOT FOUND THEN RAISE EXCEPTION 'Broken timeline index'; END IF;
     IF NOT point THEN visits:=visits+1; END IF;
     IF n.last_time<lo OR n.first_time>hi THEN CONTINUE; END IF;
@@ -118,8 +117,7 @@ BEGIN
       first_time:=oc_qtext(current_a); last_time:=oc_qtext(current_b); event_count:=current_weight::text;
       distinct_count:=current_distinct; visited_nodes:=visits; title:=NULL; event_id:=NULL; metadata:=NULL;
       IF current_weight=1 THEN
-        SELECT m.event INTO sample FROM oc_moments m WHERE m.timeline_id=tid
-          AND m.id=(SELECT node.moment_ids[1] FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=current_id);
+        SELECT m.event INTO sample FROM oc_moments m WHERE m.timeline_id=tid AND m.id=(SELECT node.moment_ids[1] FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=current_id);
         title:=sample->'metadata'->>'title'; event_id:=sample->>'id'; metadata:=sample->'metadata';
       END IF;
       RETURN NEXT; current_a:=NULL;
@@ -137,8 +135,7 @@ BEGIN
     first_time:=oc_qtext(current_a); last_time:=oc_qtext(current_b); event_count:=current_weight::text;
     distinct_count:=current_distinct; visited_nodes:=visits; title:=NULL; event_id:=NULL; metadata:=NULL;
     IF current_weight=1 THEN
-      SELECT m.event INTO sample FROM oc_moments m WHERE m.timeline_id=tid
-        AND m.id=(SELECT node.moment_ids[1] FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=current_id);
+      SELECT m.event INTO sample FROM oc_moments m WHERE m.timeline_id=tid AND m.id=(SELECT node.moment_ids[1] FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=current_id);
       title:=sample->'metadata'->>'title'; event_id:=sample->>'id'; metadata:=sample->'metadata';
     END IF;
     RETURN NEXT;
@@ -160,14 +157,14 @@ BEGIN
   SELECT ARRAY[root] INTO ids FROM oc_timelines WHERE id=tid AND root IS NOT NULL;
   WHILE cardinality(ids)>0 LOOP
     idx:=cardinality(ids); nid:=ids[idx]; point:=points[idx]; ids:=ids[1:idx-1]; points:=points[1:idx-1];
-    SELECT time,left_id,right_id,first_time,last_time,moment_ids INTO n FROM oc_nodes WHERE timeline_id=tid AND id=nid;
+    SELECT node.time,node.left_id,node.right_id,node.first_time,node.last_time,node.moment_ids INTO n FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=nid;
     IF (lo IS NOT NULL AND n.last_time<lo) OR (hi IS NOT NULL AND n.first_time>hi)
       OR (after_time IS NOT NULL AND n.last_time<after_time) THEN CONTINUE; END IF;
     IF point THEN
       IF (lo IS NOT NULL AND n.time<lo) OR (hi IS NOT NULL AND n.time>hi) OR (after_time IS NOT NULL AND n.time<after_time) THEN CONTINUE; END IF;
       -- One primary-key lookup per moment, in the node's ID order.
       FOR mid IN SELECT unnest(n.moment_ids) LOOP
-        SELECT event INTO e FROM oc_moments WHERE timeline_id=tid AND id=mid;
+        SELECT m.event INTO e FROM oc_moments m WHERE m.timeline_id=tid AND m.id=mid;
         IF after_time IS NOT NULL AND n.time=after_time AND (e->>'id') COLLATE "C"<=after_id COLLATE "C" THEN CONTINUE; END IF;
         RETURN NEXT e; emitted:=emitted+1; IF emitted>=max_rows THEN RETURN; END IF;
       END LOOP;
@@ -536,12 +533,12 @@ BEGIN
   WHILE nid IS NOT NULL OR cardinality(stack)>0 LOOP
     WHILE nid IS NOT NULL LOOP
       stack:=array_append(stack,nid);
-      SELECT left_id,right_id INTO n FROM oc_nodes WHERE timeline_id=tid AND id=nid;
+      SELECT node.left_id,node.right_id INTO n FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=nid;
       IF NOT FOUND THEN RAISE EXCEPTION 'Broken timeline index'; END IF;
       nid:=CASE WHEN oldest THEN n.left_id ELSE n.right_id END;
     END LOOP;
     nid:=stack[cardinality(stack)]; stack:=stack[1:cardinality(stack)-1];
-    SELECT time,left_id,right_id INTO n FROM oc_nodes WHERE timeline_id=tid AND id=nid;
+    SELECT node.time,node.left_id,node.right_id INTO n FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=nid;
     RETURN NEXT oc_qtext(n.time); emitted:=emitted+1;
     IF emitted=8 THEN RETURN; END IF;
     nid:=CASE WHEN oldest THEN n.right_id ELSE n.left_id END;
@@ -625,15 +622,12 @@ BEGIN
   IF lo IS NULL OR hi IS NULL OR threshold IS NULL OR threshold<='0'::mpq OR lo>hi THEN RETURN; END IF;
   -- A collapsed duration that reaches the window starts after lo - threshold.
   earliest:=lo-threshold;
-  SELECT CASE WHEN duration_root IS NULL THEN ARRAY[]::integer[] ELSE ARRAY[duration_root] END INTO ids
-    FROM oc_timelines WHERE id=tid;
+  SELECT CASE WHEN duration_root IS NULL THEN ARRAY[]::integer[] ELSE ARRAY[duration_root] END INTO ids FROM oc_timelines WHERE id=tid;
   ids:=coalesce(ids,ARRAY[]::integer[]);
   WHILE cardinality(ids)>0 LOOP
     idx:=cardinality(ids); nid:=ids[idx]; point:=points[idx]; low:=lows[idx]; high:=highs[idx];
     ids:=ids[1:idx-1]; points:=points[1:idx-1]; lows:=lows[1:idx-1]; highs:=highs[1:idx-1];
-    SELECT d.left_id,d.right_id,d.min_time,d.max_time,d.max_first,d.subtree_count,d.min_extent,
-        d.max_extent,d.first_time,d.last_time,d.band
-      INTO n FROM oc_duration_nodes d WHERE d.timeline_id=tid AND d.id=nid;
+    SELECT d.left_id,d.right_id,d.min_time,d.max_time,d.max_first,d.subtree_count,d.min_extent,d.max_extent,d.first_time,d.last_time,d.band INTO n FROM oc_duration_nodes d WHERE d.timeline_id=tid AND d.id=nid;
     IF NOT FOUND THEN RAISE EXCEPTION 'Broken duration index'; END IF;
     IF point THEN
       IF n.last_time<lo OR n.first_time>hi OR n.last_time-n.first_time>=threshold THEN CONTINUE; END IF;
@@ -667,8 +661,8 @@ BEGIN
         SELECT d.first_time,d.band->>'id' INTO high_first,high_id FROM oc_duration_nodes d WHERE d.timeline_id=tid AND d.id=high;
         IF high_first>n.max_first THEN high_first:=NULL; END IF;
       END IF;
-      FOR r IN SELECT d.first_time AS f,d.last_time AS l,d.band AS b FROM oc_duration_nodes d
-          WHERE d.timeline_id=tid AND d.first_key>=oc_qkey(n.min_time) AND d.first_key<=oc_qkey(n.max_first)
+      FOR r IN SELECT d.first_time AS f,d.last_time AS l,d.band AS b FROM oc_duration_nodes d WHERE d.timeline_id=tid
+          AND d.first_key>=oc_qkey(n.min_time) AND d.first_key<=oc_qkey(n.max_first)
             AND d.first_time>=n.min_time AND d.first_time<=n.max_first
             AND (low_first IS NULL OR d.first_time>low_first OR (d.band->>'id') COLLATE "C">low_id COLLATE "C")
             AND (high_first IS NULL OR d.first_time<high_first OR (d.band->>'id') COLLATE "C"<high_id COLLATE "C")
@@ -997,6 +991,15 @@ CREATE INDEX IF NOT EXISTS oc_timelines_preparing ON oc_timelines(id) WHERE prep
 -- current rows, so reading them is unchanged.
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS index_clock bigint NOT NULL DEFAULT 0;
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS index_pinned bigint;
+-- A fork's tombstone: a row it removed from what it reads through to (#145, phase 2), kept
+-- as a hidden row of its own with the same key. Added before the versioning below, so
+-- retired versions keep it too.
+ALTER TABLE oc_moments ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false;
+ALTER TABLE oc_nodes ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false;
+ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false;
+ALTER TABLE oc_edge_nodes ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false;
+ALTER TABLE oc_relationships ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false;
+ALTER TABLE oc_entity_search ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false;
 DO $do$
 DECLARE live text; col record; names text; olds text; retire text;
 BEGIN
@@ -1019,7 +1022,9 @@ BEGIN
     SELECT string_agg(quote_ident(a.attname),',' ORDER BY a.attnum),
       string_agg('OLD.'||quote_ident(a.attname),',' ORDER BY a.attnum) INTO names,olds
     FROM pg_attribute a WHERE a.attrelid=live::regclass AND a.attnum>0 AND NOT a.attisdropped;
-    retire:=format('INSERT INTO %I(%s,until) VALUES(%s,current_setting(''oc.clock'')::bigint);',
+    -- oc.retired counts the transaction's retired rows (see transaction in store.mjs).
+    retire:=format('INSERT INTO %I(%s,until) VALUES(%s,current_setting(''oc.clock'')::bigint);
+      PERFORM set_config(''oc.retired'',(coalesce(nullif(current_setting(''oc.retired'',true),''''),''0'')::bigint+1)::text,true);',
       live || '_retired', names, olds);
     -- Every change records the clock that made it, retiring the version a pin can still see.
     EXECUTE format($f$CREATE OR REPLACE FUNCTION %I() RETURNS trigger LANGUAGE plpgsql AS $b$
@@ -1047,3 +1052,243 @@ END $do$;
 DROP FUNCTION IF EXISTS oc_index_update();
 DROP FUNCTION IF EXISTS oc_index_retire();
 DROP FUNCTION IF EXISTS oc_index_retire_row(text,jsonb);
+-- Forks read their source's index instead of copying it (#145, phase 2; index-versions.mjs).
+-- A fork's index is its own rows (what it changed, hidden rows for what it removed) over its
+-- source's at the clock it forked at (pinned there, so the source retires what it changes),
+-- and so on through the source's own sources: index_bases names them, nearest first, and
+-- index_clocks the clocks it reads each at. A full rewrite of a fork's index (replace) makes
+-- it whole again, reading through to nothing.
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS index_bases uuid[] NOT NULL DEFAULT '{}';
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS index_clocks bigint[] NOT NULL DEFAULT '{}';
+CREATE INDEX IF NOT EXISTS oc_timelines_index_bases ON oc_timelines USING gin(index_bases)
+  WHERE index_bases<>'{}';
+DO $do$
+DECLARE live text; keys text[]; names text; eq text; levels integer:=4; k integer;
+  body text; seen text; shadows text; idx record;
+BEGIN
+  FOREACH live IN ARRAY ARRAY['oc_moments','oc_nodes','oc_duration_nodes','oc_edge_nodes',
+    'oc_relationships','oc_entity_search'] LOOP
+    -- Rows outlive their timeline while forks read them (oc_release_index below).
+    EXECUTE format('ALTER TABLE %I DROP CONSTRAINT IF EXISTS %I', live, live || '_timeline_id_fkey');
+    SELECT array_agg(a.attname::text ORDER BY array_position(i.indkey::int2[],a.attnum)) INTO keys
+    FROM pg_index i JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=ANY(i.indkey)
+    WHERE i.indrelid=live::regclass AND i.indisprimary AND a.attname<>'timeline_id';
+    -- Retired versions are found as live rows are: by key at a clock, and by every index.
+    EXECUTE format('CREATE INDEX IF NOT EXISTS %I ON %I(timeline_id,%s,until)', live || '_retired_key',
+      live || '_retired', (SELECT string_agg(quote_ident(x),',') FROM unnest(keys) x));
+    FOR idx IN SELECT c.relname,pg_get_indexdef(i.indexrelid) AS definition FROM pg_index i
+      JOIN pg_class c ON c.oid=i.indexrelid WHERE i.indrelid=live::regclass AND NOT i.indisprimary LOOP
+      EXECUTE regexp_replace(idx.definition, '^CREATE (UNIQUE )?INDEX \S+ ON \S+ USING ',
+        format('CREATE INDEX IF NOT EXISTS %I ON %I USING ', idx.relname || '_retired', live || '_retired'));
+    END LOOP;
+    -- live_at(tids, clocks, from_level): the rows a timeline sees, given its levels (tids:
+    -- itself, then what it reads through to, as index_bases; clocks: the clock each is read
+    -- at, after a placeholder for itself): its own visible rows, then each level's rows at
+    -- its clock (live, or retired then) whose key no nearer level has a version of. Levels
+    -- before from_level are known to hold none of the rows asked for (see the walks below).
+    -- The walks in the database use it; queries from the server write the same out for the
+    -- timeline's levels (indexReader in index-versions.mjs).
+    SELECT string_agg('x.' || quote_ident(a.attname),',' ORDER BY a.attnum) INTO names FROM pg_attribute a
+    WHERE a.attrelid=live::regclass AND a.attnum>0 AND NOT a.attisdropped;
+    SELECT string_agg(format('v.%1$I=x.%1$I',x),' AND ') INTO eq FROM unnest(keys) x;
+    body:=format('SELECT %s FROM %I x WHERE from_level<=1 AND x.timeline_id=tids[1] AND NOT x.hidden', names, live);
+    shadows:=format('(from_level>1 OR NOT EXISTS(SELECT 1 FROM %I v WHERE v.timeline_id=tids[1] AND %s))', live, eq);
+    FOR k IN 2..levels+1 LOOP
+      seen:=format('cardinality(tids)>=%1$s AND from_level<=%1$s AND x.timeline_id=tids[%1$s]
+        AND coalesce(x.since,0)<=clocks[%1$s]', k);
+      body:=body || format(E'\n  UNION ALL SELECT %s FROM %I x WHERE %s AND NOT x.hidden AND %s',
+        names, live, seen, shadows);
+      body:=body || format(E'\n  UNION ALL SELECT %s FROM %I x WHERE %s AND x.until>clocks[%s]
+        AND x.hidden IS NOT TRUE AND %s', names, live || '_retired', seen, k, shadows);
+      seen:=format('v.timeline_id=tids[%1$s] AND %2$s AND coalesce(v.since,0)<=clocks[%1$s]', k, eq);
+      shadows:=shadows || format(' AND (from_level>%s OR (NOT EXISTS(SELECT 1 FROM %I v WHERE %s)
+        AND NOT EXISTS(SELECT 1 FROM %I v WHERE %s AND v.until>clocks[%s])))',
+        k, live, seen, live || '_retired', seen, k);
+    END LOOP;
+    EXECUTE format('DROP FUNCTION IF EXISTS %I(uuid,integer,integer)', live || '_at');
+    EXECUTE format($f$CREATE OR REPLACE FUNCTION %I(tids uuid[], clocks bigint[], from_level integer DEFAULT 1)
+      RETURNS SETOF %I LANGUAGE sql STABLE AS $b$%s$b$$f$, live || '_at', live, body);
+  END LOOP;
+END $do$;
+-- A timeline's rows go once it is deleted and no fork reads them, and so do those of deleted
+-- timelines it read through to that nothing else reads (this runs as each is deleted).
+CREATE OR REPLACE FUNCTION oc_release_index(candidates uuid[]) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE b uuid; live text;
+BEGIN
+  FOREACH b IN ARRAY coalesce(candidates,'{}') LOOP
+    -- Releases of one timeline wait for each other, so each sees what the other deleted.
+    PERFORM pg_advisory_xact_lock(hashtextextended('oc_release_index:' || b::text,0));
+    CONTINUE WHEN EXISTS(SELECT 1 FROM oc_timelines WHERE id=b)
+      OR EXISTS(SELECT 1 FROM oc_timelines WHERE index_bases<>'{}' AND index_bases @> ARRAY[b]);
+    FOREACH live IN ARRAY ARRAY['oc_moments','oc_nodes','oc_duration_nodes','oc_edge_nodes',
+      'oc_relationships','oc_entity_search'] LOOP
+      EXECUTE format('DELETE FROM %I WHERE timeline_id=$1', live) USING b;
+      EXECUTE format('DELETE FROM %I WHERE timeline_id=$1', live || '_retired') USING b;
+    END LOOP;
+  END LOOP;
+END $$;
+CREATE OR REPLACE FUNCTION oc_timeline_index_release() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN PERFORM oc_release_index(array_prepend(OLD.id,OLD.index_bases)); RETURN NULL; END $$;
+DROP TRIGGER IF EXISTS oc_index_release ON oc_timelines;
+CREATE TRIGGER oc_index_release AFTER DELETE ON oc_timelines
+FOR EACH ROW EXECUTE FUNCTION oc_timeline_index_release();
+
+-- The walks of a fork (_lineage variants, generated from the originals so each summary
+-- algorithm has one definition). A node is looked up level by level, its own rows first:
+-- a node a fork changed is its own and so are its ancestors (PersistentTree writes the
+-- whole path), and a moment a fork changed is in a node of its own; so each step down
+-- starts at the level its parent was found at, and usually finds it there with one lookup.
+-- Within a level it tries the version (live or retired) its parent had first. The stack
+-- keeps each entry's level above bit 56 and that choice in bit 55.
+CREATE OR REPLACE FUNCTION oc_rewrite(source text, original text, replacement text) RETURNS text
+LANGUAGE plpgsql IMMUTABLE AS $$
+BEGIN
+  IF strpos(source,original)=0 THEN RAISE EXCEPTION 'Cannot generate a fork walk: % not found', original; END IF;
+  RETURN replace(source,original,replacement);
+END $$;
+-- A lookup of `cols` INTO `target` from table `tbl` (as `alias`) by ID `key`, starting at
+-- level `hint` (variable `lv` ends at the level found) and with the retired version first
+-- when `first_retired` (variable `retired` tells which it was).
+CREATE OR REPLACE FUNCTION oc_lineage_lookup(cols text, target text, tbl text, alias text, key text,
+  hint text, lv text, retired text, first_retired text) RETURNS text LANGUAGE sql IMMUTABLE AS $$
+SELECT format($b$%3$s:=%4$s; %5$s:=%6$s AND %3$s>1;
+    IF %5$s THEN %2$s ELSE %1$s END IF;
+    IF NOT FOUND THEN LOOP
+      IF %3$s>1 THEN
+        IF %5$s THEN %1$s %5$s:=false; ELSE %2$s %5$s:=FOUND; END IF;
+        EXIT WHEN FOUND;
+      END IF;
+      %3$s:=%3$s+1; %5$s:=false;
+      EXIT WHEN %3$s>cardinality(tids);
+      %1$s
+      EXIT WHEN FOUND;
+    END LOOP; END IF;$b$,
+  -- In key order, so the key's index is used even before statistics count the timeline.
+  format('SELECT %s INTO %s FROM %I %s WHERE %s.timeline_id=tids[%s] AND %s.id=%s AND coalesce(%s.since,0)<=clocks[%s] ORDER BY %s.timeline_id,%s.id LIMIT 1;',
+    cols, target, tbl, alias, alias, lv, alias, key, alias, lv, alias, alias),
+  format('SELECT %s INTO %s FROM %I %s WHERE %s.timeline_id=tids[%s] AND %s.id=%s AND coalesce(%s.since,0)<=clocks[%s] AND %s.until>clocks[%s] ORDER BY %s.timeline_id,%s.id,%s.until LIMIT 1;',
+    cols, target, tbl || '_retired', alias, alias, lv, alias, key, alias, lv, alias, lv, alias, alias, alias),
+  lv, hint, retired, first_retired)
+$$;
+DO $do$
+DECLARE src text; lineage text; levels text; pack text;
+BEGIN
+  -- The fork's levels: itself (current rows) and what it reads through to.
+  lineage:='array_prepend(id,index_bases),array_prepend(9223372036854775807,index_clocks)';
+  levels:='tids uuid[]; clocks bigint[]; lv integer; hint integer; found_retired boolean; hint_retired boolean; other_retired boolean; ';
+  pack:='+(lv::bigint<<56)+(found_retired::integer::bigint<<55)';
+
+  src:=pg_get_functiondef('oc_overview_v2(uuid,mpq,mpq,mpq)'::regprocedure);
+  src:=oc_rewrite(src,'oc_overview_v2(','oc_overview_lineage(');
+  src:=oc_rewrite(src,'DECLARE ids bigint[];','DECLARE ' || levels || 'sample_lv integer; current_lv integer; first_moment text; ids bigint[];');
+  src:=oc_rewrite(src,'SELECT ARRAY[root] INTO ids FROM oc_timelines WHERE id=tid AND root IS NOT NULL;',
+    'SELECT ARRAY[root+(1::bigint<<56)],' || lineage || ' INTO ids,tids,clocks FROM oc_timelines WHERE id=tid AND root IS NOT NULL;');
+  src:=oc_rewrite(src,'nid:=ids[idx]; point:=points[idx];',
+    'nid:=ids[idx]&36028797018963967; hint:=ids[idx]>>56; hint_retired:=(ids[idx]>>55)&1=1; point:=points[idx];');
+  src:=oc_rewrite(src,'SELECT node.time,node.left_id,node.right_id,node.first_id,node.first_time,node.last_time,node.bucket_count,node.event_count,node.distinct_count INTO n FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=nid;',
+    oc_lineage_lookup('node.time,node.left_id,node.right_id,node.first_id,node.first_time,node.last_time,node.bucket_count,node.event_count,node.distinct_count',
+      'n','oc_nodes','node','nid','hint','lv','found_retired','hint_retired'));
+  src:=oc_rewrite(src,'current_id:=CASE WHEN point THEN nid ELSE n.first_id END;',
+    'current_id:=CASE WHEN point THEN nid ELSE n.first_id END; current_lv:=lv;');
+  src:=oc_rewrite(src,'SELECT m.event INTO sample FROM oc_moments m WHERE m.timeline_id=tid AND m.id=(SELECT node.moment_ids[1] FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=current_id);',
+    oc_lineage_lookup('node.moment_ids[1]','first_moment','oc_nodes','node','current_id','current_lv','sample_lv','other_retired','false')
+    || oc_lineage_lookup('m.event','sample','oc_moments','m','first_moment','sample_lv','sample_lv','other_retired','false'));
+  src:=oc_rewrite(src,'ids:=array_append(ids,n.right_id);','ids:=array_append(ids,n.right_id' || pack || ');');
+  src:=oc_rewrite(src,'ids:=array_append(ids,nid);','ids:=array_append(ids,nid' || pack || ');');
+  src:=oc_rewrite(src,'ids:=array_append(ids,n.left_id);','ids:=array_append(ids,n.left_id' || pack || ');');
+  EXECUTE src;
+
+  src:=pg_get_functiondef('oc_events(uuid,mpq,mpq,mpq,text,integer)'::regprocedure);
+  src:=oc_rewrite(src,'oc_events(','oc_events_lineage(');
+  src:=oc_rewrite(src,'DECLARE ids bigint[];','DECLARE ' || levels || 'moment_lv integer; ids bigint[];');
+  src:=oc_rewrite(src,'SELECT ARRAY[root] INTO ids FROM oc_timelines WHERE id=tid AND root IS NOT NULL;',
+    'SELECT ARRAY[root+(1::bigint<<56)],' || lineage || ' INTO ids,tids,clocks FROM oc_timelines WHERE id=tid AND root IS NOT NULL;');
+  src:=oc_rewrite(src,'nid:=ids[idx]; point:=points[idx];',
+    'nid:=ids[idx]&36028797018963967; hint:=ids[idx]>>56; hint_retired:=(ids[idx]>>55)&1=1; point:=points[idx];');
+  src:=oc_rewrite(src,'SELECT node.time,node.left_id,node.right_id,node.first_time,node.last_time,node.moment_ids INTO n FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=nid;',
+    oc_lineage_lookup('node.time,node.left_id,node.right_id,node.first_time,node.last_time,node.moment_ids',
+      'n','oc_nodes','node','nid','hint','lv','found_retired','hint_retired'));
+  src:=oc_rewrite(src,'SELECT m.event INTO e FROM oc_moments m WHERE m.timeline_id=tid AND m.id=mid;',
+    oc_lineage_lookup('m.event','e','oc_moments','m','mid','lv','moment_lv','other_retired','false'));
+  src:=oc_rewrite(src,'ids:=array_append(ids,n.right_id);','ids:=array_append(ids,n.right_id' || pack || ');');
+  src:=oc_rewrite(src,'ids:=array_append(ids,nid);','ids:=array_append(ids,nid' || pack || ');');
+  src:=oc_rewrite(src,'ids:=array_append(ids,n.left_id);','ids:=array_append(ids,n.left_id' || pack || ');');
+  EXECUTE src;
+
+  src:=pg_get_functiondef('oc_duration_overview(uuid,mpq,mpq,mpq)'::regprocedure);
+  src:=oc_rewrite(src,'oc_duration_overview(','oc_duration_overview_lineage(');
+  src:=oc_rewrite(src,'DECLARE ids integer[];','DECLARE ' || levels || 'bound_lv integer; code bigint; ids bigint[];');
+  src:=oc_rewrite(src,'SELECT CASE WHEN duration_root IS NULL THEN ARRAY[]::integer[] ELSE ARRAY[duration_root] END INTO ids FROM oc_timelines WHERE id=tid;',
+    'SELECT CASE WHEN duration_root IS NULL THEN ARRAY[]::bigint[] ELSE ARRAY[duration_root+(1::bigint<<56)] END,' || lineage || ' INTO ids,tids,clocks FROM oc_timelines WHERE id=tid;');
+  src:=oc_rewrite(src,'ids:=coalesce(ids,ARRAY[]::integer[]);','ids:=coalesce(ids,ARRAY[]::bigint[]);');
+  -- A subtree found at a level holds rows of that level and deeper ones only. One found at
+  -- the deepest level is read by one range scan of that level's rows at its clock; so is a
+  -- fork's own subtree when it reads through one level (with that level's rows it has no
+  -- version of). Others (deeper lineages) are walked node by node.
+  src:=oc_rewrite(src,'ELSIF n.max_extent>=threshold AND n.subtree_count<=256 THEN',
+    'ELSIF n.max_extent>=threshold AND n.subtree_count<=256 AND (lv=cardinality(tids) OR cardinality(tids)=2) THEN');
+  src:=oc_rewrite(src,E'FROM oc_duration_nodes d WHERE d.timeline_id=tid\n',
+    E'FROM (SELECT x.first_key,x.first_time,x.last_time,x.band FROM oc_duration_nodes x WHERE lv=1 AND x.timeline_id=tids[1] AND NOT x.hidden\n'
+    || E'          UNION ALL SELECT x.first_key,x.first_time,x.last_time,x.band FROM oc_duration_nodes x\n'
+    || E'          WHERE x.timeline_id=tids[greatest(lv,2)] AND coalesce(x.since,0)<=clocks[greatest(lv,2)] AND NOT x.hidden\n'
+    || E'          AND (lv>1 OR NOT EXISTS(SELECT 1 FROM oc_duration_nodes v WHERE v.timeline_id=tids[1] AND v.id=x.id))\n'
+    || E'          UNION ALL SELECT x.first_key,x.first_time,x.last_time,x.band FROM oc_duration_nodes_retired x\n'
+    || E'          WHERE x.timeline_id=tids[greatest(lv,2)] AND coalesce(x.since,0)<=clocks[greatest(lv,2)] AND x.until>clocks[greatest(lv,2)]\n'
+    || E'          AND x.hidden IS NOT TRUE AND (lv>1 OR NOT EXISTS(SELECT 1 FROM oc_duration_nodes v WHERE v.timeline_id=tids[1] AND v.id=x.id))) d WHERE true\n');
+  src:=oc_rewrite(src,'nid:=ids[idx];',
+    'code:=ids[idx]; nid:=code&36028797018963967; hint:=code>>56; hint_retired:=(code>>55)&1=1;');
+  src:=oc_rewrite(src,'SELECT d.left_id,d.right_id,d.min_time,d.max_time,d.max_first,d.subtree_count,d.min_extent,d.max_extent,d.first_time,d.last_time,d.band INTO n FROM oc_duration_nodes d WHERE d.timeline_id=tid AND d.id=nid;',
+    oc_lineage_lookup('d.left_id,d.right_id,d.min_time,d.max_time,d.max_first,d.subtree_count,d.min_extent,d.max_extent,d.first_time,d.last_time,d.band',
+      'n','oc_duration_nodes','d','nid','hint','lv','found_retired','hint_retired'));
+  src:=oc_rewrite(src,'SELECT d.first_time,d.band->>''id'' INTO low_first,low_id FROM oc_duration_nodes d WHERE d.timeline_id=tid AND d.id=low;',
+    oc_lineage_lookup('d.first_time,d.band->>''id''','low_first,low_id','oc_duration_nodes','d','low','1','bound_lv','other_retired','false'));
+  src:=oc_rewrite(src,'SELECT d.first_time,d.band->>''id'' INTO high_first,high_id FROM oc_duration_nodes d WHERE d.timeline_id=tid AND d.id=high;',
+    oc_lineage_lookup('d.first_time,d.band->>''id''','high_first,high_id','oc_duration_nodes','d','high','1','bound_lv','other_retired','false'));
+  src:=oc_rewrite(src,'ids:=ids||n.right_id;','ids:=ids||(n.right_id' || pack || ');');
+  src:=oc_rewrite(src,'ids:=ids||nid;','ids:=ids||(nid' || pack || ');');
+  src:=oc_rewrite(src,'ids:=ids||n.left_id;','ids:=ids||(n.left_id' || pack || ');');
+  EXECUTE src;
+
+  src:=pg_get_functiondef('oc_recent_times(uuid,boolean)'::regprocedure);
+  src:=oc_rewrite(src,'oc_recent_times(','oc_recent_times_lineage(');
+  src:=oc_rewrite(src,'DECLARE stack bigint[]','DECLARE ' || levels || 'stack bigint[]');
+  src:=oc_rewrite(src,'SELECT root INTO nid FROM oc_timelines WHERE id=tid;',
+    'SELECT root,' || lineage || ' INTO nid,tids,clocks FROM oc_timelines WHERE id=tid;');
+  src:=oc_rewrite(src,'SELECT node.left_id,node.right_id INTO n FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=nid;',
+    oc_lineage_lookup('node.left_id,node.right_id','n','oc_nodes','node','nid','1','lv','found_retired','false'));
+  src:=oc_rewrite(src,'SELECT node.time,node.left_id,node.right_id INTO n FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=nid;',
+    oc_lineage_lookup('node.time,node.left_id,node.right_id','n','oc_nodes','node','nid','1','lv','found_retired','false'));
+  EXECUTE src;
+
+  src:=pg_get_functiondef('oc_event_text(uuid)'::regprocedure);
+  src:=oc_rewrite(src,'oc_event_text(','oc_event_text_lineage(');
+  -- Planned for the timeline's own levels: plans for any timeline can only guess at them.
+  src:=oc_rewrite(src,'LANGUAGE plpgsql','LANGUAGE plpgsql SET plan_cache_mode=force_custom_plan');
+  src:=oc_rewrite(src,'DECLARE ids text[];','DECLARE tids uuid[]; clocks bigint[]; ids text[];');
+  src:=oc_rewrite(src,E'result text;\nBEGIN\n',E'result text;\nBEGIN\n  SELECT ' || lineage || E' INTO tids,clocks FROM oc_timelines WHERE id=tid;\n');
+  src:=oc_rewrite(src,'FROM oc_duration_nodes d CROSS JOIN','FROM oc_duration_nodes_at(tids,clocks) d CROSS JOIN');
+  src:=oc_rewrite(src,'WHERE d.timeline_id=tid AND x.v IS NOT NULL','WHERE x.v IS NOT NULL');
+  src:=oc_rewrite(src,'FROM oc_moments WHERE timeline_id=tid;','FROM oc_moments_at(tids,clocks);');
+  src:=oc_rewrite(src,'FROM oc_moments WHERE timeline_id=tid AND id=u.id OFFSET 0','FROM oc_moments_at(tids,clocks) WHERE id=u.id OFFSET 0');
+  EXECUTE src;
+  -- Reading through levels looks costly enough to the planner to compile its queries, which
+  -- takes far longer than running them. Their plans are kept per connection: one made while a
+  -- level's retired versions were few would scan them whole, and keep doing so as they grow
+  -- until statistics catch up; every lookup they make has an index to use.
+  FOR src IN SELECT p.oid::regprocedure::text FROM pg_proc p WHERE p.proname IN ('oc_overview_lineage',
+    'oc_events_lineage','oc_duration_overview_lineage','oc_recent_times_lineage','oc_event_text_lineage') LOOP
+    EXECUTE format('ALTER FUNCTION %s SET jit=off SET enable_seqscan=off', src);
+  END LOOP;
+
+  -- The originals hand forks to their variants (views, generated above, never read through).
+  src:=pg_get_functiondef('oc_overview_v2(uuid,mpq,mpq,mpq)'::regprocedure);
+  EXECUTE regexp_replace(src,E'\nBEGIN\n',E'\nBEGIN\n  IF EXISTS(SELECT 1 FROM oc_timelines WHERE id=tid AND index_bases<>''{}'') THEN RETURN QUERY SELECT * FROM oc_overview_lineage(tid,lo,hi,threshold); RETURN; END IF;\n');
+  src:=pg_get_functiondef('oc_events(uuid,mpq,mpq,mpq,text,integer)'::regprocedure);
+  EXECUTE regexp_replace(src,E'\nBEGIN\n',E'\nBEGIN\n  IF EXISTS(SELECT 1 FROM oc_timelines WHERE id=tid AND index_bases<>''{}'') THEN RETURN QUERY SELECT * FROM oc_events_lineage(tid,lo,hi,after_time,after_id,max_rows); RETURN; END IF;\n');
+  src:=pg_get_functiondef('oc_duration_overview(uuid,mpq,mpq,mpq)'::regprocedure);
+  EXECUTE regexp_replace(src,E'\nBEGIN\n',E'\nBEGIN\n  IF EXISTS(SELECT 1 FROM oc_timelines WHERE id=tid AND index_bases<>''{}'') THEN RETURN QUERY SELECT * FROM oc_duration_overview_lineage(tid,lo,hi,threshold); RETURN; END IF;\n');
+  src:=pg_get_functiondef('oc_recent_times(uuid,boolean)'::regprocedure);
+  EXECUTE regexp_replace(src,E'\nBEGIN\n',E'\nBEGIN\n  IF EXISTS(SELECT 1 FROM oc_timelines WHERE id=tid AND index_bases<>''{}'') THEN RETURN QUERY SELECT * FROM oc_recent_times_lineage(tid,oldest); RETURN; END IF;\n');
+  src:=pg_get_functiondef('oc_event_text(uuid)'::regprocedure);
+  EXECUTE regexp_replace(src,E'\nBEGIN\n',E'\nBEGIN\n  IF EXISTS(SELECT 1 FROM oc_timelines WHERE id=tid AND index_bases<>''{}'') THEN RETURN oc_event_text_lineage(tid); END IF;\n');
+END $do$;

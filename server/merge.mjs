@@ -2,6 +2,7 @@
 import { HttpError } from './store.mjs';
 import { validateDocument, fixMissingAnchors, relationshipKey } from '../dist/core.mjs';
 import { differences, valuesAt, settingsAt, keyName } from './history.mjs';
+import { indexReader, lineageOf } from './index-versions.mjs';
 function same(a, b) {
   return canonical(a) === canonical(b);
 }
@@ -191,6 +192,7 @@ export async function mergePatch(client, timelineId, { baseId, otherId, headId }
  */
 async function complete(client, timelineId, { baseId, otherId, headId }, merged) {
   const removed = [...merged.moments].filter(([, e]) => e === null).map(([id]) => id);
+  const index = await indexReader(client, await lineageOf(client, timelineId));
   // Whether a moment or duration is in the merged timeline: decided, or as at the head.
   const present = async (kind, ids) => {
     const name = kind === 'moment' ? 'moments' : 'durations';
@@ -200,12 +202,12 @@ async function complete(client, timelineId, { baseId, otherId, headId }, merged)
   };
   // Durations the head holds, anchored to moments the merge removes, follow them as saves do.
   if (removed.length) {
-    const { rows } = await client.query(
-      `SELECT DISTINCT definition FROM oc_duration_nodes WHERE timeline_id=$1 AND definition IS NOT NULL
+    const { rows: anchored } = await client.query(
+      `SELECT DISTINCT definition FROM ${index('oc_duration_nodes')} x WHERE definition IS NOT NULL
       AND (definition->'start'->>'moment'=ANY($2::text[]) OR definition->'end'->>'moment'=ANY($2::text[]))`,
       [timelineId, removed],
     );
-    for (const { definition } of rows)
+    for (const { definition } of anchored)
       if (!merged.durations.has(definition.id)) merged.durations.set(definition.id, definition);
   }
   // Durations the merge keeps whose anchors it removes keep the moment's last time: the
@@ -233,12 +235,12 @@ async function complete(client, timelineId, { baseId, otherId, headId }, merged)
     ...[...merged.durations].filter(([, d]) => d === null).map(([id]) => ['duration', id]),
   ];
   if (gone.length) {
-    const { rows } = await client.query(
-      `SELECT a_kind,a_id,b_kind,b_id FROM oc_relationships r JOIN unnest($2::text[],$3::text[]) x(kind,id)
-      ON (r.a_kind=x.kind AND r.a_id=x.id) OR (r.b_kind=x.kind AND r.b_id=x.id) WHERE r.timeline_id=$1`,
+    const { rows: links } = await client.query(
+      `SELECT a_kind,a_id,b_kind,b_id FROM ${index('oc_relationships')} r JOIN unnest($2::text[],$3::text[]) x(kind,id)
+      ON (r.a_kind=x.kind AND r.a_id=x.id) OR (r.b_kind=x.kind AND r.b_id=x.id)`,
       [timelineId, gone.map(([kind]) => kind), gone.map(([, id]) => id)],
     );
-    for (const row of rows) {
+    for (const row of links) {
       const key = keyName({
         a_kind: row.a_kind,
         a_id: row.a_id,

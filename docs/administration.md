@@ -144,15 +144,21 @@ revisions keep the form they were saved in.
 **Forks and duplicates share saved history** with the timeline they copy, instead of
 copying it: a new copy keeps no history beyond its settings, and its saves keep only what
 they change. At 200,000 moments, a fork used to add 37 MB of history and now adds a few
-hundred bytes. A copy still has its own index of the whole timeline, copied row by row
-inside the database. A copy of 20,000 moments and durations or more is answered at once and
-its index copied afterwards, while its page says it is being prepared: at 200,000 moments
-the fork is answered in under a tenth of a second and ready about 30 s later (rebuilding the
-index from the timeline's document in the server took about 2 minutes). Until it is ready,
-the API answers HTTP 409 for its index, and only its metadata, sharing, settings and
-deletion are available. A copy left unprepared by a restart is prepared when the server
-starts. Reading one of the copy's saved revisions takes about a third longer than reading
-the original's (6 s rather than 4.6 s), because it reads through to the original.
+hundred bytes. **A copy shares its source's index too**: it reads through to it, keeping
+rows of its own only for what it changes, so a fork of any size is ready at once (at 200,000
+moments it used to take 30 s to copy, and before that 2 minutes to rebuild). Reading a fork
+takes about 1.2 to 1.5 times as long as reading its source. Once forked, a timeline keeps
+the earlier version of each index row it changes for as long as it lives, so its forks can
+still read them: its index grows by about one row per row its saves change. Removing the
+versions no fork reads any more is planned (#145). A deleted timeline's index is kept while
+forks read through to it. A copy of a copy of a copy of a copy (four levels) reads through
+to all of them; a copy one level deeper copies its index instead, inside the database. A
+copy of 20,000 moments and durations or more is then answered at once and its index copied
+afterwards, while its page says it is being prepared (about 30 s at 200,000 moments). Until
+it is ready, the API answers HTTP 409 for its index, and only its metadata, sharing,
+settings and deletion are available. A copy left unprepared by a restart is prepared when the
+server starts. Reading one of the copy's saved revisions takes about a third longer than
+reading the original's (6 s rather than 4.6 s), because it reads through to the original.
 
 **Pull requests keep no whole timelines.** A pull request refers to saved revisions, and a
 timeline submitted for review is kept as rows that read through to its base, so it is charged

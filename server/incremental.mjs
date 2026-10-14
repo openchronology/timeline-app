@@ -3,7 +3,7 @@
 // moment rows, the moment tree, the duration and arc interval trees, relationships and
 // search rows change only where the patch reaches. The result matches rebuilding the index
 // from applyPatch(current, patch); test/incremental-postgres.mjs checks this.
-import { beginIndexWrite } from './index-versions.mjs';
+import { beginIndexWrite, indexReader, removeRows } from './index-versions.mjs';
 import {
   validateDocument,
   validateDuration,
@@ -71,6 +71,8 @@ export function incremental(t, patch) {
  * Rows are looked up by key in lateral subqueries ending in OFFSET 0, which keeps each a
  * lookup per key: right after a timeline is written in one go (a fork, an import) the
  * planner's statistics can still count its rows as none, and a join would read all of them.
+ * A fork's rows are read through to what it forked (indexReader); what it changes becomes
+ * its own, and what it removes from there is hidden (removeRows).
  */
 
 /**
@@ -81,6 +83,7 @@ export async function applyIncrementally(c, t, patch) {
   const id = t.id;
   // Index writes record the clock of this transaction (index-versions.mjs).
   await beginIndexWrite(c, id);
+  const index = await indexReader(c, t);
   const fail = (message) => {
     throw new HttpError(400, message);
   };
@@ -130,7 +133,7 @@ export async function applyIncrementally(c, t, patch) {
     (
       await c.query(
         `SELECT m.id,oc_qtext(m.time) AS time,m.event FROM unnest($2::text[]) k(id)
-        CROSS JOIN LATERAL (SELECT * FROM oc_moments WHERE timeline_id=$1 AND id=k.id OFFSET 0) m`,
+        CROSS JOIN LATERAL ${index.lookup('oc_moments', ['k.id'])} m`,
         [id, [...momentChanges.keys()]],
       )
     ).rows.map((r) => [r.id, r.event]),
@@ -144,7 +147,7 @@ export async function applyIncrementally(c, t, patch) {
   if (durationChanges.size) {
     const { rows } = await c.query(
       `SELECT k.id,n.definition FROM unnest($2::text[]) k(id) CROSS JOIN LATERAL
-        (SELECT definition FROM oc_duration_nodes WHERE timeline_id=$1 AND band->>'id'=k.id OFFSET 0) n`,
+        (SELECT definition FROM ${index('oc_duration_nodes')} x WHERE x.band->>'id'=k.id OFFSET 0) n`,
       [id, [...durationChanges].filter(([, d]) => d).map(([k]) => k)],
     );
     for (const row of rows)
@@ -154,9 +157,11 @@ export async function applyIncrementally(c, t, patch) {
   let storage = Number(t.storage_bytes) - bytes(previousSettings) + bytes(settings);
   let added = false;
   const moved = new Set(); // moments whose time changed or that were deleted
-  const moments = new PersistentTree(c, MOMENT_TREE, 'oc_nodes', id, t.root);
+  const moments = new PersistentTree(c, MOMENT_TREE, 'oc_nodes', t, t.root, index);
   const removals = [],
-    insertions = [];
+    insertions = [],
+    edited = []; // moments changed in place, whose nodes a fork makes its own
+
   for (const [momentId, event] of momentChanges) {
     const before = saved.get(momentId);
     if (!before && !event) continue;
@@ -168,23 +173,21 @@ export async function applyIncrementally(c, t, patch) {
     }
     if (event && (!before || event.time !== before.time))
       insertions.push({ time: event.time, id: momentId });
+    else if (event && index.depth) edited.push({ time: event.time, id: momentId });
   }
-  await moments.prefetch([...removals, ...insertions]);
+  await moments.prefetch([...removals, ...insertions, ...edited]);
   for (const r of removals)
     await moments.remove(r, (n) => {
       n.ids = n.ids.filter((x) => x !== r.id);
       return n.ids.length > 0;
     });
   for (const i of insertions) await moments.insert(i, i);
+  for (const e of edited) await moments.own(e);
   const momentCount = await moments.size;
   if (!withinEntryLimit(momentCount)) fail(`Expected at most ${entryLimitText()} point events.`);
   const upserted = [...momentChanges].filter(([, e]) => e);
   const deleted = [...momentChanges].filter(([k, e]) => !e && saved.has(k)).map(([k]) => k);
-  if (deleted.length)
-    await c.query(
-      'DELETE FROM oc_moments m USING unnest($2::text[]) k(id) WHERE m.timeline_id=$1 AND m.id=k.id',
-      [id, deleted],
-    );
+  if (deleted.length) await removeRows(c, t, index, 'oc_moments', ['text'], [deleted]);
   await upsertRows(
     c,
     'oc_moments',
@@ -199,7 +202,7 @@ export async function applyIncrementally(c, t, patch) {
     if (missing.length) {
       const { rows } = await c.query(
         `SELECT m.id,oc_qtext(m.time) AS time FROM unnest($2::text[]) k(id)
-        CROSS JOIN LATERAL (SELECT id,time FROM oc_moments WHERE timeline_id=$1 AND id=k.id OFFSET 0) m`,
+        CROSS JOIN LATERAL ${index.lookup('oc_moments', ['k.id'])} m`,
         [id, missing],
       );
       for (const r of rows) momentTimes.set(r.id, r.time);
@@ -210,11 +213,11 @@ export async function applyIncrementally(c, t, patch) {
   const { rows: durationRows } = await c.query(
     `SELECT DISTINCT ON (d.band->>'id') oc_qtext(d.first_time) AS first,oc_qtext(d.last_time) AS last,d.band,d.definition FROM (
       SELECT n.* FROM unnest($2::text[]) k(id) CROSS JOIN LATERAL
-        (SELECT * FROM oc_duration_nodes WHERE timeline_id=$1 AND band->>'id'=k.id OFFSET 0) n
+        (SELECT * FROM ${index('oc_duration_nodes')} x WHERE x.band->>'id'=k.id OFFSET 0) n
       UNION ALL SELECT n.* FROM unnest($3::text[]) k(id) CROSS JOIN LATERAL
-        (SELECT * FROM oc_duration_nodes WHERE timeline_id=$1 AND definition->'start'->>'moment'=k.id OFFSET 0) n
+        (SELECT * FROM ${index('oc_duration_nodes')} x WHERE x.definition->'start'->>'moment'=k.id OFFSET 0) n
       UNION ALL SELECT n.* FROM unnest($3::text[]) k(id) CROSS JOIN LATERAL
-        (SELECT * FROM oc_duration_nodes WHERE timeline_id=$1 AND definition->'end'->>'moment'=k.id OFFSET 0) n) d`,
+        (SELECT * FROM ${index('oc_duration_nodes')} x WHERE x.definition->'end'->>'moment'=k.id OFFSET 0) n) d`,
     [id, [...durationChanges.keys()], [...moved]],
   );
   const savedDurations = new Map(durationRows.map((r) => [r.band.id, r]));
@@ -243,7 +246,14 @@ export async function applyIncrementally(c, t, patch) {
       .filter((e) => typeof e !== 'string')
       .map((e) => e.moment),
   );
-  const durations = new PersistentTree(c, INTERVAL_TREE, 'oc_duration_nodes', id, t.duration_root);
+  const durations = new PersistentTree(
+    c,
+    INTERVAL_TREE,
+    'oc_duration_nodes',
+    t,
+    t.duration_root,
+    index,
+  );
   const bands = new Map(); // final bands of affected durations (null when deleted)
   const durationOps = [];
   for (const [durationId, d] of definitions) {
@@ -301,17 +311,28 @@ export async function applyIncrementally(c, t, patch) {
       .map(([k]) => ['duration', k]),
   ];
   const unlinked = [];
+  /** Removes these links (rows with LINK columns), which the timeline has. */
+  const unlink = async (links) => {
+    if (!links.length) return;
+    await removeRows(
+      c,
+      t,
+      index,
+      'oc_relationships',
+      ['text', 'text', 'text', 'text'],
+      ['a_kind', 'a_id', 'b_kind', 'b_id'].map((column) => links.map((r) => r[column])),
+    );
+    unlinked.push(...links);
+  };
   if (removedEntities.length) {
-    const { rows } = await c.query(
-      `WITH ends AS (SELECT * FROM unnest($2::text[],$3::text[]) AS x(kind,id)),
-      a AS (DELETE FROM oc_relationships r USING ends x WHERE r.timeline_id=$1 AND r.a_kind=x.kind AND r.a_id=x.id
-        RETURNING r.a_kind,r.a_id,r.b_kind,r.b_id),
-      b AS (DELETE FROM oc_relationships r USING ends x WHERE r.timeline_id=$1 AND r.b_kind=x.kind AND r.b_id=x.id
-        RETURNING r.a_kind,r.a_id,r.b_kind,r.b_id)
-      SELECT * FROM a UNION SELECT * FROM b`,
+    const { rows: links } = await c.query(
+      `SELECT r.a_kind,r.a_id,r.b_kind,r.b_id FROM unnest($2::text[],$3::text[]) AS x(kind,id) CROSS JOIN LATERAL
+        (SELECT * FROM ${index('oc_relationships')} r WHERE r.a_kind=x.kind AND r.a_id=x.id OFFSET 0) r
+      UNION SELECT r.a_kind,r.a_id,r.b_kind,r.b_id FROM unnest($2::text[],$3::text[]) AS x(kind,id) CROSS JOIN LATERAL
+        (SELECT * FROM ${index('oc_relationships')} r WHERE r.b_kind=x.kind AND r.b_id=x.id OFFSET 0) r`,
       [id, removedEntities.map(([k]) => k), removedEntities.map(([, v]) => v)],
     );
-    unlinked.push(...rows);
+    await unlink(links);
   }
   // Final existence of linked entities.
   const exists = new Map();
@@ -328,35 +349,40 @@ export async function applyIncrementally(c, t, patch) {
   }
   const unknown = wanted.filter((ref) => !exists.has(refKey(ref)));
   if (unknown.length) {
-    const { rows } = await c.query(
+    const { rows: present } = await c.query(
       `SELECT 'm:'||m.id AS key FROM unnest($2::text[]) k(id)
-        CROSS JOIN LATERAL (SELECT id FROM oc_moments WHERE timeline_id=$1 AND id=k.id OFFSET 0) m
+        CROSS JOIN LATERAL ${index.lookup('oc_moments', ['k.id'])} m
       UNION ALL SELECT 'd:'||k.id FROM unnest($3::text[]) k(id)
-        WHERE EXISTS(SELECT 1 FROM oc_duration_nodes WHERE timeline_id=$1 AND band->>'id'=k.id)`,
+        WHERE EXISTS(SELECT 1 FROM ${index('oc_duration_nodes')} x WHERE x.band->>'id'=k.id)`,
       [
         id,
         unknown.filter((r) => 'moment' in r).map((r) => r.moment),
         unknown.filter((r) => 'duration' in r).map((r) => r.duration),
       ],
     );
-    const found = new Set(rows.map((r) => r.key));
+    const found = new Set(present.map((r) => r.key));
     for (const ref of unknown) exists.set(refKey(ref), found.has(refKey(ref)));
   }
   const linked = [];
   for (const change of relationshipChanges) {
     const params = [id, kindOf(change.a), refId(change.a), kindOf(change.b), refId(change.b)];
+    const link = 'r.a_kind=$2 AND r.a_id=$3 AND r.b_kind=$4 AND r.b_id=$5';
     if (!change.related) {
-      const { rows } = await c.query(
-        'DELETE FROM oc_relationships WHERE timeline_id=$1 AND a_kind=$2 AND a_id=$3 AND b_kind=$4 AND b_id=$5 RETURNING a_kind,a_id,b_kind,b_id',
+      const { rows: links } = await c.query(
+        `SELECT a_kind,a_id,b_kind,b_id FROM ${index('oc_relationships')} r WHERE ${link}`,
         params,
       );
-      unlinked.push(...rows);
+      await unlink(links);
     } else if (exists.get(refKey(change.a)) && exists.get(refKey(change.b))) {
-      const { rows } = await c.query(
-        'INSERT INTO oc_relationships(timeline_id,a_kind,a_id,b_kind,b_id) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING a_kind',
+      // Added unless the timeline has it (a fork's hidden link of its own shows again).
+      const { rows: added } = await c.query(
+        `INSERT INTO oc_relationships(timeline_id,a_kind,a_id,b_kind,b_id) SELECT $1,$2,$3,$4,$5
+        WHERE NOT EXISTS(SELECT 1 FROM ${index('oc_relationships')} r WHERE ${link})
+        ON CONFLICT(timeline_id,a_kind,a_id,b_kind,b_id) DO UPDATE SET hidden=false
+        WHERE oc_relationships.hidden RETURNING a_kind`,
         params,
       );
-      if (rows.length) linked.push({ a: change.a, b: change.b });
+      if (added.length) linked.push({ a: change.a, b: change.b });
     }
   }
   const rowRef = (kind, value) => ({ [kind]: value });
@@ -373,25 +399,25 @@ export async function applyIncrementally(c, t, patch) {
   ];
   let replaced = [];
   if (movedEntities.length) {
-    const { rows } = await c.query(
+    const { rows: links } = await c.query(
       `SELECT r.a_kind,r.a_id,r.b_kind,r.b_id FROM unnest($2::text[],$3::text[]) AS x(kind,id) CROSS JOIN LATERAL
-        (SELECT * FROM oc_relationships WHERE timeline_id=$1 AND a_kind=x.kind AND a_id=x.id OFFSET 0) r
+        (SELECT * FROM ${index('oc_relationships')} r WHERE r.a_kind=x.kind AND r.a_id=x.id OFFSET 0) r
       UNION SELECT r.a_kind,r.a_id,r.b_kind,r.b_id FROM unnest($2::text[],$3::text[]) AS x(kind,id) CROSS JOIN LATERAL
-        (SELECT * FROM oc_relationships WHERE timeline_id=$1 AND b_kind=x.kind AND b_id=x.id OFFSET 0) r`,
+        (SELECT * FROM ${index('oc_relationships')} r WHERE r.b_kind=x.kind AND r.b_id=x.id OFFSET 0) r`,
       [id, movedEntities.map(([k]) => k), movedEntities.map(([, v]) => v)],
     );
-    replaced = rows
+    replaced = links
       .map(fromRow)
       .filter((r) => !linkedNow.some((l) => relationshipKey(l) === relationshipKey(r)));
   }
   const arcsOut = [...unlinkedKeys, ...replaced.map(relationshipKey)];
   const arcsIn = [...linkedNow, ...replaced];
-  const edges = new PersistentTree(c, INTERVAL_TREE, 'oc_edge_nodes', id, t.edge_root);
+  const edges = new PersistentTree(c, INTERVAL_TREE, 'oc_edge_nodes', t, t.edge_root, index);
   const savedArcs = arcsOut.length
     ? (
         await c.query(
           `SELECT oc_qtext(e.first_time) AS first,e.band->>'id' AS id FROM unnest($2::text[]) k(id)
-          CROSS JOIN LATERAL (SELECT * FROM oc_edge_nodes WHERE timeline_id=$1 AND band->>'id'=k.id OFFSET 0) e`,
+          CROSS JOIN LATERAL (SELECT * FROM ${index('oc_edge_nodes')} x WHERE x.band->>'id'=k.id OFFSET 0) e`,
           [id, arcsOut],
         )
       ).rows
@@ -409,12 +435,12 @@ export async function applyIncrementally(c, t, patch) {
     .filter((ref) => 'duration' in ref && !starts.has(ref.duration))
     .map(refId);
   if (unplaced.length) {
-    const { rows } = await c.query(
+    const { rows: placed } = await c.query(
       `SELECT d.band->>'id' AS id,d.band->>'startTime' AS start FROM unnest($2::text[]) k(id)
-      CROSS JOIN LATERAL (SELECT band FROM oc_duration_nodes WHERE timeline_id=$1 AND band->>'id'=k.id OFFSET 0) d`,
+      CROSS JOIN LATERAL (SELECT band FROM ${index('oc_duration_nodes')} x WHERE x.band->>'id'=k.id OFFSET 0) d`,
       [id, [...new Set(unplaced)]],
     );
-    for (const r of rows) starts.set(r.id, r.start);
+    for (const r of placed) starts.set(r.id, r.start);
   }
   const place = (ref) => ('moment' in ref ? momentTimes.get(ref.moment) : starts.get(ref.duration));
   const arcs = arcsIn.map((r) => {
@@ -438,10 +464,13 @@ export async function applyIncrementally(c, t, patch) {
     ...[...bands].filter(([, b]) => !b).map(([k]) => ['duration', k]),
   ];
   if (searchDeletes.length)
-    await c.query(
-      `DELETE FROM oc_entity_search s USING unnest($2::text[],$3::text[]) AS x(kind,id)
-      WHERE s.timeline_id=$1 AND s.kind=x.kind AND s.entity_id=x.id`,
-      [id, searchDeletes.map(([k]) => k), searchDeletes.map(([, v]) => v)],
+    await removeRows(
+      c,
+      t,
+      index,
+      'oc_entity_search',
+      ['text', 'text'],
+      [searchDeletes.map(([k]) => k), searchDeletes.map(([, v]) => v)],
     );
   const search = searchRows(
     upserted.map(([, e]) => e),
@@ -527,7 +556,7 @@ export async function upsertSearch(c, id, rows) {
     await c.query(
       `INSERT INTO oc_entity_search(timeline_id,kind,entity_id,first_time,last_time,title,body,tags) VALUES ${tuples.join(',')}
       ON CONFLICT(timeline_id,kind,entity_id) DO UPDATE SET first_time=EXCLUDED.first_time,last_time=EXCLUDED.last_time,
-      title=EXCLUDED.title,body=EXCLUDED.body,tags=EXCLUDED.tags`,
+      title=EXCLUDED.title,body=EXCLUDED.body,tags=EXCLUDED.tags,hidden=false`,
       params,
     );
   }

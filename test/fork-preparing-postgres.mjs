@@ -1,8 +1,9 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// A large fork or duplicate is answered at once and its index copied afterwards (#145):
-// until then it refuses reads and writes of its index but shows its metadata; once ready it
-// holds exactly the revision it was copied from, even when its source saved, changed a lot
-// or was deleted meanwhile; deleting it while preparing is fine; a restart resumes.
+// A large fork or duplicate that cannot read through to its source's index (one past
+// INDEX_LEVELS) is answered at once and its index copied afterwards (#145): until then it
+// refuses reads and writes of its index but shows its metadata; once ready it holds exactly
+// the revision it was copied from, even when its source saved, changed a lot or was deleted
+// meanwhile; deleting it while preparing is fine; a restart resumes.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -32,6 +33,9 @@ const snapshot = async (id) => normal((await store.snapshot(id, user)).document)
 const preparing = async (id) =>
   (await pool.query('SELECT preparing_revision_id FROM oc_timelines WHERE id=$1', [id])).rows[0]
     ?.preparing_revision_id ?? null;
+// Every copy here copies its index, as one past INDEX_LEVELS does (fork-read-through-postgres.mjs
+// covers that choice).
+store.shareIndex = async () => false;
 // Holds copies back from being prepared, so a test can change things first.
 const prepare = store.prepare;
 const hold = () => (store.prepare = () => Promise.resolve());

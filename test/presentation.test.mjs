@@ -270,7 +270,7 @@ test('Postgres snapshot replacements bind presentation as JSON data and preserve
     async query(sql, values) {
       queries.push({ sql, values });
       return {
-        rows: sql.includes('SELECT event FROM oc_moments')
+        rows: /^SELECT event FROM .*oc_moments/.test(sql)
           ? [{ event: document.events[0] }]
           : sql.includes('AS added')
             ? [{ added: true }]

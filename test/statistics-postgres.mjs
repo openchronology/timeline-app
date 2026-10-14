@@ -17,13 +17,21 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
   versions = new Versioning(store);
 const user = randomUUID(),
   created = [];
-/** When each index table was last analyzed (manually, not by autovacuum). */
-const analyzed = async () =>
+const TABLES = [
+  'oc_moments',
+  'oc_nodes',
+  'oc_duration_nodes',
+  'oc_edge_nodes',
+  'oc_relationships',
+  'oc_entity_search',
+];
+/** When each index table (or its retired versions) was last analyzed (manually, not by autovacuum). */
+const analyzed = async (suffix = '') =>
   Object.fromEntries(
     (
       await pool.query(
-        `SELECT relname,last_analyze FROM pg_stat_user_tables WHERE relname IN
-        ('oc_moments','oc_nodes','oc_duration_nodes','oc_edge_nodes','oc_relationships','oc_entity_search')`,
+        'SELECT relname,last_analyze FROM pg_stat_user_tables WHERE relname=ANY($1::text[])',
+        [TABLES.map((table) => table + suffix)],
       )
     ).rows.map((r) => [r.relname, r.last_analyze?.getTime() ?? 0]),
   );
@@ -58,6 +66,8 @@ try {
   for (const [table, time] of Object.entries(after))
     assert(time > before[table], `${table} analyzed after a large create`);
   before = after;
+  // A fork that copies its index (one that cannot read through to it, past INDEX_LEVELS).
+  store.shareIndex = async () => false;
   const fork = await versions.copy(large.id, user, { revision: large.revision });
   created.push(fork.id);
   // A large copy's index is copied after answering (see fork-preparing-postgres.mjs).
@@ -88,8 +98,32 @@ try {
     await lookupIndex('SELECT * FROM oc_moments WHERE timeline_id=$1 AND id=$2', [fork.id, 'm1']),
     ['oc_moments_pkey'],
   );
+  // A timeline forks read through to keeps the versions its saves change (retired): a save
+  // retiring many refreshes statistics before it returns, so lookups count them; one
+  // retiring a few leaves them to autovacuum.
+  delete store.shareIndex;
+  const reader = await versions.copy(large.id, user, { revision: large.revision });
+  created.push(reader.id);
+  assert.equal(reader.preparing, false, 'a fork reads through instead');
+  const document = generateTimeline(25000);
+  const settings = { ...document, events: [], durations: undefined, relationships: undefined };
+  const moved = (from, count) => ({
+    settings,
+    changes: document.events.slice(from, from + count).map((e) => ({
+      id: e.id,
+      event: { ...e, time: e.time + '1' },
+    })),
+  });
+  let source = await store.access(large.id, user);
+  before = await analyzed('_retired');
+  source = await store.save(source.id, user, source.revision, undefined, moved(0, 3));
+  assert.deepEqual(await analyzed('_retired'), before, 'a few retired rows are not worth it');
+  source = await store.save(source.id, user, source.revision, undefined, moved(100, 300));
+  after = await analyzed('_retired');
+  for (const [table, time] of Object.entries(after))
+    assert(time > before[table], `${table} analyzed after retiring many rows`);
   console.log(
-    'PASS statistics: large timelines written in one go are analyzed before the write returns; their lookups use their own indexes.',
+    'PASS statistics: large timelines written in one go, and saves retiring many versions forks read, are analyzed before the write returns; their lookups use their own indexes.',
   );
 } finally {
   await store.idle();

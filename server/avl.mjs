@@ -3,6 +3,7 @@
 // reads and rewrites only the nodes on its path (plus rotations), recomputing each node's
 // subtree summaries from its children, so a save costs O(log n) rows instead of a rebuild.
 import { Q, durationOverview } from '../dist/core.mjs';
+import { removeRows } from './index-versions.mjs';
 
 const order = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const max = (a, b) => (b !== undefined && Q.parse(b).compare(Q.parse(a)) > 0 ? b : a);
@@ -24,24 +25,24 @@ export async function upsertRows(client, table, columns, casts, rows, conflict =
           ? ` ON CONFLICT(timeline_id,id) DO UPDATE SET ${columns
               .slice(2)
               .map((c) => `${c}=EXCLUDED.${c}`)
-              .join(',')}`
+              .join(',')},hidden=false`
           : ''),
       params,
     );
   }
 }
 
-/**
- * The node with ID `id` (SQL), as a subquery looked up by its key. OFFSET 0 keeps it a lookup
- * per node: right after a timeline is written (a fork, an import) the planner's statistics
- * can still count its nodes as none, and a join would then read all of them at every step.
+/*
+ * Nodes are looked up by ID with `node`, a function of the ID (SQL) giving a subquery for
+ * that node (indexReader's lookup), a lookup per node: right after a timeline is written (a
+ * fork, an import) the planner's statistics can still count its nodes as none, and a join
+ * would then read all of them at every step.
  */
-const node = (table, id) => `(SELECT * FROM ${table} WHERE timeline_id=$1 AND id=${id} OFFSET 0)`;
 /** The nodes on the paths (`visited`) and their children, each read by its key. */
-const pathNodes = (table) => `SELECT n.* FROM (
-      SELECT id FROM visited UNION SELECT x FROM visited v CROSS JOIN LATERAL ${node(table, 'v.id')} c,
+const pathNodes = (node) => `SELECT n.* FROM (
+      SELECT id FROM visited UNION SELECT x FROM visited v CROSS JOIN LATERAL ${node('v.id')} c,
       unnest(ARRAY[c.left_id,c.right_id]) x WHERE x IS NOT NULL
-    ) ids(node_id) CROSS JOIN LATERAL ${node(table, 'ids.node_id')} n`;
+    ) ids(node_id) CROSS JOIN LATERAL ${node('ids.node_id')} n`;
 
 /** One node per distinct moment time, holding its moment IDs in "C" order. */
 export const MOMENT_TREE = {
@@ -110,12 +111,12 @@ export const MOMENT_TREE = {
     n.distinct = (l?.distinct ?? 0) + 1 + (r?.distinct ?? 0);
   },
   // Paths from the root towards each key, plus the children of every node on them.
-  path: (table) => `WITH RECURSIVE path(key,id) AS (
+  path: (node) => `WITH RECURSIVE path(key,id) AS (
       SELECT k,$3::bigint FROM unnest($2::text[]) k
       UNION SELECT p.key,CASE WHEN p.key::mpq<n.time THEN n.left_id WHEN p.key::mpq>n.time THEN n.right_id END
-      FROM path p CROSS JOIN LATERAL ${node(table, 'p.id')} n
+      FROM path p CROSS JOIN LATERAL ${node('p.id')} n
     ), visited AS (SELECT DISTINCT id FROM path WHERE id IS NOT NULL)
-    ${pathNodes(table)}`,
+    ${pathNodes(node)}`,
   pathParams: (keys) => [keys.map((k) => k.time)],
 };
 
@@ -212,21 +213,34 @@ export const INTERVAL_TREE = {
     n.minExtent = min(min(extent, l?.minExtent), r?.minExtent);
     n.maxExtent = max(max(extent, l?.maxExtent), r?.maxExtent);
   },
-  path: (table) => `WITH RECURSIVE path(first,eid,id) AS (
+  path: (node) => `WITH RECURSIVE path(first,eid,id) AS (
       SELECT f,e,$4::integer FROM unnest($2::text[],$3::text[]) AS k(f,e)
       UNION SELECT p.first,p.eid,CASE
         WHEN p.first::mpq<n.first_time OR (p.first::mpq=n.first_time AND p.eid COLLATE "C"<(n.band->>'id') COLLATE "C") THEN n.left_id
         WHEN p.first::mpq>n.first_time OR (p.first::mpq=n.first_time AND p.eid COLLATE "C">(n.band->>'id') COLLATE "C") THEN n.right_id END
-      FROM path p CROSS JOIN LATERAL ${node(table, 'p.id')} n
+      FROM path p CROSS JOIN LATERAL ${node('p.id')} n
     ), visited AS (SELECT DISTINCT id FROM path WHERE id IS NOT NULL)
-    ${pathNodes(table)}`,
+    ${pathNodes(node)}`,
   pathParams: (keys) => [keys.map((k) => k.first), keys.map((k) => k.id)],
 };
 
-/** A tree whose rows are read on demand and written back by flush(). */
+/**
+ * A tree whose rows are read on demand and written back by flush(), of the timeline `owner`
+ * (its row, as `t` in incremental.mjs) read by `rows` (its indexReader). In a fork, a node it
+ * changes becomes its own, and so does the path to it: the walks in schema.sql rely on a
+ * fork's own nodes having only nodes of its own above them.
+ */
 export class PersistentTree {
-  constructor(client, spec, table, owner, root) {
-    Object.assign(this, { client, spec, table, owner, root: id(root) });
+  constructor(client, spec, table, owner, root, rows) {
+    Object.assign(this, {
+      client,
+      spec,
+      table,
+      owner: owner.id,
+      timeline: owner,
+      rows,
+      root: id(root),
+    });
     this.nodes = new Map();
     this.dirty = new Set();
     this.dropped = new Set();
@@ -245,7 +259,7 @@ export class PersistentTree {
     if (nodeId === null) return null;
     if (!this.nodes.has(nodeId)) {
       const { rows } = await this.client.query(
-        `SELECT ${this.spec.select} FROM ${this.table} WHERE timeline_id=$1 AND id=$2`,
+        `SELECT ${this.spec.select} FROM ${this.rows.lookup(this.table, ['$2::bigint'])} x`,
         [this.owner, nodeId],
       );
       this.#add(rows);
@@ -258,7 +272,7 @@ export class PersistentTree {
   async prefetch(keys) {
     if (!keys.length || this.root === null) return;
     const sql = this.spec
-      .path(this.table)
+      .path((nodeId) => this.rows.lookup(this.table, [nodeId]))
       .replace('SELECT n.* FROM', `SELECT ${this.spec.select} FROM`);
     const { rows } = await this.client.query(sql, [
       this.owner,
@@ -269,10 +283,19 @@ export class PersistentTree {
   }
   async #newId() {
     if (this.next === null) {
+      // The last ID read backwards from the index, whatever the statistics say; in a fork,
+      // after any ID any version of a timeline it reads through to used.
+      const last = (table, timeline) =>
+        `(SELECT id FROM ${table} WHERE timeline_id=${timeline} ORDER BY id DESC LIMIT 1)`;
       const { rows } = await this.client.query(
-        // The last ID read backwards from the index, whatever the statistics say.
-        `SELECT coalesce((SELECT id FROM ${this.table} WHERE timeline_id=$1 ORDER BY id DESC LIMIT 1),0) AS id`,
-        [this.owner],
+        `SELECT greatest(${[
+          last(this.table, '$1'),
+          ...this.timeline.index_bases.flatMap((_, i) => [
+            last(this.table, `($2::uuid[])[${i + 1}]`),
+            last(this.table + '_retired', `($2::uuid[])[${i + 1}]`),
+          ]),
+        ]},0) AS id`,
+        [this.owner, ...(this.rows.depth ? [this.timeline.index_bases] : [])],
       );
       this.next = Number(rows[0].id);
     }
@@ -293,20 +316,29 @@ export class PersistentTree {
   async remove(key, keep = null) {
     this.root = await this.#remove(this.root, key, keep);
   }
-  /** Replaces the payload of the node with `key` without moving it (its summaries are unchanged). */
+  /**
+   * Replaces the payload of the node with `key` without moving it (its summaries are
+   * unchanged). In a fork, the path to it is written too.
+   */
   async replace(key, update) {
+    const path = [];
     let nodeId = this.root;
     while (nodeId !== null) {
       const n = await this.get(nodeId),
         c = this.spec.compare(key, n);
+      path.push(n);
       if (c === 0) {
         update(n);
-        this.#touch(n);
+        for (const p of this.rows.depth ? path : [n]) this.#touch(p);
         return;
       }
       nodeId = c < 0 ? n.left : n.right;
     }
     throw new Error('Broken timeline index');
+  }
+  /** Makes the node with `key` and the path to it a fork's own (see the class). */
+  async own(key) {
+    if (this.rows.depth) await this.replace(key, () => {});
   }
   async #insert(nodeId, key, payload) {
     if (nodeId === null) {
@@ -404,9 +436,13 @@ export class PersistentTree {
   /** Writes changed nodes and deletes removed ones. */
   async flush() {
     if (this.dropped.size)
-      await this.client.query(
-        `DELETE FROM ${this.table} n USING unnest($2::bigint[]) k(id) WHERE n.timeline_id=$1 AND n.id=k.id`,
-        [this.owner, [...this.dropped]],
+      await removeRows(
+        this.client,
+        this.timeline,
+        this.rows,
+        this.table,
+        ['bigint'],
+        [[...this.dropped]],
       );
     const rows = [...this.dirty].map((nodeId) =>
       this.spec.encode(this.owner, this.nodes.get(nodeId)),
