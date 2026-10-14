@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
+import { indexReader, lineageOf } from '../server/index-versions.mjs';
 import { PostgresStore, applyPatch } from '../server/store.mjs';
 import { Versioning } from '../server/versioning.mjs';
 import { pruneHistory } from '../server/retention.mjs';
@@ -94,10 +95,13 @@ async function rowChanges(from, to) {
   return changes;
 }
 /**
- * A copy's index is its source's, row for row (copied in the database, not rebuilt; only the
- * clock that wrote each row differs): every index table and the timeline's own index columns.
+ * A copy's index is its source's, row for row (read through to it, or past four levels
+ * copied in the database, not rebuilt; only the clock that wrote each row differs): every
+ * index table as each timeline sees it, and the timeline's own index columns.
  */
 async function sameIndex(source, copy) {
+  const reader = async (id) => indexReader(pool, await lineageOf(pool, id));
+  const [a, b] = [await reader(source), await reader(copy)];
   for (const table of [
     'oc_moments',
     'oc_nodes',
@@ -106,20 +110,20 @@ async function sameIndex(source, copy) {
     'oc_relationships',
     'oc_entity_search',
   ]) {
-    const rows = (id) =>
-      `SELECT to_jsonb(x)-'timeline_id'-'since' AS row FROM ${table} x WHERE timeline_id='${id}'`;
+    const rows = (read, id) =>
+      `SELECT to_jsonb(x)-'timeline_id'-'since'-'hidden' AS row FROM ${read(table, `'${id}'::uuid`)} x`;
     const { rows: differing } = await pool.query(
-      `(${rows(source)} EXCEPT ${rows(copy)}) UNION ALL (${rows(copy)} EXCEPT ${rows(source)})`,
+      `(${rows(a, source)} EXCEPT ${rows(b, copy)}) UNION ALL (${rows(b, copy)} EXCEPT ${rows(a, source)})`,
     );
     assert.equal(differing.length, 0, `${table} copied row for row`);
     assert(
-      Number(
-        (await pool.query(`SELECT count(*) AS n FROM ${table} WHERE timeline_id=$1`, [copy]))
-          .rows[0].n,
-      ) > 0 || table === 'oc_relationships',
+      Number((await pool.query(`SELECT count(*) AS n FROM (${rows(b, copy)}) x`)).rows[0].n) > 0 ||
+        table === 'oc_relationships',
       `${table} has rows`,
     );
   }
+  // Catalogue text left stale by a save is copied as it is, and both catch up after.
+  await store.idle();
   const columns =
     'title,description,presentation,plugins,tags,assets,root,event_count,duration_root,edge_root,index_version,search_version,event_text,storage_bytes';
   const { rows } = await pool.query(

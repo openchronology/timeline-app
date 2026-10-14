@@ -23,7 +23,13 @@ import { randomUUID } from 'node:crypto';
 import { indexedNodes } from './tree.mjs';
 import { MOMENT_TREE, INTERVAL_TREE, intervalPayload, upsertRows } from './avl.mjs';
 import { applyIncrementally, incremental } from './incremental.mjs';
-import { beginIndexWrite, VERSIONED_TABLES } from './index-versions.mjs';
+import {
+  beginIndexWrite,
+  indexReader,
+  lineageOf,
+  INDEX_LEVELS,
+  VERSIONED_TABLES,
+} from './index-versions.mjs';
 import {
   recordHistory,
   recordDetached,
@@ -78,18 +84,20 @@ function timelineColumns(client) {
     });
   return columnList;
 }
-/** Every moment of a timeline (or view) in index order: time, then ID. */
-async function allEvents(client, table, id) {
-  const { rows } = await client.query(
-    `SELECT event FROM ${table} WHERE timeline_id=$1 ORDER BY time,id COLLATE "C"`,
+/** Every moment of a timeline (read by `rows`, its indexReader) in index order: time, then ID. */
+async function allEvents(client, rows, id) {
+  const { rows: events } = await client.query(
+    `SELECT event FROM ${rows('oc_moments', '$1', { scan: true })} x ORDER BY time,id COLLATE "C"`,
     [id],
   );
-  return rows.map((r) => r.event);
+  return events.map((r) => r.event);
 }
 /** The tables holding a timeline's index (what copyIndex copies). */
 const INDEX_TABLES = VERSIONED_TABLES;
-/** The same tables, whose statistics large writes leave behind. */
-const LIVE_TABLES = INDEX_TABLES.join(',');
+/** Their retired versions (index-versions.mjs). */
+const RETIRED_TABLES = INDEX_TABLES.map((table) => table + '_retired');
+/** The tables whose statistics large writes leave behind. */
+const ANALYZED_TABLES = [...INDEX_TABLES, ...RETIRED_TABLES];
 /** The timeline's own columns that describe its index (as replace writes them). */
 const TIMELINE_INDEX = [
   'title',
@@ -141,6 +149,12 @@ const COPY_PAGE = 50000;
 const PREPARE_AFTER = 20000;
 /** How many moments and durations written in one go make their statistics worth refreshing. */
 const ANALYZE_AFTER = 20000;
+/**
+ * How many index rows retired, or entities a fork changed, in one transaction make the
+ * statistics worth refreshing. Until they count a timeline's retired rows or a fork's own,
+ * a lookup by key can take any index that starts with the timeline and read all of them.
+ */
+const ANALYZE_VERSIONS_AFTER = 1000;
 export class PostgresStore {
   /** `compareLimits` caps saved comparisons by their owner's account (limits.mjs). */
   constructor(pool, { compareLimits = null } = {}) {
@@ -218,19 +232,45 @@ export class PostgresStore {
     };
   }
   /**
-   * How many moments and durations timeline `from`'s index holds, if it can be copied as it
-   * stands (copyIndex): null for a comparison (its sources are checked for the new owner when
-   * rebuilt) or an index a startup repair still has to rebuild.
+   * How many moments and durations timeline `from`'s index holds, if it can be copied or
+   * shared as it stands (copyIndex, shareIndex): null for a comparison (its sources are
+   * checked for the new owner when rebuilt) or an index a startup repair still has to rebuild.
    */
   async copyable(client, from) {
-    const { rows } = await client.query(
-      `SELECT event_count+(SELECT count(*) FROM oc_duration_nodes WHERE timeline_id=$1) AS entities
+    const rows = await indexReader(client, await lineageOf(client, from));
+    const { rows: found } = await client.query(
+      `SELECT event_count+coalesce((SELECT n.subtree_count
+        FROM ${rows.lookup('oc_duration_nodes', ['t.duration_root'])} n),0) AS entities
       FROM oc_timelines t WHERE id=$1 AND comparison IS NULL AND index_version>=2 AND search_version>=1
-      AND NOT EXISTS(SELECT 1 FROM oc_duration_nodes n WHERE n.timeline_id=t.id
-        AND (n.definition IS NULL OR n.max_first IS NULL))`,
+      AND NOT EXISTS(SELECT 1 FROM ${rows('oc_duration_nodes', '$1', { scan: true })} n
+        WHERE n.definition IS NULL OR n.max_first IS NULL)`,
       [from],
     );
-    return rows[0] ? Number(rows[0].entities) : null;
+    return found[0] ? Number(found[0].entities) : null;
+  }
+  /**
+   * Gives timeline `to` (just created, empty) the index of timeline `from` as it stands by
+   * reading through to it (index-versions.mjs): `from` is pinned at its clock, so it keeps
+   * the versions `to` sees as it changes, and `to` reads `from`'s levels after it. Nothing is
+   * copied, so it is ready at once whatever its size. Charged like a copy. Returns false,
+   * doing nothing, when the index cannot be shared: it is not copyable, or `from` already
+   * reads through as many levels as a fork may (INDEX_LEVELS).
+   */
+  async shareIndex(client, from, to) {
+    if ((await this.copyable(client, from)) === null) return false;
+    const { rows } = await client.query(
+      `UPDATE oc_timelines SET index_pinned=greatest(index_pinned,index_clock)
+      WHERE id=$1 AND cardinality(index_bases)<$2 RETURNING id`,
+      [from, INDEX_LEVELS],
+    );
+    if (!rows[0]) return false;
+    await client.query(
+      `UPDATE oc_timelines t SET index_bases=array_prepend(s.id,s.index_bases),
+      index_clocks=array_prepend(s.index_clock,s.index_clocks),storage_bytes=s.storage_bytes,
+      ${TIMELINE_INDEX.map((c) => `${c}=s.${c}`)} FROM oc_timelines s WHERE t.id=$2 AND s.id=$1`,
+      [from, to],
+    );
+    return true;
   }
   /**
    * Gives timeline `to` (just created, empty) the index of timeline `from` as it stands, copied
@@ -246,15 +286,17 @@ export class PostgresStore {
       'UPDATE oc_timelines t SET storage_bytes=s.storage_bytes FROM oc_timelines s WHERE t.id=$2 AND s.id=$1',
       [from, to],
     );
-    // Its rows are written at the copy's clock, not the source's.
+    // Its rows are written at the copy's clock, not the source's; a source that reads
+    // through to others is copied as it reads.
     await beginIndexWrite(client, to);
+    const source = await indexReader(client, await lineageOf(client, from));
     for (const table of INDEX_TABLES) {
       const { columns, key } = await copiedColumns(client, table);
       let cursor = null;
       for (;;) {
         const after = cursor ? `AND (${key})>(${key.map((_, i) => `$${i + 3}`)})` : '';
         const { rows } = await client.query(
-          `WITH page AS (SELECT ${columns} FROM ${table} WHERE timeline_id=$1 ${after}
+          `WITH page AS (SELECT ${columns} FROM ${source(table, '$1', { scan: true })} x WHERE true ${after}
             ORDER BY ${key} LIMIT ${COPY_PAGE}),
           copied AS (INSERT INTO ${table}(timeline_id,${columns}) SELECT $2,${columns} FROM page)
           SELECT ${key},(SELECT count(*) FROM page) AS rows FROM page ORDER BY ${key.map((k) => k + ' DESC')} LIMIT 1`,
@@ -414,6 +456,8 @@ export class PostgresStore {
     // Index writes record the clock of their transaction (index-versions.mjs), so replace
     // runs inside one.
     await beginIndexWrite(client, id);
+    const lineage = await lineageOf(client, id);
+    const rows = await indexReader(client, lineage);
     // Reject over-quota document growth before rebuilding the rational index.
     await client.query('UPDATE oc_timelines SET storage_bytes=$2 WHERE id=$1', [
       id,
@@ -421,9 +465,14 @@ export class PostgresStore {
     ]);
     const additions = await client.query(
       `SELECT EXISTS(SELECT value FROM jsonb_array_elements_text($2::jsonb)
-        EXCEPT SELECT id FROM oc_moments WHERE timeline_id=$1) AS added`,
+        EXCEPT SELECT id FROM ${rows('oc_moments', '$1', { scan: true })} x) AS added`,
       [id, JSON.stringify(document.events.map((event) => event.id))],
     );
+    // A fork's index written whole is its own: it reads through to nothing from now on.
+    if (rows.depth)
+      await client.query("UPDATE oc_timelines SET index_bases='{}',index_clocks='{}' WHERE id=$1", [
+        id,
+      ]);
     // A timeline this large written in one go leaves the planner's statistics behind.
     if (document.events.length + (document.durations?.length ?? 0) >= ANALYZE_AFTER)
       client.analyze = true;
@@ -450,6 +499,9 @@ export class PostgresStore {
       );
     }
     const edges = await writeEdgeNodes(client, id, document);
+    // What it read through to may be deleted, and now kept for nothing.
+    if (rows.depth)
+      await client.query('SELECT oc_release_index($1::uuid[])', [lineage.index_bases]);
     // Saved state changed: derived separation views belong to the previous revision.
     await client.query('DELETE FROM oc_views WHERE timeline_id=$1', [id]);
     await client.query(
@@ -505,13 +557,20 @@ export class PostgresStore {
     const c = await this.pool.connect();
     c.afterCommit = null;
     c.analyze = false;
+    c.indexWrites = false;
     try {
       await c.query('BEGIN');
       const result = await action(c);
+      if (c.indexWrites && !c.analyze) {
+        const { rows } = await c.query(
+          "SELECT coalesce(nullif(current_setting('oc.retired',true),''),'0')::bigint AS retired",
+        );
+        if (Number(rows[0].retired) >= ANALYZE_VERSIONS_AFTER) c.analyze = RETIRED_TABLES;
+      }
       await c.query('COMMIT');
       c.afterCommit?.();
       // Before answering, so the next request plans with the written timeline counted.
-      if (c.analyze) await this.analyze();
+      if (c.analyze) await this.analyze(c.analyze === true ? undefined : c.analyze);
       return result;
     } catch (e) {
       await c.query('ROLLBACK');
@@ -581,26 +640,27 @@ export class PostgresStore {
     return entry.done;
   }
   /**
-   * Refreshes the statistics of the timelines' index tables, after a commit that wrote a large
-   * timeline in one go (replace): until then the planner counts its rows as none, so it may
-   * read a key through any index starting with the timeline and filter every row (the save
-   * path's lookups only stay one per key). ANALYZE runs after the writing transaction, which
-   * would otherwise hold its lock until committing; writes in quick succession share one more
-   * run.
+   * Refreshes the statistics of the timelines' index tables (`tables`: by default all of them
+   * and their retired versions), after a commit that wrote a large timeline in one go
+   * (replace), many versions forks read (ANALYZE_VERSIONS_AFTER), or a large save to a fork:
+   * until then the planner counts those rows as none, so it may read a key through any index
+   * starting with the timeline and filter every row (the save path's lookups only stay one
+   * per key). ANALYZE runs after the writing transaction, which would otherwise hold its lock
+   * until committing; writes in quick succession share one more run.
    */
-  analyze() {
+  analyze(tables = ANALYZED_TABLES) {
     if (this.analyzing) {
-      this.analyzing.again = true;
+      for (const table of tables) this.analyzing.next.add(table);
       return this.analyzing.done;
     }
-    const entry = { again: false };
+    const entry = { next: new Set(tables) };
     entry.done = (async () => {
       try {
-        do {
-          entry.again = false;
-          if (this.pool.ending) break;
-          await this.pool.query(`ANALYZE ${LIVE_TABLES}`);
-        } while (entry.again);
+        while (entry.next.size && !this.pool.ending) {
+          const now = [...entry.next];
+          entry.next.clear();
+          await this.pool.query(`ANALYZE ${now.join(',')}`);
+        }
       } catch (error) {
         if (!this.pool.ending) console.error('Refreshing statistics failed:', error);
       } finally {
@@ -768,6 +828,11 @@ export class PostgresStore {
       t,
       patch,
     );
+    if (
+      t.index_bases?.length &&
+      patch.changes.length + (patch.durationChanges?.length ?? 0) >= ANALYZE_VERSIONS_AFTER
+    )
+      client.analyze = true;
     const number = (BigInt(t.revision) + 1n).toString();
     const stored = await recordHistory(client, t.id, number, settings, touched);
     const revisionId = await this.recordRows(client, t.id, userId, kind, parents, {
@@ -897,10 +962,6 @@ export class PostgresStore {
         [rows.map((r) => r.snapshot_id)],
       );
     }
-    // A deleted timeline's retired index versions go with it.
-    if (!(await client.query('SELECT 1 FROM oc_timelines WHERE id=$1', [timelineId])).rows.length)
-      for (const table of VERSIONED_TABLES)
-        await client.query(`DELETE FROM ${table}_retired WHERE timeline_id=$1`, [timelineId]);
     // Versions only the removed revisions saw go with them. Once a copy's history is gone,
     // a deleted timeline it read through to may have nothing else keeping its own.
     const released = await pruneHistoryRows(client, timelineId);
@@ -915,8 +976,9 @@ export class PostgresStore {
       await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
       // A copy being prepared has metadata (without bounds), so its page can wait for it.
       const t = await this.access(id, userId, c, { preparing: true });
+      const nodes = (await indexReader(c, t))('oc_nodes');
       const { rows } = await c.query(
-        'SELECT oc_qtext(first_time) AS first,oc_qtext(last_time) AS last FROM oc_nodes WHERE timeline_id=$1 AND id=$2',
+        `SELECT oc_qtext(first_time) AS first,oc_qtext(last_time) AS last FROM ${nodes} x WHERE x.id=$2`,
         [id, t.root],
       );
       return { ...t, ...rows[0] };
@@ -945,9 +1007,10 @@ export class PostgresStore {
     return this.transaction(async (c) => {
       await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
       const t = await this.access(id, userId, c);
-      const events = await allEvents(c, 'oc_moments', id);
-      const durations = await this.durationDefinitions(c, id);
-      const relationships = await this.relationshipList(c, id);
+      const rows = await indexReader(c, t);
+      const events = await allEvents(c, rows, id);
+      const durations = await this.durationDefinitions(c, rows, id);
+      const relationships = await this.relationshipList(c, rows, id);
       return {
         timeline: t,
         document: validateDocument({
@@ -967,25 +1030,27 @@ export class PostgresStore {
       };
     });
   }
-  async relationshipList(client, id) {
-    const { rows } = await client.query(
-      'SELECT a_kind,a_id,b_kind,b_id FROM oc_relationships WHERE timeline_id=$1',
+  /** The timeline's links (read by `rows`, its indexReader). */
+  async relationshipList(client, rows, id) {
+    const { rows: links } = await client.query(
+      `SELECT a_kind,a_id,b_kind,b_id FROM ${rows('oc_relationships', '$1', { scan: true })} x`,
       [id],
     );
-    return rows.map((r) => ({ a: { [r.a_kind]: r.a_id }, b: { [r.b_kind]: r.b_id } }));
+    return links.map((r) => ({ a: { [r.a_kind]: r.a_id }, b: { [r.b_kind]: r.b_id } }));
   }
   /** Standalone duration definitions; legacy rows convert from their moments' metadata. */
-  async durationDefinitions(client, id) {
-    const { rows } = await client.query(
-      'SELECT definition FROM oc_duration_nodes WHERE timeline_id=$1 AND definition IS NOT NULL ORDER BY definition->>\'id\' COLLATE "C"',
+  async durationDefinitions(client, rows, id) {
+    const { rows: found } = await client.query(
+      `SELECT definition FROM ${rows('oc_duration_nodes', '$1', { scan: true })} x WHERE definition IS NOT NULL ORDER BY definition->>'id' COLLATE "C"`,
       [id],
     );
-    return rows.map((r) => r.definition);
+    return found.map((r) => r.definition);
   }
   async branchDocument(client, timeline) {
-    const events = await allEvents(client, 'oc_moments', timeline.id);
-    const durations = await this.durationDefinitions(client, timeline.id);
-    const relationships = await this.relationshipList(client, timeline.id);
+    const rows = await indexReader(client, timeline);
+    const events = await allEvents(client, rows, timeline.id);
+    const durations = await this.durationDefinitions(client, rows, timeline.id);
+    const relationships = await this.relationshipList(client, rows, timeline.id);
     return validateDocument({
       format: 'openchronology',
       version: 1,
@@ -1063,6 +1128,29 @@ export class PostgresStore {
         ).rows.length
       )
         throw new HttpError(409, 'The server timeline changed. Separate the tags again.');
+      // The rows of the queried tree: the view's, or the timeline's (a fork's read through).
+      const index = await indexReader(c, t);
+      const from = (name) =>
+        view ? `(SELECT * FROM ${names[name]} WHERE timeline_id=$1)` : index(names[name]);
+      /**
+       * An interval tree's nodes `table` from its root (column `root` of `roots`) down its
+       * pruned paths (`prune`, SQL on node `n`): joined by ID, or for a fork read through,
+       * looked up node by node (a join would read every node it sees at every step).
+       */
+      const walk = (table, roots, root, prune) =>
+        view || !index.depth
+          ? `WITH RECURSIVE visible AS (
+            SELECT n.* FROM ${table} n JOIN ${roots} t ON t.id=n.timeline_id AND t.${root}=n.id
+            WHERE n.timeline_id=$1 AND ${prune}
+            UNION ALL SELECT n.* FROM visible p JOIN ${table} n ON n.timeline_id=$1 AND n.id IN (p.left_id,p.right_id)
+            WHERE ${prune} AND NOT coalesce(n.max_extent<$4::mpq AND $4::mpq>'0'::mpq,false))`
+          : `WITH RECURSIVE visible AS (
+            SELECT n.* FROM ${roots} t CROSS JOIN LATERAL ${index.lookup(table, [`t.${root}`])} n
+            WHERE t.id=$1 AND ${prune}
+            UNION ALL SELECT n.* FROM visible p CROSS JOIN LATERAL unnest(ARRAY[p.left_id,p.right_id]) c(id)
+            CROSS JOIN LATERAL ${index.lookup(table, ['c.id'])} n
+            WHERE ${prune} AND NOT coalesce(n.max_extent<$4::mpq AND $4::mpq>'0'::mpq,false))`;
+      const pruned = 'n.min_time<=$3::mpq AND n.max_time>=$2::mpq';
       if (query.kind === 'overview') {
         const span = Q.parse(query.upper).sub(Q.parse(query.lower));
         const minimum = span.compare(Q.zero) > 0 ? span.div(Q.from(1024n)) : Q.zero;
@@ -1074,12 +1162,7 @@ export class PostgresStore {
         );
         // Bands are durations at least as long as the threshold; shorter ones are summarized.
         const intervals = await c.query(
-          `WITH RECURSIVE visible AS (
-          SELECT n.* FROM ${names.durations} n JOIN ${names.roots} t ON t.id=n.timeline_id AND t.duration_root=n.id
-          WHERE n.timeline_id=$1 AND n.min_time<=$3::mpq AND n.max_time>=$2::mpq
-          UNION ALL SELECT n.* FROM visible p JOIN ${names.durations} n ON n.timeline_id=$1 AND n.id IN (p.left_id,p.right_id)
-          WHERE n.min_time<=$3::mpq AND n.max_time>=$2::mpq AND NOT coalesce(n.max_extent<$4::mpq AND $4::mpq>'0'::mpq,false)
-        ) SELECT band FROM visible WHERE first_time<=$3::mpq AND last_time>=$2::mpq
+          `${walk(names.durations, names.roots, 'duration_root', pruned)} SELECT band FROM visible WHERE first_time<=$3::mpq AND last_time>=$2::mpq
           AND ($4::mpq='0'::mpq OR last_time-first_time>=$4::mpq) LIMIT 257`,
           [tree, query.lower, query.upper, threshold],
         );
@@ -1087,12 +1170,7 @@ export class PostgresStore {
         const arcs = view
           ? { rows: [] }
           : await c.query(
-              `WITH RECURSIVE visible AS (
-          SELECT n.* FROM oc_edge_nodes n JOIN oc_timelines t ON t.id=n.timeline_id AND t.edge_root=n.id
-          WHERE n.timeline_id=$1 AND n.min_time<=$3::mpq AND n.max_time>=$2::mpq
-          UNION ALL SELECT n.* FROM visible p JOIN oc_edge_nodes n ON n.timeline_id=$1 AND n.id IN (p.left_id,p.right_id)
-          WHERE n.min_time<=$3::mpq AND n.max_time>=$2::mpq AND NOT coalesce(n.max_extent<$4::mpq AND $4::mpq>'0'::mpq,false)
-        ) SELECT band FROM visible WHERE first_time<=$3::mpq AND last_time>=$2::mpq
+              `${walk('oc_edge_nodes', 'oc_timelines', 'edge_root', pruned)} SELECT band FROM visible WHERE first_time<=$3::mpq AND last_time>=$2::mpq
           AND ($4::mpq='0'::mpq OR last_time-first_time>=$4::mpq) LIMIT 257`,
               [id, query.lower, query.upper, threshold],
             );
@@ -1140,10 +1218,10 @@ export class PostgresStore {
         // Direct links from both ends, joined to search rows for titles and times.
         const { rows } = await c.query(
           `WITH links AS (
-            SELECT b_kind AS kind,b_id AS id FROM oc_relationships WHERE timeline_id=$1 AND a_kind=$2 AND a_id=$3
-            UNION SELECT a_kind,a_id FROM oc_relationships WHERE timeline_id=$1 AND b_kind=$2 AND b_id=$3)
+            SELECT b_kind AS kind,b_id AS id FROM ${index('oc_relationships')} r WHERE a_kind=$2 AND a_id=$3
+            UNION SELECT a_kind,a_id FROM ${index('oc_relationships')} r WHERE b_kind=$2 AND b_id=$3)
           SELECT l.kind,l.id,oc_qtext(s.first_time) AS first,oc_qtext(s.last_time) AS last,s.title
-          FROM links l JOIN oc_entity_search s ON s.timeline_id=$1 AND s.kind=l.kind AND s.entity_id=l.id
+          FROM links l JOIN ${index('oc_entity_search')} s ON s.kind=l.kind AND s.entity_id=l.id
           WHERE ($4::text IS NULL OR (l.kind,l.id COLLATE "C")>($4,$5 COLLATE "C"))
           ORDER BY l.kind,l.id COLLATE "C" LIMIT $6`,
           [
@@ -1164,10 +1242,10 @@ export class PostgresStore {
               SELECT $2::text,$3::text
               UNION SELECT CASE WHEN r.a_kind=x.kind AND r.a_id=x.id THEN r.b_kind ELSE r.a_kind END,
                            CASE WHEN r.a_kind=x.kind AND r.a_id=x.id THEN r.b_id ELSE r.a_id END
-              FROM reach x JOIN oc_relationships r ON r.timeline_id=$1
-                AND ((r.a_kind=x.kind AND r.a_id=x.id) OR (r.b_kind=x.kind AND r.b_id=x.id)))
+              FROM reach x JOIN ${index('oc_relationships')} r
+                ON (r.a_kind=x.kind AND r.a_id=x.id) OR (r.b_kind=x.kind AND r.b_id=x.id))
             SELECT count(*)-1 AS count,
-              (SELECT count(*) FROM oc_relationships WHERE timeline_id=$1 AND ((a_kind=$2 AND a_id=$3) OR (b_kind=$2 AND b_id=$3))) AS direct
+              (SELECT count(*) FROM ${index('oc_relationships')} r WHERE (a_kind=$2 AND a_id=$3) OR (b_kind=$2 AND b_id=$3)) AS direct
             FROM reach`,
             [id, query.entity.kind, query.entity.id],
           );
@@ -1189,8 +1267,10 @@ export class PostgresStore {
       }
       if (query.kind === 'tags') {
         const { rows } = await c.query(
-          `SELECT tag,count(*) AS count FROM oc_entity_search,unnest(tags) AS tag
-          WHERE timeline_id=$1 GROUP BY tag ORDER BY count(*) DESC,tag COLLATE "C" LIMIT 200`,
+          // Entities with the same tags are counted together, then each tag of those.
+          `SELECT tag,sum(g.n)::bigint AS count FROM (SELECT s.tags,count(*) AS n
+            FROM ${index('oc_entity_search', '$1', { scan: true })} s GROUP BY s.tags) g,unnest(g.tags) AS tag
+          GROUP BY tag ORDER BY sum(g.n) DESC,tag COLLATE "C" LIMIT 200`,
           [id],
         );
         return {
@@ -1206,8 +1286,8 @@ export class PostgresStore {
         const tsquery = terms.map((term) => term + ':*').join(' & ');
         const { rows } = await c.query(
           `SELECT kind,entity_id,oc_qtext(first_time) AS first,oc_qtext(last_time) AS last,title,left(body,300) AS body,count(*) OVER() AS total
-          FROM oc_entity_search, to_tsquery('simple',$2) AS q
-          WHERE timeline_id=$1 AND document @@ q AND ($5::text IS NULL OR kind=$5)
+          FROM ${index('oc_entity_search', '$1', { scan: true })} s, to_tsquery('simple',$2) AS q
+          WHERE document @@ q AND ($5::text IS NULL OR kind=$5)
           ORDER BY ts_rank(document,q) DESC,first_time,kind,entity_id COLLATE "C" LIMIT $3 OFFSET $4`,
           [id, tsquery, SEARCH_PAGE_SIZE, (query.page - 1) * SEARCH_PAGE_SIZE, query.only ?? null],
         );
@@ -1228,8 +1308,8 @@ export class PostgresStore {
       if (query.kind === 'durations') {
         // Durations wholly inside a summary, in start order with an exact (start, ID) cursor.
         const { rows } = await c.query(
-          `SELECT band,oc_qtext(first_time) AS first FROM ${names.durations}
-          WHERE timeline_id=$1 AND first_time>=$2::mpq AND last_time<=$3::mpq
+          `SELECT band,oc_qtext(first_time) AS first FROM ${from('durations')} x
+          WHERE first_time>=$2::mpq AND last_time<=$3::mpq
           AND ($4::mpq IS NULL OR first_time>$4::mpq OR (first_time=$4::mpq AND band->>'id' COLLATE "C">$5))
           ORDER BY first_time,band->>'id' COLLATE "C" LIMIT $6`,
           [
@@ -1253,7 +1333,7 @@ export class PostgresStore {
       }
       if (query.kind === 'duration') {
         const { rows } = await c.query(
-          "SELECT definition,band FROM oc_duration_nodes WHERE timeline_id=$1 AND band->>'id'=$2 AND definition IS NOT NULL LIMIT 1",
+          `SELECT definition,band FROM ${index('oc_duration_nodes')} x WHERE band->>'id'=$2 AND definition IS NOT NULL LIMIT 1`,
           [id, query.id],
         );
         return {
@@ -1264,15 +1344,15 @@ export class PostgresStore {
       }
       // A moment by its ID alone, for links to it.
       if (query.kind === 'moment') {
-        const { rows } = await c.query(
-          `SELECT event FROM ${names.moments} WHERE timeline_id=$1 AND id=$2`,
-          [tree, query.id],
-        );
+        const { rows } = await c.query(`SELECT event FROM ${from('moments')} x WHERE id=$2`, [
+          tree,
+          query.id,
+        ]);
         return { event: rows[0]?.event ?? null, revision: t.revision };
       }
       if (query.id) {
         const { rows } = await c.query(
-          `SELECT event FROM ${names.moments} WHERE timeline_id=$1 AND id=$3 AND time=$2::mpq`,
+          `SELECT event FROM ${from('moments')} x WHERE id=$3 AND time=$2::mpq`,
           [tree, query.lower, query.id],
         );
         return { events: rows.map((r) => r.event), next: null, revision: t.revision };

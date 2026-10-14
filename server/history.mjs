@@ -20,6 +20,7 @@
  * a copy reads through each level in turn, up to SHARED_LEVELS levels.
  */
 import { validateDocument } from '../dist/core.mjs';
+import { indexReader, lineageOf } from './index-versions.mjs';
 
 /** How many entities one statement compares: no statement grows with the timeline. */
 const PAGE = 20000;
@@ -30,7 +31,8 @@ const CURRENT = '9223372036854775807';
 const LINK = ['a_kind', 'a_id', 'b_kind', 'b_id'];
 /**
  * Each kind of entity: its history table, its key, its stored value, and its live rows (the
- * saved timeline's index) as the same columns, with the expressions that key them.
+ * saved timeline's index, as read by its indexReader `index`) as the same columns, with the
+ * expressions that key them.
  */
 const KINDS = {
   moments: {
@@ -39,7 +41,8 @@ const KINDS = {
     values: ['time', 'event'],
     types: ['mpq', 'jsonb'],
     same: 'event',
-    live: 'SELECT id,time,event FROM oc_moments WHERE timeline_id=$1',
+    live: (index, scan) =>
+      `SELECT id,time,event FROM ${index('oc_moments', '$1', { scan })} x WHERE true`,
     liveKey: ['id'],
     bytes: 'octet_length(event::text)',
     overrides: 'oc_history_moment_overrides',
@@ -51,7 +54,8 @@ const KINDS = {
     values: ['definition'],
     types: ['jsonb'],
     same: 'definition',
-    live: "SELECT band->>'id' AS id,definition FROM oc_duration_nodes WHERE timeline_id=$1 AND definition IS NOT NULL",
+    live: (index, scan) =>
+      `SELECT band->>'id' AS id,definition FROM ${index('oc_duration_nodes', '$1', { scan })} x WHERE definition IS NOT NULL`,
     liveKey: ["band->>'id'"],
     bytes: 'octet_length(definition::text)',
     overrides: 'oc_history_duration_overrides',
@@ -63,7 +67,8 @@ const KINDS = {
     values: [],
     types: [],
     same: null,
-    live: `SELECT ${LINK} FROM oc_relationships WHERE timeline_id=$1`,
+    live: (index, scan) =>
+      `SELECT ${LINK} FROM ${index('oc_relationships', '$1', { scan })} x WHERE true`,
     liveKey: LINK,
     bytes: 'octet_length(a_id)+octet_length(b_id)+32',
     overrides: 'oc_history_relationship_overrides',
@@ -78,8 +83,8 @@ const columns = (alias, names) => names.map((name) => `${alias}.${name}`).join('
  * right after a timeline is written (a fork, an import) its statistics can still count the
  * timeline's live rows as none, so the join would read all of them for every key.
  */
-const liveAt = (kind, alias) =>
-  `(${kind.live} AND (${kind.liveKey})=(${columns(alias, kind.key)})${fence(kind)})`;
+const liveAt = (kind, alias, index) =>
+  `(${kind.live(index)} AND (${kind.liveKey})=(${columns(alias, kind.key)})${fence(kind)})`;
 /** Keeps a subquery a lookup per key, unless the kind's live rows have current statistics. */
 const fence = (kind) => (kind.analyzed ? '' : ' OFFSET 0');
 
@@ -115,14 +120,17 @@ export async function recordHistory(client, timelineId, number, settings, touche
 /** Records the entities of `kinds` (see recordHistory); returns the bytes written. */
 async function recordEntities(client, kinds, timelineId, number, starting, touched) {
   const levels = await lineage(client, timelineId, CURRENT);
+  // A timeline's live rows, read through as a fork's are (staged rows are their own).
+  const index =
+    kinds === KINDS ? await indexReader(client, await lineageOf(client, timelineId)) : null;
   let bytes = 0,
     written = 0;
   for (const [name, kind] of Object.entries(kinds)) {
     // History starting at this save copies everything, not only what the save changed.
     const keys = starting ? null : touched?.[name];
     const result = keys
-      ? await recordKeys(client, kind, timelineId, number, keys.map(keyOf(kind)), levels)
-      : await recordAll(client, kind, timelineId, number, starting, levels);
+      ? await recordKeys(client, kind, timelineId, number, keys.map(keyOf(kind)), levels, index)
+      : await recordAll(client, kind, timelineId, number, starting, levels, index);
     bytes += result.bytes;
     written += result.count;
   }
@@ -177,7 +185,7 @@ const STAGED_KINDS = Object.fromEntries(
       name,
       {
         ...kind,
-        live: `SELECT ${staged} FROM ${STAGED[name].table} WHERE timeline_id=$1`,
+        live: () => `SELECT ${staged} FROM ${STAGED[name].table} WHERE timeline_id=$1`,
         liveKey: kind.key,
         // Staged rows are analyzed once staged (recordDetached), so plans may join them.
         analyzed: true,
@@ -361,7 +369,7 @@ async function recordSettings(client, timelineId, number, settings) {
  * a copy, an entity it has not saved before and that now differs from what it reads through
  * to (`levels`) gets an override first: from here on, the copy keeps its own versions.
  */
-async function recordKeys(client, kind, timelineId, number, keys, levels) {
+async function recordKeys(client, kind, timelineId, number, keys, levels, index) {
   const copy = levels.length > 1;
   let bytes = 0,
     count = 0;
@@ -375,7 +383,7 @@ async function recordKeys(client, kind, timelineId, number, keys, levels) {
     await client.query(
       `WITH ${k} UPDATE ${kind.table} h SET until=$2 FROM k
       WHERE h.timeline_id=$1 AND h.until IS NULL AND ${key('h')}=${key('k')}
-      AND NOT EXISTS(SELECT 1 FROM ${liveAt(kind, 'h')} l
+      AND NOT EXISTS(SELECT 1 FROM ${liveAt(kind, 'h', index)} l
         ${kind.same ? `WHERE l.${kind.same}=h.${kind.same}` : ''})`,
       params,
     );
@@ -387,7 +395,7 @@ async function recordKeys(client, kind, timelineId, number, keys, levels) {
         `WITH ${k},added AS (
           INSERT INTO ${kind.overrides}(timeline_id,${kind.key},since)
           SELECT $1,${columns('k', kind.key)},$2 FROM k
-          LEFT JOIN LATERAL ${liveAt(kind, 'k')} l ON true
+          LEFT JOIN LATERAL ${liveAt(kind, 'k', index)} l ON true
           LEFT JOIN LATERAL (${inherited}${fence(kind)}) i ON true
           WHERE NOT EXISTS(${own('k')}) AND (${present('l')}<>${present('i')}
             ${kind.same ? `OR l.${kind.same} IS DISTINCT FROM i.${kind.same}` : ''})
@@ -401,7 +409,7 @@ async function recordKeys(client, kind, timelineId, number, keys, levels) {
       `WITH ${k},added AS (
         INSERT INTO ${kind.table}(timeline_id,${kind.key},since${kind.values.map((v) => ',' + v).join('')})
         SELECT $1,${columns('l', kind.key)},$2${kind.values.map((v) => ',l.' + v).join('')}
-        FROM k CROSS JOIN LATERAL ${liveAt(kind, 'k')} l
+        FROM k CROSS JOIN LATERAL ${liveAt(kind, 'k', index)} l
         WHERE NOT EXISTS(SELECT 1 FROM ${kind.table} h WHERE h.timeline_id=$1 AND h.until IS NULL
           AND ${key('h')}=${key('k')}) ${copy ? `AND EXISTS(${own('k')})` : ''}
         RETURNING ${kind.bytes} AS bytes
@@ -420,14 +428,14 @@ async function recordKeys(client, kind, timelineId, number, keys, levels) {
  * entities are copied as they are, without looking for versions the planner cannot yet
  * estimate.
  */
-async function recordAll(client, kind, timelineId, number, starting, levels) {
+async function recordAll(client, kind, timelineId, number, starting, levels, index) {
   const total = { bytes: 0, count: 0 };
   const key = (alias) => `(${columns(alias, kind.key)})`;
   const after = (alias, cursor) =>
     cursor ? `AND ${key(alias)}>(${kind.key.map((_, c) => `$${c + 2}`)})` : '';
   const pages = [
     (cursor) =>
-      `SELECT ${columns('l', kind.key)} FROM (${kind.live}) l WHERE true ${after('l', cursor)}
+      `SELECT ${columns('l', kind.key)} FROM (${kind.live(index, true)}) l WHERE true ${after('l', cursor)}
       ORDER BY ${kind.key} LIMIT ${PAGE}`,
     ...(starting
       ? []
@@ -435,7 +443,7 @@ async function recordAll(client, kind, timelineId, number, starting, levels) {
           ([id, n]) =>
             (cursor) =>
               `SELECT ${columns('h', kind.key)} FROM ${kind.table} h WHERE ${seen('h', [id, n])}
-              AND NOT EXISTS(SELECT 1 FROM (${kind.live}) l WHERE ${key('l')}=${key('h')})
+              AND NOT EXISTS(SELECT 1 FROM (${kind.live(index, true)}) l WHERE ${key('l')}=${key('h')})
               ${after('h', cursor)} ORDER BY ${kind.key} LIMIT ${PAGE}`,
         )),
   ];
@@ -446,8 +454,8 @@ async function recordAll(client, kind, timelineId, number, starting, levels) {
       if (!rows.length) break;
       const keys = rows.map((row) => kind.key.map((column) => row[column]));
       const result = starting
-        ? await copyKeys(client, kind, timelineId, number, keys)
-        : await recordKeys(client, kind, timelineId, number, keys, levels);
+        ? await copyKeys(client, kind, timelineId, number, keys, index)
+        : await recordKeys(client, kind, timelineId, number, keys, levels, index);
       total.bytes += result.bytes;
       total.count += result.count;
       if (rows.length < PAGE) break;
@@ -457,13 +465,13 @@ async function recordAll(client, kind, timelineId, number, starting, levels) {
   return total;
 }
 /** Live entities as their first versions. */
-async function copyKeys(client, kind, timelineId, number, keys) {
+async function copyKeys(client, kind, timelineId, number, keys, index) {
   const { rows } = await client.query(
     `WITH added AS (
       INSERT INTO ${kind.table}(timeline_id,${kind.key},since${kind.values.map((v) => ',' + v).join('')})
       SELECT $1,${columns('l', kind.key)},$2${kind.values.map((v) => ',l.' + v).join('')}
       FROM unnest(${kind.key.map((_, c) => `$${c + 3}::text[]`)}) AS k(${kind.key})
-      CROSS JOIN LATERAL ${liveAt(kind, 'k')} l
+      CROSS JOIN LATERAL ${liveAt(kind, 'k', index)} l
       RETURNING ${kind.bytes} AS bytes
     ) SELECT coalesce(sum(bytes),0) AS bytes,count(*) AS count FROM added`,
     [timelineId, number, ...kind.key.map((_, c) => keys.map((key) => key[c]))],
