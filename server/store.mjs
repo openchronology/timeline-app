@@ -145,6 +145,12 @@ async function copiedColumns(client, table) {
 }
 /** Rows copied per statement, so no statement grows with the timeline. */
 const COPY_PAGE = 50000;
+/**
+ * The share of what a fork reads that it must have rewritten (its own moment rows, against
+ * its moments) for it to be compacted: copying the rest is then cheaper than reading
+ * through to it, and it releases the versions its levels keep for it.
+ */
+const COMPACT_SHARE = 0.5;
 /** How many moments and durations make a copy worth preparing after answering. */
 const PREPARE_AFTER = 20000;
 /** How many moments and durations written in one go make their statistics worth refreshing. */
@@ -420,6 +426,80 @@ export class PostgresStore {
     );
     return true;
   }
+  /**
+   * Compacts fork `id` in the background once it has rewritten most of what it reads
+   * (COMPACT_SHARE), or whatever it has when `force`: it then holds its whole index, reads
+   * through to nothing, and releases the versions its levels keep for it (oc_release_index).
+   * Checked after its saves; one compaction of a timeline at a time. Resolves when done.
+   */
+  compact(id, { force = false } = {}) {
+    this.compacting ??= new Map();
+    if (!this.compacting.has(id))
+      this.compacting.set(
+        id,
+        (async () => {
+          if (!force && !(await this.diverged(id))) return;
+          while (!(await this.compactStep(id)));
+        })()
+          .catch((error) => {
+            if (!this.pool.ending) console.error('Compacting a fork failed:', error);
+          })
+          .finally(() => this.compacting.delete(id)),
+      );
+    return this.compacting.get(id);
+  }
+  /** Whether fork `id` has rewritten at least COMPACT_SHARE of what it reads. */
+  async diverged(id) {
+    const { rows } = await this.pool.query(
+      "SELECT event_count FROM oc_timelines WHERE id=$1 AND index_bases<>'{}'",
+      [id],
+    );
+    if (!rows[0]) return false;
+    const enough = Math.max(1, Math.ceil(Number(rows[0].event_count) * COMPACT_SHARE));
+    // Counted up to what is enough, so a fork with few rows of its own costs little.
+    const { rows: own } = await this.pool.query(
+      'SELECT count(*) AS n FROM (SELECT 1 FROM oc_moments WHERE timeline_id=$1 LIMIT $2) x',
+      [id, enough],
+    );
+    return Number(own[0].n) >= enough;
+  }
+  /**
+   * One step of compacting fork `id`, in a transaction of its own (the fork is locked only
+   * that long): a page of the rows it reads through to, per table, copied into rows of its
+   * own. They are the same rows, so it reads the same meanwhile, and the next step reads
+   * through to the rest only. Once none is left, its hidden rows and its lineage go and what
+   * it read is released. Returns whether it is done.
+   */
+  async compactStep(id) {
+    return this.transaction(async (c) => {
+      const { rows } = await c.query(
+        'SELECT id,index_bases,index_clocks FROM oc_timelines WHERE id=$1 FOR UPDATE',
+        [id],
+      );
+      if (!rows[0]?.index_bases.length) return true;
+      await beginIndexWrite(c, id);
+      const index = await indexReader(c, rows[0]);
+      for (const table of INDEX_TABLES) {
+        const { columns } = await copiedColumns(c, table);
+        const { rowCount } = await c.query(
+          `INSERT INTO ${table}(timeline_id,${columns}) SELECT $1,${columns}
+          FROM ${index(table)} x WHERE x.timeline_id<>$1 LIMIT ${this.compactPage ?? COPY_PAGE}`,
+          [id],
+        );
+        if (rowCount) return false;
+      }
+      for (const table of INDEX_TABLES)
+        await c.query(`DELETE FROM ${table} WHERE timeline_id=$1 AND hidden`, [id]);
+      await c.query("UPDATE oc_timelines SET index_bases='{}',index_clocks='{}' WHERE id=$1", [id]);
+      await c.query('SELECT oc_release_index($1::uuid[],$2::bigint[])', [
+        rows[0].index_bases,
+        rows[0].index_clocks,
+      ]);
+      // Its own rows are now all of it, which the statistics have yet to count.
+      c.analyze = true;
+      return true;
+    });
+  }
   /** Prepares, one at a time, copies left unprepared (for example by a restart). */
   async prepareStale() {
     const { rows } = await this.pool.query(
@@ -501,7 +581,10 @@ export class PostgresStore {
     const edges = await writeEdgeNodes(client, id, document);
     // What it read through to may be deleted, and now kept for nothing.
     if (rows.depth)
-      await client.query('SELECT oc_release_index($1::uuid[])', [lineage.index_bases]);
+      await client.query('SELECT oc_release_index($1::uuid[],$2::bigint[])', [
+        lineage.index_bases,
+        lineage.index_clocks,
+      ]);
     // Saved state changed: derived separation views belong to the previous revision.
     await client.query('DELETE FROM oc_views WHERE timeline_id=$1', [id]);
     await client.query(
@@ -558,6 +641,7 @@ export class PostgresStore {
     c.afterCommit = null;
     c.analyze = false;
     c.indexWrites = false;
+    c.compact = null;
     try {
       await c.query('BEGIN');
       const result = await action(c);
@@ -569,6 +653,7 @@ export class PostgresStore {
       }
       await c.query('COMMIT');
       c.afterCommit?.();
+      if (c.compact) this.compact(c.compact);
       // Before answering, so the next request plans with the written timeline counted.
       if (c.analyze) await this.analyze(c.analyze === true ? undefined : c.analyze);
       return result;
@@ -678,10 +763,11 @@ export class PostgresStore {
   }
   /** Resolves once no catalogue refresh is pending. */
   async idle() {
-    while (this.refreshing?.size || this.analyzing || this.preparing?.size)
+    while (this.refreshing?.size || this.analyzing || this.preparing?.size || this.compacting?.size)
       await Promise.all([
         ...[...(this.refreshing?.values() ?? [])].map((e) => e.done),
         ...(this.preparing?.values() ?? []),
+        ...(this.compacting?.values() ?? []),
         this.analyzing?.done,
       ]);
   }
@@ -828,11 +914,12 @@ export class PostgresStore {
       t,
       patch,
     );
-    if (
-      t.index_bases?.length &&
-      patch.changes.length + (patch.durationChanges?.length ?? 0) >= ANALYZE_VERSIONS_AFTER
-    )
-      client.analyze = true;
+    if (t.index_bases?.length) {
+      if (patch.changes.length + (patch.durationChanges?.length ?? 0) >= ANALYZE_VERSIONS_AFTER)
+        client.analyze = true;
+      // A fork that has rewritten most of what it reads is compacted (see compact).
+      client.compact = t.id;
+    }
     const number = (BigInt(t.revision) + 1n).toString();
     const stored = await recordHistory(client, t.id, number, settings, touched);
     const revisionId = await this.recordRows(client, t.id, userId, kind, parents, {
@@ -1517,6 +1604,20 @@ export async function convertLegacyDurations(client) {
     await store.replace(client, timeline.id, await store.branchDocument(client, timeline), {
       touch: false,
     });
+  return rows.length;
+}
+/**
+ * Releases the versions and pins nothing reads any more (oc_release_index), one timeline
+ * at a time: earlier versions kept them after a fork was deleted. Returns how many
+ * timelines it looked at.
+ */
+export async function releaseIndexes(client) {
+  const { rows } = await client.query(
+    `SELECT id FROM oc_timelines WHERE index_pinned IS NOT NULL
+    UNION SELECT DISTINCT b FROM oc_timelines t,unnest(t.index_bases) b
+    WHERE NOT EXISTS(SELECT 1 FROM oc_timelines s WHERE s.id=b)`,
+  );
+  for (const { id } of rows) await client.query('SELECT oc_release_index(ARRAY[$1::uuid])', [id]);
   return rows.length;
 }
 /** Rebuilds indexes stored before persistent AVL trees (index_version 2). */

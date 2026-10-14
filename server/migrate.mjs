@@ -2,7 +2,12 @@
 import pg from 'pg';
 import { bootstrapInstallation } from './administration.mjs';
 import { readFile } from 'node:fs/promises';
-import { convertLegacyDurations, backfillEntitySearch, rebuildIndexes } from './store.mjs';
+import {
+  convertLegacyDurations,
+  backfillEntitySearch,
+  rebuildIndexes,
+  releaseIndexes,
+} from './store.mjs';
 import { loadConfiguration } from './env-file.mjs';
 import { startHistory } from './history.mjs';
 // The packages pass their configuration file as OCH_CONFIG (#118).
@@ -21,6 +26,8 @@ try {
   if (indexed) console.log(`Built text search for ${indexed} timeline(s).`);
   const rebuilt = await rebuildIndexes(client);
   if (rebuilt) console.log(`Rebuilt incremental indexes for ${rebuilt} timeline(s).`);
+  // Versions forks no longer read, which earlier versions kept after a fork was deleted.
+  await releaseIndexes(client);
   // After the conversions above, so history starts from the timelines as they are now.
   const started = await startHistory(client);
   if (started) console.log(`Started saved history as rows for ${started} timeline(s).`);

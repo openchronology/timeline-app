@@ -96,7 +96,8 @@ const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
  * level's clock (the live version, or the version retired since) whose key no nearer level
  * has a version of. Its levels are written into the SQL (they are IDs and integers read from
  * the database), so it plans as written. `depth` is how many levels it reads through. A
- * query reading most of the rows, rather than looking some up, passes { scan: true }.
+ * query reading most of the rows, rather than looking some up, passes { scan: true } (in a
+ * transaction, whose hash memory this raises; see below).
  * `client` is the one to query with: a transaction's, or the pool.
  */
 export async function indexReader(client, t) {
@@ -105,9 +106,14 @@ export async function indexReader(client, t) {
   if (bases.some((b) => !uuid.test(b)) || clocks.some((c) => !/^\d+$/.test(c)))
     throw new Error('Invalid index lineage');
   const columns = bases.length ? await indexColumns(client) : null;
-  // Reading through levels looks costly enough to the planner to compile its queries (JIT),
-  // which takes far longer than running them: not for the rest of this transaction.
-  if (bases.length && typeof client.release === 'function') await client.query('SET LOCAL jit=off');
+  // For the rest of this transaction: reading through levels looks costly enough to the
+  // planner to compile its queries (JIT), which takes far longer than running them; and a
+  // scan hashes the keys of nearer levels, which the planner otherwise does only while it
+  // expects them to fit in work_mem, beyond that comparing every row with all of them.
+  if (bases.length && typeof client.release === 'function')
+    await client.query(
+      "SELECT set_config('jit','off',true),set_config('hash_mem_multiplier','64',true)",
+    );
   const rows = (table, tid = '$1', { scan = false } = {}) => {
     if (!bases.length) return `(SELECT * FROM ${table} WHERE timeline_id=${tid})`;
     const names = columns[table].names.map((c) => 'x.' + c).join(',');

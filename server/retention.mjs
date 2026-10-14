@@ -77,12 +77,12 @@ export async function deleteWhere(
   const index = await indexReader(store.pool, t);
   const [moments, durations] = await Promise.all([
     store.pool.query(
-      `SELECT id FROM ${index('oc_moments', '$1', { scan: true })} x WHERE ($2::mpq IS NULL OR time>=$2::mpq)
+      `SELECT id FROM ${index('oc_moments')} x WHERE ($2::mpq IS NULL OR time>=$2::mpq)
       AND ($3::mpq IS NULL OR time<=$3::mpq) AND ($4::mpq IS NULL OR time<$4::mpq) LIMIT $5`,
       [t.id, lower, upper, before, BATCH],
     ),
     store.pool.query(
-      `SELECT DISTINCT band->>'id' AS id FROM ${index('oc_duration_nodes', '$1', { scan: true })} x
+      `SELECT DISTINCT band->>'id' AS id FROM ${index('oc_duration_nodes')} x
       WHERE definition IS NOT NULL AND ($2::mpq IS NULL OR (band->>'first')::mpq>=$2::mpq)
       AND ($3::mpq IS NULL OR (band->>'last')::mpq<=$3::mpq)
       AND ($4::mpq IS NULL OR (band->>'last')::mpq<$4::mpq)`,
