@@ -427,6 +427,11 @@ test('batches grow with the timeline, and the estimate follows the server', () =
     Math.round(5e6 * 1.1 + 1e5 * 2.1),
   );
   assert.equal(estimate({ count: 100000, bytes: 5e6, history: false }, []), 0);
+  // One that keeps no saved history is charged only its growth.
+  assert.equal(
+    estimate({ count: 100000, bytes: 5e6, history: false, keepHistory: false }, [batch, batch]),
+    2e5,
+  );
 });
 
 test('progress redraws on a terminal, summarizes elsewhere, and is silent when quiet', () => {

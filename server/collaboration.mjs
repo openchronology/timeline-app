@@ -5,6 +5,12 @@ import { HttpError } from './store.mjs';
 import { validateDocument, relationshipKey } from '../dist/core.mjs';
 import { commonAncestor, lockTimelines, revisionId } from './versioning.mjs';
 import { differences } from './history.mjs';
+/** Why a timeline that keeps no saved history takes no pull requests. */
+export const PULLS_UNAVAILABLE =
+  'This timeline does not keep saved history, so it cannot take pull requests: they are reviewed and merged against saved revisions.';
+/** Why a fork that keeps no saved history cannot propose its changes. */
+export const FORK_PULLS_UNAVAILABLE =
+  'This fork does not keep saved history, so it cannot propose its changes: turn on Keep saved history in its settings first.';
 export function searchInput(value = {}) {
   if (
     !value ||
@@ -265,7 +271,9 @@ export class Collaboration {
   /**
    * What a pull request changes from its base: the settings that differ, how many moments,
    * durations and relationships it adds, removes and changes, and the first moments of each.
-   * Computed from saved history, so it costs what changed, not the timeline's size.
+   * Computed from saved history, so it costs what changed, not the timeline's size. When
+   * either revision is no longer kept (its timeline stopped keeping saved history), nothing is
+   * counted and `unavailable` says why.
    */
   async changes(baseId, sourceId) {
     const summary = {
@@ -275,12 +283,17 @@ export class Collaboration {
       relationships: { added: 0, removed: 0 },
       examples: [],
     };
-    const pages =
-      (await differences(this.pool, baseId, sourceId)) ??
-      documentDifferences(
-        await this.store.revisionDocument(this.pool, baseId),
-        await this.store.revisionDocument(this.pool, sourceId),
-      );
+    let pages = await differences(this.pool, baseId, sourceId);
+    if (!pages)
+      try {
+        pages = documentDifferences(
+          await this.store.revisionDocument(this.pool, baseId),
+          await this.store.revisionDocument(this.pool, sourceId),
+        );
+      } catch (error) {
+        if (error.status !== 409) throw error;
+        return { ...summary, unavailable: error.message };
+      }
     const shown = { added: 0, removed: 0, changed: 0 };
     for await (const page of pages)
       for (const { kind, before, after } of page) {
@@ -300,6 +313,7 @@ export class Collaboration {
   async forkInput(client, timeline, userId, input) {
     const source = await this.store.access(input.sourceTimelineId, userId, client);
     if (!source.canWrite) throw new HttpError(403, 'Write access to the source fork is required.');
+    if (!source.keep_history) throw new HttpError(409, FORK_PULLS_UNAVAILABLE);
     if (source.upstream_id !== timeline.id)
       throw new HttpError(400, 'Choose a fork of this upstream timeline.');
     const { rows } = await client.query(
@@ -322,6 +336,8 @@ export class Collaboration {
       ]);
       const t = await this.store.access(timelineId, userId, c);
       if (!t.canPropose) throw new HttpError(403, 'Contributor access is required.');
+      // A pull request is reviewed and merged against the revisions it was made from.
+      if (!t.keep_history) throw new HttpError(409, PULLS_UNAVAILABLE);
       if (!input.sourceTimelineId && t.revision !== input.baseRevision)
         throw new HttpError(
           409,

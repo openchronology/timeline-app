@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../lib/api.js';
-export default function ForkOperation({ fork, upstream, sync = false }) {
+/** `blocked`: why the operation is unavailable, if it is. */
+export default function ForkOperation({ fork, upstream, sync = false, blocked = null }) {
   const router = useRouter(),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
@@ -73,7 +74,8 @@ export default function ForkOperation({ fork, upstream, sync = false }) {
           both versions and leave your fork unchanged.
         </p>
       )}
-      <button className="primary" disabled={busy}>
+      {blocked && <p className="notice">{blocked}</p>}
+      <button className="primary" disabled={busy || !!blocked}>
         {sync ? 'Sync saved fork' : 'Open pull request'}
       </button>
       <p className="error" role="alert">

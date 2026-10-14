@@ -132,11 +132,15 @@ function response(res, status, value, headers = {}) {
   });
   res.end(JSON.stringify(value));
 }
-/** A timeline's metadata with its retention period as its display writes it. */
-async function retentionInfo(t) {
+/**
+ * A timeline's metadata with its retention period as its display writes it, and the storage
+ * turning its saved history off would free (`history_bytes`).
+ */
+async function retentionInfo(store, t) {
   return {
     ...t,
     retention: t.retention_seconds ? printRetention(t.retention_seconds, t.presentation) : null,
+    history_bytes: t.keep_history ? await store.historyBytes(store.pool, t.id) : 0,
   };
 }
 export function createRequestHandler({
@@ -1140,8 +1144,9 @@ export function createRequestHandler({
           if (
             !input ||
             Object.keys(input).some(
-              (k) => !['visibility', 'allowPrivateForks', 'retention'].includes(k),
+              (k) => !['visibility', 'allowPrivateForks', 'retention', 'keepHistory'].includes(k),
             ) ||
+            (input.keepHistory !== undefined && typeof input.keepHistory !== 'boolean') ||
             !Object.keys(input).length ||
             (input.retention !== undefined &&
               input.retention !== null &&
@@ -1151,7 +1156,7 @@ export function createRequestHandler({
           )
             throw new HttpError(
               400,
-              'Choose visibility, a private forking policy and/or a retention period.',
+              'Choose visibility, a private forking policy, a retention period and/or whether to keep saved history.',
             );
           await store.transaction(async (c) => {
             await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [id]);
@@ -1177,6 +1182,10 @@ export function createRequestHandler({
                 : input.retention === null || !input.retention.trim()
                   ? null
                   : parseRetention(input.retention, current.presentation);
+            // Saved history stops (forgetting past revisions others do not read) or starts
+            // again from the current state.
+            if (input.keepHistory === false) await store.stopHistory(c, id);
+            if (input.keepHistory === true) await store.startHistory(c, id, userId);
             await c.query(
               'UPDATE oc_timelines SET visibility=$2,allow_private_forks=$3,retention_seconds=$4,retention_applied_at=CASE WHEN retention_seconds IS DISTINCT FROM $4 THEN NULL ELSE retention_applied_at END,revision=revision+1,updated_at=now() WHERE id=$1',
               [
@@ -1187,7 +1196,7 @@ export function createRequestHandler({
               ],
             );
           });
-          return response(res, 200, await retentionInfo(await store.metadata(id, userId)));
+          return response(res, 200, await retentionInfo(store, await store.metadata(id, userId)));
         }
         if (action === 'members' && method === 'GET') {
           const { rows } = await pool.query(

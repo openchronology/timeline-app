@@ -307,10 +307,50 @@ try {
     method: 'POST',
     data: { action: 'merge', revision: forkPull.revision },
   });
+  // Its owner can stop keeping its saved history (#136): its settings say what that frees,
+  // its past checkpoints are listed but say they are not kept, and it proposes nothing.
+  assert.match(
+    await contributor.request('/timelines/' + fork.id + '/settings'),
+    /Saved history[\s\S]*Stop keeping saved history[\s\S]*freeing about/,
+  );
+  await contributor.request(forkApi + '/settings', {
+    method: 'PATCH',
+    status: 400,
+    data: { keepHistory: 'no' },
+  });
+  const quiet = await contributor.request(forkApi + '/settings', {
+    method: 'PATCH',
+    data: { keepHistory: false },
+  });
+  assert.equal(quiet.keep_history, false);
+  assert.equal(quiet.history_bytes, 0);
+  assert.match(
+    await contributor.request('/timelines/' + fork.id + '/settings'),
+    /Keep saved history from now on/,
+  );
+  assert.match(
+    await contributor.request('/timelines/' + fork.id + '/history'),
+    /doesn.{1,8}t keep saved history[\s\S]*not kept/,
+  );
+  await contributor.request(forkApi + '/history/' + firstCheckpoint, { status: 409 });
+  assert.match(
+    await contributor.request('/timelines/' + fork.id + '/history/' + firstCheckpoint),
+    /Revision not kept/,
+  );
+  assert.match(
+    await contributor.request('/timelines/' + fork.id + '/pulls/new'),
+    /does not keep saved history, so it cannot propose/,
+  );
+  const kept = await contributor.request(forkApi + '/settings', {
+    method: 'PATCH',
+    data: { keepHistory: true },
+  });
+  assert.equal(kept.keep_history, true);
+  assert.equal((await contributor.request(forkApi + '/history')).revisions[0].kind, 'baseline');
   await owner.request('/api/auth/logout', { method: 'POST', data: {} });
   assert.doesNotMatch(await owner.request('/'), /id="dashboard-mine"/);
   console.log(
-    'PASS Next.js/PostgreSQL accounts, private SSR access, public full-text search, stars, private favorites, public profiles, sorting, sharing, proposal discussion and writer-only merge.',
+    'PASS Next.js/PostgreSQL accounts, private SSR access, public full-text search, stars, private favorites, public profiles, sorting, sharing, proposal discussion, writer-only merge and optional saved history.',
   );
 } catch (e) {
   console.error(logs);

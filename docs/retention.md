@@ -42,6 +42,22 @@ The response includes `retention` (as the timeline's display writes it), `retent
 `retention_applied_at` and `retention_removed`. Only the owner sets it; API keys need the
 `timelines:write` scope.
 
+## Not keeping saved history
+
+Retention keeps saved history only within its period, but within it history is still a second
+copy of what changed. A timeline whose past revisions nobody reviews can stop keeping it
+altogether: turn off **Keep saved history** in **Sharing & settings**, or
+
+```sh
+curl -X PATCH "$OCH_API_URL/api/timelines/$ID/settings" \
+  -H "Authorization: Bearer $OCH_API_KEY" -H 'Content-Type: application/json' \
+  -d '{"keepHistory": false}'
+```
+
+Past revisions are deleted at once, apart from those forks and pull requests still use, and
+saves then keep only who saved and when. Syncing and pull requests need saved history; see
+[timelines without saved history](collaboration.md#timelines-without-saved-history).
+
 ## Deleting everything in a view
 
 Right-click (or hold) the timeline and choose **Delete everything in this view…**: it deletes

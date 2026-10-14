@@ -22,7 +22,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { indexedNodes } from './tree.mjs';
 import { MOMENT_TREE, INTERVAL_TREE, intervalPayload, upsertRows } from './avl.mjs';
-import { applyIncrementally, incremental } from './incremental.mjs';
+import { applyIncrementally, incremental, timelineSettings } from './incremental.mjs';
 import {
   beginIndexWrite,
   copyLevel,
@@ -35,6 +35,7 @@ import {
   recordHistory,
   recordDetached,
   recordDetachedPatch,
+  endHistory,
   historyDocument,
   pruneHistoryRows,
   settingsOf,
@@ -64,6 +65,24 @@ export class HttpError extends Error {
     this.status = status;
   }
 }
+/** Why a past revision of a timeline that keeps no saved history cannot be read. */
+export const HISTORY_OFF =
+  'This revision is not kept: the timeline does not keep saved history, so only its latest revision can be read.';
+/**
+ * The revisions of timeline $1 whose content others still read, with what reading them
+ * needs: those copies' history reads through to, those forks were made from or other
+ * timelines' heads are, those pull requests refer to, and the earlier revisions a patch among
+ * them is stored against. Turning saved history off keeps their content.
+ */
+const STILL_READ = `WITH RECURSIVE still_read(id) AS (
+  SELECT r.id FROM oc_revisions r WHERE r.timeline_id=$1 AND (
+    EXISTS(SELECT 1 FROM oc_history_bases b WHERE b.base_revision_id=r.id)
+    OR EXISTS(SELECT 1 FROM oc_timelines t WHERE t.fork_base_revision_id=r.id OR (t.head_revision_id=r.id AND t.id<>$1))
+    OR EXISTS(SELECT 1 FROM oc_proposals p
+      WHERE p.base_revision_id=r.id OR p.source_revision_id=r.id OR p.merged_revision_id=r.id))
+  UNION SELECT p.parent_id FROM still_read k JOIN oc_revisions c ON c.id=k.id
+    JOIN oc_revision_parents p ON p.revision_id=k.id AND p.position=0 WHERE c.patch IS NOT NULL
+)`;
 /**
  * The timeline row's columns except the catalogue search text and vector (up to a megabyte
  * each), which access checks never need. Read once per process.
@@ -741,21 +760,119 @@ export class PostgresStore {
   }
   /**
    * Records the timeline's current state (just written from `document`) as its next numbered
-   * revision, kept as rows (history.mjs).
+   * revision, kept as rows (history.mjs), or without its content when the timeline keeps no
+   * saved history.
    */
   async checkpoint(client, id, userId, document, kind, parents = []) {
     const { rows } = await client.query(
-      'SELECT revision,storage_bytes FROM oc_timelines WHERE id=$1',
+      'SELECT revision,storage_bytes,keep_history FROM oc_timelines WHERE id=$1',
       [id],
     );
-    const stored = await recordHistory(client, id, rows[0].revision, settingsOf(document));
+    const kept = rows[0].keep_history;
+    const stored = kept
+      ? await recordHistory(client, id, rows[0].revision, settingsOf(document))
+      : null;
     const revisionId = await this.recordRows(client, id, userId, kind, parents, {
       number: rows[0].revision,
       documentBytes: rows[0].storage_bytes,
       stored,
+      kept,
     });
     await client.query('UPDATE oc_timelines SET head_revision_id=$2 WHERE id=$1', [id, revisionId]);
     return revisionId;
+  }
+  /** Whether revision `id`'s document can be read (see revisionDocument). */
+  async readable(client, id) {
+    const { rows } = await client.query(
+      `SELECT 1 FROM oc_revisions r WHERE r.id=$1 AND (num_nonnulls(r.snapshot_id,r.patch)+r.history_rows::int>0
+        OR EXISTS(SELECT 1 FROM oc_timelines t WHERE t.id=r.timeline_id AND t.head_revision_id=r.id))`,
+      [id],
+    );
+    return rows.length > 0;
+  }
+  /**
+   * The storage turning timeline `id`'s saved history off would free: what its revisions are
+   * charged, apart from those whose content others still read (STILL_READ).
+   */
+  async historyBytes(client, id) {
+    const { rows } = await client.query(
+      `${STILL_READ} SELECT coalesce(sum(e.bytes),0) AS bytes FROM oc_revisions r
+      JOIN oc_storage_entries e ON e.kind='oc_revisions' AND e.entry_id=r.id::text
+      WHERE r.timeline_id=$1 AND r.id NOT IN (SELECT id FROM still_read)`,
+      [id],
+    );
+    return Number(rows[0].bytes);
+  }
+  /**
+   * Stops keeping timeline `id`'s saved history (locked by the caller): its revisions keep
+   * their place (author, time, parents) but forget their content and are refunded it, apart
+   * from those others still read (STILL_READ); the versions only forgotten revisions saw go.
+   * Its later saves record no content. Its head is read from its live index from then on.
+   */
+  async stopHistory(client, id) {
+    const { rows } = await client.query(
+      'SELECT revision FROM oc_timelines WHERE id=$1 AND keep_history',
+      [id],
+    );
+    if (!rows[0]) return;
+    const { rows: forgotten } = await client.query(
+      `${STILL_READ} SELECT r.id,r.snapshot_id FROM oc_revisions r WHERE r.timeline_id=$1
+      AND r.id NOT IN (SELECT id FROM still_read)
+      AND num_nonnulls(r.snapshot_id,r.patch)+r.history_rows::int>0`,
+      [id],
+    );
+    await client.query(
+      `UPDATE oc_revisions SET history_rows=false,stored_bytes=NULL,snapshot_id=NULL,patch=NULL
+      WHERE id=ANY($1::uuid[])`,
+      [forgotten.map((r) => r.id)],
+    );
+    await client.query(
+      'DELETE FROM oc_snapshots s WHERE s.id=ANY($1::uuid[]) AND NOT EXISTS(SELECT 1 FROM oc_revisions r WHERE r.snapshot_id=s.id)',
+      [forgotten.map((r) => r.snapshot_id).filter(Boolean)],
+    );
+    // The versions only forgotten revisions saw go; those kept revisions still see end after
+    // the latest revision, so nothing later sees them.
+    const released = await pruneHistoryRows(client, id);
+    await endHistory(client, id, (BigInt(rows[0].revision) + 1n).toString());
+    if (
+      released &&
+      !(await client.query('SELECT 1 FROM oc_timelines WHERE id=$1', [released])).rows.length
+    )
+      await this.removeHistory(client, released);
+    await client.query(
+      'UPDATE oc_timelines SET keep_history=false,history_since=NULL WHERE id=$1',
+      [id],
+    );
+  }
+  /**
+   * Starts keeping timeline `id`'s saved history again (locked by the caller), from its
+   * current state: recorded as a new revision by `userId` ('baseline'), with one copy of that
+   * state made in the database and charged to it. Earlier revisions stay as they were.
+   */
+  async startHistory(client, id, userId) {
+    const { rows } = await client.query(
+      `UPDATE oc_timelines SET keep_history=true,revision=revision+1 WHERE id=$1 AND NOT keep_history
+      RETURNING *`,
+      [id],
+    );
+    const t = rows[0];
+    if (!t) return;
+    // A copy whose kept revisions still read through to its base compares what it holds
+    // with what it reads there (as a save of the whole timeline does); otherwise its state
+    // is copied as it is.
+    const { rows: base } = await client.query(
+      'SELECT 1 FROM oc_history_bases WHERE timeline_id=$1',
+      [id],
+    );
+    if (base.length)
+      await client.query('UPDATE oc_timelines SET history_since=$2 WHERE id=$1', [id, t.revision]);
+    const stored = await recordHistory(client, id, t.revision, settingsOf(timelineSettings(t)));
+    const revisionId = await this.recordRows(client, id, userId, 'baseline', [t.head_revision_id], {
+      number: t.revision,
+      documentBytes: t.storage_bytes,
+      stored,
+    });
+    await client.query('UPDATE oc_timelines SET head_revision_id=$2 WHERE id=$1', [id, revisionId]);
   }
   /**
    * A revision outside a timeline's numbered history (a pull request's source or a rebase of
@@ -815,13 +932,23 @@ export class PostgresStore {
     await client.query('UPDATE oc_timelines SET revision=revision+1 WHERE id=$1', [t.id]);
     return this.checkpoint(client, t.id, userId, document, kind, parents);
   }
-  /** A numbered revision kept as rows, charged the bytes of the versions it wrote. */
-  async recordRows(client, id, userId, kind, parents, { number, documentBytes, stored }) {
+  /**
+   * A numbered revision kept as rows, charged the bytes of the versions it wrote; or, not
+   * `kept` (a timeline that keeps no saved history), one without content, charged nothing.
+   */
+  async recordRows(
+    client,
+    id,
+    userId,
+    kind,
+    parents,
+    { number, documentBytes, stored, kept = true },
+  ) {
     const revisionId = randomUUID();
     await client.query(
       `INSERT INTO oc_revisions(id,timeline_id,number,author_id,kind,history_rows,document_bytes,stored_bytes)
-      VALUES($1,$2,$3,$4,$5,true,$6,$7)`,
-      [revisionId, id, number, userId, kind, documentBytes, stored],
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [revisionId, id, number, userId, kind, kept, documentBytes, kept ? stored : null],
     );
     for (const [position, parent] of [...new Set(parents.filter(Boolean))].entries())
       await client.query(
@@ -849,11 +976,13 @@ export class PostgresStore {
       client.compact = t.id;
     }
     const number = (BigInt(t.revision) + 1n).toString();
-    const stored = await recordHistory(client, t.id, number, settings, touched);
+    const kept = t.keep_history !== false;
+    const stored = kept ? await recordHistory(client, t.id, number, settings, touched) : null;
     const revisionId = await this.recordRows(client, t.id, userId, kind, parents, {
       number,
       documentBytes: storage,
       stored,
+      kept,
     });
     const fixed = 4;
     await client.query(
@@ -900,14 +1029,26 @@ export class PostgresStore {
   }
   /**
    * A saved revision's document: read from rows (history.mjs), or its snapshot, or the
-   * nearest snapshot with later patches replayed.
+   * nearest snapshot with later patches replayed. A revision whose content is not kept (its
+   * timeline keeps no saved history) is read from its timeline's live index while it is the
+   * head, and is otherwise unavailable (HttpError 409, HISTORY_OFF).
    */
   async revisionDocument(client, id) {
     const kept = await client.query(
-      'SELECT timeline_id,number FROM oc_revisions WHERE id=$1 AND history_rows',
+      `SELECT r.timeline_id,r.number,r.history_rows,
+      num_nonnulls(r.snapshot_id,r.patch)+r.history_rows::int=0 AS forgotten,
+      (SELECT t.id FROM oc_timelines t WHERE t.id=r.timeline_id AND t.head_revision_id=r.id) AS head_of
+      FROM oc_revisions r WHERE r.id=$1`,
       [id],
     );
-    if (kept.rows[0]) {
+    if (kept.rows[0]?.forgotten) {
+      if (!kept.rows[0].head_of) throw new HttpError(409, HISTORY_OFF);
+      const { rows } = await client.query('SELECT * FROM oc_timelines WHERE id=$1', [
+        kept.rows[0].head_of,
+      ]);
+      return this.branchDocument(client, rows[0]);
+    }
+    if (kept.rows[0]?.history_rows) {
       const document = await historyDocument(client, kept.rows[0].timeline_id, kept.rows[0].number);
       if (!document) throw new HttpError(404, 'Saved revision unavailable.');
       return document;

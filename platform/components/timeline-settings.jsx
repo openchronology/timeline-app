@@ -4,14 +4,21 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { dismissOnBackdrop } from '../../src/dialogs.ts';
 import { api } from '../lib/api.js';
+/** A storage size, as the account page writes it. */
+const size = (bytes) =>
+  bytes >= 1048576
+    ? `${(bytes / 1048576).toFixed(bytes >= 104857600 ? 0 : 1)} MB`
+    : `${Math.max(bytes ? 1 : 0, Math.round(bytes / 1024))} KB`;
 export default function TimelineSettings({ initial, initialMembers, calendar = false }) {
   const router = useRouter(),
     dialog = useRef(null),
+    historyDialog = useRef(null),
     [timeline, setTimeline] = useState(initial),
     [members, setMembers] = useState(initialMembers),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   useEffect(() => dismissOnBackdrop(dialog.current), []);
+  useEffect(() => dismissOnBackdrop(historyDialog.current), []);
   const base = 'timelines/' + timeline.id;
   async function mutate(path, method, data) {
     if (busy) return;
@@ -20,7 +27,10 @@ export default function TimelineSettings({ initial, initialMembers, calendar = f
     try {
       const s = await api('session');
       const value = await api(base + path, { method, csrf: s.csrf, data });
-      if (path === '/settings') setTimeline(value);
+      if (path === '/settings') {
+        setTimeline(value);
+        historyDialog.current?.close();
+      }
       if (path === '/members') setMembers((await api(base + '/members')).members);
       if (path === '') router.replace('/');
       else router.refresh();
@@ -130,6 +140,63 @@ export default function TimelineSettings({ initial, initialMembers, calendar = f
             </>
           )}
         </p>
+      </section>
+      <section>
+        <h2>Saved history</h2>
+        {timeline.keep_history ? (
+          <>
+            <p className="muted">
+              Each save keeps the earlier version of what it changed, so past revisions can be
+              opened and exported, forks can sync, and pull requests can be reviewed. That takes
+              about as much storage again as the timeline itself. High-volume timelines such as
+              logs, whose past revisions nobody reviews, can do without.
+            </p>
+            <button disabled={busy} onClick={() => historyDialog.current.showModal()}>
+              Stop keeping saved history…
+            </button>
+            <dialog ref={historyDialog}>
+              <h2>Stop keeping saved history?</h2>
+              <p>
+                Past revisions are deleted now, freeing about {size(timeline.history_bytes ?? 0)},
+                apart from those forks and pull requests still use. From then on saves keep only who
+                saved and when: only the latest revision can be opened, forks of this timeline
+                cannot sync with it once it changes, and it takes no pull requests.
+              </p>
+              <p>Deleted revisions cannot be restored. Export one first if you need it.</p>
+              <div className="actions">
+                <button disabled={busy} onClick={() => historyDialog.current.close()}>
+                  Cancel
+                </button>
+                <button
+                  disabled={busy}
+                  className="danger"
+                  onClick={() => mutate('/settings', 'PATCH', { keepHistory: false })}
+                >
+                  Delete saved history
+                </button>
+              </div>
+              <p role="alert">{error}</p>
+            </dialog>
+          </>
+        ) : (
+          <>
+            <p>
+              This timeline does not keep saved history: saves keep only who saved and when, and
+              only the latest revision can be opened.
+            </p>
+            <button
+              disabled={busy}
+              onClick={() => mutate('/settings', 'PATCH', { keepHistory: true })}
+            >
+              Keep saved history from now on
+            </button>
+            <p className="muted">
+              History starts from the current state, with one copy of it (about{' '}
+              {size(Number(timeline.storage_bytes ?? 0))}) charged to your storage; later saves are
+              charged what they change.
+            </p>
+          </>
+        )}
       </section>
       <section>
         <h2>Collaborators</h2>

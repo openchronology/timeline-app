@@ -13,6 +13,15 @@ export default async function Saved({ params }) {
     snapshot = await new Versioning(services.store).historical(id, saved, user?.id);
   } catch (e) {
     if (e.status === 400 || e.status === 404) notFound();
+    // Not kept: the timeline keeps no saved history.
+    if (e.status === 409)
+      return (
+        <main className="platform">
+          <Link href={'/timelines/' + id + '/history'}>← Saved history</Link>
+          <h1>Revision not kept</h1>
+          <p>{e.message}</p>
+        </main>
+      );
     throw e;
   }
   return (

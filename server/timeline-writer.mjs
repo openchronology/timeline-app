@@ -55,7 +55,9 @@ export class TimelineWriter {
         // Its size, which decides how large a save the server applies in place.
         eventCount: Number(value.event_count ?? 0),
         storageBytes: Number(value.storage_bytes ?? 0),
-        // Whether its saved history is kept as rows yet; its first save starts it.
+        // Whether it keeps saved history at all, and whether as rows yet (its first save
+        // starts them).
+        keepHistory: value.keep_history !== false,
         history: value.history_since !== null && value.history_since !== undefined,
       },
     };
@@ -69,7 +71,12 @@ export class TimelineWriter {
       state = loaded.state;
       this.states.set(timeline, state);
     }
-    return { count: state.eventCount, bytes: state.storageBytes, history: state.history };
+    return {
+      count: state.eventCount,
+      bytes: state.storageBytes,
+      history: state.history,
+      keepHistory: state.keepHistory,
+    };
   }
   /** Forgets a timeline's revision, so the next save fetches it again. */
   forget(timeline) {
