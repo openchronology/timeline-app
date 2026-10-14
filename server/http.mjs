@@ -1119,13 +1119,14 @@ export function createRequestHandler({
             }),
           );
         }
-        const t = await store.access(id, userId);
+        // Sharing, settings and deletion stay available while a copy is being prepared.
+        const t = await store.access(id, userId, store.pool, { preparing: true });
         if (!t.canShare) throw new HttpError(403, 'Only the owner can manage sharing.');
         if (!action && method === 'DELETE') {
           auth.require(session, req);
           await store.transaction(async (c) => {
             await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [id]);
-            const current = await store.access(id, userId, c);
+            const current = await store.access(id, userId, c, { preparing: true });
             if (!current.canShare)
               throw new HttpError(403, 'Only the owner can delete a timeline.');
             await c.query('DELETE FROM oc_timelines WHERE id=$1', [id]);
@@ -1154,7 +1155,7 @@ export function createRequestHandler({
             );
           await store.transaction(async (c) => {
             await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [id]);
-            const current = await store.access(id, userId, c);
+            const current = await store.access(id, userId, c, { preparing: true });
             if (!current.canShare) throw new HttpError(403, 'Only the owner can manage sharing.');
             if (input.visibility === 'public' && current.comparison) {
               const sources = await c.query(

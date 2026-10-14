@@ -257,6 +257,19 @@ try {
   const forkPage = await contributor.request('/timelines/' + fork.id);
   assert(forkPage.includes('/editor/frame#timeline/' + fork.id));
   assert(forkPage.includes(timeline.id));
+  // While a large copy's index is still being copied, its page waits for it, its other pages
+  // lead there, and the API refuses its index but shows it as preparing.
+  await pool.query('UPDATE oc_timelines SET preparing_revision_id=head_revision_id WHERE id=$1', [
+    fork.id,
+  ]);
+  const waiting = await contributor.request('/timelines/' + fork.id);
+  assert.match(waiting, /Preparing your copy/);
+  assert(!waiting.includes('/editor/frame#timeline/' + fork.id));
+  await contributor.request('/timelines/' + fork.id + '/history', { status: 307 });
+  assert.equal((await contributor.request(forkApi)).preparing, true);
+  await contributor.request(forkApi + '/document', { status: 409 });
+  await pool.query('UPDATE oc_timelines SET preparing_revision_id=NULL WHERE id=$1', [fork.id]);
+  assert((await contributor.request('/timelines/' + fork.id)).includes('/editor/frame#timeline/'));
   assert.match(
     await contributor.request('/timelines/' + fork.id + '/pulls/new'),
     /Open pull request/,

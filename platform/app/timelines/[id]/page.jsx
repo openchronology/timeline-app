@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import Editor from '../../../components/editor.jsx';
 import TimelineSummary from '../../../components/timeline-summary.jsx';
+import PreparingCopy from '../../../components/preparing-copy.jsx';
 import { accessibleTimeline, versionInfo } from '../../../lib/timeline.js';
 import {
   firstMoments,
@@ -11,7 +12,7 @@ import {
 export const dynamic = 'force-dynamic';
 export async function generateMetadata({ params }) {
   const { id } = await params;
-  const { timeline } = await accessibleTimeline(id, { bounds: true });
+  const { timeline } = await accessibleTimeline(id, { bounds: true, preparing: true });
   return pageMetadata(
     timeline,
     '/timelines/' + timeline.id,
@@ -21,7 +22,17 @@ export async function generateMetadata({ params }) {
 }
 export default async function TimelinePage({ params }) {
   const { id } = await params;
-  const { timeline, user, services } = await accessibleTimeline(id, { bounds: true });
+  const { timeline, user, services } = await accessibleTimeline(id, {
+    bounds: true,
+    preparing: true,
+  });
+  // A large copy whose index is still being copied opens once it is ready.
+  if (timeline.preparing)
+    return (
+      <main className="platform">
+        <PreparingCopy id={id} />
+      </main>
+    );
   const [comparisonSources, moments] = await Promise.all([
     timeline.comparison
       ? Promise.all(
