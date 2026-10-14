@@ -66,8 +66,8 @@ try {
   for (const [table, time] of Object.entries(after))
     assert(time > before[table], `${table} analyzed after a large create`);
   before = after;
-  // A fork that copies its index (one that cannot read through to it, past INDEX_LEVELS).
-  store.shareIndex = async () => false;
+  // A fork that copies its index (one that may read through to no level).
+  store.indexLevels = 0;
   const fork = await versions.copy(large.id, user, { revision: large.revision });
   created.push(fork.id);
   // A large copy's index is copied after answering (see fork-preparing-postgres.mjs).
@@ -101,7 +101,7 @@ try {
   // A timeline forks read through to keeps the versions its saves change (retired): a save
   // retiring many refreshes statistics before it returns, so lookups count them; one
   // retiring a few leaves them to autovacuum.
-  delete store.shareIndex;
+  delete store.indexLevels;
   const reader = await versions.copy(large.id, user, { revision: large.revision });
   created.push(reader.id);
   assert.equal(reader.preparing, false, 'a fork reads through instead');

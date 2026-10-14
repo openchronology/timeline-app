@@ -54,7 +54,10 @@ export function indexAtSql(table) {
     WHERE r.timeline_id=$1 AND coalesce(r.since,0)<=$2 AND r.until>$2`;
 }
 
-/** How many levels a fork reads through at most: a fork of one that deep copies instead. */
+/**
+ * How many levels a fork reads through at most: a fork of one that deep copies what it would
+ * read of the nearest (copyLevel) and reads through to the rest.
+ */
 export const INDEX_LEVELS = 4;
 /** Each table's key, after the timeline. */
 const KEYS = {
@@ -207,4 +210,29 @@ export async function removeRows(client, t, rows, table, types, keys) {
     )} x`,
     [t.id, ...keys],
   );
+}
+
+/**
+ * Copies into timeline `id`'s own rows the rows of level `base` at clock `clock` whose key it
+ * has no row of its own for (hidden rows too, which hide what deeper levels have): what it
+ * reads of that level, so it can then stop reading through to it. Returns how many rows of
+ * each table it copied. Must follow beginIndexWrite for `id`.
+ */
+export async function copyLevel(client, id, base, clock) {
+  const columns = await indexColumns(client);
+  const copied = {};
+  for (const table of VERSIONED_TABLES) {
+    const written = columns[table].written.join(',');
+    const at = `timeline_id=$2 AND coalesce(since,0)<=$3`;
+    const { rowCount } = await client.query(
+      `INSERT INTO ${table}(timeline_id,${written},hidden) SELECT $1,${written},hidden FROM (
+        SELECT ${written},hidden FROM ${table} WHERE ${at}
+        UNION ALL SELECT ${written},coalesce(hidden,false) FROM ${table}_retired WHERE ${at} AND until>$3) x
+      WHERE NOT EXISTS(SELECT 1 FROM ${table} v WHERE v.timeline_id=$1
+        AND ${KEYS[table].map((k) => `v.${k}=x.${k}`).join(' AND ')})`,
+      [id, base, clock],
+    );
+    copied[table] = rowCount;
+  }
+  return copied;
 }

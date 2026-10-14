@@ -202,7 +202,8 @@ try {
     const entry = track(name, timeline, from.document);
     const lineage = await lineageOf(pool, timeline.id);
     assert.equal(lineage.index_bases.length, depth, `${name} reads through ${depth} levels`);
-    if (depth) {
+    const levels = await lineageOf(pool, from.timeline.id);
+    if (depth > levels.index_bases.length) {
       assert.equal(lineage.index_bases[0], from.timeline.id);
       assert.equal(lineage.index_clocks[0], rows[0].index_clock, `${name} reads its source now`);
       const pinned = await pool.query('SELECT index_pinned FROM oc_timelines WHERE id=$1', [
@@ -210,7 +211,25 @@ try {
       ]);
       assert(BigInt(pinned.rows[0].index_pinned) >= BigInt(rows[0].index_clock), 'pinned');
       assert.equal(await rowsOf([timeline.id]), 0, `${name} copied nothing`);
-    } else assert(await rowsOf([timeline.id]), `${name} copied its index`);
+    } else {
+      // Past INDEX_LEVELS: what its source wrote itself is copied, and it reads through to
+      // the levels its source reads, as its source does; the source is not pinned for it.
+      assert.deepEqual(
+        lineage.index_bases,
+        levels.index_bases,
+        `${name} reads its source's levels`,
+      );
+      assert.deepEqual(lineage.index_clocks, levels.index_clocks);
+      assert.equal(
+        await rowsOf([timeline.id]),
+        await rowsOf([from.timeline.id]),
+        `${name} copied its source's rows`,
+      );
+      const pinned = await pool.query('SELECT index_pinned FROM oc_timelines WHERE id=$1', [
+        from.timeline.id,
+      ]);
+      assert.equal(pinned.rows[0].index_pinned, null, 'released');
+    }
     assert.deepEqual(
       normal((await store.snapshot(timeline.id, user)).document),
       normal(from.document),
@@ -267,8 +286,8 @@ try {
     if (step === 12) await copy('fork of fork', family[1], 2);
     if (step === 21) await copy('duplicate', family[2], 3, true);
     if (step === INDEX_LEVELS * 10 - 9) await copy('deepest', family[3], INDEX_LEVELS);
-    // Past INDEX_LEVELS, a copy copies (and reads as fast as any timeline).
-    if (step === 45) await copy('copied', family[4], 0);
+    // Past INDEX_LEVELS, a copy copies its source's own rows and reads through to the rest.
+    if (step === 45) await copy('copied', family[4], INDEX_LEVELS);
     if (step === 50) await copy('second fork', source, 1);
     for (const entry of family)
       // The source is now and then saved whole (retiring every row its forks read).
@@ -297,7 +316,7 @@ try {
   family.splice(family.indexOf(source), 1);
   assert(await rowsOf([source.timeline.id]), 'kept for its forks');
   await verify('after deleting the source');
-  // Forks reading through to it go one by one, the deepest last.
+  // Forks reading through to it go one by one, the deepest ones last.
   for (const name of ['second fork', 'fork', 'fork of fork', 'duplicate']) {
     const entry = family.find((e) => e.name === name);
     await remove(entry.timeline.id);
@@ -305,9 +324,15 @@ try {
     assert(await rowsOf([source.timeline.id]), `still kept after deleting the ${name}`);
   }
   await verify('after deleting all but the deepest');
+  // The copy past INDEX_LEVELS reads through to the same levels as the deepest fork.
   const deepest = family.find((e) => e.name === 'deepest');
   await remove(deepest.timeline.id);
   family.splice(family.indexOf(deepest), 1);
+  assert(await rowsOf([source.timeline.id]), 'still kept for the copy past them');
+  await verify('after deleting the deepest');
+  const copied = family.find((e) => e.name === 'copied');
+  await remove(copied.timeline.id);
+  family.splice(family.indexOf(copied), 1);
   assert.equal(
     await rowsOf(ids.filter((id) => family.every((e) => e.timeline.id !== id))),
     0,
@@ -315,7 +340,7 @@ try {
   );
   await verify('after releasing');
   console.log(
-    `PASS read-through forks: ${revisions.size} revisions across forks ${INDEX_LEVELS} levels deep (and a copy past them) read as rebuilds, keep their walks' invariants and history; a fork saved whole reads through to nothing; deleted timelines' rows are kept while forks read them, then released.`,
+    `PASS read-through forks: ${revisions.size} revisions across forks ${INDEX_LEVELS} levels deep (and a copy past them, copying only its source's own rows) read as rebuilds, keep their walks' invariants and history; a fork saved whole reads through to nothing; deleted timelines' rows are kept while forks read them, then released.`,
   );
 } finally {
   await store.idle();
