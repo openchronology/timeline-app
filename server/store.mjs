@@ -27,6 +27,8 @@ import {
   recordHistory,
   recordDetached,
   recordDetachedPatch,
+  differences,
+  settingsAt,
   historyDocument,
   pruneHistoryRows,
   settingsOf,
@@ -113,19 +115,35 @@ const TIMELINE_INDEX = [
   'event_text_stale',
 ];
 const copied = new Map();
-/** A table's columns a copy writes: all but the timeline and generated ones. */
+/**
+ * A table's columns a copy writes (all but the timeline and generated ones), and the rest of
+ * its primary key, to copy it a page at a time.
+ */
 async function copiedColumns(client, table) {
   if (!copied.has(table)) {
-    const { rows } = await client.query(
+    const columns = await client.query(
       `SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema()
       AND table_name=$1 AND column_name<>'timeline_id' AND is_generated='NEVER'
       ORDER BY ordinal_position`,
       [table],
     );
-    copied.set(table, rows.map((r) => r.column_name).join(','));
+    const key = await client.query(
+      `SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid=i.indrelid
+      AND a.attnum=ANY(i.indkey) WHERE i.indrelid=$1::regclass AND i.indisprimary
+      AND a.attname<>'timeline_id' ORDER BY array_position(i.indkey::int2[],a.attnum)`,
+      [table],
+    );
+    copied.set(table, {
+      columns: columns.rows.map((r) => r.column_name).join(','),
+      key: key.rows.map((r) => r.attname),
+    });
   }
   return copied.get(table);
 }
+/** Rows copied per statement, so no statement grows with the timeline. */
+const COPY_PAGE = 50000;
+/** How many moments and durations make a copy worth preparing after answering. */
+const PREPARE_AFTER = 20000;
 /** How many moments and durations written in one go make their statistics worth refreshing. */
 const ANALYZE_AFTER = 20000;
 export class PostgresStore {
@@ -145,7 +163,12 @@ export class PostgresStore {
     if (!rows[0]) throw new HttpError(404, 'Timeline unavailable.');
     return rows[0];
   }
-  async access(id, userId, client = this.pool) {
+  /**
+   * The timeline as `userId` may see it, with their permissions; 404 when they may not. A
+   * copy whose index is still being prepared (see prepare) answers 409 unless `preparing`:
+   * only its metadata, sharing, settings and deletion are available until then.
+   */
+  async access(id, userId, client = this.pool, { preparing = false } = {}) {
     const columns = await timelineColumns(client);
     const { rows } = await client.query(
       `SELECT ${columns},u.username AS owner,
@@ -169,8 +192,14 @@ export class PostgresStore {
       if (sources.rows.length !== timeline.comparison.sources.length)
         throw new HttpError(404, 'A comparison source is unavailable.');
     }
+    if (timeline.preparing_revision_id && !preparing)
+      throw new HttpError(
+        409,
+        'This copy is still being prepared. It opens as soon as it is ready; try again shortly.',
+      );
     const { search_document, event_text, ...metadata } = timeline;
     return {
+      preparing: !!timeline.preparing_revision_id,
       ...metadata,
       canWrite:
         !timeline.comparison && ['owner', 'admin', 'writer', 'editor'].includes(timeline.role),
@@ -194,13 +223,11 @@ export class PostgresStore {
     };
   }
   /**
-   * Gives timeline `to` (just created, empty) the index of timeline `from` as it stands, copied
-   * row by row in the database rather than rebuilt from a document: what a fork or duplicate
-   * of `from`'s head needs, at a cost that stays in PostgreSQL. Only for an index in the
-   * current form: returns false, copying nothing, for a comparison (its sources are checked
-   * for the new owner when rebuilt) or an index a startup repair still has to rebuild.
+   * How many moments and durations timeline `from`'s index holds, if it can be copied as it
+   * stands (copyIndex): null for a comparison (its sources are checked for the new owner when
+   * rebuilt) or an index a startup repair still has to rebuild.
    */
-  async copyIndex(client, from, to) {
+  async copyable(client, from) {
     const { rows } = await client.query(
       `SELECT event_count+(SELECT count(*) FROM oc_duration_nodes WHERE timeline_id=$1) AS entities
       FROM oc_timelines t WHERE id=$1 AND comparison IS NULL AND index_version>=2 AND search_version>=1
@@ -208,26 +235,158 @@ export class PostgresStore {
         AND (n.definition IS NULL OR n.max_first IS NULL))`,
       [from],
     );
-    if (!rows[0]) return false;
+    return rows[0] ? Number(rows[0].entities) : null;
+  }
+  /**
+   * Gives timeline `to` (just created, empty) the index of timeline `from` as it stands, copied
+   * row by row in the database rather than rebuilt from a document, a page of rows per
+   * statement: what a fork or duplicate of `from`'s head needs, at a cost that stays in
+   * PostgreSQL. Returns false, copying nothing, when it is not copyable.
+   */
+  async copyIndex(client, from, to) {
+    const entities = await this.copyable(client, from);
+    if (entities === null) return false;
     // The copy is charged like a rebuild, before anything is written.
     await client.query(
       'UPDATE oc_timelines t SET storage_bytes=s.storage_bytes FROM oc_timelines s WHERE t.id=$2 AND s.id=$1',
       [from, to],
     );
     for (const table of INDEX_TABLES) {
-      const columns = await copiedColumns(client, table);
-      await client.query(
-        `INSERT INTO ${table}(timeline_id,${columns}) SELECT $2,${columns} FROM ${table} WHERE timeline_id=$1`,
-        [from, to],
-      );
+      const { columns, key } = await copiedColumns(client, table);
+      let cursor = null;
+      for (;;) {
+        const after = cursor ? `AND (${key})>(${key.map((_, i) => `$${i + 3}`)})` : '';
+        const { rows } = await client.query(
+          `WITH page AS (SELECT ${columns} FROM ${table} WHERE timeline_id=$1 ${after}
+            ORDER BY ${key} LIMIT ${COPY_PAGE}),
+          copied AS (INSERT INTO ${table}(timeline_id,${columns}) SELECT $2,${columns} FROM page)
+          SELECT ${key},(SELECT count(*) FROM page) AS rows FROM page ORDER BY ${key.map((k) => k + ' DESC')} LIMIT 1`,
+          [from, to, ...(cursor ?? [])],
+        );
+        if (!rows[0] || Number(rows[0].rows) < COPY_PAGE) break;
+        cursor = key.map((k) => rows[0][k]);
+      }
     }
     await client.query(
       `UPDATE oc_timelines t SET ${TIMELINE_INDEX.map((c) => `${c}=s.${c}`)}
       FROM oc_timelines s WHERE t.id=$2 AND s.id=$1`,
       [from, to],
     );
-    if (Number(rows[0].entities) >= ANALYZE_AFTER) client.analyze = true;
+    if (entities >= ANALYZE_AFTER) client.analyze = true;
     return true;
+  }
+  /**
+   * Leaves timeline `to` (just created, its history reading through to `revisionId`, the head
+   * of `from`) to have its index copied in the background (prepare), when that index is large
+   * and can be copied: charged now, and marked as being prepared until then. Returns whether
+   * it does; otherwise the caller copies or rebuilds the index now.
+   */
+  async copyIndexLater(client, from, to, revisionId) {
+    const entities = await this.copyable(client, from);
+    if (entities === null || entities < PREPARE_AFTER) return false;
+    await client.query(
+      `UPDATE oc_timelines t SET storage_bytes=s.storage_bytes,preparing_revision_id=$3,
+      ${['title', 'description', 'presentation', 'plugins', 'tags', 'assets'].map((c) => `${c}=s.${c}`)}
+      FROM oc_timelines s WHERE t.id=$2 AND s.id=$1`,
+      [from, to, revisionId],
+    );
+    client.afterCommit = () => this.prepare(to);
+    return true;
+  }
+  /**
+   * Prepares a copy whose index was left for later (copyIndexLater), outside the request
+   * that made it, in one transaction: a crash leaves nothing behind, and the next start tries
+   * again (prepareStale). Copies of one timeline are prepared once at a time, across server
+   * processes too. Resolves when done.
+   */
+  prepare(id) {
+    this.preparing ??= new Map();
+    if (!this.preparing.has(id))
+      this.preparing.set(
+        id,
+        this.prepareNow(id)
+          .catch((error) => {
+            if (!this.pool.ending) console.error('Preparing a copy failed:', error);
+          })
+          .finally(() => this.preparing.delete(id)),
+      );
+    return this.preparing.get(id);
+  }
+  async prepareNow(id) {
+    await this.transaction(async (c) => {
+      // One snapshot of the source throughout.
+      await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+      const { rows } = await c.query(
+        `SELECT t.preparing_revision_id AS base,r.timeline_id AS source,s.head_revision_id AS head
+        FROM oc_timelines t JOIN oc_revisions r ON r.id=t.preparing_revision_id
+        LEFT JOIN oc_timelines s ON s.id=r.timeline_id WHERE t.id=$1 FOR UPDATE OF t SKIP LOCKED`,
+        [id],
+      );
+      // Ready, deleted, or being prepared elsewhere.
+      if (!rows[0]) return;
+      const { base, source, head } = rows[0];
+      // The source as it stands, brought back to the revision copied if it saved since;
+      // otherwise (deleted, or too changed) rebuilt from that revision's document.
+      const copied =
+        head &&
+        (await this.copyIndex(c, source, id)) &&
+        (head === base || (await this.revertCopy(c, id, head, base)));
+      if (!copied)
+        await this.replace(c, id, await this.revisionDocument(c, base), { touch: false });
+      await c.query(
+        `UPDATE oc_timelines SET preparing_revision_id=NULL,
+        storage_bytes=coalesce((SELECT document_bytes FROM oc_revisions WHERE id=$2),storage_bytes)
+        WHERE id=$1`,
+        [id, base],
+      );
+      c.afterCommit = () => this.refreshText(id);
+    });
+  }
+  /**
+   * Brings a copied index from revision `head` of its source back to revision `base`, which
+   * the copy was made from, by saving their differences into it in place (no revision is
+   * recorded: its history already reads through to `base`). False when they differ too much
+   * to apply in place.
+   */
+  async revertCopy(client, id, head, base) {
+    const pages = await differences(client, head, base);
+    if (!pages) return false;
+    const patch = {
+      settings: await settingsAt(client, base),
+      changes: [],
+      durationChanges: [],
+      relationshipChanges: [],
+    };
+    const reference = (kind, value) =>
+      kind === 'moment' ? { moment: value } : { duration: value };
+    for await (const page of pages)
+      for (const { kind, key, after } of page) {
+        if (kind === 'moments') patch.changes.push({ id: key, event: after });
+        else if (kind === 'durations') patch.durationChanges.push({ id: key, duration: after });
+        else if (kind === 'relationships')
+          patch.relationshipChanges.push({
+            a: reference(key.a_kind, key.a_id),
+            b: reference(key.b_kind, key.b_id),
+            related: after !== null,
+          });
+      }
+    const t = (await client.query('SELECT * FROM oc_timelines WHERE id=$1', [id])).rows[0];
+    if (!patch.settings || !incremental(t, patch)) return false;
+    const { assignments } = await applyIncrementally(client, t, patch);
+    await client.query(
+      `UPDATE oc_timelines SET event_text_stale=true${assignments
+        .map(([column, , cast], i) => `,${column}=$${i + 2}${cast ?? ''}`)
+        .join('')} WHERE id=$1`,
+      [id, ...assignments.map(([, value]) => value)],
+    );
+    return true;
+  }
+  /** Prepares, one at a time, copies left unprepared (for example by a restart). */
+  async prepareStale() {
+    const { rows } = await this.pool.query(
+      'SELECT id FROM oc_timelines WHERE preparing_revision_id IS NOT NULL',
+    );
+    for (const { id } of rows) await this.prepare(id);
   }
   async replace(client, id, document, { touch = true } = {}) {
     document = validateDocument(document);
@@ -459,9 +618,10 @@ export class PostgresStore {
   }
   /** Resolves once no catalogue refresh is pending. */
   async idle() {
-    while (this.refreshing?.size || this.analyzing)
+    while (this.refreshing?.size || this.analyzing || this.preparing?.size)
       await Promise.all([
         ...[...(this.refreshing?.values() ?? [])].map((e) => e.done),
+        ...(this.preparing?.values() ?? []),
         this.analyzing?.done,
       ]);
   }
@@ -749,7 +909,8 @@ export class PostgresStore {
   async metadata(id, userId) {
     return this.transaction(async (c) => {
       await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
-      const t = await this.access(id, userId, c);
+      // A copy being prepared has metadata (without bounds), so its page can wait for it.
+      const t = await this.access(id, userId, c, { preparing: true });
       const { rows } = await c.query(
         'SELECT oc_qtext(first_time) AS first,oc_qtext(last_time) AS last FROM oc_nodes WHERE timeline_id=$1 AND id=$2',
         [id, t.root],

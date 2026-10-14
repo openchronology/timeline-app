@@ -74,18 +74,23 @@ export class Versioning {
           upstream.visibility === 'private' || upstream.publication_restricted,
         ],
       );
-      // The copy's index is upstream's (its head), copied in the database; its settings are
-      // the head's as saved. Otherwise it is rebuilt from the head's document.
+      // Its history reads through to the revision it copies, instead of copying it.
+      const shared = await shareHistory(c, newId, upstream.head_revision_id);
+      // Its index is upstream's (its head), copied in the database: for a large timeline
+      // after answering, while the copy is marked as being prepared, otherwise now. Its
+      // settings are the head's as saved. Otherwise it is rebuilt from the head's document.
       const settings = await settingsAt(c, upstream.head_revision_id);
       let document;
-      if (settings && (await this.store.copyIndex(c, id, newId)))
-        c.afterCommit = () => this.store.refreshText(newId);
+      if (
+        settings &&
+        ((shared && (await this.store.copyIndexLater(c, id, newId, upstream.head_revision_id))) ||
+          (await this.store.copyIndex(c, id, newId)))
+      )
+        c.afterCommit ??= () => this.store.refreshText(newId);
       else {
         document = await this.store.revisionDocument(c, upstream.head_revision_id);
         await this.store.replace(c, newId, document);
       }
-      // Its history reads through to the revision it copies, instead of copying it.
-      await shareHistory(c, newId, upstream.head_revision_id);
       await this.store.checkpoint(
         c,
         newId,
@@ -95,7 +100,7 @@ export class Versioning {
         duplicate ? [] : [upstream.head_revision_id],
       );
     });
-    return this.store.access(newId, userId);
+    return this.store.access(newId, userId, this.pool, { preparing: true });
   }
   async sync(id, userId, input) {
     expectedRevision(input?.revision);

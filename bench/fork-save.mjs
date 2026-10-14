@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// Saves right after a large timeline is written in one go (a fork), against the same saves
-// once statistics are current. Usage: node bench/fork-save.mjs [moments]   (default 200000)
+// Forks a large timeline (timing the answer and when its index is ready), then saves to it
+// straight away, and again once statistics are current. Usage: node bench/fork-save.mjs [moments]   (default 200000)
 // Needs BENCH_DATABASE_URL: a PostgreSQL database it creates and removes its own data in.
 import pg from 'pg';
 import { randomUUID } from 'node:crypto';
@@ -44,10 +44,16 @@ try {
       event: { ...e, time: e.time + '1', metadata: { ...e.metadata, title: 'Edited' } },
     })),
   });
-  let fork = await time('fork', () =>
+  const started = performance.now();
+  let fork = await time('fork answered', () =>
     versions.copy(timeline.id, user, { revision: timeline.revision }),
   );
   ids.push(fork.id);
+  // A large copy's index is copied after answering.
+  await store.idle();
+  const ready = (performance.now() - started) / 1000;
+  console.log(JSON.stringify({ size, label: 'fork ready', seconds: Number(ready.toFixed(2)) }));
+  fork = await store.access(fork.id, user);
   fork = await time('save 10 right after forking', () =>
     store.save(fork.id, user, fork.revision, undefined, edit(100, 10)),
   );

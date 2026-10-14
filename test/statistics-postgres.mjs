@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // A timeline written in one go (created, imported, forked) has its index tables' statistics
-// refreshed before the write returns, so the next request plans with it counted: a lookup by
-// ID uses the ID's index, not any index that starts with the timeline (#139).
+// refreshed before the write returns (for a large fork, before its index is ready), so the
+// next request plans with it counted: a lookup by ID uses the ID's index, not any index that
+// starts with the timeline (#139).
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -59,6 +60,8 @@ try {
   before = after;
   const fork = await versions.copy(large.id, user, { revision: large.revision });
   created.push(fork.id);
+  // A large copy's index is copied after answering (see fork-preparing-postgres.mjs).
+  await store.idle();
   after = await analyzed();
   for (const [table, time] of Object.entries(after))
     assert(time > before[table], `${table} analyzed after a large fork`);

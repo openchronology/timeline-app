@@ -982,3 +982,8 @@ ALTER TABLE oc_proposals ALTER COLUMN document DROP NOT NULL;
 UPDATE oc_proposals SET base_document=NULL,document=NULL
 WHERE (base_document IS NOT NULL OR document IS NOT NULL)
   AND base_revision_id IS NOT NULL AND source_revision_id IS NOT NULL;
+-- A large fork or duplicate is answered at once and its index copied in the background
+-- (prepare in store.mjs): until then this names the revision it copies, and the timeline
+-- refuses reads and writes of its index.
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS preparing_revision_id uuid REFERENCES oc_revisions;
+CREATE INDEX IF NOT EXISTS oc_timelines_preparing ON oc_timelines(id) WHERE preparing_revision_id IS NOT NULL;

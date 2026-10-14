@@ -105,6 +105,8 @@ async function initialize() {
   const store = pool ? new PostgresStore(pool, { compareLimits: limits }) : null;
   // Catalogue text left stale by an interrupted refresh catches up in the background.
   store?.refreshStale().catch((error) => console.error('Catalogue text refresh failed:', error));
+  // Copies whose index was still being prepared when the server stopped.
+  store?.prepareStale().catch((error) => console.error('Preparing copies failed:', error));
   // Timelines that keep only their last months or years expire older data on a schedule.
   if (store) startRetention(store);
   return {
