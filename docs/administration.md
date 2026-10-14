@@ -148,10 +148,12 @@ hundred bytes. **A copy shares its source's index too**: it reads through to it,
 rows of its own only for what it changes, so a fork of any size is ready at once (at 200,000
 moments it used to take 30 s to copy, and before that 2 minutes to rebuild). Reading a fork
 takes about 1.2 to 1.5 times as long as reading its source. Once forked, a timeline keeps
-the earlier version of each index row it changes for as long as it lives, so its forks can
-still read them: its index grows by about one row per row its saves change. Removing the
-versions no fork reads any more is planned (#145). A deleted timeline's index is kept while
-forks read through to it. A copy of a copy of a copy of a copy (four levels) reads through
+the earlier version of each index row it changes while a fork reads it, so its index grows
+by about one row per row its saves change. Those versions go when the forks reading them
+are deleted, saved as whole documents, or compacted: a fork that has rewritten half of its
+moments copies the rest of its index in the background after saving and stops reading
+through. A deleted timeline's index is kept while forks read through to it, then removed.
+Upgrading removes the versions earlier releases kept after a fork was deleted. A copy of a copy of a copy of a copy (four levels) reads through
 to all of them; a copy one level deeper copies its index instead, inside the database. A
 copy of 20,000 moments and durations or more is then answered at once and its index copied
 afterwards, while its page says it is being prepared (about 30 s at 200,000 moments). Until

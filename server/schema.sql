@@ -1110,25 +1110,51 @@ BEGIN
       RETURNS SETOF %I LANGUAGE sql STABLE AS $b$%s$b$$f$, live || '_at', live, body);
   END LOOP;
 END $do$;
--- A timeline's rows go once it is deleted and no fork reads them, and so do those of deleted
--- timelines it read through to that nothing else reads (this runs as each is deleted).
-CREATE OR REPLACE FUNCTION oc_release_index(candidates uuid[]) RETURNS void LANGUAGE plpgsql AS $$
-DECLARE b uuid; live text;
+-- What forks no longer read goes (#145, phase 3), when a timeline stops reading through to
+-- levels `bases` at `clocks` (deleted, saved whole, compacted; a null clock: all of them).
+-- Every version a level retires is one its highest pin then reads, so versions are only
+-- left unread when pins go. For each level: its pins are recomputed from the lineages that
+-- remain, its highest kept as index_pinned (what its saves keep from now on), and its
+-- retired versions no pin falls in go; a deleted level also loses the rows no pin sees,
+-- all of them once nothing reads it. A deleted timeline is released as one at no clock.
+DROP FUNCTION IF EXISTS oc_release_index(uuid[]);
+CREATE OR REPLACE FUNCTION oc_release_index(bases uuid[], clocks bigint[] DEFAULT NULL)
+RETURNS void LANGUAGE plpgsql AS $$
+DECLARE b uuid; released bigint; alive boolean; pins bigint[]; live text;
 BEGIN
-  FOREACH b IN ARRAY coalesce(candidates,'{}') LOOP
-    -- Releases of one timeline wait for each other, so each sees what the other deleted.
+  -- In ID order, so releases of several levels do not deadlock.
+  FOR b,released IN SELECT x.b,CASE WHEN bool_or(x.c IS NULL) THEN NULL ELSE min(x.c) END
+    FROM unnest(bases,clocks) x(b,c) WHERE x.b IS NOT NULL GROUP BY x.b ORDER BY x.b LOOP
+    -- Releases of one timeline wait for each other, so each sees what the other deleted;
+    -- a live one is locked too, as forking it does, so no pin is added meanwhile.
     PERFORM pg_advisory_xact_lock(hashtextextended('oc_release_index:' || b::text,0));
-    CONTINUE WHEN EXISTS(SELECT 1 FROM oc_timelines WHERE id=b)
-      OR EXISTS(SELECT 1 FROM oc_timelines WHERE index_bases<>'{}' AND index_bases @> ARRAY[b]);
+    PERFORM 1 FROM oc_timelines WHERE id=b FOR UPDATE;
+    alive:=FOUND;
+    pins:=ARRAY(SELECT DISTINCT t.index_clocks[k] FROM oc_timelines t,generate_subscripts(t.index_bases,1) k
+      WHERE t.index_bases<>'{}' AND t.index_bases @> ARRAY[b] AND t.index_bases[k]=b ORDER BY 1);
+    IF alive THEN
+      UPDATE oc_timelines SET index_pinned=pins[cardinality(pins)]
+      WHERE id=b AND index_pinned IS DISTINCT FROM pins[cardinality(pins)];
+    END IF;
     FOREACH live IN ARRAY ARRAY['oc_moments','oc_nodes','oc_duration_nodes','oc_edge_nodes',
       'oc_relationships','oc_entity_search'] LOOP
-      EXECUTE format('DELETE FROM %I WHERE timeline_id=$1', live) USING b;
-      EXECUTE format('DELETE FROM %I WHERE timeline_id=$1', live || '_retired') USING b;
+      -- Only versions the released clock saw can have lost their last reader.
+      EXECUTE format('DELETE FROM %I r WHERE r.timeline_id=$1 AND ($2::bigint IS NULL
+        OR (r.until>$2 AND coalesce(r.since,0)<=$2))
+        AND NOT EXISTS(SELECT 1 FROM unnest($3::bigint[]) c WHERE coalesce(r.since,0)<=c AND r.until>c)',
+        live || '_retired') USING b,released,pins;
+      IF NOT alive THEN
+        EXECUTE format('DELETE FROM %I l WHERE l.timeline_id=$1 AND coalesce(l.since,0)>coalesce($2,-1)', live)
+          USING b,pins[cardinality(pins)];
+      END IF;
     END LOOP;
   END LOOP;
 END $$;
 CREATE OR REPLACE FUNCTION oc_timeline_index_release() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN PERFORM oc_release_index(array_prepend(OLD.id,OLD.index_bases)); RETURN NULL; END $$;
+BEGIN
+  PERFORM oc_release_index(array_prepend(OLD.id,OLD.index_bases),array_prepend(NULL::bigint,OLD.index_clocks));
+  RETURN NULL;
+END $$;
 DROP TRIGGER IF EXISTS oc_index_release ON oc_timelines;
 CREATE TRIGGER oc_index_release AFTER DELETE ON oc_timelines
 FOR EACH ROW EXECUTE FUNCTION oc_timeline_index_release();
