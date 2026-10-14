@@ -172,14 +172,14 @@ test('merges require write access, an open unchanged proposal, and an unchanged 
     status: 'open',
     revision: '1',
     base_revision: '1',
-    base_document: base,
-    document: base,
+    base_revision_id: id,
+    source_revision_id: author,
   };
   const queries = [];
   const client = {
     query: async (sql, args) => {
       queries.push(sql);
-      if (sql.startsWith('SELECT * FROM oc_proposals')) return { rows: [{ ...proposal, status }] };
+      if (sql.includes('FROM oc_proposals p WHERE')) return { rows: [{ ...proposal, status }] };
       return { rows: [] };
     },
   };
@@ -189,6 +189,7 @@ test('merges require write access, an open unchanged proposal, and an unchanged 
     access: async () => ({ id, revision: upstream, canWrite: role === 'writer', canPropose: true }),
     replace: async () => replacement++,
     branchDocument: async () => base,
+    revisionDocument: async () => base,
     checkpoint: async () => author,
   };
   const collaboration = new Collaboration(store);

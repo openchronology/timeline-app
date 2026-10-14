@@ -5423,10 +5423,10 @@ const community = createCommunityUI({
       .catch(fail);
   },
   working: () => workingProposal,
-  edit: (proposal) => {
+  edit: (proposal, document) => {
     if (!mayReplace()) return;
     const upstream = remote!;
-    loadDocument(validateDocument(proposal.document));
+    loadDocument(validateDocument(document));
     remote = {
       ...upstream,
       revision: proposal.base_revision,

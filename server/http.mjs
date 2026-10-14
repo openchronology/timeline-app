@@ -672,7 +672,7 @@ export function createRequestHandler({
             ),
           );
         const pull =
-          /^\/api\/timelines\/([a-f0-9-]{36})\/proposals(?:\/([a-f0-9-]{36})(?:\/(comments|resolve))?)?$/.exec(
+          /^\/api\/timelines\/([a-f0-9-]{36})\/proposals(?:\/([a-f0-9-]{36})(?:\/(comments|resolve|document))?)?$/.exec(
             pathname,
           );
         if (pull && uuid.test(pull[1]) && (!pull[2] || uuid.test(pull[2]))) {
@@ -700,6 +700,8 @@ export function createRequestHandler({
                   new URL(req.url, origin).searchParams.get('after') ?? '0',
                 ),
               );
+            if (sub === 'document')
+              return response(res, 200, await collaboration.document(tid, pid, userId));
             if (!sub) return response(res, 200, await collaboration.get(tid, pid, userId));
           }
           auth.require(session, req);

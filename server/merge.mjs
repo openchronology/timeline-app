@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { HttpError } from './store.mjs';
 import { validateDocument, fixMissingAnchors, relationshipKey } from '../dist/core.mjs';
+import { differences, valuesAt, settingsAt, keyName } from './history.mjs';
 function same(a, b) {
   return canonical(a) === canonical(b);
 }
@@ -17,27 +18,46 @@ function canonical(value) {
     '}'
   );
 }
+/**
+ * Three-way merge of one value: `a` the base, `b` the proposed side, `c` the upstream side
+ * (undefined where absent). A side that kept the base takes the other; objects merge field
+ * by field when `fields`; anything else changed on both sides is a conflict, named `key`.
+ */
+function mergeValue(a, b, c, key, fields, conflicts) {
+  if (same(a, b)) return c;
+  if (same(a, c) || same(b, c)) return b;
+  const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+  if (fields && object(a) && object(b) && object(c)) {
+    const result = Object.create(null);
+    for (const k of new Set([...Object.keys(a), ...Object.keys(b), ...Object.keys(c)])) {
+      const value = mergeValue(a[k], b[k], c[k], key + '.' + k, true, conflicts);
+      if (value !== undefined) result[k] = value;
+    }
+    return result;
+  }
+  conflicts.push(key);
+  return c;
+}
+/** The settings a merge reconciles field by field; others follow the timeline merged into. */
+const SETTINGS = ['title', 'description', 'tags', 'presentation', 'plugins', 'assets'];
+function conflict(conflicts) {
+  return Object.assign(
+    new HttpError(
+      409,
+      'Rebase conflicts: ' +
+        conflicts.slice(0, 10).join(', ') +
+        '. Resolve these fields explicitly; both saved versions have been retained.',
+    ),
+    { conflicts },
+  );
+}
 export function rebaseDocument(base, proposal, upstream) {
   // Older saved versions store durations as moment links; compare standalone definitions.
   [base, proposal, upstream] = [base, proposal, upstream].map((d) => validateDocument(d));
   const result = { ...upstream };
   const conflicts = [];
-  const merge = (a, b, c, key, fields = false) => {
-    if (same(a, b)) return c;
-    if (same(a, c) || same(b, c)) return b;
-    const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
-    if (fields && object(a) && object(b) && object(c)) {
-      const result = Object.create(null);
-      for (const k of new Set([...Object.keys(a), ...Object.keys(b), ...Object.keys(c)])) {
-        const value = merge(a[k], b[k], c[k], key + '.' + k, true);
-        if (value !== undefined) result[k] = value;
-      }
-      return result;
-    }
-    conflicts.push(key);
-    return c;
-  };
-  for (const key of ['title', 'description', 'tags', 'presentation', 'plugins', 'assets']) {
+  const merge = (a, b, c, key, fields = false) => mergeValue(a, b, c, key, fields, conflicts);
+  for (const key of SETTINGS) {
     const value = merge(base[key], proposal[key], upstream[key], key);
     if (value === undefined) delete result[key];
     else result[key] = value;
@@ -85,15 +105,164 @@ export function rebaseDocument(base, proposal, upstream) {
   }
   if (relationships.length) result.relationships = relationships;
   else delete result.relationships;
-  if (conflicts.length)
-    throw Object.assign(
-      new HttpError(
-        409,
-        'Rebase conflicts: ' +
-          conflicts.slice(0, 10).join(', ') +
-          '. Resolve these fields explicitly; both saved versions have been retained.',
-      ),
-      { conflicts },
-    );
+  if (conflicts.length) throw conflict(conflicts);
   return validateDocument(result);
 }
+
+const LABELS = { moments: 'moment', durations: 'duration', relationships: 'relationship' };
+const reference = ({ kind, id }) => (kind === 'moment' ? { moment: id } : { duration: id });
+const linkKey = (r) => {
+  const side = (ref) => ('moment' in ref ? ['moment', ref.moment] : ['duration', ref.duration]);
+  const [[a_kind, a_id], [b_kind, b_id]] = [side(r.a), side(r.b)];
+  return { a_kind, a_id, b_kind, b_id };
+};
+/**
+ * Merges what revision `otherId` changed since `baseId` into timeline `timelineId`, whose
+ * saved head is `headId` (and whose live rows are that head), as rebaseDocument would merge
+ * the three documents, but entity by entity: only what `other` changed is read and merged.
+ * Returns the patch that makes the head the merged timeline (as saves take patches, complete:
+ * links to removed entities are removed and durations anchored to removed moments keep their
+ * last time), or null when a revision is not kept as rows (then merge documents). Throws 409
+ * with the conflicts.
+ */
+export async function mergePatch(client, timelineId, { baseId, otherId, headId }) {
+  const head = await settingsAt(client, headId);
+  const pages = head && (await differences(client, baseId, otherId));
+  if (!pages) return null;
+  const conflicts = [];
+  const patch = { settings: head, changes: [], durationChanges: [], relationshipChanges: [] };
+  // What the merge decided per entity, by kind and keyName (null: removed).
+  const merged = { moments: new Map(), durations: new Map(), relationships: new Map() };
+  for await (const page of pages) {
+    if (page[0].kind === 'settings') {
+      const { before, after } = page[0];
+      const settings = { ...head };
+      for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+        const value = SETTINGS.includes(key)
+          ? mergeValue(before[key], after[key], head[key], key, false, conflicts)
+          : same(before[key], head[key])
+            ? after[key]
+            : head[key];
+        if (value === undefined) delete settings[key];
+        else settings[key] = value;
+      }
+      patch.settings = settings;
+      continue;
+    }
+    const name = page[0].kind;
+    const ours = await valuesAt(
+      client,
+      headId,
+      name,
+      page.map((d) => d.key),
+    );
+    for (const { key, before, after } of page) {
+      const current = ours.get(keyName(key));
+      const value = mergeValue(
+        before ?? undefined,
+        after ?? undefined,
+        current,
+        LABELS[name] + ' ' + (name === 'relationships' ? keyName(key) : key),
+        name !== 'relationships',
+        conflicts,
+      );
+      if (same(value, current)) continue;
+      merged[name].set(keyName(key), value ?? null);
+    }
+  }
+  if (conflicts.length) throw conflict(conflicts);
+  await complete(client, timelineId, { baseId, otherId, headId }, merged);
+  for (const [id, event] of merged.moments) patch.changes.push({ id, event });
+  for (const [id, duration] of merged.durations) patch.durationChanges.push({ id, duration });
+  for (const [key, value] of merged.relationships) {
+    const { a_kind, a_id, b_kind, b_id } = JSON.parse(key);
+    patch.relationshipChanges.push({
+      a: reference({ kind: a_kind, id: a_id }),
+      b: reference({ kind: b_kind, id: b_id }),
+      related: value !== null,
+    });
+  }
+  return patch;
+}
+/**
+ * Completes a merge's decisions as rebaseDocument would leave the whole timeline: a link
+ * stays only while both its entities do, and a duration anchored to a removed moment keeps
+ * that moment's last time.
+ */
+async function complete(client, timelineId, { baseId, otherId, headId }, merged) {
+  const removed = [...merged.moments].filter(([, e]) => e === null).map(([id]) => id);
+  // Whether a moment or duration is in the merged timeline: decided, or as at the head.
+  const present = async (kind, ids) => {
+    const name = kind === 'moment' ? 'moments' : 'durations';
+    const undecided = [...new Set(ids)].filter((id) => !merged[name].has(id));
+    const atHead = undecided.length ? await valuesAt(client, headId, name, undecided) : new Map();
+    return (id) => (merged[name].has(id) ? merged[name].get(id) !== null : atHead.has(id));
+  };
+  // Durations the head holds, anchored to moments the merge removes, follow them as saves do.
+  if (removed.length) {
+    const { rows } = await client.query(
+      `SELECT DISTINCT definition FROM oc_duration_nodes WHERE timeline_id=$1 AND definition IS NOT NULL
+      AND (definition->'start'->>'moment'=ANY($2::text[]) OR definition->'end'->>'moment'=ANY($2::text[]))`,
+      [timelineId, removed],
+    );
+    for (const { definition } of rows)
+      if (!merged.durations.has(definition.id)) merged.durations.set(definition.id, definition);
+  }
+  // Durations the merge keeps whose anchors it removes keep the moment's last time: the
+  // proposed side's, the head's, or the base's.
+  const kept = [...merged.durations.values()].filter(Boolean);
+  const anchors = kept.flatMap((d) =>
+    [d.start, d.end].filter((e) => typeof e !== 'string').map((e) => e.moment),
+  );
+  if (anchors.length) {
+    const exists = await present('moment', anchors);
+    const missing = [...new Set(anchors.filter((m) => !exists(m)))];
+    if (missing.length) {
+      const times = new Map();
+      for (const revision of [baseId, headId, otherId])
+        for (const [id, event] of await valuesAt(client, revision, 'moments', missing))
+          times.set(id, event.time);
+      for (const d of fixMissingAnchors(kept, exists, (m) => times.get(m)))
+        merged.durations.set(d.id, d);
+    }
+  }
+  // Links stay only while both their entities do: links the head holds to removed
+  // entities go, and links the merge adds to missing ones are not added.
+  const gone = [
+    ...removed.map((id) => ['moment', id]),
+    ...[...merged.durations].filter(([, d]) => d === null).map(([id]) => ['duration', id]),
+  ];
+  if (gone.length) {
+    const { rows } = await client.query(
+      `SELECT a_kind,a_id,b_kind,b_id FROM oc_relationships r JOIN unnest($2::text[],$3::text[]) x(kind,id)
+      ON (r.a_kind=x.kind AND r.a_id=x.id) OR (r.b_kind=x.kind AND r.b_id=x.id) WHERE r.timeline_id=$1`,
+      [timelineId, gone.map(([kind]) => kind), gone.map(([, id]) => id)],
+    );
+    for (const row of rows) {
+      const key = keyName({
+        a_kind: row.a_kind,
+        a_id: row.a_id,
+        b_kind: row.b_kind,
+        b_id: row.b_id,
+      });
+      if (!merged.relationships.has(key)) merged.relationships.set(key, null);
+    }
+  }
+  const added = [...merged.relationships].filter(([, v]) => v !== null).map(([k]) => JSON.parse(k));
+  if (added.length) {
+    const ends = (kind) =>
+      added.flatMap((r) => [
+        ...(r.a_kind === kind ? [r.a_id] : []),
+        ...(r.b_kind === kind ? [r.b_id] : []),
+      ]);
+    const [moment, duration] = [
+      await present('moment', ends('moment')),
+      await present('duration', ends('duration')),
+    ];
+    const exists = (kind, id) => (kind === 'moment' ? moment(id) : duration(id));
+    for (const r of added)
+      if (!exists(r.a_kind, r.a_id) || !exists(r.b_kind, r.b_id))
+        merged.relationships.delete(keyName(r));
+  }
+}
+export { linkKey };

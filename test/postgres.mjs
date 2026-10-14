@@ -595,8 +595,13 @@ try {
     'POST',
     { action: 'rebase', revision: proposal.revision },
   );
-  assert.equal(rebased.document.description, changedUpstream.description);
-  assert.equal(rebased.document.title, proposedDocument.title);
+  const rebasedDocument = (
+    await editor.request(`timelines/${custody.id}/proposals/${proposal.id}/document`)
+  ).document;
+  assert.equal(rebasedDocument.description, changedUpstream.description);
+  assert.equal(rebasedDocument.title, proposedDocument.title);
+  assert.deepEqual(rebased.changes.settings, ['title']);
+  assert.deepEqual(rebased.changes.moments, { added: 1, removed: 0, changed: 0 });
   const merged = await viewer.request(
     `timelines/${custody.id}/proposals/${proposal.id}/resolve`,
     'POST',
@@ -608,7 +613,7 @@ try {
     new TimelineIndex(
       (await owner.request(`timelines/${custody.id}/document`)).document,
     ).document(),
-    new TimelineIndex(rebased.document).document(),
+    new TimelineIndex(rebasedDocument).document(),
   );
   await viewer.request(
     `timelines/${custody.id}/proposals/${proposal.id}/resolve`,
@@ -669,7 +674,13 @@ try {
     tag: 'astronomy',
   });
   assert(publicSearch.timelines.some((t) => t.id === custody.id));
-  const noteSearch = await anonymous.request('timelines/search', 'POST', { search: 'calibration' });
+  // Moment text reaches the catalogue just after a merge commits, as after any sparse save.
+  let noteSearch;
+  for (let tries = 0; tries < 40; tries++) {
+    noteSearch = await anonymous.request('timelines/search', 'POST', { search: 'calibration' });
+    if (noteSearch.timelines.some((t) => t.id === custody.id)) break;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
   assert(noteSearch.timelines.some((t) => t.id === custody.id));
   await anonymous.request('timelines/search', 'POST', { scope: 'mine' }, 401);
   await viewer.request(`timelines/${custody.id}`, 'DELETE', {}, 403);

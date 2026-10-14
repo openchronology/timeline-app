@@ -79,7 +79,9 @@ const columns = (alias, names) => names.map((name) => `${alias}.${name}`).join('
  * timeline's live rows as none, so the join would read all of them for every key.
  */
 const liveAt = (kind, alias) =>
-  `(${kind.live} AND (${kind.liveKey})=(${columns(alias, kind.key)}) OFFSET 0)`;
+  `(${kind.live} AND (${kind.liveKey})=(${columns(alias, kind.key)})${fence(kind)})`;
+/** Keeps a subquery a lookup per key, unless the kind's live rows have current statistics. */
+const fence = (kind) => (kind.analyzed ? '' : ' OFFSET 0');
 
 /** The parts of a document that are not its entities. */
 export function settingsOf({ events, durations, relationships, ...settings }) {
@@ -105,12 +107,17 @@ export async function recordHistory(client, timelineId, number, settings, touche
       timelineId,
       number,
     ]);
-  let bytes = await recordSettings(client, timelineId, number, settings),
-    written = 0;
+  const bytes = await recordSettings(client, timelineId, number, settings);
   // A copy starts as its base: it has nothing of its own to record yet.
   if (starting && rows[0].base_revision_id) return bytes;
+  return bytes + (await recordEntities(client, KINDS, timelineId, number, starting, touched));
+}
+/** Records the entities of `kinds` (see recordHistory); returns the bytes written. */
+async function recordEntities(client, kinds, timelineId, number, starting, touched) {
   const levels = await lineage(client, timelineId, CURRENT);
-  for (const [name, kind] of Object.entries(KINDS)) {
+  let bytes = 0,
+    written = 0;
+  for (const [name, kind] of Object.entries(kinds)) {
     // History starting at this save copies everything, not only what the save changed.
     const keys = starting ? null : touched?.[name];
     const result = keys
@@ -124,6 +131,142 @@ export async function recordHistory(client, timelineId, number, settings, touche
   if (starting && written > PAGE) await client.query(`ANALYZE ${TABLES.join(',')}`);
   return bytes;
 }
+
+/**
+ * A document's entities staged in temporary tables, with the same columns as each kind's
+ * live rows: a revision that is not a timeline's state (a pull request's source) is recorded
+ * from them as a timeline's saves are from its live rows.
+ */
+const STAGED = {
+  moments: {
+    table: 'oc_staged_moments',
+    columns: ['timeline_id', 'id', 'time', 'event'],
+    definition:
+      'timeline_id uuid,id text,time mpq NOT NULL,event jsonb NOT NULL,PRIMARY KEY(timeline_id,id)',
+    values: "e->>'id',(e->>'time')::mpq,e",
+    items: (document) => document.events,
+  },
+  durations: {
+    table: 'oc_staged_durations',
+    columns: ['timeline_id', 'id', 'definition'],
+    definition: 'timeline_id uuid,id text,definition jsonb NOT NULL,PRIMARY KEY(timeline_id,id)',
+    values: "e->>'id',e",
+    items: (document) => document.durations ?? [],
+  },
+  relationships: {
+    table: 'oc_staged_relationships',
+    columns: ['timeline_id', ...LINK],
+    definition: `timeline_id uuid,a_kind text,a_id text,b_kind text,b_id text,PRIMARY KEY(timeline_id,${LINK})`,
+    values: LINK.map((c) => `e->>'${c}'`).join(','),
+    items: (document) =>
+      (document.relationships ?? []).map((r) => {
+        const [a_kind, a_id] = reference(r.a),
+          [b_kind, b_id] = reference(r.b);
+        return { a_kind, a_id, b_kind, b_id };
+      }),
+  },
+};
+/** How many entities one statement stages. */
+const STAGE_BATCH = 5000;
+const reference = (ref) => ('moment' in ref ? ['moment', ref.moment] : ['duration', ref.duration]);
+/** Each kind, read from its staged rows instead of its live ones. */
+const STAGED_KINDS = Object.fromEntries(
+  Object.entries(KINDS).map(([name, kind]) => {
+    const staged = STAGED[name].columns.slice(1);
+    return [
+      name,
+      {
+        ...kind,
+        live: `SELECT ${staged} FROM ${STAGED[name].table} WHERE timeline_id=$1`,
+        liveKey: kind.key,
+        // Staged rows are analyzed once staged (recordDetached), so plans may join them.
+        analyzed: true,
+      },
+    ];
+  }),
+);
+
+/**
+ * Records `document` (validated) as a revision outside any timeline's numbered history (a pull request's
+ * source, or a rebase of one): `revisionId` is its own one-revision history, number 1, that
+ * reads through to `baseRevisionId` and keeps only what the document changes from it, so it is
+ * charged its changes. Returns the bytes written, or null when the base is not kept as rows
+ * (then the revision stores the document).
+ */
+export async function recordDetached(client, revisionId, baseRevisionId, document) {
+  if (!(await startDetached(client, revisionId, baseRevisionId))) return null;
+  await stage(client, revisionId, document);
+  const bytes =
+    (await recordSettings(client, revisionId, 1, settingsOf(document))) +
+    (await recordEntities(client, STAGED_KINDS, revisionId, 1, false, null));
+  await unstage(client, revisionId);
+  return bytes;
+}
+/**
+ * Records, like recordDetached, a revision that is its base changed by `patch` (as saves
+ * take it: settings, changes, durationChanges, relationshipChanges): only what the patch
+ * names is compared, so it costs what it changes.
+ */
+export async function recordDetachedPatch(client, revisionId, baseRevisionId, patch) {
+  // A patch only exists against a base kept as rows (mergePatch).
+  if (!(await startDetached(client, revisionId, baseRevisionId))) return null;
+  const relationships = (patch.relationshipChanges ?? []).map((r) => ({ a: r.a, b: r.b }));
+  await stage(client, revisionId, {
+    events: patch.changes.filter((c) => c.event).map((c) => c.event),
+    durations: (patch.durationChanges ?? []).filter((c) => c.duration).map((c) => c.duration),
+    relationships: relationships.filter((_, i) => patch.relationshipChanges[i].related),
+  });
+  const link = (r) => {
+    const [a_kind, a_id] = reference(r.a),
+      [b_kind, b_id] = reference(r.b);
+    return { a_kind, a_id, b_kind, b_id };
+  };
+  const bytes =
+    (await recordSettings(client, revisionId, 1, patch.settings)) +
+    (await recordEntities(client, STAGED_KINDS, revisionId, 1, false, {
+      moments: patch.changes.map((c) => c.id),
+      durations: (patch.durationChanges ?? []).map((c) => c.id),
+      relationships: relationships.map(link),
+    }));
+  await unstage(client, revisionId);
+  return bytes;
+}
+/** A detached revision's history reads through to its base, which must be kept as rows. */
+async function startDetached(client, revisionId, baseRevisionId) {
+  const base = await client.query('SELECT 1 FROM oc_revisions WHERE id=$1 AND history_rows', [
+    baseRevisionId,
+  ]);
+  if (!base.rows.length) return false;
+  await client.query('INSERT INTO oc_history_bases(timeline_id,base_revision_id) VALUES($1,$2)', [
+    revisionId,
+    baseRevisionId,
+  ]);
+  return true;
+}
+/** Stages a document's entities (see STAGED) for `id`, until the transaction ends. */
+async function stage(client, id, document) {
+  for (const stage of Object.values(STAGED)) {
+    await client.query(
+      `CREATE TEMPORARY TABLE IF NOT EXISTS ${stage.table}(${stage.definition}) ON COMMIT DROP`,
+    );
+    const items = stage.items(document);
+    for (let i = 0; i < items.length; i += STAGE_BATCH)
+      await client.query(
+        `INSERT INTO ${stage.table}(${stage.columns}) SELECT $1,${stage.values}
+        FROM jsonb_array_elements($2::jsonb) e`,
+        [id, JSON.stringify(items.slice(i, i + STAGE_BATCH))],
+      );
+  }
+  // Statistics of their keys, so comparisons with the base read the staged rows by key.
+  await client.query(
+    `ANALYZE ${Object.entries(STAGED).map(([name, stage]) => `${stage.table}(timeline_id,${KINDS[name].key})`)}`,
+  );
+}
+async function unstage(client, id) {
+  for (const stage of Object.values(STAGED))
+    await client.query(`DELETE FROM ${stage.table} WHERE timeline_id=$1`, [id]);
+}
+
 const keyOf = (kind) => (value) =>
   kind.key.length === 1 ? [value] : kind.key.map((column) => value[column]);
 
@@ -245,7 +388,7 @@ async function recordKeys(client, kind, timelineId, number, keys, levels) {
           INSERT INTO ${kind.overrides}(timeline_id,${kind.key},since)
           SELECT $1,${columns('k', kind.key)},$2 FROM k
           LEFT JOIN LATERAL ${liveAt(kind, 'k')} l ON true
-          LEFT JOIN LATERAL (${inherited} OFFSET 0) i ON true
+          LEFT JOIN LATERAL (${inherited}${fence(kind)}) i ON true
           WHERE NOT EXISTS(${own('k')}) AND (${present('l')}<>${present('i')}
             ${kind.same ? `OR l.${kind.same} IS DISTINCT FROM i.${kind.same}` : ''})
           RETURNING ${kind.overrideBytes} AS bytes
@@ -430,4 +573,155 @@ export async function pruneHistoryRows(client, timelineId) {
     [timelineId],
   );
   return rows[0]?.released ?? null;
+}
+
+/**
+ * What differs between two revisions kept as rows (`fromId`, `toId`): an async iterable of
+ * pages of { kind, key, before, after }. `kind` is 'settings', 'moments', 'durations' or
+ * 'relationships'; `key` an entity's ID (a relationship's LINK columns as an object); before
+ * and after its settings, event or definition (true for a relationship), or null where it is
+ * absent. Only the entities that either revision's history saved since they last shared a
+ * state are compared, so the cost follows the differences, not the timeline's size. Null when
+ * either revision is not kept as rows.
+ */
+export async function differences(client, fromId, toId) {
+  const { rows } = await client.query(
+    'SELECT id,timeline_id,number::text FROM oc_revisions WHERE id=ANY($1::uuid[]) AND history_rows',
+    [[fromId, toId]],
+  );
+  const revision = (id) => rows.find((row) => row.id === id);
+  if (!revision(fromId) || !revision(toId)) return null;
+  const [from, to] = await Promise.all(
+    [fromId, toId].map((id) => lineage(client, revision(id).timeline_id, revision(id).number)),
+  );
+  return comparePages(client, from, to);
+}
+async function* comparePages(client, from, to) {
+  const settings = await client.query(
+    `SELECT a.settings AS before,b.settings AS after,a.settings=b.settings AS same
+    FROM oc_history_settings a,oc_history_settings b
+    WHERE a.timeline_id=$1 AND a.since<=$2 AND (a.until IS NULL OR a.until>$2)
+    AND b.timeline_id=$3 AND b.since<=$4 AND (b.until IS NULL OR b.until>$4)`,
+    [...from[0], ...to[0]],
+  );
+  if (settings.rows[0] && !settings.rows[0].same)
+    yield [{ kind: 'settings', key: null, ...settings.rows[0], same: undefined }];
+  for (const [name, kind] of Object.entries(KINDS)) {
+    let cursor = null;
+    for (;;) {
+      const keys = await candidates(client, kind, from, to, cursor);
+      if (!keys.length) break;
+      const changed = await compareKeys(client, kind, from, to, keys);
+      if (changed.length)
+        yield changed.map((row) => ({
+          kind: name,
+          key:
+            kind.key.length === 1
+              ? row[kind.key[0]]
+              : Object.fromEntries(kind.key.map((c) => [c, row[c]])),
+          before: row.before,
+          after: row.after,
+        }));
+      if (keys.length < PAGE) break;
+      cursor = keys.at(-1);
+    }
+  }
+}
+/**
+ * A page of the keys either lineage may have changed since they last shared a state, after
+ * `cursor`: everything the levels above the first timeline both read saved (up to their
+ * revisions), and what that timeline saved between its two revisions. Lineages that share no
+ * timeline compare everything they hold.
+ */
+async function candidates(client, kind, from, to, cursor) {
+  const i = from.findIndex(([id]) => to.some(([other]) => other === id));
+  const j = i < 0 ? -1 : to.findIndex(([id]) => id === from[i][0]);
+  const above = i < 0 ? [...from, ...to] : [...from.slice(0, i), ...to.slice(0, j)];
+  const branches = above.flatMap(([id, n]) => [
+    `SELECT ${kind.key} FROM ${kind.table} WHERE timeline_id='${id}' AND since<=${n}`,
+    `SELECT ${kind.key} FROM ${kind.overrides} WHERE timeline_id='${id}' AND since<=${n}`,
+  ]);
+  if (i >= 0 && from[i][1] !== to[j][1]) {
+    const [lo, hi] = [BigInt(from[i][1]), BigInt(to[j][1])].sort((x, y) => (x < y ? -1 : 1));
+    const between = (column) => `(${column}>${lo} AND ${column}<=${hi})`;
+    branches.push(
+      `SELECT ${kind.key} FROM ${kind.table} WHERE timeline_id='${from[i][0]}'
+      AND (${between('since')} OR ${between('until')})`,
+      `SELECT ${kind.key} FROM ${kind.overrides} WHERE timeline_id='${from[i][0]}' AND ${between('since')}`,
+    );
+  }
+  if (!branches.length) return [];
+  const after = cursor ? `AND (${kind.key})>(${kind.key.map((_, c) => `$${c + 1}`)})` : '';
+  const { rows } = await client.query(
+    `SELECT DISTINCT ${kind.key} FROM (${branches
+      .map((branch) => `(${branch} ${after} ORDER BY ${kind.key} LIMIT ${PAGE})`)
+      .join(' UNION ALL ')}) c ORDER BY ${kind.key} LIMIT ${PAGE}`,
+    cursor ?? [],
+  );
+  return rows.map((row) => kind.key.map((column) => row[column]));
+}
+/** The keys whose versions differ between two lineages, with both versions. */
+async function compareKeys(client, kind, from, to, keys) {
+  const key = (alias) => `(${columns(alias, kind.key)})`;
+  const filter = (alias) => `AND ${key(alias)} IN (SELECT ${kind.key} FROM k)`;
+  const value = (alias) =>
+    kind.same
+      ? `${alias}.${kind.same}`
+      : `CASE WHEN ${alias}.${kind.key[0]} IS NULL THEN NULL ELSE 'true'::jsonb END`;
+  const { rows } = await client.query(
+    `WITH k AS (SELECT * FROM unnest(${kind.key.map((_, c) => `$${c + 1}::text[]`)}) AS k(${kind.key})),
+    a AS (${visible(kind, from, filter)}),b AS (${visible(kind, to, filter)})
+    SELECT ${kind.key.map((c) => `coalesce(a.${c},b.${c}) AS ${c}`)},${value('a')} AS before,${value('b')} AS after
+    FROM a FULL JOIN b ON ${key('a')}=${key('b')}
+    WHERE a.${kind.key[0]} IS NULL OR b.${kind.key[0]} IS NULL
+    ${kind.same ? `OR a.${kind.same} IS DISTINCT FROM b.${kind.same}` : ''}`,
+    kind.key.map((_, c) => keys.map((k) => k[c])),
+  );
+  return rows;
+}
+
+/**
+ * The versions of entities of one kind ('moments', 'durations' or 'relationships') at a
+ * revision kept as rows, by key (as `differences` gives keys): a Map from keyName to the
+ * event, definition or true. Keys the revision does not hold are absent.
+ */
+export async function valuesAt(client, revisionId, name, keys) {
+  const kind = KINDS[name];
+  const { rows: found } = await client.query(
+    'SELECT timeline_id,number::text FROM oc_revisions WHERE id=$1 AND history_rows',
+    [revisionId],
+  );
+  if (!found[0]) throw new Error('Expected a revision kept as rows.');
+  const levels = await lineage(client, found[0].timeline_id, found[0].number);
+  const values = new Map();
+  const columnsOf = (key) => (kind.key.length === 1 ? [key] : kind.key.map((c) => key[c]));
+  for (let i = 0; i < keys.length; i += PAGE) {
+    const page = keys.slice(i, i + PAGE).map(columnsOf);
+    const { rows } = await client.query(
+      `WITH k AS (SELECT * FROM unnest(${kind.key.map((_, c) => `$${c + 1}::text[]`)}) AS k(${kind.key}))
+      ${visible(kind, levels, (alias) => `AND (${columns(alias, kind.key)}) IN (SELECT ${kind.key} FROM k)`)}`,
+      kind.key.map((_, c) => page.map((key) => key[c])),
+    );
+    for (const row of rows)
+      values.set(
+        keyName(
+          kind.key.length === 1
+            ? row[kind.key[0]]
+            : Object.fromEntries(kind.key.map((c) => [c, row[c]])),
+        ),
+        kind.same ? row[kind.same] : true,
+      );
+  }
+  return values;
+}
+/** A key as `differences` gives it, as a string to look values up by. */
+export const keyName = (key) => (typeof key === 'string' ? key : JSON.stringify(key));
+/** The settings of a revision kept as rows. */
+export async function settingsAt(client, revisionId) {
+  const { rows } = await client.query(
+    `SELECT s.settings FROM oc_revisions r JOIN oc_history_settings s ON s.timeline_id=r.timeline_id
+    AND s.since<=r.number AND (s.until IS NULL OR s.until>r.number) WHERE r.id=$1 AND r.history_rows`,
+    [revisionId],
+  );
+  return rows[0]?.settings ?? null;
 }

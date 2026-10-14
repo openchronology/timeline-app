@@ -74,13 +74,8 @@ export default function PullReview({ timelineId, initial, initialComments, signe
       form.reset();
     });
   }
-  const old = new Map(p.base_document.events.map((e) => [e.id, e])),
-    now = new Map(p.document.events.map((e) => [e.id, e]));
-  const added = p.document.events.filter((e) => !old.has(e.id)),
-    removed = p.base_document.events.filter((e) => !now.has(e.id)),
-    changed = p.document.events.filter(
-      (e) => old.has(e.id) && JSON.stringify(old.get(e.id)) !== JSON.stringify(e),
-    );
+  // The server summarizes what the pull request changes, with the first moments of each kind.
+  const { moments, durations, relationships, settings, examples } = p.changes;
   return (
     <>
       <h1>{p.title}</h1>
@@ -97,35 +92,50 @@ export default function PullReview({ timelineId, initial, initialComments, signe
       <section>
         <h2>Changes</h2>
         <p>
-          {added.length} added, {removed.length} removed, {changed.length} changed moments.
+          {moments.added} added, {moments.removed} removed, {moments.changed} changed moments.
         </p>
-        {['title', 'description', 'tags', 'presentation', 'plugins', 'assets']
-          .filter((k) => JSON.stringify(p.base_document[k]) !== JSON.stringify(p.document[k]))
-          .map((k) => (
-            <p key={k}>Changed timeline {k}.</p>
-          ))}
-        {[
-          ['Added', added],
-          ['Removed', removed],
-          ['Changed', changed],
-        ].map(([label, events]) => (
-          <div key={label}>
-            {events.slice(0, 30).map((e) => (
-              <details key={e.id}>
-                <summary>
-                  {label}: {e.metadata.title || 'Unnamed moment'} · {e.time}
-                </summary>
-                {label === 'Changed' && <pre>{JSON.stringify(old.get(e.id), null, 2)}</pre>}
-                <pre>{JSON.stringify(e, null, 2)}</pre>
-              </details>
-            ))}
-            {events.length > 30 && (
-              <p>
-                {events.length - 30} more {label.toLowerCase()} moments in the proposed snapshot.
-              </p>
-            )}
-          </div>
+        {durations.added + durations.removed + durations.changed > 0 && (
+          <p>
+            {durations.added} added, {durations.removed} removed, {durations.changed} changed
+            durations.
+          </p>
+        )}
+        {relationships.added + relationships.removed > 0 && (
+          <p>
+            {relationships.added} added, {relationships.removed} removed relationships.
+          </p>
+        )}
+        {settings.map((k) => (
+          <p key={k}>Changed timeline {k}.</p>
         ))}
+        {[
+          ['Added', 'added'],
+          ['Removed', 'removed'],
+          ['Changed', 'changed'],
+        ].map(([label, change]) => {
+          const shown = examples.filter((e) => e.change === change);
+          return (
+            <div key={label}>
+              {shown.map(({ before, after }) => {
+                const e = after ?? before;
+                return (
+                  <details key={e.id}>
+                    <summary>
+                      {label}: {e.metadata.title || 'Unnamed moment'} · {e.time}
+                    </summary>
+                    {before && after && <pre>{JSON.stringify(before, null, 2)}</pre>}
+                    <pre>{JSON.stringify(e, null, 2)}</pre>
+                  </details>
+                );
+              })}
+              {moments[change] > shown.length && (
+                <p>
+                  {moments[change] - shown.length} more {change} moments in the proposed timeline.
+                </p>
+              )}
+            </div>
+          );
+        })}
       </section>
       <div className="actions">
         {p.canUpdate &&

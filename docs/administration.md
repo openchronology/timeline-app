@@ -148,10 +148,13 @@ hundred bytes. A copy still builds its own index of the whole timeline, which to
 longer than reading the original's (6 s rather than 4.6 s), because it reads through to
 the original.
 
-**Pull requests still store whole timelines.** PostgreSQL stores each as one `jsonb` value,
-which cannot exceed about 256 MB, so the server refuses a pull request on a timeline over
-200 MB as JSON (HTTP 413) and asks to split it. With content like the benchmark's, that is
-about 1.1 million moments.
+**Pull requests keep no whole timelines.** A pull request refers to saved revisions, and a
+timeline submitted for review is kept as rows that read through to its base, so it is charged
+only for what it changes. Reviewing, merging and rebasing one, and syncing a fork, read only
+what changed. At 200,000 moments, merging a fork's pull request of 200 changes took 0.35 s
+(150 s when merges read whole timelines), and syncing 100 upstream changes into a fork
+0.9 s (161 s before). Opening the proposed timeline reads it whole, as does submitting one
+from the editor.
 
 Some limits stay the same whatever this setting is:
 
