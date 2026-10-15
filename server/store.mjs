@@ -585,7 +585,12 @@ export class PostgresStore {
     }
     await client.query('UPDATE oc_timelines SET search_version=1 WHERE id=$1', [id]);
   }
-  async transaction(action) {
+  /**
+   * Runs `action(c)` in a transaction. `analyses`, when given, collects the statistics
+   * refreshes its writes ask for instead of running them before returning, for a caller
+   * making many writes in a row to run once (see analyze).
+   */
+  async transaction(action, { analyses = null } = {}) {
     const c = await this.pool.connect();
     c.afterCommit = null;
     c.analyze = false;
@@ -604,7 +609,9 @@ export class PostgresStore {
       c.afterCommit?.();
       if (c.compact) this.compact(c.compact);
       // Before answering, so the next request plans with the written timeline counted.
-      if (c.analyze) await this.analyze(c.analyze === true ? undefined : c.analyze);
+      const tables = c.analyze === true ? ANALYZED_TABLES : c.analyze;
+      if (tables && analyses) for (const table of tables) analyses.add(table);
+      else if (tables) await this.analyze(tables);
       return result;
     } catch (e) {
       await c.query('ROLLBACK');
@@ -734,31 +741,38 @@ export class PostgresStore {
     });
     return this.access(id, userId);
   }
-  async save(id, userId, revision, document, patch = null) {
-    return this.transaction(async (c) => {
-      await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [id]);
-      const t = await this.access(id, userId, c);
-      if (!t.canWrite) throw new HttpError(403, 'Write access is required to update upstream.');
-      if (t.revision !== revision)
-        throw new HttpError(
-          409,
-          'Someone changed this timeline. Export your edits before reloading.',
-        );
-      if (patch && incremental(t, patch)) {
-        // Sparse saves update the stored index in place and record only the patch.
-        await this.saveIncrementally(c, t, userId, patch);
-        c.afterCommit = () => this.refreshText(id);
+  /**
+   * Saves `document`, or `patch` (applied in place when it can be), at `revision`.
+   * `analyses`: see transaction.
+   */
+  async save(id, userId, revision, document, patch = null, { analyses = null } = {}) {
+    return this.transaction(
+      async (c) => {
+        await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [id]);
+        const t = await this.access(id, userId, c);
+        if (!t.canWrite) throw new HttpError(403, 'Write access is required to update upstream.');
+        if (t.revision !== revision)
+          throw new HttpError(
+            409,
+            'Someone changed this timeline. Export your edits before reloading.',
+          );
+        if (patch && incremental(t, patch)) {
+          // Sparse saves update the stored index in place and record only the patch.
+          await this.saveIncrementally(c, t, userId, patch);
+          c.afterCommit = () => this.refreshText(id);
+          return this.access(id, userId, c);
+        }
+        if (patch) {
+          const current = await this.branchDocument(c, t);
+          document = validateDocument(applyPatch(current, patch));
+        }
+        await this.replace(c, id, document);
+        await c.query('UPDATE oc_timelines SET revision=revision+1 WHERE id=$1', [id]);
+        await this.checkpoint(c, id, userId, document, 'save', [t.head_revision_id]);
         return this.access(id, userId, c);
-      }
-      if (patch) {
-        const current = await this.branchDocument(c, t);
-        document = validateDocument(applyPatch(current, patch));
-      }
-      await this.replace(c, id, document);
-      await c.query('UPDATE oc_timelines SET revision=revision+1 WHERE id=$1', [id]);
-      await this.checkpoint(c, id, userId, document, 'save', [t.head_revision_id]);
-      return this.access(id, userId, c);
-    });
+      },
+      { analyses },
+    );
   }
   /**
    * Records the timeline's current state (just written from `document`) as its next numbered

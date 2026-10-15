@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Data expiration and quick deletion (#91): a calendar timeline keeping its last year
 // expires older moments and durations and prunes older history, keeping what newer history
-// needs; writers delete a range at once; owners set retention in the timeline's units.
+// needs, in saves of a bounded size (also on forks, and when other saves interleave);
+// writers delete a range at once; owners set retention in the timeline's units.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -9,7 +10,8 @@ import pg from 'pg';
 import { PostgresStore } from '../server/store.mjs';
 import { createApplication } from '../server/http.mjs';
 import { Auth } from '../server/auth.mjs';
-import { expire, expireDue } from '../server/retention.mjs';
+import { expire, expireDue, deleteWhere } from '../server/retention.mjs';
+import { Versioning } from '../server/versioning.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
@@ -229,6 +231,128 @@ try {
   assert.equal(deleted.status, 200, JSON.stringify(deleted.body));
   assert.deepEqual(deleted.body.removed, { moments: 3, durations: 0 });
   assert.deepEqual((await head()).events.map((e) => e.id).sort(), ['newest', 'recent']);
+
+  // A long expiry: deleted in several saves, each a transaction of its own, and retried when
+  // another save got in first; a moment exactly at the cutoff stays. Found through the
+  // timeline's trees, so a fork (reading through to its source) expires the same.
+  const busyDocument = {
+    ...settings,
+    title: 'Busy',
+    events: [
+      ...Array.from({ length: 23 }, (_, i) => ({
+        id: 'e' + String(i).padStart(2, '0'),
+        time: at(YEAR + 1000 + i * 7),
+        metadata: { title: 'Expired ' + i },
+      })),
+      { id: 'edge', time: `${now - YEAR * 1000}/1000`, metadata: { title: 'At the cutoff' } },
+      { id: 'kept', time: at(DAY), metadata: { title: 'Kept' } },
+    ],
+    durations: [{ id: 'gone', start: at(YEAR + 500), end: at(YEAR + 100), metadata: {} }],
+  };
+  const busy = await store.create(owner, busyDocument);
+  timelines.push(busy.id);
+  const busyFork = await new Versioning(store).copy(busy.id, owner, { revision: busy.revision });
+  timelines.push(busyFork.id);
+  for (const timeline of [busy.id, busyFork.id])
+    await pool.query('UPDATE oc_timelines SET retention_seconds=$2 WHERE id=$1', [
+      timeline,
+      `${YEAR}/1`,
+    ]);
+  const savesOf = async (timeline) =>
+    Number(
+      (
+        await pool.query("SELECT count(*) FROM oc_revisions WHERE timeline_id=$1 AND kind='save'", [
+          timeline,
+        ])
+      ).rows[0].count,
+    );
+  const ids = async (timeline) =>
+    (await store.snapshot(timeline, owner)).document.events.map((e) => e.id).sort();
+  const save = store.save;
+  let interrupted = false;
+  store.save = async function (timeline, ...rest) {
+    // Someone else saves just before retention's first save.
+    if (!interrupted && timeline === busy.id) {
+      interrupted = true;
+      const current = await store.access(busy.id, owner);
+      await save.call(this, busy.id, owner, current.revision, null, {
+        settings: { ...settings, title: 'Busy' },
+        changes: [{ id: 'late', event: { id: 'late', time: at(2 * DAY), metadata: {} } }],
+        durationChanges: [],
+        relationshipChanges: [],
+      });
+    }
+    return save.call(this, timeline, ...rest);
+  };
+  for (const timeline of [busy.id, busyFork.id]) {
+    const saves = await savesOf(timeline);
+    const expired = await expire(store, timeline, now, { save: 5 });
+    assert.deepEqual({ ...expired, history: 0 }, { history: 0, moments: 23, durations: 1 });
+    // 23 moments, 5 at a time (and the interrupting save).
+    assert.equal(await savesOf(timeline), saves + 5 + (timeline === busy.id ? 1 : 0));
+    assert.deepEqual(
+      await ids(timeline),
+      timeline === busy.id ? ['edge', 'kept', 'late'] : ['edge', 'kept'],
+    );
+    assert.equal((await store.snapshot(timeline, owner)).document.durations, undefined);
+  }
+  store.save = save;
+  assert(interrupted);
+  // A range deletion takes at most its limit, the first moments in time order, and says
+  // when the range holds more.
+  const ranged = await store.create(owner, busyDocument);
+  timelines.push(ranged.id);
+  const partial = await deleteWhere(
+    store,
+    await store.access(ranged.id, owner),
+    owner,
+    ranged.revision,
+    { lower: at(YEAR + 1000 + 22 * 7), upper: at(YEAR + 1000) },
+    { limit: 4 },
+  );
+  assert.deepEqual(partial.removed, { moments: 4, durations: 0 });
+  assert.equal(partial.more, true);
+  assert.deepEqual(
+    (await ids(ranged.id)).filter((id) => /^e\d/.test(id)),
+    [
+      'e00',
+      'e01',
+      'e02',
+      'e03',
+      'e04',
+      'e05',
+      'e06',
+      'e07',
+      'e08',
+      'e09',
+      'e10',
+      'e11',
+      'e12',
+      'e13',
+      'e14',
+      'e15',
+      'e16',
+      'e17',
+      'e18',
+    ],
+    'the oldest four went',
+  );
+  // Walking the moment tree a few moments at a time finds the same.
+  const walked = await deleteWhere(
+    store,
+    await store.access(ranged.id, owner),
+    owner,
+    (await store.access(ranged.id, owner)).revision,
+    { before: `${now - YEAR * 1000}/1000` },
+    { limit: 10, walk: 3 },
+  );
+  assert.deepEqual(walked.removed, { moments: 10, durations: 1 });
+  assert.equal(walked.more, true);
+  assert.deepEqual(
+    (await ids(ranged.id)).filter((id) => /^e\d/.test(id)),
+    ['e00', 'e01', 'e02', 'e03', 'e04', 'e05', 'e06', 'e07', 'e08'],
+    'the oldest ten more went, and the duration before the cutoff',
+  );
 
   // Clearing retention, and timelines without a calendar cannot have one.
   assert.equal(

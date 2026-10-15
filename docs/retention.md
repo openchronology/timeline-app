@@ -16,7 +16,11 @@ then:
 - deletes moments older than the period, and durations that ended before it. Durations that
   followed a deleted moment keep its time as a fixed endpoint, and relationships of deleted
   moments and durations go. This is saved like any other change, so viewers see it live and
-  the timeline's history records it;
+  the timeline's history records it: in saves of at most 5,000 moments, each on its own, so
+  other saves to the timeline (a log arriving) wait for one of them at most, a few seconds
+  even at a million moments. A run deletes for up to ten minutes and the next continues.
+  What to delete is found by walking the timeline's moment tree from its oldest moment, at
+  a cost that follows what is deleted rather than the timeline's size;
 - deletes saved revisions from before the period, and the versions of moments, durations and
   relationships that only those revisions saw, which frees the storage they used. It keeps
   what is still needed: the current revision, anything forks or pull requests refer to

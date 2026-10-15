@@ -15,7 +15,7 @@ export const RETENTION_EVERY = 60 * 60 * 1000;
 /** Retention keeps at least an hour, and at most a thousand years. */
 const SHORTEST = Q.from(3600n),
   LONGEST = Q.from(1000n * 31556952n);
-/** One save removes at most this many moments; a run continues where it stopped. */
+/** One deletion of a range (deleteWhere) removes at most this many moments. */
 const BATCH = 200000;
 
 /**
@@ -60,11 +60,41 @@ function settings(t) {
     if (t[key] !== null && t[key] !== undefined) document[key] = t[key];
   return validateDocument(document);
 }
+/** Moments read per walk of the moment tree when finding what to delete. */
+const WALK_PAGE = 5000;
+/**
+ * The IDs of up to `limit` moments of timeline `t` in a range (as deleteWhere takes it), in
+ * time order, walking its moment tree a page at a time from the range's start (oc_events,
+ * which reads through for forks): the cost follows what is found, not the timeline. `more`
+ * when the range holds more.
+ */
+async function momentsIn(pool, t, { lower, upper, before }, limit, walk = WALK_PAGE) {
+  const ids = [];
+  const end = before === null ? null : Q.parse(before);
+  let after = null;
+  for (;;) {
+    const page = Math.min(walk, limit - ids.length + 1);
+    const { rows } = await pool.query(
+      `SELECT e->>'id' AS id,e->>'time' AS time FROM oc_events($1,$2::mpq,$3::mpq,$4::mpq,$5,$6) e`,
+      [t.id, lower, upper ?? before, after?.time ?? null, after?.id ?? null, page],
+    );
+    for (const row of rows) {
+      if (end && Q.parse(row.time).compare(end) >= 0) return { ids, more: false };
+      if (ids.length === limit) return { ids, more: true };
+      ids.push(row.id);
+    }
+    if (rows.length < page) return { ids, more: false };
+    after = rows.at(-1);
+  }
+}
 /**
  * Deletes the timeline's moments in a range (`lower` and `upper` inclusive, either open when
  * null; `before` exclusive) and its durations lying wholly inside it, as one save by `userId`
- * at `revision`. Durations that followed a deleted moment keep its time; links of deleted
- * entities go. Returns what was deleted and the timeline afterwards.
+ * at `revision`: at most `limit` of each (the first moments in time order), `more` when the
+ * range holds more (`walk`: the moments read per walk of the moment tree; `analyses`: see
+ * PostgresStore.transaction). Durations that followed a deleted moment keep its time; links of deleted
+ * entities go. What to delete is found through the timeline's trees and indexes, at a cost
+ * that follows it. Returns what was deleted and the timeline afterwards.
  */
 export async function deleteWhere(
   store,
@@ -72,33 +102,44 @@ export async function deleteWhere(
   userId,
   revision,
   { lower = null, upper = null, before = null },
+  { limit = BATCH, walk = WALK_PAGE, analyses = null } = {},
 ) {
   if (t.comparison) throw new HttpError(409, 'Delete moments in comparison sources instead.');
   const index = await indexReader(store.pool, t);
+  const range = { lower, upper, before };
+  // Durations wholly inside start inside it: found through their start index (first_key,
+  // which orders as their start does).
   const [moments, durations] = await Promise.all([
+    momentsIn(store.pool, t, range, limit, walk),
     store.pool.query(
-      `SELECT id FROM ${index('oc_moments')} x WHERE ($2::mpq IS NULL OR time>=$2::mpq)
-      AND ($3::mpq IS NULL OR time<=$3::mpq) AND ($4::mpq IS NULL OR time<$4::mpq) LIMIT $5`,
-      [t.id, lower, upper, before, BATCH],
-    ),
-    store.pool.query(
-      `SELECT DISTINCT band->>'id' AS id FROM ${index('oc_duration_nodes')} x
-      WHERE definition IS NOT NULL AND ($2::mpq IS NULL OR (band->>'first')::mpq>=$2::mpq)
-      AND ($3::mpq IS NULL OR (band->>'last')::mpq<=$3::mpq)
-      AND ($4::mpq IS NULL OR (band->>'last')::mpq<$4::mpq)`,
-      [t.id, lower, upper, before],
+      `SELECT band->>'id' AS id FROM ${index('oc_duration_nodes')} x
+      WHERE definition IS NOT NULL
+      AND ($2::mpq IS NULL OR (first_key>=oc_qkey($2::mpq) AND first_time>=$2::mpq))
+      AND ($3::mpq IS NULL OR (first_key<=oc_qkey($3::mpq) AND last_time<=$3::mpq))
+      AND ($4::mpq IS NULL OR (first_key<=oc_qkey($4::mpq) AND last_time<$4::mpq))
+      ORDER BY first_key LIMIT $5`,
+      [t.id, lower, upper, before, limit + 1],
     ),
   ]);
-  const removed = { moments: moments.rows.length, durations: durations.rows.length };
+  const durationIds = durations.rows.slice(0, limit).map((r) => r.id);
+  const removed = { moments: moments.ids.length, durations: durationIds.length };
+  const more = moments.more || durations.rows.length > limit;
   if (!removed.moments && !removed.durations)
-    return { removed, timeline: await store.metadata(t.id, userId) };
-  await store.save(t.id, userId, revision, null, {
-    settings: settings(t),
-    changes: moments.rows.map(({ id }) => ({ id, event: null })),
-    durationChanges: durations.rows.map(({ id }) => ({ id, duration: null })),
-    relationshipChanges: [],
-  });
-  return { removed, more: removed.moments === BATCH, timeline: await store.metadata(t.id, userId) };
+    return { removed, more, timeline: await store.metadata(t.id, userId) };
+  await store.save(
+    t.id,
+    userId,
+    revision,
+    null,
+    {
+      settings: settings(t),
+      changes: moments.ids.map((id) => ({ id, event: null })),
+      durationChanges: durationIds.map((id) => ({ id, duration: null })),
+      relationshipChanges: [],
+    },
+    { analyses },
+  );
+  return { removed, more, timeline: await store.metadata(t.id, userId) };
 }
 /**
  * Removes the timeline's saved revisions from before `before`, apart from what is still
@@ -144,12 +185,20 @@ export async function pruneHistory(client, timelineId, before) {
   await pruneHistoryRows(client, timelineId);
   return ids.length;
 }
+/** How many moments (and durations) one save of retention deletes. */
+export const RETENTION_SAVE = 5000;
+/** How long one run of retention keeps deleting from a timeline; the next run continues. */
+const RETENTION_BUDGET = 10 * 60 * 1000;
 /**
  * Applies a timeline's retention at `now` (ms): prunes history saved before the retention
- * window, then deletes moments and durations from before it as a save by the owner.
+ * window, then deletes moments and durations from before it as saves by the owner, each of
+ * at most `save` (RETENTION_SAVE) and a transaction of its own, so saves to the timeline
+ * meanwhile wait for one of them at most. A save that lost a race with another is tried again.
  */
-export async function expire(store, id, now = Date.now()) {
-  const t = (await store.pool.query('SELECT * FROM oc_timelines WHERE id=$1', [id])).rows[0];
+export async function expire(store, id, now = Date.now(), { save = RETENTION_SAVE } = {}) {
+  const read = async () =>
+    (await store.pool.query('SELECT * FROM oc_timelines WHERE id=$1', [id])).rows[0];
+  let t = await read();
   if (!t?.retention_seconds || t.comparison) return null;
   const result = { history: 0, moments: 0, durations: 0 };
   try {
@@ -158,11 +207,35 @@ export async function expire(store, id, now = Date.now()) {
       const seconds = Q.parse(t.retention_seconds);
       const since = new Date(now - seconds.toApproximateNumber() * 1000);
       result.history = await store.transaction((c) => pruneHistory(c, id, since));
-      const cutoff = days.origin.add(Q.from(BigInt(now), 1000n).sub(seconds).mul(days.scale));
-      const { removed } = await deleteWhere(store, t, t.owner_id, String(t.revision), {
-        before: cutoff.toString(),
-      });
-      Object.assign(result, removed);
+      const cutoff = days.origin
+        .add(Q.from(BigInt(now), 1000n).sub(seconds).mul(days.scale))
+        .toString();
+      const started = Date.now();
+      // The statistics refreshes its saves ask for run once, after the last.
+      const analyses = new Set();
+      for (let conflicts = 0; Date.now() - started < RETENTION_BUDGET;) {
+        let deleted;
+        try {
+          deleted = await deleteWhere(
+            store,
+            t,
+            t.owner_id,
+            String(t.revision),
+            { before: cutoff },
+            { limit: save, analyses },
+          );
+        } catch (error) {
+          // Someone saved meanwhile: read the timeline again and continue.
+          if (error.status !== 409 || ++conflicts > 10) throw error;
+          t = await read();
+          continue;
+        }
+        result.moments += deleted.removed.moments;
+        result.durations += deleted.removed.durations;
+        if (!deleted.more) break;
+        t = await read();
+      }
+      if (analyses.size) await store.analyze([...analyses]);
     }
   } finally {
     // Tried, whatever happened: the next run is due in an hour.
