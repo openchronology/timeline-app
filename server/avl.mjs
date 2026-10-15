@@ -9,6 +9,18 @@ const order = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const max = (a, b) => (b !== undefined && Q.parse(b).compare(Q.parse(a)) > 0 ? b : a);
 const min = (a, b) => (b !== undefined && Q.parse(b).compare(Q.parse(a)) < 0 ? b : a);
 const id = (value) => (value === null || value === undefined ? null : Number(value));
+/**
+ * `object[field]` (a rational's text) parsed, once per object and text: a save compares each
+ * key with every node on its path, and parsing dominated that.
+ */
+const parsedTimes = new WeakMap();
+function parsed(object, field) {
+  let cache = parsedTimes.get(object);
+  if (!cache) parsedTimes.set(object, (cache = {}));
+  const text = object[field];
+  if (cache[field]?.text !== text) cache[field] = { text, value: Q.parse(text) };
+  return cache[field].value;
+}
 
 /** Inserts or replaces rows in batches; `casts` maps column names to SQL casts. */
 export async function upsertRows(client, table, columns, casts, rows, conflict = true) {
@@ -93,7 +105,7 @@ export const MOMENT_TREE = {
     n.height,
     n.ids,
   ],
-  compare: (key, n) => Q.parse(key.time).compare(Q.parse(n.time)),
+  compare: (key, n) => parsed(key, 'time').compare(parsed(n, 'time')),
   create: (nodeId, { time, id: momentId }) => ({ id: nodeId, time, ids: [momentId] }),
   merge(n, { id: momentId }) {
     if (!n.ids.includes(momentId)) n.ids = [...n.ids, momentId].sort(order);
@@ -110,12 +122,18 @@ export const MOMENT_TREE = {
     n.count = (l?.count ?? 0) + n.ids.length + (r?.count ?? 0);
     n.distinct = (l?.distinct ?? 0) + 1 + (r?.distinct ?? 0);
   },
-  // Paths from the root towards each key, plus the children of every node on them.
-  path: (node) => `WITH RECURSIVE path(key,id) AS (
-      SELECT k,$3::bigint FROM unnest($2::text[]) k
-      UNION SELECT p.key,CASE WHEN p.key::mpq<n.time THEN n.left_id WHEN p.key::mpq>n.time THEN n.right_id END
-      FROM path p CROSS JOIN LATERAL ${node('p.id')} n
-    ), visited AS (SELECT DISTINCT id FROM path WHERE id IS NOT NULL)
+  // Paths from the root towards each key, plus the children of every node on them. The keys
+  // descend together: a node is read once, with the keys that reach it, which it splits
+  // between its children, so the lookups follow the distinct nodes on the paths (appended
+  // moments share nearly all of theirs), not keys × depth. Keys are cast once.
+  path: (node) => `WITH RECURSIVE path(id,keys) AS (
+      SELECT $3::bigint,$2::mpq[]
+      UNION ALL SELECT c.id,c.keys FROM path p CROSS JOIN LATERAL ${node('p.id')} n
+      CROSS JOIN LATERAL (VALUES
+        (n.left_id,ARRAY(SELECT k FROM unnest(p.keys) k WHERE k<n.time)),
+        (n.right_id,ARRAY(SELECT k FROM unnest(p.keys) k WHERE k>n.time))) c(id,keys)
+      WHERE c.id IS NOT NULL AND cardinality(c.keys)>0
+    ), visited AS (SELECT id FROM path)
     ${pathNodes(node)}`,
   pathParams: (keys) => [keys.map((k) => k.time)],
 };
@@ -195,7 +213,7 @@ export const INTERVAL_TREE = {
     n.maxExtent,
     n.height,
   ],
-  compare: (key, n) => Q.parse(key.first).compare(Q.parse(n.first)) || order(key.id, n.band.id),
+  compare: (key, n) => parsed(key, 'first').compare(parsed(n, 'first')) || order(key.id, n.band.id),
   create: (nodeId, payload) => ({ id: nodeId, ...payload }),
   merge: null,
   copy(to, from) {
@@ -213,14 +231,23 @@ export const INTERVAL_TREE = {
     n.minExtent = min(min(extent, l?.minExtent), r?.minExtent);
     n.maxExtent = max(max(extent, l?.maxExtent), r?.maxExtent);
   },
-  path: (node) => `WITH RECURSIVE path(first,eid,id) AS (
-      SELECT f,e,$4::integer FROM unnest($2::text[],$3::text[]) AS k(f,e)
-      UNION SELECT p.first,p.eid,CASE
-        WHEN p.first::mpq<n.first_time OR (p.first::mpq=n.first_time AND p.eid COLLATE "C"<(n.band->>'id') COLLATE "C") THEN n.left_id
-        WHEN p.first::mpq>n.first_time OR (p.first::mpq=n.first_time AND p.eid COLLATE "C">(n.band->>'id') COLLATE "C") THEN n.right_id END
-      FROM path p CROSS JOIN LATERAL ${node('p.id')} n
-    ), visited AS (SELECT DISTINCT id FROM path WHERE id IS NOT NULL)
-    ${pathNodes(node)}`,
+  // As the moment tree's: the keys (start, ID) descend together, split at each node.
+  path: (node) => {
+    const side = (op) =>
+      `f${op}n.first_time OR (f=n.first_time AND e COLLATE "C"${op}(n.band->>'id') COLLATE "C")`;
+    const keys = (op) =>
+      ['f', 'e'].map(
+        (c) =>
+          `ARRAY(SELECT ${c} FROM unnest(p.firsts,p.eids) WITH ORDINALITY k(f,e,o) WHERE ${side(op)} ORDER BY o)`,
+      );
+    return `WITH RECURSIVE path(id,firsts,eids) AS (
+      SELECT $4::integer,$2::mpq[],$3::text[]
+      UNION ALL SELECT c.id,c.firsts,c.eids FROM path p CROSS JOIN LATERAL ${node('p.id')} n
+      CROSS JOIN LATERAL (VALUES (n.left_id,${keys('<')}),(n.right_id,${keys('>')})) c(id,firsts,eids)
+      WHERE c.id IS NOT NULL AND cardinality(c.firsts)>0
+    ), visited AS (SELECT id FROM path)
+    ${pathNodes(node)}`;
+  },
   pathParams: (keys) => [keys.map((k) => k.first), keys.map((k) => k.id)],
 };
 

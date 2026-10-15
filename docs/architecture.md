@@ -52,6 +52,7 @@ Node IDs are stable, and each node records its height. A sparse save (`PUT /time
 - Durations and relationship arcs use AVL interval trees in the same way, ordered by start and then ID. The timeline row names each tree's root.
 - Durations anchored to a moved or deleted moment move with it, and arcs of moved entities are placed again.
 - Search rows and relationship rows change only for the entities a patch names.
+- A save reads the tree nodes it needs in one query before changing anything (`prefetch`, each tree's `path`): the keys descend from the root together, each node splitting those that reach it between its children, so it reads each node on the paths once (with its children) rather than once per key. Moments appended to a log share nearly their whole path, so a 5,000-moment append reads a few dozen nodes. `test/tree-paths-postgres.mjs` checks that the walks then find every node already read.
 
 A save therefore costs O(k log n) rows for k changes in a timeline of n moments, and the same save's cost does not depend on other timelines. Large patches (more than an eighth of the timeline), plugin changes (which revalidate every moment), whole-document saves, merges, syncs and forks rebuild the indexes from the document instead. A rebuilt tree is perfectly balanced, which is also a valid AVL tree.
 

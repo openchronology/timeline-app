@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { compileRoutes, parseSyslog, syslogFrames, syslogMoment } from '../server/syslog.mjs';
 import { SyslogIngest } from '../server/syslog-receiver.mjs';
+import { TimelineWriter, BATCH_LIMIT, BATCH_MIN, SLOW_SAVE } from '../server/timeline-writer.mjs';
 
 const received = Date.UTC(2026, 9, 10, 12, 0, 0);
 const A = '11111111-1111-4111-8111-111111111111',
@@ -277,4 +278,64 @@ test('ingest drops refused batches and the oldest moments past its queue limit',
   ingest.close();
   assert.throws(() => ingestFor(api, { key: 'secret' }), /OCH_API_KEY/);
   assert.throws(() => ingestFor(api, { api: 'timescale.info' }), /OCH_API_URL/);
+});
+
+test('the writer splits batches and adapts their size to how long saves take', async () => {
+  const api = fakeApi();
+  let clock = 0,
+    took = 100;
+  const fetcher = api.fetcher;
+  api.fetcher = async (url, options) => {
+    if (options.method) clock += took;
+    return fetcher(url, options);
+  };
+  const writer = new TimelineWriter({
+    api: 'https://timescale.info',
+    key: 'och_key_' + 'a'.repeat(32) + '_' + 'b'.repeat(64),
+    fetcher: api.fetcher,
+    now: () => clock,
+  });
+  const moment = (i) => ({ id: 'm' + i, time: i + '/1', metadata: { title: 'm' + i } });
+  const moments = (n) => Array.from({ length: n }, (_, i) => moment(i));
+  const sizes = () => api.saves.splice(0).map((s) => s.body.changes.length);
+  // Over the limit: split, the durations after every moment (they may name them).
+  await writer.send(A, {
+    moments: moments(BATCH_LIMIT + 10),
+    durations: [{ id: 'd', start: { moment: 'm1' }, end: '5/1', metadata: { title: 'd' } }],
+  });
+  const saves = api.saves.splice(0);
+  assert.deepEqual(
+    saves.map((s) => [s.body.changes.length, s.body.durationChanges?.length ?? 0]),
+    [
+      [BATCH_LIMIT, 0],
+      [10, 1],
+    ],
+  );
+  // Slow saves halve the next ones, down to BATCH_MIN.
+  took = SLOW_SAVE;
+  await writer.send(A, { moments: moments(BATCH_LIMIT) });
+  assert.deepEqual(sizes(), [BATCH_LIMIT]);
+  assert.equal(writer.limit(A), BATCH_LIMIT / 2);
+  for (let i = 0; i < 12; i++) await writer.send(A, { moments: moments(writer.limit(A)) });
+  assert.equal(writer.limit(A), BATCH_MIN);
+  // Fast full saves let them grow again; other timelines are unaffected.
+  took = 100;
+  assert.equal(writer.limit(B), BATCH_LIMIT);
+  await writer.send(A, { moments: moments(BATCH_MIN) });
+  assert.equal(writer.limit(A), BATCH_MIN * 1.5);
+  // Saves the server stopped as too slow are sent again halved; at BATCH_MIN they fail.
+  sizes();
+  while (writer.limit(A) < 1000) await writer.send(A, { moments: moments(writer.limit(A)) });
+  const limit = writer.limit(A);
+  sizes();
+  api.answers.push({ status: 503, value: { error: 'slow' } }, { status: 503, value: {} });
+  await writer.send(A, { moments: moments(limit) });
+  const quarter = Math.floor(Math.floor(limit / 2) / 2);
+  assert.deepEqual(sizes().slice(0, 1), [quarter]);
+  for (let i = 0; i < 20; i++) api.answers.push({ status: 503, value: {} });
+  await assert.rejects(
+    writer.send(A, { moments: moments(writer.limit(A)) }),
+    (e) => e.status === 503,
+  );
+  assert.equal(writer.limit(A), BATCH_MIN);
 });

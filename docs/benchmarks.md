@@ -85,6 +85,19 @@ Measured on an AMD Ryzen 7 7730U laptop (16 threads), with PostgreSQL in Docker 
 
 Latency stays near the save interval up to 500 messages a second; at 1,000 a second the slowest messages wait longer (p95 482 ms, max 801 ms), with each save carrying about 200 moments. Nothing was lost or duplicated at any rate. Each save is one API request, so a single timeline needs about 300 requests a minute at a 200 ms interval and 60 at the default. `API_KEY_REQUESTS_PER_MINUTE` (default 120) must allow this.
 
+## Save time against timeline size
+
+`node bench/save-size.mjs [sizes] [runs]` (with `BENCH_DATABASE_URL`; sizes comma-separated, default `100000,1000000`) creates a timeline of each size and times appending 10, 1,000 and 5,000 moments after its last (as log ingestion does) and changing 1,000 moments spread through it, each the median of three saves. The server stops any statement after 30 s, so the largest saves must stay well under it as timelines grow (#135).
+
+Measured on an 8-core virtual machine with PostgreSQL 17:
+
+| Moments   | Create | Append 10 | Append 1,000 | Append 5,000 | Change 1,000 spread |
+| --------- | -----: | --------: | -----------: | -----------: | ------------------: |
+| 200,000   |  126 s |    0.11 s |       0.91 s |       2.49 s |              0.56 s |
+| 1,000,000 |  636 s |    0.24 s |       1.35 s |       5.22 s |              0.75 s |
+
+Before #135, a 200,000-moment timeline took 283 s to create and 4.0 s to append 5,000 moments to (1.7 s for 1,000), and a million-moment one about 96 minutes to create and 21–25 s to append 5,000: a save walked the tree once per key, and starting a new timeline's saved history looked each duration up again by an expression the planner did not yet know to use.
+
 ## Saves after large writes
 
 `node bench/fork-save.mjs [moments]` (with `BENCH_DATABASE_URL`) creates a timeline, forks it, and times a 10-moment save to the fork straight away and again after an `ANALYZE`. A timeline written in one go (created, imported, forked, or rebuilt by a large save or merge) leaves PostgreSQL's statistics counting its rows as none until they are refreshed, and the planner can then read a key through any index that starts with the timeline, filtering every row. The server refreshes the index tables' statistics after such a write of 20,000 moments and durations or more, before answering, and the save path's lookups by key are written to stay one lookup per key whatever the statistics say (#139).

@@ -13,19 +13,37 @@ export const BATCH_LIMIT = 5000;
 export const BATCH_BYTES = 12 * 1024 * 1024;
 const KEY = /^och_key_[a-f0-9]{32}_[a-f0-9]{64}$/;
 
+/**
+ * Saves adapt their size to the server (send): a save taking SLOW_SAVE ms or more, or one the
+ * server stopped as too slow (503, 504), halves the next ones, down to BATCH_MIN entries; a
+ * full one taking under FAST_SAVE ms lets them grow again, up to BATCH_LIMIT. A save's time
+ * grows with its timeline, and the server stops any statement after 30 s.
+ */
+export const BATCH_MIN = 64;
+export const SLOW_SAVE = 8000;
+export const FAST_SAVE = 2000;
+/** Statuses of a save the server gave up on as too slow: a smaller one may succeed. */
+const TOO_SLOW = new Set([503, 504]);
+
 /** Whether a failed save is worth retrying later. */
 export const temporary = (status) =>
   status === undefined || status === 409 || status === 429 || status >= 500;
 
 export class TimelineWriter {
-  constructor({ api, key, fetcher = fetch }) {
+  constructor({ api, key, fetcher = fetch, now = () => performance.now() }) {
     if (!/^https?:\/\//.test(api ?? '')) throw new Error('OCH_API_URL must be an http(s) origin.');
     if (!KEY.test(key ?? ''))
       throw new Error('OCH_API_KEY must be an OpenChronology API key (och_key_...).');
     this.api = api.replace(/\/+$/, '');
     this.key = key;
     this.fetcher = fetcher;
+    this.now = now;
     this.states = new Map();
+    this.limits = new Map();
+  }
+  /** The most entries one save to `timeline` carries now (see SLOW_SAVE). */
+  limit(timeline) {
+    return this.limits.get(timeline) ?? BATCH_LIMIT;
   }
   async request(path, options = {}) {
     const response = await this.fetcher(this.api + '/api/' + path, {
@@ -83,10 +101,44 @@ export class TimelineWriter {
     this.states.delete(timeline);
   }
   /**
-   * Saves one batch. Resolves when saved; otherwise throws an error carrying `status` (none
-   * when the server could not be reached), the response `value` and `retryAfter`.
+   * Saves one batch, in saves of at most limit(timeline) entries each, moments before
+   * durations (which may name them): a save the server stops as too slow is sent again
+   * halved. Resolves with the last save's answer when all are saved; otherwise throws an
+   * error carrying `status` (none when the server could not be reached), the response
+   * `value` and `retryAfter`. Saves already made stay (sending them again overwrites them
+   * with the same).
    */
   async send(timeline, { moments = [], durations = [] }) {
+    const items = [
+      ...moments.map((event) => ({ event })),
+      ...durations.map((duration) => ({ duration })),
+    ];
+    let offset = 0,
+      value;
+    do {
+      const size = Math.min(this.limit(timeline), items.length - offset);
+      const part = items.slice(offset, offset + size);
+      const started = this.now();
+      try {
+        value = await this.save(timeline, {
+          moments: part.filter((p) => p.event).map((p) => p.event),
+          durations: part.filter((p) => p.duration).map((p) => p.duration),
+        });
+      } catch (error) {
+        if (!TOO_SLOW.has(error.status) || size <= BATCH_MIN) throw error;
+        this.limits.set(timeline, Math.max(BATCH_MIN, Math.floor(size / 2)));
+        continue;
+      }
+      const took = this.now() - started;
+      if (took >= SLOW_SAVE) this.limits.set(timeline, Math.max(BATCH_MIN, Math.floor(size / 2)));
+      else if (took < FAST_SAVE && size >= this.limit(timeline))
+        this.limits.set(timeline, Math.min(BATCH_LIMIT, Math.ceil(size * 1.5)));
+      offset += size;
+    } while (offset < items.length);
+    return value;
+  }
+  /** One save (see send). */
+  async save(timeline, { moments, durations }) {
     for (let attempt = 0; ; attempt++) {
       let state = this.states.get(timeline);
       if (!state) {
