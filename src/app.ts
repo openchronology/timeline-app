@@ -5084,8 +5084,39 @@ input('json-file').onchange = () => {
     })
     .catch(fail);
 };
+/**
+ * Above this many moments, a server timeline without unsaved edits is exported by the
+ * server, which streams it to a file (#135), instead of being assembled here: a document that
+ * size takes more memory than a page should. Images it links to by address are then not
+ * embedded (those it stores are).
+ */
+const SERVER_EXPORT = 100000n;
+/**
+ * Whether the open timeline is a server timeline with no edits waiting to be saved (one
+ * opened read-only has none).
+ */
+function savedRemote(): boolean {
+  const sparse = sparseWorkspace();
+  return (
+    !!remote &&
+    !local &&
+    !comparison &&
+    !dirty &&
+    (sparse
+      ? !sparse.changes.size && !sparse.durationChanges.size && !sparse.relationshipChanges.size
+      : !model)
+  );
+}
 el('export-button').onclick = () => {
   flushEventEdit();
+  if (!window.__TAURI__ && savedRemote() && momentCount() > SERVER_EXPORT) {
+    const a = document.createElement('a');
+    a.href = `/api/timelines/${remote!.id}/document?download=1`;
+    a.download = '';
+    a.click();
+    toast('Exporting from the server: the file downloads as it is written.');
+    return;
+  }
   const exportingDocument = documentRequest,
     exportingVersion = editVersion;
   void (async () => {

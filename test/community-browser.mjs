@@ -40,6 +40,8 @@ export async function checkCommunity(browser) {
     guest = true,
     storage = true,
     oversizedFork = false,
+    largeTimeline = false,
+    serverExports = 0,
     comments = [],
     searches = [],
     requests = [];
@@ -101,7 +103,22 @@ export async function checkCommunity(browser) {
     if (path === `/api/timelines/${id}/revision`)
       return route.fulfill({ json: { id, revision: info.revision } });
     if (path === `/api/timelines/${id}`)
-      return route.fulfill({ json: { ...info, canEdit: !guest, canPropose: !guest } });
+      return route.fulfill({
+        json: {
+          ...info,
+          canEdit: !guest,
+          canPropose: !guest,
+          ...(largeTimeline ? { event_count: '150000' } : {}),
+        },
+      });
+    if (path === `/api/timelines/${id}/document` && url.searchParams.get('download') === '1') {
+      serverExports++;
+      return route.fulfill({
+        headers: { 'Content-Disposition': `attachment; filename="timeline-${id}.ochx"` },
+        contentType: 'application/json',
+        body: JSON.stringify(document),
+      });
+    }
     if (path === `/api/timelines/${id}/browser-fork`)
       return oversizedFork
         ? route.fulfill({
@@ -310,6 +327,22 @@ export async function checkCommunity(browser) {
     );
     assert.equal(await page.locator('#publish-button').textContent(), 'Submit pull request');
     assert(await page.locator('#share-button').isHidden());
+    // A large server timeline without unsaved edits is exported by the server, which streams
+    // it to the file, rather than assembled here (#135).
+    const opened = () =>
+      page.waitForFunction(
+        () => document.getElementById('timeline-title').value === 'Featured timeline',
+      );
+    largeTimeline = true;
+    await page.reload();
+    await opened();
+    const serverExport = page.waitForEvent('download');
+    await page.locator('#export-button').click();
+    assert.equal((await serverExport).suggestedFilename(), 'timeline-' + id + '.ochx');
+    assert.equal(serverExports, 1);
+    largeTimeline = false;
+    await page.reload();
+    await opened();
     await page.locator('#timeline-title').fill('Proposed title');
     await page.locator('#timeline-title').blur();
     await page.locator('#timeline-tags').fill('astronomy, science');
