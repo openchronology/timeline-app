@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// Oracle: random sparse saves applied in place match a full rebuild of the same document,
-// leave every stored tree a valid AVL tree with correct summaries, and replay from history.
+// Oracle: random sparse saves applied in place (every other one a slice at a time) match a
+// full rebuild of the same document, leave every stored tree a valid AVL tree with correct
+// summaries, and replay from history.
 import pg from 'pg';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -201,6 +202,9 @@ try {
       await assert.rejects(store.save(timeline.id, user, timeline.revision, undefined, patch));
       continue;
     }
+    // Every other patch is applied in slices of three changes, each to the timeline as the
+    // last left it (saveIncrementally), and must end the same.
+    store.patchSlice = step % 2 ? 3 : undefined;
     timeline = await store.save(timeline.id, user, timeline.revision, undefined, patch);
     expected = next;
     revisions.set(timeline.head_revision_id, expected);
@@ -253,6 +257,66 @@ try {
   ).rows[0];
   assert.equal(text.event_text_stale, false);
   for (const e of expected.events.slice(0, 20)) assert(text.event_text.includes(e.metadata.title));
+  // A patch far larger than its slices, growing a small timeline into a larger one, applied
+  // in place (as a large timeline's would be): each slice moves the trees' roots, and the
+  // timeline ends as a rebuild of the patched document.
+  store.patchSlice = 7;
+  const small = validateDocument({
+    format: 'openchronology',
+    version: 1,
+    title: 'Sliced',
+    description: '',
+    events: Array.from({ length: 10 }, (_, i) => ({
+      id: 's' + i,
+      time: `${i}/1`,
+      metadata: { title: 'Small ' + i },
+    })),
+  });
+  let sliced = await store.create(user, small);
+  created.push(sliced.id);
+  const grown = {
+    settings: { ...small, events: [] },
+    changes: [
+      ...Array.from({ length: 300 }, (_, i) => ({
+        id: 'g' + i,
+        event: { id: 'g' + i, time: `${100 + i}/1`, metadata: { title: 'Grown ' + i } },
+      })),
+      { id: 's3', event: null },
+      { id: 's4', event: { id: 's4', time: '1000/1', metadata: { title: 'Moved' } } },
+    ],
+    durationChanges: Array.from({ length: 40 }, (_, i) => ({
+      id: 'gd' + i,
+      duration: { id: 'gd' + i, start: { moment: 'g' + i }, end: `${450 + i}/1`, metadata: {} },
+    })),
+    // Endpoints in canonical order, as the API sends them.
+    relationshipChanges: Array.from({ length: 30 }, (_, i) => ({
+      a: { duration: 'gd' + i },
+      b: { moment: 'g' + i },
+      related: true,
+    })),
+  };
+  const grownDocument = validateDocument(applyPatch(small, grown));
+  await store.transaction(async (c) => {
+    await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [sliced.id]);
+    await store.saveIncrementally(c, await store.access(sliced.id, user, c), user, grown);
+  });
+  store.patchSlice = undefined;
+  sliced = await store.access(sliced.id, user);
+  assert.equal(Number(sliced.event_count), 309);
+  assert.deepEqual(normal((await store.snapshot(sliced.id, user)).document), normal(grownDocument));
+  await checkTrees(sliced.id);
+  const rebuilt = await store.create(user, grownDocument);
+  created.push(rebuilt.id);
+  assert.deepEqual(
+    await observe(store, sliced.id),
+    await observe(store, rebuilt.id),
+    'a sliced patch matches a rebuild',
+  );
+  assert.deepEqual(
+    normal(await store.revisionDocument(pool, sliced.head_revision_id)),
+    normal(grownDocument),
+    'and is one revision',
+  );
   // A metadata-only edit writes no tree rows.
   const target = expected.events[0];
   const before = await pool.query(
@@ -269,7 +333,7 @@ try {
   );
   assert.deepEqual(after.rows, before.rows, 'metadata edits leave tree rows untouched');
   console.log(
-    `PASS incremental saves: ${patches} random patches match full rebuilds (documents, queries, search, links, arcs; ${replays} history replays, every revision read back from rows) and keep AVL invariants.`,
+    `PASS incremental saves: ${patches} random patches (and a patch applied in many slices) match full rebuilds (documents, queries, search, links, arcs; ${replays} history replays, every revision read back from rows) and keep AVL invariants.`,
   );
 } finally {
   await store?.idle();

@@ -23,7 +23,7 @@ import { randomUUID } from 'node:crypto';
 import { indexedNodes } from './tree.mjs';
 import { cursorRows, documentChunks, inSnapshot, RELATIONSHIP_ORDER } from './document-stream.mjs';
 import { MOMENT_TREE, INTERVAL_TREE, intervalPayload, upsertRows } from './avl.mjs';
-import { applyIncrementally, incremental, timelineSettings } from './incremental.mjs';
+import { applyIncrementally, incremental, slicePatch, timelineSettings } from './incremental.mjs';
 import {
   beginIndexWrite,
   copyLevel,
@@ -966,11 +966,26 @@ export class PostgresStore {
    * the update stays in place (HOT) and the catalogue's GIN index is not touched.
    */
   async saveIncrementally(client, t, userId, patch, kind = 'save', parents = [t.head_revision_id]) {
-    const { assignments, added, settings, storage, touched } = await applyIncrementally(
-      client,
-      t,
-      patch,
-    );
+    // A large patch is applied a slice at a time, each to the timeline as the last left it,
+    // so no statement grows with the patch; it is still one revision.
+    const touched = { moments: [], durations: [], relationships: [] };
+    let current = t,
+      added = false,
+      applied;
+    const slices = slicePatch(patch, this.patchSlice);
+    for (const [i, slice] of slices.entries()) {
+      applied = await applyIncrementally(client, current, slice);
+      added ||= applied.added;
+      for (const name of Object.keys(touched)) touched[name].push(...applied.touched[name]);
+      if (i < slices.length - 1) {
+        await client.query(
+          `UPDATE oc_timelines SET ${applied.assignments.map(([column, , cast], j) => `${column}=$${j + 2}${cast ?? ''}`)} WHERE id=$1`,
+          [t.id, ...applied.assignments.map(([, value]) => value)],
+        );
+        current = (await client.query('SELECT * FROM oc_timelines WHERE id=$1', [t.id])).rows[0];
+      }
+    }
+    const { assignments, settings, storage } = applied;
     if (t.index_bases?.length) {
       if (patch.changes.length + (patch.durationChanges?.length ?? 0) >= ANALYZE_VERSIONS_AFTER)
         client.analyze = true;

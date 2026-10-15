@@ -54,8 +54,16 @@ const kindOf = (ref) => ('moment' in ref ? 'moment' : 'duration');
 const refId = (ref) => ref.moment ?? ref.duration;
 
 /**
- * Whether a patch can be applied in place. Larger patches (relative to the timeline) and
- * plugin changes, which revalidate every moment, rebuild the index instead.
+ * Up to how many moments a timeline is rebuilt from a document for a patch changing most of
+ * it (more than REBUILD_SHARE): beyond it, building a whole document in memory is not worth
+ * it, and a patch is applied in place however large, a slice at a time (saveIncrementally in
+ * store.mjs). In place costs about 1 ms per change and a rebuild about 0.5 ms per moment.
+ */
+export const REBUILD_UNDER = 200000;
+const REBUILD_SHARE = 0.5;
+/**
+ * Whether a patch can be applied in place: unless it changes most of a small timeline, or
+ * changes its plugins (which revalidates every moment), which rebuild the index instead.
  */
 export function incremental(t, patch) {
   if (t.index_version < 2 || t.comparison || patch.settings.comparison) return false;
@@ -64,7 +72,34 @@ export function incremental(t, patch) {
     patch.changes.length +
     (patch.durationChanges?.length ?? 0) +
     (patch.relationshipChanges?.length ?? 0);
-  return size <= Math.max(64, Number(t.event_count) / 8);
+  const count = Number(t.event_count);
+  return count >= REBUILD_UNDER || size <= Math.max(64, count * REBUILD_SHARE);
+}
+
+/** How many changes one slice of a patch applied in place carries (see slicePatch). */
+export const PATCH_SLICE = 5000;
+/**
+ * `patch` in slices of at most `size` changes, each with its settings: moments, then
+ * durations (which may name them), then relationships (which may link them), in order.
+ */
+export function slicePatch(patch, size = PATCH_SLICE) {
+  const items = [
+    ...patch.changes.map((change) => ['changes', change]),
+    ...(patch.durationChanges ?? []).map((change) => ['durationChanges', change]),
+    ...(patch.relationshipChanges ?? []).map((change) => ['relationshipChanges', change]),
+  ];
+  const slices = [];
+  for (let start = 0; start < items.length || !slices.length; start += size) {
+    const slice = {
+      settings: patch.settings,
+      changes: [],
+      durationChanges: [],
+      relationshipChanges: [],
+    };
+    for (const [kind, change] of items.slice(start, start + size)) slice[kind].push(change);
+    slices.push(slice);
+  }
+  return slices;
 }
 
 /*
