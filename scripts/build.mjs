@@ -40,6 +40,8 @@ await build({
     'src/summary-expansion.ts',
     'src/image-assets.ts',
     'src/dialogs.ts',
+    // The server's sandbox for compiling plugin scripts (server/plugin-sandbox.mjs).
+    'src/plugin-compile-worker.mjs',
   ],
   outdir: 'dist',
   outExtension: { '.js': '.mjs' },

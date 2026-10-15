@@ -345,12 +345,14 @@ test('moments: templates, typed metadata, tags, severity rules and durations', (
     text: '{literal} x',
     complete: true,
   });
-  // A plugin key with an invalid value is refused before sending.
+  // A plugin key with a value its plugin can't read is sent as given: each plugin handles
+  // its own metadata (#157).
   const stacked = compileMapping(format, {
     ...definition,
     metadata: { stack: 'not a list' },
   }).build(format.read(line), line, 'log:z');
-  assert.throws(() => checkMoment(stacked));
+  checkMoment(stacked);
+  assert.equal(stacked.moment.metadata.stack, 'not a list');
 });
 
 test('routes and filters compare fields: patterns, numbers, severities', () => {

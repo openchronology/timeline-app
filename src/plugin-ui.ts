@@ -6,7 +6,8 @@ import {
   sourceLinks,
   pluginRichText,
   pluginFields,
-  stackEntries,
+  readStack,
+  stackEntry,
   COLOR_SWATCHES,
   colorValue,
   MOMENT_SHAPE_NAMES,
@@ -277,23 +278,26 @@ export function renderPluginFields(
       const stackKeys = plugins.flatMap((p) =>
         p.manifest.fields.filter((f) => f.kind === 'stack').map((f) => f.metadataKey),
       );
-      let entries: StackEntry[];
-      try {
-        entries = stackEntries(metadata[field.metadataKey], stackKeys);
-      } catch (error) {
-        section.textContent = error instanceof Error ? error.message : String(error);
-        container.append(section);
-        continue;
-      }
+      // The stack reads what it can of whatever is stored (#157). Saving writes only the
+      // entries it read, so a stack holding others is shown but not edited.
+      const read = readStack(metadata[field.metadataKey], stackKeys);
+      let entries: StackEntry[] = read.entries;
+      const stackEditable = editable && !read.unreadable;
       const heading = document.createElement('h3');
       heading.textContent = field.label;
+      const unreadable = document.createElement('p');
+      unreadable.className = 'field-hint stack-unreadable';
+      unreadable.hidden = !read.unreadable;
+      unreadable.textContent = Array.isArray(metadata[field.metadataKey])
+        ? `${read.unreadable} ${read.unreadable === 1 ? 'entry' : 'entries'} of this stack can't be read, so the stack can't be edited here. Edit it under Additional metadata instead.`
+        : "This stack's value can't be read, so the stack can't be edited here. Edit it under Additional metadata instead.";
       const list = document.createElement('div');
       list.className = 'stack-list';
       const commit = () => onChange(field.metadataKey, entries);
       let dragged: string | null = null;
       const move = (from: number, to: number) => {
         if (
-          !editable ||
+          !stackEditable ||
           from < 0 ||
           to < 0 ||
           from >= entries.length ||
@@ -316,7 +320,7 @@ export function renderPluginFields(
           const name = document.createElement('strong');
           name.textContent = `Entry ${index + 1}`;
           actions.append(name);
-          const button = (label: string, action: () => void, disabled = !editable) => {
+          const button = (label: string, action: () => void, disabled = !stackEditable) => {
             const b = document.createElement('button');
             b.type = 'button';
             b.textContent = label;
@@ -326,7 +330,7 @@ export function renderPluginFields(
             return b;
           };
           const handle = button('↕ Drag', () => {});
-          handle.draggable = editable;
+          handle.draggable = stackEditable;
           handle.ondragstart = (event) => {
             dragged = entry.id;
             event.dataTransfer?.setData('text/plain', entry.id);
@@ -336,7 +340,7 @@ export function renderPluginFields(
             dragged = null;
           };
           handle.onpointerdown = (event) => {
-            if (!editable || event.pointerType === 'mouse') return;
+            if (!stackEditable || event.pointerType === 'mouse') return;
             event.preventDefault();
             handle.setPointerCapture(event.pointerId);
             dragged = entry.id;
@@ -357,10 +361,10 @@ export function renderPluginFields(
             dragged = null;
           };
           card.ondragover = (event) => {
-            if (editable && dragged) event.preventDefault();
+            if (stackEditable && dragged) event.preventDefault();
           };
           card.ondrop = (event) => {
-            if (!dragged || !editable) return;
+            if (!dragged || !stackEditable) return;
             event.preventDefault();
             move(
               entries.findIndex((e) => e.id === dragged),
@@ -368,16 +372,16 @@ export function renderPluginFields(
             );
             dragged = null;
           };
-          button('↑', () => move(index, index - 1), !editable || index === 0).ariaLabel =
+          button('↑', () => move(index, index - 1), !stackEditable || index === 0).ariaLabel =
             'Move stack entry up';
           button(
             '↓',
             () => move(index, index + 1),
-            !editable || index === entries.length - 1,
+            !stackEditable || index === entries.length - 1,
           ).ariaLabel = 'Move stack entry down';
           button('Delete', () =>
             confirmDelete(String(entry.metadata.title || 'Untitled stack entry'), () => {
-              if (!section.isConnected || !editable) return;
+              if (!section.isConnected || !stackEditable) return;
               entries = entries.filter((e) => e.id !== entry.id);
               commit();
               draw();
@@ -398,7 +402,7 @@ export function renderPluginFields(
                 ? document.createElement('input')
                 : document.createElement('textarea');
             input.value = String(entry.metadata[key] ?? '');
-            input.disabled = !editable;
+            input.disabled = !stackEditable;
             input.oninput = () => {
               entry.metadata[key] = input.value;
               commit();
@@ -406,7 +410,7 @@ export function renderPluginFields(
             label.append(input);
             card.append(label);
             if (key === 'description' && pluginRichText(plugins))
-              attachRichText(input as HTMLTextAreaElement, editable);
+              attachRichText(input as HTMLTextAreaElement, stackEditable);
           }
           const other = document.createElement('div');
           let syncRaw = () => {};
@@ -414,7 +418,7 @@ export function renderPluginFields(
             other,
             plugins,
             entry.metadata,
-            editable,
+            stackEditable,
             (key, value) => {
               if (value) entry.metadata[key] = value;
               else delete entry.metadata[key];
@@ -431,7 +435,7 @@ export function renderPluginFields(
           const summary = document.createElement('summary');
           summary.textContent = 'Additional metadata';
           const raw = document.createElement('textarea');
-          raw.disabled = !editable;
+          raw.disabled = !stackEditable;
           const rest = { ...entry.metadata };
           delete rest.title;
           delete rest.description;
@@ -446,7 +450,7 @@ export function renderPluginFields(
           raw.oninput = () => {
             try {
               const value = JSON.parse(raw.value);
-              const checked = stackEntries([{ id: entry.id, metadata: value }], stackKeys)[0];
+              const checked = stackEntry({ id: entry.id, metadata: value }, stackKeys);
               entry.metadata = {
                 ...checked.metadata,
                 title: entry.metadata.title,
@@ -458,7 +462,7 @@ export function renderPluginFields(
                 other,
                 plugins,
                 entry.metadata,
-                editable,
+                stackEditable,
                 (key, value) => {
                   if (value) entry.metadata[key] = value;
                   else delete entry.metadata[key];
@@ -478,19 +482,19 @@ export function renderPluginFields(
           card.append(details);
           list.append(card);
         });
-        add.disabled = !editable;
+        add.disabled = !stackEditable;
       };
       const add = document.createElement('button');
       add.type = 'button';
       add.textContent = 'Add entry to stack';
       add.onclick = () => {
-        if (!editable) return;
+        if (!stackEditable) return;
         entries.push({ id: crypto.randomUUID(), metadata: { title: '', description: '' } });
         commit();
         draw();
         list.lastElementChild?.querySelector('input')?.focus();
       };
-      section.append(heading, list, add);
+      section.append(heading, unreadable, list, add);
       draw();
       container.append(section);
       continue;

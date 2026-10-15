@@ -31,6 +31,13 @@ import {
   pluginFocus,
   scaleTimeline,
   stackEntries,
+  readStack,
+  stackEntry,
+  checkPluginScript,
+  OFFICIAL_SUITES,
+  pluginExpand,
+  searchText,
+  searchRows,
   stackWindow,
   validatePluginManifest,
   validateInstalledPlugins,
@@ -49,6 +56,73 @@ import { createPluginLibrary } from '../server/plugins.mjs';
 import { createApplication } from '../server/http.mjs';
 import { PostgresStore } from '../server/store.mjs';
 const installed = (manifest) => ({ manifest, enabled: true });
+test('the built-in plugins compile, as nothing compiles them when they load (#157)', () => {
+  for (const manifest of [...BUILTIN_PLUGINS, ...OFFICIAL_SUITES.flatMap((s) => s.plugins)])
+    checkPluginScript(manifest);
+});
+test('every field kind reads wrong-shaped metadata without throwing (#157)', () => {
+  // The newest version of each built-in plugin: every field kind, marker and effect.
+  const plugins = searchPluginLibrary(BUILTIN_PLUGINS, { limit: 50 }).plugins.map(installed);
+  const kinds = new Set(pluginFields(plugins).map((f) => f.kind));
+  for (const kind of [
+    'text',
+    'multiline',
+    'image-url',
+    'stack',
+    'color',
+    'shape',
+    'size',
+    'links',
+    'heading',
+    'font',
+  ])
+    assert(kinds.has(kind), kind);
+  const keys = new Set([
+    'title',
+    'description',
+    'tags',
+    'sources',
+    ...plugins.flatMap(({ manifest }) => [
+      ...manifest.fields.map((f) => f.metadataKey),
+      ...(manifest.marker ? [manifest.marker.metadataKey] : []),
+      ...(manifest.background ? [manifest.background.metadataKey] : []),
+    ]),
+  ]);
+  const values = [
+    null,
+    0,
+    -1,
+    1e308,
+    true,
+    '',
+    'x'.repeat(20000),
+    [],
+    [null, 7, 'x'],
+    {},
+    { id: 1 },
+    [{ id: 'a', metadata: 'text' }],
+    [{ id: 'a', metadata: { stack: [{}] } }],
+    [[[]]],
+  ];
+  for (const value of values)
+    for (const key of keys) {
+      const metadata = { [key]: value };
+      const color = pluginColor(plugins, metadata);
+      assert(color === null || typeof color === 'string');
+      assert.equal(typeof pluginShape(plugins, metadata), 'string');
+      assert.equal(typeof pluginSize(plugins, metadata), 'string');
+      pluginHeading(plugins, metadata);
+      pluginMarker(plugins, metadata);
+      pluginBackground(plugins, metadata);
+      pluginFocus(plugins);
+      pluginExpand(plugins);
+      pluginMetadata(plugins, metadata);
+      for (const field of pluginFields(plugins).filter((f) => f.kind === 'stack'))
+        stackEntries(metadata[field.metadataKey]);
+      assert.equal(typeof searchText(metadata).body, 'string');
+      searchRows([{ id: 'm', time: '0/1', metadata }], []);
+    }
+});
 test('hover cards are declarative, opt-in and project bounded notes without code', () => {
   assert(pluginFocus([installed(FOCUS_ON_HOVER)]));
   assert(!pluginFocus([{ manifest: FOCUS_ON_HOVER, enabled: false }]));
@@ -115,24 +189,52 @@ test('stacks persist metadata and order without adding timeline points or storin
     stackEntries(doc.events[0].metadata.stack).map((e) => e.id),
     ['a', 'b'],
   );
-  for (const bad of [
-    [{ id: 'a', time: '1/2', metadata: {} }],
-    [{ id: 'a', metadata: { stack: [] } }],
+  // The stack reads what it can of any value and never throws (#157); its editor refuses
+  // what it cannot read.
+  for (const [bad, readable] of [
+    [[{ id: 'a', time: '1/2', metadata: {} }], 0],
+    [[{ id: 'a', metadata: { stack: [] } }], 0],
     [
-      { id: 'a', metadata: {} },
-      { id: 'a', metadata: {} },
+      [
+        { id: 'a', metadata: {} },
+        { id: 'a', metadata: {} },
+      ],
+      1,
     ],
-    [{ id: 'a', metadata: { title: 42 } }],
-    [{ id: 'a', metadata: [] }],
+    [
+      [
+        { id: 'a', metadata: { title: 42 } },
+        { id: 'b', metadata: {} },
+      ],
+      1,
+    ],
+    [[{ id: 'a', metadata: [] }], 0],
+    [[null, 7, 'x', [], { id: 'é', metadata: {} }], 0],
+  ]) {
+    assert.equal(stackEntries(bad).length, readable);
+    assert.equal(readStack(bad).unreadable, bad.length - readable);
+  }
+  for (const value of [42, 'stack', { id: 'a' }, null, true])
+    assert.deepEqual(readStack(value), { entries: [], unreadable: 1 });
+  assert.deepEqual(readStack(undefined), { entries: [], unreadable: 0 });
+  for (const bad of [
+    { id: 'a', metadata: { stack: [] } },
+    { id: 'a', metadata: { title: 42 } },
   ])
-    assert.throws(() => stackEntries(bad));
+    assert.throws(() => stackEntry(bad));
   assert.equal(
     stackEntries(Array.from({ length: 1001 }, (_, i) => ({ id: String(i), metadata: {} }))).length,
     1001,
   );
-  assert.throws(() => stackEntries([{ id: 'a', metadata: { children: [] } }], ['children']));
+  assert.equal(stackEntries([{ id: 'a', metadata: { children: [] } }], ['children']).length, 0);
+  // A nested stack is stored as given; the stack field reads that entry as unreadable.
   doc.events[0].metadata.stack[0].metadata.stack = [];
-  assert.throws(() => validateDocument(doc), /cannot contain another stack/);
+  const stored = validateDocument(doc);
+  assert.deepEqual(stored.events[0].metadata.stack[0].metadata.stack, []);
+  assert.deepEqual(
+    stackEntries(stored.events[0].metadata.stack).map((e) => e.id),
+    ['b'],
+  );
 });
 test('stack branches virtualize arbitrary depth in either direction independently of time', () => {
   for (const direction of [-1, 1]) {
@@ -422,7 +524,7 @@ test('plugin interpreter rejects ambient authority and bounds work; image effect
     'function render(m,api) { return api.timestamp(api.rational("0")); }',
     'function render(m,api) { return api.shape("circle"); }'.repeat(400),
   ])
-    assert.throws(() => validatePluginManifest({ ...PLUGIN_EXAMPLE, source }));
+    assert.throws(() => checkPluginScript(validatePluginManifest({ ...PLUGIN_EXAMPLE, source })));
   const run = (source) => [installed(validatePluginManifest({ ...PLUGIN_EXAMPLE, source }))];
   assert.equal(
     pluginShape(

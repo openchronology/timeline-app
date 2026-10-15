@@ -18,8 +18,10 @@ import {
   relationshipKey,
   snippet,
   SEARCH_PAGE_SIZE,
+  BUILTIN_PLUGINS,
 } from '../dist/core.mjs';
 import { randomUUID } from 'node:crypto';
+import { pluginCompiler } from './plugin-sandbox.mjs';
 import { indexedNodes } from './tree.mjs';
 import { cursorRows, documentChunks, inSnapshot, RELATIONSHIP_ORDER } from './document-stream.mjs';
 import { MOMENT_TREE, INTERVAL_TREE, intervalPayload, upsertRows } from './avl.mjs';
@@ -168,11 +170,38 @@ const ANALYZE_AFTER = 20000;
  * a lookup by key can take any index that starts with the timeline and read all of them.
  */
 const ANALYZE_VERSIONS_AFTER = 1000;
+/** The scripts of the plugins every build includes: compiled by its tests, not again here. */
+const BUILTIN_SCRIPTS = new Set(BUILTIN_PLUGINS.map((p) => p.source).filter(Boolean));
 export class PostgresStore {
-  /** `compareLimits` caps saved comparisons by their owner's account (limits.mjs). */
-  constructor(pool, { compareLimits = null } = {}) {
+  /**
+   * `compareLimits` caps saved comparisons by their owner's account (limits.mjs). `compiler`
+   * compiles the plugin scripts timelines are given (plugin-sandbox.mjs).
+   */
+  constructor(pool, { compareLimits = null, compiler = null } = {}) {
     this.pool = pool;
     this.compareLimits = compareLimits;
+    this.compiler = compiler;
+  }
+  /**
+   * Refuses (HTTP 400) installed plugins `plugins` whose scripts do not compile, compiling
+   * them in the sandbox (#157): only scripts that are new, that is neither the built-in
+   * plugins' nor those of `current` (the plugins the timeline has now), so most saves compile
+   * nothing. The server never runs them.
+   */
+  async checkScripts(plugins, current = null) {
+    const known = new Set((current ?? []).map((p) => p?.manifest?.source));
+    for (const { manifest } of plugins ?? []) {
+      const source = manifest.source;
+      if (source === undefined || BUILTIN_SCRIPTS.has(source) || known.has(source)) continue;
+      try {
+        await (this.compiler ??= pluginCompiler()).check(source);
+      } catch (error) {
+        throw new HttpError(
+          400,
+          `The plugin “${manifest.name}” does not compile: ${error.message}`,
+        );
+      }
+    }
   }
   async liveState(id, userId, client = this.pool) {
     const { rows } = await client.query(
@@ -729,6 +758,7 @@ export class PostgresStore {
   }
   async create(userId, document) {
     document = validateDocument(document);
+    await this.checkScripts(document.plugins);
     const id = randomUUID();
     await this.transaction(async (c) => {
       await c.query('INSERT INTO oc_timelines(id,owner_id,title) VALUES($1,$2,$3)', [
@@ -756,6 +786,7 @@ export class PostgresStore {
             409,
             'Someone changed this timeline. Export your edits before reloading.',
           );
+        await this.checkScripts(patch ? patch.settings.plugins : document.plugins, t.plugins);
         if (patch && incremental(t, patch)) {
           // Sparse saves update the stored index in place and record only the patch.
           await this.saveIncrementally(c, t, userId, patch);

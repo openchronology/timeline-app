@@ -398,11 +398,18 @@ export function validatePluginManifest(value: unknown): PluginManifest {
       throw new Error('Plugin targets are "moments" and/or "durations".');
     result.targets = p.targets as PluginTarget[];
   }
-  if (p.source !== undefined) {
-    result.source = text(p.source, 16384);
-    compilePluginScript(result.source);
-  }
+  // The script is only checked here to be text of at most 16 KiB. It is compiled before it
+  // runs, in the browser; the server compiles scripts it is given only in a sandbox (#157,
+  // server/plugin-sandbox.mjs), and never runs them.
+  if (p.source !== undefined) result.source = text(p.source, 16384);
   return result;
+}
+/**
+ * Refuses a plugin whose script does not compile, with the compiler's message. The browser
+ * checks plugins it publishes or installs; the server never calls this outside its sandbox.
+ */
+export function checkPluginScript(manifest: PluginManifest) {
+  if (manifest.source !== undefined) compilePluginScript(manifest.source);
 }
 export function validateInstalledPlugins(value: unknown): InstalledPlugin[] {
   if (
@@ -631,47 +638,63 @@ export interface StackEntry {
   id: string;
   metadata: Record<string, unknown>;
 }
+/**
+ * A stack's entries as the stack field reads them (#157): whatever metadata holds, reading
+ * never throws. An entry is read when it is exactly an object of a unique ASCII ID and
+ * metadata, whose title and notes (when given) are text and which holds no stack of its own;
+ * any other entry, or a value that is not an array, is unreadable. Readers show what they
+ * can; the details panel shows a stack with unreadable entries read-only, so editing never
+ * drops them.
+ */
+export function readStack(
+  value: unknown,
+  stackKeys: readonly string[] = ['stack'],
+): { entries: StackEntry[]; unreadable: number } {
+  if (value === undefined) return { entries: [], unreadable: 0 };
+  if (!Array.isArray(value)) return { entries: [], unreadable: 1 };
+  const ids = new Set<string>();
+  const entries: StackEntry[] = [];
+  for (const raw of value) {
+    try {
+      const entry = stackEntry(raw, stackKeys);
+      if (ids.has(entry.id)) throw new Error('Duplicate stack entry.');
+      ids.add(entry.id);
+      entries.push(entry);
+    } catch {
+      // Unreadable: counted below.
+    }
+  }
+  return { entries, unreadable: value.length - entries.length };
+}
+/** The entries readStack can read. */
 export function stackEntries(
   value: unknown,
   stackKeys: readonly string[] = ['stack'],
 ): StackEntry[] {
-  if (value === undefined) return [];
-  if (!Array.isArray(value)) throw new Error('A moment stack must be an array.');
-  const ids = new Set<string>();
-  return value.map((raw) => {
-    const entry = object(raw, ['id', 'metadata']);
-    if (
-      typeof entry.id !== 'string' ||
-      !/^[A-Za-z0-9_.:-]{1,128}$/.test(entry.id) ||
-      ids.has(entry.id)
-    )
-      throw new Error('Stack entry IDs must be unique ASCII identifiers.');
-    ids.add(entry.id);
-    const metadata = entry.metadata;
-    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata))
-      throw new Error('Stack entry metadata must be an object.');
-    const copy = JSON.parse(JSON.stringify(metadata)) as Record<string, unknown>;
-    for (const field of ['title', 'description'])
-      if (copy[field] !== undefined && typeof copy[field] !== 'string')
-        throw new Error('Stack titles and notes must be text.');
-    if (['stack', ...stackKeys].some((key) => Object.hasOwn(copy, key)))
-      throw new Error('Stack entries cannot contain another stack.');
-    return { id: entry.id, metadata: copy };
-  });
+  return readStack(value, stackKeys).entries;
 }
-export function validateStackMetadata(
-  metadata: Record<string, unknown>,
-  plugins: readonly InstalledPlugin[] = [],
-) {
-  const keys = [
-    ...new Set([
-      'stack',
-      ...plugins.flatMap((p) =>
-        p.manifest.fields.filter((f) => f.kind === 'stack').map((f) => f.metadataKey),
-      ),
-    ]),
-  ];
-  for (const key of keys) if (Object.hasOwn(metadata, key)) stackEntries(metadata[key], keys);
+/** One stack entry, refused unless well formed: what the stack's editor writes. */
+export function stackEntry(value: unknown, stackKeys: readonly string[] = ['stack']): StackEntry {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Object.keys(value).some((key) => key !== 'id' && key !== 'metadata')
+  )
+    throw new Error('A stack entry is an ID and metadata.');
+  const entry = value as Record<string, unknown>;
+  if (typeof entry.id !== 'string' || !/^[A-Za-z0-9_.:-]{1,128}$/.test(entry.id))
+    throw new Error('Stack entry IDs must be ASCII identifiers.');
+  const metadata = entry.metadata;
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata))
+    throw new Error('Stack entry metadata must be an object.');
+  const copy = JSON.parse(JSON.stringify(metadata)) as Record<string, unknown>;
+  for (const field of ['title', 'description'])
+    if (copy[field] !== undefined && typeof copy[field] !== 'string')
+      throw new Error('Stack titles and notes must be text.');
+  if (['stack', ...stackKeys].some((key) => Object.hasOwn(copy, key)))
+    throw new Error('Stack entries cannot contain another stack.');
+  return { id: entry.id, metadata: copy };
 }
 export const MOMENT_STACKS: PluginManifest = validatePluginManifest({
   apiVersion: 1,

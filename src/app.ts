@@ -62,7 +62,9 @@ import {
   pluginFields,
   stackWindow,
   scaleTimeline,
-  validateStackMetadata,
+  checkPluginScript,
+  readStack,
+  stackEntries,
   validatePresentation,
   DEFAULT_PRESENTATION,
   UNIT_PRESETS,
@@ -371,7 +373,6 @@ function flushEventEdit() {
     const metadata = JSON.parse(el<HTMLTextAreaElement>('event-metadata').value);
     if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata))
       throw new Error('Additional metadata must be a JSON object.');
-    validateStackMetadata(metadata, installedPlugins());
     const tags = parseTagInput(input('event-tags').value);
     const point: PointEvent = {
       id: selected?.id ?? momentSession?.draft?.id ?? eventId(),
@@ -1045,9 +1046,10 @@ function comparisonRows() {
         const depth = fields.reduce(
           (sum, field) =>
             sum +
-            (Array.isArray(group.metadata?.[field.metadataKey])
-              ? (group.metadata![field.metadataKey] as unknown[]).length
-              : 0),
+            stackEntries(
+              group.metadata?.[field.metadataKey],
+              fields.map((f) => f.metadataKey),
+            ).length,
           0,
         );
         const extent = Math.max(0, depth * 72 - 40);
@@ -1337,8 +1339,8 @@ function drawFrame() {
       let branchDepth = 0;
       for (const field of pluginFields(activePlugins())) {
         if (field.kind !== 'stack') continue;
-        const entries = metadata[field.metadataKey];
-        if (!Array.isArray(entries) || !entries.length) continue;
+        const entries = stackEntries(metadata[field.metadataKey], stackFieldKeys());
+        if (!entries.length) continue;
         const base = branchDepth;
         branchDepth += entries.length;
         const direction = top < 2 ? -1 : 1;
@@ -1354,13 +1356,7 @@ function drawFrame() {
         bottomExtent = Math.max(bottomExtent, far + 50);
         for (let index = Math.max(base, window.first); index <= window.last; index++) {
           const entry = entries[index - base];
-          if (
-            !entry ||
-            typeof entry.id !== 'string' ||
-            !entry.metadata ||
-            typeof entry.metadata !== 'object'
-          )
-            continue;
+          if (!entry) continue;
           const childKey = `${group.id}:${field.metadataKey}:${entry.id}`;
           stackRetained.add(childKey);
           let child = stackLabels.get(childKey);
@@ -2838,6 +2834,12 @@ function installedPlugins(): InstalledPlugin[] {
 function activePlugins(): InstalledPlugin[] {
   return momentPlugins(installedPlugins());
 }
+/** The metadata keys of the active plugins' stack fields. */
+function stackFieldKeys() {
+  return pluginFields(activePlugins())
+    .filter((f) => f.kind === 'stack')
+    .map((f) => f.metadataKey);
+}
 let detachRichNotes: (() => void) | undefined;
 function refreshPluginFields() {
   detachRichNotes?.();
@@ -2894,6 +2896,7 @@ function refreshPluginFields() {
 function changePlugins(plugins: InstalledPlugin[]) {
   if (!editable()) return;
   const validated = validateInstalledPlugins(plugins);
+  for (const { manifest } of validated) checkPluginScript(manifest);
   model!.plugins = validated.length ? validated : undefined;
   changed();
   showInstalledPlugins();
@@ -3097,7 +3100,9 @@ function authoredPlugin() {
     throw new Error('Reopen the plugin editor for the current timeline.');
   const definition = JSON.parse(el<HTMLTextAreaElement>('plugin-definition').value);
   const source = el<HTMLTextAreaElement>('plugin-source').value;
-  return validatePluginManifest({ ...definition, ...(source.trim() ? { source } : {}) });
+  const manifest = validatePluginManifest({ ...definition, ...(source.trim() ? { source } : {}) });
+  checkPluginScript(manifest);
+  return manifest;
 }
 function installAuthoredPlugin(manifest: PluginManifest, replaceId = manifest.id) {
   const plugins = installedPlugins().filter(
@@ -3167,6 +3172,7 @@ input('plugin-definition-file').onchange = async () => {
     const source = await file.text();
     if (doc !== documentRequest || request !== pluginAuthorRequest) return;
     const manifest = validatePluginManifest(JSON.parse(source));
+    checkPluginScript(manifest);
     setAuthorDefinition(manifest);
     text('plugin-author-error', '');
     text('plugin-author-status', 'Definition imported. Review it, then install or publish.');
@@ -3908,7 +3914,10 @@ function addStackEntry(point: PointEvent) {
   if (!field || !editable()) return;
   eventForm(model?.byId.get(point.id) ?? point);
   const metadata = JSON.parse(el<HTMLTextAreaElement>('event-metadata').value);
-  const entries = Array.isArray(metadata[field.metadataKey]) ? metadata[field.metadataKey] : [];
+  // A stack with entries it cannot read is not edited (see renderPluginFields).
+  const read = readStack(metadata[field.metadataKey], stackFieldKeys());
+  if (read.unreadable) return;
+  const entries = read.entries;
   const id = eventId();
   metadata[field.metadataKey] = [...entries, { id, metadata: { title: '', description: '' } }];
   el<HTMLTextAreaElement>('event-metadata').value = JSON.stringify(metadata, null, 2);

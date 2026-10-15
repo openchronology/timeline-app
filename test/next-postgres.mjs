@@ -7,7 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import pg from 'pg';
 import { randomUUID } from 'node:crypto';
 import { passwordHash } from '../server/auth.mjs';
-import { demo } from '../dist/core.mjs';
+import { demo, PLUGIN_EXAMPLE } from '../dist/core.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
@@ -145,6 +145,26 @@ try {
     description: 'A searchable exact timeline',
     tags: ['framework-ci'],
   };
+  // The Next server compiles a new plugin script in its sandbox worker (#157): one that
+  // compiles is accepted, one that doesn't is refused.
+  const custom = { ...PLUGIN_EXAMPLE, id: 'next-custom' };
+  const withPlugin = (source) => ({
+    ...demo(),
+    title: 'Plugin sandbox',
+    plugins: [{ manifest: { ...custom, source }, enabled: true }],
+  });
+  const compiled = await owner.request('/api/timelines', {
+    method: 'POST',
+    data: withPlugin(PLUGIN_EXAMPLE.source + '\n'),
+    status: 201,
+  });
+  timelines.push(compiled.id);
+  const refused = await owner.request('/api/timelines', {
+    method: 'POST',
+    data: withPlugin('function render(m,api) { return fetch(1); }'),
+    status: 400,
+  });
+  assert.match(refused.error, /does not compile/);
   let timeline = await owner.request('/api/timelines', {
     method: 'POST',
     status: 201,
