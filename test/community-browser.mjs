@@ -338,7 +338,7 @@ export async function checkCommunity(browser) {
     await opened();
     const serverExport = page.waitForEvent('download');
     await page.locator('#export-button').click();
-    assert.equal((await serverExport).suggestedFilename(), 'timeline-' + id + '.ochx');
+    assert.equal((await serverExport).suggestedFilename(), 'featured-timeline.ochx');
     assert.equal(serverExports, 1);
     largeTimeline = false;
     await page.reload();

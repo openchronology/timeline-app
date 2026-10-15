@@ -5112,7 +5112,8 @@ el('export-button').onclick = () => {
   if (!window.__TAURI__ && savedRemote() && momentCount() > SERVER_EXPORT) {
     const a = document.createElement('a');
     a.href = `/api/timelines/${remote!.id}/document?download=1`;
-    a.download = '';
+    // Named here: some browsers name a download without one after its address.
+    a.download = fileName(remote!.title, '.ochx');
     a.click();
     toast('Exporting from the server: the file downloads as it is written.');
     return;
@@ -5139,15 +5140,17 @@ el('export-button').onclick = () => {
     }
   })().catch(fail);
 };
+/** A file name for a timeline titled `title`. */
+const fileName = (title: string, extension: string) =>
+  (title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .slice(0, 70) || 'timeline') + extension;
 function download(blob: Blob, title: string, extension: string) {
   const url = URL.createObjectURL(blob),
     a = document.createElement('a');
   a.href = url;
-  a.download =
-    (title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .slice(0, 70) || 'timeline') + extension;
+  a.download = fileName(title, extension);
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
