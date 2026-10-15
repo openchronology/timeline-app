@@ -379,12 +379,46 @@ textarea {
   background: var(--paper);
 }
 
+/* Dialogs look like the editor's (src/styles.css): the platform's own (share, report,
+   human verification) open over the page around it. */
 dialog {
   width: fit-content;
   max-width: min(900px, calc(100vw - 30px));
   max-height: calc(100dvh - 30px);
   overflow: auto;
   overflow-wrap: anywhere;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #f9fbf5;
+  color: var(--ink);
+  box-shadow: 0 20px 100px #152b3540;
+}
+dialog::backdrop {
+  background: #17271d73;
+}
+.dialog-heading h2 {
+  font-family: Georgia, serif;
+  font-size: 24px;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+}
+.dialog-heading button {
+  flex-shrink: 0;
+  width: var(--control-height);
+  min-height: var(--control-height);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  font-size: 20px;
+  font-weight: 400;
+}
+.dialog-heading button:hover {
+  background: var(--hover);
+  color: var(--ink);
 }
 
 .account-avatar {
