@@ -337,10 +337,10 @@ export async function checkCommunity(browser) {
     const serverExport = page.waitForEvent('download');
     await page.locator('#export-button').click();
     // Some browsers download a link without the page's routing, so the address is checked.
-    const exported = await serverExport;
-    assert.equal(exported.suggestedFilename(), 'featured-timeline.ochx');
-    assert.equal(new URL(exported.url()).pathname, `/api/timelines/${id}/document`);
-    assert.equal(new URL(exported.url()).searchParams.get('download'), '1');
+    const serverFile = await serverExport;
+    assert.equal(serverFile.suggestedFilename(), 'featured-timeline.ochx');
+    assert.equal(new URL(serverFile.url()).pathname, `/api/timelines/${id}/document`);
+    assert.equal(new URL(serverFile.url()).searchParams.get('download'), '1');
     largeTimeline = false;
     await page.reload();
     await opened();
