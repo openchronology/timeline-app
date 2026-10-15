@@ -728,6 +728,12 @@ END $$;
 DROP TRIGGER IF EXISTS oc_entity_search_document ON oc_entity_search;
 CREATE TRIGGER oc_entity_search_document BEFORE INSERT OR UPDATE ON oc_entity_search
   FOR EACH ROW EXECUTE FUNCTION oc_entity_search_document();
+-- Searches find their matches through this index rather than reading all of a timeline's
+-- rows, so a search for something specific costs what it finds, not the timeline's size.
+-- On the text alone (the timeline is checked on the rows it finds): one with the timeline
+-- first needs the btree_gin extension, which not every PostgreSQL package installs. Retired
+-- versions get the same index below, for forks searching what their source has changed.
+CREATE INDEX IF NOT EXISTS oc_entity_search_document ON oc_entity_search USING gin(document);
 
 -- Derived indexes for tag separation: one saved revision filtered to entities with any of a
 -- set of tags, or none of them. Built on first use and cached per revision; a save discards

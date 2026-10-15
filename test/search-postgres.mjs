@@ -71,6 +71,17 @@ try {
   assert.equal((await search('routine')).results.length, 25);
   assert.equal((await search('routine', 2)).results.length, 5);
   assert.equal((await search(" ' & | ! :* ")).total, '0', 'Operators are not query syntax.');
+  // Large timelines find their matches through the text index (#135), and forks what they
+  // read of the versions their source retired; a timeline this small reads its few rows by
+  // key instead.
+  const { rows: textIndexes } = await pool.query(
+    `SELECT tablename FROM pg_indexes WHERE indexname LIKE 'oc\\_entity\\_search\\_document%'
+    AND indexdef LIKE '%USING gin (document)' ORDER BY tablename`,
+  );
+  assert.deepEqual(
+    textIndexes.map((r) => r.tablename),
+    ['oc_entity_search', 'oc_entity_search_retired'],
+  );
   // Saves rebuild the search rows, including sparse moves of anchoring moments.
   timeline = await store.save(timeline.id, user, timeline.revision, undefined, {
     settings: { ...doc, events: [], durations: undefined },
