@@ -33,6 +33,7 @@ export default function TimelineSearch({ query }) {
           <option value="featured">Featured first</option>
           <option value="stars">By stars</option>
           <option value="popularity">By popularity</option>
+          <option value="trending">Trending this month</option>
           <option value="alphabetical">Alphabetical</option>
           <option value="age">Newest first</option>
           <option value="relevance" disabled={!search.trim()}>

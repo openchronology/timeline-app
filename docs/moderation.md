@@ -71,7 +71,7 @@ Requires a reason, which is sent to the owner as the statement of reasons. What 
 | Plugin or suite | Leaves the library (search and install), and new versions are refused. Copies already installed in timelines stay.                                                                                                                                                                                      |
 | Account         | Suspended, as in the Users view: its sessions, API keys and pending desktop sign-ins end. The last active administrator can't be suspended.                                                                                                                                                             |
 
-New reports about a restricted thing join its case rather than opening another.
+New reports about a restricted thing join its case rather than opening another. While a restriction is in force, its owner is not [established](browsing.md): browsing leaves out their public timelines, and their stars count for nothing.
 
 ### Reviews and lifting
 

@@ -4,6 +4,7 @@ import { EXPAND_ON_HOVER } from '../dist/core.mjs';
 import { isDeepStrictEqual } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { PostgresStore } from './store.mjs';
+import { refreshAccounts } from './standing.mjs';
 import {
   SEED_USER_ID,
   LEGACY_SEED_TIMELINES,
@@ -33,7 +34,12 @@ export async function seedPlatform(pool, { manager = '' } = {}) {
       'INSERT INTO oc_users(id,username,password_hash,quota_bypass) VALUES($1,$2,NULL,true) ON CONFLICT(id) DO NOTHING',
       [SEED_USER_ID, 'seed'],
     );
-    await client.query('UPDATE oc_users SET quota_bypass=true WHERE id=$1', [SEED_USER_ID]);
+    // The operator's curated timelines are listed like an established account's (#103).
+    await client.query(
+      "UPDATE oc_users SET quota_bypass=true,trust=coalesce(trust,'trusted') WHERE id=$1",
+      [SEED_USER_ID],
+    );
+    await refreshAccounts(client, [SEED_USER_ID]);
     let managerId;
     if (manager) {
       const result = await client.query(

@@ -3,6 +3,34 @@
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api.js';
 import { ReportCase } from './admin-reports.jsx';
+import { NEWCOMER_DAYS, FULL_DAYS } from '../../server/standing.mjs';
+/**
+ * An account's standing (#103; server/standing.mjs) and what it rests on: browsing lists the
+ * public timelines of established accounts, and their stars and forks count for popularity.
+ */
+function standing(item) {
+  const age = (Date.now() - Date.parse(item.created_at)) / 86400000;
+  if (item.standing > 0) {
+    const notes = [
+      item.is_admin && 'administrator',
+      item.trust === 'trusted' && 'marked trusted',
+      item.endorsers > 0 && `${item.endorsers} endorsing account${item.endorsers === 1 ? '' : 's'}`,
+    ].filter(Boolean);
+    return `Established · standing ${Math.round(item.standing * 100)}%${notes.length ? ' · ' + notes.join(', ') : ''}`;
+  }
+  const reasons = [
+    item.is_disabled && 'suspended',
+    item.trust === 'untrusted' && 'marked untrusted',
+    !item.confirmed && 'no confirmed email or social sign-in',
+    item.restricted && 'a moderation restriction in force',
+    age < NEWCOMER_DAYS && `newer than ${NEWCOMER_DAYS} days`,
+    age >= NEWCOMER_DAYS &&
+      age < FULL_DAYS &&
+      !item.endorsers &&
+      `under ${FULL_DAYS} days old and not starred or forked by an established account`,
+  ].filter(Boolean);
+  return `Not established: ${reasons.join('; ') || 'pending the next update'}`;
+}
 export default function Admin() {
   const [kind, setKind] = useState('users'),
     [search, setSearch] = useState(''),
@@ -188,6 +216,7 @@ export default function Admin() {
                     {item.email || 'No recovery email'} · {Number(item.used_bytes).toLocaleString()}{' '}
                     bytes used
                   </p>
+                  <p className="muted">{standing(item)}</p>
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
@@ -197,6 +226,7 @@ export default function Admin() {
                         is_disabled: d.has('is_disabled'),
                         quota_bypass: d.has('quota_bypass'),
                         quota_bytes: d.get('quota_bytes') === '' ? null : d.get('quota_bytes'),
+                        trust: d.get('trust') || null,
                       });
                     }}
                   >
@@ -219,6 +249,14 @@ export default function Admin() {
                         pattern="\s*\d+(\.\d+)?\s*([kKmMgGtT][iI]?)?[bB]?\s*"
                         defaultValue={item.quota_bytes ?? ''}
                       />
+                    </label>
+                    <label>
+                      Standing
+                      <select name="trust" defaultValue={item.trust ?? ''}>
+                        <option value="">From its activity</option>
+                        <option value="trusted">Trusted: always established</option>
+                        <option value="untrusted">Untrusted: never established</option>
+                      </select>
                     </label>
                     <button disabled={busy}>Apply user settings</button>
                   </form>

@@ -9,6 +9,7 @@ import { Auth } from './auth.mjs';
 import { PostgresStore } from './store.mjs';
 import { pluginCompiler } from './plugin-sandbox.mjs';
 import { startRetention } from './retention.mjs';
+import { startStanding } from './standing.mjs';
 import { providersFromEnv } from './oauth.mjs';
 import { compareLimits, defaultQuota, entryLimit, LimitError } from './limits.mjs';
 import { analyticsId, platformName, SiteError } from './site.mjs';
@@ -120,6 +121,8 @@ async function initialize() {
   store?.prepareStale().catch((error) => console.error('Preparing copies failed:', error));
   // Timelines that keep only their last months or years expire older data on a schedule.
   if (store) startRetention(store);
+  // Account standing and popularity follow accounts ageing, forks and trending (#103).
+  if (pool) startStanding(pool);
   return {
     ...options,
     auth: pool ? new Auth(pool, origin) : null,

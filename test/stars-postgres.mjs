@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import pg from 'pg';
 import { PostgresStore } from '../server/store.mjs';
 import { searchTimelines } from '../server/collaboration.mjs';
+import { sweepStanding } from '../server/standing.mjs';
 import { setTimelineStar } from '../server/stars.mjs';
 import { createApplication } from '../server/http.mjs';
 import { Auth } from '../server/auth.mjs';
@@ -12,7 +13,7 @@ const pool = new pg.Pool(
   process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL } : {},
 );
 const ids = [randomUUID(), randomUUID()],
-  tids = Array.from({ length: 5 }, () => randomUUID());
+  tids = Array.from({ length: 7 }, () => randomUUID());
 const username = 'stars_' + ids[0].slice(0, 8);
 let app;
 try {
@@ -22,7 +23,7 @@ try {
       id,
       username + i,
     ]);
-  for (const [i, id] of tids.entries())
+  for (const [i, id] of tids.slice(0, 5).entries())
     await pool.query(
       `INSERT INTO oc_timelines(id,owner_id,title,visibility,created_at) VALUES($1,$2,$3,$4,now()+$5*interval '1 day')`,
       [
@@ -41,8 +42,19 @@ try {
     );
   await pool.query('UPDATE oc_timelines SET upstream_id=$1 WHERE id=ANY($2::uuid[])', [
     tids[1],
-    tids.slice(3),
+    tids.slice(3, 5),
   ]);
+  // Forks by another account, which counts for popularity (#103): public and private.
+  await pool.query("UPDATE oc_users SET trust='trusted' WHERE id=$1", [ids[1]]);
+  for (const [id, visibility] of [
+    [tids[5], 'public'],
+    [tids[6], 'private'],
+  ])
+    await pool.query(
+      'INSERT INTO oc_timelines(id,owner_id,title,visibility,upstream_id) VALUES($1,$2,$3,$4,$5)',
+      [id, ids[1], 'Other fork', visibility, tids[1]],
+    );
+  await sweepStanding(pool);
   const store = new PostgresStore(pool);
   await assert.rejects(
     setTimelineStar(pool, store, tids[0], null, { starred: true }),
@@ -95,7 +107,7 @@ try {
   assert.equal(
     popular.timelines.find((t) => t.id === tids[1]).popularity,
     '1',
-    'Private forks must not affect public popularity',
+    "Private forks, and the owner's own, must not affect public popularity",
   );
   await pool.query('UPDATE oc_timelines SET featured=true WHERE id=$1', [tids[1]]);
   assert.equal((await searchTimelines(pool, null, query)).timelines[0].id, tids[1]);
@@ -141,6 +153,7 @@ try {
     ),
   );
   assert.equal((await store.access(tids[0], ids[0])).star_count, '1');
+  await pool.query('DELETE FROM oc_timelines WHERE owner_id=$1', [ids[1]]);
   await pool.query('DELETE FROM oc_users WHERE id=$1', [ids[1]]);
   assert.equal((await store.access(tids[0], ids[0])).star_count, '0');
   await pool.query('DELETE FROM oc_timelines WHERE id=$1', [tids[1]]);

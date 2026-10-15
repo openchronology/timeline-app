@@ -1433,3 +1433,23 @@ CREATE INDEX IF NOT EXISTS oc_reports_case ON oc_reports(case_id,created_at);
 -- A signed-in reader reports a thing once per case; reporting again replaces their report.
 CREATE UNIQUE INDEX IF NOT EXISTS oc_reports_reporter ON oc_reports(case_id,reporter_id,coalesce(entity_kind,''),coalesce(entity_id,''))
   WHERE reporter_id IS NOT NULL;
+-- Account standing and timeline popularity (#103; server/standing.mjs), recomputed from
+-- stars, forks, account age and confirmation, and moderation. Kept apart from the accounts
+-- and timelines they rank, so recomputing them never rewrites (or notifies about) those rows.
+-- An administrator's override: 'trusted' accounts have full standing, 'untrusted' none.
+ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS trust text CHECK(trust IN ('trusted','untrusted'));
+CREATE TABLE IF NOT EXISTS oc_account_standing (
+  user_id uuid PRIMARY KEY REFERENCES oc_users ON DELETE CASCADE,
+  -- 0 for an account not (yet) established; up to 1.
+  standing real NOT NULL CHECK(standing>=0 AND standing<=1),
+  -- Endorsing accounts that starred or publicly forked its public timelines.
+  endorsers integer NOT NULL DEFAULT 0,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS oc_timeline_popularity (
+  timeline_id uuid PRIMARY KEY REFERENCES oc_timelines ON DELETE CASCADE,
+  -- The standing of the accounts that starred or publicly forked it; trending, of those that
+  -- did within the last 30 days.
+  popularity real NOT NULL DEFAULT 0,
+  trending real NOT NULL DEFAULT 0
+);
