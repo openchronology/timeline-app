@@ -4,8 +4,9 @@
  * key) → PostgreSQL → the live event stream → an open editor, without reloading.
  *
  * Checks routing, live display, Follow latest, a server restart mid-stream (the receiver
- * retries, the viewer reconnects and catches up), and a sustained-rate soak with no lost or
- * duplicated moments. The soak doubles as a benchmark:
+ * retries, the viewer reconnects and catches up), a sustained-rate soak with no lost or
+ * duplicated moments, and the owner choosing a time format while messages arrive (#123). The
+ * soak doubles as a benchmark:
  *
  *   DATABASE_URL=... npm run bench:realtime        (100 messages/s for 60 s)
  *   SOAK_RATE=500 SOAK_SECONDS=30 DATABASE_URL=... node test/syslog-live-postgres.mjs
@@ -24,6 +25,7 @@ import { PostgresStore } from '../server/store.mjs';
 import { compileRoutes } from '../server/syslog.mjs';
 import { SyslogIngest, listenSyslog } from '../server/syslog-receiver.mjs';
 import { validateDocument } from '../dist/core.mjs';
+import { passwordHash } from '../server/auth.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 // `--bench` (npm run bench:realtime) soaks longer and faster than the CI check.
 const bench = process.argv.includes('--bench');
@@ -79,6 +81,32 @@ async function stopServer() {
     server.kill('SIGKILL');
     await exited;
   }
+}
+/** Signs in over the API; the session's cookies, as [name, value] pairs. */
+async function signIn(username, password) {
+  const cookies = new Map();
+  let csrf;
+  for (const [path, data] of [['/api/session'], ['/api/auth/login', { username, password }]]) {
+    const res = await fetch(origin + path, {
+      method: data ? 'POST' : 'GET',
+      headers: {
+        Origin: origin,
+        ...(cookies.size ? { Cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join('; ') } : {}),
+        ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
+        ...(data ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(data ? { body: JSON.stringify(data) } : {}),
+    });
+    for (const header of res.headers.getSetCookie()) {
+      const [key, value] = header.split(';')[0].split('=');
+      if (value) cookies.set(key, value);
+      else cookies.delete(key);
+    }
+    const value = await res.json();
+    assert(res.ok, `${path}: ${JSON.stringify(value)}`);
+    csrf = value.csrf ?? csrf;
+  }
+  return [...cookies];
 }
 
 const owner = randomUUID(),
@@ -245,10 +273,64 @@ try {
   assert.equal(ingest.stats.dropped + ingest.stats.rejected + ingest.stats.invalid, 0);
   assert.equal(loads, 1, 'The viewer never reloaded.');
   assert.deepEqual(errors, []);
+
+  // The owner picks a time format while messages arrive (#123): it is saved when chosen, on
+  // whatever the receiver saved last, and is still there after a refresh.
+  await pool.query('UPDATE oc_users SET password_hash=$2 WHERE id=$1', [
+    owner,
+    await passwordHash('syslog-owner-password-2026'),
+  ]);
+  const cookies = await signIn('syslog_' + owner.slice(0, 8), 'syslog-owner-password-2026');
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await context.addCookies(cookies.map(([name, value]) => ({ name, value, url: origin })));
+  const tab = await context.newPage();
+  tab.on('pageerror', (e) => errors.push(e.message));
+  await tab.goto(`${origin}/timelines/${web}`);
+  const editor = tab.frameLocator('iframe.editor-frame');
+  await editor.locator('#publish-button').waitFor();
+  let choosing = 0;
+  const arriving = setInterval(
+    () => void sendUdp(line('web', 'While choosing ' + choosing++)),
+    150,
+  );
+  try {
+    await editor.locator('#presentation-button').click();
+    await editor.locator('#presentation-mode').selectOption('gregorian');
+    await delay(500);
+    await editor.locator('#presentation-save').click();
+    await editor.locator('#presentation-dialog').waitFor({ state: 'hidden', timeout: 30000 });
+    assert.equal(await editor.locator('#toast').textContent(), 'Display settings saved.');
+    await delay(500);
+  } finally {
+    clearInterval(arriving);
+  }
+  const saved = await pool.query('SELECT presentation FROM oc_timelines WHERE id=$1', [web]);
+  assert.equal(saved.rows[0].presentation?.mode, 'gregorian', 'Saved on the server.');
+  await tab.reload();
+  await editor.locator('#publish-button').waitFor();
+  await editor.locator('#presentation-button').click();
+  assert.equal(await editor.locator('#presentation-mode').inputValue(), 'gregorian');
+  await editor.locator('#presentation-dialog button[data-close]').click();
+  // Other edits wait for Save to server; leaving with them unsaved asks first. (Once every
+  // message is saved and shown: a live update replaces a timeline with no unsaved edits.)
+  for (let i = 0; (await stored(web)).n < 8 + total + choosing; i++) {
+    assert(i < 100, 'The messages sent while choosing are saved.');
+    await delay(200);
+  }
+  await delay(2000);
+  await editor.locator('#timeline-title').fill('Web logs, renamed');
+  await editor.locator('#timeline-title').press('Tab');
+  const asked = new Promise((done) => tab.once('dialog', (dialog) => done(dialog)));
+  void tab.evaluate(() => location.reload()).catch(() => {});
+  const dialog = await asked;
+  assert.equal(dialog.type(), 'beforeunload');
+  await dialog.dismiss();
+  await context.close();
+  assert.deepEqual(errors, []);
   udp.close();
   tcp.end();
   console.log(
-    'PASS realtime syslog: UDP/TCP routing, live display, Follow latest, restart catch-up and a sustained-rate soak without loss.',
+    'PASS realtime syslog: UDP/TCP routing, live display, Follow latest, restart catch-up, a sustained-rate soak without loss, and a time format saved while messages arrive.',
   );
 } finally {
   ingest?.close();
