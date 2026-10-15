@@ -1385,3 +1385,51 @@ BEGIN
     END IF;
   END LOOP;
 END $do$;
+-- Reports and moderation decisions (#115; server/moderation.mjs). A case is one reported
+-- thing (a timeline, comment, library plugin or suite, or account) and the reports about it;
+-- reports of a moment or duration belong to its timeline's case and say which. At most one
+-- case per thing is open or in force; a decision closes an open case, and a restriction stays
+-- in force until lifted. Targets are named as text (a timeline or account UUID, a comment's
+-- number, a plugin or suite id), so a case outlives what it names, as a record of what was
+-- decided.
+CREATE TABLE IF NOT EXISTS oc_moderation_cases (
+  id uuid PRIMARY KEY,
+  target_kind text NOT NULL CHECK(target_kind IN ('timeline','comment','plugin','suite','user')),
+  target_id text NOT NULL,
+  -- The account answerable for the target, told of decisions and able to appeal them.
+  owner_id uuid REFERENCES oc_users ON DELETE SET NULL,
+  status text NOT NULL DEFAULT 'open' CHECK(status IN ('open','dismissed','restricted','lifted')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  -- The statement of reasons given to the owner, and who decided.
+  reason text CHECK(char_length(reason)<=2000),
+  decided_by uuid REFERENCES oc_users ON DELETE SET NULL,
+  decided_at timestamptz,
+  -- A restricted timeline's visibility before, restored when the restriction is lifted.
+  previous_visibility text,
+  -- The owner's one request for review, and its outcome.
+  appeal text CHECK(char_length(appeal)<=2000),
+  appealed_at timestamptz,
+  appeal_outcome text CHECK(appeal_outcome IN ('upheld','lifted')),
+  appeal_decided_at timestamptz
+);
+CREATE UNIQUE INDEX IF NOT EXISTS oc_moderation_cases_current ON oc_moderation_cases(target_kind,target_id)
+  WHERE status IN ('open','restricted');
+CREATE INDEX IF NOT EXISTS oc_moderation_cases_owner ON oc_moderation_cases(owner_id,decided_at);
+CREATE TABLE IF NOT EXISTS oc_reports (
+  id uuid PRIMARY KEY,
+  case_id uuid NOT NULL REFERENCES oc_moderation_cases ON DELETE CASCADE,
+  category text NOT NULL CHECK(category IN ('child_abuse','illegal','sexual','violence',
+    'self_harm','harassment','spam','copyright','other')),
+  details text NOT NULL DEFAULT '' CHECK(char_length(details)<=2000),
+  -- Within a timeline, the moment or duration reported.
+  entity_kind text CHECK(entity_kind IN ('moment','duration')),
+  entity_id text CHECK(entity_id ~ '^[A-Za-z0-9_.:-]{1,128}$'),
+  -- Null for a reader who was not signed in.
+  reporter_id uuid REFERENCES oc_users ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CHECK((entity_kind IS NULL)=(entity_id IS NULL))
+);
+CREATE INDEX IF NOT EXISTS oc_reports_case ON oc_reports(case_id,created_at);
+-- A signed-in reader reports a thing once per case; reporting again replaces their report.
+CREATE UNIQUE INDEX IF NOT EXISTS oc_reports_reporter ON oc_reports(case_id,reporter_id,coalesce(entity_kind,''),coalesce(entity_id,''))
+  WHERE reporter_id IS NOT NULL;

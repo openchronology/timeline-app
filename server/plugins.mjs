@@ -76,7 +76,7 @@ export function createPluginLibrary(definitions = BUILTIN_PLUGINS, pool = null) 
       const { search = '', page = 1, limit = 12, sort = 'popularity' } = value;
       const { rows } = await pool.query(
         `WITH versions AS (
-        SELECT id,version,manifest,published_at FROM oc_plugins UNION ALL
+        SELECT id,version,manifest,published_at FROM oc_plugins WHERE NOT EXISTS(SELECT 1 FROM oc_moderation_cases mc WHERE mc.target_kind='plugin' AND mc.target_id=oc_plugins.id AND mc.status='restricted') UNION ALL
         SELECT m->>'id', (m->>'version')::bigint,m,'epoch'::timestamptz FROM jsonb_array_elements($1::jsonb) m
       ), ages AS (SELECT id,min(published_at) AS first_published FROM versions GROUP BY id),
       latest AS (SELECT DISTINCT ON(id) * FROM versions ORDER BY id,version DESC),
@@ -109,7 +109,7 @@ export function createPluginLibrary(definitions = BUILTIN_PLUGINS, pool = null) 
     },
     async get(id, version) {
       const { rows } = await pool.query(
-        'SELECT manifest FROM oc_plugins WHERE id=$1 AND version=$2',
+        `SELECT manifest FROM oc_plugins WHERE id=$1 AND version=$2 AND NOT EXISTS(SELECT 1 FROM oc_moderation_cases mc WHERE mc.target_kind='plugin' AND mc.target_id=oc_plugins.id AND mc.status='restricted')`,
         [id, Number(version)],
       );
       return rows.length ? validatePluginManifest(rows[0].manifest) : local.get(id, version);
@@ -136,6 +136,7 @@ export function createPluginLibrary(definitions = BUILTIN_PLUGINS, pool = null) 
         await client.query('BEGIN');
         // Serialize publications by this account to enforce the storage quota concurrently.
         await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [owner]);
+        await refuseRestricted(client, 'plugin', manifest.id);
         const { rows } = await client.query(
           'SELECT count(*) AS count FROM oc_plugins WHERE owner_id=$1',
           [owner],
@@ -161,6 +162,18 @@ export function createPluginLibrary(definitions = BUILTIN_PLUGINS, pool = null) 
       }
     },
   };
+}
+/** Refuses a new version of a plugin or suite moderators restricted (#115). */
+async function refuseRestricted(client, kind, id) {
+  const { rows } = await client.query(
+    "SELECT 1 FROM oc_moderation_cases WHERE target_kind=$1 AND target_id=$2 AND status='restricted'",
+    [kind, id],
+  );
+  if (rows.length)
+    throw new HttpError(
+      403,
+      `Moderators restricted this ${kind}, so it cannot be published. You can ask for a review in your account.`,
+    );
 }
 /**
  * Plugin suites (#78): the official suites, and on a server with PostgreSQL the suites
@@ -204,7 +217,7 @@ export function createSuiteLibrary(definitions = OFFICIAL_SUITES, pool = null) {
       const { search, page, limit } = check(value);
       const { rows } = await pool.query(
         `WITH versions AS (
-          SELECT id,version,suite FROM oc_plugin_suites UNION ALL
+          SELECT id,version,suite FROM oc_plugin_suites WHERE NOT EXISTS(SELECT 1 FROM oc_moderation_cases mc WHERE mc.target_kind='suite' AND mc.target_id=oc_plugin_suites.id AND mc.status='restricted') UNION ALL
           SELECT s->>'id',(s->>'version')::bigint,s FROM jsonb_array_elements($1::jsonb) s
         ), latest AS (SELECT DISTINCT ON(id) * FROM versions ORDER BY id,version DESC),
         matching AS (SELECT * FROM latest WHERE strpos(lower(concat_ws(' ',suite->>'name',
@@ -225,7 +238,7 @@ export function createSuiteLibrary(definitions = OFFICIAL_SUITES, pool = null) {
     },
     async get(id, version) {
       const { rows } = await pool.query(
-        'SELECT suite FROM oc_plugin_suites WHERE id=$1 AND version=$2',
+        `SELECT suite FROM oc_plugin_suites WHERE id=$1 AND version=$2 AND NOT EXISTS(SELECT 1 FROM oc_moderation_cases mc WHERE mc.target_kind='suite' AND mc.target_id=oc_plugin_suites.id AND mc.status='restricted')`,
         [id, Number(version)],
       );
       return rows.length ? validatePluginSuite(rows[0].suite) : local.get(id, version);
@@ -248,6 +261,7 @@ export function createSuiteLibrary(definitions = OFFICIAL_SUITES, pool = null) {
       try {
         await client.query('BEGIN');
         await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,1))', [owner]);
+        await refuseRestricted(client, 'suite', suite.id);
         const { rows } = await client.query(
           'SELECT count(*) AS count FROM oc_plugin_suites WHERE owner_id=$1',
           [owner],

@@ -51,6 +51,12 @@ import {
  */
 export const SNAPSHOT_BYTES = 200_000_000;
 /**
+ * SQL: whether timeline `t` (a table alias) is restricted by a moderation decision (#115;
+ * moderation.mjs). Only its owner and administrators then see it.
+ */
+export const restrictedTimeline = (t) =>
+  `EXISTS(SELECT 1 FROM oc_moderation_cases mc WHERE mc.target_kind='timeline' AND mc.target_id=${t}.id::text AND mc.status='restricted')`;
+/**
  * A whole document as JSON to store, refused with a reason rather than by the database when
  * it is too large (TIMELINE_ENTRY_LIMIT=unlimited reaches that).
  */
@@ -208,7 +214,8 @@ export class PostgresStore {
       `SELECT t.id,t.revision FROM oc_timelines t
       WHERE t.id=$1 AND (t.visibility='public' OR t.owner_id=$2::uuid
       OR EXISTS(SELECT 1 FROM oc_users a WHERE a.id=$2::uuid AND a.is_admin AND NOT a.is_disabled)
-      OR EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$2::uuid))`,
+      OR (EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$2::uuid)
+        AND NOT ${restrictedTimeline('t')}))`,
       [id, userId ?? null],
     );
     if (!rows[0]) throw new HttpError(404, 'Timeline unavailable.');
@@ -224,20 +231,30 @@ export class PostgresStore {
     const { rows } = await client.query(
       `SELECT ${columns},u.username AS owner,
       EXISTS(SELECT 1 FROM oc_timeline_stars s WHERE s.timeline_id=t.id AND s.user_id=$2::uuid) AS starred,
-      CASE WHEN EXISTS(SELECT 1 FROM oc_users admin WHERE admin.id=$2::uuid AND admin.is_admin AND NOT admin.is_disabled) THEN 'admin' WHEN t.owner_id=$2::uuid THEN 'owner' ELSE m.role END AS role
+      CASE WHEN EXISTS(SELECT 1 FROM oc_users admin WHERE admin.id=$2::uuid AND admin.is_admin AND NOT admin.is_disabled) THEN 'admin' WHEN t.owner_id=$2::uuid THEN 'owner' ELSE m.role END AS role,
+      (SELECT jsonb_build_object('case',mc.id,'reason',mc.reason,'decided_at',mc.decided_at,
+        'appealed_at',mc.appealed_at,'appeal_outcome',mc.appeal_outcome)
+        FROM oc_moderation_cases mc WHERE mc.target_kind='timeline' AND mc.target_id=t.id::text
+        AND mc.status='restricted') AS moderation
       FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id
       LEFT JOIN oc_members m ON m.timeline_id=t.id AND m.user_id=$2::uuid WHERE t.id=$1`,
       [id, userId ?? null],
     );
     const timeline = rows[0];
-    if (!timeline || (!timeline.role && timeline.visibility !== 'public'))
+    // A timeline restricted by moderators (#115) is seen only by its owner and administrators.
+    if (
+      !timeline ||
+      (!timeline.role && timeline.visibility !== 'public') ||
+      (timeline.moderation && !['owner', 'admin'].includes(timeline.role))
+    )
       throw new HttpError(404, 'Timeline unavailable. Sign in if it is private.');
     if (timeline.comparison) {
       const sources = await client.query(
         `SELECT t.id FROM oc_timelines t
         WHERE t.id=ANY($1::uuid[]) AND t.comparison IS NULL AND
-        (t.visibility='public' OR t.owner_id=$2::uuid OR EXISTS(SELECT 1 FROM oc_users a WHERE a.id=$2::uuid AND a.is_admin AND NOT a.is_disabled) OR EXISTS
-          (SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$2::uuid))`,
+        (t.owner_id=$2::uuid OR EXISTS(SELECT 1 FROM oc_users a WHERE a.id=$2::uuid AND a.is_admin AND NOT a.is_disabled)
+          OR ((t.visibility='public' OR EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$2::uuid))
+            AND NOT ${restrictedTimeline('t')}))`,
         [timeline.comparison.sources, userId ?? null],
       );
       if (sources.rows.length !== timeline.comparison.sources.length)
@@ -501,8 +518,9 @@ export class PostgresStore {
       const sources = await client.query(
         `SELECT t.id FROM oc_timelines t
         WHERE t.id=ANY($1::uuid[]) AND t.id<>$2::uuid AND t.comparison IS NULL
-        AND (t.visibility='public' OR ($3='private' AND (t.owner_id=$4::uuid OR EXISTS
-          (SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$4::uuid))))`,
+        AND (t.visibility='public' OR ($3='private' AND (t.owner_id=$4::uuid OR (EXISTS
+          (SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$4::uuid)
+          AND NOT ${restrictedTimeline('t')}))))`,
         [document.comparison.sources, id, parent.visibility, parent.owner_id],
       );
       if (sources.rows.length !== document.comparison.sources.length)

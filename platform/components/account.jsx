@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AccountAccess from './account-access.jsx';
 import { api } from '../lib/api.js';
+import ModerationDecisions from './moderation-decisions.jsx';
 export default function Account({ returnTo = '/', login = false }) {
   const router = useRouter();
   const [session, setSession] = useState(null),
@@ -447,6 +448,7 @@ export default function Account({ returnTo = '/', login = false }) {
       {session?.user && !anonymous && account && (
         <AccountAccess session={session} account={account} refresh={refresh} />
       )}
+      {session?.user && !anonymous && <ModerationDecisions session={session} />}
       {codes && (
         <section className="notice">
           <h2>Save your recovery codes</h2>

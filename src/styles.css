@@ -896,6 +896,10 @@ dialog.moment-dialog {
   white-space: nowrap;
   font-size: 14px;
 }
+/* Report sits beside Share. */
+.inspector-heading .share-entity + .share-entity {
+  margin-left: 8px;
+}
 .moment-dialog h2 {
   font-family: Georgia, serif;
   font-size: 24px;

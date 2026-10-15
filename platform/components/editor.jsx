@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import StarButton from './star-button.jsx';
 import VersionActions from './version-actions.jsx';
 import ShareDialog from './share-dialog.jsx';
+import ReportDialog from './report-dialog.jsx';
 /** The page to share for a link fragment of the editor (see src/links.ts). */
 function sharedAddress(id, fragment) {
   const base = location.origin + '/timelines/' + id;
@@ -30,7 +31,8 @@ export default function Editor({
     router = useRouter(),
     [local, setLocal] = useState(false),
     [actions, setActions] = useState(null),
-    [share, setShare] = useState(null);
+    [share, setShare] = useState(null),
+    [report, setReport] = useState(null);
   const offer = (fragment, title) =>
     setShare({
       url: sharedAddress(id, fragment),
@@ -68,6 +70,18 @@ export default function Editor({
           typeof event.data.fragment === 'string' ? event.data.fragment : null,
           String(event.data.title ?? timeline?.title ?? 'Timeline').slice(0, 300),
         );
+      // Reporting a moment or duration in it (#115).
+      if (
+        event.data?.type === 'openchronology:report' &&
+        id &&
+        event.data.timeline === id &&
+        ['moment', 'duration'].includes(event.data.kind) &&
+        typeof event.data.id === 'string'
+      )
+        setReport({
+          target: { kind: event.data.kind, timeline: id, id: event.data.id },
+          title: String(event.data.title ?? 'Untitled').slice(0, 300),
+        });
       if (
         event.data?.type === 'openchronology:published' &&
         /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(event.data.id)
@@ -116,6 +130,20 @@ export default function Editor({
                 Sharing &amp; settings
               </a>
             )}
+            {!canShare && (
+              <button
+                type="button"
+                className="report-button"
+                onClick={() =>
+                  setReport({
+                    target: { kind: 'timeline', timeline: id },
+                    title: timeline?.title || 'Timeline',
+                  })
+                }
+              >
+                Report
+              </button>
+            )}
             {timeline && !timeline.comparison && (
               <VersionActions
                 timeline={timeline}
@@ -131,6 +159,16 @@ export default function Editor({
           </nav>,
           actions,
         )}
+      {timeline?.moderation && (
+        <p className="notice moderation-notice" role="status">
+          Moderators restricted this timeline
+          {timeline.moderation.reason ? `: ${timeline.moderation.reason}` : '.'} It is private, and
+          only you and the site’s administrators can open it.{' '}
+          <a href="/account#moderation">
+            {timeline.moderation.appealed_at ? 'See your review request' : 'Ask for a review'}
+          </a>
+        </p>
+      )}
       <iframe
         ref={frame}
         onLoad={() =>
@@ -153,6 +191,7 @@ export default function Editor({
         }
       />
       {id && <ShareDialog share={share} onClose={() => setShare(null)} />}
+      {id && <ReportDialog report={report} onClose={() => setReport(null)} />}
     </>
   );
 }

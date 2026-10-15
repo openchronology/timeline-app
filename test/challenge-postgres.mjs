@@ -157,11 +157,19 @@ try {
   ]);
   assert((await veteran.client.request('plugins/publish', {}, 400)).challenged);
   assert(!(await admin.client.request('plugins/publish', {}, 400)).challenged);
+
+  // Reporting (#115): signed out, it asks; an account's reports are limited by its account.
+  const reader = client();
+  await reader.request('session');
+  const report = { target: { kind: 'timeline', timeline: timeline.id }, category: 'spam' };
+  assert((await reader.request('reports', report, 201)).challenged);
+  assert(!(await newcomer.client.request('reports', report, 201)).challenged);
   console.log(
-    'PASS challenges: sign-up and email, sign-in after failures, contributions by new accounts, plugin publishing.',
+    'PASS challenges: sign-up and email, sign-in after failures, contributions by new accounts, plugin publishing, signed-out reports.',
   );
 } finally {
   // Other suites share this database; an extra administrator would change their results.
+  await pool.query('DELETE FROM oc_moderation_cases WHERE owner_id=ANY($1)', [created]);
   await pool.query('DELETE FROM oc_timelines WHERE owner_id=ANY($1)', [created]);
   await pool.query('DELETE FROM oc_users WHERE id=ANY($1)', [created]);
   await new Promise((resolve) => app.close(resolve));

@@ -7,6 +7,7 @@ import {
 import { deleteWhere, parseRetention, printRetention } from './retention.mjs';
 import { setTimelineStar } from './stars.mjs';
 import { Administration, usage, requireDataProvider, avatarValue } from './administration.mjs';
+import { Moderation } from './moderation.mjs';
 import { authorizeKey, keyRequestRead } from './api-keys.mjs';
 import { BrowserForks } from './browser-forks.mjs';
 import { queryPlugins } from './query-plugins.mjs';
@@ -23,7 +24,7 @@ import { OAuth, providersFromEnv } from './oauth.mjs';
 import { mailFromEnv, encryptionKey } from './mail.mjs';
 import { DeviceAuth } from './device-auth.mjs';
 import { TimelineFiles } from './files.mjs';
-import { HttpError, PostgresStore } from './store.mjs';
+import { HttpError, PostgresStore, restrictedTimeline } from './store.mjs';
 import {
   Q,
   parseTime,
@@ -228,6 +229,7 @@ export function createRequestHandler({
     }),
     devices = auth ? new DeviceAuth(auth) : null;
   const administration = store ? new Administration(store, auth) : null;
+  const moderation = store ? new Moderation(store, auth, administration) : null;
   const collaboration = store ? new Collaboration(store) : null;
   const browserForks = store ? new BrowserForks(store, auth) : null;
   return async (req, res) => {
@@ -408,6 +410,51 @@ export function createRequestHandler({
           method !== 'DELETE'
         )
           await requireDataProvider(pool, userId);
+        // Reports and moderation decisions (#115; moderation.mjs).
+        if (pathname === '/api/reports' && method === 'POST') {
+          if (session) auth.require(session, req);
+          else auth.requireLogin(req);
+          await auth.rateLimit('report:' + (userId ?? req.clientAddress));
+          if (!session) await challenges.require(req, 'report', null);
+          return response(res, 201, await moderation.report(userId, await body(req, 8192)));
+        }
+        if (pathname === '/api/moderation' && method === 'GET') {
+          if (!session) throw new HttpError(401, 'Sign in to see moderation decisions.');
+          return response(res, 200, await moderation.mine(userId));
+        }
+        const appeal = /^\/api\/moderation\/([a-f0-9-]{36})\/appeal$/.exec(pathname);
+        if (appeal && method === 'POST' && uuid.test(appeal[1])) {
+          if (!session) throw new HttpError(401, 'Sign in to ask for a review.');
+          auth.require(session, req);
+          await auth.rateLimit('appeal:' + userId);
+          return response(
+            res,
+            200,
+            await moderation.appeal(userId, appeal[1], await body(req, 8192)),
+          );
+        }
+        const reports = /^\/api\/admin\/reports(?:\/([a-f0-9-]{36}))?$/.exec(pathname);
+        if (reports) {
+          if (method === 'GET' && !reports[1])
+            return response(
+              res,
+              200,
+              await moderation.queue(
+                session,
+                Object.fromEntries(new URL(req.url, origin).searchParams),
+              ),
+            );
+          if (method === 'PATCH' && reports[1] && uuid.test(reports[1])) {
+            auth.require(session, req);
+            await auth.rateLimit('admin:' + userId);
+            return response(
+              res,
+              200,
+              await moderation.decide(session, reports[1], await body(req, 8192)),
+            );
+          }
+          throw new HttpError(404, 'Unknown administration action.');
+        }
         if (pathname.startsWith('/api/admin/')) {
           const parts = pathname.slice('/api/admin/'.length).split('/');
           if (
@@ -776,7 +823,8 @@ export function createRequestHandler({
           const { rows } = await pool.query(
             `SELECT t.id,t.title,t.visibility,t.revision,t.event_count,u.username AS owner,
             CASE WHEN t.owner_id=$1 THEN 'owner' ELSE m.role END AS role FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id
-            LEFT JOIN oc_members m ON m.timeline_id=t.id AND m.user_id=$1 WHERE t.owner_id=$1 OR m.user_id=$1 ORDER BY t.updated_at DESC LIMIT 100`,
+            LEFT JOIN oc_members m ON m.timeline_id=t.id AND m.user_id=$1
+            WHERE t.owner_id=$1 OR (m.user_id=$1 AND NOT ${restrictedTimeline('t')}) ORDER BY t.updated_at DESC LIMIT 100`,
             [userId],
           );
           return response(res, 200, { timelines: rows });
@@ -1248,6 +1296,11 @@ export function createRequestHandler({
             }
             if (input.visibility === 'public' && current.publication_restricted)
               throw new HttpError(403, 'Copies of private upstream timelines must remain private.');
+            if (input.visibility === 'public' && current.moderation)
+              throw new HttpError(
+                403,
+                'Moderators restricted this timeline, so it stays private. You can ask for a review in your account.',
+              );
             // Keeping only the last of a calendar timeline: expired on the next run.
             const retention =
               input.retention === undefined
