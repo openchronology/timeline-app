@@ -146,6 +146,15 @@ Upgrading copies each timeline's current state into its saved history once, duri
 `openchronology-migrate`: about 14 s for 200,000 moments and 45 s for a million. Earlier
 revisions keep the form they were saved in.
 
+**The large tables are maintained more often than PostgreSQL's defaults.** By default,
+autovacuum waits until a fifth of a table has changed, or grown by a fifth, and refreshes
+the planner's statistics after a tenth. With hundreds of millions of rows, that's far too
+late. `openchronology-migrate` sets the timelines' index tables, their retired versions and
+their saved history to be vacuumed after about 2% of their rows change or are added, and
+analysed after 1%. Vacuum skips pages nothing changed, so small installations barely notice.
+A value you've set yourself on one of these tables, with `ALTER TABLE ... SET`, stays across
+upgrades.
+
 **A timeline can stop keeping saved history** (**Keep saved history** in its settings), for
 logs and other timelines whose past revisions nobody reviews. History roughly doubles what a
 timeline is charged: at 200,000 moments, a 38 MB timeline was charged 78 MB with it and
