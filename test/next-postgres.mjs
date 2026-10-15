@@ -306,7 +306,7 @@ try {
   assert.equal(streamed.timeline.id, fork.id);
   assert.equal(streamed.document.title, 'Fork title');
   const file = await contributor.request(forkApi + '/document?download=1', { headers: true });
-  assert.match(file.headers.get('content-disposition'), /attachment; filename="timeline-.*\.ochx"/);
+  assert.match(file.headers.get('content-disposition'), /attachment; filename="fork-title\.ochx"/);
   assert.equal(file.value.format, 'openchronology');
   assert.deepEqual(
     file.value.events.map((e) => e.id).sort(),

@@ -41,7 +41,6 @@ export async function checkCommunity(browser) {
     storage = true,
     oversizedFork = false,
     largeTimeline = false,
-    serverExports = 0,
     comments = [],
     searches = [],
     requests = [];
@@ -112,9 +111,8 @@ export async function checkCommunity(browser) {
         },
       });
     if (path === `/api/timelines/${id}/document` && url.searchParams.get('download') === '1') {
-      serverExports++;
       return route.fulfill({
-        headers: { 'Content-Disposition': `attachment; filename="timeline-${id}.ochx"` },
+        headers: { 'Content-Disposition': 'attachment; filename="featured-timeline.ochx"' },
         contentType: 'application/json',
         body: JSON.stringify(document),
       });
@@ -338,8 +336,11 @@ export async function checkCommunity(browser) {
     await opened();
     const serverExport = page.waitForEvent('download');
     await page.locator('#export-button').click();
-    assert.equal((await serverExport).suggestedFilename(), 'featured-timeline.ochx');
-    assert.equal(serverExports, 1);
+    // Some browsers download a link without the page's routing, so the address is checked.
+    const exported = await serverExport;
+    assert.equal(exported.suggestedFilename(), 'featured-timeline.ochx');
+    assert.equal(new URL(exported.url()).pathname, `/api/timelines/${id}/document`);
+    assert.equal(new URL(exported.url()).searchParams.get('download'), '1');
     largeTimeline = false;
     await page.reload();
     await opened();

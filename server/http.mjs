@@ -154,6 +154,12 @@ async function streamResponse(res, chunks, headers = {}) {
     await chunks.return();
   }
 }
+/** A file name for a timeline titled `title` (as the editor names its exports), or `fallback`. */
+const fileName = (title, fallback) =>
+  (title ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .slice(0, 70) || fallback;
 /** Headers making a document a downloaded .ochx file, when the request asks (?download=1). */
 const download = (url, name) =>
   url.searchParams.get('download') === '1'
@@ -872,7 +878,11 @@ export function createRequestHandler({
               timeline: await store.metadata(id, null),
             });
           }
-          const file = download(new URL(req.url, origin), 'timeline-' + id);
+          // Named from its title, as the editor names the files it exports.
+          const file = download(
+            new URL(req.url, origin),
+            fileName((await store.access(id, userId)).title, 'timeline-' + id),
+          );
           return await streamResponse(
             res,
             store.snapshotChunks(id, userId, { documentOnly: !!file }),
