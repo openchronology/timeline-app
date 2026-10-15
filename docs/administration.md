@@ -121,6 +121,9 @@ reads or changes only part of it, at a cost that grows slowly with its size:
 Some work handles the whole timeline at once, and its time grows with it: **exporting** to
 `.ochx` and **reading a saved revision** (history pages). Both stream: the server sends the
 document as it reads it, a page at a time, so its memory stays about the same at any size.
+The editor exports a server timeline of over 100,000 moments with no unsaved edits the same
+way, straight from the server to the file, rather than assembling it in the browser; images
+it links to by address are then not embedded (those the timeline stores are).
 Forking, pull requests, merges and syncs read only what changed.
 
 These figures come from an 8-core virtual machine with PostgreSQL 17, using the

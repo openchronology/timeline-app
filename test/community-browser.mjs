@@ -40,10 +40,18 @@ export async function checkCommunity(browser) {
     guest = true,
     storage = true,
     oversizedFork = false,
+    largeTimeline = false,
     comments = [],
     searches = [],
     requests = [];
   await context.addInitScript(() => {
+    // Links the page follows to download, as the browser reports them (or not).
+    window.followedLinks = [];
+    const click = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () {
+      window.followedLinks.push({ href: this.href, download: this.getAttribute('download') });
+      return click.call(this);
+    };
     window.idbOpens = 0;
     const open = IDBFactory.prototype.open;
     IDBFactory.prototype.open = function (...args) {
@@ -101,7 +109,21 @@ export async function checkCommunity(browser) {
     if (path === `/api/timelines/${id}/revision`)
       return route.fulfill({ json: { id, revision: info.revision } });
     if (path === `/api/timelines/${id}`)
-      return route.fulfill({ json: { ...info, canEdit: !guest, canPropose: !guest } });
+      return route.fulfill({
+        json: {
+          ...info,
+          canEdit: !guest,
+          canPropose: !guest,
+          ...(largeTimeline ? { event_count: '150000' } : {}),
+        },
+      });
+    if (path === `/api/timelines/${id}/export/featured-timeline.ochx`) {
+      return route.fulfill({
+        headers: { 'Content-Disposition': 'attachment; filename="featured-timeline.ochx"' },
+        contentType: 'application/json',
+        body: JSON.stringify(document),
+      });
+    }
     if (path === `/api/timelines/${id}/browser-fork`)
       return oversizedFork
         ? route.fulfill({
@@ -310,6 +332,37 @@ export async function checkCommunity(browser) {
     );
     assert.equal(await page.locator('#publish-button').textContent(), 'Submit pull request');
     assert(await page.locator('#share-button').isHidden());
+    // A large server timeline without unsaved edits is exported by the server, which streams
+    // it to the file, rather than assembled here (#135).
+    const opened = () =>
+      page.waitForFunction(
+        () => document.getElementById('timeline-title').value === 'Featured timeline',
+      );
+    largeTimeline = true;
+    await page.reload();
+    await opened();
+    // Playwright's WebKit reports no download for such a link here (browsers may follow it
+    // without the page's routing, and nothing else serves this address), so the link the
+    // editor follows is checked in every browser, and the download where it is reported.
+    const webkit = browser.browserType().name() === 'webkit';
+    const serverExport = webkit ? null : page.waitForEvent('download');
+    await page.evaluate(() => (window.followedLinks = []));
+    await page.locator('#export-button').click();
+    await page.waitForFunction(() => window.followedLinks.length > 0);
+    const [followed] = await page.evaluate(() => window.followedLinks);
+    assert.equal(
+      new URL(followed.href).pathname,
+      `/api/timelines/${id}/export/featured-timeline.ochx`,
+    );
+    assert.equal(followed.download, '');
+    if (serverExport) {
+      const serverFile = await serverExport;
+      assert.equal(serverFile.suggestedFilename(), 'featured-timeline.ochx');
+      assert.equal(new URL(serverFile.url()).pathname, new URL(followed.href).pathname);
+    }
+    largeTimeline = false;
+    await page.reload();
+    await opened();
     await page.locator('#timeline-title').fill('Proposed title');
     await page.locator('#timeline-title').blur();
     await page.locator('#timeline-tags').fill('astronomy, science');

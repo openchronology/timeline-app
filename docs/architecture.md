@@ -92,6 +92,7 @@ All paths start with `/api/`. Request and response bodies are JSON except SQLite
 | `POST /timelines`                         | Create a private timeline from an exchange document                 |
 | `GET /timelines/:id`                      | Read authorized timeline metadata and bounds                        |
 | `GET /timelines/:id/document`             | Read/export a full snapshot, streamed; `?download=1` for an `.ochx` |
+| `GET /timelines/:id/export/:name.ochx`    | The `.ochx` streamed as a file named `:name` (signed in)            |
 | `PUT /timelines/:id`                      | Save `{revision, document}` with conflict detection                 |
 | `PUT /timelines/:id/changes`              | Save sparse edits against a revision; preserve untouched moments    |
 | `POST /timelines/:id/query`               | Read bounded summaries or an event page                             |

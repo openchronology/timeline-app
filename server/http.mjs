@@ -154,6 +154,12 @@ async function streamResponse(res, chunks, headers = {}) {
     await chunks.return();
   }
 }
+/** A file name for a timeline titled `title` (as the editor names its exports), or `fallback`. */
+const fileName = (title, fallback) =>
+  (title ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .slice(0, 70) || fallback;
 /** Headers making a document a downloaded .ochx file, when the request asks (?download=1). */
 const download = (url, name) =>
   url.searchParams.get('download') === '1'
@@ -844,6 +850,19 @@ export function createRequestHandler({
               : await versions.copy(forkAction[1], userId, input, forkAction[2] === 'duplicate'),
           );
         }
+        // A timeline's .ochx file, streamed, named by the end of its address: the editor
+        // downloads large timelines from here, and browsers that name a download after its
+        // address name it as those that follow Content-Disposition do.
+        const exported =
+          /^\/api\/timelines\/([a-f0-9-]{36})\/export\/([a-z0-9-]{1,70})\.ochx$/.exec(pathname);
+        if (exported && method === 'GET') {
+          if (!userId) throw new HttpError(401, 'Sign in to export a timeline from the server.');
+          return await streamResponse(
+            res,
+            store.snapshotChunks(exported[1], userId, { documentOnly: true }),
+            { 'Content-Disposition': `attachment; filename="${exported[2]}.ochx"` },
+          );
+        }
         const match =
           /^\/api\/timelines\/([^/]+)(?:\/(document|query|members|settings|file|changes|delete-range|revision|recent))?$/.exec(
             pathname,
@@ -872,7 +891,11 @@ export function createRequestHandler({
               timeline: await store.metadata(id, null),
             });
           }
-          const file = download(new URL(req.url, origin), 'timeline-' + id);
+          // Named from its title, as the editor names the files it exports.
+          const file = download(
+            new URL(req.url, origin),
+            fileName((await store.access(id, userId)).title, 'timeline-' + id),
+          );
           return await streamResponse(
             res,
             store.snapshotChunks(id, userId, { documentOnly: !!file }),

@@ -5084,8 +5084,41 @@ input('json-file').onchange = () => {
     })
     .catch(fail);
 };
+/**
+ * Above this many moments, a server timeline without unsaved edits is exported by the
+ * server, which streams it to a file (#135), instead of being assembled here: a document that
+ * size takes more memory than a page should. Images it links to by address are then not
+ * embedded (those it stores are).
+ */
+const SERVER_EXPORT = 100000n;
+/**
+ * Whether the open timeline is a server timeline with no edits waiting to be saved (one
+ * opened read-only has none).
+ */
+function savedRemote(): boolean {
+  const sparse = sparseWorkspace();
+  return (
+    !!remote &&
+    !local &&
+    !comparison &&
+    !dirty &&
+    (sparse
+      ? !sparse.changes.size && !sparse.durationChanges.size && !sparse.relationshipChanges.size
+      : !model)
+  );
+}
 el('export-button').onclick = () => {
   flushEventEdit();
+  if (!window.__TAURI__ && session.user && savedRemote() && momentCount() > SERVER_EXPORT) {
+    // Named by the end of the address (and by the server's Content-Disposition), which
+    // every browser names it after.
+    const a = document.createElement('a');
+    a.href = `/api/timelines/${remote!.id}/export/${fileName(remote!.title, '.ochx')}`;
+    a.download = '';
+    a.click();
+    toast('Exporting from the server: the file downloads as it is written.');
+    return;
+  }
   const exportingDocument = documentRequest,
     exportingVersion = editVersion;
   void (async () => {
@@ -5108,15 +5141,17 @@ el('export-button').onclick = () => {
     }
   })().catch(fail);
 };
+/** A file name for a timeline titled `title`. */
+const fileName = (title: string, extension: string) =>
+  (title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .slice(0, 70) || 'timeline') + extension;
 function download(blob: Blob, title: string, extension: string) {
   const url = URL.createObjectURL(blob),
     a = document.createElement('a');
   a.href = url;
-  a.download =
-    (title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .slice(0, 70) || 'timeline') + extension;
+  a.download = fileName(title, extension);
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
