@@ -45,6 +45,13 @@ export async function checkCommunity(browser) {
     searches = [],
     requests = [];
   await context.addInitScript(() => {
+    // Links the page follows to download, as the browser reports them (or not).
+    window.followedLinks = [];
+    const click = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () {
+      window.followedLinks.push({ href: this.href, download: this.getAttribute('download') });
+      return click.call(this);
+    };
     window.idbOpens = 0;
     const open = IDBFactory.prototype.open;
     IDBFactory.prototype.open = function (...args) {
@@ -334,15 +341,25 @@ export async function checkCommunity(browser) {
     largeTimeline = true;
     await page.reload();
     await opened();
-    const serverExport = page.waitForEvent('download');
+    // Playwright's WebKit reports no download for such a link here (browsers may follow it
+    // without the page's routing, and nothing else serves this address), so the link the
+    // editor follows is checked in every browser, and the download where it is reported.
+    const webkit = browser.browserType().name() === 'webkit';
+    const serverExport = webkit ? null : page.waitForEvent('download');
+    await page.evaluate(() => (window.followedLinks = []));
     await page.locator('#export-button').click();
-    // Some browsers download a link without the page's routing, so the address is checked.
-    const serverFile = await serverExport;
-    assert.equal(serverFile.suggestedFilename(), 'featured-timeline.ochx');
+    await page.waitForFunction(() => window.followedLinks.length > 0);
+    const [followed] = await page.evaluate(() => window.followedLinks);
     assert.equal(
-      new URL(serverFile.url()).pathname,
+      new URL(followed.href).pathname,
       `/api/timelines/${id}/export/featured-timeline.ochx`,
     );
+    assert.equal(followed.download, '');
+    if (serverExport) {
+      const serverFile = await serverExport;
+      assert.equal(serverFile.suggestedFilename(), 'featured-timeline.ochx');
+      assert.equal(new URL(serverFile.url()).pathname, new URL(followed.href).pathname);
+    }
     largeTimeline = false;
     await page.reload();
     await opened();
