@@ -1579,11 +1579,18 @@ export class PostgresStore {
           return { results: [], total: '0', page: query.page, revision: t.revision };
         // Terms contain only letters and digits, so they are safe tsquery prefix operands.
         const tsquery = terms.map((term) => term + ':*').join(' & ');
+        // Every match is ranked and counted, but only the page's are read whole: carrying
+        // each match's text and times to the count would spill to disk past a few thousand.
         const { rows } = await c.query(
-          `SELECT kind,entity_id,oc_qtext(first_time) AS first,oc_qtext(last_time) AS last,title,left(body,300) AS body,count(*) OVER() AS total
-          FROM ${index('oc_entity_search', '$1', { scan: true })} s, to_tsquery('simple',$2) AS q
-          WHERE document @@ q AND ($5::text IS NULL OR kind=$5)
-          ORDER BY ts_rank(document,q) DESC,first_time,kind,entity_id COLLATE "C" LIMIT $3 OFFSET $4`,
+          `SELECT p.kind,p.entity_id,oc_qtext(e.first_time) AS first,oc_qtext(e.last_time) AS last,
+            e.title,left(e.body,300) AS body,p.total
+          FROM (SELECT kind,entity_id,first_time,rank,count(*) OVER() AS total FROM (
+              SELECT s.kind,s.entity_id,s.first_time,ts_rank(s.document,q) AS rank
+              FROM ${index('oc_entity_search', '$1', { scan: true })} s, to_tsquery('simple',$2) AS q
+              WHERE s.document @@ q AND ($5::text IS NULL OR s.kind=$5)) m
+            ORDER BY rank DESC,first_time,kind,entity_id COLLATE "C" LIMIT $3 OFFSET $4) p
+          CROSS JOIN LATERAL ${index.lookup('oc_entity_search', ['p.kind', 'p.entity_id'])} e
+          ORDER BY p.rank DESC,p.first_time,p.kind,p.entity_id COLLATE "C"`,
           [id, tsquery, SEARCH_PAGE_SIZE, (query.page - 1) * SEARCH_PAGE_SIZE, query.only ?? null],
         );
         return {
