@@ -2726,7 +2726,10 @@ el('guest-fork-button').onclick = () => {
   if (remote) void forkInBrowser(remote.id);
 };
 window.addEventListener('beforeunload', (event) => {
-  if (memoryOnly() && !remote && !comparison && (dirty || pendingEventEdit)) {
+  // Work kept nowhere else: a timeline only in memory, or edits not yet saved to the server
+  // (in a browser; the desktop app's window is not a page left this way).
+  const unkept = memoryOnly() ? !remote : !desktop && !!remote && !embedded;
+  if (unkept && !comparison && (dirty || pendingEventEdit)) {
     event.preventDefault();
     event.returnValue = '';
   }
@@ -4707,14 +4710,84 @@ el<HTMLFormElement>('presentation-form').onsubmit = (event) => {
       return;
     }
     const editingTime = !el('event-form').hidden ? readEventTime() : null;
-    model!.presentation = displaySettings();
-    changed();
-    if (editingTime) setEventTime(editingTime);
-    el<HTMLDialogElement>('presentation-dialog').close();
+    const presentation = displaySettings();
+    const apply = () => {
+      model!.presentation = presentation;
+      if (editingTime) setEventTime(editingTime);
+      el<HTMLDialogElement>('presentation-dialog').close();
+    };
+    if (!savesDisplayToServer()) {
+      apply();
+      changed();
+      return;
+    }
+    const save = el<HTMLButtonElement>('presentation-save'),
+      workspace = documentRequest;
+    save.disabled = true;
+    text('presentation-error', '');
+    void saveDisplaySettings(presentation)
+      .then(() => {
+        if (workspace !== documentRequest) return;
+        apply();
+        heading();
+        requestRender();
+        toast('Display settings saved.');
+      })
+      .catch((error) => {
+        if (workspace === documentRequest)
+          text('presentation-error', error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        save.disabled = false;
+      });
   } catch (error) {
     text('presentation-error', error instanceof Error ? error.message : String(error));
   }
 };
+/**
+ * Display settings of a server timeline its editor may save are saved when chosen (#123),
+ * unlike other edits, which wait for Save to server: they change how the timeline reads,
+ * not what it holds, and a timeline being written to (by a log import or syslog) would
+ * otherwise refuse each save of them as someone else having changed it. In a proposal they
+ * are part of what is proposed.
+ */
+function savesDisplayToServer() {
+  return !!remote && !local && !workingProposal && !!model && !!(remote.canWrite ?? remote.canEdit);
+}
+/**
+ * Saves `presentation` as the open server timeline's display, on its latest saved settings:
+ * a save of nothing else, sent again if another lands first.
+ */
+async function saveDisplaySettings(presentation: TimePresentation) {
+  const id = remote!.id;
+  for (let attempt = 0; ; attempt++) {
+    const saved = await api<RemoteTimeline>(`timelines/${id}`);
+    try {
+      const result = await api<RemoteTimeline>(`timelines/${id}/changes`, 'PUT', {
+        revision: saved.revision,
+        settings: {
+          format: 'openchronology',
+          version: 1,
+          title: saved.title,
+          description: saved.description,
+          presentation,
+          ...(saved.plugins ? { plugins: saved.plugins } : {}),
+          ...(saved.tags ? { tags: saved.tags } : {}),
+          ...(saved.assets ? { assets: saved.assets } : {}),
+        },
+        changes: [],
+        durationChanges: [],
+        relationshipChanges: [],
+      });
+      // Unsaved edits made on the revision this save follows may now be saved on it; edits on
+      // an earlier one still meet the change they missed.
+      if (remote?.id === id && remote.revision === saved.revision) remote = result;
+      return;
+    } catch (error) {
+      if ((error as { status?: number }).status !== 409 || attempt >= 4) throw error;
+    }
+  }
+}
 el('apply-exact-bounds').onclick = () => {
   follow.navigation();
   cancelZoomAnimation();
