@@ -133,7 +133,17 @@ try {
   await dialog.getByLabel('Details (optional)').fill('Explicit images throughout.');
   await dialog.getByRole('button', { name: 'Send report' }).click();
   await dialog.getByText('The site’s administrators will review your report.').waitFor();
-  await dialog.getByRole('button', { name: 'Close', exact: true }).last().click();
+  // Like the editor's dialogs, it closes on a click outside it, through its exit animation.
+  await reader.evaluate(() => {
+    const element = document.querySelector('dialog.report-dialog');
+    window.closing = false;
+    new MutationObserver(() => {
+      if (element.hasAttribute('data-dialog-closing')) window.closing = true;
+    }).observe(element, { attributes: true });
+  });
+  await reader.mouse.click(12, 450);
+  await dialog.waitFor({ state: 'hidden' });
+  assert(await reader.evaluate(() => window.closing), 'The dialog animates closed.');
   // …and a moment in it, from the moment's details.
   await reader.goto(`${origin}/timelines/${created.id}/moments/m1`);
   await editor.locator('#moment-report').click();

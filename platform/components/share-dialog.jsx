@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { dismissOnBackdrop } from '../../src/dialogs.ts';
 /** Social sites' own share pages: a link to each, without their scripts. */
 const SITES = [
   ['Facebook', (url) => `https://www.facebook.com/sharer/sharer.php?u=${url}`],
@@ -40,6 +41,8 @@ export default function ShareDialog({ share, onClose }) {
     [status, setStatus] = useState(''),
     [size, setSize] = useState('responsive'),
     [native, setNative] = useState(false);
+  // Closes with the editor's exit animation, and on a click outside it, like its dialogs.
+  useEffect(() => dismissOnBackdrop(dialog.current), []);
   useEffect(() => {
     setNative(typeof navigator !== 'undefined' && typeof navigator.share === 'function');
   }, []);

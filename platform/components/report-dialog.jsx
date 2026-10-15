@@ -2,6 +2,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
+import { dismissOnBackdrop } from '../../src/dialogs.ts';
 import { REPORT_CATEGORIES, REPORT_TEXT } from '../../server/report-categories.mjs';
 /**
  * Reports something to the site's administrators (#115; server/moderation.mjs), signed in or
@@ -16,6 +17,8 @@ export default function ReportDialog({ report, onClose }) {
     [error, setError] = useState(''),
     [sending, setSending] = useState(false),
     [sent, setSent] = useState(false);
+  // Closes with the editor's exit animation, and on a click outside it, like its dialogs.
+  useEffect(() => dismissOnBackdrop(dialog.current), []);
   useEffect(() => {
     setCategory('');
     setDetails('');
