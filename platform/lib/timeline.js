@@ -38,6 +38,7 @@ export function versionInfo(timeline) {
     comparison,
     star_count,
     starred,
+    moderation,
   } = timeline;
   return {
     id,
@@ -51,5 +52,7 @@ export function versionInfo(timeline) {
     comparison,
     star_count,
     starred,
+    // A moderation restriction in force (#115), told to its owner and administrators only.
+    moderation: moderation ?? null,
   };
 }

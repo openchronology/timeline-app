@@ -2,9 +2,12 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api.js';
+import { ReportCase } from './admin-reports.jsx';
 export default function Admin() {
   const [kind, setKind] = useState('users'),
     [search, setSearch] = useState(''),
+    // Which reports (#115): awaiting a decision, restricted, or closed.
+    [view, setView] = useState('open'),
     [page, setPage] = useState(1),
     [result, setResult] = useState(null),
     [session, setSession] = useState(null),
@@ -16,9 +19,17 @@ export default function Admin() {
     const controller = new AbortController();
     Promise.all([
       api('session', { signal: controller.signal }),
-      api('admin/' + kind + '?' + new URLSearchParams({ search, page: String(page) }), {
-        signal: controller.signal,
-      }),
+      api(
+        'admin/' +
+          kind +
+          '?' +
+          new URLSearchParams(
+            kind === 'reports' ? { view, page: String(page) } : { search, page: String(page) },
+          ),
+        {
+          signal: controller.signal,
+        },
+      ),
     ])
       .then(([s, r]) => {
         if (active) {
@@ -34,7 +45,7 @@ export default function Admin() {
       active = false;
       controller.abort();
     };
-  }, [kind, search, page, reload]);
+  }, [kind, search, view, page, reload]);
   async function change(path, changes) {
     if (busy) return;
     setBusy(true);
@@ -77,14 +88,14 @@ export default function Admin() {
           read-only)
           <input
             name="quota"
-            key={result?.settings.default_quota_bytes}
-            defaultValue={result?.settings.default_quota_bytes}
+            key={result?.settings?.default_quota_bytes}
+            defaultValue={result?.settings?.default_quota_bytes}
             pattern="\s*\d+(\.\d+)?\s*([kKmMgGtT][iI]?)?[bB]?\s*"
-            disabled={result?.settings.default_quota_from_env}
+            disabled={result?.settings?.default_quota_from_env}
             required
           />
         </label>
-        {result?.settings.default_quota_from_env ? (
+        {result?.settings?.default_quota_from_env ? (
           <p className="field-hint">
             Set by <code>DEFAULT_USER_STORAGE_BYTES</code> in the environment file; change it there
             and restart.
@@ -121,113 +132,142 @@ export default function Admin() {
           >
             <option value="users">Users</option>
             <option value="timelines">Timelines</option>
+            <option value="reports">Reports</option>
           </select>
         </label>
-        <label>
-          Search
-          <input
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            maxLength={200}
-          />
-        </label>
+        {kind === 'reports' ? (
+          <label>
+            Show
+            <select
+              value={view}
+              onChange={(e) => {
+                setResult(null);
+                setView(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="open">Awaiting a decision</option>
+              <option value="restricted">Restricted</option>
+              <option value="closed">Closed</option>
+            </select>
+          </label>
+        ) : (
+          <label>
+            Search
+            <input
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              maxLength={200}
+            />
+          </label>
+        )}
       </div>
       <p role="alert" className="error">
         {error}
       </p>
       <div className="timeline-grid">
-        {result?.items.map((item) => (
-          <article className="timeline-card" key={item.id}>
-            {kind === 'users' ? (
-              <>
-                <h2>@{item.username}</h2>
-                <p>
-                  {item.email || 'No recovery email'} · {Number(item.used_bytes).toLocaleString()}{' '}
-                  bytes used
-                </p>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const d = new FormData(e.currentTarget);
-                    void change('users/' + item.id, {
-                      is_admin: d.has('is_admin'),
-                      is_disabled: d.has('is_disabled'),
-                      quota_bypass: d.has('quota_bypass'),
-                      quota_bytes: d.get('quota_bytes') === '' ? null : d.get('quota_bytes'),
-                    });
-                  }}
-                >
-                  {['is_admin', 'is_disabled', 'quota_bypass'].map((flag) => (
-                    <label key={flag} className="checkbox-label">
-                      <input type="checkbox" name={flag} defaultChecked={item[flag]} />
-                      {
-                        {
-                          is_admin: 'Administrator',
-                          is_disabled: 'Suspend access (revokes sessions and keys)',
-                          quota_bypass: 'Bypass storage limit',
-                        }[flag]
-                      }
-                    </label>
-                  ))}
-                  <label>
-                    Custom quota in bytes or a size such as 2GiB (blank inherits site default)
-                    <input
-                      name="quota_bytes"
-                      pattern="\s*\d+(\.\d+)?\s*([kKmMgGtT][iI]?)?[bB]?\s*"
-                      defaultValue={item.quota_bytes ?? ''}
-                    />
-                  </label>
-                  <button disabled={busy}>Apply user settings</button>
-                </form>
-              </>
-            ) : (
-              <>
-                <h2>
-                  <a href={'/timelines/' + item.id}>{item.title}</a>
-                </h2>
-                <p>
-                  @{item.owner} · {item.visibility} · {Number(item.event_count).toLocaleString()}{' '}
-                  moments
-                </p>
-                <div className="actions">
-                  <button
-                    disabled={busy}
-                    onClick={() => change('timelines/' + item.id, { featured: !item.featured })}
-                  >
-                    {item.featured ? 'Unfeature' : 'Feature'}
-                  </button>
-                  <button
-                    disabled={busy}
-                    onClick={() =>
-                      change('timelines/' + item.id, {
-                        visibility: item.visibility === 'public' ? 'private' : 'public',
-                      })
-                    }
-                  >
-                    Make {item.visibility === 'public' ? 'private' : 'public'}
-                  </button>
-                  <button
-                    className="danger"
-                    disabled={busy}
-                    onClick={() => {
-                      if (
-                        confirm(
-                          'Permanently delete this timeline and its reviews? Retained fork ancestors remain.',
-                        )
-                      )
-                        void change('timelines/' + item.id, { delete: true });
+        {kind === 'reports' &&
+          result?.items.map((item) => (
+            <ReportCase
+              key={item.id}
+              item={item}
+              busy={busy}
+              decide={(action, reason) => change('reports/' + item.id, { action, reason })}
+            />
+          ))}
+        {kind !== 'reports' &&
+          result?.items.map((item) => (
+            <article className="timeline-card" key={item.id}>
+              {kind === 'users' ? (
+                <>
+                  <h2>@{item.username}</h2>
+                  <p>
+                    {item.email || 'No recovery email'} · {Number(item.used_bytes).toLocaleString()}{' '}
+                    bytes used
+                  </p>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const d = new FormData(e.currentTarget);
+                      void change('users/' + item.id, {
+                        is_admin: d.has('is_admin'),
+                        is_disabled: d.has('is_disabled'),
+                        quota_bypass: d.has('quota_bypass'),
+                        quota_bytes: d.get('quota_bytes') === '' ? null : d.get('quota_bytes'),
+                      });
                     }}
                   >
-                    Delete
-                  </button>
-                </div>
-              </>
-            )}
-          </article>
-        ))}
+                    {['is_admin', 'is_disabled', 'quota_bypass'].map((flag) => (
+                      <label key={flag} className="checkbox-label">
+                        <input type="checkbox" name={flag} defaultChecked={item[flag]} />
+                        {
+                          {
+                            is_admin: 'Administrator',
+                            is_disabled: 'Suspend access (revokes sessions and keys)',
+                            quota_bypass: 'Bypass storage limit',
+                          }[flag]
+                        }
+                      </label>
+                    ))}
+                    <label>
+                      Custom quota in bytes or a size such as 2GiB (blank inherits site default)
+                      <input
+                        name="quota_bytes"
+                        pattern="\s*\d+(\.\d+)?\s*([kKmMgGtT][iI]?)?[bB]?\s*"
+                        defaultValue={item.quota_bytes ?? ''}
+                      />
+                    </label>
+                    <button disabled={busy}>Apply user settings</button>
+                  </form>
+                </>
+              ) : (
+                <>
+                  <h2>
+                    <a href={'/timelines/' + item.id}>{item.title}</a>
+                  </h2>
+                  <p>
+                    @{item.owner} · {item.visibility} · {Number(item.event_count).toLocaleString()}{' '}
+                    moments
+                  </p>
+                  <div className="actions">
+                    <button
+                      disabled={busy}
+                      onClick={() => change('timelines/' + item.id, { featured: !item.featured })}
+                    >
+                      {item.featured ? 'Unfeature' : 'Feature'}
+                    </button>
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        change('timelines/' + item.id, {
+                          visibility: item.visibility === 'public' ? 'private' : 'public',
+                        })
+                      }
+                    >
+                      Make {item.visibility === 'public' ? 'private' : 'public'}
+                    </button>
+                    <button
+                      className="danger"
+                      disabled={busy}
+                      onClick={() => {
+                        if (
+                          confirm(
+                            'Permanently delete this timeline and its reviews? Retained fork ancestors remain.',
+                          )
+                        )
+                          void change('timelines/' + item.id, { delete: true });
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </>
+              )}
+            </article>
+          ))}
       </div>
       <nav className="pager">
         <button disabled={page <= 1 || busy} onClick={() => setPage((p) => p - 1)}>

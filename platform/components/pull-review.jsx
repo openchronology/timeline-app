@@ -4,13 +4,15 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '../lib/api.js';
-export default function PullReview({ timelineId, initial, initialComments, signedIn }) {
+import ReportDialog from './report-dialog.jsx';
+export default function PullReview({ timelineId, initial, initialComments, signedIn, username }) {
   const router = useRouter(),
     [p, setProposal] = useState(initial),
     [comments, setComments] = useState(initialComments.comments),
     [cursor, setCursor] = useState(initialComments.next),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [report, setReport] = useState(null);
   const base = 'timelines/' + timelineId + '/proposals/' + p.id;
   async function perform(operation) {
     if (busy) return;
@@ -178,7 +180,25 @@ export default function PullReview({ timelineId, initial, initialComments, signe
               @{c.author} ·{' '}
               {new Date(c.created_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}
             </p>
-            <p className="preserve-text">{c.body}</p>
+            {c.removed ? (
+              <p className="field-hint">Removed by moderators.</p>
+            ) : (
+              <p className="preserve-text">{c.body}</p>
+            )}
+            {!c.removed && c.author !== username && (
+              <button
+                type="button"
+                className="link-button"
+                onClick={() =>
+                  setReport({
+                    target: { kind: 'comment', id: String(c.id) },
+                    title: `Comment by @${c.author}`,
+                  })
+                }
+              >
+                Report
+              </button>
+            )}
           </article>
         ))}
         {cursor && (
@@ -198,6 +218,7 @@ export default function PullReview({ timelineId, initial, initialComments, signe
           <Link href="/login">Sign in to comment</Link>
         )}
       </section>
+      <ReportDialog report={report} onClose={() => setReport(null)} />
     </>
   );
 }

@@ -213,6 +213,18 @@ export class Administration {
           if (current.publication_restricted)
             throw new HttpError(403, 'Private upstream data cannot be published.');
           if (
+            (
+              await c.query(
+                "SELECT 1 FROM oc_moderation_cases WHERE target_kind='timeline' AND target_id=$1 AND status='restricted'",
+                [id],
+              )
+            ).rows.length
+          )
+            throw new HttpError(
+              409,
+              'Moderators restricted this timeline. Lift the restriction under Reports to publish it again.',
+            );
+          if (
             current.comparison &&
             (
               await c.query(

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Form from 'next/form';
 import { platformServices } from '../../../server/platform.mjs';
 import { createPluginLibrary, createSuiteLibrary } from '../../../server/plugins.mjs';
+import ReportLink from '../../components/report-link.jsx';
 export const dynamic = 'force-dynamic';
 export default async function Plugins({ searchParams }) {
   const params = await searchParams;
@@ -69,6 +70,10 @@ export default async function Plugins({ searchParams }) {
                 </p>
                 <p>{suite.description}</p>
                 <p className="muted">Plugins: {suite.plugins.map((p) => p.name).join(', ')}</p>
+                {/* Suites accounts published (u-…) can be reported; official ones cannot. */}
+                {suite.id.startsWith('u-') && (
+                  <ReportLink target={{ kind: 'suite', id: suite.id }} title={suite.name} />
+                )}
               </article>
             ))}
           </div>
@@ -83,6 +88,9 @@ export default async function Plugins({ searchParams }) {
               {p.id} · Version {p.version}
             </p>
             <p>{p.description}</p>
+            {p.id.startsWith('u-') && (
+              <ReportLink target={{ kind: 'plugin', id: p.id }} title={p.name} />
+            )}
           </article>
         ))}
       </div>

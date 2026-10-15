@@ -6,6 +6,7 @@ import { accountCompareLimit, currentSession } from '../../../lib/session.js';
 import { searchTimelines } from '../../../../server/collaboration.mjs';
 import TimelineList from '../../../components/timeline-list.jsx';
 import { siteName } from '../../../lib/sharing.js';
+import ReportLink from '../../../components/report-link.jsx';
 export const dynamic = 'force-dynamic';
 const pageNumber = (n) =>
   Math.max(1, Math.min(10000, Number.isSafeInteger(Number(n)) ? Number(n) : 1));
@@ -54,6 +55,9 @@ export default async function Profile({ params, searchParams }) {
         <img className="account-avatar" src={rows[0].avatar_url} alt="" width={64} height={64} />
       )}
       <h1>@{username}</h1>
+      {current.user?.username !== username && (
+        <ReportLink target={{ kind: 'user', id: username }} title={'@' + username} />
+      )}
       <CompareTray limit={accountCompareLimit(current)} signedIn={!!current.user} />
       <section>
         <h2>Public timelines</h2>

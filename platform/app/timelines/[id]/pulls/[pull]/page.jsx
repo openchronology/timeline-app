@@ -21,7 +21,13 @@ export default async function Pull({ params }) {
   return (
     <main className="platform">
       <Link href={'/timelines/' + id + '/pulls'}>← Pull requests</Link>
-      <PullReview timelineId={id} initial={proposal} initialComments={comments} signedIn={!!user} />
+      <PullReview
+        timelineId={id}
+        initial={proposal}
+        initialComments={comments}
+        signedIn={!!user}
+        username={user?.username}
+      />
     </main>
   );
 }

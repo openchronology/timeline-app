@@ -3344,6 +3344,7 @@ function eventForm(event?: PointEvent, time?: Q) {
   el('event-cancel').parentElement!.hidden = !editable();
   // Only what the server keeps can be shared: not unsaved moments or edits.
   el('moment-share').hidden = !event || !shareable() || !!sparseWorkspace()?.changes.has(event.id);
+  el('moment-report').hidden = el('moment-share').hidden || !!remote?.canShare;
   text('event-error', '');
   showMomentDetails(event ? 'Moment details' : 'New moment');
   if (event && !comparison) reportLink({ kind: 'moment', id: event.id });
@@ -6476,6 +6477,7 @@ function showDuration(duration: Duration, readOnly: boolean, isNew = false) {
   );
   el('duration-share').hidden =
     isNew || !shareable() || !!sparseWorkspace()?.durationChanges.has(duration.id);
+  el('duration-report').hidden = el('duration-share').hidden || !!remote?.canShare;
   const dialog = el<HTMLDialogElement>('duration-dialog');
   if (!dialog.open) dialog.showModal();
   if (!isNew && !comparison) reportLink({ kind: 'duration', id: duration.id });
@@ -7364,6 +7366,25 @@ el('duration-share').onclick = () => {
   if (openDuration)
     requestShare(
       { kind: 'duration', id: openDuration.duration.id },
+      openDuration.duration.metadata.title || 'Duration',
+    );
+};
+/** Asks the platform page to report a moment or duration of this timeline (#115). */
+function requestReport(kind: 'moment' | 'duration', id: string, title: string) {
+  if (!shareable()) return;
+  window.parent.postMessage(
+    { type: 'openchronology:report', timeline: remote!.id, kind, id, title },
+    location.origin,
+  );
+}
+el('moment-report').onclick = () => {
+  if (selected) requestReport('moment', selected.id, selected.metadata.title || 'Moment');
+};
+el('duration-report').onclick = () => {
+  if (openDuration)
+    requestReport(
+      'duration',
+      openDuration.duration.id,
       openDuration.duration.metadata.title || 'Duration',
     );
 };

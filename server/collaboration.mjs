@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { rebaseDocument, mergePatch } from './merge.mjs';
 import { randomUUID } from 'node:crypto';
-import { HttpError } from './store.mjs';
+import { HttpError, restrictedTimeline } from './store.mjs';
 import { validateDocument, relationshipKey } from '../dist/core.mjs';
 import { commonAncestor, lockTimelines, revisionId } from './versioning.mjs';
 import { differences } from './history.mjs';
@@ -74,7 +74,7 @@ export async function searchTimelines(pool, userId, value, featured = []) {
       (t.featured OR t.id=ANY($5::uuid[])) AS featured,
       CASE WHEN $2='' THEN 0 ELSE ts_rank_cd(t.search_document,websearch_to_tsquery('english',$2)) END AS rank
     FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id
-    WHERE (CASE WHEN $1::boolean THEN t.owner_id=$6::uuid ELSE (t.visibility='public' OR (($8::boolean OR $11::boolean) AND (t.owner_id=$6::uuid OR EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$6::uuid)))) END)
+    WHERE (CASE WHEN $1::boolean THEN t.owner_id=$6::uuid ELSE (t.visibility='public' OR (($8::boolean OR $11::boolean) AND (t.owner_id=$6::uuid OR (EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$6::uuid) AND NOT ${restrictedTimeline('t')})))) END)
       AND ($2='' OR t.search_document @@ websearch_to_tsquery('english',$2))
       AND ($7='' OR t.tags @> ARRAY[$7]::text[])
       AND ($9='' OR u.username=$9)
@@ -547,7 +547,11 @@ export class Collaboration {
     if (typeof after !== 'string' || !/^[0-9]{1,18}$/.test(after))
       throw new HttpError(400, 'Invalid comment cursor.');
     const { rows } = await this.pool.query(
-      'SELECT c.id,c.body,c.created_at,u.username AS author FROM oc_proposal_comments c JOIN oc_users u ON u.id=c.author_id WHERE c.proposal_id=$1 AND c.id>$2 ORDER BY c.id LIMIT 51',
+      // A comment moderators restricted (#115) keeps its place, without its text.
+      `SELECT c.id,CASE WHEN mc.id IS NULL THEN c.body ELSE '' END AS body,mc.id IS NOT NULL AS removed,
+      c.created_at,u.username AS author FROM oc_proposal_comments c JOIN oc_users u ON u.id=c.author_id
+      LEFT JOIN oc_moderation_cases mc ON mc.target_kind='comment' AND mc.target_id=c.id::text AND mc.status='restricted'
+      WHERE c.proposal_id=$1 AND c.id>$2 ORDER BY c.id LIMIT 51`,
       [id, after],
     );
     return { comments: rows.slice(0, 50), next: rows.length > 50 ? rows[49].id : null };

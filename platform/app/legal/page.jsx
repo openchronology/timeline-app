@@ -15,6 +15,8 @@ export default async function LegalPage() {
   const documents = await Promise.all(
     files.map(async ([path, title]) => ({
       title,
+      // An anchor for links to one document: #terms, #privacy, #copyright…
+      id: path.replace(/^.*\//, '').replace(/\..*$/, '').toLowerCase().replaceAll('_', '-'),
       text: await readFile(resolve(process.env.OCH_APP_ROOT ?? process.cwd(), path), 'utf8'),
     })),
   );
@@ -26,7 +28,7 @@ export default async function LegalPage() {
         independently.
       </p>
       {documents.map((d) => (
-        <details className="legal-document" key={d.title}>
+        <details className="legal-document" key={d.title} id={d.id}>
           <summary>{d.title}</summary>
           <pre>{d.text}</pre>
         </details>

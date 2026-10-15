@@ -15,13 +15,14 @@ import { tokenHash } from './auth.mjs';
  * - `turnstile`: Cloudflare Turnstile, verified with Cloudflare's siteverify API. Desktop
  *   and API-key sessions, which cannot show Cloudflare's widget, are given proof of work.
  */
-export const PURPOSES = ['register', 'email', 'sign-in', 'contribution', 'plugin'];
+export const PURPOSES = ['register', 'email', 'sign-in', 'contribution', 'plugin', 'report'];
 const PURPOSE_TEXT = {
   register: 'Confirm you are a person to create an account.',
   email: 'Confirm you are a person to send this email.',
   'sign-in': 'Several sign-in attempts failed. Confirm you are a person to continue.',
   contribution: 'Confirm you are a person to post to this timeline.',
   plugin: 'Confirm you are a person to publish this plugin.',
+  report: 'Confirm you are a person to send this report.',
 };
 const TURNSTILE_VERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 /** Proof-of-work answers are accepted for this long after the challenge is issued. */
