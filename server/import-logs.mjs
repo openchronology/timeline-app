@@ -231,11 +231,11 @@ async function* entries(path, multiline, onBytes) {
 
 /**
  * The most entries (moments and durations) one save may carry for the server to apply it in
- * place: max(64, the timeline's moments ÷ 8). Larger saves rebuild the timeline's whole
- * index, so a large log saved in large batches would rebuild the growing timeline per save;
- * batches grow with the timeline instead.
+ * place: max(64, the timeline's moments ÷ 2) (see incremental in incremental.mjs). Larger
+ * saves rebuild a small timeline's whole index, so a log saved in large batches would
+ * rebuild the growing timeline per save; batches grow with the timeline instead.
  */
-export const batchLimit = (count) => Math.min(BATCH_LIMIT - 1, Math.max(64, Math.floor(count / 8)));
+export const batchLimit = (count) => Math.min(BATCH_LIMIT - 1, Math.max(64, Math.floor(count / 2)));
 /**
  * Storage an import adds, as the server charges it: the document's growth, and per save the
  * versions it keeps in history (the batch, as stored), plus one copy of the timeline when

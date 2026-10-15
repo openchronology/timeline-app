@@ -412,7 +412,7 @@ test('entry IDs repeat on re-import and stay distinct for identical lines', () =
 
 test('batches grow with the timeline, and the estimate follows the server', () => {
   assert.equal(batchLimit(0), 64);
-  assert.equal(batchLimit(800), 100);
+  assert.equal(batchLimit(800), 400);
   assert.equal(batchLimit(1e9), 4999);
   // Each save is charged the versions it keeps, as well as the timeline's growth.
   const estimate = (start, batches) => storageEstimate(new Map([['t', { start, batches }]]));
