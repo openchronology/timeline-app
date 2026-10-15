@@ -546,7 +546,7 @@ export class PostgresStore {
         document.plugins === undefined ? null : JSON.stringify(document.plugins),
         document.tags ?? null,
         document.assets === undefined ? null : JSON.stringify(document.assets),
-        eventSearchText(document),
+        eventSearchText(document, bands, tree),
         document.comparison ? JSON.stringify(document.comparison) : null,
         Buffer.byteLength(JSON.stringify(document)),
         additions.rows[0].added,
@@ -1799,10 +1799,19 @@ export function applyPatch(current, patch) {
     ...(relationships.length ? { relationships } : {}),
   };
 }
-function eventSearchText(document) {
+/**
+ * A document's catalogue text, as oc_event_text in schema.sql builds it from the index:
+ * durations (their resolved `bands`) by start, then ID ("C" order), then moments in time
+ * order, then ID ("C" order), as `tree` (indexedNodes) holds them.
+ */
+function eventSearchText(document, bands, tree) {
   const text = [];
   let length = 0;
-  for (const duration of document.durations ?? [])
+  const byId = new Map((document.durations ?? []).map((d) => [d.id, d]));
+  const starts = [...bands]
+    .map((band) => ({ band, first: Q.parse(band.first) }))
+    .sort((a, b) => a.first.compare(b.first) || (a.band.id < b.band.id ? -1 : 1));
+  for (const duration of starts.map(({ band }) => byId.get(band.id)).filter(Boolean))
     for (const key of ['title', 'description']) {
       if (typeof duration.metadata[key] === 'string') {
         const part = duration.metadata[key].slice(0, 4096);
@@ -1811,7 +1820,10 @@ function eventSearchText(document) {
       }
       if (length >= 1048576) return text.join(' ').slice(0, 1048576);
     }
-  for (const event of document.events) {
+  const events = [...tree.nodes]
+    .sort((a, b) => a.id - b.id)
+    .flatMap((n) => [...n.events].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)));
+  for (const event of events) {
     const metadata = [
       event.metadata,
       ...Object.values(event.metadata)
