@@ -1349,3 +1349,33 @@ CREATE TRIGGER oc_revision_immutable BEFORE UPDATE ON oc_revisions FOR EACH ROW 
 DROP TRIGGER IF EXISTS oc_track_storage ON oc_revisions;
 CREATE TRIGGER oc_track_storage AFTER INSERT OR UPDATE OF snapshot_id,patch,history_rows,stored_bytes OR DELETE
   ON oc_revisions FOR EACH ROW EXECUTE FUNCTION oc_track_storage();
+
+-- Maintenance of the large tables (#135). Autovacuum's defaults wait for 20% of a table to
+-- change, or 20% more rows (10% changes for statistics): at hundreds of millions of rows
+-- that is far too late for vacuums to stay short and for the planner's statistics to hold.
+-- About 1-2% instead keeps each run small; vacuum skips the pages nothing changed, so
+-- running more often costs small installations next to nothing. Each is set only on a table
+-- without a value of its own, so an administrator's tuning stays, and setting none takes no
+-- lock (autovacuum's own runs conflict with it).
+DO $do$
+DECLARE big text; current text[]; wanted text; missing text[];
+BEGIN
+  FOREACH big IN ARRAY ARRAY['oc_moments','oc_nodes','oc_duration_nodes','oc_edge_nodes',
+    'oc_relationships','oc_entity_search','oc_moments_retired','oc_nodes_retired',
+    'oc_duration_nodes_retired','oc_edge_nodes_retired','oc_relationships_retired',
+    'oc_entity_search_retired','oc_history_moments','oc_history_durations',
+    'oc_history_relationships','oc_history_moment_overrides','oc_history_duration_overrides',
+    'oc_history_relationship_overrides'] LOOP
+    SELECT coalesce(reloptions,'{}') INTO current FROM pg_class WHERE oid=big::regclass;
+    missing:='{}';
+    FOREACH wanted IN ARRAY ARRAY['autovacuum_vacuum_scale_factor=0.02',
+      'autovacuum_vacuum_insert_scale_factor=0.02','autovacuum_analyze_scale_factor=0.01'] LOOP
+      IF NOT EXISTS(SELECT 1 FROM unnest(current) o WHERE split_part(o,'=',1)=split_part(wanted,'=',1)) THEN
+        missing:=missing||wanted;
+      END IF;
+    END LOOP;
+    IF cardinality(missing)>0 THEN
+      EXECUTE format('ALTER TABLE %I SET (%s)',big,array_to_string(missing,','));
+    END IF;
+  END LOOP;
+END $do$;

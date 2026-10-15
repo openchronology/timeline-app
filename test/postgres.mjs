@@ -19,6 +19,29 @@ if (!process.env.DATABASE_URL)
   throw new Error('DATABASE_URL must refer to a dedicated test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
+// The large tables are vacuumed and analysed after about 1-2% of them change (#135).
+{
+  const { rows } = await pool.query(
+    `SELECT relname,reloptions FROM pg_class WHERE relkind='r' AND relnamespace=current_schema()::regnamespace
+    AND relname ~ '^oc_((moments|nodes|duration_nodes|edge_nodes|relationships|entity_search)(_retired)?|history_(moments|durations|relationships|moment_overrides|duration_overrides|relationship_overrides))$'`,
+  );
+  assert.equal(rows.length, 18);
+  for (const row of rows)
+    for (const option of [
+      'autovacuum_vacuum_scale_factor=0.02',
+      'autovacuum_vacuum_insert_scale_factor=0.02',
+      'autovacuum_analyze_scale_factor=0.01',
+    ])
+      assert.ok(row.reloptions?.includes(option), `${row.relname} sets ${option}`);
+  // Upgrading keeps an administrator's own value.
+  await pool.query('ALTER TABLE oc_moments SET (autovacuum_analyze_scale_factor=0.005)');
+  await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
+  const tuned = await pool.query(
+    `SELECT reloptions FROM pg_class WHERE oid='oc_moments'::regclass`,
+  );
+  assert.ok(tuned.rows[0].reloptions.includes('autovacuum_analyze_scale_factor=0.005'));
+  await pool.query('ALTER TABLE oc_moments SET (autovacuum_analyze_scale_factor=0.01)');
+}
 let providerSubject = 42001;
 const providers = { github: { clientId: 'test-client', clientSecret: 'test-secret' } };
 const delivered = [],
