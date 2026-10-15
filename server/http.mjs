@@ -11,7 +11,7 @@ import { authorizeKey, keyRequestRead } from './api-keys.mjs';
 import { BrowserForks } from './browser-forks.mjs';
 import { queryPlugins } from './query-plugins.mjs';
 import { Collaboration, searchTimelines } from './collaboration.mjs';
-import { Versioning } from './versioning.mjs';
+import { Versioning, revisionId } from './versioning.mjs';
 import { createPluginLibrary, createSuiteLibrary } from './plugins.mjs';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -124,6 +124,41 @@ function bound(value) {
     throw new HttpError(400, error.message);
   }
 }
+/**
+ * Answers 200 with `chunks` (an async generator of text, a document-stream.mjs document) as
+ * the body, written as it is read: the server never holds the whole of it. Errors before the
+ * first part answer as usual (thrown); later ones end the response early. A response that can
+ * take a stream itself (the Next.js adapter, next-handler.mjs) is handed it.
+ */
+async function streamResponse(res, chunks, headers = {}) {
+  const first = await chunks.next();
+  const values = {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+    ...headers,
+  };
+  if (res.streamBody) return res.streamBody(200, values, first, chunks);
+  res.writeHead(200, values);
+  try {
+    for (let part = first; !part.done && !res.destroyed; part = await chunks.next())
+      if (!res.write(part.value))
+        await new Promise((resolve) => {
+          res.once('drain', resolve);
+          res.once('close', resolve);
+        });
+    res.end();
+  } catch (error) {
+    console.error('Streaming a document failed:', error);
+    res.destroy(error);
+  } finally {
+    await chunks.return();
+  }
+}
+/** Headers making a document a downloaded .ochx file, when the request asks (?download=1). */
+const download = (url, name) =>
+  url.searchParams.get('download') === '1'
+    ? { 'Content-Disposition': `attachment; filename="${name}.ochx"` }
+    : null;
 function response(res, status, value, headers = {}) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -754,16 +789,23 @@ export function createRequestHandler({
           method === 'GET'
         ) {
           const versions = new Versioning(store);
+          if (history[2]) {
+            revisionId(history[2]);
+            const file = download(new URL(req.url, origin), 'timeline-' + history[2]);
+            return await streamResponse(
+              res,
+              store.revisionChunks(history[1], history[2], userId, { documentOnly: !!file }),
+              file ?? {},
+            );
+          }
           return response(
             res,
             200,
-            history[2]
-              ? await versions.historical(history[1], history[2], userId)
-              : await versions.history(
-                  history[1],
-                  userId,
-                  Number(new URL(req.url, origin).searchParams.get('page') ?? 1),
-                ),
+            await versions.history(
+              history[1],
+              userId,
+              Number(new URL(req.url, origin).searchParams.get('page') ?? 1),
+            ),
           );
         }
         const browserFork = /^\/api\/timelines\/([a-f0-9-]{36})\/browser-fork$/.exec(pathname);
@@ -830,7 +872,12 @@ export function createRequestHandler({
               timeline: await store.metadata(id, null),
             });
           }
-          return response(res, 200, await store.snapshot(id, userId));
+          const file = download(new URL(req.url, origin), 'timeline-' + id);
+          return await streamResponse(
+            res,
+            store.snapshotChunks(id, userId, { documentOnly: !!file }),
+            file ?? {},
+          );
         }
         if (action === 'file' && method === 'GET') {
           if ((await store.access(id, userId)).comparison)

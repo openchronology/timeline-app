@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { randomUUID } from 'node:crypto';
-import { HttpError } from './store.mjs';
+import { HttpError, HISTORY_OFF } from './store.mjs';
 import { timelineSettings } from './incremental.mjs';
 import { rebaseDocument, mergePatch } from './merge.mjs';
 import { shareHistory, settingsAt, settingsOf } from './history.mjs';
@@ -195,14 +195,25 @@ export class Versioning {
       keepHistory: t.keep_history,
     };
   }
-  async historical(id, savedId, userId) {
+  /**
+   * Whether timeline `id` has saved revision `savedId` that `userId` may read: false when it
+   * has none; HttpError 409 when it is not kept (see Store.stopHistory).
+   */
+  async historyRevision(id, savedId, userId) {
     revisionId(savedId);
     await this.store.access(id, userId);
     const { rows } = await this.pool.query(
       'SELECT id FROM oc_revisions WHERE timeline_id=$1 AND id=$2 AND number IS NOT NULL',
       [id, savedId],
     );
-    if (!rows.length) throw new HttpError(404, 'Saved revision unavailable.');
+    if (!rows.length) return false;
+    if (!(await this.store.readable(this.pool, savedId))) throw new HttpError(409, HISTORY_OFF);
+    return true;
+  }
+  /** Saved revision `savedId` of timeline `id`, as a whole document (see historyRevision). */
+  async historical(id, savedId, userId) {
+    if (!(await this.historyRevision(id, savedId, userId)))
+      throw new HttpError(404, 'Saved revision unavailable.');
     return { document: await this.store.revisionDocument(this.pool, savedId) };
   }
 }

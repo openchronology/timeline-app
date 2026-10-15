@@ -21,6 +21,7 @@ import {
 } from '../dist/core.mjs';
 import { randomUUID } from 'node:crypto';
 import { indexedNodes } from './tree.mjs';
+import { cursorRows, documentChunks, inSnapshot, RELATIONSHIP_ORDER } from './document-stream.mjs';
 import { MOMENT_TREE, INTERVAL_TREE, intervalPayload, upsertRows } from './avl.mjs';
 import { applyIncrementally, incremental, timelineSettings } from './incremental.mjs';
 import {
@@ -37,6 +38,7 @@ import {
   recordDetachedPatch,
   endHistory,
   historyDocument,
+  historyParts,
   pruneHistoryRows,
   settingsOf,
 } from './history.mjs';
@@ -1186,10 +1188,118 @@ export class PostgresStore {
       };
     });
   }
-  /** The timeline's links (read by `rows`, its indexReader). */
+  /**
+   * The timeline as `userId` may see it, as JSON text a part at a time from one snapshot
+   * (document-stream.mjs): `{timeline, document}` as snapshot gives it, or with `documentOnly`
+   * the document alone (an .ochx file). Access is checked before anything is yielded.
+   */
+  snapshotChunks(id, userId, { documentOnly = false } = {}) {
+    const store = this;
+    return inSnapshot(this.pool, async function* (c) {
+      const t = await store.access(id, userId, c);
+      yield* store.liveChunks(c, t, documentOnly ? {} : { timeline: t });
+    });
+  }
+  /**
+   * The live document of timeline `t` as documentChunks writes it, in the transaction of
+   * `client`; wrapped as `{timeline, document}` when `timeline` is given.
+   */
+  async *liveChunks(client, t, { timeline } = {}) {
+    const rows = await indexReader(client, t);
+    const relationship = (r) => ({ a: { [r.a_kind]: r.a_id }, b: { [r.b_kind]: r.b_id } });
+    yield* documentChunks(
+      {
+        format: 'openchronology',
+        version: 1,
+        title: t.title,
+        description: t.description,
+        ...(t.presentation ? { presentation: t.presentation } : {}),
+        ...(t.plugins ? { plugins: t.plugins } : {}),
+        ...(t.tags === null || t.tags === undefined ? {} : { tags: t.tags }),
+        ...(t.assets ? { assets: t.assets } : {}),
+        ...(t.comparison ? { comparison: t.comparison } : {}),
+      },
+      [
+        // In the orders their indexes give (sorting a large timeline's moments by time
+        // would take longer than a statement may).
+        [
+          'events',
+          cursorRows(
+            client,
+            `SELECT event FROM ${rows('oc_moments', '$1', { scan: true })} x ORDER BY id`,
+            [t.id],
+          ),
+          (r) => r.event,
+        ],
+        [
+          'durations',
+          cursorRows(
+            client,
+            `SELECT definition FROM ${rows('oc_duration_nodes', '$1', { scan: true })} x
+            WHERE definition IS NOT NULL ORDER BY first_key,first_time,band->>'id' COLLATE "C"`,
+            [t.id],
+          ),
+          (r) => r.definition,
+        ],
+        [
+          'relationships',
+          cursorRows(
+            client,
+            `SELECT a_kind,a_id,b_kind,b_id FROM ${rows('oc_relationships', '$1', { scan: true })} x
+            ORDER BY a_kind,a_id,b_kind,b_id`,
+            [t.id],
+          ),
+          relationship,
+        ],
+      ],
+      timeline
+        ? { prefix: `{"timeline":${JSON.stringify(timeline)},"document":`, suffix: '}' }
+        : {},
+    );
+  }
+  /**
+   * Saved revision `savedId` of timeline `id`, as `userId` may see it, as JSON text a part at
+   * a time from one snapshot: `{document}`, or with `documentOnly` the document alone. One
+   * kept as rows is read through cursors; the head of a timeline keeping no saved history is
+   * its live document; others (stored as documents before history was kept as rows) are
+   * read whole. Unavailable ones fail before anything is yielded (revisionDocument).
+   */
+  revisionChunks(id, savedId, userId, { documentOnly = false } = {}) {
+    const store = this;
+    return inSnapshot(this.pool, async function* (c) {
+      const t = await store.access(id, userId, c);
+      const { rows } = await c.query(
+        `SELECT r.number,r.history_rows,t.head_revision_id=r.id AND
+        num_nonnulls(r.snapshot_id,r.patch)+r.history_rows::int=0 AS live
+        FROM oc_revisions r JOIN oc_timelines t ON t.id=r.timeline_id
+        WHERE r.timeline_id=$1 AND r.id=$2 AND r.number IS NOT NULL`,
+        [id, savedId],
+      );
+      if (!rows[0]) throw new HttpError(404, 'Saved revision unavailable.');
+      const wrap = documentOnly ? {} : { prefix: '{"document":', suffix: '}' };
+      const parts =
+        rows[0].history_rows && (await historyParts(c, id, rows[0].number, { stream: true }));
+      if (parts)
+        yield* documentChunks(
+          parts.settings,
+          parts.parts.map(([name, sql, value]) => [name, cursorRows(c, sql), value]),
+          wrap,
+        );
+      else if (rows[0].live) {
+        if (!documentOnly) yield '{"document":';
+        yield* store.liveChunks(c, t);
+        if (!documentOnly) yield '}';
+      } else {
+        const document = JSON.stringify(await store.revisionDocument(c, savedId));
+        yield documentOnly ? document : `{"document":${document}}`;
+      }
+    });
+  }
+  /** The timeline's links (read by `rows`, its indexReader), in a document's order. */
   async relationshipList(client, rows, id) {
     const { rows: links } = await client.query(
-      `SELECT a_kind,a_id,b_kind,b_id FROM ${rows('oc_relationships', '$1', { scan: true })} x`,
+      `SELECT a_kind,a_id,b_kind,b_id FROM ${rows('oc_relationships', '$1', { scan: true })} x
+      ORDER BY ${RELATIONSHIP_ORDER}`,
       [id],
     );
     return links.map((r) => ({ a: { [r.a_kind]: r.a_id }, b: { [r.b_kind]: r.b_id } }));

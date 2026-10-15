@@ -54,7 +54,7 @@ function client(ip) {
   const cookies = new Map();
   let csrf;
   return {
-    async request(path, { method = 'GET', data, status = 200 } = {}) {
+    async request(path, { method = 'GET', data, status = 200, headers = false } = {}) {
       const res = await fetch(origin + path, {
         method,
         redirect: 'manual',
@@ -79,7 +79,7 @@ function client(ip) {
         ? JSON.parse(text)
         : text;
       if (value?.csrf) csrf = value.csrf;
-      return value;
+      return headers ? { value, headers: res.headers } : value;
     },
   };
 }
@@ -301,6 +301,28 @@ try {
     (await contributor.request(forkApi + '/history/' + firstCheckpoint)).document.title,
     merged.document.title,
   );
+  // Documents and checkpoints stream (#135), and download as .ochx files.
+  const streamed = await contributor.request(forkApi + '/document');
+  assert.equal(streamed.timeline.id, fork.id);
+  assert.equal(streamed.document.title, 'Fork title');
+  const file = await contributor.request(forkApi + '/document?download=1', { headers: true });
+  assert.match(file.headers.get('content-disposition'), /attachment; filename="timeline-.*\.ochx"/);
+  assert.equal(file.value.format, 'openchronology');
+  assert.deepEqual(
+    file.value.events.map((e) => e.id).sort(),
+    streamed.document.events.map((e) => e.id).sort(),
+  );
+  const checkpoint = await contributor.request(
+    forkApi + '/history/' + firstCheckpoint + '?download=1',
+    { headers: true },
+  );
+  assert.match(checkpoint.headers.get('content-disposition'), /\.ochx"/);
+  assert.equal(checkpoint.value.title, merged.document.title);
+  assert.match(
+    await contributor.request('/timelines/' + fork.id + '/history/' + firstCheckpoint),
+    /href="\/api\/timelines\/[0-9a-f-]+\/history\/[0-9a-f-]+\?download=1"/,
+  );
+  await guest.request(forkApi + '/document?download=1', { status: 404 });
   await guest.request(forkApi + '/history', { status: 404 });
   await guest.request(api + '/history/' + saved.head_revision_id, { status: 404 });
   await owner.request(api + '/proposals/' + forkPull.id + '/resolve', {
