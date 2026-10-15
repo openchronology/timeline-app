@@ -110,7 +110,7 @@ export async function checkCommunity(browser) {
           ...(largeTimeline ? { event_count: '150000' } : {}),
         },
       });
-    if (path === `/api/timelines/${id}/document` && url.searchParams.get('download') === '1') {
+    if (path === `/api/timelines/${id}/export/featured-timeline.ochx`) {
       return route.fulfill({
         headers: { 'Content-Disposition': 'attachment; filename="featured-timeline.ochx"' },
         contentType: 'application/json',
@@ -339,8 +339,10 @@ export async function checkCommunity(browser) {
     // Some browsers download a link without the page's routing, so the address is checked.
     const serverFile = await serverExport;
     assert.equal(serverFile.suggestedFilename(), 'featured-timeline.ochx');
-    assert.equal(new URL(serverFile.url()).pathname, `/api/timelines/${id}/document`);
-    assert.equal(new URL(serverFile.url()).searchParams.get('download'), '1');
+    assert.equal(
+      new URL(serverFile.url()).pathname,
+      `/api/timelines/${id}/export/featured-timeline.ochx`,
+    );
     largeTimeline = false;
     await page.reload();
     await opened();

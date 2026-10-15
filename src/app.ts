@@ -5109,11 +5109,13 @@ function savedRemote(): boolean {
 }
 el('export-button').onclick = () => {
   flushEventEdit();
-  if (!window.__TAURI__ && savedRemote() && momentCount() > SERVER_EXPORT) {
-    // The server answers with an attachment, which every browser saves under the name the
-    // server gives without leaving this page (download links to an address are named and
-    // followed differently by each).
-    window.location.assign(`/api/timelines/${remote!.id}/document?download=1`);
+  if (!window.__TAURI__ && session.user && savedRemote() && momentCount() > SERVER_EXPORT) {
+    // Named by the end of the address (and by the server's Content-Disposition), which
+    // every browser names it after.
+    const a = document.createElement('a');
+    a.href = `/api/timelines/${remote!.id}/export/${fileName(remote!.title, '.ochx')}`;
+    a.download = '';
+    a.click();
     toast('Exporting from the server: the file downloads as it is written.');
     return;
   }

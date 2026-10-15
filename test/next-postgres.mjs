@@ -312,6 +312,14 @@ try {
     file.value.events.map((e) => e.id).sort(),
     streamed.document.events.map((e) => e.id).sort(),
   );
+  // The editor's export of a large timeline, named by its address; signed in only.
+  const named = await contributor.request(forkApi + '/export/fork-title.ochx', { headers: true });
+  assert.match(named.headers.get('content-disposition'), /filename="fork-title\.ochx"/);
+  assert.deepEqual(
+    named.value.events.map((e) => e.id).sort(),
+    streamed.document.events.map((e) => e.id).sort(),
+  );
+  await guest.request(forkApi + '/export/fork-title.ochx', { status: 401 });
   const checkpoint = await contributor.request(
     forkApi + '/history/' + firstCheckpoint + '?download=1',
     { headers: true },
