@@ -21,6 +21,7 @@
  */
 import { validateDocument } from '../dist/core.mjs';
 import { indexReader, lineageOf } from './index-versions.mjs';
+import { RELATIONSHIP_ORDER } from './document-stream.mjs';
 
 /** How many entities one statement compares: no statement grows with the timeline. */
 const PAGE = 20000;
@@ -549,6 +550,23 @@ export async function endHistory(client, timelineId, until) {
 
 /** Revision `number` of a timeline kept as rows, as a document. */
 export async function historyDocument(client, timelineId, number) {
+  const parts = await historyParts(client, timelineId, number);
+  if (!parts) return null;
+  const document = { ...parts.settings };
+  for (const [name, sql, value] of parts.parts) {
+    const { rows } = await client.query(sql);
+    if (rows.length || name === 'events') document[name] = rows.map(value);
+  }
+  return validateDocument(document);
+}
+/**
+ * Revision `number` of a timeline kept as rows, in parts: its settings, and a query per kind
+ * of entity, [name, SQL, row => value]. Moments in time order (then ID), durations by ID and
+ * relationships as documents sort them; or, for a `stream` (document-stream.mjs), each in its
+ * key's order, which the versions' primary keys give without sorting. Null when it is not
+ * kept as rows.
+ */
+export async function historyParts(client, timelineId, number, { stream = false } = {}) {
   const settings = await client.query(
     `SELECT settings FROM oc_history_settings
     WHERE timeline_id=$1 AND since<=$2 AND (until IS NULL OR until>$2)`,
@@ -556,24 +574,20 @@ export async function historyDocument(client, timelineId, number) {
   );
   if (!settings.rows[0]) return null;
   const levels = await lineage(client, timelineId, String(number));
-  const read = (kind, order = '') =>
-    client.query(`SELECT * FROM (${visible(KINDS[kind], levels)}) v ${order}`);
-  const events = await read('moments', 'ORDER BY time,id COLLATE "C"');
-  const durations = await read('durations', 'ORDER BY id COLLATE "C"');
-  const relationships = await read('relationships');
-  return validateDocument({
-    ...settings.rows[0].settings,
-    events: events.rows.map((r) => r.event),
-    ...(durations.rows.length ? { durations: durations.rows.map((r) => r.definition) } : {}),
-    ...(relationships.rows.length
-      ? {
-          relationships: relationships.rows.map((r) => ({
-            a: { [r.a_kind]: r.a_id },
-            b: { [r.b_kind]: r.b_id },
-          })),
-        }
-      : {}),
-  });
+  const read = (kind, order) =>
+    `SELECT * FROM (${visible(KINDS[kind], levels)}) v ORDER BY ${order}`;
+  return {
+    settings: settings.rows[0].settings,
+    parts: [
+      ['events', read('moments', stream ? 'id' : 'time,id COLLATE "C"'), (r) => r.event],
+      ['durations', read('durations', stream ? 'id' : 'id COLLATE "C"'), (r) => r.definition],
+      [
+        'relationships',
+        read('relationships', stream ? LINK.join(',') : RELATIONSHIP_ORDER),
+        (r) => ({ a: { [r.a_kind]: r.a_id }, b: { [r.b_kind]: r.b_id } }),
+      ],
+    ],
+  };
 }
 
 /**

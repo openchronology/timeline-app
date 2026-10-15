@@ -69,7 +69,7 @@ Paths below start with `/api`. POST search routes support the desktop's native p
 | `POST /timelines/:id/duplicate`                           | `{revision}`; independent saved copy                                                                                         |
 | `POST /timelines/:id/sync`                                | `{revision}`; merge saved upstream into fork                                                                                 |
 | `GET /timelines/:id/history?page=1`                       | Paginated checkpoint summaries, each `available` unless not kept; `keepHistory`                                              |
-| `GET /timelines/:id/history/:saved`                       | Saved document; only that timeline's checkpoints; 409 when not kept                                                          |
+| `GET /timelines/:id/history/:saved`                       | Saved document, streamed; `?download=1` for an `.ochx`; only that timeline's checkpoints; 409 when not kept                  |
 | `POST /timelines/:id/proposals/search`                    | `{page?, limit?}`                                                                                                            |
 | `POST /timelines/:id/proposals`                           | `{title, body, sourceTimelineId, sourceRevisionId}` for forks; legacy `{title, body, baseRevision, document}` also supported |
 | `GET /timelines/:id/proposals/:proposal`                  | Pinned revision IDs, change summary (`changes`), permissions and revisions                                                   |

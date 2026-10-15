@@ -53,6 +53,30 @@ export async function dispatchNextRequest(request, handler) {
     end(value) {
       body = value ?? null;
     },
+    /**
+     * Takes a body read a part at a time (streamResponse in http.mjs): `first`, then the
+     * rest of `chunks`, pulled as the client reads, so neither is held whole; a client that
+     * stops reading closes them.
+     */
+    streamBody(code, values, first, chunks) {
+      res.writeHead(code, values);
+      if (request.method === 'HEAD') return void chunks.return();
+      const encoder = new TextEncoder();
+      let next = first;
+      body = new ReadableStream({
+        async pull(controller) {
+          try {
+            const part = next ?? (await chunks.next());
+            next = null;
+            if (part.done) controller.close();
+            else controller.enqueue(encoder.encode(part.value));
+          } catch (error) {
+            controller.error(error);
+          }
+        },
+        cancel: () => chunks.return(),
+      });
+    },
   };
   await handler(req, res);
   return new Response(request.method === 'HEAD' || [204, 304].includes(status) ? null : body, {

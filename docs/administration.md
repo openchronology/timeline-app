@@ -118,10 +118,10 @@ reads or changes only part of it, at a cost that grows slowly with its size:
   save's time and its storage charge follow the change, not the timeline's size.
 - **Viewing** reads only what is on screen.
 
-Some work handles the whole timeline at once, and that cost grows with it: **exporting** to
-`.ochx`, **reading a saved revision** (history pages), and **forking**, which copies the
-timeline's index inside the database. Pull requests, merges and syncs read only what
-changed.
+Some work handles the whole timeline at once, and its time grows with it: **exporting** to
+`.ochx` and **reading a saved revision** (history pages). Both stream: the server sends the
+document as it reads it, a page at a time, so its memory stays about the same at any size.
+Forking, pull requests, merges and syncs read only what changed.
 
 These figures come from an 8-core virtual machine with PostgreSQL 17, using the
 [benchmark timelines](benchmarks.md) (moments with titles, descriptions and tags, plus one
@@ -129,8 +129,8 @@ duration and one relationship for every ten moments):
 
 | Moments   | Saving 10 moments | Saving 5,000 new moments | History it keeps | Reading a saved revision | Exporting | Server memory |
 | --------- | ----------------: | -----------------------: | ---------------: | -----------------------: | --------: | ------------: |
-| 200,000   |            0.05 s |                    2–3 s |           0.4 MB |                    4.6 s |       4 s |        0.4 GB |
-| 1,000,000 |         0.1–0.2 s |                    4–6 s |           0.4 MB |                     21 s |      19 s |        1.3 GB |
+| 200,000   |            0.05 s |                    2–3 s |           0.4 MB |                    3.4 s |       3 s |        0.1 GB |
+| 1,000,000 |         0.1–0.2 s |                    4–6 s |           0.4 MB |                     14 s |      12 s |        0.1 GB |
 
 A save reads the index nodes it changes in one statement, which follows the nodes on the
 paths to its moments rather than the moments themselves: appended log moments share nearly

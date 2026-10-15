@@ -1,15 +1,16 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-'use client';
-export default function RevisionDownload({ document, savedId }) {
-  function download() {
-    const url = URL.createObjectURL(
-      new Blob([JSON.stringify(document, null, 2)], { type: 'application/json' }),
-    );
-    const a = window.document.createElement('a');
-    a.href = url;
-    a.download = 'timeline-' + savedId + '.ochx';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-  return <button onClick={download}>Export this checkpoint (.ochx)</button>;
+/**
+ * Downloads a saved checkpoint as .ochx straight from the server, which streams it (#135):
+ * the page never holds the whole document.
+ */
+export default function RevisionDownload({ timelineId, savedId }) {
+  return (
+    <a
+      className="button"
+      href={`/api/timelines/${timelineId}/history/${savedId}?download=1`}
+      download={'timeline-' + savedId + '.ochx'}
+    >
+      Export this checkpoint (.ochx)
+    </a>
+  );
 }
