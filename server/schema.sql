@@ -229,9 +229,11 @@ CREATE TABLE IF NOT EXISTS oc_proposal_comments (
 CREATE INDEX IF NOT EXISTS oc_proposal_comments_page ON oc_proposal_comments(proposal_id,id);
 
 -- Existing timelines become searchable without requiring their owner to resave them.
+-- (At most the first 20,000 moments read: it runs on every upgrade for a timeline whose text
+-- stays empty, and saves rebuild the text properly.)
 UPDATE oc_timelines t SET event_text=coalesce((
   SELECT left(string_agg(left(coalesce(m.event->'metadata'->>'title','') || ' ' || coalesce(m.event->'metadata'->>'description',''),4096),' '),1048576)
-  FROM oc_moments m WHERE m.timeline_id=t.id
+  FROM (SELECT event FROM oc_moments WHERE timeline_id=t.id LIMIT 20000) m
 ),'') WHERE t.event_text='' AND EXISTS (SELECT 1 FROM oc_moments m WHERE m.timeline_id=t.id);
 
 -- Saved documents and their ancestry are separate from the current rational index.
@@ -832,40 +834,46 @@ ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS patch_bytes bigint NOT NULL DE
 ALTER TABLE oc_timelines SET (fillfactor=50);
 -- Catalogue text (event_text) is refreshed after incremental saves; true until then.
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS event_text_stale boolean NOT NULL DEFAULT false;
--- Catalogue text: duration then moment titles and notes (moments in time order, each followed
--- by its stacked entries), each part at most 4096 characters and the whole at most 1 MiB.
--- Built in the database after incremental saves; mirrors eventSearchText in store.mjs.
--- Moments are read in chunks, stopping once the text is full.
+-- Catalogue text: duration then moment titles and notes (durations in start order, moments in
+-- time order, each followed by its stacked entries), each part at most 4096 characters and
+-- the whole at most 1 MiB. Built in the database after incremental saves (eventSearchText in
+-- store.mjs builds it from a whole document). Both are read in order and the text stops once
+-- full, so its cost follows the text, not the timeline (#135): durations through their start
+-- index, moments a page at a time walking the moment tree (oc_events, which reads through
+-- for forks).
 DROP FUNCTION IF EXISTS oc_text_parts(jsonb,boolean);
 CREATE OR REPLACE FUNCTION oc_event_text(tid uuid) RETURNS text LANGUAGE plpgsql STABLE AS $$
-DECLARE ids text[]; chunk text; result text;
+DECLARE parts text[]:='{}'; total bigint:=0; part text; page jsonb[]; after_time mpq; after_id text;
 BEGIN
-  SELECT string_agg(left(x.v,4096),' ' ORDER BY d.band->>'id' COLLATE "C",x.o) INTO result
-  FROM oc_duration_nodes d CROSS JOIN LATERAL (VALUES
+  FOR part IN SELECT left(x.v,4096) FROM oc_duration_nodes d CROSS JOIN LATERAL (VALUES
     (1,CASE WHEN jsonb_typeof(d.definition->'metadata'->'title')='string' THEN d.definition->'metadata'->>'title' END),
     (2,CASE WHEN jsonb_typeof(d.definition->'metadata'->'description')='string' THEN d.definition->'metadata'->>'description' END)) x(o,v)
-  WHERE d.timeline_id=tid AND x.v IS NOT NULL;
-  SELECT array_agg(id ORDER BY time,id COLLATE "C") INTO ids FROM oc_moments WHERE timeline_id=tid;
-  FOR i IN 1..coalesce(cardinality(ids),0) BY 1000 LOOP
-    EXIT WHEN length(coalesce(result,''))>=1048576;
-    SELECT string_agg(left(x.v,4096),' ' ORDER BY u.ord,x.n,x.o) INTO chunk
-    FROM unnest(ids[i:i+999]) WITH ORDINALITY u(id,ord)
-    -- OFFSET 0 keeps it a lookup per moment, whatever the statistics say of a timeline just written.
-    CROSS JOIN LATERAL (SELECT event->'metadata' AS meta FROM oc_moments WHERE timeline_id=tid AND id=u.id OFFSET 0) m
-    CROSS JOIN LATERAL (
-      SELECT 0::bigint AS n,y.o,y.v FROM (VALUES
-        (1,CASE WHEN jsonb_typeof(m.meta->'title')='string' THEN m.meta->>'title' END),
-        (2,CASE WHEN jsonb_typeof(m.meta->'description')='string' THEN m.meta->>'description' END)) y(o,v)
-      UNION ALL
-      SELECT a.ord*1000000+e.ord,y.o,y.v FROM jsonb_each(m.meta) WITH ORDINALITY a(key,value,ord)
-      CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(a.value)='array' THEN a.value ELSE '[]'::jsonb END) WITH ORDINALITY e(item,ord)
-      CROSS JOIN LATERAL (VALUES
-        (1,CASE WHEN jsonb_typeof(e.item->'metadata'->'title')='string' THEN e.item->'metadata'->>'title' END),
-        (2,CASE WHEN jsonb_typeof(e.item->'metadata'->'description')='string' THEN e.item->'metadata'->>'description' END)) y(o,v)
-    ) x WHERE x.v IS NOT NULL;
-    result:=concat_ws(' ',result,chunk);
+  WHERE d.timeline_id=tid AND x.v IS NOT NULL ORDER BY d.first_key,d.first_time,d.band->>'id' COLLATE "C",x.o LOOP
+    parts:=parts||part; total:=total+length(part)+1;
+    IF total>1048576 THEN RETURN left(array_to_string(parts,' '),1048576); END IF;
   END LOOP;
-  RETURN left(coalesce(result,''),1048576);
+  LOOP
+    SELECT array_agg(e ORDER BY o) INTO page FROM oc_events(tid,NULL,NULL,after_time,after_id,1000) WITH ORDINALITY p(e,o);
+    EXIT WHEN page IS NULL;
+    FOR part IN SELECT left(x.v,4096) FROM unnest(page) WITH ORDINALITY u(e,ord)
+      CROSS JOIN LATERAL (
+        SELECT 0::bigint AS n,y.o,y.v FROM (VALUES
+          (1,CASE WHEN jsonb_typeof(u.e->'metadata'->'title')='string' THEN u.e->'metadata'->>'title' END),
+          (2,CASE WHEN jsonb_typeof(u.e->'metadata'->'description')='string' THEN u.e->'metadata'->>'description' END)) y(o,v)
+        UNION ALL
+        SELECT a.ord*1000000+i.ord,y.o,y.v FROM jsonb_each(u.e->'metadata') WITH ORDINALITY a(key,value,ord)
+        CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(a.value)='array' THEN a.value ELSE '[]'::jsonb END) WITH ORDINALITY i(item,ord)
+        CROSS JOIN LATERAL (VALUES
+          (1,CASE WHEN jsonb_typeof(i.item->'metadata'->'title')='string' THEN i.item->'metadata'->>'title' END),
+          (2,CASE WHEN jsonb_typeof(i.item->'metadata'->'description')='string' THEN i.item->'metadata'->>'description' END)) y(o,v)
+      ) x WHERE x.v IS NOT NULL ORDER BY u.ord,x.n,x.o LOOP
+      parts:=parts||part; total:=total+length(part)+1;
+      IF total>1048576 THEN RETURN left(array_to_string(parts,' '),1048576); END IF;
+    END LOOP;
+    EXIT WHEN cardinality(page)<1000;
+    after_time:=(page[cardinality(page)]->>'time')::mpq; after_id:=page[cardinality(page)]->>'id';
+  END LOOP;
+  RETURN array_to_string(parts,' ');
 END $$;
 -- Data retention (#91): a Gregorian timeline can keep only its last retention_seconds of
 -- moments; the server expires older ones, and history saved before then, on a schedule.
@@ -1291,13 +1299,12 @@ BEGIN
   src:=pg_get_functiondef('oc_event_text(uuid)'::regprocedure);
   src:=oc_rewrite(src,'oc_event_text(','oc_event_text_lineage(');
   -- Planned for the timeline's own levels: plans for any timeline can only guess at them.
+  -- Its moments come from oc_events, which reads through for forks itself.
   src:=oc_rewrite(src,'LANGUAGE plpgsql','LANGUAGE plpgsql SET plan_cache_mode=force_custom_plan');
-  src:=oc_rewrite(src,'DECLARE ids text[];','DECLARE tids uuid[]; clocks bigint[]; ids text[];');
-  src:=oc_rewrite(src,E'result text;\nBEGIN\n',E'result text;\nBEGIN\n  SELECT ' || lineage || E' INTO tids,clocks FROM oc_timelines WHERE id=tid;\n');
+  src:=oc_rewrite(src,'DECLARE parts','DECLARE tids uuid[]; clocks bigint[]; parts');
+  src:=oc_rewrite(src,E'after_id text;\nBEGIN\n',E'after_id text;\nBEGIN\n  SELECT ' || lineage || E' INTO tids,clocks FROM oc_timelines WHERE id=tid;\n');
   src:=oc_rewrite(src,'FROM oc_duration_nodes d CROSS JOIN','FROM oc_duration_nodes_at(tids,clocks) d CROSS JOIN');
   src:=oc_rewrite(src,'WHERE d.timeline_id=tid AND x.v IS NOT NULL','WHERE x.v IS NOT NULL');
-  src:=oc_rewrite(src,'FROM oc_moments WHERE timeline_id=tid;','FROM oc_moments_at(tids,clocks);');
-  src:=oc_rewrite(src,'FROM oc_moments WHERE timeline_id=tid AND id=u.id OFFSET 0','FROM oc_moments_at(tids,clocks) WHERE id=u.id OFFSET 0');
   EXECUTE src;
   -- Reading through levels looks costly enough to the planner to compile its queries, which
   -- takes far longer than running them. Their plans are kept per connection: one made while a
