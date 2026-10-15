@@ -70,7 +70,7 @@ export {
 export type { SearchResult, SearchPage } from './search.js';
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { Rational as Q, RationalMap } from 'rational-ordered-map';
-import { validateInstalledPlugins, validateStackMetadata, imageURL } from './plugins.js';
+import { validateInstalledPlugins, imageURL } from './plugins.js';
 import type { InstalledPlugin } from './plugins.js';
 export * from './plugins.js';
 export * from './suites.js';
@@ -239,8 +239,9 @@ export function validateDocument(value: unknown, partial = false): TimelineDocum
       throw new Error('Time must be a string containing an exact rational or finite decimal.');
     if (!e.metadata || typeof e.metadata !== 'object' || Array.isArray(e.metadata))
       throw new Error('Event metadata must be a JSON object.');
+    // Plugins' metadata is stored as given: each plugin reads its own fields and handles
+    // values it cannot use (#157). Only the core's own fields are checked.
     const metadata = JSON.parse(JSON.stringify(e.metadata)) as Metadata;
-    validateStackMetadata(metadata, plugins);
     for (const field of ['title', 'description']) {
       if (metadata[field] !== undefined && typeof metadata[field] !== 'string')
         throw new Error(`Event ${field} must be text.`);

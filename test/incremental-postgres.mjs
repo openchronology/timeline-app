@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { PostgresStore, applyPatch } from '../server/store.mjs';
-import { Q, validateDocument } from '../dist/core.mjs';
+import { Q, validateDocument, validatePluginManifest, PLUGIN_EXAMPLE } from '../dist/core.mjs';
 import { randomEdits } from './random-edits.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -332,6 +332,56 @@ try {
     [timeline.id],
   );
   assert.deepEqual(after.rows, before.rows, 'metadata edits leave tree rows untouched');
+  // Changing the plugins saves in place too (#157): each plugin reads its own metadata, so
+  // nothing is revalidated or rebuilt. A new script is compiled (in the sandbox) once.
+  const plugins = [{ manifest: validatePluginManifest(PLUGIN_EXAMPLE), enabled: true }];
+  const settings = { ...expected, events: [], durations: undefined, relationships: undefined };
+  timeline = await store.save(timeline.id, user, timeline.revision, undefined, {
+    settings: { ...settings, plugins },
+    changes: [],
+  });
+  assert.deepEqual(timeline.plugins, plugins);
+  const installed = await pool.query(
+    'SELECT xmin::text FROM oc_nodes WHERE timeline_id=$1 UNION ALL SELECT xmin::text FROM oc_duration_nodes WHERE timeline_id=$1 UNION ALL SELECT xmin::text FROM oc_edge_nodes WHERE timeline_id=$1',
+    [timeline.id],
+  );
+  assert.deepEqual(installed.rows, before.rows, 'plugin changes leave tree rows untouched');
+  // One whose script does not compile is refused, and nothing changes.
+  const broken = validatePluginManifest({
+    ...PLUGIN_EXAMPLE,
+    id: 'broken',
+    source: 'function render(m,api) { return fetch(1); }',
+  });
+  await assert.rejects(
+    store.save(timeline.id, user, timeline.revision, undefined, {
+      settings: { ...settings, plugins: [...plugins, { manifest: broken, enabled: true }] },
+      changes: [],
+    }),
+    (error) =>
+      error.status === 400 && /does not compile: Unknown local variable: fetch/.test(error.message),
+  );
+  assert.equal((await store.access(timeline.id, user)).revision, timeline.revision);
+  // Metadata a plugin may find malformed is stored as given, and search reads what it can.
+  const odd = {
+    ...target,
+    metadata: {
+      title: 'Odd stack',
+      stack: [{ id: 'x', metadata: { title: 'Nested', stack: 'not a stack' } }, 7, null, 'text'],
+      sources: 'not a list',
+      color: { not: 'a color' },
+    },
+  };
+  timeline = await store.save(timeline.id, user, timeline.revision, undefined, {
+    settings: { ...settings, plugins },
+    changes: [{ id: target.id, event: odd }],
+  });
+  const stored = await store.query(timeline.id, user, { kind: 'moment', id: target.id });
+  assert.deepEqual(stored.event.metadata, odd.metadata);
+  const found = await store.query(timeline.id, user, { kind: 'search', text: 'nested', page: 1 });
+  assert.deepEqual(
+    found.results.map((r) => r.id),
+    [target.id],
+  );
   console.log(
     `PASS incremental saves: ${patches} random patches (and a patch applied in many slices) match full rebuilds (documents, queries, search, links, arcs; ${replays} history replays, every revision read back from rows) and keep AVL invariants.`,
   );

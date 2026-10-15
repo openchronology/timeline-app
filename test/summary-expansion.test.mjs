@@ -7,6 +7,7 @@ import {
   EXPAND_ON_HOVER,
   pluginExpand,
   validatePluginManifest,
+  checkPluginScript,
   validateDocument,
 } from '../dist/core.mjs';
 
@@ -71,10 +72,12 @@ test('radial expansion is an optional serializable scripted plugin with restrict
   assert.equal(pluginExpand([{ manifest: custom, enabled: true }]), true);
   assert.throws(() => validatePluginManifest({ ...custom, summary: { kind: 'html' } }));
   assert.throws(() =>
-    validatePluginManifest({
-      ...custom,
-      source:
-        'function render(moment: string, api: PluginAPI): string { return api.fetch("https://example.org"); }',
-    }),
+    checkPluginScript(
+      validatePluginManifest({
+        ...custom,
+        source:
+          'function render(moment: string, api: PluginAPI): string { return api.fetch("https://example.org"); }',
+      }),
+    ),
   );
 });

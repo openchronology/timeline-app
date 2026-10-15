@@ -7,6 +7,7 @@ import { createRequestHandler } from './http.mjs';
 import { Challenges } from './challenge.mjs';
 import { Auth } from './auth.mjs';
 import { PostgresStore } from './store.mjs';
+import { pluginCompiler } from './plugin-sandbox.mjs';
 import { startRetention } from './retention.mjs';
 import { providersFromEnv } from './oauth.mjs';
 import { compareLimits, defaultQuota, entryLimit, LimitError } from './limits.mjs';
@@ -36,6 +37,16 @@ async function pluginLibrary(path) {
   }
   if (!Array.isArray(plugins))
     throw new ConfigurationError('PLUGIN_LIBRARY must contain a JSON array of plugins.');
+  // Their scripts are compiled once, in the sandbox (#157), as published plugins' are.
+  for (const plugin of plugins)
+    if (typeof plugin?.source === 'string')
+      await pluginCompiler()
+        .check(plugin.source)
+        .catch((error) => {
+          throw new ConfigurationError(
+            `PLUGIN_LIBRARY: the plugin ${plugin.id} does not compile: ${error.message}`,
+          );
+        });
   return plugins;
 }
 async function initialize() {

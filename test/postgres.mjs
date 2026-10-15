@@ -253,6 +253,28 @@ try {
     mode: 'custom',
     source: CUSTOM_EXAMPLE,
   };
+  // A plugin whose script does not compile is refused; the server compiles it in its
+  // sandbox and runs no plugin (#157).
+  const refused = await owner.request(
+    'timelines',
+    'POST',
+    {
+      ...document,
+      plugins: [
+        ...document.plugins,
+        {
+          manifest: {
+            ...published,
+            id: 'broken',
+            source: 'function render(m,api) { return fetch(1); }',
+          },
+          enabled: true,
+        },
+      ],
+    },
+    400,
+  );
+  assert.match(refused.error, /does not compile: Unknown local variable: fetch/);
   const t = await owner.request('timelines', 'POST', document, 201);
   timelines.push(t.id);
   assert.equal(t.visibility, 'private');

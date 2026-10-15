@@ -336,6 +336,7 @@ export class Collaboration {
       ]);
       const t = await this.store.access(timelineId, userId, c);
       if (!t.canPropose) throw new HttpError(403, 'Contributor access is required.');
+      if (input.document) await this.store.checkScripts(input.document.plugins, t.plugins);
       // A pull request is reviewed and merged against the revisions it was made from.
       if (!t.keep_history) throw new HttpError(409, PULLS_UNAVAILABLE);
       if (!input.sourceTimelineId && t.revision !== input.baseRevision)
@@ -393,6 +394,7 @@ export class Collaboration {
         ...(input.sourceTimelineId ? [input.sourceTimelineId] : []),
       ]);
       const t = await this.store.access(timelineId, userId, c);
+      if (input.document) await this.store.checkScripts(input.document.plugins, t.plugins);
       const { rows } = await c.query(
         `SELECT ${PROPOSAL} FROM oc_proposals p WHERE p.timeline_id=$1 AND p.id=$2 FOR UPDATE`,
         [timelineId, id],

@@ -75,6 +75,20 @@ try {
           title: 'Early ' + id,
           description: i === 2 ? 'long '.repeat(1000) : 'notes ' + id,
           ...(i === 4 ? { entries: [{ metadata: { title: 'Stacked ' + id } }, {}] } : {}),
+          // Shapes no plugin reads are stored as given and skipped (#157).
+          ...(i === 5
+            ? {
+                stack: [
+                  7,
+                  null,
+                  'x',
+                  [[{ metadata: { title: 'Deep' } }]],
+                  { metadata: 'text' },
+                  { metadata: { title: 42, description: 'Odd ' + id } },
+                ],
+                other: 'not a list',
+              }
+            : {}),
         },
       },
       { id: id + 'late', time: `${100 - i}/1`, metadata: { title: 'Late ' + id } },

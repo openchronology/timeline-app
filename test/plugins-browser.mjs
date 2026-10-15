@@ -718,6 +718,41 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     await cards.nth(2).getByLabel('Title', { exact: true }).fill('From child menu');
     assert.equal((await exported()).events.find((e) => e.id === 'icon').metadata.stack.length, 3);
     assert.equal(await input('event-save').isVisible(), true);
+    // Stacks read what they can of any stored value (#157): readable entries show, and a
+    // stack with others is shown read-only, so editing never drops them.
+    const odd = [
+      { id: 'ok', metadata: { title: 'Readable' } },
+      7,
+      { id: 'nested', metadata: { stack: [] } },
+    ];
+    await imported({
+      ...stacked,
+      title: 'Odd stack',
+      events: stacked.events.map((e) =>
+        e.id === 'icon' ? { ...e, metadata: { ...e.metadata, stack: odd } } : e,
+      ),
+    });
+    assert.equal(await page.locator('.stack-marker').count(), 1);
+    await page.getByRole('button', { name: 'With icon', exact: true }).click();
+    assert.equal(await cards.count(), 1);
+    assert.equal(await cards.nth(0).getByLabel('Title', { exact: true }).inputValue(), 'Readable');
+    assert.equal(await cards.nth(0).getByLabel('Title', { exact: true }).isDisabled(), true);
+    assert.match(
+      await page.locator('.stack-unreadable').textContent(),
+      /2 entries of this stack can't be read/,
+    );
+    assert.equal(await add.isDisabled(), true);
+    assert.deepEqual((await exported()).events.find((e) => e.id === 'icon').metadata.stack, odd);
+    await imported({
+      ...stacked,
+      title: 'Odd stack value',
+      events: stacked.events.map((e) =>
+        e.id === 'icon' ? { ...e, metadata: { ...e.metadata, stack: 'not a stack' } } : e,
+      ),
+    });
+    await page.getByRole('button', { name: 'With icon', exact: true }).click();
+    assert.equal(await cards.count(), 0);
+    assert.match(await page.locator('.stack-unreadable').textContent(), /value can't be read/);
     await imported({
       ...stacked,
       title: 'Color plugin UI',

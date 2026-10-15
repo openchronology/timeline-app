@@ -8,6 +8,24 @@ import {
   searchSuiteLibrary,
 } from '../dist/core.mjs';
 import { HttpError } from './store.mjs';
+import { pluginCompiler } from './plugin-sandbox.mjs';
+const BUILTIN_SCRIPTS = new Set(BUILTIN_PLUGINS.map((p) => p.source).filter(Boolean));
+/**
+ * Refuses (HTTP 400) a publication with a plugin whose script does not compile, compiled in
+ * the sandbox (#157). The catalogue's plugins were compiled when published, and are not again.
+ */
+export async function checkPublished(manifests, compiler = pluginCompiler()) {
+  for (const manifest of manifests)
+    if (manifest.source !== undefined && !BUILTIN_SCRIPTS.has(manifest.source))
+      try {
+        await compiler.check(manifest.source);
+      } catch (error) {
+        throw new HttpError(
+          400,
+          `The plugin “${manifest.name}” does not compile: ${error.message}`,
+        );
+      }
+}
 export function createPluginLibrary(definitions = BUILTIN_PLUGINS, pool = null) {
   if (!Array.isArray(definitions) || definitions.length > 10000)
     throw new Error('Invalid plugin library.');
@@ -112,6 +130,7 @@ export function createPluginLibrary(definitions = BUILTIN_PLUGINS, pool = null) 
       manifest = validatePluginManifest({ ...manifest, id: prefix + slug });
       if (Buffer.byteLength(JSON.stringify(manifest, null, 2)) > 32768)
         throw new HttpError(400, 'Published plugin exceeds 32 KiB.');
+      await checkPublished([manifest]);
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
@@ -224,6 +243,7 @@ export function createSuiteLibrary(definitions = OFFICIAL_SUITES, pool = null) {
       if (!/^[a-z][a-z0-9-]{0,28}$/.test(slug))
         throw new HttpError(400, 'Use a suite slug of at most 29 characters.');
       suite = validatePluginSuite({ ...suite, id: prefix + slug });
+      await checkPublished(suite.plugins);
       const client = await pool.connect();
       try {
         await client.query('BEGIN');

@@ -62,12 +62,12 @@ const refId = (ref) => ref.moment ?? ref.duration;
 export const REBUILD_UNDER = 200000;
 const REBUILD_SHARE = 0.5;
 /**
- * Whether a patch can be applied in place: unless it changes most of a small timeline, or
- * changes its plugins (which revalidates every moment), which rebuild the index instead.
+ * Whether a patch can be applied in place: unless it changes most of a small timeline, which
+ * rebuilds the index instead. Changing the plugins is a change of settings like any other:
+ * each plugin reads its own metadata, so no moment is revalidated (#157).
  */
 export function incremental(t, patch) {
   if (t.index_version < 2 || t.comparison || patch.settings.comparison) return false;
-  if (canonical(patch.settings.plugins) !== canonical(t.plugins ?? undefined)) return false;
   const size =
     patch.changes.length +
     (patch.durationChanges?.length ?? 0) +
