@@ -18,9 +18,15 @@ export default async function Dashboard({ searchParams }) {
     page: String(pageNumber(params.page)),
     minePage: String(pageNumber(params.minePage)),
     favoritePage: String(pageNumber(params.favoritePage)),
-    sort: ['featured', 'stars', 'popularity', 'alphabetical', 'age', 'relevance'].includes(
-      params.sort,
-    )
+    sort: [
+      'featured',
+      'stars',
+      'popularity',
+      'trending',
+      'alphabetical',
+      'age',
+      'relevance',
+    ].includes(params.sort)
       ? params.sort
       : params.search
         ? 'relevance'

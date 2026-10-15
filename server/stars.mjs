@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { HttpError } from './store.mjs';
+import { refreshAccounts, refreshPopularity } from './standing.mjs';
 export async function setTimelineStar(pool, store, id, userId, value) {
   if (!userId) throw new HttpError(401, 'Sign in to star timelines.');
   if (
@@ -20,7 +21,7 @@ export async function setTimelineStar(pool, store, id, userId, value) {
     if (!actor.rowCount) throw new HttpError(401, 'Sign in to star timelines.');
     // Serialize visibility changes and star mutations before checking access.
     await client.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [id]);
-    await store.access(id, userId, client);
+    const timeline = await store.access(id, userId, client);
     if (value.starred)
       await client.query(
         'INSERT INTO oc_timeline_stars(user_id,timeline_id) VALUES($1,$2) ON CONFLICT DO NOTHING',
@@ -31,6 +32,9 @@ export async function setTimelineStar(pool, store, id, userId, value) {
         userId,
         id,
       ]);
+    // Its popularity at once; its owner may now be endorsed (#103; standing.mjs).
+    await refreshPopularity(client, [id]);
+    await refreshAccounts(client, [timeline.owner_id]);
     const { rows } = await client.query('SELECT star_count FROM oc_timelines WHERE id=$1', [id]);
     await client.query('COMMIT');
     return { starred: value.starred, star_count: rows[0].star_count };

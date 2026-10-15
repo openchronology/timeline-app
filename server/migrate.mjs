@@ -10,6 +10,7 @@ import {
 } from './store.mjs';
 import { loadConfiguration } from './env-file.mjs';
 import { startHistory } from './history.mjs';
+import { sweepStanding } from './standing.mjs';
 // The packages pass their configuration file as OCH_CONFIG (#118).
 loadConfiguration();
 if (!process.env.DATABASE_URL && !process.env.PGDATABASE)
@@ -31,6 +32,8 @@ try {
   // After the conversions above, so history starts from the timelines as they are now.
   const started = await startHistory(client);
   if (started) console.log(`Started saved history as rows for ${started} timeline(s).`);
+  // Browsing lists established accounts' timelines (#103): ranked from the start.
+  await sweepStanding(client);
   await client.query('COMMIT');
   console.log('OpenChronology schema installed.');
 } finally {

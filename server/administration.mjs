@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { passwordHash } from './auth.mjs';
 import { HttpError } from './store.mjs';
 import { defaultQuota, storageBytes } from './limits.mjs';
+import { standingOf, refreshAccounts } from './standing.mjs';
 /** A quota in bytes, as a string: a byte count or a size such as 500MiB or 2GB, up to 10 TB. */
 export function quotaValue(value, nullable = false) {
   if (nullable && value === null) return null;
@@ -120,12 +121,28 @@ export class Administration {
       );
     const result = await this.pool.query(
       kind === 'users'
-        ? `WITH matching AS (SELECT id,username,email,is_admin,is_disabled,quota_bypass,quota_bytes,used_bytes,created_at FROM oc_users WHERE strpos(lower(username||' '||coalesce(email,'')),lower($1))>0) SELECT (SELECT count(*) FROM matching) AS total,coalesce((SELECT jsonb_agg(p) FROM (SELECT * FROM matching ORDER BY username,id LIMIT 25 OFFSET $2)p),'[]') AS items`
+        ? `WITH matching AS (SELECT id,username,email,is_admin,is_disabled,quota_bypass,quota_bytes,used_bytes,created_at,trust FROM oc_users WHERE strpos(lower(username||' '||coalesce(email,'')),lower($1))>0) SELECT (SELECT count(*) FROM matching) AS total,coalesce((SELECT jsonb_agg(p) FROM (SELECT * FROM matching ORDER BY username,id LIMIT 25 OFFSET $2)p),'[]') AS items`
         : `WITH matching AS (SELECT t.id,t.title,t.visibility,t.featured,t.event_count,u.username AS owner FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id WHERE strpos(lower(t.title||' '||u.username),lower($1))>0) SELECT (SELECT count(*) FROM matching) AS total,coalesce((SELECT jsonb_agg(p) FROM (SELECT * FROM matching ORDER BY title,id LIMIT 25 OFFSET $2)p),'[]') AS items`,
       [search, (page - 1) * 25],
     );
+    const listed = result.rows[0];
+    // Each account's standing (#103) and what it rests on, as it stands now.
+    if (kind === 'users' && listed.items.length) {
+      const standing = new Map(
+        (
+          await standingOf(
+            this.pool,
+            listed.items.map((item) => item.id),
+          )
+        ).map((row) => [row.id, row]),
+      );
+      for (const item of listed.items) {
+        const { standing: value, endorsers, confirmed, restricted } = standing.get(item.id);
+        Object.assign(item, { standing: value, endorsers, confirmed, restricted });
+      }
+    }
     return {
-      ...result.rows[0],
+      ...listed,
       page,
       settings: {
         ...(
@@ -142,7 +159,7 @@ export class Administration {
       throw new HttpError(400, 'Invalid administration request.');
     const allowed =
       kind === 'users'
-        ? ['is_admin', 'is_disabled', 'quota_bypass', 'quota_bytes']
+        ? ['is_admin', 'is_disabled', 'quota_bypass', 'quota_bytes', 'trust']
         : kind === 'settings'
           ? ['default_quota_bytes']
           : ['visibility', 'featured', 'delete'];
@@ -167,6 +184,11 @@ export class Administration {
             changes[field] = value[field];
           }
         if ('quota_bytes' in value) changes.quota_bytes = quotaValue(value.quota_bytes, true);
+        if ('trust' in value) {
+          if (![null, 'trusted', 'untrusted'].includes(value.trust))
+            throw new HttpError(400, 'Trust is trusted, untrusted or null.');
+          changes.trust = value.trust;
+        }
         if (
           target.is_admin &&
           (changes.is_admin === false || changes.is_disabled === true) &&
@@ -184,6 +206,9 @@ export class Administration {
               ' WHERE id=$1',
             [id, ...fields.map((f) => changes[f])],
           );
+        // What ranks its timelines and weighs its stars follows (#103; standing.mjs).
+        if (['is_admin', 'is_disabled', 'trust'].some((field) => field in changes))
+          await refreshAccounts(c, [id]);
         if (changes.is_disabled === true || (target.is_admin && changes.is_admin === false)) {
           await c.query('DELETE FROM oc_sessions WHERE user_id=$1', [id]);
           await c.query('UPDATE oc_api_keys SET revoked_at=now() WHERE user_id=$1', [id]);

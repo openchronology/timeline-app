@@ -18,6 +18,7 @@
 import { randomUUID } from 'node:crypto';
 import { HttpError } from './store.mjs';
 import { queueMail } from './mail.mjs';
+import { refreshAccounts } from './standing.mjs';
 import { REPORT_CATEGORIES, REPORT_TARGETS, REPORT_TEXT } from './report-categories.mjs';
 
 const CATEGORIES = new Set(REPORT_CATEGORIES.map(([key]) => key));
@@ -280,6 +281,9 @@ export class Moderation {
           [id, !!appealing],
         );
       }
+      // A restriction in force leaves its owner without standing (#103; standing.mjs).
+      if (row.owner_id && (action === 'restrict' || action === 'lift'))
+        await refreshAccounts(c, [row.owner_id]);
       await this.notify(c, row, action, reason);
       await c.query(
         'INSERT INTO oc_admin_audit(actor_id,action,target_id,changes) VALUES($1,$2,$3,$4)',

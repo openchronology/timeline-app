@@ -45,7 +45,9 @@ export function searchInput(value = {}) {
     limit < 1 ||
     limit > 50 ||
     !['public', 'mine', 'visible', 'starred'].includes(scope) ||
-    !['featured', 'stars', 'popularity', 'alphabetical', 'age', 'relevance'].includes(sort) ||
+    !['featured', 'stars', 'popularity', 'trending', 'alphabetical', 'age', 'relevance'].includes(
+      sort,
+    ) ||
     typeof starredBy !== 'string' ||
     starredBy.length > 64 ||
     (starredBy !== '' && scope !== 'public')
@@ -70,22 +72,30 @@ export async function searchTimelines(pool, userId, value, featured = []) {
     `WITH matching AS (
     SELECT t.id,t.title,t.description,t.tags,t.visibility,t.revision,t.event_count,t.comparison,t.updated_at,t.created_at,t.star_count,u.username AS owner,
       EXISTS(SELECT 1 FROM oc_timeline_stars s WHERE s.timeline_id=t.id AND s.user_id=$6::uuid) AS starred,
-      t.star_count+(SELECT count(*) FROM oc_timelines f WHERE f.upstream_id=t.id AND f.visibility='public') AS popularity,
+      coalesce(p.popularity,0) AS popularity,coalesce(p.trending,0) AS trending,
+      coalesce(a.standing,0)>0 AS established,
       (t.featured OR t.id=ANY($5::uuid[])) AS featured,
       CASE WHEN $2='' THEN 0 ELSE ts_rank_cd(t.search_document,websearch_to_tsquery('english',$2)) END AS rank
     FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id
+    LEFT JOIN oc_account_standing a ON a.user_id=t.owner_id
+    LEFT JOIN oc_timeline_popularity p ON p.timeline_id=t.id
     WHERE (CASE WHEN $1::boolean THEN t.owner_id=$6::uuid ELSE (t.visibility='public' OR (($8::boolean OR $11::boolean) AND (t.owner_id=$6::uuid OR (EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$6::uuid) AND NOT ${restrictedTimeline('t')})))) END)
       AND ($2='' OR t.search_document @@ websearch_to_tsquery('english',$2))
       AND ($7='' OR t.tags @> ARRAY[$7]::text[])
       AND ($9='' OR u.username=$9)
       AND (NOT $11::boolean OR EXISTS(SELECT 1 FROM oc_timeline_stars s WHERE s.timeline_id=t.id AND s.user_id=$6::uuid))
       AND ($12='' OR EXISTS(SELECT 1 FROM oc_timeline_stars s JOIN oc_users su ON su.id=s.user_id WHERE s.timeline_id=t.id AND su.username=$12))
+      -- Browsing lists established accounts' timelines, and featured ones (#103).
+      AND (NOT $13::boolean OR coalesce(a.standing,0)>0 OR t.featured OR t.id=ANY($5::uuid[]))
   ), page AS (SELECT * FROM matching ORDER BY CASE WHEN $10='featured' THEN featured ELSE false END DESC,
+      -- Searches find newcomers' timelines too, after established accounts' matches.
+      CASE WHEN $2<>'' THEN established ELSE true END DESC,
       CASE WHEN $10='relevance' THEN rank ELSE 0 END DESC,
-      CASE WHEN $10='stars' THEN star_count WHEN $10='popularity' THEN popularity ELSE 0 END DESC,
+      CASE WHEN $10='stars' THEN star_count WHEN $10='popularity' THEN popularity
+        WHEN $10='trending' THEN trending ELSE 0 END DESC,
       CASE WHEN $10='alphabetical' THEN lower(title) ELSE '' END ASC,
       CASE WHEN $10='age' THEN created_at ELSE NULL END DESC,updated_at DESC,id LIMIT $3 OFFSET $4)
-  SELECT (SELECT count(*) FROM matching) AS total,coalesce((SELECT jsonb_agg(to_jsonb(page)||jsonb_build_object('star_count',page.star_count::text,'popularity',page.popularity::text)) FROM page),'[]'::jsonb) AS timelines`,
+  SELECT (SELECT count(*) FROM matching) AS total,coalesce((SELECT jsonb_agg((to_jsonb(page)||jsonb_build_object('star_count',page.star_count::text,'popularity',page.popularity::text))-'established'-'trending') FROM page),'[]'::jsonb) AS timelines`,
     [
       scope === 'mine',
       search,
@@ -99,6 +109,8 @@ export async function searchTimelines(pool, userId, value, featured = []) {
       sort,
       scope === 'starred',
       starredBy,
+      // Browsing: public timelines found by neither text, owner nor a reader's favorites.
+      scope === 'public' && !search && !owner && !starredBy,
     ],
   );
   const total = Number(rows[0].total);

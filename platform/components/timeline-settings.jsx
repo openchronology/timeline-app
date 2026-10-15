@@ -9,7 +9,12 @@ const size = (bytes) =>
   bytes >= 1048576
     ? `${(bytes / 1048576).toFixed(bytes >= 104857600 ? 0 : 1)} MB`
     : `${Math.max(bytes ? 1 : 0, Math.round(bytes / 1024))} KB`;
-export default function TimelineSettings({ initial, initialMembers, calendar = false }) {
+export default function TimelineSettings({
+  initial,
+  initialMembers,
+  calendar = false,
+  listing = null,
+}) {
   const router = useRouter(),
     dialog = useRef(null),
     historyDialog = useRef(null),
@@ -67,6 +72,15 @@ export default function TimelineSettings({ initial, initialMembers, calendar = f
           Public timelines appear in search and expose their saved history. Signed-in viewers can
           fork and recommend changes; only writers and the owner can change upstream.
         </p>
+        {listing && !listing.listed && (
+          <p className="muted">
+            Browsing lists the public timelines of established accounts. This account becomes
+            established once it has a confirmed email (or signs in with Google, GitHub or Facebook)
+            and is {listing.fullDays} days old, or {listing.newcomerDays} days old and starred or
+            forked by an established account. Until then its public timelines can be opened by link,
+            found by search and seen on its profile.
+          </p>
+        )}
         <p>
           Share: <a href={'/timelines/' + timeline.id}>{'/timelines/' + timeline.id}</a>
         </p>

@@ -52,7 +52,7 @@ The configuration is read the way systemd and Docker Compose read it: `#` starts
 Open `/account`, sign in, and follow **Site administration** to `/admin`.
 Administrators can search and paginate users and timelines, grant/revoke admin
 access, suspend/reactivate users, set quotas and exemptions, feature timelines,
-change visibility, and delete timelines. **Reports** is the review queue for what readers report ([moderation](moderation.md)). Suspensions preserve user-owned data;
+change visibility, and delete timelines. **Reports** is the review queue for what readers report ([moderation](moderation.md)). Each user shows its [standing](browsing.md), which decides whether browsing lists its public timelines; mark an account trusted or untrusted to override it. Suspensions preserve user-owned data;
 there is no automatic ownership transfer or destructive account removal.
 The last active administrator cannot be suspended or demoted. Private timelines
 are available to site administrators for management; private-fork publication
