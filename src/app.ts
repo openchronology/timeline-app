@@ -5110,14 +5110,10 @@ function savedRemote(): boolean {
 el('export-button').onclick = () => {
   flushEventEdit();
   if (!window.__TAURI__ && savedRemote() && momentCount() > SERVER_EXPORT) {
-    // Loaded in a frame of its own: the server answers with an attachment, which every
-    // browser saves under the name the server gives (download links to an address are named
-    // and followed differently by each), and this page is left as it is.
-    const frame = document.createElement('iframe');
-    frame.hidden = true;
-    frame.src = `/api/timelines/${remote!.id}/document?download=1`;
-    document.body.append(frame);
-    setTimeout(() => frame.remove(), 60000);
+    // The server answers with an attachment, which every browser saves under the name the
+    // server gives without leaving this page (download links to an address are named and
+    // followed differently by each).
+    window.location.assign(`/api/timelines/${remote!.id}/document?download=1`);
     toast('Exporting from the server: the file downloads as it is written.');
     return;
   }
