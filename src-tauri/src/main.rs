@@ -105,6 +105,129 @@ struct Files {
     pending: Option<(PathBuf, Arc<Snapshot>, Stamp)>,
     stamp: Option<Stamp>,
     generation: u64,
+    /// The baseline's number among those changes made at once produced (#179), and the
+    /// others still kept, so the editor can undo and redo them until the file is saved.
+    baseline_id: u64,
+    kept: Vec<(u64, Arc<Snapshot>)>,
+    next_id: u64,
+}
+/// How many baselines changes made at once keep for undoing them.
+const KEPT_BASELINES: usize = 8;
+impl Files {
+    /// Makes `baseline` the open timeline's, keeping the one before for undo; its number.
+    fn replace_baseline(&mut self, baseline: Arc<Snapshot>, id: Option<u64>) -> u64 {
+        if let Some(previous) = self.baseline.take() {
+            self.kept.retain(|(n, _)| *n != self.baseline_id);
+            self.kept.push((self.baseline_id, previous));
+            if self.kept.len() > KEPT_BASELINES {
+                self.kept.remove(0);
+            }
+        }
+        let id = id.unwrap_or_else(|| {
+            self.next_id += 1;
+            self.next_id
+        });
+        self.kept.retain(|(n, _)| *n != id);
+        self.baseline = Some(baseline);
+        self.baseline_id = id;
+        self.generation += 1;
+        id
+    }
+    /// Forgets kept baselines: the file was saved, or another opened.
+    fn forget_kept(&mut self) {
+        self.kept.clear();
+        self.next_id += 1;
+        self.baseline_id = self.next_id;
+    }
+    fn opened(&self) -> Result<Opened, String> {
+        Ok(Opened {
+            header: self
+                .baseline
+                .as_ref()
+                .ok_or("No timeline file is open")?
+                .header()?,
+            path: self
+                .current
+                .as_ref()
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+            generation: self.generation,
+        })
+    }
+}
+#[derive(serde::Serialize)]
+struct Staged {
+    #[serde(flatten)]
+    opened: Opened,
+    /// The baselines before and after: what undo and redo take back to.
+    before: u64,
+    after: u64,
+}
+#[derive(Clone, serde::Serialize)]
+struct Progress {
+    done: usize,
+    total: usize,
+}
+/// Applies `patch` to the open timeline at once, unsaved (#179): bulk edits such as deleting
+/// everything in a view or shifting times, which would be too many to keep as edits in the
+/// page. The file changes only when saved; until then undo can take the change back.
+#[tauri::command]
+async fn desktop_stage_patch(
+    app: tauri::AppHandle,
+    generation: u64,
+    patch: Patch,
+    progress: tauri::ipc::Channel<Progress>,
+) -> Result<Staged, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let current = baseline(&app, generation)?;
+        let staged = current.with_patch(&patch, &|done, total| {
+            let _ = progress.send(Progress { done, total });
+        })?;
+        let state = app.state::<Mutex<Files>>();
+        let mut files = state.lock().map_err(|e| e.to_string())?;
+        if files.generation != generation {
+            return Err("The open timeline file changed".into());
+        }
+        let before = files.baseline_id;
+        let after = files.replace_baseline(Arc::new(staged), None);
+        Ok(Staged {
+            opened: files.opened()?,
+            before,
+            after,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+/// Goes back (or forward again) to a baseline a change made at once left: undo and redo.
+#[tauri::command]
+async fn desktop_restore_baseline(
+    app: tauri::AppHandle,
+    generation: u64,
+    baseline: u64,
+) -> Result<Staged, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<Mutex<Files>>();
+        let mut files = state.lock().map_err(|e| e.to_string())?;
+        if files.generation != generation {
+            return Err("The open timeline file changed".into());
+        }
+        let snapshot = files
+            .kept
+            .iter()
+            .find(|(n, _)| *n == baseline)
+            .map(|(_, s)| s.clone())
+            .ok_or("That change can no longer be undone.")?;
+        let before = files.baseline_id;
+        let after = files.replace_baseline(snapshot, Some(baseline));
+        Ok(Staged {
+            opened: files.opened()?,
+            before,
+            after,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 #[tauri::command]
 async fn desktop_open(app: tauri::AppHandle) -> Result<Option<Opened>, String> {
@@ -207,6 +330,7 @@ async fn desktop_accept_open(app: tauri::AppHandle, path: String) -> Result<(), 
         files.baseline = Some(baseline);
         files.stamp = Some(stamp);
         files.generation += 1;
+        files.forget_kept();
         Ok(())
     })
     .await
@@ -309,6 +433,7 @@ async fn desktop_save(
         files.current = Some(path.clone());
         files.stamp = Some(stamp(&path)?);
         files.generation += 1;
+        files.forget_kept();
         Ok(Some(Opened {
             header,
             path: path.to_string_lossy().into_owned(),
@@ -358,6 +483,8 @@ fn main() {
             desktop_query,
             desktop_document,
             desktop_save,
+            desktop_stage_patch,
+            desktop_restore_baseline,
             desktop_servers,
             desktop_connect,
             desktop_disconnect,

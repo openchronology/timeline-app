@@ -71,7 +71,10 @@ every moment in the visible range and the durations wholly inside it, after aski
   brings everything back, until the change is saved.
 - In a server timeline, writers delete on the server at once, as one saved revision; save
   other changes first. The timeline's history keeps the version before the deletion (until
-  retention prunes it). The desktop app's own files are not covered.
+  retention prunes it).
+- In a desktop file of over 2,048 moments, which the app keeps in its native store, the
+  deletion is made there at once, unsaved: **Undo** brings everything back until you save
+  the file, and saving writes the whole file. Save other changes first ([#179](https://github.com/openchronology/timeline-app/issues/179)).
 
 The API deletes a range, both ends included, for anyone who can write the timeline:
 

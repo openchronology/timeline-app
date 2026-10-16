@@ -216,6 +216,14 @@ the baseline, in time proportional to the change. Otherwise (the first save of a
 from an older version, or Save As) a patched copy of the baseline replaces the
 destination through a transactional SQLite backup. Either way, invalid patches leave the
 original untouched.
+Changes made at once (#179), such as deleting everything in a view or shifting times, would
+be too many to keep as edits in the page: each overlay edit is drawn on its own and checked
+against every summary. `desktop_stage_patch` applies them natively instead, to a patched
+copy of the baseline (`Snapshot::with_patch`), reporting its progress through a Tauri
+channel. The copy becomes the open baseline, unsaved; its save token is new, so the next
+save writes the whole file. The baselines before are kept (up to eight), so undo and redo
+switch between them (`desktop_restore_baseline`) until the file is saved or another opened.
+They require no other unsaved edits, which the switch would otherwise lose.
 Save As preserves the original file. Generation checks reject stale commands;
 file and WAL modification stamps detect external changes and require Save As.
 As with other file editors, avoid simultaneous editing by another application.

@@ -479,6 +479,31 @@ impl Snapshot {
     /// exactly this baseline's saved state (same index layout and save token), the changes
     /// are applied to the file and then to the baseline in place, in time proportional to
     /// the change; otherwise a changed copy of the baseline replaces the file.
+    /// This baseline with `patch` applied, as a new disk copy: changes made at once, such as
+    /// bulk edits (#179), that stay unsaved. This baseline is left as it was, so it can be
+    /// taken back (undo). The copy's layout token is new, so no file matches it and saving
+    /// it later writes the whole file (save_patch). `progress` is told as changes are made.
+    pub fn with_patch(
+        &self,
+        patch: &Patch,
+        progress: &dyn Fn(usize, usize),
+    ) -> Result<Self, String> {
+        let _gate = self.query_gate.lock().map_err(|e| e.to_string())?;
+        validate(&patch.settings)?;
+        if !patch.settings.events.is_empty()
+            || !patch.settings.durations.is_empty()
+            || patch.changes.len() > 200000
+            || patch.duration_changes.len() > 200000
+        {
+            return Err("Invalid sparse changes".into());
+        }
+        let staged = Self::open(&self.path)?;
+        let db = Connection::open(&staged.path, true)?;
+        apply_with(&db, patch, &intervals::token(), progress)?;
+        drop(db);
+        staged.header()?;
+        Ok(staged)
+    }
     pub fn save_patch(&self, target: &Path, patch: &Patch) -> Result<Self, String> {
         let _gate = self.query_gate.lock().map_err(|e| e.to_string())?;
         validate(&patch.settings)?;
@@ -526,6 +551,8 @@ impl Snapshot {
         Ok(staged)
     }
 }
+/// How many changes `apply_with` makes between reports of its progress.
+const PROGRESS_STEP: usize = 2000;
 /// Whether a file's interval indexes use the current layout.
 fn current_layout(db: &Connection) -> Result<bool, String> {
     Ok(intervals::layout(db)?.is_some_and(|(version, _)| version == intervals::LAYOUT)
@@ -555,14 +582,37 @@ fn matching_file(target: &Path, token: Option<String>) -> Result<Option<Connecti
 /// Applies sparse changes in one transaction, updating the moment index per changed time
 /// and the duration and arc trees per changed interval; nothing else is rebuilt.
 fn apply(db: &Connection, patch: &Patch, token: &str) -> Result<(), String> {
+    apply_with(db, patch, token, &|_, _| {})
+}
+/// As `apply`, telling `progress` how many of the moment and duration changes are done.
+fn apply_with(
+    db: &Connection,
+    patch: &Patch,
+    token: &str,
+    progress: &dyn Fn(usize, usize),
+) -> Result<(), String> {
     db.execute("BEGIN IMMEDIATE", &[])?;
-    let result = apply_changes(db, patch, token).and_then(|()| db.execute("COMMIT", &[]));
+    let result = apply_changes(db, patch, token, progress).and_then(|()| db.execute("COMMIT", &[]));
     if result.is_err() {
         let _ = db.execute("ROLLBACK", &[]);
     }
     result
 }
-fn apply_changes(db: &Connection, patch: &Patch, token: &str) -> Result<(), String> {
+fn apply_changes(
+    db: &Connection,
+    patch: &Patch,
+    token: &str,
+    progress: &dyn Fn(usize, usize),
+) -> Result<(), String> {
+    let total = patch.changes.len() + patch.duration_changes.len();
+    let mut done = 0;
+    let mut step = || {
+        done += 1;
+        if done % PROGRESS_STEP == 0 {
+            progress(done, total);
+        }
+    };
+    progress(0, total);
     use std::collections::{BTreeMap, BTreeSet};
     let schema = db.scalar("SELECT sql FROM sqlite_schema WHERE name='events'", &[])?;
     if schema.to_lowercase().contains("json_valid") {
@@ -595,6 +645,7 @@ fn apply_changes(db: &Connection, patch: &Patch, token: &str) -> Result<(), Stri
     }
     let mut durations = BTreeSet::new();
     for change in &patch.duration_changes {
+        step();
         if !durations.insert(change.id.clone()) {
             return Err("Duplicate sparse duration change".into());
         }
@@ -618,6 +669,7 @@ fn apply_changes(db: &Connection, patch: &Patch, token: &str) -> Result<(), Stri
         }
     }
     for change in &patch.changes {
+        step();
         if !ids.insert(&change.id) {
             return Err("Duplicate sparse change".into());
         }
@@ -973,6 +1025,95 @@ mod tests {
         assert!(updated.save_patch(&path, &bad).is_err());
         assert_eq!(super::super::open(&path).unwrap(), saved);
         assert_eq!(updated.document().unwrap(), saved);
+        std::fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn staged_patches_leave_the_baseline_and_file_until_saved_whole() {
+        let path = path();
+        let mut doc = document();
+        for i in 0..5000 {
+            doc.events.push(Event {
+                id: format!("m{i}"),
+                time: format!("{i}/1"),
+                metadata: serde_json::Map::new(),
+            });
+        }
+        doc.durations = serde_json::from_value(json!([
+            {"id":"fixed","start":"1/1","end":"2/1","metadata":{}},
+            {"id":"follows","start":{"moment":"m0"},"end":"9/1","metadata":{}}
+        ]))
+        .unwrap();
+        super::super::save(&path, &doc).unwrap();
+        let source = Snapshot::open(&path).unwrap();
+        let settings = source.header().unwrap().document;
+        // Every moment 1000 later, and the fixed duration with them; m1 deleted.
+        let mut changes: Vec<Value> = (0..5000)
+            .filter(|i| *i != 1)
+            .map(|i| json!({"id":format!("m{i}"),"event":{"id":format!("m{i}"),"time":format!("{}/1",i+1000),"metadata":{}}}))
+            .collect();
+        changes.push(json!({"id":"m1","event":null}));
+        let patch: Patch = serde_json::from_value(json!({
+            "settings":settings,
+            "changes":changes,
+            "durationChanges":[{"id":"fixed","duration":{"id":"fixed","start":"1001/1","end":"1002/1","metadata":{}}}]
+        }))
+        .unwrap();
+        let reports = std::cell::RefCell::new(Vec::new());
+        let staged = source
+            .with_patch(&patch, &|done, total| {
+                reports.borrow_mut().push((done, total))
+            })
+            .unwrap();
+        assert_eq!(
+            *reports.borrow(),
+            vec![(0, 5001), (2000, 5001), (4000, 5001)],
+            "Told how far it got."
+        );
+        assert_ne!(staged.path(), source.path());
+        let time =
+            |d: &Document, id: &str| d.events.iter().find(|e| e.id == id).map(|e| e.time.clone());
+        let changed = staged.document().unwrap();
+        assert_eq!(time(&changed, "m0").as_deref(), Some("1000/1"));
+        assert_eq!(time(&changed, "m1"), None);
+        assert_eq!(changed.events.len(), 4999);
+        // The baseline it came from, and the file, are as they were: unsaved, and undoable.
+        assert_eq!(
+            time(&source.document().unwrap(), "m0").as_deref(),
+            Some("0/1")
+        );
+        assert_eq!(
+            time(&super::super::open(&path).unwrap(), "m0").as_deref(),
+            Some("0/1")
+        );
+        let overview = staged
+            .query(&query("overview", "1000", "6000", "0"))
+            .unwrap();
+        let count: u64 = overview["groups"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|g| g["count"].as_str().unwrap().parse::<u64>().unwrap())
+            .sum();
+        assert_eq!(count, 4999);
+        // Saving writes the whole file, whatever else the save sends.
+        let empty: Patch =
+            serde_json::from_value(json!({"settings":settings,"changes":[]})).unwrap();
+        let saved = staged.save_patch(&path, &empty).unwrap();
+        let file = super::super::open(&path).unwrap();
+        assert_eq!(time(&file, "m0").as_deref(), Some("1000/1"));
+        assert_eq!(file.events.len(), 4999);
+        let durations = serde_json::to_value(&file.durations).unwrap();
+        assert_eq!(durations[0]["start"], "1001/1");
+        assert_eq!(durations[1]["start"], json!({"moment":"m0"}));
+        // Later saves of that file apply in place again.
+        let renamed: Patch = serde_json::from_value(json!({"settings":settings,"changes":[{"id":"m2","event":{"id":"m2","time":"1/2","metadata":{}}}]})).unwrap();
+        let again = saved.save_patch(&path, &renamed).unwrap();
+        assert_eq!(again.path(), saved.path());
+        assert_eq!(
+            time(&super::super::open(&path).unwrap(), "m2").as_deref(),
+            Some("1/2")
+        );
+        drop((source, staged, saved, again));
         std::fs::remove_file(path).unwrap();
     }
     #[test]
