@@ -109,6 +109,7 @@ import type {
   PluginManifest,
 } from './core.js';
 import { ViewportCache, RemoteWorkspace, regroup, applyChanges } from './remote-cache.js';
+import type { SavingChanges } from './remote-cache.js';
 import type { Motion } from './remote-cache.js';
 import {
   WindowStore,
@@ -1613,7 +1614,10 @@ function render(refreshFrame = true) {
           if (request === frameRequest && !controller.signal.aborted) {
             if (local && saving) return;
             el('loading-window').hidden = true;
-            if (error?.status === 409 && !dirty && remote) {
+            // Edits stay; the view moves to the latest revision (#165).
+            if (error?.status === 409 && dirty && remote && sparseWorkspace() && !workingProposal)
+              void moveToLatest(id).catch(fail);
+            else if (error?.status === 409 && !dirty && remote) {
               const view = viewport.clone();
               void openRemote(id)
                 .then(() => {
@@ -5682,25 +5686,38 @@ el('publish-button').onclick = () => {
         index && remote
           ? undefined
           : await embedImages(await (materialized ?? completeDocument()), false);
-      const result =
-        index && remote
-          ? await api<RemoteTimeline>(`timelines/${remote.id}/changes`, 'PUT', {
-              revision: remote.revision,
-              ...patch,
-            })
-          : remote
-            ? await api<RemoteTimeline>(`timelines/${remote.id}`, 'PUT', {
+      let result: RemoteTimeline;
+      try {
+        result =
+          index && remote
+            ? await api<RemoteTimeline>(`timelines/${remote.id}/changes`, 'PUT', {
                 revision: remote.revision,
-                document,
+                ...patch,
+                // What the edits were made on, so they merge onto a newer revision (#165).
+                base: saveBase(sent!, remote),
               })
-            : await api<RemoteTimeline>('timelines', 'POST', document);
+            : remote
+              ? await api<RemoteTimeline>(`timelines/${remote.id}`, 'PUT', {
+                  revision: remote.revision,
+                  document,
+                })
+              : await api<RemoteTimeline>('timelines', 'POST', document);
+      } catch (error) {
+        const conflicts = (error as { conflicts?: SaveConflict[] }).conflicts;
+        if (!Array.isArray(conflicts) || workspace !== documentRequest) throw error;
+        offerConflicts(conflicts, (error as Error).message);
+        return;
+      }
       if (workspace !== documentRequest) return;
+      // Saved: what was kept against conflicts is settled.
+      keptVersions = null;
       remote = result;
       local = null;
       if (document) model!.assets = document.assets;
       if (index && sent) {
         index.accepted(sent, selected?.id);
-        if (patch) index.assets = patch.settings.assets;
+        // Settings others saved meanwhile were merged in: take them where unedited since.
+        if (patch) adoptSettings(index, patch.settings, result);
         if (version === editVersion) {
           clearHistory();
         }
@@ -5728,6 +5745,180 @@ el('publish-button').onclick = () => {
       saving = false;
       heading();
     }
+  })().catch(fail);
+};
+/**
+ * Moves the open server timeline, with unsaved edits, to its latest revision (#165): its
+ * settings take the latest values where not edited here, and the view reads the latest
+ * revision under the edits. Each edit keeps the version it was made on, so saving merges.
+ */
+async function moveToLatest(id: string) {
+  const request = documentRequest,
+    index = sparseWorkspace(),
+    before = remote;
+  const info = await api<RemoteTimeline>(`timelines/${id}`);
+  if (request !== documentRequest || remote !== before || !index || saving) return;
+  if (info.presentation) info.presentation = validatePresentation(info.presentation);
+  if (info.plugins) info.plugins = validateInstalledPlugins(info.plugins);
+  if (info.assets) info.assets = validateAssets(info.assets);
+  if (info.tags) info.tags = validateTags(info.tags);
+  // Settings not edited here are as `before` had them: they take the latest.
+  adoptSettings(index, before!, info);
+  if (
+    info.event_generation !== undefined &&
+    BigInt(info.event_generation) > BigInt(before?.event_generation ?? '0')
+  )
+    follow.addition();
+  remote = info;
+  remoteCache.clear();
+  frameRequest++;
+  liveTransitionPending = true;
+  heading();
+  requestRender();
+}
+/** A save's conflict with what was saved meanwhile (server/save-merge.mjs). */
+interface SaveConflict {
+  kind: 'moment' | 'duration' | 'setting';
+  id: string;
+  title: string | null;
+}
+const SETTING_KEYS = ['title', 'description', 'tags', 'presentation', 'plugins', 'assets'] as const;
+/**
+ * Conflicts the editor chose to keep its own version of: saved without what they were made
+ * on, so they replace what was saved. For the open timeline only, until it saves.
+ */
+let keptVersions: {
+  document: number;
+  moments: Set<string>;
+  durations: Set<string>;
+  settings: Set<string>;
+} | null = null;
+/**
+ * What the edits being saved were made on (#165): each changed moment's and duration's
+ * version when loaded (null for one added) and the settings as loaded. The server merges the
+ * edits onto a newer revision with it, refusing only what conflicts.
+ */
+function saveBase(sent: SavingChanges, saved: RemoteTimeline) {
+  const kept = keptVersions?.document === documentRequest ? keptVersions : null;
+  return {
+    settings: Object.fromEntries(
+      SETTING_KEYS.filter((key) => !kept?.settings.has(key)).map((key) => [
+        key,
+        saved[key] ?? null,
+      ]),
+    ),
+    moments: [...sent.moments]
+      .filter(([id]) => !kept?.moments.has(id))
+      .map(([id, change]) => ({ id, event: change.before ?? null })),
+    durations: [...sent.durations]
+      .filter(([id]) => !kept?.durations.has(id))
+      .map(([id, change]) => ({ id, duration: change.before ?? null })),
+  };
+}
+/**
+ * After a save: settings as saved (with others' merged in), for each the editor has not
+ * changed again since it sent `sent`.
+ */
+function adoptSettings(
+  index: RemoteWorkspace,
+  sent: Partial<Pick<TimelineDocument, (typeof SETTING_KEYS)[number]>>,
+  saved: RemoteTimeline,
+) {
+  for (const key of SETTING_KEYS)
+    if (JSON.stringify(index[key] ?? null) === JSON.stringify(sent[key] ?? null))
+      takeSetting(index, key, saved);
+    else if (key === 'assets') index.assets = { ...(saved.assets ?? {}), ...(index.assets ?? {}) };
+}
+/** Setting `key` of the workspace as `saved` has it. */
+function takeSetting(
+  index: RemoteWorkspace,
+  key: (typeof SETTING_KEYS)[number],
+  saved: RemoteTimeline,
+) {
+  if (key === 'title') index.title = saved.title;
+  if (key === 'description') index.description = saved.description;
+  if (key === 'tags') index.tags = saved.tags ? validateTags(saved.tags) : undefined;
+  if (key === 'presentation')
+    index.presentation = saved.presentation ? validatePresentation(saved.presentation) : undefined;
+  if (key === 'plugins')
+    index.plugins = saved.plugins ? validateInstalledPlugins(saved.plugins) : undefined;
+  if (key === 'assets') index.assets = saved.assets ? validateAssets(saved.assets) : undefined;
+}
+const SETTING_NAMES: Record<string, string> = {
+  title: 'The title',
+  description: 'The description',
+  tags: 'The tags',
+  presentation: 'The time display',
+  plugins: 'The plugins',
+  assets: 'The images',
+};
+let pendingConflicts: SaveConflict[] = [];
+/** Shows a save's conflicts, to keep the editor's versions or take the saved ones. */
+function offerConflicts(conflicts: SaveConflict[], message: string) {
+  pendingConflicts = conflicts;
+  text('conflict-description', message);
+  el('conflict-list').replaceChildren(
+    ...conflicts.map((conflict) => {
+      const item = document.createElement('li');
+      item.textContent =
+        conflict.kind === 'setting'
+          ? (SETTING_NAMES[conflict.id] ?? conflict.id)
+          : `The ${conflict.kind} “${conflict.title || 'Untitled'}”`;
+      return item;
+    }),
+  );
+  el<HTMLDialogElement>('conflict-dialog').showModal();
+}
+el('conflict-mine').onclick = () => {
+  const kept =
+    keptVersions?.document === documentRequest
+      ? keptVersions
+      : {
+          document: documentRequest,
+          moments: new Set(),
+          durations: new Set(),
+          settings: new Set(),
+        };
+  for (const conflict of pendingConflicts)
+    (conflict.kind === 'moment'
+      ? kept.moments
+      : conflict.kind === 'duration'
+        ? kept.durations
+        : kept.settings
+    ).add(conflict.id);
+  keptVersions = kept as typeof keptVersions;
+  el<HTMLDialogElement>('conflict-dialog').close();
+  el('publish-button').click();
+};
+el('conflict-theirs').onclick = () => {
+  const index = sparseWorkspace(),
+    conflicts = pendingConflicts,
+    workspace = documentRequest;
+  el<HTMLDialogElement>('conflict-dialog').close();
+  if (!index || !remote) return;
+  void (async () => {
+    const settings = conflicts.filter((c) => c.kind === 'setting').map((c) => c.id);
+    // The settings as saved now, for those taken from it.
+    const saved = settings.length ? await api<RemoteTimeline>(`timelines/${remote!.id}`) : null;
+    if (workspace !== documentRequest) return;
+    for (const conflict of conflicts) {
+      if (conflict.kind === 'moment') index.discardMoment(conflict.id);
+      if (conflict.kind === 'duration') index.discardDuration(conflict.id);
+      if (selected?.id === conflict.id || openDuration?.duration.id === conflict.id) {
+        el<HTMLDialogElement>('inspector').close();
+        el<HTMLDialogElement>('duration-dialog').close();
+        selected = null;
+      }
+    }
+    for (const key of settings)
+      if ((SETTING_KEYS as readonly string[]).includes(key))
+        takeSetting(index, key as (typeof SETTING_KEYS)[number], saved!);
+    // Undo and redo would bring back what was dropped.
+    clearHistory();
+    remoteCache.clear();
+    frameRequest++;
+    requestRender();
+    el('publish-button').click();
   })().catch(fail);
 };
 async function members() {
@@ -6137,6 +6328,12 @@ if (!offlineHtml)
         return;
       }
       if (!remote || remote.id !== id || remote.revision === revision) return;
+      // Unsaved edits stay; the view follows the latest revision, and saving merges onto it
+      // (#165). Not while saving, or in a pull request's working copy.
+      if (dirty && !saving && !workingProposal && sparseWorkspace()) {
+        await moveToLatest(id);
+        return;
+      }
       if (dirty || saving) {
         el('live-notice').hidden = false;
         return;

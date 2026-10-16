@@ -476,6 +476,21 @@ export class RemoteWorkspace extends TimelineIndex {
       }
     for (const [id] of this.originals) if (!keepMoment(id)) this.originals.delete(id);
   }
+  /**
+   * Drops the unsaved change to moment `id` and what was loaded of it, so its saved version
+   * is read again (choosing the saved version over a conflicting edit, #165).
+   */
+  discardMoment(id: string) {
+    this.changes.delete(id);
+    this.originals.delete(id);
+    super.remove(id);
+  }
+  /** As discardMoment, for duration `id`. */
+  discardDuration(id: string) {
+    this.durationChanges.delete(id);
+    this.durationOriginals.delete(id);
+    super.deleteDuration(id);
+  }
   beginSave(): SavingChanges {
     this.savingIds = new Set(this.changes.keys());
     this.savingDurations = new Set(this.durationChanges.keys());

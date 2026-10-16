@@ -24,7 +24,7 @@ function canonical(value) {
  * (undefined where absent). A side that kept the base takes the other; objects merge field
  * by field when `fields`; anything else changed on both sides is a conflict, named `key`.
  */
-function mergeValue(a, b, c, key, fields, conflicts) {
+export function mergeValue(a, b, c, key, fields, conflicts) {
   if (same(a, b)) return c;
   if (same(a, c) || same(b, c)) return b;
   const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -40,7 +40,7 @@ function mergeValue(a, b, c, key, fields, conflicts) {
   return c;
 }
 /** The settings a merge reconciles field by field; others follow the timeline merged into. */
-const SETTINGS = ['title', 'description', 'tags', 'presentation', 'plugins', 'assets'];
+export const SETTINGS = ['title', 'description', 'tags', 'presentation', 'plugins', 'assets'];
 function conflict(conflicts) {
   return Object.assign(
     new HttpError(

@@ -266,7 +266,8 @@ Every point has a place. Explore the spaces between them.</textarea>
             </div>
           </div>
           <div id="live-notice" class="comparison-settings" hidden role="status">
-            New server changes are available. Your unsaved edits are retained.
+            New server changes are available. Your unsaved edits are retained: Save to server
+            adds them to the latest version, and Reload latest discards them.
             <button id="live-reload">Reload latest</button>
           </div>
           <section id="separation-settings" class="comparison-settings" hidden>
@@ -1052,6 +1053,23 @@ Every point has a place. Explore the spaces between them.</textarea>
       aria-label="Timeline actions"
       hidden
     ></div>
+    <dialog id="conflict-dialog" aria-labelledby="conflict-heading">
+      <div class="dialog-heading">
+        <h2 id="conflict-heading">Edits saved meanwhile</h2>
+        <button type="button" data-close="conflict-dialog" aria-label="Close">×</button>
+      </div>
+      <p id="conflict-description"></p>
+      <ul id="conflict-list" class="conflict-list"></ul>
+      <p>
+        Keep your versions to replace what was saved, or use the saved versions to drop your
+        edits to these. Your other edits are saved either way.
+      </p>
+      <div class="dialog-actions">
+        <button data-close="conflict-dialog" type="button">Cancel</button>
+        <button id="conflict-theirs" type="button">Use the saved versions</button>
+        <button id="conflict-mine" class="button-primary" type="button">Keep my versions</button>
+      </div>
+    </dialog>
     <dialog
       id="delete-dialog"
       aria-labelledby="delete-heading"

@@ -267,7 +267,8 @@ Keep the returned timeline UUID and revision. To update, fetch
 `PUT /api/timelines/<id>` with `{ "revision": "<current>", "document": <document> }`.
 A stale revision returns **409**; fetch again and reconcile instead of
 blindly overwriting. Partial moment updates use the same revision check at
-`PUT /api/timelines/<id>/changes`; see [collaboration API](collaboration.md).
+`PUT /api/timelines/<id>/changes`, or merge onto a newer revision when they say what they
+were made on; see [saving while others save](collaboration.md#saving-while-others-save).
 Use `POST /api/timelines/<id>/query` for bounded windows instead of downloading
 whole large documents. Keys are also accepted from desktop/aggregation clients;
 interactive browser sessions retain their existing CSRF protection.

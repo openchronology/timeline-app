@@ -56,6 +56,8 @@ export async function requestApi<T>(
     if (status < 200 || status >= 300)
       throw Object.assign(new Error((body as { error?: string }).error ?? 'Request failed.'), {
         status,
+        // A save's conflicts with what was saved meanwhile (server/save-merge.mjs).
+        conflicts: (body as { conflicts?: unknown }).conflicts,
       });
     return body as T;
   });
