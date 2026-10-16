@@ -6,6 +6,7 @@ import { searchTimelines } from '../../server/collaboration.mjs';
 import { CompareTray } from '../components/compare-selection.jsx';
 import TimelineList from '../components/timeline-list.jsx';
 import LegacyLinks from '../components/legacy-links.jsx';
+import { profilePath } from '../../src/addresses.ts';
 export const dynamic = 'force-dynamic';
 const pageNumber = (value) =>
   Math.max(1, Math.min(10000, Number.isSafeInteger(Number(value)) ? Number(value) : 1));
@@ -92,7 +93,7 @@ export default async function Dashboard({ searchParams }) {
       {user && (
         <section id="dashboard-favorites">
           <h2>Your favorites</h2>
-          <Link href={'/users/' + encodeURIComponent(user.username)}>Your public profile</Link>
+          <Link href={profilePath(user.username)}>Your public profile</Link>
           {favorites && (
             <TimelineList compareLimit={compareLimit} result={favorites} query={query} favorites />
           )}

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { dismissOnBackdrop } from '../../src/dialogs.ts';
 import { CONTENT_LABELS } from '../../src/content-labels.ts';
 import { api } from '../lib/api.js';
+import { RESERVED_NAMES, slugFromTitle, timelinePath } from '../../src/addresses.ts';
 /** A storage size, as the account page writes it. */
 const size = (bytes) =>
   bytes >= 1048576
@@ -15,6 +16,7 @@ export default function TimelineSettings({
   initialMembers,
   calendar = false,
   listing = null,
+  origin = '',
 }) {
   const router = useRouter(),
     dialog = useRef(null),
@@ -22,7 +24,8 @@ export default function TimelineSettings({
     [timeline, setTimeline] = useState(initial),
     [members, setMembers] = useState(initialMembers),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [addressError, setAddressError] = useState('');
   useEffect(() => dismissOnBackdrop(dialog.current), []);
   useEffect(() => dismissOnBackdrop(historyDialog.current), []);
   const base = 'timelines/' + timeline.id;
@@ -30,6 +33,7 @@ export default function TimelineSettings({
     if (busy) return;
     setBusy(true);
     setError('');
+    setAddressError('');
     try {
       const s = await api('session');
       const value = await api(base + path, { method, csrf: s.csrf, data });
@@ -39,9 +43,11 @@ export default function TimelineSettings({
       }
       if (path === '/members') setMembers((await api(base + '/members')).members);
       if (path === '') router.replace('/');
+      // Its page moves to its new address (#148).
+      else if (data && 'slug' in data) router.replace(timelinePath(value) + '/settings');
       else router.refresh();
     } catch (e) {
-      setError(e.message);
+      (data && 'slug' in data ? setAddressError : setError)(e.message);
     } finally {
       setBusy(false);
     }
@@ -83,7 +89,7 @@ export default function TimelineSettings({
           </p>
         )}
         <p>
-          Share: <a href={'/timelines/' + timeline.id}>{'/timelines/' + timeline.id}</a>
+          Share: <a href={timelinePath(timeline)}>{origin + timelinePath(timeline)}</a>
         </p>
         {timeline.publication_restricted && (
           <p className="muted">This copy contains private upstream data and must remain private.</p>
@@ -100,6 +106,61 @@ export default function TimelineSettings({
         <p className="muted">
           Forks have independent owners and collaborators. Revoking access stops future upstream
           reads and syncs, but cannot erase copies already made.
+        </p>
+      </section>
+      <section>
+        <h2>Address</h2>
+        {RESERVED_NAMES.has(timeline.owner) ? (
+          <p className="muted">
+            @{timeline.owner} is also the name of one of the site&apos;s own pages, so its timelines
+            are at <code>/timelines/</code> and their IDs.
+          </p>
+        ) : (
+          <form
+            className="address-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void mutate('/settings', 'PATCH', {
+                slug: new FormData(e.currentTarget).get('slug'),
+              });
+            }}
+          >
+            <label>
+              <span>
+                {origin}/{timeline.owner}/
+              </span>
+              <input
+                name="slug"
+                key={timeline.slug ?? ''}
+                defaultValue={timeline.slug ?? slugFromTitle(timeline.title ?? '')}
+                aria-label="Address"
+                placeholder="for example fall-of-rome"
+                pattern="[a-z0-9][a-z0-9_\-]{0,63}"
+                title="1–64 lowercase letters, digits, hyphens or underscores, starting with a letter or digit"
+                maxLength={64}
+                required
+              />
+            </label>
+            <button disabled={busy}>Save address</button>
+            {timeline.slug && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => mutate('/settings', 'PATCH', { slug: null })}
+              >
+                Use its ID
+              </button>
+            )}
+            {addressError && (
+              <p className="error" role="alert">
+                {addressError}
+              </p>
+            )}
+          </form>
+        )}
+        <p className="muted">
+          Without an address of its own, a timeline is at its ID. Links to its earlier addresses
+          keep leading here, until another of your timelines takes one of them.
         </p>
       </section>
       <section>

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import AccountAccess from './account-access.jsx';
 import { api } from '../lib/api.js';
 import ModerationDecisions from './moderation-decisions.jsx';
+import { profilePath } from '../../src/addresses.ts';
 export default function Account({ returnTo = '/', login = false }) {
   const router = useRouter();
   const [session, setSession] = useState(null),
@@ -171,9 +172,7 @@ export default function Account({ returnTo = '/', login = false }) {
       </h1>
       {session?.user && !anonymous && (
         <p>
-          <Link href={'/users/' + encodeURIComponent(session.user.username)}>
-            Your public profile
-          </Link>
+          <Link href={profilePath(session.user.username)}>Your public profile</Link>
         </p>
       )}
       {!session && !error && <p role="status">Loading your session…</p>}

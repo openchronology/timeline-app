@@ -1480,3 +1480,21 @@ CREATE TABLE IF NOT EXISTS oc_age_refusals (
   browser_hash text PRIMARY KEY,
   expires_at timestamptz NOT NULL
 );
+-- Timeline addresses (#148; src/addresses.ts): `/<owner>/<slug>`, unique among its owner's
+-- timelines. Without one, a timeline is at `/<owner>/<id>`.
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS slug text;
+ALTER TABLE oc_timelines DROP CONSTRAINT IF EXISTS oc_timelines_slug;
+ALTER TABLE oc_timelines ADD CONSTRAINT oc_timelines_slug CHECK(
+  slug ~ '^[a-z0-9][a-z0-9_-]{0,63}$'
+  AND slug !~* '^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$');
+CREATE UNIQUE INDEX IF NOT EXISTS oc_timelines_owner_slug ON oc_timelines(owner_id,slug)
+  WHERE slug IS NOT NULL;
+-- Slugs a timeline had before: their addresses lead to it until another of its owner's
+-- timelines takes them.
+CREATE TABLE IF NOT EXISTS oc_timeline_former_slugs (
+  owner_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE,
+  slug text NOT NULL,
+  timeline_id uuid NOT NULL REFERENCES oc_timelines ON DELETE CASCADE,
+  PRIMARY KEY(owner_id,slug)
+);
+CREATE INDEX IF NOT EXISTS oc_timeline_former_slugs_timeline ON oc_timeline_former_slugs(timeline_id);

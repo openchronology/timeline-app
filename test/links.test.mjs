@@ -47,8 +47,21 @@ test('fragments read back as the same links', () => {
   assert.equal(linkFragment({ kind: 'moment', id: 'leg:2' }), 'moment/leg%3A2');
 });
 test('shared addresses give moments and durations pages of their own', () => {
-  assert.equal(sharePath(id, null), '/timelines/' + id);
-  assert.equal(sharePath(id, { kind: 'moment', id: 'leg:2' }), `/timelines/${id}/moments/leg%3A2`);
-  assert.equal(sharePath(id, { kind: 'duration', id: 'x' }), `/timelines/${id}/durations/x`);
-  assert.equal(sharePath(id, { kind: 'search', text: 'storm' }), `/timelines/${id}#search/storm`);
+  assert.equal(sharePath({ id }, null), '/timelines/' + id);
+  assert.equal(
+    sharePath({ id }, { kind: 'moment', id: 'leg:2' }),
+    `/timelines/${id}/moments/leg%3A2`,
+  );
+  assert.equal(sharePath({ id }, { kind: 'duration', id: 'x' }), `/timelines/${id}/durations/x`);
+  assert.equal(
+    sharePath({ id }, { kind: 'search', text: 'storm' }),
+    `/timelines/${id}#search/storm`,
+  );
+  // At its owner's name and slug, or ID (#148).
+  assert.equal(sharePath({ id, owner: 'ada', slug: null }, null), `/ada/${id}`);
+  assert.equal(
+    sharePath({ id, owner: 'ada', slug: 'voyages' }, { kind: 'moment', id: 'leg:2' }),
+    '/ada/voyages/moments/leg%3A2',
+  );
+  assert.equal(sharePath({ id, owner: 'admin', slug: 'voyages' }, null), '/timelines/' + id);
 });

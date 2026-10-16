@@ -1,89 +1,19 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-import Link from 'next/link';
-import { CompareTray } from '../../../components/compare-selection.jsx';
-import { notFound } from 'next/navigation';
-import { accountCompareLimit, currentSession } from '../../../lib/session.js';
-import { searchTimelines } from '../../../../server/collaboration.mjs';
-import TimelineList from '../../../components/timeline-list.jsx';
-import { siteName } from '../../../lib/sharing.js';
-import { minor } from '../../../../server/auth.mjs';
-import ReportLink from '../../../components/report-link.jsx';
+// Profiles were here before they were at /<username> (#148); those whose names the site's own
+// pages use still are.
+import { permanentRedirect } from 'next/navigation';
+import Profile, { profileMetadata } from '../../../components/profile.jsx';
+import { profilePath } from '../../../../src/addresses.ts';
 export const dynamic = 'force-dynamic';
-const pageNumber = (n) =>
-  Math.max(1, Math.min(10000, Number.isSafeInteger(Number(n)) ? Number(n) : 1));
 export async function generateMetadata({ params }) {
-  const { username } = await params;
-  const title = '@' + username,
-    description = `Public timelines and favorites of @${username} on ${siteName()}.`,
-    url = '/users/' + encodeURIComponent(username);
-  return {
-    title: `${title} · ${siteName()}`,
-    description,
-    alternates: { canonical: url },
-    openGraph: { type: 'profile', siteName: siteName(), title, description, url, username },
-    twitter: { card: 'summary', title, description },
-  };
+  return profileMetadata((await params).username);
 }
-export default async function Profile({ params, searchParams }) {
-  const { username } = await params,
-    query = await searchParams,
-    current = await currentSession();
-  if (!current.services.pool || typeof username !== 'string' || username.length > 64) notFound();
-  const { rows } = await current.services.pool.query(
-    'SELECT username,avatar_url,birth_year FROM oc_users WHERE username=$1 AND NOT is_disabled',
-    [username],
-  );
-  if (!rows[0]) notFound();
-  const [owned, favorites] = await Promise.all([
-    searchTimelines(current.services.pool, current.user?.id, {
-      scope: 'public',
-      owner: username,
-      page: pageNumber(query.page),
-    }),
-    searchTimelines(current.services.pool, current.user?.id, {
-      scope: 'public',
-      starredBy: username,
-      page: pageNumber(query.favoritePage),
-      sort: 'age',
-    }),
-  ]);
-  const basePath = '/users/' + encodeURIComponent(username),
-    pages = { page: String(owned.page), favoritePage: String(favorites.page) };
-  return (
-    <main className="platform">
-      <Link href="/">All timelines</Link>
-      {rows[0].avatar_url && (
-        <img className="account-avatar" src={rows[0].avatar_url} alt="" width={64} height={64} />
-      )}
-      <h1>@{username}</h1>
-      {current.user?.username !== username && (
-        <ReportLink target={{ kind: 'user', id: username }} title={'@' + username} />
-      )}
-      <CompareTray limit={accountCompareLimit(current)} signedIn={!!current.user} />
-      <section>
-        <h2>Public timelines</h2>
-        <TimelineList
-          compareLimit={accountCompareLimit(current)}
-          result={owned}
-          query={pages}
-          basePath={basePath}
-          guest={!current.user}
-        />
-      </section>
-      {/* A minor's favorites stay private (the UK Children's Code; #166). */}
-      {!minor(rows[0].birth_year) && (
-        <section>
-          <h2>Public favorites</h2>
-          <TimelineList
-            compareLimit={accountCompareLimit(current)}
-            result={favorites}
-            query={pages}
-            basePath={basePath}
-            favorites
-            guest={!current.user}
-          />
-        </section>
-      )}
-    </main>
-  );
+export default async function LegacyProfile({ params, searchParams }) {
+  const { username } = await params;
+  const path = profilePath(username.toLowerCase());
+  if (!path.startsWith('/users/')) {
+    const query = new URLSearchParams(await searchParams).toString();
+    permanentRedirect(path + (query ? '?' + query : ''));
+  }
+  return <Profile username={username} searchParams={searchParams} />;
 }

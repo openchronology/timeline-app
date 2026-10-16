@@ -14,6 +14,7 @@ import {
   recoveryHash,
 } from './security-crypto.mjs';
 import { queueMail, flushMail } from './mail.mjs';
+import { RESERVED_NAMES } from '../dist/core.mjs';
 const generic = {
   message:
     'If the account is eligible, an email will arrive shortly. Check your inbox and spam folder.',
@@ -85,6 +86,9 @@ export class AccountSecurity {
     const username = typeof body.username === 'string' ? body.username.toLowerCase() : '';
     if (!/^[a-z0-9][a-z0-9_-]{2,31}$/.test(username))
       throw new HttpError(400, 'Use a 3–32 character username.');
+    // Profiles are at /<username> (#148): not the site's own pages.
+    if (RESERVED_NAMES.has(username))
+      throw new HttpError(400, 'That username is taken. Choose another.');
     await this.refuseAgain(req);
     const email = emailAddress(body.email),
       password = newPassword(body.password, body.passwordConfirmation, username),

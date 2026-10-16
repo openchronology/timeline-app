@@ -3,6 +3,7 @@ import Editor from '../../../components/editor.jsx';
 import TimelineSummary from '../../../components/timeline-summary.jsx';
 import PreparingCopy from '../../../components/preparing-copy.jsx';
 import { accessibleTimeline, versionInfo } from '../../../lib/timeline.js';
+import { timelinePath } from '../../../../src/addresses.ts';
 import {
   firstMoments,
   pageMetadata,
@@ -15,7 +16,7 @@ export async function generateMetadata({ params }) {
   const { timeline } = await accessibleTimeline(id, { bounds: true, preparing: true });
   return pageMetadata(
     timeline,
-    '/timelines/' + timeline.id,
+    timelinePath(timeline),
     timelineTitle(timeline),
     timelineDescription(timeline),
   );
@@ -46,8 +47,10 @@ export default async function TimelinePage({ params }) {
       <TimelineSummary timeline={timeline} moments={moments} />
       <Editor
         id={id}
+        path={timelinePath(timeline)}
         comparisonSources={comparisonSources.map((source) => ({
           id: source.id,
+          path: timelinePath(source),
           title: source.title,
         }))}
         canShare={timeline.canShare}

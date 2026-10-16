@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import Editor from '../../../../../components/editor.jsx';
 import TimelineSummary from '../../../../../components/timeline-summary.jsx';
 import { accessibleTimeline, versionInfo } from '../../../../../lib/timeline.js';
+import { timelinePath } from '../../../../../../src/addresses.ts';
 import {
   durationOf,
   durationTitle,
@@ -30,7 +31,7 @@ export async function generateMetadata({ params }) {
   const extent = `${presentTime(timeline, band.first)} – ${presentTime(timeline, band.last)}`;
   return pageMetadata(
     timeline,
-    sharedPath(timeline.id, { kind: 'duration', id: band.id }),
+    sharedPath(timeline, { kind: 'duration', id: band.id }),
     `${durationTitle(duration)} · ${timelineTitle(timeline)}`,
     excerpt(`${extent}. ${duration.metadata?.description ?? ''}`),
   );
@@ -49,6 +50,7 @@ export default async function DurationPage({ params }) {
       </TimelineSummary>
       <Editor
         id={timeline.id}
+        path={timelinePath(timeline)}
         focus={'duration/' + encodeURIComponent(band.id)}
         canShare={timeline.canShare}
         timeline={versionInfo(timeline)}

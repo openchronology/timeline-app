@@ -171,8 +171,11 @@ try {
     data: document,
   });
   timelines.push(timeline.id);
-  const base = '/timelines/' + timeline.id,
-    api = '/api' + base;
+  // Its page is at its owner's name and its ID until it has a slug (#148).
+  const ownerName = 'nextowner_' + suffix,
+    legacy = '/timelines/' + timeline.id,
+    base = '/' + ownerName + '/' + timeline.id,
+    api = '/api' + legacy;
   const ownDashboard = await owner.request('/');
   assert.match(ownDashboard, /id="dashboard-mine"/);
   assert(ownDashboard.includes(`href="${base}"`));
@@ -183,12 +186,13 @@ try {
   );
   await owner.request(api + '/star', { method: 'POST', data: { starred: true } });
   assert.match(await owner.request('/'), /id="dashboard-favorites"/);
-  const profileUrl = '/users/nextowner_' + suffix;
+  const profileUrl = '/' + ownerName;
   assert(
     !(await guest.request(profileUrl)).includes(`href="${base}"`),
     'Private favorites leaked into public profile',
   );
   await guest.request(base, { status: 404 });
+  await guest.request(legacy, { status: 404 });
   await guest.request(api + '/document', { status: 404 });
   await contributor.request(base + '/settings', { status: 404 });
   // Owners see data retention, which needs a calendar display (this timeline has none).
@@ -226,11 +230,22 @@ try {
   });
   const profile = await guest.request(profileUrl);
   assert.match(profile, /Public favorites/);
+  // Profiles were at /users/<username>, and names the site's pages use are not profiles.
+  const movedProfile = await guest.request('/users/' + ownerName + '?page=2', {
+    status: 308,
+    headers: true,
+  });
+  assert.equal(movedProfile.headers.get('location'), profileUrl + '?page=2');
+  await guest.request('/users', { status: 404 });
+  await guest.request('/' + ownerName.toUpperCase(), { status: 308 });
   assert(profile.includes(`href="${base}"`));
   for (const sort of ['stars', 'popularity', 'alphabetical', 'age', 'relevance'])
     assert((await guest.request('/?search=' + term + '&sort=' + sort)).includes(`href="${base}"`));
   const publicPage = await guest.request(base);
   assert.match(publicPage, /title="Timeline editor"/);
+  // Its older address leads to its page, keeping the rest of the address.
+  const moved = await guest.request(legacy + '/pulls?page=1', { status: 307, headers: true });
+  assert.equal(moved.headers.get('location'), base + '/pulls?page=1');
   assert(publicPage.includes('/editor/frame#timeline/' + timeline.id));
   assert(
     (await guest.request('/?search=' + term + '&tag=framework-ci')).includes(`href="${base}"`),
@@ -272,9 +287,10 @@ try {
     data: { revision: timeline.revision },
   });
   timelines.push(fork.id);
-  const forkApi = '/api/timelines/' + fork.id;
+  const forkApi = '/api/timelines/' + fork.id,
+    forkBase = '/' + contributorName + '/' + fork.id;
   // Timeline actions are mounted into the editor frame after hydration.
-  const forkPage = await contributor.request('/timelines/' + fork.id);
+  const forkPage = await contributor.request(forkBase);
   assert(forkPage.includes('/editor/frame#timeline/' + fork.id));
   assert(forkPage.includes(timeline.id));
   // While a large copy's index is still being copied, its page waits for it, its other pages
@@ -282,19 +298,16 @@ try {
   await pool.query('UPDATE oc_timelines SET preparing_revision_id=head_revision_id WHERE id=$1', [
     fork.id,
   ]);
-  const waiting = await contributor.request('/timelines/' + fork.id);
+  const waiting = await contributor.request(forkBase);
   assert.match(waiting, /Preparing your copy/);
   assert(!waiting.includes('/editor/frame#timeline/' + fork.id));
-  await contributor.request('/timelines/' + fork.id + '/history', { status: 307 });
+  await contributor.request(forkBase + '/history', { status: 307 });
   assert.equal((await contributor.request(forkApi)).preparing, true);
   await contributor.request(forkApi + '/document', { status: 409 });
   await pool.query('UPDATE oc_timelines SET preparing_revision_id=NULL WHERE id=$1', [fork.id]);
-  assert((await contributor.request('/timelines/' + fork.id)).includes('/editor/frame#timeline/'));
-  assert.match(
-    await contributor.request('/timelines/' + fork.id + '/pulls/new'),
-    /Open pull request/,
-  );
-  assert.match(await contributor.request('/timelines/' + fork.id + '/sync'), /Sync saved fork/);
+  assert((await contributor.request(forkBase)).includes('/editor/frame#timeline/'));
+  assert.match(await contributor.request(forkBase + '/pulls/new'), /Open pull request/);
+  assert.match(await contributor.request(forkBase + '/sync'), /Sync saved fork/);
   const saved = await contributor.request(forkApi, {
     method: 'PUT',
     data: { revision: fork.revision, document: { ...merged.document, title: 'Fork title' } },
@@ -314,7 +327,7 @@ try {
   assert.equal(history.revisions.length, 2);
   const firstCheckpoint = history.revisions[1].id;
   assert.match(
-    await contributor.request('/timelines/' + fork.id + '/history/' + firstCheckpoint),
+    await contributor.request(forkBase + '/history/' + firstCheckpoint),
     /Export this checkpoint/,
   );
   assert.equal(
@@ -347,7 +360,7 @@ try {
   assert.match(checkpoint.headers.get('content-disposition'), /\.ochx"/);
   assert.equal(checkpoint.value.title, merged.document.title);
   assert.match(
-    await contributor.request('/timelines/' + fork.id + '/history/' + firstCheckpoint),
+    await contributor.request(forkBase + '/history/' + firstCheckpoint),
     /href="\/api\/timelines\/[0-9a-f-]+\/history\/[0-9a-f-]+\?download=1"/,
   );
   await guest.request(forkApi + '/document?download=1', { status: 404 });
@@ -360,7 +373,7 @@ try {
   // Its owner can stop keeping its saved history (#136): its settings say what that frees,
   // its past checkpoints are listed but say they are not kept, and it proposes nothing.
   assert.match(
-    await contributor.request('/timelines/' + fork.id + '/settings'),
+    await contributor.request(forkBase + '/settings'),
     /Saved history[\s\S]*Stop keeping saved history[\s\S]*freeing about/,
   );
   await contributor.request(forkApi + '/settings', {
@@ -374,21 +387,18 @@ try {
   });
   assert.equal(quiet.keep_history, false);
   assert.equal(quiet.history_bytes, 0);
+  assert.match(await contributor.request(forkBase + '/settings'), /Keep saved history from now on/);
   assert.match(
-    await contributor.request('/timelines/' + fork.id + '/settings'),
-    /Keep saved history from now on/,
-  );
-  assert.match(
-    await contributor.request('/timelines/' + fork.id + '/history'),
+    await contributor.request(forkBase + '/history'),
     /doesn.{1,8}t keep saved history[\s\S]*not kept/,
   );
   await contributor.request(forkApi + '/history/' + firstCheckpoint, { status: 409 });
   assert.match(
-    await contributor.request('/timelines/' + fork.id + '/history/' + firstCheckpoint),
+    await contributor.request(forkBase + '/history/' + firstCheckpoint),
     /Revision not kept/,
   );
   assert.match(
-    await contributor.request('/timelines/' + fork.id + '/pulls/new'),
+    await contributor.request(forkBase + '/pulls/new'),
     /does not keep saved history, so it cannot propose/,
   );
   const kept = await contributor.request(forkApi + '/settings', {
@@ -397,10 +407,72 @@ try {
   });
   assert.equal(kept.keep_history, true);
   assert.equal((await contributor.request(forkApi + '/history')).revisions[0].kind, 'baseline');
+  // A slug of its own (#148): /<owner>/<slug>, which its other addresses lead to. Setting it
+  // leaves the timeline's revision as it is.
+  const revision = (await owner.request(api)).revision;
+  for (const slug of ['Not a slug!', '-dash', 'a'.repeat(65), randomUUID()])
+    await owner.request(api + '/settings', { method: 'PATCH', status: 400, data: { slug } });
+  timeline = await owner.request(api + '/settings', { method: 'PATCH', data: { slug: term } });
+  assert.equal(timeline.slug, term);
+  assert.equal(timeline.revision, revision);
+  const address = '/' + ownerName + '/' + term;
+  assert.match(await guest.request(address), /title="Timeline editor"/);
+  for (const [from, to] of [
+    [base, address],
+    [legacy + '/history', address + '/history'],
+    ['/' + ownerName.toUpperCase() + '/' + term.toUpperCase(), address],
+  ])
+    assert.equal(
+      (await guest.request(from, { status: 307, headers: true })).headers.get('location'),
+      to,
+    );
+  assert((await guest.request(profileUrl)).includes(`href="${address}"`));
+  const settings = await owner.request(address + '/settings');
+  assert(settings.includes('name="slug"') && settings.includes(`value="${term}"`));
+  const momentId = merged.document.events[0].id;
+  assert.match(
+    await guest.request(address + '/moments/' + encodeURIComponent(momentId)),
+    new RegExp(`rel="canonical" href="${origin}${address}/moments/`),
+  );
+  const embedded = await guest.request(
+    '/api/oembed?url=' + encodeURIComponent(origin + address + '/moments/' + momentId),
+  );
+  assert.equal(embedded.author_url, origin + profileUrl);
+  assert(embedded.html.includes('/embed/' + timeline.id));
+  assert(
+    (await guest.request('/sitemap.xml')).includes(`<loc>${origin}${address}</loc>`),
+    'The sitemap lists its address.',
+  );
+  // Another slug: the old one still leads to it, until another of its owner's timelines
+  // takes it; a slug its owner already uses is refused.
+  timeline = await owner.request(api + '/settings', {
+    method: 'PATCH',
+    data: { slug: term + '-readdress' },
+  });
+  assert.equal(
+    (await guest.request(address, { status: 307, headers: true })).headers.get('location'),
+    address + '-readdress',
+  );
+  const other = '/api/timelines/' + compiled.id + '/settings';
+  const taken = await owner.request(other, {
+    method: 'PATCH',
+    status: 409,
+    data: { slug: term + '-readdress' },
+  });
+  assert.equal(taken.error, `Another timeline of @${ownerName} is at ${address}-readdress.`);
+  await owner.request(other, { method: 'PATCH', data: { slug: term } });
+  assert.match(await owner.request(address), /title="Timeline editor"/);
+  assert(!(await owner.request(address)).includes('/editor/frame#timeline/' + timeline.id));
+  await guest.request(address, { status: 404 });
+  // Without a slug, it is at its ID again.
+  timeline = await owner.request(api + '/settings', { method: 'PATCH', data: { slug: null } });
+  assert.equal(timeline.slug, null);
+  assert.match(await guest.request(base), /title="Timeline editor"/);
+  await guest.request('/' + ownerName + '/no-such-slug', { status: 404 });
   await owner.request('/api/auth/logout', { method: 'POST', data: {} });
   assert.doesNotMatch(await owner.request('/'), /id="dashboard-mine"/);
   console.log(
-    'PASS Next.js/PostgreSQL accounts, private SSR access, public full-text search, stars, private favorites, public profiles, sorting, sharing, proposal discussion, writer-only merge and optional saved history.',
+    'PASS Next.js/PostgreSQL accounts, private SSR access, public full-text search, stars, private favorites, public profiles, sorting, sharing, proposal discussion, writer-only merge, optional saved history and addresses.',
   );
 } catch (e) {
   console.error(logs);

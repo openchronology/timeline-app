@@ -208,6 +208,7 @@ export async function checkAccounts(browser) {
               revision: '1',
               event_count: '0',
               owner: user?.username,
+              slug: 'notes',
               visibility: 'private',
               canEdit: true,
               canShare: true,
@@ -339,6 +340,8 @@ export async function checkAccounts(browser) {
     );
     await poll(() => nativePage.locator('#publish-button').isEnabled());
     await nativePage.locator('#share-button').click();
+    // Timelines are at their owner's name and slug (#148), but "account" is also one of the
+    // site's own pages, so its timelines stay at their IDs.
     assert.equal(
       await nativePage.locator('#sharing-link').textContent(),
       'https://timescale.info/timelines/00000000-0000-0000-0000-000000000001',

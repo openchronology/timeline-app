@@ -7,9 +7,28 @@ them, previews for social sites and search engines, and embeds for other website
 here applies to timelines on the server; anyone can follow a link to a public timeline, while
 a private one opens only for its members.
 
+## Addresses
+
+Profiles and timelines have addresses like GitHub's ([#148](https://github.com/openchronology/timeline-app/issues/148)):
+
+| Address              | Is                                                                                      |
+| -------------------- | --------------------------------------------------------------------------------------- |
+| `/<username>`        | A profile: its public timelines and favorites.                                          |
+| `/<username>/<slug>` | A timeline, once its owner has given it a slug.                                         |
+| `/<username>/<id>`   | A timeline without a slug. Its ID is a detail of it, so this is its address until then. |
+| `/timelines/<id>`    | Any timeline, as before. It leads to the timeline's address.                            |
+
+Everything under a timeline's page is under its address too: `/<username>/<slug>/history`, `…/pulls`, `…/settings`, and its moments' and durations' pages below.
+
+- **Choosing a slug:** its owner sets it in **Sharing & settings**, under **Address**. A slug is 1–64 lowercase letters, digits, hyphens or underscores, starting with a letter or digit, and unique among its owner's timelines. The field suggests one made from the title. **Use its ID** removes it.
+- **Other addresses lead to it:** its ID, `/timelines/<id>`, a slug it had before and capitals all redirect to the address, with the rest of the path and the query. A slug it had before keeps leading to it until another of its owner's timelines takes that slug.
+- **Private timelines:** the redirect happens only once the reader may open it, so an address reveals nothing of a private timeline to anyone else. Its pages are not found for them at any address.
+- **Names the site uses:** usernames that are, or may become, the site's own pages (`login`, `admin`, `timelines`, `users`, `settings` and others; `RESERVED_NAMES` in `src/addresses.ts`) can't be registered. An account that already has one, such as a first administrator named `admin`, keeps its profile at `/users/<username>` and its timelines at `/timelines/<id>`. `/users/<username>` otherwise redirects to `/<username>`.
+- **Preview images and embeds** stay at the timeline's ID (`/timelines/<id>/opengraph-image`, `/embed/<id>`).
+
 ## Links
 
-A timeline's page is `/timelines/<id>`. A fragment after it names what to look at:
+A timeline's page is at its [address](#addresses). A fragment after it names what to look at:
 
 | Fragment                | Opens                                                           |
 | ----------------------- | --------------------------------------------------------------- |
@@ -21,8 +40,8 @@ A timeline's page is `/timelines/<id>`. A fragment after it names what to look a
 IDs and words are percent-encoded (`#moment/leg%3A2` for `leg:2`). The address follows what is
 open: opening a moment adds its fragment, and closing it removes it, so the address bar can be
 copied at any time. Moments and durations also have pages of their own,
-`/timelines/<id>/moments/<id>` and `/timelines/<id>/durations/<id>`, which open the timeline at
-them the same way. They are what **Share** offers, because social sites and search engines read
+`/<username>/<slug>/moments/<id>` and `/<username>/<slug>/durations/<id>`, which open the
+timeline at them the same way. They are what **Share** offers, because social sites and search engines read
 pages but not fragments.
 
 The same fragments work for embeds (`/embed/<id>#moment/…`) and in the editor's own address
@@ -101,10 +120,11 @@ services that discover oEmbed from a page (such as Iframely and Embedly, and the
 editors that use them) can turn a pasted link into the timeline itself:
 
 ```
-GET /api/oembed?url=https://timescale.info/timelines/<id>&maxwidth=600&format=json
+GET /api/oembed?url=https://timescale.info/<username>/<slug>&maxwidth=600&format=json
 ```
 
 It answers a `rich` embed with the iframe above (opening at the page's moment or duration, or at
 the link's fragment), its size (at most 800 × 480, within `maxwidth` and `maxheight`), the
-title and owner, and the preview image as its thumbnail. Only `json` is available; addresses of
-other sites, and timelines that are not public, are not found.
+title and owner, and the preview image as its thumbnail. Any of a timeline's addresses will do.
+Only `json` is available; addresses of other sites, and timelines that are not public, are not
+found.

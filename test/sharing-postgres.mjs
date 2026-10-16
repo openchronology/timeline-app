@@ -86,7 +86,7 @@ const unescape = (text) => text.replaceAll('&amp;', '&').replaceAll('&quot;', '"
 
 const owner = client('192.0.2.111'),
   guest = client('192.0.2.112');
-let userId, timelineId, browser, embedder;
+let userId, timelineId, otherTimelineId, browser, embedder;
 try {
   for (let i = 0; i < 100 && !exited; i++) {
     try {
@@ -138,7 +138,8 @@ try {
     data: document,
   });
   timelineId = created.id;
-  const base = '/timelines/' + timelineId,
+  // Its pages are at its owner's name and its ID (#148).
+  const base = '/' + username + '/' + timelineId,
     momentPath = base + '/moments/leg%3A2',
     durationPath = base + '/durations/crossing';
 
@@ -147,6 +148,7 @@ try {
   assert.equal(meta(privatePage, 'robots'), 'noindex, nofollow');
   assert(!privatePage.includes('application/json+oembed'));
   await guest.request(base, { status: 404 });
+  await guest.request('/timelines/' + timelineId, { status: 404 });
   await guest.request(momentPath, { status: 404 });
   const privateEmbed = await guest.request('/embed/' + timelineId, { status: 404, raw: true });
   assert.match(privateEmbed.headers.get('content-security-policy'), /frame-ancestors \*/);
@@ -156,14 +158,14 @@ try {
   const privateImage = await guest.request(base + '/opengraph-image', { raw: true });
   assert.equal(privateImage.headers.get('content-type'), 'image/png');
   // An ID-only moment lookup, as links use.
-  const looked = await owner.request(`/api${base}/query`, {
+  const looked = await owner.request(`/api/timelines/${timelineId}/query`, {
     method: 'POST',
     data: { kind: 'moment', id: 'leg:2' },
   });
   assert.equal(looked.event.metadata.title, 'Storm ' + suffix);
   assert.equal(
     (
-      await owner.request(`/api${base}/query`, {
+      await owner.request(`/api/timelines/${timelineId}/query`, {
         method: 'POST',
         data: { kind: 'moment', id: 'none' },
       })
@@ -171,7 +173,10 @@ try {
     null,
   );
 
-  await owner.request(`/api${base}/settings`, { method: 'PATCH', data: { visibility: 'public' } });
+  await owner.request(`/api/timelines/${timelineId}/settings`, {
+    method: 'PATCH',
+    data: { visibility: 'public' },
+  });
 
   // The timeline's page: title, description, canonical address, link previews and oEmbed.
   const page = await guest.request(base);
@@ -187,7 +192,8 @@ try {
   assert.equal(meta(page, 'robots'), null);
   assert(page.includes(`<link rel="canonical" href="${origin + base}"/>`));
   const image = meta(page, 'og:image');
-  assert(image.startsWith(origin + base + '/opengraph-image'), image);
+  // Next names preview images by the route they are in, at the timeline's ID.
+  assert(image.startsWith(`${origin}/timelines/${timelineId}/opengraph-image`), image);
   assert.equal(meta(page, 'og:image:width'), '1200');
   assert.match(page, /type="application\/json\+oembed"/);
   // Its moments, in text and linked to their own pages.
@@ -204,7 +210,11 @@ try {
   const moment = await guest.request(momentPath);
   assert.equal(meta(moment, 'og:title'), `Storm ${suffix} · Voyages of ${suffix}`);
   assert.equal(meta(moment, 'og:url'), origin + momentPath);
-  assert(meta(moment, 'og:image').startsWith(origin + momentPath + '/opengraph-image'));
+  assert(
+    meta(moment, 'og:image').startsWith(
+      `${origin}/timelines/${timelineId}/moments/leg%3A2/opengraph-image`,
+    ),
+  );
   assert(moment.includes(`#timeline/${timelineId}/moment/leg%3A2`));
   const momentImage = await guest.request(meta(moment, 'og:image').slice(origin.length), {
     raw: true,
@@ -250,7 +260,8 @@ try {
   assert.deepEqual([narrow.width, narrow.height], [400, 240]);
   await oembed(origin + base, '&format=xml', 501);
   await oembed('https://example.com' + base, '', 404);
-  await oembed(origin + '/users/' + username, '', 404);
+  await oembed(origin + '/' + username, '', 404);
+  assert.equal((await oembed(origin + '/timelines/' + timelineId)).title, answer.title);
 
   // Search engines: what to crawl, and where the public timelines are.
   const robots = await guest.request('/robots.txt');
@@ -259,8 +270,8 @@ try {
   assert(robots.includes(`Sitemap: ${origin}/sitemap.xml`));
   const sitemap = await guest.request('/sitemap.xml');
   assert(sitemap.includes(`<loc>${origin + base}</loc>`));
-  assert(sitemap.includes(`<loc>${origin}/users/${username}</loc>`));
-  const profile = await guest.request('/users/' + username);
+  assert(sitemap.includes(`<loc>${origin}/${username}</loc>`));
+  const profile = await guest.request('/' + username);
   assert.equal(meta(profile, 'og:title'), '@' + username);
 
   // In a browser: links open what they name, the address follows what is open, and the
@@ -274,9 +285,7 @@ try {
   assert.equal(await editor().locator('#event-title').inputValue(), 'Storm ' + suffix);
   assert(await editor().locator('#event-title').isDisabled());
   await editor().locator('#close-inspector').click();
-  await tab.waitForFunction(
-    () => location.hash === '' && location.pathname.startsWith('/timelines/'),
-  );
+  await tab.waitForFunction((path) => location.hash === '' && location.pathname === path, base);
   // Opening a moment puts it in the address.
   await tab.goto(origin + momentPath);
   await editor().locator('#inspector').waitFor({ state: 'visible' });
@@ -357,16 +366,46 @@ try {
   assert(await embedded.locator('#event-title').isDisabled());
   assert(!(await embedded.locator('#add-button').isVisible()));
   assert(!(await embedded.locator('#moment-share').isVisible()));
-  assert.equal(
-    await embedded.locator('#embed-open').getAttribute('href'),
-    `/timelines/${timelineId}/moments/leg%3A2`,
-  );
+  assert.equal(await embedded.locator('#embed-open').getAttribute('href'), momentPath);
   assert(!requests.some((r) => r.url().endsWith('/api/session')));
   for (const request of requests) assert.equal(await request.headerValue('cookie'), null);
+
+  // Its owner gives it an address of its own in its settings (#148), which suggest one from
+  // its title: the settings page moves there, and its page is there.
+  const taken = await owner.request('/api/timelines', {
+    method: 'POST',
+    status: 201,
+    data: { ...document, title: 'Taken' },
+  });
+  otherTimelineId = taken.id;
+  await owner.request(`/api/timelines/${taken.id}/settings`, {
+    method: 'PATCH',
+    data: { slug: 'taken-' + suffix },
+  });
+  const settings = await signedIn.newPage();
+  await settings.goto(origin + base + '/settings');
+  const address = settings.getByRole('textbox', { name: 'Address' });
+  assert.equal(await address.inputValue(), 'voyages-of-' + suffix);
+  // A slug another of its owner's timelines has is refused beside the field.
+  await address.fill('taken-' + suffix);
+  await settings.getByRole('button', { name: 'Save address' }).click();
+  await settings
+    .locator('.address-form [role=alert]')
+    .getByText(`Another timeline of @${username} is at /${username}/taken-${suffix}.`)
+    .waitFor();
+  await address.fill('voyages-' + suffix);
+  await settings.getByRole('button', { name: 'Save address' }).click();
+  const named = `/${username}/voyages-${suffix}`;
+  await settings.waitForURL(origin + named + '/settings');
+  await settings.getByRole('link', { name: origin + named, exact: true }).waitFor();
+  await settings.goto(origin + momentPath);
+  await settings.waitForURL(origin + named + '/moments/leg%3A2');
+  await settings.frameLocator('iframe.editor-frame').locator('#inspector').waitFor();
+  await settings.close();
   await signedIn.close();
   await context.close();
   console.log(
-    'PASS sharing: page metadata and previews, preview images, moment and duration pages, links, the share dialog, embeds, oEmbed, robots and sitemap; private timelines show none.',
+    'PASS sharing: addresses, page metadata and previews, preview images, moment and duration pages, links, the share dialog, embeds, oEmbed, robots and sitemap; private timelines show none.',
   );
 } catch (error) {
   console.error(logs);
@@ -375,7 +414,8 @@ try {
   await browser?.close();
   embedder?.close();
   child.kill();
-  if (timelineId) await pool.query('DELETE FROM oc_timelines WHERE id=$1', [timelineId]);
+  for (const id of [timelineId, otherTimelineId])
+    if (id) await pool.query('DELETE FROM oc_timelines WHERE id=$1', [id]);
   if (userId) await pool.query('DELETE FROM oc_users WHERE id=$1', [userId]);
   await pool.end();
 }

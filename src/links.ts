@@ -7,6 +7,7 @@
  */
 import { Rational as Q } from 'rational-ordered-map';
 import { parseNumber } from './numeric.js';
+import { timelinePath } from './addresses.js';
 
 export type TimelineLink =
   | { kind: 'moment'; id: string }
@@ -60,10 +61,13 @@ export function linkFragment(link: TimelineLink): string {
 /**
  * The address to share for a link: moments and durations have pages of their own, which
  * social sites and search engines read (they ignore fragments); searches and views are
- * fragments of the timeline's page.
+ * fragments of the timeline's page, at its address (#148).
  */
-export function sharePath(timeline: string, link: TimelineLink | null): string {
-  const base = '/timelines/' + timeline;
+export function sharePath(
+  timeline: Parameters<typeof timelinePath>[0],
+  link: TimelineLink | null,
+): string {
+  const base = timelinePath(timeline);
   if (!link) return base;
   if (link.kind === 'moment') return `${base}/moments/${encodeURIComponent(link.id)}`;
   if (link.kind === 'duration') return `${base}/durations/${encodeURIComponent(link.id)}`;

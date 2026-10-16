@@ -137,6 +137,7 @@ import {
   requestProgress,
 } from './transport.js';
 import { parseLink, linkFragment, sharePath } from './links.js';
+import { profilePath, timelinePath } from './addresses.js';
 import { readViewState, viewStorageKey, VIEW_PREFIX } from './view-state.js';
 import type { ViewState } from './view-state.js';
 import type { TimelineLink } from './links.js';
@@ -173,11 +174,20 @@ interface RemoteTimeline {
   /** Its sensitive-content labels (#115): its owner's and moderators'. */
   labels?: string[];
   owner: string;
+  /** Its address's last part (#148), when its owner has chosen one. */
+  slug?: string | null;
   event_count: string;
   star_count?: string;
   starred?: boolean;
   first?: string;
   last?: string;
+}
+/**
+ * A server timeline's page (#148): at its owner's name and slug, or its ID until it has one.
+ * Servers from before addresses, which send no slug, have it at /timelines/<id>.
+ */
+function remotePath(timeline: RemoteTimeline): string {
+  return 'slug' in timeline ? timelinePath(timeline) : '/timelines/' + timeline.id;
 }
 interface NativeOpened {
   document: TimelineDocument;
@@ -2325,7 +2335,9 @@ function heading() {
   text('owner-label', remote ? remote.owner : desktop ? 'Offline workspace' : 'Local workspace');
   const ownerLink = el<HTMLAnchorElement>('owner-label');
   if (remote) {
-    ownerLink.href = (desktop ? serverOrigin : '') + '/users/' + encodeURIComponent(remote.owner);
+    ownerLink.href =
+      (desktop ? serverOrigin : '') +
+      ('slug' in remote ? profilePath(remote.owner) : '/users/' + encodeURIComponent(remote.owner));
     ownerLink.target = '_top';
   } else ownerLink.removeAttribute('href');
   text(
@@ -2788,7 +2800,7 @@ async function openRemote(id: string, restoreSeparation = true) {
   reportedLink = null;
   gateSensitive(id);
   if (embedded) {
-    el<HTMLAnchorElement>('embed-open').href = sharePath(id, null);
+    el<HTMLAnchorElement>('embed-open').href = sharePath(remote, null);
     el('embed-open').hidden = false;
   }
   if (info.presentation) info.presentation = validatePresentation(info.presentation);
@@ -5934,7 +5946,7 @@ el('account-button').onclick = () => {
       return;
     void retainForSignIn()
       .then(() => {
-        const returnTo = remote ? `/timelines/${remote.id}` : '/editor';
+        const returnTo = remote ? remotePath(remote) : '/editor';
         window.parent.location.href = session.user
           ? '/account'
           : `/login?returnTo=${encodeURIComponent(returnTo)}`;
@@ -6579,11 +6591,11 @@ async function members() {
 el('share-button').onclick = () => {
   if (!remote?.canShare) return;
   if (platformEditor) {
-    if (mayReplace()) window.parent.location.href = `/timelines/${remote.id}/settings`;
+    if (mayReplace()) window.parent.location.href = remotePath(remote) + '/settings';
     return;
   }
   el<HTMLSelectElement>('visibility').value = remote.visibility;
-  text('sharing-link', `${serverOrigin}/timelines/${remote.id}`);
+  text('sharing-link', serverOrigin + remotePath(remote));
   text('sharing-error', '');
   el<HTMLDialogElement>('sharing-dialog').showModal();
   void members().catch(fail);
@@ -8110,7 +8122,7 @@ function reportLink(link: TimelineLink | null) {
     );
   else if (embedded) {
     window.history.replaceState(null, '', fragment ? '#' + fragment : location.pathname);
-    el<HTMLAnchorElement>('embed-open').href = sharePath(remote.id, link);
+    el<HTMLAnchorElement>('embed-open').href = sharePath(remote, link);
   }
 }
 /** Closing what a link names leaves the page's address at the timeline. */

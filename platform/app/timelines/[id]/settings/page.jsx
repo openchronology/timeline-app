@@ -2,7 +2,9 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { accessibleTimeline } from '../../../../lib/timeline.js';
+import { timelinePath } from '../../../../../src/addresses.ts';
 import TimelineSettings from '../../../../components/timeline-settings.jsx';
+import { siteOrigin } from '../../../../lib/sharing.js';
 import { calendar, printRetention } from '../../../../../server/retention.mjs';
 import { NEWCOMER_DAYS, FULL_DAYS } from '../../../../../server/standing.mjs';
 export const dynamic = 'force-dynamic';
@@ -25,7 +27,7 @@ export default async function Settings({ params }) {
     ).rows.length > 0;
   return (
     <main className="platform">
-      <Link href={'/timelines/' + id}>← {timeline.title || 'Untitled timeline'}</Link>
+      <Link href={timelinePath(timeline)}>← {timeline.title || 'Untitled timeline'}</Link>
       <TimelineSettings
         initial={{
           ...timeline,
@@ -39,6 +41,7 @@ export default async function Settings({ params }) {
         initialMembers={rows}
         listing={{ listed, newcomerDays: NEWCOMER_DAYS, fullDays: FULL_DAYS }}
         calendar={!!calendar(timeline.presentation) && !timeline.comparison}
+        origin={siteOrigin()}
       />
     </main>
   );

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import StarButton from './star-button.jsx';
 import { describeLabels } from '../../src/content-labels.ts';
 import { CompareCheckbox } from './compare-selection.jsx';
+import { profilePath, timelinePath } from '../../src/addresses.ts';
 function link(query, values, basePath = '/') {
   const p = new URLSearchParams({ ...query, ...values });
   return basePath + '?' + p;
@@ -29,11 +30,10 @@ export default function TimelineList({
               limit={compareLimit}
             />
             <h3>
-              <Link href={'/timelines/' + t.id}>{t.title || 'Untitled timeline'}</Link>
+              <Link href={timelinePath(t)}>{t.title || 'Untitled timeline'}</Link>
             </h3>
             <p className="muted">
-              <Link href={'/users/' + encodeURIComponent(t.owner)}>@{t.owner}</Link> ·{' '}
-              {t.visibility} ·{' '}
+              <Link href={profilePath(t.owner)}>@{t.owner}</Link> · {t.visibility} ·{' '}
               {t.comparison
                 ? `${t.comparison.sources.length} timelines · Read-only comparison`
                 : `${Number(t.event_count).toLocaleString()} moments`}

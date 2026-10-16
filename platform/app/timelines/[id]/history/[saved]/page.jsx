@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { accessibleTimeline } from '../../../../../lib/timeline.js';
+import { timelinePath } from '../../../../../../src/addresses.ts';
 import { Versioning } from '../../../../../../server/versioning.mjs';
 import RevisionDownload from '../../../../../components/revision-download.jsx';
 export const dynamic = 'force-dynamic';
@@ -22,7 +23,7 @@ export default async function Saved({ params }) {
     if (e.status === 409)
       return (
         <main className="platform">
-          <Link href={'/timelines/' + id + '/history'}>← Saved history</Link>
+          <Link href={timelinePath(timeline) + '/history'}>← Saved history</Link>
           <h1>Revision not kept</h1>
           <p>{e.message}</p>
         </main>
@@ -31,7 +32,7 @@ export default async function Saved({ params }) {
   }
   return (
     <main className="platform">
-      <Link href={'/timelines/' + id + '/history'}>← Saved history</Link>
+      <Link href={timelinePath(timeline) + '/history'}>← Saved history</Link>
       <h1>{snapshot?.document.title ?? timeline.title}</h1>
       <p>
         Saved checkpoint <code>{saved}</code>

@@ -59,7 +59,7 @@ The offline bundle excludes the HTTP transport and does not initialize accounts,
 
 ## PostgreSQL deployment
 
-The server uses PostgreSQL with the real pgmp extension. Accounts own private timelines by default. Owners control visibility, access and deletion. They can add viewers, contributors and writers. Public access grants viewing to everyone; signed-in users can propose changes, while only owners/writers update upstream. Sharing links use `/timelines/<uuid>`. Old `#timeline/<uuid>` bookmarks redirect to their canonical Next.js routes.
+The server uses PostgreSQL with the real pgmp extension. Accounts own private timelines by default. Owners control visibility, access and deletion. They can add viewers, contributors and writers. Public access grants viewing to everyone; signed-in users can propose changes, while only owners/writers update upstream. Profiles are at `/<username>` and timelines at `/<username>/<slug>`, or `/<username>/<uuid>` until their owner chooses a slug; `/timelines/<uuid>` and old `#timeline/<uuid>` bookmarks lead there ([addresses](docs/sharing.md#addresses)).
 
 For a local container deployment:
 
