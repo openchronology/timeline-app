@@ -111,6 +111,8 @@ test('login return paths accept canonical pages and refuse external or ambiguous
     '/editor',
     '/plugins',
     '/timelines/00000000-0000-0000-0000-000000000001',
+    '/ada/voyages',
+    '/ada/00000000-0000-0000-0000-000000000001',
     '/connect/desktop/ABCDEFGH23',
   ])
     assert.equal(safeReturnTo(path), path);
@@ -120,6 +122,9 @@ test('login return paths accept canonical pages and refuse external or ambiguous
     '/\\evil.example',
     '/editor?next=https://evil.example',
     '/api/auth/logout',
+    '/ada/voyages/settings',
+    '/ada/voyages?next=https://evil.example',
+    '/login/voyages',
     undefined,
   ])
     assert.equal(safeReturnTo(path), '/');

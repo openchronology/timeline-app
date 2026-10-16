@@ -24,7 +24,7 @@ export default function VersionActions({ timeline, signedIn, onGuestFork }) {
   }
   return (
     <>
-      <a target="_top" href={'/timelines/' + timeline.id + '/history'}>
+      <a target="_top" href={timeline.path + '/history'}>
         History
       </a>
       {timeline.canFork && (
@@ -56,10 +56,10 @@ export default function VersionActions({ timeline, signedIn, onGuestFork }) {
           </a>
           {timeline.canWrite && (
             <>
-              <a target="_top" href={'/timelines/' + timeline.id + '/sync'}>
+              <a target="_top" href={timeline.path + '/sync'}>
                 Sync upstream
               </a>
-              <a target="_top" href={'/timelines/' + timeline.id + '/pulls/new'}>
+              <a target="_top" href={timeline.path + '/pulls/new'}>
                 Propose saved changes
               </a>
             </>

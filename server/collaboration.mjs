@@ -70,7 +70,7 @@ export async function searchTimelines(pool, userId, value, featured = []) {
     throw new HttpError(401, 'Sign in to see your timelines.');
   const { rows } = await pool.query(
     `WITH matching AS (
-    SELECT t.id,t.title,t.description,t.tags,t.visibility,t.revision,t.event_count,t.comparison,t.updated_at,t.created_at,t.star_count,u.username AS owner,
+    SELECT t.id,t.slug,t.title,t.description,t.tags,t.visibility,t.revision,t.event_count,t.comparison,t.updated_at,t.created_at,t.star_count,u.username AS owner,
       EXISTS(SELECT 1 FROM oc_timeline_stars s WHERE s.timeline_id=t.id AND s.user_id=$6::uuid) AS starred,
       coalesce(p.popularity,0) AS popularity,coalesce(p.trending,0) AS trending,
       coalesce(a.standing,0)>0 AS established,

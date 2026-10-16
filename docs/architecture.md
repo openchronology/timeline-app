@@ -288,8 +288,8 @@ They require an authenticated session, CSRF protection, and read access to the
 timeline. Stars do not change its saved revision or exported document.
 
 The dashboard includes the user's paginated favorites, including accessible
-private timelines. `/users/<username>` shows public timelines and public
-favorites only. Losing access removes a private timeline from search results;
+private timelines. `/<username>` ([addresses](sharing.md#addresses)) shows
+public timelines and public favorites only. Losing access removes a private timeline from search results;
 its bookmark does not grant access. Timeline browsing supports featured-first,
 star count, popularity (stars plus public forks), alphabetical title, newest
 creation date, and full-text relevance. Private forks do not contribute to

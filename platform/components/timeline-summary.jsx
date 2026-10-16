@@ -11,6 +11,7 @@ import {
   timelineFacts,
   timelineTitle,
 } from '../lib/sharing.js';
+import { profilePath } from '../../src/addresses.ts';
 export default function TimelineSummary({ timeline, moments = [], children }) {
   return (
     <section className="sr-only" aria-label="Timeline summary">
@@ -21,7 +22,7 @@ export default function TimelineSummary({ timeline, moments = [], children }) {
         {timeline.owner && (
           <>
             {' · '}
-            <a href={'/users/' + encodeURIComponent(timeline.owner)}>@{timeline.owner}</a>
+            <a href={profilePath(timeline.owner)}>@{timeline.owner}</a>
           </>
         )}
       </p>
@@ -32,7 +33,7 @@ export default function TimelineSummary({ timeline, moments = [], children }) {
           <ol>
             {moments.map((event) => (
               <li key={event.id}>
-                <a href={sharedPath(timeline.id, { kind: 'moment', id: event.id })}>
+                <a href={sharedPath(timeline, { kind: 'moment', id: event.id })}>
                   {momentTitle(event)}
                 </a>{' '}
                 <time>{presentTime(timeline, event.time)}</time>

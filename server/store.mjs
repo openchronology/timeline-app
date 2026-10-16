@@ -20,6 +20,10 @@ import {
   SEARCH_PAGE_SIZE,
   BUILTIN_PLUGINS,
   contentLabels,
+  validSlug,
+  RESERVED_NAMES,
+  SLUG_RULE,
+  TIMELINE_UUID,
 } from '../dist/core.mjs';
 import { randomUUID } from 'node:crypto';
 import { pluginCompiler } from './plugin-sandbox.mjs';
@@ -232,6 +236,54 @@ export class PostgresStore {
     );
     if (!rows[0]) throw new HttpError(404, 'Timeline unavailable.');
     return rows[0];
+  }
+  /**
+   * The ID of the timeline at `/<owner>/<name>` (#148): by its slug, its ID or a slug it had
+   * before; null when there is none. It says nothing of who may open it: its pages check.
+   */
+  async addressed(owner, name) {
+    const { rows } = TIMELINE_UUID.test(name)
+      ? await this.pool.query(
+          'SELECT t.id FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id WHERE u.username=$1 AND t.id=$2',
+          [owner, name],
+        )
+      : await this.pool.query(
+          `SELECT t.id FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id WHERE u.username=$1 AND t.slug=$2
+          UNION ALL SELECT f.timeline_id FROM oc_timeline_former_slugs f JOIN oc_users u ON u.id=f.owner_id
+          WHERE u.username=$1 AND f.slug=$2 LIMIT 1`,
+          [owner, name],
+        );
+    return rows[0]?.id ?? null;
+  }
+  /**
+   * Gives timeline `t` (as access returned it, locked) the address `/<owner>/<slug>`, or none
+   * when `slug` is null. Its former slug keeps leading to it until another of its owner's
+   * timelines takes it.
+   */
+  async setSlug(c, t, slug) {
+    if (slug === (t.slug ?? null)) return;
+    if (slug !== null && !validSlug(slug)) throw new HttpError(400, SLUG_RULE);
+    if (slug !== null && RESERVED_NAMES.has(t.owner))
+      throw new HttpError(
+        409,
+        `@${t.owner} is also one of the site's own addresses, so its timelines are at /timelines/<id>.`,
+      );
+    if (slug !== null)
+      await c.query('DELETE FROM oc_timeline_former_slugs WHERE owner_id=$1 AND slug=$2', [
+        t.owner_id,
+        slug,
+      ]);
+    if (t.slug)
+      await c.query(
+        'INSERT INTO oc_timeline_former_slugs(owner_id,slug,timeline_id) VALUES($1,$2,$3) ON CONFLICT(owner_id,slug) DO UPDATE SET timeline_id=excluded.timeline_id',
+        [t.owner_id, t.slug, t.id],
+      );
+    try {
+      await c.query('UPDATE oc_timelines SET slug=$2 WHERE id=$1', [t.id, slug]);
+    } catch (error) {
+      if (error.code !== '23505') throw error;
+      throw new HttpError(409, `Another timeline of @${t.owner} is at /${t.owner}/${slug}.`);
+    }
   }
   /**
    * The timeline as `userId` may see it, with their permissions; 404 when they may not. A

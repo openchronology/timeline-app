@@ -95,6 +95,7 @@ export type { TimePresentation } from './presentation.js';
 export type { PresentationContext, TimePresenter } from './presentation.js';
 export { createDifference, exactText } from './difference.js';
 export { parseLink, linkFragment, sharePath } from './links.js';
+export * from './addresses.js';
 export type { TimelineLink } from './links.js';
 export type { DifferenceUnit, TimeDifference } from './difference.js';
 export { planRuler, validateRulerPolicy } from './ruler.js';

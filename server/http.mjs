@@ -921,7 +921,7 @@ export function createRequestHandler({
         if (pathname === '/api/timelines' && method === 'GET') {
           if (!session) throw new HttpError(401, 'Sign in to see your timelines.');
           const { rows } = await pool.query(
-            `SELECT t.id,t.title,t.visibility,t.revision,t.event_count,u.username AS owner,
+            `SELECT t.id,t.slug,t.title,t.visibility,t.revision,t.event_count,u.username AS owner,
             CASE WHEN t.owner_id=$1 THEN 'owner' ELSE m.role END AS role FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id
             LEFT JOIN oc_members m ON m.timeline_id=t.id AND m.user_id=$1
             WHERE t.owner_id=$1 OR (m.user_id=$1 AND NOT ${restrictedTimeline('t')}) ORDER BY t.updated_at DESC LIMIT 100`,
@@ -1396,14 +1396,20 @@ export function createRequestHandler({
             !input ||
             Object.keys(input).some(
               (k) =>
-                !['visibility', 'allowPrivateForks', 'retention', 'keepHistory', 'labels'].includes(
-                  k,
-                ),
+                ![
+                  'visibility',
+                  'allowPrivateForks',
+                  'retention',
+                  'keepHistory',
+                  'labels',
+                  'slug',
+                ].includes(k),
             ) ||
             (input.labels !== undefined &&
               (!Array.isArray(input.labels) ||
                 contentLabels(input.labels).length !== input.labels.length)) ||
             (input.keepHistory !== undefined && typeof input.keepHistory !== 'boolean') ||
+            (input.slug !== undefined && input.slug !== null && typeof input.slug !== 'string') ||
             !Object.keys(input).length ||
             (input.retention !== undefined &&
               input.retention !== null &&
@@ -1413,7 +1419,7 @@ export function createRequestHandler({
           )
             throw new HttpError(
               400,
-              'Choose visibility, a private forking policy, a retention period, whether to keep saved history and/or content labels.',
+              'Choose visibility, a private forking policy, a retention period, whether to keep saved history, content labels and/or an address.',
             );
           await store.transaction(async (c) => {
             await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [id]);
@@ -1444,10 +1450,15 @@ export function createRequestHandler({
                 : input.retention === null || !input.retention.trim()
                   ? null
                   : parseRetention(input.retention, current.presentation);
+            // Its address, /<owner>/<slug> (#148); an empty slug removes it.
+            if (input.slug !== undefined)
+              await store.setSlug(c, current, input.slug?.trim().toLowerCase() || null);
             // Saved history stops (forgetting past revisions others do not read) or starts
             // again from the current state.
             if (input.keepHistory === false) await store.stopHistory(c, id);
             if (input.keepHistory === true) await store.startHistory(c, id, userId);
+            // An address alone leaves the timeline's revision as it is.
+            if (Object.keys(input).every((k) => k === 'slug')) return;
             await c.query(
               'UPDATE oc_timelines SET visibility=$2,allow_private_forks=$3,retention_seconds=$4,retention_applied_at=CASE WHEN retention_seconds IS DISTINCT FROM $4 THEN NULL ELSE retention_applied_at END,content_labels=$5,revision=revision+1,updated_at=now() WHERE id=$1',
               [

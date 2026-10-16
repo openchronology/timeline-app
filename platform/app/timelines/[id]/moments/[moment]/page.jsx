@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import Editor from '../../../../../components/editor.jsx';
 import TimelineSummary from '../../../../../components/timeline-summary.jsx';
 import { accessibleTimeline, versionInfo } from '../../../../../lib/timeline.js';
+import { timelinePath } from '../../../../../../src/addresses.ts';
 import {
   entityParam,
   excerpt,
@@ -30,7 +31,7 @@ export async function generateMetadata({ params }) {
   const time = presentTime(timeline, event.time);
   return pageMetadata(
     timeline,
-    sharedPath(timeline.id, { kind: 'moment', id: event.id }),
+    sharedPath(timeline, { kind: 'moment', id: event.id }),
     `${momentTitle(event)} · ${timelineTitle(timeline)}`,
     excerpt(`${time}. ${event.metadata?.description ?? ''}`) || time,
   );
@@ -48,6 +49,7 @@ export default async function MomentPage({ params }) {
       </TimelineSummary>
       <Editor
         id={timeline.id}
+        path={timelinePath(timeline)}
         focus={'moment/' + encodeURIComponent(event.id)}
         canShare={timeline.canShare}
         timeline={versionInfo(timeline)}

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import Link from 'next/link';
 import { accessibleTimeline } from '../../../../lib/timeline.js';
+import { timelinePath } from '../../../../../src/addresses.ts';
 import { Versioning } from '../../../../../server/versioning.mjs';
 export const dynamic = 'force-dynamic';
 export default async function History({ params, searchParams }) {
@@ -14,7 +15,7 @@ export default async function History({ params, searchParams }) {
   );
   return (
     <main className="platform">
-      <Link href={'/timelines/' + id}>← Timeline</Link>
+      <Link href={timelinePath(timeline)}>← Timeline</Link>
       <h1>Saved history: {timeline.title}</h1>
       <p>
         Each server save, sync and merge creates an immutable checkpoint. Earlier history from
@@ -31,7 +32,7 @@ export default async function History({ params, searchParams }) {
         <article className="timeline-card" key={r.id}>
           <h2>
             {r.available ? (
-              <Link href={'/timelines/' + id + '/history/' + r.id}>
+              <Link href={timelinePath(timeline) + '/history/' + r.id}>
                 Revision {r.number} · {r.kind}
               </Link>
             ) : (

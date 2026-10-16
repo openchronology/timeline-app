@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import Link from 'next/link';
 import { accessibleTimeline } from '../../../../lib/timeline.js';
+import { timelinePath } from '../../../../../src/addresses.ts';
 import { Collaboration, PULLS_UNAVAILABLE } from '../../../../../server/collaboration.mjs';
 export const dynamic = 'force-dynamic';
 export default async function Pulls({ params, searchParams }) {
@@ -12,7 +13,7 @@ export default async function Pulls({ params, searchParams }) {
   );
   const { services, user, timeline } = await accessibleTimeline(id);
   const result = await new Collaboration(services.store).list(id, user?.id, { page, limit: 12 });
-  const base = '/timelines/' + id;
+  const base = timelinePath(timeline);
   return (
     <main className="platform">
       <Link href={base}>← {timeline.title || 'Untitled timeline'}</Link>

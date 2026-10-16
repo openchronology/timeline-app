@@ -1,8 +1,9 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// Public timelines, most recently changed first, and the profiles that own them. Moments are
-// reached from their timelines' pages, which link to them.
+// Public timelines, most recently changed first, and the profiles that own them, at their
+// addresses (#148). Moments are reached from their timelines' pages, which link to them.
 import { platformServices } from '../../server/platform.mjs';
 import { siteOrigin } from '../lib/sharing.js';
+import { profilePath, timelinePath } from '../../src/addresses.ts';
 export const dynamic = 'force-dynamic';
 /** A sitemap holds at most 50,000 addresses. */
 const TIMELINES = 45000,
@@ -23,7 +24,8 @@ export default async function sitemap() {
   if (!pool) return pages;
   const [timelines, owners] = await Promise.all([
     pool.query(
-      `SELECT id,updated_at FROM oc_timelines WHERE visibility='public' ORDER BY updated_at DESC LIMIT $1`,
+      `SELECT t.id,t.slug,u.username AS owner,t.updated_at FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id
+      WHERE t.visibility='public' ORDER BY t.updated_at DESC LIMIT $1`,
       [TIMELINES],
     ),
     pool.query(
@@ -36,11 +38,11 @@ export default async function sitemap() {
   return [
     ...pages,
     ...timelines.rows.map((t) => ({
-      url: `${origin}/timelines/${t.id}`,
+      url: origin + timelinePath(t),
       lastModified: t.updated_at,
     })),
     ...owners.rows.map((u) => ({
-      url: `${origin}/users/${encodeURIComponent(u.username)}`,
+      url: origin + profilePath(u.username),
       lastModified: u.updated_at,
     })),
   ];

@@ -8,8 +8,8 @@ import VersionActions from './version-actions.jsx';
 import ShareDialog from './share-dialog.jsx';
 import ReportDialog from './report-dialog.jsx';
 /** The page to share for a link fragment of the editor (see src/links.ts). */
-function sharedAddress(id, fragment) {
-  const base = location.origin + '/timelines/' + id;
+function sharedAddress(path, fragment) {
+  const base = location.origin + path;
   const [kind, rest] = fragment ? [fragment.slice(0, fragment.indexOf('/')), fragment] : [];
   if (kind === 'moment' || kind === 'duration')
     return `${base}/${kind}s/${rest.slice(kind.length + 1)}`;
@@ -17,6 +17,8 @@ function sharedAddress(id, fragment) {
 }
 export default function Editor({
   id,
+  // Its page (#148): /<owner>/<slug>, or /<owner>/<id> until it has a slug.
+  path = id ? '/timelines/' + id : null,
   canShare = false,
   fresh = false,
   sample = false,
@@ -35,13 +37,13 @@ export default function Editor({
     [report, setReport] = useState(null);
   const offer = (fragment, title) =>
     setShare({
-      url: sharedAddress(id, fragment),
+      url: sharedAddress(path, fragment),
       title,
       embed:
         timeline?.visibility === 'public'
           ? `${location.origin}/embed/${id}${fragment ? '#' + fragment : ''}`
           : null,
-      settings: canShare ? '/timelines/' + id + '/settings' : null,
+      settings: canShare ? path + '/settings' : null,
     });
   // The frame can finish loading before this page's script runs (and misses onLoad).
   useEffect(() => {
@@ -62,7 +64,7 @@ export default function Editor({
         window.history.replaceState(
           window.history.state,
           '',
-          '/timelines/' + id + (fragment ? '#' + fragment : ''),
+          path + (fragment ? '#' + fragment : ''),
         );
       }
       if (event.data?.type === 'openchronology:share' && id && event.data.timeline === id)
@@ -82,7 +84,10 @@ export default function Editor({
           target: { kind: event.data.kind, timeline: id, id: event.data.id },
           title: String(event.data.title ?? 'Untitled').slice(0, 300),
         });
-      if (
+      // Saved: this timeline's page shows what was saved; a new one's page opens (at its
+      // address, #148).
+      if (event.data?.type === 'openchronology:published' && event.data.id === id) router.refresh();
+      else if (
         event.data?.type === 'openchronology:published' &&
         /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(event.data.id)
       )
@@ -90,7 +95,7 @@ export default function Editor({
     }
     window.addEventListener('message', message);
     return () => window.removeEventListener('message', message);
-  }, [router, id, timeline?.visibility, canShare]);
+  }, [router, id, path, timeline?.visibility, canShare]);
   return (
     <>
       {id &&
@@ -105,7 +110,7 @@ export default function Editor({
               signedIn={signedIn}
             />
             {!timeline?.comparison && (
-              <a target="_top" href={'/timelines/' + id + '/pulls'}>
+              <a target="_top" href={path + '/pulls'}>
                 Pull requests
               </a>
             )}
@@ -113,11 +118,11 @@ export default function Editor({
               <>
                 <span>Read-only comparison · Sources:</span>
                 {comparisonSources.map((source) => (
-                  <a target="_top" key={source.id} href={'/timelines/' + source.id}>
+                  <a target="_top" key={source.id} href={source.path}>
                     {source.title}
                   </a>
                 ))}
-                <a target="_top" href={'/timelines/' + id + '/history'}>
+                <a target="_top" href={path + '/history'}>
                   History
                 </a>
               </>
@@ -126,7 +131,7 @@ export default function Editor({
               Share
             </button>
             {canShare && (
-              <a target="_top" href={'/timelines/' + id + '/settings'}>
+              <a target="_top" href={path + '/settings'}>
                 Sharing &amp; settings
               </a>
             )}

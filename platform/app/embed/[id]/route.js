@@ -4,7 +4,7 @@
  * `embedded` in src/app.ts). Private timelines, and comparisons of them, are never embedded.
  */
 import { editorHtml, editorPolicy } from '../../../lib/editor-html.js';
-import { publicTimeline, siteOrigin, timelineTitle } from '../../../lib/sharing.js';
+import { publicTimeline, sharedPath, siteOrigin, timelineTitle } from '../../../lib/sharing.js';
 import { platformServices } from '../../../../server/platform.mjs';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,7 +35,7 @@ export async function GET(request, { params }) {
       '<!doctype html><meta charset="utf-8"><title>Timeline unavailable</title><p style="font-family:system-ui;margin:16px">This timeline is not public, or no longer exists.</p>',
       { status: 404, headers },
     );
-  const canonical = `${siteOrigin()}/timelines/${timeline.id}`;
+  const canonical = siteOrigin() + sharedPath(timeline);
   const html = (await editorHtml()).replace(
     /<title>[^<]*<\/title>/,
     `<title>${escape(timelineTitle(timeline))} · OpenChronology</title><link rel="canonical" href="${escape(canonical)}" />`,

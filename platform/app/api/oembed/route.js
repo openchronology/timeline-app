@@ -6,6 +6,7 @@
  */
 import { platformServices } from '../../../../server/platform.mjs';
 import { parseLink, linkFragment } from '../../../../dist/core.mjs';
+import { profilePath, timelineAddress } from '../../../../src/addresses.ts';
 import {
   embedCode,
   entityParam,
@@ -16,8 +17,8 @@ import {
 } from '../../../lib/sharing.js';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-const PAGE =
-  /^\/timelines\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})(?:\/(moments|durations)\/([^/]+))?\/?$/i;
+/** The rest of a timeline's address: its page, or one of its moments' or durations'. */
+const REST = /^(?:\/(moments|durations)\/([^/]+))?\/?$/;
 const fail = (status, error) =>
   Response.json({ error }, { status, headers: { 'Cache-Control': 'no-store' } });
 /** A size limit from the request: a positive integer, or none. */
@@ -36,14 +37,18 @@ export async function GET(request) {
     return fail(400, 'Give the url of a timeline.');
   }
   const origin = siteOrigin();
-  const page = PAGE.exec(target.pathname);
+  // At /timelines/<id>, or /<owner>/<slug or id> (#148).
+  const address = timelineAddress(target.pathname),
+    page = address && REST.exec(address.rest);
   if (target.host !== new URL(origin).host || !page) return fail(404, 'Not a timeline address.');
-  const timeline = await publicTimeline(await platformServices(), page[1]);
+  const services = await platformServices();
+  const id = address.id ?? (await services.store?.addressed(address.owner, address.name));
+  const timeline = id ? await publicTimeline(services, id) : null;
   if (!timeline) return fail(404, 'This timeline is not public, or no longer exists.');
   // What the embed opens to: the page's moment or duration, or its link fragment.
-  const entity = page[3] ? entityParam(page[3]) : null;
+  const entity = page[2] ? entityParam(page[2]) : null;
   const link = entity
-    ? { kind: page[2] === 'moments' ? 'moment' : 'duration', id: entity }
+    ? { kind: page[1] === 'moments' ? 'moment' : 'duration', id: entity }
     : parseLink(target.hash);
   const src = `${origin}/embed/${timeline.id}${link ? '#' + linkFragment(link) : ''}`;
   const width = Math.min(800, limit(query.get('maxwidth'))),
@@ -58,7 +63,7 @@ export async function GET(request) {
       provider_url: origin,
       title,
       author_name: timeline.owner,
-      author_url: `${origin}/users/${encodeURIComponent(timeline.owner)}`,
+      author_url: origin + profilePath(timeline.owner),
       html: embedCode(src, title, width, height),
       width,
       height,

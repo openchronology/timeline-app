@@ -1,0 +1,60 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  availableUsername,
+  profilePath,
+  slugFromTitle,
+  timelineAddress,
+  timelinePath,
+  validSlug,
+} from '../dist/core.mjs';
+
+const id = '6f1c4e2a-9b3d-4c5e-8f70-112233445566';
+test('profiles and timelines are at their owner’s name (#148)', () => {
+  assert.equal(profilePath('ada'), '/ada');
+  assert.equal(timelinePath({ id, owner: 'ada', slug: 'voyages' }), '/ada/voyages');
+  assert.equal(timelinePath({ id, owner: 'ada', slug: null }), '/ada/' + id);
+  // Without an owner, and for names the site's own pages use, the older addresses.
+  assert.equal(timelinePath({ id }), '/timelines/' + id);
+  assert.equal(profilePath('admin'), '/users/admin');
+  assert.equal(timelinePath({ id, owner: 'admin', slug: 'voyages' }), '/timelines/' + id);
+});
+test('slugs and usernames: their rules, and the names the site keeps', () => {
+  for (const slug of ['a', 'fall-of-rome', 'ww_2', 'x'.repeat(64)]) assert(validSlug(slug), slug);
+  for (const slug of ['', '-a', 'A', 'a b', 'a.b', 'x'.repeat(65), id])
+    assert(!validSlug(slug), slug);
+  assert(availableUsername('ada'));
+  for (const name of ['login', 'timelines', 'users', 'settings', 'ab', 'Ada'])
+    assert(!availableUsername(name), name);
+  assert.equal(slugFromTitle('The Fall of Rome (476)'), 'the-fall-of-rome-476');
+  assert.equal(slugFromTitle('  Écoles — d’été  '), 'ecoles-d-ete');
+  assert.equal(slugFromTitle('東京'), '');
+  assert(validSlug(slugFromTitle('a'.repeat(63) + ' b')));
+});
+test('page addresses name a timeline by its owner and slug or ID, or by its ID alone', () => {
+  assert.deepEqual(timelineAddress('/ada/voyages'), { owner: 'ada', name: 'voyages', rest: '' });
+  assert.deepEqual(timelineAddress('/Ada/Voyages/moments/leg%3A2'), {
+    owner: 'ada',
+    name: 'voyages',
+    rest: '/moments/leg%3A2',
+  });
+  assert.deepEqual(timelineAddress('/ada/' + id + '/history'), {
+    owner: 'ada',
+    name: id,
+    rest: '/history',
+  });
+  assert.deepEqual(timelineAddress('/timelines/' + id + '/settings'), { id, rest: '/settings' });
+  // The site's own pages, profiles and what could be neither.
+  for (const path of [
+    '/',
+    '/ada',
+    '/login/x',
+    '/users/ada',
+    '/timelines/voyages',
+    '/ada/not.a.slug',
+    '/_next/static',
+    '/api/timelines',
+  ])
+    assert.equal(timelineAddress(path), null, path);
+});

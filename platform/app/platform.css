@@ -741,3 +741,18 @@ dialog::backdrop {
 label .field-hint {
   font-weight: 400;
 }
+/* A timeline's address (#148): its owner's part, then the slug, on one line where it fits. */
+.address-form label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-weight: 400;
+}
+.address-form label span {
+  overflow-wrap: anywhere;
+}
+.address-form label input {
+  flex: 1 1 12em;
+  width: auto;
+}

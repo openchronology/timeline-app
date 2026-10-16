@@ -7,6 +7,7 @@
 import 'server-only';
 import { createPresenter, Q } from '../../dist/core.mjs';
 import { siteName } from '../../server/site.mjs';
+import { timelinePath } from '../../src/addresses.ts';
 
 /** The platform's name in titles and link previews (PLATFORM_NAME, or OpenChronology). */
 export { siteName };
@@ -103,9 +104,9 @@ export function momentTitle(event) {
 export function durationTitle(duration) {
   return excerpt(duration.metadata?.title, 120) || 'Untitled duration';
 }
-/** The page to share for a timeline, or one of its moments or durations. */
+/** The page to share for a timeline (#148), or one of its moments or durations. */
 export function sharedPath(timeline, entity) {
-  const base = '/timelines/' + timeline;
+  const base = timelinePath(timeline);
   if (!entity) return base;
   return `${base}/${entity.kind === 'moment' ? 'moments' : 'durations'}/${encodeURIComponent(entity.id)}`;
 }
