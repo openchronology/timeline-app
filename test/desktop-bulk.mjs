@@ -78,8 +78,12 @@ try {
       `[...document.querySelectorAll('#timeline-menu button')].find((b) => b.textContent === ${JSON.stringify(item)}).click()`,
     );
   };
-  const toast = (text) =>
-    d.wait(`document.getElementById('toast').textContent.includes(${JSON.stringify(text)})`, 60000);
+  /** Waits for a notice matching `pattern` (numbers may or may not be grouped, by locale). */
+  const toast = (pattern) =>
+    d.wait(
+      `new RegExp(${JSON.stringify(pattern.source)}).test(document.getElementById('toast').textContent)`,
+      60000,
+    );
   const clearToast = () => d.eval(`document.getElementById('toast').textContent = ''`);
   const set = (id, value) =>
     d.eval(`(() => {
@@ -101,7 +105,7 @@ try {
   );
   await clearToast();
   await click('map-submit');
-  await toast('Moved 2,500 moments and 0 durations. Undo restores them.');
+  await toast(/Moved 2,?500 moments and 0 durations\. Undo restores them\./);
   await d.wait(`!document.getElementById('map-dialog').open`);
   await view(-10, 5010, 2500);
   await view(99990, 105010, 2500);
@@ -123,7 +127,7 @@ try {
   );
   await clearToast();
   await click('delete-confirm');
-  await toast('Deleted 1,010 moments and 1 duration.');
+  await toast(/Deleted 1,?010 moments and 1 duration\./);
   await view(-10, 5010, 3990);
   await click('undo-button');
   await view(-10, 5010, 5000);
