@@ -28,10 +28,11 @@ export function birthYear(value, now = new Date()) {
     current = now.getUTCFullYear();
   if (!Number.isInteger(year) || year < 1900 || year > current)
     throw new HttpError(400, 'Give your year of birth.');
-  if (current - year < ACCOUNT_AGE)
-    throw new HttpError(403, `Accounts are for people ${ACCOUNT_AGE} and older.`);
+  if (current - year < ACCOUNT_AGE) throw new HttpError(403, AGE_REFUSED);
   return year;
 }
+/** The answer to a sign-up refused for its age: neutral, as the FTC's guidance asks. */
+export const AGE_REFUSED = "Sorry, we can't create an account for you.";
 export class AccountSecurity {
   constructor(auth, mailer, key, passwordCheck) {
     this.auth = auth;
@@ -84,9 +85,10 @@ export class AccountSecurity {
     const username = typeof body.username === 'string' ? body.username.toLowerCase() : '';
     if (!/^[a-z0-9][a-z0-9_-]{2,31}$/.test(username))
       throw new HttpError(400, 'Use a 3–32 character username.');
+    await this.refuseAgain(req);
     const email = emailAddress(body.email),
       password = newPassword(body.password, body.passwordConfirmation, username),
-      born = birthYear(body.birthYear);
+      born = await this.ageChecked(req, body.birthYear);
     await this.auth.rateLimit('email:' + email);
     await this.passwordCheck(password);
     const hash = await passwordHash(password),
@@ -120,6 +122,35 @@ export class AccountSecurity {
       verificationRequired: true,
       proofCookie: this.auth.nonceCookie('verify', proof, false, 86400),
     };
+  }
+  /**
+   * `value` as a year of birth (birthYear); one refused for its age is remembered for this
+   * browser for a day, so a second answer is refused too (refuseAgain).
+   */
+  async ageChecked(req, value) {
+    try {
+      return birthYear(value);
+    } catch (error) {
+      const browser = this.browser(req);
+      if (error.status === 403 && validToken(browser))
+        await this.pool.query(
+          `INSERT INTO oc_age_refusals(browser_hash,expires_at) VALUES($1,now()+interval '1 day')
+          ON CONFLICT(browser_hash) DO UPDATE SET expires_at=excluded.expires_at`,
+          [digest(browser)],
+        );
+      throw error;
+    }
+  }
+  /** Refuses a browser refused for its age within the last day. */
+  async refuseAgain(req) {
+    await this.pool.query('DELETE FROM oc_age_refusals WHERE expires_at<=now()');
+    const browser = this.browser(req);
+    if (!validToken(browser)) return;
+    const { rows } = await this.pool.query(
+      'SELECT 1 FROM oc_age_refusals WHERE browser_hash=$1 AND expires_at>now()',
+      [digest(browser)],
+    );
+    if (rows.length) throw new HttpError(403, AGE_REFUSED);
   }
   async begin(user, kind, req, returnTo = '/') {
     return this.transaction(async (c) => {
@@ -231,9 +262,10 @@ export class AccountSecurity {
     let born = null,
       tooYoung = null,
       closed = false;
+    if (!session) await this.refuseAgain(req);
     if (body.birthYear !== undefined && body.birthYear !== '')
       try {
-        born = birthYear(body.birthYear);
+        born = await this.ageChecked(req, body.birthYear);
       } catch (error) {
         if (error.status !== 403) throw error;
         tooYoung = error;

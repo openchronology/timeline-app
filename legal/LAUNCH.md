@@ -21,10 +21,11 @@ Before making the hosted policies effective:
   log fields and concrete retention/removal schedules. Document processors,
   international transfers, and representatives where required. Ensure contracts and
   actual configuration match the public privacy notice.
-- Establish identity verification, export, account deletion, correction, complaint,
-  appeal, breach-response, and legal-hold procedures. Timeline deletion is implemented;
-  account deletion and removal of library definitions/discussion require operator
-  work. Do not promise self-service functions that do not exist.
+- Establish identity verification, export, correction, complaint, appeal,
+  breach-response, and legal-hold procedures. Deleting timelines, one's own comments and
+  one's own account is self-service (PRIVACY.md); a copy of all of an account's data at
+  once is not (each timeline exports separately), so access and portability requests
+  need operator work. Do not promise self-service functions that do not exist.
 - Decide whether to use a US DMCA designated agent. If so, register and publish
   matching required contact details, track renewal deadlines, and establish the
   notice/counter-notice and repeat-infringer process before relying on safe harbor.
@@ -34,6 +35,26 @@ Before making the hosted policies effective:
   is not age verification or parental consent, and accounts that may be under 18 always
   see sensitive-content warnings. Review this against the regions served (for example
   higher digital-consent ages under the GDPR in some EU countries).
+- US COPPA (the amended rule, in force since 22 April 2026): the service is for a
+  general audience and refuses accounts under 13 through a neutral age screen (no hint
+  of the age needed; a refused browser is refused again for a day). If the operator
+  learns an account belongs to a child under 13, close it and delete its data. Keep a
+  written information security program and a data retention policy anyway; the rule
+  requires both of services it covers, and they are good practice for any.
+- UK Age Appropriate Design Code (Children's Code): write a data protection impact
+  assessment covering under-18 users, and keep the high-privacy defaults for accounts
+  that may be under 18 (TERMS.md, Young people). Review it with RISK-ASSESSMENT.md.
+- US state laws on minors and social media: about twenty states have them, many
+  enjoined or in litigation, and their definitions of a social media platform vary.
+  Check, for the states served, whether the service meets their definitions (most
+  exclude services whose main purpose is not social interaction, or that are
+  educational): for example Texas's SCOPE Act (HB 18), New York's SAFE for Kids Act
+  (its rules on feeds for minors take effect 25 January 2027), and Utah, Louisiana,
+  Texas and Alabama's app store accountability laws if the desktop app is distributed
+  through an app store.
+- Australia's social media minimum age (under 16, since 10 December 2025): the service
+  is likely outside it (its purpose is not social interaction, and educational services
+  are excluded), but record the reasoning before offering accounts there.
 - Content policy (TERMS.md): no pornography or gratuitous gore; educational depictions
   allowed when labelled. Keep it that way to stay outside age-verification laws for
   pornography (US state laws, the UK Online Safety Act's pornography duties) and
@@ -45,7 +66,9 @@ Before making the hosted policies effective:
   reports of child abuse and other illegal content are listed first.
 - UK Online Safety Act: complete and keep current the illegal-content risk assessment and
   the children's access and risk assessments (template: RISK-ASSESSMENT.md), and keep
-  reporting and complaints working (Report, the review queue, review requests).
+  reporting and complaints working (Report, the review queue, review requests). The terms
+  describe how users and children are protected, how moderation decides, and the
+  complaints procedure (TERMS.md: Young people; How content is moderated; Complaints).
 - EU Digital Services Act: publish a single point of contact for authorities and users,
   keep notice-and-action (Report) and statements of reasons (the owner's notice and
   email) working, and publish the moderation policy (TERMS.md acceptable use).

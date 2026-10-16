@@ -114,8 +114,19 @@ try {
     passwordConfirmation: password,
   };
   await visitor.request('auth/register', 'POST', signup, 400);
-  await visitor.request('auth/register', 'POST', { ...signup, birthYear: year - 10 }, 403);
-  await visitor.request('auth/register', 'POST', { ...signup, birthYear: year - 15 });
+  const refused = await visitor.request(
+    'auth/register',
+    'POST',
+    { ...signup, birthYear: year - 10 },
+    403,
+  );
+  // Neutral: it does not say what age would do (the FTC's guidance on age screens).
+  assert.doesNotMatch(refused.error, /\d/);
+  // Going back to give another year in the same browser is refused too, for a day.
+  await visitor.request('auth/register', 'POST', { ...signup, birthYear: year - 15 }, 403);
+  const another = client();
+  await another.request('session');
+  await another.request('auth/register', 'POST', { ...signup, birthYear: year - 15 });
   const registration = (
     await pool.query('SELECT birth_year FROM oc_registrations WHERE username=$1', [
       'young_' + suffix,

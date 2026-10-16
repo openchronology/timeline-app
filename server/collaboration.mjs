@@ -86,7 +86,10 @@ export async function searchTimelines(pool, userId, value, featured = []) {
       AND ($7='' OR t.tags @> ARRAY[$7]::text[])
       AND ($9='' OR u.username=$9)
       AND (NOT $11::boolean OR EXISTS(SELECT 1 FROM oc_timeline_stars s WHERE s.timeline_id=t.id AND s.user_id=$6::uuid))
-      AND ($12='' OR EXISTS(SELECT 1 FROM oc_timeline_stars s JOIN oc_users su ON su.id=s.user_id WHERE s.timeline_id=t.id AND su.username=$12))
+      -- A reader's public favorites; not those of an account that may be under 18, private by
+      -- default (the UK Children's Code; #166).
+      AND ($12='' OR EXISTS(SELECT 1 FROM oc_timeline_stars s JOIN oc_users su ON su.id=s.user_id WHERE s.timeline_id=t.id AND su.username=$12
+        AND (su.birth_year IS NULL OR extract(year FROM now())::int-su.birth_year>=18)))
       -- Browsing lists established accounts' timelines, and featured ones (#103).
       AND (NOT $13::boolean OR coalesce(a.standing,0)>0
         OR ((t.featured OR t.id=ANY($5::uuid[])) AND cardinality(t.content_labels||t.moderator_labels)=0))
@@ -570,12 +573,23 @@ export class Collaboration {
     const { rows } = await this.pool.query(
       // A comment moderators restricted (#115) keeps its place, without its text.
       `SELECT c.id,CASE WHEN mc.id IS NULL THEN c.body ELSE '' END AS body,mc.id IS NOT NULL AS removed,
-      c.created_at,u.username AS author FROM oc_proposal_comments c JOIN oc_users u ON u.id=c.author_id
+      c.created_at,u.username AS author,c.author_id=$3::uuid AS mine FROM oc_proposal_comments c JOIN oc_users u ON u.id=c.author_id
       LEFT JOIN oc_moderation_cases mc ON mc.target_kind='comment' AND mc.target_id=c.id::text AND mc.status='restricted'
       WHERE c.proposal_id=$1 AND c.id>$2 ORDER BY c.id LIMIT 51`,
-      [id, after],
+      [id, after, userId ?? null],
     );
     return { comments: rows.slice(0, 50), next: rows.length > 50 ? rows[49].id : null };
+  }
+  /** Deletes comment `commentId` on pull request `id`: its author may, at any time (#166). */
+  async deleteComment(timelineId, id, commentId, userId) {
+    if (!userId) throw new HttpError(401, 'Sign in to delete your comments.');
+    await this.get(timelineId, id, userId);
+    const { rowCount } = await this.pool.query(
+      'DELETE FROM oc_proposal_comments WHERE id=$1 AND proposal_id=$2 AND author_id=$3',
+      [commentId, id, userId],
+    );
+    if (!rowCount) throw new HttpError(404, 'You have no such comment here.');
+    return { ok: true };
   }
   async comment(timelineId, id, userId, value) {
     if (typeof value?.body !== 'string' || !value.body.trim() || value.body.length > 20000)

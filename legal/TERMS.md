@@ -14,10 +14,27 @@ accounts secure, provide truthful information, and report unauthorized access.
 An account is personal unless you are authorized to act for an organization.
 Accounts are for people aged 13 or older; the service does not offer accounts to
 children under 13 or parental-consent accounts. Sign-up asks for your year of birth.
-Accounts of people who may be under 18 always see warnings before sensitive content
-(below). Anyone may read public timelines without an account. This eligibility rule
+Anyone may read public timelines without an account. This eligibility rule
 does not restrict rights under the software license or use of a separate offline
 installation.
+
+## Young people
+
+Accounts of people who may be under 18 (by the year of birth they gave) get the most
+protective settings, which they cannot turn off:
+
+- warnings before sensitive content (below) always show, and its images stay blurred
+  until chosen;
+- the timelines they star are not shown on their profile;
+- browsing leaves out labelled timelines.
+
+Timelines start private for everyone. The service has no private messages, no contact
+between people outside public pull-request discussions, no location features, no
+advertising and no profiling for advertising. A parent or guardian who believes their
+child under 13 has an account, or who has a concern about a teenager's account, can
+contact the operator; the account can be closed and its data deleted. If you are
+young and something here upsets or worries you, use **Report** or tell an adult you
+trust.
 
 ## Your data and collaborators
 
@@ -96,16 +113,54 @@ bypass, credential theft, or deliberate disruption. Respect technical rate and
 size limits. Report suspected security defects privately using the published
 contact; do not access other users' data or disrupt the service while investigating.
 
+## How content is moderated
+
 Anyone, with or without an account, can report a timeline, moment, duration,
-comment, published plugin or account they can see. The owner is not told who
-reported. The operator may label, limit, remove, or suspend content or accounts for
-these violations, security incidents, or legal obligations. The owner is told what
-was decided and why, and can ask once for the decision to be reviewed (a suspended
-account by contacting the operator). Signed-in reporters with a confirmed email are
-told the outcome. Where practicable, the operator will provide an opportunity to
-export lawful data. Immediate action may be necessary; unlawful or harmful material need
-not remain available. This discretion does not transfer ownership of user data.
-Copyright complaints and repeat infringement are handled under COPYRIGHT.md.
+comment, published plugin or suite, or account they can see, choosing what is wrong
+(child sexual abuse or exploitation, other illegal content, sexually explicit content,
+graphic violence, promoting suicide or self-harm, harassment or private information,
+spam, copyright infringement, or something else). The owner is not told who reported.
+Reports of child abuse and other illegal content are reviewed first.
+
+People, not automated systems, review reports and decide. The operator and the site's
+administrators may:
+
+- dismiss a report;
+- add a sensitive-content label, which the owner cannot remove;
+- restrict content, so only its owner (and administrators) can see it;
+- suspend an account;
+
+for violations of these terms, security incidents, or legal obligations. Apparent child
+sexual abuse material is restricted at once, preserved as the law requires and reported
+to the authorities (in the US, to NCMEC). Immediate action may be necessary; unlawful
+or harmful material need not remain available. Where practicable, the operator will
+provide an opportunity to export lawful data. This discretion does not transfer
+ownership of user data. Copyright complaints and repeat infringement are handled under
+COPYRIGHT.md.
+
+The service uses no automated content detection. Two automatic measures shape what
+appears, not whether it is allowed: browsing ranks public timelines with an account
+standing (from account age, email confirmation, two-factor authentication, stars and
+forks received, and moderation decisions), leaving out new accounts' timelines until
+they are established; and signing up, sending email, reporting, publishing plugins,
+repeated failed sign-ins and new accounts' contributions to others' timelines may ask
+for a human-verification challenge. Search ranks by relevance to what
+you typed.
+
+## Complaints
+
+- **About content:** use **Report** on it.
+- **About a decision on your content or account:** you are told what was decided and
+  why, by notice in your account and by email, and can ask once from Account for it
+  to be reviewed by someone. A suspended account asks by contacting the operator.
+  Signed-in reporters with a confirmed email are told the outcome of their report.
+- **About anything else:** contact the operator, for example about how a report was
+  handled, about the service not meeting these terms or its legal duties, or about
+  being wrongly treated as under 18.
+
+Complaints are answered as soon as practicable and are not used against the person
+who makes them. Where you live may also give you the right to complain to a regulator
+or a court, or (in the EU) to an out-of-court dispute settlement body.
 
 ## Availability, departure, and liability
 
@@ -113,8 +168,9 @@ Keep independent exports. Local edits do not publish automatically: saving to th
 server changes the timeline or proposal you explicitly select. The service may
 change or be interrupted and does not promise perpetual hosting, particular
 storage capacity, recovery of every version, or a service-level guarantee.
-You can delete owned timelines through the interface. Account deletion and other
-data requests currently require operator assistance; see PRIVACY.md.
+You can delete, through the interface, the timelines you own, your comments, and
+your account (Account → Delete your account), which deletes what it owns and wrote,
+as PRIVACY.md describes. Other data requests go to the operator; see PRIVACY.md.
 
 To the extent permitted by applicable law, the service is provided as available,
 without promises of uninterrupted availability or fitness for a particular purpose.

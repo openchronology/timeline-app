@@ -1473,3 +1473,10 @@ ALTER TABLE oc_moderation_cases ADD CONSTRAINT oc_moderation_cases_status_check
 ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS birth_year smallint CHECK(birth_year BETWEEN 1900 AND 2200);
 ALTER TABLE oc_registrations ADD COLUMN IF NOT EXISTS birth_year smallint CHECK(birth_year BETWEEN 1900 AND 2200);
 ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS show_sensitive boolean NOT NULL DEFAULT false;
+-- A browser refused an account for its age (#166): asked again within a day, it is refused
+-- again, so a child cannot simply go back and give another year (the FTC's guidance on
+-- neutral age screens). Keyed by a hash of the browser's sign-in nonce.
+CREATE TABLE IF NOT EXISTS oc_age_refusals (
+  browser_hash text PRIMARY KEY,
+  expires_at timestamptz NOT NULL
+);

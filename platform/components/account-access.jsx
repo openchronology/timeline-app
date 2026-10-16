@@ -223,6 +223,55 @@ export default function AccountAccess({ session, account, refresh }) {
       <p className="error" role="alert">
         {error}
       </p>
+      <h2>Delete your account</h2>
+      <p className="muted">
+        Deletes your account and what is yours: your timelines (with their saved history, pull
+        requests and comments; others’ forks of them stay theirs), the pull requests and comments
+        you wrote on other timelines, your published plugins and suites, stars, API keys and sign-in
+        methods. Changes already merged into other people’s timelines stay there. Export what you
+        want to keep first. This cannot be undone.
+      </p>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const d = new FormData(e.currentTarget);
+          if (busy) return;
+          setBusy(true);
+          setError('');
+          try {
+            // Not through action(): there is no account left to refresh afterwards.
+            await api('auth/account', {
+              method: 'DELETE',
+              csrf: session.csrf,
+              data: {
+                confirm: d.get('confirm'),
+                ...(d.get('password') ? { password: d.get('password') } : {}),
+                ...(d.get('code') ? { code: d.get('code') } : {}),
+              },
+            });
+            window.location.assign('/');
+          } catch (failure) {
+            setError(failure.message);
+            setBusy(false);
+          }
+        }}
+      >
+        <label>
+          Type your username to confirm
+          <input name="confirm" autoComplete="off" required />
+        </label>
+        <label>
+          Current password (if your account has one)
+          <input name="password" type="password" autoComplete="current-password" />
+        </label>
+        <label>
+          Authenticator or recovery code (if two-factor authentication is on)
+          <input name="code" autoComplete="one-time-code" />
+        </label>
+        <button className="danger" disabled={busy}>
+          Delete my account
+        </button>
+      </form>
     </section>
   );
 }
