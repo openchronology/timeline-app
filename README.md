@@ -237,6 +237,8 @@ after the stack starts, or `npm run seed` / `pnpm seed` / `yarn seed` with a mig
 PostgreSQL database. See [seeding instructions](docs/seeding.md) for the six
 featured timelines, source/date conventions, and secure management access.
 
+**Shift or scale times…** in the timeline's menu moves or stretches the times of every moment and duration, or of those with chosen tags or relationships, for good, as comparisons align them; on the server it is one saved version, with its progress shown ([shifting and scaling times](docs/time-mapping.md)).
+
 Timelines that keep growing, such as log timelines, can [keep only their last year, month or week](docs/retention.md): the server expires older moments and history on a schedule, freeing storage, and **Delete everything in this view…** clears a stretch of time at once.
 
 Public timelines, and the moments and durations in them, can be [shared](docs/sharing.md): every moment, duration, search and view has a link, **Share** offers the link, social sites and an embed code, link previews show a card with a picture of the timeline, and other sites can embed a timeline (or discover it through oEmbed). Search engines get a sitemap and a text version of each public timeline.

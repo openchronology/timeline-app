@@ -58,23 +58,7 @@ export function viewFilterKey(filter: ViewFilter): string {
  * moments they follow may be on the other side.
  */
 export function filterDocument(document: TimelineDocument, filter: ViewFilter): TimelineDocument {
-  // Membership on the "any" side, by reference key.
-  let inside: (key: string, metadata: Metadata) => boolean;
-  if ('related' in filter) {
-    const start = refKey(validateRef(filter.related));
-    const set = reachable(
-      adjacency(validateRelationships(document.relationships, null)),
-      start,
-      filter.depth === 'direct' ? 1 : Infinity,
-    );
-    set.add(start);
-    inside = (key) => set.has(key);
-  } else {
-    const wanted = new Set(validateTags(filter.tags));
-    inside = (_key, metadata) => entityTags(metadata).some((tag) => wanted.has(tag));
-  }
-  const keep = (key: string, metadata: Metadata) =>
-    inside(key, metadata) === (filter.mode === 'any');
+  const keep = filterMembership(document, filter);
   const times = new Map(document.events.map((e) => [e.id, e.time]));
   const events: PointEvent[] = document.events.filter((e) => keep('m:' + e.id, e.metadata));
   const durations: Duration[] = [];
@@ -100,6 +84,31 @@ export function filterDocument(document: TimelineDocument, filter: ViewFilter): 
     ...(durations.length ? { durations } : { durations: undefined }),
     ...(relationships.length ? { relationships } : { relationships: undefined }),
   };
+}
+/**
+ * Whether an entity, named by its reference key (`m:<id>` or `d:<id>`) with its metadata, is
+ * on the side of `document` that `filter` selects.
+ */
+export function filterMembership(
+  document: Pick<TimelineDocument, 'relationships'>,
+  filter: ViewFilter,
+): (key: string, metadata: Metadata) => boolean {
+  // Membership on the "any" side, by reference key.
+  let inside: (key: string, metadata: Metadata) => boolean;
+  if ('related' in filter) {
+    const start = refKey(validateRef(filter.related));
+    const set = reachable(
+      adjacency(validateRelationships(document.relationships, null)),
+      start,
+      filter.depth === 'direct' ? 1 : Infinity,
+    );
+    set.add(start);
+    inside = (key) => set.has(key);
+  } else {
+    const wanted = new Set(validateTags(filter.tags));
+    inside = (_key, metadata) => entityTags(metadata).some((tag) => wanted.has(tag));
+  }
+  return (key, metadata) => inside(key, metadata) === (filter.mode === 'any');
 }
 /** Tags used by moments and durations, most used first. */
 export function tagCounts(

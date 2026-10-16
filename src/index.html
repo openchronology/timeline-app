@@ -278,6 +278,7 @@ Every point has a place. Explore the spaces between them.</textarea>
             <div class="comparison-heading">
               <strong id="separation-heading">Separated by tags</strong>
               <span id="separation-tags" class="separation-tags"></span>
+              <button id="separation-map" hidden>Shift or scale these…</button>
               <button id="separation-rejoin">Rejoin</button>
             </div>
             <p id="separation-note" class="field-hint">
@@ -477,6 +478,63 @@ Every point has a place. Explore the spaces between them.</textarea>
         <div class="dialog-actions">
           <button id="separate-submit" class="button-primary" type="submit">Separate</button
           ><button type="button" data-close="separate-dialog">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="map-dialog" aria-labelledby="map-heading">
+      <form id="map-form">
+        <div class="dialog-heading">
+          <h2 id="map-heading">Shift or scale times</h2>
+          <button type="button" data-close="map-dialog" aria-label="Close">×</button>
+        </div>
+        <p class="field-hint">
+          Each time becomes (time − around) × scale + around + offset, exactly, as comparisons align
+          timelines. A duration’s start or end that follows a moment moves with that moment.
+        </p>
+        <div class="map-fields">
+          <label
+            >Scale<input id="map-scale" value="1" spellcheck="false" autocomplete="off"
+          /></label>
+          <label>Around<input id="map-around" spellcheck="false" autocomplete="off" /></label>
+          <label
+            >Offset<input id="map-offset" value="0" spellcheck="false" autocomplete="off"
+          /></label>
+        </div>
+        <p id="map-units" class="field-hint"></p>
+        <fieldset id="map-scope" class="map-scope">
+          <legend>Apply to</legend>
+          <label class="checkbox-label"
+            ><input type="radio" name="map-scope" value="all" checked /> Every moment and
+            duration</label
+          >
+          <label class="checkbox-label"
+            ><input type="radio" name="map-scope" value="tagged" /> Those tagged</label
+          >
+          <label class="checkbox-label"
+            ><input type="radio" name="map-scope" value="untagged" /> Those not tagged</label
+          >
+          <input
+            id="map-tags"
+            aria-label="Tags"
+            placeholder="Comma-separated, e.g. war, trade"
+            spellcheck="false"
+          />
+          <label id="map-related-direct" class="checkbox-label" hidden
+            ><input type="radio" name="map-scope" value="related-direct" /> <span></span
+          ></label>
+          <label id="map-related-all" class="checkbox-label" hidden
+            ><input type="radio" name="map-scope" value="related-all" /> <span></span
+          ></label>
+        </fieldset>
+        <p id="map-summary" class="map-summary" role="status"></p>
+        <div id="map-working" class="map-working" hidden>
+          <progress id="map-progress"></progress>
+          <span id="map-status" role="status"></span>
+        </div>
+        <p id="map-error" class="form-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button id="map-submit" class="button-primary" type="submit">Apply</button
+          ><button id="map-cancel" type="button" data-close="map-dialog">Cancel</button>
         </div>
       </form>
     </dialog>

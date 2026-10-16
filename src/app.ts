@@ -92,9 +92,16 @@ import {
   snippet,
   SEARCH_PAGE_SIZE,
   createDifference,
+  timeMapping,
+  timeMappingInput,
+  mapTime,
+  mappedEntities,
+  unchangedMapping,
 } from './core.js';
 import type {
   EntityRef,
+  TimeMapping,
+  ViewFilter,
   Relationship,
   DurationBand,
   SearchPage,
@@ -127,6 +134,7 @@ import {
   exportSqlite,
   anonymousRequests,
   useNativeServer,
+  requestProgress,
 } from './transport.js';
 import { parseLink, linkFragment, sharePath } from './links.js';
 import { readViewState, viewStorageKey, VIEW_PREFIX } from './view-state.js';
@@ -1805,19 +1813,22 @@ async function comparisonSources(ids: string[]): Promise<ComparisonSource[]> {
   return sources;
 }
 /** Tells comparison offsets' units, which the comparison's time display defines. */
-function describeOffsetUnits() {
-  if (!comparison) return;
-  let units: string;
+/** What offsets (time differences) a time display reads, said for people. */
+function offsetUnits(presentation: TimePresentation | undefined): string {
   try {
-    const difference = createDifference(comparison.presentation),
+    const difference = createDifference(presentation),
       names = difference.units.map((u) => u.plural ?? u.name);
-    units = names.length
+    return names.length
       ? `Offsets take ${names.length > 14 ? names.slice(0, 14).join(', ') + ', …' : names.join(', ')}` +
-        (difference.plain ? `; a plain number is ${difference.plain}.` : '.')
+          (difference.plain ? `; a plain number is ${difference.plain}.` : '.')
       : `Offsets are ${difference.plain ?? 'written as this time display reads them'}.`;
   } catch (error) {
-    units = error instanceof Error ? error.message : String(error);
+    return error instanceof Error ? error.message : String(error);
   }
+}
+function describeOffsetUnits() {
+  if (!comparison) return;
+  const units = offsetUnits(comparison.presentation);
   text('comparison-offset-units', units);
   for (const field of document.querySelectorAll<HTMLInputElement>('.comparison-offset'))
     field.title = units;
@@ -4146,6 +4157,20 @@ function showTimelineMenu(
   // Only when the view shows something to delete.
   if (rangeDeletable() && (frame.groups.length || frame.durations?.length))
     add('Delete everything in this view…', requestRangeDelete);
+  if (!comparison && bulkEditable() && fittable())
+    add('Shift or scale times…', () =>
+      requestTimeMap(
+        time,
+        point
+          ? { ref: { moment: point.id }, label: point.metadata.title ?? point.id }
+          : duration
+            ? {
+                ref: { duration },
+                label: String(model?.durations.get(duration)?.metadata.title ?? duration),
+              }
+            : null,
+      ),
+    );
   if (shareable())
     add('Share this view', () =>
       requestShare({ kind: 'view', left: viewport.left, right: viewport.right }, remote!.title),
@@ -5058,13 +5083,18 @@ function historyEntities() {
   return { moments, durations };
 }
 /**
- * Whether everything in the view can be deleted at once: a timeline in this page (undoable),
- * or a server timeline this account writes (on the server, at once). Not a desktop file.
+ * Whether many moments and durations can be changed at once, comparison or not: in a timeline
+ * in this page (undoable), or in a server timeline this account writes (on the server, at
+ * once). Not a desktop file.
  */
-function rangeDeletable(): boolean {
-  if (comparison || !editable()) return false;
+function bulkEditable(): boolean {
+  if (embedded || !model || (remote && !remote.canEdit)) return false;
   if (!sparseWorkspace()) return true;
   return !!remote && !local && !!remote.canWrite;
+}
+/** Whether everything in the view can be deleted at once (bulkEditable, not comparing). */
+function rangeDeletable(): boolean {
+  return !comparison && bulkEditable();
 }
 /** Asks, then deletes every moment in the view and the durations wholly inside it (#91). */
 function requestRangeDelete() {
@@ -5157,6 +5187,291 @@ function requestRangeDelete() {
   el<HTMLDialogElement>('delete-dialog').showModal();
   el('delete-cancel').focus();
 }
+/**
+ * Shifting or scaling times for good (#96; time-map.ts): everything, or what a tag or
+ * relationship filter selects, as comparisons align. In this page it is one undoable edit; on
+ * the server, one save made there at once, whose progress the dialog shows.
+ */
+let mapRelated: { ref: EntityRef; label: string } | null = null,
+  mapRunning = false;
+function mapPresentation() {
+  return model?.presentation ?? remote?.presentation;
+}
+/** Opens the dialog: scaling around `around`, preferring `filter`'s selection when given. */
+function requestTimeMap(
+  around: Q,
+  related: { ref: EntityRef; label: string } | null = null,
+  filter: ViewFilter | null = null,
+) {
+  if (!bulkEditable() || mapRunning) return;
+  closeTimelineMenu();
+  mapRelated =
+    related ??
+    (filter && 'related' in filter
+      ? { ref: filter.related, label: separation && 'label' in separation ? separation.label : '' }
+      : null);
+  input('map-scale').value = '1';
+  input('map-offset').value = '0';
+  input('map-around').value = presented(around, 'input');
+  input('map-tags').value = filter && 'tags' in filter ? filter.tags.join(', ') : '';
+  const label = mapRelated ? `“${mapRelated.label || 'this'}”` : '';
+  el('map-related-direct').hidden = el('map-related-all').hidden = !mapRelated;
+  el('map-related-direct').querySelector('span')!.textContent = `Related to ${label}`;
+  el('map-related-all').querySelector('span')!.textContent =
+    `Connected to ${label} through any chain`;
+  const scope =
+    filter && 'tags' in filter
+      ? filter.mode === 'any'
+        ? 'tagged'
+        : 'untagged'
+      : filter && 'related' in filter
+        ? `related-${filter.depth}`
+        : 'all';
+  for (const radio of el('map-scope').querySelectorAll<HTMLInputElement>('input[type=radio]'))
+    radio.checked = radio.value === scope;
+  text(
+    'map-units',
+    offsetUnits(mapPresentation()) + ' Around is a time, written as the timeline shows them.',
+  );
+  text('map-error', '');
+  el('map-working').hidden = true;
+  setMapBusy(false);
+  describeTimeMap();
+  el<HTMLDialogElement>('map-dialog').showModal();
+  input('map-offset').focus();
+  input('map-offset').select();
+}
+/** The filter the dialog's scope names, or null for everything. */
+function mapFilter(): ViewFilter | null {
+  const scope =
+    el('map-scope').querySelector<HTMLInputElement>('input[type=radio]:checked')?.value ?? 'all';
+  if (scope === 'tagged' || scope === 'untagged') {
+    const tags = validateTags(parseTagInput(input('map-tags').value));
+    if (!tags.length) throw new Error('Name at least one tag.');
+    return { tags, mode: scope === 'tagged' ? 'any' : 'none' };
+  }
+  if (scope.startsWith('related-') && mapRelated)
+    return {
+      related: mapRelated.ref,
+      depth: scope === 'related-all' ? 'all' : 'direct',
+      mode: 'any',
+    };
+  return null;
+}
+function readTimeMap(): TimeMapping {
+  const difference = createDifference(mapPresentation());
+  let offset: Q, around: Q;
+  try {
+    offset = difference.parse(input('map-offset').value);
+  } catch (error) {
+    throw new Error(`Offset: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  try {
+    around = parseInputTime(input('map-around').value);
+  } catch (error) {
+    throw new Error(`Around: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  return {
+    ...timeMapping({ scale: input('map-scale').value, offset: '0' }),
+    offset,
+    around,
+  };
+}
+/** Says ahead what applying will change, and how. */
+function describeTimeMap() {
+  let summary: string;
+  try {
+    const mapping = readTimeMap(),
+      filter = mapFilter();
+    if (unchangedMapping(mapping)) summary = 'With scale 1 and offset 0, nothing moves.';
+    else if (!sparseWorkspace() && model) {
+      const { events, durations } = mappedEntities(model.document(), mapping, filter, parseTime);
+      summary = `This moves ${events.length.toLocaleString()} ${events.length === 1 ? 'moment' : 'moments'} and ${durations.length.toLocaleString()} ${durations.length === 1 ? 'duration' : 'durations'}. You can undo it.`;
+    } else {
+      const count = BigInt(remote?.event_count ?? '0'),
+        moments = `${count.toLocaleString()} ${count === 1n ? 'moment' : 'moments'}`;
+      summary =
+        (filter
+          ? `This moves the moments and durations selected, of the timeline’s ${moments}.`
+          : `This moves all ${moments} and all durations.`) +
+        ' It is saved on the server at once, as one version; the timeline’s history keeps the one before.' +
+        (count >= 100000n
+          ? ' On a timeline this large it can take minutes, and others’ saves wait until it finishes.'
+          : '');
+    }
+  } catch (error) {
+    summary = error instanceof Error ? error.message : String(error);
+  }
+  text('map-summary', summary);
+}
+function setMapBusy(busy: boolean) {
+  mapRunning = busy;
+  for (const control of el('map-form').querySelectorAll<HTMLInputElement | HTMLButtonElement>(
+    'input, button',
+  ))
+    control.disabled = busy;
+}
+function mapStep(done: number | null, total: number | null, status: string) {
+  const bar = el<HTMLProgressElement>('map-progress');
+  el('map-working').hidden = false;
+  if (done === null || !total) bar.removeAttribute('value');
+  else {
+    bar.max = total;
+    bar.value = done;
+  }
+  text('map-status', status);
+}
+const nextTurn = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+/** Applies the mapping to the timeline in this page, as one undoable edit. */
+async function mapHere(mapping: TimeMapping, filter: ViewFilter | null) {
+  const index = model!,
+    request = documentRequest;
+  const { events, durations } = mappedEntities(index.document(), mapping, filter, parseTime);
+  const total = events.length + durations.length,
+    group: GroupEdit['group'] = [];
+  let done = 0;
+  const step = async () => {
+    if (++done % 5000 === 0) {
+      mapStep(done, total, `${done.toLocaleString()} of ${total.toLocaleString()}`);
+      await nextTurn();
+    }
+  };
+  for (const event of events) {
+    if (request !== documentRequest) return null;
+    group.push({ before: index.byId.get(event.id), after: event });
+    index.put(event);
+    await step();
+  }
+  for (const duration of durations) {
+    if (request !== documentRequest) return null;
+    group.push({ duration: true, before: index.durations.get(duration.id), after: duration });
+    index.putDuration(duration);
+    await step();
+  }
+  if (request !== documentRequest || !group.length) return { moments: 0, durations: 0 };
+  record({ group });
+  selected = null;
+  selectedGroup = null;
+  el('event-form').hidden = true;
+  el<HTMLDialogElement>('inspector').close();
+  changed();
+  return { moments: events.length, durations: durations.length };
+}
+/** Applies the mapping on the server, showing its progress. */
+async function mapOnServer(mapping: TimeMapping, filter: ViewFilter | null) {
+  const id = remote!.id,
+    request = documentRequest;
+  const result = await requestProgress<
+    { moved: { moments: number; durations: number } },
+    { reading?: boolean; rebuilding?: string; done?: number; total?: number }
+  >(
+    `timelines/${id}/map-times`,
+    {
+      revision: remote!.revision,
+      mapping: timeMappingInput(mapping),
+      ...(filter ? { filter } : {}),
+    },
+    session.csrf,
+    (step) => {
+      if (step.reading) mapStep(null, null, 'Reading the timeline…');
+      else if (step.rebuilding)
+        mapStep(
+          step.done ?? null,
+          step.total ?? null,
+          `Rebuilding the timeline: ${step.rebuilding}…`,
+        );
+      else if (step.total !== undefined)
+        mapStep(
+          step.done ?? 0,
+          step.total,
+          `Saving ${(step.done ?? 0).toLocaleString()} of ${step.total.toLocaleString()} changes…`,
+        );
+    },
+  );
+  if (remote?.id === id && request === documentRequest) {
+    const view = viewport.clone();
+    await openRemote(id, false);
+    viewport = view;
+  }
+  return result.moved;
+}
+el<HTMLFormElement>('map-form').onsubmit = (event) => {
+  event.preventDefault();
+  if (mapRunning) return;
+  let mapping: TimeMapping, filter: ViewFilter | null;
+  try {
+    mapping = readTimeMap();
+    filter = mapFilter();
+    if (sparseWorkspace() && dirty)
+      throw new Error('Save your changes first: this is saved on the server at once.');
+  } catch (error) {
+    text('map-error', error instanceof Error ? error.message : String(error));
+    return;
+  }
+  text('map-error', '');
+  if (unchangedMapping(mapping)) {
+    el<HTMLDialogElement>('map-dialog').close();
+    return;
+  }
+  setMapBusy(true);
+  mapStep(null, null, 'Working…');
+  void (async () => {
+    // Separated tracks are read-only: back to the whole timeline, which this changes.
+    if (comparison) stopComparison();
+    const before = viewport.clone();
+    const moved = sparseWorkspace()
+      ? await mapOnServer(mapping, filter)
+      : await mapHere(mapping, filter);
+    setMapBusy(false);
+    // Another timeline was opened meanwhile.
+    if (!moved) return el<HTMLDialogElement>('map-dialog').close();
+    // When everything moved, so does the view, to show what it showed.
+    if (!filter)
+      viewport = new Viewport(mapTime(before.left, mapping), before.span.mul(mapping.scale));
+    requestRender();
+    el<HTMLDialogElement>('map-dialog').close();
+    toast(
+      `Moved ${moved.moments.toLocaleString()} ${moved.moments === 1 ? 'moment' : 'moments'} and ${moved.durations.toLocaleString()} ${moved.durations === 1 ? 'duration' : 'durations'}.${sparseWorkspace() ? '' : ' Undo restores them.'}`,
+    );
+  })().catch((error) => {
+    setMapBusy(false);
+    el('map-working').hidden = true;
+    text('map-error', error instanceof Error ? error.message : String(error));
+  });
+};
+for (const id of ['map-scale', 'map-offset', 'map-around', 'map-tags'])
+  input(id).addEventListener('input', describeTimeMap);
+el('map-scope').addEventListener('change', describeTimeMap);
+input('map-tags').addEventListener('focus', () => {
+  const tagged = el('map-scope').querySelector<HTMLInputElement>('input[value=tagged]')!;
+  const untagged = el('map-scope').querySelector<HTMLInputElement>('input[value=untagged]')!;
+  if (!tagged.checked && !untagged.checked) {
+    tagged.checked = true;
+    describeTimeMap();
+  }
+});
+// It cannot be closed while it works: not with Escape, nor by a click outside it.
+el('map-dialog').addEventListener('cancel', (event) => {
+  if (mapRunning) event.preventDefault();
+});
+el('map-dialog').addEventListener(
+  'click',
+  (event) => {
+    if (mapRunning) event.stopImmediatePropagation();
+  },
+  true,
+);
+el('separation-map').onclick = () => {
+  if (!separation) return;
+  const center = viewport.left.add(viewport.span.div(Q.from(2n)));
+  requestTimeMap(
+    center,
+    null,
+    'tags' in separation
+      ? { tags: separation.tags, mode: 'any' }
+      : { related: separation.related, depth: separation.depth, mode: 'any' },
+  );
+};
 /** Records a new edit; any redoable edits branch away and are discarded. */
 function record(edit: HistoryEntry) {
   history.push(edit);
@@ -7378,6 +7693,7 @@ function startSeparation(by: string[] | Separation) {
         : 'Separated by all connected relationships',
   );
   text('separation-tags', label);
+  el('separation-map').hidden = !bulkEditable();
   heading();
   requestRender();
 }

@@ -519,7 +519,12 @@ export class PostgresStore {
     );
     for (const { id } of rows) await this.prepare(id);
   }
-  async replace(client, id, document, { touch = true } = {}) {
+  /**
+   * Writes timeline `id`'s index whole from `document`, telling `progress` (if given) each
+   * stage of REBUILD_STAGES as it starts.
+   */
+  async replace(client, id, document, { touch = true, progress } = {}) {
+    const stage = (done, rebuilding) => progress?.({ rebuilding, done, total: REBUILD_STAGES });
     document = withoutImageCopies(validateDocument(document));
     if (document.comparison) {
       const parent = (
@@ -570,11 +575,16 @@ export class PostgresStore {
     if (document.events.length + (document.durations?.length ?? 0) >= ANALYZE_AFTER)
       client.analyze = true;
     const tree = indexedNodes(document);
+    stage(1, 'writing moments');
     await writeMoments(client, 'oc_moments', id, document.events);
+    stage(2, 'ordering moments');
     await writeNodes(client, 'oc_nodes', id, tree);
+    stage(3, 'placing durations');
     const durations = await writeDurationNodes(client, 'oc_duration_nodes', id, document);
     const bands = durations.bands;
+    stage(4, 'indexing for search');
     await this.indexSearch(client, id, document, bands);
+    stage(5, 'linking relationships');
     await client.query('DELETE FROM oc_relationships WHERE timeline_id=$1', [id]);
     const links = document.relationships ?? [];
     const kind = (ref) => ('moment' in ref ? ['moment', ref.moment] : ['duration', ref.duration]);
@@ -810,7 +820,12 @@ export class PostgresStore {
    * Saves `document`, or `patch` (applied in place when it can be), at `revision`.
    * `analyses`: see transaction.
    */
-  async save(id, userId, revision, document, patch = null, { analyses = null } = {}) {
+  /**
+   * Saves `document`, or `patch` onto the current revision. `progress`, if given, is told as
+   * a large patch is applied in place (see saveIncrementally), or as the timeline is rebuilt
+   * with it instead (`{ rebuilding: stage, done, total }`; see replace).
+   */
+  async save(id, userId, revision, document, patch = null, { analyses = null, progress } = {}) {
     return this.transaction(
       async (c) => {
         await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [id]);
@@ -829,16 +844,20 @@ export class PostgresStore {
         await this.checkScripts(patch ? patch.settings.plugins : document.plugins, t.plugins);
         if (patch && incremental(t, patch)) {
           // Sparse saves update the stored index in place and record only the patch.
-          await this.saveIncrementally(c, t, userId, patch);
+          await this.saveIncrementally(c, t, userId, patch, 'save', [t.head_revision_id], {
+            progress,
+          });
           c.afterCommit = () => this.refreshText(id);
           return this.access(id, userId, c);
         }
         if (patch) {
+          progress?.({ rebuilding: 'reading it', done: 0, total: REBUILD_STAGES });
           const current = await this.branchDocument(c, t);
           document = validateDocument(applyPatch(current, patch));
         }
-        await this.replace(c, id, document);
+        await this.replace(c, id, document, { progress });
         await c.query('UPDATE oc_timelines SET revision=revision+1 WHERE id=$1', [id]);
+        progress?.({ rebuilding: 'recording the version', done: 6, total: REBUILD_STAGES });
         await this.checkpoint(c, id, userId, document, 'save', [t.head_revision_id]);
         return this.access(id, userId, c);
       },
@@ -1050,7 +1069,15 @@ export class PostgresStore {
    * and its indexed columns stay unchanged (updated_at advances at most once a minute), so
    * the update stays in place (HOT) and the catalogue's GIN index is not touched.
    */
-  async saveIncrementally(client, t, userId, patch, kind = 'save', parents = [t.head_revision_id]) {
+  async saveIncrementally(
+    client,
+    t,
+    userId,
+    patch,
+    kind = 'save',
+    parents = [t.head_revision_id],
+    { progress } = {},
+  ) {
     // A large patch is applied a slice at a time, each to the timeline as the last left it,
     // so no statement grows with the patch; it is still one revision.
     const touched = { moments: [], durations: [], relationships: [] };
@@ -1058,8 +1085,18 @@ export class PostgresStore {
       added = false,
       applied;
     const slices = slicePatch(patch, this.patchSlice);
+    // Told how many changes are applied so far, of how many (`progress`).
+    const total = slices.reduce(
+      (n, s) => n + s.changes.length + s.durationChanges.length + s.relationshipChanges.length,
+      0,
+    );
+    let done = 0;
+    progress?.({ done, total });
     for (const [i, slice] of slices.entries()) {
       applied = await applyIncrementally(client, current, slice);
+      done +=
+        slice.changes.length + slice.durationChanges.length + slice.relationshipChanges.length;
+      progress?.({ done, total });
       added ||= applied.added;
       for (const name of Object.keys(touched)) touched[name].push(...applied.touched[name]);
       if (i < slices.length - 1) {
@@ -1758,6 +1795,8 @@ export class PostgresStore {
  * converts when read. Returns the number of converted timelines.
  */
 /** Writes moment rows (the tree's nodes refer to them by ID). */
+/** Stages of rebuilding a timeline with a save (store.save, replace), for its progress. */
+const REBUILD_STAGES = 7;
 async function writeMoments(client, table, id, events) {
   await client.query(`DELETE FROM ${table} WHERE timeline_id=$1`, [id]);
   await upsertRows(

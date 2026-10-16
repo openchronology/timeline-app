@@ -94,3 +94,51 @@ export async function exportSqlite(
   if (!response.ok) throw new Error((await response.json()).error ?? 'File export failed.');
   return response.blob();
 }
+/**
+ * POSTs `data` to an API path that streams its progress as JSON lines (server/http.mjs,
+ * progressLines), telling `progress` each step; resolves with the result. The desktop app's
+ * requests go through its native client, which takes one JSON reply instead, without steps.
+ */
+export async function requestProgress<T, P = unknown>(
+  path: string,
+  data: unknown,
+  csrf: string | null | undefined,
+  progress: (step: P) => void,
+): Promise<T> {
+  if (window.__TAURI__) return requestApi<T>(path, 'POST', data, csrf);
+  const response = await fetch('/api/' + path, {
+    method: 'POST',
+    credentials,
+    headers: {
+      Accept: 'application/x-ndjson',
+      'Content-Type': 'application/json',
+      ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok || !response.body) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
+    throw Object.assign(new Error(body.error ?? 'Request failed.'), { status: response.status });
+  }
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffered = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    buffered += value ?? '';
+    const lines = buffered.split('\n');
+    buffered = done ? '' : lines.pop()!;
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const step = JSON.parse(line) as {
+        progress?: P;
+        result?: T;
+        error?: { status: number; message: string };
+      };
+      if (step.error)
+        throw Object.assign(new Error(step.error.message), { status: step.error.status });
+      if ('result' in step) return step.result as T;
+      if (step.progress !== undefined) progress(step.progress);
+    }
+    if (done) throw new Error('The server stopped before finishing. Reload to see what was saved.');
+  }
+}

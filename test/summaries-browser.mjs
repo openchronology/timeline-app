@@ -93,6 +93,7 @@ export async function checkSummaries(page, restore) {
       'Edit',
       'Delete',
       'Delete everything in this view…',
+      'Shift or scale times…',
     ]);
     await menu.getByRole('menuitem', { name: 'Edit', exact: true }).click();
     await dialog.waitFor();

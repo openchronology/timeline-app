@@ -3,6 +3,7 @@ import { checkSearch } from './search-browser.mjs';
 import { checkSummaries } from './summaries-browser.mjs';
 import { checkCapacity } from './capacity-browser.mjs';
 import { checkRangeDelete } from './range-delete-browser.mjs';
+import { checkTimeMap } from './time-map-browser.mjs';
 import { checkDurationBackgrounds } from './duration-backgrounds-browser.mjs';
 import { checkHeadings } from './headings-browser.mjs';
 import { checkSuites } from './suites-browser.mjs';
@@ -282,6 +283,7 @@ try {
   await checkSummaries(page, document);
   await checkCapacity(page, document);
   await checkRangeDelete(page, document);
+  await checkTimeMap(page, document);
   await checkDurationBackgrounds(page, document);
   await checkHeadings(page, document);
   await checkSuites(page, document);
