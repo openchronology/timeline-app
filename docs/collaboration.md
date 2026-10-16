@@ -78,7 +78,7 @@ The syslog receiver and the log importer don't need a `base`: they fetch the lat
 
 ### Timelines without saved history
 
-High-volume timelines whose past revisions nobody reviews, such as logs, can stop keeping saved history: turn off **Keep saved history** in **Sharing & settings** (owner only; on by default). In an append-only timeline history is about the size of the timeline itself, so this roughly halves its storage and quota charge.
+High-volume timelines whose past revisions nobody reviews, such as logs, can stop keeping saved history: choose **Stop keeping saved history…** in **Sharing & settings** (owner only; on by default). In an append-only timeline history is about the size of the timeline itself, so this roughly halves its storage and quota charge.
 
 - **Turning it off** deletes the content of its past revisions at once, freeing the storage the settings page states. Revisions forks, copies and pull requests still read are kept, as deletion keeps them.
 - **While it is off**, each save still records a revision with its author, time and parents, but no content, and is charged nothing for history. The latest revision is read from the timeline itself; **History** lists the others as not kept.

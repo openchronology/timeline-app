@@ -6,7 +6,16 @@ export default {
   serverExternalPackages: ['pg'],
   poweredByHeader: false,
   outputFileTracingIncludes: {
-    '/*': ['../dist/**/*', '../legal/**/*', '../LICENSE', '../NOTICE', '../THIRD_PARTY.md'],
+    // The help area (#172) reads docs/ and the README as it runs.
+    '/*': [
+      '../dist/**/*',
+      '../legal/**/*',
+      '../docs/**/*',
+      '../README.md',
+      '../LICENSE',
+      '../NOTICE',
+      '../THIRD_PARTY.md',
+    ],
   },
   experimental: { proxyClientMaxBodySize: '40mb' },
 };

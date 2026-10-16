@@ -4,6 +4,7 @@ import Form from 'next/form';
 import { platformServices } from '../../../server/platform.mjs';
 import { createPluginLibrary, createSuiteLibrary } from '../../../server/plugins.mjs';
 import ReportLink from '../../components/report-link.jsx';
+import HelpTip from '../../components/help-tip.jsx';
 export const dynamic = 'force-dynamic';
 export default async function Plugins({ searchParams }) {
   const params = await searchParams;
@@ -77,7 +78,13 @@ export default async function Plugins({ searchParams }) {
               </article>
             ))}
           </div>
-          <h2>Plugins</h2>
+          <h2>
+            Plugins
+            <HelpTip topic="plugins" about="plugins">
+              Plugins add icons, colours, images, notes and more to a timeline. Add them from its
+              Plugins button.
+            </HelpTip>
+          </h2>
         </section>
       ) : null}
       <div className="timeline-grid">

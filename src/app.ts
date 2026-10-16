@@ -138,6 +138,8 @@ import {
 } from './transport.js';
 import { parseLink, linkFragment, sharePath } from './links.js';
 import { profilePath, timelinePath } from './addresses.js';
+import { addHelpTips } from './help-tips.js';
+import { startTour } from './tour.js';
 import { readViewState, viewStorageKey, VIEW_PREFIX } from './view-state.js';
 import type { ViewState } from './view-state.js';
 import type { TimelineLink } from './links.js';
@@ -4559,6 +4561,32 @@ stage.addEventListener('keydown', (event) => {
 
 el('timeline-help-button').onclick = () =>
   el<HTMLDialogElement>('timeline-help-dialog').showModal();
+/**
+ * A help page's address (#172): the server's own help on the website, the connected server's
+ * on the desktop, and timescale.info's in the offline file and the plain browser edition.
+ */
+function helpAddress(topic: string) {
+  const origin = platformEditor
+    ? ''
+    : desktop && serverOrigin
+      ? serverOrigin
+      : 'https://timescale.info';
+  return `${origin}/help/${topic}`;
+}
+/** Opens help beside the editor: in a new tab, or the desktop's own browser. */
+function openHelp(url: string) {
+  if (desktop) void window.__TAURI__!.core.invoke('desktop_open_image', { url }).catch(fail);
+  else window.open(url, '_blank', 'noopener,noreferrer');
+}
+addHelpTips(document, helpAddress, openHelp);
+const tour = () => startTour(document, helpAddress('guide'), openHelp);
+el('tour-button').onclick = () => {
+  // Once Help has closed, and given the focus back, the tour takes it.
+  const help = el<HTMLDialogElement>('timeline-help-dialog');
+  help.addEventListener('close', () => tour(), { once: true });
+  help.close();
+};
+el('guide-button').onclick = () => openHelp(helpAddress('guide'));
 el('zoom-in').onclick = () => zoom(Q.from(4n, 5n));
 el('zoom-out').onclick = () => zoom(Q.from(5n, 4n));
 el('fit-button').onclick = fit;
@@ -7178,6 +7206,8 @@ void (async () => {
     }
   }
   await route();
+  // Started from the help (/editor?tour=1).
+  if (new URLSearchParams(location.search).get('tour') === '1') tour();
 })().catch(fail);
 
 /** Durations anchored to the open moment, with a shortcut to start a new one there. */

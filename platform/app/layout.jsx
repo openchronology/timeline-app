@@ -40,12 +40,14 @@ export default async function RootLayout({ children }) {
             <a href="/plugins">Plugin library</a>
             <a href="/account">Account</a>
             <a href="/download">Download</a>
+            <a href="/help">Help</a>
           </nav>
         </header>
         {children}
         <footer className="platform-footer">
           © 2026 Athan Clark · GPLv3 · No warranty ·{' '}
-          <a href="/legal">Terms, privacy &amp; licenses</a> · <a href="/docs/api">HTTP API</a> ·{' '}
+          <a href="/legal">Terms, privacy &amp; licenses</a> · <a href="/help">Help</a> ·{' '}
+          <a href="/docs/api">HTTP API</a> ·{' '}
           <a href="/openchronology-web-source.tar.gz" download>
             Source
           </a>

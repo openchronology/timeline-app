@@ -162,6 +162,24 @@ try {
   assert.equal(openapi.servers[0].url, origin);
   assert(openapi.paths['/api/timelines/{id}/settings'].patch);
   assert.match(html, /href="\/docs\/api"/);
+  // The help (#172): docs/ as the server runs, by section, searchable, under the policy.
+  const help = await fetch(origin + '/help'),
+    helpHtml = await help.text();
+  assert.equal(help.status, 200);
+  assert(
+    helpHtml.includes(
+      `nonce="${help.headers.get('content-security-policy').match(/'nonce-([^']+)'/)[1]}"`,
+    ),
+  );
+  assert.match(helpHtml, /href="\/help\/tags"/);
+  assert.match(helpHtml, /href="\/docs\/api"/);
+  const tags = await (await fetch(origin + '/help/tags')).text();
+  assert.match(tags, /<h2 id="separating-by-tags">Separating by tags<\/h2>/);
+  assert.match(tags, /href="\/help\/time-mapping"/);
+  const found = await (await fetch(origin + '/help?q=separating+tags')).text();
+  assert.match(found, /href="\/help\/tags#separating-by-tags"/);
+  assert.equal((await fetch(origin + '/help/no-such-page')).status, 404);
+  assert.match(html, /href="\/help"/);
   // The plugin library page lists the official plugin suites (#78) above the plugins.
   const plugins = await (await fetch(origin + '/plugins')).text();
   assert.match(plugins, /Plugin suites/);
@@ -307,6 +325,20 @@ try {
           'Editor host must fit its header and frame without a sticky footer or second scrollbar',
         );
       }
+      // The editor's tour, from the help (#172).
+      await page.goto(origin + '/help');
+      await page.getByRole('link', { name: 'Take the tour of the editor' }).click();
+      await page.waitForURL(origin + '/editor?tour=1');
+      const toured = page.frameLocator('iframe.editor-frame').locator('.tour-card');
+      await toured.getByRole('heading', { name: 'The timeline', exact: true }).waitFor();
+      await toured.getByRole('button', { name: 'End tour' }).click();
+      await toured.waitFor({ state: 'detached' });
+      // A "?" on the website shows its tip, and leads to the help about it.
+      await page.goto(origin + '/plugins');
+      const tip = page.getByRole('link', { name: 'Help on plugins' });
+      await tip.hover();
+      await page.locator('#tip-plugins').waitFor({ state: 'visible' });
+      assert.equal(await tip.getAttribute('href'), '/help/plugins');
       await page.getByRole('link', { name: 'Account', exact: true }).click();
       await page.waitForURL(origin + '/account');
       await page.getByText('Server accounts are unavailable.').waitFor();
