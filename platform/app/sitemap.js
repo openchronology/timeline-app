@@ -14,6 +14,7 @@ export default async function sitemap() {
     { url: origin + '/', changeFrequency: 'daily' },
     { url: origin + '/plugins', changeFrequency: 'weekly' },
     { url: origin + '/download', changeFrequency: 'weekly' },
+    { url: origin + '/docs/api', changeFrequency: 'weekly' },
   ];
   let pool;
   try {

@@ -125,7 +125,8 @@ export default function AccountAccess({ session, account, refresh }) {
       <h2>API keys</h2>
       <p>
         Keys act with your timeline permissions and storage limit. They cannot manage accounts or
-        the site. Use HTTPS and send the key in the Authorization header; never put it in a URL.
+        the site. Use HTTPS and send the key in the Authorization header; never put it in a URL. The{' '}
+        <a href="/docs/api">HTTP API reference</a> lists what they can do.
       </p>
       <form onSubmit={create}>
         <label>

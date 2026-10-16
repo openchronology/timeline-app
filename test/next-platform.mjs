@@ -143,6 +143,25 @@ try {
     const r = await fetch(origin + path);
     assert.equal(r.status, 200, path);
   }
+  // The HTTP API (#178): its reference, under the content security policy, and its OpenAPI
+  // description, with or without the server's storage.
+  const reference = await fetch(origin + '/docs/api'),
+    referenceHtml = await reference.text();
+  assert.equal(reference.status, 200);
+  const referenceNonce = reference.headers
+    .get('content-security-policy')
+    .match(/'nonce-([^']+)'/)[1];
+  assert(referenceHtml.includes(`nonce="${referenceNonce}"`));
+  assert.match(referenceHtml, /timescale\.test HTTP API/);
+  assert.match(referenceHtml, /id="op-searchTimelines"/);
+  assert.match(referenceHtml, /href="\/api\/openapi\.json"/);
+  const described = await fetch(origin + '/api/openapi.json');
+  assert.equal(described.status, 200);
+  const openapi = await described.json();
+  assert.equal(openapi.openapi, '3.1.0');
+  assert.equal(openapi.servers[0].url, origin);
+  assert(openapi.paths['/api/timelines/{id}/settings'].patch);
+  assert.match(html, /href="\/docs\/api"/);
   // The plugin library page lists the official plugin suites (#78) above the plugins.
   const plugins = await (await fetch(origin + '/plugins')).text();
   assert.match(plugins, /Plugin suites/);

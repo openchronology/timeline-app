@@ -27,6 +27,8 @@ import { OAuth, providersFromEnv } from './oauth.mjs';
 import { mailFromEnv, encryptionKey } from './mail.mjs';
 import { DeviceAuth } from './device-auth.mjs';
 import { TimelineFiles } from './files.mjs';
+import { openApiDocument } from './openapi/index.mjs';
+import { siteName } from './site.mjs';
 import { HttpError, PostgresStore, restrictedTimeline, withoutImageCopies } from './store.mjs';
 import {
   Q,
@@ -276,6 +278,7 @@ export function createRequestHandler({
   const moderation = store ? new Moderation(store, auth, administration) : null;
   const collaboration = store ? new Collaboration(store) : null;
   const browserForks = store ? new BrowserForks(store, auth) : null;
+  let apiDescription = null;
   return async (req, res) => {
     // Enable only behind a proxy that overwrites X-Forwarded-For and blocks direct access.
     if (trustProxy) {
@@ -309,6 +312,16 @@ export function createRequestHandler({
         } catch {
           return response(res, 503, { status: 'unavailable' });
         }
+      }
+      // This API's description (#178), for anyone: docs/api.md.
+      if (pathname === '/api/openapi.json' && ['GET', 'HEAD'].includes(method)) {
+        apiDescription ??= JSON.stringify(openApiDocument({ origin, name: siteName() }));
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'public, max-age=300',
+          'Access-Control-Allow-Origin': '*',
+        });
+        return res.end(method === 'HEAD' ? undefined : apiDescription);
       }
       if (!['GET', 'HEAD'].includes(method) && req.headers.origin && req.headers.origin !== origin)
         throw new HttpError(403, 'Cross-origin request rejected.');
@@ -451,10 +464,12 @@ export function createRequestHandler({
             'api-key:' + session.api_key_id,
             Math.max(1, Math.min(1000, Number(process.env.API_KEY_REQUESTS_PER_MINUTE) || 120)),
           );
+        // Copying a public timeline into a browser supplies nothing: guests may (#178).
         if (
           pathname.startsWith('/api/timelines') &&
           !keyRequestRead(pathname, method) &&
-          method !== 'DELETE'
+          method !== 'DELETE' &&
+          !pathname.endsWith('/browser-fork')
         )
           await requireDataProvider(pool, userId);
         // Reports and moderation decisions (#115; moderation.mjs).
