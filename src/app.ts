@@ -145,7 +145,11 @@ const offlineHtml = typeof __OFFLINE_HTML__ !== 'undefined' && __OFFLINE_HTML__;
 declare global {
   interface Window {
     __TAURI__?: {
-      core: { invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> };
+      core: {
+        invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
+        /** Messages a command sends back as it works, such as its progress. */
+        Channel: new <T>() => { onmessage: (message: T) => void };
+      };
     };
   }
 }
@@ -675,7 +679,12 @@ type EventEdit = { before?: PointEvent; after?: PointEvent };
 type LinkEdit = { link: Relationship; related: boolean };
 /** Several edits undone and redone as one, such as deleting everything in a view. */
 type GroupEdit = { group: (EventEdit | DurationEdit)[] };
-type HistoryEntry = EventEdit | DurationEdit | LinkEdit | GroupEdit;
+/**
+ * A change made at once to a large desktop file's native baseline (#179): undo and redo take
+ * the baseline back and forward, until the file is saved.
+ */
+type BaselineEdit = { baseline: { before: number; after: number } };
+type HistoryEntry = EventEdit | DurationEdit | LinkEdit | GroupEdit | BaselineEdit;
 let history: HistoryEntry[] = [],
   future: HistoryEntry[] = [],
   frameRequest = 0,
@@ -2710,6 +2719,8 @@ function loadDocument(doc: TimelineDocument) {
         model = new RemoteWorkspace(header);
         if (selected) sparseWorkspace()!.load(selected);
         local = { ...result, id: 'local-sqlite', revision: String(result.generation) };
+        desktopSettings = JSON.stringify(model.document());
+        desktopSavedBaseline = null;
         frameRequest++;
         remoteCache.clear();
         heading();
@@ -5076,7 +5087,7 @@ function historyEntities() {
   const moments = new Set<string>(),
     durations = new Set<string>();
   for (const entry of [...history, ...future].flatMap((e) => ('group' in e ? e.group : [e]))) {
-    if ('link' in entry) continue;
+    if ('link' in entry || 'baseline' in entry) continue;
     const id = (entry.before ?? entry.after)?.id;
     if (id) ('duration' in entry ? durations : moments).add(id);
   }
@@ -5084,13 +5095,118 @@ function historyEntities() {
 }
 /**
  * Whether many moments and durations can be changed at once, comparison or not: in a timeline
- * in this page (undoable), or in a server timeline this account writes (on the server, at
- * once). Not a desktop file.
+ * in this page (undoable), in a large desktop file (in its native store, undoable until
+ * saved), or in a server timeline this account writes (on the server, at once).
  */
 function bulkEditable(): boolean {
   if (embedded || !model || (remote && !remote.canEdit)) return false;
   if (!sparseWorkspace()) return true;
-  return !!remote && !local && !!remote.canWrite;
+  // A large desktop file: in its native store, unsaved (#179).
+  if (local) return !remote;
+  return !!remote && !!remote.canWrite;
+}
+/**
+ * A large desktop file's settings when it was opened, saved or last changed at once, to tell
+ * whether there are edits a change made at once would conflict with (desktopSettled).
+ */
+let desktopSettings = '',
+  // The baseline the file holds since it was opened or saved, once changes made at once
+  // begin: undoing back to it leaves nothing unsaved.
+  desktopSavedBaseline: number | null = null,
+  restoringBaseline = false;
+/** Whether a large desktop file is open with no unsaved edits but changes made at once. */
+function desktopSettled(): boolean {
+  const index = sparseWorkspace();
+  return (
+    !!local &&
+    !!index &&
+    index.dirtyCount === 0 &&
+    JSON.stringify(index.document()) === desktopSettings
+  );
+}
+interface StagedBaseline extends NativeOpened {
+  before: number;
+  after: number;
+}
+/** Adopts the baseline a change made at once, or its undo or redo, left: views read it anew. */
+function adoptBaseline(result: StagedBaseline) {
+  local = { ...local!, ...result, path: local!.path, revision: String(result.generation) };
+  model = new RemoteWorkspace(validateDocument(result.document));
+  desktopSettings = JSON.stringify(model.document());
+  remoteCache.clear();
+  frameRequest++;
+  selected = null;
+  selectedGroup = null;
+  el('event-form').hidden = true;
+  el<HTMLDialogElement>('inspector').close();
+  editVersion++;
+  dirty = result.after !== desktopSavedBaseline;
+  heading();
+  requestRender();
+}
+type NativePatch = {
+  settings: TimelineDocument;
+  changes: { id: string; event: PointEvent | null }[];
+  durationChanges: { id: string; duration: Duration | null }[];
+  relationshipChanges: never[];
+};
+/**
+ * Applies `changes` and `durationChanges` to the open desktop file's baseline at once (#179),
+ * unsaved and undoable, telling `progress` how far it has got.
+ */
+async function stageOnDesktop(
+  changes: NativePatch['changes'],
+  durationChanges: NativePatch['durationChanges'],
+  progress: (done: number, total: number) => void,
+) {
+  const channel = new window.__TAURI__!.core.Channel<{ done: number; total: number }>();
+  channel.onmessage = ({ done, total }) => progress(done, total);
+  const request = documentRequest,
+    wasDirty = dirty;
+  const patch: NativePatch = {
+    settings: { ...sparseWorkspace()!.document(), events: [], durations: [] },
+    changes,
+    durationChanges,
+    relationshipChanges: [],
+  };
+  const result = await window.__TAURI__!.core.invoke<StagedBaseline>('desktop_stage_patch', {
+    generation: local!.generation,
+    patch,
+    progress: channel,
+  });
+  if (request !== documentRequest) return false;
+  if (!wasDirty) desktopSavedBaseline = result.before;
+  adoptBaseline(result);
+  record({ baseline: { before: result.before, after: result.after } });
+  // Undo becomes available.
+  heading();
+  return true;
+}
+/** Undoes or redoes a change made at once to a desktop file, by taking its baseline back. */
+async function restoreBaseline(edit: BaselineEdit, redo: boolean) {
+  const keep = () => (redo ? future : history).push(edit);
+  if (restoringBaseline) return keep();
+  if (!desktopSettled()) {
+    keep();
+    toast('Save or undo your later edits first.');
+    return;
+  }
+  restoringBaseline = true;
+  const request = documentRequest;
+  try {
+    const result = await window.__TAURI__!.core.invoke<StagedBaseline>('desktop_restore_baseline', {
+      generation: local!.generation,
+      baseline: redo ? edit.baseline.after : edit.baseline.before,
+    });
+    if (request !== documentRequest) return;
+    adoptBaseline(result);
+    (redo ? history : future).push(edit);
+    heading();
+  } catch (error) {
+    fail(error);
+  } finally {
+    restoringBaseline = false;
+  }
 }
 /** Whether everything in the view can be deleted at once (bulkEditable, not comparing). */
 function rangeDeletable(): boolean {
@@ -5148,6 +5264,48 @@ function requestRangeDelete() {
           `Deleted ${group.length.toLocaleString()} moments and durations. Undo restores them.`,
         );
       },
+    };
+  } else if (local) {
+    // A large desktop file: deleted in its native store at once, unsaved and undoable (#179).
+    if (!desktopSettled()) {
+      toast('Save your changes first: this changes the whole file at once.');
+      return;
+    }
+    text('delete-heading', 'Delete everything in this view?');
+    text('delete-confirm', 'Delete them');
+    text(
+      'delete-description',
+      `Delete every moment ${between}, and the durations wholly inside that range? You can undo this until you save the file.`,
+    );
+    pendingDelete = {
+      id: '',
+      document: request,
+      remove: () =>
+        void (async () => {
+          toast('Deleting…');
+          const saved = await window.__TAURI__!.core.invoke<TimelineDocument>('desktop_document', {
+            generation: local!.generation,
+          });
+          const times = new Map(saved.events.map((e) => [e.id, e.time]));
+          const within = (time: string) =>
+            parseTime(time).compare(lower) >= 0 && parseTime(time).compare(upper) <= 0;
+          const moments = saved.events.filter((e) => within(e.time));
+          const spans = (saved.durations ?? []).filter((duration) => {
+            const band = resolveDuration(duration, (id) => times.get(id));
+            return !!band && within(band.first) && within(band.last);
+          });
+          if (!moments.length && !spans.length) return toast(`Nothing to delete ${between}.`);
+          if (
+            await stageOnDesktop(
+              moments.map((e) => ({ id: e.id, event: null })),
+              spans.map((d) => ({ id: d.id, duration: null })),
+              () => {},
+            )
+          )
+            toast(
+              `Deleted ${moments.length.toLocaleString()} ${moments.length === 1 ? 'moment' : 'moments'} and ${spans.length.toLocaleString()} ${spans.length === 1 ? 'duration' : 'durations'}. Undo restores them; saving writes it to the file.`,
+            );
+        })().catch(fail),
     };
   } else {
     // On the server: the deletion is saved there at once, as a revision of its own.
@@ -5288,16 +5446,18 @@ function describeTimeMap() {
       const { events, durations } = mappedEntities(model.document(), mapping, filter, parseTime);
       summary = `This moves ${events.length.toLocaleString()} ${events.length === 1 ? 'moment' : 'moments'} and ${durations.length.toLocaleString()} ${durations.length === 1 ? 'duration' : 'durations'}. You can undo it.`;
     } else {
-      const count = BigInt(remote?.event_count ?? '0'),
+      const count = BigInt((local ?? remote)?.event_count ?? '0'),
         moments = `${count.toLocaleString()} ${count === 1n ? 'moment' : 'moments'}`;
       summary =
         (filter
           ? `This moves the moments and durations selected, of the timeline’s ${moments}.`
           : `This moves all ${moments} and all durations.`) +
-        ' It is saved on the server at once, as one version; the timeline’s history keeps the one before.' +
-        (count >= 100000n
-          ? ' On a timeline this large it can take minutes, and others’ saves wait until it finishes.'
-          : '');
+        (local
+          ? ' It changes the file’s copy at once; you can undo it until you save the file.'
+          : ' It is saved on the server at once, as one version; the timeline’s history keeps the one before.' +
+            (count >= 100000n
+              ? ' On a timeline this large it can take minutes, and others’ saves wait until it finishes.'
+              : ''));
     }
   } catch (error) {
     summary = error instanceof Error ? error.message : String(error);
@@ -5357,6 +5517,22 @@ async function mapHere(mapping: TimeMapping, filter: ViewFilter | null) {
   changed();
   return { moments: events.length, durations: durations.length };
 }
+/** Applies the mapping to a large desktop file at once, unsaved and undoable (#179). */
+async function mapOnDesktop(mapping: TimeMapping, filter: ViewFilter | null) {
+  mapStep(null, null, 'Reading the timeline…');
+  const saved = await window.__TAURI__!.core.invoke<TimelineDocument>('desktop_document', {
+    generation: local!.generation,
+  });
+  const { events, durations } = mappedEntities(saved, mapping, filter, parseTime);
+  if (!events.length && !durations.length) return { moments: 0, durations: 0 };
+  const staged = await stageOnDesktop(
+    events.map((event) => ({ id: event.id, event })),
+    durations.map((duration) => ({ id: duration.id, duration })),
+    (done, total) =>
+      mapStep(done, total, `Changing ${done.toLocaleString()} of ${total.toLocaleString()}…`),
+  );
+  return staged ? { moments: events.length, durations: durations.length } : null;
+}
 /** Applies the mapping on the server, showing its progress. */
 async function mapOnServer(mapping: TimeMapping, filter: ViewFilter | null) {
   const id = remote!.id,
@@ -5402,8 +5578,12 @@ el<HTMLFormElement>('map-form').onsubmit = (event) => {
   try {
     mapping = readTimeMap();
     filter = mapFilter();
-    if (sparseWorkspace() && dirty)
-      throw new Error('Save your changes first: this is saved on the server at once.');
+    if (local ? sparseWorkspace() && !desktopSettled() : sparseWorkspace() && dirty)
+      throw new Error(
+        local
+          ? 'Save your changes first: this changes the whole file at once.'
+          : 'Save your changes first: this is saved on the server at once.',
+      );
   } catch (error) {
     text('map-error', error instanceof Error ? error.message : String(error));
     return;
@@ -5419,9 +5599,11 @@ el<HTMLFormElement>('map-form').onsubmit = (event) => {
     // Separated tracks are read-only: back to the whole timeline, which this changes.
     if (comparison) stopComparison();
     const before = viewport.clone();
-    const moved = sparseWorkspace()
-      ? await mapOnServer(mapping, filter)
-      : await mapHere(mapping, filter);
+    const moved = !sparseWorkspace()
+      ? await mapHere(mapping, filter)
+      : local
+        ? await mapOnDesktop(mapping, filter)
+        : await mapOnServer(mapping, filter);
     setMapBusy(false);
     // Another timeline was opened meanwhile.
     if (!moved) return el<HTMLDialogElement>('map-dialog').close();
@@ -5431,7 +5613,7 @@ el<HTMLFormElement>('map-form').onsubmit = (event) => {
     requestRender();
     el<HTMLDialogElement>('map-dialog').close();
     toast(
-      `Moved ${moved.moments.toLocaleString()} ${moved.moments === 1 ? 'moment' : 'moments'} and ${moved.durations.toLocaleString()} ${moved.durations === 1 ? 'duration' : 'durations'}.${sparseWorkspace() ? '' : ' Undo restores them.'}`,
+      `Moved ${moved.moments.toLocaleString()} ${moved.moments === 1 ? 'moment' : 'moments'} and ${moved.durations.toLocaleString()} ${moved.durations === 1 ? 'duration' : 'durations'}.${sparseWorkspace() && !local ? '' : ' Undo restores them.'}`,
     );
   })().catch((error) => {
     setMapBusy(false);
@@ -5495,8 +5677,9 @@ function applyEdit(redo: boolean) {
   previewing = false;
   const edit = (redo ? future : history).pop();
   if (!edit || !model) return;
+  if ('baseline' in edit) return void restoreBaseline(edit, redo);
   const index = model;
-  const apply = (edit: Exclude<HistoryEntry, GroupEdit>) => {
+  const apply = (edit: Exclude<HistoryEntry, GroupEdit | BaselineEdit>) => {
     if ('link' in edit) {
       // Undo applies the opposite of the recorded state; redo reapplies it.
       if (edit.related === redo) index.relate(edit.link.a, edit.link.b);
@@ -6607,6 +6790,8 @@ if (desktop) {
     loadDocument(document);
     model = new RemoteWorkspace(document);
     local = { ...result, id: 'local-sqlite', revision: String(result.generation) };
+    desktopSettings = JSON.stringify(model.document());
+    desktopSavedBaseline = null;
     viewport = Viewport.fit(
       result.first ? Q.parse(result.first) : undefined,
       result.last ? Q.parse(result.last) : undefined,
@@ -6682,6 +6867,9 @@ if (desktop) {
             dirty = version !== editVersion;
             if (!dirty) {
               clearHistory();
+              // The file holds what is open now (#179).
+              if (sparseWorkspace()) desktopSettings = JSON.stringify(model!.document());
+              desktopSavedBaseline = null;
             }
           }
           remoteCache.clear();

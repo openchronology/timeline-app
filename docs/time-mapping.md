@@ -9,7 +9,7 @@ Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 - **The timeline's menu** (right-click, or press and hold, on the timeline). Opened on a moment or a duration, the dialog also offers what is related to it.
 - **Separated tracks** have **Shift or scale these…** in their bar. It applies to the upper track, returning to the whole timeline first.
 
-It is offered to whoever may change the whole timeline: anyone editing a timeline in their browser, and writers of a server timeline. As with deleting everything in a view, it is not offered yet for desktop `.och` files of over 2,048 moments, which the desktop app keeps in its native store rather than the page ([#179](https://github.com/openchronology/timeline-app/issues/179)).
+It is offered to whoever may change the whole timeline: anyone editing a timeline in their browser or the desktop app, and writers of a server timeline.
 
 ## The mapping
 
@@ -44,6 +44,7 @@ A duration's fixed start or end is mapped. A start or end that follows a moment 
 The dialog says what will change before you apply it:
 
 - **In the browser** (drafts, imported files, the offline edition) it counts the moments and durations that will move. Applying it is one edit, which one **Undo** reverts. When everything moves, the view moves with it, so it still shows the same moments.
+- **In a desktop file of over 2,048 moments,** which the app keeps in its native store rather than the page, it is made there at once ([#179](https://github.com/openchronology/timeline-app/issues/179)), and stays unsaved: **Undo** and **Redo** take it back and forward until you save the file, and saving writes the whole file. Save other changes first; it refuses until you do. (Smaller desktop files are kept in the page, as in the browser.)
 - **On the server** it is saved at once, as one version. The timeline's history keeps the version before it. The dialog says how many moments the timeline has, and warns when it is large. Save your own unsaved edits first; it refuses until you do.
 
 While it works, a progress bar shows how far it has got. The dialog cannot be closed until it finishes.
