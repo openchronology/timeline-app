@@ -1,10 +1,18 @@
 # Copyright, abuse, and security reporting
 
-Draft version: 2026-10-06. Operator: Athan Clark, an individual.
+Draft version: 2026-10-15. Operator: Athan Clark, an individual.
 Public reporting email and, if used, designated-agent details are pending.
 This draft does not assert that a DMCA agent has been registered or that a safe
-harbor automatically applies. Reports cannot yet be submitted through an in-app
-form; the published operator contact will be the reporting channel.
+harbor automatically applies.
+
+Anyone can report a timeline, moment, duration, comment, published plugin or suite, or
+account with **Report**, choosing "Copyright infringement" and describing the work and
+why its use is unauthorized; no account is needed. A formal notice, such as a US DMCA
+notice, goes to the operator contact once it is published, as described below.
+
+Images on timelines are links to where their owners host them, not copies stored by
+the service (docs/images.md). A complaint about a linked image can ask for the link to
+be removed from the timeline; removing the image itself is a matter for its host.
 
 For a copyright complaint, identify the copyrighted work, the specific timeline,
 plugin, comment, image, or URL at issue, your contact information, and why the use
@@ -17,9 +25,13 @@ is permitted, including by license or fair use, assess that before sending a cla
 The operator should review complete reports promptly, restrict identified material
 when appropriate, and notify the affected user unless prohibited or unsafe.
 Report details may be shared with that user to allow a response; sensitive contact
-information should be limited to what the process requires. Repeat infringers'
-hosted accounts may be terminated in appropriate circumstances. Preserve a limited
-record of decisions and respect lawful preservation requirements.
+information should be limited to what the process requires. In-app reports are
+handled in the review queue (docs/moderation.md): restricted material becomes visible
+only to its owner, who is told why and can ask for a review. Repeat infringers' hosted
+accounts are suspended in appropriate circumstances: before deciding, the operator
+reviews the account's earlier restrictions for copyright, which the moderation records
+keep (`oc_moderation_cases`, `oc_reports`).
+Preserve a limited record of decisions and respect lawful preservation requirements.
 
 If US DMCA procedures apply, an affected user may provide a counter-notice with a
 signature, identification of the removed material and its former location, a

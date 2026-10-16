@@ -42,7 +42,7 @@ For each kind of priority illegal content in Ofcom's risk profiles, record how l
 - **Content harmful to children** (pornography, suicide, self-harm, eating disorders, violence, and the rest of Ofcom's list), with measures:
   - **Prohibited:** pornography and gore for its own sake (TERMS.md).
   - **Allowed but labelled:** educational depictions of nudity, violence and disturbing events. Readers get a warning before a labelled timeline opens, its images stay blurred until shown, and it is left out of featured timelines and of browsing by signed-out readers and accounts under 18.
-  - **Minors' accounts:** accounts of people who may be under 18 always see these warnings.
+  - **Minors' accounts:** accounts of people who may be under 18 always see these warnings, and their profiles don't show the timelines they star. Accounts can delete their comments and themselves.
   - **Moderators** can add labels the owner cannot remove.
 - **Residual risk and further measures:** \_\_\_\_
 

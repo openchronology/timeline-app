@@ -123,14 +123,14 @@ Signed-out reporters aren't told anything.
 
 Accounts are for people 13 and older (#115). Sign-up asks for a year of birth: with a password, when registering; with Google, GitHub or Facebook, when confirming an email address, before the new account can sign in. The age is counted from the end of the year of birth, so someone turning 13 this year is refused until next year.
 
-| Year of birth | Result                                                                                                                                          |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Under 13      | Refused. A just-created social sign-in account is deleted; one that already holds timelines is suspended for the operator to review.            |
-| Under 18      | The account always sees sensitive-content warnings, and doesn't browse labelled timelines. Its **Account** page explains why there's no choice. |
-| 18 or older   | **Account → Sensitive content** can turn the warnings off.                                                                                      |
-| None recorded | Accounts made before this was asked, under terms requiring 18: treated as adults.                                                               |
+| Year of birth | Result                                                                                                                                                                                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Under 13      | Refused, neutrally ("Sorry, we can't create an account for you."). A just-created social sign-in account is deleted; one that already holds timelines is suspended for the operator to review. The browser is refused again for a day, whatever year it gives next. |
+| Under 18      | The account always sees sensitive-content warnings, and doesn't browse labelled timelines. Its **Account** page explains why there's no choice. Its profile doesn't show its public favorites.                                                                      |
+| 18 or older   | **Account → Sensitive content** can turn the warnings off.                                                                                                                                                                                                          |
+| None recorded | Accounts made before this was asked, under terms requiring 18: treated as adults.                                                                                                                                                                                   |
 
-Only the year is stored (`oc_users.birth_year`). It is self-declared: not age verification, which the content policy is designed not to need.
+Only the year is stored (`oc_users.birth_year`). It is self-declared: not age verification, which the content policy is designed not to need. The sign-up form doesn't say what age is required, and the refusal doesn't either, as the FTC's COPPA guidance asks of a neutral age screen; a refused browser is remembered by a hash of its sign-in token in `oc_age_refusals` for a day (#166).
 
 ## Child sexual abuse material
 

@@ -26,8 +26,8 @@ in five minutes. Temporary records are cleaned by the delivery worker. Authentic
 secrets and recovery-code hashes remain until replaced, disabled, or account removal.
 
 The database stores the timelines you explicitly save: exact rational times,
-titles, notes, tags, metadata, formatting scripts, plugin definitions, and embedded
-images. It also stores visibility, collaborator permissions, saved revision documents,
+titles, notes, tags, metadata, formatting scripts, plugin definitions, and links
+to images (not copies of them). It also stores visibility, collaborator permissions, saved revision documents,
 fork relationships and ancestry, proposed
 and base snapshots, and discussion comments with account attribution. These support
 editing, search, sharing, collaboration, and export. Private timelines are excluded
@@ -43,7 +43,9 @@ Secrets, passwords, and MFA codes are excluded from that audit trail.
 Sign-up asks for your year of birth, to confirm you are old enough for an account and to
 keep warnings before sensitive content on for accounts of people who may be under 18;
 only the year is stored, with your choice of whether to see sensitive content without
-warnings. The service computes an account standing (from account age, confirmation,
+warnings. A sign-up refused for its age is answered neutrally, and a hash of that
+browser's sign-in token is kept for one day so that another answer from it is refused
+too; nothing else about the refused sign-up is kept. The service computes an account standing (from account age, confirmation,
 two-factor authentication, stars and forks received, and moderation decisions) to rank
 public timelines; only administrators see it. Reports record what was reported, the
 category and any details you give, and your account if you were signed in; the owner of
@@ -56,7 +58,11 @@ authentication rate-limit keys are hashed. Hosting providers and reverse proxies
 may generate request and security logs. The deployment must document their actual
 fields, recipients, and retention before this notice becomes effective. Support,
 privacy, and abuse reports may contain the information you provide and are used
-to respond and investigate. The application includes no advertising or analytics
+to respond and investigate. If the operator turns on Cloudflare Turnstile for
+human-verification challenges (instead of the built-in proof of work), your browser
+loads Cloudflare's challenge when one is asked for, and Cloudflare receives network
+and device information to tell people from automated traffic, under its own privacy
+policy. The application includes no advertising or analytics
 integration; a deployment adding either must update this notice and meet applicable
 consent requirements before doing so.
 
@@ -115,11 +121,19 @@ to that timeline. Independently owned forks and submitted snapshots on other
 timelines remain; ancestry needed by those forks and reviews is retained. A public
 review exposes its submitted snapshot, not the source fork's other private history.
 Revoking upstream access stops future reads and synchronization but does not erase
-copies already made. Account deletion is not currently self-service;
-request it using the privacy contact when published. Requests concerning comments
-on other owners' timelines require operator review, balancing applicable rights
-and discussion integrity. Do not assume closing a recommendation deletes its
-snapshots or comments. Expired login flows and sessions are cleaned by authentication
+copies already made. Do not assume closing a recommendation deletes its snapshots or
+comments.
+
+You can delete your own comments at any time, from the pull request they are on. You can
+delete your account from Account → Delete your account, confirming with your username,
+your password and, if two-factor authentication is on, a code. Deleting it deletes at once
+the timelines you own (as deleting each would), the pull requests and comments you wrote
+on other timelines, your published plugins and suites, stars, memberships, API keys,
+sign-in methods, sessions and security records. Kept: changes already merged into other
+people's timelines, which are part of their history (it names an account that no longer
+exists), others' forks of your timelines, and moderation records, which no longer name
+you. The last administrator of an installation cannot delete their account. Other
+requests, such as about content of yours elsewhere, go to the privacy contact. Expired login flows and sessions are cleaned by authentication
 operations, rather than guaranteed immediate physical erasure at expiry.
 
 Backup deletion and log retention depend on the deployment and must be specified
@@ -141,9 +155,16 @@ Accounts are for people aged 13 or older; the service does not knowingly offer
 accounts to children under 13. A sign-up giving a year of birth under 13 is refused,
 and an account created through a social sign-in that does so is closed before it can be
 used. Report suspected accounts of children under 13 to the operator so they can be
-investigated and addressed under applicable law. Accounts of people who may be under 18
-always see warnings before sensitive content. This is not a claim that an age question
-alone satisfies children's privacy or online-safety laws.
+investigated and addressed under applicable law.
+
+Accounts of people who may be under 18 get high-privacy settings by default that they
+cannot change: warnings before sensitive content always show, the timelines they star
+are not shown on their profile, and browsing leaves out labelled timelines. For everyone,
+timelines start private, profiles show only a username and an optional avatar, and the
+service collects no location, has no private messaging, and does no profiling for
+advertising. The year of birth is used only for these settings and the age requirement.
+This is not a claim that an age question alone satisfies children's privacy or
+online-safety laws.
 
 Material privacy changes must describe the new practices before they take effect;
 existing data must not be repurposed incompatibly without the necessary legal basis.

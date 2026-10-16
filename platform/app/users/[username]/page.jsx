@@ -6,6 +6,7 @@ import { accountCompareLimit, currentSession } from '../../../lib/session.js';
 import { searchTimelines } from '../../../../server/collaboration.mjs';
 import TimelineList from '../../../components/timeline-list.jsx';
 import { siteName } from '../../../lib/sharing.js';
+import { minor } from '../../../../server/auth.mjs';
 import ReportLink from '../../../components/report-link.jsx';
 export const dynamic = 'force-dynamic';
 const pageNumber = (n) =>
@@ -29,7 +30,7 @@ export default async function Profile({ params, searchParams }) {
     current = await currentSession();
   if (!current.services.pool || typeof username !== 'string' || username.length > 64) notFound();
   const { rows } = await current.services.pool.query(
-    'SELECT username,avatar_url FROM oc_users WHERE username=$1 AND NOT is_disabled',
+    'SELECT username,avatar_url,birth_year FROM oc_users WHERE username=$1 AND NOT is_disabled',
     [username],
   );
   if (!rows[0]) notFound();
@@ -69,17 +70,20 @@ export default async function Profile({ params, searchParams }) {
           guest={!current.user}
         />
       </section>
-      <section>
-        <h2>Public favorites</h2>
-        <TimelineList
-          compareLimit={accountCompareLimit(current)}
-          result={favorites}
-          query={pages}
-          basePath={basePath}
-          favorites
-          guest={!current.user}
-        />
-      </section>
+      {/* A minor's favorites stay private (the UK Children's Code; #166). */}
+      {!minor(rows[0].birth_year) && (
+        <section>
+          <h2>Public favorites</h2>
+          <TimelineList
+            compareLimit={accountCompareLimit(current)}
+            result={favorites}
+            query={pages}
+            basePath={basePath}
+            favorites
+            guest={!current.user}
+          />
+        </section>
+      )}
     </main>
   );
 }

@@ -8,6 +8,7 @@ import { deleteWhere, parseRetention, printRetention } from './retention.mjs';
 import { setTimelineStar } from './stars.mjs';
 import { Administration, usage, requireDataProvider, avatarValue } from './administration.mjs';
 import { Moderation } from './moderation.mjs';
+import { deleteAccount } from './account-deletion.mjs';
 import { saveBase } from './save-merge.mjs';
 import { authorizeKey, keyRequestRead } from './api-keys.mjs';
 import { BrowserForks } from './browser-forks.mjs';
@@ -676,6 +677,18 @@ export function createRequestHandler({
             200,
             await devices.approve(session, req, (await body(req)).userCode),
           );
+        // Deleting one's own account (#166; account-deletion.mjs).
+        if (pathname === '/api/auth/account' && method === 'DELETE') {
+          auth.require(session, req);
+          await auth.rateLimit('security:' + userId);
+          const result = await deleteAccount({
+            store,
+            auth,
+            session,
+            value: await body(req, 4096),
+          });
+          return response(res, 200, result, { 'Set-Cookie': auth.cookie('', true) });
+        }
         if (pathname === '/api/auth/account' && method === 'GET') {
           if (!session) throw new HttpError(401, 'Sign in to continue.');
           const identities = (
@@ -795,6 +808,25 @@ export function createRequestHandler({
               (await body(req, 4096)).after ?? '0',
             ),
           );
+        // Authors delete their own comments (#166).
+        const ownComment =
+          /^\/api\/timelines\/([a-f0-9-]{36})\/proposals\/([a-f0-9-]{36})\/comments\/([0-9]{1,18})$/.exec(
+            pathname,
+          );
+        if (
+          ownComment &&
+          method === 'DELETE' &&
+          uuid.test(ownComment[1]) &&
+          uuid.test(ownComment[2])
+        ) {
+          auth.require(session, req);
+          await auth.rateLimit('proposals:' + userId);
+          return response(
+            res,
+            200,
+            await collaboration.deleteComment(ownComment[1], ownComment[2], ownComment[3], userId),
+          );
+        }
         const pull =
           /^\/api\/timelines\/([a-f0-9-]{36})\/proposals(?:\/([a-f0-9-]{36})(?:\/(comments|resolve|document))?)?$/.exec(
             pathname,

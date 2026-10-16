@@ -216,8 +216,7 @@ export default function Account({ returnTo = '/', login = false }) {
                 required
               />
               <span className="field-hint">
-                Accounts are for people 13 and older. Accounts of people under 18 always see
-                warnings before sensitive content.
+                Only the year is kept, to set up your account (see the privacy notice).
               </span>
             </label>
           )}

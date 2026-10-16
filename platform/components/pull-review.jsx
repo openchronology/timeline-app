@@ -185,6 +185,23 @@ export default function PullReview({ timelineId, initial, initialComments, signe
             ) : (
               <p className="preserve-text">{c.body}</p>
             )}
+            {c.mine && (
+              <button
+                type="button"
+                className="link-button"
+                disabled={busy}
+                onClick={() =>
+                  confirm('Delete your comment? It cannot be restored.') &&
+                  void perform(async () => {
+                    const s = await api('session');
+                    await api(`${base}/comments/${c.id}`, { method: 'DELETE', csrf: s.csrf });
+                    setComments((list) => list.filter((other) => other.id !== c.id));
+                  })
+                }
+              >
+                Delete
+              </button>
+            )}{' '}
             {!c.removed && c.author !== username && (
               <button
                 type="button"
