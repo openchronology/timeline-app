@@ -75,9 +75,11 @@ jump the viewport back to Fit all. New and removed markers fade over 220 ms;
 reduced-motion preferences disable these fades. Retiring DOM nodes have a fixed
 budget and are removed after their animations.
 
-Unsaved edits are never replaced by background updates. The editor shows **Reload
-latest** when upstream changes arrive while edits are pending. Reload confirms
-replacement through the usual unsaved-work check. A working source with unsaved
+Unsaved edits are never replaced by background updates. With edits pending on a
+server timeline, the editor moves to the latest revision underneath them, and saving
+merges them onto it ([saving while others save](collaboration.md#saving-while-others-save)).
+While a save is under way, or in a pull request's working copy, it shows **Reload
+latest** instead; reloading confirms replacement through the usual unsaved-work check. A working source with unsaved
 edits is likewise preserved during comparison while other tracks keep refreshing;
 exit, save or export that working timeline before reloading it. Comparison moment
 inspectors are cleared when refreshed source contents change, avoiding stale edits.

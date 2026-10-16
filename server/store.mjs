@@ -26,6 +26,7 @@ import { indexedNodes } from './tree.mjs';
 import { cursorRows, documentChunks, inSnapshot, RELATIONSHIP_ORDER } from './document-stream.mjs';
 import { MOMENT_TREE, INTERVAL_TREE, intervalPayload, upsertRows } from './avl.mjs';
 import { applyIncrementally, incremental, slicePatch, timelineSettings } from './incremental.mjs';
+import { rebaseSave } from './save-merge.mjs';
 import {
   beginIndexWrite,
   copyLevel,
@@ -799,11 +800,16 @@ export class PostgresStore {
         await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [id]);
         const t = await this.access(id, userId, c);
         if (!t.canWrite) throw new HttpError(403, 'Write access is required to update upstream.');
-        if (t.revision !== revision)
+        // Edits made on an earlier revision: merged onto this one when the editor says what
+        // it saw (#165; save-merge.mjs), else refused. With what it saw, they are checked
+        // even on this revision: an editor following the latest revision keeps edits made
+        // before it moved, which others may have changed since.
+        if (t.revision !== revision && !patch?.base)
           throw new HttpError(
             409,
             'Someone changed this timeline. Export your edits before reloading.',
           );
+        if (patch?.base) patch = await rebaseSave(c, t, patch);
         await this.checkScripts(patch ? patch.settings.plugins : document.plugins, t.plugins);
         if (patch && incremental(t, patch)) {
           // Sparse saves update the stored index in place and record only the patch.

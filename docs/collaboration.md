@@ -31,6 +31,47 @@ Signed-in public readers may fork or duplicate. The owner of a private timeline 
 
 Browser edits remain continuous. **Save to server** creates a saved checkpoint of the whole timeline. Saved revisions have UUID identities distinct from optimistic-concurrency counters, immutable documents and zero, one or two parents. A save stores only the versions of what it changed, and reading a revision assembles its whole document from the versions valid at that revision. A fork starts with its upstream checkpoint as a parent; sync and merge record both parents. Sharing-policy updates can advance the concurrency counter without creating document history, so checkpoint numbers can have gaps. The current rational index is updated in the same transaction as its head checkpoint.
 
+## Saving while others save
+
+A timeline can change while you edit it: a collaborator saves, or a [syslog receiver](syslog.md) or [log import](log-import.md) adds moments every few seconds. Your edits stay unsaved in the editor, and the view keeps following the latest saved revision underneath them. **Save to server** then merges your edits onto the latest revision (#165; `server/save-merge.mjs`):
+
+| What                                                        | Rule                                                                                                                                                                 |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A moment or duration                                        | Takes your version if no one else changed it since you opened it. If both of you changed it, the fields merge: a title you changed and notes they changed keep both. |
+| A setting (title, description, tags, time display, plugins) | Takes your value if you changed it, and keeps theirs if you didn't. Images merge one by one.                                                                         |
+| Links between moments and durations                         | Added or removed as you asked.                                                                                                                                       |
+
+**Conflicts.** A field you both changed differently, or something you edited that someone else deleted, is a conflict. The save then saves nothing and lists the conflicts:
+
+- **Keep my versions:** your versions replace what was saved.
+- **Use the saved versions:** your edits to those are dropped, along with your undo history.
+
+Either way, the rest of your edits are then saved.
+
+### In the API
+
+`PUT /api/timelines/<id>/changes` merges when it also carries a `base`: what the edits were made on.
+
+```json
+{
+  "revision": "41",
+  "settings": { "...": "the settings wanted" },
+  "changes": [{ "id": "m1", "event": { "...": "the moment wanted" } }],
+  "base": {
+    "settings": { "title": "as loaded", "description": "as loaded" },
+    "moments": [{ "id": "m1", "event": { "...": "m1 as loaded, or null if added" } }],
+    "durations": [{ "id": "d1", "duration": { "...": "as loaded, or null" } }]
+  }
+}
+```
+
+- **Checking:** with a `base`, the save is checked against what was loaded even when `revision` is the latest.
+- **Overwriting:** a change or setting left out of `base` applies as sent; that is how **Keep my versions** works.
+- **Conflicts:** answer HTTP 409 with `conflicts`, a list of `{kind: "moment" | "duration" | "setting", id, title}`, and nothing is saved.
+- **Without a `base`:** a save on an older revision is refused with 409, as before.
+
+The syslog receiver and the log importer don't need a `base`: they fetch the latest revision and send again.
+
 **History** lists twenty checkpoints per page. A checkpoint can be inspected and exported as `.ochx`; importing that file creates a working document, not a rewrite of history. File exports remain portable timeline snapshots, not account credentials or full platform revision graphs. History access follows the timeline's current visibility and membership. A public merge exposes the submitted snapshot, never the source fork's other private history. Cross-timeline revision URLs cannot be used to bypass that boundary.
 
 **Sync upstream** merges the saved fork and saved upstream against their latest common ancestor. Independent changes produce a new saved fork checkpoint. If upstream is already an ancestor, syncing is a no-op. Repeated contributions use the updated ancestry rather than the original fork point. A public fork cannot import newly private upstream data. Multiple equally valid merge bases (crisscross merges) require explicit reconciliation in this first version.

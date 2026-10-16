@@ -8,6 +8,7 @@ import { deleteWhere, parseRetention, printRetention } from './retention.mjs';
 import { setTimelineStar } from './stars.mjs';
 import { Administration, usage, requireDataProvider, avatarValue } from './administration.mjs';
 import { Moderation } from './moderation.mjs';
+import { saveBase } from './save-merge.mjs';
 import { authorizeKey, keyRequestRead } from './api-keys.mjs';
 import { BrowserForks } from './browser-forks.mjs';
 import { queryPlugins } from './query-plugins.mjs';
@@ -1057,6 +1058,8 @@ export function createRequestHandler({
               changes,
               durationChanges,
               relationshipChanges,
+              // What the editor saw, to merge onto a newer revision (#165; save-merge.mjs).
+              base: saveBase(input.base),
             }),
           );
         }
