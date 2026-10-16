@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { dismissOnBackdrop } from '../../src/dialogs.ts';
+import { CONTENT_LABELS } from '../../src/content-labels.ts';
 import { api } from '../lib/api.js';
 /** A storage size, as the account page writes it. */
 const size = (bytes) =>
@@ -100,6 +101,39 @@ export default function TimelineSettings({
           Forks have independent owners and collaborators. Revoking access stops future upstream
           reads and syncs, but cannot erase copies already made.
         </p>
+      </section>
+      <section>
+        <h2>Sensitive content</h2>
+        <p className="muted">
+          Educational, historical, medical, artistic and news depictions of nudity, violence or
+          disturbing events are allowed when labelled; pornography and gore for its own sake are
+          not. Readers are warned before a labelled timeline opens, its images stay blurred until
+          they show them, and it is left out of featured timelines and of browsing by readers who
+          aren’t signed in. Label single moments and durations in their details instead.
+        </p>
+        <fieldset className="content-labels" disabled={busy}>
+          <legend>This timeline contains</legend>
+          {CONTENT_LABELS.map(([key, name]) => {
+            const moderated = (timeline.moderator_labels ?? []).includes(key);
+            return (
+              <label key={key} className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={moderated || (timeline.content_labels ?? []).includes(key)}
+                  disabled={moderated}
+                  onChange={(e) => {
+                    const labels = new Set(timeline.content_labels ?? []);
+                    if (e.target.checked) labels.add(key);
+                    else labels.delete(key);
+                    void mutate('/settings', 'PATCH', { labels: [...labels] });
+                  }}
+                />
+                {name}
+                {moderated && <span className="muted"> (added by moderators)</span>}
+              </label>
+            );
+          })}
+        </fieldset>
       </section>
       <section>
         <h2>Data retention</h2>

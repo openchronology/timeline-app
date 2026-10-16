@@ -62,9 +62,14 @@ export async function GET(request) {
       html: embedCode(src, title, width, height),
       width,
       height,
-      thumbnail_url: `${origin}/timelines/${timeline.id}/opengraph-image`,
-      thumbnail_width: 1200,
-      thumbnail_height: 630,
+      // No thumbnail of a labelled timeline (#115): it opens behind its warning.
+      ...(timeline.labels?.length
+        ? {}
+        : {
+            thumbnail_url: `${origin}/timelines/${timeline.id}/opengraph-image`,
+            thumbnail_width: 1200,
+            thumbnail_height: 630,
+          }),
       cache_age: 3600,
     },
     { headers: { 'Cache-Control': 'public, max-age=3600', 'Access-Control-Allow-Origin': '*' } },

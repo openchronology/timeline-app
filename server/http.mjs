@@ -35,6 +35,7 @@ import {
   validateRef,
   canonicalRelationship,
   setEntryLimit,
+  contentLabels,
 } from '../dist/core.mjs';
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 async function body(req, maximum = 16 * 1024 * 1024) {
@@ -1268,8 +1269,14 @@ export function createRequestHandler({
           if (
             !input ||
             Object.keys(input).some(
-              (k) => !['visibility', 'allowPrivateForks', 'retention', 'keepHistory'].includes(k),
+              (k) =>
+                !['visibility', 'allowPrivateForks', 'retention', 'keepHistory', 'labels'].includes(
+                  k,
+                ),
             ) ||
+            (input.labels !== undefined &&
+              (!Array.isArray(input.labels) ||
+                contentLabels(input.labels).length !== input.labels.length)) ||
             (input.keepHistory !== undefined && typeof input.keepHistory !== 'boolean') ||
             !Object.keys(input).length ||
             (input.retention !== undefined &&
@@ -1280,7 +1287,7 @@ export function createRequestHandler({
           )
             throw new HttpError(
               400,
-              'Choose visibility, a private forking policy, a retention period and/or whether to keep saved history.',
+              'Choose visibility, a private forking policy, a retention period, whether to keep saved history and/or content labels.',
             );
           await store.transaction(async (c) => {
             await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [id]);
@@ -1316,12 +1323,14 @@ export function createRequestHandler({
             if (input.keepHistory === false) await store.stopHistory(c, id);
             if (input.keepHistory === true) await store.startHistory(c, id, userId);
             await c.query(
-              'UPDATE oc_timelines SET visibility=$2,allow_private_forks=$3,retention_seconds=$4,retention_applied_at=CASE WHEN retention_seconds IS DISTINCT FROM $4 THEN NULL ELSE retention_applied_at END,revision=revision+1,updated_at=now() WHERE id=$1',
+              'UPDATE oc_timelines SET visibility=$2,allow_private_forks=$3,retention_seconds=$4,retention_applied_at=CASE WHEN retention_seconds IS DISTINCT FROM $4 THEN NULL ELSE retention_applied_at END,content_labels=$5,revision=revision+1,updated_at=now() WHERE id=$1',
               [
                 id,
                 input.visibility ?? current.visibility,
                 input.allowPrivateForks ?? current.allow_private_forks,
                 retention,
+                // What its owner marks it as containing (#115); moderators' labels stay.
+                input.labels === undefined ? current.content_labels : contentLabels(input.labels),
               ],
             );
           });

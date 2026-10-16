@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { Rational as Q } from 'rational-ordered-map';
+import { contentLabels, CONTENT_LABELS_KEY } from './content-labels.js';
 import type { PointEvent, Metadata } from './core.js';
 import { normalizeEntityTags } from './tags.js';
 import { entryLimitText, withinEntryLimit } from './entry-limit.js';
@@ -351,5 +352,8 @@ export function durationOverview(metadata: Metadata): Metadata {
       if (size > 4096) break;
       result[key] = value;
     }
+  // Its sensitive-content labels (#115), so its background image is blurred.
+  const labels = contentLabels(metadata[CONTENT_LABELS_KEY]);
+  if (labels.length) result[CONTENT_LABELS_KEY] = labels;
   return result;
 }

@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { validateDocument } from './core.js';
+import { describeLabels } from './content-labels.js';
 import type { TimelineDocument, PointEvent } from './core.js';
 /** A moment a pull request adds, removes or changes, with its versions. */
 interface MomentChange {
@@ -161,6 +162,7 @@ export function createCommunityUI(host: Host) {
       event_count: string;
       star_count?: string;
       starred?: boolean;
+      labels?: string[];
     };
     // Each server listed is searched; their pages are shown together, a server at a time.
     const listed = sources().filter((s) => (scope === 'public' ? s.reachable : s.signedIn));
@@ -230,7 +232,14 @@ export function createCommunityUI(host: Host) {
           (t.featured ? ' · Featured' : ''),
       );
       details.className = 'field-hint';
-      card.append(link, details, paragraph(t.description.slice(0, 220)));
+      card.append(link, details);
+      // A labelled timeline's card says so (#115); it opens behind its warning.
+      if (t.labels?.length) {
+        const badge = paragraph(`Sensitive: ${describeLabels(t.labels).toLowerCase()}`);
+        badge.className = 'sensitive-badge';
+        card.append(badge);
+      }
+      card.append(paragraph(t.description.slice(0, 220)));
       const star = button(`${t.starred ? '★ Starred' : '☆ Star'} · ${t.star_count ?? '0'}`, () => {
         star.disabled = true;
         void host

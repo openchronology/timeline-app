@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
 import { REPORT_CATEGORIES, REPORT_TEXT } from '../../server/report-categories.mjs';
+import { CONTENT_LABELS, describeLabels } from '../../src/content-labels.ts';
 const CATEGORY = Object.fromEntries(REPORT_CATEGORIES);
 const KIND = {
   timeline: 'Timeline',
@@ -11,7 +12,8 @@ const KIND = {
 };
 /** What restricting each kind of thing does (server/moderation.mjs). */
 const EFFECT = {
-  timeline: 'Restricting makes it private: only its owner and administrators can open it.',
+  timeline:
+    'Restricting makes it private: only its owner and administrators can open it. Labelling warns readers before it opens and blurs its images; its owner cannot remove the labels.',
   comment: 'Restricting hides its text from everyone.',
   plugin: 'Restricting removes it from the library and refuses new versions.',
   suite: 'Restricting removes it from the library and refuses new versions.',
@@ -67,8 +69,9 @@ export function ReportCase({ item, busy, decide }) {
             {
               {
                 restricted: 'Restricted',
+                labelled: `Labelled: ${describeLabels(item.labels ?? []).toLowerCase()}`,
                 dismissed: 'Dismissed',
-                lifted: 'Restricted, then lifted',
+                lifted: item.labels ? 'Labelled, then lifted' : 'Restricted, then lifted',
               }[item.status]
             }
           </strong>
@@ -106,17 +109,42 @@ export function ReportCase({ item, busy, decide }) {
               Dismiss
             </button>
           </div>
+          {item.target_kind === 'timeline' && item.path && (
+            <fieldset className="report-labels" id={'labels-' + item.id}>
+              <legend>Or label it as containing</legend>
+              {CONTENT_LABELS.map(([key, name]) => (
+                <label key={key} className="checkbox-label">
+                  <input type="checkbox" value={key} />
+                  {name}
+                </label>
+              ))}
+              <button
+                disabled={busy}
+                onClick={() =>
+                  decide(
+                    'label',
+                    reason(),
+                    [
+                      ...document.querySelectorAll(`#labels-${CSS.escape(item.id)} input:checked`),
+                    ].map((box) => box.value),
+                  )
+                }
+              >
+                Label
+              </button>
+            </fieldset>
+          )}
         </>
       )}
-      {item.status === 'restricted' && (
+      {(item.status === 'restricted' || item.status === 'labelled') && (
         <div className="actions">
           {appealing && (
             <button disabled={busy} onClick={() => decide('uphold')}>
-              Keep the restriction
+              {item.status === 'labelled' ? 'Keep the labels' : 'Keep the restriction'}
             </button>
           )}
           <button disabled={busy} onClick={() => decide('lift')}>
-            Lift the restriction
+            {item.status === 'labelled' ? 'Remove the labels' : 'Lift the restriction'}
           </button>
         </div>
       )}

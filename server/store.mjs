@@ -19,6 +19,7 @@ import {
   snippet,
   SEARCH_PAGE_SIZE,
   BUILTIN_PLUGINS,
+  contentLabels,
 } from '../dist/core.mjs';
 import { randomUUID } from 'node:crypto';
 import { pluginCompiler } from './plugin-sandbox.mjs';
@@ -270,6 +271,11 @@ export class PostgresStore {
     return {
       preparing: !!timeline.preparing_revision_id,
       ...metadata,
+      // Its sensitive-content labels (#115): its owner's and moderators'.
+      labels: contentLabels([
+        ...(timeline.content_labels ?? []),
+        ...(timeline.moderator_labels ?? []),
+      ]),
       canWrite:
         !timeline.comparison && ['owner', 'admin', 'writer', 'editor'].includes(timeline.role),
       canPropose:

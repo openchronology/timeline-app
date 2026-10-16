@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import Link from 'next/link';
 import StarButton from './star-button.jsx';
+import { describeLabels } from '../../src/content-labels.ts';
 import { CompareCheckbox } from './compare-selection.jsx';
 function link(query, values, basePath = '/') {
   const p = new URLSearchParams({ ...query, ...values });
@@ -38,6 +39,9 @@ export default function TimelineList({
                 : `${Number(t.event_count).toLocaleString()} moments`}
               {t.featured ? ' · Featured' : ''}
             </p>
+            {t.labels?.length > 0 && (
+              <p className="sensitive-badge">Sensitive: {describeLabels(t.labels).toLowerCase()}</p>
+            )}
             <p>{t.description?.slice(0, 220)}</p>
             <StarButton id={t.id} count={t.star_count} starred={t.starred} signedIn={!guest} />
             {guest && !t.comparison && (

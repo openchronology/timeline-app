@@ -1453,3 +1453,17 @@ CREATE TABLE IF NOT EXISTS oc_timeline_popularity (
   popularity real NOT NULL DEFAULT 0,
   trending real NOT NULL DEFAULT 0
 );
+-- Sensitive-content labels (#115; CONTENT_LABELS in src/core.ts): what its owner marks a
+-- timeline as containing, and what moderators add, which its owner cannot remove. Readers
+-- are warned before it opens and its images stay blurred until they choose to see them.
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS content_labels text[] NOT NULL DEFAULT '{}';
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS moderator_labels text[] NOT NULL DEFAULT '{}';
+ALTER TABLE oc_timelines DROP CONSTRAINT IF EXISTS oc_timelines_content_labels;
+ALTER TABLE oc_timelines ADD CONSTRAINT oc_timelines_content_labels CHECK(
+  content_labels <@ ARRAY['nudity','violence','disturbing']
+  AND moderator_labels <@ ARRAY['nudity','violence','disturbing']);
+-- A report may be settled by labelling what was reported: the labels moderators added.
+ALTER TABLE oc_moderation_cases ADD COLUMN IF NOT EXISTS labels text[];
+ALTER TABLE oc_moderation_cases DROP CONSTRAINT IF EXISTS oc_moderation_cases_status_check;
+ALTER TABLE oc_moderation_cases ADD CONSTRAINT oc_moderation_cases_status_check
+  CHECK(status IN ('open','dismissed','restricted','lifted','labelled'));

@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { compilePluginScript } from './custom-time.js';
+import { contentLabels, CONTENT_LABELS_KEY } from './content-labels.js';
 /** Versioned host components and optional source interpreted by our bounded language. */
 export interface PluginField {
   kind:
@@ -621,6 +622,9 @@ export function pluginMetadata(
         )
           result[field.metadataKey] = metadata[field.metadataKey];
     }
+  // Its sensitive-content labels (#115), so its images are blurred wherever they show.
+  const labels = contentLabels(metadata[CONTENT_LABELS_KEY]);
+  if (labels.length) result[CONTENT_LABELS_KEY] = labels;
   return result;
 }
 export const MOMENT_ICONS: PluginManifest = validatePluginManifest({

@@ -57,6 +57,10 @@ Previews are made as a guest sees the timeline: a private timeline's preview ima
 site's own card, and its pages ask search engines not to index them, so nothing private
 appears in a preview even when a member shares the link.
 
+A timeline with [sensitive-content labels](moderation.md#sensitive-content-labels) previews as
+its title and what it is labelled as containing, without its moments or description, and its
+oEmbed answer has no thumbnail: it opens behind its warning.
+
 ## Search engines
 
 - `/robots.txt` lets crawlers read pages but not the API, accounts, the bare editor or embeds,
