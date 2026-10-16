@@ -2,6 +2,7 @@
 'use client';
 import { useState } from 'react';
 import { api } from '../lib/api.js';
+import HelpTip from './help-tip.jsx';
 export default function AccountAccess({ session, account, refresh }) {
   const [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
@@ -122,7 +123,13 @@ export default function AccountAccess({ session, account, refresh }) {
           content, and their images)
         </label>
       )}
-      <h2>API keys</h2>
+      <h2>
+        API keys
+        <HelpTip topic="api#calling-it" about="API keys">
+          For programs: a key reaches your timelines through the HTTP API, with the scopes you
+          choose.
+        </HelpTip>
+      </h2>
       <p>
         Keys act with your timeline permissions and storage limit. They cannot manage accounts or
         the site. Use HTTPS and send the key in the Authorization header; never put it in a URL. The{' '}

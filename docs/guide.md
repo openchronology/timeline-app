@@ -278,6 +278,12 @@ A notice under the header suggests another way to open a timeline when it gets s
 
 Undo and redo work outside text fields; inside one, they undo your typing.
 
+## Help in the app
+
+- **The tour:** **Help** under the timeline lists its controls and offers **Take the tour**, which lights up the main controls one at a time. Use **Next** and **Back**, or the arrow keys; Escape ends it. On the website, **Take the tour of the editor** on the help page starts it too.
+- **? buttons:** beside the harder settings, in dialogs and on the website's settings pages. Point at one, or move to it with the keyboard, to read a short tip; select it to open the help about it.
+- **The help:** **Help** in the website's header has this guide, the [frequently asked questions](faq.md) and every topic in detail, with a search box. The desktop app opens its server's help in your browser (timescale.info's when it isn't connected), and the offline file opens timescale.info's.
+
 ## Where to go next
 
 - [Frequently asked questions](faq.md)

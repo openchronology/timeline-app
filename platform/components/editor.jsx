@@ -28,6 +28,8 @@ export default function Editor({
   comparisonSources = [],
   forkId,
   focus,
+  // Starts the editor's tour (#172), from the help.
+  tour = false,
 }) {
   const frame = useRef(null),
     router = useRouter(),
@@ -186,6 +188,7 @@ export default function Editor({
         src={
           '/editor/frame' +
           (sample ? '?demo=dense' : fresh ? '?new=1' : '') +
+          (tour ? (sample || fresh ? '&' : '?') + 'tour=1' : '') +
           (forkId
             ? '#guest-fork/' + forkId
             : comparisonIds

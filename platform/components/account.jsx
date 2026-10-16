@@ -7,6 +7,7 @@ import AccountAccess from './account-access.jsx';
 import { api } from '../lib/api.js';
 import ModerationDecisions from './moderation-decisions.jsx';
 import { profilePath } from '../../src/addresses.ts';
+import HelpTip from './help-tip.jsx';
 export default function Account({ returnTo = '/', login = false }) {
   const router = useRouter();
   const [session, setSession] = useState(null),
@@ -339,7 +340,15 @@ export default function Account({ returnTo = '/', login = false }) {
       )}
       {session?.user && !anonymous && (
         <section>
-          <h2>Account security</h2>
+          <h2>
+            Account security
+            <HelpTip
+              topic="authentication#two-factor-authentication-and-recovery"
+              about="account security"
+            >
+              Two-factor authentication asks for a code from an app as well as your password.
+            </HelpTip>
+          </h2>
           <p>
             {account?.security?.email ?? 'No email address'}
             {account?.security?.email_verified_at ? ' · verified' : ''}

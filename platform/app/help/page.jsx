@@ -30,6 +30,11 @@ export default async function Help({ searchParams }) {
         among the <a href="/help/faq">frequently asked questions</a>. Every topic below is also
         searchable.
       </p>
+      <p>
+        <a className="button" href="/editor?tour=1">
+          Take the tour of the editor
+        </a>
+      </p>
       {helpSections(pages).map((section) => (
         <section key={section.title} className="help-section">
           <h2>{section.title}</h2>
