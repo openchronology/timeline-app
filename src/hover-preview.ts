@@ -5,6 +5,14 @@ import { renderMarkdown } from './rich-text.js';
 import type { InstalledPlugin } from './plugins.js';
 
 /** Host-owned preview: manifests never supply HTML or executable handlers. */
+/** The host an image URL names, or nothing for one that is not a URL. */
+function hostOf(url: string) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
+}
 export function createHoverPreview(
   stage: HTMLElement,
   scale: () => number,
@@ -24,7 +32,10 @@ export function createHoverPreview(
   notes.className = 'focus-notes';
   const sources = document.createElement('section');
   sources.className = 'focus-sources';
-  card.append(img, title, notes, sources);
+  // Where the image is hosted, credited (#109).
+  const credit = document.createElement('small');
+  credit.className = 'focus-credit';
+  card.append(img, credit, title, notes, sources);
   stage.append(card);
   const data = new WeakMap<
     HTMLButtonElement,
@@ -129,7 +140,10 @@ export function createHoverPreview(
       }
       sources.append(heading, list);
     }
-    const url = imageSource(pluginMarker(entry.plugins, entry.metadata));
+    const linked = pluginMarker(entry.plugins, entry.metadata);
+    const url = imageSource(linked);
+    credit.textContent = linked && url ? `Image: ${hostOf(linked)}` : '';
+    credit.hidden = !credit.textContent;
     img.hidden = !url || !img.complete || !img.naturalWidth;
     if (url && img.getAttribute('src') !== url) {
       img.hidden = true;

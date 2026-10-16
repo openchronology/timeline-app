@@ -23,7 +23,9 @@ installation.
 
 You retain ownership of your timelines, moment metadata, images, comments, and
 original plugin and time-formatting scripts. You must have the rights needed to
-upload, link, copy, and share those materials, including embedded image copies.
+upload, link, copy, and share those materials. Images are shown by linking to where
+their owners host them; the service stores the links, not copies. Link only images
+you may share, and respect any limits their hosts set.
 Do not upload passwords, sensitive secrets, or other people's private information
 without authorization. The service is not designed for regulated confidential
 records or safety-critical decisions.

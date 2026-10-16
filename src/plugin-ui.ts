@@ -543,7 +543,9 @@ export function renderPluginFields(
         note.textContent =
           input.value && !url
             ? 'Use a public HTTPS image URL without credentials.'
-            : 'Public HTTPS image. The host must allow anonymous cross-origin image access.';
+            : editable
+              ? 'Public HTTPS image, shown from where it is hosted: link only images you may share. The host must allow anonymous cross-origin image access.'
+              : 'Shown from where it is hosted; its rights belong to its owner.';
         if (!url) {
           img.removeAttribute('src');
           link.removeAttribute('href');
@@ -551,6 +553,8 @@ export function renderPluginFields(
         }
         if (imagesOffline()) link.removeAttribute('href');
         else link.href = url;
+        // Its source, credited (#109): images are linked where their owners host them.
+        sourceLabel.textContent = `Image from ${new URL(url).hostname} · open the original ↗`;
         const resolved = imageSource(url);
         if (!resolved) {
           img.hidden = true;

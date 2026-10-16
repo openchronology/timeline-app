@@ -53,6 +53,16 @@ import {
  */
 export const SNAPSHOT_BYTES = 200_000_000;
 /**
+ * `document` without copies of its images (its `assets`), as the server keeps timelines: it
+ * links to images where their owners host them, and stores no copies of them (#109). Copies
+ * are for the files people export.
+ */
+export function withoutImageCopies(document) {
+  if (!document || document.assets === undefined) return document;
+  const { assets: _copies, ...rest } = document;
+  return rest;
+}
+/**
  * SQL: whether timeline `t` (a table alias) is restricted by a moderation decision (#115;
  * moderation.mjs). Only its owner and administrators then see it.
  */
@@ -510,7 +520,7 @@ export class PostgresStore {
     for (const { id } of rows) await this.prepare(id);
   }
   async replace(client, id, document, { touch = true } = {}) {
-    document = validateDocument(document);
+    document = withoutImageCopies(validateDocument(document));
     if (document.comparison) {
       const parent = (
         await client.query(
@@ -782,7 +792,7 @@ export class PostgresStore {
       ]);
   }
   async create(userId, document) {
-    document = validateDocument(document);
+    document = withoutImageCopies(validateDocument(document));
     await this.checkScripts(document.plugins);
     const id = randomUUID();
     await this.transaction(async (c) => {
@@ -1887,6 +1897,62 @@ export async function convertLegacyDurations(client) {
  * at a time: earlier versions kept them after a fork was deleted. Returns how many
  * timelines it looked at.
  */
+/**
+ * Removes the copies of images earlier releases stored with timelines (#109): from timelines,
+ * their saved history (settings, revision patches and snapshots), and pull requests. The
+ * server links to images and stores no copies of them. Saved history is otherwise immutable;
+ * this purge is its one exception, made once by the migration (with the server stopped),
+ * like a takedown. A timeline's storage shrinks by what its copies took; what saved history
+ * was charged stays. Returns how many rows it changed.
+ */
+export async function releaseImageCopies(client) {
+  const { rows } = await client.query(
+    `SELECT EXISTS(SELECT 1 FROM oc_timelines WHERE assets IS NOT NULL)
+      OR EXISTS(SELECT 1 FROM oc_history_settings WHERE settings ? 'assets')
+      OR EXISTS(SELECT 1 FROM oc_revisions WHERE patch->'settings' ? 'assets')
+      OR EXISTS(SELECT 1 FROM oc_snapshots WHERE document ? 'assets')
+      OR EXISTS(SELECT 1 FROM oc_proposals WHERE document ? 'assets' OR base_document ? 'assets') AS found`,
+  );
+  if (!rows[0].found) return 0;
+  let changed = (
+    await client.query(
+      `UPDATE oc_timelines SET storage_bytes=greatest(0,storage_bytes-octet_length(assets::text)),
+      assets=NULL WHERE assets IS NOT NULL`,
+    )
+  ).rowCount;
+  changed += (
+    await client.query(
+      `UPDATE oc_proposals SET document=document-'assets',base_document=base_document-'assets'
+      WHERE document ? 'assets' OR base_document ? 'assets'`,
+    )
+  ).rowCount;
+  for (const [table, trigger, update] of [
+    [
+      'oc_history_settings',
+      'oc_history_immutable',
+      "UPDATE oc_history_settings SET settings=settings-'assets' WHERE settings ? 'assets'",
+    ],
+    [
+      'oc_revisions',
+      'oc_revision_immutable',
+      `UPDATE oc_revisions SET patch=jsonb_set(patch,'{settings}',(patch->'settings')-'assets')
+      WHERE patch->'settings' ? 'assets'`,
+    ],
+    [
+      'oc_snapshots',
+      'oc_snapshot_immutable',
+      "UPDATE oc_snapshots SET document=document-'assets' WHERE document ? 'assets'",
+    ],
+  ]) {
+    await client.query(`ALTER TABLE ${table} DISABLE TRIGGER ${trigger}`);
+    try {
+      changed += (await client.query(update)).rowCount;
+    } finally {
+      await client.query(`ALTER TABLE ${table} ENABLE TRIGGER ${trigger}`);
+    }
+  }
+  return changed;
+}
 export async function releaseIndexes(client) {
   const { rows } = await client.query(
     `SELECT id FROM oc_timelines WHERE index_pinned IS NOT NULL

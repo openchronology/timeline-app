@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { rebaseDocument, mergePatch } from './merge.mjs';
 import { randomUUID } from 'node:crypto';
-import { HttpError, restrictedTimeline } from './store.mjs';
+import { HttpError, restrictedTimeline, withoutImageCopies } from './store.mjs';
 import { validateDocument, relationshipKey } from '../dist/core.mjs';
 import { commonAncestor, lockTimelines, revisionId } from './versioning.mjs';
 import { differences } from './history.mjs';
@@ -172,7 +172,8 @@ function proposalInput(value) {
     return { ...value, title: value.title.trim() };
   }
   try {
-    document = validateDocument(value.document);
+    // Images are linked, not copied, on the server (#109).
+    document = withoutImageCopies(validateDocument(value.document));
   } catch (error) {
     throw new HttpError(400, error.message);
   }

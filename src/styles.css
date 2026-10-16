@@ -2674,3 +2674,10 @@ body[data-warnings]:not([data-images-shown])
   color: #6b5326;
   font-size: 12px;
 }
+/* An image's source, credited where it shows (#109). */
+.focus-credit {
+  display: block;
+  margin: -2px 0 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
