@@ -14,6 +14,7 @@ export default async function EditorPage({ searchParams }) {
         sample={query.demo === 'dense'}
         fresh={query.new === '1' || !!forkId}
         forkId={forkId}
+        tour={query.tour === '1'}
       />
     </main>
   );

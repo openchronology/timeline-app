@@ -325,6 +325,20 @@ try {
           'Editor host must fit its header and frame without a sticky footer or second scrollbar',
         );
       }
+      // The editor's tour, from the help (#172).
+      await page.goto(origin + '/help');
+      await page.getByRole('link', { name: 'Take the tour of the editor' }).click();
+      await page.waitForURL(origin + '/editor?tour=1');
+      const toured = page.frameLocator('iframe.editor-frame').locator('.tour-card');
+      await toured.getByRole('heading', { name: 'The timeline', exact: true }).waitFor();
+      await toured.getByRole('button', { name: 'End tour' }).click();
+      await toured.waitFor({ state: 'detached' });
+      // A "?" on the website shows its tip, and leads to the help about it.
+      await page.goto(origin + '/plugins');
+      const tip = page.getByRole('link', { name: 'Help on plugins' });
+      await tip.hover();
+      await page.locator('#tip-plugins').waitFor({ state: 'visible' });
+      assert.equal(await tip.getAttribute('href'), '/help/plugins');
       await page.getByRole('link', { name: 'Account', exact: true }).click();
       await page.waitForURL(origin + '/account');
       await page.getByText('Server accounts are unavailable.').waitFor();

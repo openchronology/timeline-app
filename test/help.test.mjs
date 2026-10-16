@@ -3,7 +3,7 @@
 // between them leading somewhere, and search.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { HELP_SECTIONS, helpLink, helpPages, renderMarkdown, searchHelp } from '../server/help.mjs';
 
 const render = (source) => renderMarkdown(source).html;
@@ -112,4 +112,48 @@ test('search finds the sections that mention every word, headings first', async 
   );
   assert.deepEqual(searchHelp(pages, '   '), []);
   assert.deepEqual(searchHelp(pages, 'zqxjvwk'), []);
+});
+
+test('the "?" buttons and the tour lead to help that exists, beside controls that exist', async () => {
+  const pages = await helpPages(new URL('..', import.meta.url).pathname);
+  const read = (path) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+  const leads = (topic) => {
+    const [slug, anchor] = topic.split('#');
+    const page = pages.get(slug);
+    return !!page && (!anchor || page.headings.some((h) => h.id === anchor));
+  };
+  // The editor's (src/help-tips.ts), and the website's (<HelpTip topic="…">).
+  const editor = read('src/help-tips.ts');
+  const topics = [...editor.matchAll(/topic: '([^']+)'/g)].map((m) => m[1]);
+  assert(topics.length >= 12, `${topics.length} editor tips`);
+  const jsx = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(new URL('../' + dir, import.meta.url), { withFileTypes: true }))
+      if (entry.isDirectory()) walk(`${dir}/${entry.name}`);
+      else if (entry.name.endsWith('.jsx')) jsx.push(`${dir}/${entry.name}`);
+  };
+  walk('platform/app');
+  walk('platform/components');
+  const website = jsx.flatMap((file) =>
+    [...read(file).matchAll(/<HelpTip\s+topic="([^"]+)"/g)].map((m) => m[1]),
+  );
+  assert(website.length >= 8, `${website.length} website tips`);
+  assert.deepEqual(
+    [...topics, ...website].filter((topic) => !leads(topic)),
+    [],
+    'Help tips leading to no page or heading',
+  );
+  // What they and the tour attach to is in the editor's markup.
+  const markup = read('src/index.html');
+  const selectors = [
+    ...editor.matchAll(/selector: '([^']+)'/g),
+    ...read('src/tour.ts').matchAll(/selectors: \[([^\]]+)\]/g),
+  ].map((m) => m[1]);
+  const ids = selectors.flatMap((s) => [...s.matchAll(/#([a-z-]+)/g)].map((m) => m[1]));
+  assert(ids.length > 20);
+  assert.deepEqual(
+    ids.filter((id) => !markup.includes(`id="${id}"`)),
+    [],
+    'Tips and tour steps naming elements the editor lacks',
+  );
 });

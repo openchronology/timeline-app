@@ -6,6 +6,7 @@ import { dismissOnBackdrop } from '../../src/dialogs.ts';
 import { CONTENT_LABELS } from '../../src/content-labels.ts';
 import { api } from '../lib/api.js';
 import { RESERVED_NAMES, slugFromTitle, timelinePath } from '../../src/addresses.ts';
+import HelpTip from './help-tip.jsx';
 /** A storage size, as the account page writes it. */
 const size = (bytes) =>
   bytes >= 1048576
@@ -61,7 +62,13 @@ export default function TimelineSettings({
     <>
       <h1>Sharing &amp; settings</h1>
       <section>
-        <h2>Visibility</h2>
+        <h2>
+          Visibility
+          <HelpTip topic="sharing#links" about="visibility">
+            Private timelines open only for you and those you add. Public ones are for anyone, in
+            search and with their saved history.
+          </HelpTip>
+        </h2>
         <label>
           Who can view this timeline?
           <select
@@ -109,7 +116,12 @@ export default function TimelineSettings({
         </p>
       </section>
       <section>
-        <h2>Address</h2>
+        <h2>
+          Address
+          <HelpTip topic="sharing#addresses" about="addresses">
+            The timeline’s link: your name and this slug. Its other addresses keep leading here.
+          </HelpTip>
+        </h2>
         {RESERVED_NAMES.has(timeline.owner) ? (
           <p className="muted">
             @{timeline.owner} is also the name of one of the site&apos;s own pages, so its timelines
@@ -164,7 +176,13 @@ export default function TimelineSettings({
         </p>
       </section>
       <section>
-        <h2>Sensitive content</h2>
+        <h2>
+          Sensitive content
+          <HelpTip topic="moderation#sensitive-content-labels" about="sensitive content">
+            Readers are warned before a labelled timeline opens, and its images stay blurred until
+            they choose to see them.
+          </HelpTip>
+        </h2>
         <p className="muted">
           Educational, historical, medical, artistic and news depictions of nudity, violence or
           disturbing events are allowed when labelled; pornography and gore for its own sake are
@@ -197,7 +215,16 @@ export default function TimelineSettings({
         </fieldset>
       </section>
       <section>
-        <h2>Data retention</h2>
+        <h2>
+          Data retention
+          <HelpTip
+            topic="retention#keeping-only-the-last-year-or-month-or-week"
+            about="data retention"
+          >
+            Keeps only the last stretch of a timeline that keeps growing, such as a log: older
+            moments are deleted for good.
+          </HelpTip>
+        </h2>
         {calendar ? (
           <form
             onSubmit={(e) => {
@@ -251,7 +278,13 @@ export default function TimelineSettings({
         </p>
       </section>
       <section>
-        <h2>Saved history</h2>
+        <h2>
+          Saved history
+          <HelpTip topic="retention#not-keeping-saved-history" about="saved history">
+            Each save keeps what it changed, so past revisions can be opened. Logs nobody reviews
+            can do without.
+          </HelpTip>
+        </h2>
         {timeline.keep_history ? (
           <>
             <p className="muted">
@@ -308,7 +341,13 @@ export default function TimelineSettings({
         )}
       </section>
       <section>
-        <h2>Collaborators</h2>
+        <h2>
+          Collaborators
+          <HelpTip topic="collaboration#custody-and-permissions" about="collaborators">
+            Viewers read, contributors propose changes, and writers save them and merge pull
+            requests.
+          </HelpTip>
+        </h2>
         {members.map((m) => (
           <p key={m.username}>
             @{m.username} · {m.role}{' '}

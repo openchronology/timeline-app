@@ -2733,3 +2733,123 @@ body[data-warnings]:not([data-images-shown])
   color: var(--muted);
   font-size: 11px;
 }
+
+/* Help (#172): "?" buttons beside settings, with one tooltip, and the editor's tour. */
+.help-tip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 0 0 0 6px;
+  padding: 0;
+  border: 1px solid var(--line-strong, #cdd6c8);
+  border-radius: 50%;
+  background: var(--paper, #fff);
+  color: var(--green);
+  font:
+    700 11px/1 system-ui,
+    sans-serif;
+  vertical-align: middle;
+  cursor: help;
+}
+/* Beside a dialog's heading: the heading's own size, not its close button's. */
+.inspector-heading .help-tip,
+.dialog-heading .help-tip {
+  width: 18px;
+  font:
+    700 11px/1 system-ui,
+    sans-serif;
+  margin-right: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--green);
+}
+.inspector-heading .help-tip + .share-entity {
+  margin-left: 0;
+}
+.help-tip:hover,
+.help-tip:focus-visible,
+.inspector-heading .help-tip:hover,
+.dialog-heading .help-tip:hover {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}
+.help-tooltip {
+  position: fixed;
+  z-index: 300;
+  max-width: min(18rem, calc(100vw - 16px));
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #1f2b25;
+  color: #f2f6ef;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.2);
+  pointer-events: none;
+}
+.timeline-help-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.timeline-help-actions form {
+  margin: 0;
+}
+.tour-spotlight {
+  position: fixed;
+  z-index: 280;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 3px var(--focus, #61a378),
+    0 0 0 9999px rgb(18 28 23 / 0.45);
+  pointer-events: none;
+  transition:
+    left 0.2s,
+    top 0.2s,
+    width 0.2s,
+    height 0.2s;
+}
+.tour-card {
+  position: fixed;
+  z-index: 290;
+  width: min(22rem, calc(100vw - 16px));
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--paper, #fff);
+  color: var(--ink);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.25);
+}
+.tour-card h2 {
+  margin: 0 0 6px;
+  font-size: 17px;
+}
+.tour-card p {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.tour-count {
+  color: var(--muted, #6f7c71);
+  font-size: 12px !important;
+}
+.tour-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tour-actions span {
+  display: flex;
+  gap: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-spotlight {
+    transition: none;
+  }
+}

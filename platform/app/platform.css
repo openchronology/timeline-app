@@ -1097,3 +1097,73 @@ main.help {
     margin-bottom: 1.5rem;
   }
 }
+/* "?" beside a setting (#172): its tip on hover or focus; a click opens the help on it. */
+.help-tip {
+  position: relative;
+  display: inline-block;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+}
+.help-tip > a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--green);
+  font:
+    700 11px/1 system-ui,
+    sans-serif;
+  text-decoration: none;
+  cursor: help;
+}
+.help-tip > a:hover,
+.help-tip > a:focus-visible {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}
+.help-tip [role='tooltip'] {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 6px);
+  left: 50%;
+  width: max-content;
+  max-width: min(18rem, 80vw);
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #1f2b25;
+  color: #f2f6ef;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: normal;
+  text-transform: none;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.2);
+  transform: translateX(-50%);
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+}
+.help-tip:hover [role='tooltip'],
+.help-tip:focus-within [role='tooltip'] {
+  visibility: visible;
+  opacity: 1;
+}
+/* On phones the tip is a strip along the bottom of the screen, wherever its button is. */
+@media (max-width: 650px) {
+  .help-tip [role='tooltip'] {
+    position: fixed;
+    top: auto;
+    right: 1rem;
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    left: 1rem;
+    width: auto;
+    max-width: none;
+    transform: none;
+  }
+}
