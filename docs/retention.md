@@ -50,7 +50,7 @@ The response includes `retention` (as the timeline's display writes it), `retent
 
 Retention keeps saved history only within its period, but within it history is still a second
 copy of what changed. A timeline whose past revisions nobody reviews can stop keeping it
-altogether: turn off **Keep saved history** in **Sharing & settings**, or
+altogether: choose **Stop keeping saved history…** in **Sharing & settings**, or
 
 ```sh
 curl -X PATCH "$OCH_API_URL/api/timelines/$ID/settings" \

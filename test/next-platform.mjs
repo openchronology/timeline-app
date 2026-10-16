@@ -162,6 +162,24 @@ try {
   assert.equal(openapi.servers[0].url, origin);
   assert(openapi.paths['/api/timelines/{id}/settings'].patch);
   assert.match(html, /href="\/docs\/api"/);
+  // The help (#172): docs/ as the server runs, by section, searchable, under the policy.
+  const help = await fetch(origin + '/help'),
+    helpHtml = await help.text();
+  assert.equal(help.status, 200);
+  assert(
+    helpHtml.includes(
+      `nonce="${help.headers.get('content-security-policy').match(/'nonce-([^']+)'/)[1]}"`,
+    ),
+  );
+  assert.match(helpHtml, /href="\/help\/tags"/);
+  assert.match(helpHtml, /href="\/docs\/api"/);
+  const tags = await (await fetch(origin + '/help/tags')).text();
+  assert.match(tags, /<h2 id="separating-by-tags">Separating by tags<\/h2>/);
+  assert.match(tags, /href="\/help\/time-mapping"/);
+  const found = await (await fetch(origin + '/help?q=separating+tags')).text();
+  assert.match(found, /href="\/help\/tags#separating-by-tags"/);
+  assert.equal((await fetch(origin + '/help/no-such-page')).status, 404);
+  assert.match(html, /href="\/help"/);
   // The plugin library page lists the official plugin suites (#78) above the plugins.
   const plugins = await (await fetch(origin + '/plugins')).text();
   assert.match(plugins, /Plugin suites/);

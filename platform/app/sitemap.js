@@ -2,6 +2,7 @@
 // Public timelines, most recently changed first, and the profiles that own them, at their
 // addresses (#148). Moments are reached from their timelines' pages, which link to them.
 import { platformServices } from '../../server/platform.mjs';
+import { helpPages } from '../../server/help.mjs';
 import { siteOrigin } from '../lib/sharing.js';
 import { profilePath, timelinePath } from '../../src/addresses.ts';
 export const dynamic = 'force-dynamic';
@@ -15,6 +16,12 @@ export default async function sitemap() {
     { url: origin + '/plugins', changeFrequency: 'weekly' },
     { url: origin + '/download', changeFrequency: 'weekly' },
     { url: origin + '/docs/api', changeFrequency: 'weekly' },
+    { url: origin + '/help', changeFrequency: 'weekly' },
+    // The help's pages (#172).
+    ...[...(await helpPages().catch(() => new Map())).keys()].map((slug) => ({
+      url: `${origin}/help/${slug}`,
+      changeFrequency: 'weekly',
+    })),
   ];
   let pool;
   try {

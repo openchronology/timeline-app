@@ -5,7 +5,7 @@ import { platformServices } from '../server/platform.mjs';
 import { RESERVED_NAMES, USERNAME, timelineAddress } from '../src/addresses.ts';
 /** The site's own pages, which get the content security policy. */
 const PAGES =
-  /^\/(?:login|account|admin|plugins|download|legal|editor|docs(?:\/.*)?|timelines(?:\/.*)?|users(?:\/.*)?|connect(?:\/.*)?)?$/;
+  /^\/(?:login|account|admin|plugins|download|legal|editor|docs(?:\/.*)?|help(?:\/.*)?|timelines(?:\/.*)?|users(?:\/.*)?|connect(?:\/.*)?)?$/;
 /** Marks what this proxy told a page, so a client cannot claim it. */
 const PASS = crypto.randomUUID();
 export async function proxy(request) {
