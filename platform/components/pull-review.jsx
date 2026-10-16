@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '../lib/api.js';
 import ReportDialog from './report-dialog.jsx';
+import { REBASE_PULL_REQUEST } from '../../src/wording.ts';
 export default function PullReview({ timelineId, initial, initialComments, signedIn, username }) {
   const router = useRouter(),
     [p, setProposal] = useState(initial),
@@ -124,7 +125,7 @@ export default function PullReview({ timelineId, initial, initialComments, signe
                 return (
                   <details key={e.id}>
                     <summary>
-                      {label}: {e.metadata.title || 'Unnamed moment'} · {e.time}
+                      {label}: {e.metadata.title || 'Untitled moment'} · {e.time}
                     </summary>
                     {before && after && <pre>{JSON.stringify(before, null, 2)}</pre>}
                     <pre>{JSON.stringify(e, null, 2)}</pre>
@@ -165,7 +166,7 @@ export default function PullReview({ timelineId, initial, initialComments, signe
         )}
         {p.canUpdate && p.base_revision !== p.upstreamRevision && (
           <button disabled={busy} onClick={() => resolve('rebase')}>
-            Rebase on upstream
+            {REBASE_PULL_REQUEST}
           </button>
         )}
       </div>

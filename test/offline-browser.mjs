@@ -86,7 +86,7 @@ try {
   await poll(async () => (await input('storage-badge').textContent()) === 'Offline HTML');
   assert(await input('memory-notice').isVisible());
   assert.match(await input('memory-notice').textContent(), /Export an .ochx/);
-  assert.match(await input('event-count').textContent(), /0 events/);
+  assert.match(await input('event-count').textContent(), /0 moments/);
   for (const id of [
     'account-button',
     'publish-button',
@@ -108,7 +108,7 @@ try {
   assert.equal(await input('event-exact').inputValue(), '1/3');
   // Save adds it.
   await closeMomentDetails(page);
-  assert.match(await input('event-count').textContent(), /1 events/);
+  assert.match(await input('event-count').textContent(), /1 moment\b/);
   await input('fit-button').click();
   await poll(async () => (await markers.count()) === 1);
   const box = await input('timeline-stage').boundingBox(),
@@ -202,7 +202,7 @@ try {
   await mkdir('artifacts', { recursive: true });
   await page.screenshot({ path: `artifacts/offline-${engine}.png`, fullPage: true });
   await page.reload();
-  await poll(async () => (await input('event-count').textContent()) === '0 events');
+  await poll(async () => (await input('event-count').textContent()) === '0 moments');
   assert.deepEqual(await page.evaluate(() => window.__networkCalls), []);
   assert.deepEqual(
     requests.filter((request) => request.split('#')[0] !== url && !/^(blob:|data:)/.test(request)),

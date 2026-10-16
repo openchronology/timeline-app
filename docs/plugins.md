@@ -76,7 +76,7 @@ Example manifest:
 }
 ```
 
-`id` is a lowercase ASCII slug; `version` is a positive integer. Optional `source` contains a restricted `render` function. Older declarative snapshots remain supported. The existing built-ins publish scripted version 2 and retain declarative version 1 detail URLs; the new shape plugin starts at version 1. API version 1 permits eight fields per manifest and 32 installed plugins per timeline, with at most 128 KiB of UTF-8 serialized configuration. Unknown properties and unsupported components are rejected. Metadata keys are bounded ASCII identifiers; `title`, `description`, prototype-related keys and nested paths are unavailable to plugin fields. Field text is rendered as text, never HTML. Host components do not modify event times or timeline bounds.
+`id` is a lowercase ASCII slug; `version` is a positive integer. Optional `source` contains a restricted `render` function. Older declarative snapshots remain supported. The existing built-ins publish scripted version 2 and retain declarative version 1 detail URLs; the new shape plugin starts at version 1. API version 1 permits eight fields per manifest and 32 installed plugins per timeline, with at most 128 KiB of UTF-8 serialized configuration. Unknown properties and unsupported components are rejected. Metadata keys are bounded ASCII identifiers; `title`, `description`, prototype-related keys and nested paths are unavailable to plugin fields. Field text is rendered as text, never HTML. Host components do not modify moment times or timeline bounds.
 
 The document's ordered configuration is:
 
@@ -98,7 +98,7 @@ The document's ordered configuration is:
 }
 ```
 
-Read-only server overview queries return the requested plugin metadata for individual markers in the same bounded query. They do not download the full timeline or issue a separate request for each icon. Group summaries do not include arbitrary event metadata.
+Read-only server overview queries return the requested plugin metadata for individual markers in the same bounded query. They do not download the full timeline or issue a separate request for each icon. Group summaries do not include arbitrary moment metadata.
 
 ## Library API and publishing
 
@@ -137,7 +137,7 @@ The default metadata shape is `stack: [{id: "entry-id", metadata: {title: "Title
 
 Stack entries also appear as branches at their parent's horizontal time. Above-axis captions branch upward; below-axis captions branch downward. Each entry receives a dot and, if named, its title, with other active marker plugins applied (including icons). Selecting a branch dot opens the parent editor and scrolls to that entry. Grouped parent moments hide their branches until zoom separates the parents.
 
-Drag the timeline in either dimension. Alt-scroll or Up/Down on the focused timeline pans vertically; normal wheel/pinch still zooms time, and Shift-scroll pans horizontally. **Center axis** resets only vertical position; **Fit all** recenters it while fitting time. Vertical position is a camera setting, not stored event data. Only branch rows near the viewport receive DOM nodes. Vertical-only navigation reuses the existing frame and does not requery PostgreSQL. Server overview metadata includes the enabled stack fields so shared, read-only timelines show the same branches.
+Drag the timeline in either dimension. Alt-scroll or Up/Down on the focused timeline pans vertically; normal wheel/pinch still zooms time, and Shift-scroll pans horizontally. **Center axis** resets only vertical position; **Fit all** recenters it while fitting time. Vertical position is a camera setting, not stored moment data. Only branch rows near the viewport receive DOM nodes. Vertical-only navigation reuses the existing frame and does not requery PostgreSQL. Server overview metadata includes the enabled stack fields so shared, read-only timelines show the same branches.
 
 ## Colors and continuous moment editing
 
@@ -145,7 +145,7 @@ Drag the timeline in either dimension. Alt-scroll or Up/Down on the focused time
 
 With an active stack plugin, a parent or stack-entry context menu offers **Add entry to stack**, appending to the parent stack and focusing its new card. Stack-entry context-menu deletion targets the child and still requires confirmation.
 
-Moment editing applies valid changes to the browser rational map after 250 ms, including title, notes, exact time, additional JSON, plugin fields, and stack additions/deletions/order. Those changes show at once; **Save** keeps them, and **Cancel** or closing the details puts the moment back. Incomplete parser/JSON/URL input keeps the last valid event and shows a validation message. Switching moments, leaving a field, exporting, or saving the timeline flushes pending valid edits. A new moment joins the timeline when it is saved. Undo coalesces edits during one inspector session. Moment edits are never written to the server automatically: **Save to server** remains a snapshot action for the complete timeline, and leaving or reloading the page with edits it has not saved asks first. (Time display settings are the exception: they are [saved when chosen](time-presentation.md).) `.och` saving and `.ochx` export likewise include the current complete timeline.
+Moment editing applies valid changes to the browser rational map after 250 ms, including title, notes, exact time, additional JSON, plugin fields, and stack additions/deletions/order. Those changes show at once; **Save** keeps them, and **Cancel** or closing the details puts the moment back. Incomplete parser/JSON/URL input keeps the last valid version and shows a validation message. Switching moments, leaving a field, exporting, or saving the timeline flushes pending valid edits. A new moment joins the timeline when it is saved. Undo coalesces edits during one inspector session. Moment edits are never written to the server automatically: **Save to server** remains a snapshot action for the complete timeline, and leaving or reloading the page with edits it has not saved asks first. (Time display settings are the exception: they are [saved when chosen](time-presentation.md).) `.och` saving and `.ochx` export likewise include the current complete timeline.
 
 Moment titles are optional. Empty, missing, or whitespace-only titles leave the dot visible but suppress its timeline caption and time label. Named main-axis moments show their title and time; stack captions show only their title because time is inherited from their parent. Group summary counts remain visible. Titles and exact time can always be inspected by selecting a dot. **Clear selection** appears with an active time selection, flushes pending valid edits, and clears the cursor and inspector selection without deleting a moment. The yellow cursor paints above caption backgrounds so nearby labels cannot mask it.
 
@@ -342,12 +342,12 @@ behavior remains available. Larger summaries stay collapsed. Keyboard users can
 focus a summary and press Down to enter the fan; Escape closes it. Reduced motion
 removes the movement animation.
 
-Only one fan is retained. Members are fetched on demand with a five-event page
+Only one fan is retained. Members are fetched on demand with a five-moment page
 limit, without putting them into the normal viewport cache. Leaving the fan,
 disabling the plugin, changing the viewport, or refreshing its source revision
 aborts the request and releases the transient nodes and data. Stale or paginated
 responses do not produce partial fans. Comparison sources and native SQLite use
-their existing bounded event queries. Custom scripts can return `api.expand()`;
+their existing bounded moment queries. Custom scripts can return `api.expand()`;
 the optional manifest component is `"summary": {"kind": "radial"}`. The host
 always enforces the five-member limit and owns the DOM and animation.
 

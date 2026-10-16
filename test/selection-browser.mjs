@@ -77,7 +77,7 @@ export async function checkSelection(page, restoreDocument) {
   const cursorBox = await input('time-cursor').boundingBox();
   assert(Math.abs(cursorBox.x + cursorBox.width / 2 - x) < 2);
   assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), [
-    '+Event',
+    '+Moment',
     'Fit all',
     'Delete everything in this view…',
     'Shift or scale times…',
@@ -89,7 +89,7 @@ export async function checkSelection(page, restoreDocument) {
   const markerTitle = await marker.getAttribute('aria-label');
   await marker.click({ button: 'right' });
   assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), [
-    '+Event',
+    '+Moment',
     'Fit all',
     'Edit',
     'Delete',
@@ -101,7 +101,7 @@ export async function checkSelection(page, restoreDocument) {
   assert.equal(await input('event-title').inputValue(), markerTitle);
   await closeMomentDetails(page);
   await page.mouse.click(x, y, { button: 'right' });
-  await menu.getByRole('menuitem', { name: '+Event', exact: true }).click();
+  await menu.getByRole('menuitem', { name: '+Moment', exact: true }).click();
   assert.equal(await input('event-exact').inputValue(), contextTime);
   assert.equal(await input('event-time').inputValue(), contextTime + ' ticks');
   await input('event-title').fill('From context menu');
@@ -152,7 +152,7 @@ export async function checkSelection(page, restoreDocument) {
   await menu.getByRole('menuitem', { name: 'Delete', exact: true }).waitFor();
   await menu.getByRole('menuitem', { name: 'Delete', exact: true }).click();
   assert.match(await input('delete-description').textContent(), /Other/);
-  assert.equal(await input('event-count').textContent(), '3 events');
+  assert.equal(await input('event-count').textContent(), '3 moments');
   await input('delete-confirm').click();
   assert.equal((await exported()).events.length, 2);
   await closeMomentDetails(page);
@@ -171,7 +171,7 @@ export async function checkSelection(page, restoreDocument) {
   });
   await page.locator('.event-marker.group').click({ button: 'right' });
   assert.equal(await menu.getByRole('menuitem', { name: 'Delete', exact: true }).count(), 0);
-  await menu.getByRole('menuitem', { name: 'View events', exact: true }).click();
+  await menu.getByRole('menuitem', { name: 'View moments', exact: true }).click();
   await input('group-events').getByRole('button', { name: /^One/ }).click({ button: 'right' });
   await menu.getByRole('menuitem', { name: 'Delete', exact: true }).click();
   assert.match(await input('delete-description').textContent(), /One/);

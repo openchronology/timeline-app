@@ -215,7 +215,7 @@ export async function checkFollowLatest(browser) {
     );
     index = new TimelineIndex(document);
     await push();
-    await wait(() => document.getElementById('event-count').textContent.includes('9 events'));
+    await wait(() => document.getElementById('event-count').textContent.includes('9 moments'));
     await page.clock.runFor(14000);
     assert.equal(recentReads, 0);
     await page.locator('#zoom-out').click();

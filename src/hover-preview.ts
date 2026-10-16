@@ -102,7 +102,7 @@ export function createHoverPreview(
     title.textContent =
       typeof entry.metadata.title === 'string' && entry.metadata.title.trim()
         ? entry.metadata.title
-        : 'Unnamed moment';
+        : 'Untitled moment';
     const description =
       typeof entry.metadata.description === 'string'
         ? entry.metadata.description.slice(0, 600)

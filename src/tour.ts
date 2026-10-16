@@ -15,12 +15,12 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     selectors: ['#timeline-stage'],
     title: 'The timeline',
-    text: 'Drag to move through time, and scroll or pinch to zoom. Click empty space to select a time; click a moment to open it.',
+    text: 'Drag to move through time, and scroll to zoom (on a touch screen, pinch). Click empty space to select a time; click a moment to open it.',
   },
   {
     selectors: ['#add-button'],
     title: 'Add a moment',
-    text: '＋ Event adds a moment at the selected time, or in the middle of the view. You can also right-click the timeline, or press and hold it.',
+    text: '＋ Moment adds one at the selected time, or in the middle of the view. You can also right-click the timeline, or press and hold it.',
   },
   {
     selectors: ['#add-duration-button'],

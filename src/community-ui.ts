@@ -468,7 +468,7 @@ export function createCommunityUI(host: Host) {
         const e = (after ?? before)!;
         el('pull-diff').append(
           paragraph(
-            label + ': ' + (e.metadata.title || 'Unnamed moment') + ' (' + e.id + ') at ' + e.time,
+            label + ': ' + (e.metadata.title || 'Untitled moment') + ' (' + e.id + ') at ' + e.time,
           ),
         );
         if (label === 'Changed')

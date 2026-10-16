@@ -94,7 +94,7 @@ export const HELP_TIPS: readonly HelpTip[] = [
     selector: '#follow-latest-control',
     placement: 'inside',
     topic: 'guide#what-markers-show',
-    about: 'following the latest events',
+    about: 'following the latest moments',
     tip: 'Keeps the newest moments in view as others add them, once you stop moving around for 15 seconds.',
   },
   {

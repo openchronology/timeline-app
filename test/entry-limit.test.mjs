@@ -30,9 +30,9 @@ test('validation follows the entry limit a server sets (#129)', (t) => {
   assert.equal(entryLimit(), 200000);
   setEntryLimit(3);
   assert.equal(validateDocument(document(3, 3, 2)).events.length, 3);
-  assert.throws(() => validateDocument(document(4)), /Expected at most 3 point events\./);
+  assert.throws(() => validateDocument(document(4)), /A timeline holds at most 3 moments\./);
   assert.throws(() => validateDocument(document(3, 4)), /Use at most 3 durations per timeline\./);
-  assert.throws(() => validateDocument(document(5, 0, 4)), /Expected at most 3 point events\./);
+  assert.throws(() => validateDocument(document(5, 0, 4)), /A timeline holds at most 3 moments\./);
   setEntryLimit(1000);
   assert.throws(
     () => validateDocument(document(6, 0, 1001)),

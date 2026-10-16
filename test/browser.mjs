@@ -86,7 +86,7 @@ try {
   await page.goto('http://localhost:5173/');
   assert.equal(await page.locator('#calendar-mode').count(), 0);
   await poll(async () => (await markers.count()) > 0);
-  assert.match(await input('event-count').textContent(), /10 events/);
+  assert.match(await input('event-count').textContent(), /10 moments/);
   await checkResponsiveTimeline(page);
   await page.reload();
   await checkResponsiveTimeline(page);
@@ -109,9 +109,9 @@ try {
   await page.waitForFunction(() =>
     document.getElementById('event-edit-status').textContent.startsWith('Not on the timeline'),
   );
-  assert.match(await input('event-count').textContent(), /10 events/);
+  assert.match(await input('event-count').textContent(), /10 moments/);
   await closeMomentDetails(page);
-  assert.match(await input('event-count').textContent(), /11 events/);
+  assert.match(await input('event-count').textContent(), /11 moments/);
   await input('undo-button').click();
   const stage = input('timeline-stage');
   await stage.scrollIntoViewIfNeeded();

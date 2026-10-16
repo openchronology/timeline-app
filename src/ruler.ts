@@ -6,9 +6,7 @@ import { validateContext, unitsPerPixel } from './view-context.js';
 import type { PresentationContext } from './view-context.js';
 
 export type RulerPolicy =
-  | { kind: 'decimal' }
-  | { kind: 'gregorian' }
-  | { kind: 'steps'; steps: string[] };
+  { kind: 'decimal' } | { kind: 'gregorian' } | { kind: 'steps'; steps: string[] };
 export interface RulerTick {
   time: Q;
   level: 'minor' | 'major' | 'boundary';

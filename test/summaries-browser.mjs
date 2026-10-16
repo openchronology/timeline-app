@@ -88,7 +88,7 @@ export async function checkSummaries(page, restore) {
       .locator('.duration-band[data-duration-id="long"]')
       .click({ button: 'right', position: { x: 8, y: 4 } });
     assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), [
-      '+Event',
+      '+Moment',
       'Fit all',
       'Edit',
       'Delete',

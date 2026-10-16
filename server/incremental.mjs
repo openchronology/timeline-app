@@ -219,7 +219,7 @@ export async function applyIncrementally(c, t, patch) {
   for (const i of insertions) await moments.insert(i, i);
   for (const e of edited) await moments.own(e);
   const momentCount = await moments.size;
-  if (!withinEntryLimit(momentCount)) fail(`Expected at most ${entryLimitText()} point events.`);
+  if (!withinEntryLimit(momentCount)) fail(`A timeline holds at most ${entryLimitText()} moments.`);
   const upserted = [...momentChanges].filter(([, e]) => e);
   const deleted = [...momentChanges].filter(([k, e]) => !e && saved.has(k)).map(([k]) => k);
   if (deleted.length) await removeRows(c, t, index, 'oc_moments', ['text'], [deleted]);

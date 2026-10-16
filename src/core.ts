@@ -96,6 +96,7 @@ export type { PresentationContext, TimePresenter } from './presentation.js';
 export { createDifference, exactText } from './difference.js';
 export { parseLink, linkFragment, sharePath } from './links.js';
 export * from './addresses.js';
+export * from './wording.js';
 export type { TimelineLink } from './links.js';
 export type { DifferenceUnit, TimeDifference } from './difference.js';
 export { planRuler, validateRulerPolicy } from './ruler.js';
@@ -234,28 +235,28 @@ export function validateDocument(value: unknown, partial = false): TimelineDocum
   )
     throw new Error('The timeline needs a title and description.');
   if (!Array.isArray(doc.events) || !withinEntryLimit(doc.events.length))
-    throw new Error(`Expected at most ${entryLimitText()} point events.`);
+    throw new Error(`A timeline holds at most ${entryLimitText()} moments.`);
   const comparison = doc.comparison === undefined ? undefined : validateComparison(doc.comparison);
   if (comparison && (doc.events.length || (Array.isArray(doc.durations) && doc.durations.length)))
-    throw new Error('Saved comparisons reference sources instead of storing events.');
+    throw new Error('Saved comparisons reference sources instead of storing moments.');
   const ids = new Set<string>();
   const plugins = doc.plugins === undefined ? undefined : validateInstalledPlugins(doc.plugins);
   const events = doc.events.map((raw: unknown): PointEvent => {
-    if (!raw || typeof raw !== 'object') throw new Error('Invalid event.');
+    if (!raw || typeof raw !== 'object') throw new Error('Invalid moment.');
     const e = raw as Record<string, unknown>;
     if (typeof e.id !== 'string' || !/^[A-Za-z0-9_.:-]{1,128}$/.test(e.id) || ids.has(e.id))
-      throw new Error('Event IDs must be unique ASCII identifiers.');
+      throw new Error('Moment IDs must be unique ASCII identifiers.');
     ids.add(e.id);
     if (typeof e.time !== 'string')
       throw new Error('Time must be a string containing an exact rational or finite decimal.');
     if (!e.metadata || typeof e.metadata !== 'object' || Array.isArray(e.metadata))
-      throw new Error('Event metadata must be a JSON object.');
+      throw new Error('Moment metadata must be a JSON object.');
     // Plugins' metadata is stored as given: each plugin reads its own fields and handles
     // values it cannot use (#157). Only the core's own fields are checked.
     const metadata = JSON.parse(JSON.stringify(e.metadata)) as Metadata;
     for (const field of ['title', 'description']) {
       if (metadata[field] !== undefined && typeof metadata[field] !== 'string')
-        throw new Error(`Event ${field} must be text.`);
+        throw new Error(`Moment ${field === 'title' ? 'titles' : 'notes'} must be text.`);
     }
     if (metadata.tags !== undefined) metadata.tags = normalizeEntityTags(metadata.tags);
     return { id: e.id, time: parseTime(e.time).toString(), metadata };
@@ -332,7 +333,7 @@ export class TimelineIndex {
     // Bulk-load coincident events once; copying/sorting a growing bucket per event is quadratic.
     const buckets = new Map<string, PointEvent[]>();
     for (const event of document.events) {
-      if (this.byId.has(event.id)) throw new Error('Event IDs must be unique.');
+      if (this.byId.has(event.id)) throw new Error('Moment IDs must be unique.');
       const time = parseTime(event.time).toString();
       const normalized = Object.freeze({
         ...event,
