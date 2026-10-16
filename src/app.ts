@@ -181,7 +181,14 @@ interface LocalTimeline extends NativeOpened {
 }
 let local: LocalTimeline | null = null;
 interface Session {
-  user: { id: string; username: string } | null;
+  user: {
+    id: string;
+    username: string;
+    /** May be under 18: always warned of sensitive content (#115). */
+    minor?: boolean;
+    /** An adult who chose to see sensitive content without warnings. */
+    showSensitive?: boolean;
+  } | null;
   csrf: string | null;
   server: boolean;
   dashboard?: boolean;
@@ -2170,9 +2177,11 @@ function timelineLabels(): string[] {
 }
 /**
  * Whether the reader is warned of sensitive content: a server timeline (or comparison) they
- * cannot write. Its owner and writers see it as it is.
+ * cannot write. Its owner and writers see it as it is, and so do adults who chose to see
+ * sensitive content without warnings (never accounts that may be under 18).
  */
 function warned() {
+  if (session.user?.showSensitive && !session.user.minor) return false;
   return (!!remote || !!comparison) && !local && !(remote?.canWrite && !comparison);
 }
 /** Images of labelled content are shown, for the open timeline (until the tab closes). */

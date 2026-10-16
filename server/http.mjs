@@ -19,7 +19,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { isIP } from 'node:net';
-import { Auth } from './auth.mjs';
+import { minor, Auth } from './auth.mjs';
 import { Challenges } from './challenge.mjs';
 import { OAuth, providersFromEnv } from './oauth.mjs';
 import { mailFromEnv, encryptionKey } from './mail.mjs';
@@ -332,6 +332,9 @@ export function createRequestHandler({
                   username: session.username,
                   isAdmin: !!session.is_admin,
                   avatarUrl: session.avatar_url ?? '',
+                  // Sensitive content (#115): minors are always warned; adults may choose.
+                  minor: minor(session.birth_year),
+                  showSensitive: !!session.show_sensitive && !minor(session.birth_year),
                 }
               : null,
             csrf: session?.csrf ?? nonce,
@@ -494,12 +497,26 @@ export function createRequestHandler({
         if (pathname === '/api/auth/profile' && method === 'PATCH') {
           auth.require(session, req);
           const value = await body(req, 400000);
-          if (!value || Object.keys(value).some((k) => k !== 'avatarUrl'))
+          if (
+            !value ||
+            !Object.keys(value).length ||
+            Object.keys(value).some((k) => !['avatarUrl', 'showSensitive'].includes(k)) ||
+            (value.showSensitive !== undefined && typeof value.showSensitive !== 'boolean')
+          )
             throw new HttpError(400, 'Invalid profile.');
-          await pool.query('UPDATE oc_users SET avatar_url=$2 WHERE id=$1', [
-            userId,
-            avatarValue(value.avatarUrl),
-          ]);
+          // Seeing sensitive content without warnings is for adults (#115).
+          if (value.showSensitive && minor(session.birth_year))
+            throw new HttpError(403, 'Accounts of people under 18 always see these warnings.');
+          if ('avatarUrl' in value)
+            await pool.query('UPDATE oc_users SET avatar_url=$2 WHERE id=$1', [
+              userId,
+              avatarValue(value.avatarUrl),
+            ]);
+          if ('showSensitive' in value)
+            await pool.query('UPDATE oc_users SET show_sensitive=$2 WHERE id=$1', [
+              userId,
+              value.showSensitive,
+            ]);
           return response(res, 200, { ok: true });
         }
         if (pathname === '/api/auth/api-keys') {
@@ -679,7 +696,11 @@ export function createRequestHandler({
           ).rows[0];
           return response(res, 200, {
             security: profile,
-            profile: { avatarUrl: session.avatar_url ?? '' },
+            profile: {
+              avatarUrl: session.avatar_url ?? '',
+              minor: minor(session.birth_year),
+              showSensitive: !!session.show_sensitive && !minor(session.birth_year),
+            },
             usage: await usage(pool, userId),
             keys: await auth.keys.list(userId),
             identities: identities.map((row) => row.provider),

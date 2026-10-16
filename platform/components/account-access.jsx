@@ -101,6 +101,27 @@ export default function AccountAccess({ session, account, refresh }) {
           </button>
         </div>
       </form>
+      <h2>Sensitive content</h2>
+      {account?.profile?.minor ? (
+        <p className="muted">
+          Timelines, moments and durations labelled as containing nudity, graphic violence or
+          disturbing content open behind a warning, with their images blurred until you show them.
+          Accounts of people under 18 always see these warnings.
+        </p>
+      ) : (
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={!!account?.profile?.showSensitive}
+            disabled={busy}
+            onChange={(e) =>
+              void action('auth/profile', 'PATCH', { showSensitive: e.target.checked })
+            }
+          />
+          Show sensitive content without warnings (labelled nudity, graphic violence and disturbing
+          content, and their images)
+        </label>
+      )}
       <h2>API keys</h2>
       <p>
         Keys act with your timeline permissions and storage limit. They cannot manage accounts or

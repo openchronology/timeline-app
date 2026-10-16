@@ -203,6 +203,24 @@ export default function Account({ returnTo = '/', login = false }) {
               <input name="email" type="email" autoComplete="email" maxLength={254} required />
             </label>
           )}
+          {['register', 'email'].includes(mode) && (
+            <label>
+              Year of birth
+              <input
+                name="birthYear"
+                type="number"
+                inputMode="numeric"
+                min={1900}
+                max={new Date().getFullYear()}
+                autoComplete="bday-year"
+                required
+              />
+              <span className="field-hint">
+                Accounts are for people 13 and older. Accounts of people under 18 always see
+                warnings before sensitive content.
+              </span>
+            </label>
+          )}
           {['login', 'register', 'reset'].includes(mode) && (
             <label>
               Password

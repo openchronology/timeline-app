@@ -29,9 +29,26 @@ Before making the hosted policies effective:
   matching required contact details, track renewal deadlines, and establish the
   notice/counter-notice and repeat-infringer process before relying on safe harbor.
   Registration alone does not satisfy every condition.
-- Confirm the adult-only service policy, handling of suspected child accounts, and
-  regional age requirements. No age-verification or parental-consent flow is
-  implemented; eligibility language alone is not a compliance mechanism.
+- Confirm the 13+ account policy, handling of suspected accounts of children under 13,
+  and regional age requirements. Sign-up asks for a year of birth (self-declared): it
+  is not age verification or parental consent, and accounts that may be under 18 always
+  see sensitive-content warnings. Review this against the regions served (for example
+  higher digital-consent ages under the GDPR in some EU countries).
+- Content policy (TERMS.md): no pornography or gratuitous gore; educational depictions
+  allowed when labelled. Keep it that way to stay outside age-verification laws for
+  pornography (US state laws, the UK Online Safety Act's pornography duties) and
+  18 U.S.C. 2257 record-keeping; allowing explicit material would require them.
+- Register as an electronic service provider with NCMEC's CyberTipline before launch, so
+  apparent child sexual abuse material can be reported as 18 U.S.C. 2258A requires, and
+  follow the procedure in docs/moderation.md (restrict, preserve for one year, report;
+  never copy or forward the material). Name who reviews the report queue and how often;
+  reports of child abuse and other illegal content are listed first.
+- UK Online Safety Act: complete and keep current the illegal-content risk assessment and
+  the children's access and risk assessments (template: RISK-ASSESSMENT.md), and keep
+  reporting and complaints working (Report, the review queue, review requests).
+- EU Digital Services Act: publish a single point of contact for authorities and users,
+  keep notice-and-action (Report) and statements of reasons (the owner's notice and
+  email) working, and publish the moderation policy (TERMS.md acceptable use).
 - Publish matching Corresponding Source alongside browser/desktop/container releases
   and preserve dependency copyright/license notices. See docs/licensing.md.
 - Check domain ownership and name conflicts; no registered trademark is asserted.

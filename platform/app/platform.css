@@ -738,3 +738,6 @@ dialog::backdrop {
   color: #6b5326;
   font-size: 12px;
 }
+label .field-hint {
+  font-weight: 400;
+}

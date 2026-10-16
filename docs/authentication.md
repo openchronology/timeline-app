@@ -88,6 +88,8 @@ Verify the sending domain in Resend and apply its DNS instructions for SPF/DKIM;
 
 Registration is disabled until email delivery and encryption are configured. A signup creates a pending record, not an account or session. The emailed confirmation expires after 24 hours, requires an explicit POST, and is bound to the browser that requested it. Open it in that browser; mail scanners cannot confirm by fetching a link. Tokens appear in URL fragments, are removed from browser history by the account page, and are stored only as hashes in the database. Register again to request another confirmation. Existing accounts and new social accounts must confirm an email address before obtaining an application session. Provider email claims never implicitly link accounts.
 
+Accounts are for people 13 and older ([ages](moderation.md#ages)). Registration asks for a year of birth, kept with the pending record and copied to the account when it is confirmed. A new social account gives it at the email step, before it can obtain a session; one that gives an age under 13 is deleted there, since it cannot have been used.
+
 ## Two-factor authentication and recovery
 
 In `/account`, enroll an authenticator app using the supplied key or `otpauth` link and confirm its six-digit code. TOTP uses RFC 6238, 30-second steps, a one-step clock tolerance, and rejects already consumed codes. Synchronize the server clock. Encrypted secrets use AES-256-GCM with account-bound authenticated data. Ten random 128-bit recovery codes are shown once and stored only as hashes; each works once after a successful password or social sign-in. Store them offline.

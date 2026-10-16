@@ -11,7 +11,7 @@ Browsing (public timelines with no search text) lists:
 - the public timelines of **established** accounts;
 - featured timelines, whoever owns them.
 
-A timeline with [sensitive-content labels](moderation.md#sensitive-content-labels) is never featured, and readers who aren't signed in don't browse it.
+A timeline with [sensitive-content labels](moderation.md#sensitive-content-labels) is never featured, and readers who aren't signed in, or whose accounts may be under 18, don't browse it.
 
 Other public timelines are still reachable:
 

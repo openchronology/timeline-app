@@ -93,7 +93,7 @@ Educational, historical, medical, artistic and news depictions of nudity, violen
 - **A timeline:** its owner sets them under **Sharing & settings → Sensitive content**; moderators add them from a report ([Label](#label)).
 - **A moment or duration:** whoever can edit it sets them in its details, under **Sensitive content**. They are kept in its metadata (`content_labels`), so they travel with `.ochx` and `.och` files.
 
-For readers who are not its owner or writers:
+For readers who are not its owner or writers (adults can turn the warnings off under **Account → Sensitive content**; accounts that may be under 18 cannot, see [ages](#ages)):
 
 | Labelled             | What readers get                                                                                                                                                                                                                                                                              |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -102,7 +102,7 @@ For readers who are not its owner or writers:
 
 A labelled timeline is also:
 
-- never **featured**, and left out of browsing by readers who aren't signed in (search, links and profiles still find it, behind its warning);
+- never **featured**, and left out of browsing by readers who aren't signed in or may be under 18 (search, links and profiles still find it, behind its warning);
 - shown in timeline lists with a **Sensitive** badge;
 - previewed in links as its title and labels alone, with no moment strip or excerpt, and no oEmbed thumbnail ([sharing](sharing.md#link-previews)).
 
@@ -119,9 +119,29 @@ Emails go only to confirmed addresses, and only when email is configured (`RESEN
 
 Signed-out reporters aren't told anything.
 
+## Ages
+
+Accounts are for people 13 and older (#115). Sign-up asks for a year of birth: with a password, when registering; with Google, GitHub or Facebook, when confirming an email address, before the new account can sign in. The age is counted from the end of the year of birth, so someone turning 13 this year is refused until next year.
+
+| Year of birth | Result                                                                                                                                          |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Under 13      | Refused. A just-created social sign-in account is deleted; one that already holds timelines is suspended for the operator to review.            |
+| Under 18      | The account always sees sensitive-content warnings, and doesn't browse labelled timelines. Its **Account** page explains why there's no choice. |
+| 18 or older   | **Account → Sensitive content** can turn the warnings off.                                                                                      |
+| None recorded | Accounts made before this was asked, under terms requiring 18: treated as adults.                                                               |
+
+Only the year is stored (`oc_users.birth_year`). It is self-declared: not age verification, which the content policy is designed not to need.
+
 ## Child sexual abuse material
 
-Restrict it at once: restricting keeps the data while nobody else can see it. In the United States, a provider who learns of apparent child sexual abuse material must report it to NCMEC's CyberTipline (18 U.S.C. 2258A) and preserve it for one year. Don't copy, download or forward the material, even internally. Suspend the account too, from the Users view. Delete the timeline only after the preservation period, or as law enforcement directs.
+The operator's procedure (see also `legal/LAUNCH.md` and `legal/RISK-ASSESSMENT.md`):
+
+1. **Restrict it at once.** Restricting keeps the data while nobody else can see it. Suspend the account too: report the account and restrict it, or use the Users view.
+2. **Report it.** In the United States, a provider who learns of apparent child sexual abuse material must report it to NCMEC's CyberTipline (18 U.S.C. 2258A). Register with the CyberTipline before launch. Elsewhere, report to the national hotline or police as local law requires.
+3. **Preserve it** for one year (the REPORT Act), or as law enforcement directs. Leave the restricted timeline and its history in place: don't export, copy, download or forward the material, even internally or to "check" it. The database, its backups and the moderation records (`oc_moderation_cases`, `oc_reports`, `oc_admin_audit`) are the preserved copy; keep backups for at least the preservation period.
+4. **Delete the timeline** only after the preservation period, or as law enforcement directs (**Site administration → Timelines → Delete**).
+
+Other illegal content follows the same steps, with whatever reporting and preservation its law requires; a legal hold works the same way.
 
 ## Data
 
