@@ -756,3 +756,161 @@ label .field-hint {
   flex: 1 1 12em;
   width: auto;
 }
+/* The HTTP API reference (#178): contents beside the operations, stacked when narrow. */
+main.api-reference {
+  display: grid;
+  grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+}
+.api-contents {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  font-size: 13px;
+}
+.api-contents ul {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+.api-contents li a {
+  display: block;
+  padding: 2px 0;
+  color: var(--ink);
+  text-decoration: none;
+}
+.api-contents-tag {
+  display: block;
+  margin-top: 0.5rem;
+  font-weight: 600;
+}
+.api-filter {
+  margin-bottom: 0.5rem;
+}
+.api-operation {
+  margin: 0.4rem 0;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  overflow-wrap: anywhere;
+}
+.api-operation > summary {
+  cursor: pointer;
+  padding: 0.2rem 0;
+}
+.api-operation[open] > summary {
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.5rem;
+}
+.api-operation .api-summary {
+  margin-left: 0.4rem;
+  color: var(--muted);
+}
+.api-operation h4 {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.api-method {
+  display: inline-block;
+  min-width: 3.6em;
+  padding: 0 0.4em;
+  border-radius: 4px;
+  font:
+    600 11px/1.7 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  text-align: center;
+  color: #fff;
+  background: #57655a;
+}
+.api-get {
+  background: #2f6d4f;
+}
+.api-post {
+  background: #2d5f8a;
+}
+.api-put,
+.api-patch {
+  background: #8a5a14;
+}
+.api-delete {
+  background: #9b2f2f;
+}
+.api-fields {
+  margin: 0.25rem 0;
+  padding-left: 1.1rem;
+}
+.api-fields li {
+  margin: 0.2rem 0;
+}
+.api-description p {
+  margin: 0.1rem 0;
+  color: var(--muted);
+}
+.api-type {
+  color: #2d5f8a;
+  font-size: 13px;
+}
+.api-required {
+  color: #9b2f2f;
+  font-size: 12px;
+}
+.api-responses > div {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  gap: 0.5rem;
+}
+.api-responses dd {
+  margin: 0;
+}
+.api-responses dd p {
+  margin: 0.15rem 0;
+}
+.api-ok {
+  color: #2f6d4f;
+}
+.api-failed {
+  color: #9b2f2f;
+}
+.api-try {
+  margin-top: 0.75rem;
+}
+.api-try summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.api-try form {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.api-try .api-body {
+  min-height: 8rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+.api-result pre {
+  max-height: 24rem;
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  background: #f3f5f0;
+  font-size: 12px;
+}
+@media (max-width: 900px) {
+  main.api-reference {
+    display: block;
+  }
+  .api-contents {
+    position: static;
+    max-height: 16rem;
+    margin-bottom: 1rem;
+  }
+}
