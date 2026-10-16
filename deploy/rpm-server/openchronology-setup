@@ -34,6 +34,7 @@ key=$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')
 new_config "$CONFIG" "s|^AUTH_ENCRYPTION_KEY=\$|AUTH_ENCRYPTION_KEY=$key|" \
   "$EXAMPLES/openchronology.env.example"
 new_config "$CONFIG_DIR/syslog.env" "" "$EXAMPLES/syslog.env.example"
+new_config "$CONFIG_DIR/journald.env" "" "$EXAMPLES/journald.env.example"
 if [ -n "$systemd" ]; then systemctl daemon-reload; fi
 
 psql_as_postgres() { runuser -u postgres -- psql -X -q -v ON_ERROR_STOP=1 "$@"; }

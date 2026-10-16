@@ -45,6 +45,7 @@ url="postgresql:///openchronology?host=/var/run/postgresql"
 new_config "$CONFIG" "s|^AUTH_ENCRYPTION_KEY=\$|AUTH_ENCRYPTION_KEY=$key|; s|^DATABASE_URL=.*|DATABASE_URL=$url|" \
   "$EXAMPLES/openchronology.env.example"
 new_config "$CONFIG_DIR/syslog.env" "" "$EXAMPLES/syslog.env.example"
+new_config "$CONFIG_DIR/journald.env" "" "$EXAMPLES/journald.env.example"
 
 [ -n "$systemd" ] && systemctl daemon-reload
 

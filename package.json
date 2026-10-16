@@ -36,6 +36,7 @@
     "bench:capacity": "node bench/capacity.mjs",
     "bench:realtime": "node test/syslog-live-postgres.mjs --bench",
     "syslog": "node server/syslog-receiver.mjs",
+    "journald": "node server/journald-receiver.mjs",
     "import:logs": "node server/import-logs.mjs",
     "bench:report": "node bench/report.mjs"
   },

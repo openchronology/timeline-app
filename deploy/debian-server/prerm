@@ -7,12 +7,12 @@ case "$1" in
   remove | upgrade | deconfigure)
     if [ -d /run/systemd/system ]; then
       systemctl stop openchronology.service openchronology-mail.service \
-        openchronology-syslog.service >/dev/null 2>&1 || true
+        openchronology-syslog.service openchronology-journald.service >/dev/null 2>&1 || true
     fi
     ;;
 esac
 if [ "$1" = remove ] && [ -d /run/systemd/system ]; then
   systemctl disable --quiet openchronology.service openchronology-mail.service \
-    openchronology-syslog.service >/dev/null 2>&1 || true
+    openchronology-syslog.service openchronology-journald.service >/dev/null 2>&1 || true
 fi
 exit 0
