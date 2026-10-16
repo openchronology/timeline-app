@@ -272,6 +272,7 @@ jobs:
       - run: node test/save-merge-postgres.mjs
       - run: node test/labels-postgres.mjs
       - run: node test/ages-postgres.mjs
+      - run: node test/image-links-postgres.mjs
       # As root, so the system journal is readable whatever the runner's groups.
       - name: Following the systemd journal
         run: sudo -E env "PATH=$PATH" node test/journald-live-postgres.mjs

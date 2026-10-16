@@ -39,7 +39,7 @@ try {
     title: 'Fork fixture',
     tags: ['ancestry'],
     plugins: [{ manifest: validatePluginManifest(PLUGIN_EXAMPLE), enabled: true }],
-    assets: { 'https://example.com/icon.png': 'data:image/png;base64,aGVsbG8=' },
+    // No image copies: the server keeps links, not copies (#109; image-links-postgres.mjs).
     presentation: { ...DEFAULT_PRESENTATION, mode: 'custom', source: CUSTOM_EXAMPLE },
   });
   const legacyId = randomUUID(),

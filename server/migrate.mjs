@@ -7,6 +7,7 @@ import {
   backfillEntitySearch,
   rebuildIndexes,
   releaseIndexes,
+  releaseImageCopies,
 } from './store.mjs';
 import { loadConfiguration } from './env-file.mjs';
 import { startHistory } from './history.mjs';
@@ -29,6 +30,9 @@ try {
   if (rebuilt) console.log(`Rebuilt incremental indexes for ${rebuilt} timeline(s).`);
   // Versions forks no longer read, which earlier versions kept after a fork was deleted.
   await releaseIndexes(client);
+  // Copies of linked images earlier releases kept with timelines (#109).
+  const released = await releaseImageCopies(client);
+  if (released) console.log(`Removed stored copies of linked images from ${released} row(s).`);
   // After the conversions above, so history starts from the timelines as they are now.
   const started = await startHistory(client);
   if (started) console.log(`Started saved history as rows for ${started} timeline(s).`);

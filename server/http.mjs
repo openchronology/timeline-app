@@ -25,7 +25,7 @@ import { OAuth, providersFromEnv } from './oauth.mjs';
 import { mailFromEnv, encryptionKey } from './mail.mjs';
 import { DeviceAuth } from './device-auth.mjs';
 import { TimelineFiles } from './files.mjs';
-import { HttpError, PostgresStore, restrictedTimeline } from './store.mjs';
+import { HttpError, PostgresStore, restrictedTimeline, withoutImageCopies } from './store.mjs';
 import {
   Q,
   parseTime,
@@ -87,9 +87,11 @@ function fileResponse(res, bytes) {
   });
   res.end(bytes);
 }
-function document(value, partial = false) {
+function document(value, partial = false, copies = false) {
   try {
-    return validateDocument(value, partial);
+    // Images are linked, not copied, on the server (#109); only exports keep copies.
+    const valid = validateDocument(value, partial);
+    return copies ? valid : withoutImageCopies(valid);
   } catch (error) {
     throw new HttpError(400, error.message);
   }
@@ -725,7 +727,11 @@ export function createRequestHandler({
         if (pathname === '/api/files/export' && method === 'POST') {
           auth.require(session, req);
           await auth.rateLimit('files:' + userId);
-          return fileResponse(res, await converter.convert('write', document(await body(req))));
+          // An export is the requester's own file: it keeps the images it embeds.
+          return fileResponse(
+            res,
+            await converter.convert('write', document(await body(req), false, true)),
+          );
         }
         if (pathname === '/api/auth/logout' && method === 'POST') {
           auth.require(session, req);

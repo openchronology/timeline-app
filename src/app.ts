@@ -5677,7 +5677,8 @@ const community = createCommunityUI({
     if (!model) throw new Error('Load an editable timeline first.');
     proposalSubmissionVersion = editVersion;
     proposalSubmissionDocument = documentRequest;
-    return embedImages(await completeDocument(), offlineHtml);
+    // Proposed on the server: links to images, not copies (#109).
+    return withoutImageCopies(await completeDocument());
   },
   compare: (ids) => {
     const request = documentRequest;
@@ -5813,15 +5814,10 @@ el('publish-button').onclick = () => {
       const index = sparseWorkspace();
       const sent = index?.beginSave();
       const patch = remote ? index?.patch() : undefined;
-      const materialized = remote ? undefined : completeDocument();
-      const sparseDocument =
-        index && remote ? await embedImages(index.document(), false) : undefined;
-      if (patch && sparseDocument)
-        patch.settings.assets = { ...index!.assets, ...sparseDocument.assets };
-      const document =
-        index && remote
-          ? undefined
-          : await embedImages(await (materialized ?? completeDocument()), false);
+      // The server keeps links to images, not copies of them (#109): copies are for the
+      // files you export.
+      if (patch) delete patch.settings.assets;
+      const document = index && remote ? undefined : withoutImageCopies(await completeDocument());
       let result: RemoteTimeline;
       try {
         result =
@@ -5849,7 +5845,7 @@ el('publish-button').onclick = () => {
       keptVersions = null;
       remote = result;
       local = null;
-      if (document) model!.assets = document.assets;
+      if (document) model!.assets = undefined;
       if (index && sent) {
         index.accepted(sent, selected?.id);
         // Settings others saved meanwhile were merged in: take them where unedited since.
@@ -5911,6 +5907,11 @@ async function moveToLatest(id: string) {
   liveTransitionPending = true;
   heading();
   requestRender();
+}
+/** `document` without copies of its images, as the server keeps it (#109). */
+function withoutImageCopies(document: TimelineDocument): TimelineDocument {
+  const { assets: _copies, ...rest } = document;
+  return rest;
 }
 /** A save's conflict with what was saved meanwhile (server/save-merge.mjs). */
 interface SaveConflict {

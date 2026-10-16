@@ -99,8 +99,9 @@ to applicable law and appropriate limits.
 Moment image URLs can request images from third-party HTTPS hosts in connected
 editions. Those hosts see network information, including an IP address and requested
 URL; image requests omit browser credentials and referrers. Opening an original
-image source visits that site under its own policies. Export or server-save actions
-may embed a browser-created image copy if the host allows it. Plugin scripts run
+image source visits that site under its own policies. The server stores image links,
+not copies; exports to your own files may embed a browser-created image copy if the
+host allows it. Plugin scripts run
 through a restricted interpreter without direct network, DOM, or import access;
 host-rendered image fields can still cause these image requests. Published plugin
 definitions are public independently of private timelines using them.
