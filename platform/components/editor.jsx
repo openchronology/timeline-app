@@ -84,7 +84,10 @@ export default function Editor({
           target: { kind: event.data.kind, timeline: id, id: event.data.id },
           title: String(event.data.title ?? 'Untitled').slice(0, 300),
         });
-      if (
+      // Saved: this timeline's page shows what was saved; a new one's page opens (at its
+      // address, #148).
+      if (event.data?.type === 'openchronology:published' && event.data.id === id) router.refresh();
+      else if (
         event.data?.type === 'openchronology:published' &&
         /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(event.data.id)
       )
