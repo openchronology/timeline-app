@@ -19,12 +19,15 @@ import { randomUUID } from 'node:crypto';
 import { HttpError } from './store.mjs';
 import { queueMail } from './mail.mjs';
 import { refreshAccounts } from './standing.mjs';
+import { contentLabels, describeLabels } from '../dist/core.mjs';
 import { REPORT_CATEGORIES, REPORT_TARGETS, REPORT_TEXT } from './report-categories.mjs';
 
 const CATEGORIES = new Set(REPORT_CATEGORIES.map(([key]) => key));
 const ENTITY = /^[A-Za-z0-9_.:-]{1,128}$/;
 const UUID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
-const ACTIONS = ['restrict', 'dismiss', 'uphold', 'lift'];
+const ACTIONS = ['restrict', 'label', 'dismiss', 'uphold', 'lift'];
+/** Decisions in force: a restriction, or labels moderators added to a timeline. */
+const IN_FORCE = ['restricted', 'labelled'];
 /** The queue's views: what awaits a decision, what is restricted, and what was closed. */
 const VIEWS = ['open', 'restricted', 'closed'];
 
@@ -198,8 +201,8 @@ export class Moderation {
             WHERE r.case_id=mc.id ORDER BY r.created_at DESC LIMIT 20) x),'[]') AS reports
         FROM oc_moderation_cases mc LEFT JOIN oc_users o ON o.id=mc.owner_id
         WHERE CASE $1 WHEN 'open' THEN mc.status='open'
-            OR (mc.status='restricted' AND mc.appealed_at IS NOT NULL AND mc.appeal_decided_at IS NULL)
-          WHEN 'restricted' THEN mc.status='restricted'
+            OR (mc.status IN ('restricted','labelled') AND mc.appealed_at IS NOT NULL AND mc.appeal_decided_at IS NULL)
+          WHEN 'restricted' THEN mc.status IN ('restricted','labelled')
           ELSE mc.status IN ('dismissed','lifted') END)
       SELECT (SELECT count(*) FROM matching) AS total,coalesce((SELECT jsonb_agg(p) FROM (
         SELECT * FROM matching ORDER BY
@@ -228,13 +231,18 @@ export class Moderation {
     if (
       !value ||
       typeof value !== 'object' ||
-      Object.keys(value).some((key) => !['action', 'reason', 'password', 'code'].includes(key))
+      Object.keys(value).some(
+        (key) => !['action', 'reason', 'labels', 'password', 'code'].includes(key),
+      )
     )
       throw new HttpError(400, 'Invalid moderation decision.');
     if (!ACTIONS.includes(value.action)) throw new HttpError(400, 'Choose a decision.');
     const reason = text(value.reason, 'The reason');
-    if (value.action === 'restrict' && !reason)
-      throw new HttpError(400, 'Give the owner the reason for the restriction.');
+    if ((value.action === 'restrict' || value.action === 'label') && !reason)
+      throw new HttpError(400, 'Give the owner the reason for the decision.');
+    const labels = contentLabels(value.labels);
+    if (value.action === 'label' && (!labels.length || labels.length !== value.labels.length))
+      throw new HttpError(400, 'Choose what the timeline contains.');
     const result = await this.store.transaction(async (c) => {
       await c.query("SELECT pg_advisory_xact_lock(hashtextextended('oc-admin-policy',0))");
       const actor = (await c.query('SELECT * FROM oc_users WHERE id=$1 FOR UPDATE', [session.id]))
@@ -249,18 +257,33 @@ export class Moderation {
         )
       ).rows[0];
       if (!row) throw new HttpError(404, 'Report unavailable.');
-      const appealing = row.status === 'restricted' && row.appealed_at && !row.appeal_decided_at;
+      const appealing = IN_FORCE.includes(row.status) && row.appealed_at && !row.appeal_decided_at;
       const { action } = value;
-      if ((action === 'restrict' || action === 'dismiss') && row.status !== 'open')
+      if (['restrict', 'label', 'dismiss'].includes(action) && row.status !== 'open')
         throw new HttpError(409, 'This report was already decided.');
+      if (action === 'label' && row.target_kind !== 'timeline')
+        throw new HttpError(400, 'Only timelines are labelled.');
       if (action === 'uphold' && !appealing) throw new HttpError(409, 'No review was asked for.');
-      if (action === 'lift' && row.status !== 'restricted')
-        throw new HttpError(409, 'Nothing is restricted.');
+      if (action === 'lift' && !IN_FORCE.includes(row.status))
+        throw new HttpError(409, 'Nothing is in force.');
       if (action === 'restrict') {
         const previous = await this.restrict(c, row);
         await c.query(
           "UPDATE oc_moderation_cases SET status='restricted',reason=$2,decided_by=$3,decided_at=now(),previous_visibility=$4 WHERE id=$1",
           [id, reason, actor.id, previous],
+        );
+      } else if (action === 'label') {
+        if (!row.target)
+          throw new HttpError(409, 'What was reported no longer exists. Dismiss the report.');
+        // Its owner cannot remove these (#115); lifting the decision does.
+        await c.query(
+          `UPDATE oc_timelines SET moderator_labels=ARRAY(SELECT DISTINCT unnest(moderator_labels||$2::text[]))
+          WHERE id=$1`,
+          [row.target_id, labels],
+        );
+        await c.query(
+          "UPDATE oc_moderation_cases SET status='labelled',labels=$2,reason=$3,decided_by=$4,decided_at=now() WHERE id=$1",
+          [id, labels, reason, actor.id],
         );
       } else if (action === 'dismiss')
         await c.query(
@@ -284,14 +307,19 @@ export class Moderation {
       // A restriction in force leaves its owner without standing (#103; standing.mjs).
       if (row.owner_id && (action === 'restrict' || action === 'lift'))
         await refreshAccounts(c, [row.owner_id]);
-      await this.notify(c, row, action, reason);
+      await this.notify(c, row, action, reason, labels);
       await c.query(
         'INSERT INTO oc_admin_audit(actor_id,action,target_id,changes) VALUES($1,$2,$3,$4)',
         [
           actor.id,
           'reports',
           id,
-          { action, target_kind: row.target_kind, target_id: row.target_id },
+          {
+            action,
+            target_kind: row.target_kind,
+            target_id: row.target_id,
+            ...(action === 'label' ? { labels } : {}),
+          },
         ],
       );
       return { ok: true };
@@ -336,8 +364,20 @@ export class Moderation {
     return null;
   }
 
-  /** Undoes what restrict did for case `row`. */
+  /** Undoes what restrict, or label, did for case `row`. */
   async lift(c, row) {
+    if (row.status === 'labelled') {
+      // The labels this decision added; others' (an owner's, other decisions') stay.
+      await c.query(
+        `UPDATE oc_timelines SET moderator_labels=ARRAY(
+          SELECT l FROM unnest(moderator_labels) l WHERE NOT l=ANY($2::text[])
+          UNION SELECT unnest(mc.labels) FROM oc_moderation_cases mc
+            WHERE mc.target_kind='timeline' AND mc.target_id=$1 AND mc.status='labelled' AND mc.id<>$3)
+        WHERE id::text=$1`,
+        [row.target_id, row.labels ?? [], row.id],
+      );
+      return;
+    }
     if (row.target_kind === 'timeline' && row.previous_visibility)
       await c.query('UPDATE oc_timelines SET visibility=$2 WHERE id::text=$1', [
         row.target_id,
@@ -348,7 +388,7 @@ export class Moderation {
   }
 
   /** Emails the owner and reporters (those with a confirmed address) about a decision. */
-  async notify(c, row, action, reason) {
+  async notify(c, row, action, reason, labels = []) {
     const security = this.auth.security;
     if (!security?.available) return;
     const origin = this.auth.origin;
@@ -379,19 +419,28 @@ export class Moderation {
               : `It is hidden from everyone else${row.target_kind === 'comment' ? '' : ' and cannot be published again while restricted'}.`
         }\n\n${review}`,
       );
+    if (action === 'label')
+      await send(
+        row.owner_id,
+        'A moderation decision about your content',
+        `Moderators labelled ${yours}${path ? ` (${origin}${path})` : ''} as containing ${describeLabels(labels).toLowerCase()}.\n\nReason: ${reason}\n\nReaders are warned before it opens, its images stay blurred until they choose to see them, and it is left out of featured timelines and of browsing by readers who are not signed in. You cannot remove these labels yourself.\n\n${review}`,
+      );
+    // What a review or a lift is about: a restriction, or labels.
+    const decision =
+      row.status === 'labelled' ? 'the labels moderators added to' : 'the restriction on';
     if (action === 'uphold')
       await send(
         row.owner_id,
         'The review of a moderation decision',
-        `Moderators reviewed the restriction on ${yours} and kept it in place.`,
+        `Moderators reviewed ${decision} ${yours} and kept ${row.status === 'labelled' ? 'them' : 'it'} in place.`,
       );
     if (action === 'lift')
       await send(
         row.owner_id,
         'A moderation decision was reversed',
-        `Moderators lifted the restriction on ${yours}${path ? ` (${origin}${path})` : ''}. It is as it was before.`,
+        `Moderators lifted ${decision} ${yours}${path ? ` (${origin}${path})` : ''}. It is as it was before.`,
       );
-    if (action === 'restrict' || action === 'dismiss') {
+    if (action === 'restrict' || action === 'label' || action === 'dismiss') {
       const reporters = await c.query(
         'SELECT DISTINCT reporter_id FROM oc_reports WHERE case_id=$1 AND reporter_id IS NOT NULL',
         [row.id],
@@ -403,7 +452,9 @@ export class Moderation {
           `Thank you for reporting ${named(row.target_kind, row.target, false)}. Moderators reviewed it and ${
             action === 'restrict'
               ? 'restricted it.'
-              : 'found that it does not break the rules, so it stays as it is.'
+              : action === 'label'
+                ? 'labelled it, so readers are warned before it opens.'
+                : 'found that it does not break the rules, so it stays as it is.'
           }`,
         );
     }
@@ -412,9 +463,9 @@ export class Moderation {
   /** The decisions in force or reversed on things `userId` owns, for their account page. */
   async mine(userId) {
     const { rows } = await this.pool.query(
-      `SELECT mc.id,mc.target_kind,mc.target_id,mc.status,mc.reason,mc.decided_at,mc.appeal,
+      `SELECT mc.id,mc.target_kind,mc.target_id,mc.status,mc.labels,mc.reason,mc.decided_at,mc.appeal,
         mc.appealed_at,mc.appeal_outcome,mc.appeal_decided_at,${TARGET} AS target
-      FROM oc_moderation_cases mc WHERE mc.owner_id=$1 AND mc.status IN ('restricted','lifted')
+      FROM oc_moderation_cases mc WHERE mc.owner_id=$1 AND mc.status IN ('restricted','labelled','lifted')
       ORDER BY mc.decided_at DESC LIMIT 50`,
       [userId],
     );
@@ -439,7 +490,7 @@ export class Moderation {
           userId,
         ])
       ).rows[0];
-      if (!row || row.status !== 'restricted') throw new HttpError(404, 'Decision unavailable.');
+      if (!row || !IN_FORCE.includes(row.status)) throw new HttpError(404, 'Decision unavailable.');
       if (row.appealed_at) throw new HttpError(409, 'You have already asked for a review.');
       await c.query('UPDATE oc_moderation_cases SET appeal=$2,appealed_at=now() WHERE id=$1', [
         id,

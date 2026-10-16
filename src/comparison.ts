@@ -26,6 +26,8 @@ export interface ComparisonSource {
   first?: string;
   last?: string;
   assets?: Record<string, string>;
+  /** Its sensitive-content labels (#115). */
+  labels?: string[];
   index?: TimelineIndex;
   query?: (query: Record<string, unknown>, signal?: AbortSignal) => Promise<Frame | EventPage>;
 }

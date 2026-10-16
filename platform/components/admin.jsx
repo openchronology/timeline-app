@@ -203,7 +203,9 @@ export default function Admin() {
               key={item.id}
               item={item}
               busy={busy}
-              decide={(action, reason) => change('reports/' + item.id, { action, reason })}
+              decide={(action, reason, labels) =>
+                change('reports/' + item.id, { action, reason, ...(labels ? { labels } : {}) })
+              }
             />
           ))}
         {kind !== 'reports' &&

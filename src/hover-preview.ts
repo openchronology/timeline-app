@@ -86,6 +86,8 @@ export function createHoverPreview(
     target?.removeAttribute('aria-describedby');
     target = button;
     button.setAttribute('aria-describedby', card.id);
+    // A labelled moment's image is blurred here as on its marker (#115).
+    card.toggleAttribute('data-sensitive', button.hasAttribute('data-sensitive'));
     title.textContent =
       typeof entry.metadata.title === 'string' && entry.metadata.title.trim()
         ? entry.metadata.title

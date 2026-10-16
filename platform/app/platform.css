@@ -727,3 +727,14 @@ dialog::backdrop {
 .moderation-notice {
   margin: 8px 0;
 }
+/* A labelled timeline's card (#115). */
+.sensitive-badge {
+  display: inline-block;
+  margin: 0 0 6px;
+  padding: 2px 8px;
+  border: 1px solid #d9c9a8;
+  border-radius: 999px;
+  background: #fbf6ea;
+  color: #6b5326;
+  font-size: 12px;
+}

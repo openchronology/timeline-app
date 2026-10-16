@@ -224,7 +224,11 @@ Every point has a place. Explore the spaces between them.</textarea>
           <div class="document-meta">
             <span id="timeline-server" class="server-chip" hidden></span
             ><span id="event-count">10 events</span><span class="meta-separator">·</span
-            ><span id="save-status">A local draft, ready to explore</span>
+            ><span id="save-status">A local draft, ready to explore</span
+            ><span id="sensitive-status" class="sensitive-status" hidden
+              ><span class="meta-separator">·</span><span id="sensitive-labels"></span>
+              <button type="button" class="link-button reveal-images">Show images</button></span
+            >
           </div>
         </section>
         <label class="document-tags"
@@ -371,6 +375,10 @@ Every point has a place. Explore the spaces between them.</textarea>
         ><button id="moment-report" class="share-entity" type="button" hidden>Report</button
         ><button id="close-inspector" aria-label="Close moment details">×</button>
       </div>
+      <p id="moment-sensitive" class="sensitive-note" hidden>
+        <span></span>
+        <button type="button" class="link-button reveal-images">Show images</button>
+      </p>
       <div id="group-details" hidden>
         <h2 id="group-title"></h2>
         <p id="group-note" class="muted"></p>
@@ -425,6 +433,12 @@ Every point has a place. Explore the spaces between them.</textarea>
             spellcheck="false"
             placeholder="Comma-separated, e.g. war, trade"
         /></label>
+        <fieldset id="event-labels" class="content-labels">
+          <legend>Sensitive content</legend>
+          <label><input type="checkbox" value="nudity" /> Nudity</label>
+          <label><input type="checkbox" value="violence" /> Graphic violence</label>
+          <label><input type="checkbox" value="disturbing" /> Disturbing content</label>
+        </fieldset>
         <div id="plugin-event-fields"></div>
         <section id="event-durations"></section>
         <section id="event-related" class="related-section"></section>
@@ -499,6 +513,10 @@ Every point has a place. Explore the spaces between them.</textarea>
         ><button id="duration-report" class="share-entity" type="button" hidden>Report</button
         ><button data-close="duration-dialog" aria-label="Close duration details">×</button>
       </div>
+      <p id="duration-sensitive" class="sensitive-note" hidden>
+        <span></span>
+        <button type="button" class="link-button reveal-images">Show images</button>
+      </p>
       <form id="duration-form">
         <label>Title<input id="duration-title" maxlength="1000" placeholder="Optional" /></label>
         <div id="duration-endpoints" class="duration-endpoints"></div>
@@ -510,6 +528,12 @@ Every point has a place. Explore the spaces between them.</textarea>
             spellcheck="false"
             placeholder="Comma-separated, e.g. war, trade"
         /></label>
+        <fieldset id="duration-labels" class="content-labels">
+          <legend>Sensitive content</legend>
+          <label><input type="checkbox" value="nudity" /> Nudity</label>
+          <label><input type="checkbox" value="violence" /> Graphic violence</label>
+          <label><input type="checkbox" value="disturbing" /> Disturbing content</label>
+        </fieldset>
         <div id="plugin-duration-fields"></div>
         <section id="duration-related" class="related-section"></section>
         <details>
@@ -1053,6 +1077,29 @@ Every point has a place. Explore the spaces between them.</textarea>
       aria-label="Timeline actions"
       hidden
     ></div>
+    <div
+      id="sensitive-gate"
+      class="sensitive-gate"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="sensitive-gate-heading"
+      hidden
+    >
+      <div class="sensitive-gate-card">
+        <h2 id="sensitive-gate-heading">Sensitive content</h2>
+        <p id="sensitive-gate-description"></p>
+        <p>
+          Its owner or the site’s moderators labelled it so readers can choose whether to see it.
+          Its images stay blurred until you show them.
+        </p>
+        <div class="dialog-actions">
+          <a id="sensitive-gate-away" href="/" target="_top">Browse other timelines</a>
+          <button id="sensitive-gate-show" class="button-primary" type="button">
+            Show timeline
+          </button>
+        </div>
+      </div>
+    </div>
     <dialog id="conflict-dialog" aria-labelledby="conflict-heading">
       <div class="dialog-heading">
         <h2 id="conflict-heading">Edits saved meanwhile</h2>

@@ -74,7 +74,9 @@ export async function searchTimelines(pool, userId, value, featured = []) {
       EXISTS(SELECT 1 FROM oc_timeline_stars s WHERE s.timeline_id=t.id AND s.user_id=$6::uuid) AS starred,
       coalesce(p.popularity,0) AS popularity,coalesce(p.trending,0) AS trending,
       coalesce(a.standing,0)>0 AS established,
-      (t.featured OR t.id=ANY($5::uuid[])) AS featured,
+      -- Labelled timelines (#115) are never featured.
+      ((t.featured OR t.id=ANY($5::uuid[])) AND cardinality(t.content_labels||t.moderator_labels)=0) AS featured,
+      ARRAY(SELECT DISTINCT unnest(t.content_labels||t.moderator_labels)) AS labels,
       CASE WHEN $2='' THEN 0 ELSE ts_rank_cd(t.search_document,websearch_to_tsquery('english',$2)) END AS rank
     FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id
     LEFT JOIN oc_account_standing a ON a.user_id=t.owner_id
@@ -86,7 +88,11 @@ export async function searchTimelines(pool, userId, value, featured = []) {
       AND (NOT $11::boolean OR EXISTS(SELECT 1 FROM oc_timeline_stars s WHERE s.timeline_id=t.id AND s.user_id=$6::uuid))
       AND ($12='' OR EXISTS(SELECT 1 FROM oc_timeline_stars s JOIN oc_users su ON su.id=s.user_id WHERE s.timeline_id=t.id AND su.username=$12))
       -- Browsing lists established accounts' timelines, and featured ones (#103).
-      AND (NOT $13::boolean OR coalesce(a.standing,0)>0 OR t.featured OR t.id=ANY($5::uuid[]))
+      AND (NOT $13::boolean OR coalesce(a.standing,0)>0
+        OR ((t.featured OR t.id=ANY($5::uuid[])) AND cardinality(t.content_labels||t.moderator_labels)=0))
+      -- Readers who are not signed in browse no labelled timelines (#115); they find them by
+      -- search, link or profile, behind the warning.
+      AND (NOT $13::boolean OR $6::uuid IS NOT NULL OR cardinality(t.content_labels||t.moderator_labels)=0)
   ), page AS (SELECT * FROM matching ORDER BY CASE WHEN $10='featured' THEN featured ELSE false END DESC,
       -- Searches find newcomers' timelines too, after established accounts' matches.
       CASE WHEN $2<>'' THEN established ELSE true END DESC,

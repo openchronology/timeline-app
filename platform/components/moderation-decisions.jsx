@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { REPORT_TEXT } from '../../server/report-categories.mjs';
+import { describeLabels } from '../../src/content-labels.ts';
 const KIND = {
   timeline: 'Your timeline',
   comment: 'Your comment',
@@ -52,8 +53,8 @@ export default function ModerationDecisions({ session }) {
     <section id="moderation">
       <h2>Moderation decisions</h2>
       <p className="muted">
-        The site’s administrators restricted these after reports. You can ask once for each to be
-        reviewed.
+        The site’s administrators restricted or labelled these after reports. You can ask once for
+        each to be reviewed.
       </p>
       {decisions?.map((d) => (
         <article className="timeline-card" key={d.id}>
@@ -64,8 +65,14 @@ export default function ModerationDecisions({ session }) {
             )}
           </h3>
           <p>
-            {d.status === 'lifted' ? 'Restricted, then lifted' : 'Restricted'} on{' '}
-            {day(d.decided_at)}
+            {d.status === 'labelled'
+              ? `Labelled as containing ${describeLabels(d.labels ?? []).toLowerCase()}`
+              : d.status === 'lifted'
+                ? d.labels
+                  ? 'Labelled, then lifted'
+                  : 'Restricted, then lifted'
+                : 'Restricted'}{' '}
+            on {day(d.decided_at)}
             {d.reason && (
               <>
                 : <span className="preserve-text">{d.reason}</span>
@@ -82,7 +89,7 @@ export default function ModerationDecisions({ session }) {
                   : 'It awaits a decision.'}
             </p>
           ) : (
-            d.status === 'restricted' && (
+            d.status !== 'lifted' && (
               <form onSubmit={(event) => appeal(event, d.id)}>
                 <label>
                   Why should this be reviewed?

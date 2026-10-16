@@ -55,6 +55,9 @@ import {
   pluginSize,
   PLUGIN_EXAMPLE,
   validateTags,
+  contentLabels,
+  describeLabels,
+  CONTENT_LABELS_KEY,
   validateAssets,
   isOfficialPlugin,
   searchPluginLibrary,
@@ -155,6 +158,8 @@ interface RemoteTimeline {
   canPropose?: boolean;
   tags?: string[];
   assets?: Record<string, string>;
+  /** Its sensitive-content labels (#115): its owner's and moderators'. */
+  labels?: string[];
   owner: string;
   event_count: string;
   star_count?: string;
@@ -374,7 +379,9 @@ function flushEventEdit() {
     const metadata = JSON.parse(el<HTMLTextAreaElement>('event-metadata').value);
     if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata))
       throw new Error('Additional metadata must be a JSON object.');
-    const tags = parseTagInput(input('event-tags').value);
+    const tags = parseTagInput(input('event-tags').value),
+      labels = checkedLabels('event-labels');
+    delete metadata[CONTENT_LABELS_KEY];
     const point: PointEvent = {
       id: selected?.id ?? momentSession?.draft?.id ?? eventId(),
       time: readEventTime().toString(),
@@ -383,6 +390,7 @@ function flushEventEdit() {
         title: input('event-title').value,
         description: el<HTMLTextAreaElement>('event-description').value,
         ...(tags.length ? { tags } : {}),
+        ...(labels.length ? { [CONTENT_LABELS_KEY]: labels } : {}),
       },
     };
     pendingEventEdit = false;
@@ -485,6 +493,7 @@ const summaryExpansion = createSummaryExpansion(stage, {
     } else {
       renderPluginHeading(button, null, '');
       renderPluginMarker(button, imageSource(pluginMarker(activePlugins(), event.metadata)), 1n);
+      markSensitive(button, event.metadata);
       button.style.backgroundColor = pluginColor(activePlugins(), event.metadata) ?? '';
       button.dataset.size = pluginSize(activePlugins(), event.metadata);
       renderPluginShape(button, pluginShape(activePlugins(), event.metadata));
@@ -1300,6 +1309,7 @@ function drawFrame() {
     } else {
       renderPluginHeading(button, null, '');
       renderPluginMarker(button, imageSource(pluginMarker(plugins, metadata)), count);
+      markSensitive(button, metadata);
       const color = count === 1n ? pluginColor(plugins, metadata) : null;
       button.style.backgroundColor = color ?? '';
       button.dataset.size = count === 1n && !span ? pluginSize(plugins, metadata) : 'medium';
@@ -1404,6 +1414,8 @@ function drawFrame() {
             imageSource(pluginMarker(activePlugins(), entry.metadata)),
             1n,
           );
+          // A stack entry is as sensitive as its moment.
+          markSensitive(child.button, metadata);
           const color = pluginColor(activePlugins(), entry.metadata);
           child.button.style.backgroundColor = color ?? '';
           child.button.style.borderColor = '';
@@ -1772,6 +1784,7 @@ async function comparisonSources(ids: string[]): Promise<ComparisonSource[]> {
       presentation: info.presentation ? validatePresentation(info.presentation) : undefined,
       plugins: info.plugins ? validateInstalledPlugins(info.plugins) : [],
       assets: info.assets ? validateAssets(info.assets) : {},
+      labels: contentLabels(info.labels),
       query: (query, signal) =>
         api<Frame | EventPage>(
           `timelines/${id}/query`,
@@ -1812,6 +1825,7 @@ function startComparison(sources: ComparisonSource[], presentation: TimePresenta
   windowController?.abort();
   clearTimeout(frameTimer);
   comparison = view;
+  gateSensitive('compare:' + sources.map((source) => source.key).join(','));
   remoteCache.clear();
   sparseWorkspace()?.evict();
   liveTransitionPending = false;
@@ -2110,7 +2124,117 @@ el('capacity-dismiss').onclick = () => {
   }
   el('capacity-notice').hidden = true;
 };
+/** The labels in fieldset `id` that are checked (#115). */
+function checkedLabels(id: string): string[] {
+  return contentLabels(
+    [...el(id).querySelectorAll<HTMLInputElement>('input:checked')].map((box) => box.value),
+  );
+}
+/**
+ * Shows the labels of an entity's `metadata` in fieldset `field` (read-only when `readOnly`),
+ * and, for readers warned of them, notice `note` above its details.
+ */
+function showLabels(
+  field: string,
+  note: string,
+  metadata: Record<string, unknown> | undefined,
+  readOnly: boolean,
+) {
+  const labels = contentLabels(metadata?.[CONTENT_LABELS_KEY]);
+  for (const box of el(field).querySelectorAll<HTMLInputElement>('input')) {
+    box.checked = labels.includes(box.value as never);
+    box.disabled = readOnly;
+  }
+  // Readers see the labels as the notice; there is nothing for them to set.
+  el(field).hidden = readOnly && !labels.length;
+  const shown = [...new Set([...labels, ...timelineLabels()])];
+  el(note).hidden = !warned() || !shown.length;
+  el(note).querySelector('span')!.textContent =
+    `Sensitive content: ${describeLabels(shown).toLowerCase()}.`;
+  el(note)
+    .closest('dialog')
+    ?.toggleAttribute('data-sensitive', labels.length > 0);
+}
+/** Marks `element` as showing a labelled moment's or duration's images (#115). */
+function markSensitive(element: Element, metadata: Record<string, unknown> | undefined) {
+  element.toggleAttribute(
+    'data-sensitive',
+    contentLabels(metadata?.[CONTENT_LABELS_KEY]).length > 0,
+  );
+}
+/** The open timeline's sensitive-content labels (#115), or its comparison's sources'. */
+function timelineLabels(): string[] {
+  return comparison
+    ? contentLabels(comparison.tracks.flatMap((track) => track.source.labels ?? []))
+    : contentLabels(remote?.labels);
+}
+/**
+ * Whether the reader is warned of sensitive content: a server timeline (or comparison) they
+ * cannot write. Its owner and writers see it as it is.
+ */
+function warned() {
+  return (!!remote || !!comparison) && !local && !(remote?.canWrite && !comparison);
+}
+/** Images of labelled content are shown, for the open timeline (until the tab closes). */
+let imagesShown = false,
+  sensitiveKey = '';
+const sessionKey = (kind: string) => `openchronology:${kind}:${sensitiveKey}`;
+function remembered(kind: string) {
+  try {
+    return sessionStorage.getItem(sessionKey(kind)) === '1';
+  } catch {
+    return false;
+  }
+}
+function remember(kind: string, value: boolean) {
+  try {
+    if (value) sessionStorage.setItem(sessionKey(kind), '1');
+    else sessionStorage.removeItem(sessionKey(kind));
+  } catch {
+    /* Without storage it lasts until the page closes. */
+  }
+}
+/** Shows what the open timeline is labelled as, and blurs its images until shown. */
+function updateSensitive() {
+  const labels = warned() ? timelineLabels() : [];
+  const body = document.body;
+  body.toggleAttribute('data-warnings', warned());
+  body.toggleAttribute('data-sensitive', labels.length > 0);
+  body.toggleAttribute('data-images-shown', imagesShown);
+  el('sensitive-status').hidden = !labels.length;
+  text('sensitive-labels', `Sensitive: ${describeLabels(labels).toLowerCase()}`);
+  for (const button of document.querySelectorAll('.reveal-images'))
+    button.textContent = imagesShown ? 'Blur images' : 'Show images';
+  if (!labels.length) el('sensitive-gate').hidden = true;
+}
+/**
+ * On opening timeline (or comparison) `key`: for a labelled one, the warning before it shows,
+ * unless the reader chose to see it in this tab already (#115).
+ */
+function gateSensitive(key: string) {
+  sensitiveKey = key;
+  imagesShown = remembered('images');
+  updateSensitive();
+  const labels = warned() ? timelineLabels() : [];
+  text(
+    'sensitive-gate-description',
+    `This timeline is labelled as containing ${describeLabels(labels).toLowerCase()}.`,
+  );
+  el('sensitive-gate').hidden = !labels.length || remembered('shown');
+  if (!el('sensitive-gate').hidden) el('sensitive-gate-show').focus();
+}
+el('sensitive-gate-show').onclick = () => {
+  remember('shown', true);
+  el('sensitive-gate').hidden = true;
+};
+for (const button of document.querySelectorAll<HTMLButtonElement>('.reveal-images'))
+  button.onclick = () => {
+    imagesShown = !imagesShown;
+    remember('images', imagesShown);
+    updateSensitive();
+  };
 function heading() {
+  updateSensitive();
   updateFollowControl();
   // Where the open timeline lives, for tests and benchmarks (bench/ui.mjs).
   document.documentElement.dataset.storage =
@@ -2631,6 +2755,7 @@ async function openRemote(id: string, restoreSeparation = true) {
   if (request !== documentRequest) return;
   remote = info;
   reportedLink = null;
+  gateSensitive(id);
   if (embedded) {
     el<HTMLAnchorElement>('embed-open').href = sharePath(id, null);
     el('embed-open').hidden = false;
@@ -3317,9 +3442,11 @@ function eventForm(event?: PointEvent, time?: Q) {
   requestRender();
   el<HTMLTextAreaElement>('event-description').value = event?.metadata.description ?? '';
   input('event-tags').value = event ? entityTags(event.metadata).join(', ') : '';
+  showLabels('event-labels', 'moment-sensitive', event?.metadata, !editable());
   const rest = { ...event?.metadata };
   delete rest.title;
   delete rest.description;
+  delete rest[CONTENT_LABELS_KEY];
   if (event && entityTags(event.metadata).length === (event.metadata.tags as unknown[])?.length)
     delete rest.tags;
   el<HTMLTextAreaElement>('event-metadata').value = JSON.stringify(rest, null, 2);
@@ -6653,9 +6780,11 @@ function showDuration(duration: Duration, readOnly: boolean, isNew = false) {
   input('duration-title').value = duration.metadata.title ?? '';
   el<HTMLTextAreaElement>('duration-description').value = duration.metadata.description ?? '';
   input('duration-tags').value = entityTags(duration.metadata).join(', ');
+  showLabels('duration-labels', 'duration-sensitive', duration.metadata, readOnly);
   const rest = { ...duration.metadata };
   delete rest.title;
   delete rest.description;
+  delete rest[CONTENT_LABELS_KEY];
   if (entityTags(duration.metadata).length === (duration.metadata.tags as unknown[])?.length)
     delete rest.tags;
   el<HTMLTextAreaElement>('duration-metadata').value = JSON.stringify(rest, null, 2);
@@ -6685,7 +6814,9 @@ function durationFromForm(): Duration {
   const metadata = JSON.parse(el<HTMLTextAreaElement>('duration-metadata').value);
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata))
     throw new Error('Additional metadata must be a JSON object.');
-  const tags = parseTagInput(input('duration-tags').value);
+  const tags = parseTagInput(input('duration-tags').value),
+    labels = checkedLabels('duration-labels');
+  delete metadata[CONTENT_LABELS_KEY];
   return validateDuration(
     {
       ...current,
@@ -6694,6 +6825,7 @@ function durationFromForm(): Duration {
         title: input('duration-title').value,
         description: el<HTMLTextAreaElement>('duration-description').value,
         ...(tags.length ? { tags } : {}),
+        ...(labels.length ? { [CONTENT_LABELS_KEY]: labels } : {}),
       },
     },
     parseTime,
@@ -7994,6 +8126,7 @@ function renderDurationBackgrounds() {
         durationBackgrounds.set(key, entry);
       }
       const { box, img } = entry;
+      markSensitive(box, band.metadata);
       box.style.left = left + 'px';
       box.style.width = right - left + 'px';
       img.style.width = full + 'px';

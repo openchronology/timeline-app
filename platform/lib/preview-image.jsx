@@ -6,7 +6,7 @@
  */
 import 'server-only';
 import { ImageResponse } from 'next/og';
-import { Q } from '../../dist/core.mjs';
+import { Q, describeLabels } from '../../dist/core.mjs';
 import { platformServices } from '../../server/platform.mjs';
 import {
   durationOf,
@@ -176,6 +176,17 @@ export async function previewImage(id, entity) {
     console.error('Preview unavailable:', error);
   }
   if (!timeline) return siteCard();
+  // A labelled timeline (#115) previews as its title and labels alone: nothing from it is
+  // shown to someone who has not chosen to see it.
+  if (timeline.labels?.length)
+    return new ImageResponse(
+      <Card
+        title={timeline.title || 'Untitled timeline'}
+        facts={`Sensitive content: ${describeLabels(timeline.labels).toLowerCase()}`}
+        groups={[]}
+      />,
+      size,
+    );
   const groups = await strip(services, timeline).catch(() => []);
   const first = timeline.first ? Q.parse(timeline.first) : Q.zero,
     span = timeline.last ? Q.parse(timeline.last).sub(first) : Q.zero;

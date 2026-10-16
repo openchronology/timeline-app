@@ -73,14 +73,38 @@ Requires a reason, which is sent to the owner as the statement of reasons. What 
 
 New reports about a restricted thing join its case rather than opening another. While a restriction is in force, its owner is not [established](browsing.md): browsing leaves out their public timelines, and their stars count for nothing.
 
+### Label
+
+For a timeline only: when what was reported is allowed but should carry a warning (educational nudity, a war's photographs), label it instead of restricting it. Choose what it contains (nudity, graphic violence, disturbing content) and give a reason, which is sent to the owner. Its owner cannot remove these labels; they show under **Sharing & settings** as added by moderators. What labels do is described under [sensitive-content labels](#sensitive-content-labels).
+
 ### Reviews and lifting
 
 The owner can ask once for a review: from **Account → Moderation decisions**, or the link in the timeline's notice. A suspended account can't sign in, so its email asks it to contact the operator instead. The request appears under **Awaiting a decision**, where the administrator either:
 
-- **keeps the restriction**, or
-- **lifts the restriction**.
+- **keeps the restriction** (or the labels), or
+- **lifts the restriction** (or **removes the labels**).
 
-A restriction can also be lifted at any time from **Restricted**. Lifting restores what restricting changed: a timeline's earlier visibility, or a suspended account.
+A restriction or labels can also be lifted at any time from **Restricted**. Lifting restores what the decision changed: a timeline's earlier visibility, a suspended account, or the labels moderators added (its owner's own labels stay).
+
+## Sensitive-content labels
+
+Educational, historical, medical, artistic and news depictions of nudity, violence and disturbing events are allowed when labelled; pornography and gore for its own sake are not ([#115](https://github.com/openchronology/timeline-app/issues/115)). Labels are **nudity**, **graphic violence** and **disturbing content**:
+
+- **A timeline:** its owner sets them under **Sharing & settings → Sensitive content**; moderators add them from a report ([Label](#label)).
+- **A moment or duration:** whoever can edit it sets them in its details, under **Sensitive content**. They are kept in its metadata (`content_labels`), so they travel with `.ochx` and `.och` files.
+
+For readers who are not its owner or writers:
+
+| Labelled             | What readers get                                                                                                                                                                                                                                                                              |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A timeline           | A warning before it opens (**Show timeline** or **Browse other timelines**). Its images stay blurred until **Show images** next to its save status. Both choices last until the browser tab closes. Embeds open behind the same warning. A comparison with a labelled source is labelled too. |
+| A moment or duration | Its images (marker, hover card, details, duration background) stay blurred until **Show images**, and its details say what it contains.                                                                                                                                                       |
+
+A labelled timeline is also:
+
+- never **featured**, and left out of browsing by readers who aren't signed in (search, links and profiles still find it, behind its warning);
+- shown in timeline lists with a **Sensitive** badge;
+- previewed in links as its title and labels alone, with no moment strip or excerpt, and no oEmbed thumbnail ([sharing](sharing.md#link-previews)).
 
 ## Who is told what
 

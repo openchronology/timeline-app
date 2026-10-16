@@ -75,6 +75,7 @@ import type { InstalledPlugin } from './plugins.js';
 export * from './plugins.js';
 export * from './suites.js';
 export * from './capacity.js';
+export * from './content-labels.js';
 export * from './drafts.js';
 export { stackWindow, scaleTimeline } from './stack-layout.js';
 import { parseTimestamp } from './calendar.js';
