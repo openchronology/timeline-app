@@ -15,6 +15,11 @@ export default async function EditorPage({ searchParams }) {
         fresh={query.new === '1' || !!forkId}
         forkId={forkId}
         tour={query.tour === '1'}
+        draft={
+          typeof query.draft === 'string' && /^[a-z0-9-]{1,64}$/.test(query.draft)
+            ? query.draft
+            : undefined
+        }
       />
     </main>
   );

@@ -6,6 +6,7 @@ import { searchTimelines } from '../../server/collaboration.mjs';
 import { CompareTray } from '../components/compare-selection.jsx';
 import TimelineList from '../components/timeline-list.jsx';
 import LegacyLinks from '../components/legacy-links.jsx';
+import BrowserDrafts from '../components/browser-drafts.jsx';
 import { profilePath } from '../../src/addresses.ts';
 export const dynamic = 'force-dynamic';
 const pageNumber = (value) =>
@@ -84,6 +85,7 @@ export default async function Dashboard({ searchParams }) {
         <h1>Timelines</h1>
       </div>
       <CompareTray limit={compareLimit} signedIn={!!user} />
+      {user && <BrowserDrafts userId={user.id} />}
       {user && (
         <section id="dashboard-mine">
           <h2>Your timelines</h2>

@@ -4,21 +4,45 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 /**
  * Signed-in browser drafts: an old whole-document draft still restores and is converted to
- * per-record storage; later edits store only their own records and survive a reload.
+ * per-record storage; later edits store only their own records and survive a reload. Each
+ * timeline started is a draft of its own (#188): listed on the dashboard, opened by address,
+ * deleted there, gone once saved to the server, and only its account's.
  */
 export async function checkDrafts(browser) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  // Who is signed in, and whether the server shows its dashboard.
+  const account = { id: 'drafter', dashboard: false };
   await context.route('http://localhost:5173/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === '/api/session')
       return route.fulfill({
         json: {
-          user: { id: 'drafter', username: 'drafter' },
+          user: { id: account.id, username: account.id },
           csrf: 'csrf',
           server: true,
-          dashboard: false,
+          dashboard: account.dashboard,
         },
       });
+    // Saving a draft to the server.
+    if (path === '/api/timelines' && route.request().method() === 'POST') {
+      const document = route.request().postDataJSON();
+      return route.fulfill({
+        status: 201,
+        json: {
+          id: '00000000-0000-0000-0000-0000000000aa',
+          title: document.title,
+          description: document.description,
+          revision: '1',
+          event_count: String(document.events.length),
+          owner: account.id,
+          slug: null,
+          visibility: 'private',
+          canEdit: true,
+          canWrite: true,
+          canShare: true,
+        },
+      });
+    }
     if (path.startsWith('/api/'))
       return route.fulfill({ json: { timelines: [], page: 1, pages: 0, total: 0 } });
     if (path === '/blank')
@@ -58,6 +82,13 @@ export async function checkDrafts(browser) {
           };
         }),
     );
+  const poll = async (predicate) => {
+    for (let i = 0; i < 100; i++) {
+      if (await predicate()) return;
+      await page.waitForTimeout(100);
+    }
+    throw new Error('Timed out');
+  };
   const saved = () =>
     page.waitForFunction(
       () => document.getElementById('save-status').textContent === 'Saved in this browser',
@@ -102,7 +133,7 @@ export async function checkDrafts(browser) {
     // Opening stores the draft record by record and drops the old whole document.
     await saved();
     let keys = await stored();
-    assert.deepEqual(keys.drafts.sort(), ['settings']);
+    assert.deepEqual(keys.drafts.sort(), ['registry', 'settings']);
     assert.deepEqual(keys['draft-moments'].sort(), ['a', 'b', 'c']);
     assert.deepEqual(keys['draft-durations'], ['span']);
     assert.equal(keys['draft-links'].length, 1);
@@ -128,8 +159,124 @@ export async function checkDrafts(browser) {
     );
     assert.match(await page.locator('#event-count').textContent(), /4 moments/);
     await page.getByRole('button', { name: 'Added in a draft', exact: true }).waitFor();
+
+    // Another timeline is a draft of its own: the first is kept, so nothing asks.
+    const asked = [];
+    page.on('dialog', (dialog) => {
+      asked.push(dialog.message());
+      void dialog.accept();
+    });
+    const list = () =>
+      page.evaluate(
+        () =>
+          new Promise((done, fail) => {
+            const request = indexedDB.open('openchronology');
+            request.onerror = () => fail(request.error);
+            request.onsuccess = () => {
+              const tx = request.result.transaction('drafts');
+              const read = tx.objectStore('drafts').get('registry');
+              tx.oncomplete = () => {
+                request.result.close();
+                done((read.result ?? []).map((d) => `${d.title}:${d.moments}:${d.owner}`).sort());
+              };
+            };
+          }),
+      );
+    await page.locator('#new-button').click();
+    await page.waitForFunction(
+      () => document.getElementById('timeline-title').value === 'Untitled timeline',
+    );
+    assert.deepEqual(asked, [], 'Starting a timeline asked about the draft');
+    // An untouched new timeline is not a draft yet; edited, it is.
+    assert.deepEqual(await list(), ['Edited draft:4:drafter']);
+    await page.locator('#timeline-title').fill('Second draft');
+    await page.locator('#timeline-title').press('Tab');
+    await saved();
+    await poll(async () => (await list()).length === 2);
+    assert.deepEqual(await list(), ['Edited draft:4:drafter', 'Second draft:0:drafter']);
+    // An imported file is a draft at once; the sample, untouched, is not.
+    await page.locator('#json-file').setInputFiles({
+      name: 'imported.ochx',
+      mimeType: 'application/json',
+      buffer: Buffer.from(
+        JSON.stringify({
+          format: 'openchronology',
+          version: 1,
+          title: 'Imported draft',
+          description: '',
+          events: [{ id: 'i', time: '1/1', metadata: { title: 'Imported' } }],
+        }),
+      ),
+    });
+    await poll(async () => (await list()).includes('Imported draft:1:drafter'));
+    await page.locator('#dashboard-demo').evaluate((button) => button.click());
+    await page.waitForFunction(
+      () => document.getElementById('timeline-title').value !== 'Imported draft',
+    );
+    await page.waitForTimeout(1000);
+    assert.equal((await list()).length, 3);
+    assert.deepEqual(asked, []);
+
+    // The dashboard lists them, newest first, to open or delete.
+    account.dashboard = true;
+    await page.goto('http://localhost:5173/');
+    const drafts = page.locator('#dashboard-drafts');
+    await drafts.waitFor();
+    assert.deepEqual(await drafts.locator('.draft-open').allTextContents(), [
+      'Imported draft',
+      'Second draft',
+      'Edited draft',
+    ]);
+    assert.match(await drafts.locator('article').first().textContent(), /1 moment · edited /);
+    await drafts.getByRole('button', { name: 'Second draft', exact: true }).click();
+    await page.waitForFunction(
+      () => document.getElementById('timeline-title').value === 'Second draft',
+    );
+    await page.goto('http://localhost:5173/');
+    await drafts.waitFor();
+    await drafts.getByRole('button', { name: 'Delete the draft “Imported draft”' }).click();
+    await poll(async () => (await drafts.locator('.draft-open').count()) === 2);
+    assert.match(asked.at(-1), /Delete the draft “Imported draft” from this browser for good\?/);
+    assert.equal((await list()).length, 2);
+    // Opened by address (the website's dashboard links to /editor?draft=…).
+    account.dashboard = false;
+    const registry = await page.evaluate(
+      () =>
+        new Promise((done) => {
+          const request = indexedDB.open('openchronology');
+          request.onsuccess = () => {
+            const tx = request.result.transaction('drafts');
+            const read = tx.objectStore('drafts').get('registry');
+            tx.oncomplete = () => {
+              request.result.close();
+              done(read.result);
+            };
+          };
+        }),
+    );
+    const edited = registry.find((d) => d.title === 'Edited draft');
+    await page.goto('http://localhost:5173/?draft=' + edited.id);
+    await page.waitForFunction(
+      () => document.getElementById('timeline-title').value === 'Edited draft',
+    );
+    // Saved to the server, a draft is a draft no more.
+    await page.locator('#publish-button').click();
+    await page.waitForFunction(
+      () => document.getElementById('save-status').textContent === 'Saved on the server',
+    );
+    await poll(async () => (await list()).length === 1);
+    assert.deepEqual(await list(), ['Second draft:0:drafter']);
+    // Another account in this browser sees none of them.
+    account.id = 'someone-else';
+    account.dashboard = true;
+    await page.goto('http://localhost:5173/');
+    await page.locator('#dashboard').waitFor();
+    await page.waitForTimeout(500);
+    assert(await drafts.isHidden());
     assert.deepEqual(errors, []);
-    console.log('PASS drafts: legacy drafts convert; edits store their own records and reload.');
+    console.log(
+      'PASS drafts: legacy drafts convert; edits store their own records and reload; each timeline is a draft of its own, listed, opened, deleted, gone once saved, and only its account’s.',
+    );
   } finally {
     await context.close();
   }

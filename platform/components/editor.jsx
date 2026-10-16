@@ -30,6 +30,8 @@ export default function Editor({
   focus,
   // Starts the editor's tour (#172), from the help.
   tour = false,
+  // A draft in this browser to open (#188), from the dashboard.
+  draft,
 }) {
   const frame = useRef(null),
     router = useRouter(),
@@ -189,6 +191,9 @@ export default function Editor({
           '/editor/frame' +
           (sample ? '?demo=dense' : fresh ? '?new=1' : '') +
           (tour ? (sample || fresh ? '&' : '?') + 'tour=1' : '') +
+          (draft
+            ? (sample || fresh || tour ? '&' : '?') + 'draft=' + encodeURIComponent(draft)
+            : '') +
           (forkId
             ? '#guest-fork/' + forkId
             : comparisonIds

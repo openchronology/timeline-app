@@ -11,12 +11,8 @@ import type { TimelineDocument, PointEvent } from './core.js';
 import type { Duration } from './durations.js';
 import type { Relationship } from './relationships.js';
 
-export const DRAFT_STORES = [
-  'draft-moments',
-  'draft-durations',
-  'draft-links',
-  'draft-retired',
-] as const;
+import { DRAFT_STORES } from './draft-store.js';
+export { DRAFT_STORES };
 export type DraftStore = (typeof DRAFT_STORES)[number];
 /** Writes a record, or deletes it when `value` is undefined. */
 export interface DraftWrite {

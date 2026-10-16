@@ -47,7 +47,13 @@ Without an account, a timeline you start lives only in the open tab. A banner, *
 
 To sign in or create an account, use **Account** in the website's header (in the desktop app, **Sign in**). You can use a username and password, or **Continue with Google**, GitHub or Facebook where the site offers them. Accounts are for people 13 and older ([ages](moderation.md#ages)).
 
-Signed in, a timeline you have not yet saved to the server is kept as a draft in this browser. The status under the title says **Saved in this browser**. Only one draft is kept, so starting another new timeline replaces it. Save to the server to keep a timeline for good and to reach it from other devices.
+Signed in, a timeline you have not yet saved to the server is kept as a draft in this browser, from your first edit (an imported file at once). The status under the title says **Saved in this browser**. Each timeline you start or import is a draft of its own, so starting another keeps the one before:
+
+- **Drafts in this browser**, on the home page, lists your drafts, most recently edited first. Choose one to open it, or **Delete** it.
+- **Opening the editor** without choosing returns to the draft you edited last.
+- **Saving a draft to the server** moves it there, and it leaves the list.
+
+Drafts stay in this browser only, and only for your account. Save to the server to keep a timeline for good and to reach it from other devices.
 
 ### The desktop app and the offline file
 
