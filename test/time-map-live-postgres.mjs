@@ -10,7 +10,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { chromium } from 'playwright';
-import { passwordHash } from '../server/auth.mjs';
+import { Auth, passwordHash } from '../server/auth.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
@@ -42,31 +42,14 @@ child.on('exit', () => (exited = true));
 const suffix = Date.now().toString(36),
   password = 'mapping-browser-password-2026',
   ids = [];
-/** Signs in over the API; the session's cookies, as [name, value] pairs. */
+/**
+ * A session for `username`, as [name, value] cookie pairs. Issued directly: signing in with a
+ * password is rate limited per address, which the live tests run one after another share.
+ */
 async function signIn(username) {
-  const cookies = new Map();
-  let csrf;
-  for (const [path, data] of [['/api/session'], ['/api/auth/login', { username, password }]]) {
-    const res = await fetch(origin + path, {
-      method: data ? 'POST' : 'GET',
-      headers: {
-        Origin: origin,
-        ...(cookies.size ? { Cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join('; ') } : {}),
-        ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
-        ...(data ? { 'Content-Type': 'application/json' } : {}),
-      },
-      ...(data ? { body: JSON.stringify(data) } : {}),
-    });
-    for (const header of res.headers.getSetCookie()) {
-      const [key, value] = header.split(';')[0].split('=');
-      if (value) cookies.set(key, value);
-      else cookies.delete(key);
-    }
-    const value = await res.json();
-    assert(res.ok, `${path}: ${JSON.stringify(value)}`);
-    csrf = value.csrf ?? csrf;
-  }
-  return [...cookies];
+  const user = (await pool.query('SELECT * FROM oc_users WHERE username=$1', [username])).rows[0];
+  const issued = await new Auth(pool, origin).issue(user);
+  return [issued.cookie.split(';')[0].split('=')];
 }
 async function account(name) {
   const id = randomUUID(),
