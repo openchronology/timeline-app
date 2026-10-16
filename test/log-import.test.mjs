@@ -412,6 +412,31 @@ test('entry IDs repeat on re-import and stay distinct for identical lines', () =
   assert(/^[A-Za-z0-9_.:-]{1,128}$/.test(d));
 });
 
+test('journal entries are named by their cursor, however journalctl orders their fields', () => {
+  // journalctl prints an entry's fields in a different order from one run to the next (#151).
+  const format = compileFormat('journald', {}, { zone: UTC });
+  const fields = {
+    __CURSOR: 's=1;i=2;b=3',
+    __REALTIME_TIMESTAMP: '1760004902000000',
+    MESSAGE: 'same entry',
+    _HOSTNAME: 'box',
+  };
+  const lines = [
+    JSON.stringify(fields),
+    JSON.stringify(Object.fromEntries(Object.entries(fields).reverse())),
+  ];
+  const id = (line) => {
+    const entry = format.read(line);
+    return new EntryIds('log').next(format.identity(entry, line), entry.time);
+  };
+  assert.notEqual(lines[0], lines[1]);
+  assert.equal(id(lines[0]), id(lines[1]));
+  // Other formats are named by their text, as before.
+  const plain = compileFormat('jsonl', {}, { zone: UTC });
+  const text = '{"time":"2026-10-09T08:15:01Z","message":"x"}';
+  assert.equal(plain.identity(plain.read(text), text), text);
+});
+
 test('batches grow with the timeline, and the estimate follows the server', () => {
   assert.equal(batchLimit(0), 64);
   assert.equal(batchLimit(800), 400);

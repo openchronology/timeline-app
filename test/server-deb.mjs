@@ -85,6 +85,17 @@ try {
   assert.doesNotMatch(await sh('ldd /usr/lib/openchronology/bin/och-convert'), /not found/);
   // The log importer runs as a command with the bundled Node.js.
   assert.match(await sh('och-import-logs --help'), /^Usage: och-import-logs/);
+  // The journald follower is installed, and loads with the bundled Node.js (#151).
+  assert.match(
+    await sh(
+      'test -f /usr/lib/systemd/system/openchronology-journald.service && test -f /usr/share/openchronology/journald.env.example && echo installed',
+    ),
+    /installed/,
+  );
+  assert.match(
+    await sh('cd /usr/lib/openchronology && node/bin/node server/journald-receiver.mjs 2>&1; true'),
+    /Set JOURNALD_TIMELINE/,
+  );
   const dry = JSON.parse(
     await sh(
       "printf 'Oct  9 08:15:01 host sshd[1]: Accepted\\n' > /tmp/syslog && och-import-logs --format syslog --timezone UTC --year 2026 --dry-run --quiet /tmp/syslog 2>/dev/null",

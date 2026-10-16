@@ -377,7 +377,7 @@ async function readAll(settings, progress, each) {
         progress.stats.unrouted++;
         continue;
       }
-      const built = mapping.build(entry, text, ids.next(text, entry.time));
+      const built = mapping.build(entry, text, ids.next(format.identity(entry, text), entry.time));
       try {
         checkMoment(built);
       } catch (error) {

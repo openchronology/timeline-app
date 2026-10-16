@@ -84,6 +84,17 @@ try {
   // The SQLite converter finds its libraries on this distribution.
   assert.doesNotMatch(await sh('ldd /usr/lib/openchronology/bin/och-convert'), /not found/);
   assert.match(await sh('och-import-logs --help'), /^Usage: och-import-logs/);
+  // The journald follower is installed, and loads with the bundled Node.js (#151).
+  assert.match(
+    await sh(
+      'test -f /usr/lib/systemd/system/openchronology-journald.service && test -f /usr/share/openchronology/journald.env.example && echo installed',
+    ),
+    /installed/,
+  );
+  assert.match(
+    await sh('cd /usr/lib/openchronology && node/bin/node server/journald-receiver.mjs 2>&1; true'),
+    /Set JOURNALD_TIMELINE/,
+  );
   await sh('kill "$(cat /tmp/server.pid)" || true');
 
   // The administrator (#118): its password is read whole from the configuration, # and

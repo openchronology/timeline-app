@@ -102,7 +102,8 @@ RUN set -eu; \
     sed "s/@PG_MAJOR@/$PG_MAJOR/g" /root/debian/README.Debian > "$doc/README.Debian"; \
     install -D -m 0644 /root/debian/openchronology.env "$ROOT/usr/share/openchronology/openchronology.env.example"; \
     install -D -m 0644 /root/debian/syslog.env "$ROOT/usr/share/openchronology/syslog.env.example"; \
-    for unit in openchronology openchronology-mail openchronology-syslog; do \
+    install -D -m 0644 /root/debian/journald.env "$ROOT/usr/share/openchronology/journald.env.example"; \
+    for unit in openchronology openchronology-mail openchronology-syslog openchronology-journald; do \
       install -D -m 0644 "/root/debian/$unit.service" "$ROOT/usr/lib/systemd/system/$unit.service"; \
     done; \
     install -D -m 0755 /root/debian/openchronology-migrate "$ROOT/usr/sbin/openchronology-migrate"; \

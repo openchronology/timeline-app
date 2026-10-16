@@ -54,6 +54,10 @@ The syslog receiver (syslog.md) is configured in /etc/openchronology/syslog.env 
 in /etc/openchronology/syslog-routes.json; then
 `sudo systemctl enable --now openchronology-syslog`.
 
+The journald follower (journald.md) streams this machine's systemd journal, or another
+machine's over SSH, into timelines. Configure it in /etc/openchronology/journald.env (the timeline or
+routes, and which units); then `sudo systemctl enable --now openchronology-journald`.
+
 `och-import-logs` imports historic log files (log-import.md), with OCH_API_URL and
 OCH_API_KEY from the environment or syslog.env: `och-import-logs --help`.
 

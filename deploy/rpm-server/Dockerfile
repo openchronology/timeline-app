@@ -109,7 +109,8 @@ RUN set -eu; \
     sed "s/@PG_MAJOR@/$PG_MAJOR/g" /root/rpm/README.RPM > "$doc/README.RPM"; \
     install -D -m 0644 /root/shared/openchronology.env "$ROOT/usr/share/openchronology/openchronology.env.example"; \
     install -D -m 0644 /root/shared/syslog.env "$ROOT/usr/share/openchronology/syslog.env.example"; \
-    for unit in openchronology openchronology-mail openchronology-syslog; do \
+    install -D -m 0644 /root/shared/journald.env "$ROOT/usr/share/openchronology/journald.env.example"; \
+    for unit in openchronology openchronology-mail openchronology-syslog openchronology-journald; do \
       sed 's|README.Debian|README.RPM|' "/root/shared/$unit.service" > "/root/$unit.service"; \
       install -D -m 0644 "/root/$unit.service" "$ROOT/usr/lib/systemd/system/$unit.service"; \
     done; \

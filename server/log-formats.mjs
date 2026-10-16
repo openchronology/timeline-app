@@ -221,6 +221,10 @@ export const BUILTIN_FORMATS = {
     },
     title: '{message}',
     tags: ['journald', 'severity:{severity}', 'host:{host}', 'app:{app}', 'unit:{unit}'],
+    // What names an entry for its moment ID (#151): journalctl prints an entry's fields in a
+    // different order each time, so its line differs from one run to the next; its cursor
+    // does not.
+    identity: '__CURSOR',
   },
 };
 
@@ -311,6 +315,14 @@ export function compileFormat(
   return {
     name,
     format,
+    /**
+     * What names entry `entry` (as read) for its moment ID: its format's identity field, if
+     * it has one, or else `text`, the entry as written.
+     */
+    identity(entry, text) {
+      const value = format.identity ? entry.fields[format.identity] : undefined;
+      return typeof value === 'string' && value ? value : text;
+    },
     /** Fields, severity and exact time of one entry, or an error for text it cannot read. */
     read(entry) {
       if (format.read === 'rfc5424' || (format.read === 'syslog' && /^<\d{1,3}>/.test(entry))) {
