@@ -45,10 +45,10 @@ const owner = randomUUID(),
   username = 'labeller_' + owner.slice(0, 8),
   password = 'labels-browser-password-2026';
 /** Signs in over the API; the session's cookies, as [name, value] pairs. */
-async function signIn() {
+async function signIn(as = username) {
   const cookies = new Map();
   let csrf;
-  for (const [path, data] of [['/api/session'], ['/api/auth/login', { username, password }]]) {
+  for (const [path, data] of [['/api/session'], ['/api/auth/login', { username: as, password }]]) {
     const res = await fetch(origin + path, {
       method: data ? 'POST' : 'GET',
       headers: {
@@ -214,14 +214,39 @@ try {
     assert(i < 49, 'The setting is saved.');
     await delay(100);
   }
+  // An adult who turned the warnings off sees it as it is; a teenager cannot turn them off.
+  const year = new Date().getUTCFullYear();
+  for (const [name, born] of [
+    ['adult', year - 30],
+    ['teen', year - 15],
+  ])
+    await pool.query(
+      'INSERT INTO oc_users(id,username,email_verified_at,password_hash,birth_year,show_sensitive) VALUES($1,$2,now(),$3,$4,true)',
+      [randomUUID(), `${name}_${username}`, await passwordHash(password), born],
+    );
+  const adult = await tab(await signIn('adult_' + username));
+  await adult.goto(`${origin}/timelines/${war}`);
+  const adultFrame = adult.frameLocator('iframe.editor-frame');
+  await adultFrame.locator('.event-marker[aria-label="Battle"] img').waitFor({ state: 'attached' });
+  assert(await adultFrame.locator('#sensitive-gate').isHidden());
+  assert(!(await blurred(adultFrame, 'Battle')));
+  const teen = await tab(await signIn('teen_' + username));
+  await teen.goto(`${origin}/timelines/${war}`);
+  await teen.frameLocator('iframe.editor-frame').locator('#sensitive-gate').waitFor();
+  await teen.goto(`${origin}/account`);
+  await teen.getByText('Accounts of people under 18 always see these warnings.').waitFor();
+
   assert.deepEqual(errors, []);
   console.log(
-    'PASS labels in a browser: warnings, blurred images, moment labels and owners’ view.',
+    'PASS labels in a browser: warnings, blurred images, moment labels, owners’ view, adults’ choice and minors.',
   );
 } finally {
   await browser?.close();
   child.kill();
   await pool.query('DELETE FROM oc_timelines WHERE owner_id=$1', [owner]);
-  await pool.query('DELETE FROM oc_users WHERE id=$1', [owner]);
+  await pool.query('DELETE FROM oc_users WHERE id=$1 OR username LIKE $2', [
+    owner,
+    '%\\_' + username,
+  ]);
   await pool.end();
 }

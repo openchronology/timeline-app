@@ -271,6 +271,7 @@ jobs:
       - run: node test/standing-postgres.mjs
       - run: node test/save-merge-postgres.mjs
       - run: node test/labels-postgres.mjs
+      - run: node test/ages-postgres.mjs
       - run: npm run test:postgres
       - run: npm run test:platform:postgres
       - name: Realtime syslog timelines in a live browser

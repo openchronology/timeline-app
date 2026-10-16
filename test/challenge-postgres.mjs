@@ -95,6 +95,7 @@ try {
     email: 'newcomer_' + suffix + '@example.test',
     password,
     passwordConfirmation: password,
+    birthYear: 1990,
   };
   const refused = await visitor.request('auth/register', signup, 428, { solveChallenge: false });
   assert.equal(refused.challenge.provider, 'pow');

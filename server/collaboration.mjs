@@ -90,9 +90,11 @@ export async function searchTimelines(pool, userId, value, featured = []) {
       -- Browsing lists established accounts' timelines, and featured ones (#103).
       AND (NOT $13::boolean OR coalesce(a.standing,0)>0
         OR ((t.featured OR t.id=ANY($5::uuid[])) AND cardinality(t.content_labels||t.moderator_labels)=0))
-      -- Readers who are not signed in browse no labelled timelines (#115); they find them by
-      -- search, link or profile, behind the warning.
-      AND (NOT $13::boolean OR $6::uuid IS NOT NULL OR cardinality(t.content_labels||t.moderator_labels)=0)
+      -- Readers who are not signed in, or may be under 18, browse no labelled timelines
+      -- (#115); they find them by search, link or profile, behind the warning.
+      AND (NOT $13::boolean OR cardinality(t.content_labels||t.moderator_labels)=0
+        OR EXISTS(SELECT 1 FROM oc_users me WHERE me.id=$6::uuid
+          AND (me.birth_year IS NULL OR extract(year FROM now())::int-me.birth_year>=18)))
   ), page AS (SELECT * FROM matching ORDER BY CASE WHEN $10='featured' THEN featured ELSE false END DESC,
       -- Searches find newcomers' timelines too, after established accounts' matches.
       CASE WHEN $2<>'' THEN established ELSE true END DESC,

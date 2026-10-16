@@ -1,6 +1,6 @@
 # timescale.info — privacy notice
 
-Draft version: 2026-10-06. Not yet effective. Responsible operator: Athan Clark,
+Draft version: 2026-10-15. Not yet effective. Responsible operator: Athan Clark,
 an individual. Public privacy contact, hosting providers, hosting region, and
 backup/log retention schedules are pending confirmation; see LAUNCH.md.
 
@@ -39,6 +39,17 @@ names, prefixes, permissions, expiry, revocation, and last-used timestamps. The
 service also records per-user logical storage usage, quota exemptions, suspension
 status, administrator privileges, and an audit trail of administration actions.
 Secrets, passwords, and MFA codes are excluded from that audit trail.
+
+Sign-up asks for your year of birth, to confirm you are old enough for an account and to
+keep warnings before sensitive content on for accounts of people who may be under 18;
+only the year is stored, with your choice of whether to see sensitive content without
+warnings. The service computes an account standing (from account age, confirmation,
+two-factor authentication, stars and forks received, and moderation decisions) to rank
+public timelines; only administrators see it. Reports record what was reported, the
+category and any details you give, and your account if you were signed in; the owner of
+what you report is not told who reported it. Moderation decisions keep their reason,
+who decided, any review request and its outcome, as a record. Reports and decisions are
+kept while needed to moderate and as required by law.
 
 IP addresses are processed for connection handling and abuse prevention; temporary
 authentication rate-limit keys are hashed. Hosting providers and reverse proxies
@@ -125,10 +136,13 @@ and legal obligations, with consent for optional processing where required. Host
 locations, international-transfer mechanisms, and any required representatives must
 be confirmed before offering the service in jurisdictions requiring them.
 
-The hosted service is intended for adults aged 18 or older and does not knowingly
-offer accounts to children. Report suspected collection from children to the
-operator so it can be investigated and addressed under applicable law. This is
-not a claim that an age restriction alone satisfies children's privacy laws.
+Accounts are for people aged 13 or older; the service does not knowingly offer
+accounts to children under 13. A sign-up giving a year of birth under 13 is refused,
+and an account created through a social sign-in that does so is closed before it can be
+used. Report suspected accounts of children under 13 to the operator so they can be
+investigated and addressed under applicable law. Accounts of people who may be under 18
+always see warnings before sensitive content. This is not a claim that an age question
+alone satisfies children's privacy or online-safety laws.
 
 Material privacy changes must describe the new practices before they take effect;
 existing data must not be repurposed incompatibly without the necessary legal basis.

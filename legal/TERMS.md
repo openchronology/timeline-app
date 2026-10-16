@@ -1,6 +1,6 @@
 # timescale.info — terms of service
 
-Draft version: 2026-10-06. Not yet effective. Operator: Athan Clark, an individual.
+Draft version: 2026-10-15. Not yet effective. Operator: Athan Clark, an individual.
 Contact and jurisdiction: pending operator confirmation; see LAUNCH.md.
 These terms cover the hosted service at timescale.info and desktop connections
 to that service. Independent installations have their own operators and policies.
@@ -12,9 +12,12 @@ hosting services constitutes agreement to these terms. Public visitors may read
 timelines without an account. Keep credentials and connected identity-provider
 accounts secure, provide truthful information, and report unauthorized access.
 An account is personal unless you are authorized to act for an organization.
-The hosted service is intended for people aged 18 or older; it does not offer
-parental-consent accounts. This eligibility rule does not restrict rights under
-the software license or use of a separate offline installation.
+Accounts are for people aged 13 or older; the service does not offer accounts to
+children under 13 or parental-consent accounts. Sign-up asks for your year of birth.
+Accounts of people who may be under 18 always see warnings before sensitive content
+(below). Anyone may read public timelines without an account. This eligibility rule
+does not restrict rights under the software license or use of a separate offline
+installation.
 
 ## Your data and collaborators
 
@@ -75,16 +78,30 @@ execution reduces available capabilities but cannot guarantee defect-free output
 
 ## Acceptable use and moderation
 
+The service is for knowledge: history, science, education, journalism, art and
+records. Educational, historical, medical, artistic and news depictions of nudity,
+violence and disturbing events are allowed, but must be labelled as sensitive content
+(nudity, graphic violence, disturbing content) on the timeline, moment or duration
+that contains them. Readers are then warned before it opens and its images are
+blurred until they choose to see them. Not allowed at all: pornography or other
+sexually explicit material made to arouse; gore or cruelty shown for its own sake;
+and any sexual content involving minors, which is removed, preserved as the law
+requires and reported to the authorities.
+
 Do not use hosted services for illegal content, infringement, harassment, threats,
 fraud, doxxing, malware, attempts to escape script restrictions, access-control
 bypass, credential theft, or deliberate disruption. Respect technical rate and
 size limits. Report suspected security defects privately using the published
 contact; do not access other users' data or disrupt the service while investigating.
 
-The operator may limit, remove, or suspend content or accounts for these violations,
-security incidents, or legal obligations. Where practicable, the operator will
-explain the reason and provide a contact for review and an opportunity to export
-lawful data. Immediate action may be necessary; unlawful or harmful material need
+Anyone, with or without an account, can report a timeline, moment, duration,
+comment, published plugin or account they can see. The owner is not told who
+reported. The operator may label, limit, remove, or suspend content or accounts for
+these violations, security incidents, or legal obligations. The owner is told what
+was decided and why, and can ask once for the decision to be reviewed (a suspended
+account by contacting the operator). Signed-in reporters with a confirmed email are
+told the outcome. Where practicable, the operator will provide an opportunity to
+export lawful data. Immediate action may be necessary; unlawful or harmful material need
 not remain available. This discretion does not transfer ownership of user data.
 Copyright complaints and repeat infringement are handled under COPYRIGHT.md.
 

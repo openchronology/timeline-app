@@ -1467,3 +1467,9 @@ ALTER TABLE oc_moderation_cases ADD COLUMN IF NOT EXISTS labels text[];
 ALTER TABLE oc_moderation_cases DROP CONSTRAINT IF EXISTS oc_moderation_cases_status_check;
 ALTER TABLE oc_moderation_cases ADD CONSTRAINT oc_moderation_cases_status_check
   CHECK(status IN ('open','dismissed','restricted','lifted','labelled'));
+-- Accounts are for people 13 and older (#115): the year of birth given at sign-up (null for
+-- accounts made before it was asked, under terms requiring 18). Accounts that may be under 18
+-- see labelled content behind its warning, always; adults may choose to see it without.
+ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS birth_year smallint CHECK(birth_year BETWEEN 1900 AND 2200);
+ALTER TABLE oc_registrations ADD COLUMN IF NOT EXISTS birth_year smallint CHECK(birth_year BETWEEN 1900 AND 2200);
+ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS show_sensitive boolean NOT NULL DEFAULT false;

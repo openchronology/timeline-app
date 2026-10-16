@@ -47,6 +47,16 @@ export async function passwordMatches(password, hash) {
     actual = await derive(password, salt, version);
   return expected.length === actual.length && timingSafeEqual(actual, expected);
 }
+/** The youngest age an account is for (#115). */
+export const ACCOUNT_AGE = 13;
+/**
+ * Whether an account with year of birth `year` may be under 18: counted from the end of its
+ * year of birth, so until the year it turns 18 is over. Accounts without one were made under
+ * terms requiring 18.
+ */
+export function minor(year, now = new Date()) {
+  return year != null && now.getUTCFullYear() - Number(year) < 18;
+}
 export class Auth {
   constructor(
     pool,
@@ -80,7 +90,7 @@ export class Auth {
       token = bearer?.[1] ?? this.readCookie(req, this.cookieName);
     if (!token || !/^[a-f0-9]{64}$/.test(token)) return null;
     const { rows } = await client.query(
-      `SELECT s.csrf,s.token_hash,s.kind,s.created_at,s.mfa_verified,u.id,u.username,u.mfa_enabled,u.email_verified_at,u.is_admin,u.avatar_url FROM oc_sessions s JOIN oc_users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.kind=$2 AND s.expires_at>now() AND s.last_seen_at>now()-interval '1 day' AND NOT u.is_disabled AND u.email_verified_at IS NOT NULL AND (NOT u.mfa_enabled OR s.mfa_verified)`,
+      `SELECT s.csrf,s.token_hash,s.kind,s.created_at,s.mfa_verified,u.id,u.username,u.mfa_enabled,u.email_verified_at,u.is_admin,u.avatar_url,u.birth_year,u.show_sensitive FROM oc_sessions s JOIN oc_users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.kind=$2 AND s.expires_at>now() AND s.last_seen_at>now()-interval '1 day' AND NOT u.is_disabled AND u.email_verified_at IS NOT NULL AND (NOT u.mfa_enabled OR s.mfa_verified)`,
       [tokenHash(token), bearer ? 'desktop' : 'web'],
     );
     if (rows[0])

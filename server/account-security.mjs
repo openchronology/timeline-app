@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { randomBytes, randomUUID } from 'node:crypto';
 import { HttpError } from './store.mjs';
-import { passwordHash, passwordMatches } from './auth.mjs';
+import { passwordHash, passwordMatches, ACCOUNT_AGE } from './auth.mjs';
 import {
   digest,
   seal,
@@ -19,6 +19,19 @@ const generic = {
     'If the account is eligible, an email will arrive shortly. Check your inbox and spam folder.',
 };
 const validToken = (value) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+/**
+ * A year of birth given at sign-up (#115), as a number; refused for anyone who may be under
+ * ACCOUNT_AGE (counted from the end of the year, so until the year they turn it is over).
+ */
+export function birthYear(value, now = new Date()) {
+  const year = Number(value),
+    current = now.getUTCFullYear();
+  if (!Number.isInteger(year) || year < 1900 || year > current)
+    throw new HttpError(400, 'Give your year of birth.');
+  if (current - year < ACCOUNT_AGE)
+    throw new HttpError(403, `Accounts are for people ${ACCOUNT_AGE} and older.`);
+  return year;
+}
 export class AccountSecurity {
   constructor(auth, mailer, key, passwordCheck) {
     this.auth = auth;
@@ -72,7 +85,8 @@ export class AccountSecurity {
     if (!/^[a-z0-9][a-z0-9_-]{2,31}$/.test(username))
       throw new HttpError(400, 'Use a 3–32 character username.');
     const email = emailAddress(body.email),
-      password = newPassword(body.password, body.passwordConfirmation, username);
+      password = newPassword(body.password, body.passwordConfirmation, username),
+      born = birthYear(body.birthYear);
     await this.auth.rateLimit('email:' + email);
     await this.passwordCheck(password);
     const hash = await passwordHash(password),
@@ -91,8 +105,8 @@ export class AccountSecurity {
         return;
       // Pending signups confer no account/session and cannot claim an existing identity.
       await c.query(
-        "INSERT INTO oc_registrations(token_hash,id,username,email,password_hash,browser_hash,expires_at) VALUES($1,$2,$3,$4,$5,$6,now()+interval '24 hours')",
-        [digest(token), randomUUID(), username, email, hash, digest(proof)],
+        "INSERT INTO oc_registrations(token_hash,id,username,email,password_hash,browser_hash,birth_year,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,now()+interval '24 hours')",
+        [digest(token), randomUUID(), username, email, hash, digest(proof), born],
       );
       await queueMail(c, this.key, {
         to: email,
@@ -213,12 +227,35 @@ export class AccountSecurity {
       throw new HttpError(401, 'Sign in before confirming an email address.');
     const userId = session?.id ?? pending.user_id;
     await this.auth.rateLimit('email:' + email);
+    // The year of birth, if given; one under 13 closes a new account (below).
+    let born = null,
+      tooYoung = null,
+      closed = false;
+    if (body.birthYear !== undefined && body.birthYear !== '')
+      try {
+        born = birthYear(body.birthYear);
+      } catch (error) {
+        if (error.status !== 403) throw error;
+        tooYoung = error;
+      }
     await this.transaction(async (c) => {
       const user = (await c.query('SELECT * FROM oc_users WHERE id=$1 FOR UPDATE', [userId]))
         .rows[0];
       if (user.email_verified_at)
         throw new HttpError(400, 'This account already has a verified email address.');
       if (session) await this.fresh(c, user, session, body);
+      // A new account (from a social sign-in) gives its year of birth here, before it can
+      // sign in (#115). One for someone under 13 is closed: it cannot have been used yet.
+      if (user.birth_year == null) {
+        if (tooYoung && !session) {
+          await this.close(c, user);
+          closed = true;
+          return;
+        }
+        if (tooYoung) throw tooYoung;
+        if (born === null) throw new HttpError(400, 'Give your year of birth.');
+        await c.query('UPDATE oc_users SET birth_year=$2 WHERE id=$1', [userId, born]);
+      }
       if (
         (await c.query('SELECT id FROM oc_users WHERE lower(email)=$1 AND id!=$2', [email, userId]))
           .rows.length
@@ -236,8 +273,20 @@ export class AccountSecurity {
         text: `Confirm email for @${user.username} in the browser where you requested it:\n${this.auth.origin}/login#verify=${token}\nThis link expires in 24 hours. Ignore it if you did not request this.`,
       });
     });
+    if (closed) throw tooYoung;
     this.deliver();
     return { ...generic, proofCookie: this.auth.nonceCookie('verify', proof, false, 86400) };
+  }
+  /**
+   * Closes the account `user`, which gave an age under 13 before it could sign in: deleted if
+   * it holds nothing (it cannot, before its email is confirmed), else suspended for the
+   * operator to review.
+   */
+  async close(c, user) {
+    const holds = (await c.query('SELECT 1 FROM oc_timelines WHERE owner_id=$1 LIMIT 1', [user.id]))
+      .rows.length;
+    if (holds) await c.query('UPDATE oc_users SET is_disabled=true WHERE id=$1', [user.id]);
+    else await c.query('DELETE FROM oc_users WHERE id=$1', [user.id]);
   }
   async verify(req, token) {
     if (!validToken(token)) throw new HttpError(400, 'Invalid or expired confirmation link.');
@@ -255,8 +304,8 @@ export class AccountSecurity {
         if (signup.browser_hash !== digest(proof))
           throw new HttpError(400, 'Open this confirmation in the browser where you registered.');
         await c.query(
-          'INSERT INTO oc_users(id,username,email,email_verified_at,password_hash) VALUES($1,$2,$3,now(),$4)',
-          [signup.id, signup.username, signup.email, signup.password_hash],
+          'INSERT INTO oc_users(id,username,email,email_verified_at,password_hash,birth_year) VALUES($1,$2,$3,now(),$4,$5)',
+          [signup.id, signup.username, signup.email, signup.password_hash, signup.birth_year],
         );
         await c.query('DELETE FROM oc_registrations WHERE username=$1 OR email=$2', [
           signup.username,

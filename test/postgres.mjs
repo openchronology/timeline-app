@@ -136,7 +136,7 @@ async function completeSocial(c, email) {
   const pending = await c.request('session');
   if (!pending.user) {
     assert.equal(pending.challenge, 'email');
-    await c.request('auth/email/enroll', 'POST', { email });
+    await c.request('auth/email/enroll', 'POST', { email, birthYear: 1990 });
     await confirmEmail(c, email);
     await c.request('session');
     const url = new URL((await c.request('auth/github/start', 'POST', {})).url);
@@ -173,6 +173,7 @@ try {
       email,
       password,
       passwordConfirmation: password,
+      birthYear: 1990,
     });
     assert.equal(pending.verificationRequired, true);
     assert.equal((await c.request('session')).user, null);
