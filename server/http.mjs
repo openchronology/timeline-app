@@ -9,6 +9,7 @@ import { setTimelineStar } from './stars.mjs';
 import { Administration, usage, requireDataProvider, avatarValue } from './administration.mjs';
 import { Moderation } from './moderation.mjs';
 import { deleteAccount } from './account-deletion.mjs';
+import { mapTimes } from './time-map.mjs';
 import { saveBase } from './save-merge.mjs';
 import { authorizeKey, keyRequestRead } from './api-keys.mjs';
 import { BrowserForks } from './browser-forks.mjs';
@@ -37,6 +38,7 @@ import {
   canonicalRelationship,
   setEntryLimit,
   contentLabels,
+  timeMapping,
 } from '../dist/core.mjs';
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 async function body(req, maximum = 16 * 1024 * 1024) {
@@ -158,6 +160,43 @@ async function streamResponse(res, chunks, headers = {}) {
     res.destroy(error);
   } finally {
     await chunks.return();
+  }
+}
+/**
+ * Runs `work`, which reports progress to the function it is given, as a stream of JSON lines:
+ * `{"progress": …}` as it goes, then `{"result": …}` or `{"error": {status, message}}`. The
+ * work continues if the client goes away.
+ */
+async function* progressLines(work) {
+  const lines = [];
+  let finished = false,
+    wake = null;
+  const push = (value) => {
+    lines.push(JSON.stringify(value) + '\n');
+    wake?.();
+  };
+  push({ progress: { reading: true } });
+  work((progress) => push({ progress }))
+    .then(
+      (result) => push({ result }),
+      (error) => {
+        if (!(error instanceof HttpError)) console.error('A streamed request failed:', error);
+        push({
+          error:
+            error instanceof HttpError
+              ? { status: error.status, message: error.message }
+              : { status: 500, message: 'The server could not finish this.' },
+        });
+      },
+    )
+    .finally(() => {
+      finished = true;
+      wake?.();
+    });
+  for (;;) {
+    if (lines.length) yield lines.shift();
+    else if (finished) return;
+    else await new Promise((resolve) => (wake = resolve));
   }
 }
 /** A file name for a timeline titled `title` (as the editor names its exports), or `fallback`. */
@@ -973,7 +1012,7 @@ export function createRequestHandler({
           );
         }
         const match =
-          /^\/api\/timelines\/([^/]+)(?:\/(document|query|members|settings|file|changes|delete-range|revision|recent))?$/.exec(
+          /^\/api\/timelines\/([^/]+)(?:\/(document|query|members|settings|file|changes|delete-range|map-times|revision|recent))?$/.exec(
             pathname,
           );
         if (!match || !uuid.test(match[1])) throw new HttpError(404, 'Unknown endpoint.');
@@ -1041,6 +1080,34 @@ export function createRequestHandler({
           if (!t.canWrite) throw new HttpError(403, 'Only writers can delete moments.');
           const result = await deleteWhere(store, t, userId, input.revision, { lower, upper });
           return response(res, 200, result);
+        }
+        // Shifts and scales times for good (#96; time-map.mjs), as one save, streaming its
+        // progress as JSON lines.
+        if (action === 'map-times' && method === 'POST') {
+          auth.require(session, req);
+          const input = await body(req);
+          if (typeof input.revision !== 'string' || !/^\d+$/.test(input.revision))
+            throw new HttpError(400, 'Expected a revision string.');
+          let mapping;
+          try {
+            mapping = timeMapping(input.mapping);
+          } catch (error) {
+            throw new HttpError(400, error.message);
+          }
+          const filter = viewFilter(input.filter) ?? null;
+          const t = await store.access(id, userId);
+          if (t.comparison) throw new HttpError(409, 'Shift the timelines this compares instead.');
+          if (!t.canWrite) throw new HttpError(403, 'Only writers can change times.');
+          if (t.revision !== input.revision)
+            throw new HttpError(409, 'Someone changed this timeline. Reload it, then try again.');
+          const run = (progress) =>
+            mapTimes(store, t, userId, { revision: input.revision, mapping, filter }, progress);
+          // Progress as JSON lines for clients that read them; one reply for others (desktop).
+          if (!/application\/x-ndjson/.test(req.headers.accept ?? ''))
+            return response(res, 200, await run(undefined));
+          return await streamResponse(res, progressLines(run), {
+            'Content-Type': 'application/x-ndjson; charset=utf-8',
+          });
         }
         if (action === 'changes' && method === 'PUT') {
           auth.require(session, req);

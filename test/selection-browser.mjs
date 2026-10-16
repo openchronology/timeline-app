@@ -80,6 +80,7 @@ export async function checkSelection(page, restoreDocument) {
     '+Event',
     'Fit all',
     'Delete everything in this view…',
+    'Shift or scale times…',
   ]);
   await page.keyboard.press('Escape');
   assert(await menu.isHidden());
@@ -93,6 +94,7 @@ export async function checkSelection(page, restoreDocument) {
     'Edit',
     'Delete',
     'Delete everything in this view…',
+    'Shift or scale times…',
   ]);
   await menu.getByRole('menuitem', { name: 'Edit', exact: true }).click();
   await input('event-form').waitFor();

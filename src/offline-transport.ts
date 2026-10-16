@@ -21,3 +21,11 @@ export async function exportSqlite(
 }
 /** The offline page makes no requests, so there are no cookies to leave out. */
 export function anonymousRequests() {}
+export async function requestProgress<T>(
+  _path: string,
+  _data: unknown,
+  _csrf: string | null | undefined,
+  _progress: (step: unknown) => void,
+): Promise<T> {
+  throw new Error('This offline file uses JSON import and export.');
+}

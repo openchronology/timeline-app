@@ -53,7 +53,7 @@ export function printRetention(seconds, presentation) {
     : `${seconds} s`;
 }
 /** The settings a save sends back unchanged. */
-function settings(t) {
+export function settings(t) {
   const document = { format: 'openchronology', version: 1, title: t.title, events: [] };
   document.description = t.description ?? '';
   for (const key of ['presentation', 'plugins', 'tags', 'assets'])

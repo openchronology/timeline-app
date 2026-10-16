@@ -2483,6 +2483,58 @@ dialog button {
   width: auto;
   min-height: 0;
 }
+/* Shifting or scaling times (#96). */
+#map-dialog {
+  width: min(560px, calc(100vw - 32px));
+}
+.map-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px 12px;
+}
+.map-scope {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 8px 12px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.map-scope legend {
+  font-size: 12px;
+  font-weight: 600;
+  color: #44584b;
+  padding: 0 4px;
+}
+.map-scope .checkbox-label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.map-scope .checkbox-label input {
+  width: auto;
+  min-height: 0;
+}
+#map-tags {
+  margin-left: 24px;
+  width: calc(100% - 24px);
+}
+.map-summary {
+  margin: 10px 0 0;
+}
+.map-working {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.map-working progress {
+  flex: 1;
+  min-width: 0;
+}
 .separation-tags {
   font-family: ui-monospace, monospace;
   font-size: 13px;
