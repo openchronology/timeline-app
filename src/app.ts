@@ -1382,6 +1382,7 @@ function drawFrame() {
       plugins,
       { ...metadata, title: span ? metadata.title : (group.title ?? metadata.title) },
       count,
+      span ? 'Untitled duration' : 'Untitled moment',
     );
     if (count === 1n && group.id) {
       let branchDepth = 0;
@@ -1480,7 +1481,13 @@ function drawFrame() {
               })
               .catch(fail);
           };
-          hoverPreview.update(child.button, activePlugins(), entry.metadata);
+          hoverPreview.update(
+            child.button,
+            activePlugins(),
+            entry.metadata,
+            1n,
+            'Untitled stack entry',
+          );
         }
       }
     }
@@ -4176,8 +4183,9 @@ function showTimelineMenu(
           .catch(fail),
     );
   }
-  if (group && BigInt(group.count) > 1n)
-    add('View moments', () => {
+  // A group's details list its moments, and the durations collapsed into it.
+  if (group && entityCount(group) > 1n)
+    add(viewGroupLabel(group), () => {
       void selectGroup(group).catch(fail);
     });
   // Only when the view shows something to delete.
@@ -4260,8 +4268,15 @@ function openStageMenu(target: HTMLElement, x: number, y: number) {
       doc = documentRequest;
     void groupPage(group)
       .then((page) => {
+        // The moment's own actions; with durations collapsed in too, opening them all.
         if (generation === menuGeneration && doc === documentRequest && page.events[0])
-          showTimelineMenu(x, y, Q.parse(page.events[0].time), page.events[0]);
+          showTimelineMenu(
+            x,
+            y,
+            Q.parse(page.events[0].time),
+            page.events[0],
+            entityCount(group) > 1n ? group : undefined,
+          );
       })
       .catch(fail);
   }
@@ -7211,6 +7226,16 @@ void (async () => {
   if (new URLSearchParams(location.search).get('tour') === '1') tour();
 })().catch(fail);
 
+/** What a summary's menu item opening its details says: what the summary holds. */
+function viewGroupLabel(group: FrameGroup) {
+  const moments = BigInt(group.count) > 0n,
+    durations = BigInt(group.durationCount ?? 0) > 0n;
+  return moments && durations
+    ? 'View moments and durations'
+    : durations
+      ? 'View durations'
+      : 'View moments';
+}
 /** Durations anchored to the open moment, with a shortcut to start a new one there. */
 function refreshDurations() {
   const host = el('event-durations');
@@ -8760,7 +8785,7 @@ function renderDurationBands() {
       presented(parsedTime(band.first)) +
       ' → ' +
       presented(parsedTime(band.last));
-    hoverPreview.update(button, plugins, band.metadata);
+    hoverPreview.update(button, plugins, band.metadata, 1n, 'Untitled duration');
   });
   for (const [key, button] of durationButtons)
     if (!shown.has(key)) {

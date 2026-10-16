@@ -238,7 +238,7 @@ export function validateDocument(value: unknown, partial = false): TimelineDocum
     throw new Error(`A timeline holds at most ${entryLimitText()} moments.`);
   const comparison = doc.comparison === undefined ? undefined : validateComparison(doc.comparison);
   if (comparison && (doc.events.length || (Array.isArray(doc.durations) && doc.durations.length)))
-    throw new Error('Saved comparisons reference sources instead of storing moments.');
+    throw new Error('Saved comparisons reference sources instead of storing moments or durations.');
   const ids = new Set<string>();
   const plugins = doc.plugins === undefined ? undefined : validateInstalledPlugins(doc.plugins);
   const events = doc.events.map((raw: unknown): PointEvent => {

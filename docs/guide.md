@@ -74,7 +74,7 @@ Type the bounds the way the timeline's display writes times. **Exact rational bo
 ### What markers show
 
 - **A dot** is one moment. A titled moment shows its title and time; an untitled one shows only its dot.
-- **A dot with a number** is a summary: moments too close together on screen to draw apart. **Group within** under the timeline sets how close, from 12 to 48 pixels. Click a summary to list its moments 25 at a time, with **Zoom into this group**; double-click it to zoom straight in. Moments at exactly the same time stay together however far you zoom.
+- **A dot with a number** is a summary: moments, and durations too short to draw, too close together on screen to draw apart. **Group within** under the timeline sets how close, from 12 to 48 pixels. Click a summary to list what it holds (its moments 25 at a time, and the durations collapsed into it), with **Zoom into this group**; double-click it to zoom straight in. Moments at exactly the same time stay together however far you zoom.
 - **A band** is a duration. A duration too short to draw at the current zoom is summarized like a moment, and becomes a band again as you zoom in ([summaries](durations.md#summaries)).
 - **An arc** above the axis is a relationship between two things.
 - **A yellow line** is the time you selected by clicking empty space. New moments go there.
