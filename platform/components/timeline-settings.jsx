@@ -7,6 +7,7 @@ import { CONTENT_LABELS } from '../../src/content-labels.ts';
 import { api } from '../lib/api.js';
 import { RESERVED_NAMES, slugFromTitle, timelinePath } from '../../src/addresses.ts';
 import HelpTip from './help-tip.jsx';
+import { ADD_COLLABORATOR, ROLE_OPTIONS, VISIBILITY_OPTIONS } from '../../src/wording.ts';
 /** A storage size, as the account page writes it. */
 const size = (bytes) =>
   bytes >= 1048576
@@ -76,10 +77,16 @@ export default function TimelineSettings({
             disabled={busy}
             onChange={(e) => mutate('/settings', 'PATCH', { visibility: e.target.value })}
           >
-            <option value="private">Private — invited accounts only</option>
-            <option value="public" disabled={timeline.publication_restricted}>
-              Public — anyone can view upstream
-            </option>
+            {/* The same words as the editor's sharing dialog (#187). */}
+            {VISIBILITY_OPTIONS.map(([value, label]) => (
+              <option
+                key={value}
+                value={value}
+                disabled={value === 'public' && timeline.publication_restricted}
+              >
+                {label}
+              </option>
+            ))}
           </select>
         </label>
         <p className="muted">
@@ -367,12 +374,14 @@ export default function TimelineSettings({
           <label>
             Access
             <select name="role">
-              <option value="viewer">Viewer — read</option>
-              <option value="contributor">Contributor — propose changes</option>
-              <option value="writer">Writer — merge and publish upstream</option>
+              {ROLE_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
             </select>
           </label>
-          <button disabled={busy}>Add or update collaborator</button>
+          <button disabled={busy}>{ADD_COLLABORATOR}</button>
         </form>
       </section>
       <p className="error" role="alert">

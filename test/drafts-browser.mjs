@@ -98,7 +98,7 @@ export async function checkDrafts(browser) {
     await page.waitForFunction(
       () => document.getElementById('timeline-title').value === 'Legacy draft',
     );
-    assert.match(await page.locator('#event-count').textContent(), /3 events/);
+    assert.match(await page.locator('#event-count').textContent(), /3 moments/);
     // Opening stores the draft record by record and drops the old whole document.
     await saved();
     let keys = await stored();
@@ -126,7 +126,7 @@ export async function checkDrafts(browser) {
     await page.waitForFunction(
       () => document.getElementById('timeline-title').value === 'Edited draft',
     );
-    assert.match(await page.locator('#event-count').textContent(), /4 events/);
+    assert.match(await page.locator('#event-count').textContent(), /4 moments/);
     await page.getByRole('button', { name: 'Added in a draft', exact: true }).waitFor();
     assert.deepEqual(errors, []);
     console.log('PASS drafts: legacy drafts convert; edits store their own records and reload.');

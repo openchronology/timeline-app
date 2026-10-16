@@ -167,9 +167,15 @@
       <h2 id="timeline-help-title">Timeline controls</h2>
       <ul>
         <li>Drag to pan horizontally and vertically.</li>
-        <li>Scroll or pinch to zoom through time; use + and − for centered zoom.</li>
+        <li>
+          Scroll, or on a touch screen pinch side by side, to zoom through time; use + and − for
+          centered zoom.
+        </li>
         <li>Alt-scroll moves vertically.</li>
-        <li>Ctrl-scroll scales the timeline’s contents.</li>
+        <li>
+          Ctrl-scroll, a trackpad pinch, or on a touch screen a pinch with one finger above the
+          other, scales the timeline’s contents.
+        </li>
         <li>Arrow keys pan; + and − keys zoom when the timeline is focused.</li>
         <li>Click empty space to select a time. Right-click or hold to open the context menu.</li>
       </ul>
@@ -228,7 +234,7 @@ Every point has a place. Explore the spaces between them.</textarea>
           </div>
           <div class="document-meta">
             <span id="timeline-server" class="server-chip" hidden></span
-            ><span id="event-count">10 events</span><span class="meta-separator">·</span
+            ><span id="event-count">10 moments</span><span class="meta-separator">·</span
             ><span id="save-status">A local draft, ready to explore</span
             ><span id="sensitive-status" class="sensitive-status" hidden
               ><span class="meta-separator">·</span><span id="sensitive-labels"></span>
@@ -258,7 +264,7 @@ Every point has a place. Explore the spaces between them.</textarea>
                 class="follow-latest-control"
                 hidden
                 title="Follow new server moments after 15 seconds without navigation"
-                ><input id="follow-latest" type="checkbox" /> Follow latest events</label
+                ><input id="follow-latest" type="checkbox" /> Follow latest moments</label
               >
               <button id="search-button" title="Search moments and durations (/)">Search</button>
               <button id="separate-button">Separate by tags</button>
@@ -271,7 +277,7 @@ Every point has a place. Explore the spaces between them.</textarea>
               ><button id="center-vertical">Center axis</button
               ><button id="clear-selection" hidden>Clear selection</button
               ><button id="add-duration-button">＋ Duration</button
-              ><button id="add-button" class="button-primary">＋ Event</button>
+              ><button id="add-button" class="button-primary">＋ Moment</button>
             </div>
           </div>
           <div id="live-notice" class="comparison-settings" hidden role="status">
@@ -668,7 +674,7 @@ Every point has a place. Explore the spaces between them.</textarea>
         <button id="pull-view">View proposed timeline</button
         ><button id="pull-edit">Edit proposal</button
         ><button id="pull-export">Export proposal .ochx</button
-        ><button id="pull-rebase">Rebase onto latest upstream</button
+        ><button id="pull-rebase">Rebase on upstream</button
         ><button id="pull-merge" class="button-primary">Merge</button
         ><button id="pull-reject">Reject</button><button id="pull-close">Close</button>
       </div>
@@ -866,7 +872,7 @@ Every point has a place. Explore the spaces between them.</textarea>
         </div>
         <p class="field-hint">
           These settings belong to this timeline and are included in saved files and server copies.
-          Event coordinates stay exact.
+          Times stay exact.
         </p>
         <label
           >Representation<select id="presentation-mode">
@@ -996,7 +1002,7 @@ Every point has a place. Explore the spaces between them.</textarea>
           >Preview context<select id="presentation-preview-purpose">
             <option value="input">Exact editing value</option>
             <option value="axis">Ruler label</option>
-            <option value="event">Event label</option>
+            <option value="event">Moment and duration label</option>
             <option value="tooltip">Full tooltip</option>
           </select></label
         >
@@ -1109,9 +1115,9 @@ Every point has a place. Explore the spaces between them.</textarea>
       </div>
       <label
         >Visibility<select id="visibility">
-          <option value="private">Private — you and your collaborators</option>
+          <option value="private">Private — you and the collaborators you add</option>
           <option value="public">
-            Public — everyone can view and signed-in users can propose changes
+            Public — anyone can view it, and signed-in readers can propose changes
           </option>
         </select></label
       ><button id="copy-link">Copy timeline link</button>
@@ -1122,10 +1128,10 @@ Every point has a place. Explore the spaces between them.</textarea>
         <label>Account username<input id="member-name" required /></label>
         <div class="dialog-actions">
           <select id="member-role" aria-label="Collaborator role">
-            <option value="viewer">Viewer</option>
+            <option value="viewer">Viewer — read</option>
             <option value="contributor">Contributor — propose changes</option>
-            <option value="writer">Writer — update upstream and merge</option></select
-          ><button type="submit" class="button-primary">Add collaborator</button>
+            <option value="writer">Writer — save changes and merge pull requests</option></select
+          ><button type="submit" class="button-primary">Add or update collaborator</button>
         </div>
       </form>
       <button id="delete-timeline" class="button-danger">
@@ -1185,11 +1191,11 @@ Every point has a place. Explore the spaces between them.</textarea>
       aria-labelledby="delete-heading"
       aria-describedby="delete-description"
     >
-      <h2 id="delete-heading">Delete event?</h2>
+      <h2 id="delete-heading">Delete moment?</h2>
       <p id="delete-description"></p>
       <div class="dialog-actions">
         <button id="delete-cancel" data-close="delete-dialog" type="button">Cancel</button>
-        <button id="delete-confirm" class="button-danger" type="button">Delete event</button>
+        <button id="delete-confirm" class="button-danger" type="button">Delete moment</button>
       </div>
     </dialog>
     <dialog id="datetime-dialog" class="datetime-dialog" aria-labelledby="datetime-heading">

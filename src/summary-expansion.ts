@@ -171,7 +171,7 @@ export function createSummaryExpansion(stage: HTMLElement, host: Host) {
         member.type = 'button';
         member.className = 'event-marker summary-member';
         member.dataset.eventId = event.id;
-        member.setAttribute('aria-label', event.metadata.title?.trim() || 'Unnamed moment');
+        member.setAttribute('aria-label', event.metadata.title?.trim() || 'Untitled moment');
         member.style.setProperty('--fan-scale', String(positions[i].scale));
         member.style.left = p.x + 'px';
         member.style.top = p.y + 'px';

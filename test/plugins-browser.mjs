@@ -960,7 +960,7 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
       0,
       'Stack captions must not repeat inherited time',
     );
-    await page.getByRole('button', { name: 'Unnamed moment', exact: true }).click();
+    await page.getByRole('button', { name: 'Untitled moment', exact: true }).click();
     await input('clear-selection').waitFor({ state: 'visible' });
     assert(await input('time-cursor').isVisible());
     const cursorLayer = await input('time-cursor').evaluate((node) =>

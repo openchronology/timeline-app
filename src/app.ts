@@ -140,6 +140,7 @@ import { parseLink, linkFragment, sharePath } from './links.js';
 import { profilePath, timelinePath } from './addresses.js';
 import { addHelpTips } from './help-tips.js';
 import { startTour } from './tour.js';
+import { momentsText, SAVE_TO_SERVER } from './wording.js';
 import { readViewState, viewStorageKey, VIEW_PREFIX } from './view-state.js';
 import type { ViewState } from './view-state.js';
 import type { TimelineLink } from './links.js';
@@ -458,7 +459,7 @@ function flushEventEdit() {
     );
   } catch (error) {
     text('event-error', error instanceof Error ? error.message : String(error));
-    text('event-edit-status', 'Incomplete edits — the last valid event is retained.');
+    text('event-edit-status', 'Incomplete edits — the last valid version is kept.');
   }
 }
 const markerGroups = new WeakMap<HTMLElement, FrameGroup>();
@@ -529,7 +530,7 @@ const summaryExpansion = createSummaryExpansion(stage, {
       button.dataset.size = pluginSize(activePlugins(), event.metadata);
       renderPluginShape(button, pluginShape(activePlugins(), event.metadata));
     }
-    button.title = `${event.metadata.title || 'Unnamed moment'} · ${presented(Q.parse(event.time))}`;
+    button.title = `${event.metadata.title || 'Untitled moment'} · ${presented(Q.parse(event.time))}`;
     hoverPreview.update(button, activePlugins(), event.metadata);
     markerGroups.set(button, {
       first: event.time,
@@ -1332,8 +1333,8 @@ function drawFrame() {
         ? ((!comparison ? model?.byId.get(group.id)?.metadata : undefined) ?? group.metadata ?? {})
         : {};
     const name = span
-      ? 'Duration: ' + (span.metadata.title?.trim() || 'Unnamed duration')
-      : group.title?.trim() || 'Unnamed moment';
+      ? 'Duration: ' + (span.metadata.title?.trim() || 'Untitled duration')
+      : group.title?.trim() || 'Untitled moment';
     // A heading moment (#110) shows only its title, which is what is clicked.
     const heading = count === 1n && !span ? pluginHeading(plugins, metadata) : null;
     if (heading) {
@@ -1381,6 +1382,7 @@ function drawFrame() {
       plugins,
       { ...metadata, title: span ? metadata.title : (group.title ?? metadata.title) },
       count,
+      span ? 'Untitled duration' : 'Untitled moment',
     );
     if (count === 1n && group.id) {
       let branchDepth = 0;
@@ -1442,9 +1444,9 @@ function drawFrame() {
           child.button.dataset.time = first.toString();
           child.button.setAttribute(
             'aria-label',
-            `${title.trim() || 'Unnamed stack entry'} — stack entry of ${group.title?.trim() || 'Unnamed moment'}`,
+            `${title.trim() || 'Untitled stack entry'} — stack entry of ${group.title?.trim() || 'Untitled moment'}`,
           );
-          child.button.title = `${title.trim() || 'Unnamed stack entry'} (inherits ${presented(mid, 'input')})`;
+          child.button.title = `${title.trim() || 'Untitled stack entry'} (inherits ${presented(mid, 'input')})`;
           renderPluginMarker(
             child.button,
             imageSource(pluginMarker(activePlugins(), entry.metadata)),
@@ -1479,7 +1481,13 @@ function drawFrame() {
               })
               .catch(fail);
           };
-          hoverPreview.update(child.button, activePlugins(), entry.metadata);
+          hoverPreview.update(
+            child.button,
+            activePlugins(),
+            entry.metadata,
+            1n,
+            'Untitled stack entry',
+          );
         }
       }
     }
@@ -2332,7 +2340,7 @@ function heading() {
     'event-count',
     comparison
       ? `${comparison.tracks.length} timelines · Read-only comparison`
-      : `${count.toLocaleString()} events`,
+      : momentsText(count),
   );
   text('owner-label', remote ? remote.owner : desktop ? 'Offline workspace' : 'Local workspace');
   const ownerLink = el<HTMLAnchorElement>('owner-label');
@@ -2360,9 +2368,9 @@ function heading() {
       ? 'Update pull request'
       : remote
         ? (remote.canWrite ?? remote.canEdit)
-          ? 'Save upstream'
+          ? SAVE_TO_SERVER
           : 'Submit pull request'
-        : 'Save to server',
+        : SAVE_TO_SERVER,
   );
   el('pull-button').hidden = offlineHtml || !remote || !session.server || !!remote.comparison;
   el('propose-button').hidden =
@@ -3658,7 +3666,7 @@ async function selectGroup(group: FrameGroup) {
   text(
     'group-note',
     group.distinct === 1 && !group.durationCount
-      ? 'These events share the same exact coordinate. Zoom cannot separate coincident points.'
+      ? 'These moments share the same exact time. Zooming in can’t separate them.'
       : 'These are close at this scale. Zoom in to reveal their separate coordinates and full durations.',
   );
   el('group-zoom').hidden = group.distinct === 1 && !group.durationCount;
@@ -3731,7 +3739,7 @@ async function showGroupDurations(group: FrameGroup, after: DurationCursor, requ
   groupDurationCursor = page.next;
   for (const band of page.durations) {
     const button = document.createElement('button');
-    button.textContent = band.metadata.title || 'Unnamed duration';
+    button.textContent = band.metadata.title || 'Untitled duration';
     const small = document.createElement('small');
     small.textContent = `${presented(Q.parse(band.first), 'event')} → ${presented(Q.parse(band.last), 'event')}`;
     button.append(small);
@@ -3753,7 +3761,7 @@ function showGroupPage(events: PointEvent[], next: { time: string; id: string } 
   list.replaceChildren();
   for (const e of events) {
     const b = document.createElement('button');
-    b.textContent = e.metadata.title ?? 'Untitled event';
+    b.textContent = e.metadata.title || 'Untitled moment';
     const small = document.createElement('small');
     small.textContent = presented(Q.parse(e.time), 'event');
     small.title = presented(Q.parse(e.time)) + '\nExact: ' + e.time;
@@ -4136,7 +4144,7 @@ function showTimelineMenu(
     menu.append(button);
   };
   if (editable())
-    add('+Event', () => {
+    add('+Moment', () => {
       selectedGroup = null;
       eventForm(undefined, time);
     });
@@ -4175,8 +4183,9 @@ function showTimelineMenu(
           .catch(fail),
     );
   }
-  if (group && BigInt(group.count) > 1n)
-    add('View events', () => {
+  // A group's details list its moments, and the durations collapsed into it.
+  if (group && entityCount(group) > 1n)
+    add(viewGroupLabel(group), () => {
       void selectGroup(group).catch(fail);
     });
   // Only when the view shows something to delete.
@@ -4259,8 +4268,15 @@ function openStageMenu(target: HTMLElement, x: number, y: number) {
       doc = documentRequest;
     void groupPage(group)
       .then((page) => {
+        // The moment's own actions; with durations collapsed in too, opening them all.
         if (generation === menuGeneration && doc === documentRequest && page.events[0])
-          showTimelineMenu(x, y, Q.parse(page.events[0].time), page.events[0]);
+          showTimelineMenu(
+            x,
+            y,
+            Q.parse(page.events[0].time),
+            page.events[0],
+            entityCount(group) > 1n ? group : undefined,
+          );
       })
       .catch(fail);
   }
@@ -5078,11 +5094,11 @@ function requestDelete(point: PointEvent) {
   if (!model!.byId.has(point.id)) return;
   closeTimelineMenu();
   pendingDelete = { id: point.id, document: documentRequest };
-  text('delete-heading', 'Delete event?');
-  text('delete-confirm', 'Delete event');
+  text('delete-heading', 'Delete moment?');
+  text('delete-confirm', 'Delete moment');
   text(
     'delete-description',
-    `Delete “${point.metadata.title || 'Untitled event'}” at ${presented(Q.parse(point.time), 'input')}? Durations that follow it keep its current time as a fixed endpoint, and its relationships are removed. You can undo this deletion.`,
+    `Delete “${point.metadata.title || 'Untitled moment'}” at ${presented(Q.parse(point.time), 'input')}? Durations that follow it keep its current time as a fixed endpoint, and its relationships are removed. You can undo this deletion.`,
   );
   el<HTMLDialogElement>('delete-dialog').showModal();
   el('delete-cancel').focus();
@@ -6963,7 +6979,7 @@ if (offlineHtml) {
     'propose-button',
   ])
     el(id).hidden = true;
-  emptyTimelineText = 'Import a timeline or add your first event.';
+  emptyTimelineText = 'Import a timeline or add your first moment.';
 }
 if (!offlineHtml)
   live = liveUpdates({
@@ -7210,6 +7226,16 @@ void (async () => {
   if (new URLSearchParams(location.search).get('tour') === '1') tour();
 })().catch(fail);
 
+/** What a summary's menu item opening its details says: what the summary holds. */
+function viewGroupLabel(group: FrameGroup) {
+  const moments = BigInt(group.count) > 0n,
+    durations = BigInt(group.durationCount ?? 0) > 0n;
+  return moments && durations
+    ? 'View moments and durations'
+    : durations
+      ? 'View durations'
+      : 'View moments';
+}
 /** Durations anchored to the open moment, with a shortcut to start a new one there. */
 function refreshDurations() {
   const host = el('event-durations');
@@ -7275,7 +7301,7 @@ function durationLabel(duration: Duration) {
     frame.durations?.find((b) => b.id === duration.id) ??
     (model ? resolveDuration(duration, (id) => model!.momentTime(id)) : null);
   return (
-    (duration.metadata.title || 'Unnamed duration') +
+    (duration.metadata.title || 'Untitled duration') +
     (band ? ` · ${presented(Q.parse(band.first))} → ${presented(Q.parse(band.last))}` : '')
   );
 }
@@ -7525,7 +7551,7 @@ function requestDurationDelete() {
   text('delete-confirm', 'Delete duration');
   text(
     'delete-description',
-    `Delete “${current.duration.metadata.title || 'Unnamed duration'}”? Moments it follows are not affected. You can undo this deletion.`,
+    `Delete “${current.duration.metadata.title || 'Untitled duration'}”? Moments it follows are not affected. You can undo this deletion.`,
   );
   el<HTMLDialogElement>('delete-dialog').showModal();
   el('delete-cancel').focus();
@@ -7642,7 +7668,7 @@ function endpointEditor(which: 'start' | 'end') {
     const summary = document.createElement('p');
     summary.className = 'duration-anchor';
     summary.textContent =
-      (anchored?.metadata.title || (anchored ? 'Unnamed moment' : 'Moment ' + endpoint.moment)) +
+      (anchored?.metadata.title || (anchored ? 'Untitled moment' : 'Moment ' + endpoint.moment)) +
       (time ? ' · ' + presented(time) : '');
     const open = document.createElement('button');
     open.type = 'button';
@@ -7788,7 +7814,7 @@ function renderMomentPicker(moments: PickedMoment[]) {
     button.type = 'button';
     button.className = 'search-result';
     const title = document.createElement('strong');
-    title.textContent = moment.title || 'Unnamed moment';
+    title.textContent = moment.title || 'Untitled moment';
     const meta = document.createElement('span');
     meta.className = 'search-meta';
     meta.textContent = presented(Q.parse(moment.time), 'event');
@@ -8090,7 +8116,7 @@ function renderSearchResults(results: SearchResult[]) {
     button.className = 'search-result';
     const title = document.createElement('strong');
     title.textContent =
-      result.title || (result.kind === 'moment' ? 'Unnamed moment' : 'Unnamed duration');
+      result.title || (result.kind === 'moment' ? 'Untitled moment' : 'Untitled duration');
     const meta = document.createElement('span');
     meta.className = 'search-meta';
     meta.textContent =
@@ -8469,7 +8495,7 @@ function renderRelated(host: HTMLElement, ref: EntityRef | null, readOnly = fals
       open.type = 'button';
       open.className = 'related-entity';
       open.textContent =
-        (entry.title || (entry.kind === 'moment' ? 'Unnamed moment' : 'Unnamed duration')) +
+        (entry.title || (entry.kind === 'moment' ? 'Untitled moment' : 'Untitled duration')) +
         ' · ' +
         (entry.kind === 'moment'
           ? presented(Q.parse(entry.first), 'event')
@@ -8752,14 +8778,14 @@ function renderDurationBands() {
     bandContent.set(button, content);
     button.style.backgroundColor = pluginColor(plugins, band.metadata) ?? '';
     button.textContent = band.metadata.title ?? '';
-    button.setAttribute('aria-label', 'Duration: ' + (band.metadata.title || 'Unnamed duration'));
+    button.setAttribute('aria-label', 'Duration: ' + (band.metadata.title || 'Untitled duration'));
     button.title =
       (band.metadata.title || 'Duration') +
       ' · ' +
       presented(parsedTime(band.first)) +
       ' → ' +
       presented(parsedTime(band.last));
-    hoverPreview.update(button, plugins, band.metadata);
+    hoverPreview.update(button, plugins, band.metadata, 1n, 'Untitled duration');
   });
   for (const [key, button] of durationButtons)
     if (!shown.has(key)) {

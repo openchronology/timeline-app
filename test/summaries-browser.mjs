@@ -88,7 +88,7 @@ export async function checkSummaries(page, restore) {
       .locator('.duration-band[data-duration-id="long"]')
       .click({ button: 'right', position: { x: 8, y: 4 } });
     assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), [
-      '+Event',
+      '+Moment',
       'Fit all',
       'Edit',
       'Delete',
@@ -111,6 +111,10 @@ export async function checkSummaries(page, restore) {
     // A collapsed duration next to a moment joins its summary.
     const mixed = page.locator('.event-marker.group[aria-label^="1 moment · 1 duration"]');
     await mixed.waitFor();
+    // Its menu opens what it holds, by name (#187).
+    await mixed.click({ button: 'right', force: true });
+    await menu.getByRole('menuitem', { name: 'View moments and durations', exact: true }).waitFor();
+    await page.keyboard.press('Escape');
     await mixed.click({ force: true });
     await page.locator('#group-details').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#group-title').textContent(), '1 moment · 1 duration');

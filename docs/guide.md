@@ -63,7 +63,7 @@ Signed in, a timeline you have not yet saved to the server is kept as a draft in
 | Pan                            | Drag the timeline. Arrow keys also pan when the timeline is focused, and Shift-scroll pans left and right.           |
 | Zoom through time              | Scroll, or pinch with two fingers side by side. **＋** and **−** zoom around the centre, as do the `+` and `-` keys. |
 | Move up and down               | Drag, use Alt-scroll, or press the Up and Down arrow keys.                                                           |
-| Make dots and labels larger    | Ctrl-scroll, or pinch with one finger above the other. This changes only their size on screen, from 20% to 300%.     |
+| Make dots and labels larger    | Ctrl-scroll, pinch on a trackpad, or pinch with one finger above the other. Only their size on screen changes.       |
 | See everything                 | **Fit all**. **Center axis** brings the axis back to the middle without changing the time shown.                     |
 | Go to an exact stretch of time | Type times into **Left bound** and **Right bound** under the timeline, then **Go**.                                  |
 
@@ -74,18 +74,18 @@ Type the bounds the way the timeline's display writes times. **Exact rational bo
 ### What markers show
 
 - **A dot** is one moment. A titled moment shows its title and time; an untitled one shows only its dot.
-- **A dot with a number** is a summary: moments too close together on screen to draw apart. **Group within** under the timeline sets how close, from 12 to 48 pixels. Click a summary to list its moments 25 at a time, with **Zoom into this group**; double-click it to zoom straight in. Moments at exactly the same time stay together however far you zoom.
+- **A dot with a number** is a summary: moments, and durations too short to draw, too close together on screen to draw apart. **Group within** under the timeline sets how close, from 12 to 48 pixels. Click a summary to list what it holds (its moments 25 at a time, and the durations collapsed into it), with **Zoom into this group**; double-click it to zoom straight in. Moments at exactly the same time stay together however far you zoom.
 - **A band** is a duration. A duration too short to draw at the current zoom is summarized like a moment, and becomes a band again as you zoom in ([summaries](durations.md#summaries)).
 - **An arc** above the axis is a relationship between two things.
 - **A yellow line** is the time you selected by clicking empty space. New moments go there.
 
-Over a server timeline that keeps growing, **Follow latest events** keeps the newest moments in view, once you have stopped moving around for 15 seconds.
+Over a server timeline that keeps growing, **Follow latest moments** keeps the newest moments in view, once you have stopped moving around for 15 seconds.
 
 ## Moments and durations
 
 ### Adding a moment
 
-**＋ Event** adds a moment at the selected time, or in the middle of the view. You can also right-click the timeline (or press and hold it on a touch screen) and choose **+Event** to add one where you clicked. Clicking empty space only selects a time; it never creates anything.
+**＋ Moment** adds a moment at the selected time, or in the middle of the view. You can also right-click the timeline (or press and hold it on a touch screen) and choose **+Moment** to add one where you clicked. Clicking empty space only selects a time; it never creates anything.
 
 The **New moment** dialog opens. The moment joins the timeline when you choose **Save**.
 
@@ -171,7 +171,7 @@ The status under the title says where your work stands: **Unsaved changes**, **S
 
 ### To the server
 
-Signed in, **Save to server** saves a timeline from your browser to your account. It starts private. Once a timeline is on the server, the same button reads **Save upstream** for its owner and writers, and saves your changes as a new revision. Each account has a storage limit, shown on the **Account** page.
+Signed in, **Save to server** saves a timeline from your browser to your account. It starts private. Once a timeline is on the server, the same button saves your changes to it as a new revision, for its owner and writers. Each account has a storage limit, shown on the **Account** page.
 
 ### Revisions
 
@@ -192,7 +192,7 @@ The rest of your edits are saved either way. See [saving while others save](coll
 
 New server timelines are private. To change that, open **Sharing & settings** above the timeline (owners only):
 
-- **Visibility:** **Private — invited accounts only** or **Public — anyone can view upstream**. Public timelines appear in search, and anyone can read them and their saved history.
+- **Visibility:** **Private — you and the collaborators you add** or **Public — anyone can view it, and signed-in readers can propose changes**. Public timelines appear in search, and anyone can read them and their saved history.
 - **Address:** a short name for the timeline's link, such as `/yourname/fall-of-rome`, then **Save address**.
 - **Sensitive content:** labels for the whole timeline, so readers are warned before it opens.
 

@@ -100,7 +100,7 @@ try {
     });
   await assert.rejects(
     add(5),
-    (error) => error.status === 400 && /at most 5 point events/.test(error.message),
+    (error) => error.status === 400 && /at most 5 moments/.test(error.message),
   );
   // Unlimited: sessions say null, and the timeline grows past the default.
   assert.equal(

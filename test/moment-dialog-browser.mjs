@@ -204,7 +204,7 @@ export async function checkMomentDialog(page, restoreDocument) {
   // The offline file words it as an invitation to import.
   assert.match(
     await input('empty-message').textContent(),
-    /^(This timeline has no moments yet\.|Import a timeline or add your first event\.)$/,
+    /^(This timeline has no moments yet\.|Import a timeline or add your first moment\.)$/,
   );
   assert(await input('fit-button').isHidden());
   assert(await input('empty-fit').isHidden());
@@ -212,7 +212,7 @@ export async function checkMomentDialog(page, restoreDocument) {
   await page.mouse.click(stage.x + stage.width / 2, stage.y + 80, { button: 'right' });
   const menu = input('timeline-menu');
   await menu.waitFor();
-  assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), ['+Event']);
+  assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), ['+Moment']);
   await page.keyboard.press('Escape');
   // Durations alone are something to fit, and Fit shows them.
   await load({

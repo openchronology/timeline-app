@@ -1333,12 +1333,12 @@ export class PostgresStore {
   }
   async recent(id, userId, direction = 'last') {
     if (!['last', 'first'].includes(direction))
-      throw new HttpError(400, 'Invalid recent-event direction.');
+      throw new HttpError(400, 'Choose the first or last moments.');
     return this.transaction(async (c) => {
       await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
       const timeline = await this.access(id, userId, c);
       if (timeline.comparison)
-        throw new HttpError(409, 'Read recent events from comparison sources.');
+        throw new HttpError(409, 'Read recent moments from comparison sources.');
       const { rows } = await c.query('SELECT oc_recent_times($1,$2) AS time', [
         id,
         direction === 'first',

@@ -39,7 +39,12 @@ export function createHoverPreview(
   stage.append(card);
   const data = new WeakMap<
     HTMLButtonElement,
-    { metadata: Record<string, unknown>; plugins: readonly InstalledPlugin[] }
+    {
+      metadata: Record<string, unknown>;
+      plugins: readonly InstalledPlugin[];
+      /** What an untitled one is called: a moment, a duration or a stack entry. */
+      untitled: string;
+    }
   >();
   const bound = new WeakSet<HTMLButtonElement>();
   let target: HTMLButtonElement | null = null;
@@ -102,7 +107,7 @@ export function createHoverPreview(
     title.textContent =
       typeof entry.metadata.title === 'string' && entry.metadata.title.trim()
         ? entry.metadata.title
-        : 'Unnamed moment';
+        : entry.untitled;
     const description =
       typeof entry.metadata.description === 'string'
         ? entry.metadata.description.slice(0, 600)
@@ -205,11 +210,12 @@ export function createHoverPreview(
       plugins: readonly InstalledPlugin[],
       metadata: Record<string, unknown>,
       count = 1n,
+      untitled = 'Untitled moment',
     ) {
       const enabled = count === 1n && pluginFocus(plugins, metadata);
       button.classList.toggle('focus-preview', enabled);
       if (enabled) {
-        data.set(button, { metadata, plugins });
+        data.set(button, { metadata, plugins, untitled });
         button.removeAttribute('title');
       } else {
         data.delete(button);

@@ -52,7 +52,7 @@ export async function checkZoomHelp(page) {
   const dialog = page.locator('#timeline-help-dialog');
   assert(await dialog.isVisible());
   assert.match(await dialog.textContent(), /Alt-scroll moves vertically/);
-  assert.match(await dialog.textContent(), /Ctrl-scroll scales/);
+  assert.match(await dialog.textContent(), /Ctrl-scroll, a trackpad pinch/);
   await page.mouse.click(2, 2);
   await dialog.waitFor({ state: 'hidden' });
 }

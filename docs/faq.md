@@ -48,7 +48,7 @@ The Gregorian display uses one fixed offset from UTC per timeline (**Timezone of
 
 ## Why do some moments show as a number?
 
-That is a summary: moments too close together on screen to draw apart. Click it to list them, or double-click it to zoom in. **Group within** under the timeline sets how close moments must be to group. See [what markers show](guide.md#what-markers-show).
+That is a summary: moments too close together on screen to draw apart, with any durations too short to draw at this zoom. Click it to list them, or double-click it to zoom in. **Group within** under the timeline sets how close moments must be to group. See [what markers show](guide.md#what-markers-show).
 
 ## I closed a moment's details and my changes disappeared. Why?
 
