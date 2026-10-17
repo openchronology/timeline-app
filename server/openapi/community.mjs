@@ -341,7 +341,7 @@ export const paths = {
   '/api/admin/reports': {
     get: {
       operationId: 'listReportCases',
-      tags: ['Administration', 'Reports and moderation'],
+      tags: ['Reports and moderation'],
       summary: 'List reported cases for review',
       description:
         'For administrators only. A page of 25 cases. `open` lists cases awaiting a decision and decisions whose owner asked for a review, those reporting child abuse or other illegal content first, then the oldest; `restricted` lists decisions in force (restrictions and labels); `closed` lists dismissed cases and lifted decisions, newest first.',
@@ -367,7 +367,7 @@ export const paths = {
   '/api/admin/reports/{id}': {
     patch: {
       operationId: 'decideReportCase',
-      tags: ['Administration', 'Reports and moderation'],
+      tags: ['Reports and moderation'],
       summary: 'Decide a reported case',
       description:
         'For administrators only. `dismiss` closes an open case; `restrict` makes a timeline private, hides a comment, plugin or suite (and refuses its new versions) or suspends an account; `label` adds content labels to a reported timeline; `uphold` keeps a decision whose owner asked for a review; `lift` undoes a restriction or labels at any time. `restrict` and `label` need a `reason`, given to the owner. The owner and signed-in reporters with a confirmed email are told by email. ' +

@@ -284,6 +284,10 @@ const DISCONNECTED: Session = { user: null, csrf: null, server: false };
 function sessionOf(origin: string): Session {
   return origin === serverOrigin ? session : (sessions.get(origin) ?? DISCONNECTED);
 }
+/** How many timelines the server in use lets this account compare at once: 2 to 8. */
+function compareLimit() {
+  return Math.min(8, Math.max(2, session.compareLimit ?? 8));
+}
 /** Whether items say which server they come from: on a desktop connected to several. */
 function severalServers() {
   return desktop && connected.length > 1;
@@ -2832,11 +2836,13 @@ function loadDocument(doc: TimelineDocument, draft: string | null = null) {
       .then(async (result) => {
         if (workspace !== documentRequest || version !== editVersion) return;
         const header = validateDocument(result.document);
-        await window.__TAURI__!.core.invoke('desktop_accept_open', { path: result.path });
+        const generation = await window.__TAURI__!.core.invoke<number>('desktop_accept_open', {
+          path: result.path,
+        });
         if (workspace !== documentRequest || version !== editVersion) return;
         model = new RemoteWorkspace(header);
         if (selected) sparseWorkspace()!.load(selected);
-        local = { ...result, id: 'local-sqlite', revision: String(result.generation) };
+        local = { ...result, generation, id: 'local-sqlite', revision: String(generation) };
         desktopSettings = JSON.stringify(model.document());
         desktopSavedBaseline = null;
         frameRequest++;
@@ -3047,7 +3053,7 @@ async function route(force = false) {
   if (compared) {
     if (comparison) return;
     const ids = [...new Set(compared[1].split(','))];
-    const limit = Math.min(8, Math.max(2, session.compareLimit ?? 8));
+    const limit = compareLimit();
     if (
       ids.length < 2 ||
       ids.length > limit ||
@@ -6324,6 +6330,7 @@ const community = createCommunityUI({
   link: (id, origin) => timelineHash(id, origin ?? serverOrigin),
   user: () => session.user,
   server: () => session.server,
+  compareLimit: () => compareLimit(),
   guestCopies: () => !desktop && !offlineHtml,
   timeline: () => remote,
   document: async () => {
@@ -6949,12 +6956,15 @@ if (desktop) {
   ) => {
     if (!result || workspace !== documentRequest) return;
     const document = validateDocument(result.document);
-    await window.__TAURI__!.core.invoke<void>('desktop_accept_open', { path: result.path });
+    // The generation the file has now, not the open reply's guess (#193).
+    const generation = await window.__TAURI__!.core.invoke<number>('desktop_accept_open', {
+      path: result.path,
+    });
     if (workspace !== documentRequest) return;
     historyReplace();
     loadDocument(document);
     model = new RemoteWorkspace(document);
-    local = { ...result, id: 'local-sqlite', revision: String(result.generation) };
+    local = { ...result, generation, id: 'local-sqlite', revision: String(generation) };
     desktopSettings = JSON.stringify(model.document());
     desktopSavedBaseline = null;
     viewport = Viewport.fit(
@@ -7211,7 +7221,7 @@ window.addEventListener('pageshow', () => {
 });
 const comparisons = comparisonUI({
   // Without a server (offline, desktop on its own) every comparison may hold up to eight.
-  limit: () => Math.min(8, Math.max(2, session.compareLimit ?? 8)),
+  limit: () => compareLimit(),
   available: () => !offlineHtml && !!session.server,
   current: currentComparisonSource,
   sources: comparisonSources,

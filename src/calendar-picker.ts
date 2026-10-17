@@ -173,9 +173,7 @@ export function calendarPicker(
         // Compare numerically as well, so a zero-padded `05` marks day 5.
         button.setAttribute(
           'aria-pressed',
-          String(
-            fields.get('Day')!.value === String(d) || BigInt(fields.get('Day')!.value || '0') === d,
-          ),
+          String(/^\d+$/.test(fields.get('Day')!.value) && BigInt(fields.get('Day')!.value) === d),
         );
         button.onclick = () => {
           fields.get('Day')!.value = String(d);
@@ -211,16 +209,30 @@ export function calendarPicker(
     refreshGrid();
     try {
       const get = (name: string) => fields.get(name)!.value;
-      let y = BigInt(get('Year'));
-      if (y <= 0n) throw new Error('The era year must be positive.');
+      // A whole number from `min` to `max` (a number input also takes `1.5`, `1e1` or `-5`).
+      const whole = (name: string, min: bigint, max?: bigint) => {
+        const value = get(name).trim();
+        if (
+          !/^\d+$/.test(value) ||
+          BigInt(value) < min ||
+          (max !== undefined && BigInt(value) > max)
+        )
+          throw new Error(
+            max === undefined
+              ? `${name} must be a whole number from ${min}.`
+              : `${name} must be a whole number from ${min} to ${max}.`,
+          );
+        return BigInt(value);
+      };
+      let y = whole('Year', 1n);
       if (era.value === 'BCE') y = 1n - y;
       const sec = parseNumber(get('Second'));
       if (sec.compare(Q.zero) < 0 || sec.compare(Q.from(60n)) >= 0)
         throw new Error('Seconds must be from zero to below 60.');
-      const pad = (value: string) => String(BigInt(value)).padStart(2, '0');
+      const pad = (value: bigint) => String(value).padStart(2, '0');
       const ys = y < 0n ? '-' + String(-y).padStart(4, '0') : String(y).padStart(4, '0');
       const next = parseTimestamp(
-        `${ys}-${pad(get('Month'))}-${pad(get('Day'))}T${pad(get('Hour'))}:${pad(get('Minute'))}:00${match[7]}`,
+        `${ys}-${pad(whole('Month', 1n, 12n))}-${pad(whole('Day', 1n, 31n))}T${pad(whole('Hour', 0n, 23n))}:${pad(whole('Minute', 0n, 59n))}:00${match[7]}`,
       ).add(sec);
       error.textContent = '';
       change(origin.add(next.mul(scale)));

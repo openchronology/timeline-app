@@ -40,6 +40,17 @@ test('anonymous sign-in requires a browser-bound CSRF nonce', () => {
   );
   assert.match(auth.nonceCookie('login', nonce), /HttpOnly; SameSite=Lax; Max-Age=600; Secure$/);
 });
+test('the sign-in throttle limits each key, and a flood of keys forgets the oldest (#193)', () => {
+  const auth = new Auth(null, 'https://timescale.info');
+  for (let i = 0; i < 10; i++) auth.throttle('ip:victim');
+  assert.throws(() => auth.throttle('ip:victim'), rejects(429));
+  auth.throttle('ip:known');
+  // 10,000 distinct keys: everyone else is still let in, and the map stays bounded.
+  for (let i = 0; i < 10000; i++) auth.throttle('ip:flood' + i);
+  auth.throttle('ip:newcomer');
+  assert.equal(auth.attempts.size, 10000);
+  assert(!auth.attempts.has('ip:victim'), 'the oldest key goes first');
+});
 test('session lookups separate native bearers and web cookies and enforce idle and absolute expiry', async () => {
   const queries = [],
     pool = {

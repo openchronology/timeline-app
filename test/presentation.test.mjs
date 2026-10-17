@@ -149,6 +149,23 @@ test('custom JavaScript and TypeScript interpret exact arithmetic and explicit r
   const custom = compileCustom(source);
   assert.equal(custom.print(Q.from(-2n)), 'negative:-2/1');
   assert.equal(custom.print(Q.from(2n)), 'positive:2/1');
+  // After a value, + is concatenation however it is spaced; a sign still starts a number
+  // where no value comes before it (#193).
+  const parseRational = 'function parse(text, api) { return api.rational(text); }';
+  const print = (body) =>
+    compileCustom(`function print(time, api) { ${body} }\n${parseRational}`).print(Q.from(2n));
+  assert.equal(print('return "a" +"b";'), 'ab');
+  assert.equal(
+    print('return api.compare(time, api.rational("0")) >-1 ? "after" : "before";'),
+    'after',
+  );
+  assert.equal(
+    print('return -1 < api.compare(time, api.rational("0")) ? "after" : "before";'),
+    'after',
+  );
+  // `x +1` is x + 1: concatenation, which takes text only.
+  assert.throws(() => print('return api.exact(time) +1;'), /Expected text/);
+  assert.throws(() => print('return "x" -1;'), /no subtraction operator.*api\.sub/);
 });
 
 test('custom code rejects ambient authority, prototype access, imports, loops and calls', () => {

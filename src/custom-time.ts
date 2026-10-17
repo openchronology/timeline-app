@@ -123,13 +123,26 @@ function tokenize(source: string): Token[] {
       tokens.push({ text: 'literal', value, literal: true });
     } else {
       // Three-character operators are tried before their two- and one-character prefixes.
-      // A number may carry a sign, so `x +1` reads as `x` followed by the literal `+1`
-      // (a syntax error); `x + 1` is concatenation. There is no subtraction operator.
-      const token =
+      // A number may carry a sign where no value comes before it (`return -1`, `f(+2)`).
+      // After a value, `+` is concatenation however it is spaced (`x +1` is `x + 1`, #193);
+      // there is no subtraction operator.
+      let token =
         /^(?:===|!==|<=|>=|[A-Za-z_$][A-Za-z0-9_$]*|[+-]?\d+(?:\.\d+)?|[{}(),;:.?+<>=])/.exec(
           source.slice(at),
         )?.[0];
       if (!token) throw new Error(`Unsupported syntax at character ${at + 1}.`);
+      const previous = tokens.at(-1),
+        afterValue =
+          !!previous &&
+          previous.text !== 'return' &&
+          (!!previous.literal || /^[A-Za-z0-9_$)]/.test(previous.text));
+      if (afterValue && /^[+-]\d/.test(token)) {
+        if (token[0] === '-')
+          throw new Error(
+            `There is no subtraction operator (character ${at + 1}); use api.sub for exact arithmetic.`,
+          );
+        token = '+';
+      }
       at += token.length;
       if (/^[+-]?\d/.test(token)) {
         const value = Number(token);

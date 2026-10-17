@@ -74,7 +74,7 @@ export async function checkDesktopCache(browser) {
   await context.exposeFunction('nativeInvoke', async (command, args) => {
     if (command === 'desktop_servers') return [];
     if (command === 'desktop_open') return header();
-    if (command === 'desktop_accept_open') return;
+    if (command === 'desktop_accept_open') return generation;
     if (command === 'desktop_document') {
       assert.equal(args.generation, generation);
       reads++;

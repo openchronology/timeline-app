@@ -328,6 +328,24 @@ try {
       .rows[0].n,
     '0',
   );
+  // Re-enabling the account lifts a moderation restriction on it too, deciding a pending
+  // review (#193).
+  const caseId = randomUUID();
+  await pool.query(
+    "INSERT INTO oc_moderation_cases(id,target_kind,target_id,owner_id,status,appeal,appealed_at) VALUES($1,'user',$2,$3,'restricted','Please review.',now())",
+    [caseId, owner.u.id, owner.u.id],
+  );
+  await request('admin/users/' + owner.u.id, 'PATCH', { is_disabled: false, password }, admin);
+  assert.deepEqual(
+    (
+      await pool.query(
+        'SELECT status,appeal_outcome,appeal_decided_at IS NOT NULL AS decided FROM oc_moderation_cases WHERE id=$1',
+        [caseId],
+      )
+    ).rows[0],
+    { status: 'lifted', appeal_outcome: 'lifted', decided: true },
+  );
+  await request('admin/users/' + owner.u.id, 'PATCH', { is_disabled: true, password }, admin);
   const audit = (
     await pool.query('SELECT changes FROM oc_admin_audit WHERE actor_id=$1', [adminUser.id])
   ).rows;

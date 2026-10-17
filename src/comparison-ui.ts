@@ -3,7 +3,7 @@
 // and start comparing them (comparison.ts).
 import { DEFAULT_PRESENTATION } from './core.js';
 import type { TimePresentation } from './core.js';
-import { ComparisonView, samePresentation } from './comparison.js';
+import { samePresentation } from './comparison.js';
 import type { ComparisonSource } from './comparison.js';
 /** What the dialog needs from the editor (app.ts supplies it). */
 interface Host {

@@ -408,7 +408,19 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
         }
         // Fill the overview index: one bucket per distinct time, weighted by its moment count.
         // Overview groups join back to events by time (workspace.rs) to show single moments.
-        db.execute("INSERT INTO points(time,value,weight) SELECT time,time,count(*) FROM events GROUP BY time COLLATE RATIONAL_V1",&[])?;
+        // One statement per time, as an edit does (workspace.rs): each has the instruction
+        // budget to itself, where one statement for all of a large file's times ran out (#193).
+        for row in db.query(
+            "SELECT time FROM events GROUP BY time COLLATE RATIONAL_V1",
+            &[],
+        )? {
+            let time = row
+                .into_iter()
+                .next()
+                .flatten()
+                .ok_or("Missing moment time")?;
+            db.execute("INSERT INTO points(time,value,weight) SELECT time,time,count(*) FROM events WHERE time=q(?) COLLATE RATIONAL_V1 GROUP BY time COLLATE RATIONAL_V1",&[&time])?;
+        }
         create_duration_table(&db)?;
         for duration in &doc.durations {
             insert_duration(&db, duration)?;

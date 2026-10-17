@@ -77,8 +77,13 @@ export default function TimelineList({
             )}
             <div className="tags">
               {(t.tags ?? []).map((tag) => (
-                // A tag searches the dashboard's public timelines (always /), from page one.
-                <Link className="button" key={tag} href={link(query, { tag, page: '1' })}>
+                // A tag searches the dashboard's public timelines (always /), from page one; a
+                // profile's own pages (its favorites page) don't carry over.
+                <Link
+                  className="button"
+                  key={tag}
+                  href={link(basePath === '/' ? query : {}, { tag, page: '1' })}
+                >
                   {tag}
                 </Link>
               ))}

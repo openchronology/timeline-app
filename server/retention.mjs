@@ -186,8 +186,8 @@ export async function pruneHistory(client, timelineId, before) {
   const { rows } = await client.query(
     `WITH RECURSIVE shared(id) AS (
       SELECT r.id FROM oc_revisions r WHERE r.timeline_id=$1 AND (
-        EXISTS(SELECT 1 FROM oc_timelines t
-          WHERE (t.head_revision_id=r.id AND t.id<>$1) OR t.fork_base_revision_id=r.id)
+        EXISTS(SELECT 1 FROM oc_timelines t WHERE t.fork_base_revision_id=r.id)
+        OR r.id IN (SELECT head_revision_id FROM oc_timelines WHERE id<>$1)
         OR EXISTS(SELECT 1 FROM oc_proposals p WHERE p.base_revision_id=r.id OR p.source_revision_id=r.id OR p.merged_revision_id=r.id)
         OR EXISTS(SELECT 1 FROM oc_revision_parents p JOIN oc_revisions child ON child.id=p.revision_id
           WHERE p.parent_id=r.id AND child.timeline_id<>$1))

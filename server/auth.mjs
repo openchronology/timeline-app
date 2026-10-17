@@ -2,13 +2,7 @@
 // Signing in: password hashing (scrypt), registration and sign-in with rate limits, issuing
 // and reading session tokens, and the account age rules (#115). Account security, API keys
 // and email build on it (account-security.mjs, api-keys.mjs, mail.mjs).
-import {
-  randomBytes,
-  randomUUID,
-  scrypt as scryptCallback,
-  timingSafeEqual,
-  createHash,
-} from 'node:crypto';
+import { randomBytes, scrypt as scryptCallback, timingSafeEqual, createHash } from 'node:crypto';
 import { promisify } from 'node:util';
 import { checkPasswordBreach } from './security-crypto.mjs';
 import { ApiKeys } from './api-keys.mjs';
@@ -116,15 +110,19 @@ export class Auth {
   }
   /**
    * The in-memory throttle in front of rateLimit: at most `maximum` attempts per `key` per
-   * minute in this process. It refuses everyone while more than 10,000 keys are tracked, which
-   * bounds the map's memory under a flood of distinct addresses. Throws 429.
+   * minute in this process. It tracks at most 10,000 keys, forgetting the oldest to make room,
+   * which bounds the map's memory under a flood of distinct addresses without refusing everyone
+   * else (#193); rateLimit, in the database, still counts every key. Throws 429.
    */
   throttle(key, maximum = 10) {
     const now = Date.now();
     for (const [k, v] of this.attempts) if (v.expires < now) this.attempts.delete(k);
     const old = this.attempts.get(key) ?? { count: 0, expires: now + 60000 };
-    if (old.count++ >= maximum || this.attempts.size > 10000)
+    if (old.count++ >= maximum)
       throw new HttpError(429, 'Too many sign-in attempts. Please wait a minute.');
+    // A Map iterates in insertion order: its first key is the oldest.
+    if (!this.attempts.has(key) && this.attempts.size >= 10000)
+      this.attempts.delete(this.attempts.keys().next().value);
     this.attempts.set(key, old);
   }
   /**

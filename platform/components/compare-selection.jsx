@@ -81,16 +81,17 @@ export function CompareCheckbox({ id, title, limit = 8 }) {
 /**
  * The tray above the lists: how many timelines are chosen, a link that opens them in /compare
  * (`?timelines=<id>,<id>…`) once there are two to `limit` of them, and a button to clear them.
- * A guest whose limit is below 8 is told that signing in allows more.
- * @param {{limit?: number, signedIn?: boolean}} props
+ * A guest whose limit is below a signed-in account's (`userLimit`) is told that signing in
+ * allows more.
+ * @param {{limit?: number, userLimit?: number, signedIn?: boolean}} props
  */
-export function CompareTray({ limit = 8, signedIn = true }) {
+export function CompareTray({ limit = 8, userLimit = 8, signedIn = true }) {
   const [ids, setIds] = useSelection();
   return (
     <div className="compare-tray">
       <span>
         {ids.length} selected for comparison (up to {limit}
-        {!signedIn && limit < 8 ? '; sign in to compare up to 8' : ''})
+        {!signedIn && limit < userLimit ? `; sign in to compare up to ${userLimit}` : ''})
       </span>
       {ids.length >= 2 && ids.length <= limit && (
         <a className="button primary" href={'/compare?timelines=' + ids.join(',')}>

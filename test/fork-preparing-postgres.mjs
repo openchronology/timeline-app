@@ -143,13 +143,20 @@ try {
   let fork = await heldFork(source);
   assert.equal(fork.title, source.title);
   assert.equal((await store.metadata(fork.id, user)).preparing, true);
+  const stillPreparing = (e) => e.status === 409 && /being prepared/.test(e.message);
+  hold();
   for (const attempt of [
     () => store.snapshot(fork.id, user),
     () => store.save(fork.id, user, fork.revision, undefined, { settings, changes: [] }),
     () => versions.copy(fork.id, user, { revision: fork.revision }),
     () => versions.sync(fork.id, user, { revision: fork.revision }),
   ])
-    await assert.rejects(attempt, (e) => e.status === 409 && /being prepared/.test(e.message));
+    await assert.rejects(attempt, stillPreparing);
+  release();
+  // A request refused while the copy is being prepared starts its preparation again, in
+  // case one skipped it (SKIP LOCKED) and left it for the next start (#193).
+  await assert.rejects(store.snapshot(fork.id, user), stillPreparing);
+  assert(store.preparing.has(fork.id), 'the refused request tries again');
   assert.equal(await prepared(fork.id), 0, 'copied, not rebuilt');
   await ready(fork.id, source.id);
   assert.equal((await store.access(fork.id, user)).preparing, false);

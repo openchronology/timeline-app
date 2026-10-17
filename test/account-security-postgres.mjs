@@ -119,6 +119,31 @@ try {
   const second = client();
   await second.request('session');
   await second.request('auth/login', { username, password });
+  // An email change to another account's address sends no link, which could never be
+  // confirmed; the answer is the same as for a free address (#193).
+  const takenEmail = 'taken_' + email,
+    freeEmail = 'free_' + email;
+  await pool.query(
+    'INSERT INTO oc_users(id,username,email,email_verified_at) VALUES(gen_random_uuid(),$1,$2,now())',
+    ['taken_' + suffix, takenEmail],
+  );
+  const changes = async () =>
+    (
+      await pool.query("SELECT email FROM oc_email_tokens WHERE user_id=$1 AND purpose='change'", [
+        uid,
+      ])
+    ).rows.map((r) => r.email);
+  const toTaken = await owner.request('auth/email/change', {
+    password,
+    email: takenEmail.toUpperCase(),
+  });
+  assert.deepEqual(await changes(), []);
+  const toFree = await owner.request('auth/email/change', { password, email: freeEmail });
+  assert.equal(toTaken.message, toFree.message);
+  assert.deepEqual(await changes(), [freeEmail]);
+  await flushMail(pool, mailer, key);
+  assert(!messages.some((m) => m.to === takenEmail));
+  assert(messages.some((m) => m.to === freeEmail && m.text.includes('#verify=')));
   const setup = await owner.request('auth/mfa/setup', { password });
   const stored = (await pool.query('SELECT secret FROM oc_mfa_setups WHERE user_id=$1', [uid]))
     .rows[0].secret;
@@ -197,6 +222,7 @@ try {
   );
 } finally {
   if (uid) await pool.query('DELETE FROM oc_users WHERE id=$1', [uid]);
+  await pool.query('DELETE FROM oc_users WHERE username=$1', ['taken_' + suffix]);
   await pool.query('DELETE FROM oc_registrations WHERE username=$1', [username]);
   await new Promise((resolve) => app.close(resolve));
   await pool.end();

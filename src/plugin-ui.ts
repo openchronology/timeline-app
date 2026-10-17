@@ -733,7 +733,6 @@ export function renderPluginShape(button: HTMLButtonElement, shape: string) {
   path.setAttribute('d', SHAPE_PATHS[shape]);
   path.setAttribute('fill', button.style.backgroundColor || '#547d5b');
   path.setAttribute('stroke', 'white');
-  path.setAttribute('stroke-width', '3');
   path.setAttribute('stroke-linejoin', 'round');
   path.setAttribute('stroke-width', '5');
   const border = path.cloneNode(true) as SVGPathElement;
