@@ -75,7 +75,7 @@ Both [RFC 5424](https://www.rfc-editor.org/rfc/rfc5424) and the BSD format of [R
 
 - **Time** is the message's timestamp in exact Unix seconds, including RFC 5424 fractions of a second and time-zone offsets. rsyslog's ISO lines (`2026-10-09T08:15:01.123+02:00 host app[pid]: …`, which some relays forward) keep their time. BSD timestamps have no year or zone: they are read in `SYSLOG_TIMEZONE` (UTC unless set), in the year that puts them nearest to when they arrived. Messages without a timestamp use the time they arrived.
 - **Title** is the first line of the message (up to 200 characters); longer or multi-line messages keep the full text, up to 16 KiB, as notes.
-- **Tags** are `syslog`, `severity:<level>`, `facility:<name>`, `host:<host>` and `app:<app>`, so **Separate by tags** and search can pick out a host, an application or the errors.
+- **Tags** are `syslog`, `severity:<level>`, `facility:<name>`, `host:<host>` and `app:<app>`, so **Separate by tags** and search can pick out a host, an application or the errors. The [Log severity colors](plugins.md#log-severity-colors) plugin colors messages by severity.
 - **Additional metadata** keeps the parsed fields under `syslog`: format, facility, severity, host, app, process ID, message ID and RFC 5424 structured data.
 - Text that matches neither format is kept whole as a `user.notice` message received now.
 

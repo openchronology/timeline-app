@@ -74,6 +74,8 @@ These are the [log importer's journald moments](log-import.md#moments):
 | Tags                                 | `journald`, `severity:<level>`, `host:<host>`, `app:<identifier>`, `unit:<unit>` |
 | **Additional metadata** (`journald`) | Every field of the entry                                                         |
 
+The [Log severity colors](plugins.md#log-severity-colors) plugin colors entries by severity.
+
 Each moment's ID comes from the entry's journal cursor. journalctl prints an entry's fields in a different order each time, so the cursor is what stays the same.
 
 ## Delivery and restarts

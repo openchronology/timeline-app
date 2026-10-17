@@ -334,8 +334,8 @@ export function durationSummaries(
 }
 
 /**
- * Viewport bands carry a bounded projection: title, a notes preview, and short text fields
- * that plugins such as colors read. Full metadata is fetched when a duration is opened.
+ * Viewport bands carry a bounded projection: title, a notes preview, short text fields that
+ * plugins such as colors read, and tags. Full metadata is fetched when a duration is opened.
  */
 export function durationOverview(metadata: Metadata): Metadata {
   const result: Metadata = {};
@@ -354,6 +354,11 @@ export function durationOverview(metadata: Metadata): Metadata {
       if (size > 4096) break;
       result[key] = value;
     }
+  // Its tags, which plugins may derive values from (#122), such as a log entry's severity.
+  if (Array.isArray(metadata.tags)) {
+    const tags = metadata.tags.filter((t): t is string => typeof t === 'string').slice(0, 40);
+    if (tags.length && size + JSON.stringify(tags).length <= 4096) result.tags = tags;
+  }
   // Its sensitive-content labels (#115), so its background image is blurred.
   const labels = contentLabels(metadata[CONTENT_LABELS_KEY]);
   if (labels.length) result[CONTENT_LABELS_KEY] = labels;

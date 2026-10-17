@@ -35,9 +35,23 @@ export interface PluginManifest {
   background?: { kind: 'image'; metadataKey: string };
   /** Entities the plugin applies to; omitted means moments, plus durations for colors/cards. */
   targets?: PluginTarget[];
+  /** Metadata computed in the browser for the plugins to read, never saved (#122). */
+  derive?: PluginDerivation[];
   source?: string;
 }
 export type PluginTarget = 'moments' | 'durations';
+/** Where a derived value is read: a tag's value (`severity` reads `severity:err`), or a path. */
+export type DerivationSource = { tag: string } | { path: string };
+/**
+ * A value derived from a moment's or duration's metadata (#122): the first source that has
+ * one, through the map when given (sources whose value it doesn't map are passed over), set
+ * as `metadataKey` where the entity has no value there already.
+ */
+export interface PluginDerivation {
+  metadataKey: string;
+  from: DerivationSource[];
+  map?: Record<string, string>;
+}
 export interface InstalledPlugin {
   manifest: PluginManifest;
   enabled: boolean;
@@ -109,6 +123,68 @@ type Effects = {
   expand?: boolean;
   heading?: { level: HeadingLevel; font: string };
 };
+/** The text at a source: a tag's value, or a text, number or true/false at a path. */
+function sourceValue(source: DerivationSource, metadata: Record<string, unknown>): string | null {
+  if ('tag' in source) {
+    const prefix = source.tag + ':';
+    const tags = Array.isArray(metadata.tags) ? metadata.tags : [];
+    const found = tags.find(
+      (t): t is string => typeof t === 'string' && t.startsWith(prefix) && t.length > prefix.length,
+    );
+    return found ? found.slice(prefix.length) : null;
+  }
+  let value: unknown = metadata;
+  for (const part of source.path.split('.')) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    value = Object.hasOwn(value, part) ? (value as Record<string, unknown>)[part] : undefined;
+  }
+  return typeof value === 'string'
+    ? value.slice(0, 2048)
+    : typeof value === 'number' || typeof value === 'boolean'
+      ? String(value)
+      : null;
+}
+function derivedValue(rule: PluginDerivation, metadata: Record<string, unknown>): string | null {
+  for (const source of rule.from) {
+    const value = sourceValue(source, metadata);
+    if (value === null) continue;
+    if (!rule.map) return value;
+    if (Object.hasOwn(rule.map, value)) return rule.map[value];
+  }
+  return null;
+}
+/**
+ * Metadata as the enabled plugins see it (#122): the entity's own, with each derivation of
+ * each plugin applied in order. A derivation sets its key only where nothing has, the entity
+ * or an earlier derivation, so a color chosen for a moment still wins, and a later
+ * derivation can read what an earlier one set. It is computed wherever the metadata is
+ * drawn and never saved. Without derivations, the metadata itself.
+ */
+export function derivedMetadata(
+  plugins: readonly InstalledPlugin[] = [],
+  metadata: Record<string, unknown> = {},
+): Record<string, unknown> {
+  let view: Record<string, unknown> | null = null;
+  for (const { manifest, enabled } of plugins)
+    if (enabled && manifest.derive)
+      for (const rule of manifest.derive) {
+        const current: Record<string, unknown> = view ?? metadata;
+        if (current[rule.metadataKey] !== undefined) continue;
+        const value = derivedValue(rule, current);
+        if (value === null) continue;
+        view = { ...current, [rule.metadataKey]: value };
+      }
+  return view ?? metadata;
+}
+/** The top-level metadata keys a plugin's derivations read and set. */
+export function derivationKeys(manifest: PluginManifest): string[] {
+  const keys = new Set<string>();
+  for (const rule of manifest.derive ?? []) {
+    keys.add(rule.metadataKey);
+    for (const source of rule.from) keys.add('tag' in source ? 'tags' : source.path.split('.')[0]);
+  }
+  return [...keys];
+}
 const compiledScripts = new Map<string, ReturnType<typeof compilePluginScript>>();
 function manifestEffects(manifest: PluginManifest, metadata: Record<string, unknown>): Effects {
   if (!manifest.source) return {};
@@ -131,6 +207,7 @@ function manifestEffects(manifest: PluginManifest, metadata: Record<string, unkn
           const key = text();
           if (
             !manifest.fields.some((f) => f.metadataKey === key) &&
+            !manifest.derive?.some((d) => d.metadataKey === key) &&
             !['title', 'description'].includes(key)
           )
             throw new Error('Undeclared metadata field.');
@@ -226,8 +303,9 @@ function manifestEffects(manifest: PluginManifest, metadata: Record<string, unkn
 }
 function scriptEffects(
   plugins: readonly InstalledPlugin[],
-  metadata: Record<string, unknown>,
+  stored: Record<string, unknown>,
 ): Effects {
+  const metadata = derivedMetadata(plugins, stored);
   const effects: Effects = {};
   for (const { manifest, enabled } of plugins)
     if (enabled) {
@@ -309,6 +387,65 @@ function key(value: unknown) {
     throw new Error('Invalid or reserved plugin metadata key.');
   return value;
 }
+/**
+ * Derivations as a manifest declares them: one to eight, each of one to 16 sources and a
+ * map of at most 64 values. Paths are one to four metadata keys joined by dots; tags are as
+ * tags are stored (lowercase), without the colon.
+ */
+function derivations(value: unknown): PluginDerivation[] {
+  if (!Array.isArray(value) || !value.length || value.length > 8)
+    throw new Error('A plugin derives one to eight values.');
+  return value.map((raw) => {
+    const d = object(raw, ['metadataKey', 'from', 'map']);
+    if (!Array.isArray(d.from) || !d.from.length || d.from.length > 16)
+      throw new Error('A derived value has one to 16 sources.');
+    const from = d.from.map((rawSource): DerivationSource => {
+      const source = object(rawSource, ['tag', 'path']);
+      if (Object.keys(source).length !== 1) throw new Error('A source is a tag or a path.');
+      if (source.tag !== undefined) {
+        if (
+          typeof source.tag !== 'string' ||
+          !/^[^\x00-\x1f\x7f,:A-Z]{1,63}$/.test(source.tag) ||
+          source.tag.trim() !== source.tag
+        )
+          throw new Error('A source tag is a lowercase tag name without its colon.');
+        return { tag: source.tag };
+      }
+      if (typeof source.path !== 'string' || !source.path) throw new Error('Invalid source path.');
+      const parts = source.path.split('.');
+      if (
+        parts.length > 4 ||
+        parts.some(
+          (part) =>
+            !/^[A-Za-z0-9_-]{1,64}$/.test(part) ||
+            ['__proto__', 'prototype', 'constructor'].includes(part),
+        )
+      )
+        throw new Error('A source path is one to four metadata keys joined by dots.');
+      return { path: source.path };
+    });
+    const rule: PluginDerivation = { metadataKey: key(d.metadataKey), from };
+    if (d.map !== undefined) {
+      if (!d.map || typeof d.map !== 'object' || Array.isArray(d.map))
+        throw new Error('A derivation map is an object of text values.');
+      const entries = Object.entries(d.map as Record<string, unknown>);
+      if (
+        entries.length > 64 ||
+        entries.some(
+          ([from, to]) =>
+            !from ||
+            from.length > 128 ||
+            ['__proto__', 'prototype', 'constructor'].includes(from) ||
+            typeof to !== 'string' ||
+            to.length > 256,
+        )
+      )
+        throw new Error('A derivation maps at most 64 values of at most 256 characters.');
+      rule.map = Object.fromEntries(entries) as Record<string, string>;
+    }
+    return rule;
+  });
+}
 export function validatePluginManifest(value: unknown): PluginManifest {
   const p = object(value, [
     'apiVersion',
@@ -323,6 +460,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     'notes',
     'background',
     'targets',
+    'derive',
     'source',
   ]);
   if (
@@ -402,6 +540,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
       throw new Error('Plugin targets are "moments" and/or "durations".');
     result.targets = p.targets as PluginTarget[];
   }
+  if (p.derive !== undefined) result.derive = derivations(p.derive);
   // The script is only checked here to be text of at most 16 KiB. It is compiled before it
   // runs, in the browser; the server compiles scripts it is given only in a sandbox (#157,
   // server/plugin-sandbox.mjs), and never runs them.
@@ -560,8 +699,9 @@ export function durationPlugins(plugins: readonly InstalledPlugin[] = []): Insta
  */
 export function pluginBackground(
   plugins: readonly InstalledPlugin[] = [],
-  metadata: Record<string, unknown> = {},
+  stored: Record<string, unknown> = {},
 ): string | null {
+  const metadata = derivedMetadata(plugins, stored);
   let image: string | null = null;
   for (const { manifest, enabled } of plugins)
     if (enabled && manifest.background) {
@@ -588,8 +728,9 @@ export function pluginFields(plugins: readonly InstalledPlugin[] = []): PluginFi
 }
 export function pluginMarker(
   plugins: readonly InstalledPlugin[] = [],
-  metadata: Record<string, unknown> = {},
+  stored: Record<string, unknown> = {},
 ): string | null {
+  const metadata = derivedMetadata(plugins, stored);
   let image: string | null = null;
   for (const { manifest, enabled } of plugins)
     if (enabled && manifest.marker?.kind === 'image') {
@@ -624,11 +765,47 @@ export function pluginMetadata(
           Array.isArray(metadata[field.metadataKey])
         )
           result[field.metadataKey] = metadata[field.metadataKey];
+      // What its derivations read (#122), so the browser derives the same from an overview:
+      // the keys they set, the tags they read and the values at their paths, nothing else.
+      for (const rule of manifest.derive ?? []) {
+        if (typeof metadata[rule.metadataKey] === 'string')
+          result[rule.metadataKey] = (metadata[rule.metadataKey] as string).slice(0, 10000);
+        for (const source of rule.from) projectSource(source, metadata, result);
+      }
     }
   // Its sensitive-content labels (#115), so its images are blurred wherever they show.
   const labels = contentLabels(metadata[CONTENT_LABELS_KEY]);
   if (labels.length) result[CONTENT_LABELS_KEY] = labels;
   return result;
+}
+/** Copies what a derivation source reads into an overview's projection. */
+function projectSource(
+  source: DerivationSource,
+  metadata: Record<string, unknown>,
+  result: Record<string, unknown>,
+) {
+  if ('tag' in source) {
+    const prefix = source.tag + ':';
+    const tags = (Array.isArray(metadata.tags) ? metadata.tags : []).filter(
+      (t): t is string => typeof t === 'string' && t.startsWith(prefix),
+    );
+    if (tags.length)
+      result.tags = [...new Set([...((result.tags as string[] | undefined) ?? []), ...tags])];
+    return;
+  }
+  const value = sourceValue(source, metadata);
+  if (value === null) return;
+  const parts = source.path.split('.');
+  let target = result;
+  for (const part of parts.slice(0, -1)) {
+    const next = target[part];
+    target = (target[part] =
+      next && typeof next === 'object' && !Array.isArray(next) ? next : {}) as Record<
+      string,
+      unknown
+    >;
+  }
+  target[parts.at(-1)!] = value.slice(0, 256);
 }
 export const MOMENT_ICONS: PluginManifest = validatePluginManifest({
   apiVersion: 1,
@@ -728,8 +905,9 @@ export function colorValue(value: unknown): string | null {
 }
 export function pluginColor(
   plugins: readonly InstalledPlugin[] = [],
-  metadata: Record<string, unknown> = {},
+  stored: Record<string, unknown> = {},
 ): string | null {
+  const metadata = derivedMetadata(plugins, stored);
   let color: string | null = null;
   for (const { manifest, enabled } of plugins)
     if (enabled && manifest.marker?.kind === 'color') {
@@ -858,6 +1036,49 @@ export const DURATION_BACKGROUNDS: PluginManifest = validatePluginManifest({
   background: { kind: 'image', metadataKey: 'backgroundUrl' },
   targets: ['durations'],
 });
+/**
+ * Where log imports keep a severity (#122): the `severity:<level>` tag, and the severity in
+ * each format's own metadata (server/log-formats.mjs), for formats that tag none (access logs)
+ * or imports whose tags were changed.
+ */
+const SEVERITY_SOURCES: DerivationSource[] = [
+  { tag: 'severity' },
+  ...[
+    'syslog',
+    'journald',
+    'jsonl',
+    'apache-error',
+    'nginx-error',
+    'apache-common',
+    'apache-combined',
+    'nginx-combined',
+  ].map((format) => ({ path: `${format}.severity` })),
+];
+export const LOG_SEVERITY_COLORS: PluginManifest = validatePluginManifest({
+  apiVersion: 1,
+  id: 'log-severity-colors',
+  version: 1,
+  name: 'Log severity colors',
+  description:
+    'Color imported log entries by severity, from any log format: debug gray, notice blue, warning yellow, errors red and anything more severe dark red; info keeps the default. A color chosen for an entry still wins, and nothing is saved: the colors are worked out as the timeline is drawn.',
+  fields: [],
+  derive: [
+    {
+      metadataKey: 'color',
+      from: SEVERITY_SOURCES,
+      map: {
+        emerg: '#8f3f3c',
+        alert: '#8f3f3c',
+        crit: '#8f3f3c',
+        err: '#bc6663',
+        warning: '#d6ad4c',
+        notice: '#7aadc4',
+        debug: '#9aa49f',
+      },
+    },
+  ],
+  marker: { kind: 'color', metadataKey: 'color' },
+});
 // Keep previously published declarative versions available at their original detail URLs.
 const LEGACY_PLUGINS = [MOMENT_ICONS, MOMENT_STACKS, MOMENT_COLORS, FOCUS_ON_HOVER].map(
   ({ source, ...manifest }) => validatePluginManifest({ ...manifest, version: 1 }),
@@ -878,6 +1099,7 @@ export const BUILTIN_PLUGINS: readonly PluginManifest[] = [
   EXPAND_ON_HOVER,
   DURATION_BACKGROUNDS,
   MOMENT_HEADINGS,
+  LOG_SEVERITY_COLORS,
 ];
 
 /** A page of a plugin library: the newest version of each plugin matching a search. */

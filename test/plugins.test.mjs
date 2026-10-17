@@ -53,6 +53,10 @@ import {
   searchPluginLibrary,
   isOfficialPlugin,
   BUILTIN_PLUGINS,
+  LOG_SEVERITY_COLORS,
+  derivedMetadata,
+  derivationKeys,
+  durationOverview,
 } from '../dist/core.mjs';
 import { createPluginLibrary } from '../server/plugins.mjs';
 import { createApplication } from '../server/http.mjs';
@@ -402,17 +406,17 @@ test('public plugin API works without accounts or PostgreSQL and validates its i
       'geological-ages',
       'moment-headings',
       'historical-dates',
+      'log-severity-colors',
       'moment-colors',
       'moment-icons',
       'moment-shapes',
       'moment-stacks',
-      'rich-text-notes',
     ],
   );
-  // Twelve to a page: the thirteenth is on the next.
+  // Twelve to a page: the thirteenth and on are on the next.
   assert.deepEqual(
     (await request(app, '/api/plugins?page=2')).body.plugins.map((p) => p.id),
-    ['moment-sources'],
+    ['rich-text-notes', 'moment-sources'],
   );
   assert.equal((await request(app, '/api/plugins?search=absent&page=1&limit=1')).body.total, 0);
   const response = await request(app, '/api/plugins/search', 'POST', {
@@ -835,5 +839,127 @@ test('headings: a level makes a moment a heading, in its font or Times New Roman
       ...MOMENT_HEADINGS,
       fields: [{ kind: 'typeface', metadataKey: 'x', label: 'x' }],
     }),
+  );
+});
+
+test('derived metadata: computed for the plugins to read, never over what an entity has (#122)', () => {
+  const severity = [installed(LOG_SEVERITY_COLORS)];
+  // Every log format: the severity tag, or the format's own severity where it tags none.
+  assert.equal(pluginColor(severity, { tags: ['syslog', 'severity:err'] }), '#bc6663');
+  assert.equal(pluginColor(severity, { journald: { severity: 'warning' } }), '#d6ad4c');
+  assert.equal(pluginColor(severity, { 'nginx-combined': { severity: 'crit' } }), '#8f3f3c');
+  assert.equal(pluginColor(severity, { tags: ['severity:debug'] }), '#9aa49f');
+  assert.equal(pluginColor(severity, { tags: ['severity:notice'] }), '#7aadc4');
+  // The tag comes first; a level the map doesn't color (info) passes to the next source.
+  assert.equal(
+    pluginColor(severity, { tags: ['severity:err'], syslog: { severity: 'debug' } }),
+    '#bc6663',
+  );
+  assert.equal(
+    pluginColor(severity, { tags: ['severity:info'], syslog: { severity: 'alert' } }),
+    '#8f3f3c',
+  );
+  assert.equal(pluginColor(severity, { tags: ['severity:info'] }), null);
+  assert.equal(pluginColor(severity, { title: 'Not a log entry' }), null);
+  // A color the entry has wins, and nothing is written into the entry.
+  const entry = { color: '#5f8b67', tags: ['severity:err'] };
+  assert.equal(pluginColor(severity, entry), '#5f8b67');
+  const log = { tags: ['severity:err'] };
+  assert.deepEqual(derivedMetadata(severity, log), { tags: ['severity:err'], color: '#bc6663' });
+  assert.deepEqual(log, { tags: ['severity:err'] });
+  // Without derivations (or disabled), the metadata itself.
+  assert.equal(derivedMetadata([installed(MOMENT_COLORS)], log), log);
+  assert.equal(derivedMetadata([{ ...severity[0], enabled: false }], log), log);
+  assert.equal(pluginColor([{ ...severity[0], enabled: false }], log), null);
+
+  // The color plugin reads the derived color in either order, with its script too.
+  for (const plugins of [
+    [installed(MOMENT_COLORS), installed(LOG_SEVERITY_COLORS)],
+    [installed(LOG_SEVERITY_COLORS), installed(MOMENT_COLORS)],
+    [
+      {
+        ...installed(LOG_SEVERITY_COLORS),
+        manifest: { ...LOG_SEVERITY_COLORS, marker: undefined },
+      },
+      installed(MOMENT_COLORS),
+    ],
+  ])
+    assert.equal(pluginColor(plugins, log), '#bc6663');
+
+  // A custom plugin: derivations chain, and a script reads what its own derive sets.
+  const custom = validatePluginManifest({
+    apiVersion: 1,
+    id: 'status-from-logs',
+    version: 1,
+    name: 'Status from logs',
+    description: 'Shapes from a derived level.',
+    fields: [],
+    derive: [
+      { metadataKey: 'level', from: [{ path: 'app.log.level' }, { tag: 'severity' }] },
+      { metadataKey: 'status', from: [{ path: 'level' }], map: { err: 'blocked' } },
+    ],
+    source:
+      'function render(moment: string, api: PluginAPI): string { return api.get("status") === "blocked" ? api.shape("diamond") : api.none(); }',
+  });
+  checkPluginScript(custom);
+  assert.equal(pluginShape([installed(custom)], { tags: ['severity:err'] }), 'diamond');
+  assert.equal(pluginShape([installed(custom)], { app: { log: { level: 'err' } } }), 'diamond');
+  assert.equal(pluginShape([installed(custom)], { app: { log: { level: 7 } } }), 'circle');
+  assert.equal(pluginShape([installed(custom)], { tags: ['severity:info'] }), 'circle');
+  assert.deepEqual(derivationKeys(custom), ['level', 'app', 'tags', 'status']);
+  assert.deepEqual(derivationKeys(LOG_SEVERITY_COLORS).slice(0, 3), ['color', 'tags', 'syslog']);
+
+  // An overview carries what the derivations read, and nothing else of it.
+  const full = {
+    title: 'disk full',
+    tags: ['syslog', 'severity:err', 'host:web-1'],
+    syslog: { severity: 'err', host: 'web-1', structuredData: { secret: 'x' } },
+    private: 'not projected',
+  };
+  const projected = pluginMetadata(severity, full);
+  assert.deepEqual(projected.tags, ['severity:err']);
+  assert.deepEqual(projected.syslog, { severity: 'err' });
+  assert.equal(projected.private, undefined);
+  assert.equal(pluginColor(severity, projected), pluginColor(severity, full));
+  // Durations: bands carry their tags, and the plugin applies to them.
+  const band = durationOverview({ title: 'outage', tags: ['severity:crit'], journald: {} });
+  assert.deepEqual(band.tags, ['severity:crit']);
+  assert.equal(pluginColor(durationPlugins(severity), band), '#8f3f3c');
+
+  // What a derivation may declare.
+  const derive = (rules) => validatePluginManifest({ ...custom, source: undefined, derive: rules });
+  for (const rules of [
+    [],
+    {},
+    Array.from({ length: 9 }, () => ({ metadataKey: 'a', from: [{ tag: 'a' }] })),
+    [{ metadataKey: 'a', from: [] }],
+    [{ metadataKey: 'a', from: Array.from({ length: 17 }, () => ({ tag: 'a' })) }],
+    [{ metadataKey: 'title', from: [{ tag: 'a' }] }],
+    [{ metadataKey: 'tags', from: [{ tag: 'a' }] }],
+    [{ metadataKey: 'a', from: [{ tag: 'severity:' }] }],
+    [{ metadataKey: 'a', from: [{ tag: 'Severity' }] }],
+    [{ metadataKey: 'a', from: [{ tag: 'a', path: 'b' }] }],
+    [{ metadataKey: 'a', from: [{ path: 'a..b' }] }],
+    [{ metadataKey: 'a', from: [{ path: 'a.b.c.d.e' }] }],
+    [{ metadataKey: 'a', from: [{ path: 'a.__proto__' }] }],
+    [{ metadataKey: 'a', from: [{ path: 'a.*' }] }],
+    [{ metadataKey: 'a', from: [{ tag: 'a' }], map: { b: 3 } }],
+    [{ metadataKey: 'a', from: [{ tag: 'a' }], map: { b: 'x'.repeat(257) } }],
+    [{ metadataKey: 'a', from: [{ tag: 'a' }], map: ['b'] }],
+    [{ metadataKey: 'a', from: [{ tag: 'a' }], script: 'x' }],
+  ])
+    assert.throws(() => derive(rules), JSON.stringify(rules));
+  assert.equal(derive([{ metadataKey: 'a', from: [{ path: 'a-b.c_d' }] }]).derive.length, 1);
+  // A map key named like an object's own properties is only a value.
+  assert.equal(
+    pluginColor(
+      [
+        installed(
+          derive([{ metadataKey: 'color', from: [{ tag: 'k' }], map: { toString: '#123456' } }]),
+        ),
+      ],
+      { tags: ['k:hasOwnProperty'] },
+    ),
+    null,
   );
 });
