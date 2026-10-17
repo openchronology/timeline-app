@@ -20,7 +20,8 @@ domain="gui/$(id -u)"
 log="@HOMEBREW_PREFIX@/var/log/openchronology-$worker.log"
 
 # The agent's definition: the worker's command (which reads its configuration in
-# @HOMEBREW_PREFIX@/etc/openchronology), kept running, logging beside the server's log.
+# @HOMEBREW_PREFIX@/etc/openchronology), kept running, logging beside the server's log, in
+# every kind of session (as brew services writes it), so that it starts over SSH as well.
 write_plist() {
   mkdir -p "$agents" "@HOMEBREW_PREFIX@/var/log"
   cat >"$plist" <<EOF
@@ -38,6 +39,14 @@ write_plist() {
   <true/>
   <key>KeepAlive</key>
   <true/>
+  <key>LimitLoadToSessionType</key>
+  <array>
+    <string>Aqua</string>
+    <string>Background</string>
+    <string>LoginWindow</string>
+    <string>StandardIO</string>
+    <string>System</string>
+  </array>
   <key>ThrottleInterval</key>
   <integer>10</integer>
   <key>WorkingDirectory</key>
@@ -67,6 +76,9 @@ case "$action" in
   start)
     unload
     write_plist
+    # Enabled explicitly, as brew services does: macOS's background item management, scanning
+    # the new plist, otherwise removes the agent seconds after it starts.
+    launchctl enable "$domain/$label"
     launchctl bootstrap "$domain" "$plist"
     echo "openchronology-$worker started ($label); it starts again when you log in. Log: $log"
     ;;
