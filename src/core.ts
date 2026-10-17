@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The editor's core, shared by every edition, the server and the tests (built as dist/core.mjs):
+// timeline documents and their validation, the TimelineIndex of moments, durations and links,
+// and the Viewport. It also re-exports the other core modules.
 import {
   validateDurations,
   validateDuration,
@@ -68,7 +72,6 @@ export {
   SEARCH_MAX_TERMS,
 } from './search.js';
 export type { SearchResult, SearchPage } from './search.js';
-// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { Rational as Q, RationalMap } from 'rational-ordered-map';
 import { validateInstalledPlugins, imageURL } from './plugins.js';
 import type { InstalledPlugin } from './plugins.js';

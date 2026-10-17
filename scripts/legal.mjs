@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Legal notices in the built pages: the copyright banner for bundles, the footer with the build
+// identity, and dist/legal.html with the notice, draft terms and policies, and licenses.
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { writeBuildInfo } from './build-info.mjs';
 

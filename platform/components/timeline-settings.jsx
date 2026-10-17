@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// A timeline's sharing and settings: visibility, address, collaborators, content labels,
+// saved history and deletion.
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { dismissOnBackdrop } from '../../src/dialogs.ts';

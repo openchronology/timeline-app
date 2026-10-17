@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The editor at /editor: a new (?new=1), sample (?demo=dense), forked (?fork=) or browser
+// draft (?draft=) timeline, with the tour on ?tour=1.
 import Editor from '../../components/editor.jsx';
 export const dynamic = 'force-dynamic';
 export default async function EditorPage({ searchParams }) {

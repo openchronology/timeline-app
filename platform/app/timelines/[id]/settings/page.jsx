@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// A timeline's sharing and settings at …/settings, for those who may share it
+// (components/timeline-settings.jsx).
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { accessibleTimeline } from '../../../../lib/timeline.js';

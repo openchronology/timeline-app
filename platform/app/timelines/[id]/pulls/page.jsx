@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// A timeline's pull requests at …/pulls, a page at a time (server/collaboration.mjs).
 import Link from 'next/link';
 import { accessibleTimeline } from '../../../../lib/timeline.js';
 import { timelinePath } from '../../../../../src/addresses.ts';

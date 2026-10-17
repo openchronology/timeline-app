@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// The dashboard's search form for public timelines: words, tag and sort order.
 import { useState } from 'react';
 import Form from 'next/form';
 export default function TimelineSearch({ query }) {

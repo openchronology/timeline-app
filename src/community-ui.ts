@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The dashboard and pull requests in the editor: lists of timelines (yours, starred and public),
+// stars, forks and comparisons, and reviewing, discussing and merging pull requests.
 import { validateDocument } from './core.js';
 import { describeLabels } from './content-labels.js';
 import type { TimelineDocument, PointEvent } from './core.js';

@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Where signing in may return to: only the site's own pages, so a link cannot send people
+// elsewhere.
 import { timelineAddress } from '../../src/addresses.ts';
 export function safeReturnTo(value) {
   if (value === '/' || value === '/editor' || value === '/account' || value === '/plugins')

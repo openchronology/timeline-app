@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// A timeline's page, at /<owner>/<slug> (#148) or /timelines/<id>: the editor open at it, its
+// first moments as text, and its link-preview metadata. A copy still being prepared waits.
 import Editor from '../../../components/editor.jsx';
 import TimelineSummary from '../../../components/timeline-summary.jsx';
 import PreparingCopy from '../../../components/preparing-copy.jsx';

@@ -1,4 +1,6 @@
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+# CI: builds GMP and SQLite as static libraries with a pinned vcpkg for the Windows desktop
+# build (the triplet in triplets/), and passes their location to later steps (GITHUB_ENV).
 $ErrorActionPreference = 'Stop'
 $root = Join-Path $env:RUNNER_TEMP 'och-vcpkg'
 # Source archives and built packages live outside the clone so CI can cache them: builds then

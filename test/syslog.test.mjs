@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Syslog (server/syslog.mjs and its receiver): RFC 5424 and BSD messages, TCP framing, routes,
+// moments, and batched writes with retries and limits.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { compileRoutes, parseSyslog, syslogFrames, syslogMoment } from '../server/syslog.mjs';

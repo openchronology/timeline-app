@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Tags (docs/tags.md) and separations: validating timeline and entity tags, splitting a timeline
+// into what carries chosen tags (or relates to a chosen entity) and the rest, and tag counts.
 import { resolveDuration } from './durations.js';
 import {
   adjacency,

@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// npm run build: builds the editor (scripts/build.mjs), then the Next.js platform as the
+// standalone server that npm start and the Docker image run.
 import { syncPlatformAssets } from './platform-assets.mjs';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';

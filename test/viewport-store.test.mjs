@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Signed-in users’ stored timeline windows (src/viewport-store.ts): keys, saving, per-revision
+// counts, eviction past the budget, and answering views once restored.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Q, Viewport } from '../dist/core.mjs';

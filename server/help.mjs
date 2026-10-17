@@ -369,7 +369,11 @@ let loaded = null;
  */
 export function helpPages(root = process.env.OCH_APP_ROOT ?? process.cwd()) {
   loaded ??= (async () => {
-    const files = (await readdir(join(root, 'docs'))).filter((f) => f.endsWith('.md'));
+    // docs/README.md lists the docs for those reading the repository; the help's own index
+    // does that here, and "readme" is the project's README.
+    const files = (await readdir(join(root, 'docs'))).filter(
+      (f) => f.endsWith('.md') && f !== 'README.md',
+    );
     const pages = new Map();
     for (const file of files.sort())
       pages.set(

@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Versioning against PostgreSQL (npm run test:versioning:postgres): immutable history, forks and
+// copies, pinned proposals, sync, merge ancestry, conflicts, privacy and upstream deletion.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';

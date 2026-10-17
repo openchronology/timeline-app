@@ -1,4 +1,7 @@
 name: Desktop targets
+# Builds, tests and uploads the desktop app's packages (scripts/desktop/build.mjs): .deb and
+# AppImage, Rocky Linux RPM, macOS on Apple silicon and Intel, and Windows, the last two with
+# pinned static GMP and SQLite. Called by ci.yml and release.yml.
 on:
   workflow_call:
     inputs:

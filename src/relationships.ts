@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Relationships (docs/relationships.md): undirected links between moments and durations, their
+// validation, the graph they form, and the arcs drawn between linked entities.
 import { Rational as Q } from 'rational-ordered-map';
 import { durationTree, resolveDuration } from './durations.js';
 import type { Duration, DurationBand, IntervalNode } from './durations.js';

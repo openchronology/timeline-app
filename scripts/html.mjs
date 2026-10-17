@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Writes dist/index.html, the editor's page (src/index.html) with its legal footer, and
+// dist/legal.html.
 import { readFile, writeFile, rename } from 'node:fs/promises';
 import { buildLegal, withLegal } from './legal.mjs';
 

@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// /connect/desktop/<code>: approving the desktop app's sign-in with the signed-in account
+// (components/device-approval.jsx).
 import { notFound, redirect } from 'next/navigation';
 import { currentSession } from '../../../../lib/session.js';
 import DeviceApproval from '../../../../components/device-approval.jsx';

@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Builds one desktop package with Tauri: node scripts/desktop/build.mjs <target> (a target in
+// packages.mjs). With RELEASE_TAG, checks the checkout is that tag and stamps its version;
+// retries macOS packaging, then stages the package in desktop-artifacts/.
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { writeFile } from 'node:fs/promises';

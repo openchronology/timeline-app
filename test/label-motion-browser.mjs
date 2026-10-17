@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Labels kept in place as the view moves, bounded crossfades, and motion people can turn down.
 import assert from 'node:assert/strict';
 import { DEFAULT_PRESENTATION, parseTimestamp } from '../dist/core.mjs';
 

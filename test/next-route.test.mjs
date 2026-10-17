@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The Next.js route bridge (server/next-handler.mjs): streamed requests, redirects, cookies and
+// sessions, startup failures, binary responses, and safe login return paths.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { dispatchNextRequest } from '../server/next-handler.mjs';

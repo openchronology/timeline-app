@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Follow latest (src/follow-latest.ts): opt-in, deferred while the view is busy, cancelled by
+// navigation or switching timeline, and never looping on failure.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { followLatest } from '../dist/follow-latest.mjs';

@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The HTTP API (createRequestHandler): its routes, reading and checking requests, and handing
+// them to the store, accounts, collaboration, moderation and the other services. Next.js serves
+// it in production (next-handler.mjs); createApplication is a plain Node server for tests.
 import {
   compareLimits as compareLimitsFromEnv,
   compareLimit,

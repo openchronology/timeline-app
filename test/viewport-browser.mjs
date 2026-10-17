@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Wheel zooming keeps its precision: hundreds of wheel steps in and out leave the bounds put.
 import assert from 'node:assert/strict';
 import { Q } from '../dist/core.mjs';
 

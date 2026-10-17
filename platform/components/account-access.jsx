@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// The account page's access settings: profile picture, sensitive content, linked sign-in
+// methods, API keys, and deleting the account.
 import { useState } from 'react';
 import { api } from '../lib/api.js';
 import HelpTip from './help-tip.jsx';

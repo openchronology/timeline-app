@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Signing in (server/auth.mjs, server/oauth.mjs): provider settings and PKCE, anonymous sign-in,
+// session expiry, Google and Facebook token checks, OAuth state, and older password hashes.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign, createHmac, scryptSync } from 'node:crypto';

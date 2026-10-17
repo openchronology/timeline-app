@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Build identity (scripts/build-info.mjs): commits, release tags and local changes in both HTML
+// builds, and download URLs that match the release assets.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, execFile } from 'node:child_process';

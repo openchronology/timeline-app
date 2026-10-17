@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The HTTP server: readiness checks, guest deployments without a database, query validation,
+// password hashing, cookies and CSRF.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';

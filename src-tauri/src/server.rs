@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The desktop app's server connections: up to eight servers, signing in to them by device login,
+// API requests to them for the editor, and opening image links in the browser.
 use reqwest::{Client, Method, Url};
 use serde::Serialize;
 use serde_json::{json, Value};

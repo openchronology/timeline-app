@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The log importer: times and zones, built-in and custom formats, moments, routes and filters,
+// repeatable entry IDs, batches, progress, and plain, gzipped and standard input.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile, utimes } from 'node:fs/promises';

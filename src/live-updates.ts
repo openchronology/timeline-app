@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Live updates of the server timelines on screen: an event stream (or polling, on the desktop
+// or without one) says when one has a new revision, and it is refreshed.
 export interface LiveTimeline {
   id: string;
   revision: string;

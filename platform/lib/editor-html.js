@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The editor's built page (dist/index.html) as the platform serves it, and its content
+// security policy.
 import 'server-only';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';

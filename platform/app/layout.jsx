@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Every page's frame: the site's header and navigation, its footer with the build, and
+// analytics when enabled; also the site's default metadata for link previews.
 import './platform.css';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';

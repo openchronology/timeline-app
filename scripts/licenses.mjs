@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The license texts of the bundled browser dependencies (rational-ordered-map and fraction.js),
+// for THIRD_PARTY.txt and the offline page.
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';

@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// One saved checkpoint at …/history/<checkpoint>: shown here for smaller timelines, and
+// downloadable as .ochx.
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { accessibleTimeline } from '../../../../../lib/timeline.js';

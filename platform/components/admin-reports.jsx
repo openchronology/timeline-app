@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// One case in the administrators' report queue (#115): what was reported and why, and the
+// decisions that can be taken on it.
 import { REPORT_CATEGORIES, REPORT_TEXT } from '../../server/report-categories.mjs';
 import { CONTENT_LABELS, describeLabels } from '../../src/content-labels.ts';
 const CATEGORY = Object.fromEntries(REPORT_CATEGORIES);

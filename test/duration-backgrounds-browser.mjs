@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Duration backgrounds (#94): a duration’s image drawn behind the timeline it spans.
 import assert from 'node:assert/strict';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
 import { DURATION_BACKGROUNDS } from '../dist/core.mjs';

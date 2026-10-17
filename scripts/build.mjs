@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Builds the editor into dist/: the browser bundle, the shared core the server and tests import,
+// the page with its legal notices, third-party licenses, the offline HTML and the web source
+// archive (scripts/source.mjs).
 import { build } from 'esbuild';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { buildOffline } from './offline.mjs';

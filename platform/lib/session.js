@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The visitor's session on a server-rendered page, and how many timelines they may compare.
 import 'server-only';
 import { headers } from 'next/headers';
 import { platformServices } from '../../server/platform.mjs';

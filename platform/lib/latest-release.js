@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The latest release on GitHub, for the download page, asked for at most every ten minutes.
 import 'server-only';
 import { REPOSITORY, releaseFrom } from './releases.js';
 /** GitHub is asked at most every ten minutes; a failure is remembered for one. */

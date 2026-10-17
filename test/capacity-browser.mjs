@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Capacity advice in the editor: large timelines suggest the desktop app or the platform.
 import assert from 'node:assert/strict';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
 import { THRESHOLDS } from '../dist/core.mjs';

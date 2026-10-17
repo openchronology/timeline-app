@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// Google Analytics, when the site enables it: asks the visitor's consent first and loads only
+// after it; AnalyticsSettings lets them change their choice.
 import { useEffect, useState } from 'react';
 
 /** Where a visitor's choice is kept: in their browser only. */

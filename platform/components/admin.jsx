@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// Site administration: accounts and their standing (#103), timelines, site settings and the
+// report queue, with changes confirmed before they apply.
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api.js';
 import { ReportCase } from './admin-reports.jsx';

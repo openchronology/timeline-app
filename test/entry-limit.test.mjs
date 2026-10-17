@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The entry limit (#129): validation follows the server’s limit, and a document too large for
+// PostgreSQL is refused before it reaches the database.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateDocument, entryLimit, setEntryLimit, DEFAULT_ENTRY_LIMIT } from '../dist/core.mjs';

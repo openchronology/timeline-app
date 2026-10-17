@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The timeline on narrow screens and phones, either way up, drawn without any input.
 import assert from 'node:assert/strict';
 
 export async function checkResponsiveTimeline(page) {

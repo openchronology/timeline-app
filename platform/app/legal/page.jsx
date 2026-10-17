@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// /legal: the service terms, privacy notice, copyright notices and software licenses, read
+// from the repository's files.
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 export const dynamic = 'force-dynamic';

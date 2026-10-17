@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Proposing a fork's saved changes to its upstream at …/pulls/new
+// (components/fork-operation.jsx).
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { accessibleTimeline, versionInfo } from '../../../../../lib/timeline.js';

@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The ruler: decimal, clock and calendar graduations, offsets and unit scales, custom steps,
+// crossfades and label spacing, exact at any zoom.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

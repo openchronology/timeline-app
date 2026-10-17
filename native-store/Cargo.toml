@@ -1,3 +1,5 @@
+# The native store's crate: SQLite timeline files (.och) with exact rational times, used by the
+# desktop app (src-tauri) and the server's och-convert.
 [package]
 name = "openchronology-store"
 version = "0.1.0"

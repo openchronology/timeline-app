@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Shifting and scaling times (#96): exact mappings, and which entities move, anchored ends
+// following their moments.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

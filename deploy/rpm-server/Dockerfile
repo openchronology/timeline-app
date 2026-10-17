@@ -98,8 +98,9 @@ COPY --from=native /build/native-store/target/release/och-convert ${APP}/bin/och
 COPY --from=native /stage/usr/ ${ROOT}/usr/
 COPY --from=native /stage/pg-major /root/pg-major
 COPY --from=native /build/pgmp/COPYING ${ROOT}/usr/share/doc/openchronology-server/pgmp/COPYING
-COPY LICENSE NOTICE THIRD_PARTY.md README.md ${ROOT}/usr/share/doc/openchronology-server/
+# The docs first, so the project's README, not docs/README.md, is the one installed.
 COPY docs ${ROOT}/usr/share/doc/openchronology-server/
+COPY LICENSE NOTICE THIRD_PARTY.md README.md ${ROOT}/usr/share/doc/openchronology-server/
 COPY deploy/debian-server/ /root/shared/
 COPY deploy/rpm-server/ /root/rpm/
 RUN set -eu; \

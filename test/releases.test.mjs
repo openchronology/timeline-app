@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The download page (platform/lib/releases.js): every file a release attaches, the visitor’s
+// system, and links to the latest release.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

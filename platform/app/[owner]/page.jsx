@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// A profile at /<username> (#148), shown by components/profile.jsx. Names the site's own
+// pages use are not profiles; a capitalized name redirects to its lowercase address.
 import { notFound, permanentRedirect } from 'next/navigation';
 import Profile, { profileMetadata } from '../../components/profile.jsx';
 import { RESERVED_NAMES, USERNAME } from '../../../src/addresses.ts';

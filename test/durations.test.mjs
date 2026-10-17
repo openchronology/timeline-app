@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Durations: fixed and anchored ends, pinning when an anchor is deleted, legacy links, interval
+// queries, sparse edits, saving, merges and plugins.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

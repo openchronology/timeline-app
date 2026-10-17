@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The dashboard at /: the signed-in account's timelines, favorites and browser drafts, and
+// the public timelines to search and browse.
 import Link from 'next/link';
 import TimelineSearch from '../components/timeline-search.jsx';
 import { accountCompareLimit, currentSession } from '../lib/session.js';

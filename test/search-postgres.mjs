@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Search against PostgreSQL: ranked prefix matches over moments, stacks and durations, pages,
+// rebuilt on save, and backfilled.
 import pg from 'pg';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';

@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Plugins (docs/plugins.md): manifests of the fields moments and durations carry (images, stacks,
+// colors, shapes, headings and more), their validation, the built-in plugins and the library,
+// and reading each field's value.
 import { compilePluginScript } from './custom-time.js';
 import { contentLabels, CONTENT_LABELS_KEY } from './content-labels.js';
 /** Versioned host components and optional source interpreted by our bounded language. */

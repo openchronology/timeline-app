@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The ruler in the editor: anchoring, subdivisions and saved policies.
 import assert from 'node:assert/strict';
 import { Q, DEFAULT_PRESENTATION, parseTimestamp } from '../dist/core.mjs';
 

@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Read-only plugin projection (server/query-plugins.mjs) over a comparison, within document limits.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { queryPlugins } from '../server/query-plugins.mjs';

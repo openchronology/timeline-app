@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Page addresses (#148): profiles and timelines at their owner’s name, the rules for slugs and
+// usernames, and naming a timeline by owner and slug or by ID.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

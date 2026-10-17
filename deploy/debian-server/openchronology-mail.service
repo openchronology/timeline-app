@@ -1,3 +1,5 @@
+# Account email delivery (Resend) as a systemd service, with the server's configuration
+# (Debian and RPM packages).
 [Unit]
 Description=OpenChronology account email delivery (Resend)
 Documentation=file:///usr/share/doc/openchronology-server/README.Debian

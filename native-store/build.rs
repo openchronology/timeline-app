@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Builds the vendored SQLite rational extension (vendor/sqlite-rational) with CMake and links it
+// with SQLite and GMP; OCH_NATIVE_PREFIX and OCH_NATIVE_STATIC choose pinned static libraries.
 use std::{env, path::PathBuf, process::Command};
 fn main() {
     let source =

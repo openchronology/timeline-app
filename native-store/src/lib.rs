@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+//! The native store: timeline documents in SQLite files with exact rational times
+//! (sqlite-rational), saving, opening and checking them, and the window, summary and filter
+//! queries the desktop app browses with (workspace.rs).
 mod intervals;
 mod sqlite;
 mod workspace;

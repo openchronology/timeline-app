@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The public example timelines seeding installs (docs/seeding.md): their documents, IDs and
+// images, and how timelines seeded by earlier releases are expanded or enriched without
+// overwriting edits.
 import {
   DEFAULT_PRESENTATION,
   MOMENT_SOURCES,

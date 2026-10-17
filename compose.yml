@@ -1,3 +1,5 @@
+# Docker Compose for a self-hosted server: PostgreSQL with pgmp, migrations and the web app,
+# with optional seed data, mail worker and syslog receiver (docs/docker.md).
 x-app-build: &app-build
   context: .
   dockerfile: deploy/Dockerfile.app

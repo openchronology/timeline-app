@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Administration rules: storage quotas, safe avatar uploads, and API keys’ lifetimes and scopes,
+// which never reach account or admin access.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { quotaValue, avatarValue } from '../server/administration.mjs';

@@ -4,6 +4,8 @@ A timeline editor for moments in time. Time is an arbitrary-precision rational c
 
 The [user guide](docs/guide.md), the [FAQ](docs/faq.md) and everything in [`docs/`](docs/) are also on every server, at `/help`, searchable and as current as the code it runs.
 
+To change it, start with [contributing](CONTRIBUTING.md): where everything is, with a table of contents in every folder, and how to make a change.
+
 ## Try the browser editor
 
 Use Node.js 22 or 24:

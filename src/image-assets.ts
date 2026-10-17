@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Images a timeline carries with it: copied into the document as data (for files and the
+// offline HTML), and shown from those copies instead of fetching their URLs.
 import { imageURL } from './plugins.js';
 import type { TimelineDocument } from './core.js';
 let assets: Record<string, string> = {};

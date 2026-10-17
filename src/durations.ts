@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Durations (docs/durations.md): spans between exact times or moments they follow, their
+// validation and resolution, the interval tree for windows, and summaries when collapsed.
 import { Rational as Q } from 'rational-ordered-map';
 import { contentLabels, CONTENT_LABELS_KEY } from './content-labels.js';
 import type { PointEvent, Metadata } from './core.js';

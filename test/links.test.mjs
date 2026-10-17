@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Links into a timeline: fragments naming moments, durations, searches and views, and pages of
+// their own for shared moments and durations.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Q, parseLink, linkFragment, sharePath } from '../dist/core.mjs';

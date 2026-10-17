@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Summary groups: collapsed durations in frame form, and nearby groups merged into one at the
+// view's grouping distance.
 import { Rational as Q } from 'rational-ordered-map';
 import { durationOverview } from './durations.js';
 import type { DurationSummary } from './durations.js';

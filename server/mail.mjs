@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Email: the Resend sender RESEND_API_KEY and AUTH_EMAIL_FROM configure, and an outbox in
+// PostgreSQL that keeps messages encrypted until flushMail sends them.
 import { randomUUID } from 'node:crypto';
 import { seal, unseal, encryptionKey } from './security-crypto.mjs';
 export function mailFromEnv(env = process.env, fetcher = fetch) {

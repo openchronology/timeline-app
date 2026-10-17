@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Smoke test of the running Docker Compose suite (CI): readiness on PostgreSQL, the website, the
+// editor frame, and a session with file exchange.
 import assert from 'node:assert/strict';
 const origin = 'http://localhost:5173';
 const health = await fetch(`${origin}/healthz`);

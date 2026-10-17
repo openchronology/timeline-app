@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Timelines whose saved head is on a server or in a desktop file: the cache of viewport windows
+// fetched from it, the RemoteWorkspace that keeps only loaded and edited entries in memory,
+// and applying those edits to a saved document.
 import {
   Q,
   TimelineIndex,

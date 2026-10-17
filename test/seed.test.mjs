@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The seed catalogue (server/seed-data.mjs): six sourced example timelines, their plugins and
+// comparisons, and upgrades that keep people’s edits.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

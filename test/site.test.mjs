@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The platform’s name and Google Analytics (server/site.mjs), off unless configured.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { analyticsId, analyticsPolicy, platformName, siteName } from '../server/site.mjs';

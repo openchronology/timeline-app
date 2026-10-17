@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The comparison dialog: search for and choose two or more timelines (from servers or files)
+// and start comparing them (comparison.ts).
 import { DEFAULT_PRESENTATION } from './core.js';
 import type { TimePresentation } from './core.js';
 import { ComparisonView, samePresentation } from './comparison.js';

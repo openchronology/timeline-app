@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Browser drafts kept per record: the journal of changed entities, and restoring exactly the
+// document the index exports.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

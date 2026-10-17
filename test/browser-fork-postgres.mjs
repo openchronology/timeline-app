@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Copying a public timeline into the browser, against PostgreSQL: access, untouched data, no fork
+// stored, event and byte budgets, revision checks and rate limits.
 import assert from 'node:assert/strict';
 import pg from 'pg';
 import { randomUUID } from 'node:crypto';

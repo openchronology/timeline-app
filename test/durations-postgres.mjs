@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Durations against PostgreSQL: standalone definitions, anchored and fixed ends, bounded frames,
+// sparse edits, ends pinned when a moment goes, history, and converting legacy links.
 import pg from 'pg';
 import { beginIndexWrite } from '../server/index-versions.mjs';
 import { randomUUID } from 'node:crypto';

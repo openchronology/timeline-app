@@ -1,3 +1,5 @@
+# PostgreSQL 16 with the pgmp extension built in (compose.yml's database service): pgmp stores
+# times as exact rationals.
 FROM postgres:16-bookworm AS postgres-base
 
 FROM postgres-base AS build

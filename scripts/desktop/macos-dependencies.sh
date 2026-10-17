@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+# CI: builds GMP and SQLite as static libraries with a pinned vcpkg for the macOS desktop build,
+# and passes their location to later steps (GITHUB_ENV).
 set -euo pipefail
 brew install autoconf autoconf-archive automake libtool pkg-config cmake ninja
 vcpkg_root="$RUNNER_TEMP/och-vcpkg"

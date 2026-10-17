@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Following the latest moments of a live timeline: arrivals are gathered, and the view moves to
+// them only once navigation has been idle for 15 seconds.
 interface Host<T> {
   load(signal: AbortSignal): Promise<T | null>;
   apply(value: T): void;

@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Comparing timelines (docs/comparison.md): two to eight on tracks side by side or combined, each
+// aligned by a scale and offset, their plugins merged, and each fetched through its own cache.
 import { Q, TimelineIndex, Viewport, DEFAULT_PRESENTATION } from './core.js';
 import type {
   DurationBand,

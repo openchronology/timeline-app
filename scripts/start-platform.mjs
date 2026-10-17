@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// npm start: runs the built standalone Next.js platform server in production, with settings
+// from .env (HOST and PORT default to 127.0.0.1:5173).
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import { loadEnvFile } from '../server/env-file.mjs';

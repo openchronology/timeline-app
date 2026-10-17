@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Human-verification challenges against PostgreSQL: when sign-up, sign-in, contributions, plugin
+// publishing and reports are asked for an answer, and answers spent once.
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';

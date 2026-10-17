@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The Next.js platform against PostgreSQL (npm run test:platform:postgres): accounts, private
+// pages, search, stars, profiles, sharing, proposals, merging, saved history and addresses.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';

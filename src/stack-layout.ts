@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Screen layout arithmetic: scaling the timeline's display around a point, and which cards of a
+// moment's stack are within view.
 /** Child coordinates are presentation rows, independent of rational time. */
 export function scaleTimeline(current: number, offset: number, requested: number, anchor: number) {
   if (![current, offset, requested, anchor].every(Number.isFinite) || current <= 0)

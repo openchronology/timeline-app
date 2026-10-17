@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The card shown on hovering a moment: its image, title and text, built by the editor from the
+// moment's plugin fields.
 import { imageSource } from './image-assets.js';
 import { pluginFocus, pluginMarker, pluginColor, pluginRichText, imageURL } from './plugins.js';
 import { renderMarkdown } from './rich-text.js';

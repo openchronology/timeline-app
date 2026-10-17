@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// What a page shows when it fails to load, with a button to try again.
 export default function ErrorPage({ reset }) {
   return (
     <main className="platform">

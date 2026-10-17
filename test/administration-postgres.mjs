@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Administration against PostgreSQL: the first administrator, CSRF and permissions, quotas under
+// concurrent saves, scoped and revoked API keys, profiles, migration and suspension.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';

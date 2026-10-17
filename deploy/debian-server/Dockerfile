@@ -1,6 +1,6 @@
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 # Builds openchronology-server_<version>_amd64.deb for one distribution. Use
-# scripts/server-deb.mjs, which passes these arguments and collects the package:
+# scripts/server-package.mjs, which passes these arguments and collects the package:
 #   BASE      debian:trixie or ubuntu:24.04   PG_MAJOR  17 or 16 (that distribution's server)
 #   DEB_VERSION, OCH_BUILD_COMMIT, OCH_BUILD_VERSION
 ARG BASE=debian:trixie
@@ -93,8 +93,9 @@ COPY deploy/debian-server/openchronology-server.mjs ${APP}/openchronology-server
 COPY --from=native /build/native-store/target/release/och-convert ${APP}/bin/och-convert
 COPY --from=native /stage/usr/ ${ROOT}/usr/
 COPY --from=native /build/pgmp/COPYING ${ROOT}/usr/share/doc/openchronology-server/pgmp/COPYING
-COPY LICENSE NOTICE THIRD_PARTY.md README.md ${ROOT}/usr/share/doc/openchronology-server/
+# The docs first, so the project's README, not docs/README.md, is the one installed.
 COPY docs ${ROOT}/usr/share/doc/openchronology-server/
+COPY LICENSE NOTICE THIRD_PARTY.md README.md ${ROOT}/usr/share/doc/openchronology-server/
 COPY deploy/debian-server/ /root/debian/
 RUN set -eu; \
     doc="$ROOT/usr/share/doc/openchronology-server"; \

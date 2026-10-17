@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The build's identity: its commit, release tag and whether the checkout was modified, from Git
+// or from the build-info.json a source archive carries. Written to dist/build-info.json for
+// the page footer and the release checks.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';

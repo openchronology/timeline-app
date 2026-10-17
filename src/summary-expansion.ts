@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Expanding a summary on the timeline: hovering or focusing a group of two to five moments fans
+// them out around it, loaded on demand and gone when the view changes.
 import type { FrameGroup, PointEvent } from './core.js';
 interface Host {
   scale(): number;

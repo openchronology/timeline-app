@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Account security primitives: encrypting secrets at rest (seal and unseal with
+// AUTH_ENCRYPTION_KEY), authenticator codes (TOTP), recovery codes, email and new-password
+// checks, and the Have I Been Pwned breach lookup.
 import {
   createCipheriv,
   createDecipheriv,

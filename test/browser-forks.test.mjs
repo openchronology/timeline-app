@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Copying a public timeline into the browser (server/browser-forks.mjs): event and byte budgets,
+// public saved revisions only, bounded downloads, and how many copies run at once.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BrowserForks, BROWSER_FORK_LIMITS } from '../server/browser-forks.mjs';
