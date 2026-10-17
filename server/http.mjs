@@ -14,6 +14,7 @@ import {
   compareLimits as compareLimitsFromEnv,
   compareLimit,
   entryLimit as entryLimitFromEnv,
+  mebibytes,
 } from './limits.mjs';
 import { deleteWhere, parseRetention, printRetention } from './retention.mjs';
 import { setTimelineStar } from './stars.mjs';
@@ -75,8 +76,11 @@ async function body(req, maximum = 16 * 1024 * 1024) {
     throw new HttpError(400, 'Invalid JSON.');
   }
 }
-/** A SQLite timeline file uploaded as the body, up to 32 MiB; 415 for another type. */
-async function fileBody(req) {
+/**
+ * A SQLite timeline file uploaded as the body, up to `limit` bytes (TIMELINE_FILE_BYTES);
+ * 415 for another type.
+ */
+async function fileBody(req, limit = 64 * 1024 * 1024) {
   if (
     !['application/vnd.openchronology.sqlite', 'application/octet-stream'].includes(
       req.headers['content-type'],
@@ -87,7 +91,7 @@ async function fileBody(req) {
     parts = [];
   for await (const part of req) {
     size += part.length;
-    if (size > 32 * 1024 * 1024) throw new HttpError(413, 'SQLite upload exceeds 32 MiB.');
+    if (size > limit) throw new HttpError(413, `SQLite upload exceeds ${mebibytes(limit)}.`);
     parts.push(part);
   }
   return Buffer.concat(parts);
@@ -465,6 +469,8 @@ export function createRequestHandler({
                 }
               : {}),
             fileExchange: !!pool && converter.enabled,
+            // The largest .och file it exchanges, in bytes (TIMELINE_FILE_BYTES).
+            fileLimit: converter.limit,
             // How many timelines this account may compare at once.
             compareLimit: compareLimit(limits, session),
             // Moments (and durations, relationships) a timeline may hold; null for no limit.
@@ -901,7 +907,7 @@ export function createRequestHandler({
           auth.require(session, req);
           await auth.rateLimit('files:' + userId);
           return response(res, 200, {
-            document: await converter.convert('read', await fileBody(req)),
+            document: await converter.convert('read', await fileBody(req, converter.limit)),
           });
         }
         if (pathname === '/api/files/export' && method === 'POST') {

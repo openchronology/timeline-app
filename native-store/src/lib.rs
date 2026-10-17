@@ -36,7 +36,7 @@ mod workspace;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sqlite::Connection;
-use std::{collections::HashSet, path::Path};
+use std::{borrow::Cow, collections::HashSet, path::Path};
 pub use workspace::{Header, Patch, Query, Snapshot};
 /// `PRAGMA application_id` of a timeline file, as SQLite prints it: the ASCII bytes "OCTL"
 /// read as a big-endian 32-bit integer.
@@ -128,38 +128,44 @@ fn endpoint(value: &Value) -> Result<(Option<&str>, Option<&str>), String> {
 /// standalone durations anchored to both original moments.
 pub fn convert_legacy_durations(doc: &mut Document) -> Result<(), String> {
     for event in &mut doc.events {
-        let Some(value) = event.metadata.remove("durations") else {
-            continue;
-        };
-        let links = value.as_array().ok_or("Durations must be an array")?;
-        if links.len() > 1000 {
-            return Err("Use at most 1000 durations per moment".into());
-        }
-        for link in links {
-            let id = link.get("id").and_then(Value::as_str).unwrap_or_default();
-            let end = link
-                .get("endId")
-                .and_then(Value::as_str)
-                .unwrap_or_default();
-            if !identifier(id) || !identifier(end) {
-                return Err("Invalid duration identifier".into());
-            }
-            if end == event.id {
-                return Err("Duration endpoints must be distinct existing moments".into());
-            }
-            doc.durations.push(Duration {
-                id: id.into(),
-                start: serde_json::json!({"moment": event.id}),
-                end: serde_json::json!({"moment": end}),
-                metadata: link
-                    .get("metadata")
-                    .and_then(Value::as_object)
-                    .cloned()
-                    .ok_or("Invalid duration metadata")?,
-            });
-        }
+        legacy_durations(event, &mut doc.durations)?;
     }
     doc.durations.sort_by(|a, b| a.id.cmp(&b.id));
+    Ok(())
+}
+/// One moment's part of `convert_legacy_durations`: removes its `durations` links, if any,
+/// and adds the standalone durations they become to `durations`.
+fn legacy_durations(event: &mut Event, durations: &mut Vec<Duration>) -> Result<(), String> {
+    let Some(value) = event.metadata.remove("durations") else {
+        return Ok(());
+    };
+    let links = value.as_array().ok_or("Durations must be an array")?;
+    if links.len() > 1000 {
+        return Err("Use at most 1000 durations per moment".into());
+    }
+    for link in links {
+        let id = link.get("id").and_then(Value::as_str).unwrap_or_default();
+        let end = link
+            .get("endId")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        if !identifier(id) || !identifier(end) {
+            return Err("Invalid duration identifier".into());
+        }
+        if end == event.id {
+            return Err("Duration endpoints must be distinct existing moments".into());
+        }
+        durations.push(Duration {
+            id: id.into(),
+            start: serde_json::json!({"moment": event.id}),
+            end: serde_json::json!({"moment": end}),
+            metadata: link
+                .get("metadata")
+                .and_then(Value::as_object)
+                .cloned()
+                .ok_or("Invalid duration metadata")?,
+        });
+    }
     Ok(())
 }
 /// One group of nearby moments from the `points` overview (see `overview`).
@@ -202,15 +208,29 @@ fn check_file(db: &Connection) -> Result<(), String> {
 /// between distinct existing entities. Lengths are counted in UTF-16 units to match the
 /// editor's JavaScript limits. Returns the first problem found as a readable message.
 fn validate(doc: &Document) -> Result<(), String> {
+    if doc.events.len() > MAX_EVENTS {
+        return Err(TOO_LARGE.into());
+    }
+    validate_settings(doc)?;
+    let mut ids = HashSet::new();
+    for e in &doc.events {
+        event_problem(e, |id| ids.insert(id))?;
+    }
+    validate_entities(&doc.durations, &doc.relationships, |id| ids.contains(id))
+}
+/// The most moments a timeline holds.
+const MAX_EVENTS: usize = 200000;
+const TOO_LARGE: &str = "Invalid timeline format, version, or document size";
+/// validate's checks of everything but the entities: format and version, title, description,
+/// presentation, plugins, tags and embedded images.
+fn validate_settings(doc: &Document) -> Result<(), String> {
     if doc.format != "openchronology"
         || doc.version != 1
         || doc.title.encode_utf16().count() > 300
         || doc.description.encode_utf16().count() > 20000
-        || doc.events.len() > 200000
     {
-        return Err("Invalid timeline format, version, or document size".into());
+        return Err(TOO_LARGE.into());
     }
-    let mut ids = HashSet::new();
     if let Some(presentation) = &doc.presentation {
         if !presentation.is_object() || presentation.to_string().len() > 131072 {
             return Err("Invalid or oversized presentation settings".into());
@@ -243,37 +263,41 @@ fn validate(doc: &Document) -> Result<(), String> {
             return Err("Invalid or oversized embedded images".into());
         }
     }
-    for e in &doc.events {
-        if e.id.is_empty()
-            || e.id.len() > 128
-            || !e
-                .id
-                .bytes()
-                .all(|c| c.is_ascii_alphanumeric() || b"_.:-".contains(&c))
-            || !ids.insert(&e.id)
-        {
-            return Err("Event IDs must be unique ASCII identifiers".into());
-        }
-        if e.metadata.contains_key("durations") {
-            return Err("Durations are stored separately from moments".into());
-        }
-        for key in ["title", "description"] {
-            if e.metadata.get(key).is_some_and(|v| !v.is_string()) {
-                return Err(format!("Event {key} must be text"));
-            }
+    Ok(())
+}
+/// validate's checks of one moment: a valid ID that `insert` reports as new (false for one
+/// already seen), no legacy `durations` links, and text titles and notes.
+fn event_problem<'a>(e: &'a Event, insert: impl FnOnce(&'a str) -> bool) -> Result<(), String> {
+    if !identifier(&e.id) || !insert(&e.id) {
+        return Err("Event IDs must be unique ASCII identifiers".into());
+    }
+    if e.metadata.contains_key("durations") {
+        return Err("Durations are stored separately from moments".into());
+    }
+    for key in ["title", "description"] {
+        if e.metadata.get(key).is_some_and(|v| !v.is_string()) {
+            return Err(format!("Event {key} must be text"));
         }
     }
-    if doc.durations.len() > 200000 {
+    Ok(())
+}
+/// validate's checks of durations and relationships, given whether a moment ID exists.
+fn validate_entities(
+    durations_list: &[Duration],
+    relationships: &[Relationship],
+    moment: impl Fn(&str) -> bool,
+) -> Result<(), String> {
+    if durations_list.len() > 200000 {
         return Err("Use at most 200000 durations per timeline".into());
     }
     let mut durations = HashSet::new();
-    for d in &doc.durations {
+    for d in durations_list {
         if !identifier(&d.id) || !durations.insert(&d.id) {
             return Err("Duration IDs must be unique ASCII identifiers".into());
         }
         for value in [&d.start, &d.end] {
-            if let (_, Some(moment)) = endpoint(value)? {
-                if !ids.contains(&moment.to_string()) {
+            if let (_, Some(anchor)) = endpoint(value)? {
+                if !moment(anchor) {
                     return Err("Duration anchors must name existing moments".into());
                 }
             }
@@ -287,17 +311,17 @@ fn validate(doc: &Document) -> Result<(), String> {
             return Err("Durations cannot contain durations".into());
         }
     }
-    if doc.relationships.len() > 200000 {
+    if relationships.len() > 200000 {
         return Err("Use at most 200000 relationships per timeline".into());
     }
-    for r in &doc.relationships {
+    for r in relationships {
         let (a, b) = (entity_ref(&r.a)?, entity_ref(&r.b)?);
         if a == b {
             return Err("An entity cannot be related to itself".into());
         }
         for (kind, id) in [a, b] {
             let exists = if kind == "moment" {
-                ids.contains(&id.to_string())
+                moment(id)
             } else {
                 durations.contains(&id.to_string())
             };
@@ -318,10 +342,44 @@ fn validate(doc: &Document) -> Result<(), String> {
 /// left exactly as it was. The indexes (moment overview, duration and arc trees) are rebuilt
 /// from scratch and stamped with a new save token.
 pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
-    let mut doc = doc.clone();
-    convert_legacy_durations(&mut doc)?;
-    let doc = &doc;
+    // Only a document with legacy links is copied to convert them (#202): a large one held
+    // twice took twice the memory.
+    let converted;
+    let doc = if doc
+        .events
+        .iter()
+        .any(|e| e.metadata.contains_key("durations"))
+    {
+        let mut copy = doc.clone();
+        convert_legacy_durations(&mut copy)?;
+        converted = copy;
+        &converted
+    } else {
+        doc
+    };
     validate(doc)?;
+    write(path, doc, doc.events.iter().map(|e| Ok(Cow::Borrowed(e))))
+}
+/// `save` with the moments supplied one at a time instead of in `settings.events` (which is
+/// ignored), so a large document need not be held whole: och-convert parses each moment's
+/// metadata only as it is written (#202). The settings are checked first; each moment as it
+/// comes, legacy links converted; the durations and relationships last. A problem anywhere
+/// rolls the save back, leaving an existing file as it was (a new one stays empty).
+pub fn save_streamed(
+    path: &Path,
+    settings: &Document,
+    events: impl Iterator<Item = Result<Event, String>>,
+) -> Result<(), String> {
+    validate_settings(settings)?;
+    write(path, settings, events.map(|e| e.map(Cow::Owned)))
+}
+/// save's writing, from `doc`'s settings, durations and relationships and the `events` given,
+/// checking each moment (and then the entities) as validate does.
+fn write<'a>(
+    path: &Path,
+    doc: &Document,
+    mut events: impl Iterator<Item = Result<Cow<'a, Event>, String>>,
+) -> Result<(), String> {
     let db = Connection::open(path, true)?;
     let id = db.scalar("PRAGMA application_id", &[])?;
     if id != APPLICATION_ID {
@@ -399,7 +457,17 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
         db.execute("INSERT INTO timeline_meta VALUES(1,?,?) ON CONFLICT(singleton) DO UPDATE SET title=excluded.title,description=excluded.description",&[&doc.title,&doc.description])?;
         // q(?) parses and canonicalizes each time (2/4 becomes 1/2) and fails on malformed
         // input or a zero denominator, which aborts the save.
-        for event in &doc.events {
+        let (mut ids, mut legacy, mut count) = (HashSet::new(), Vec::new(), 0);
+        for event in events.by_ref() {
+            let mut event = event?;
+            if event.metadata.contains_key("durations") {
+                legacy_durations(event.to_mut(), &mut legacy)?;
+            }
+            count += 1;
+            if count > MAX_EVENTS {
+                return Err(TOO_LARGE.into());
+            }
+            event_problem(&event, |id| ids.insert(id.to_string()))?;
             let metadata = serde_json::to_string(&event.metadata).map_err(|e| e.to_string())?;
             db.execute(
                 "INSERT INTO events(id,time,metadata) VALUES(?,q(?),?)",
@@ -426,8 +494,19 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
             db.execute("INSERT INTO points(time,value,weight,mode) SELECT time,time,count(*),'append' FROM events WHERE time>=?1 COLLATE RATIONAL_V1 AND time<=?2 COLLATE RATIONAL_V1 GROUP BY time COLLATE RATIONAL_V1",&[&first,&last])?;
         }
         db.execute("INSERT INTO points(mode) VALUES('build')", &[])?;
+        // Durations from legacy links join the document's, in ID order as convert_legacy_durations
+        // leaves them.
+        let durations: Cow<[Duration]> = if legacy.is_empty() {
+            Cow::Borrowed(&doc.durations)
+        } else {
+            let mut all = doc.durations.clone();
+            all.extend(legacy);
+            all.sort_by(|a, b| a.id.cmp(&b.id));
+            Cow::Owned(all)
+        };
+        validate_entities(&durations, &doc.relationships, |id| ids.contains(id))?;
         create_duration_table(&db)?;
-        for duration in &doc.durations {
+        for duration in durations.iter() {
             insert_duration(&db, duration)?;
         }
         rebuild_duration_index(&db)?;
@@ -935,6 +1014,74 @@ mod tests {
         save(&path, &reopened).unwrap();
         assert_eq!(open(&path).unwrap(), reopened);
         fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn streamed_saves_check_each_moment_and_match_whole_ones() {
+        // The moments one at a time (och-convert, #202): the same file as a whole save.
+        let (whole, streamed) = (file("whole"), file("streamed"));
+        let mut document = doc();
+        document.events[2].metadata.insert(
+            "durations".into(),
+            serde_json::json!([{"id": "span", "endId": "first", "metadata": {"title": "Span"}}]),
+        );
+        save(&whole, &document).unwrap();
+        let settings = Document {
+            events: Vec::new(),
+            ..document.clone()
+        };
+        save_streamed(
+            &streamed,
+            &settings,
+            document.events.clone().into_iter().map(Ok),
+        )
+        .unwrap();
+        let read = open(&streamed).unwrap();
+        assert_eq!(read, open(&whole).unwrap());
+        assert_eq!(read.durations.len(), 1, "legacy links become a duration");
+        // A problem in any moment, or with the entities, rolls the save back.
+        let mut bad = document.events.clone();
+        bad[1].id = "first".into();
+        assert_eq!(
+            save_streamed(&streamed, &settings, bad.into_iter().map(Ok)),
+            Err("Event IDs must be unique ASCII identifiers".into())
+        );
+        let failing = document
+            .events
+            .clone()
+            .into_iter()
+            .map(Ok)
+            .chain([Err("Bad moment".into())]);
+        assert_eq!(
+            save_streamed(&streamed, &settings, failing),
+            Err("Bad moment".into())
+        );
+        let mut dangling = settings.clone();
+        dangling.relationships.push(Relationship {
+            a: serde_json::json!({"moment": "first"}),
+            b: serde_json::json!({"moment": "missing"}),
+        });
+        assert!(save_streamed(
+            &streamed,
+            &dangling,
+            document.events.clone().into_iter().map(Ok)
+        )
+        .is_err());
+        assert_eq!(open(&streamed).unwrap(), read);
+        // At most 200,000 moments.
+        let many = (0..=MAX_EVENTS).map(|i| {
+            Ok(Event {
+                id: format!("m{i}"),
+                time: format!("{i}/1"),
+                metadata: Map::new(),
+            })
+        });
+        assert_eq!(
+            save_streamed(&streamed, &doc(), many),
+            Err(TOO_LARGE.into())
+        );
+        assert_eq!(open(&streamed).unwrap(), read);
+        fs::remove_file(whole).unwrap();
+        fs::remove_file(streamed).unwrap();
     }
     #[test]
     fn legacy_json_checks_can_be_saved_without_trusting_the_schema() {

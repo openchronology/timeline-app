@@ -65,6 +65,7 @@ test('server deployments expose a guest dashboard without database storage and r
     csrf: null,
     providers: [],
     fileExchange: false,
+    fileLimit: 64 * 1024 * 1024,
     compareLimit: 4,
     entryLimit: 200000,
   });

@@ -17,7 +17,13 @@ import { pluginCompiler } from './plugin-sandbox.mjs';
 import { startRetention } from './retention.mjs';
 import { startStanding } from './standing.mjs';
 import { providersFromEnv } from './oauth.mjs';
-import { compareLimits, defaultQuota, entryLimit, LimitError } from './limits.mjs';
+import {
+  compareLimits,
+  defaultQuota,
+  entryLimit,
+  LimitError,
+  timelineFileBytes,
+} from './limits.mjs';
 import { analyticsId, platformName, SiteError } from './site.mjs';
 import { applyEnvironmentQuota } from './administration.mjs';
 /**
@@ -115,6 +121,7 @@ async function initialize() {
   try {
     limits = compareLimits();
     entries = entryLimit();
+    timelineFileBytes();
     defaultQuota();
     platformName();
     analyticsId();

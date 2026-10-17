@@ -55,7 +55,7 @@ export const tags = [
   {
     name: 'Files',
     description:
-      'Converting between `.ochx` documents (JSON) and the desktop app’s SQLite `.och` files, which are at most 32 MiB. Only signed-in browser and desktop sessions may convert; API keys may not.',
+      'Converting between `.ochx` documents (JSON) and the desktop app’s SQLite `.och` files, which are at most the server’s file limit (`TIMELINE_FILE_BYTES`, 64 MiB by default; the session’s `fileLimit`). Only signed-in browser and desktop sessions may convert; API keys may not.',
   },
   {
     name: 'Live updates',
@@ -1160,7 +1160,7 @@ export const paths = {
       tags: ['Timeline data'],
       summary: 'Download a timeline as a SQLite file',
       description:
-        'The timeline as a desktop `.och` file (at most 32 MiB), for signed-in callers; ten a minute per client address. Comparisons cannot be downloaded: download their sources.',
+        'The timeline as a desktop `.och` file (at most the server’s file limit, 64 MiB by default; 413 beyond it), for signed-in callers; ten a minute per client address. Comparisons cannot be downloaded: download their sources.',
       security: SIGNED_IN_TIMELINE_READ,
       responses: {
         200: sqliteFile('The SQLite file.'),
@@ -1330,7 +1330,7 @@ export const paths = {
       tags: ['Files'],
       summary: 'Read a SQLite timeline file',
       description:
-        'Converts a desktop `.och` SQLite file (at most 32 MiB) to a document, without saving anything. Ten conversions a minute per account; two at once per server.',
+        'Converts a desktop `.och` SQLite file (at most the server’s file limit, 64 MiB by default; 413 beyond it) to a document, without saving anything. Ten conversions a minute per account; two at once per server.',
       security: SIGNED_IN,
       requestBody: {
         required: true,
@@ -1356,7 +1356,7 @@ export const paths = {
       tags: ['Files'],
       summary: 'Write a SQLite timeline file',
       description:
-        'Converts a document (at most 16 MiB of JSON) to a desktop `.och` SQLite file (at most 32 MiB), keeping the images it embeds. Ten conversions a minute per account; two at once per server.',
+        'Converts a document (at most 16 MiB of JSON) to a desktop `.och` SQLite file (at most the server’s file limit, 64 MiB by default; 413 beyond it), keeping the images it embeds. Ten conversions a minute per account; two at once per server.',
       security: SIGNED_IN,
       requestBody: body(ref('TimelineDocument')),
       responses: {
