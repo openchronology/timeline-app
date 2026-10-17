@@ -1,7 +1,22 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// The desktop app (Tauri): the commands its editor calls to open, import, browse and save SQLite
-// timeline files through native-store, and to reach servers (server.rs).
+//! The desktop app (Tauri): the commands its editor calls to open, import, browse and save SQLite
+//! timeline files through native-store, and to reach servers (server.rs).
+//!
+//! The editor (src/app.ts) calls these commands over Tauri's IPC with
+//! `window.__TAURI__.core.invoke`. Every command returns `Result<_, String>`; an error string
+//! rejects the editor's promise and is shown to the user, so errors are written as readable
+//! sentences.
+//!
+//! State kept here, as Tauri-managed state:
+//! - `Mutex<Files>`: the open timeline file, its disk-backed baseline (`Snapshot`), a file
+//!   picked but not yet accepted, and the baselines kept for undoing changes made at once.
+//!   Its `generation` counts every change of baseline; the editor passes the generation it
+//!   last saw, and commands refuse to act on a baseline it has not seen.
+//! - `server::Server`: the connected servers and their sign-ins (server.rs).
+//!
+//! File work runs on Tauri's blocking thread pool (`spawn_blocking`), so long reads and saves
+//! never stall the async runtime that serves IPC.
 mod server;
 use openchronology_store::{Document, Header, Patch, Query, Snapshot};
 use std::{
@@ -10,15 +25,22 @@ use std::{
 };
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
+/// Opens a public HTTPS link in the system browser rather than in the webview: image links
+/// (the image field, the download menu's links) and help pages. Errors on any other kind of
+/// URL (see `server::image_source`) or when no browser can be started.
 #[tauri::command]
 fn desktop_open_image(url: String) -> Result<(), String> {
     server::open_image(&url)
 }
+/// The connected servers' origins, the one in use first, for the editor's server list.
 #[tauri::command]
 fn desktop_servers(state: tauri::State<'_, server::Server>) -> Result<Vec<String>, String> {
     state.servers()
 }
-/** Remembers the connected servers (not their sign-ins) for the next start. */
+/**
+ * Remembers the connected servers (not their sign-ins) for the next start, in `servers.json`
+ * in the app's config directory; `main`'s setup reads it back.
+ */
 fn remember_servers(app: &tauri::AppHandle, state: &server::Server) -> Result<(), String> {
     let directory = app.path().app_config_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
@@ -28,6 +50,9 @@ fn remember_servers(app: &tauri::AppHandle, state: &server::Server) -> Result<()
     )
     .map_err(|e| e.to_string())
 }
+/// Connects to the server at `origin` (or uses an already connected one), making it the one
+/// in use, and remembers the list. Errors on an invalid origin, when eight servers are already
+/// connected, or when the list cannot be written.
 #[tauri::command]
 fn desktop_connect(
     app: tauri::AppHandle,
@@ -37,6 +62,7 @@ fn desktop_connect(
     state.connect(&origin)?;
     remember_servers(&app, &state)
 }
+/// Disconnects from the server at `origin`, forgetting its sign-in, and remembers the list.
 #[tauri::command]
 fn desktop_disconnect(
     app: tauri::AppHandle,
@@ -46,6 +72,12 @@ fn desktop_disconnect(
     state.disconnect(&origin)?;
     remember_servers(&app, &state)
 }
+/// Sends one API request to a connected server for the editor (src/transport.ts): `path`
+/// under `/api/`, an HTTP `method`, an optional JSON body, and the CSRF token and
+/// human-verification answer the server asked for. The session credential stays in this
+/// process and never reaches the webview. Resolves to the status and JSON body, whatever the
+/// status; errors when the request is refused locally, the server cannot be reached, or the
+/// connection changed while it was in flight.
 #[tauri::command]
 async fn desktop_request(
     state: tauri::State<'_, server::Server>,
@@ -60,6 +92,9 @@ async fn desktop_request(
         .request(&server, &path, &method, data, csrf, challenge)
         .await
 }
+/// Starts a device sign-in to `server`: the server issues a code, the sign-in page opens in
+/// the system browser, and the reply (user code, verification URL, whether the browser opened)
+/// tells the editor what to show. The editor then calls `desktop_auth_poll`.
 #[tauri::command]
 async fn desktop_auth_start(
     state: tauri::State<'_, server::Server>,
@@ -67,6 +102,9 @@ async fn desktop_auth_start(
 ) -> Result<serde_json::Value, String> {
     state.start_login(&server).await
 }
+/// Asks `server` whether the pending device sign-in was confirmed. Resolves to
+/// `{"pending": true}` while waiting, or the session once signed in (its credential kept here).
+/// Errors when no sign-in is pending or it expired.
 #[tauri::command]
 async fn desktop_auth_poll(
     state: tauri::State<'_, server::Server>,
@@ -74,15 +112,22 @@ async fn desktop_auth_poll(
 ) -> Result<serde_json::Value, String> {
     state.poll_login(&server).await
 }
+/// What the editor receives for an opened, imported, staged or saved timeline: the header
+/// (settings, moment count, time range), flattened into the reply.
 #[derive(serde::Serialize)]
 struct Opened {
     #[serde(flatten)]
     header: Header,
+    /// The file's path (for an import or a staged document, its private disk copy's path).
     path: String,
+    /// The generation to pass with later queries and saves of this baseline.
     generation: u64,
 }
+/// The size and modification time of a file and of its `-wal` file (None when missing), to
+/// notice when another program changes a file while the app has it open.
 #[derive(Clone, PartialEq)]
 struct Stamp(Vec<Option<(u64, std::time::SystemTime)>>);
+/// The current `Stamp` of the file at `path`. Errors when its metadata cannot be read.
 fn stamp(path: &std::path::Path) -> Result<Stamp, String> {
     let mut files = Vec::new();
     for name in [
@@ -100,12 +145,20 @@ fn stamp(path: &std::path::Path) -> Result<Stamp, String> {
     }
     Ok(Stamp(files))
 }
+/// The open timeline, behind a `Mutex` in Tauri's state.
 #[derive(Default)]
 struct Files {
+    /// The file the editor has open and saves to (None before the first open).
     current: Option<PathBuf>,
+    /// Its disk-backed baseline, which answers queries and takes saves. Shared with commands
+    /// in flight through the `Arc`, so a slow query never holds the lock.
     baseline: Option<Arc<Snapshot>>,
+    /// A file opened, imported or staged but not yet accepted by the editor: its path,
+    /// baseline and stamp. `desktop_accept_open` makes it current.
     pending: Option<(PathBuf, Arc<Snapshot>, Stamp)>,
+    /// The current file's stamp when last opened or saved, to detect outside changes.
     stamp: Option<Stamp>,
+    /// Incremented whenever `baseline` changes (accept, save, staged change, undo/redo).
     generation: u64,
     /// The baseline's number among those changes made at once produced (#179), and the
     /// others still kept, so the editor can undo and redo them until the file is saved.
@@ -141,6 +194,7 @@ impl Files {
         self.next_id += 1;
         self.baseline_id = self.next_id;
     }
+    /// The reply describing the current baseline and generation. Errors if none is open.
     fn opened(&self) -> Result<Opened, String> {
         Ok(Opened {
             header: self
@@ -157,6 +211,7 @@ impl Files {
         })
     }
 }
+/// The reply to a change made at once, or an undo or redo of one.
 #[derive(serde::Serialize)]
 struct Staged {
     #[serde(flatten)]
@@ -165,6 +220,7 @@ struct Staged {
     before: u64,
     after: u64,
 }
+/// How many of a staged patch's changes are applied, sent over a channel as it goes.
 #[derive(Clone, serde::Serialize)]
 struct Progress {
     done: usize,
@@ -173,6 +229,11 @@ struct Progress {
 /// Applies `patch` to the open timeline at once, unsaved (#179): bulk edits such as deleting
 /// everything in a view or shifting times, which would be too many to keep as edits in the
 /// page. The file changes only when saved; until then undo can take the change back.
+///
+/// Inputs: the editor's `generation`, the `patch`, and a channel for progress reports.
+/// Resolves to the new header and generation with the baseline numbers for undo and redo.
+/// Errors when the patch is invalid or the open file changed meanwhile (checked before and
+/// after applying, which runs without the lock held).
 #[tauri::command]
 async fn desktop_stage_patch(
     app: tauri::AppHandle,
@@ -202,6 +263,9 @@ async fn desktop_stage_patch(
     .map_err(|e| e.to_string())?
 }
 /// Goes back (or forward again) to a baseline a change made at once left: undo and redo.
+///
+/// `baseline` is a number from an earlier `Staged` reply. Errors when the file changed or
+/// that baseline is no longer kept (saved since, or more than eight changes ago).
 #[tauri::command]
 async fn desktop_restore_baseline(
     app: tauri::AppHandle,
@@ -231,6 +295,13 @@ async fn desktop_restore_baseline(
     .await
     .map_err(|e| e.to_string())?
 }
+/// Lets the user pick a timeline file (`.och`, `.sqlite`) and copies it into a new baseline.
+///
+/// Opening has two steps so a file the editor rejects never replaces the open one: this
+/// command leaves the new baseline pending and returns its header, with the generation it will
+/// have; the editor validates the header and then calls `desktop_accept_open`. Resolves to
+/// None when the dialog is cancelled. Errors when the file is not a valid timeline, or changed
+/// while being copied (its stamp is compared before and after).
 #[tauri::command]
 async fn desktop_open(app: tauri::AppHandle) -> Result<Option<Opened>, String> {
     let Some(file) = app
@@ -261,6 +332,10 @@ async fn desktop_open(app: tauri::AppHandle) -> Result<Option<Opened>, String> {
     .await
     .map_err(|e| e.to_string())?
 }
+/// Lets the user pick a JSON timeline (`.ochx`, `.json`, at most 32 MiB) and stages it as a
+/// pending baseline, as `desktop_open` does; its path is the private copy's, so the editor
+/// saves it with Save As. Resolves to None when cancelled; errors on an oversized or invalid
+/// document.
 #[tauri::command]
 async fn desktop_import(app: tauri::AppHandle) -> Result<Option<Opened>, String> {
     let Some(file) = app
@@ -280,6 +355,8 @@ async fn desktop_import(app: tauri::AppHandle) -> Result<Option<Opened>, String>
                 "JSON imports are limited to 32 MiB. Use .och for larger timelines.".into(),
             );
         }
+        // Read one byte past the limit, so a file that grew after the size check fails to
+        // parse instead of being read whole.
         let document: Document =
             serde_json::from_reader(std::io::BufReader::new(input).take(32 * 1024 * 1024 + 1))
                 .map_err(|e| e.to_string())?;
@@ -299,6 +376,9 @@ async fn desktop_import(app: tauri::AppHandle) -> Result<Option<Opened>, String>
     .await
     .map_err(|e| e.to_string())?
 }
+/// Moves a document the editor holds in the page into a disk-backed baseline, pending like
+/// `desktop_open`'s: the editor does this when a timeline grows past 2048 moments, so it can
+/// browse it with windowed queries. Errors when the document is invalid.
 #[tauri::command]
 async fn desktop_stage(app: tauri::AppHandle, document: Document) -> Result<Opened, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -318,6 +398,10 @@ async fn desktop_stage(app: tauri::AppHandle, document: Document) -> Result<Open
     .await
     .map_err(|e| e.to_string())?
 }
+/// Makes the pending file (from `desktop_open`, `desktop_import` or `desktop_stage`) the open
+/// one, once the editor has accepted its header. `path` must be the pending one's, so a reply
+/// to an older open cannot accept a newer one. Bumps the generation and forgets the undo
+/// baselines of the previous file.
 #[tauri::command]
 async fn desktop_accept_open(app: tauri::AppHandle, path: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -338,6 +422,8 @@ async fn desktop_accept_open(app: tauri::AppHandle, path: String) -> Result<(), 
     .await
     .map_err(|e| e.to_string())?
 }
+/// The open baseline, if the editor's `generation` is still current. The lock is released on
+/// return, so the caller works on the shared `Arc` without holding it.
 fn baseline(app: &tauri::AppHandle, generation: u64) -> Result<Arc<Snapshot>, String> {
     let state = app.state::<Mutex<Files>>();
     let files = state.lock().map_err(|e| e.to_string())?;
@@ -349,6 +435,9 @@ fn baseline(app: &tauri::AppHandle, generation: u64) -> Result<Arc<Snapshot>, St
         .clone()
         .ok_or("No timeline file is open".into())
 }
+/// Answers one windowed query on the open baseline (`Snapshot::query`): overview frames,
+/// moment and duration pages, single entities, search, tags and relations. Errors when the
+/// generation is stale or the query is invalid or too large.
 #[tauri::command]
 async fn desktop_query(
     app: tauri::AppHandle,
@@ -359,12 +448,25 @@ async fn desktop_query(
         .await
         .map_err(|e| e.to_string())?
 }
+/// The open baseline's whole document, for operations that need every entity: the complete
+/// document with unsaved edits applied (to export or upload it), and bulk deletes and time
+/// mappings of a large file. Errors when the generation is stale.
 #[tauri::command]
 async fn desktop_document(app: tauri::AppHandle, generation: u64) -> Result<Document, String> {
     tauri::async_runtime::spawn_blocking(move || baseline(&app, generation)?.document())
         .await
         .map_err(|e| e.to_string())?
 }
+/// Saves the open timeline, as a whole `document` or as a sparse `patch` of the open
+/// baseline (exactly one of the two).
+///
+/// Without `save_as`, it saves to the open file, which must still be `expected_path` (the file
+/// the editor believes is open) and unchanged by other programs since it was opened or last
+/// saved; otherwise, or with `save_as`, the user picks the destination (`.och` added when no
+/// extension is given). The saved file becomes the open one with a new baseline and
+/// generation, and undo baselines are forgotten. Resolves to None when the dialog is
+/// cancelled. Errors when the generation is stale, the destination changed, the file was
+/// changed elsewhere, or the save itself fails (the file is then left as it was).
 #[tauri::command]
 async fn desktop_save(
     app: tauri::AppHandle,
@@ -401,6 +503,8 @@ async fn desktop_save(
         }
         path
     };
+    // The dialog ran without the lock, so check everything again under it, and keep the lock
+    // for the whole save so no other command changes the baseline meanwhile.
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<Mutex<Files>>();
         let mut files = state.lock().map_err(|e| e.to_string())?;
@@ -445,6 +549,8 @@ async fn desktop_save(
     .await
     .map_err(|e| e.to_string())?
 }
+/// Starts the app: the dialog plugin, the file and server state, reconnecting to the servers
+/// remembered from last time, and the commands the editor may invoke.
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())

@@ -1,5 +1,18 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 //! A small RAII binding to the same system SQLite linked by sqlite-rational.
+//!
+//! The store needs only a handful of SQLite calls, and sqlite-rational must register its
+//! functions, collation and virtual table on the very connection the queries run on, so this
+//! declares the C functions directly instead of pulling in a binding crate that might link a
+//! second SQLite. Every value crosses the boundary as text: parameters are bound as TEXT and
+//! columns are read back as TEXT (NULL becomes `None`), which suits exact rationals, which
+//! sqlite-rational keeps as canonical `n/d` strings anyway.
+//!
+//! Numeric constants below are SQLite's documented codes, written inline: open flags
+//! (1 `SQLITE_OPEN_READONLY`, 2 `SQLITE_OPEN_READWRITE`, 4 `SQLITE_OPEN_CREATE`), result
+//! codes (0 `SQLITE_OK`, 5 `SQLITE_BUSY`, 6 `SQLITE_LOCKED`, 100 `SQLITE_ROW`,
+//! 101 `SQLITE_DONE`), column type 5 `SQLITE_NULL`, and limit IDs (0 `SQLITE_LIMIT_LENGTH`,
+//! 1 `SQLITE_LIMIT_SQL_LENGTH`, 2 `SQLITE_LIMIT_COLUMN`, 3 `SQLITE_LIMIT_EXPR_DEPTH`).
 use std::{
     ffi::{c_char, c_int, c_void, CStr, CString},
     marker::PhantomData,
@@ -51,12 +64,23 @@ extern "C" {
         callback: Option<unsafe extern "C" fn(*mut c_void) -> c_int>,
         context: *mut c_void,
     );
+    /// From the statically linked sqlite-rational: registers q(), the q_* functions, the
+    /// RATIONAL_V1 collation and the rational_index virtual-table module on one connection.
     fn sqlite_rational_register(db: *mut c_void) -> c_int;
 }
+/// An open SQLite connection with sqlite-rational registered and the store's safety pragmas
+/// applied. Closed when dropped. Not shared across threads: callers open one per operation.
 pub struct Connection {
     raw: *mut c_void,
+    /// Remaining progress-handler ticks (each 1000 virtual-machine instructions) before SQLite
+    /// interrupts the running statement; boxed so the pointer handed to SQLite stays valid when
+    /// the `Connection` moves. Only consulted once a budget is installed (`limit_reads`, or
+    /// `OCH_CONVERSION_LIMITS=1` at open). It is not reset per statement, so it bounds the total
+    /// work done on the connection, not each query.
     _budget: Box<u64>,
 }
+/// SQLite's progress callback: counts down the connection's budget and returns non-zero
+/// (interrupting the statement with `SQLITE_INTERRUPT`) once it reaches zero.
 unsafe extern "C" fn progress(context: *mut c_void) -> c_int {
     let remaining = &mut *context.cast::<u64>();
     *remaining = remaining.saturating_sub(1);
@@ -66,6 +90,8 @@ unsafe extern "C" fn progress(context: *mut c_void) -> c_int {
         0
     }
 }
+/// A prepared statement, finalized when dropped; the lifetime ties it to its connection so the
+/// connection cannot be closed while the statement is alive.
 struct Statement<'a> {
     raw: *mut c_void,
     _db: PhantomData<&'a Connection>,
@@ -85,6 +111,23 @@ impl Drop for Statement<'_> {
     }
 }
 impl Connection {
+    /// Opens `path` read-write and creating it when `create` is true, otherwise read-only.
+    ///
+    /// Waits up to 5 s for another connection's lock (busy timeout), registers sqlite-rational,
+    /// and sets the pragmas every store connection relies on:
+    /// - `trusted_schema=OFF`: functions and virtual tables named in a file's schema (views,
+    ///   triggers, CHECK constraints, defaults) cannot run with side effects, since the file
+    ///   may come from anyone (an upload, a downloaded `.och`).
+    /// - `foreign_keys=ON`: enforce any foreign keys a schema declares.
+    /// - `cache_size=-2048` (2 MiB), `mmap_size=0`, `temp_store=FILE`: keep memory small and
+    ///   predictable; sorts and temporary results spill to disk instead of RAM.
+    ///
+    /// With `OCH_CONVERSION_LIMITS=1` in the environment (set by `och-convert`) it also caps
+    /// string/blob size (32 MiB), SQL length, column count and expression depth, and installs the
+    /// instruction budget, so a hostile upload cannot make a conversion run unbounded.
+    ///
+    /// Errors: a non-Unicode path, or SQLite's message when the file cannot be opened or the
+    /// extension cannot be registered.
     pub fn open(path: &Path, create: bool) -> Result<Self, String> {
         let name = CString::new(path.to_str().ok_or("The file path must be Unicode")?)
             .map_err(|e| e.to_string())?;
@@ -132,6 +175,10 @@ impl Connection {
         db.execute("PRAGMA temp_store=FILE", &[])?;
         Ok(db)
     }
+    /// Applies the same limits as `OCH_CONVERSION_LIMITS` to this connection and refills its
+    /// instruction budget (20000 ticks of 1000 instructions, about 20 million in all). The
+    /// desktop app uses it for browsing queries, so one viewport request cannot pin a CPU or
+    /// build huge results however the file was crafted.
     pub fn limit_reads(&mut self) {
         unsafe {
             sqlite3_limit(self.raw, 0, 32 * 1024 * 1024);
@@ -147,6 +194,7 @@ impl Connection {
             );
         }
     }
+    /// SQLite's message for the connection's most recent failure.
     fn error(&self) -> String {
         unsafe {
             CStr::from_ptr(sqlite3_errmsg(self.raw))
@@ -154,6 +202,10 @@ impl Connection {
                 .into_owned()
         }
     }
+    /// Copies this database page by page into `path` (created if missing, its previous
+    /// contents replaced) with SQLite's online backup API. The copy is a consistent snapshot of
+    /// the source. Each step copies 128 pages; while either side is busy or locked by another
+    /// connection it retries every 20 ms for up to 10 s, then gives up with SQLite's error.
     pub fn backup_to(&self, path: &Path) -> Result<(), String> {
         let destination = Self::open(path, true)?;
         let name = c"main";
@@ -163,6 +215,8 @@ impl Connection {
             return Err(destination.error());
         }
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        // 101 SQLITE_DONE: every page copied; 0 SQLITE_OK: more pages remain;
+        // 5/6 SQLITE_BUSY/SQLITE_LOCKED: try again shortly, until the deadline.
         let result = loop {
             let rc = unsafe { sqlite3_backup_step(backup, 128) };
             match rc {
@@ -174,6 +228,7 @@ impl Connection {
                 _ => break Err(destination.error()),
             }
         };
+        // Always release the backup handle, even after a failed step.
         let finished = unsafe { sqlite3_backup_finish(backup) };
         result?;
         if finished != 0 {
@@ -181,6 +236,8 @@ impl Connection {
         }
         Ok(())
     }
+    /// Runs one SQL statement with text parameters and returns every row, each column as text
+    /// (`None` for NULL). No row or byte cap; see `query_limited`.
     pub fn query(
         &self,
         sql: &str,
@@ -188,6 +245,15 @@ impl Connection {
     ) -> Result<Vec<Vec<Option<String>>>, String> {
         self.query_limited(sql, parameters, usize::MAX, usize::MAX)
     }
+    /// Runs one SQL statement and collects its rows, failing once it would return more than
+    /// `max_rows` rows or more than `max_bytes` bytes of column text in all, so a query over an
+    /// untrusted or very large file cannot exhaust memory.
+    ///
+    /// `parameters` bind in order to `?`, `?1`, `?2`, … as TEXT; SQL that needs a number casts
+    /// it (`CAST(? AS INTEGER)`), and rationals go through `q(?)`. Only the first statement in
+    /// `sql` is prepared; any text after it is ignored. Errors: SQLite's message for a prepare,
+    /// bind or step failure (including an interrupt from the instruction budget), a budget
+    /// error, or a column that is not UTF-8.
     pub fn query_limited(
         &self,
         sql: &str,
@@ -220,6 +286,8 @@ impl Connection {
         }
         let mut rows = Vec::new();
         let mut bytes = 0usize;
+        // Step until 101 SQLITE_DONE; each 100 SQLITE_ROW is copied out before the next step,
+        // since SQLite's column pointers are valid only until then.
         loop {
             match unsafe { sqlite3_step(stmt.raw) } {
                 101 => break,
@@ -229,6 +297,8 @@ impl Connection {
                     }
                     let mut row = Vec::new();
                     for col in 0..unsafe { sqlite3_column_count(stmt.raw) } {
+                        // 5 is SQLITE_NULL; any other type is read through SQLite's text
+                        // conversion (integers become decimal text).
                         if unsafe { sqlite3_column_type(stmt.raw, col) } == 5 {
                             row.push(None);
                             continue;
@@ -254,9 +324,13 @@ impl Connection {
         }
         Ok(rows)
     }
+    /// Runs a statement for its effect (DDL, writes, pragmas, transaction control), discarding
+    /// any rows it returns.
     pub fn execute(&self, sql: &str, parameters: &[&str]) -> Result<(), String> {
         self.query(sql, parameters).map(|_| ())
     }
+    /// The first column of the first row, as text: for `count(*)`, pragmas and single exact
+    /// rational results. Errors when there is no row or that value is NULL.
     pub fn scalar(&self, sql: &str, parameters: &[&str]) -> Result<String, String> {
         self.query(sql, parameters)?
             .into_iter()

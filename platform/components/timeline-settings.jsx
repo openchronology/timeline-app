@@ -15,6 +15,27 @@ const size = (bytes) =>
   bytes >= 1048576
     ? `${(bytes / 1048576).toFixed(bytes >= 104857600 ? 0 : 1)} MB`
     : `${Math.max(bytes ? 1 : 0, Math.round(bytes / 1024))} KB`;
+/**
+ * A timeline's settings page (/<owner>/<timeline>/settings), for those who may share it (the
+ * page is a 404 for anyone else, and the API checks every change again).
+ *
+ * Each change goes to the API at once: PATCH /api/timelines/<id>/settings with the one field
+ * that changed (visibility, allowPrivateForks, slug, labels, retention or keepHistory), which
+ * answers the timeline's metadata as it is now, with its printed retention period and
+ * `history_bytes`; POST and DELETE /api/timelines/<id>/members to add or remove a collaborator;
+ * DELETE /api/timelines/<id> to delete it.
+ *
+ * @param {object} props
+ * @param {object} props.initial the timeline's metadata, read by the page, with `retention`
+ *   (its period as its display writes it, or null) and `history_bytes` (what turning saved
+ *   history off would free)
+ * @param {{username: string, role: string}[]} props.initialMembers its collaborators
+ * @param {boolean} [props.calendar] it displays Gregorian dates (and is not a comparison), so
+ *   it can keep only a recent period: the server must know what time it is in it
+ * @param {{listed: boolean, newcomerDays: number, fullDays: number}|null} [props.listing]
+ *   whether browsing lists it (#103), and the days the standing rules use, to explain why not
+ * @param {string} [props.origin] the site's origin, to show its full address
+ */
 export default function TimelineSettings({
   initial,
   initialMembers,
@@ -29,10 +50,26 @@ export default function TimelineSettings({
     [members, setMembers] = useState(initialMembers),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
+    // A refused address is shown next to its field rather than at the end of the page.
     [addressError, setAddressError] = useState('');
+  // A click outside either confirmation dialog closes it.
   useEffect(() => dismissOnBackdrop(dialog.current), []);
   useEffect(() => dismissOnBackdrop(historyDialog.current), []);
   const base = 'timelines/' + timeline.id;
+  /**
+   * Sends one change and shows its result; one at a time, so a click while one is being sent
+   * is ignored.
+   *
+   * The page isn't given the CSRF token, so it reads GET /api/session for it first: the API
+   * refuses a write on a cookie session without it in X-CSRF-Token. After a settings change
+   * the timeline shown is the answer (and the history dialog closes); after a members change
+   * the list is read again; after deleting, the dashboard opens. A new address moves the page
+   * to it; anything else refreshes the page's server-rendered parts.
+   *
+   * @param {string} path after /api/timelines/<id>: '/settings', '/members', or '' (itself)
+   * @param {string} method PATCH, POST or DELETE
+   * @param {object} data the JSON body
+   */
   async function mutate(path, method, data) {
     if (busy) return;
     setBusy(true);
@@ -56,6 +93,7 @@ export default function TimelineSettings({
       setBusy(false);
     }
   }
+  /** Adds a collaborator, by username, with the role chosen. */
   function member(event) {
     event.preventDefault();
     const f = new FormData(event.currentTarget);
@@ -84,6 +122,7 @@ export default function TimelineSettings({
               <option
                 key={value}
                 value={value}
+                // A private fork's copy holds the upstream's private data: it can't be public.
                 disabled={value === 'public' && timeline.publication_restricted}
               >
                 {label}
@@ -137,6 +176,8 @@ export default function TimelineSettings({
             are at <code>/timelines/</code> and their IDs.
           </p>
         ) : (
+          // The field is keyed by the saved slug, so it shows the saved one after a change; a
+          // timeline without a slug suggests one from its title. The server checks it again.
           <form
             className="address-form"
             onSubmit={(e) => {
@@ -202,6 +243,8 @@ export default function TimelineSettings({
         <fieldset className="content-labels" disabled={busy}>
           <legend>This timeline contains</legend>
           {CONTENT_LABELS.map(([key, name]) => {
+            // Labels moderators added (#115) are shown checked and can't be removed by the owner;
+            // the owner's own labels are sent whole, as the new set, on each change.
             const moderated = (timeline.moderator_labels ?? []).includes(key);
             return (
               <label key={key} className="checkbox-label">
@@ -234,6 +277,8 @@ export default function TimelineSettings({
             moments are deleted for good.
           </HelpTip>
         </h2>
+        {/* The period is written as the timeline's display reads it ("1 year", "90 days"); the
+            server parses it with the timeline's calendar and prints it back the same way. */}
         {calendar ? (
           <form
             onSubmit={(e) => {
@@ -305,6 +350,7 @@ export default function TimelineSettings({
             <button disabled={busy} onClick={() => historyDialog.current.showModal()}>
               Stop keeping saved history…
             </button>
+            {/* A confirmation, with its own copy of the error, since the page behind is inert. */}
             <dialog ref={historyDialog}>
               <h2>Stop keeping saved history?</h2>
               <p>

@@ -71,7 +71,11 @@ export function withoutImageCopies(document) {
 }
 /**
  * SQL: whether timeline `t` (a table alias) is restricted by a moderation decision (#115;
- * moderation.mjs). Only its owner and administrators then see it.
+ * moderation.mjs). Only its owner and administrators then see it. Restricting a timeline
+ * also makes it private (moderation.mjs restrict), so access checks need this only where
+ * membership would otherwise let someone in. The lookup is one probe of the partial unique
+ * index oc_moderation_cases_current (target_kind, target_id, over open and restricted
+ * cases); `target_id` is text because cases also target comments, plugins, suites and users.
  */
 export const restrictedTimeline = (t) =>
   `EXISTS(SELECT 1 FROM oc_moderation_cases mc WHERE mc.target_kind='timeline' AND mc.target_id=${t}.id::text AND mc.status='restricted')`;
@@ -88,7 +92,14 @@ export function documentJson(document) {
     );
   return serialized;
 }
+/**
+ * An error the HTTP layer answers with `status` and `message` (shown to the person), rather
+ * than as a 500. Thrown throughout the store for refusals: 400 invalid input, 403 missing
+ * permission, 404 unavailable, 409 a conflict with the timeline's current state, 413 too
+ * large or over quota.
+ */
 export class HttpError extends Error {
+  /** `status`: the HTTP status to answer with; `message`: the reason, for people to read. */
   constructor(status, message) {
     super(message);
     this.status = status;
@@ -102,19 +113,35 @@ export const HISTORY_OFF =
  * needs: those copies' history reads through to, those forks were made from or other
  * timelines' heads are, those pull requests refer to, and the earlier revisions a patch among
  * them is stored against. Turning saved history off keeps their content.
+ *
+ * A recursive CTE prefixed to a query that reads `still_read(id)` (historyBytes,
+ * stopHistory). The seed checks each of the timeline's revisions for a reference (only the
+ * copies' bases have an index, oc_history_bases_revision; the timelines' and pull requests'
+ * revision columns have none, so those checks read those tables). The recursive step
+ * follows a patch revision to its first parent (position 0, the revision its patch applies
+ * to) until it reaches one that is not a patch. UNION, not UNION ALL, so a revision shared
+ * by several chains is visited once.
  */
 const STILL_READ = `WITH RECURSIVE still_read(id) AS (
   SELECT r.id FROM oc_revisions r WHERE r.timeline_id=$1 AND (
+    -- A copy's history reads through to it (its base), a fork was made from it, it is
+    -- another timeline's head, or a pull request refers to it.
     EXISTS(SELECT 1 FROM oc_history_bases b WHERE b.base_revision_id=r.id)
     OR EXISTS(SELECT 1 FROM oc_timelines t WHERE t.fork_base_revision_id=r.id OR (t.head_revision_id=r.id AND t.id<>$1))
     OR EXISTS(SELECT 1 FROM oc_proposals p
       WHERE p.base_revision_id=r.id OR p.source_revision_id=r.id OR p.merged_revision_id=r.id))
+  -- A kept patch needs the revision it applies to, and so on down to a whole one.
   UNION SELECT p.parent_id FROM still_read k JOIN oc_revisions c ON c.id=k.id
     JOIN oc_revision_parents p ON p.revision_id=k.id AND p.position=0 WHERE c.patch IS NOT NULL
 )`;
 /**
  * The timeline row's columns except the catalogue search text and vector (up to a megabyte
  * each), which access checks never need. Read once per process.
+ *
+ * Resolves to a comma-separated list of `t.<column>` (quoted with quote_ident, in table
+ * order) read from information_schema, so columns added by later schema upgrades are
+ * included without listing them here. The promise is cached; a failed read clears it so the
+ * next call tries again.
  */
 let columnList = null;
 function timelineColumns(client) {
@@ -131,7 +158,12 @@ function timelineColumns(client) {
     });
   return columnList;
 }
-/** Every moment of a timeline (read by `rows`, its indexReader) in index order: time, then ID. */
+/**
+ * Every moment of a timeline (read by `rows`, its indexReader) in index order: time, then ID
+ * ("C" collation, the order IDs have everywhere). A scan ({ scan: true }), so a fork hashes
+ * the keys its nearer levels hold rather than checking them row by row; the sort is over
+ * all the timeline's moments, so this is for documents built whole (snapshot, merges).
+ */
 async function allEvents(client, rows, id) {
   const { rows: events } = await client.query(
     `SELECT event FROM ${rows('oc_moments', '$1', { scan: true })} x ORDER BY time,id COLLATE "C"`,
@@ -145,7 +177,11 @@ const INDEX_TABLES = VERSIONED_TABLES;
 const RETIRED_TABLES = INDEX_TABLES.map((table) => table + '_retired');
 /** The tables whose statistics large writes leave behind. */
 const ANALYZED_TABLES = [...INDEX_TABLES, ...RETIRED_TABLES];
-/** The timeline's own columns that describe its index (as replace writes them). */
+/**
+ * The timeline's own columns that describe its index (as replace writes them). shareIndex
+ * copies them from the source row to a new fork, which then reads its source's index rows,
+ * so the fork's root IDs, counts and catalogue text match what it reads.
+ */
 const TIMELINE_INDEX = [
   'title',
   'description',
@@ -163,10 +199,19 @@ const TIMELINE_INDEX = [
   'event_text',
   'event_text_stale',
 ];
+/** copiedColumns' cache: per table, `{ columns }`, read once per process. */
 const copied = new Map();
-/** A table's columns a copy of its rows writes (all but the timeline, its version and generated ones). */
+/**
+ * A table's columns a copy of its rows writes (all but the timeline, its version and
+ * generated ones), as a comma-separated list for `INSERT INTO table(timeline_id,<list>)
+ * SELECT <id>,<list>` (compactStep). Generated columns cannot be written, and `since` is
+ * left to its default (the `oc.clock` setting beginIndexWrite makes) so the copy records
+ * the clock of the transaction copying it.
+ */
 async function copiedColumns(client, table) {
   if (!copied.has(table)) {
+    // From information_schema rather than a list here, so columns later schema upgrades add
+    // are copied too.
     const columns = await client.query(
       `SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema()
       AND table_name=$1 AND column_name NOT IN ('timeline_id','since') AND is_generated='NEVER'
@@ -197,10 +242,20 @@ const ANALYZE_AFTER = 20000;
 const ANALYZE_VERSIONS_AFTER = 1000;
 /** The scripts of the plugins every build includes: compiled by its tests, not again here. */
 const BUILTIN_SCRIPTS = new Set(BUILTIN_PLUGINS.map((p) => p.source).filter(Boolean));
+/**
+ * The server's store of timelines in PostgreSQL (schema.sql). Each request method checks
+ * access (access, liveState), then reads in a REPEATABLE READ transaction, so all of a
+ * response comes from one snapshot, or writes in a transaction holding the timeline's row
+ * lock (`SELECT … FOR UPDATE`), which orders concurrent saves to one timeline. Work that
+ * need not delay the answer (catalogue text, statistics, preparing and compacting forks)
+ * runs after commit, coalesced per timeline in the maps this object keeps.
+ */
 export class PostgresStore {
   /**
    * `compareLimits` caps saved comparisons by their owner's account (limits.mjs). `compiler`
-   * compiles the plugin scripts timelines are given (plugin-sandbox.mjs).
+   * compiles the plugin scripts timelines are given (plugin-sandbox.mjs), made on first use
+   * when not given. `pool` is a pg Pool; migrations pass null and call the methods that take
+   * a client directly.
    */
   constructor(pool, { compareLimits = null, compiler = null } = {}) {
     this.pool = pool;
@@ -228,7 +283,16 @@ export class PostgresStore {
       }
     }
   }
+  /**
+   * Timeline `id`'s current revision number, `{ id, revision }`, if `userId` (null when
+   * signed out) may see it; HttpError 404 otherwise. A cheap check for clients polling or
+   * subscribing to changes (GET /timelines/:id/revision, live.mjs): unlike access it reads
+   * no other columns, and it does not refuse a copy still being prepared.
+   */
   async liveState(id, userId, client = this.pool) {
+    // The same rule as access, in one row lookup by primary key: public, the owner, an
+    // enabled administrator, or a member of a timeline not restricted by moderators (a
+    // restricted timeline is also private, so `public` cannot let anyone else in).
     const { rows } = await client.query(
       `SELECT t.id,t.revision FROM oc_timelines t
       WHERE t.id=$1 AND (t.visibility='public' OR t.owner_id=$2::uuid
@@ -245,6 +309,12 @@ export class PostgresStore {
    * before; null when there is none. It says nothing of who may open it: its pages check.
    */
   async addressed(owner, name) {
+    // A name shaped like a UUID is an ID (slugs may not be: the oc_timelines_slug check),
+    // looked up by primary key and confirmed to be the owner's. Otherwise the current slug,
+    // by the unique index oc_timelines_owner_slug, then a former slug by
+    // oc_timeline_former_slugs' primary key (owner, slug). Each is unique per owner and
+    // setSlug deletes a former slug when a timeline takes it, so at most one row matches;
+    // LIMIT 1 lets the scan stop at the first.
     const { rows } = TIMELINE_UUID.test(name)
       ? await this.pool.query(
           'SELECT t.id FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id WHERE u.username=$1 AND t.id=$2',
@@ -262,6 +332,12 @@ export class PostgresStore {
    * Gives timeline `t` (as access returned it, locked) the address `/<owner>/<slug>`, or none
    * when `slug` is null. Its former slug keeps leading to it until another of its owner's
    * timelines takes it.
+   *
+   * `c` is the caller's transaction, which holds the timeline's row lock. Refuses with
+   * HttpError 400 a slug that breaks SLUG_RULE, 409 one for an owner whose username is
+   * one of the site's reserved paths, and 409 one another of the owner's timelines has
+   * (the unique index oc_timelines_owner_slug, error 23505). Writes
+   * oc_timeline_former_slugs and the timeline's `slug`.
    */
   async setSlug(c, t, slug) {
     if (slug === (t.slug ?? null)) return;
@@ -271,16 +347,21 @@ export class PostgresStore {
         409,
         `@${t.owner} is also one of the site's own addresses, so its timelines are at /timelines/<id>.`,
       );
+    // Taking a slug ends whatever former address it was (this timeline's or another's).
     if (slug !== null)
       await c.query('DELETE FROM oc_timeline_former_slugs WHERE owner_id=$1 AND slug=$2', [
         t.owner_id,
         slug,
       ]);
+    // The slug it leaves keeps leading to it. ON CONFLICT on the primary key (owner, slug)
+    // repoints a former address another of the owner's timelines held, rather than failing.
     if (t.slug)
       await c.query(
         'INSERT INTO oc_timeline_former_slugs(owner_id,slug,timeline_id) VALUES($1,$2,$3) ON CONFLICT(owner_id,slug) DO UPDATE SET timeline_id=excluded.timeline_id',
         [t.owner_id, t.slug, t.id],
       );
+    // The unique index decides a race between two timelines taking one slug: the loser
+    // gets a unique violation (23505), answered as a conflict.
     try {
       await c.query('UPDATE oc_timelines SET slug=$2 WHERE id=$1', [t.id, slug]);
     } catch (error) {
@@ -292,9 +373,22 @@ export class PostgresStore {
    * The timeline as `userId` may see it, with their permissions; 404 when they may not. A
    * copy whose index is still being prepared (see prepare) answers 409 unless `preparing`:
    * only its metadata, sharing, settings and deletion are available until then.
+   *
+   * `client` is the transaction to read in (a caller that locked the row passes its own, so
+   * the row read is the locked one), or the pool. Returns the timeline row (without its
+   * catalogue text and vector) with `owner` (username), `starred`, `role` ('admin', 'owner',
+   * or the membership role), `moderation` (the restricting case, if any), `labels` and the
+   * permission flags `canWrite`, `canPropose`, `canEdit`, `canShare` and `canFork`. A
+   * comparison also needs every source to be visible to `userId` (404 otherwise), and is
+   * never writable or forkable: it is rebuilt from its sources.
    */
   async access(id, userId, client = this.pool, { preparing = false } = {}) {
     const columns = await timelineColumns(client);
+    // One row by primary key with what the permissions need: the owner's username, whether
+    // the person starred it (the stars' primary key, user then timeline), their role (an
+    // enabled administrator, the owner, else their membership by oc_members' primary key)
+    // and any moderation case restricting it (oc_moderation_cases_current). The role is
+    // NULL for someone with none, who then sees only a public timeline.
     const { rows } = await client.query(
       `SELECT ${columns},u.username AS owner,
       EXISTS(SELECT 1 FROM oc_timeline_stars s WHERE s.timeline_id=t.id AND s.user_id=$2::uuid) AS starred,
@@ -316,6 +410,9 @@ export class PostgresStore {
     )
       throw new HttpError(404, 'Timeline unavailable. Sign in if it is private.');
     if (timeline.comparison) {
+      // A comparison shows its sources' moments, so each must be visible to this person by
+      // the same rule as above (and be an ordinary timeline). Counting the visible ones
+      // against the listed ones refuses it if any is not, without saying which.
       const sources = await client.query(
         `SELECT t.id FROM oc_timelines t
         WHERE t.id=ANY($1::uuid[]) AND t.comparison IS NULL AND
@@ -333,6 +430,10 @@ export class PostgresStore {
         'This copy is still being prepared. It opens as soon as it is ready; try again shortly.',
       );
     const { search_document, event_text, ...metadata } = timeline;
+    // Writing needs a writing role; proposing and editing need a signed-in person with any
+    // contributing role, or a public timeline; forking needs a signed-in person and a public
+    // timeline, ownership (or administration), or a private timeline that allows forks.
+    // Nothing of a comparison but sharing is permitted.
     return {
       preparing: !!timeline.preparing_revision_id,
       ...metadata,
@@ -369,6 +470,11 @@ export class PostgresStore {
    */
   async copyable(client, from) {
     const rows = await indexReader(client, await lineageOf(client, from));
+    // Moments are counted on the row (event_count); durations are the duration tree root's
+    // subtree_count, looked up through the levels `from` reads. The row qualifies only if
+    // its index is current (index_version 2, search_version 1) and no duration row is a
+    // legacy one (no definition or max_first), which convertLegacyDurations has yet to
+    // rebuild; that check scans the duration rows `from` sees.
     const { rows: found } = await client.query(
       `SELECT event_count+coalesce((SELECT n.subtree_count
         FROM ${rows.lookup('oc_duration_nodes', ['t.duration_root'])} n),0) AS entities
@@ -393,10 +499,18 @@ export class PostgresStore {
    */
   async shareIndex(client, from, to, revisionId) {
     if ((await this.copyable(client, from)) === null) return false;
+    // Pins `from` at its current clock: from now on its triggers retire (keep) any row
+    // version this clock sees before changing it. greatest() keeps a higher pin an earlier
+    // fork made; one pin, the highest, covers every lower one (index-versions.mjs). The
+    // update also locks `from`'s row until commit, so no save moves its clock meanwhile.
     await client.query(
       'UPDATE oc_timelines SET index_pinned=greatest(index_pinned,index_clock) WHERE id=$1',
       [from],
     );
+    // The fork reads `from` first, at its clock, then whatever `from` reads, at theirs
+    // (array_prepend onto `from`'s lineage), and takes `from`'s index columns
+    // (TIMELINE_INDEX) and storage size, as if its index had been written whole. RETURNING
+    // the new lineage's length says whether it reads through more levels than allowed.
     const { rows } = await client.query(
       `UPDATE oc_timelines t SET index_bases=array_prepend(s.id,s.index_bases),
       index_clocks=array_prepend(s.index_clock,s.index_clocks),storage_bytes=s.storage_bytes,
@@ -405,7 +519,9 @@ export class PostgresStore {
       [from, to],
     );
     if (rows[0].depth <= this.levels()) return true;
-    // What it copies is mostly `from`'s own rows, counted up to what is enough.
+    // What it copies is mostly `from`'s own rows, counted up to what is enough: each count
+    // reads at most PREPARE_AFTER entries of the primary keys (timeline first), so this costs
+    // the same however large `from` is.
     const { rows: own } = await client.query(
       `SELECT (SELECT count(*) FROM (SELECT 1 FROM oc_moments WHERE timeline_id=$1 LIMIT $2) m)
         +(SELECT count(*) FROM (SELECT 1 FROM oc_duration_nodes WHERE timeline_id=$1 LIMIT $2) d) AS n`,
@@ -415,6 +531,8 @@ export class PostgresStore {
       await this.takeLevels(client, to);
       return true;
     }
+    // Too much to copy before answering: marked as being prepared (access refuses its index
+    // with 409 until then) and copied after commit, in a transaction of its own (prepare).
     await client.query('UPDATE oc_timelines SET preparing_revision_id=$2 WHERE id=$1', [
       to,
       revisionId,
@@ -430,6 +548,10 @@ export class PostgresStore {
    * Has timeline `id` (locked) read through to no more levels than a fork may: it copies what
    * it reads of its nearest levels into rows of its own (copyLevel) and releases them. One
    * left reading through to nothing has its index whole and drops its hidden rows.
+   *
+   * Runs in the caller's transaction and advances `id`'s index clock (beginIndexWrite).
+   * Releases the levels it stops reading (oc_release_index, which locks each of them) and
+   * asks for fresh statistics when it copied many rows (`client.analyze`).
    */
   async takeLevels(client, id) {
     const { index_bases: bases, index_clocks: clocks } = await lineageOf(client, id);
@@ -437,17 +559,23 @@ export class PostgresStore {
     if (taken <= 0) return;
     await beginIndexWrite(client, id);
     let entities = 0;
+    // Nearest first: a nearer level's copied rows then hide the same keys of the next, as
+    // they did when read through.
     for (let level = 0; level < taken; level++) {
       const copied = await copyLevel(client, id, bases[level], clocks[level]);
       entities += copied.oc_moments + copied.oc_duration_nodes;
     }
+    // Hidden rows only hide what levels below have; with no level left they hide nothing.
     if (taken === bases.length)
       for (const table of INDEX_TABLES)
         await client.query(`DELETE FROM ${table} WHERE timeline_id=$1 AND hidden`, [id]);
+    // Drops the levels copied from the front of the lineage (arrays are 1-based, so the
+    // slice starts after the `taken` first).
     await client.query(
       'UPDATE oc_timelines SET index_bases=index_bases[$2:],index_clocks=index_clocks[$2:] WHERE id=$1',
       [id, taken + 1],
     );
+    // The copied levels may now keep versions (or, deleted, rows) for nothing.
     await client.query('SELECT oc_release_index($1::uuid[],$2::bigint[])', [
       bases.slice(0, taken),
       clocks.slice(0, taken),
@@ -475,8 +603,16 @@ export class PostgresStore {
       );
     return this.preparing.get(id);
   }
+  /**
+   * prepare's work for copy `id`, in one transaction: copies the levels it reads beyond
+   * the limit (takeLevels) or rebuilds it from the revision it copies, then clears
+   * `preparing_revision_id` and refreshes its catalogue text after commit.
+   */
   async prepareNow(id) {
     await this.transaction(async (c) => {
+      // FOR UPDATE SKIP LOCKED: another server process preparing it holds the row, so this
+      // one skips it instead of waiting to do the same work; it also skips a copy a request
+      // has locked at that moment, which is then left for the next start (prepareStale).
       const { rows } = await c.query(
         `SELECT preparing_revision_id AS base,cardinality(index_bases) AS depth FROM oc_timelines
         WHERE id=$1 AND preparing_revision_id IS NOT NULL FOR UPDATE SKIP LOCKED`,
@@ -489,6 +625,7 @@ export class PostgresStore {
       // revision it copies.
       else
         await this.replace(c, id, await this.revisionDocument(c, rows[0].base), { touch: false });
+      // Ready: access serves its index from now on.
       await c.query('UPDATE oc_timelines SET preparing_revision_id=NULL WHERE id=$1', [id]);
       c.afterCommit = () => this.refreshText(id);
     });
@@ -515,7 +652,12 @@ export class PostgresStore {
       );
     return this.compacting.get(id);
   }
-  /** Whether fork `id` has rewritten at least COMPACT_SHARE of what it reads. */
+  /**
+   * Whether fork `id` has rewritten at least COMPACT_SHARE of what it reads: its own moment
+   * rows (hidden ones included) against its moment count. False for a timeline that reads
+   * through to nothing. Reads outside any transaction, as an estimate: compactStep locks the
+   * fork for each step and stops once it reads through to nothing.
+   */
   async diverged(id) {
     const { rows } = await this.pool.query(
       "SELECT event_count FROM oc_timelines WHERE id=$1 AND index_bases<>'{}'",
@@ -523,7 +665,8 @@ export class PostgresStore {
     );
     if (!rows[0]) return false;
     const enough = Math.max(1, Math.ceil(Number(rows[0].event_count) * COMPACT_SHARE));
-    // Counted up to what is enough, so a fork with few rows of its own costs little.
+    // Counted up to what is enough, so a fork with few rows of its own costs little: the
+    // LIMIT stops the scan of oc_moments' primary key (timeline, ID) at `enough` rows.
     const { rows: own } = await this.pool.query(
       'SELECT count(*) AS n FROM (SELECT 1 FROM oc_moments WHERE timeline_id=$1 LIMIT $2) x',
       [id, enough],
@@ -539,6 +682,8 @@ export class PostgresStore {
    */
   async compactStep(id) {
     return this.transaction(async (c) => {
+      // The row lock orders this step with the fork's saves (which lock it too), so the
+      // lineage read here is the one copied from. Deleted or already compacted: done.
       const { rows } = await c.query(
         'SELECT id,index_bases,index_clocks FROM oc_timelines WHERE id=$1 FOR UPDATE',
         [id],
@@ -546,6 +691,10 @@ export class PostgresStore {
       if (!rows[0]?.index_bases.length) return true;
       await beginIndexWrite(c, id);
       const index = await indexReader(c, rows[0]);
+      // One table at a time, one page per step: the fork's visible rows (indexReader) that
+      // come from a level rather than its own (timeline_id is another's), inserted as its
+      // own. Once copied, its own rows shadow those keys, so the next step's read skips
+      // them and finds the next page. A step that copied anything ends there.
       for (const table of INDEX_TABLES) {
         const { columns } = await copiedColumns(c, table);
         const { rowCount } = await c.query(
@@ -555,6 +704,8 @@ export class PostgresStore {
         );
         if (rowCount) return false;
       }
+      // Nothing left to read through to: as in takeLevels, its hidden rows hide nothing now,
+      // it stops reading its levels, and they are released.
       for (const table of INDEX_TABLES)
         await c.query(`DELETE FROM ${table} WHERE timeline_id=$1 AND hidden`, [id]);
       await c.query("UPDATE oc_timelines SET index_bases='{}',index_clocks='{}' WHERE id=$1", [id]);
@@ -567,7 +718,11 @@ export class PostgresStore {
       return true;
     });
   }
-  /** Prepares, one at a time, copies left unprepared (for example by a restart). */
+  /**
+   * Prepares, one at a time, copies left unprepared (for example by a restart). Run at
+   * startup; the partial index oc_timelines_preparing finds them without reading every
+   * timeline.
+   */
   async prepareStale() {
     const { rows } = await this.pool.query(
       'SELECT id FROM oc_timelines WHERE preparing_revision_id IS NOT NULL',
@@ -577,11 +732,22 @@ export class PostgresStore {
   /**
    * Writes timeline `id`'s index whole from `document`, telling `progress` (if given) each
    * stage of REBUILD_STAGES as it starts.
+   *
+   * Runs in the caller's transaction (`client`), which should hold the timeline's row lock.
+   * Deletes and rewrites all of its index rows (moments, moment tree, duration and arc
+   * trees, relationships, search rows), drops its separation views, and updates its row:
+   * title and settings, roots, counts, catalogue text (built here, so not stale), storage
+   * size, and `updated_at` unless `touch` is false (repairs and migrations). A fork's index
+   * written whole becomes its own and its levels are released. Refuses with HttpError 400 a
+   * comparison over more sources than its owner may compare, or over sources that are not
+   * visible to its owner (public sources only, for a public comparison). Does not record a
+   * revision: callers checkpoint.
    */
   async replace(client, id, document, { touch = true, progress } = {}) {
     const stage = (done, rebuilding) => progress?.({ rebuilding, done, total: REBUILD_STAGES });
     document = withoutImageCopies(validateDocument(document));
     if (document.comparison) {
+      // The comparison's owner and whether they are an administrator (for their limit).
       const parent = (
         await client.query(
           'SELECT t.owner_id,t.visibility,u.is_admin FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id WHERE t.id=$1',
@@ -592,6 +758,10 @@ export class PostgresStore {
         this.compareLimits && compareLimit(this.compareLimits, { isAdmin: parent.is_admin });
       if (limit && document.comparison.sources.length > limit)
         throw new HttpError(400, `This account can compare at most ${limit} timelines.`);
+      // Sources the comparison may show, judged for its owner, not the person saving: an
+      // ordinary timeline other than itself that is public, or, for a private comparison,
+      // one its owner owns or is a member of (unless restricted by moderators). A public
+      // comparison would otherwise show private moments to everyone.
       const sources = await client.query(
         `SELECT t.id FROM oc_timelines t
         WHERE t.id=ANY($1::uuid[]) AND t.id<>$2::uuid AND t.comparison IS NULL
@@ -611,11 +781,17 @@ export class PostgresStore {
     await beginIndexWrite(client, id);
     const lineage = await lineageOf(client, id);
     const rows = await indexReader(client, lineage);
-    // Reject over-quota document growth before rebuilding the rational index.
+    // Reject over-quota document growth before rebuilding the rational index: a trigger
+    // charges the change in storage_bytes to the owner and raises "Account storage limit"
+    // past their quota (answered 413 by transaction).
     await client.query('UPDATE oc_timelines SET storage_bytes=$2 WHERE id=$1', [
       id,
       Buffer.byteLength(JSON.stringify(document)),
     ]);
+    // Whether the document adds any moment the index lacks (its IDs EXCEPT those the
+    // timeline sees now, read before the rows are rewritten): if so, event_generation
+    // advances below, which tells clients following the timeline that moments were added
+    // (rather than only edited or deleted).
     const additions = await client.query(
       `SELECT EXISTS(SELECT value FROM jsonb_array_elements_text($2::jsonb)
         EXCEPT SELECT id FROM ${rows('oc_moments', '$1', { scan: true })} x) AS added`,
@@ -640,6 +816,8 @@ export class PostgresStore {
     stage(4, 'indexing for search');
     await this.indexSearch(client, id, document, bands);
     stage(5, 'linking relationships');
+    // Relationships are inserted 1,000 at a time (5,000 parameters per statement, well under
+    // PostgreSQL's 65,535), each stored as (a_kind, a_id, b_kind, b_id).
     await client.query('DELETE FROM oc_relationships WHERE timeline_id=$1', [id]);
     const links = document.relationships ?? [];
     const kind = (ref) => ('moment' in ref ? ['moment', ref.moment] : ['duration', ref.duration]);
@@ -665,6 +843,10 @@ export class PostgresStore {
       ]);
     // Saved state changed: derived separation views belong to the previous revision.
     await client.query('DELETE FROM oc_views WHERE timeline_id=$1', [id]);
+    // The row's description of the index, in one update: settings, the three trees' roots,
+    // the moment count, catalogue text (fresh, so event_text_stale is cleared), comparison,
+    // storage size (the same as set above, so its charge is unchanged), event_generation when
+    // moments were added, updated_at when `touch`, and index_version 2 (current).
     await client.query(
       'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,tags=$8,assets=$9::jsonb,event_text=$10,comparison=$11::jsonb,storage_bytes=$12,event_generation=event_generation+CASE WHEN $13 THEN 1 ELSE 0 END,updated_at=CASE WHEN $14 THEN now() ELSE updated_at END,duration_root=$15,edge_root=$16,index_version=2,event_text_stale=false WHERE id=$1',
       [
@@ -687,10 +869,17 @@ export class PostgresStore {
       ],
     );
   }
-  /** Rebuilds the timeline's text search rows from a complete document and its resolved bands. */
+  /**
+   * Rebuilds the timeline's text search rows (oc_entity_search: one per moment and duration,
+   * with its times, title, body and tags) from a complete document and its resolved bands,
+   * and marks its search index current (search_version 1). Runs in the caller's
+   * transaction, after beginIndexWrite. Each row's tsvector (`document`) is computed by a
+   * trigger on insert, not here.
+   */
   async indexSearch(client, id, document, bands) {
     await client.query('DELETE FROM oc_entity_search WHERE timeline_id=$1', [id]);
     const rows = searchRows(document.events, bands);
+    // 500 rows (4,000 parameters) per statement; the times cast to mpq, the tags to text[].
     for (let offset = 0; offset < rows.length; offset += 500) {
       const params = [];
       const tuples = rows.slice(offset, offset + 500).map((row) => {
@@ -718,6 +907,14 @@ export class PostgresStore {
    * Runs `action(c)` in a transaction. `analyses`, when given, collects the statistics
    * refreshes its writes ask for instead of running them before returning, for a caller
    * making many writes in a row to run once (see analyze).
+   *
+   * `action` receives a pooled client inside BEGIN … COMMIT (READ COMMITTED unless it sets
+   * another level first) and may set on it: `afterCommit`, a function run once committed
+   * (background work such as refreshText or prepare); `analyze`, true or a list of tables
+   * whose statistics to refresh after commit; `compact`, a fork to compact after commit.
+   * beginIndexWrite sets `indexWrites`. Resolves to what `action` returns. On any error it
+   * rolls back and rethrows, turning the storage trigger's "Account storage limit"
+   * exception into HttpError 413.
    */
   async transaction(action, { analyses = null } = {}) {
     const c = await this.pool.connect();
@@ -729,12 +926,16 @@ export class PostgresStore {
       await c.query('BEGIN');
       const result = await action(c);
       if (c.indexWrites && !c.analyze) {
+        // The retiring triggers count the transaction's retired rows in the transaction-local
+        // setting oc.retired (unset, or empty, when none were): many make the retired tables'
+        // statistics worth refreshing (ANALYZE_VERSIONS_AFTER).
         const { rows } = await c.query(
           "SELECT coalesce(nullif(current_setting('oc.retired',true),''),'0')::bigint AS retired",
         );
         if (Number(rows[0].retired) >= ANALYZE_VERSIONS_AFTER) c.analyze = RETIRED_TABLES;
       }
       await c.query('COMMIT');
+      // Neither is awaited: the answer does not wait for them.
       c.afterCommit?.();
       if (c.compact) this.compact(c.compact);
       // Before answering, so the next request plans with the written timeline counted.
@@ -756,6 +957,10 @@ export class PostgresStore {
    * Rebuilds the catalogue text (event_text) after incremental saves, outside the save's
    * transaction; rapid saves to one timeline coalesce into one more rebuild. Also drops
    * separation views of earlier revisions.
+   *
+   * Returns a promise resolving when this round (and any it was asked to repeat) is done;
+   * failures are logged, not thrown. While a round is running for `id`, another call only
+   * asks it to run once more. Clears `event_text_stale` on success.
    */
   refreshText(id) {
     this.refreshing ??= new Map();
@@ -779,12 +984,18 @@ export class PostgresStore {
           // applies only if no save committed meanwhile (that save's own refresh runs next), and
           // rewrites event_text (recomputing the catalogue vector) only when the text changed.
           const started = Date.now();
+          // oc_event_text (schema.sql) reads the first 1 MiB of titles and notes through the
+          // timeline's indexes; LATERAL runs it once for the row, which is read only while
+          // still stale. `same` compares with the stored text so an unchanged one is not
+          // rewritten (rewriting it would rewrite the GIN-indexed search vector too).
           const { rows } = await this.pool.query(
             `SELECT t.revision,x.text,t.event_text IS NOT DISTINCT FROM x.text AS same FROM oc_timelines t
             CROSS JOIN LATERAL (SELECT oc_event_text(t.id) AS text) x WHERE t.id=$1 AND t.event_text_stale`,
             [id],
           );
           if (!rows[0]) continue;
+          // Optimistic: `revision=` the one read, so a save that committed meanwhile (and
+          // left the text stale again) is not marked fresh; its own refresh follows.
           await this.pool.query(
             rows[0].same
               ? 'UPDATE oc_timelines SET event_text_stale=false WHERE id=$1 AND revision=$2'
@@ -793,6 +1004,8 @@ export class PostgresStore {
           );
           if (this.refreshCost.size > 10000) this.refreshCost.clear();
           this.refreshCost.set(id, Date.now() - started);
+          // Separation views (view) are built per revision; those of other revisions are
+          // never read again (the oc_view_* rows go with them, ON DELETE CASCADE).
           await this.pool.query('DELETE FROM oc_views WHERE timeline_id=$1 AND revision<>$2', [
             id,
             rows[0].revision,
@@ -829,6 +1042,7 @@ export class PostgresStore {
         while (entry.next.size && !this.pool.ending) {
           const now = [...entry.next];
           entry.next.clear();
+          // Table names come from INDEX_TABLES and RETIRED_TABLES only, never from input.
           await this.pool.query(`ANALYZE ${now.join(',')}`);
         }
       } catch (error) {
@@ -840,13 +1054,21 @@ export class PostgresStore {
     this.analyzing = entry;
     return entry.done;
   }
-  /** Refreshes catalogue text left stale (for example by a restart) and waits for pending refreshes. */
+  /**
+   * Refreshes catalogue text left stale (for example by a restart) and waits for pending
+   * refreshes. Run at startup (platform.mjs); reads every timeline row's flag, as there is
+   * no index on event_text_stale.
+   */
   async refreshStale() {
     const { rows } = await this.pool.query('SELECT id FROM oc_timelines WHERE event_text_stale');
     await Promise.all(rows.map((r) => this.refreshText(r.id)));
     await this.idle();
   }
-  /** Resolves once no catalogue refresh is pending. */
+  /**
+   * Resolves once no background work is pending: catalogue refreshes, statistics refreshes,
+   * copies being prepared and forks being compacted (work started meanwhile is waited for
+   * too). Used by refreshStale and by tests.
+   */
   async idle() {
     while (this.refreshing?.size || this.analyzing || this.preparing?.size || this.compacting?.size)
       await Promise.all([
@@ -856,11 +1078,19 @@ export class PostgresStore {
         this.analyzing?.done,
       ]);
   }
+  /**
+   * Creates a timeline owned by `userId` from `document` (validated; image copies dropped;
+   * new plugin scripts compiled, HttpError 400 if one does not), with its index written
+   * whole and its first revision recorded, in one transaction. Returns it as access gives
+   * it to its owner. Over quota: HttpError 413, and nothing is created.
+   */
   async create(userId, document) {
     document = withoutImageCopies(validateDocument(document));
     await this.checkScripts(document.plugins);
     const id = randomUUID();
     await this.transaction(async (c) => {
+      // The row first (its defaults: private, revision 1 and so on), so replace can write
+      // the index rows that refer to it and fill in the rest of its columns.
       await c.query('INSERT INTO oc_timelines(id,owner_id,title) VALUES($1,$2,$3)', [
         id,
         userId,
@@ -872,17 +1102,24 @@ export class PostgresStore {
     return this.access(id, userId);
   }
   /**
-   * Saves `document`, or `patch` (applied in place when it can be), at `revision`.
-   * `analyses`: see transaction.
-   */
-  /**
-   * Saves `document`, or `patch` onto the current revision. `progress`, if given, is told as
-   * a large patch is applied in place (see saveIncrementally), or as the timeline is rebuilt
-   * with it instead (`{ rebuilding: stage, done, total }`; see replace).
+   * Saves `document`, or `patch` (applied in place when it can be), as timeline `id`'s next
+   * revision, by `userId`. `revision` is the revision the editor last read: a save without a
+   * `patch.base` must be on the current one (HttpError 409 otherwise); one with it is merged
+   * onto the current revision (rebaseSave). `progress`, if given, is told as a large patch
+   * is applied in place (see saveIncrementally), or as the timeline is rebuilt with it
+   * instead (`{ rebuilding: stage, done, total }`; see replace). `analyses`: see
+   * transaction.
+   *
+   * In one transaction holding the timeline's row lock, so saves to one timeline run one
+   * after another. Needs write access (HttpError 403); new plugin scripts must compile
+   * (400). Returns the timeline as access gives it after the save. Afterwards the catalogue
+   * text is refreshed (sparse saves) and a fork may be compacted.
    */
   async save(id, userId, revision, document, patch = null, { analyses = null, progress } = {}) {
     return this.transaction(
       async (c) => {
+        // Locked before access reads it, so the revision compared below is the one this
+        // save builds on, and no other save to the timeline can commit until this one does.
         await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [id]);
         const t = await this.access(id, userId, c);
         if (!t.canWrite) throw new HttpError(403, 'Write access is required to update upstream.');
@@ -905,12 +1142,15 @@ export class PostgresStore {
           c.afterCommit = () => this.refreshText(id);
           return this.access(id, userId, c);
         }
+        // A whole document, or a patch too large to apply in place: the index is rebuilt
+        // from the document (a patch applied to the current one, read whole).
         if (patch) {
           progress?.({ rebuilding: 'reading it', done: 0, total: REBUILD_STAGES });
           const current = await this.branchDocument(c, t);
           document = validateDocument(applyPatch(current, patch));
         }
         await this.replace(c, id, document, { progress });
+        // The next revision number, which checkpoint reads and records.
         await c.query('UPDATE oc_timelines SET revision=revision+1 WHERE id=$1', [id]);
         progress?.({ rebuilding: 'recording the version', done: 6, total: REBUILD_STAGES });
         await this.checkpoint(c, id, userId, document, 'save', [t.head_revision_id]);
@@ -923,6 +1163,11 @@ export class PostgresStore {
    * Records the timeline's current state (just written from `document`) as its next numbered
    * revision, kept as rows (history.mjs), or without its content when the timeline keeps no
    * saved history.
+   *
+   * In the caller's transaction, after the caller has advanced `revision` (create relies
+   * on its default, 1). `kind` is the revision's kind ('save', 'merge', …), `parents` its
+   * parent revisions (first the one it follows). Points the timeline's head at the new
+   * revision and returns its ID.
    */
   async checkpoint(client, id, userId, document, kind, parents = []) {
     const { rows } = await client.query(
@@ -944,6 +1189,8 @@ export class PostgresStore {
   }
   /** Whether revision `id`'s document can be read (see revisionDocument). */
   async readable(client, id) {
+    // It keeps content (a snapshot, a patch or history rows: num_nonnulls counts the first
+    // two), or it is its timeline's head, read from the live index.
     const { rows } = await client.query(
       `SELECT 1 FROM oc_revisions r WHERE r.id=$1 AND (num_nonnulls(r.snapshot_id,r.patch)+r.history_rows::int>0
         OR EXISTS(SELECT 1 FROM oc_timelines t WHERE t.id=r.timeline_id AND t.head_revision_id=r.id))`,
@@ -956,6 +1203,8 @@ export class PostgresStore {
    * charged, apart from those whose content others still read (STILL_READ).
    */
   async historyBytes(client, id) {
+    // Each revision's charge is its storage entry (kind 'oc_revisions', keyed by its ID as
+    // text: oc_storage_entries' primary key), summed over those stopHistory would forget.
     const { rows } = await client.query(
       `${STILL_READ} SELECT coalesce(sum(e.bytes),0) AS bytes FROM oc_revisions r
       JOIN oc_storage_entries e ON e.kind='oc_revisions' AND e.entry_id=r.id::text
@@ -971,22 +1220,28 @@ export class PostgresStore {
    * Its later saves record no content. Its head is read from its live index from then on.
    */
   async stopHistory(client, id) {
+    // Already off: nothing to do.
     const { rows } = await client.query(
       'SELECT revision FROM oc_timelines WHERE id=$1 AND keep_history',
       [id],
     );
     if (!rows[0]) return;
+    // The revisions to forget: those with content (as in readable) that nothing else reads.
     const { rows: forgotten } = await client.query(
       `${STILL_READ} SELECT r.id,r.snapshot_id FROM oc_revisions r WHERE r.timeline_id=$1
       AND r.id NOT IN (SELECT id FROM still_read)
       AND num_nonnulls(r.snapshot_id,r.patch)+r.history_rows::int>0`,
       [id],
     );
+    // Clearing exactly these four columns is the one update the revision trigger allows
+    // (oc_revision_forget); oc_track_storage then refunds what each was charged.
     await client.query(
       `UPDATE oc_revisions SET history_rows=false,stored_bytes=NULL,snapshot_id=NULL,patch=NULL
       WHERE id=ANY($1::uuid[])`,
       [forgotten.map((r) => r.id)],
     );
+    // Their snapshots go unless another revision still refers to one (several revisions
+    // can share a snapshot).
     await client.query(
       'DELETE FROM oc_snapshots s WHERE s.id=ANY($1::uuid[]) AND NOT EXISTS(SELECT 1 FROM oc_revisions r WHERE r.snapshot_id=s.id)',
       [forgotten.map((r) => r.snapshot_id).filter(Boolean)],
@@ -995,11 +1250,15 @@ export class PostgresStore {
     // the latest revision, so nothing later sees them.
     const released = await pruneHistoryRows(client, id);
     await endHistory(client, id, (BigInt(rows[0].revision) + 1n).toString());
+    // pruneHistoryRows names the timeline of this one's base once no revision of this one
+    // reads through to it any more; if that timeline was deleted, its remaining history,
+    // perhaps kept only for this copy, goes too.
     if (
       released &&
       !(await client.query('SELECT 1 FROM oc_timelines WHERE id=$1', [released])).rows.length
     )
       await this.removeHistory(client, released);
+    // history_since is cleared too: startHistory sets it again for a copy that needs it.
     await client.query(
       'UPDATE oc_timelines SET keep_history=false,history_since=NULL WHERE id=$1',
       [id],
@@ -1011,6 +1270,8 @@ export class PostgresStore {
    * state made in the database and charged to it. Earlier revisions stay as they were.
    */
   async startHistory(client, id, userId) {
+    // Turns it on and takes the next revision number in one statement; no row when it was
+    // already on. RETURNING * gives the row as updated, for its settings below.
     const { rows } = await client.query(
       `UPDATE oc_timelines SET keep_history=true,revision=revision+1 WHERE id=$1 AND NOT keep_history
       RETURNING *`,
@@ -1040,12 +1301,18 @@ export class PostgresStore {
    * one, a validated document), with `parents`: kept as rows that read through to `baseId` and charged what
    * `document` changes from it, or, when that base is not kept as rows, stored as a document
    * of `timelineId`.
+   *
+   * In the caller's transaction. Returns the new revision's ID; its parents are linked in
+   * order (duplicates and nulls dropped), the first at position 0.
    */
   async recordDetached(client, timelineId, userId, document, kind, parents, baseId) {
     const revisionId = randomUUID();
     const stored = await recordDetached(client, revisionId, baseId, document);
     if (stored === null)
       return this.recordRevision(client, timelineId, userId, document, kind, parents);
+    // Its own one-revision history: its ID as timeline_id and number 1, so it reads through
+    // to its base like a copy and lies outside every timeline's numbered history.
+    // `history_rows` true: its content is rows; `stored_bytes` what it is charged.
     await client.query(
       `INSERT INTO oc_revisions(id,timeline_id,number,author_id,kind,history_rows,document_bytes,stored_bytes)
       VALUES($1,$1,1,$2,$3,true,$4,$5)`,
@@ -1065,6 +1332,7 @@ export class PostgresStore {
   async recordDetachedPatch(client, t, userId, patch, kind, parents, baseId) {
     const revisionId = randomUUID();
     const stored = await recordDetachedPatch(client, revisionId, baseId, patch);
+    // As in recordDetached; its document size is recorded as timeline `t`'s current size.
     await client.query(
       `INSERT INTO oc_revisions(id,timeline_id,number,author_id,kind,history_rows,document_bytes,stored_bytes)
       VALUES($1,$1,1,$2,$3,true,$4,$5)`,
@@ -1088,6 +1356,7 @@ export class PostgresStore {
       client.afterCommit = () => this.refreshText(t.id);
       return revisionId;
     }
+    // Too large to apply in place: rebuilt from the patched document, then recorded.
     const document = validateDocument(applyPatch(await this.branchDocument(client, t), patch));
     await this.replace(client, t.id, document);
     await client.query('UPDATE oc_timelines SET revision=revision+1 WHERE id=$1', [t.id]);
@@ -1096,6 +1365,12 @@ export class PostgresStore {
   /**
    * A numbered revision kept as rows, charged the bytes of the versions it wrote; or, not
    * `kept` (a timeline that keeps no saved history), one without content, charged nothing.
+   *
+   * `number` is the revision's number in the timeline's history; `documentBytes` the size
+   * of the timeline's document then; `stored` the bytes of the rows
+   * recordHistory wrote. Inserts the revision and its parent links (`parents` in order,
+   * duplicates and nulls dropped; position 0 is the revision it follows) and returns its ID.
+   * The unique (timeline_id, number) constraint refuses a second revision with one number.
    */
   async recordRows(
     client,
@@ -1121,8 +1396,14 @@ export class PostgresStore {
   /**
    * Applies a sparse save in place and records, as rows, the versions of what it changed:
    * its cost follows the change, not the timeline's size. The timeline row is updated once
-   * and its indexed columns stay unchanged (updated_at advances at most once a minute), so
-   * the update stays in place (HOT) and the catalogue's GIN index is not touched.
+   * (once more per extra slice of a large patch) and its indexed columns stay unchanged
+   * (updated_at, in the index oc_timelines_public, advances at most once a minute), so the
+   * update stays in place (HOT) and the catalogue's GIN index is not touched.
+   *
+   * `t` is the timeline as access read it under the caller's row lock; `kind` and `parents`
+   * are the revision's (by default a save following the head). Leaves the catalogue text
+   * stale for refreshText, asks for statistics after a large save to a fork, and asks for
+   * the fork to be considered for compaction. Returns the new revision's ID.
    */
   async saveIncrementally(
     client,
@@ -1154,6 +1435,9 @@ export class PostgresStore {
       progress?.({ done, total });
       added ||= applied.added;
       for (const name of Object.keys(touched)) touched[name].push(...applied.touched[name]);
+      // Between slices, the row columns the slice changed (`assignments`: column, value and
+      // cast, such as tree roots and counts) are written and the row read again, so the next
+      // slice starts from them. The last slice's go into the final update below.
       if (i < slices.length - 1) {
         await client.query(
           `UPDATE oc_timelines SET ${applied.assignments.map(([column, , cast], j) => `${column}=$${j + 2}${cast ?? ''}`)} WHERE id=$1`,
@@ -1178,6 +1462,10 @@ export class PostgresStore {
       stored,
       kept,
     });
+    // One update of the row: the next revision number and its head, event_generation when
+    // moments were added, the catalogue text marked stale (refreshText rebuilds it after
+    // commit), updated_at at most once a minute (see above), and the changed columns,
+    // numbered after the first three parameters.
     const fixed = 4;
     await client.query(
       `UPDATE oc_timelines SET revision=revision+1,head_revision_id=$2,
@@ -1189,6 +1477,14 @@ export class PostgresStore {
     );
     return revisionId;
   }
+  /**
+   * A revision stored as a whole document (a snapshot), the way revisions were kept before
+   * history was kept as rows; still used for revisions outside a timeline's numbered
+   * history whose base is not kept as rows (recordDetached). Stores `document` as a new
+   * snapshot (HttpError 413 past SNAPSHOT_BYTES), or reuses snapshot `snapshotId` when
+   * given, and inserts the revision (with `number`, null outside numbered history) and its
+   * parent links. Returns its ID.
+   */
   async recordRevision(
     client,
     id,
@@ -1210,6 +1506,7 @@ export class PostgresStore {
         [snapshotId, serialized, size],
       );
     }
+    // A reused snapshot's size is read from it (by its primary key).
     await client.query(
       'INSERT INTO oc_revisions(id,timeline_id,number,snapshot_id,author_id,kind,document_bytes) VALUES($1,$2,$3,$4,$5,$6,coalesce($7,(SELECT document_bytes FROM oc_snapshots WHERE id=$4)))',
       [revisionId, id, number, snapshotId, userId, kind, size],
@@ -1228,6 +1525,8 @@ export class PostgresStore {
    * head, and is otherwise unavailable (HttpError 409, HISTORY_OFF).
    */
   async revisionDocument(client, id) {
+    // How the revision is kept: `forgotten` when it has no content (as in readable), and
+    // `head_of` its timeline's ID when it is that timeline's head.
     const kept = await client.query(
       `SELECT r.timeline_id,r.number,r.history_rows,
       num_nonnulls(r.snapshot_id,r.patch)+r.history_rows::int=0 AS forgotten,
@@ -1247,8 +1546,12 @@ export class PostgresStore {
       if (!document) throw new HttpError(404, 'Saved revision unavailable.');
       return document;
     }
+    // Kept as a document: walks first parents (position 0) back from the revision until one
+    // with a snapshot, then returns that snapshot followed by the patches in the order they
+    // were saved (deepest first), to replay in one pass.
     const { rows } = await client.query(
       `WITH RECURSIVE chain(id,depth,snapshot_id,patch) AS (
+        -- The revision itself, then each first parent while no snapshot has been reached.
         SELECT r.id,0,r.snapshot_id,r.patch FROM oc_revisions r WHERE r.id=$1
         UNION ALL SELECT r.id,c.depth+1,r.snapshot_id,r.patch FROM chain c
         JOIN oc_revision_parents p ON p.revision_id=c.id AND p.position=0
@@ -1256,6 +1559,7 @@ export class PostgresStore {
       ) SELECT c.depth,c.patch,s.document FROM chain c LEFT JOIN oc_snapshots s ON s.id=c.snapshot_id ORDER BY c.depth DESC`,
       [id],
     );
+    // The deepest row must carry a snapshot; otherwise the chain is broken (a parent gone).
     if (!rows.length || !rows[0].document) throw new HttpError(404, 'Saved revision unavailable.');
     if (rows.length === 1) return rows[0].document;
     return replayPatches(
@@ -1263,11 +1567,22 @@ export class PostgresStore {
       rows.slice(1).map((r) => r.patch),
     );
   }
+  /**
+   * Removes the saved history of timeline `timelineId` that nothing needs any more, in the
+   * caller's transaction, once the timeline is deleted (its callers delete the row first),
+   * with the revisions its pull requests kept. Keeps the revisions other timelines'
+   * heads, forks, pull requests and other timelines' revisions refer to (with their
+   * ancestors), and those a copy's history reads through to. Deletes the rest with their
+   * parent links, unshared snapshots and the versions only they saw, then, recursively, the
+   * history of a deleted timeline that this one's history alone kept.
+   */
   async removeHistory(client, timelineId) {
     // Once a timeline is deleted, so are its pull requests: the revisions they kept outside
     // any timeline's history (their own ID as timeline), reading through to its revisions,
     // go first, with their links to other revisions.
     if (!(await client.query('SELECT 1 FROM oc_timelines WHERE id=$1', [timelineId])).rows.length) {
+      // Detached revisions (timeline_id = their own ID) whose base (oc_history_bases) is a
+      // revision of this timeline, unless a remaining pull request still refers to one.
       const { rows: detached } = await client.query(
         `SELECT d.id FROM oc_revisions d JOIN oc_history_bases b ON b.timeline_id=d.id
         JOIN oc_revisions r ON r.id=b.base_revision_id
@@ -1277,17 +1592,24 @@ export class PostgresStore {
       );
       const ids = detached.map((row) => row.id);
       if (ids.length) {
+        // Parent links first: they refer to the revisions (foreign keys, no cascade). The
+        // parent_id side uses oc_revision_parent_lookup.
         await client.query(
           'DELETE FROM oc_revision_parents WHERE revision_id=ANY($1::uuid[]) OR parent_id=ANY($1::uuid[])',
           [ids],
         );
         await client.query('DELETE FROM oc_revisions WHERE id=ANY($1::uuid[])', [ids]);
+        // Each one's own history is its rows: they go, with its base.
         for (const id of ids) await pruneHistoryRows(client, id);
       }
     }
     // Keep ancestors still needed by another fork or submitted review, and the revisions
     // copies read through to. Other timelines' private history is never exposed through
-    // the history API.
+    // the history API. A recursive CTE: the seed is this timeline's revisions something
+    // else refers to (a timeline's head or fork base, a pull request, a child revision of
+    // another timeline); the recursive step adds all their ancestors (every parent
+    // position; UNION, so each once). The rest of its revisions go, unless a copy's history
+    // reads through to one (oc_history_bases_revision).
     const { rows } = await client.query(
       `WITH RECURSIVE kept(id) AS (
       SELECT r.id FROM oc_revisions r WHERE r.timeline_id=$1 AND (
@@ -1307,6 +1629,7 @@ export class PostgresStore {
         [ids],
       );
       await client.query('DELETE FROM oc_revisions WHERE id=ANY($1::uuid[])', [ids]);
+      // Snapshots no remaining revision refers to (a null snapshot_id matches nothing).
       await client.query(
         'DELETE FROM oc_snapshots s WHERE s.id=ANY($1::uuid[]) AND NOT EXISTS(SELECT 1 FROM oc_revisions r WHERE r.snapshot_id=s.id)',
         [rows.map((r) => r.snapshot_id)],
@@ -1321,12 +1644,21 @@ export class PostgresStore {
     )
       await this.removeHistory(client, released);
   }
+  /**
+   * The timeline as access gives it to `userId` (404 when they may not see it), with
+   * `first` and `last`, the times of its first and last moments as "n/d" text (absent when
+   * it has none). Read in a REPEATABLE READ transaction, so the bounds belong to the
+   * revision access read.
+   */
   async metadata(id, userId) {
     return this.transaction(async (c) => {
+      // Must be the transaction's first statement: one snapshot for every read below.
       await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
       // A copy being prepared has metadata (without bounds), so its page can wait for it.
       const t = await this.access(id, userId, c, { preparing: true });
       const nodes = (await indexReader(c, t))('oc_nodes');
+      // The moment tree's root node holds its subtree's first and last times, so the
+      // bounds are one lookup by primary key (timeline, node ID), not a scan of the moments.
       const { rows } = await c.query(
         `SELECT oc_qtext(first_time) AS first,oc_qtext(last_time) AS last FROM ${nodes} x WHERE x.id=$2`,
         [id, t.root],
@@ -1334,6 +1666,12 @@ export class PostgresStore {
       return { ...t, ...rows[0] };
     });
   }
+  /**
+   * The times of the timeline's latest (or, with `direction` 'first', earliest) distinct
+   * moments, for jumping to its start or end: `{ revision, event_generation, times }`, the
+   * times as "n/d" text. HttpError 400 for another direction, 404 without access, 409 for a
+   * comparison (read its sources instead).
+   */
   async recent(id, userId, direction = 'last') {
     if (!['last', 'first'].includes(direction))
       throw new HttpError(400, 'Choose the first or last moments.');
@@ -1342,6 +1680,9 @@ export class PostgresStore {
       const timeline = await this.access(id, userId, c);
       if (timeline.comparison)
         throw new HttpError(409, 'Read recent moments from comparison sources.');
+      // oc_recent_times walks the moment tree in order from its last (or first) node and
+      // stops after 8 distinct times, reading no moments' metadata; for a fork it hands
+      // over to its _lineage variant, which reads through the levels.
       const { rows } = await c.query('SELECT oc_recent_times($1,$2) AS time', [
         id,
         direction === 'first',
@@ -1353,8 +1694,15 @@ export class PostgresStore {
       };
     });
   }
+  /**
+   * The timeline as `userId` may see it and its whole current document, read whole into
+   * memory from one REPEATABLE READ snapshot: `{ timeline, document }`. For documents too
+   * large to hold, snapshotChunks streams the same. HttpError 404 without access, 409 for
+   * a copy still being prepared.
+   */
   async snapshot(id, userId) {
     return this.transaction(async (c) => {
+      // One snapshot for the moments, durations and relationships read separately below.
       await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
       const t = await this.access(id, userId, c);
       const rows = await indexReader(c, t);
@@ -1413,7 +1761,10 @@ export class PostgresStore {
       },
       [
         // In the orders their indexes give (sorting a large timeline's moments by time
-        // would take longer than a statement may).
+        // would take longer than a statement may): moments by ID (oc_moments' primary
+        // key), durations by start (oc_duration_nodes_first_key, then the exact start and
+        // ID), relationships by their primary key. Each is read through a cursor a page at
+        // a time (cursorRows), in the snapshot of `client`'s transaction.
         [
           'events',
           cursorRows(
@@ -1460,6 +1811,9 @@ export class PostgresStore {
     const store = this;
     return inSnapshot(this.pool, async function* (c) {
       const t = await store.access(id, userId, c);
+      // The revision must be one of this timeline's numbered revisions (so another
+      // timeline's private history is never read through this one). `live`: it is the head
+      // and keeps no content, so it is read from the live index.
       const { rows } = await c.query(
         `SELECT r.number,r.history_rows,t.head_revision_id=r.id AND
         num_nonnulls(r.snapshot_id,r.patch)+r.history_rows::int=0 AS live
@@ -1487,7 +1841,10 @@ export class PostgresStore {
       }
     });
   }
-  /** The timeline's links (read by `rows`, its indexReader), in a document's order. */
+  /**
+   * The timeline's links (read by `rows`, its indexReader), in a document's order
+   * (RELATIONSHIP_ORDER), as `{ a, b }` references. A scan of all of them, sorted.
+   */
   async relationshipList(client, rows, id) {
     const { rows: links } = await client.query(
       `SELECT a_kind,a_id,b_kind,b_id FROM ${rows('oc_relationships', '$1', { scan: true })} x
@@ -1496,7 +1853,12 @@ export class PostgresStore {
     );
     return links.map((r) => ({ a: { [r.a_kind]: r.a_id }, b: { [r.b_kind]: r.b_id } }));
   }
-  /** Standalone duration definitions; legacy rows convert from their moments' metadata. */
+  /**
+   * The timeline's duration definitions (read by `rows`, its indexReader), by ID ("C"
+   * order). Legacy rows without a definition are skipped: those durations still live in
+   * their moments' metadata, from which validateDocument converts them (core.ts
+   * convertLegacyDurations) when the document is built.
+   */
   async durationDefinitions(client, rows, id) {
     const { rows: found } = await client.query(
       `SELECT definition FROM ${rows('oc_duration_nodes', '$1', { scan: true })} x WHERE definition IS NOT NULL ORDER BY definition->>'id' COLLATE "C"`,
@@ -1504,6 +1866,12 @@ export class PostgresStore {
     );
     return found.map((r) => r.definition);
   }
+  /**
+   * Timeline `timeline`'s (a row with its settings and lineage) current document, built
+   * whole from its live index in the transaction of `client` (a fork's read through its
+   * levels) and validated. For saves rebuilt from a document, merges, separation views and
+   * migrations; it holds the whole timeline in memory.
+   */
   async branchDocument(client, timeline) {
     const rows = await indexReader(client, timeline);
     const events = await allEvents(client, rows, timeline.id);
@@ -1528,15 +1896,23 @@ export class PostgresStore {
    * Returns the derived index for one side of a tag separation at the current saved revision,
    * building it from the saved document on first use. A save discards views; each timeline
    * keeps its eight most recent.
+   *
+   * Returns the view's ID (oc_views), for query to read in place of the timeline's index.
+   * HttpError 404 without access, 409 for a comparison.
    */
   async view(id, userId, filter) {
     const key = viewFilterKey(filter);
     return this.transaction(async (c) => {
       const t = await this.access(id, userId, c);
       if (t.comparison) throw new HttpError(409, 'Comparisons cannot be separated by tags.');
+      // Concurrent requests for the same view (timeline, revision, filter) wait here, so
+      // one builds it and the others find it below, instead of all building it and all but
+      // one failing on oc_views' unique (timeline_id, revision, filter_key). The lock is
+      // transaction-scoped: released at commit, once the view is visible.
       await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
         id + '|' + t.revision + '|' + key,
       ]);
+      // Found by the unique index on (timeline_id, revision, filter_key).
       const existing = await c.query(
         'SELECT id FROM oc_views WHERE timeline_id=$1 AND revision=$2 AND filter_key=$3',
         [id, t.revision, key],
@@ -1553,6 +1929,8 @@ export class PostgresStore {
       await writeNodes(c, 'oc_view_nodes', viewId, tree);
       const durations = await writeDurationNodes(c, 'oc_view_duration_nodes', viewId, document);
       await c.query('UPDATE oc_views SET duration_root=$2 WHERE id=$1', [viewId, durations.root]);
+      // Keeps the timeline's eight newest views (this one included); older ones go, their
+      // rows with them (ON DELETE CASCADE).
       await c.query(
         'DELETE FROM oc_views WHERE timeline_id=$1 AND id NOT IN (SELECT id FROM oc_views WHERE timeline_id=$1 ORDER BY created_at DESC,id LIMIT 8)',
         [id],
@@ -1560,12 +1938,32 @@ export class PostgresStore {
       return viewId;
     });
   }
+  /**
+   * Answers one read of timeline `id` for `userId` (a validated `query`, by `query.kind`):
+   * - 'overview': the window [lower, upper] summarized at a grouping threshold (at least
+   *   the span / 1,024): moment groups, bands (durations at least the threshold long) and
+   *   relationship arcs, at most 256 of each, and collapsed short durations;
+   * - 'related': a page of the entities linked to `query.entity`, with, on the first page,
+   *   how many are linked directly and reachable through any number of links;
+   * - 'tags': the 200 commonest tags with their counts;
+   * - 'search': a page of full-text matches, ranked, with the total;
+   * - 'durations': a page of the durations wholly inside [lower, upper];
+   * - 'duration' / 'moment': one entity by its ID;
+   * - otherwise moments: by ID and time (`query.id`), or a page of those in [lower, upper]
+   *   after an exact (time, ID) cursor.
+   * With `query.filter`, it reads a tag separation's derived index (view) instead of the
+   * timeline's. All in one REPEATABLE READ transaction, and every answer carries the
+   * revision it was read at. HttpError 404 without access, 409 for a comparison, for a copy
+   * still being prepared, or when `query.revision` is given and is not the current one.
+   */
   async query(id, userId, query) {
     // Tag separations read a derived index for the filter, built on first use.
     const view = query.filter ? await this.view(id, userId, query.filter) : null;
     const tree = view ?? id,
       names = treeNames(view);
     return this.transaction(async (c) => {
+      // Every statement below reads one snapshot, so the parts of an answer (groups, bands,
+      // arcs) agree with each other and with the revision reported.
       await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
       const t = await this.access(id, userId, c);
       if (t.comparison)
@@ -1575,6 +1973,8 @@ export class PostgresStore {
           409,
           'The server timeline changed. Save or export your edits before reloading.',
         );
+      // The view was built (or found) in a transaction of its own; a save that committed
+      // since then leaves it describing an earlier revision.
       if (
         view &&
         !(
@@ -1588,12 +1988,21 @@ export class PostgresStore {
         throw new HttpError(409, 'The server timeline changed. Separate the tags again.');
       // The rows of the queried tree: the view's, or the timeline's (a fork's read through).
       const index = await indexReader(c, t);
+      // SQL for all rows of tree table `name` (a treeNames key): a view's rows are keyed by
+      // the view's ID in timeline_id, which the queries below pass as $1 (`tree`).
       const from = (name) =>
         view ? `(SELECT * FROM ${names[name]} WHERE timeline_id=$1)` : index(names[name]);
       /**
        * An interval tree's nodes `table` from its root (column `root` of `roots`) down its
        * pruned paths (`prune`, SQL on node `n`): joined by ID, or for a fork read through,
        * looked up node by node (a join would read every node it sees at every step).
+       *
+       * The text is a recursive CTE `visible` that the caller follows with its SELECT. The
+       * seed is the root (named by the roots row whose ID is $1); each step follows a node's
+       * left and right children by primary key (timeline, node ID), keeping only nodes
+       * whose subtree overlaps the window (`prune`) and, when the threshold ($4) is above
+       * zero, skipping subtrees whose longest interval is shorter than it (those are
+       * summarized instead). UNION ALL: a tree has no cycles, so no duplicate check.
        */
       const walk = (table, roots, root, prune) =>
         view || !index.depth
@@ -1608,23 +2017,33 @@ export class PostgresStore {
             UNION ALL SELECT n.* FROM visible p CROSS JOIN LATERAL unnest(ARRAY[p.left_id,p.right_id]) c(id)
             CROSS JOIN LATERAL ${index.lookup(table, ['c.id'])} n
             WHERE ${prune} AND NOT coalesce(n.max_extent<$4::mpq AND $4::mpq>'0'::mpq,false))`;
+      // A subtree can hold an interval meeting the window [lower, upper] only if its
+      // earliest time (min_time) is at most the window's end and its latest (max_time) at
+      // least the window's start.
       const pruned = 'n.min_time<=$3::mpq AND n.max_time>=$2::mpq';
       if (query.kind === 'overview') {
+        // The server's minimum resolution: at most 1,025 groups however small the requested
+        // threshold (docs/architecture.md, window summaries).
         const span = Q.parse(query.upper).sub(Q.parse(query.lower));
         const minimum = span.compare(Q.zero) > 0 ? span.div(Q.from(1024n)) : Q.zero;
         const threshold =
           Q.parse(query.threshold).compare(minimum) < 0 ? minimum.toString() : query.threshold;
+        // The moment groups: oc_overview_v2 (schema.sql; oc_view_overview for a view) walks
+        // the moment tree, using its subtree counts instead of reading the moments, and
+        // hands a fork to its _lineage variant. The last row carries visited_nodes.
         const { rows } = await c.query(
           `SELECT * FROM ${names.overview}($1,$2::mpq,$3::mpq,$4::mpq)`,
           [tree, query.lower, query.upper, threshold],
         );
         // Bands are durations at least as long as the threshold; shorter ones are summarized.
+        // LIMIT 257 reads one more than the 256 returned, to tell whether there were more.
         const intervals = await c.query(
           `${walk(names.durations, names.roots, 'duration_root', pruned)} SELECT band FROM visible WHERE first_time<=$3::mpq AND last_time>=$2::mpq
           AND ($4::mpq='0'::mpq OR last_time-first_time>=$4::mpq) LIMIT 257`,
           [tree, query.lower, query.upper, threshold],
         );
-        // Arcs use the same pruned interval query; separation views draw none.
+        // Arcs use the same pruned interval query, over the relationship arc tree
+        // (oc_edge_nodes, rooted at edge_root); separation views draw none.
         const arcs = view
           ? { rows: [] }
           : await c.query(
@@ -1632,6 +2051,8 @@ export class PostgresStore {
           AND ($4::mpq='0'::mpq OR last_time-first_time>=$4::mpq) LIMIT 257`,
               [id, query.lower, query.upper, threshold],
             );
+        // Durations shorter than the threshold, grouped like moments (oc_duration_overview,
+        // from the duration tree's subtree summaries), to merge into the moment groups.
         const collapsed = await c.query(
           `SELECT first_time,last_time,duration_count,band FROM ${names.durationOverview}($1,$2::mpq,$3::mpq,$4::mpq)`,
           [tree, query.lower, query.upper, threshold],
@@ -1673,7 +2094,10 @@ export class PostgresStore {
         };
       }
       if (query.kind === 'related') {
-        // Direct links from both ends, joined to search rows for titles and times.
+        // Direct links from both ends, joined to search rows for titles and times. A link is
+        // stored once, in canonical order, so the entity may be its `a` (the primary key
+        // finds those) or its `b` (oc_relationships_b). Paged by a (kind, ID) keyset cursor
+        // in "C" order, reading one more than the page to tell whether another follows.
         const { rows } = await c.query(
           `WITH links AS (
             SELECT b_kind AS kind,b_id AS id FROM ${index('oc_relationships')} r WHERE a_kind=$2 AND a_id=$3
@@ -1694,7 +2118,11 @@ export class PostgresStore {
         const page = rows.slice(0, query.limit);
         let reachable, direct;
         if (!query.after) {
-          // Everything connected through any number of links (an undirected closure).
+          // Everything connected through any number of links (an undirected closure): a
+          // recursive CTE from the entity, each step taking the other end of every link
+          // touching an entity reached. UNION (not UNION ALL) drops entities already reached,
+          // so cycles end. Minus one for the entity itself; `direct` counts its own links.
+          // It costs what the connected component holds, and runs on the first page only.
           const closure = await c.query(
             `WITH RECURSIVE reach(kind,id) AS (
               SELECT $2::text,$3::text
@@ -1725,7 +2153,9 @@ export class PostgresStore {
       }
       if (query.kind === 'tags') {
         const { rows } = await c.query(
-          // Entities with the same tags are counted together, then each tag of those.
+          // Entities with the same tags are counted together, then each tag of those: the
+          // inner GROUP BY collapses the search rows to one per distinct tag set, so unnest
+          // runs per set, not per entity. The 200 commonest, ties by tag in "C" order.
           `SELECT tag,sum(g.n)::bigint AS count FROM (SELECT s.tags,count(*) AS n
             FROM ${index('oc_entity_search', '$1', { scan: true })} s GROUP BY s.tags) g,unnest(g.tags) AS tag
           GROUP BY tag ORDER BY sum(g.n) DESC,tag COLLATE "C" LIMIT 200`,
@@ -1744,6 +2174,12 @@ export class PostgresStore {
         const tsquery = terms.map((term) => term + ':*').join(' & ');
         // Every match is ranked and counted, but only the page's are read whole: carrying
         // each match's text and times to the count would spill to disk past a few thousand.
+        // The innermost query finds matches through the GIN index oc_entity_search_document
+        // (the `@@` match) and ranks them (ts_rank, 'simple' configuration: no stemming);
+        // the middle one counts them all (count(*) OVER (), before LIMIT) and keeps the
+        // page in a stable order (rank, start, then kind and ID); each of the page's rows is
+        // then looked up again by key (the primary key: timeline, kind, entity ID) for its
+        // title and the first 300 characters of its body.
         const { rows } = await c.query(
           `SELECT p.kind,p.entity_id,oc_qtext(e.first_time) AS first,oc_qtext(e.last_time) AS last,
             e.title,left(e.body,300) AS body,p.total
@@ -1771,7 +2207,9 @@ export class PostgresStore {
         };
       }
       if (query.kind === 'durations') {
-        // Durations wholly inside a summary, in start order with an exact (start, ID) cursor.
+        // Durations wholly inside a summary, in start order with an exact (start, ID) cursor:
+        // a keyset page (rows after the last one returned), one more row than the page to
+        // tell whether another follows. A scan of the tree's rows, filtered by time.
         const { rows } = await c.query(
           `SELECT band,oc_qtext(first_time) AS first FROM ${from('durations')} x
           WHERE first_time>=$2::mpq AND last_time<=$3::mpq
@@ -1797,6 +2235,8 @@ export class PostgresStore {
         };
       }
       if (query.kind === 'duration') {
+        // One duration's definition and resolved band by its ID, through the expression
+        // index oc_duration_nodes_duration_id (timeline, band->>'id').
         const { rows } = await c.query(
           `SELECT definition,band FROM ${index('oc_duration_nodes')} x WHERE band->>'id'=$2 AND definition IS NOT NULL LIMIT 1`,
           [id, query.id],
@@ -1807,7 +2247,7 @@ export class PostgresStore {
           revision: t.revision,
         };
       }
-      // A moment by its ID alone, for links to it.
+      // A moment by its ID alone, for links to it (oc_moments' primary key).
       if (query.kind === 'moment') {
         const { rows } = await c.query(`SELECT event FROM ${from('moments')} x WHERE id=$2`, [
           tree,
@@ -1815,6 +2255,7 @@ export class PostgresStore {
         ]);
         return { event: rows[0]?.event ?? null, revision: t.revision };
       }
+      // A moment by its ID (primary key), only if it is at time `lower`; none otherwise.
       if (query.id) {
         const { rows } = await c.query(
           `SELECT event FROM ${from('moments')} x WHERE id=$3 AND time=$2::mpq`,
@@ -1822,6 +2263,10 @@ export class PostgresStore {
         );
         return { events: rows.map((r) => r.event), next: null, revision: t.revision };
       }
+      // A page of moments in [lower, upper] (either may be open) after the exact (time, ID)
+      // cursor: oc_events (schema.sql; oc_view_events for a view) walks the moment tree in
+      // order, skipping subtrees outside the window or before the cursor, and stops after
+      // the requested rows, one more than the page.
       const { rows } = await c.query(
         `SELECT ${names.events}($1,$2::mpq,$3::mpq,$4::mpq,$5,$6) AS event`,
         [
@@ -1844,14 +2289,15 @@ export class PostgresStore {
   }
 }
 
-/**
- * Durations used to live in their start moment's metadata. Rebuilding the current index
- * from the converted document stores standalone definitions; saved history is immutable and
- * converts when read. Returns the number of converted timelines.
- */
-/** Writes moment rows (the tree's nodes refer to them by ID). */
 /** Stages of rebuilding a timeline with a save (store.save, replace), for its progress. */
 const REBUILD_STAGES = 7;
+/**
+ * Writes moment rows (the tree's nodes refer to them by ID) of timeline (or view) `id` into
+ * `table` (oc_moments or oc_view_moments), replacing all it had: deleted, then inserted in
+ * batches of 250 rows (upsertRows, avl.mjs), with no ON CONFLICT (`false`) since nothing
+ * is left to conflict with. In the caller's transaction; for oc_moments, after
+ * beginIndexWrite.
+ */
 async function writeMoments(client, table, id, events) {
   await client.query(`DELETE FROM ${table} WHERE timeline_id=$1`, [id]);
   await upsertRows(
@@ -1863,7 +2309,11 @@ async function writeMoments(client, table, id, events) {
     false,
   );
 }
-/** Writes a balanced moment tree; batched inserts bound round trips and mpq keys stay out of B-trees. */
+/**
+ * Writes a balanced moment tree; batched inserts bound round trips and mpq keys stay out of
+ * B-trees. `tree` is indexedNodes' (tree.mjs); its nodes replace all of timeline (or view)
+ * `id`'s rows in `table` (oc_nodes or oc_view_nodes), as writeMoments does.
+ */
 async function writeNodes(client, table, id, tree) {
   await client.query(`DELETE FROM ${table} WHERE timeline_id=$1`, [id]);
   await upsertRows(
@@ -1875,7 +2325,11 @@ async function writeNodes(client, table, id, tree) {
     false,
   );
 }
-/** Writes the augmented duration interval tree; returns its root and resolved bands in tree order. */
+/**
+ * Writes the augmented duration interval tree; returns its root and resolved bands in tree
+ * order. Each duration's start and end are resolved against `document`'s moments (a
+ * duration may be anchored to a moment's time) before the tree is built.
+ */
 async function writeDurationNodes(client, table, id, document) {
   const times = new Map(document.events.map((e) => [e.id, e.time]));
   return writeIntervalNodes(
@@ -1885,7 +2339,10 @@ async function writeDurationNodes(client, table, id, document) {
     durationTree(document.durations ?? [], (moment) => times.get(moment)),
   );
 }
-/** Relationship arcs placed between their endpoints' times. */
+/**
+ * Relationship arcs placed between their endpoints' times (a duration's start), written as
+ * an interval tree into oc_edge_nodes; returns its root (for edge_root) and bands.
+ */
 async function writeEdgeNodes(client, id, document) {
   const times = new Map(document.events.map((e) => [e.id, e.time]));
   const places = entityTimes(document.events, document.durations ?? [], (m) => times.get(m));
@@ -1896,10 +2353,17 @@ async function writeEdgeNodes(client, id, document) {
     edgeTree(document.relationships ?? [], (key) => places.get(key)),
   );
 }
-/** Writes an augmented interval tree (durations or arcs); returns its root and bands in tree order. */
+/**
+ * Writes an augmented interval tree (durations or arcs); returns its root and bands in tree
+ * order. Replaces all of `id`'s rows in `table`. Nodes are numbered in preorder from 1, so
+ * the root is always node 1 (null for an empty tree), and each row carries its subtree's
+ * summaries (time bounds, largest start, count, extent bounds) and height, which the
+ * pruned walks and later in-place AVL edits (incremental.mjs) rely on.
+ */
 async function writeIntervalNodes(client, table, id, root) {
   await client.query(`DELETE FROM ${table} WHERE timeline_id=$1`, [id]);
   const rows = [];
+  // Preorder: a node's row is pushed (taking the next ID) before its children's.
   function flatten(node) {
     if (!node) return null;
     const row = {
@@ -1931,7 +2395,11 @@ async function writeIntervalNodes(client, table, id, root) {
   );
   return { root: rows.length ? 1 : null, bands: rows.map((row) => row.source) };
 }
-/** Main index objects, or the derived view tables and generated functions for a filter. */
+/**
+ * Main index objects, or the derived view tables and generated functions for a filter. The
+ * oc_view_* functions are generated in schema.sql from the originals by renaming their
+ * tables, so both sets take the same arguments (a view's ID in place of a timeline's).
+ */
 function treeNames(view) {
   return view
     ? {
@@ -1953,7 +2421,11 @@ function treeNames(view) {
         roots: 'oc_timelines',
       };
 }
-/** Builds search rows for timelines saved before entity search existed. */
+/**
+ * Builds search rows for timelines saved before entity search existed (search_version 0;
+ * comparisons have none). Run by migrate.mjs in its transaction `client`; each timeline's
+ * document is read whole. Returns how many timelines it indexed.
+ */
 export async function backfillEntitySearch(client) {
   const store = new PostgresStore(null);
   const { rows } = await client.query(
@@ -1962,6 +2434,7 @@ export async function backfillEntitySearch(client) {
   for (const timeline of rows) {
     const document = await store.branchDocument(client, timeline);
     const times = new Map(document.events.map((e) => [e.id, e.time]));
+    // The resolved bands, as writeDurationNodes would return them (preorder).
     const bands = [];
     const walk = (node) => {
       if (!node) return;
@@ -1975,8 +2448,18 @@ export async function backfillEntitySearch(client) {
   }
   return rows.length;
 }
+/**
+ * Durations used to live in their start moment's metadata. Rebuilding the current index
+ * from the converted document stores standalone definitions; saved history is immutable and
+ * converts when read. Returns the number of converted timelines.
+ *
+ * Also rebuilds duration trees built before their subtree summaries (max_first null). Run
+ * by migrate.mjs in its transaction `client`; `updated_at` is left alone.
+ */
 export async function convertLegacyDurations(client) {
   const store = new PostgresStore(null);
+  // Timelines with any legacy duration row: EXISTS stops at the first one found per
+  // timeline.
   const { rows } = await client.query(
     'SELECT t.* FROM oc_timelines t WHERE EXISTS(SELECT 1 FROM oc_duration_nodes n WHERE n.timeline_id=t.id AND (n.definition IS NULL OR n.max_first IS NULL))',
   );
@@ -1987,11 +2470,6 @@ export async function convertLegacyDurations(client) {
   return rows.length;
 }
 /**
- * Releases the versions and pins nothing reads any more (oc_release_index), one timeline
- * at a time: earlier versions kept them after a fork was deleted. Returns how many
- * timelines it looked at.
- */
-/**
  * Removes the copies of images earlier releases stored with timelines (#109): from timelines,
  * their saved history (settings, revision patches and snapshots), and pull requests. The
  * server links to images and stores no copies of them. Saved history is otherwise immutable;
@@ -2000,6 +2478,8 @@ export async function convertLegacyDurations(client) {
  * was charged stays. Returns how many rows it changed.
  */
 export async function releaseImageCopies(client) {
+  // Whether there is anything to purge, so a migration with none skips the updates (and
+  // the trigger changes) below. Each EXISTS stops at its first match.
   const { rows } = await client.query(
     `SELECT EXISTS(SELECT 1 FROM oc_timelines WHERE assets IS NOT NULL)
       OR EXISTS(SELECT 1 FROM oc_history_settings WHERE settings ? 'assets')
@@ -2008,12 +2488,14 @@ export async function releaseImageCopies(client) {
       OR EXISTS(SELECT 1 FROM oc_proposals WHERE document ? 'assets' OR base_document ? 'assets') AS found`,
   );
   if (!rows[0].found) return 0;
+  // The timeline's storage shrinks by the size of its assets as JSON text (not below 0).
   let changed = (
     await client.query(
       `UPDATE oc_timelines SET storage_bytes=greatest(0,storage_bytes-octet_length(assets::text)),
       assets=NULL WHERE assets IS NOT NULL`,
     )
   ).rowCount;
+  // jsonb `-` removes a key; removing an absent one leaves the document as it was.
   changed += (
     await client.query(
       `UPDATE oc_proposals SET document=document-'assets',base_document=base_document-'assets'
@@ -2038,6 +2520,9 @@ export async function releaseImageCopies(client) {
       "UPDATE oc_snapshots SET document=document-'assets' WHERE document ? 'assets'",
     ],
   ]) {
+    // Saved history refuses updates (its immutability triggers), so each table's trigger is
+    // disabled just for its purge and enabled again whatever happens. ALTER TABLE locks
+    // the table against other writers until the migration's transaction ends.
     await client.query(`ALTER TABLE ${table} DISABLE TRIGGER ${trigger}`);
     try {
       changed += (await client.query(update)).rowCount;
@@ -2047,7 +2532,15 @@ export async function releaseImageCopies(client) {
   }
   return changed;
 }
+/**
+ * Releases the versions and pins nothing reads any more (oc_release_index), one timeline
+ * at a time: earlier versions kept them after a fork was deleted. Returns how many
+ * timelines it looked at.
+ */
 export async function releaseIndexes(client) {
+  // Every pinned timeline, and every deleted timeline a lineage still names (its rows
+  // outlive it while read). UNION removes duplicates. Each is released with no clock:
+  // oc_release_index recomputes its pins from the lineages that remain.
   const { rows } = await client.query(
     `SELECT id FROM oc_timelines WHERE index_pinned IS NOT NULL
     UNION SELECT DISTINCT b FROM oc_timelines t,unnest(t.index_bases) b
@@ -2056,7 +2549,12 @@ export async function releaseIndexes(client) {
   for (const { id } of rows) await client.query('SELECT oc_release_index(ARRAY[$1::uuid])', [id]);
   return rows.length;
 }
-/** Rebuilds indexes stored before persistent AVL trees (index_version 2). */
+/**
+ * Rebuilds indexes stored before persistent AVL trees (index_version 2), each from its
+ * document read whole, without touching `updated_at`; comparisons, rebuilt from their
+ * sources, are only marked current. Run by migrate.mjs in its transaction `client`.
+ * Returns how many timelines it rebuilt.
+ */
 export async function rebuildIndexes(client) {
   const store = new PostgresStore(null);
   const { rows } = await client.query(
@@ -2131,7 +2629,12 @@ export function replayPatches(snapshot, patches) {
     ...(links.size ? { relationships: [...links.values()] } : {}),
   });
 }
-/** Applies sparse moment and duration edits to the current saved document. */
+/**
+ * Applies sparse moment and duration edits to the current saved document. Also applies
+ * relationship changes, takes the patch's settings, keeps durations anchored to deleted
+ * moments at those moments' last times, and drops links to deleted entities. Returns an
+ * unvalidated document (callers validate it); `current` is not changed.
+ */
 export function applyPatch(current, patch) {
   const events = new Map(current.events.map((e) => [e.id, e]));
   const lastTimes = new Map(current.events.map((e) => [e.id, e.time]));
@@ -2211,6 +2714,10 @@ function eventSearchText(document, bands, tree) {
 }
 
 // Inspector metadata is fetched separately. Oversized stack/custom fields are not viewport payloads.
+/**
+ * A singleton moment's metadata as the overview sends it: the enabled plugins' projection
+ * of it (pluginMetadata), or nothing when that is over 2,048 characters as JSON.
+ */
 function overviewMetadata(plugins, metadata) {
   const projected = pluginMetadata(plugins, metadata);
   return JSON.stringify(projected).length <= 2048 ? projected : {};

@@ -18,21 +18,37 @@ import {
 } from '../../lib/releases.js';
 import { latestRelease } from '../../lib/latest-release.js';
 import { siteName } from '../../lib/sharing.js';
+// Rendered per request: what it puts first depends on the visitor's browser.
 export const dynamic = 'force-dynamic';
+/** The page's title and description. */
 export function generateMetadata() {
   return {
     title: `Download · ${siteName()}`,
     description: 'The OpenChronology desktop app for Windows, macOS and Linux, and the server.',
   };
 }
+/** The desktop app's operating systems, by the key `detectPlatform` gives. */
 const NAMES = { windows: 'Windows', macos: 'macOS', linux: 'Linux' };
+/** Where the setup guides are read: the repository's main branch on GitHub. */
 const DOCS = `https://github.com/${REPOSITORY}/blob/main`;
 
+/**
+ * An asset's size, such as "84 MB", or nothing when the release is unknown (GitHub could not
+ * be reached) or does not list the asset.
+ * @param {{release: object|null, asset: string}} props the release and the asset's file name
+ */
 function Size({ release, asset }) {
   const size = assetSize(release, asset);
   return size ? <span className="download-size">{size}</span> : null;
 }
-/** One file to download: its link, what it is, and its size once a release says. */
+/**
+ * One file to download: its link, what it is, and its size once a release says.
+ * @param {object} props
+ * @param {object|null} props.release the latest release, or null to link by name to the
+ *   latest release's assets
+ * @param {{asset: string, name?: string, detail: string}} props.file the file (lib/releases.js)
+ * @param {boolean} [props.primary] the large button that names the system, rather than a row
+ */
 function File({ release, file, primary = false }) {
   return (
     <a
@@ -49,6 +65,15 @@ function File({ release, file, primary = false }) {
   );
 }
 
+/**
+ * The download page (/download).
+ *
+ * Guesses the visitor's system from the User-Agent and the `Sec-CH-UA-Platform` client hint,
+ * and their Linux distribution from the User-Agent, to recommend a file and order the cards;
+ * every file is listed whatever the guess. The latest release comes from GitHub
+ * (lib/latest-release.js, cached), for its version, date and sizes; without it the links
+ * still work, pointing at GitHub's "latest release" downloads by file name.
+ */
 export default async function Download() {
   const request = await headers();
   const userAgent = request.get('user-agent') ?? '';
@@ -63,10 +88,13 @@ export default async function Download() {
           ? 'freebsd15'
           : null;
   const release = await latestRelease();
+  // The desktop app's system, if the visitor's is one (not FreeBSD, phones and so on), and
+  // its files for that system, the first of which is the recommended one.
   const desktop = Object.keys(NAMES).includes(platform) ? platform : null;
   const yours = DESKTOP.filter((file) => file.os === desktop);
   // Each operating system's files, the visitor's first.
   const systems = Object.keys(NAMES).sort((a, b) => (b === desktop) - (a === desktop));
+  // The server packages, the visitor's distribution first.
   const servers = [...SERVERS].sort((a, b) => (b.key === distribution) - (a.key === distribution));
   const published = release?.published
     ? new Date(release.published).toLocaleDateString('en', { dateStyle: 'long' })

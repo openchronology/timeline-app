@@ -1,5 +1,11 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 /** A deliberately small Markdown vocabulary. No HTML, images, embeds or executable URLs. */
+/**
+ * The only links notes may carry: absolute `https:` URLs of at most 4096 characters with no
+ * user name or password (which could disguise the real host). Returns the URL normalised by
+ * the URL parser, or null for anything else, including relative, `javascript:`, `data:` and
+ * plain `http:` URLs. Used both when rendering Markdown and when serialising the editor.
+ */
 export function safeNoteLink(value: string): string | null {
   try {
     const url = new URL(value);
@@ -10,11 +16,21 @@ export function safeNoteLink(value: string): string | null {
     return null;
   }
 }
+/**
+ * Appends one line of inline Markdown to `parent` as DOM nodes, never as HTML: backslash
+ * escapes, `code`, **strong**, *emphasis* and [text](https link). Everything else, including
+ * any HTML tags, becomes text nodes. Strong and emphasis recurse into their contents; past
+ * twelve levels the rest is shown as plain text, bounding the recursion on hostile input.
+ */
 function inline(parent: HTMLElement, text: string, depth = 0) {
   if (depth > 12) {
     parent.append(document.createTextNode(text));
     return;
   }
+  // Alternatives, tried left to right at each position: an escaped punctuation character
+  // (group 1), inline code (2), strong (3, lazy so `**a** and **b**` is two), emphasis (4),
+  // and a link's text and URL (5, 6). Every repetition is bounded, which limits the work
+  // each match attempt can do on long or hostile notes.
   const pattern =
     /\\([\\`*_[\]#>+.!-])|`([^`\n]{1,2048})`|\*\*([^\n]{1,2048}?)\*\*|\*([^*\n]{1,2048})\*|\[([^\]\n]{1,512})\]\(([^\s)]{1,4096})\)/g;
   let start = 0;
@@ -39,12 +55,19 @@ function inline(parent: HTMLElement, text: string, depth = 0) {
         link.rel = 'noopener noreferrer';
         link.referrerPolicy = 'no-referrer';
         parent.append(link);
-      } else parent.append(document.createTextNode(match[0]));
+      } else parent.append(document.createTextNode(match[0])); // Unsafe URL: shown literally.
     }
     start = match.index! + match[0].length;
   }
   parent.append(document.createTextNode(text.slice(start)));
 }
+/**
+ * Replaces `container`'s contents with the rendering of `markdown`, line by line: ``` fences
+ * (contents kept verbatim as text), `#` to `###` headings, `>` quotes, `-`/`*` bullets and
+ * `1.` numbered items, and paragraphs, where consecutive lines are joined with line breaks
+ * and a blank line ends the block. Only the first 100,000 characters are rendered. Builds
+ * DOM nodes directly (no innerHTML), so no markup in the notes can run or load anything.
+ */
 export function renderMarkdown(container: HTMLElement, markdown: string) {
   container.replaceChildren();
   container.classList.add('markdown-view');
@@ -52,6 +75,7 @@ export function renderMarkdown(container: HTMLElement, markdown: string) {
   let list: HTMLElement | null = null,
     paragraph: HTMLElement | null = null,
     code: HTMLElement | null = null;
+  // The open list, paragraph or code block that the next line may continue.
   for (const line of lines) {
     if (line.startsWith('```')) {
       if (code) code = null;
@@ -77,6 +101,8 @@ export function renderMarkdown(container: HTMLElement, markdown: string) {
       quote = /^>\s?(.*)$/.exec(line);
     if (item) {
       const tag = item[1] ? 'UL' : 'OL';
+      // A change between bullets and numbers starts a new list; item numbers themselves are
+      // not kept, an ordered list always counts from one.
       if (!list || list.tagName !== tag) {
         list = document.createElement(tag.toLowerCase());
         container.append(list);
@@ -100,7 +126,16 @@ export function renderMarkdown(container: HTMLElement, markdown: string) {
     }
   }
 }
+/** Backslash-escapes every character the Markdown vocabulary treats specially (inline undoes it). */
 const escapeText = (s: string) => s.replace(/([\\`*_[\]#>+.!-])/g, '\\$1');
+/**
+ * Serialises the visual editor's DOM back to the Markdown vocabulary that renderMarkdown
+ * reads. Text is escaped, so typed asterisks and the like survive a round trip; formatting
+ * the browser's editing commands produce (b/strong, i/em, headings, lists, links, p/div) is
+ * mapped back; embedded and scripted elements are dropped, and unknown elements keep only
+ * their text. Links that fail safeNoteLink are reduced to their text. Nesting deeper than
+ * 32 elements is cut off. Runs of blank lines are collapsed and the result trimmed.
+ */
 export function editorMarkdown(container: HTMLElement): string {
   const walk = (node: Node, depth = 0): string => {
     if (depth > 32) return '';
@@ -123,12 +158,15 @@ export function editorMarkdown(container: HTMLElement): string {
       case 'EM':
       case 'I':
         return `*${children()}*`;
+      // Inline code can't contain backticks (there is no escape inside code spans), nor a
+      // fenced block a closing fence, so those are removed.
       case 'CODE':
         return `\`${(node.textContent ?? '').replace(/`/g, '')}\``;
       case 'PRE':
         return '\n\n```\n' + (node.textContent ?? '').replace(/```/g, '') + '\n```\n\n';
       case 'A': {
         const href = safeNoteLink(node.getAttribute('href') ?? '');
+        // Parentheses are percent-encoded so they cannot end the link's URL early.
         return href
           ? `[${children()}](${href.replace(/[()]/g, (c) => (c === '(' ? '%28' : '%29'))})`
           : children();
@@ -167,7 +205,16 @@ export function editorMarkdown(container: HTMLElement): string {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
-/** The textarea remains the source of truth; switching modes never rewrites untouched Markdown. */
+/**
+ * The textarea remains the source of truth; switching modes never rewrites untouched Markdown.
+ *
+ * Hides `input` behind a visual editor (a contenteditable div with a formatting toolbar) and
+ * an **Edit Markdown** toggle back to the textarea. Each visual edit rewrites the textarea's
+ * value with editorMarkdown and dispatches a bubbling `input` event, so the form sees an
+ * ordinary edit. When `editable` is false both views are read-only, but the toggle still
+ * works for reading the source. Notes over 100,000 characters open in the textarea only.
+ * Returns a function that removes the editor and shows the textarea again.
+ */
 export function attachRichText(input: HTMLTextAreaElement, editable: boolean) {
   const wrapper = document.createElement('div');
   wrapper.className = 'rich-text-editor';
@@ -178,6 +225,7 @@ export function attachRichText(input: HTMLTextAreaElement, editable: boolean) {
   const editor = document.createElement('div');
   editor.className = 'rich-text-content markdown-view';
   editor.contentEditable = String(editable);
+  // A contenteditable div has no implicit role; these make it read as a multi-line text field.
   editor.setAttribute('role', 'textbox');
   editor.ariaLabel = 'Rich text notes';
   editor.setAttribute('aria-multiline', 'true');
@@ -186,7 +234,10 @@ export function attachRichText(input: HTMLTextAreaElement, editable: boolean) {
   input.before(wrapper);
   wrapper.append(toolbar, editor);
   input.hidden = true;
+  /** True while the Markdown source (the textarea) is shown instead of the visual editor. */
   let source = false;
+  // renderMarkdown shows only the first 100,000 characters, and a visual edit would write
+  // that truncated rendering back over the notes; larger notes are edited as source only.
   const oversized = input.value.length > 100000;
   if (oversized) {
     const notice = document.createElement('p');
@@ -199,21 +250,29 @@ export function attachRichText(input: HTMLTextAreaElement, editable: boolean) {
     toolbar.hidden = true;
     editor.contentEditable = 'false';
   }
+  /** Writes the visual editor's content back to the textarea and announces the change. */
   const sync = () => {
     input.value = editorMarkdown(editor);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   };
+  /** Adds a toolbar button; `always` keeps it enabled in read-only mode (the mode toggle). */
   const button = (label: string, action: () => void, always = false) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = label;
     b.setAttribute('aria-label', label);
     b.disabled = !editable && !always;
+    // Keep focus, and with it the text selection, in the editor while clicking the toolbar.
     b.onmousedown = (e) => e.preventDefault();
     b.onclick = action;
     toolbar.append(b);
     return b;
   };
+  /**
+   * Applies a browser editing command to the selection and syncs. execCommand is deprecated
+   * but still supported by browsers; whatever HTML it produces is normalised by
+   * editorMarkdown on sync.
+   */
   const command = (name: string, value?: string) => {
     if (!editable) return;
     editor.focus();
@@ -243,11 +302,13 @@ export function attachRichText(input: HTMLTextAreaElement, editable: boolean) {
         if (b !== toggle) b.disabled = source || !editable;
       toggle.textContent = source ? 'Visual editor' : 'Edit Markdown';
       toggle.setAttribute('aria-label', toggle.textContent);
+      // Returning to the visual view re-renders from the textarea, which may have been edited.
       if (!source) renderMarkdown(editor, input.value);
     },
     true,
   );
   editor.oninput = sync;
+  // Paste only plain text, so no foreign HTML, styles or images enter the notes.
   editor.onpaste = (e) => {
     e.preventDefault();
     command('insertText', e.clipboardData?.getData('text/plain') ?? '');
@@ -261,6 +322,7 @@ export function attachRichText(input: HTMLTextAreaElement, editable: boolean) {
       e.preventDefault();
   });
   editor.ondrop = (e) => e.preventDefault(); // Never import rich clipboard HTML or dropped external resources.
+  // In an editable view a click on a link places the caret instead of following it.
   editor.onclick = (e) => {
     if (editable && (e.target as Element).closest('a')) e.preventDefault();
   };

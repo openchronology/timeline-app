@@ -1,5 +1,21 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 //! Disk-backed immutable editing baseline. Ordinary browsing never reads all events.
+//!
+//! When the desktop app opens a timeline file it does not load the document into the page.
+//! It keeps a `Snapshot`: a private, checked SQLite copy of the file in a temporary directory,
+//! and asks it for what the view needs (`Snapshot::query`): an overview of one viewport (groups
+//! of nearby moments, duration bands, relationship arcs and summaries of what is too small to
+//! draw), a page of moments or durations, one entity, a search page, the tags, or an entity's
+//! relations. Each query opens its own read-only connection under the browsing limits
+//! (`Connection::limit_reads`) and bounds its result, so a viewport of a 200000-moment file
+//! costs about the same as one of a small file.
+//!
+//! Edits stay in the page until saved; a save sends only the changed entities as a `Patch`
+//! (`Snapshot::save_patch`). When the file still holds exactly the snapshot's state (the same
+//! index layout and save token), the patch is applied to the file and the copy in place,
+//! updating the indexes along the changed paths only (`apply_changes`, intervals.rs);
+//! otherwise a patched copy replaces the file. Bulk edits made at once are staged as a new
+//! copy (`Snapshot::with_patch`), so they can be undone until the file is saved.
 use super::{
     check_file, header_document, intervals, validate, Connection, Document, Duration, Event,
 };
@@ -10,27 +26,39 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
+/// Makes temporary directory and file names unique within this process.
 static NEXT: AtomicU64 = AtomicU64::new(0);
+/// The byte budget for one query's SQLite results, and for its JSON reply (counted as UTF-16
+/// in the webview, so twice its UTF-8 length; see `Snapshot::query`).
 const BUDGET: usize = 8 * 1024 * 1024;
+/// What the editor needs on opening a file, without its entities.
 #[derive(Serialize)]
 pub struct Header {
+    /// The document's settings, with empty moment, duration and relationship lists.
     pub document: Document,
+    /// How many moments the file holds, as decimal text.
     pub event_count: String,
+    /// The earliest and latest moment times, or None for an empty timeline.
     pub first: Option<String>,
     pub last: Option<String>,
 }
+/// One moment change in a sparse save: the moment's new state, or None to delete it.
 #[derive(Deserialize)]
 pub struct Change {
     pub id: String,
     pub event: Option<Event>,
 }
+/// One duration change in a sparse save: the duration's new state, or None to delete it.
 #[derive(Deserialize)]
 pub struct DurationChange {
     pub id: String,
     pub duration: Option<Duration>,
 }
+/// A sparse save: the document's settings and only the entities that changed.
 #[derive(Deserialize)]
 pub struct Patch {
+    /// The new settings (title, description, presentation, plugins, tags, images); its moment
+    /// and duration lists must be empty.
     pub settings: Document,
     pub changes: Vec<Change>,
     #[serde(default, rename = "durationChanges")]
@@ -38,12 +66,15 @@ pub struct Patch {
     #[serde(default, rename = "relationshipChanges")]
     pub relationship_changes: Vec<RelationshipChange>,
 }
+/// A link to add (`related`) or remove between two entities, each `{"moment": id}` or
+/// `{"duration": id}`.
 #[derive(Deserialize)]
 pub struct RelationshipChange {
     pub a: Value,
     pub b: Value,
     pub related: bool,
 }
+/// Where the next page starts: just after the last entry of the previous one.
 #[derive(Deserialize, Clone)]
 pub struct Cursor {
     /// Event pages use `time`; duration pages order by start and send `first`; related
@@ -57,6 +88,7 @@ pub struct Cursor {
 pub struct ViewFilter {
     #[serde(default)]
     pub tags: Vec<String>,
+    /// "any": the entities on the inside (tagged, or related); "none": everything else.
     pub mode: String,
     /// Relationship separations: the entity and how far to follow links.
     #[serde(default)]
@@ -64,27 +96,38 @@ pub struct ViewFilter {
     #[serde(default)]
     pub depth: Option<String>,
 }
+/// One request from the editor to `Snapshot::query`, as JSON. Which fields apply depends on
+/// `kind`; see `Snapshot::query` for each kind and its result.
 #[derive(Deserialize, Clone)]
 pub struct Query {
+    /// "overview", "events", "durations", "duration", "search", "tags" or "related".
     pub kind: String,
+    /// The moment ("events") or duration ("duration") to read.
     #[serde(default)]
     pub id: Option<String>,
+    /// The viewport [lower, upper] as exact times; for a moment read, `lower` is its time.
     #[serde(default)]
     pub lower: String,
     #[serde(default)]
     pub upper: String,
+    /// The overview's grouping distance: entries closer than this are summarized together.
     #[serde(default)]
     pub threshold: String,
+    /// The page cursor and page size of paged kinds.
     #[serde(default)]
     pub after: Option<Cursor>,
     #[serde(default)]
     pub limit: Option<usize>,
+    /// Metadata keys the enabled plugins draw with, projected into overview entries whose
+    /// metadata is too large to send whole.
     #[serde(default)]
     pub metadata_keys: Vec<String>,
+    /// A search's text and page number (from 1).
     #[serde(default)]
     pub text: String,
     #[serde(default)]
     pub page: Option<usize>,
+    /// Asks the query of one side of a tag or relationship separation instead of everything.
     #[serde(default)]
     pub filter: Option<ViewFilter>,
     /// The entity of a `related` query.
@@ -101,14 +144,29 @@ impl Drop for Directory {
         let _ = std::fs::remove_dir_all(&self.0);
     }
 }
+/// A private, checked SQLite copy of a timeline (the baseline the editor's unsaved edits
+/// apply to), answering windowed queries and taking sparse saves.
 pub struct Snapshot {
+    /// The private temporary directory holding the copy; shared with the snapshot an
+    /// in-place save returns, and removed when the last of them is dropped.
     directory: std::sync::Arc<Directory>,
+    /// The copy, `baseline.och` in that directory.
     path: PathBuf,
+    /// Serializes queries, full reads and saves on this snapshot, so an in-place save never
+    /// writes the copy while a query is reading it.
     query_gate: std::sync::Mutex<()>,
     /// Derived indexes for tag separations, built from this baseline on first use.
     views: std::sync::Mutex<Vec<(String, std::sync::Arc<Snapshot>)>>,
 }
 impl Snapshot {
+    /// Copies the timeline file at `source` into a new private snapshot, after checking it.
+    ///
+    /// The source must be a valid timeline (`check_file`) with no triggers (a trigger would run
+    /// the file's own SQL when the copy is written) and with the overview index's shadow tables
+    /// as real tables; the copy's `points` must be exactly sqlite-rational's `rational_index`
+    /// module. Files with an older index layout get their duration and arc trees rebuilt in the
+    /// copy. The copy lives in a fresh directory readable only by the user (0700 on Unix).
+    /// The source is only read. Errors when a check fails or the file cannot be copied.
     pub fn open(source: &Path) -> Result<Self, String> {
         let directory = std::env::temp_dir().join(format!(
             "och-workspace-{}-{}-{}",
@@ -132,9 +190,13 @@ impl Snapshot {
             query_gate: std::sync::Mutex::new(()),
             views: std::sync::Mutex::new(Vec::new()),
         };
+        // Check and copy within one read transaction, so the copy is exactly the state that
+        // was checked even if another program writes the file meanwhile.
         let db = Connection::open(source, false)?;
         db.execute("BEGIN", &[])?;
         check_file(&db)?;
+        // No triggers anywhere (they would run the file's SQL when the copy is written), and
+        // the overview index's shadow tables must be real tables, since header() reads them.
         if db.scalar("SELECT count(*) FROM sqlite_schema WHERE type='trigger'",&[])?!="0" || db.scalar("SELECT count(*) FROM sqlite_schema WHERE name IN ('points_nodes','points_meta') AND type='table'",&[])?!="2" {return Err("Timeline indexes must be data tables and must not contain executable triggers".into());}
         db.backup_to(&snapshot.path)?;
         db.execute("COMMIT", &[])?;
@@ -153,6 +215,8 @@ impl Snapshot {
         {
             return Err("Unsupported SQLite rational index".into());
         }
+        // Serves the moment pages' (time, id) keyset order and range (see `query`, "events").
+        // Only the private copy gets it; files written by `save` carry events_time.
         saved.execute(
             "CREATE INDEX IF NOT EXISTS events_time_id ON events(time COLLATE RATIONAL_V1,id)",
             &[],
@@ -166,9 +230,14 @@ impl Snapshot {
             intervals::set_layout(&saved, &format!("rebuilt-{}", intervals::token()))?;
         }
         super::create_start_index(&saved)?;
+        // Reading the header validates the settings and the overview index's root.
         snapshot.header()?;
         Ok(snapshot)
     }
+    /// A snapshot of a document given whole: a JSON import, or a large document the editor
+    /// moves out of the page. It is saved to a temporary file (created new, 0600 on Unix, so
+    /// no other file or user is involved), copied into a snapshot as from a file, and the
+    /// temporary file is removed whatever the outcome. Errors when the document is invalid.
     pub fn from_document(document: &Document) -> Result<Self, String> {
         // Stage explicit imports on disk before exposing a bounded, indexed baseline.
         let source = std::env::temp_dir().join(format!(
@@ -199,6 +268,7 @@ impl Snapshot {
         let _ = std::fs::remove_file(&source);
         result
     }
+    /// The private copy's path (the editor's "file" for an import that is not saved yet).
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -206,10 +276,15 @@ impl Snapshot {
     fn directory(&self) -> &Path {
         &self.directory.0
     }
+    /// The settings, moment count and time range, read without loading any moments.
     pub fn header(&self) -> Result<Header, String> {
         let document = header_document(&self.path)?;
         let mut db = Connection::open(&self.path, false)?;
         db.limit_reads();
+        // The count and bounds come from the root of the overview index, read straight from
+        // its shadow tables: points_meta records the root node's ID, and that node's first,
+        // last and count (total weight, so every moment) cover the whole tree. No root (an
+        // empty timeline) gives a count of 0 and no bounds.
         let rows=db.query_limited("SELECT n.first,n.last,CAST(coalesce(n.count,0) AS TEXT) FROM points_meta m LEFT JOIN points_nodes n ON n.id=m.root WHERE m.singleton=1",&[],1,256*1024)?;
         let row = rows.first().ok_or("Missing rational index root")?;
         let count = row[2].clone().ok_or("Missing event count")?;
@@ -226,6 +301,8 @@ impl Snapshot {
             last: row[1].clone(),
         })
     }
+    /// The whole document, every entity included: for full-document operations (bulk edits,
+    /// exports, building a separation's view). Not used for browsing.
     pub fn document(&self) -> Result<Document, String> {
         let _gate = self.query_gate.lock().map_err(|e| e.to_string())?;
         super::open(&self.path)
@@ -278,6 +355,8 @@ impl Snapshot {
         {
             return Ok(view.clone());
         }
+        // Build the view outside the views lock: it reads the whole document and writes a new
+        // snapshot, which can take a while.
         let document = super::filter_document(self.document()?, &membership, filter.mode == "any");
         let view = std::sync::Arc::new(Self::from_document(&document)?);
         let mut views = self.views.lock().map_err(|e| e.to_string())?;
@@ -288,6 +367,24 @@ impl Snapshot {
         }
         Ok(view)
     }
+    /// Answers one editor query, as JSON. The kinds and their results:
+    /// - "overview": the viewport [lower, upper] at grouping distance `threshold`:
+    ///   `{groups, durations, durationsTruncated, edges, edgesTruncated, visitedNodes,
+    ///   threshold}`. Groups are nearby moments (with the moment itself when a group holds
+    ///   one) and summaries of durations too short to draw, merged where they overlap;
+    ///   `threshold` is the distance actually used (at least 1/1024 of the viewport).
+    /// - "events" with `id`: that moment, if it is still at time `lower`; without: a page of
+    ///   up to 100 moments in [lower, upper] in (time, ID) order: `{events, next}`.
+    /// - "durations": a page of durations wholly inside [lower, upper]: `{durations, next}`.
+    /// - "duration": one duration by ID with its full metadata: `{duration}`.
+    /// - "search": a page of 25 moments and durations matching `text`.
+    /// - "tags": the 200 most used tags with their counts.
+    /// - "related": an entity's direct relations, paged, with counts on the first page.
+    ///
+    /// With a `filter`, the same query runs on the derived snapshot of that separation side.
+    /// Errors on invalid input (reversed bounds, a negative threshold, oversized values or
+    /// cursors), when a read limit is hit, or when the reply would exceed `BUDGET` in the
+    /// webview.
     pub fn query(&self, q: &Query) -> Result<Value, String> {
         if let Some(filter) = &q.filter {
             let view = self.view(filter)?;
@@ -329,6 +426,9 @@ impl Snapshot {
             return search(&db, &q.text, q.page.unwrap_or(1), moments);
         }
         if q.kind == "tags" {
+            // Tag use across moments and durations: json_each expands each `tags` array into
+            // one row per tag (text entries only), counted per tag, most used first. A scan
+            // of every entity's metadata, bounded by the read limits.
             let rows = db.query_limited("SELECT t.value,count(*) FROM (SELECT metadata FROM events UNION ALL SELECT metadata FROM durations) e,json_each(e.metadata,'$.tags') t WHERE json_type(e.metadata,'$.tags')='array' AND t.type='text' GROUP BY t.value ORDER BY count(*) DESC,t.value LIMIT 200", &[], 200, BUDGET)?;
             let tags: Vec<Value> = rows
                 .into_iter()
@@ -361,6 +461,7 @@ impl Snapshot {
                 q.limit.unwrap_or(25).clamp(1, 100),
             );
         }
+        // The remaining kinds take a viewport; q() also rejects malformed bounds here.
         if db.scalar("SELECT q_cmp(q(?),q(?))", &[&q.lower, &q.upper])? == "1" {
             return Err("Reversed viewport bounds".into());
         }
@@ -369,10 +470,19 @@ impl Snapshot {
                 if db.scalar("SELECT q_cmp(q(?),q('0'))", &[&q.threshold])? == "-1" {
                     return Err("Negative grouping threshold".into());
                 }
+                // Never group finer than 1/1024 of the viewport width, which bounds a frame
+                // to about 1025 moment groups however far the editor zooms in.
                 let threshold = db.scalar(
                     "SELECT q_max(q(?),q_div(q_sub(q(?),q(?)),q('1024')))",
                     &[&q.threshold, &q.upper, &q.lower],
                 )?;
+                // Moment groups from the overview index (span mode over the closed viewport; see
+                // lib.rs `overview`), in time order. A group holding one moment (weight 1) is
+                // joined to that moment by time (events_time index) to send its ID, title
+                // (cut to 512 characters) and metadata: whole when it is at most 2048 bytes,
+                // otherwise only the plugin keys in ?1 (text fields, descriptions cut to 512
+                // characters, and small arrays), or {} if even that exceeds 2048 bytes. More
+                // than 1025 groups fails the row budget rather than truncating the frame.
                 let rows=db.query_limited("SELECT p.time,p.last_time,p.weight,p.distinct_count,p.visited_nodes,e.id,CASE WHEN json_valid(e.metadata) THEN substr(json_extract(e.metadata,'$.title'),1,512) END,CASE WHEN length(CAST(e.metadata AS BLOB))<=2048 THEN e.metadata ELSE (SELECT CASE WHEN length(projected)<=2048 THEN projected ELSE '{}' END FROM (SELECT json_group_object(j.key,CASE WHEN j.type='text' THEN substr(j.value,1,CASE WHEN j.key='description' THEN 512 ELSE 10000 END) ELSE json(j.value) END) AS projected FROM json_each(e.metadata) j WHERE j.key IN (SELECT value FROM json_each(?)) AND (j.type='text' OR (j.type='array' AND length(j.value)<=2048)))) END FROM points p LEFT JOIN events e ON p.weight=1 AND e.time=p.time COLLATE RATIONAL_V1 WHERE p.lower=q(?) AND p.upper=q(?) AND p.include_upper=1 AND p.threshold=q(?) AND p.mode='span' ORDER BY p.time COLLATE RATIONAL_V1 LIMIT 1026",&[&metadata_keys,&q.lower,&q.upper,&threshold],1025,BUDGET)?;
                 let mut groups = Vec::new();
                 let mut visited = 0u64;
@@ -393,6 +503,8 @@ impl Snapshot {
                     }
                     groups.push(group);
                 }
+                // Add the duration bands and arcs long enough to draw, and summaries of the
+                // durations that are not, merged with the moment groups they overlap.
                 {
                     let mut result = super::duration_window(&db, &q.lower, &q.upper, &threshold)?;
                     let arcs = super::edge_window(&db, &q.lower, &q.upper, &threshold)?;
@@ -425,6 +537,8 @@ impl Snapshot {
                 {
                     return Err("Invalid moment identifier".into());
                 }
+                // A primary-key lookup that also requires the time the editor expects, so a
+                // moment that has moved returns nothing rather than a different place.
                 let rows=db.query_limited("SELECT id,q(time),metadata FROM events WHERE id=? AND time=q(?) COLLATE RATIONAL_V1",&[id,&q.lower],1,BUDGET)?;
                 let mut events = Vec::new();
                 for row in rows {
@@ -448,6 +562,10 @@ impl Snapshot {
                     return Err("Event cursor exceeds query budget".into());
                 }
                 let take = (limit + 1).to_string();
+                // Keyset pagination on the events_time_id index: moments in [lower, upper]
+                // strictly after the cursor's (time, id), which on the first page is
+                // (lower, '') and so takes every moment at lower. One row past the limit tells
+                // whether there is a next page; the full metadata is returned.
                 let rows=db.query_limited("SELECT id,q(time),metadata FROM events WHERE time>=q(?) COLLATE RATIONAL_V1 AND time<=q(?) COLLATE RATIONAL_V1 AND (time COLLATE RATIONAL_V1,id)>(q(?),?) ORDER BY time COLLATE RATIONAL_V1,id LIMIT CAST(? AS INTEGER)",&[&q.lower,&q.upper,time,id,&take],101,BUDGET)?;
                 let more = rows.len() > limit;
                 let mut events = Vec::new();
@@ -470,15 +588,13 @@ impl Snapshot {
             }
             _ => return Err("Unsupported local timeline query".into()),
         };
+        // JavaScript strings take two bytes per UTF-16 unit; refuse replies the webview would
+        // hold in more than BUDGET bytes.
         if result.to_string().len() * 2 > BUDGET {
             return Err("Viewport exceeds webview memory budget".into());
         }
         Ok(result)
     }
-    /// Saves sparse changes to `target` and returns the new baseline. When `target` holds
-    /// exactly this baseline's saved state (same index layout and save token), the changes
-    /// are applied to the file and then to the baseline in place, in time proportional to
-    /// the change; otherwise a changed copy of the baseline replaces the file.
     /// This baseline with `patch` applied, as a new disk copy: changes made at once, such as
     /// bulk edits (#179), that stay unsaved. This baseline is left as it was, so it can be
     /// taken back (undo). The copy's layout token is new, so no file matches it and saving
@@ -497,6 +613,7 @@ impl Snapshot {
         {
             return Err("Invalid sparse changes".into());
         }
+        // A fresh private copy of this baseline, patched under a token no file has.
         let staged = Self::open(&self.path)?;
         let db = Connection::open(&staged.path, true)?;
         apply_with(&db, patch, &intervals::token(), progress)?;
@@ -504,6 +621,15 @@ impl Snapshot {
         staged.header()?;
         Ok(staged)
     }
+    /// Saves sparse changes to `target` and returns the new baseline. When `target` holds
+    /// exactly this baseline's saved state (same index layout and save token), the changes
+    /// are applied to the file and then to the baseline in place, in time proportional to
+    /// the change; otherwise a changed copy of the baseline replaces the file.
+    ///
+    /// Either way the file is changed in one transaction, so a failed save leaves it as it
+    /// was. A target that is neither an OpenChronology timeline nor an empty database is
+    /// refused. The returned baseline shares this one's disk copy after an in-place save; the
+    /// caller drops this one.
     pub fn save_patch(&self, target: &Path, patch: &Patch) -> Result<Self, String> {
         let _gate = self.query_gate.lock().map_err(|e| e.to_string())?;
         validate(&patch.settings)?;
@@ -531,6 +657,8 @@ impl Snapshot {
                 views: std::sync::Mutex::new(Vec::new()),
             });
         }
+        // Otherwise patch a fresh copy of this baseline and copy it over the target with the
+        // backup API, which writes the target in one transaction.
         let staged = Self::open(&self.path)?;
         let db = Connection::open(&staged.path, true)?;
         apply(&db, patch, &token)?;
@@ -553,7 +681,8 @@ impl Snapshot {
 }
 /// How many changes `apply_with` makes between reports of its progress.
 const PROGRESS_STEP: usize = 2000;
-/// Whether a file's interval indexes use the current layout.
+/// Whether a file's interval indexes use the current layout: `index_layout` records
+/// `intervals::LAYOUT` and all five interval tables exist as tables.
 fn current_layout(db: &Connection) -> Result<bool, String> {
     Ok(intervals::layout(db)?.is_some_and(|(version, _)| version == intervals::LAYOUT)
         && db.scalar(
@@ -562,6 +691,10 @@ fn current_layout(db: &Connection) -> Result<bool, String> {
         )? == "5")
 }
 /// The target, opened for writing, if it is a valid timeline holding the baseline's state.
+///
+/// It must pass the same checks as `Snapshot::open` and carry the baseline's save token. A
+/// baseline rebuilt from an older file ("rebuilt-" token) never matches, so its first save
+/// writes the whole file.
 fn matching_file(target: &Path, token: Option<String>) -> Result<Option<Connection>, String> {
     let Some(token) = token else { return Ok(None) };
     if token.starts_with("rebuilt-") || !target.is_file() {
@@ -598,6 +731,20 @@ fn apply_with(
     }
     result
 }
+/// The body of `apply_with`, inside its transaction. In order:
+/// 1. Rebuilds a legacy `events` table whose CHECK uses json_valid (see `save`).
+/// 2. Applies duration changes, then moment changes, to `durations` and `events`, validating
+///    each entity alone against the new settings.
+/// 3. Re-places in the duration tree every changed duration and every duration anchored to a
+///    moved or deleted moment; durations that followed a deleted moment keep its last time as
+///    a fixed endpoint.
+/// 4. Drops the links of deleted entities, applies the patch's link changes, and re-places in
+///    the arc tree every arc whose link changed or whose endpoint moved.
+/// 5. Recounts the overview index's buckets at every time a moment left or reached.
+/// 6. Rewrites the settings tables and records the new save token.
+///
+/// Errors (and so a rollback) on an invalid entity, a duplicate or mismatched change, an
+/// anchor to a missing moment, or more than 200000 durations.
 fn apply_changes(
     db: &Connection,
     patch: &Patch,
@@ -614,6 +761,9 @@ fn apply_changes(
     };
     progress(0, total);
     use std::collections::{BTreeMap, BTreeSet};
+    // Older system SQLite builds reject json_valid() in CHECK constraints with
+    // trusted_schema=OFF, so recreate such an events table without it (re-canonicalizing
+    // times) and its paging index, as `save` does by recreating its tables.
     let schema = db.scalar("SELECT sql FROM sqlite_schema WHERE name='events'", &[])?;
     if schema.to_lowercase().contains("json_valid") {
         db.execute("CREATE TABLE _och_clean_events(id TEXT PRIMARY KEY,time TEXT NOT NULL COLLATE RATIONAL_V1 CHECK(q_is_canonical(time)=1),metadata TEXT NOT NULL) STRICT",&[])?;
@@ -628,12 +778,14 @@ fn apply_changes(
             &[],
         )?;
     }
+    // Times whose overview bucket must be recounted: each changed moment's old and new time.
     let mut affected = BTreeSet::new();
     let mut ids = std::collections::HashSet::new();
     // Moments whose time changed or that were deleted: their durations and arcs move.
     let mut moved = BTreeSet::new();
     // Saved times of deleted moments; durations that followed them keep these times.
     let mut retired = Vec::new();
+    // Read before any change is made, while the moments still exist.
     for change in patch.changes.iter().filter(|c| c.event.is_none()) {
         if let Some(time) = db
             .query("SELECT time FROM events WHERE id=?", &[&change.id])?
@@ -643,6 +795,7 @@ fn apply_changes(
             retired.push((change.id.clone(), time));
         }
     }
+    // Durations to place again in the tree; starts with the changed ones.
     let mut durations = BTreeSet::new();
     for change in &patch.duration_changes {
         step();
@@ -687,11 +840,13 @@ fn apply_changes(
             let mut doc = patch.settings.clone();
             doc.events = vec![event.clone()];
             validate(&doc)?;
+            // Canonical form, so it compares equal to the stored time when unchanged.
             let time = db.scalar("SELECT q(?)", &[&event.time])?;
             affected.insert(time.clone());
             if old.as_ref().is_some_and(|old| *old != time) {
                 moved.insert(change.id.clone());
             }
+            // Upsert by primary key: a new moment is inserted, an existing one updated.
             db.execute("INSERT INTO events(id,time,metadata) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET time=excluded.time,metadata=excluded.metadata",&[&event.id,&time,&serde_json::to_string(&event.metadata).map_err(|e|e.to_string())?])?;
         } else {
             if old.is_some() {
@@ -702,6 +857,8 @@ fn apply_changes(
     }
     // Durations to place again: changed ones and those anchored to moved moments.
     for moment in &moved {
+        // Two seeks, on durations_start_moment and durations_end_moment; UNION lists a
+        // duration anchored to the moment at both ends once.
         for row in db.query(
             "SELECT id FROM durations WHERE start_moment=?1 UNION SELECT id FROM durations WHERE end_moment=?1",
             &[moment],
@@ -709,6 +866,8 @@ fn apply_changes(
             durations.insert(row[0].clone().ok_or("Missing duration ID")?);
         }
     }
+    // Durations that followed a deleted moment stay where it was: the anchor becomes a fixed
+    // endpoint at the moment's last saved time.
     for (id, time) in &retired {
         if db.scalar("SELECT count(*) FROM events WHERE id=?", &[id])? == "0" {
             db.execute(
@@ -733,6 +892,8 @@ fn apply_changes(
             .first()
             .and_then(|r| r[0].clone());
         tree.remove(id)?;
+        // The duration as now stored, with its endpoint JSON and resolved times, as in
+        // rebuild_duration_index (lib.rs); no row means it was deleted.
         let rows = db.query("SELECT CASE WHEN d.start_moment IS NULL THEN json_quote(d.start_time) ELSE json_object('moment',d.start_moment) END,CASE WHEN d.end_moment IS NULL THEN json_quote(d.end_time) ELSE json_object('moment',d.end_moment) END,COALESCE(d.start_time,(SELECT e.time FROM events e WHERE e.id=d.start_moment)),COALESCE(d.end_time,(SELECT e.time FROM events e WHERE e.id=d.end_moment)),d.metadata FROM durations d WHERE d.id=?1", &[id])?;
         let after = match rows.first() {
             Some(r) => {
@@ -783,6 +944,8 @@ fn apply_changes(
         } else {
             db.scalar("SELECT count(*) FROM durations WHERE id=?1", &[id])? != "0"
         };
+        // Every link of the entity: a seek on the primary key for the first endpoint and on
+        // relationships_b for the second.
         let links = db.query(
             "SELECT a_kind,a_id,b_kind,b_id FROM relationships WHERE a_kind=?1 AND a_id=?2 UNION SELECT a_kind,a_id,b_kind,b_id FROM relationships WHERE b_kind=?1 AND b_id=?2",
             &[kind, id],
@@ -859,10 +1022,13 @@ fn apply_changes(
         })?;
     }
     edges.flush()?;
+    // Recount each affected bucket: delete it, then insert it again weighted by the moments
+    // now at that time (events_time index), or not at all when none are left.
     for time in affected {
         db.execute("DELETE FROM points WHERE time=q(?)", &[&time])?;
         db.execute("INSERT INTO points(time,value,weight) SELECT time,time,count(*) FROM events WHERE time=q(?) COLLATE RATIONAL_V1 GROUP BY time COLLATE RATIONAL_V1",&[&time])?;
     }
+    // The settings tables are replaced whole, as in `save` (which also sheds legacy CHECKs).
     for table in ["timeline_settings", "timeline_plugins", "timeline_extras"] {
         db.execute(&format!("DROP TABLE IF EXISTS {table}"), &[])?;
     }
@@ -894,6 +1060,7 @@ fn apply_changes(
     )?;
     intervals::set_layout(db, token)
 }
+/// Windowed queries stay bounded, and sparse and staged saves change only what they should.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1147,6 +1314,7 @@ mod tests {
     }
 }
 
+/// Imports and legacy schemas stay disk-backed and can be saved.
 #[cfg(test)]
 mod legacy_tests {
     use super::*;
@@ -1178,6 +1346,7 @@ mod legacy_tests {
     }
 }
 
+/// Crafted files cannot run SQL through triggers or fake index tables.
 #[cfg(test)]
 mod safety_tests {
     use super::*;
@@ -1202,6 +1371,7 @@ mod safety_tests {
     }
 }
 
+/// Relationships: arcs, related pages, separations by relationship, and sparse link edits.
 #[cfg(test)]
 mod relationship_tests {
     use super::*;
@@ -1336,6 +1506,7 @@ mod relationship_tests {
         assert!(Snapshot::from_document(&missing).is_err());
     }
 }
+/// Tag separations partition entities and keep durations placed across sides.
 #[cfg(test)]
 mod view_tests {
     use super::*;
@@ -1395,6 +1566,7 @@ mod view_tests {
             .is_err());
     }
 }
+/// Overview groups and duration summaries match a brute-force reference.
 #[cfg(test)]
 mod summary_tests {
     use super::*;
@@ -1580,6 +1752,7 @@ mod summary_tests {
         assert_eq!(checked, 48);
     }
 }
+/// Search over titles, notes, stacks and durations, with pages.
 #[cfg(test)]
 mod search_tests {
     use super::*;
@@ -1647,6 +1820,7 @@ mod search_tests {
             .is_err());
     }
 }
+/// Standalone and legacy durations, anchored bands and their sparse saves.
 #[cfg(test)]
 mod duration_tests {
     use super::*;
@@ -1800,6 +1974,12 @@ fn search(db: &Connection, text: &str, page: usize, moments: bool) -> Result<Val
         .join(" AND ");
     let offset = ((page - 1) * 25).to_string();
     let n = terms.len();
+    // entities: every moment (and, unless restricted, every duration) with its title and a
+    // body of its notes plus the titles and notes of objects nested in its array fields
+    // (stacks and similar). hits: the lowercased haystack. Rows where every term (?1..?n)
+    // occurs are ordered with full title matches first, then by time, kind and ID, and paged
+    // 25 at a time (OFFSET ?n+1); count(*) OVER() gives the total before LIMIT. A scan of
+    // every entity, bounded by the read limits.
     let durations = if moments {
         ""
     } else {
@@ -1848,6 +2028,10 @@ fn related(
     }
     let (after_kind, after_id) = after.unwrap_or(("", ""));
     let take = (limit + 1).to_string();
+    // links: the entity's neighbours in both directions (a seek on the primary key and one on
+    // relationships_b; UNION removes duplicates). shown: each with its times and title, from
+    // events or duration_intervals. Keyset-paged by (kind, id) after the cursor (?3, ?4), one
+    // row past the limit to tell whether there is a next page.
     let rows = db.query_limited(
         "WITH links(kind,id) AS (SELECT b_kind,b_id FROM relationships WHERE a_kind=?1 AND a_id=?2 UNION SELECT a_kind,a_id FROM relationships WHERE b_kind=?1 AND b_id=?2), \
          shown AS (SELECT l.kind,l.id,q(e.time) AS first,q(e.time) AS last,coalesce(json_extract(e.metadata,'$.title'),'') AS title FROM links l JOIN events e ON l.kind='moment' AND e.id=l.id \
@@ -1870,7 +2054,9 @@ fn related(
     };
     let mut result = json!({"related":page,"next":next});
     if after.is_none() {
-        // Everything connected through any number of links (an undirected closure).
+        // Everything connected through any number of links (an undirected closure). The
+        // recursive UNION discards entities already reached, so cycles end; minus one for the
+        // entity itself.
         let count = db.scalar(
             "WITH RECURSIVE reach(kind,id) AS (SELECT ?1,?2 UNION SELECT CASE WHEN r.a_kind=x.kind AND r.a_id=x.id THEN r.b_kind ELSE r.a_kind END,CASE WHEN r.a_kind=x.kind AND r.a_id=x.id THEN r.b_id ELSE r.a_id END FROM reach x JOIN relationships r ON (r.a_kind=x.kind AND r.a_id=x.id) OR (r.b_kind=x.kind AND r.b_id=x.id)) SELECT count(*)-1 FROM reach",
             &[kind, id],

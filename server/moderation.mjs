@@ -22,9 +22,15 @@ import { refreshAccounts } from './standing.mjs';
 import { contentLabels, describeLabels } from '../dist/core.mjs';
 import { REPORT_CATEGORIES, REPORT_TARGETS, REPORT_TEXT } from './report-categories.mjs';
 
+/** The report categories a reader may choose (report-categories.mjs; oc_reports.category's CHECK). */
 const CATEGORIES = new Set(REPORT_CATEGORIES.map(([key]) => key));
+/** A moment's or duration's id, as oc_reports.entity_id's CHECK accepts it. */
 const ENTITY = /^[A-Za-z0-9_.:-]{1,128}$/;
 const UUID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
+/**
+ * An administrator's decisions: restrict, label and dismiss settle an open case; uphold answers
+ * an owner's request for review; lift reverses a restriction or labels at any time.
+ */
 const ACTIONS = ['restrict', 'label', 'dismiss', 'uphold', 'lift'];
 /** Decisions in force: a restriction, or labels moderators added to a timeline. */
 const IN_FORCE = ['restricted', 'labelled'];
@@ -42,7 +48,13 @@ function text(value, name, fallback = '') {
   return value.trim();
 }
 
-/** SQL: what a case is about, for the queue, the owner and emails (`mc` is the case). */
+/**
+ * SQL: what a case is about, for the queue, the owner and emails (`mc` is the case). A scalar
+ * subquery per kind builds a small jsonb summary (a title, or a comment's first 500 characters
+ * with its pull request); it is null once the target is deleted, which callers read as "no
+ * longer exists". Targets are stored as text, so ids are compared as text (`id::text`). Plugins
+ * and suites keep a row per version: the newest version's name is shown.
+ */
 const TARGET = `CASE mc.target_kind
   WHEN 'timeline' THEN (SELECT jsonb_build_object('title',t.title) FROM oc_timelines t WHERE t.id::text=mc.target_id)
   WHEN 'comment' THEN (SELECT jsonb_build_object('text',left(c.body,500),'timeline',p.timeline_id,'proposal',p.id,'title',p.title)
@@ -52,7 +64,13 @@ const TARGET = `CASE mc.target_kind
   WHEN 'user' THEN (SELECT jsonb_build_object('title','@'||u.username,'username',u.username) FROM oc_users u WHERE u.id::text=mc.target_id)
 END`;
 
-/** Where a case's target is seen, as a path on the platform; null once it is gone. */
+/**
+ * Where a case's target is seen, as a path on the platform; null once it is gone.
+ * @param {string} kind the case's target_kind
+ * @param {string} id the case's target_id
+ * @param {object|null} target its TARGET summary
+ * @returns {string|null}
+ */
 export function targetPath(kind, id, target) {
   if (!target) return null;
   if (kind === 'timeline') return `/timelines/${id}`;
@@ -70,8 +88,18 @@ function named(kind, target, yours) {
   return `${yours ? 'your' : 'the'} ${kind}${title}`;
 }
 
+/**
+ * Reports, the review queue, decisions and appeals. Cases live in oc_moderation_cases, one per
+ * target while open or restricted (the partial unique index oc_moderation_cases_current), and
+ * the reports gathered in each in oc_reports. http.mjs routes /api/reports, /api/admin/reports
+ * and /api/moderation (an owner's decisions and appeals) here.
+ */
 export class Moderation {
-  /** `administration` (administration.mjs) checks administrators and confirms their changes. */
+  /**
+   * `store` (store.mjs) gives the pool, transactions and timeline access checks; `auth`
+   * (auth.mjs) its security helpers (recent-sign-in confirmation, mail) and the site's origin;
+   * `administration` (administration.mjs) checks administrators and confirms their changes.
+   */
   constructor(store, auth, administration) {
     this.store = store;
     this.pool = store.pool;
@@ -82,6 +110,15 @@ export class Moderation {
   /**
    * What `value` names, as `{kind, id, owner, entity}`: a case's target and its owner, and for
    * a moment or duration which one. 404 unless `userId` (null when signed out) can see it.
+   *
+   * A moment or duration is reported as part of its timeline's case: the case's target is the
+   * timeline and `entity` names which one. Its id is only checked for shape, not looked up in
+   * the timeline. Read-only; runs on `c` so report's advisory lock and inserts share its
+   * transaction.
+   * @param {import('pg').PoolClient} c
+   * @param {{kind: string, timeline?: string, id?: string}} value
+   * @param {string|null} userId
+   * @returns {Promise<{kind: string, id: string, owner: string|null, entity: object|null}>}
    */
   async target(c, value, userId) {
     if (!value || typeof value !== 'object' || !REPORT_TARGETS.includes(value.kind))
@@ -105,6 +142,7 @@ export class Moderation {
     let row;
     if (kind === 'comment') {
       if (!/^[0-9]{1,18}$/.test(value.id)) throw new HttpError(400, 'Invalid comment.');
+      // The comment's author owns it; its pull request names the timeline to check access on.
       row = (
         await c.query(
           'SELECT c.author_id AS owner,p.timeline_id FROM oc_proposal_comments c JOIN oc_proposals p ON p.id=c.proposal_id WHERE c.id=$1',
@@ -114,6 +152,8 @@ export class Moderation {
       // Its pull request's timeline must be one the reader sees.
       if (row) await this.store.access(row.timeline_id, userId, c, { preparing: true });
     } else if (kind === 'plugin' || kind === 'suite') {
+      // Any version names the owner (every version of an id has the same one), so LIMIT 1.
+      // The table name is chosen from two literals, never from input.
       row = (
         await c.query(
           `SELECT owner_id AS owner FROM ${kind === 'plugin' ? 'oc_plugins' : 'oc_plugin_suites'} WHERE id=$1 LIMIT 1`,
@@ -121,6 +161,8 @@ export class Moderation {
         )
       ).rows[0];
     } else {
+      // An account is reported by username but its case names it by id, so a rename keeps the
+      // case; an account owns itself. Suspended accounts cannot be reported again.
       row = (
         await c.query(
           'SELECT id::text AS id,id AS owner FROM oc_users WHERE username=$1 AND NOT is_disabled',
@@ -132,7 +174,14 @@ export class Moderation {
     return { kind, id: row.id ?? value.id, owner: row.owner, entity: null };
   }
 
-  /** Records a report by `userId` (null when signed out): `{target, category, details}`. */
+  /**
+   * Records a report by `userId` (null when signed out): `{target, category, details}`.
+   *
+   * In one transaction: finds what is reported (target), joins the target's current case or
+   * opens one, and adds the report. Refuses (400) a report of the reader's own thing. Rate
+   * limits and the human-verification challenge are applied by http.mjs before this runs.
+   * @returns {Promise<{ok: true}>}
+   */
   async report(userId, value) {
     if (
       !value ||
@@ -146,10 +195,17 @@ export class Moderation {
       const target = await this.target(c, value.target, userId ?? null);
       if (userId && target.owner === userId)
         throw new HttpError(400, 'This is yours: change or delete it instead of reporting it.');
-      // One current case per target, however many report it at once.
+      // One current case per target, however many report it at once. The transaction-scoped
+      // advisory lock on the target's key serializes concurrent reports of it, so the lookup
+      // and insert below cannot both miss and open two cases (which the partial unique index
+      // oc_moderation_cases_current would otherwise reject with an error). It is released at
+      // commit or rollback.
       await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
         `oc-case:${target.kind}:${target.id}`,
       ]);
+      // The case in progress: open, or restricted (new reports of a restricted thing join its
+      // case). A dismissed, lifted or labelled case is closed to new reports, which open a
+      // new case.
       let id = (
         await c.query(
           "SELECT id FROM oc_moderation_cases WHERE target_kind=$1 AND target_id=$2 AND status IN ('open','restricted')",
@@ -163,6 +219,10 @@ export class Moderation {
           [id, target.kind, target.id, target.owner ?? null],
         );
       }
+      // A signed-in reader has one report per case and entity (the partial unique index
+      // oc_reports_reporter, matched here by its expressions and WHERE): reporting the same
+      // thing again replaces their category and details and dates it now. Signed-out reports
+      // (reporter_id null) fall outside that index and always add a row.
       await c.query(
         `INSERT INTO oc_reports(id,case_id,category,details,entity_kind,entity_id,reporter_id)
         VALUES($1,$2,$3,$4,$5,$6,$7)
@@ -182,7 +242,13 @@ export class Moderation {
     });
   }
 
-  /** The review queue for an administrator: `view` (open, restricted or closed) and `page`. */
+  /**
+   * The review queue for an administrator: `view` (open, restricted or closed) and `page`
+   * (25 cases a page, clamped to 1..10000). 403 unless `session` is an active administrator.
+   * @returns {Promise<{view: string, page: number, total: number, items: object[]}>} each item
+   *   a case row with its owner's username, target summary, report count, `urgent` flag, its
+   *   latest twenty reports and the target's path
+   */
   async queue(session, query = {}) {
     await this.administration.require(session);
     const view = VIEWS.includes(query.view) ? query.view : 'open',
@@ -190,6 +256,17 @@ export class Moderation {
         1,
         Math.min(10000, Number.isSafeInteger(Number(query.page)) ? Number(query.page) : 1),
       );
+    // One round trip for a page and its total. The CTE `matching` is the view's cases, each
+    // with its target summary, report count, whether any report names child abuse or other
+    // illegal content (`urgent`), and its latest twenty reports with reporters' usernames
+    // (null when signed out). The views:
+    //   open: open cases, and decisions in force whose owner asked for a review not yet
+    //     decided;
+    //   restricted: decisions in force (restrictions and labels);
+    //   closed: dismissed and lifted cases.
+    // The open view puts urgent cases first, then the longest waiting (by the review request
+    // when there is one, else the case's creation); the others list the latest decided
+    // first. `id` breaks ties so pages are stable.
     const { rows } = await this.pool.query(
       `WITH matching AS (
         SELECT mc.*,o.username AS owner,${TARGET} AS target,
@@ -225,6 +302,14 @@ export class Moderation {
   /**
    * An administrator's decision on case `id`: `{action, reason, password, code}`, confirmed as
    * other administration changes are (administration.mjs) and recorded in its audit.
+   *
+   * Which actions apply: restrict, label and dismiss to an open case only (409 otherwise);
+   * label to a timeline only; uphold only while a review request awaits a decision; lift to a
+   * restriction or labels in force. Restrict and label require a reason. In one transaction it
+   * applies the decision (restrict, lift), updates the case, refreshes the owner's standing
+   * after a restriction or lift, queues the emails (notify) and writes oc_admin_audit; queued
+   * mail is sent after commit (security.deliver).
+   * @returns {Promise<{ok: true}>}
    */
   async decide(session, id, value) {
     await this.administration.require(session);
@@ -244,12 +329,20 @@ export class Moderation {
     if (value.action === 'label' && (!labels.length || labels.length !== value.labels.length))
       throw new HttpError(400, 'Choose what the timeline contains.');
     const result = await this.store.transaction(async (c) => {
+      // The lock every administration change takes (administration.mjs), so decisions and
+      // changes to administrators run one at a time: the check that the actor is still an
+      // active administrator, and the last-administrator check in restrict, cannot race a
+      // concurrent demotion or suspension.
       await c.query("SELECT pg_advisory_xact_lock(hashtextextended('oc-admin-policy',0))");
+      // Re-read and lock the actor's row: the session may be older than a change to it.
       const actor = (await c.query('SELECT * FROM oc_users WHERE id=$1 FOR UPDATE', [session.id]))
         .rows[0];
       if (!actor?.is_admin || actor.is_disabled)
         throw new HttpError(403, 'Administrator access required.');
+      // A recent sign-in, the password, and a second factor when on; 403 otherwise.
       await this.auth.security.fresh(c, actor, session, value);
+      // The case, locked so two administrators deciding it at once are serialized: the
+      // second sees the first's status and is refused.
       const row = (
         await c.query(
           `SELECT mc.*,${TARGET} AS target FROM oc_moderation_cases mc WHERE mc.id=$1 FOR UPDATE`,
@@ -257,6 +350,7 @@ export class Moderation {
         )
       ).rows[0];
       if (!row) throw new HttpError(404, 'Report unavailable.');
+      // A review the owner asked for that awaits a decision.
       const appealing = IN_FORCE.includes(row.status) && row.appealed_at && !row.appeal_decided_at;
       const { action } = value;
       if (['restrict', 'label', 'dismiss'].includes(action) && row.status !== 'open')
@@ -275,7 +369,9 @@ export class Moderation {
       } else if (action === 'label') {
         if (!row.target)
           throw new HttpError(409, 'What was reported no longer exists. Dismiss the report.');
-        // Its owner cannot remove these (#115); lifting the decision does.
+        // Its owner cannot remove these (#115); lifting the decision does. Adds the labels to
+        // those already there, without duplicates (DISTINCT over the concatenated arrays).
+        // The case keeps the labels it added, so lift can take away just those.
         await c.query(
           `UPDATE oc_timelines SET moderator_labels=ARRAY(SELECT DISTINCT unnest(moderator_labels||$2::text[]))
           WHERE id=$1`,
@@ -290,6 +386,7 @@ export class Moderation {
           "UPDATE oc_moderation_cases SET status='dismissed',reason=$2,decided_by=$3,decided_at=now() WHERE id=$1",
           [id, reason || null, actor.id],
         );
+      // Upholding leaves the decision in force and closes the owner's one review request.
       else if (action === 'uphold')
         await c.query(
           "UPDATE oc_moderation_cases SET appeal_outcome='upheld',appeal_decided_at=now() WHERE id=$1",
@@ -297,6 +394,8 @@ export class Moderation {
         );
       else {
         await this.lift(c, row);
+        // Lifting while a review awaits decides that review too (outcome 'lifted'); lifting
+        // otherwise leaves the appeal columns as they were.
         await c.query(
           `UPDATE oc_moderation_cases SET status='lifted',
           appeal_outcome=CASE WHEN $2 THEN 'lifted' ELSE appeal_outcome END,
@@ -308,6 +407,7 @@ export class Moderation {
       if (row.owner_id && (action === 'restrict' || action === 'lift'))
         await refreshAccounts(c, [row.owner_id]);
       await this.notify(c, row, action, reason, labels);
+      // The administration audit trail, beside administration.mjs's changes (action 'reports').
       await c.query(
         'INSERT INTO oc_admin_audit(actor_id,action,target_id,changes) VALUES($1,$2,$3,$4)',
         [
@@ -328,11 +428,21 @@ export class Moderation {
     return result;
   }
 
-  /** Puts a restriction on case `row`'s target in place; a timeline's visibility before it. */
+  /**
+   * Puts a restriction on case `row`'s target in place; a timeline's visibility before it.
+   *
+   * A timeline is made private (its earlier visibility is returned, for the case to keep and
+   * lift to restore); an account is suspended as /admin suspends one. Comments, plugins and
+   * suites are not changed here: the queries that show them check for a restricted case. 409
+   * when the target is gone, or when it is the last active administrator. Runs inside
+   * decide's transaction.
+   * @returns {Promise<string|null>} the timeline's previous visibility, else null
+   */
   async restrict(c, row) {
     if (!row.target)
       throw new HttpError(409, 'What was reported no longer exists. Dismiss the report.');
     if (row.target_kind === 'timeline') {
+      // Locked so its visibility cannot change between reading and replacing it.
       const t = (
         await c.query('SELECT visibility FROM oc_timelines WHERE id=$1 FOR UPDATE', [row.target_id])
       ).rows[0];
@@ -340,6 +450,8 @@ export class Moderation {
       return t.visibility;
     }
     if (row.target_kind === 'user') {
+      // The account, locked; then the count of active administrators, which decide's
+      // 'oc-admin-policy' lock keeps from changing underneath.
       const user = (
         await c.query('SELECT is_admin,is_disabled FROM oc_users WHERE id=$1 FOR UPDATE', [
           row.target_id,
@@ -364,10 +476,20 @@ export class Moderation {
     return null;
   }
 
-  /** Undoes what restrict, or label, did for case `row`. */
+  /**
+   * Undoes what restrict, or label, did for case `row`: removes the labels it added, restores
+   * a timeline's earlier visibility, or unsuspends an account (its ended sessions and revoked
+   * API keys stay ended). Nothing to undo for comments, plugins and suites: they show again
+   * once the case is no longer restricted. Runs inside decide's transaction.
+   */
   async lift(c, row) {
     if (row.status === 'labelled') {
-      // The labels this decision added; others' (an owner's, other decisions') stay.
+      // The labels this decision added; others' (an owner's, other decisions') stay. The new
+      // array is the timeline's moderator labels less this case's, united with the labels of
+      // every other labelled case on the same timeline, so a label two decisions added
+      // survives lifting one of them. (An owner's own labels are in content_labels, which
+      // this does not touch.) The timeline is matched as text because cases name targets
+      // as text.
       await c.query(
         `UPDATE oc_timelines SET moderator_labels=ARRAY(
           SELECT l FROM unnest(moderator_labels) l WHERE NOT l=ANY($2::text[])
@@ -387,7 +509,14 @@ export class Moderation {
       await c.query('UPDATE oc_users SET is_disabled=false WHERE id::text=$1', [row.target_id]);
   }
 
-  /** Emails the owner and reporters (those with a confirmed address) about a decision. */
+  /**
+   * Emails the owner and reporters (those with a confirmed address) about a decision.
+   *
+   * The owner hears of a restriction or labels (with the reason and how to ask for review), an
+   * upheld review and a lift; reporters hear of restrict, label and dismiss, without the
+   * reason. Mail is queued on `c` (mail.mjs's outbox), so it is sent only if decide's
+   * transaction commits. Does nothing when the site has no mail configured.
+   */
   async notify(c, row, action, reason, labels = []) {
     const security = this.auth.security;
     if (!security?.available) return;
@@ -441,6 +570,7 @@ export class Moderation {
         `Moderators lifted ${decision} ${yours}${path ? ` (${origin}${path})` : ''}. It is as it was before.`,
       );
     if (action === 'restrict' || action === 'label' || action === 'dismiss') {
+      // Every signed-in reporter once, however many reports they made in the case.
       const reporters = await c.query(
         'SELECT DISTINCT reporter_id FROM oc_reports WHERE case_id=$1 AND reporter_id IS NOT NULL',
         [row.id],
@@ -460,7 +590,13 @@ export class Moderation {
     }
   }
 
-  /** The decisions in force or reversed on things `userId` owns, for their account page. */
+  /**
+   * The decisions in force or reversed on things `userId` owns, for their account page.
+   * Open and dismissed cases are left out: an owner is not told of reports nobody acted on,
+   * and reporters are never named. The latest fifty, by decision time (served by the index
+   * oc_moderation_cases_owner on owner_id, decided_at).
+   * @returns {Promise<{decisions: object[]}>}
+   */
   async mine(userId) {
     const { rows } = await this.pool.query(
       `SELECT mc.id,mc.target_kind,mc.target_id,mc.status,mc.labels,mc.reason,mc.decided_at,mc.appeal,
@@ -477,7 +613,13 @@ export class Moderation {
     };
   }
 
-  /** The owner's one request for a review of the restriction in case `id`. */
+  /**
+   * The owner's one request for a review of the restriction (or labels) in case `id`:
+   * `{appeal}`, its text. 404 unless `userId` owns the case and a decision is in force; 409 if
+   * they already asked. The case row is locked (FOR UPDATE) so two requests at once cannot
+   * both pass the "already asked" check. The request then shows in the queue's open view.
+   * @returns {Promise<{ok: true}>}
+   */
   async appeal(userId, id, value) {
     if (!value || typeof value !== 'object' || Object.keys(value).some((k) => k !== 'appeal'))
       throw new HttpError(400, 'Invalid review request.');

@@ -34,8 +34,14 @@ const sleep = (ms) => new Promise((resume) => setTimeout(resume, ms));
  * moment-ingest.mjs does. `cursorFile` keeps the cursor of the last entry sent.
  */
 export class JournaldIngest extends MomentIngest {
+  /**
+   * @param {object} options MomentIngest's, and `cursorFile`: where the cursor is kept (null
+   *   to keep none, as in tests)
+   */
   constructor({ cursorFile = null, ...options }) {
     super({ ...options, label: 'journald' });
+    // The importer's journald format and default mapping, in UTC (journal entries carry
+    // their own microsecond timestamps), and its ids, so both make the same moments.
     this.format = compileFormat('journald', {}, { zone: parseZone('UTC') });
     this.mapping = compileMapping(this.format, {});
     this.ids = new EntryIds('log');
@@ -45,7 +51,10 @@ export class JournaldIngest extends MomentIngest {
     this.saved = null;
     this.saving = Promise.resolve();
   }
-  /** The cursor the last run stopped after, or null for a first run. */
+  /**
+   * The cursor the last run stopped after, or null for a first run (no file, or an empty
+   * one). Other read errors (permissions, say) throw rather than silently starting over.
+   */
   async resume() {
     if (!this.cursorFile) return null;
     try {
@@ -56,7 +65,14 @@ export class JournaldIngest extends MomentIngest {
     }
     return this.saved;
   }
-  /** Reads, routes and queues one entry; returns the timelines it went to. */
+  /**
+   * Reads, routes and queues one entry; returns the timelines it went to. An entry that does
+   * not read or map to a valid moment is counted invalid and dropped, and its cursor is not
+   * taken. Routes match on the entry's journal fields, its severity and the format name. An
+   * entry no route takes counts as settled at once, so its cursor can be kept.
+   * @param {string} line one line of `journalctl -o json`
+   * @returns {string[]}
+   */
   accept(line) {
     this.stats.received++;
     let entry, built;
@@ -91,6 +107,9 @@ export class JournaldIngest extends MomentIngest {
     if (!this.idle || !this.cursor || this.cursor === this.saved || !this.cursorFile) return;
     const cursor = this.cursor;
     this.saved = cursor;
+    // Writes are chained, one at a time and in order, so an older cursor never lands after
+    // a newer one. Written to a temporary file and renamed over the old, so a crash midway
+    // leaves the previous cursor whole, never a partial one.
     this.saving = this.saving
       .then(async () => {
         await mkdir(dirname(this.cursorFile), { recursive: true });
@@ -107,6 +126,7 @@ export class JournaldIngest extends MomentIngest {
  * `since`): on this machine, or on `host` over SSH (with `sshKey`, and `knownHosts` for the
  * hosts it has seen: a host's key is accepted the first time and checked after). `units`
  * and `matches` narrow it as `journalctl -u` and `FIELD=value` arguments do.
+ * @returns {[string, string[]]} the program and its arguments, for spawn (no local shell)
  */
 export function journalCommand({
   command = 'journalctl',
@@ -149,7 +169,9 @@ export function journalCommand({
 
 /**
  * Feeds `ingest` from journalctl until `signal` aborts, restarting it (after the last entry
- * read) whenever it stops: the journal rotated, an SSH connection dropped.
+ * read) whenever it stops: the journal rotated, an SSH connection dropped. Restarting from
+ * the last entry read, not the last sent, is right here: entries read but unsent are still
+ * in the ingest's queues.
  */
 export async function followJournal(ingest, options, signal, log = console) {
   let failures = 0;
@@ -157,6 +179,7 @@ export async function followJournal(ingest, options, signal, log = console) {
     const [command, args] = journalCommand({ ...options, cursor: ingest.cursor });
     const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
     let errors = '';
+    // The end of its error output, for the log line when it stops.
     child.stderr.on('data', (chunk) => (errors = (errors + chunk).slice(-2000)));
     const stop = () => child.kill('SIGTERM');
     signal.addEventListener('abort', stop, { once: true });
@@ -184,12 +207,20 @@ export async function followJournal(ingest, options, signal, log = console) {
   }
 }
 
+/** A list from the environment: words separated by spaces or commas. */
 const list = (text) =>
   String(text ?? '')
     .split(/[\s,]+/)
     .filter(Boolean);
 
-/** Reads the configuration from `env` and follows the journal until stopped. */
+/**
+ * Reads the configuration from `env` and follows the journal until stopped (docs/journald.md):
+ * routes from JOURNALD_ROUTES_JSON, the file JOURNALD_ROUTES, or one timeline
+ * (JOURNALD_TIMELINE); the cursor in JOURNALD_CURSOR_FILE, else in systemd's state directory
+ * (STATE_DIRECTORY, its first entry), else ./journald.cursor; the SSH known hosts beside it.
+ * On SIGTERM or SIGINT it stops journalctl, sends what is queued, keeps the cursor and returns.
+ * @returns {Promise<number>} the exit code: 0, or 1 when the queues could not be emptied
+ */
 export async function main(env = process.env) {
   let routes;
   if (env.JOURNALD_ROUTES_JSON) routes = JSON.parse(env.JOURNALD_ROUTES_JSON);
@@ -238,6 +269,8 @@ export async function main(env = process.env) {
   return drained ? 0 : 1;
 }
 
+// Whether this file is the program being run, comparing real paths, since a package's bin
+// links to it through a symlink.
 const invoked = (() => {
   try {
     return process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;

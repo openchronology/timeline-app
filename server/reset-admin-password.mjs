@@ -34,6 +34,11 @@ await client.connect();
 try {
   await client.query('BEGIN');
   const wanted = (env.ADMIN_USERNAME ?? '').toLowerCase();
+  // The ADMIN_USERNAME account, or, when that is unset, the one the installation bootstrapped
+  // (oc_site_settings is a single row, joined on its `singleton` flag). When ADMIN_USERNAME is
+  // set, the bootstrap admin is not considered: the condition is false for it. The ORDER BY puts
+  // the named account first. FOR UPDATE OF u locks only the account row (not the settings row)
+  // against a concurrent sign-in or security change until the transaction ends.
   const user = (
     await client.query(
       `SELECT u.* FROM oc_users u LEFT JOIN oc_site_settings s ON s.singleton
@@ -48,6 +53,10 @@ try {
         ? `There is no account named ${wanted} (ADMIN_USERNAME). Check the configuration, or run openchronology-migrate to create the administrator.`
         : 'Set ADMIN_USERNAME in the configuration to the administrator to reset.',
     );
+  // The new password, then everything that could still act on the old one ends: sessions,
+  // approved-but-unclaimed desktop sign-ins, sign-in challenges and reset links. API keys and
+  // two-factor authentication are kept, as the header says. The reset is recorded in the
+  // administration audit log as done by the account itself.
   await client.query('UPDATE oc_users SET password_hash=$2 WHERE id=$1', [
     user.id,
     await passwordHash(password),

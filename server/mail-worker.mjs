@@ -16,6 +16,8 @@ const pool = new pg.Pool({
   connectionTimeoutMillis: 10000,
   statement_timeout: 30000,
 });
+// SIGTERM or SIGINT (docker stop, Ctrl-C) ends the loop after the current flush, so a message
+// being sent is finished and its row updated before the pool closes.
 let stopped = false;
 process.on('SIGTERM', () => {
   stopped = true;

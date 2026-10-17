@@ -29,10 +29,15 @@ import type {
   PointEvent,
   TimelineDocument,
 } from './core.js';
+/**
+ * An unsaved edit to a moment: its saved version (`before`, absent for a new moment) and
+ * its desired version (`after`, absent for a deletion).
+ */
 export interface MomentChange {
   before?: PointEvent;
   after?: PointEvent;
 }
+/** An unsaved edit to a duration, as MomentChange. */
 export interface DurationChange {
   before?: Duration;
   after?: Duration;
@@ -42,17 +47,24 @@ export interface RelationshipChange {
   relationship: Relationship;
   related: boolean;
 }
+/** A copy of the unsaved edits taken when a save starts (see beginSave and accepted). */
 export interface SavingChanges {
   moments: Map<string, MomentChange>;
   durations: Map<string, DurationChange>;
   relationships: Map<string, RelationshipChange>;
 }
 
+/**
+ * A window to fetch: the time range (exact rational strings, inclusive) and the grouping
+ * threshold, the distance below which the server summarises neighbouring moments into
+ * one group. Sent as the overview query's bounds.
+ */
 export interface WindowQuery {
   lower: string;
   upper: string;
   threshold: string;
 }
+/** A frame with nothing in it, made fresh each call so no caller shares (and mutates) one. */
 const EMPTY = (): Frame => ({ groups: [], visitedNodes: 0 });
 /** A cached window in storable form (see snapshot and restore). */
 export interface StoredWindow {
@@ -63,6 +75,7 @@ export interface StoredWindow {
 }
 /** The most recent change of view: what to fetch ahead of the reader. */
 export type Motion = 'pan' | 'zoom-in' | 'zoom-out' | null;
+/** A cached window: its range and threshold (parsed once), the server's frame for it, and bookkeeping. */
 interface Entry {
   lower: Q;
   upper: Q;
@@ -71,10 +84,13 @@ interface Entry {
   /** When the window was fetched, and when it last answered or was stored. */
   fetched: number;
   used: number;
+  /** Its approximate size in memory: the JSON length in UTF-16 code units, two bytes each. */
   bytes: number;
 }
 /** The power of two at or below a positive rational. */
 function dyadic(value: Q): Q {
+  // The difference in bit lengths estimates log2 to within one; correct downward if the
+  // estimate overshoots.
   let exponent = value.numerator.toString(2).length - value.denominator.toString(2).length;
   const power = (e: number) => (e >= 0 ? Q.from(1n << BigInt(e)) : Q.from(1n, 1n << BigInt(-e)));
   if (power(exponent).compare(value) > 0) exponent--;
@@ -85,6 +101,7 @@ function octaves(a: Q, b: Q): number {
   const ratio = a.div(b);
   return Math.abs(ratio.numerator.toString(2).length - ratio.denominator.toString(2).length);
 }
+/** Whether a window's range contains [lower, upper]. */
 const covers = (e: { lower: Q; upper: Q }, lower: Q, upper: Q) =>
   e.lower.compare(lower) <= 0 && e.upper.compare(upper) >= 0;
 /**
@@ -108,19 +125,24 @@ export class ViewportCache {
   /** A window answers views for 30 seconds; it is kept, for display while refetching, for five minutes. */
   readonly freshFor = 30000;
   readonly keepFor = 300000;
+  /** `clock` gives the time in milliseconds; tests pass a fake one. */
   constructor(private clock: () => number = Date.now) {}
+  /** Forgets every window (the source changed revision or alignment). */
   clear() {
     this.entries = [];
     this.shown = undefined;
   }
+  /** The number of cached windows. */
   get size() {
     return this.entries.length;
   }
+  /** The cache's approximate memory use, the sum of the windows' estimates. */
   get bytes() {
     return this.entries.reduce((total, e) => total + e.bytes, 0);
   }
   /** The resolution and window to fetch for a view; dyadic levels let nearby zooms share one. */
   plan(view: Viewport, width: number, pixels: number): WindowQuery {
+    // A quarter of the view on each side, so small pans stay within the window.
     const margin = view.span.div(Q.from(4n));
     const threshold = this.level(view, width, pixels);
     return {
@@ -129,6 +151,12 @@ export class ViewportCache {
       threshold: threshold.toString(),
     };
   }
+  /**
+   * The grouping threshold to ask for. Starts from the view's own (the time `pixels` wide on
+   * screen), raised so a planned window (1.5 view widths) holds at most about 1,024 groups,
+   * then rounded down to a power of two: slightly different zooms ask for the same
+   * threshold and so can share windows. Never below that minimum.
+   */
   private level(view: Viewport, width: number, pixels: number): Q {
     let threshold = view.threshold(width, Math.max(1, pixels));
     const minimum = view.span.mul(Q.from(3n, 2n)).div(Q.from(1024n));
@@ -136,6 +164,12 @@ export class ViewportCache {
     const level = dyadic(threshold);
     return level.compare(minimum) < 0 ? minimum : level;
   }
+  /**
+   * The cached frame for a view at the planned threshold, cut to the view, or null on a
+   * miss. Only windows of exactly that threshold that cover the whole view and were fetched
+   * within `freshFor` count; the newest wins. Records the view as the cache's focus (for
+   * eviction) and the window as the one shown.
+   */
   get(view: Viewport, query: WindowQuery): Frame | null {
     const threshold = Q.parse(query.threshold),
       now = this.clock();
@@ -154,6 +188,10 @@ export class ViewportCache {
     this.shown = entry;
     return this.cut(entry.frame, view);
   }
+  /**
+   * Caches the server's frame for a planned window, then evicts down to budget. Throws
+   * (caching nothing) if one response exceeds `maxGroups` or `maxBytes`.
+   */
   store(query: WindowQuery, frame: Frame) {
     const bytes = JSON.stringify(frame).length * 2;
     if (frame.groups.length > this.maxGroups || bytes > this.maxBytes)
@@ -200,6 +238,8 @@ export class ViewportCache {
         upper = e.upper.compare(view.right) < 0 ? e.upper : view.right;
       return upper.compare(lower) > 0 ? upper.sub(lower).div(view.span).toApproximateNumber() : 0;
     };
+    // Compared element by element: coverage (else more overlap first), distance in
+    // resolution, finer before coarser, newest first.
     const rank = (e: Entry) => [
       covers(e, view.left, view.right) ? 0 : 1 - overlap(e),
       threshold ? octaves(e.threshold, threshold) : 0,
@@ -342,6 +382,7 @@ export class ViewportCache {
       this.entries = this.entries.filter((e) => e !== farthest);
     }
   }
+  /** A window's frame limited to the groups and bands that reach into the view (edges inclusive). */
   private cut(frame: Frame, view: Viewport): Frame {
     return {
       ...frame,
@@ -355,16 +396,33 @@ export class ViewportCache {
   }
 }
 
-/** Inspector reads are disposable; unsaved edits and their originals are explicitly pinned. */
+/**
+ * Inspector reads are disposable; unsaved edits and their originals are explicitly pinned.
+ *
+ * The in-memory side of a timeline whose saved head is on a server or in a desktop file. It
+ * is a TimelineIndex holding only what was loaded (moments and durations being inspected
+ * or edited) plus the unsaved changes against the saved versions. The chart is drawn from
+ * server frames with these changes laid over them (`overlay`); saving sends the changes
+ * (`patch`) and, once accepted, makes the sent versions the new originals.
+ */
 export class RemoteWorkspace extends TimelineIndex {
+  /** Unsaved edits by ID; an edit undone back to the saved version is removed. */
   readonly changes = new Map<string, MomentChange>();
   readonly durationChanges = new Map<string, DurationChange>();
   readonly relationshipChanges = new Map<string, RelationshipChange>();
+  /** The saved versions of loaded entities, the `before` of their first edit. */
   private originals = new Map<string, PointEvent>();
   private durationOriginals = new Map<string, Duration>();
+  /**
+   * Set while a moment is being replaced in place, so a delete reached from inside put is
+   * not recorded as a deletion. (TimelineIndex.put currently removes through `remove`, not
+   * `delete`, so this only guards against that changing.)
+   */
   private replacing = false;
+  /** Entities whose changes a save in progress has sent; they stay loaded until it ends. */
   private savingIds = new Set<string>();
   private savingDurations = new Set<string>();
+  /** Starts from the document's settings; its moments, durations and links stay on the server. */
   constructor(document: TimelineDocument) {
     super({ ...document, events: [], durations: [], relationships: [] });
   }
@@ -372,28 +430,37 @@ export class RemoteWorkspace extends TimelineIndex {
   protected override durationList(): Duration[] {
     return [];
   }
+  /** Likewise links: only unsaved ones are known here, kept in relationshipChanges. */
   protected override relationshipList(): Relationship[] {
     return [];
   }
+  /** How many unsaved edits there are, of every kind. */
   get dirtyCount() {
     return this.changes.size + this.durationChanges.size + this.relationshipChanges.size;
   }
+  /** Links two entities and records the link as wanted. */
   override relate(a: EntityRef, b: EntityRef): Relationship {
     const relationship = super.relate(a, b);
     this.relationshipChanges.set(relationshipKey(relationship), { relationship, related: true });
     return relationship;
   }
+  /**
+   * Records the link between two entities as unwanted. Always reports success: the link may
+   * exist only on the server, which removes it idempotently when saving.
+   */
   override unrelate(a: EntityRef, b: EntityRef): boolean {
     const relationship = canonicalRelationship(a, b);
     super.unrelate(a, b);
     this.relationshipChanges.set(relationshipKey(relationship), { relationship, related: false });
     return true;
   }
+  /** Adds a saved duration read from the server, unless an unsaved edit of it is already here. */
   loadDuration(duration: Duration) {
     if (this.durationChanges.has(duration.id)) return;
     this.durationOriginals.set(duration.id, duration);
     super.putDuration(duration);
   }
+  /** Edits a duration, recording the change against its saved version (or dropping it if equal). */
   override putDuration(duration: Duration) {
     const before =
       this.durationChanges.get(duration.id)?.before ?? this.durationOriginals.get(duration.id);
@@ -402,6 +469,7 @@ export class RemoteWorkspace extends TimelineIndex {
     if (JSON.stringify(before) === JSON.stringify(after)) this.durationChanges.delete(duration.id);
     else this.durationChanges.set(duration.id, { before, after });
   }
+  /** Deletes a duration: a deletion of the saved one, or simply forgetting a new one. */
   override deleteDuration(id: string): boolean {
     const before = this.durationChanges.get(id)?.before ?? this.durationOriginals.get(id);
     const deleted = super.deleteDuration(id);
@@ -409,6 +477,7 @@ export class RemoteWorkspace extends TimelineIndex {
     else this.durationChanges.delete(id);
     return deleted;
   }
+  /** Adds a saved moment read from the server, unless an unsaved edit of it is already here. */
   load(event: PointEvent) {
     if (this.changes.has(event.id)) return;
     this.originals.set(event.id, event);
@@ -419,6 +488,10 @@ export class RemoteWorkspace extends TimelineIndex {
       this.replacing = false;
     }
   }
+  /**
+   * Adds or edits a moment, recording the change against its saved version. Comparing the
+   * normalised stored moment with that version drops the change when an edit returns to it.
+   */
   override put(event: PointEvent) {
     const before = this.changes.get(event.id)?.before ?? this.originals.get(event.id);
     this.replacing = true;
@@ -431,6 +504,7 @@ export class RemoteWorkspace extends TimelineIndex {
       this.changes.delete(event.id);
     else this.changes.set(event.id, { before, after: this.byId.get(event.id) });
   }
+  /** Deletes a moment: a deletion of the saved one, or simply forgetting a new one. */
   override delete(id: string): boolean {
     const before = this.changes.get(id)?.before ?? this.originals.get(id);
     const deleted = super.delete(id);
@@ -494,6 +568,10 @@ export class RemoteWorkspace extends TimelineIndex {
     this.durationOriginals.delete(id);
     super.deleteDuration(id);
   }
+  /**
+   * Marks the current changes as being saved (their entities stay loaded meanwhile) and
+   * returns a copy to send. Edits made during the save keep accumulating in `changes`.
+   */
   beginSave(): SavingChanges {
     this.savingIds = new Set(this.changes.keys());
     this.savingDurations = new Set(this.durationChanges.keys());
@@ -503,11 +581,13 @@ export class RemoteWorkspace extends TimelineIndex {
       relationships: new Map(this.relationshipChanges),
     };
   }
+  /** Ends a save (accepted or not) and releases what it no longer needs. */
   endSave(selectedId?: string) {
     this.savingIds.clear();
     this.savingDurations.clear();
     this.evict(selectedId);
   }
+  /** The unsaved edits in the save request's form: settings, then each change's desired state (null to delete). */
   patch() {
     return {
       settings: { ...super.document(), events: undefined, durations: undefined },
@@ -531,6 +611,11 @@ export class RemoteWorkspace extends TimelineIndex {
       this.relationshipChanges,
     );
   }
+  /**
+   * After the server accepted `sent`: the sent versions become the saved originals, and
+   * each change is dropped if nothing changed since it was sent, or kept as an edit from
+   * the newly saved version to what the person has made of it during the save.
+   */
   accepted(sent: SavingChanges, selectedId?: string) {
     // A link edited again while saving keeps its newer state.
     for (const [key, saved] of sent.relationships)
@@ -587,6 +672,14 @@ export class RemoteWorkspace extends TimelineIndex {
       }
     return result;
   }
+  /**
+   * Lays the unsaved edits over a server frame of the saved head: an edited or deleted
+   * moment is taken out of the summary that held its saved time (by count only; summaries
+   * never reveal their members) and its new version added as its own group if in view;
+   * durations and links are re-placed by overlayDurations and overlayEdges; then groups are
+   * merged again at `threshold`. At most 256 bands are drawn; the rest are flagged
+   * truncated.
+   */
   overlay(frame: Frame, view: Viewport, threshold: Q): Frame {
     const groups: FrameGroup[] = [];
     // Singleton duration summaries are re-placed like bands, so local edits move them.
@@ -700,6 +793,7 @@ export class RemoteWorkspace extends TimelineIndex {
     );
   }
 }
+/** The changes part of a save request (see RemoteWorkspace.patch), as stored or sent. */
 export interface PendingPatch {
   changes: { id: string; event: PointEvent | null }[];
   durationChanges?: { id: string; duration: Duration | null }[];
@@ -717,6 +811,7 @@ export function applyChanges(
   relationshipEdits: ReadonlyMap<string, RelationshipChange> = new Map(),
 ): TimelineDocument {
   const events = new Map(saved.events.map((e) => [e.id, e]));
+  // Where each moment was last saved, which anchors of deleted moments are fixed to.
   const lastTimes = new Map(saved.events.map((e) => [e.id, e.time]));
   for (const [id, change] of moments) {
     if (change.before) lastTimes.set(id, change.before.time);

@@ -10,6 +10,24 @@ import { api } from '../lib/api.js';
 import ModerationDecisions from './moderation-decisions.jsx';
 import { profilePath } from '../../src/addresses.ts';
 import HelpTip from './help-tip.jsx';
+/**
+ * The sign-in page (/login) and the account page (/account) in one component: a guest sees the
+ * form for the current step (`mode`), a signed-in account its security settings and sessions,
+ * its profile, API keys and linked sign-ins (AccountAccess), and moderation decisions about its
+ * content.
+ *
+ * It reads GET /api/session (`{server, user, csrf, providers, security, challenge}`) and,
+ * when signed in, GET /api/auth/account (`{security, profile, usage, keys, identities,
+ * sessions}`), and writes through POST /api/auth/…. Every POST carries `session.csrf` as
+ * X-CSRF-Token: for a guest it is the sign-in nonce (the `oc_login` cookie's value, a
+ * double-submit check against login CSRF), for an account its session's token; the server
+ * refuses a write without it (server/auth.mjs).
+ *
+ * @param {object} props
+ * @param {string} [props.returnTo] where to go after signing in (checked by the page)
+ * @param {boolean} [props.login] this is /login: an account already signed in goes straight
+ *   to `returnTo`
+ */
 export default function Account({ returnTo = '/', login = false }) {
   const router = useRouter();
   const [session, setSession] = useState(null),
@@ -17,10 +35,20 @@ export default function Account({ returnTo = '/', login = false }) {
     [error, setError] = useState(''),
     [message, setMessage] = useState(''),
     [busy, setBusy] = useState(false),
+    // The guest's step: login, register, forgot, reset, verify, or a challenge the server set
+    // after the password (mfa: a second factor; email: an address to confirm first).
     [mode, setMode] = useState('login'),
+    // The token from an emailed link (#verify=… or #reset=…), sent with that step's form.
     [token, setToken] = useState(''),
+    // A two-factor setup in progress: `{secret, uri}` from /api/auth/mfa/setup, until enabled.
     [setup, setSetup] = useState(null),
+    // Fresh recovery codes, shown once, until the reader says they stored them.
     [codes, setCodes] = useState(null);
+  /**
+   * Reads the session again, and the account when signed in, after anything that may have
+   * changed them; signing out also drops a pending two-factor setup and unsaved codes.
+   * @returns {Promise<object>} the session
+   */
   async function refresh() {
     const s = await api('session');
     setSession(s);
@@ -31,9 +59,13 @@ export default function Account({ returnTo = '/', login = false }) {
     }
     return s;
   }
+  // On the first render: the step the address asks for, then the session. `active` keeps a
+  // reply that arrives after the page is left from setting state.
   useEffect(() => {
     let active = true;
     if (new URLSearchParams(location.search).get('mode') === 'register') setMode('register');
+    // An emailed link carries its token in the fragment, which browsers never send to a server
+    // (or in a Referer), and it is removed from the address and history at once.
     const hash = new URLSearchParams(location.hash.slice(1));
     const value = hash.get('verify') ?? hash.get('reset');
     if (value) {
@@ -45,6 +77,7 @@ export default function Account({ returnTo = '/', login = false }) {
       .then(async (s) => {
         if (!active) return;
         setSession(s);
+        // A sign-in that stopped at a challenge (on another load of this page) resumes there.
         if (!value && s.challenge) setMode(s.challenge);
         if (s.user) {
           if (login && !value) router.replace(returnTo);
@@ -59,6 +92,13 @@ export default function Account({ returnTo = '/', login = false }) {
       active = false;
     };
   }, [login, returnTo, router]);
+  /**
+   * Sends the guest's form for the current step to POST /api/auth/<step> with its fields (and
+   * the emailed token for verify and reset), then moves on by what the server answers:
+   * `{challenge}` asks for another step; `{verificationRequired}` (and the email and forgot
+   * steps) stay put with the server's message; verify and reset return to signing in; anything
+   * else signed in, so the page goes to `returnTo` and re-renders the server's parts.
+   */
   async function submit(event) {
     event.preventDefault();
     if (busy) return;
@@ -105,6 +145,12 @@ export default function Account({ returnTo = '/', login = false }) {
       setBusy(false);
     }
   }
+  /**
+   * Starts signing in with a provider (GitHub, Google or Facebook), or linking one to the
+   * signed-in account: POST /api/auth/<name>/start answers `{url}`, the provider's
+   * authorization page, which the browser then opens. The provider returns to `returnTo` (the
+   * account page when linking).
+   */
   async function provider(name) {
     setBusy(true);
     setError('');
@@ -120,6 +166,12 @@ export default function Account({ returnTo = '/', login = false }) {
       setBusy(false);
     }
   }
+  /**
+   * A signed-in account's change: POST /api/<path> with `data`, then shows the server's message
+   * and reads the account again. A two-factor setup answers `{secret, uri}`, kept until it is
+   * confirmed; enabling it or replacing the codes answers `{recoveryCodes}`, shown once.
+   * @returns {Promise<object|undefined>} the server's answer, or nothing when it failed
+   */
   async function action(path, data = {}) {
     if (busy) return;
     setBusy(true);
@@ -142,6 +194,12 @@ export default function Account({ returnTo = '/', login = false }) {
       setBusy(false);
     }
   }
+  /**
+   * The security form has one button per change; the pressed button's value is the API path,
+   * and every change sends the same fields (the current password and code the server asks for
+   * to confirm it, and the new values). Disabling two-factor authentication and replacing the
+   * recovery codes are confirmed first, since both sign out the other sessions.
+   */
   function securityForm(event) {
     event.preventDefault();
     const fields = Object.fromEntries(new FormData(event.currentTarget));
@@ -158,6 +216,8 @@ export default function Account({ returnTo = '/', login = false }) {
       return;
     void action(path, fields);
   }
+  // Whether to show the guest's forms: no account yet, or a step that an emailed link or a
+  // challenge put the page in even while a session exists.
   const anonymous = !session?.user || ['mfa', 'email', 'verify', 'reset'].includes(mode);
   return (
     <div className="account-card">
@@ -279,6 +339,7 @@ export default function Account({ returnTo = '/', login = false }) {
             </label>
           )}
           <div className="actions">
+            {/* No token yet (the session is loading) means the server would refuse it. */}
             <button className="primary" disabled={busy || !session?.csrf}>
               {
                 {
@@ -331,6 +392,7 @@ export default function Account({ returnTo = '/', login = false }) {
           {(session.providers ?? []).map((name) => (
             <button
               key={name}
+              // A provider already linked to the account can't be linked again.
               disabled={busy || account?.identities.includes(name)}
               onClick={() => provider(name)}
             >
@@ -378,6 +440,8 @@ export default function Account({ returnTo = '/', login = false }) {
                 />
               </label>
             )}
+            {/* A code confirms changes once two-factor authentication is on, and confirms the
+                authenticator itself while it is being set up. */}
             {(account?.security?.mfa_enabled || setup) && (
               <label>
                 Authenticator or recovery code

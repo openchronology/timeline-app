@@ -1,4 +1,10 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+/**
+ * The platform's services, made once per process from the environment: the PostgreSQL pool,
+ * the store, authentication, the request handler (http.mjs) and its settings, and the
+ * background work (retention, standing, catching up interrupted refreshes). The Next.js
+ * routes (next-handler.mjs, platform/proxy.js) ask for them through platformServices.
+ */
 import pg from 'pg';
 import { resolve } from 'node:path';
 import { readFile } from 'node:fs/promises';
@@ -14,11 +20,24 @@ import { providersFromEnv } from './oauth.mjs';
 import { compareLimits, defaultQuota, entryLimit, LimitError } from './limits.mjs';
 import { analyticsId, platformName, SiteError } from './site.mjs';
 import { applyEnvironmentQuota } from './administration.mjs';
+/**
+ * Where the services are kept: a global symbol rather than a module variable, so every copy
+ * of this module the framework loads (route bundles, hot reloads) shares one pool and one set
+ * of timers.
+ */
 const key = Symbol.for('openchronology.platform.services');
 
 /** A deployment setting the platform cannot start with; its message is safe to show users. */
 export class ConfigurationError extends Error {}
 
+/**
+ * The services, initialized on first call; concurrent callers share the one initialization.
+ * A failed initialization is forgotten, so the next request tries again (after the operator
+ * fixes the configuration, say).
+ * @returns {Promise<object>} the handler's options plus `auth`, `store` and `handler`; `pool`,
+ *   `auth` and `store` are null without a database
+ * @throws {ConfigurationError} for a setting the platform cannot start with
+ */
 export async function platformServices() {
   if (!globalThis[key])
     globalThis[key] = initialize().catch((error) => {
@@ -27,6 +46,13 @@ export async function platformServices() {
     });
   return globalThis[key];
 }
+/**
+ * The operator's extra plugins (PLUGIN_LIBRARY): a JSON array of manifests in a file, their
+ * scripts compiled once in the sandbox. Validated later with the built-in ones
+ * (createPluginLibrary in plugins.mjs).
+ * @throws {ConfigurationError} when the file is unreadable, not an array, or a script does
+ *   not compile
+ */
 async function pluginLibrary(path) {
   let plugins;
   try {
@@ -50,6 +76,12 @@ async function pluginLibrary(path) {
         });
   return plugins;
 }
+/**
+ * Builds the services from the environment (APP_ORIGIN, DATABASE_URL or the PG variables,
+ * limits, PLUGIN_LIBRARY, OAuth providers, FEATURED_TIMELINES, TRUST_PROXY, challenge
+ * settings) and starts the background work. Without a database the platform serves the
+ * static app and the plugin library only.
+ */
 async function initialize() {
   const origin = process.env.APP_ORIGIN ?? `http://localhost:${process.env.PORT ?? 5173}`;
   const address = new URL(origin);
@@ -67,6 +99,8 @@ async function initialize() {
     throw new ConfigurationError(
       'Public production deployments require HTTPS: set APP_ORIGIN to an https:// origin, or ALLOW_INSECURE_ORIGIN=1 for a trusted private network.',
     );
+  // At most ten connections per process; a statement running over 30 seconds is cancelled by
+  // the server, and waiting over 10 seconds for a connection fails the request.
   const pool =
     process.env.DATABASE_URL || process.env.PGDATABASE
       ? new pg.Pool({
@@ -92,13 +126,16 @@ async function initialize() {
   // DEFAULT_USER_STORAGE_BYTES, when set, is the default quota from every start.
   if (pool)
     await applyEnvironmentQuota(pool).catch((error) => {
-      // Before the first migration there are no settings yet; the migration applies it.
+      // Before the first migration there are no settings yet (42P01, undefined table); the
+      // migration applies it.
       if (error.code !== '42P01') throw error;
     });
   const plugins = process.env.PLUGIN_LIBRARY
     ? [...BUILTIN_PLUGINS, ...(await pluginLibrary(process.env.PLUGIN_LIBRARY))]
     : BUILTIN_PLUGINS;
   const providers = providersFromEnv();
+  // Timelines the operator features besides those flagged in /admin: comma-separated ids,
+  // anything else ignored.
   const featured = (process.env.FEATURED_TIMELINES ?? '')
     .split(',')
     .filter((id) => /^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id));

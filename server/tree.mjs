@@ -1,13 +1,23 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Builds a perfectly balanced moment tree from a whole document, for rebuilding a timeline's
+// index (Store.replace); incremental saves (avl.mjs) then change it in place.
 import { TimelineIndex } from '../dist/core.mjs';
 /**
  * Builds a perfectly balanced moment tree, which is also a valid AVL tree: incremental saves
  * (server/avl.mjs) continue from it. Node IDs are in-order positions only initially.
+ * Returns `{root, nodes, count}`: the root's ID (null when empty), the nodes in the shape
+ * MOMENT_TREE encodes (plus each node's moments as `events`), and the moment count.
  */
 export function indexedNodes(document) {
   const index = new TimelineIndex(document),
     entries = [...index.points],
     nodes = [];
+  /**
+   * Builds the subtree of entries [start, end): the middle entry is its root, so the two
+   * halves differ in size by at most one and the heights of every node's subtrees by at
+   * most one. Children are built first, so each node's summaries come from theirs. ID
+   * mid + 1 is the entry's position, unique and 1-based.
+   */
   function build(start, end) {
     if (start >= end) return null;
     const mid = Math.floor((start + end) / 2),

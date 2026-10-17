@@ -25,6 +25,11 @@ import {
 import type { HeadingLevel } from './plugins.js';
 import type { InstalledPlugin, StackEntry } from './plugins.js';
 
+/**
+ * An image element for plugin pictures: fetched without credentials or a referrer (the
+ * image host learns nothing of the timeline or the person), decoded off the main thread
+ * and loaded lazily unless the caller says otherwise.
+ */
 function image(alt: string) {
   const img = document.createElement('img');
   img.alt = alt;
@@ -34,6 +39,13 @@ function image(alt: string) {
   img.loading = 'lazy';
   return img;
 }
+/**
+ * Draws a marker's content: for a single moment with an image `source` (already resolved to
+ * an embedded copy or a URL), that image, shown only once it has loaded (the `icon` class
+ * styles the marker for it); otherwise its count, abbreviated above 999 (`1.2k`, `12k`), or
+ * nothing for a single moment. Reuses the existing image element and only touches the DOM
+ * when something changed, since markers are redrawn on every frame.
+ */
 export function renderPluginMarker(
   button: HTMLButtonElement,
   source: string | null,
@@ -55,8 +67,10 @@ export function renderPluginMarker(
   if (!img) {
     img = image('');
     img.loading = 'eager'; // Visible marker images must load even while their pending preview is hidden.
+    // Decorative: the marker button carries the moment's accessible name.
     img.setAttribute('aria-hidden', 'true');
     button.replaceChildren(img);
+    // A late load or error for an image the marker no longer shows is ignored.
     img.onload = () => {
       if (img!.parentElement !== button) return;
       button.classList.add('icon');
@@ -74,6 +88,15 @@ export function renderPluginMarker(
     img.src = source;
   }
 }
+/**
+ * Builds the inspector inputs for every field the installed plugins declare (in plugin
+ * order) into `container`, from a moment's or stack entry's `metadata`. Each input calls
+ * `onChange(metadataKey, value)` as it is edited, with the value already checked where the
+ * field has rules (links, fonts, image URLs); the caller stores it. `openImage` opens an
+ * image's original, `confirmDelete` asks before removing a stack entry, and `inheritedTime`
+ * is the time a stack's entries share. `child` is set for the fields inside a stack entry,
+ * which can't hold stacks of their own. With `editable` false everything is read-only.
+ */
 export function renderPluginFields(
   container: HTMLElement,
   plugins: readonly InstalledPlugin[],
@@ -99,6 +122,7 @@ export function renderPluginFields(
       const input = document.createElement('textarea');
       input.dataset.pluginKey = field.metadataKey;
       input.rows = 3;
+      // Up to 100 links of 4,096 characters, each with its newline.
       input.maxLength = 100 * 4097;
       input.spellcheck = false;
       input.disabled = !editable;
@@ -119,6 +143,8 @@ export function renderPluginFields(
         }
         list.hidden = links.length === 0;
       };
+      // Validates the lines as a whole (sourceLinks: HTTPS only, at most 100); an invalid
+      // list is reported on the textarea and not saved, so the last valid one stays.
       const update = (commit: boolean) => {
         try {
           const links = sourceLinks(
@@ -224,6 +250,7 @@ export function renderPluginFields(
           onChange(field.metadataKey, select.value === DEFAULT_HEADING_FONT ? '' : select.value);
         else custom.focus();
       };
+      // A custom family list is saved only when valid (or cleared, meaning the default).
       custom.onchange = () => {
         const value = fontValue(custom.value);
         custom.setCustomValidity(
@@ -249,6 +276,8 @@ export function renderPluginFields(
       const swatches = document.createElement('div');
       swatches.className = 'color-swatches';
       const buttons: HTMLButtonElement[] = [];
+      // Chooses a colour from a swatch or the picker; the swatch with no value means the
+      // default colour, which the picker shows as the default green.
       const select = (value: string) => {
         buttons.forEach((b, i) =>
           b.setAttribute('aria-pressed', String(COLOR_SWATCHES[i].value === value)),
@@ -296,7 +325,9 @@ export function renderPluginFields(
       const list = document.createElement('div');
       list.className = 'stack-list';
       const commit = () => onChange(field.metadataKey, entries);
+      /** The ID of the entry being dragged, by mouse (HTML drag and drop) or touch/pen. */
       let dragged: string | null = null;
+      /** Moves an entry from one index to another, saving and redrawing; bad moves are ignored. */
       const move = (from: number, to: number) => {
         if (
           !stackEditable ||
@@ -311,6 +342,11 @@ export function renderPluginFields(
         commit();
         draw();
       };
+      /**
+       * Rebuilds every entry card: reorder controls (a drag handle and up/down buttons for
+       * keyboards), delete, the inherited time, title and notes, the other plugin fields,
+       * and the entry's remaining metadata as raw JSON.
+       */
       const draw = () => {
         list.replaceChildren();
         entries.forEach((entry, index) => {
@@ -341,6 +377,8 @@ export function renderPluginFields(
           handle.ondragend = () => {
             dragged = null;
           };
+          // Touch and pen don't start HTML drag and drop reliably, so they drag by pointer
+          // capture instead and drop on whichever card is under the finger on release.
           handle.onpointerdown = (event) => {
             if (!stackEditable || event.pointerType === 'mouse') return;
             event.preventDefault();
@@ -362,6 +400,7 @@ export function renderPluginFields(
           handle.onpointercancel = () => {
             dragged = null;
           };
+          // Accepting the dragover (preventDefault) is what makes the card a drop target.
           card.ondragover = (event) => {
             if (stackEditable && dragged) event.preventDefault();
           };
@@ -383,6 +422,7 @@ export function renderPluginFields(
           ).ariaLabel = 'Move stack entry down';
           button('Delete', () =>
             confirmDelete(String(entry.metadata.title || 'Untitled stack entry'), () => {
+              // The inspector may have been redrawn while the confirmation was open.
               if (!section.isConnected || !stackEditable) return;
               entries = entries.filter((e) => e.id !== entry.id);
               commit();
@@ -414,6 +454,8 @@ export function renderPluginFields(
             if (key === 'description' && pluginRichText(plugins))
               attachRichText(input as HTMLTextAreaElement, stackEditable);
           }
+          // The entry's own plugin fields (no nested stacks); their edits also refresh the
+          // raw JSON view below, assigned once that view exists.
           const other = document.createElement('div');
           let syncRaw = () => {};
           renderPluginFields(
@@ -449,6 +491,9 @@ export function renderPluginFields(
             raw.value = JSON.stringify(rest, null, 2);
             raw.setCustomValidity('');
           };
+          // Raw JSON edits replace everything but title and notes once they parse into a
+          // valid entry; the plugin fields are then rebuilt to match. Invalid JSON is
+          // reported on the textarea and not saved.
           raw.oninput = () => {
             try {
               const value = JSON.parse(raw.value);
@@ -519,6 +564,7 @@ export function renderPluginFields(
       input.type = field.kind === 'image-url' ? 'url' : 'text';
       input.autocomplete = 'off';
     }
+    /** For image fields: validates the URL and updates the picture, its link and its note. */
     let preview: ((immediate?: boolean) => void) | undefined;
     if (field.kind === 'image-url') {
       const link = document.createElement('a');
@@ -557,6 +603,7 @@ export function renderPluginFields(
         else link.href = url;
         // Its source, credited (#109): images are linked where their owners host them.
         sourceLabel.textContent = `Image from ${new URL(url).hostname} · open the original ↗`;
+        // An embedded copy if the timeline has one; offline there is nothing else to show.
         const resolved = imageSource(url);
         if (!resolved) {
           img.hidden = true;
@@ -565,6 +612,8 @@ export function renderPluginFields(
             'No embedded image copy. Export this timeline from the online app to include its icon.';
           return;
         }
+        // While typing, wait 300 ms and load only if the field is still on screen, so each
+        // keystroke doesn't fetch a partial URL.
         if (img.getAttribute('src') !== resolved) {
           img.hidden = true;
           const load = () => {
@@ -576,6 +625,7 @@ export function renderPluginFields(
           else previewTimer = setTimeout(load, 300);
         }
       };
+      // Events for an image the field no longer names are ignored.
       img.onerror = () => {
         if (img.getAttribute('src') !== imageSource(imageURL(input.value))) return;
         img.hidden = true;
@@ -649,6 +699,12 @@ export function renderPluginHeading(
   if (button.textContent !== text || button.children.length) button.textContent = text;
   return true;
 }
+/**
+ * Gives a marker its shape. A clip path (`--marker-clip`) shapes the marker's own
+ * background and hit area; for any shape but a circle, two SVG copies of the outline are
+ * added as well, a filled shape behind the content and a white-stroked border in front, so
+ * polygons get a real outline. Previous shape elements are removed first.
+ */
 export function renderPluginShape(button: HTMLButtonElement, shape: string) {
   button.dataset.shape = shape;
   const clips: Record<string, string> = {
@@ -682,6 +738,7 @@ export function renderPluginShape(button: HTMLButtonElement, shape: string) {
   path.setAttribute('stroke-width', '5');
   const border = path.cloneNode(true) as SVGPathElement;
   border.setAttribute('fill', 'none');
+  // A shallow clone keeps the `marker-shape` class, so the removal above clears it too.
   const outline = svg.cloneNode(false) as SVGSVGElement;
   outline.classList.add('marker-outline');
   outline.append(border);

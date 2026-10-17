@@ -7,8 +7,18 @@ import { decimalExponent, parseNumber } from './numeric.js';
 import { validateContext, unitsPerPixel } from './view-context.js';
 import type { PresentationContext } from './view-context.js';
 
+/**
+ * How the ruler is graduated (docs/time-presentation.md#ruler-graduations-and-breakpoints):
+ * powers of ten, civil calendar units, or a ladder of increasing exact steps (canonical
+ * rational strings, in displayed units, aligned to displayed zero).
+ */
 export type RulerPolicy =
   { kind: 'decimal' } | { kind: 'gregorian' } | { kind: 'steps'; steps: string[] };
+/**
+ * One mark on the ruler at an exact time. `level` is its strongest role: a minor
+ * subdivision, a labelled major mark, or a calendar boundary coarser than the labels (a
+ * new day or month). `label` says whether any layer labels it.
+ */
 export interface RulerTick {
   time: Q;
   level: 'minor' | 'major' | 'boundary';
@@ -20,17 +30,30 @@ export interface RulerTick {
   majorOpacity: number;
   boundaryOpacity: number;
   labelOpacity: number;
+  /**
+   * The label versions to draw, each with the interval its detail is chosen for and its
+   * weight; two while levels crossfade, so differing calendar detail can fade between them.
+   */
   labels: { interval: Q; opacity: number }[];
 }
+/** The visible ticks in time order, and the name of the labelled step (`hour`, `1/10` …). */
 export interface RulerPlan {
   ticks: RulerTick[];
   graduation: string;
 }
+/** At most this many ticks per plan, however wide the view; planning throws beyond it. */
 const MAX_TICKS = 512;
 const pow10 = (exponent: number): Q =>
   exponent >= 0 ? Q.from(10n ** BigInt(exponent)) : Q.from(1n, 10n ** BigInt(-exponent));
+/** Integer division rounding toward negative infinity (bigint `/` truncates toward zero). */
 const floorDiv = (n: bigint, d: bigint) => n / d - (n < 0n && n % d ? 1n : 0n);
 
+/**
+ * Checks an untrusted ruler policy and returns it canonical: custom steps must be 2 to 32
+ * positive, strictly increasing exact numbers of at most 1,024 characters (as written and
+ * once reduced), and come back as canonical rational strings. Throws a readable error
+ * otherwise.
+ */
 export function validateRulerPolicy(value: unknown): RulerPolicy {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new Error('Invalid ruler graduation settings.');
@@ -58,6 +81,11 @@ export function validateRulerPolicy(value: unknown): RulerPolicy {
   return { kind: 'steps', steps };
 }
 
+/**
+ * One graduation level. `nominal` is its typical length, used only to choose levels and
+ * label detail. Ticks are placed either every `step` from `anchor` (fixed lengths), or
+ * every `months` or `years` on real calendar dates, whose lengths vary.
+ */
 interface Level {
   name: string;
   nominal: Q;
@@ -66,15 +94,23 @@ interface Level {
   months?: bigint;
   years?: bigint;
 }
+/** A fixed-length level, aligned to `anchor` (zero by default), named after its step. */
 function fixed(step: Q, name = step.toString(), anchor = Q.zero): Level {
   return { step, nominal: step, name, anchor };
 }
+/** The smallest `base × 10^k` (k any integer) at least `target`. */
 function decimalLevel(target: Q, base = Q.one): Level {
   const relative = target.div(base);
   let exponent = decimalExponent(relative);
   if (pow10(exponent).compare(relative) < 0) exponent++;
   return fixed(base.mul(pow10(exponent)));
 }
+/**
+ * A level's tick times within the view (both edges inclusive), in time order. Starts at the
+ * first tick at or after the left edge, found directly by floor division (or by month or
+ * year arithmetic) rather than by stepping from zero, so huge or far-off times cost the
+ * same as small ones. Throws past MAX_TICKS.
+ */
 function bounds(context: PresentationContext, level: Level): Q[] {
   const right = context.left.add(context.span);
   const result: Q[] = [];
@@ -89,7 +125,10 @@ function bounds(context: PresentationContext, level: Level): Q[] {
     }
     return result;
   }
+  // Calendar levels: count months as year × 12 + (month − 1), or whole years, from year
+  // zero, so multi-month and multi-year steps stay aligned for negative years too.
   const [year, month] = dateParts(context.left.div(Q.from(86400n)).floor().numerator);
+  // The time of the first day of month (or year) number `index`.
   const at = (index: bigint): Q =>
     level.months
       ? Q.from(
@@ -105,6 +144,13 @@ function bounds(context: PresentationContext, level: Level): Q[] {
   }
   return result;
 }
+/**
+ * The Gregorian ladder for a label target (seconds per label), finest first: decimal
+ * fractions of a second down to the target's precision, 1 and 10 seconds, minutes and
+ * hours in usual multiples, day, week (Mondays: 4 days after the Thursday epoch), month,
+ * quarter and year; then, for targets beyond a year, a decimal multiple of years and a
+ * tenth of it.
+ */
 function calendarLevels(target: Q): Level[] {
   // Arbitrary precision below seconds; larger graduations use real civil units.
   const exponent = Math.min(0, decimalExponent(target) - 1);
@@ -148,21 +194,33 @@ function calendarLevels(target: Q): Level[] {
   return levels;
 }
 
+/** One layer's plan, with the nominal lengths of the labelled level and its neighbours. */
 interface LevelPlan extends RulerPlan {
   previous: Q;
   major: Q;
   next: Q;
 }
+/** Smoothstep: 0 below 0, 1 above 1, an S-curve with zero slope at both ends between. */
 const smooth = (value: number) => {
   const t = Math.max(0, Math.min(1, value));
   return t * t * (3 - 2 * t);
 };
 // Only bounded, dimensionless ratios become numbers. Absolute time stays rational.
+/** How far `value` is from `start` to `finish`, smoothed, in [0, 1]. */
 function fade(value: Q, start: Q, finish: Q): number {
   if (value.compare(start) <= 0) return 0;
   if (value.compare(finish) >= 0) return 1;
   return smooth(value.sub(start).div(finish.sub(start)).toApproximateNumber());
 }
+/**
+ * Plans one layer of the ruler: the labelled (major) level is the first with a nominal
+ * length of at least `majorTarget`; minor subdivisions are levels at least `minorTarget`
+ * long, fading in from that length to twice it; calendar boundaries coarser than the
+ * labels fade in as the view widens toward their length. Ticks of different levels at
+ * the same time are merged into one with the strongest role. Gregorian levels are laid out
+ * in local time (shifted by the zone offset) so that midnights and month starts fall on
+ * local dates.
+ */
 function planLevel(
   context: PresentationContext,
   checked: RulerPolicy,
@@ -186,6 +244,8 @@ function planLevel(
         ? calendarLevels(majorTarget)
         : checked.steps.map((step) => fixed(Q.parse(step)));
     const index = levels.findIndex((level) => level.nominal.compare(majorTarget) >= 0);
+    // Past either end of a custom ladder, or above the calendar's years, continue with
+    // decimal powers of the end step.
     if (index < 0) {
       major = decimalLevel(majorTarget, levels.at(-1)!.nominal);
       minor = fixed(major.step!.div(Q.from(10n)));
@@ -196,6 +256,8 @@ function planLevel(
       major = levels[index];
       minor = levels[index - 1];
     }
+    // The neighbouring levels, which set the crossfade's range: the ladder's own where the
+    // major level is one of its entries, else a factor of ten either way.
     previous = major.nominal.div(Q.from(10n));
     next = major.nominal.mul(Q.from(10n));
     if (
@@ -206,6 +268,7 @@ function planLevel(
       next = levels[index + 1]?.nominal ?? next;
     }
     if (checked.kind === 'gregorian') {
+      // At 10 seconds and below, a tenth of the step (decimal subdivision of seconds).
       if (major.step && major.step.compare(Q.from(10n)) <= 0) {
         minor = fixed(major.step.div(Q.from(10n)));
       } else {
@@ -228,6 +291,7 @@ function planLevel(
           (level) =>
             level.nominal.compare(minor!.nominal) >= 0 && level.nominal.compare(major.nominal) < 0,
         );
+      // Natural boundaries coarser than the labels, once the view spans at least half of one.
       boundaries = levels.filter(
         (level) =>
           ['minute', 'hour', 'day', 'month', 'year'].includes(level.name) &&
@@ -238,6 +302,8 @@ function planLevel(
   }
   const shift = checked.kind === 'gregorian' ? Q.from(BigInt(offsetMinutes) * 60n) : Q.zero;
   const localContext = { ...context, left: context.left.add(shift) };
+  // Ticks by exact time; levels are inserted from finest to coarsest, so the later, stronger
+  // role wins while opacities keep their maximum.
   const ticks = new Map<string, RulerTick>();
   const insert = (level: Level, weight: RulerTick['level'], label: boolean, opacity: number) => {
     if (opacity === 0) return;
@@ -282,7 +348,18 @@ function planLevel(
   return { ticks: sorted, graduation: major.name, previous, major: major.nominal, next };
 }
 
-/** Exact anchored geometry with spatial crossfades between neighboring levels. */
+/**
+ * Exact anchored geometry with spatial crossfades between neighboring levels.
+ *
+ * Plans the ruler for a view, in the view's own units (the presenter maps them to stored
+ * coordinates). Label and subdivision targets come from the pixel size: labels need
+ * 70 (calendar) or 90 pixels at the text scale, and at least 1/32 of the width; minor marks
+ * 9 pixels, and at least 1/192 of the width, which bounds the work on very wide screens.
+ * Near a breakpoint the next coarser layer is planned too and the two are blended by
+ * smoothstep of the zoom depth (never elapsed time), so zooming reverses a fade and
+ * panning only moves marks. Throws on an invalid context, policy or offset, or past
+ * MAX_TICKS.
+ */
 export function planRuler(
   context: PresentationContext,
   policy: RulerPolicy = { kind: 'decimal' },
@@ -310,6 +387,8 @@ export function planRuler(
     Q.parseDecimal(Math.max(9 * text, 6, context.widthPixels / 192).toFixed(3)),
   );
   const fine = planLevel(context, checked, offsetMinutes, majorTarget, minorTarget);
+  // Crossfade over the last factor of two before the breakpoint (where the label target
+  // reaches the major level's length), or from the previous level if that is closer.
   const start =
     fine.previous.compare(fine.major.div(Q.from(2n))) > 0
       ? fine.previous
@@ -318,6 +397,8 @@ export function planRuler(
   const layers: [LevelPlan, number][] = [[fine, 1 - blend]];
   if (blend > 0)
     layers.push([planLevel(context, checked, offsetMinutes, fine.next, minorTarget), blend]);
+  // Combine the layers tick by tick: weights add up (they sum to one across layers), both
+  // layers' label versions are kept, and the stronger role wins.
   const merged = new Map<string, RulerTick>();
   for (const [plan, alpha] of layers) {
     if (alpha === 0) continue;

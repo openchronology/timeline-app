@@ -27,7 +27,11 @@ export function calendar(presentation) {
   const p = validatePresentation(presentation);
   return p.mode === 'gregorian' ? { scale: Q.parse(p.scale), origin: Q.parse(p.origin) } : null;
 }
-/** A retention period written in the timeline's units (`1 year`, `90 days`), in seconds. */
+/**
+ * A retention period written in the timeline's units (`1 year`, `90 days`), in seconds, as
+ * an exact rational's text (stored in oc_timelines.retention_seconds). 400 unless the
+ * timeline's display is a calendar and the period is from an hour to 1,000 years.
+ */
 export function parseRetention(text, presentation) {
   const days = calendar(presentation);
   if (!days)
@@ -52,7 +56,11 @@ export function printRetention(seconds, presentation) {
     ? createDifference(presentation).print(Q.parse(seconds).mul(days.scale))
     : `${seconds} s`;
 }
-/** The settings a save sends back unchanged. */
+/**
+ * The settings a save sends back unchanged: a document of timeline row `t`'s title,
+ * description, presentation, plugins, tags and assets with no moments, for deleteWhere's
+ * save, which changes only moments and durations.
+ */
 export function settings(t) {
   const document = { format: 'openchronology', version: 1, title: t.title, events: [] };
   document.description = t.description ?? '';
@@ -73,7 +81,11 @@ async function momentsIn(pool, t, { lower, upper, before }, limit, walk = WALK_P
   const end = before === null ? null : Q.parse(before);
   let after = null;
   for (;;) {
+    // One more than still wanted, to learn whether the range holds more.
     const page = Math.min(walk, limit - ids.length + 1);
+    // oc_events (schema.sql) walks the moment tree from (after time, after id) onwards,
+    // reading through a fork to its base, and returns at most `page` moments in time order
+    // within [lower, upper]; with `before`, up to it, the exclusive end checked below.
     const { rows } = await pool.query(
       `SELECT e->>'id' AS id,e->>'time' AS time FROM oc_events($1,$2::mpq,$3::mpq,$4::mpq,$5,$6) e`,
       [t.id, lower, upper ?? before, after?.time ?? null, after?.id ?? null, page],
@@ -108,7 +120,13 @@ export async function deleteWhere(
   const index = await indexReader(store.pool, t);
   const range = { lower, upper, before };
   // Durations wholly inside start inside it: found through their start index (first_key,
-  // which orders as their start does).
+  // which orders as their start does). first_key is oc_qkey of the start, a B-tree-sized key
+  // that truncation never puts out of order, so the first_key bounds narrow the index scan
+  // and the exact first_time and last_time comparisons settle each row. A duration lies
+  // inside when it starts at or after `lower` and ends by `upper` (or before `before`).
+  // Rows with no definition are legacy link rows awaiting conversion, not durations. index()
+  // reads the duration tree through a fork's lineage (index-versions.mjs). One row more than
+  // `limit` tells whether more remain.
   const [moments, durations] = await Promise.all([
     momentsIn(store.pool, t, range, limit, walk),
     store.pool.query(
@@ -147,8 +165,24 @@ export async function deleteWhere(
  * ancestry), revisions copies read through to, and the revisions newer ones are stored
  * against (a patch replays its first parent, back to a snapshot; revisions kept as rows
  * need none). Returns how many revisions went.
+ *
+ * Runs in the caller's transaction; deletes revisions, their parent links, snapshots no
+ * revision uses any more, and versions kept as rows no remaining revision sees.
+ * @param {import('pg').PoolClient} client
+ * @param {string} timelineId
+ * @param {Date} before the start of the retention window
+ * @returns {Promise<number>}
  */
 export async function pruneHistory(client, timelineId, before) {
+  // Two recursive CTEs:
+  //   shared: this timeline's revisions something else refers to (another timeline's head,
+  //     any fork's base, a pull request's base, source or merge, or a revision of another
+  //     timeline that has it as a parent), and all their ancestors, followed through
+  //     oc_revision_parents;
+  //   needed: those, plus revisions inside the window, revisions copies read through to
+  //     (oc_history_bases), and the head; then, for each needed revision stored as a patch,
+  //     its first parent (position 0, the one a patch replays), back to a snapshot.
+  // What is left of this timeline's revisions from before the window goes.
   const { rows } = await client.query(
     `WITH RECURSIVE shared(id) AS (
       SELECT r.id FROM oc_revisions r WHERE r.timeline_id=$1 AND (
@@ -177,6 +211,7 @@ export async function pruneHistory(client, timelineId, before) {
     [ids],
   );
   await client.query('DELETE FROM oc_revisions WHERE id=ANY($1::uuid[])', [ids]);
+  // The snapshots of the deleted revisions, unless a remaining revision still uses one.
   await client.query(
     'DELETE FROM oc_snapshots s WHERE s.id=ANY($1::uuid[]) AND NOT EXISTS(SELECT 1 FROM oc_revisions r WHERE r.snapshot_id=s.id)',
     [rows.map((r) => r.snapshot_id).filter(Boolean)],
@@ -199,6 +234,7 @@ export async function expire(store, id, now = Date.now(), { save = RETENTION_SAV
   const read = async () =>
     (await store.pool.query('SELECT * FROM oc_timelines WHERE id=$1', [id])).rows[0];
   let t = await read();
+  // No retention set, the timeline gone, or a comparison (which holds no moments of its own).
   if (!t?.retention_seconds || t.comparison) return null;
   const result = { history: 0, moments: 0, durations: 0 };
   try {
@@ -207,6 +243,8 @@ export async function expire(store, id, now = Date.now(), { save = RETENTION_SAV
       const seconds = Q.parse(t.retention_seconds);
       const since = new Date(now - seconds.toApproximateNumber() * 1000);
       result.history = await store.transaction((c) => pruneHistory(c, id, since));
+      // The window's start in the timeline's own coordinates: origin + (now − retention) ×
+      // scale, with now in seconds as an exact rational (milliseconds over 1000).
       const cutoff = days.origin
         .add(Q.from(BigInt(now), 1000n).sub(seconds).mul(days.scale))
         .toString();
@@ -238,7 +276,8 @@ export async function expire(store, id, now = Date.now(), { save = RETENTION_SAV
       if (analyses.size) await store.analyze([...analyses]);
     }
   } finally {
-    // Tried, whatever happened: the next run is due in an hour.
+    // Tried, whatever happened: the next run is due in an hour. retention_removed (what the
+    // last run deleted) is reported with the timeline's retention setting.
     await store.pool.query(
       'UPDATE oc_timelines SET retention_applied_at=now(),retention_removed=$2 WHERE id=$1',
       [id, result.moments + result.durations],
@@ -246,15 +285,23 @@ export async function expire(store, id, now = Date.now(), { save = RETENTION_SAV
   }
   return result;
 }
-/** Applies retention to the timelines due for it; one server process at a time. */
+/**
+ * Applies retention to the timelines due for it (up to 100 a run, those waiting longest
+ * first); one server process at a time. A timeline's failure is logged and the rest go on.
+ */
 export async function expireDue(store, now = Date.now(), log = console) {
   const client = await store.pool.connect();
   try {
+    // A session-level advisory lock, tried without waiting: held on this connection for the
+    // whole run (across the many transactions expire makes on other connections) and
+    // released below. Another process already running retention holds it, and this one
+    // skips the run.
     const { rows } = await client.query(
       "SELECT pg_try_advisory_lock(hashtextextended('oc-retention',0)) AS locked",
     );
     if (!rows[0].locked) return;
     try {
+      // Timelines with retention never applied, or last applied over RETENTION_EVERY ago.
       const due = await client.query(
         `SELECT id FROM oc_timelines WHERE retention_seconds IS NOT NULL
         AND (retention_applied_at IS NULL OR retention_applied_at<now()-$1::interval)
@@ -272,7 +319,11 @@ export async function expireDue(store, now = Date.now(), log = console) {
     client.release();
   }
 }
-/** Runs retention every quarter of an hour, starting shortly after startup. */
+/**
+ * Runs retention every quarter of an hour, starting 30 seconds after startup (platform.mjs).
+ * The timers are unref'd so they never keep the process alive.
+ * @returns {() => void} stops the runs
+ */
 export function startRetention(store, every = 15 * 60 * 1000, log = console) {
   const run = () =>
     expireDue(store, Date.now(), log).catch((error) => log.error('Retention failed:', error));

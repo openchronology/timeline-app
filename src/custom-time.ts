@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The bounded interpreter behind custom time printers/parsers and plugin render scripts: a
+// tokenizer, a recursive-descent compiler to a small expression tree, and an evaluator with
+// operation budgets (docs/time-presentation.md#custom-javascript-and-typescript-subset).
 import { Rational as Q } from 'rational-ordered-map';
 import { parseTimestamp, printTimestamp } from './calendar.js';
 import { fixedDecimal, parseNumber, printNumber } from './numeric.js';
@@ -7,16 +10,30 @@ import type { PresentationContext } from './view-context.js';
 
 // This is a small language interpreter, not a JavaScript execution sandbox.
 // No source text is passed to eval, Function, a browser worker, or the server runtime.
+/**
+ * Every value a script can hold: text, a JavaScript number (only small option literals such
+ * as digit counts; exact numbers are rationals), a boolean, or an exact rational.
+ */
 export type ScriptValue = string | number | boolean | Q;
 type Value = ScriptValue;
+/** A compiled expression: a literal, a local variable, an `api.*` call, an operator, or `?:`. */
 type Expr =
   | { kind: 'literal'; value: Value }
   | { kind: 'name'; name: string }
   | { kind: 'call'; name: string; args: Expr[] }
   | { kind: 'binary'; op: string; left: Expr; right: Expr }
   | { kind: 'choice'; test: Expr; yes: Expr; no: Expr };
+/** A compiled function: its first parameter's name, its `const` locals in order, and its return. */
 type Body = { parameter: string; locals: { name: string; value: Expr }[]; result: Expr };
+/**
+ * A token. String and number literals have `text: 'literal'` and `literal: true`, so a
+ * string whose contents look like a keyword or operator is never mistaken for one.
+ */
 type Token = { text: string; value?: string | number; literal?: boolean };
+/**
+ * The time API: each method's allowed argument counts. Checked when compiling, so a script
+ * that calls an unknown method or passes the wrong number of arguments never runs.
+ */
 const arities: Readonly<Record<string, readonly number[]>> = Object.freeze({
   rational: [1],
   parseNumber: [1],
@@ -50,6 +67,12 @@ const arities: Readonly<Record<string, readonly number[]>> = Object.freeze({
   purpose: [0],
 });
 
+/**
+ * Splits source into tokens, skipping whitespace, line comments and block comments. Strings
+ * use single or double quotes with only the escapes \n \r \t \\ \" \'; number literals
+ * become JavaScript numbers of magnitude at most a million. Throws on anything else, and
+ * past 16,384 characters, 4,096 tokens or a 2,048-character string.
+ */
 function tokenize(source: string): Token[] {
   if (source.length > 16384) throw new Error('Custom source is limited to 16,384 characters.');
   const tokens: Token[] = [];
@@ -99,6 +122,9 @@ function tokenize(source: string): Token[] {
       if (!closed || value.length > 2048) throw new Error('Unclosed or oversized string.');
       tokens.push({ text: 'literal', value, literal: true });
     } else {
+      // Three-character operators are tried before their two- and one-character prefixes.
+      // A number may carry a sign, so `x +1` reads as `x` followed by the literal `+1`
+      // (a syntax error); `x + 1` is concatenation. There is no subtraction operator.
       const token =
         /^(?:===|!==|<=|>=|[A-Za-z_$][A-Za-z0-9_$]*|[+-]?\d+(?:\.\d+)?|[{}(),;:.?+<>=])/.exec(
           source.slice(at),
@@ -119,6 +145,17 @@ function tokenize(source: string): Token[] {
 
 /** A custom presentation's functions: print and parse, and how it writes time differences. */
 const FUNCTIONS = ['print', 'parse', 'printDifference', 'parseDifference'];
+/**
+ * Parses source into its function bodies by recursive descent. A program is a sequence of
+ * `function name(value[: T], api[: TimeAPI]) [: T] { const x = …; … return …; }` with no
+ * other statements. For a time presentation the names are print and parse (required) and
+ * printDifference and parseDifference (optional); for a plugin (`plugin`) only render.
+ * Type annotations are checked against the function's role but have no other effect.
+ * `methods` lists the `api.*` methods allowed and their arities. Variables must be declared
+ * before use and can't be reassigned, so evaluation needs no scope analysis. Throws a
+ * readable error on any syntax it does not accept and past 1,024 expression nodes or 32
+ * nesting levels.
+ */
 function compile(source: string, plugin = false, methods = arities): Map<string, Body> {
   const tokens = tokenize(source);
   let at = 0,
@@ -142,6 +179,15 @@ function compile(source: string, plugin = false, methods = arities): Map<string,
       if (!allowed.includes(identifier())) throw new Error('Unsupported type annotation.');
     }
   };
+  /**
+   * Parses one expression by precedence climbing: a primary (literal, `true`/`false`,
+   * parenthesised expression, `api.method(…)` call or declared local) followed by binary
+   * operators binding at least `minimum`. Each right operand is parsed with a minimum one
+   * above its operator, which makes the operators left-associative. `cond ? a : b` is only
+   * taken at the outermost level (minimum 0), so it binds loosest, and the `: b` branch,
+   * parsed at that level too, makes chains right-associative. `names` are the locals in
+   * scope.
+   */
   function expression(names: Set<string>, depth = 0, minimum = 0): Expr {
     if (depth > 32 || ++nodes > 1024) throw new Error('Custom expression is too complex.');
     let left: Expr;
@@ -180,6 +226,7 @@ function compile(source: string, plugin = false, methods = arities): Map<string,
         left = { kind: 'name', name };
       }
     }
+    // `+` is text concatenation only; exact arithmetic goes through api.add and the like.
     const precedence: Record<string, number> = {
       '===': 1,
       '!==': 1,
@@ -212,6 +259,8 @@ function compile(source: string, plugin = false, methods = arities): Map<string,
           ? 'Define render exactly once.'
           : 'Define print and parse exactly once, and optionally printDifference and parseDifference.',
       );
+    // Printers take a Rational and return a string; parsers the reverse; render takes a
+    // string (always empty) and returns a string.
     const printing = name === 'print' || name === 'printDifference';
     take('(');
     const parameter = identifier();
@@ -252,7 +301,13 @@ function compile(source: string, plugin = false, methods = arities): Map<string,
   return bodies;
 }
 
+/** The number of bits in a bigint's magnitude. */
 const bitLength = (n: bigint) => (n < 0n ? -n : n).toString(2).length;
+/**
+ * Refuses a single value too large to keep computing with: text over 2,048 characters, or a
+ * rational whose numerator or denominator exceeds 4,096 bits (repeated multiplication can
+ * otherwise grow exact rationals without limit). Returns the value unchanged.
+ */
 function bounded(value: Value): Value {
   if (typeof value === 'string' && value.length > 2048)
     throw new Error('Custom text exceeds 2048 characters.');
@@ -265,6 +320,8 @@ function bounded(value: Value): Value {
     );
   return value;
 }
+// Runtime type checks: the language is dynamically typed, so each API method checks its
+// arguments and throws a readable error on the wrong kind.
 function string(value: Value): string {
   if (typeof value !== 'string') throw new Error('Expected text.');
   return value;
@@ -277,12 +334,19 @@ function number(value: Value): number {
   if (typeof value !== 'number') throw new Error('Expected a numeric option.');
   return value;
 }
+/** A string index for slice: an integer within ±2,048 (negative counts from the end). */
 function index(value: Value): number {
   const result = number(value);
   if (!Number.isInteger(result) || Math.abs(result) > 2048)
     throw new Error('String indices must be integers between -2048 and 2048.');
   return result;
 }
+/**
+ * Runs one time-API method on evaluated arguments. `context` describes the viewport for
+ * printers and parsers called from the editor (validated by the caller); the view methods
+ * throw without it, while `hasView` and `purpose` let a script check first. Pure: no method
+ * touches the DOM, the network or anything outside its arguments.
+ */
 function call(name: string, args: Value[], context?: PresentationContext): Value {
   const a = args[0],
     b = args[1];
@@ -305,6 +369,8 @@ function call(name: string, args: Value[], context?: PresentationContext): Value
         return context.widthPixels;
       case 'unitsPerPixel':
         return unitsPerPixel(context);
+      // labelResolution: the time between labels, exactly unitsPerPixel × spacing, with the
+      // spacing defaulting to 115 pixels for ruler labels and 6 otherwise.
       default:
         return unitsPerPixel(context).mul(
           Q.parseDecimal(
@@ -318,6 +384,7 @@ function call(name: string, args: Value[], context?: PresentationContext): Value
       return Q.parse(string(a));
     case 'parseNumber': {
       const text = string(a);
+      // A huge exponent would build an enormous exact rational before any budget is checked.
       const exponent = /[eE]([+-]?\d+)$/.exec(text);
       if (exponent && Math.abs(Number(exponent[1])) > 1000)
         throw new Error('Custom exponent exceeds 1000.');
@@ -355,6 +422,8 @@ function call(name: string, args: Value[], context?: PresentationContext): Value
       const text = string(a),
         from = string(b),
         to = string(args[2]);
+      // First occurrence only, and through a function so `$&`-style patterns in the
+      // replacement are not interpreted.
       return text.replace(from, () => to);
     }
     case 'upper':
@@ -376,6 +445,14 @@ function call(name: string, args: Value[], context?: PresentationContext): Value
   }
 }
 
+/**
+ * Evaluates a compiled function on one argument. `invoke` runs API calls (the time API by
+ * default; plugin scripts supply their own). Every evaluated node counts against the
+ * budgets: 4,096 steps, 64 levels of nesting, 128 API calls, 32,768 characters of text
+ * produced and 65,536 bits of rational components produced, in total, plus the per-value
+ * limits of `bounded`. They bound work, not time, and throw when exceeded. Arguments are
+ * evaluated eagerly, but only the chosen branch of `?:` is.
+ */
 function run(body: Body, argument: Value, context?: PresentationContext, invoke = call): Value {
   const locals = new Map<string, Value>([[body.parameter, bounded(argument)]]);
   let steps = 0,
@@ -411,6 +488,8 @@ function run(body: Body, argument: Value, context?: PresentationContext, invoke 
           right = evaluate(expr.right, depth + 1);
         if (expr.op === '+') result = string(left) + string(right);
         else {
+          // Comparisons only between two values of the same primitive type; rationals are
+          // objects, so `===` would compare identity, and must use api.compare.
           if (left instanceof Q || right instanceof Q || typeof left !== typeof right)
             throw new Error('Use api.compare for rational comparisons.');
           switch (expr.op) {
@@ -448,6 +527,13 @@ function run(body: Body, argument: Value, context?: PresentationContext, invoke 
   return evaluate(body.result);
 }
 
+/**
+ * Compiles a custom time presentation into its printer and parser. The printer turns a
+ * stored rational time into text, the parser text into a rational; both receive the
+ * (validated) viewport context when there is one. Throws on a compile error; the returned
+ * functions throw when a script fails, exceeds a budget or returns the wrong type, and the
+ * callers fall back to showing the exact coordinate or keeping the previous input.
+ */
 export function compileCustom(source: string): {
   print(time: Q, context?: PresentationContext): string;
   parse(text: string, context?: PresentationContext): Q;
@@ -459,7 +545,11 @@ export function compileCustom(source: string): {
   };
 }
 
-/** A custom presentation's optional difference functions, which work in stored coordinates. */
+/**
+ * A custom presentation's optional difference functions, which work in stored coordinates.
+ * They run with no view context. Each is present only when the source defines it; without
+ * them the caller prints and reads differences as exact stored coordinates.
+ */
 export function compileCustomDifference(source: string): {
   print?(difference: Q): string;
   parse?(text: string): Q;
@@ -473,6 +563,7 @@ export function compileCustomDifference(source: string): {
   };
 }
 
+/** The starter source offered for a new custom presentation: time in seconds shown as minutes. */
 export const CUSTOM_EXAMPLE = `function print(time: Rational, api: TimeAPI): string {
   const minutes = api.div(time, api.rational("60"));
   return api.decimal(minutes, 6) + " minutes";
@@ -482,7 +573,15 @@ function parse(text: string, api: TimeAPI): Rational {
   return api.mul(minutes, api.rational("60"));
 }`;
 
-/** Compile only; no user source executes during manifest validation. */
+/**
+ * Compile only; no user source executes during manifest validation.
+ *
+ * Compiles a plugin's `render` function with the plugin API (docs/plugins.md). The returned
+ * runner evaluates it with an empty string as its parameter: the string helpers run here,
+ * every other method (`get`, `shape`, `merge` …) is answered by the caller's `invoke`, which
+ * holds the moment and builds the rendering effects. The runner returns render's string
+ * result and throws as `run` does.
+ */
 export function compilePluginScript(source: string) {
   const methods = {
     get: [1],

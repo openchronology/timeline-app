@@ -4,7 +4,9 @@
 // decisions that can be taken on it.
 import { REPORT_CATEGORIES, REPORT_TEXT } from '../../server/report-categories.mjs';
 import { CONTENT_LABELS, describeLabels } from '../../src/content-labels.ts';
+/** Each report category's name, by its key. */
 const CATEGORY = Object.fromEntries(REPORT_CATEGORIES);
+/** What each kind of reported thing is called. */
 const KIND = {
   timeline: 'Timeline',
   comment: 'Comment',
@@ -21,13 +23,30 @@ const EFFECT = {
   suite: 'Restricting removes it from the library and refuses new versions.',
   user: 'Restricting suspends the account, ending its sessions and API keys.',
 };
+/** A time to the minute, in UTC, so every administrator reads the same one. */
 const when = (time) => new Date(time).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
 /**
  * One case in the review queue (#115): what was reported, the reports, and the decisions open
  * to an administrator. `decide(action, reason)` sends one.
+ *
+ * An open case can be restricted, dismissed or, for a timeline, labelled; a decision in force
+ * can be lifted, or upheld when its owner asked for a review. The server checks each of these
+ * again (server/moderation.mjs), under a lock, so two administrators can't both decide a case.
+ *
+ * @param {object} props
+ * @param {object} props.item a case from GET /api/admin/reports: its target (`target_kind`,
+ *   `target`, `path`, null once the target is gone, and `owner`), `status` (open, restricted,
+ *   labelled, dismissed or lifted), its `reports`, the decision (`reason`, `labels`,
+ *   `decided_at`) and any review the owner asked for (`appeal`, `appealed_at`,
+ *   `appeal_outcome`, `appeal_decided_at`)
+ * @param {boolean} props.busy a change is being sent: the buttons wait
+ * @param {(action: string, reason?: string, labels?: string[]) => void} props.decide sends a
+ *   decision (the page adds the confirmation password and code)
  */
 export function ReportCase({ item, busy, decide }) {
+  // The owner asked for a review of the decision, and no administrator has answered it yet.
   const appealing = item.status === 'restricted' && item.appealed_at && !item.appeal_decided_at;
+  // The reason and labels are uncontrolled fields, read from the page when a button is pressed.
   const reason = () => document.getElementById('reason-' + item.id)?.value ?? '';
   return (
     <article className="timeline-card report-case">
@@ -51,6 +70,7 @@ export function ReportCase({ item, busy, decide }) {
         {item.reports.map((r, i) => (
           <li key={i}>
             <strong>{CATEGORY[r.category] ?? r.category}</strong>
+            {/* A report about one moment or duration of a timeline links to its page. */}
             {r.entity_id && (
               <>
                 {' '}
@@ -73,6 +93,8 @@ export function ReportCase({ item, busy, decide }) {
                 restricted: 'Restricted',
                 labelled: `Labelled: ${describeLabels(item.labels ?? []).toLowerCase()}`,
                 dismissed: 'Dismissed',
+                // A lifted case keeps the labels it had, which tells a lifted label from a
+                // lifted restriction.
                 lifted: item.labels ? 'Labelled, then lifted' : 'Restricted, then lifted',
               }[item.status]
             }
@@ -100,6 +122,7 @@ export function ReportCase({ item, busy, decide }) {
           </label>
           <p className="field-hint">{EFFECT[item.target_kind]}</p>
           <div className="actions">
+            {/* Nothing is left to restrict once the target is gone; it can still be dismissed. */}
             <button
               className="danger"
               disabled={busy || !item.path}

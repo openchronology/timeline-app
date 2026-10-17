@@ -1,4 +1,12 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+/**
+ * Searching and browsing timelines (searchTimelines; docs/browsing.md), and pull requests
+ * (docs/collaboration.md): proposing changes to a timeline from its editor or from a fork,
+ * updating and rebasing them, merging, rejecting or closing them, and commenting on them.
+ * A pull request pins two saved revisions, its base and its source, so it is reviewed and
+ * merged against exactly what it was made from; which is why only timelines that keep saved
+ * history take them.
+ */
 import { rebaseDocument, mergePatch } from './merge.mjs';
 import { randomUUID } from 'node:crypto';
 import { HttpError, restrictedTimeline, withoutImageCopies } from './store.mjs';
@@ -11,6 +19,15 @@ export const PULLS_UNAVAILABLE =
 /** Why a fork that keeps no saved history cannot propose its changes. */
 export const FORK_PULLS_UNAVAILABLE =
   'This fork does not keep saved history, so it cannot propose its changes: turn on Keep saved history in its settings first.';
+/**
+ * A timeline search as the dashboard and API send it, checked and normalized: `search` (web
+ * search syntax, up to 300 characters), `tag`, `owner` (a username), `starredBy` (a username
+ * whose public favorites to list; only with the public scope), `scope` (public, mine, visible
+ * or starred), `sort` (relevance by default when there is search text, else featured),
+ * `page` and `limit` (up to 50). Tags are compared lower-cased and NFC-normalized, as they are
+ * stored.
+ * @throws {HttpError} 400 for unknown keys or values out of range
+ */
 export function searchInput(value = {}) {
   if (
     !value ||
@@ -64,10 +81,45 @@ export function searchInput(value = {}) {
     owner: owner.normalize('NFC').trim(),
   };
 }
+/**
+ * A page of timelines for the dashboard's browser and search (POST /api/timelines/search).
+ *
+ * Scopes: `public` (public timelines; with no search text, owner or starredBy this is
+ * browsing, which lists only established accounts' and featured timelines, #103), `mine`
+ * (the reader's own, of any visibility), `visible` (public ones plus those the reader owns or
+ * is a member of) and `starred` (of those, the ones the reader starred). 401 for mine and
+ * starred when signed out.
+ * @param {import('pg').Pool} pool
+ * @param {string|null} userId the reader
+ * @param {object} value the search (searchInput)
+ * @param {string[]} featured timeline ids the site features besides those flagged featured
+ *   (FEATURED_TIMELINES in the environment; platform.mjs)
+ * @returns {Promise<{timelines: object[], total: number, page: number, limit: number, pages: number}>}
+ *   star_count and popularity come as strings (bigint and real kept exact for JSON)
+ */
 export async function searchTimelines(pool, userId, value, featured = []) {
   const { search, tag, page, limit, scope, owner, sort, starredBy } = searchInput(value);
   if (['mine', 'starred'].includes(scope) && !userId)
     throw new HttpError(401, 'Sign in to see your timelines.');
+  // One query for a page and its total. Parameters: $1 the mine scope, $2 search text, $3 and
+  // $4 limit and offset, $5 featured ids, $6 the reader (null when signed out), $7 tag, $8 the
+  // visible scope, $9 owner, $10 sort, $11 the starred scope, $12 starredBy, $13 browsing.
+  //
+  // `matching` is every timeline the scope and filters allow, with what ranking needs: the
+  // reader's star, popularity and trending (oc_timeline_popularity, standing.mjs), whether its
+  // owner is established (standing above 0 in oc_account_standing), whether it shows as
+  // featured, its labels, and its text-search rank. Text search uses the generated tsvector
+  // search_document (title and tags weighted A, description B, moments' text C) and its GIN
+  // index oc_timelines_search; ts_rank_cd ranks by cover density. A tag filter uses the GIN
+  // index oc_timelines_tags (array containment). Members see a timeline only while it is not
+  // restricted by moderators; a restricted timeline is private, so the public branch never
+  // shows it.
+  //
+  // `page` orders: featured first when sorting by featured; with search text, established
+  // accounts' matches before newcomers'; then the chosen sort (rank, stars, popularity,
+  // trending, title, or creation date), then the latest updated, then id so pages are
+  // stable. Each CASE gives a constant for the sorts it does not apply to, so one ORDER BY
+  // serves every sort.
   const { rows } = await pool.query(
     `WITH matching AS (
     SELECT t.id,t.slug,t.title,t.description,t.tags,t.visibility,t.revision,t.event_count,t.comparison,t.updated_at,t.created_at,t.star_count,u.username AS owner,
@@ -106,6 +158,7 @@ export async function searchTimelines(pool, userId, value, featured = []) {
         WHEN $10='trending' THEN trending ELSE 0 END DESC,
       CASE WHEN $10='alphabetical' THEN lower(title) ELSE '' END ASC,
       CASE WHEN $10='age' THEN created_at ELSE NULL END DESC,updated_at DESC,id LIMIT $3 OFFSET $4)
+  -- The total over every match, and the page as JSON without the columns only ranking needs.
   SELECT (SELECT count(*) FROM matching) AS total,coalesce((SELECT jsonb_agg((to_jsonb(page)||jsonb_build_object('star_count',page.star_count::text,'popularity',page.popularity::text))-'established'-'trending') FROM page),'[]'::jsonb) AS timelines`,
     [
       scope === 'mine',
@@ -127,6 +180,7 @@ export async function searchTimelines(pool, userId, value, featured = []) {
   const total = Number(rows[0].total);
   return { timelines: rows[0].timelines, total, page, limit, pages: Math.ceil(total / limit) };
 }
+/** A timeline's revision counter as a string (a positive bigint); 400 otherwise. */
 const revision = (value) => {
   if (
     typeof value !== 'string' ||
@@ -136,6 +190,14 @@ const revision = (value) => {
     throw new HttpError(400, 'Expected a revision string.');
   return value;
 };
+/**
+ * A pull request as its author sends it, checked: a title (up to 300 characters) and a
+ * description (up to 20,000), and either a fork's saved revision (`sourceTimelineId` and
+ * `sourceRevisionId`) or a whole `document` proposed against `baseRevision`, the timeline's
+ * revision counter it was edited from. A document is validated and its image copies dropped.
+ * `revision`, the pull request's own counter, is checked by update and resolve.
+ * @throws {HttpError} 400
+ */
 function proposalInput(value) {
   if (
     !value ||
@@ -218,11 +280,22 @@ async function* documentDifferences(before, after) {
     if (page.length) yield page;
   }
 }
+/**
+ * Pull requests on a timeline (oc_proposals) and their comments (oc_proposal_comments). Each
+ * pull request carries a revision counter of its own (`revision`), sent back by clients on
+ * every change, so a change made from a stale view is refused (409) instead of overwriting
+ * another. `store` (store.mjs) gives access checks, transactions and revision storage.
+ */
 export class Collaboration {
   constructor(store) {
     this.store = store;
     this.pool = store.pool;
   }
+  /**
+   * A page of the timeline's pull requests, newest first: `{page, limit}` (up to 50). 404
+   * unless `userId` may see the timeline.
+   * @returns {Promise<{proposals: object[], total: number, page: number, pages: number}>}
+   */
   async list(timelineId, userId, value = {}) {
     if (
       !value ||
@@ -242,6 +315,8 @@ export class Collaboration {
     )
       throw new HttpError(400, 'Invalid pagination.');
     await this.store.access(timelineId, userId);
+    // The timeline's pull requests with their authors' usernames; a page of them, newest
+    // first (id breaks ties), and the total, in one round trip.
     const { rows } = await this.pool.query(
       `WITH matching AS (SELECT p.id,p.title,p.status,p.base_revision,p.revision,p.created_at,p.updated_at,u.username AS author FROM oc_proposals p JOIN oc_users u ON u.id=p.author_id WHERE p.timeline_id=$1), page AS (SELECT * FROM matching ORDER BY created_at DESC,id LIMIT $2 OFFSET $3) SELECT (SELECT count(*) FROM matching) AS total,coalesce((SELECT jsonb_agg(to_jsonb(page)) FROM page),'[]'::jsonb) AS proposals`,
       [timelineId, limit, (page - 1) * limit],
@@ -249,6 +324,12 @@ export class Collaboration {
     const total = Number(rows[0].total);
     return { proposals: rows[0].proposals, total, page, pages: Math.ceil(total / limit) };
   }
+  /**
+   * Pull request `id` with its summary of changes and what `userId` may do with it: merge
+   * (write access, while open), update (its author, with contributor access), close (its
+   * author or a writer). A fork's pull request names its source timeline when the reader may
+   * see it (null otherwise). 404 unless the reader may see the timeline.
+   */
   async get(timelineId, id, userId) {
     const t = await this.store.access(timelineId, userId);
     const p = await this.proposal(timelineId, id);
@@ -277,6 +358,7 @@ export class Collaboration {
         : null,
     };
   }
+  /** Pull request `id` on the timeline, with its author's username; 404 when there is none. */
   async proposal(timelineId, id) {
     const { rows } = await this.pool.query(
       `SELECT ${PROPOSAL},u.username AS author FROM oc_proposals p JOIN oc_users u ON u.id=p.author_id
@@ -334,12 +416,21 @@ export class Collaboration {
       }
     return summary;
   }
+  /**
+   * The revisions a fork's pull request pins: its source, a saved (numbered) revision of the
+   * fork, and its base, the latest revision the fork and the upstream `timeline` have in
+   * common (commonAncestor walks oc_revision_parents from both). Refused unless `userId` may
+   * write the fork, the fork keeps saved history and is a fork of this timeline.
+   * @returns {Promise<{baseId: string, sourceId: string}>}
+   */
   async forkInput(client, timeline, userId, input) {
     const source = await this.store.access(input.sourceTimelineId, userId, client);
     if (!source.canWrite) throw new HttpError(403, 'Write access to the source fork is required.');
     if (!source.keep_history) throw new HttpError(409, FORK_PULLS_UNAVAILABLE);
     if (source.upstream_id !== timeline.id)
       throw new HttpError(400, 'Choose a fork of this upstream timeline.');
+    // A saved revision of the fork: in its history and numbered (not a detached revision,
+    // such as another pull request's source).
     const { rows } = await client.query(
       'SELECT id FROM oc_revisions WHERE id=$1 AND timeline_id=$2 AND number IS NOT NULL',
       [input.sourceRevisionId, source.id],
@@ -350,10 +441,21 @@ export class Collaboration {
       sourceId: input.sourceRevisionId,
     };
   }
+  /**
+   * Opens a pull request on `timelineId` by `userId` (contributor access), from a document
+   * edited at the timeline's current revision or from a fork's saved revision. A document is
+   * saved as a detached revision (store.recordDetached: outside the numbered history, its
+   * parent the head) and the head becomes its base. Refused when the timeline keeps no saved
+   * history, the document was edited from an older revision (409), or the author has 100
+   * open pull requests on it.
+   * @returns the new pull request, as get gives it
+   */
   async create(timelineId, userId, value) {
     const input = proposalInput(value),
       id = randomUUID();
     await this.store.transaction(async (c) => {
+      // Lock the timeline and the fork (FOR UPDATE, in id order so two transactions locking
+      // both cannot deadlock), so neither's head moves while the pull request is pinned.
       await lockTimelines(c, [
         timelineId,
         ...(input.sourceTimelineId ? [input.sourceTimelineId] : []),
@@ -368,6 +470,8 @@ export class Collaboration {
           409,
           'Upstream changed. Reload the latest timeline before starting a pull request.',
         );
+      // The author's open pull requests on this timeline, capped at 100; the timeline lock
+      // keeps two at once from both passing the count.
       const { rows } = await c.query(
         "SELECT count(*) AS count FROM oc_proposals WHERE timeline_id=$1 AND author_id=$2 AND status='open'",
         [timelineId, userId],
@@ -409,6 +513,14 @@ export class Collaboration {
     });
     return this.get(timelineId, id, userId);
   }
+  /**
+   * Replaces pull request `id`'s title, description and proposed changes; its author only,
+   * while it is open, and only from its current `revision` (409 otherwise). A document
+   * proposal keeps its base (rebase moves it) and saves the new document as a detached
+   * revision whose parent is the previous source; a fork's proposal re-pins to a newer saved
+   * revision of the same fork, with a fresh common ancestor as its base.
+   * @returns the pull request, as get gives it
+   */
   async update(timelineId, id, userId, value) {
     const input = proposalInput(value);
     revision(input.revision);
@@ -419,6 +531,7 @@ export class Collaboration {
       ]);
       const t = await this.store.access(timelineId, userId, c);
       if (input.document) await this.store.checkScripts(input.document.plugins, t.plugins);
+      // The pull request, locked so its revision check and update are one step.
       const { rows } = await c.query(
         `SELECT ${PROPOSAL} FROM oc_proposals p WHERE p.timeline_id=$1 AND p.id=$2 FOR UPDATE`,
         [timelineId, id],
@@ -456,6 +569,8 @@ export class Collaboration {
               p.base_revision_id,
             ),
           };
+      // Re-pins the revisions and bumps the pull request's own counter. A fork's proposal
+      // records the upstream revision counter it now stands on.
       await c.query(
         'UPDATE oc_proposals SET title=$3,body=$4,source_revision_id=$5,base_revision_id=$6,base_revision=$7,revision=revision+1,updated_at=now() WHERE timeline_id=$1 AND id=$2',
         [
@@ -471,11 +586,23 @@ export class Collaboration {
     });
     return this.get(timelineId, id, userId);
   }
+  /**
+   * Acts on open pull request `id`, from its current `revision` (409 otherwise):
+   * - `rebase` (its author): moves its base to the timeline's head, merging its changes into
+   *   the head entity by entity, saved as a new detached revision with both as parents.
+   * - `merge` (write access): applies its changes to the timeline as a new save whose parents
+   *   are the head and the source. A document proposal must be based on the current revision
+   *   (the author rebases first); a fork's is merged against its common ancestor.
+   * - `reject` (write access) or `close` (write access, or its author): closes it unmerged.
+   * The timeline is locked for the whole transaction, so a merge and a save cannot interleave.
+   * @returns the pull request, as get gives it
+   */
   async resolve(timelineId, id, userId, value) {
     if (!value || !['merge', 'reject', 'close', 'rebase'].includes(value.action))
       throw new HttpError(400, 'Choose merge, reject, close, or rebase.');
     revision(value.revision);
     await this.store.transaction(async (c) => {
+      // The timeline first, then the pull request, the order every writer here locks them in.
       await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [timelineId]);
       const t = await this.store.access(timelineId, userId, c);
       const { rows } = await c.query(
@@ -552,6 +679,8 @@ export class Collaboration {
                 await this.store.branchDocument(c, t),
               )
             : validateDocument(source);
+          // Revisions saved as whole documents: replace the timeline's content, bump its
+          // revision counter as a save does, and record the result as a merge checkpoint.
           await this.store.replace(c, timelineId, document);
           await c.query('UPDATE oc_timelines SET revision=revision+1 WHERE id=$1', [timelineId]);
           mergedId = await this.store.checkpoint(c, timelineId, userId, document, 'merge', parents);
@@ -559,6 +688,8 @@ export class Collaboration {
         mergedRevision = (BigInt(t.revision) + 1n).toString();
       }
       const status = { merge: 'merged', reject: 'rejected', close: 'closed' }[value.action];
+      // Closes the pull request, recording who resolved it and, for a merge, the timeline
+      // revision and saved revision it produced.
       await c.query(
         'UPDATE oc_proposals SET status=$3,resolved_by=$4,merged_revision=$5,merged_revision_id=$6,revision=revision+1,updated_at=now() WHERE timeline_id=$1 AND id=$2',
         [timelineId, id, status, userId, mergedRevision, mergedId],
@@ -566,12 +697,20 @@ export class Collaboration {
     });
     return this.get(timelineId, id, userId);
   }
+  /**
+   * Comments on pull request `id`, oldest first, fifty at a time after comment id `after` (a
+   * keyset cursor: ids only grow). `next` is the cursor for the next page, or null. 404 unless
+   * `userId` may see the timeline and the pull request.
+   * @returns {Promise<{comments: object[], next: string|null}>}
+   */
   async comments(timelineId, id, userId, after = '0') {
     await this.get(timelineId, id, userId);
     if (typeof after !== 'string' || !/^[0-9]{1,18}$/.test(after))
       throw new HttpError(400, 'Invalid comment cursor.');
     const { rows } = await this.pool.query(
-      // A comment moderators restricted (#115) keeps its place, without its text.
+      // A comment moderators restricted (#115) keeps its place, without its text: the LEFT
+      // JOIN finds a restricted case on it, if any. Fetches 51 rows to learn whether another
+      // page follows without counting.
       `SELECT c.id,CASE WHEN mc.id IS NULL THEN c.body ELSE '' END AS body,mc.id IS NOT NULL AS removed,
       c.created_at,u.username AS author,c.author_id=$3::uuid AS mine FROM oc_proposal_comments c JOIN oc_users u ON u.id=c.author_id
       LEFT JOIN oc_moderation_cases mc ON mc.target_kind='comment' AND mc.target_id=c.id::text AND mc.status='restricted'
@@ -591,10 +730,17 @@ export class Collaboration {
     if (!rowCount) throw new HttpError(404, 'You have no such comment here.');
     return { ok: true };
   }
+  /**
+   * Adds `userId`'s comment (1 to 20,000 characters, trimmed) to pull request `id`. Anyone who
+   * may see the timeline may comment; http.mjs requires a signed-in account, applies a rate
+   * limit and, when needed, the human-verification challenge first.
+   * @returns {Promise<{id: string}>} the new comment's id (a bigint, as a string)
+   */
   async comment(timelineId, id, userId, value) {
     if (typeof value?.body !== 'string' || !value.body.trim() || value.body.length > 20000)
       throw new HttpError(400, 'Comment must contain 1–20,000 characters.');
     return this.store.transaction(async (c) => {
+      // Locks the timeline, so a comment is not added while it is being deleted.
       await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [timelineId]);
       await this.store.access(timelineId, userId, c);
       const { rows } = await c.query('SELECT id FROM oc_proposals WHERE timeline_id=$1 AND id=$2', [
@@ -610,4 +756,5 @@ export class Collaboration {
     });
   }
 }
+/** Re-exported from merge.mjs for callers (and tests) that import it from here. */
 export { rebaseDocument } from './merge.mjs';

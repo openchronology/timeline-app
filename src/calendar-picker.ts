@@ -6,7 +6,17 @@ import { dayNumber, dateParts } from './calendar.js';
 import { parseNumber } from './numeric.js';
 import type { TimePresentation, PresentationContext } from './presentation.js';
 
-/** Calendar controls use exact arithmetic and the timeline's zone, never the host's Date. */
+/**
+ * Calendar controls use exact arithmetic and the timeline's zone, never the host's Date.
+ *
+ * Fills `host` with year/era, month, day, hour, minute and second fields and a month grid
+ * for `time`, a stored coordinate. Shown only for Gregorian presentations; otherwise `host`
+ * is emptied and hidden. Fields the current view makes obvious (`context.span`: the year
+ * within a year's view, the date within a day's, …) move into a collapsed "Expand calendar
+ * context" section but still count. Every committed change rebuilds the time from all
+ * fields and calls `change` with the new stored coordinate; invalid input shows a message
+ * in an alert region instead. `disabled` makes everything read-only.
+ */
 export function calendarPicker(
   host: HTMLElement,
   settings: TimePresentation | undefined,
@@ -18,9 +28,11 @@ export function calendarPicker(
   host.replaceChildren();
   host.hidden = settings?.mode !== 'gregorian';
   if (!settings || host.hidden) return;
+  // Work in displayed seconds, (stored − origin) / scale, and map back only on commit.
   const scale = Q.parse(settings.scale),
     origin = Q.parse(settings.origin);
   const coordinate = time.sub(origin).div(scale);
+  // The local fields of the whole second; group 7 is the zone suffix, reused on commit.
   const stamp = printTimestamp(coordinate.floor(), settings.offsetMinutes);
   const match = /^([+-]?\d+)-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(.*)$/.exec(stamp)!;
   const year = BigInt(match[1]);
@@ -33,11 +45,17 @@ export function calendarPicker(
   const summary = document.createElement('summary');
   summary.textContent = 'Expand calendar context';
   contextFields.append(summary);
+  // Thresholds match the adaptive labels: a day, a Julian year, an hour, a minute.
   const span = context.span.div(scale);
   const hideDate = span.compare(Q.from(86400n)) <= 0;
   const hideYear = span.compare(Q.from(31557600n)) < 0;
   const hideHour = span.compare(Q.from(3600n)) <= 0;
   const hideMinute = span.compare(Q.from(60n)) <= 0;
+  /**
+   * Adds a labelled input to `parent` and commits on `change` (not on every keystroke, so
+   * half-typed values aren't rejected). Year and Second are text fields: years may exceed
+   * what a number input holds exactly, and seconds may be exact fractions like `1/3`.
+   */
   function field(name: string, value: string, parent: HTMLElement, min?: string, max?: string) {
     const label = document.createElement('label');
     label.textContent = name;
@@ -53,6 +71,7 @@ export function calendarPicker(
     parent.append(label);
     input.addEventListener('change', commit);
   }
+  // The year field holds the BCE/CE year (always positive); astronomical 0 is 1 BCE.
   field('Year', String(year > 0n ? year : 1n - year), hideYear ? contextFields : calendar, '1');
   const eraLabel = document.createElement('label');
   eraLabel.textContent = 'Era';
@@ -81,6 +100,11 @@ export function calendarPicker(
   const grid = document.createElement('div');
   grid.className = 'calendar-day-picker';
   (hideDate ? contextFields : calendar).append(grid);
+  /**
+   * Redraws the month grid for the fields' year, era and month: previous/next month
+   * buttons, weekday headings (weeks start on Monday) and a button per day, the chosen one
+   * marked with aria-pressed. Draws nothing while the year or month is incomplete.
+   */
   function refreshGrid() {
     grid.replaceChildren();
     try {
@@ -89,6 +113,7 @@ export function calendarPicker(
       if (era.value === 'BCE') y = 1n - y;
       const m = BigInt(fields.get('Month')!.value);
       if (m < 1n || m > 12n) return;
+      // Day numbers count days from 1970-01-01; the next month's first day gives the length.
       const first = dayNumber(y, m, 1n),
         next = dayNumber(m === 12n ? y + 1n : y, m === 12n ? 1n : m + 1n, 1n);
       const bar = document.createElement('div');
@@ -115,6 +140,8 @@ export function calendarPicker(
         button.disabled = disabled;
         button.setAttribute('aria-label', step < 0n ? 'Previous month' : 'Next month');
         button.onclick = () => {
+          // The day before this month's first, or the next month's first, gives the month
+          // to move to, crossing years and eras without special cases.
           const [ny, nm] = dateParts(step < 0n ? first - 1n : next);
           fields.get('Year')!.value = String(ny > 0n ? ny : 1n - ny);
           era.value = ny > 0n ? 'CE' : 'BCE';
@@ -133,6 +160,8 @@ export function calendarPicker(
         label.textContent = weekday;
         cells.append(label);
       }
+      // Day 0 (1970-01-01) was a Thursday, index 3 from Monday; the double modulo keeps
+      // the result non-negative for days before 1970.
       const skip = Number((((first + 3n) % 7n) + 7n) % 7n);
       for (let i = 0; i < skip; i++) cells.append(document.createElement('span'));
       for (let d = 1n; d <= next - first; d++) {
@@ -141,6 +170,7 @@ export function calendarPicker(
         button.textContent = String(d);
         button.disabled = disabled;
         button.setAttribute('aria-label', 'Pick day ' + d);
+        // Compare numerically as well, so a zero-padded `05` marks day 5.
         button.setAttribute(
           'aria-pressed',
           String(
@@ -161,6 +191,7 @@ export function calendarPicker(
   refreshGrid();
   const error = document.createElement('p');
   error.className = 'form-error';
+  // Announced as soon as a message appears.
   error.setAttribute('role', 'alert');
   host.append(calendar, clock, contextFields, error);
   contextFields.hidden = !hideYear && !hideDate && !hideHour && !hideMinute;
@@ -171,6 +202,11 @@ export function calendarPicker(
     note.textContent = 'Fields hidden at this zoom level keep their current values.';
     contextFields.append(note);
   }
+  /**
+   * Rebuilds the stored time from every field (hidden ones included) as an ISO timestamp in
+   * the timeline's zone, adds the exact seconds, and maps it back through scale and origin.
+   * Reports invalid fields (an impossible date, seconds outside [0, 60)) in the error line.
+   */
   function commit() {
     refreshGrid();
     try {

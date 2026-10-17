@@ -11,8 +11,19 @@ import {
 } from 'node:crypto';
 import { HttpError } from './store.mjs';
 import { tokenHash } from './auth.mjs';
+/** A new 256-bit random secret in hex: OAuth state, PKCE verifier, OpenID nonce. */
 const secret = () => randomBytes(32).toString('hex');
+/**
+ * The S256 PKCE code challenge (RFC 7636) for `verifier`: sent with the authorization request,
+ * while the verifier is sent only with the server-side code exchange, so an authorization code
+ * intercepted on its way back is useless without it.
+ */
 export const pkce = (verifier) => createHash('sha256').update(verifier).digest('base64url');
+/**
+ * The configured identity providers from `env`: each of Google, GitHub and Facebook whose
+ * client ID and secret are both set (Facebook also needs OAUTH_FACEBOOK_GRAPH_VERSION). Throws
+ * at start-up on half a configuration rather than quietly disabling the provider.
+ */
 export function providersFromEnv(env = process.env) {
   const providers = {};
   for (const name of ['google', 'github', 'facebook']) {
@@ -33,6 +44,10 @@ export function providersFromEnv(env = process.env) {
 }
 /** Confidential authorization-code exchange; provider tokens never leave this module. */
 export class OAuth {
+  /**
+   * `auth` is the Auth instance; `providers` comes from providersFromEnv; `fetcher` is
+   * injectable for tests. `keys` caches Google's signing keys for an hour.
+   */
   constructor(auth, providers = {}, fetcher = fetch) {
     this.auth = auth;
     this.pool = auth.pool;
@@ -40,9 +55,15 @@ export class OAuth {
     this.fetch = fetcher;
     this.keys = null;
   }
+  /** The names of the configured providers, for the sign-in page's buttons. */
   names() {
     return Object.keys(this.providers);
   }
+  /**
+   * Fetches JSON from a provider: no redirects (a provider endpoint redirecting elsewhere is
+   * refused), a ten-second timeout, a 128 KiB cap enforced while reading (not only by the
+   * declared length), and a 502 for any failure, invalid JSON or `error` field.
+   */
   async json(url, options = {}) {
     let res;
     try {
@@ -73,6 +94,13 @@ export class OAuth {
       throw new HttpError(502, 'The identity provider could not complete sign-in.');
     return value;
   }
+  /**
+   * Starts a sign-in (or, with `input.link`, linking the provider to the signed-in account) with
+   * `provider`. Checks CSRF (the session's token, or the sign-in page's nonce when signed out);
+   * linking also needs a sign-in within five minutes. `input.returnTo` must be one of the app's
+   * own pages, so the flow cannot be used as an open redirect. Stores a one-use flow record and
+   * returns the provider's authorization URL and the `oc_oauth` browser cookie.
+   */
   async start(req, provider, input, session) {
     const config = this.providers[provider];
     if (!config) throw new HttpError(404, 'That sign-in provider is not configured.');
@@ -97,6 +125,11 @@ export class OAuth {
       browser = this.auth.nonce(req, 'oauth'),
       verifier = secret(),
       nonce = secret();
+    // Sweeps expired flows (oc_oauth_expiry), then records this one for ten minutes, keyed by
+    // the hash of its state. It is bound to the browser by the hash of the `oc_oauth` cookie, so
+    // a callback URL carried to another browser fails (login CSRF). The PKCE verifier and nonce
+    // are kept here, server-side only. A link flow remembers the account and the exact session
+    // that started it.
     await this.pool.query('DELETE FROM oc_oauth_flows WHERE expires_at<=now()');
     await this.pool.query(
       "INSERT INTO oc_oauth_flows(state_hash,browser_hash,provider,verifier,nonce,return_to,link_user,link_session,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,now()+interval '10 minutes')",
@@ -132,6 +165,8 @@ export class OAuth {
             : 'public_profile',
     }))
       url.searchParams.set(key, value);
+    // Facebook's login dialog does not take PKCE; its exchange is protected by the client
+    // secret, and its identity call by appsecret_proof (callback).
     if (provider !== 'facebook') {
       url.searchParams.set('code_challenge', pkce(verifier));
       url.searchParams.set('code_challenge_method', 'S256');
@@ -139,6 +174,14 @@ export class OAuth {
     if (provider === 'google') url.searchParams.set('nonce', nonce);
     return { url: url.href, cookie: this.auth.nonceCookie('oauth', browser) };
   }
+  /**
+   * Verifies a Google ID token and returns its subject (the stable Google account id). Checks:
+   * RS256 only (refusing `none` or HMAC algorithm confusion), a signature by one of Google's
+   * published keys (refetched when the cache is an hour old or lacks the token's key id), the
+   * issuer, the audience (this app's client id), the nonce stored with the flow (binding the token
+   * to this sign-in), expiry, an issue time not in the future (a minute's tolerance) and a
+   * well-formed subject. Throws 502 on any failure.
+   */
   async googleClaims(token, config, nonce) {
     if (typeof token !== 'string' || token.length > 32768)
       throw new HttpError(502, 'Invalid Google identity token.');
@@ -186,12 +229,23 @@ export class OAuth {
       throw new HttpError(502, 'Google identity verification failed.');
     return claims.sub;
   }
+  /**
+   * The provider's redirect back. Spends the flow record matching `state` and this browser,
+   * exchanges the authorization code (with the PKCE verifier and client secret) for tokens,
+   * verifies the identity, and either signs in (finishPrimary, which may ask for two-factor
+   * authentication or an email) or links the identity to the account that started the flow.
+   * Provider tokens are used only here and then discarded. Result: the session or challenge and
+   * where to go next; `cancelled` when the person declined at the provider.
+   */
   async callback(req, provider, query) {
     const config = this.providers[provider],
       state = query.get('state'),
       browser = this.auth.readCookie(req, `${this.auth.secure ? '__Host-' : ''}oc_oauth`);
     if (!config || !/^[a-f0-9]{64}$/.test(state ?? '') || !/^[a-f0-9]{64}$/.test(browser ?? ''))
       throw new HttpError(400, 'Sign-in state is missing or invalid.');
+    // Spends the flow in the same statement that finds it (DELETE … RETURNING), so a state can
+    // be used once even by concurrent callbacks; it must match this browser's cookie, this
+    // provider and be unexpired.
     const { rows } = await this.pool.query(
       'DELETE FROM oc_oauth_flows WHERE state_hash=$1 AND browser_hash=$2 AND provider=$3 AND expires_at>now() RETURNING *',
       [tokenHash(state), tokenHash(browser), provider],
@@ -201,6 +255,8 @@ export class OAuth {
     if (query.has('error')) return { returnTo: flow.return_to, cancelled: true };
     const code = query.get('code');
     if (!code || code.length > 4096) throw new HttpError(400, 'Missing authorization code.');
+    // Linking needs the very session that started it, still signed in, so a link cannot be
+    // completed into an account by someone else's browser or after a sign-out.
     if (flow.link_user) {
       const session = await this.auth.session(req);
       if (session?.id !== flow.link_user || session.token_hash !== flow.link_session)
@@ -242,6 +298,8 @@ export class OAuth {
           ? 'https://api.github.com/user'
           : `https://graph.facebook.com/${config.version}/me`,
       );
+      // appsecret_proof (an HMAC of the access token with the app secret) proves the call
+      // comes from this app's server, as Facebook's secure-requests guide recommends.
       if (provider === 'facebook') {
         identityUrl.searchParams.set('fields', 'id');
         identityUrl.searchParams.set(
@@ -275,10 +333,20 @@ export class OAuth {
         : flow.return_to,
     };
   }
+  /**
+   * The account for the provider identity (`provider`, `subject`), in one transaction. Accounts
+   * are found only by this pair, never by email, so a matching address at a provider never
+   * grants access to an account. With `linkUser`, the identity is attached to that account
+   * (refused with 409 if it belongs to another, or if the account already has a different
+   * identity at that provider, from the UNIQUE(user_id,provider) constraint). Without it, an
+   * unknown identity gets a new account with a generated username and no password; it has no
+   * confirmed email yet, so it must give one before it can have a session.
+   */
   async identity(provider, subject, linkUser) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
+      // The account already holding this identity, if any (primary key provider, subject).
       const existing = await client.query(
         'SELECT u.id,u.username FROM oc_identities i JOIN oc_users u ON u.id=i.user_id WHERE i.provider=$1 AND i.subject=$2',
         [provider, subject],
@@ -300,6 +368,9 @@ export class OAuth {
               [id, `${provider}_${randomBytes(8).toString('hex')}`],
             )
           ).rows[0];
+        // Claims the identity. If a concurrent callback for the same identity won the race,
+        // DO NOTHING returns no row: the account just created is removed again and the winner's
+        // account is used instead.
         const inserted = await client.query(
           'INSERT INTO oc_identities(provider,subject,user_id) VALUES($1,$2,$3) ON CONFLICT(provider,subject) DO NOTHING RETURNING user_id',
           [provider, subject, id],
@@ -323,6 +394,8 @@ export class OAuth {
       return user;
     } catch (error) {
       await client.query('ROLLBACK');
+      // unique_violation: UNIQUE(user_id,provider), the account already links another identity
+      // at this provider.
       if (error.code === '23505')
         throw new HttpError(
           409,

@@ -23,11 +23,15 @@ import { indexReader } from './index-versions.mjs';
 import { canonical, timelineSettings } from './incremental.mjs';
 import { mergeValue, SETTINGS } from './merge.mjs';
 
+/** An entity ID as the application allows them (see docs/architecture.md). */
 const ENTITY = /^[A-Za-z0-9_.:-]{1,128}$/;
 
 /**
  * `value` (a request's `base`) as `{settings, moments, durations}`: settings an object (of
  * any of SETTINGS), moments and durations maps from ID to the version seen (null for none).
+ * Null when the request sent none (the save applies as it is). Throws 400 for a malformed
+ * base: not an object, more than 5,000 entries of a kind, an invalid or repeated ID, a
+ * version that is not an object or null, or a setting outside SETTINGS.
  */
 export function saveBase(value) {
   if (value === undefined) return null;
@@ -86,6 +90,9 @@ function mergeEntity(before, mine, head) {
 /**
  * `patch` (with `base`, saveBase) rebased onto timeline `t`'s current head: the changes to
  * apply, without `base`. Throws 409 naming the conflicts, if any.
+ * `c` is the save's transaction, with `t` (the timeline row) locked, so the head read here is
+ * the one the changes apply to. Reads only the moments and durations the base names, by key
+ * through the timeline's levels; writes nothing.
  */
 export async function rebaseSave(c, t, patch) {
   const { base } = patch;
@@ -94,6 +101,7 @@ export async function rebaseSave(c, t, patch) {
   const title = (...versions) => versions.find((v) => v?.metadata?.title)?.metadata.title || null;
 
   const momentIds = patch.changes.filter((ch) => base.moments.has(ch.id)).map((ch) => ch.id);
+  // The head's version of each moment the base names, looked up by key (indexReader).
   const savedMoments = new Map(
     momentIds.length
       ? (
@@ -123,6 +131,8 @@ export async function rebaseSave(c, t, patch) {
   const durationIds = (patch.durationChanges ?? [])
     .filter((ch) => base.durations.has(ch.id))
     .map((ch) => ch.id);
+  // The head's definition of each duration the base names, by its band's ID: a lookup per
+  // key on the expression index (timeline_id, band->>'id'), OFFSET 0 keeping it one.
   const savedDurations = new Map(
     durationIds.length
       ? (
@@ -152,6 +162,8 @@ export async function rebaseSave(c, t, patch) {
     else if (!same(duration, head)) durationChanges.push({ id: change.id, duration });
   }
 
+  // Settings merge one by one, only those the editor reported seeing; assets merge image by
+  // image (field by field), the others as whole values.
   const saved = timelineSettings(t),
     settings = { ...patch.settings };
   for (const key of SETTINGS) {
