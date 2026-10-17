@@ -818,15 +818,26 @@ export class AccountSecurity {
         await c.query("DELETE FROM oc_email_tokens WHERE user_id=$1 AND purpose='change'", [
           user.id,
         ]);
-        await c.query(
-          "INSERT INTO oc_email_tokens(token_hash,user_id,purpose,email,old_email,browser_hash,expires_at) VALUES($1,$2,'change',$3,$4,$5,now()+interval '24 hours')",
-          [digest(token), user.id, email, user.email, digest(proof)],
-        );
-        await queueMail(c, this.key, {
-          to: email,
-          subject: 'Confirm your new OpenChronology email',
-          text: `Confirm your new email in the requesting browser:\n${this.auth.origin}/login#verify=${token}\nThis link expires in 24 hours.`,
-        });
+        // Another account has the new address (oc_users_email, case-insensitive): no link,
+        // which could never be confirmed (#193). The answer is the generic one either way, so
+        // it does not reveal the address; confirmation still refuses one taken meanwhile.
+        const taken = (
+          await c.query('SELECT id FROM oc_users WHERE lower(email)=$1 AND id!=$2', [
+            email,
+            user.id,
+          ])
+        ).rows.length;
+        if (!taken) {
+          await c.query(
+            "INSERT INTO oc_email_tokens(token_hash,user_id,purpose,email,old_email,browser_hash,expires_at) VALUES($1,$2,'change',$3,$4,$5,now()+interval '24 hours')",
+            [digest(token), user.id, email, user.email, digest(proof)],
+          );
+          await queueMail(c, this.key, {
+            to: email,
+            subject: 'Confirm your new OpenChronology email',
+            text: `Confirm your new email in the requesting browser:\n${this.auth.origin}/login#verify=${token}\nThis link expires in 24 hours.`,
+          });
+        }
         await this.notify(
           c,
           user,

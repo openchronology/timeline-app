@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { CompareTray } from './compare-selection.jsx';
 import { notFound } from 'next/navigation';
-import { accountCompareLimit, currentSession } from '../lib/session.js';
+import { accountCompareLimit, currentSession, userCompareLimit } from '../lib/session.js';
 import { searchTimelines } from '../../server/collaboration.mjs';
 import TimelineList from './timeline-list.jsx';
 import { siteName } from '../lib/sharing.js';
@@ -58,7 +58,11 @@ export default async function Profile({ username, searchParams }) {
       {current.user?.username !== username && (
         <ReportLink target={{ kind: 'user', id: username }} title={'@' + username} />
       )}
-      <CompareTray limit={accountCompareLimit(current)} signedIn={!!current.user} />
+      <CompareTray
+        limit={accountCompareLimit(current)}
+        userLimit={userCompareLimit(current)}
+        signedIn={!!current.user}
+      />
       <section>
         <h2>Public timelines</h2>
         <TimelineList

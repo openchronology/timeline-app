@@ -296,6 +296,18 @@ export class Administration {
               ' WHERE id=$1',
             [id, ...fields.map((f) => changes[f])],
           );
+        // Re-enabling an account lifts a moderation restriction on it too (#193), as lifting
+        // the case would: otherwise it stays without standing and in the restricted queue,
+        // and a later lift could undo a suspension made since. A review awaiting decision is
+        // decided as lifted, as in moderation.mjs.
+        if (changes.is_disabled === false && target.is_disabled)
+          await c.query(
+            `UPDATE oc_moderation_cases SET status='lifted',
+            appeal_outcome=CASE WHEN appealed_at IS NOT NULL AND appeal_decided_at IS NULL THEN 'lifted' ELSE appeal_outcome END,
+            appeal_decided_at=CASE WHEN appealed_at IS NOT NULL AND appeal_decided_at IS NULL THEN now() ELSE appeal_decided_at END
+            WHERE target_kind='user' AND target_id=$1::text AND status='restricted'`,
+            [id],
+          );
         // What ranks its timelines and weighs its stars follows (#103; standing.mjs).
         if (['is_admin', 'is_disabled', 'trust'].some((field) => field in changes))
           await refreshAccounts(c, [id]);

@@ -68,6 +68,8 @@ interface Host {
   user(): { id: string; username: string } | null;
   /** Whether the server in use is reachable. */
   server(): boolean;
+  /** How many timelines this account may compare at once (default 8). */
+  compareLimit?(): number;
   /** Whether guests may fork public timelines into the browser (default true). */
   guestCopies?(): boolean;
   /** The server timeline open in the editor, with this account's permissions on it. */
@@ -158,17 +160,21 @@ export function createCommunityUI(host: Host) {
     timer: ReturnType<typeof setTimeout> | undefined;
   /** Timeline IDs chosen for comparison; kept across pages and searches in this tab. */
   const compared = new Set<string>();
+  /** How many timelines this account may compare at once: by default four for guests. */
+  const compareLimit = () => host.compareLimit?.() ?? 8;
   /**
    * Redraws the comparison count, enables Compare from two timelines, and disables unchecked
-   * boxes once eight are chosen: the most any account may compare. The account's own
-   * limit (by default four for guests), unlike in the comparison dialog, is not applied here.
+   * boxes once the account's limit is chosen.
    */
   const compareSelection = () => {
-    text('dashboard-compare-count', `${compared.size} selected for comparison`);
+    text(
+      'dashboard-compare-count',
+      `${compared.size} selected for comparison (up to ${compareLimit()})`,
+    );
     el<HTMLButtonElement>('dashboard-compare').disabled = compared.size < 2;
     for (const box of document.querySelectorAll<HTMLInputElement>('[data-compare-id]')) {
       box.checked = compared.has(box.dataset.compareId!);
-      box.disabled = compared.size >= 8 && !box.checked;
+      box.disabled = compared.size >= compareLimit() && !box.checked;
     }
   };
   el('dashboard-compare').onclick = () => host.compare?.([...compared]);
@@ -254,7 +260,7 @@ export function createCommunityUI(host: Host) {
       checkbox.type = 'checkbox';
       checkbox.dataset.compareId = t.id;
       checkbox.checked = compared.has(t.id);
-      checkbox.disabled = compared.size >= 8 && !checkbox.checked;
+      checkbox.disabled = compared.size >= compareLimit() && !checkbox.checked;
       // Comparisons are of one server's timelines: the server in use's.
       if (!t.source.inUse) {
         checkbox.disabled = true;
@@ -262,7 +268,7 @@ export function createCommunityUI(host: Host) {
         label.title = 'Use this timeline’s server to compare its timelines.';
       }
       checkbox.onchange = () => {
-        if (checkbox.checked && compared.size < 8) compared.add(t.id);
+        if (checkbox.checked && compared.size < compareLimit()) compared.add(t.id);
         else compared.delete(t.id);
         compareSelection();
       };

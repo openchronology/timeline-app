@@ -89,13 +89,13 @@ export default function AccountAccess({ session, account, refresh }) {
           : Number(account?.usage?.effective_quota_bytes ?? 0).toLocaleString() + ' byte limit'}
       </p>
       {avatar && (
-        // The preview loads the address without credentials (a CORS request) and without a
-        // Referer, so the image's host learns nothing about the account page.
+        // The preview loads the address without a Referer, so the image's host learns nothing
+        // about the account page. Not as a CORS request: most image hosts send no CORS headers,
+        // and such an image would not show (#193).
         <img
           className="account-avatar"
           src={avatar}
           alt="Your avatar"
-          crossOrigin="anonymous"
           referrerPolicy="no-referrer"
         />
       )}

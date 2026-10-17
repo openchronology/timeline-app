@@ -3,7 +3,7 @@
 // the public timelines to search and browse.
 import Link from 'next/link';
 import TimelineSearch from '../components/timeline-search.jsx';
-import { accountCompareLimit, currentSession } from '../lib/session.js';
+import { accountCompareLimit, currentSession, userCompareLimit } from '../lib/session.js';
 import { searchTimelines } from '../../server/collaboration.mjs';
 import { CompareTray } from '../components/compare-selection.jsx';
 import TimelineList from '../components/timeline-list.jsx';
@@ -57,6 +57,7 @@ export default async function Dashboard({ searchParams }) {
   // A guest's defaults, until the session says otherwise (and if reading it fails).
   let user = null,
     compareLimit = 8,
+    userLimit = 8,
     mine,
     publicResults,
     favorites,
@@ -65,6 +66,7 @@ export default async function Dashboard({ searchParams }) {
     const current = await currentSession();
     user = current.user;
     compareLimit = accountCompareLimit(current);
+    userLimit = userCompareLimit(current);
     if (!current.services.pool)
       error = 'Server storage is unavailable. You can create or import a local timeline.';
     else
@@ -106,7 +108,7 @@ export default async function Dashboard({ searchParams }) {
         <h1>Timelines</h1>
       </div>
       {/* The timelines picked to compare, from any of the lists below. */}
-      <CompareTray limit={compareLimit} signedIn={!!user} />
+      <CompareTray limit={compareLimit} userLimit={userLimit} signedIn={!!user} />
       {user && <BrowserDrafts userId={user.id} />}
       {user && (
         <section id="dashboard-mine">

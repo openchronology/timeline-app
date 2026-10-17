@@ -298,8 +298,8 @@ async fn desktop_restore_baseline(
 /// Lets the user pick a timeline file (`.och`, `.sqlite`) and copies it into a new baseline.
 ///
 /// Opening has two steps so a file the editor rejects never replaces the open one: this
-/// command leaves the new baseline pending and returns its header, with the generation it will
-/// have; the editor validates the header and then calls `desktop_accept_open`. Resolves to
+/// command leaves the new baseline pending and returns its header; the editor validates the
+/// header and then calls `desktop_accept_open`, which answers with the generation it has. Resolves to
 /// None when the dialog is cancelled. Errors when the file is not a valid timeline, or changed
 /// while being copied (its stamp is compared before and after).
 #[tauri::command]
@@ -401,9 +401,11 @@ async fn desktop_stage(app: tauri::AppHandle, document: Document) -> Result<Open
 /// Makes the pending file (from `desktop_open`, `desktop_import` or `desktop_stage`) the open
 /// one, once the editor has accepted its header. `path` must be the pending one's, so a reply
 /// to an older open cannot accept a newer one. Bumps the generation and forgets the undo
-/// baselines of the previous file.
+/// baselines of the previous file. Resolves to the new generation: the one the open reply
+/// gave is only a guess, since a save or restore of the previous file may finish in between
+/// (#193).
 #[tauri::command]
-async fn desktop_accept_open(app: tauri::AppHandle, path: String) -> Result<(), String> {
+async fn desktop_accept_open(app: tauri::AppHandle, path: String) -> Result<u64, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<Mutex<Files>>();
         let mut files = state.lock().map_err(|e| e.to_string())?;
@@ -417,7 +419,7 @@ async fn desktop_accept_open(app: tauri::AppHandle, path: String) -> Result<(), 
         files.stamp = Some(stamp);
         files.generation += 1;
         files.forget_kept();
-        Ok(())
+        Ok(files.generation)
     })
     .await
     .map_err(|e| e.to_string())?

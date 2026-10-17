@@ -337,8 +337,13 @@ export function createRequestHandler({
       "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
     );
     try {
-      const pathname = new URL(req.url, origin).pathname,
-        method = req.method;
+      let pathname;
+      try {
+        pathname = new URL(req.url, origin).pathname;
+      } catch {
+        throw new HttpError(400, 'Invalid request path.');
+      }
+      const method = req.method;
       // API keys reach only the timeline endpoints, refused before anything else is read.
       if (
         (req.headers.authorization ?? '').startsWith('Bearer och_key_') &&
@@ -1725,7 +1730,14 @@ export function createRequestHandler({
               error instanceof TypeError
             ? 400
             : 500);
-      if (status === 500 || error.code === '57014') console.error(error);
+      // A 400 from a TypeError, RangeError or SyntaxError rather than an HttpError is logged
+      // too: it is usually input a handler did not check, but may be a bug (#193).
+      if (
+        status === 500 ||
+        error.code === '57014' ||
+        (status === 400 && error.status === undefined && error.code === undefined)
+      )
+        console.error(error);
       response(res, status, {
         error:
           status === 500

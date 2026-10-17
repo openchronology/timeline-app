@@ -44,12 +44,13 @@ CREATE TABLE IF NOT EXISTS oc_users (
 --   (desktop); the token itself is never stored, so the table yields no usable sessions.
 --   csrf: the token mutation requests must echo in X-CSRF-Token.
 --   expires_at: 14 days after sign-in; a session idle for a day also ends (last_seen_at).
--- Ending an account's sessions (DELETE ... WHERE user_id, on password and two-factor changes,
--- suspension) has no index leading with user_id and reads the table.
 CREATE TABLE IF NOT EXISTS oc_sessions (
   token_hash text PRIMARY KEY, user_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE,
   csrf text NOT NULL, expires_at timestamptz NOT NULL
 );
+-- Ending an account's sessions (DELETE ... WHERE user_id, on password and two-factor changes,
+-- suspension, an email change) and the cascade from oc_users (#193).
+CREATE INDEX IF NOT EXISTS oc_sessions_user ON oc_sessions(user_id);
 -- Expired-session sweep: expires_at<=now() in auth.mjs issue (with oc_sessions_idle).
 CREATE INDEX IF NOT EXISTS oc_sessions_expiry ON oc_sessions(expires_at);
 -- Upgrades, each a no-op once applied (existing rows take the defaults):
@@ -146,7 +147,7 @@ ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS plugins jsonb;
 -- Collaborators the owner invites (http.mjs members routes; store.mjs and collaboration.mjs
 -- check access by the primary key). The owner is no member. Roles are upgraded below to
 -- viewer, contributor or writer. Listing the timelines shared with an account filters on
--- user_id alone, which no index leads with.
+-- user_id alone (oc_members_user, at the end).
 CREATE TABLE IF NOT EXISTS oc_members (
   timeline_id uuid NOT NULL REFERENCES oc_timelines ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE,
@@ -324,6 +325,8 @@ BEGIN
     -- Pop the top entry: a node, standing for its own time only (point) or its subtree.
     idx:=cardinality(ids); nid:=ids[idx]; point:=points[idx]; ids:=ids[1:idx-1]; points:=points[1:idx-1];
     SELECT node.time,node.left_id,node.right_id,node.first_time,node.last_time,node.moment_ids INTO n FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=nid;
+    -- A node or moment the index names but cannot find, as in oc_overview_v2 (#193).
+    IF NOT FOUND THEN RAISE EXCEPTION 'Broken timeline index'; END IF;
     -- Prune subtrees outside the window or wholly before the cursor's time.
     IF (lo IS NOT NULL AND n.last_time<lo) OR (hi IS NOT NULL AND n.first_time>hi)
       OR (after_time IS NOT NULL AND n.last_time<after_time) THEN CONTINUE; END IF;
@@ -333,6 +336,7 @@ BEGIN
       -- One primary-key lookup per moment, in the node's ID order.
       FOR mid IN SELECT unnest(n.moment_ids) LOOP
         SELECT m.event INTO e FROM oc_moments m WHERE m.timeline_id=tid AND m.id=mid;
+        IF NOT FOUND THEN RAISE EXCEPTION 'Broken timeline index'; END IF;
         -- At the cursor's time, IDs up to and including after_id were on earlier pages.
         IF after_time IS NOT NULL AND n.time=after_time AND (e->>'id') COLLATE "C"<=after_id COLLATE "C" THEN CONTINUE; END IF;
         -- Stop as soon as the page is full: nothing past it is read.
@@ -778,8 +782,8 @@ CREATE TRIGGER oc_storage_charge AFTER INSERT OR UPDATE OR DELETE ON oc_storage_
 --   or nothing without content), charged to its author for pull request sources and rebases,
 --   else to the timeline's owner (or the author once the timeline is gone);
 --   oc_proposals: stored documents, body and title; oc_proposal_comments: the body.
--- Its oc_plugins branch is unused: plugins (and suites) have their own functions below,
--- whose ledger key is "id/version". Rows without an account to charge get no entry.
+-- Plugins (and suites) have their own functions below, whose ledger key is "id/version".
+-- Rows without an account to charge get no entry.
 CREATE OR REPLACE FUNCTION oc_track_storage() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE uid uuid; n bigint; key text; v_kind text:=TG_TABLE_NAME;
 BEGIN
@@ -799,7 +803,6 @@ BEGIN
     ELSE SELECT document_bytes INTO n FROM oc_snapshots WHERE id=NEW.snapshot_id; END IF;
   ELSIF TG_TABLE_NAME='oc_proposals' THEN uid:=NEW.author_id; n:=coalesce(octet_length(NEW.document::text),0)+coalesce(octet_length(NEW.base_document::text),0)+octet_length(NEW.body)+octet_length(NEW.title);
   ELSIF TG_TABLE_NAME='oc_proposal_comments' THEN uid:=NEW.author_id; n:=octet_length(NEW.body);
-  ELSIF TG_TABLE_NAME='oc_plugins' THEN uid:=NEW.owner_id; n:=octet_length(NEW.manifest::text); key:=NEW.id||'/'||NEW.version;
   END IF;
   -- An update (a timeline's new size, a revision forgetting its content) replaces the size.
   IF uid IS NOT NULL THEN INSERT INTO oc_storage_entries(kind,entry_id,user_id,bytes) VALUES(v_kind,key,uid,coalesce(n,0)) ON CONFLICT(kind,entry_id) DO UPDATE SET bytes=excluded.bytes; END IF;
@@ -1281,7 +1284,7 @@ CREATE INDEX IF NOT EXISTS oc_edge_nodes_edge_id ON oc_edge_nodes(timeline_id,(b
 -- full snapshot written periodically so reading any revision replayed a bounded chain. Since
 -- history is kept as rows (below), saves write neither; revisions saved as patches still read
 -- back by replaying them. patch_chain and patch_bytes counted the patches since the last
--- snapshot; nothing uses them any more.
+-- snapshot, and are dropped (#193).
 ALTER TABLE oc_revisions ALTER COLUMN snapshot_id DROP NOT NULL;
 ALTER TABLE oc_revisions ADD COLUMN IF NOT EXISTS patch jsonb;
 -- Size of the revision's whole document as exported JSON (an upper-bound estimate for patches).
@@ -1289,8 +1292,7 @@ ALTER TABLE oc_revisions ADD COLUMN IF NOT EXISTS document_bytes bigint CHECK(do
 -- Which content a revision has is checked below, once revisions can also be kept as rows.
 ALTER TABLE oc_revisions DROP CONSTRAINT IF EXISTS oc_revisions_content;
 -- (Unused since history is kept as rows; see above.)
-ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS patch_chain integer NOT NULL DEFAULT 0;
-ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS patch_bytes bigint NOT NULL DEFAULT 0;
+ALTER TABLE oc_timelines DROP COLUMN IF EXISTS patch_chain, DROP COLUMN IF EXISTS patch_bytes;
 -- Saves update the timeline row once; free space on each page keeps those updates in place
 -- (HOT), so the catalogue's GIN index over the whole timeline's text is not rewritten.
 ALTER TABLE oc_timelines SET (fillfactor=50);
@@ -2069,3 +2071,26 @@ CREATE TABLE IF NOT EXISTS oc_timeline_former_slugs (
 );
 -- A timeline's former slugs, found when it is deleted (the cascade).
 CREATE INDEX IF NOT EXISTS oc_timeline_former_slugs_timeline ON oc_timeline_former_slugs(timeline_id);
+-- Indexes for what is searched by account, by revision or by expiry (#193), added once the
+-- tables have all their columns:
+-- an account's members, device sign-ins, challenges and email links (ending them on a
+-- password, two-factor or email change, a suspension, and the cascade from oc_users);
+CREATE INDEX IF NOT EXISTS oc_members_user ON oc_members(user_id);
+CREATE INDEX IF NOT EXISTS oc_device_logins_user ON oc_device_logins(user_id);
+CREATE INDEX IF NOT EXISTS oc_auth_challenges_user ON oc_auth_challenges(user_id);
+CREATE INDEX IF NOT EXISTS oc_email_tokens_user ON oc_email_tokens(user_id);
+-- pending registrations for a name or address (confirming one uses up the others);
+CREATE INDEX IF NOT EXISTS oc_registrations_username ON oc_registrations(username);
+CREATE INDEX IF NOT EXISTS oc_registrations_email ON oc_registrations(email);
+-- the expiry sweeps (mail.mjs, account-security.mjs);
+CREATE INDEX IF NOT EXISTS oc_mail_outbox_expiry ON oc_mail_outbox(expires_at);
+CREATE INDEX IF NOT EXISTS oc_mfa_setups_expiry ON oc_mfa_setups(expires_at);
+CREATE INDEX IF NOT EXISTS oc_age_refusals_expiry ON oc_age_refusals(expires_at);
+-- the revisions forks and pull requests refer to, and the snapshots revisions keep, which
+-- deciding what history is still read searches (store.mjs STILL_READ, removeHistory;
+-- retention.mjs). Heads have none: they change on every save, which stays a HOT update.
+CREATE INDEX IF NOT EXISTS oc_timelines_fork_base ON oc_timelines(fork_base_revision_id) WHERE fork_base_revision_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS oc_proposals_base_revision ON oc_proposals(base_revision_id);
+CREATE INDEX IF NOT EXISTS oc_proposals_source_revision ON oc_proposals(source_revision_id) WHERE source_revision_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS oc_proposals_merged_revision ON oc_proposals(merged_revision_id) WHERE merged_revision_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS oc_revisions_snapshot ON oc_revisions(snapshot_id) WHERE snapshot_id IS NOT NULL;

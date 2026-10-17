@@ -14,6 +14,7 @@
 //! 101 `SQLITE_DONE`), column type 5 `SQLITE_NULL`, and limit IDs (0 `SQLITE_LIMIT_LENGTH`,
 //! 1 `SQLITE_LIMIT_SQL_LENGTH`, 2 `SQLITE_LIMIT_COLUMN`, 3 `SQLITE_LIMIT_EXPR_DEPTH`).
 use std::{
+    cell::Cell,
     ffi::{c_char, c_int, c_void, CStr, CString},
     marker::PhantomData,
     path::Path,
@@ -75,16 +76,19 @@ pub struct Connection {
     /// Remaining progress-handler ticks (each 1000 virtual-machine instructions) before SQLite
     /// interrupts the running statement; boxed so the pointer handed to SQLite stays valid when
     /// the `Connection` moves. Only consulted once a budget is installed (`limit_reads`, or
-    /// `OCH_CONVERSION_LIMITS=1` at open). It is not reset per statement, so it bounds the total
-    /// work done on the connection, not each query.
-    _budget: Box<u64>,
+    /// `OCH_CONVERSION_LIMITS=1` at open). Refilled for each statement, so it bounds each
+    /// query, not the whole conversion: one budget for every insert of a large file ran out
+    /// near 10,000 moments (#193).
+    _budget: Box<Cell<u64>>,
 }
+/// Progress-handler ticks per statement: about 20 million instructions.
+const BUDGET: u64 = 20000;
 /// SQLite's progress callback: counts down the connection's budget and returns non-zero
 /// (interrupting the statement with `SQLITE_INTERRUPT`) once it reaches zero.
 unsafe extern "C" fn progress(context: *mut c_void) -> c_int {
-    let remaining = &mut *context.cast::<u64>();
-    *remaining = remaining.saturating_sub(1);
-    if *remaining == 0 {
+    let remaining = &*context.cast::<Cell<u64>>();
+    remaining.set(remaining.get().saturating_sub(1));
+    if remaining.get() == 0 {
         1
     } else {
         0
@@ -143,9 +147,9 @@ impl Connection {
         if raw.is_null() {
             return Err("Could not open SQLite file".into());
         }
-        let mut db = Self {
+        let db = Self {
             raw,
-            _budget: Box::new(20000),
+            _budget: Box::new(Cell::new(BUDGET)),
         };
         if result != 0 {
             return Err(db.error());
@@ -157,12 +161,7 @@ impl Connection {
                 sqlite3_limit(raw, 1, 100000);
                 sqlite3_limit(raw, 2, 128);
                 sqlite3_limit(raw, 3, 128);
-                sqlite3_progress_handler(
-                    raw,
-                    1000,
-                    Some(progress),
-                    (&mut *db._budget as *mut u64).cast(),
-                );
+                sqlite3_progress_handler(raw, 1000, Some(progress), db._budget.as_ptr().cast());
             }
         }
         if unsafe { sqlite_rational_register(raw) } != 0 {
@@ -175,23 +174,18 @@ impl Connection {
         db.execute("PRAGMA temp_store=FILE", &[])?;
         Ok(db)
     }
-    /// Applies the same limits as `OCH_CONVERSION_LIMITS` to this connection and refills its
-    /// instruction budget (20000 ticks of 1000 instructions, about 20 million in all). The
-    /// desktop app uses it for browsing queries, so one viewport request cannot pin a CPU or
-    /// build huge results however the file was crafted.
+    /// Applies the same limits as `OCH_CONVERSION_LIMITS` to this connection and installs its
+    /// instruction budget (BUDGET ticks of 1000 instructions, about 20 million per statement).
+    /// The desktop app uses it for browsing queries, so one viewport request cannot pin a CPU
+    /// or build huge results however the file was crafted.
     pub fn limit_reads(&mut self) {
         unsafe {
             sqlite3_limit(self.raw, 0, 32 * 1024 * 1024);
             sqlite3_limit(self.raw, 1, 100000);
             sqlite3_limit(self.raw, 2, 128);
             sqlite3_limit(self.raw, 3, 128);
-            *self._budget = 20000;
-            sqlite3_progress_handler(
-                self.raw,
-                1000,
-                Some(progress),
-                (&mut *self._budget as *mut u64).cast(),
-            );
+            self._budget.set(BUDGET);
+            sqlite3_progress_handler(self.raw, 1000, Some(progress), self._budget.as_ptr().cast());
         }
     }
     /// SQLite's message for the connection's most recent failure.
@@ -271,6 +265,8 @@ impl Connection {
             raw,
             _db: PhantomData,
         };
+        // Each statement has the whole budget.
+        self._budget.set(BUDGET);
         for (i, value) in parameters.iter().enumerate() {
             let len: c_int = value
                 .len()

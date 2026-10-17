@@ -320,7 +320,7 @@ export const schemas = {
   TimelineMetadata: {
     type: 'object',
     description:
-      'A timeline as the caller may see it, with what they may do. It also carries internal fields of the server’s index (such as `root`, `index_version`, `duration_root`, `edge_root`, `patch_chain`), which clients should ignore.',
+      'A timeline as the caller may see it, with what they may do. It also carries internal fields of the server’s index (such as `root`, `index_version`, `duration_root`, `edge_root`), which clients should ignore.',
     properties: {
       id: ref('Uuid'),
       owner_id: ref('Uuid'),

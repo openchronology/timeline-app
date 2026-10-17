@@ -115,9 +115,9 @@ export const HISTORY_OFF =
  * them is stored against. Turning saved history off keeps their content.
  *
  * A recursive CTE prefixed to a query that reads `still_read(id)` (historyBytes,
- * stopHistory). The seed checks each of the timeline's revisions for a reference (only the
- * copies' bases have an index, oc_history_bases_revision; the timelines' and pull requests'
- * revision columns have none, so those checks read those tables). The recursive step
+ * stopHistory). The seed checks each of the timeline's revisions for a reference, each
+ * through an index (oc_history_bases_revision, oc_timelines_fork_base and the pull requests'
+ * oc_proposals_*_revision), except the timelines' heads, read once (#193). The recursive step
  * follows a patch revision to its first parent (position 0, the revision its patch applies
  * to) until it reaches one that is not a patch. UNION, not UNION ALL, so a revision shared
  * by several chains is visited once.
@@ -127,7 +127,10 @@ const STILL_READ = `WITH RECURSIVE still_read(id) AS (
     -- A copy's history reads through to it (its base), a fork was made from it, it is
     -- another timeline's head, or a pull request refers to it.
     EXISTS(SELECT 1 FROM oc_history_bases b WHERE b.base_revision_id=r.id)
-    OR EXISTS(SELECT 1 FROM oc_timelines t WHERE t.fork_base_revision_id=r.id OR (t.head_revision_id=r.id AND t.id<>$1))
+    -- Heads change on every save, so they have no index (it would end HOT updates); one
+    -- hashed read of the timelines' heads stands in for it.
+    OR EXISTS(SELECT 1 FROM oc_timelines t WHERE t.fork_base_revision_id=r.id)
+    OR r.id IN (SELECT head_revision_id FROM oc_timelines WHERE id<>$1)
     OR EXISTS(SELECT 1 FROM oc_proposals p
       WHERE p.base_revision_id=r.id OR p.source_revision_id=r.id OR p.merged_revision_id=r.id))
   -- A kept patch needs the revision it applies to, and so on down to a whole one.
@@ -424,11 +427,15 @@ export class PostgresStore {
       if (sources.rows.length !== timeline.comparison.sources.length)
         throw new HttpError(404, 'A comparison source is unavailable.');
     }
-    if (timeline.preparing_revision_id && !preparing)
+    if (timeline.preparing_revision_id && !preparing) {
+      // Tries again: a preparation that found the copy locked (SKIP LOCKED) skipped it, and
+      // would otherwise wait for the next start (#193). A no-op while one is under way.
+      void this.prepare(timeline.id);
       throw new HttpError(
         409,
         'This copy is still being prepared. It opens as soon as it is ready; try again shortly.',
       );
+    }
     const { search_document, event_text, ...metadata } = timeline;
     // Writing needs a writing role; proposing and editing need a signed-in person with any
     // contributing role, or a public timeline; forking needs a signed-in person and a public
@@ -612,7 +619,7 @@ export class PostgresStore {
     await this.transaction(async (c) => {
       // FOR UPDATE SKIP LOCKED: another server process preparing it holds the row, so this
       // one skips it instead of waiting to do the same work; it also skips a copy a request
-      // has locked at that moment, which is then left for the next start (prepareStale).
+      // has locked at that moment, which the next request for it (access) tries again.
       const { rows } = await c.query(
         `SELECT preparing_revision_id AS base,cardinality(index_bases) AS depth FROM oc_timelines
         WHERE id=$1 AND preparing_revision_id IS NOT NULL FOR UPDATE SKIP LOCKED`,
@@ -1122,7 +1129,8 @@ export class PostgresStore {
         // save builds on, and no other save to the timeline can commit until this one does.
         await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [id]);
         const t = await this.access(id, userId, c);
-        if (!t.canWrite) throw new HttpError(403, 'Write access is required to update upstream.');
+        if (!t.canWrite)
+          throw new HttpError(403, 'Write access is required to save this timeline.');
         // Edits made on an earlier revision: merged onto this one when the editor says what
         // it saw (#165; save-merge.mjs), else refused. With what it saw, they are checked
         // even on this revision: an editor following the latest revision keeps edits made
@@ -1613,7 +1621,8 @@ export class PostgresStore {
     const { rows } = await client.query(
       `WITH RECURSIVE kept(id) AS (
       SELECT r.id FROM oc_revisions r WHERE r.timeline_id=$1 AND (
-        EXISTS(SELECT 1 FROM oc_timelines t WHERE t.head_revision_id=r.id OR t.fork_base_revision_id=r.id)
+        EXISTS(SELECT 1 FROM oc_timelines t WHERE t.fork_base_revision_id=r.id)
+        OR r.id IN (SELECT head_revision_id FROM oc_timelines)
         OR EXISTS(SELECT 1 FROM oc_proposals p WHERE p.base_revision_id=r.id OR p.source_revision_id=r.id OR p.merged_revision_id=r.id)
         OR EXISTS(SELECT 1 FROM oc_revision_parents p JOIN oc_revisions child ON child.id=p.revision_id WHERE p.parent_id=r.id AND child.timeline_id<>$1))
       UNION SELECT p.parent_id FROM oc_revision_parents p JOIN kept k ON k.id=p.revision_id

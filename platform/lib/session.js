@@ -47,3 +47,7 @@ export async function currentSession() {
 export function accountCompareLimit(current) {
   return compareLimit(current.services.compareLimits ?? compareLimits(), current.user);
 }
+/** How many timelines a signed-in (not administrator) account may compare at once. */
+export function userCompareLimit(current) {
+  return (current.services.compareLimits ?? compareLimits()).user;
+}
