@@ -160,6 +160,68 @@ class ExtensionTests(unittest.TestCase):
         self.c.execute("DELETE FROM coords WHERE time='0'")
         self.c.execute("INSERT INTO coords(time,weight) VALUES('2',7)")
         self.assert_tree({Q(1):1,Q(2):7})
+    def test_bulk_append_and_build(self):
+        rng=random.Random(4211);values={}
+        while len(values)<500: values[Q(rng.randrange(-10**6,10**6),rng.randrange(1,50))]=rng.randrange(1,6)
+        shuffled=list(values.items());rng.shuffle(shuffled)
+        self.c.executemany("INSERT INTO coords(time,value,weight,mode) VALUES(?,?,?,'append')",
+            [(text(k),f'v{i}',w) for i,(k,w) in enumerate(shuffled)])
+        # Until built, queries and ordinary changes are refused.
+        for statement in ['SELECT time FROM coords',"INSERT INTO coords(time) VALUES('7/3')",
+                          "DELETE FROM coords WHERE time='0/1'"]:
+            with self.assertRaisesRegex(sqlite3.DatabaseError,'build'): self.c.execute(statement).fetchall()
+        self.c.execute("INSERT INTO coords(mode) VALUES('build')")
+        self.assert_tree(values)
+        entries=sorted(values.items())
+        self.assertEqual(self.c.execute('SELECT time,weight FROM coords ORDER BY time').fetchall(),[(text(k),w) for k,w in entries])
+        for threshold in [Q(0),Q(1,7),Q(1000)]:
+            for mode in ['span','neighbors']:
+                self.assertEqual(overview(self.c,Q(-10**6),Q(10**6),threshold,mode),reference(entries,Q(-10**6),Q(10**6),threshold,mode))
+        # The built index takes ordinary changes, and appends only once empty again.
+        self.c.execute("INSERT INTO coords(time,weight) VALUES('1/3',2)");values[Q(1,3)]=2
+        self.c.execute('DELETE FROM coords WHERE time=?',(text(entries[0][0]),));del values[entries[0][0]]
+        self.assert_tree(values)
+        with self.assertRaises(sqlite3.DatabaseError): self.c.execute("INSERT INTO coords(time,mode) VALUES('9/1','append')")
+        # Building again rebuilds the same rows; rowids are kept and new ones follow them.
+        rowids=self.c.execute('SELECT rowid,time FROM coords ORDER BY rowid').fetchall()
+        self.c.execute("INSERT INTO coords(mode) VALUES('build')")
+        self.assert_tree(values)
+        self.assertEqual(self.c.execute('SELECT rowid,time FROM coords ORDER BY rowid').fetchall(),rowids)
+        self.c.execute("INSERT INTO coords(time) VALUES('99/7')");values[Q(99,7)]=1
+        self.assertGreater(self.c.execute("SELECT rowid FROM coords WHERE time='99/7'").fetchone()[0],max(r for r,_ in rowids))
+        self.assert_tree(values)
+        self.c.execute('DELETE FROM coords');self.c.execute("INSERT INTO coords(mode) VALUES('build')")
+        self.assert_tree({})
+    def test_bulk_load_refusals(self):
+        for statement in ["INSERT INTO coords(mode) VALUES('other')","INSERT INTO coords(mode) VALUES(1)",
+                          "INSERT INTO coords(time,mode) VALUES('1/1','build')",
+                          "INSERT INTO coords(time,threshold,mode) VALUES('1/1','1/1','append')",
+                          "INSERT INTO coords(time,weight,mode) VALUES('1/1',0,'append')",
+                          "INSERT INTO coords(time,mode) VALUES('1/0','append')"]:
+            with self.assertRaises(sqlite3.DatabaseError,msg=statement): self.c.execute(statement)
+        self.assert_tree({})
+        # Two rows at one rational value: the build fails, and its statement changes nothing.
+        self.c.executemany("INSERT INTO coords(time,mode) VALUES(?,'append')",[('1/2',),('2/4',),('3/1',)])
+        with self.assertRaises(sqlite3.DatabaseError): self.c.execute("INSERT INTO coords(mode) VALUES('build')")
+        with self.assertRaisesRegex(sqlite3.DatabaseError,'build'): self.c.execute('SELECT * FROM coords').fetchall()
+        self.c.execute("DELETE FROM coords_nodes WHERE time='1/2' AND rowid=1")
+        self.c.execute("INSERT INTO coords(mode) VALUES('build')")
+        self.assert_tree({Q(1,2):1,Q(3):1})
+        # Weights that overflow together fail the build.
+        c=connection();c.execute('CREATE VIRTUAL TABLE coords USING rational_index')
+        c.executemany("INSERT INTO coords(time,weight,mode) VALUES(?,?,'append')",[('0',2**63-1),('1',1)])
+        with self.assertRaises(sqlite3.DatabaseError): c.execute("INSERT INTO coords(mode) VALUES('build')")
+        c.close()
+    def test_bulk_load_persists(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path=os.path.join(temp,'map.db');c=connection(path)
+            c.execute('CREATE VIRTUAL TABLE coords USING rational_index')
+            c.executemany("INSERT INTO coords(time,value,mode) VALUES(?,?,'append')",[(f'{i}/3',str(i)) for i in range(2000,0,-1)])
+            c.execute("INSERT INTO coords(mode) VALUES('build')");c.commit();c.close()
+            c=connection(path)
+            self.assertEqual(overview(c,Q(0),Q(1000),Q(1,2),'neighbors'),[('1/3','2000/3',2000,2000,'1/3')])
+            self.assertEqual(c.execute("SELECT value FROM coords WHERE time='1/1'").fetchone(),('3',))
+            c.close()
     def test_utf16_and_attached_schema(self):
         c=connection();c.execute("PRAGMA encoding='UTF-16'")
         c.execute("CREATE TABLE t(time TEXT COLLATE RATIONAL_V1)")
