@@ -21,10 +21,10 @@ export async function checkLogSeverity(page, restore) {
       doc.title,
     );
   };
-  const timeline = (plugins) => ({
+  const timeline = (plugins, name = String(plugins.length)) => ({
     format: 'openchronology',
     version: 1,
-    title: `Logs ${plugins.length}`,
+    title: `Logs ${name}`,
     description: '',
     plugins,
     events: [
@@ -92,10 +92,10 @@ export async function checkLogSeverity(page, restore) {
   await page.waitForFunction(() => document.getElementById('event-title').value === 'disk full');
   assert.equal(JSON.parse(await page.locator('#event-metadata').inputValue()).color, undefined);
   await closeMomentDetails(page);
-  // Disabled: no colors.
-  await load(timeline([{ manifest: LOG_SEVERITY_COLORS, enabled: false }]));
+  // Disabled, with no other color plugin: nothing is colored, not even a chosen color.
+  await load(timeline([{ manifest: LOG_SEVERITY_COLORS, enabled: false }], 'disabled'));
   await page.locator('#markers .event-marker[data-first="0/1"]').waitFor();
-  assert.deepEqual(await colors(), { ...expected, err: '', access: '', outage: '' });
+  assert.deepEqual(await colors(), { err: '', access: '', info: '', chosen: '', outage: '' });
   await load(restore);
   console.log(
     'PASS log severity colors: moments and durations colored by severity from tags or format metadata, chosen colors kept, nothing saved.',
