@@ -14,8 +14,10 @@ import {
   assetSize,
   detectDistribution,
   detectPlatform,
+  editionFile,
   installCommand,
 } from '../../lib/releases.js';
+import { EDITIONS } from '../../../dist/core.mjs';
 import { latestRelease } from '../../lib/latest-release.js';
 import { siteName } from '../../lib/sharing.js';
 // Rendered per request: what it puts first depends on the visitor's browser.
@@ -182,6 +184,21 @@ export default async function Download() {
             </p>
             <File release={release} file={{ ...OFFLINE, detail: 'Offline browser file (.html)' }} />
           </article>
+          {/* Editions for one use (#197): on the organization's site at once, and as a release
+              file from the first release that has them. */}
+          {EDITIONS.map((edition) => {
+            const file = editionFile(edition);
+            return (
+              <article key={edition.id} className="download-card" data-edition={edition.id}>
+                <h3>{edition.name} edition</h3>
+                <p className="muted">{edition.description}</p>
+                <a className="download-file" href={file.page}>
+                  Open at {file.page.replace(/^https:\/\//, '')}
+                </a>
+                {release?.assets[file.asset] ? <File release={release} file={file} /> : null}
+              </article>
+            );
+          })}
         </div>
       </section>
 

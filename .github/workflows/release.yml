@@ -54,7 +54,7 @@ jobs:
       - name: Stage web release files
         run: |
           mkdir release-assets
-          cp dist/openchronology-offline.html dist/openchronology-web-source.tar.gz dist/openchronology-desktop-source.tar.gz dist/build-info.json release-assets/
+          cp dist/openchronology-offline.html dist/openchronology-offline-*.html dist/openchronology-web-source.tar.gz dist/openchronology-desktop-source.tar.gz dist/build-info.json release-assets/
           cp LICENSE release-assets/LICENSE.txt
           cp NOTICE release-assets/NOTICE.txt
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -3,6 +3,7 @@
 // editor, the offline HTML file, the desktop app through Tauri and the website's editor), and
 // opening, drawing, editing, saving and sharing timelines on top of core.ts.
 import { calendarPicker } from './calendar-picker.js';
+import { aroundToday, blankDocument, editionById } from './editions.js';
 import { followLatest } from './follow-latest.js';
 import { createSummaryExpansion } from './summary-expansion.js';
 import { pluginExpand } from './plugins.js';
@@ -159,6 +160,24 @@ import type { ViewState } from './view-state.js';
 import type { TimelineLink } from './links.js';
 declare const __OFFLINE_HTML__: boolean;
 const offlineHtml = typeof __OFFLINE_HTML__ !== 'undefined' && __OFFLINE_HTML__;
+declare const __EDITION__: string | null;
+/** The offline file's edition (#197), such as CFAM's, or null for the general one. */
+const offlineEdition =
+  offlineHtml && typeof __EDITION__ !== 'undefined' ? editionById(__EDITION__) : null;
+/** A new, empty timeline, as the edition starts them. */
+const newDocument = () => blankDocument(offlineEdition, -new Date().getTimezoneOffset());
+/**
+ * Where a timeline opens: around its moments, or around today for an empty Gregorian one in
+ * an edition that starts its timelines with Gregorian dates.
+ */
+function openingView(index: TimelineIndex) {
+  const first = index.points.minKey();
+  if (!first && offlineEdition?.gregorian && index.presentation?.mode === 'gregorian') {
+    const { left, span } = aroundToday(Date.now());
+    return new Viewport(left, span);
+  }
+  return Viewport.fit(first, index.points.maxKey());
+}
 declare global {
   interface Window {
     __TAURI__?: {
@@ -261,9 +280,12 @@ if (embedded) {
 // Which edition this is, beside the brand: the offline file or the desktop app.
 if (offlineHtml || desktop) {
   const edition = el('edition-chip');
-  edition.textContent = offlineHtml ? 'Offline' : 'Desktop';
+  edition.textContent = offlineHtml
+    ? 'Offline' + (offlineEdition ? ' · ' + offlineEdition.name : '')
+    : 'Desktop';
   edition.title = offlineHtml
-    ? 'This file works without a network: timelines stay on this device.'
+    ? 'This file works without a network: timelines stay on this device.' +
+      (offlineEdition ? ' ' + offlineEdition.description : '')
     : 'The desktop app: local .och files, and the servers you connect to.';
   edition.hidden = false;
 }
@@ -333,17 +355,9 @@ function timelineHash(id: string, origin = serverOrigin) {
   return desktop ? `#server/${encodeURIComponent(origin)}/timeline/${id}` : `#timeline/${id}`;
 }
 let model: TimelineIndex | null = new TimelineIndex(
-    offlineHtml || freshTimeline
-      ? {
-          format: 'openchronology',
-          version: 1,
-          title: 'Untitled timeline',
-          description: 'A short description for your timeline',
-          events: [],
-        }
-      : demo(sampleTimeline),
+    offlineHtml || freshTimeline ? newDocument() : demo(sampleTimeline),
   ),
-  viewport = Viewport.fit(model.points.minKey(), model.points.maxKey());
+  viewport = openingView(model);
 /** This device's recent measurements for the open timeline (see capacity.ts). */
 let capacity: Measurements = { navigation: [], edits: [], views: [] },
   capacityKey = '',
@@ -2817,7 +2831,7 @@ function loadDocument(doc: TimelineDocument, draft: string | null = null) {
   local = null;
   model = new TimelineIndex(doc);
   draftOf = draft ? { id: draft, model } : null;
-  viewport = Viewport.fit(model.points.minKey(), model.points.maxKey());
+  viewport = openingView(model);
   dirty = false;
   history = [];
   future = [];
@@ -5926,13 +5940,7 @@ el('new-button').onclick = () => {
   if (!mayReplace()) return;
   historyReplace();
   sqlitePath = null;
-  loadDocument({
-    format: 'openchronology',
-    version: 1,
-    title: 'Untitled timeline',
-    description: 'A short description for your timeline',
-    events: [],
-  });
+  loadDocument(newDocument());
 };
 function historyReplace() {
   follow.reset();
@@ -6436,13 +6444,7 @@ el('delete-timeline').onclick = () => {
           el<HTMLDialogElement>('sharing-dialog').close();
           dirty = false;
           historyReplace();
-          loadDocument({
-            format: 'openchronology',
-            version: 1,
-            title: 'Untitled timeline',
-            description: 'A short description for your timeline',
-            events: [],
-          });
+          loadDocument(newDocument());
           setDashboard(true);
           void directory().catch(fail);
           void community.dashboard().catch(fail);
@@ -6801,13 +6803,7 @@ async function keepAsLocal() {
         validateDocument(sparseWorkspace()?.apply(snapshot.document) ?? snapshot.document),
       );
     } catch {
-      model = new TimelineIndex({
-        format: 'openchronology',
-        version: 1,
-        title: 'Untitled timeline',
-        description: 'A short description for your timeline',
-        events: [],
-      });
+      model = new TimelineIndex(newDocument());
       toast('The remote snapshot was unavailable. Open a local file or reconnect to view it.');
     }
   }

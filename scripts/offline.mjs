@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Builds the standalone offline editor, dist/openchronology-offline.html: one file with its
 // script and styles inlined, no network transport, a hash-pinned content security policy, and
-// the licenses.
+// the licenses. Each edition (src/editions.ts, #197) is built the same way beside it, as
+// dist/openchronology-offline-<id>.html.
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -9,7 +10,26 @@ import { resolve } from 'node:path';
 import { dependencyLicenses } from './licenses.mjs';
 import { withLegal, copyrightBanner } from './legal.mjs';
 
+/** The editions' IDs, from src/editions.ts itself, bundled and loaded here. */
+async function editions() {
+  const bundled = await build({
+    entryPoints: ['src/editions.ts'],
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    write: false,
+  });
+  const { EDITIONS } = await import(
+    'data:text/javascript;base64,' + Buffer.from(bundled.outputFiles[0].text).toString('base64')
+  );
+  return EDITIONS.map((e) => e.id);
+}
+/** The general offline file, then one per edition. */
 export async function buildOffline() {
+  await buildEdition(null);
+  for (const id of await editions()) await buildEdition(id);
+}
+async function buildEdition(edition) {
   const result = await build({
     entryPoints: ['src/app.ts'],
     outfile: 'offline/app.js',
@@ -21,7 +41,7 @@ export async function buildOffline() {
     sourcemap: false,
     write: false,
     metafile: true,
-    define: { __OFFLINE_HTML__: 'true' },
+    define: { __OFFLINE_HTML__: 'true', __EDITION__: JSON.stringify(edition) },
     banner: { js: copyrightBanner },
     plugins: [
       {
@@ -86,5 +106,5 @@ export async function buildOffline() {
   await mkdir('dist', { recursive: true });
   if (/<script\b[^>]*\bsrc=|<link\b[^>]*rel="stylesheet"/i.test(html))
     throw new Error('Offline HTML contains an external asset.');
-  await writeFile('dist/openchronology-offline.html', html);
+  await writeFile(`dist/openchronology-offline${edition ? '-' + edition : ''}.html`, html);
 }

@@ -21,7 +21,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium, firefox, webkit } from 'playwright';
-import { Q, validateDocument, demo } from '../dist/core.mjs';
+import { Q, validateDocument, demo, parseTime } from '../dist/core.mjs';
 
 const engine = process.env.BROWSER ?? 'chromium';
 if (!['chromium', 'firefox', 'webkit'].includes(engine)) throw new Error('Unknown BROWSER');
@@ -211,8 +211,46 @@ try {
     [],
   );
   assert.deepEqual(errors, []);
+
+  // The CFAM edition (#197): a new timeline has the causal factor analysis plugins, enabled,
+  // shows Gregorian dates, and opens on the fortnight around today.
+  const cfamFile = join(directory, 'cfam.html');
+  await copyFile(resolve('dist/openchronology-offline-cfam.html'), cfamFile);
+  const cfam = await context.newPage(),
+    cfamRequests = [];
+  cfam.on('pageerror', (error) => errors.push(error.message));
+  cfam.on('request', (request) => cfamRequests.push(request.url()));
+  const opened = Date.now();
+  await cfam.goto(pathToFileURL(cfamFile).href);
+  assert.equal(await cfam.locator('#edition-chip').textContent(), 'Offline · CFAM');
+  const left = parseTime(await cfam.locator('#exact-left').inputValue()),
+    right = parseTime(await cfam.locator('#exact-right').inputValue());
+  const span = right.sub(left),
+    centre = left.add(span.div(Q.from(2n)));
+  // Centred within ten minutes of when it opened, in stored seconds.
+  assert(Math.abs(Number(centre.numerator / centre.denominator) - opened / 1000) < 600);
+  assert(span.equals(Q.from(14n * 86400n)));
+  assert.match(await cfam.locator('#left-bound').inputValue(), /\d{4}-\d{2}-\d{2}/);
+  await cfam.locator('#plugins-button').click();
+  const installed = cfam.locator('#installed-plugins .installed-plugin');
+  await cfam.waitForFunction(
+    () => document.querySelectorAll('#installed-plugins .installed-plugin').length === 3,
+  );
+  for (const [i, name] of ['Moment stacks', 'Moment shapes', 'Moment colors'].entries()) {
+    assert.match(await installed.nth(i).locator('strong').textContent(), new RegExp(name));
+    assert(await installed.nth(i).locator('input[type=checkbox]').isChecked());
+  }
+  assert.deepEqual(await cfam.evaluate(() => window.__networkCalls), []);
+  assert.deepEqual(
+    cfamRequests.filter(
+      (request) =>
+        request.split('#')[0] !== pathToFileURL(cfamFile).href && !/^(blob:|data:)/.test(request),
+    ),
+    [],
+  );
+  assert.deepEqual(errors, []);
   console.log(
-    `PASS ${engine}: standalone file://, exact editing/JSON, pan/zoom/grouping, and zero network calls or external dependencies.`,
+    `PASS ${engine}: standalone file://, exact editing/JSON, pan/zoom/grouping, the CFAM edition's defaults, and zero network calls or external dependencies.`,
   );
 } catch (error) {
   await mkdir('artifacts', { recursive: true });

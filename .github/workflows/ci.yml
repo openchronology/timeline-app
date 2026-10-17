@@ -116,6 +116,7 @@ jobs:
           name: openchronology-offline-html
           path: |
             dist/openchronology-offline.html
+            dist/openchronology-offline-*.html
             dist/openchronology-web-source.tar.gz
           if-no-files-found: error
   browser:
