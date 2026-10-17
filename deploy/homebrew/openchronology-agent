@@ -1,0 +1,96 @@
+#!/bin/sh
+# Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+# Runs the syslog receiver (openchronology-syslog) or account email delivery
+# (openchronology-mail) as your launchd agent (#125), as `brew services` runs the server:
+# started now and whenever you log in, and started again if it stops.
+# Usage: openchronology-agent start|stop|restart|status syslog|mail
+set -eu
+usage() {
+  echo 'Usage: openchronology-agent start|stop|restart|status syslog|mail' >&2
+  exit 2
+}
+[ $# -eq 2 ] || usage
+action=$1
+worker=$2
+case "$worker" in syslog | mail) ;; *) usage ;; esac
+label="org.openchronology.$worker"
+agents="$HOME/Library/LaunchAgents"
+plist="$agents/$label.plist"
+domain="gui/$(id -u)"
+log="@HOMEBREW_PREFIX@/var/log/openchronology-$worker.log"
+
+# The agent's definition: the worker's command (which reads its configuration in
+# @HOMEBREW_PREFIX@/etc/openchronology), kept running, logging beside the server's log.
+write_plist() {
+  mkdir -p "$agents" "@HOMEBREW_PREFIX@/var/log"
+  cat >"$plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>$label</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@HOMEBREW_PREFIX@/bin/openchronology-$worker</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>WorkingDirectory</key>
+  <string>@LIBEXEC@</string>
+  <key>StandardOutPath</key>
+  <string>$log</string>
+  <key>StandardErrorPath</key>
+  <string>$log</string>
+</dict>
+</plist>
+EOF
+}
+loaded() { launchctl print "$domain/$label" >/dev/null 2>&1; }
+# Unloads the agent, waiting until launchd has (it unloads in the background); stopping lets the
+# worker finish: the receiver saves what is queued, for up to ten seconds.
+unload() {
+  loaded || return 0
+  launchctl bootout "$domain/$label" 2>/dev/null || true
+  i=0
+  while loaded && [ $i -lt 30 ]; do
+    sleep 1
+    i=$((i + 1))
+  done
+}
+
+case "$action" in
+  start)
+    unload
+    write_plist
+    launchctl bootstrap "$domain" "$plist"
+    echo "openchronology-$worker started ($label); it starts again when you log in. Log: $log"
+    ;;
+  stop)
+    unload
+    rm -f "$plist"
+    echo "openchronology-$worker stopped; it no longer starts when you log in."
+    ;;
+  restart)
+    if loaded; then
+      launchctl kickstart -k "$domain/$label"
+      echo "openchronology-$worker restarted. Log: $log"
+    else
+      exec "$0" start "$worker"
+    fi
+    ;;
+  status)
+    if ! loaded; then
+      echo "openchronology-$worker is not started (openchronology-agent start $worker)."
+      exit 3
+    fi
+    # launchd's own account of it: whether it is running, its process and how it last ended.
+    launchctl print "$domain/$label" |
+      sed -n -E 's/^[[:space:]]+((state|pid|last exit code) = .*)$/\1/p'
+    ;;
+  *) usage ;;
+esac

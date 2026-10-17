@@ -4,6 +4,9 @@
 import pg from 'pg';
 import { setTimeout as delay } from 'node:timers/promises';
 import { flushMail, mailFromEnv, encryptionKey } from './mail.mjs';
+import { loadConfiguration } from './env-file.mjs';
+// The configuration OCH_CONFIG names, where no service manager passed it (Windows, macOS).
+loadConfiguration();
 const mailer = mailFromEnv(),
   key = encryptionKey(process.env.AUTH_ENCRYPTION_KEY);
 if (!mailer || !key)

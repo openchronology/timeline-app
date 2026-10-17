@@ -31,8 +31,9 @@ Edit $(brew --prefix)/etc/openchronology/openchronology.env, then
     without a proxy, set ALLOW_INSECURE_ORIGIN=1 and HOST=0.0.0.0 to serve
     http://<name>:5173 directly. The server logs to $(brew --prefix)/var/log/openchronology.log;
     if the website reports "Server misconfigured", the reason is there.
-  - RESEND_API_KEY and AUTH_EMAIL_FROM for account email, delivered by `openchronology-mail`
-    while it runs (in a terminal, or your own launchd agent).
+  - RESEND_API_KEY and AUTH_EMAIL_FROM for account email, delivered by
+    `openchronology-mail`; run it as your launchd agent with `openchronology-agent start mail`
+    (below).
   - ADMIN_USERNAME, ADMIN_EMAIL and ADMIN_INITIAL_PASSWORD for the first administrator,
     created by `openchronology-migrate`. The password is used once; to sign in with it again
     (or with a new one written there), run `openchronology-reset-admin-password`.
@@ -51,9 +52,23 @@ Serve it publicly through an HTTPS reverse proxy (brew install caddy). With Cadd
 Caddy 2.5 and later replace an incoming X-Forwarded-For with the client address, so set
 TRUST_PROXY=1 (with another proxy, only if it does the same; see README.md).
 
-The syslog receiver (syslog.md), `openchronology-syslog`, reads
-$(brew --prefix)/etc/openchronology/syslog.env. `och-import-logs` imports historic log files
+The syslog receiver (syslog.md), `openchronology-syslog`, receives syslog over UDP and TCP on
+127.0.0.1:5514 and adds each message to the timelines its routes choose. Set OCH_API_KEY (a
+read/write API key from Account -> API keys) in $(brew --prefix)/etc/openchronology/syslog.env
+and write the routes to $(brew --prefix)/etc/openchronology/syslog-routes.json, then
+`openchronology-agent start syslog`. `och-import-logs` imports historic log files
 (log-import.md): `och-import-logs --help`.
+
+Email delivery and the syslog receiver run as your launchd agents, as `brew services` runs the
+server: started now and whenever you log in, and started again if they stop.
+
+    openchronology-agent start syslog      (or mail)
+    openchronology-agent status syslog     running or not, its process and last exit code
+    openchronology-agent restart syslog    after editing its configuration
+    openchronology-agent stop syslog       stops it, and it no longer starts at login
+
+They log to $(brew --prefix)/var/log/openchronology-syslog.log and openchronology-mail.log.
+Their definitions are ~/Library/LaunchAgents/org.openchronology.syslog.plist and .mail.plist.
 
 Upgrade
 -------
@@ -74,6 +89,7 @@ unless you ask Homebrew to keep it (its databases, in $(brew --prefix)/var/postg
 remain either way). To keep PostgreSQL and the database running:
 
     brew install postgresql@17
+    openchronology-agent stop syslog; openchronology-agent stop mail
     brew services stop openchronology-server
     brew uninstall openchronology-server
 
@@ -88,4 +104,5 @@ Layout
   $(brew --prefix)/opt/openchronology-server/libexec   the application and och-convert
   $(brew --prefix)/etc/openchronology                  configuration (created by setup)
   $(brew --prefix)/share/openchronology                configuration templates of this version
+  ~/Library/LaunchAgents/org.openchronology.*.plist    the agents openchronology-agent started
   $(brew --prefix)/lib/postgresql@17, share/postgresql@17   pgmp

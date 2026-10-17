@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { checkSyslogService, fetchApi } from './server-syslog.mjs';
 
 const run = promisify(execFile);
 const sh = async (script, { allowFailure = false } = {}) => {
@@ -62,6 +63,41 @@ assert.equal(session.server, true, 'The server reaches its database.');
 assert.equal((await fetch('http://127.0.0.1:5173/api/plugins')).status, 200);
 assert.match(await (await fetch('http://127.0.0.1:5173/')).text(), /<html/i);
 assert.match(await sh('och-import-logs --help'), /^Usage: och-import-logs/);
+
+// The syslog receiver as a launchd agent (openchronology-agent, #125) delivers a message into
+// a timeline, and stops for good when stopped.
+const agentPlist = `${process.env.HOME}/Library/LaunchAgents/org.openchronology.syslog.plist`;
+await checkSyslogService({
+  name: 'macOS',
+  psql,
+  api: fetchApi,
+  configure: (key, routes) =>
+    sh(
+      `sed -i '' 's|^OCH_API_KEY=.*|OCH_API_KEY=${key}|' "${prefix}/etc/openchronology/syslog.env" && printf '%s' '${routes}' > "${prefix}/etc/openchronology/syslog-routes.json"`,
+    ),
+  start: async () => {
+    assert.match(await sh('openchronology-agent start syslog'), /openchronology-syslog started/);
+    assert.match(await sh(`plutil -lint "${agentPlist}"`), /OK/);
+  },
+  stop: async () => {
+    assert.match(await sh('openchronology-agent status syslog'), /^state = running$/m);
+    assert.match(await sh('openchronology-agent stop syslog'), /stopped/);
+  },
+  logs: () => sh(`tail -40 "${prefix}/var/log/openchronology-syslog.log"`, { allowFailure: true }),
+});
+assert.match(await sh(`test -e "${agentPlist}" && echo present || echo gone`), /gone/);
+assert.match(
+  await sh('openchronology-agent status syslog; echo "exit $?"', { allowFailure: true }),
+  /is not started[\s\S]*exit 3/,
+);
+assert.match(
+  await sh(`tail -5 "${prefix}/var/log/openchronology-syslog.log"`),
+  /^syslog: stopped/m,
+);
+assert.match(
+  await sh('openchronology-agent start nothing; echo "exit $?"', { allowFailure: true }),
+  /Usage: openchronology-agent[\s\S]*exit 2/,
+);
 
 // The administrator (#118): its password is read whole from the configuration, # and all,
 // and openchronology-reset-admin-password sets it again.

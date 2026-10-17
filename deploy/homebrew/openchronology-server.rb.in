@@ -66,12 +66,15 @@ class OpenchronologyServer < Formula
       s.gsub! "/etc/openchronology", "#{etc}/openchronology", audit_result: false
       s.gsub! "sudo systemctl restart openchronology", "brew services restart openchronology-server",
               audit_result: false
+      # The mail and syslog workers run as your launchd agents (openchronology-agent).
+      s.gsub! "sudo systemctl enable --now openchronology-", "openchronology-agent start ",
+              audit_result: false
       s.gsub! "sudo openchronology-", "openchronology-", audit_result: false
     end
 
     # The commands, pointing at this installation.
     commands = %w[openchronology-setup openchronology-migrate openchronology-reset-admin-password
-                  och-import-logs openchronology-mail openchronology-syslog]
+                  och-import-logs openchronology-mail openchronology-syslog openchronology-agent]
     commands.each { |command| bin.install "homebrew/#{command}" }
     # Not every command names every path.
     inreplace commands.map { |command| bin/command } do |s|

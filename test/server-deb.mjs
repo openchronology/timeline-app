@@ -7,6 +7,7 @@ import { execFile } from 'node:child_process';
 import { basename, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { serverPackage, serverTargets } from '../scripts/server-targets.mjs';
+import { checkSystemdServices } from './server-syslog.mjs';
 
 const run = promisify(execFile);
 const deb = resolve(process.argv[2] ?? '');
@@ -103,6 +104,14 @@ try {
   );
   assert.equal(dry.entries, 1);
   assert.equal(dry.samples[0].moment.time, `${Date.UTC(2026, 9, 9, 8, 15, 1) / 1000}/1`);
+  // The services are valid systemd units, and the syslog receiver delivers a message into a
+  // timeline as its unit runs it (#125).
+  await checkSystemdServices({
+    sh,
+    psql,
+    name: target,
+    installSystemd: 'export DEBIAN_FRONTEND=noninteractive; apt-get install -y -qq systemd',
+  });
   await sh('kill "$(cat /tmp/server.pid)" || true');
 
   // The administrator (#118): its password is read whole from the configuration, # and

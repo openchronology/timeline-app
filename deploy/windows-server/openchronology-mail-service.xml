@@ -1,0 +1,30 @@
+<!-- Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only -->
+<!-- Account email delivery (mail-worker.mjs) as the OpenChronologyMail Windows service (#125),
+     run by WinSW (openchronology-mail-service.exe, beside this file) with the server's
+     configuration, as the LocalService account. Setup installs it to start by hand, once
+     RESEND_API_KEY and AUTH_EMAIL_FROM are set (README.Windows.txt). -->
+<service>
+  <id>OpenChronologyMail</id>
+  <name>OpenChronology email delivery</name>
+  <description>Sends OpenChronology's account email (Resend).</description>
+  <executable>%BASE%\..\node\node.exe</executable>
+  <arguments>"%BASE%\..\app\server\mail-worker.mjs"</arguments>
+  <workingdirectory>%BASE%\..\app</workingdirectory>
+  <env name="OCH_CONFIG" value="%ProgramData%\OpenChronology\openchronology.env"/>
+  <env name="NODE_ENV" value="production"/>
+  <depend>OpenChronologyPostgreSQL</depend>
+  <startmode>Manual</startmode>
+  <onfailure action="restart" delay="10 sec"/>
+  <resetfailure>1 hour</resetfailure>
+  <stoptimeout>15 sec</stoptimeout>
+  <logpath>%ProgramData%\OpenChronology\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>5</keepFiles>
+  </log>
+  <serviceaccount>
+    <domain>NT AUTHORITY</domain>
+    <user>LocalService</user>
+    <allowservicelogon>true</allowservicelogon>
+  </serviceaccount>
+</service>

@@ -1,0 +1,32 @@
+<!-- Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only -->
+<!-- The syslog receiver (syslog.md) as the OpenChronologySyslog Windows service (#125), run by
+     WinSW (openchronology-syslog-service.exe, beside this file) as openchronology-service.xml
+     runs the server: Node.js runs the receiver with syslog.env in ProgramData, as the
+     LocalService account. Setup installs it to start by hand, since it needs an API key and
+     routes first (README.Windows.txt); it may send to a server elsewhere, so it does not
+     depend on the OpenChronology service. -->
+<service>
+  <id>OpenChronologySyslog</id>
+  <name>OpenChronology syslog receiver</name>
+  <description>Receives syslog on 127.0.0.1:5514 (UDP and TCP) into OpenChronology timelines.</description>
+  <executable>%BASE%\..\node\node.exe</executable>
+  <arguments>"%BASE%\..\app\server\syslog-receiver.mjs"</arguments>
+  <workingdirectory>%BASE%\..\app</workingdirectory>
+  <env name="OCH_CONFIG" value="%ProgramData%\OpenChronology\syslog.env"/>
+  <env name="NODE_ENV" value="production"/>
+  <startmode>Manual</startmode>
+  <onfailure action="restart" delay="10 sec"/>
+  <resetfailure>1 hour</resetfailure>
+  <!-- Stopping sends Ctrl+C: the receiver saves what is queued, waiting up to ten seconds. -->
+  <stoptimeout>15 sec</stoptimeout>
+  <logpath>%ProgramData%\OpenChronology\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>5</keepFiles>
+  </log>
+  <serviceaccount>
+    <domain>NT AUTHORITY</domain>
+    <user>LocalService</user>
+    <allowservicelogon>true</allowservicelogon>
+  </serviceaccount>
+</service>

@@ -43,7 +43,7 @@ FunctionEnd
 
 Section "OpenChronology Server"
   ; An upgrade stops the services before replacing the files they run.
-  nsExec::ExecToLog 'powershell -NoProfile -Command "Stop-Service OpenChronology, OpenChronologyPostgreSQL -Force -ErrorAction SilentlyContinue"'
+  nsExec::ExecToLog 'powershell -NoProfile -Command "Stop-Service OpenChronologySyslog, OpenChronologyMail, OpenChronology, OpenChronologyPostgreSQL -Force -ErrorAction SilentlyContinue"'
   Pop $0
   SetOutPath "$INSTDIR"
   File /r "${STAGE}\*.*"

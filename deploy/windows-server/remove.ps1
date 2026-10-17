@@ -1,13 +1,20 @@
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-# Removes the OpenChronology and OpenChronologyPostgreSQL services before the uninstaller
-# deletes the installation (#116). The configuration and the database, in
-# %ProgramData%\OpenChronology, remain.
+# Removes the OpenChronology services (the server, the syslog receiver, email delivery and
+# PostgreSQL) before the uninstaller deletes the installation (#116, #125). The configuration
+# and the database, in %ProgramData%\OpenChronology, remain.
 param([string]$InstallDir = $PSScriptRoot)
 $ErrorActionPreference = 'Continue'
-$wrapper = Join-Path $InstallDir 'service\openchronology-service.exe'
-if (Get-Service OpenChronology -ErrorAction SilentlyContinue) {
-  Stop-Service OpenChronology -Force -ErrorAction SilentlyContinue
-  & $wrapper uninstall | Out-Host
+# Each WinSW service, and the copy of the wrapper that installed it.
+$services = [ordered]@{
+  OpenChronologySyslog = 'openchronology-syslog-service.exe'
+  OpenChronologyMail   = 'openchronology-mail-service.exe'
+  OpenChronology       = 'openchronology-service.exe'
+}
+foreach ($name in $services.Keys) {
+  if (Get-Service $name -ErrorAction SilentlyContinue) {
+    Stop-Service $name -Force -ErrorAction SilentlyContinue
+    & (Join-Path $InstallDir "service\$($services[$name])") uninstall | Out-Host
+  }
 }
 if (Get-Service OpenChronologyPostgreSQL -ErrorAction SilentlyContinue) {
   Stop-Service OpenChronologyPostgreSQL -Force -ErrorAction SilentlyContinue

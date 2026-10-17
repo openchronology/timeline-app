@@ -10,6 +10,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import { checkSyslogService, fetchApi } from './server-syslog.mjs';
 
 const run = promisify(execFile);
 const installer = resolve(process.argv[2] ?? '');
@@ -98,6 +99,43 @@ assert.equal((await fetch('http://127.0.0.1:5173/api/plugins')).status, 200);
 assert.match(await (await fetch('http://127.0.0.1:5173/')).text(), /<html/i);
 assert.match(await ps(`& '${dir}\\och-import-logs.cmd' --help`), /Usage: och-import-logs/);
 
+// The syslog receiver and email delivery are services too (#125), installed to start by hand.
+for (const name of ['OpenChronologySyslog', 'OpenChronologyMail']) {
+  assert.equal(await status(name), 'Stopped');
+  assert.match(await ps(`(Get-Service ${name}).StartType`), /Manual/);
+}
+// Configured and started as README.Windows.txt says, the receiver delivers a message into a
+// timeline as Local Service, which setup let read its configuration and routes.
+const syslogConfig = `${data}\\syslog.env`;
+await checkSyslogService({
+  name: 'Windows',
+  psql,
+  api: fetchApi,
+  configure: async (key, routes) => {
+    const text = await readFile(syslogConfig, 'utf8');
+    await writeFile(syslogConfig, text.replace(/^OCH_API_KEY=.*$/m, `OCH_API_KEY=${key}`));
+    await writeFile(`${data}\\syslog-routes.json`, routes);
+  },
+  start: async () => {
+    await ps(
+      'Set-Service OpenChronologySyslog -StartupType Automatic; Start-Service OpenChronologySyslog',
+    );
+    assert.equal(await status('OpenChronologySyslog'), 'Running');
+    assert.match(
+      await ps('(Get-CimInstance Win32_Service -Filter "Name=\'OpenChronologySyslog\'").StartName'),
+      /LocalService/i,
+    );
+  },
+  stop: async () => {
+    await ps('Stop-Service OpenChronologySyslog');
+    assert.equal(await status('OpenChronologySyslog'), 'Stopped');
+  },
+  logs: () =>
+    ps(`Get-Content -Tail 40 '${data}\\logs\\openchronology-syslog-service*.log'`, {
+      allowFailure: true,
+    }),
+});
+
 // The administrator (#118): its password is read whole from the configuration, # and all,
 // and openchronology-reset-admin-password sets it again.
 const adminPassword = 'Abc!def#ghi@jkl-mno';
@@ -130,11 +168,17 @@ assert.match(upgrade, /OpenChronology is upgraded/, upgrade.slice(-3000));
 assert.match(await readFile(configFile, 'utf8'), new RegExp('^' + key + '$', 'm'));
 assert.equal(await psql("SELECT count(*) FROM oc_users WHERE username='admin'"), '1');
 assert.deepEqual(await healthy(), { status: 'ok', storage: 'postgresql' });
+// The receiver, set to start with Windows, runs again after the upgrade; email delivery, still
+// started by hand, does not.
+assert.equal(await status('OpenChronologySyslog'), 'Running');
+assert.equal(await status('OpenChronologyMail'), 'Stopped');
 
 // Removing it removes the services and the program, and keeps the configuration and data.
 await ps(`Start-Process -Wait -FilePath '${dir}\\uninstall.exe' -ArgumentList '/S', '_?=${dir}'`);
 assert.equal(await status('OpenChronology'), '');
 assert.equal(await status('OpenChronologyPostgreSQL'), '');
+assert.equal(await status('OpenChronologySyslog'), '');
+assert.equal(await status('OpenChronologyMail'), '');
 assert.match(await ps(`Test-Path '${configFile}'`), /True/);
 assert.match(await ps(`Test-Path '${data}\\pgdata\\PG_VERSION'`), /True/);
 assert.match(await ps(`Test-Path '${dir}\\app'`), /False/);

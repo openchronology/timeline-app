@@ -20,6 +20,7 @@ import {
 } from './syslog.mjs';
 import { parseZone } from './log-time.mjs';
 import { MomentIngest } from './moment-ingest.mjs';
+import { loadConfiguration } from './env-file.mjs';
 
 /** Syslog messages into moments (syslog.mjs), queued and sent as moment-ingest.mjs does. */
 export class SyslogIngest extends MomentIngest {
@@ -152,8 +153,11 @@ export async function main(env = process.env) {
       process.exit(drained ? 0 : 1);
     });
 }
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href)
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  // The configuration OCH_CONFIG names (syslog.env), where no service manager passed it.
+  loadConfiguration();
   main().catch((error) => {
     console.error('syslog:', error.message);
     process.exit(1);
   });
+}
