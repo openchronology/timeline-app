@@ -15,13 +15,13 @@ then:
 
 - deletes moments older than the period, and durations that ended before it. Durations that
   followed a deleted moment keep its time as a fixed endpoint, and relationships of deleted
-  moments and durations go. This is saved like any other change, so viewers see it live and
+  events go. This is saved like any other change, so viewers see it live and
   the timeline's history records it: in saves of at most 5,000 moments, each on its own, so
   other saves to the timeline (a log arriving) wait for one of them at most, a few seconds
   even at a million moments. A run deletes for up to ten minutes and the next continues.
   What to delete is found by walking the timeline's moment tree from its oldest moment, at
   a cost that follows what is deleted rather than the timeline's size;
-- deletes saved revisions from before the period, and the versions of moments, durations and
+- deletes saved revisions from before the period, and the versions of events and
   relationships that only those revisions saw, which frees the storage they used. It keeps
   what is still needed: the current revision, anything forks or pull requests refer to
   (including the revision a fork or duplicate was copied from, whose history it reads
@@ -86,6 +86,6 @@ curl -X POST "$OCH_API_URL/api/timelines/$ID/delete-range" \
 
 `lower` and `upper` are exact stored coordinates (for a calendar timeline at its default
 scale, Unix seconds). `revision` is the timeline's current revision; an older one is
-refused with 409, as other saves are. The answer says how many moments and durations went
+refused with 409, as other saves are. The answer says how many events went
 (`removed`), and `more: true` when a range held over 200,000 moments: send it again for the
 rest.

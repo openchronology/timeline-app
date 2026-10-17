@@ -11,7 +11,7 @@ Anyone who can see something on the platform can report it to the site's adminis
 | What                        | Where                                                                  |
 | --------------------------- | ---------------------------------------------------------------------- |
 | A timeline                  | Its page, beside **Share** (not for its owner)                         |
-| A moment or duration        | Its details in the editor, beside **Share**                            |
+| An event                    | Its details in the editor, beside **Share**                            |
 | A comment on a pull request | Under the comment                                                      |
 | A plugin or suite           | Its card in the plugin library (published ones; not the official ones) |
 | An account                  | Its profile page                                                       |
@@ -38,7 +38,7 @@ It can also add up to 2,000 characters of details.
 
 ## Reviewing
 
-Reports of the same thing gather in one **case**. A moment's or duration's report belongs to its timeline's case and says which moment or duration it names.
+Reports of the same thing gather in one **case**. An event's report (a moment's or a duration's) belongs to its timeline's case and says which event it names.
 
 The queue has three views:
 
@@ -52,7 +52,7 @@ Each case shows:
 
 - what was reported, with a link (a comment's text is quoted);
 - its owner;
-- the latest twenty reports: their categories, details, who reported them (or "signed out"), and the moment or duration named.
+- the latest twenty reports: their categories, details, who reported them (or "signed out"), and the event named.
 
 Decisions use the same confirmation as other administration changes: a sign-in within the last five minutes, the current password, and a fresh authenticator or recovery code when two-factor authentication is on. Each decision is recorded in `oc_admin_audit` (action `reports`).
 
@@ -91,14 +91,14 @@ A restriction or labels can also be lifted at any time from **Restricted**. Lift
 Educational, historical, medical, artistic and news depictions of nudity, violence and disturbing events are allowed when labelled; pornography and gore for its own sake are not ([#115](https://github.com/openchronology/timeline-app/issues/115)). Labels are **nudity**, **graphic violence** and **disturbing content**:
 
 - **A timeline:** its owner sets them under **Sharing & settings → Sensitive content**; moderators add them from a report ([Label](#label)).
-- **A moment or duration:** whoever can edit it sets them in its details, under **Sensitive content**. They are kept in its metadata (`content_labels`), so they travel with `.ochx` and `.och` files.
+- **An event (a moment or a duration):** whoever can edit it sets them in its details, under **Sensitive content**. They are kept in its metadata (`content_labels`), so they travel with `.ochx` and `.och` files.
 
 For readers who are not its owner or writers (adults can turn the warnings off under **Account → Sensitive content**; accounts that may be under 18 cannot, see [ages](#ages)):
 
-| Labelled             | What readers get                                                                                                                                                                                                                                                                              |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A timeline           | A warning before it opens (**Show timeline** or **Browse other timelines**). Its images stay blurred until **Show images** next to its save status. Both choices last until the browser tab closes. Embeds open behind the same warning. A comparison with a labelled source is labelled too. |
-| A moment or duration | Its images (marker, hover card, details, duration background) stay blurred until **Show images**, and its details say what it contains.                                                                                                                                                       |
+| Labelled   | What readers get                                                                                                                                                                                                                                                                              |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A timeline | A warning before it opens (**Show timeline** or **Browse other timelines**). Its images stay blurred until **Show images** next to its save status. Both choices last until the browser tab closes. Embeds open behind the same warning. A comparison with a labelled source is labelled too. |
+| An event   | Its images (marker, hover card, details, duration background) stay blurred until **Show images**, and its details say what it contains.                                                                                                                                                       |
 
 A labelled timeline is also:
 
@@ -110,7 +110,7 @@ A labelled timeline is also:
 
 Emails go only to confirmed addresses, and only when email is configured (`RESEND_API_KEY`, `AUTH_EMAIL_FROM`):
 
-| Event          | Owner                                                    | Signed-in reporters              |
+| What happened  | Owner                                                    | Signed-in reporters              |
 | -------------- | -------------------------------------------------------- | -------------------------------- |
 | Restricted     | What, the reason, what it means, how to ask for a review | That it was restricted           |
 | Dismissed      | —                                                        | That it does not break the rules |
@@ -148,6 +148,6 @@ Other illegal content follows the same steps, with whatever reporting and preser
 | Table                 | Holds                                                                                                                                                                                                                                                                                                  |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `oc_moderation_cases` | One row per case: what it names (`target_kind`, `target_id`), the owner, `status` (`open`, `dismissed`, `restricted`, `lifted`), the reason, who decided and when, a restricted timeline's earlier visibility, and the review request and its outcome. At most one case per thing is open or in force. |
-| `oc_reports`          | The reports: category, details, the moment or duration named, and the reporter (null when signed out).                                                                                                                                                                                                 |
+| `oc_reports`          | The reports: category, details, the event named, and the reporter (null when signed out).                                                                                                                                                                                                              |
 
 Cases name their targets as text, so a case outlives a deleted timeline as a record of what was decided.

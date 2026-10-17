@@ -87,13 +87,15 @@ Type the bounds the way the timeline's display writes times. **Exact rational bo
 
 Over a server timeline that keeps growing, **Follow latest moments** keeps the newest moments in view, once you have stopped moving around for 15 seconds.
 
-## Moments and durations
+## Events: moments and durations
 
-### Adding a moment
+An event is either a **moment**, a single point in time, or a **duration**, a span between two times.
 
-**＋ Moment** adds a moment at the selected time, or in the middle of the view. You can also right-click the timeline (or press and hold it on a touch screen) and choose **+Moment** to add one where you clicked. Clicking empty space only selects a time; it never creates anything.
+### Adding an event
 
-The **New moment** dialog opens. The moment joins the timeline when you choose **Save**.
+**＋ Event** adds an event at the selected time, or in the middle of the view. You can also right-click the timeline (or press and hold it on a touch screen) and choose **＋ Event** to add one where you clicked. Clicking empty space only selects a time; it never creates anything.
+
+The **New event** dialog opens on its **Moment** tab. Choose **Duration** at the top to make it a duration instead: it starts at the moment's time and lasts a quarter of the view. The title, notes, tags and sensitive-content labels you typed carry over, either way. The event joins the timeline when you choose **Save**. Once saved, an event keeps its kind: the dialog's other tab is disabled.
 
 ### The details panel
 
@@ -114,7 +116,7 @@ On the website, **Share** in the panel links to the moment, and **Report** tells
 
 ### Durations
 
-**＋ Duration** creates a duration over the middle of the view. Click a band to open it. The **Duration** dialog has a **Title**, **Notes**, **Tags**, **Sensitive content** and **Related to**, as for moments, and a **Start** and an **End**:
+Choose the **Duration** tab of **＋ Event** to create a duration. Click a band to open it. The **Duration** dialog has a **Title**, **Notes**, **Tags**, **Sensitive content** and **Related to**, as for moments, and a **Start** and an **End**:
 
 - **Fixed time:** a time of its own.
 - **Follows a moment:** choose the moment in **Choose a moment**, which lists moments in time order or searches them as you type. **Open moment** jumps to it, and **Choose another moment…** changes it.
@@ -133,11 +135,11 @@ Give each image's HTTPS address. A server keeps only the link, not a copy, and c
 
 ### Undo and redo
 
-**Undo** and **Redo** beside the bounds, or Ctrl+Z and Ctrl+Shift+Z (or Ctrl+Y; ⌘ on macOS), undo and redo adding, editing and deleting moments, durations and links. Saving to the server or to a desktop file starts a fresh undo history.
+**Undo** and **Redo** beside the bounds, or Ctrl+Z and Ctrl+Shift+Z (or Ctrl+Y; ⌘ on macOS), undo and redo adding, editing and deleting events and links. Saving to the server or to a desktop file starts a fresh undo history.
 
 ## Relationships
 
-Open a moment or duration and find **Related to**. It lists what is linked to it, 25 at a time; choose one to open it. To link something, open **Add a relationship**, search for it by title or notes, and choose it. **×** removes a link.
+Open an event and find **Related to**. It lists what is linked to it, 25 at a time; choose one to open it. To link something, open **Add a relationship**, search for it by title or notes, and choose it. **×** removes a link.
 
 Relationships show as arcs above the axis. Two buttons pull them out of the crowd:
 
@@ -148,7 +150,7 @@ Relationships show as arcs above the axis. Two buttons pull them out of the crow
 
 ## Tags and tracks
 
-Tags are short labels on moments and durations, such as `war` or `trade`. Each can carry up to 40.
+Tags are short labels on events, such as `war` or `trade`. Each can carry up to 40.
 
 **Separate by tags** lists the timeline's tags and how often each is used. Choose some (or type others under **Other tags**) and select **Separate**. Everything carrying any of them moves into a track above; everything else stays below. Both tracks pan and zoom together, and both are read-only. Separating never changes or saves the timeline. **Rejoin** brings it back together. See [separating by tags](tags.md#separating-by-tags).
 
@@ -202,7 +204,7 @@ New server timelines are private. To change that, open **Sharing & settings** ab
 - **Address:** a short name for the timeline's link, such as `/yourname/fall-of-rome`, then **Save address**.
 - **Sensitive content:** labels for the whole timeline, so readers are warned before it opens.
 
-**Share** opens the share dialog, with **Copy link**, links to post on social sites, and **Embed on a website** for public timelines. Moments and durations have **Share** in their details. Right-click the timeline and choose **Share this view** to share exactly what you see. The address bar also follows what is open, so you can copy it at any time. See [sharing timelines](sharing.md).
+**Share** opens the share dialog, with **Copy link**, links to post on social sites, and **Embed on a website** for public timelines. Events have **Share** in their details. Right-click the timeline and choose **Share this view** to share exactly what you see. The address bar also follows what is open, so you can copy it at any time. See [sharing timelines](sharing.md).
 
 **☆ Star** adds a timeline to **Your favorites**. **Report** tells the site's administrators about a timeline that breaks the rules ([reporting](moderation.md#reporting)).
 
@@ -248,7 +250,7 @@ The comparison stacks the timelines on one shared time axis. Each track has a **
 
 Right-click (or press and hold) the timeline for two tools that change a whole stretch at once:
 
-- **Shift or scale times…** moves, stretches or compresses times by a **Scale**, **Around** a time, plus an **Offset**. **Apply to** chooses every moment and duration, those with or without some tags, or what is related to the moment or duration you clicked. Use it to correct a timeline recorded against the wrong clock ([shifting and scaling](time-mapping.md)).
+- **Shift or scale times…** moves, stretches or compresses times by a **Scale**, **Around** a time, plus an **Offset**. **Apply to** chooses every event, those with or without some tags, or what is related to the event you clicked. Use it to correct a timeline recorded against the wrong clock ([shifting and scaling](time-mapping.md)).
 - **Delete everything in this view…** deletes every moment in view and the durations wholly inside it, after asking ([deleting a view](retention.md#deleting-everything-in-a-view)).
 
 In the browser, one **Undo** reverts either. On the server, each is saved at once as one revision; save your other edits first.

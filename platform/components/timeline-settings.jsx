@@ -238,7 +238,7 @@ export default function TimelineSettings({
           disturbing events are allowed when labelled; pornography and gore for its own sake are
           not. Readers are warned before a labelled timeline opens, its images stay blurred until
           they show them, and it is left out of featured timelines and of browsing by readers who
-          aren’t signed in. Label single moments and durations in their details instead.
+          aren’t signed in. Label single events in their details instead.
         </p>
         <fieldset className="content-labels" disabled={busy}>
           <legend>This timeline contains</legend>
@@ -317,15 +317,15 @@ export default function TimelineSettings({
           </p>
         )}
         <p className="muted">
-          About once an hour the server deletes moments and durations older than this, and the saved
-          history from before then, apart from what forks, pull requests and newer history still
-          need. That frees storage; deleted data cannot be restored.
+          About once an hour the server deletes events older than this, and the saved history from
+          before then, apart from what forks, pull requests and newer history still need. That frees
+          storage; deleted data cannot be restored.
           {timeline.retention && timeline.retention_applied_at && (
             <>
               {' '}
               Last applied {new Date(timeline.retention_applied_at).toLocaleString()}
               {timeline.retention_removed != null &&
-                `, deleting ${Number(timeline.retention_removed).toLocaleString()} moments and durations`}
+                `, deleting ${Number(timeline.retention_removed).toLocaleString()} events`}
               .
             </>
           )}

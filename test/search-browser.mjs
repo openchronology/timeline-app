@@ -108,7 +108,8 @@ export async function checkSearch(page, restore) {
             new RegExp(source).test(document.getElementById('moment-picker-status').textContent),
           pattern,
         );
-    await page.locator('#add-duration-button').click();
+    await page.locator('#add-button').click();
+    await page.locator('#moment-kind [data-kind=duration]').click();
     const durationDialog = page.locator('#duration-dialog');
     await durationDialog.waitFor({ state: 'visible' });
     const start = durationDialog.locator('[data-endpoint="start"]'),

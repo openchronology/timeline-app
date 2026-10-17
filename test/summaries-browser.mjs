@@ -89,7 +89,7 @@ export async function checkSummaries(page, restore) {
       .locator('.duration-band[data-duration-id="long"]')
       .click({ button: 'right', position: { x: 8, y: 4 } });
     assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), [
-      '+Moment',
+      '＋ Event',
       'Fit all',
       'Edit',
       'Delete',
@@ -114,7 +114,7 @@ export async function checkSummaries(page, restore) {
     await mixed.waitFor();
     // Its menu opens what it holds, by name (#187).
     await mixed.click({ button: 'right', force: true });
-    await menu.getByRole('menuitem', { name: 'View moments and durations', exact: true }).waitFor();
+    await menu.getByRole('menuitem', { name: 'View events', exact: true }).waitFor();
     await page.keyboard.press('Escape');
     await mixed.click({ force: true });
     await page.locator('#group-details').waitFor({ state: 'visible' });

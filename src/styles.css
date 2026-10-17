@@ -869,6 +869,36 @@ dialog.moment-dialog {
   justify-content: space-between;
   gap: 10px;
 }
+/* Moment | Duration atop the event dialogs (#209): a new event can switch kind; an existing
+   one shows its kind, with the other tab disabled. */
+.event-kind {
+  display: flex;
+  margin: 14px 0 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 3px;
+  gap: 3px;
+  background: var(--hover);
+}
+.event-kind[hidden] {
+  display: none;
+}
+.event-kind button {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  min-height: calc(var(--control-height) - 4px);
+}
+.event-kind button[aria-selected='true'] {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 1px 3px #20372c26;
+}
+.event-kind button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
 .inspector-heading button,
 .dialog-heading button {
   flex-shrink: 0;
@@ -2026,7 +2056,6 @@ body[data-embed] #presentation-button,
 body[data-embed] #plugins-button,
 body[data-embed] #compare-button,
 body[data-embed] #center-vertical,
-body[data-embed] #add-duration-button,
 body[data-embed] #add-button,
 body[data-embed] .density-control {
   display: none !important;

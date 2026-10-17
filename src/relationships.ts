@@ -77,7 +77,7 @@ export function validateRelationships(
       throw new Error('A relationship has two endpoints, a and b.');
     const relationship = canonicalRelationship(validateRef(r.a), validateRef(r.b));
     if (exists && (!exists(refKey(relationship.a)) || !exists(refKey(relationship.b))))
-      throw new Error('Relationships must connect existing moments and durations.');
+      throw new Error('Relationships must connect existing events.');
     seen.set(relationshipKey(relationship), relationship);
   }
   return [...seen].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, r]) => r);

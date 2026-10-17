@@ -2476,7 +2476,6 @@ function heading() {
   star.textContent = `${remote?.starred ? '★ Starred' : '☆ Star'} · ${remote?.star_count ?? '0'}`;
 
   el('add-button').hidden = !editable();
-  el('add-duration-button').hidden = !editable();
   el('separate-button').hidden = !!comparison || (!model && !remote && !local);
   el('search-button').hidden = !!comparison || (!model && !remote && !local);
   el<HTMLButtonElement>('undo-button').disabled = !history.length;
@@ -3648,9 +3647,74 @@ function eventForm(event?: PointEvent, time?: Q) {
   el('moment-share').hidden = !event || !shareable() || !!sparseWorkspace()?.changes.has(event.id);
   el('moment-report').hidden = el('moment-share').hidden || !!remote?.canShare;
   text('event-error', '');
-  showMomentDetails(event ? 'Moment details' : 'New moment');
+  showEventKind('moment', !!momentSession?.isNew);
+  showMomentDetails(event ? 'Moment details' : 'New event');
   if (event && !comparison) reportLink({ kind: 'moment', id: event.id });
 }
+/**
+ * The Moment | Duration tabs atop the event dialogs (#209). A new event can become the other
+ * kind; an existing one shows its kind, with the other tab disabled.
+ */
+function showEventKind(kind: 'moment' | 'duration', switchable: boolean) {
+  const bar = el(kind + '-kind');
+  bar.hidden = false;
+  for (const tab of bar.querySelectorAll<HTMLButtonElement>('button')) {
+    const current = tab.dataset.kind === kind;
+    tab.setAttribute('aria-selected', String(current));
+    tab.disabled = !current && !switchable;
+    tab.title = current || switchable ? '' : `An existing ${kind} stays a ${kind}.`;
+  }
+}
+/** What a new event keeps when it changes kind: its title, notes, tags and labels. */
+function sharedFields(form: 'event' | 'duration') {
+  return {
+    title: input(form + '-title').value,
+    description: el<HTMLTextAreaElement>(form + '-description').value,
+    tags: input(form + '-tags').value,
+    labels: checkedLabels(form + '-labels'),
+  };
+}
+function fillSharedFields(form: 'event' | 'duration', fields: ReturnType<typeof sharedFields>) {
+  input(form + '-title').value = fields.title;
+  el<HTMLTextAreaElement>(form + '-description').value = fields.description;
+  input(form + '-tags').value = fields.tags;
+  for (const box of el(form + '-labels').querySelectorAll<HTMLInputElement>('input'))
+    box.checked = fields.labels.includes(box.value);
+}
+/** Closes `from` at once, without its exit animation, as `to` opens in its place unanimated. */
+function switchDialog(from: string, to: string) {
+  HTMLDialogElement.prototype.close.call(el<HTMLDialogElement>(from));
+  el(to).dataset.dialogSwitched = '';
+}
+// A new moment becomes a duration from its time, a quarter of the view long.
+el('moment-kind').addEventListener('click', (event) => {
+  const tab = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-kind=duration]');
+  if (!tab || tab.disabled || !momentSession?.isNew) return;
+  const fields = sharedFields('event'),
+    start = selectedTime ?? viewport.left.add(viewport.span.div(Q.from(2n)));
+  discardMomentEdits();
+  switchDialog('inspector', 'duration-dialog');
+  createDuration(start.toString(), start.add(viewport.span.div(Q.from(4n))).toString());
+  fillSharedFields('duration', fields);
+  flushDurationEdit();
+  input('duration-title').focus();
+});
+// A new duration becomes a moment at its start.
+el('duration-kind').addEventListener('click', (event) => {
+  const tab = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-kind=moment]');
+  if (!tab || tab.disabled || !openDuration?.isNew) return;
+  flushDurationEdit();
+  const fields = sharedFields('duration'),
+    band = resolveDuration(openDuration.duration, (id) => model?.momentTime(id));
+  discardDurationEdits();
+  switchDialog('duration-dialog', 'inspector');
+  eventForm(undefined, band ? Q.parse(band.startTime) : undefined);
+  fillSharedFields('event', fields);
+  queueEventEdit();
+  input('event-title').focus();
+});
+for (const id of ['inspector', 'duration-dialog'])
+  el(id).addEventListener('close', () => delete el(id).dataset.dialogSwitched);
 async function groupPage(
   group: FrameGroup,
   after: { time: string; id: string } | null = null,
@@ -3780,6 +3844,7 @@ async function selectGroup(group: FrameGroup) {
   }
   el('event-form').hidden = true;
   el('group-details').hidden = false;
+  el('moment-kind').hidden = true;
   text('group-title', summaryName(group));
   text(
     'group-note',
@@ -4262,7 +4327,7 @@ function showTimelineMenu(
     menu.append(button);
   };
   if (editable())
-    add('+Moment', () => {
+    add('＋ Event', () => {
       selectedGroup = null;
       eventForm(undefined, time);
     });
@@ -5434,9 +5499,7 @@ function requestRangeDelete() {
         el('event-form').hidden = true;
         el<HTMLDialogElement>('inspector').close();
         changed();
-        toast(
-          `Deleted ${group.length.toLocaleString()} moments and durations. Undo restores them.`,
-        );
+        toast(`Deleted ${group.length.toLocaleString()} events. Undo restores them.`);
       },
     };
   } else if (local) {
@@ -5624,7 +5687,7 @@ function describeTimeMap() {
         moments = `${count.toLocaleString()} ${count === 1n ? 'moment' : 'moments'}`;
       summary =
         (filter
-          ? `This moves the moments and durations selected, of the timeline’s ${moments}.`
+          ? `This moves the events selected, of the timeline’s ${moments}.`
           : `This moves all ${moments} and all durations.`) +
         (local
           ? ' It changes the file’s copy at once; you can undo it until you save the file.'
@@ -7351,11 +7414,7 @@ void (async () => {
 function viewGroupLabel(group: FrameGroup) {
   const moments = BigInt(group.count) > 0n,
     durations = BigInt(group.durationCount ?? 0) > 0n;
-  return moments && durations
-    ? 'View moments and durations'
-    : durations
-      ? 'View durations'
-      : 'View moments';
+  return moments && durations ? 'View events' : durations ? 'View durations' : 'View moments';
 }
 /** Durations anchored to the open moment, with a shortcut to start a new one there. */
 function refreshDurations() {
@@ -7478,7 +7537,7 @@ function showDuration(duration: Duration, readOnly: boolean, isNew = false) {
   // Opening another entity ends the current session without keeping it.
   discardDurationEdits();
   openDuration = { duration, readOnly, edit: null, isNew, document: documentRequest };
-  text('duration-heading', isNew ? 'New duration' : 'Duration');
+  text('duration-heading', isNew ? 'New event' : 'Duration');
   input('duration-title').value = duration.metadata.title ?? '';
   el<HTMLTextAreaElement>('duration-description').value = duration.metadata.description ?? '';
   input('duration-tags').value = entityTags(duration.metadata).join(', ');
@@ -7506,6 +7565,7 @@ function showDuration(duration: Duration, readOnly: boolean, isNew = false) {
   el('duration-share').hidden =
     isNew || !shareable() || !!sparseWorkspace()?.durationChanges.has(duration.id);
   el('duration-report').hidden = el('duration-share').hidden || !!remote?.canShare;
+  showEventKind('duration', isNew && !readOnly);
   const dialog = el<HTMLDialogElement>('duration-dialog');
   if (!dialog.open) dialog.showModal();
   if (!isNew && !comparison) reportLink({ kind: 'duration', id: duration.id });
@@ -8084,7 +8144,7 @@ el('separate-button').onclick = () => {
   el<HTMLDialogElement>('separate-dialog').showModal();
   void loadTagCounts()
     .then((counts) => {
-      text('separate-error', counts.length ? '' : 'No moments or durations have tags yet.');
+      text('separate-error', counts.length ? '' : 'No events have tags yet.');
       for (const { tag, count } of counts) {
         const label = document.createElement('label');
         label.className = 'checkbox-label';
@@ -8214,7 +8274,7 @@ async function runSearch(page: number) {
     text(
       'search-status',
       searchState.total === 0n && !result.results.length
-        ? 'No moments or durations match.'
+        ? 'No events match.'
         : `${searchState.total} ${searchState.total === 1n ? 'match' : 'matches'}` +
             (pages > 1n ? ` · page ${page} of ${pages}` : '') +
             (sparseWorkspace()?.dirtyCount ? ' · includes unsaved edits' : ''),
@@ -8463,13 +8523,6 @@ document.addEventListener(
   },
   true,
 );
-el('add-duration-button').onclick = () => {
-  const span = viewport.span;
-  createDuration(
-    viewport.left.add(span.mul(Q.from(3n, 8n))).toString(),
-    viewport.left.add(span.mul(Q.from(5n, 8n))).toString(),
-  );
-};
 /**
  * "Related to" lists an entity's direct relationships (25 at a time) and how many more are
  * connected through other links. Links are undirected; unsaved edits on indexed timelines
@@ -8677,7 +8730,7 @@ function renderRelated(host: HTMLElement, ref: EntityRef | null, readOnly = fals
   summary.textContent = 'Add a relationship';
   const search = document.createElement('input');
   search.type = 'search';
-  search.placeholder = 'Search moments and durations';
+  search.placeholder = 'Search events';
   search.setAttribute('aria-label', 'Find an entity to relate');
   const results = document.createElement('div');
   results.className = 'related-results';
@@ -8717,7 +8770,7 @@ function renderRelated(host: HTMLElement, ref: EntityRef | null, readOnly = fals
           results.append(button);
         }
         if (!page.results.length && searchTerms(words).length)
-          results.textContent = 'No moments or durations match.';
+          results.textContent = 'No events match.';
       })().catch(fail);
     }, 200);
   };

@@ -29,7 +29,7 @@ The editor suggests another platform when a timeline outgrows the one in use. Th
   Once measured slow, the notice stays for that timeline, even if later views are quick (a small pan after slow zooming). Without such measurements it appears from 20,000 moments. It offers **Export** (to open the file in the desktop app), **Save to server** or **Sign in** where the browser is connected to a server, a link to the desktop app, and, in the offline HTML file, a link to the platform.
 
 - **Desktop app:** The notice appears when views of the timeline consistently take more than a second on this computer. It suggests saving the timeline to a server.
-- **Every platform:** The notice appears from 150,000 moments, durations or relationships, since a timeline holds at most 200,000. On a server with a different `TIMELINE_ENTRY_LIMIT`, the notice appears at three quarters of that limit, and never when the limit is `unlimited`. It suggests splitting the timeline. On the platform and in the desktop app the count covers moments; in the browser it also covers durations and relationships.
+- **Every platform:** The notice appears from 150,000 events (moments or durations) or relationships, since a timeline holds at most 200,000. On a server with a different `TIMELINE_ENTRY_LIMIT`, the notice appears at three quarters of that limit, and never when the limit is `unlimited`. It suggests splitting the timeline. On the platform and in the desktop app the count covers moments; in the browser it also covers durations and relationships.
 
 These rules live in `src/capacity.ts`.
 

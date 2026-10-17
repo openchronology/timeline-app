@@ -276,7 +276,7 @@ Every point has a place. Explore the spaces between them.</textarea>
                 title="Follow new server moments after 15 seconds without navigation"
                 ><input id="follow-latest" type="checkbox" /> Follow latest moments</label
               >
-              <button id="search-button" title="Search moments and durations (/)">Search</button>
+              <button id="search-button" title="Search events (/)">Search</button>
               <button id="separate-button">Separate by tags</button>
               <button id="presentation-button">Time display</button>
               <button id="plugins-button">Plugins</button>
@@ -286,8 +286,7 @@ Every point has a place. Explore the spaces between them.</textarea>
               ><button id="fit-button">Fit all</button
               ><button id="center-vertical">Center axis</button
               ><button id="clear-selection" hidden>Clear selection</button
-              ><button id="add-duration-button">＋ Duration</button
-              ><button id="add-button" class="button-primary">＋ Moment</button>
+              ><button id="add-button" class="button-primary">＋ Event</button>
             </div>
           </div>
           <div id="live-notice" class="comparison-settings" hidden role="status">
@@ -303,8 +302,7 @@ Every point has a place. Explore the spaces between them.</textarea>
               <button id="separation-rejoin">Rejoin</button>
             </div>
             <p id="separation-note" class="field-hint">
-              Read-only. Moments and durations with any of these tags are shown above; everything
-              else stays below.
+              Read-only. Events with any of these tags are shown above; everything else stays below.
             </p>
           </section>
           <section id="comparison-settings" class="comparison-settings" hidden>
@@ -397,6 +395,10 @@ Every point has a place. Explore the spaces between them.</textarea>
         ><button id="moment-report" class="share-entity" type="button" hidden>Report</button
         ><button id="close-inspector" aria-label="Close moment details">×</button>
       </div>
+      <div id="moment-kind" class="event-kind" role="tablist" aria-label="Kind of event">
+        <button type="button" role="tab" data-kind="moment">Moment</button
+        ><button type="button" role="tab" data-kind="duration">Duration</button>
+      </div>
       <p id="moment-sensitive" class="sensitive-note" hidden>
         <span></span>
         <button type="button" class="link-button reveal-images">Show images</button>
@@ -488,8 +490,8 @@ Every point has a place. Explore the spaces between them.</textarea>
           <button type="button" data-close="separate-dialog" aria-label="Close">×</button>
         </div>
         <p class="field-hint">
-          Moments and durations with any chosen tag move into a track above the rest of the
-          timeline. Nothing is changed or saved.
+          Events with any chosen tag move into a track above the rest of the timeline. Nothing is
+          changed or saved.
         </p>
         <div id="separate-tags" class="separate-tags" role="group" aria-label="Tags"></div>
         <label
@@ -525,8 +527,7 @@ Every point has a place. Explore the spaces between them.</textarea>
         <fieldset id="map-scope" class="map-scope">
           <legend>Apply to</legend>
           <label class="checkbox-label"
-            ><input type="radio" name="map-scope" value="all" checked /> Every moment and
-            duration</label
+            ><input type="radio" name="map-scope" value="all" checked /> Every event</label
           >
           <label class="checkbox-label"
             ><input type="radio" name="map-scope" value="tagged" /> Those tagged</label
@@ -591,6 +592,10 @@ Every point has a place. Explore the spaces between them.</textarea>
         <button id="duration-share" class="share-entity" type="button" hidden>Share</button
         ><button id="duration-report" class="share-entity" type="button" hidden>Report</button
         ><button data-close="duration-dialog" aria-label="Close duration details">×</button>
+      </div>
+      <div id="duration-kind" class="event-kind" role="tablist" aria-label="Kind of event">
+        <button type="button" role="tab" data-kind="moment">Moment</button
+        ><button type="button" role="tab" data-kind="duration">Duration</button>
       </div>
       <p id="duration-sensitive" class="sensitive-note" hidden>
         <span></span>
@@ -1012,7 +1017,7 @@ Every point has a place. Explore the spaces between them.</textarea>
           >Preview context<select id="presentation-preview-purpose">
             <option value="input">Exact editing value</option>
             <option value="axis">Ruler label</option>
-            <option value="event">Moment and duration label</option>
+            <option value="event">Event label</option>
             <option value="tooltip">Full tooltip</option>
           </select></label
         >

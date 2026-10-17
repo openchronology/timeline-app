@@ -133,7 +133,7 @@ export async function checkIssues(page, restore) {
     await page.getByRole('button', { name: 'New duration starting here', exact: true }).click();
     const durationDialog = page.locator('#duration-dialog');
     await durationDialog.waitFor({ state: 'visible' });
-    assert.equal(await page.locator('#duration-heading').textContent(), 'New duration');
+    assert.equal(await page.locator('#duration-heading').textContent(), 'New event');
     await page.locator('#duration-title').fill('Linked span');
     const endpoint = durationDialog.locator('[data-endpoint="end"]');
     // A fixed end shows only its time; following a moment opens the moment selector.
