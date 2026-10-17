@@ -7,8 +7,13 @@ import { DEFAULT_ENTRY_LIMIT } from '../dist/core.mjs';
 
 /** No comparison holds more than this: live updates, layouts and saved views assume it. */
 export const COMPARE_CEILING = 8;
+/** Comparison limits when the environment sets none, by kind of account. */
 const COMPARE_DEFAULTS = { guest: 4, user: 8, admin: 8 };
 
+/**
+ * An invalid limit in the environment (or a storage size an administrator typed); its message
+ * says what is expected. platform.mjs turns it into a ConfigurationError at startup.
+ */
 export class LimitError extends Error {}
 
 /**
@@ -27,12 +32,16 @@ export function compareLimits(env = process.env) {
   }
   return limits;
 }
-/** The comparison limit for an account (null for a guest). */
+/**
+ * The comparison limit for an account (null for a guest): `account` may be a session
+ * (`isAdmin`) or an oc_users row (`is_admin`).
+ */
 export function compareLimit(limits, account) {
   if (!account) return limits.guest;
   return account.isAdmin || account.is_admin ? limits.admin : limits.user;
 }
 
+/** Size units, lower-cased, to bytes: none or b, decimal (kb…tb) and binary (kib…tib). */
 const UNITS = new Map([
   ['', 1n],
   ['b', 1n],
@@ -58,6 +67,8 @@ export function storageBytes(text) {
     throw new LimitError(
       `Expected a storage size such as 104857600, 500MiB or 2GB, not "${String(text).trim()}".`,
     );
+  // Exact arithmetic in bigints: the digits without the point, times the unit, divided by
+  // the power of ten the fraction's length gives (so 1.5GiB is 15 × 1024³ / 10).
   const [whole, fraction = ''] = match[1].split('.');
   if (fraction && unit === 1n) throw new LimitError('A size in bytes is a whole number.');
   const bytes = (BigInt(whole + fraction) * unit) / 10n ** BigInt(fraction.length);

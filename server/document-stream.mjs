@@ -27,6 +27,7 @@ const CHUNK = 256 * 1024;
  * validateDocument leaves them. `prefix` and `suffix` wrap it.
  */
 export async function* documentChunks(settings, parts, { prefix = '', suffix = '' } = {}) {
+  // The settings object without its closing brace: the entity arrays follow as more fields.
   let text = prefix + JSON.stringify(settings).slice(0, -1);
   for (const [name, rows, value] of parts) {
     let count = 0;
@@ -45,6 +46,7 @@ export async function* documentChunks(settings, parts, { prefix = '', suffix = '
   }
   yield text + '}' + suffix;
 }
+/** Numbers cursors, so their names are unique on a connection. */
 let cursors = 0;
 /**
  * The rows of `sql` (with `params`), a page at a time through a cursor in the transaction of
@@ -54,6 +56,8 @@ let cursors = 0;
  */
 export async function* cursorRows(client, sql, params = []) {
   const cursor = 'oc_document_' + ++cursors;
+  // A forward-only cursor (NO SCROLL, so the server keeps nothing to go back to), living
+  // until CLOSE or the transaction's end; FETCH then reads PAGE rows at a time from it.
   await client.query(`DECLARE ${cursor} NO SCROLL CURSOR FOR ${sql}`, params);
   try {
     for (;;) {
@@ -62,6 +66,8 @@ export async function* cursorRows(client, sql, params = []) {
       if (rows.length < PAGE) return;
     }
   } finally {
+    // Closed early too, when the consumer stops reading; a failure here (the transaction
+    // already aborted) is ignored, as the transaction's end closes it anyway.
     await client.query(`CLOSE ${cursor}`).catch(() => {});
   }
 }
@@ -75,6 +81,7 @@ export async function* inSnapshot(pool, chunks) {
   const client = await pool.connect();
   let failed = false;
   try {
+    // Every statement sees the same snapshot, taken at the first one, and nothing is written.
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
     yield* chunks(client);
   } catch (error) {
@@ -82,6 +89,8 @@ export async function* inSnapshot(pool, chunks) {
     throw error;
   } finally {
     await client.query(failed ? 'ROLLBACK' : 'COMMIT').catch(() => (failed = true));
+    // A client whose transaction failed or could not end is discarded (release(true))
+    // rather than handed to another request in an unknown state.
     client.release(failed ? true : undefined);
   }
 }

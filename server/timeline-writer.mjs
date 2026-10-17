@@ -11,6 +11,7 @@
 export const BATCH_LIMIT = 5000;
 /** Requests are limited to 16 MiB; batches stay well under it. */
 export const BATCH_BYTES = 12 * 1024 * 1024;
+/** An API key's shape (och_key_<id>_<secret>), checked before any request is made. */
 const KEY = /^och_key_[a-f0-9]{32}_[a-f0-9]{64}$/;
 
 /**
@@ -25,11 +26,27 @@ export const FAST_SAVE = 2000;
 /** Statuses of a save the server gave up on as too slow: a smaller one may succeed. */
 const TOO_SLOW = new Set([503, 504]);
 
-/** Whether a failed save is worth retrying later. */
+/**
+ * Whether a failed save is worth retrying later: the server unreachable (no status), a
+ * conflict save could not settle, rate limiting, or a server error.
+ */
 export const temporary = (status) =>
   status === undefined || status === 409 || status === 429 || status >= 500;
 
+/**
+ * A client for adding entries to timelines with an API key (timelines:write). It remembers,
+ * per timeline, the revision and settings to send back (`states`) and the save size that suits
+ * it (`limits`).
+ */
 export class TimelineWriter {
+  /**
+   * @param {object} options
+   * @param {string} options.api the server's origin (OCH_API_URL)
+   * @param {string} options.key the API key (OCH_API_KEY)
+   * @param {typeof fetch} [options.fetcher] for tests
+   * @param {() => number} [options.now] a millisecond clock, for timing saves
+   * @throws {Error} for an origin that is not http(s) or a malformed key
+   */
   constructor({ api, key, fetcher = fetch, now = () => performance.now() }) {
     if (!/^https?:\/\//.test(api ?? '')) throw new Error('OCH_API_URL must be an http(s) origin.');
     if (!KEY.test(key ?? ''))
@@ -45,6 +62,12 @@ export class TimelineWriter {
   limit(timeline) {
     return this.limits.get(timeline) ?? BATCH_LIMIT;
   }
+  /**
+   * One API request to `/api/<path>` with the key: redirects refused (a key is never sent on
+   * to another host), a 60-second timeout. Never throws for an HTTP status; a body that is
+   * not JSON reads as {}. Network failures and timeouts throw.
+   * @returns {Promise<{status: number, value: object, retryAfter: string|null|undefined}>}
+   */
   async request(path, options = {}) {
     const response = await this.fetcher(this.api + '/api/' + path, {
       ...options,
@@ -158,6 +181,7 @@ export class TimelineWriter {
             : {}),
         }),
       });
+      // Saved: the answer carries the new revision, so the next save needs no reload.
       if (status === 200) {
         state.revision = value.revision;
         state.eventCount = Number(value.event_count ?? state.eventCount + moments.length);

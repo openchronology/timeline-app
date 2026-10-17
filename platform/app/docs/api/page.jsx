@@ -15,7 +15,10 @@ import {
   streams,
   typeName,
 } from '../../../lib/api-reference.js';
+// Rendered per request: the document names the site's own origin and name, which are
+// settings read at run time.
 export const dynamic = 'force-dynamic';
+/** The page's title, description and canonical address. */
 export function generateMetadata() {
   return {
     title: `HTTP API · ${siteName()}`,
@@ -23,12 +26,32 @@ export function generateMetadata() {
     alternates: { canonical: '/docs/api' },
   };
 }
+/**
+ * The id of an operation's section, for links from the contents: its operationId, or its
+ * method and path made into a fragment when it has none.
+ */
 const anchor = (operation, method, path) =>
   'op-' + (operation.operationId ?? method + path.replace(/[^a-z0-9]+/gi, '-'));
+/** The id of a group's (an OpenAPI tag's) section. */
 const tagAnchor = (name) => 'tag-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
+/**
+ * One operation of the API, as a collapsible section: its method, path and summary; who may
+ * call it; its parameters, request body and responses; and a form to try it (ApiTry).
+ *
+ * `data-api-search` holds the words the contents' filter (ApiFilter) matches against.
+ *
+ * @param {object} props
+ * @param {object} props.document the whole OpenAPI document, to resolve `$ref`s in schemas
+ * @param {string} props.path the operation's path template, such as `/api/timelines/{id}`
+ * @param {string} props.method its HTTP method, in lower case
+ * @param {object} props.operation the OpenAPI operation object
+ * @param {object[]} props.parameters its parameters, with the path's own merged in
+ */
 function Operation({ document, path, method, operation, parameters }) {
   const requestSchema = jsonBody(operation);
+  // A body that is not JSON (such as a timeline file to import): shown by media type, and
+  // not tried from here.
   const otherBody = !requestSchema && operation.requestBody;
   return (
     <details
@@ -43,6 +66,7 @@ function Operation({ document, path, method, operation, parameters }) {
         {operation.deprecated && <span className="muted"> · deprecated</span>}
       </summary>
       <ApiText text={operation.description} />
+      {/* An operation's own security requirements, or else the document's default ones. */}
       <p className="muted">Who: {access(operation.security ?? document.security)}</p>
       {parameters.length > 0 && (
         <>
@@ -86,6 +110,7 @@ function Operation({ document, path, method, operation, parameters }) {
             </dt>
             <dd>
               <ApiText text={response.description} />
+              {/* Bodies only for successes: every failure has the same error shape. */}
               {Object.entries(response.content ?? {}).map(([type, media]) =>
                 status.startsWith('2') ? (
                   <div key={type}>
@@ -98,6 +123,7 @@ function Operation({ document, path, method, operation, parameters }) {
           </div>
         ))}
       </dl>
+      {/* Endless streams can't be shown, and the form only sends JSON, so neither is tried. */}
       {!streams(operation) && !otherBody && (
         <ApiTry
           method={method}
@@ -109,6 +135,12 @@ function Operation({ document, path, method, operation, parameters }) {
     </details>
   );
 }
+/**
+ * The API reference (/docs/api): the OpenAPI document built for this site's origin and name
+ * (the same one /api/openapi.json serves), shown as contents with a filter, then each group of
+ * operations, then every schema. It reads nothing per visitor; trying an operation is done in
+ * the browser by ApiTry.
+ */
 export default function ApiReference() {
   const document = openApiDocument({ origin: siteOrigin(), name: siteName() });
   const groups = operationsByTag(document);

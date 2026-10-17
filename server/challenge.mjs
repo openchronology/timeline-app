@@ -15,7 +15,9 @@ import { tokenHash } from './auth.mjs';
  * - `turnstile`: Cloudflare Turnstile, verified with Cloudflare's siteverify API. Desktop
  *   and API-key sessions, which cannot show Cloudflare's widget, are given proof of work.
  */
+/** The actions a challenge can be for; each answer is bound to one and works only for it. */
 export const PURPOSES = ['register', 'email', 'sign-in', 'contribution', 'plugin', 'report'];
+/** The message shown with a challenge for each purpose. */
 const PURPOSE_TEXT = {
   register: 'Confirm you are a person to create an account.',
   email: 'Confirm you are a person to send this email.',
@@ -29,7 +31,12 @@ const TURNSTILE_VERIFY = 'https://challenges.cloudflare.com/turnstile/v0/sitever
 const LIFETIME_SECONDS = 600;
 /** Sign-in failures counted per address and per account before a challenge is needed. */
 const SIGN_IN_FAILURES = 3;
+/** Hex SHA-256 of a string. */
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
+/**
+ * Constant-time string equality (false for non-strings or different lengths), so checking a
+ * client's challenge and signature does not leak by timing how much of a signature was right.
+ */
 const same = (a, b) =>
   typeof a === 'string' &&
   typeof b === 'string' &&
@@ -37,6 +44,13 @@ const same = (a, b) =>
   timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 export class Challenges {
+  /**
+   * Validates the settings (throwing at start-up on bad ones): `provider` (pow, turnstile or
+   * off), `difficulty` (the largest number a proof of work may need, 1000 to 10,000,000), `key`
+   * (AUTH_ENCRYPTION_KEY bytes, from which the signing key is derived), `turnstile` site and
+   * secret keys, `origin` (APP_ORIGIN, whose hostname Turnstile answers must name) and
+   * `trustDays` (how old an account must be before contributing without a check).
+   */
   constructor({
     pool,
     provider = 'pow',
@@ -59,6 +73,8 @@ export class Challenges {
     this.provider = provider;
     this.difficulty = difficulty;
     // Without AUTH_ENCRYPTION_KEY, challenges are signed per process (development only).
+    // The signing key is derived by HMAC with a fixed label, so the encryption key itself is
+    // never used for signing and a signature reveals nothing about it.
     this.key = createHmac('sha256', key ?? randomBytes(32))
       .update('openchronology challenge v1')
       .digest();
@@ -84,6 +100,14 @@ export class Challenges {
     if (this.provider !== 'turnstile') return this.provider;
     return session && session.kind !== 'web' ? 'pow' : 'turnstile';
   }
+  /**
+   * A new challenge for `purpose`. Turnstile: the site key for the widget. Proof of work: the
+   * server picks a secret number up to `difficulty` and publishes only the SHA-256 of salt and
+   * number, so the client must try numbers until one matches (on average half the range). The
+   * salt carries random bytes, the purpose and the expiry time, and the challenge is signed, so
+   * nothing needs storing until it is answered and an answer cannot be moved to another purpose
+   * or used after it expires.
+   */
   issue(purpose, session) {
     if (this.kind(session) === 'turnstile')
       return { provider: 'turnstile', purpose, siteKey: this.turnstile.siteKey };
@@ -100,9 +124,11 @@ export class Challenges {
       signature: this.sign(challenge),
     };
   }
+  /** HMAC-SHA-256 of `challenge` with the derived signing key, in hex. */
   sign(challenge) {
     return createHmac('sha256', this.key).update(challenge).digest('hex');
   }
+  /** A 428 HttpError carrying a new challenge for `purpose` for the client to solve. */
   refuse(purpose, session, message = PURPOSE_TEXT[purpose]) {
     return Object.assign(new HttpError(428, message), {
       challenge: this.issue(purpose, session),
@@ -130,6 +156,12 @@ export class Challenges {
     if (!accepted)
       throw this.refuse(purpose, session, 'That check expired or failed. Please try again.');
   }
+  /**
+   * Whether a proof-of-work `answer` is valid for `purpose`, spending it if so. The salt must
+   * name this purpose and an unexpired time; sha256(salt + number) must equal the challenge, and
+   * the challenge must carry this server's signature, which proves it was issued here (the
+   * client cannot invent an easy challenge, nor change the salt, which the hash covers).
+   */
   async verifyWork(answer, purpose) {
     const { salt, number, challenge, signature } = answer;
     if (typeof salt !== 'string' || salt.length > 200 || !Number.isInteger(number)) return false;
@@ -139,6 +171,11 @@ export class Challenges {
     const expected = sha256(salt + number);
     if (!same(challenge, expected) || !same(signature, this.sign(expected))) return false;
     // Each answer is spent once; replays fail even within its lifetime.
+    // Sweeps spent answers whose challenge has expired (oc_challenge_uses_expiry); those can no
+    // longer be replayed anyway, as the expiry check above refuses them. Then records this one,
+    // keyed by the hash of its salt and kept until its expiry: ON CONFLICT DO NOTHING inserts
+    // nothing for an answer already used, so rowCount tells a first use (1) from a replay (0),
+    // atomically across instances.
     await this.pool.query('DELETE FROM oc_challenge_uses WHERE expires_at<=now()');
     const { rowCount } = await this.pool.query(
       'INSERT INTO oc_challenge_uses(id,expires_at) VALUES($1,to_timestamp($2)) ON CONFLICT DO NOTHING',
@@ -146,6 +183,11 @@ export class Challenges {
     );
     return rowCount === 1;
   }
+  /**
+   * Whether a Turnstile `answer` token is valid for `purpose`, according to Cloudflare's
+   * siteverify API (with the client address `ip` when known). Throws 503 when Cloudflare cannot
+   * be reached, rather than letting the action through unchecked.
+   */
   async verifyTurnstile(answer, purpose, ip) {
     if (typeof answer.token !== 'string' || !answer.token || answer.token.length > 2048)
       return false;
@@ -173,12 +215,22 @@ export class Challenges {
   /** Sign-in needs a challenge after several failures from the address or for the account. */
   async signInNeeded(ip, username) {
     if (this.provider === 'off') return false;
+    // The larger of the two unexpired failure counters (address and account) that signInFailed
+    // keeps in oc_auth_attempts, looked up by the hashes of their keys (the primary key).
     const { rows } = await this.pool.query(
       'SELECT max(count) AS count FROM oc_auth_attempts WHERE key=ANY($1) AND expires_at>now()',
       [[tokenHash('sign-in-failure:' + ip), tokenHash('sign-in-failure-account:' + username)]],
     );
     return (rows[0]?.count ?? 0) >= SIGN_IN_FAILURES;
   }
+  /**
+   * Counts a failed password sign-in against the client address and the account: upserted
+   * counters in oc_auth_attempts (shared with the rate limits under different, hashed keys),
+   * each window fifteen minutes from its first failure. The upsert does not renew an expired
+   * counter: it relies on Auth.rateLimit, which every sign-in calls first, having swept expired
+   * rows. Asking for a check, instead of locking
+   * the account, means failures caused by someone else cannot lock its owner out.
+   */
   async signInFailed(ip, username) {
     for (const key of ['sign-in-failure:' + ip, 'sign-in-failure-account:' + username])
       await this.pool.query(
@@ -192,6 +244,9 @@ export class Challenges {
    */
   async contributionNeeded(userId, timelineId) {
     if (this.provider === 'off') return false;
+    // One row when both the account and timeline exist (an implicit cross join of the two
+    // single-row lookups): trusted if an administrator, the owner, a member (EXISTS stops at the
+    // first membership) or an account older than the trust period.
     const { rows } = await this.pool.query(
       `SELECT u.is_admin OR t.owner_id=u.id
         OR EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=u.id)

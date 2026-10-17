@@ -5,11 +5,38 @@
 import { useState } from 'react';
 import { api } from '../lib/api.js';
 import HelpTip from './help-tip.jsx';
+/**
+ * The account page's second half, under its security settings (Account renders it once the
+ * account is loaded): storage used, the profile picture, sensitive content, API keys, linked
+ * providers and deleting the account.
+ *
+ * Everything shown comes from the `account` that Account read (GET /api/auth/account); each
+ * change is a request to /api/auth/… with the session's CSRF token, followed by `refresh()` so
+ * the page shows the result. Changes that grant or remove access (creating a key, unlinking a
+ * provider, deleting the account) also send the current password and, when on, a two-factor
+ * code: the server asks for a recent sign-in confirmed with them (security.fresh).
+ *
+ * @param {object} props
+ * @param {object} props.session GET /api/session's answer (its `csrf` and `user`)
+ * @param {object} props.account GET /api/auth/account's answer: `profile` (`avatarUrl`,
+ *   `minor`, `showSensitive`), `usage`, `keys` and `identities`
+ * @param {() => Promise<object>} props.refresh reads the session and account again
+ */
 export default function AccountAccess({ session, account, refresh }) {
   const [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
+    // A key just created: its secret, shown once and never again (the server keeps a hash).
     [token, setToken] = useState(null),
+    // The avatar being edited (an address or a data: URL), previewed before it is saved.
     [avatar, setAvatar] = useState(account?.profile?.avatarUrl ?? '');
+  /**
+   * Sends one change to /api/<path>, then reads the account again; a failure is shown at the
+   * end of the section. One at a time: a click while one is being sent is ignored.
+   * @param {string} path the API path, after /api/
+   * @param {string} method its HTTP method
+   * @param {object} [data] the JSON body
+   * @returns {Promise<object|undefined>} the server's answer, or nothing when it failed
+   */
   async function action(path, method, data) {
     if (busy) return;
     setBusy(true);
@@ -24,6 +51,12 @@ export default function AccountAccess({ session, account, refresh }) {
       setBusy(false);
     }
   }
+  /**
+   * Creates an API key: POST /api/auth/api-keys with its name, lifetime in days, scopes (always
+   * reading timelines, and writing them when chosen) and the confirmation password and code.
+   * The answer's `token` is the key itself, shown once; the form is cleared, so the password
+   * is not left in it.
+   */
   async function create(e) {
     e.preventDefault();
     const form = e.currentTarget,
@@ -49,12 +82,15 @@ export default function AccountAccess({ session, account, refresh }) {
         </p>
       )}
       <p>
+        {/* Administrators and accounts allowed past the limit have none. */}
         Storage: {Number(account?.usage?.used_bytes ?? 0).toLocaleString()} bytes used ·{' '}
         {account?.usage?.quota_bypass || account?.usage?.is_admin
           ? 'Unlimited'
           : Number(account?.usage?.effective_quota_bytes ?? 0).toLocaleString() + ' byte limit'}
       </p>
       {avatar && (
+        // The preview loads the address without credentials (a CORS request) and without a
+        // Referer, so the image's host learns nothing about the account page.
         <img
           className="account-avatar"
           src={avatar}
@@ -84,6 +120,9 @@ export default function AccountAccess({ session, account, refresh }) {
             type="file"
             accept="image/png,image/jpeg,image/webp"
             onChange={(e) => {
+              // An uploaded picture becomes a data: URL, saved like an address; the server checks
+              // its size and that it really is a PNG, JPEG or WebP. Clearing the input lets the
+              // same file be chosen again.
               const f = e.target.files?.[0];
               e.target.value = '';
               if (!f) return;
@@ -105,6 +144,7 @@ export default function AccountAccess({ session, account, refresh }) {
         </div>
       </form>
       <h2>Sensitive content</h2>
+      {/* Minors can't turn the warnings off: the server refuses it (#115). */}
       {account?.profile?.minor ? (
         <p className="muted">
           Timelines, moments and durations labelled as containing nudity, graphic violence or
@@ -178,6 +218,7 @@ export default function AccountAccess({ session, account, refresh }) {
             {k.revoked_at ? 'Revoked' : new Date(k.expires_at) < new Date() ? 'Expired' : 'Active'}
           </p>
           <div className="actions">
+            {/* Revoking (POST) stops the key but keeps it listed; removing (DELETE) forgets it. */}
             <button
               disabled={busy || !!k.revoked_at}
               onClick={() => action('auth/api-keys/' + k.id, 'POST', {})}
@@ -255,6 +296,8 @@ export default function AccountAccess({ session, account, refresh }) {
               csrf: session.csrf,
               data: {
                 confirm: d.get('confirm'),
+                // Only what was given: an account with no password (signed up through a
+                // provider), or without two-factor authentication, sends none.
                 ...(d.get('password') ? { password: d.get('password') } : {}),
                 ...(d.get('code') ? { code: d.get('code') } : {}),
               },

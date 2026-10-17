@@ -2,6 +2,14 @@
 // The HTTP API (createRequestHandler): its routes, reading and checking requests, and handing
 // them to the store, accounts, collaboration, moderation and the other services. Next.js serves
 // it in production (next-handler.mjs); createApplication is a plain Node server for tests.
+//
+// The order of checks for every request (createRequestHandler): security headers; API keys
+// confined to /api/timelines; health and the API description; a cross-origin refusal for
+// anything but GET and HEAD; the public plugin library and the session; then, under /api/,
+// the session (cookie, desktop Bearer token or API key), the key's scope and rate limit, and
+// the data-provider check for writes to timelines. Each route group below says who may call it
+// and what it checks first. Writes by browser sessions carry the session's CSRF token
+// (auth.require), and anonymous forms the login nonce (auth.requireLogin).
 import {
   compareLimits as compareLimitsFromEnv,
   compareLimit,
@@ -46,6 +54,11 @@ import {
   timeMapping,
 } from '../dist/core.mjs';
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+/**
+ * The request's JSON body, read up to `maximum` bytes (16 MiB by default; routes pass less).
+ * 415 unless sent as application/json, 413 past the limit (stopping as soon as it is passed),
+ * 400 for invalid JSON.
+ */
 async function body(req, maximum = 16 * 1024 * 1024) {
   if (!req.headers['content-type']?.startsWith('application/json'))
     throw new HttpError(415, 'Send JSON.');
@@ -62,6 +75,7 @@ async function body(req, maximum = 16 * 1024 * 1024) {
     throw new HttpError(400, 'Invalid JSON.');
   }
 }
+/** A SQLite timeline file uploaded as the body, up to 32 MiB; 415 for another type. */
 async function fileBody(req) {
   if (
     !['application/vnd.openchronology.sqlite', 'application/octet-stream'].includes(
@@ -78,6 +92,7 @@ async function fileBody(req) {
   }
   return Buffer.concat(parts);
 }
+/** A 303 redirect (after a social sign-in's callback), optionally setting cookies. */
 function redirect(res, location, cookie) {
   res.writeHead(303, {
     Location: location,
@@ -86,6 +101,7 @@ function redirect(res, location, cookie) {
   });
   res.end();
 }
+/** A SQLite timeline file as a download. */
 function fileResponse(res, bytes) {
   res.writeHead(200, {
     'Content-Type': 'application/vnd.openchronology.sqlite',
@@ -95,6 +111,11 @@ function fileResponse(res, bytes) {
   });
   res.end(bytes);
 }
+/**
+ * A timeline document from a request, validated (core's validateDocument; `partial` for a
+ * fragment such as one changed moment), without image copies unless `copies`. 400 when
+ * invalid.
+ */
 function document(value, partial = false, copies = false) {
   try {
     // Images are linked, not copied, on the server (#109); only exports keep copies.
@@ -104,7 +125,11 @@ function document(value, partial = false, copies = false) {
     throw new HttpError(400, error.message);
   }
 }
-/** A tag separation filter: one to forty tags, entities with any of them or none. */
+/**
+ * A separation filter from a request: by tags (one to forty, entities with any of them or
+ * none), or by relationship to an entity (`related`, `depth` direct or all, `mode` any or
+ * none). undefined when none is given; 400 when malformed.
+ */
 function viewFilter(value) {
   if (value === undefined || value === null) return undefined;
   if (value.related !== undefined) {
@@ -128,6 +153,7 @@ function viewFilter(value) {
     throw new HttpError(400, 'A tag filter needs one to forty tags and a mode.');
   return { tags, mode: value.mode };
 }
+/** A time bound from a request: an exact rational as a string, normalized; null when absent. */
 function bound(value) {
   if (value == null) return null;
   if (typeof value !== 'string') throw new HttpError(400, 'Time bounds must be rational strings.');
@@ -215,6 +241,7 @@ const download = (url, name) =>
   url.searchParams.get('download') === '1'
     ? { 'Content-Disposition': `attachment; filename="${name}.ochx"` }
     : null;
+/** A JSON answer, never cached. */
 function response(res, status, value, headers = {}) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -237,6 +264,13 @@ async function retentionInfo(store, t) {
     history_bytes: t.keep_history ? await store.historyBytes(store.pool, t.id) : 0,
   };
 }
+/**
+ * The request handler: `(req, res)` for Node's http server or the Next.js adapter. Its
+ * services are made once here from `options`; without a `pool` it serves only the static app,
+ * the plugin library and the session (`server: false`), and every other /api/ route answers
+ * 503 so the app keeps working in the browser alone. Errors are answered as JSON with their
+ * status (see the catch at the end).
+ */
 export function createRequestHandler({
   pool = null,
   origin = 'http://localhost:5173',
@@ -281,6 +315,7 @@ export function createRequestHandler({
   const moderation = store ? new Moderation(store, auth, administration) : null;
   const collaboration = store ? new Collaboration(store) : null;
   const browserForks = store ? new BrowserForks(store, auth) : null;
+  // The OpenAPI document, built on first request and kept.
   let apiDescription = null;
   return async (req, res) => {
     // Enable only behind a proxy that overwrites X-Forwarded-For and blocks direct access.
@@ -290,6 +325,10 @@ export function createRequestHandler({
         req.clientAddress = forwarded.trim();
     }
     req.clientAddress ??= req.socket.remoteAddress ?? 'unknown';
+    // Security headers on every answer: no MIME sniffing, no referrer, HSTS on HTTPS, and a
+    // content security policy allowing only this origin's scripts and connections, images from
+    // anywhere over HTTPS (timelines link to images where their owners host them, #109), and
+    // no framing.
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
     if (origin.startsWith('https:')) res.setHeader('Strict-Transport-Security', 'max-age=31536000');
@@ -300,11 +339,16 @@ export function createRequestHandler({
     try {
       const pathname = new URL(req.url, origin).pathname,
         method = req.method;
+      // API keys reach only the timeline endpoints, refused before anything else is read.
       if (
         (req.headers.authorization ?? '').startsWith('Bearer och_key_') &&
         !pathname.startsWith('/api/timelines')
       )
         throw new HttpError(403, 'API keys are limited to timeline endpoints.');
+      // Health, for anyone (load balancers, Compose): 503 unless the database answers with
+      // the current schema. The query reads no rows (LIMIT 0, joins ON false) but fails if
+      // any table or column named is missing, so a server whose migration has not run
+      // reports unavailable.
       if (pathname === '/healthz' && method === 'GET') {
         try {
           if (pool)
@@ -326,8 +370,13 @@ export function createRequestHandler({
         });
         return res.end(method === 'HEAD' ? undefined : apiDescription);
       }
+      // Everything that may change something refuses another site's pages outright (a
+      // browser sends Origin on such requests); the CSRF tokens below are a second line.
       if (!['GET', 'HEAD'].includes(method) && req.headers.origin && req.headers.origin !== origin)
         throw new HttpError(403, 'Cross-origin request rejected.');
+      // The plugin library (plugins.mjs): searched and read by anyone, signed in or not, and
+      // with or without a database (then only the official plugins). Searches take their
+      // options from the query string (GET) or a small JSON body (POST, at most 4 KiB).
       if (pathname === '/api/plugins' && method === 'GET') {
         const query = new URL(req.url, origin).searchParams;
         return response(
@@ -375,6 +424,9 @@ export function createRequestHandler({
           throw new HttpError(400, 'Invalid plugin version.');
         return response(res, 200, await library.get(pluginPath[1], pluginPath[2]));
       }
+      // The session, for anyone: who is signed in (if anyone), the CSRF token for their writes,
+      // or, signed out, a fresh login nonce (set as a cookie) for the sign-in forms; and what
+      // this server offers (storage, providers, email, file exchange, limits).
       if (pathname === '/api/session' && method === 'GET') {
         const session = auth ? await auth.session(req) : null;
         const nonce = !session && auth ? auth.nonce(req, 'login') : null;
@@ -422,6 +474,11 @@ export function createRequestHandler({
             503,
             'Server storage is not configured. Your browser timeline remains available.',
           );
+        // Sign-in and registration, for anyone. Checked first: the CSRF token of a session
+        // already open (signing in as someone else), else the login nonce; then the
+        // human-verification challenge (always to register; to sign in after repeated
+        // failures from the address or for the account). Rate limits are in auth.signIn. A
+        // session already open is ended once the new one is issued.
         if (['/api/auth/login', '/api/auth/register'].includes(pathname) && method === 'POST') {
           const previous = await auth.session(req);
           if (previous) auth.require(previous, req);
@@ -457,6 +514,10 @@ export function createRequestHandler({
           ].filter(Boolean);
           return response(res, 200, publicResult, cookies.length ? { 'Set-Cookie': cookies } : {});
         }
+        // Every other /api/ route: the session, if any (null when signed out). An API key that
+        // does not resolve is refused here rather than treated as signed out. Keys are held to
+        // their scopes (read or write) and to their own rate limit, API_KEY_REQUESTS_PER_MINUTE
+        // (default 120, at most 1000).
         const session = await auth.session(req),
           userId = session?.id;
         if ((req.headers.authorization ?? '').startsWith('Bearer och_key_') && !session)
@@ -467,7 +528,10 @@ export function createRequestHandler({
             'api-key:' + session.api_key_id,
             Math.max(1, Math.min(1000, Number(process.env.API_KEY_REQUESTS_PER_MINUTE) || 120)),
           );
-        // Copying a public timeline into a browser supplies nothing: guests may (#178).
+        // Writing to timelines requires an account that may supply data (not suspended, not
+        // read-only by a zero quota; administration.mjs requireDataProvider): every
+        // /api/timelines request but reads, deletions and copying into a browser. Copying a
+        // public timeline into a browser supplies nothing: guests may (#178).
         if (
           pathname.startsWith('/api/timelines') &&
           !keyRequestRead(pathname, method) &&
@@ -476,6 +540,9 @@ export function createRequestHandler({
         )
           await requireDataProvider(pool, userId);
         // Reports and moderation decisions (#115; moderation.mjs).
+        // Reporting: anyone, signed in or not. Checked first: the session's CSRF token, or the
+        // login nonce when signed out; ten reports a minute per account or address; and the
+        // human-verification challenge when signed out.
         if (pathname === '/api/reports' && method === 'POST') {
           if (session) auth.require(session, req);
           else auth.requireLogin(req);
@@ -483,6 +550,8 @@ export function createRequestHandler({
           if (!session) await challenges.require(req, 'report', null);
           return response(res, 201, await moderation.report(userId, await body(req, 8192)));
         }
+        // An owner's own decisions, and their one request for review: signed in only (the
+        // request also with the CSRF token and a rate limit).
         if (pathname === '/api/moderation' && method === 'GET') {
           if (!session) throw new HttpError(401, 'Sign in to see moderation decisions.');
           return response(res, 200, await moderation.mine(userId));
@@ -498,6 +567,9 @@ export function createRequestHandler({
             await moderation.appeal(userId, appeal[1], await body(req, 8192)),
           );
         }
+        // The review queue and decisions: administrators only (Moderation checks, and decide
+        // also confirms with password and second factor). Decisions carry the CSRF token and
+        // share the administrators' rate limit.
         const reports = /^\/api\/admin\/reports(?:\/([a-f0-9-]{36}))?$/.exec(pathname);
         if (reports) {
           if (method === 'GET' && !reports[1])
@@ -520,6 +592,10 @@ export function createRequestHandler({
           }
           throw new HttpError(404, 'Unknown administration action.');
         }
+        // Site administration (administration.mjs): administrators only, checked by
+        // Administration. Lists of users or timelines (settings come with the users' list);
+        // changes to a user, a timeline or the site settings, with the CSRF token, a rate
+        // limit, and the password and second factor (Administration.change).
         if (pathname.startsWith('/api/admin/')) {
           const parts = pathname.slice('/api/admin/'.length).split('/');
           if (
@@ -554,6 +630,8 @@ export function createRequestHandler({
           }
           throw new HttpError(404, 'Unknown administration action.');
         }
+        // The account's own profile (avatar, sensitive-content preference): signed in, with the
+        // CSRF token. The body allows a data-URL avatar of up to 256 KiB.
         if (pathname === '/api/auth/profile' && method === 'PATCH') {
           auth.require(session, req);
           const value = await body(req, 400000);
@@ -579,6 +657,9 @@ export function createRequestHandler({
             ]);
           return response(res, 200, { ok: true });
         }
+        // API keys (api-keys.mjs): a signed-in browser or desktop session lists, creates (with
+        // the CSRF token and a rate limit), revokes (POST) or deletes (DELETE) its own. API
+        // keys cannot reach these: they are confined to /api/timelines above.
         if (pathname === '/api/auth/api-keys') {
           if (!session) throw new HttpError(401, 'Sign in to manage API keys.');
           if (method === 'GET') return response(res, 200, { keys: await auth.keys.list(userId) });
@@ -593,6 +674,8 @@ export function createRequestHandler({
           auth.require(session, req);
           return response(res, 200, await auth.keys.revoke(userId, apiKey[1], method === 'DELETE'));
         }
+        // Unlinking a social sign-in: signed in, with the CSRF token, a rate limit and a fresh
+        // confirmation (security.fresh), refused when it would leave no way to sign in.
         if (pathname === '/api/auth/identities/unlink' && method === 'POST') {
           auth.require(session, req);
           await auth.rateLimit('unlink:' + userId);
@@ -600,6 +683,8 @@ export function createRequestHandler({
           if (!['google', 'github', 'facebook'].includes(value.provider))
             throw new HttpError(400, 'Unknown provider.');
           await auth.security.transaction(async (c) => {
+            // The account locked, so two unlinks at once cannot each see the other identity
+            // still there and together remove the last way to sign in.
             const user = (await c.query('SELECT * FROM oc_users WHERE id=$1 FOR UPDATE', [userId]))
               .rows[0];
             await auth.security.fresh(c, user, session, value);
@@ -616,6 +701,11 @@ export function createRequestHandler({
           });
           return response(res, 200, { ok: true });
         }
+        // Account security (AccountSecurity in auth.mjs): the first five work signed out too
+        // (finishing a two-factor sign-in, confirming an email, recovering a password); the rest
+        // need a session. Checked first: the CSRF token or login nonce, and a rate limit per
+        // address; for those that email an address the requester types, the human-verification
+        // challenge; for the signed-in ones, also a rate limit per account.
         const securityRoutes = new Set([
           'mfa/complete',
           'email/enroll',
@@ -680,6 +770,9 @@ export function createRequestHandler({
           ].filter(Boolean);
           return response(res, 200, publicResult, cookies.length ? { 'Set-Cookie': cookies } : {});
         }
+        // Publishing plugins and suites (plugins.mjs): a signed-in account that may supply data,
+        // with the CSRF token and a rate limit; the human-verification challenge for all but
+        // administrators.
         if (pathname === '/api/plugins/suites/publish' && method === 'POST') {
           auth.require(session, req);
           await requireDataProvider(pool, userId);
@@ -696,6 +789,9 @@ export function createRequestHandler({
           const manifest = await library.publish(userId, await body(req, 32768));
           return response(res, 201, manifest);
         }
+        // Social sign-in (oauth.mjs): starting it (signed out with the login nonce, or signed in
+        // recently with the CSRF token to link a provider), and the provider's redirect back,
+        // which ends a session already open once a new one is issued.
         const providerRoute = /^\/api\/auth\/(google|github|facebook)\/(start|callback)$/.exec(
           pathname,
         );
@@ -722,6 +818,9 @@ export function createRequestHandler({
                 : undefined,
           );
         }
+        // Desktop sign-in by code (device-auth.mjs): the desktop app starts and polls without a
+        // session; a browser session signed in within five minutes approves the code (CSRF
+        // token and rate limit checked in DeviceAuth.approve).
         if (pathname === '/api/auth/device/start' && method === 'POST') {
           await body(req);
           return response(res, 200, await devices.start(req.clientAddress));
@@ -746,6 +845,9 @@ export function createRequestHandler({
           });
           return response(res, 200, result, { 'Set-Cookie': auth.cookie('', true) });
         }
+        // The account page: signed in. Its linked providers, its sessions still valid (not
+        // past expiry, seen within a day; identified to the page by their token hash, never the
+        // token), its security state and remaining recovery codes, storage, and API keys.
         if (pathname === '/api/auth/account' && method === 'GET') {
           if (!session) throw new HttpError(401, 'Sign in to continue.');
           const identities = (
@@ -779,6 +881,7 @@ export function createRequestHandler({
             sessions: sessions.map((row) => ({ ...row, current: row.id === session.token_hash })),
           });
         }
+        // Signing out everywhere else, and signing out: signed in, with the CSRF token.
         if (pathname === '/api/auth/revoke-others' && method === 'POST') {
           auth.require(session, req);
           await pool.query('DELETE FROM oc_sessions WHERE user_id=$1 AND token_hash!=$2', [
@@ -787,6 +890,8 @@ export function createRequestHandler({
           ]);
           return response(res, 200, { ok: true });
         }
+        // Converting SQLite timeline files (files.mjs): signed in, with the CSRF token and a
+        // rate limit. Nothing is stored; the converted document or file is returned.
         if (pathname === '/api/files/import' && method === 'POST') {
           auth.require(session, req);
           await auth.rateLimit('files:' + userId);
@@ -812,6 +917,8 @@ export function createRequestHandler({
         // check that an import fits before writing; quotaBytes is null when none applies.
         if (pathname === '/api/timelines/usage' && method === 'GET') {
           if (!userId) throw new HttpError(401, 'Sign in to see storage use.');
+          // A quota applies only while the site enforces quotas, and never to exempt accounts
+          // or administrators.
           const account = await usage(pool, userId);
           const { rows } = await pool.query(
             'SELECT enforce_quotas FROM oc_site_settings WHERE singleton',
@@ -822,12 +929,15 @@ export function createRequestHandler({
             quotaBytes: limited ? Number(account.effective_quota_bytes) : null,
           });
         }
+        // Searching and browsing timelines (collaboration.mjs searchTimelines): anyone; the
+        // scopes mine and starred need a session.
         if (pathname === '/api/timelines/search' && method === 'POST')
           return response(
             res,
             200,
             await searchTimelines(pool, userId, await body(req, 4096), featured),
           );
+        // Starring (stars.mjs): signed in, with the CSRF token and a rate limit.
         const star = /^\/api\/timelines\/([a-f0-9-]{36})\/star$/.exec(pathname);
         if (star && uuid.test(star[1]) && method === 'POST') {
           auth.require(session, req);
@@ -838,6 +948,8 @@ export function createRequestHandler({
             await setTimelineStar(pool, store, star[1], userId, await body(req, 1024)),
           );
         }
+        // Pull requests and their comments (collaboration.mjs). Reading (these POST searches
+        // and the GETs below): anyone who may see the timeline, checked by Collaboration.
         const pullList = /^\/api\/timelines\/([a-f0-9-]{36})\/proposals\/search$/.exec(pathname);
         if (pullList && uuid.test(pullList[1]) && method === 'POST')
           return response(
@@ -917,6 +1029,10 @@ export function createRequestHandler({
               return response(res, 200, await collaboration.document(tid, pid, userId));
             if (!sub) return response(res, 200, await collaboration.get(tid, pid, userId));
           }
+          // Writing (opening, updating, resolving, commenting): signed in, with the CSRF token
+          // and a rate limit; opening one or commenting asks newer accounts that are not
+          // members for the human-verification challenge. Permissions (contributor, writer,
+          // author) are checked by Collaboration.
           auth.require(session, req);
           await auth.rateLimit('proposals:' + userId);
           const input = await body(req);
@@ -936,6 +1052,8 @@ export function createRequestHandler({
             return response(res, 201, await collaboration.comment(tid, pid, userId, input));
           throw new HttpError(405, 'Method not allowed.');
         }
+        // The signed-in account's timelines: those it owns, and those it is a member of unless
+        // moderators restricted them (#115); the 100 most recently updated.
         if (pathname === '/api/timelines' && method === 'GET') {
           if (!session) throw new HttpError(401, 'Sign in to see your timelines.');
           const { rows } = await pool.query(
@@ -947,10 +1065,13 @@ export function createRequestHandler({
           );
           return response(res, 200, { timelines: rows });
         }
+        // Creating a timeline: signed in (or an API key with write scope), with the CSRF token.
         if (pathname === '/api/timelines' && method === 'POST') {
           auth.require(session, req);
           return response(res, 201, await store.create(userId, document(await body(req))));
         }
+        // Saved history (versioning.mjs): a page of revisions, or one revision streamed (as an
+        // .ochx file with ?download=1); for anyone who may see the timeline.
         const history = /^\/api\/timelines\/([a-f0-9-]{36})\/history(?:\/([a-f0-9-]{36}))?$/.exec(
           pathname,
         );
@@ -980,6 +1101,9 @@ export function createRequestHandler({
             ),
           );
         }
+        // Copying a public timeline into the browser (browser-forks.mjs): anyone, guests
+        // included; BrowserForks applies a rate limit per address and refuses private
+        // timelines.
         const browserFork = /^\/api\/timelines\/([a-f0-9-]{36})\/browser-fork$/.exec(pathname);
         if (browserFork && uuid.test(browserFork[1])) {
           if (method !== 'POST') throw new HttpError(405, 'Method not allowed.');
@@ -999,6 +1123,8 @@ export function createRequestHandler({
             await browserForks.copy(browserFork[1], input.revision, req.clientAddress),
           );
         }
+        // Forking, duplicating, and syncing a fork with its upstream (versioning.mjs): signed
+        // in, with the CSRF token and a rate limit; access to both is checked by Versioning.
         const forkAction = /^\/api\/timelines\/([a-f0-9-]{36})\/(fork|duplicate|sync)$/.exec(
           pathname,
         );
@@ -1029,6 +1155,11 @@ export function createRequestHandler({
             { 'Content-Disposition': `attachment; filename="${exported[2]}.ochx"` },
           );
         }
+        // One timeline and its actions. Reads (metadata, document, query, revision, recent):
+        // anyone who may see it, checked by the store. Writes (save, changes, delete-range,
+        // map-times): signed in or a write-scoped key, with the CSRF token; write access
+        // checked by the store or here. Sharing, settings, members and deletion: its owner
+        // (or an administrator), checked further down.
         const match =
           /^\/api\/timelines\/([^/]+)(?:\/(document|query|members|settings|file|changes|delete-range|map-times|revision|recent))?$/.exec(
             pathname,
@@ -1050,6 +1181,8 @@ export function createRequestHandler({
         if (!action && method === 'GET')
           return response(res, 200, await store.metadata(id, userId));
         if (action === 'document' && method === 'GET') {
+          // A guest's copy goes through BrowserForks, with its rate limit and concurrency cap,
+          // rather than the streamed snapshot.
           if (!userId) {
             const copy = await browserForks.copy(id, undefined, req.clientAddress);
             return response(res, 200, {
@@ -1068,6 +1201,8 @@ export function createRequestHandler({
             file ?? {},
           );
         }
+        // The timeline as a SQLite file: signed in, rate-limited per address; not for
+        // comparisons.
         if (action === 'file' && method === 'GET') {
           if ((await store.access(id, userId)).comparison)
             throw new HttpError(409, 'Export individual comparison sources instead.');
@@ -1127,6 +1262,10 @@ export function createRequestHandler({
             'Content-Type': 'application/x-ndjson; charset=utf-8',
           });
         }
+        // An incremental save (store.save): up to 5000 changed moments and durations (null to
+        // delete) and 5000 relationships, at `revision`, with the settings sent back. Each
+        // moment is validated in the context of those settings; ids must be unique within the
+        // save. The store checks write access and the revision.
         if (action === 'changes' && method === 'PUT') {
           auth.require(session, req);
           const input = await body(req);
@@ -1208,6 +1347,7 @@ export function createRequestHandler({
             }),
           );
         }
+        // A save of the whole document at `revision`.
         if (!action && method === 'PUT') {
           auth.require(session, req);
           const input = await body(req);
@@ -1219,6 +1359,9 @@ export function createRequestHandler({
             await store.save(id, userId, input.revision, document(input.document)),
           );
         }
+        // Queries (store.query), for anyone who may see the timeline: tags, related entities,
+        // an overview of a range, text search, duration and moment pages, single lookups.
+        // Each kind's input is checked here; `revision` reads an earlier saved state.
         if (action === 'query' && method === 'POST') {
           const input = await body(req);
           if (
@@ -1397,6 +1540,8 @@ export function createRequestHandler({
         if (!t.canShare) throw new HttpError(403, 'Only the owner can manage sharing.');
         if (!action && method === 'DELETE') {
           auth.require(session, req);
+          // Rechecked under the timeline's row lock, so ownership cannot change between the
+          // check and the deletion; history kept outside the timeline goes with it.
           await store.transaction(async (c) => {
             await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [id]);
             const current = await store.access(id, userId, c, { preparing: true });
@@ -1407,6 +1552,10 @@ export function createRequestHandler({
           });
           return response(res, 200, { ok: true });
         }
+        // Sharing and settings: visibility, private forks, retention, saved history, content
+        // labels, address. Rechecked under the timeline's row lock; publishing is refused for a
+        // comparison with a private source, a copy of a private timeline, and a timeline
+        // moderators restricted.
         if (action === 'settings' && method === 'PATCH') {
           auth.require(session, req);
           const input = await body(req);
@@ -1477,6 +1626,8 @@ export function createRequestHandler({
             if (input.keepHistory === true) await store.startHistory(c, id, userId);
             // An address alone leaves the timeline's revision as it is.
             if (Object.keys(input).every((k) => k === 'slug')) return;
+            // A changed retention period clears retention_applied_at, so the next run applies
+            // it at once; the revision is bumped, as a save does.
             await c.query(
               'UPDATE oc_timelines SET visibility=$2,allow_private_forks=$3,retention_seconds=$4,retention_applied_at=CASE WHEN retention_seconds IS DISTINCT FROM $4 THEN NULL ELSE retention_applied_at END,content_labels=$5,revision=revision+1,updated_at=now() WHERE id=$1',
               [
@@ -1491,6 +1642,9 @@ export function createRequestHandler({
           });
           return response(res, 200, await retentionInfo(store, await store.metadata(id, userId)));
         }
+        // Members: listed, added (or their role changed: ON CONFLICT updates it) and removed by
+        // the owner or an administrator (canShare above). 'editor' is accepted as the old name
+        // of 'writer'.
         if (action === 'members' && method === 'GET') {
           const { rows } = await pool.query(
             'SELECT u.username,m.role FROM oc_members m JOIN oc_users u ON u.id=m.user_id WHERE timeline_id=$1 ORDER BY u.username',
@@ -1525,6 +1679,8 @@ export function createRequestHandler({
         }
         throw new HttpError(405, 'Method not allowed.');
       }
+      // The static app: only the files named here, so no path from the request reaches the
+      // file system beyond this list.
       const file = pathname === '/' ? 'index.html' : pathname.slice(1);
       if (
         !/^(index\.html|legal\.html|openchronology-web-source\.tar\.gz|app\.(js|css)(\.map)?|core\.mjs(\.map)?|(?:THIRD_PARTY|LICENSE|NOTICE)\.txt)$/.test(
@@ -1549,6 +1705,11 @@ export function createRequestHandler({
       });
       res.end(method === 'HEAD' ? undefined : bytes);
     } catch (error) {
+      // Errors as JSON with a status: an HttpError's own; the storage quota trigger's
+      // exception (P0001) as 413; a statement timeout (57014) as 503; a missing static file
+      // as 404; JavaScript syntax, range and type errors as 400; anything else as 500, logged,
+      // with a generic message. A 428 carries a fresh challenge, a 409 from a save its first
+      // 100 conflicts.
       const status =
         error.status ??
         (error.code === 'P0001' && error.message.startsWith('Account storage limit')

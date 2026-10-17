@@ -10,11 +10,29 @@ import TimelineList from '../components/timeline-list.jsx';
 import LegacyLinks from '../components/legacy-links.jsx';
 import BrowserDrafts from '../components/browser-drafts.jsx';
 import { profilePath } from '../../src/addresses.ts';
+// Rendered for every request: it depends on who is signed in and on the query.
 export const dynamic = 'force-dynamic';
+/** A page number from the address: a whole number from 1 to 10,000, or 1 when it is not one. */
 const pageNumber = (value) =>
   Math.max(1, Math.min(10000, Number.isSafeInteger(Number(value)) ? Number(value) : 1));
+/**
+ * The dashboard (/).
+ *
+ * Reads the visitor's session, then searches the database directly (server/collaboration.mjs's
+ * `searchTimelines`, not the HTTP API) for three lists at once: the public timelines that
+ * match the query, and, when signed in, the account's own timelines and the ones it starred.
+ * Each list pages on its own (`page`, `minePage`, `favoritePage`), so the query carries all
+ * three. Without a database, or when a search fails, the page still renders, with a notice,
+ * since local editing works without the server.
+ *
+ * @param {{searchParams: Promise<Record<string, string|string[]>>}} props the address's query:
+ *   `search`, `tag`, `owner`, `sort` and the three page numbers
+ */
 export default async function Dashboard({ searchParams }) {
   const params = await searchParams;
+  // The query, made safe: strings only (a repeated parameter is an array, and ignored), cut to
+  // a length the search accepts, and a sort it knows. A search sorts by relevance unless asked
+  // otherwise; browsing without one shows the featured timelines first.
   const query = {
     search: typeof params.search === 'string' ? params.search.slice(0, 300) : '',
     tag: typeof params.tag === 'string' ? params.tag.slice(0, 64) : '',
@@ -36,6 +54,7 @@ export default async function Dashboard({ searchParams }) {
         ? 'relevance'
         : 'featured',
   };
+  // A guest's defaults, until the session says otherwise (and if reading it fails).
   let user = null,
     compareLimit = 8,
     mine,
@@ -86,6 +105,7 @@ export default async function Dashboard({ searchParams }) {
       <div className="page-heading">
         <h1>Timelines</h1>
       </div>
+      {/* The timelines picked to compare, from any of the lists below. */}
       <CompareTray limit={compareLimit} signedIn={!!user} />
       {user && <BrowserDrafts userId={user.id} />}
       {user && (
@@ -118,6 +138,7 @@ export default async function Dashboard({ searchParams }) {
           public forks.
         </p>
         {!user && <Link href="/login">Sign in to see your timelines</Link>}
+        {/* Keyed by the query, so its fields start over from the address after a search. */}
         <TimelineSearch key={JSON.stringify(query)} query={query} />
         {error ? (
           <p className="notice" role="status">

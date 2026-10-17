@@ -1,5 +1,18 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Build from an explicit allowlist: never archive working directories or secrets wholesale.
+//
+// Writes the GPL source snapshot, dist/openchronology-{web,desktop}-source.tar.gz: the
+// first-party source, lockfiles and scripts, plus the preferred source of the bundled
+// third-party code (rational-ordered-map, fraction.js, pg and its dependencies), so the
+// platform can offer the corresponding source of what it serves (the site's footer links it).
+//
+//   node scripts/source.mjs                       web archive, without Rust crates
+//   node scripts/source.mjs --desktop             desktop archive: runs `cargo vendor` itself
+//   node scripts/source.mjs --rust-vendor <dir>   web archive with crates already vendored in
+//                                                 <dir> (the Docker images do this)
+//
+// The tree is assembled in a temporary directory, which is always removed, and archived as
+// one `openchronology/` folder.
 import { cp, mkdir, mkdtemp, readdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, basename } from 'node:path';
@@ -9,6 +22,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { writeBuildInfo } from './build-info.mjs';
 const exec = promisify(execFile);
+// The command line: --desktop, or --rust-vendor followed by a directory.
 const desktop = process.argv.includes('--desktop');
 const vendorFlag = process.argv.indexOf('--rust-vendor');
 const nativeVendor = vendorFlag < 0 ? null : process.argv[vendorFlag + 1];
@@ -16,11 +30,13 @@ if (vendorFlag >= 0 && !nativeVendor) throw new Error('--rust-vendor requires a 
 const temporary = await mkdtemp(join(tmpdir(), 'openchronology-source-'));
 const root = join(temporary, 'openchronology');
 await mkdir(root);
+// The version and commit the archive was made from (scripts/build-info.mjs).
 await writeFile(
   join(root, 'build-info.json'),
   JSON.stringify(await writeBuildInfo(), null, 2) + '\n',
 );
 try {
+  // The first-party directories, copied whole but for what the filter below leaves out.
   for (const name of [
     'src',
     'platform',
@@ -39,6 +55,8 @@ try {
       recursive: true,
       filter: (path) => {
         // Test artifacts, local databases, compiler outputs, and private configuration do not belong in releases.
+        // Matched by name at any depth: any `.env*` file, and timeline and SQLite files with their
+        // write-ahead and journal companions.
         const part = basename(path);
         return (
           !['target', 'node_modules', 'build', '.git', 'artifacts', '.next', 'public'].includes(
@@ -50,6 +68,7 @@ try {
       },
     });
   }
+  // Top-level files; a missing one (such as another package manager's lockfile) is skipped.
   for (const name of [
     'LICENSE',
     'NOTICE',
@@ -101,6 +120,8 @@ try {
     join(dirname(preferred), 'REBUILD.txt'),
     'Preferred TypeScript sources recovered from the pinned package source maps.\nBuild support is included under the upstream MIT license.\nTo rebuild: npm install --ignore-scripts, then npm run build.\nTo update the application archive: npm pack --ignore-scripts and replace\nvendor/rational-ordered-map-0.1.0.tgz in the OpenChronology source tree.\nUpdate the file dependency lock with your package manager before rebuilding.\n',
   );
+  // fraction.js, a dependency of rational-ordered-map, resolved from there so it is the copy
+  // that is actually bundled.
   const fractionEntry = createRequire(mapEntry).resolve('fraction.js');
   const fractionRoot = dirname(dirname(fractionEntry));
   // The actual package root contains src/fraction.js (the preferred implementation).
@@ -108,7 +129,19 @@ try {
     recursive: true,
     filter: (path) => basename(path) !== 'node_modules',
   });
+  // Packages already copied, by name and version.
   const copied = new Set();
+  /**
+   * Copies an npm package's source, then its dependencies' (and the optional ones that are
+   * installed), into third-party-source/<name>-<version>, each once.
+   *
+   * Node resolves a package to its entry file, so this walks up from there to the directory
+   * whose package.json names the package: its root. A package with no such root throws.
+   *
+   * @param {string} name the package's name
+   * @param {NodeJS.Require} from the require of the package that depends on it, so the
+   *   version it actually resolves to is the one copied
+   */
   async function runtimeSource(name, from) {
     let directory = dirname(from.resolve(name));
     while (true) {
@@ -141,7 +174,11 @@ try {
       }
     }
   }
+  // The server's PostgreSQL client and everything it depends on at run time.
   await runtimeSource('pg', createRequire(import.meta.url));
+  // Rust crates, so the native parts build offline from the archive: vendored by cargo for the
+  // desktop archive (both the app's and the native store's crates), or copied from a directory
+  // vendored earlier, with a cargo configuration that points crates.io at them.
   if (desktop) {
     const destination = join(root, 'rust-dependencies');
     const { stdout } = await exec(
@@ -171,6 +208,7 @@ try {
       '[source.crates-io]\nreplace-with = "vendored-sources"\n[source.vendored-sources]\ndirectory = "rust-dependencies"\n',
     );
   }
+  // What the archive is and how to build from it, at its top.
   const description = `OpenChronology source snapshot\nCopyright (c) 2026 Athan Clark. GPL-3.0-only.\n\nThis archive contains first-party source, lockfiles, build and installation scripts,\nvendored SQLite sources, and preferred sources of bundled browser dependencies.\n${desktop ? 'Rust crate sources are included with a cargo vendor configuration.\n' : nativeVendor ? 'Rust crate sources for the native converter are included; desktop packages require their own archive.\n' : 'This web source archive does not include Rust crate sources; use the desktop source archive for compiled native distributions.\n'}Install npm dependencies using npm ci (or the documented pnpm/Yarn alternatives).\nUse npm run build to build web assets. See README.md and docs/licensing.md.\nThird-party sources retain their own copyrights and licenses.\n`;
   await writeFile(join(root, 'SOURCE-README.txt'), description);
   await mkdir('dist', { recursive: true });

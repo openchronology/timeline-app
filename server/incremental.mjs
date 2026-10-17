@@ -3,6 +3,7 @@
 // moment rows, the moment tree, the duration and arc interval trees, relationships and
 // search rows change only where the patch reaches. The result matches rebuilding the index
 // from applyPatch(current, patch); test/incremental-postgres.mjs checks this.
+// See "Incremental saves" in docs/architecture.md.
 import { beginIndexWrite, indexReader, removeRows } from './index-versions.mjs';
 import {
   validateDocument,
@@ -18,6 +19,7 @@ import {
 import { HttpError } from './store.mjs';
 import { PersistentTree, MOMENT_TREE, INTERVAL_TREE, intervalPayload, upsertRows } from './avl.mjs';
 
+/** The UTF-8 size of a value's JSON: what the timeline's storage charge counts. */
 const bytes = (value) => Buffer.byteLength(JSON.stringify(value));
 /** JSON with sorted keys, for comparing stored and submitted settings. */
 export function canonical(value) {
@@ -34,7 +36,10 @@ export function canonical(value) {
     );
   return JSON.stringify(value ?? null);
 }
-/** The document-level fields stored on the timeline row. */
+/**
+ * The document-level fields stored on the timeline row `t`, as a validated document without
+ * entities (optional fields only when set).
+ */
 export function timelineSettings(t) {
   return validateDocument({
     format: 'openchronology',
@@ -49,8 +54,11 @@ export function timelineSettings(t) {
     events: [],
   });
 }
+/** A document without its entities. */
 const settingsOnly = ({ events, durations, relationships, ...settings }) => settings;
+/** A relationship end's kind, as stored (a_kind, b_kind). */
 const kindOf = (ref) => ('moment' in ref ? 'moment' : 'duration');
+/** A relationship end's entity ID, as stored (a_id, b_id). */
 const refId = (ref) => ref.moment ?? ref.duration;
 
 /**
@@ -67,6 +75,7 @@ const REBUILD_SHARE = 0.5;
  * each plugin reads its own metadata, so no moment is revalidated (#157).
  */
 export function incremental(t, patch) {
+  // Indexes older than the AVL trees (version 2) and comparison timelines are rebuilt.
   if (t.index_version < 2 || t.comparison || patch.settings.comparison) return false;
   const size =
     patch.changes.length +
@@ -113,6 +122,18 @@ export function slicePatch(patch, size = PATCH_SLICE) {
 /**
  * Applies `patch` to timeline `t` (locked by the caller). Returns the normalized patch to
  * record as the revision and the timeline row's new values, or throws an HttpError.
+ *
+ * `c` is the save's transaction; `t` the timeline row (its roots, counts, settings, storage
+ * and lineage). The steps: validate the changes; read the saved versions of what they name
+ * and drop changes identical to them; change the moment tree and moment rows; move the
+ * durations that changed or follow a moved or deleted moment; remove links of deleted
+ * entities and apply the patch's link changes; place arcs again for links that moved; update
+ * search rows; write the trees. The result: `recorded` (the patch to record), `assignments`
+ * ([column, value, cast] for the timeline row, written by the caller), `added` (whether a
+ * moment was added), `settings`, `storage` and `touched` (what saved history compares).
+ * Side effects: advances the index clock (beginIndexWrite) and writes the timeline's index
+ * rows; nothing else outside the transaction. A 400 refuses invalid changes or a timeline
+ * past the entry limits, rolling the transaction back.
  */
 export async function applyIncrementally(c, t, patch) {
   const id = t.id;
@@ -163,7 +184,8 @@ export async function applyIncrementally(c, t, patch) {
     ...new Map((patch.relationshipChanges ?? []).map((r) => [relationshipKey(r), r])).values(),
   ];
 
-  // Saved state of the changed moments.
+  // Saved state of the changed moments: each looked up by key through the timeline's levels
+  // (indexReader's lookup), so a fork finds what it reads through to.
   const saved = new Map(
     (
       await c.query(
@@ -180,6 +202,8 @@ export async function applyIncrementally(c, t, patch) {
     if (event && before && canonical(before) === canonical(event)) momentChanges.delete(momentId);
   }
   if (durationChanges.size) {
+    // Saved definitions of the changed durations, by the band's ID: per key a lookup on the
+    // expression index (timeline_id, band->>'id') of each level, OFFSET 0 keeping it one.
     const { rows } = await c.query(
       `SELECT k.id,n.definition FROM unnest($2::text[]) k(id) CROSS JOIN LATERAL
         (SELECT definition FROM ${index('oc_duration_nodes')} x WHERE x.band->>'id'=k.id OFFSET 0) n`,
@@ -230,7 +254,8 @@ export async function applyIncrementally(c, t, patch) {
     { time: '::mpq', event: '::jsonb' },
     upserted.map(([k, e]) => [id, k, e.time, JSON.stringify(e)]),
   );
-  // Final time of any moment, from the patch or the saved rows.
+  // Final time of any moment, from the patch or the saved rows (timesOf reads those the patch
+  // does not name, by key; a moment the patch deletes has none).
   const momentTimes = new Map(upserted.map(([k, e]) => [k, e.time]));
   const timesOf = async (ids) => {
     const missing = [...new Set(ids)].filter((m) => !momentTimes.has(m) && !momentChanges.has(m));
@@ -244,7 +269,10 @@ export async function applyIncrementally(c, t, patch) {
     }
   };
 
-  // Durations: changed ones and those anchored to moved or deleted moments.
+  // Durations: changed ones and those anchored to moved or deleted moments. Three lookups per
+  // key, each on an expression index of oc_duration_nodes (and its retired twin): by the
+  // band's ID ($2), and by the moment a start or an end is anchored to ($3, the moved
+  // moments). DISTINCT ON keeps each duration once.
   const { rows: durationRows } = await c.query(
     `SELECT DISTINCT ON (d.band->>'id') oc_qtext(d.first_time) AS first,oc_qtext(d.last_time) AS last,d.band,d.definition FROM (
       SELECT n.* FROM unnest($2::text[]) k(id) CROSS JOIN LATERAL
@@ -360,6 +388,8 @@ export async function applyIncrementally(c, t, patch) {
     unlinked.push(...links);
   };
   if (removedEntities.length) {
+    // The links of each removed entity, at either end: by the primary key's prefix
+    // (timeline_id, a_kind, a_id) and by oc_relationships_b (timeline_id, b_kind, b_id).
     const { rows: links } = await c.query(
       `SELECT r.a_kind,r.a_id,r.b_kind,r.b_id FROM unnest($2::text[],$3::text[]) AS x(kind,id) CROSS JOIN LATERAL
         (SELECT * FROM ${index('oc_relationships')} r WHERE r.a_kind=x.kind AND r.a_id=x.id OFFSET 0) r
@@ -384,6 +414,8 @@ export async function applyIncrementally(c, t, patch) {
   }
   const unknown = wanted.filter((ref) => !exists.has(refKey(ref)));
   if (unknown.length) {
+    // Which of the other linked entities the timeline holds: moments by key, durations by
+    // their band's ID; keys come back as refKey writes them ('m:…', 'd:…').
     const { rows: present } = await c.query(
       `SELECT 'm:'||m.id AS key FROM unnest($2::text[]) k(id)
         CROSS JOIN LATERAL ${index.lookup('oc_moments', ['k.id'])} m
@@ -403,6 +435,7 @@ export async function applyIncrementally(c, t, patch) {
     const params = [id, kindOf(change.a), refId(change.a), kindOf(change.b), refId(change.b)];
     const link = 'r.a_kind=$2 AND r.a_id=$3 AND r.b_kind=$4 AND r.b_id=$5';
     if (!change.related) {
+      // The link, if the timeline has it (a fork's may be read through), to remove.
       const { rows: links } = await c.query(
         `SELECT a_kind,a_id,b_kind,b_id FROM ${index('oc_relationships')} r WHERE ${link}`,
         params,
@@ -410,6 +443,8 @@ export async function applyIncrementally(c, t, patch) {
       await unlink(links);
     } else if (exists.get(refKey(change.a)) && exists.get(refKey(change.b))) {
       // Added unless the timeline has it (a fork's hidden link of its own shows again).
+      // The conflict clause meets only the timeline's own rows: a hidden one is shown again
+      // (and so counted as added); a visible one is left alone and returns nothing.
       const { rows: added } = await c.query(
         `INSERT INTO oc_relationships(timeline_id,a_kind,a_id,b_kind,b_id) SELECT $1,$2,$3,$4,$5
         WHERE NOT EXISTS(SELECT 1 FROM ${index('oc_relationships')} r WHERE ${link})
@@ -423,6 +458,7 @@ export async function applyIncrementally(c, t, patch) {
   const rowRef = (kind, value) => ({ [kind]: value });
   const fromRow = (r) => ({ a: rowRef(r.a_kind, r.a_id), b: rowRef(r.b_kind, r.b_id) });
   const unlinkedKeys = new Set(unlinked.map((r) => relationshipKey(fromRow(r))));
+  // The links this save added.
   const linkedNow = linked;
   storage +=
     linkedNow.reduce((s, r) => s + bytes(r) + 1, 0) -
@@ -434,6 +470,7 @@ export async function applyIncrementally(c, t, patch) {
   ];
   let replaced = [];
   if (movedEntities.length) {
+    // Links of the moved entities, at either end (as for removed entities above).
     const { rows: links } = await c.query(
       `SELECT r.a_kind,r.a_id,r.b_kind,r.b_id FROM unnest($2::text[],$3::text[]) AS x(kind,id) CROSS JOIN LATERAL
         (SELECT * FROM ${index('oc_relationships')} r WHERE r.a_kind=x.kind AND r.a_id=x.id OFFSET 0) r
@@ -448,6 +485,8 @@ export async function applyIncrementally(c, t, patch) {
   const arcsOut = [...unlinkedKeys, ...replaced.map(relationshipKey)];
   const arcsIn = [...linkedNow, ...replaced];
   const edges = new PersistentTree(c, INTERVAL_TREE, 'oc_edge_nodes', t, t.edge_root, index);
+  // The stored arcs to remove (their start and ID, the interval tree's key), by the arc's
+  // ID on the expression index (timeline_id, band->>'id') of oc_edge_nodes.
   const savedArcs = arcsOut.length
     ? (
         await c.query(
@@ -470,6 +509,7 @@ export async function applyIncrementally(c, t, patch) {
     .filter((ref) => 'duration' in ref && !starts.has(ref.duration))
     .map(refId);
   if (unplaced.length) {
+    // Starts of linked durations this save did not move, by their band's ID.
     const { rows: placed } = await c.query(
       `SELECT d.band->>'id' AS id,d.band->>'startTime' AS start FROM unnest($2::text[]) k(id)
       CROSS JOIN LATERAL (SELECT band FROM ${index('oc_duration_nodes')} x WHERE x.band->>'id'=k.id OFFSET 0) d`,
@@ -513,6 +553,8 @@ export async function applyIncrementally(c, t, patch) {
   );
   await upsertSearch(c, id, search);
 
+  // The trees' changed nodes are written last, after every check that can refuse the save
+  // (a refusal rolls the whole transaction back).
   await moments.flush();
   await durations.flush();
   await edges.flush();
@@ -571,7 +613,12 @@ export async function applyIncrementally(c, t, patch) {
   return { recorded, assignments, added, settings, storage: Math.max(storage, 0), touched };
 }
 
-/** Inserts or replaces entity search rows. */
+/**
+ * Inserts or replaces entity search rows (as searchRows gives them) of timeline `id`, 500
+ * per statement. A row whose key (timeline_id, kind, entity_id) exists is updated in place,
+ * and shown again if a fork had hidden it; the search vector follows by trigger
+ * (oc_entity_search_document). Must follow beginIndexWrite in the same transaction.
+ */
 export async function upsertSearch(c, id, rows) {
   for (let offset = 0; offset < rows.length; offset += 500) {
     const params = [];

@@ -4,6 +4,9 @@
 //! no upload-size limits, so it can write the largest benchmark timelines.
 use openchronology_store::Document;
 use std::path::Path;
+/// Reads the JSON timeline, removes any existing output file so each run writes a fresh one,
+/// and saves it. Exits with 2 on wrong usage
+/// and 1 on any read, parse or save error.
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 3 {

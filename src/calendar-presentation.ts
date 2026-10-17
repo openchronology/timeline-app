@@ -15,9 +15,15 @@ import { unitsPerPixel } from './view-context.js';
 import type { PresentationContext } from './view-context.js';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// Stored Gregorian times are seconds since 1970-01-01T00:00:00Z (Unix time, no leap seconds).
 const DAY = Q.from(86400n),
   HOUR = Q.from(3600n),
   MINUTE = Q.from(60n);
+/**
+ * The local calendar fields of a time's whole second in a fixed offset (minutes east of
+ * UTC), as zero-padded strings taken from the ISO timestamp. Years are astronomical
+ * (year 0 is 1 BCE, -1 is 2 BCE) and may have any number of digits; `zone` is `Z` or `±hh:mm`.
+ */
 function parts(time: Q, offset: number) {
   const full = printTimestamp(time.floor(), offset);
   const match = /^([+-]?\d+)-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(Z|[+-]\d{2}:\d{2})$/.exec(
@@ -33,16 +39,27 @@ function parts(time: Q, offset: number) {
     zone: match[7],
   };
 }
+/** An astronomical year as a BCE/CE year: 1 → `1 CE`, 0 → `1 BCE`, -43 → `44 BCE`. */
 function eraYear(year: string): string {
   const y = BigInt(year);
   return `${y > 0n ? y : 1n - y} ${y > 0n ? 'CE' : 'BCE'}`;
 }
+/**
+ * An ISO timestamp with its astronomical year rewritten as a BCE/CE year (padded to four
+ * digits) and the era appended: `-0043-03-15T…Z` → `0044-03-15T…Z BCE`. normalizeEra undoes it.
+ */
 function eraTimestamp(text: string): string {
   return text.replace(/^([+-]?\d+)(.*)$/, (_, year: string, rest: string) => {
     const y = BigInt(year);
     return `${String(y > 0n ? y : 1n - y).padStart(4, '0')}${rest} ${y > 0n ? 'CE' : 'BCE'}`;
   });
 }
+/**
+ * The inverse of the era labels: text starting with a year and carrying a `BCE` or `CE` word
+ * gets the astronomical year back (`44 BCE` → `-0043`, `0044-03-15T…Z BCE` →
+ * `-0043-03-15T…Z`) with the era word removed. Text without an era is returned unchanged.
+ * Throws for year zero, which BCE/CE numbering skips.
+ */
 function normalizeEra(text: string): string {
   const match = /^(\d+)(.*?)\s+(BCE|CE)(?=\s|$)(.*)$/i.exec(text);
   if (!match) return text;
@@ -53,10 +70,17 @@ function normalizeEra(text: string): string {
     (y < 0n ? '-' + String(-y).padStart(4, '0') : String(y).padStart(4, '0')) + match[2] + match[4]
   );
 }
+/** A full date label, `yyyy-mm-dd CE` (or BCE). */
 const date = (p: ReturnType<typeof parts>) => {
   const [year, era] = eraYear(p.year).split(' ');
   return `${year.padStart(4, '0')}-${p.month}-${p.day} ${era}`;
 };
+/**
+ * A year label for views spanning millennia. Within a million years of the present it is a
+ * BCE/CE year; further back it is an age before 2000 CE in the largest power-of-1000 unit
+ * that fits (`mya` million years ago, `bya` billion, … `qya`, then plain scientific years
+ * ago); further ahead, an SI count of years after 2000 CE. parseCalendar reads all three.
+ */
 function deepYear(year: string): string {
   const y = BigInt(year);
   if (y <= -1000000n) {
@@ -80,15 +104,32 @@ function deepYear(year: string): string {
   if (y >= 1000000n) return printSI(Q.from(y - 2000n), 6, 'yr') + ' after 2000 CE';
   return eraYear(year);
 }
+/**
+ * The time between neighbouring labels in this view: seconds per pixel times the label
+ * spacing (115 pixels on the ruler, 6 for moments, unless the context says otherwise). A
+ * label never needs fields finer than this.
+ */
 function precision(context: PresentationContext): Q {
   return unitsPerPixel(context).mul(
     Q.parseDecimal((context.spacingPixels ?? (context.purpose === 'axis' ? 115 : 6)).toString()),
   );
 }
+/** `mm-dd` when the year is the view's left-edge year (parseCalendar fills it in), else a full date. */
 function abbreviatedDate(p: ReturnType<typeof parts>, base: ReturnType<typeof parts>): string {
   return p.year === base.year ? `${p.month}-${p.day}` : date(p);
 }
-/** Input/tooltip text remains an exact isomorphism; chart text intentionally omits invisible detail. */
+/**
+ * Input/tooltip text remains an exact isomorphism; chart text intentionally omits invisible detail.
+ *
+ * Without a context, or for inputs and tooltips, prints the full exact timestamp with its
+ * era (fractional seconds exactly, as a decimal or `{+n/d}`). For axis and moment labels,
+ * the fields shown follow the label resolution: years (or deep-time ages from 10,000 years
+ * per label), months from 28 days, dates from a day, then a clock in hours, minutes or
+ * seconds (with up to six decimals). Fields the whole view shares are omitted (the date
+ * within a day's view, the hour within an hour's) and are restored from the view by
+ * parseCalendar. Below a millisecond of resolution in a view of a second or less, labels
+ * become Δ offsets from the left edge in SI seconds.
+ */
 export function printCalendar(time: Q, offset: number, context?: PresentationContext): string {
   if (!context || context.purpose === 'input' || context.purpose === 'tooltip')
     return eraTimestamp(printTimestamp(time, offset));
@@ -101,8 +142,10 @@ export function printCalendar(time: Q, offset: number, context?: PresentationCon
   const rounded = decimals > 0 ? Q.parseDecimal(fixedDecimal(time, decimals)) : time;
   const p = parts(rounded, offset),
     end = parts(context.left.add(context.span), offset);
+  // Julian years (365.25 days), ten thousand of them, and 28 days (the shortest month).
   if (resolution.compare(Q.from(31557600n)) >= 0)
     return resolution.compare(Q.from(315576000000n)) >= 0 ? deepYear(p.year) : eraYear(p.year);
+  // Month names alone only while the whole view lies within one year.
   if (resolution.compare(Q.from(2419200n)) >= 0)
     return base.year === end.year && p.year === base.year
       ? MONTHS[Number(p.month) - 1]
@@ -114,6 +157,8 @@ export function printCalendar(time: Q, offset: number, context?: PresentationCon
   const dayView = context.span.compare(DAY) <= 0;
   const hourView = context.span.compare(HOUR) <= 0;
   const minuteView = context.span.compare(MINUTE) <= 0;
+  // Whole seconds from the calendar fields plus the (rounded) fraction; padded so that one
+  // digit seconds still print as `05.25`.
   const seconds = Q.from(BigInt(p.second)).add(rounded.sub(rounded.floor()));
   const secondText = decimals
     ? fixedDecimal(seconds, decimals).padStart(3 + decimals, '0')
@@ -128,6 +173,11 @@ export function printCalendar(time: Q, offset: number, context?: PresentationCon
   return (dayView ? '' : shortDate + ' ') + clock;
 }
 
+/**
+ * The caption above the chart that supplies what adaptive labels omit: the dates the view
+ * spans, the base hour or minute for short clock labels, and the zone; the Δ origin when
+ * labels are relative; or the range of ages in deep time.
+ */
 export function describeCalendar(offset: number, context: PresentationContext): string {
   const base = parts(context.left, offset),
     end = parts(context.left.add(context.span), offset);
@@ -152,7 +202,16 @@ export function describeCalendar(offset: number, context: PresentationContext): 
   return `${dates} · ${zone}`;
 }
 
-/** Abbreviations resolve against the left bound's local calendar fields, never the host clock. */
+/**
+ * Abbreviations resolve against the left bound's local calendar fields, never the host clock.
+ *
+ * Reads, in order: deep-time ages (`1.5 mya`, `3 Myr after 2000 CE`, which must come to whole
+ * years and mean 1 January of that year); without a context, a bare year, year-month or
+ * date (midnight in the offset); a full ISO timestamp, with or without an era; and, with a
+ * context, everything printCalendar writes for a view: Δ offsets, short dates, years,
+ * year-months, month names and clock labels, with omitted fields taken from the left edge.
+ * Throws on anything else, and on seconds of 60 or more.
+ */
 export function parseCalendar(text: string, offset: number, context?: PresentationContext): Q {
   const age =
     /^([+]?[\d]+(?:\.\d+)?(?:e[+-]?\d+)?)\s+(mya|bya|tya|pya|eya|zya|yya|rya|qya|years ago|[kMGTPEZYRQ]?yr after 2000 CE)$/i.exec(
@@ -177,9 +236,11 @@ export function parseCalendar(text: string, offset: number, context?: Presentati
       : parseNumber(age[1]).mul(Q.from(10n ** BigInt(exponents[age[2].toLowerCase()])));
     if (!years.equals(years.floor()))
       throw new Error('Geological age labels must resolve to whole calendar years.');
+    // The value is whole, so its canonical string is `n/1` and the numerator is the count.
     const amount = BigInt(years.floor().toString().split('/')[0]);
     const y = !future ? 2000n - amount : 2000n + amount;
     const year = y < 0n ? '-' + String(-y).padStart(4, '0') : String(y).padStart(4, '0');
+    // Any time's parts carry the offset's zone suffix; the epoch is just a convenient one.
     const zone = offset === 0 ? 'Z' : parts(Q.zero, offset).zone;
     return parseTimestamp(`${year}-01-01T00:00:00${zone}`);
   }
@@ -202,6 +263,8 @@ export function parseCalendar(text: string, offset: number, context?: Presentati
     minute = '00',
     seconds = Q.zero;
   let clock = value;
+  // The calendar unit a clock label leaves out (a day for `14h`, an hour for `05m`): the
+  // label repeats every cycle, which matters at the left edge below.
   let cycle: Q | undefined;
   const fullDate = /^([+-]?\d{4,})-(\d{2})-(\d{2})(?:\s+(.*))?$/.exec(value);
   const shortDate = /^(\d{2})-(\d{2})(?:\s+(.*))?$/.exec(value);
@@ -265,6 +328,10 @@ export function parseCalendar(text: string, offset: number, context?: Presentati
   return result;
 }
 
+/**
+ * Whether calendar labels become Δ seconds from the left edge: in views of a second or less
+ * where six pixels cover less than a millisecond. describeCalendar then names the origin.
+ */
 function relativeCalendar(context: PresentationContext): boolean {
   return (
     context.span.compare(Q.one) <= 0 &&

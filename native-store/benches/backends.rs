@@ -12,17 +12,24 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// An environment variable, or `default` when it is unset or not Unicode.
 fn env(name: &str, default: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| default.into())
 }
+/// Where `node bench/seed.mjs` wrote `timeline-<size>.och` and `workload-<size>.json`.
 fn data_dir() -> PathBuf {
     // Relative paths resolve from the repository root, as they do for the Node harness.
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
     root.join(env("BENCH_DATA_DIR", "bench/data"))
 }
+/// A store query from its JSON form, as the editor sends it over IPC.
 fn query(value: Value) -> Query {
     serde_json::from_value(value).expect("query")
 }
+/// For each size: opens the seeded file once for the read benchmarks, keeps a scratch working
+/// copy for the write benchmarks, and measures open, overview (full and zoomed), an event page,
+/// a single-moment read, and create/update/delete saves. The scratch directory is removed at
+/// the end.
 fn main() {
     // Comma- or space-separated, as for the Node harness, which validates them first.
     let sizes: Vec<usize> = env("BENCH_SIZES", "1000,10000,100000,200000")
@@ -50,6 +57,7 @@ fn main() {
         let Header {
             document: settings, ..
         } = snapshot.header().expect("header");
+        // The workload names one existing moment (`target`) and the viewports to query.
         let target = work["target"].clone();
         let overview = |window: &Value| {
             query(
@@ -80,6 +88,9 @@ fn main() {
         let uncreated = patch(json!([{"id":"bench-new","event":null}]));
         let working = scratch.join(format!("working-{size}.och"));
         std::fs::copy(&file, &working).expect("working copy");
+        // An empty first save makes the file and baseline share a save token even when the seed
+        // predates the current index layout (whose first save writes the whole file), so the
+        // measured saves below all take the in-place path of save_patch.
         let mut baseline = Snapshot::open(&working).expect("open working copy");
         baseline = baseline
             .save_patch(&working, &patch(json!([])))

@@ -2,6 +2,34 @@
 //! The native store: timeline documents in SQLite files with exact rational times
 //! (sqlite-rational), saving, opening and checking them, and the window, summary and filter
 //! queries the desktop app browses with (workspace.rs).
+//!
+//! # File format
+//!
+//! A timeline file (`.och`) is an ordinary SQLite database marked with
+//! `PRAGMA application_id=1329812556` ("OCTL") and `PRAGMA user_version=1`. Times are exact
+//! rationals stored as canonical `n/d` TEXT and ordered with sqlite-rational's `RATIONAL_V1`
+//! collation (plain text order is not numeric order). Its tables:
+//!
+//! - `timeline_meta`, `timeline_settings`, `timeline_plugins`, `timeline_extras`: one-row
+//!   tables (`singleton=1`) for the title and description, presentation settings JSON, plugin
+//!   list JSON, and `{"tags","assets"}` JSON. The last three may be missing from older files.
+//! - `events`: the moments, one row each, with their metadata JSON. Indexed by time.
+//! - `points`: a `rational_index` virtual table (shadow tables `points_nodes`, `points_meta`)
+//!   with one row per distinct moment time, weighted by how many moments share it. Its
+//!   augmented tree answers viewport overviews (groups of nearby moments) without reading
+//!   every moment.
+//! - `durations`: standalone durations; each endpoint is a fixed time or a moment it follows.
+//! - `duration_intervals` + `duration_nodes`: durations with endpoints resolved to times, and
+//!   a persistent AVL interval tree over them (intervals.rs), for viewport bands and summaries.
+//! - `relationships`: undirected links between moments and durations, stored once each.
+//! - `edge_intervals` + `edge_nodes`: the links as arcs between their endpoints' times, in the
+//!   same kind of interval tree.
+//! - `interval_roots`, `index_layout`: each tree's root node, and the index layout version
+//!   and save token that tell the desktop app a file matches its disk copy (workspace.rs).
+//!
+//! Files come from anyone (uploads, downloads), so every connection runs with
+//! `trusted_schema=OFF` and readers check that the tables they query are real tables, not
+//! views or triggers that would run SQL from the file (`check_file`, `Snapshot::open`).
 mod intervals;
 mod sqlite;
 mod workspace;
@@ -10,11 +38,17 @@ use serde_json::{Map, Value};
 use sqlite::Connection;
 use std::{collections::HashSet, path::Path};
 pub use workspace::{Header, Patch, Query, Snapshot};
+/// `PRAGMA application_id` of a timeline file, as SQLite prints it: the ASCII bytes "OCTL"
+/// read as a big-endian 32-bit integer.
 const APPLICATION_ID: &str = "1329812556"; // OCTL
+/// A moment, as in the editor's documents (src/core.ts).
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Event {
+    /// Unique among the document's moments: 1 to 128 ASCII letters, digits or `_.:-`.
     pub id: String,
+    /// An exact rational such as `3/4` or `-12/1`; saving canonicalizes it with `q()`.
     pub time: String,
+    /// Free-form fields; `title` and `description`, when present, must be strings.
     pub metadata: Map<String, Value>,
 }
 /// A standalone duration. Each endpoint is an exact time string or `{"moment": id}`.
@@ -25,6 +59,8 @@ pub struct Duration {
     pub end: Value,
     pub metadata: Map<String, Value>,
 }
+/// A whole timeline document, in the JSON shape the editor and server use (`.ochx` files).
+/// `format` is always `"openchronology"` and `version` 1 (see `validate`).
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Document {
     pub format: String,
@@ -69,6 +105,7 @@ pub(crate) fn entity_ref(value: &Value) -> Result<(&'static str, &str), String> 
     }
     Ok((kind, id))
 }
+/// Whether `id` is a valid moment or duration ID: 1 to 128 ASCII letters, digits or `_.:-`.
 fn identifier(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 128
@@ -125,27 +162,45 @@ pub fn convert_legacy_durations(doc: &mut Document) -> Result<(), String> {
     doc.durations.sort_by(|a, b| a.id.cmp(&b.id));
     Ok(())
 }
+/// One group of nearby moments from the `points` overview (see `overview`).
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Group {
+    /// The earliest and latest moment times in the group.
     pub first: String,
     pub last: String,
+    /// How many moments the group holds, as decimal text (it can exceed `u32`).
     pub count: String,
+    /// How many distinct times the group holds.
     pub distinct: u32,
+    /// Tree nodes the index visited to answer the query (a cost diagnostic).
     pub visited_nodes: u32,
 }
+/// Refuses anything that is not a version-1 OpenChronology timeline, and any file whose
+/// data tables have been replaced by views or other schema objects: with `trusted_schema=OFF`
+/// a view still runs its own SQL when read, so a crafted file could otherwise substitute
+/// arbitrary queries for the tables the store reads.
 fn check_file(db: &Connection) -> Result<(), String> {
     if db.scalar("PRAGMA application_id", &[])? != APPLICATION_ID
         || db.scalar("PRAGMA user_version", &[])? != "1"
     {
         return Err("This is not a supported OpenChronology SQLite timeline".into());
     }
-    // These names must be data tables, never attacker-supplied SQL views.
+    // These names must be data tables, never attacker-supplied SQL views. The first count
+    // requires both mandatory tables to exist as tables; the second allows the optional ones
+    // to be missing (older files) but never to exist as anything other than a table.
     if db.scalar("SELECT count(*) FROM sqlite_schema WHERE name IN ('events','timeline_meta') AND type='table'", &[])? != "2"
         || db.scalar("SELECT count(*) FROM sqlite_schema WHERE name IN ('timeline_settings','timeline_plugins','timeline_extras','durations','relationships') AND type!='table'", &[])? != "0" {
         return Err("Invalid timeline data tables".into());
     }
     Ok(())
 }
+/// Checks a document against the format's rules and size limits before it is saved, and
+/// again after it is read: format and version, title (300 UTF-16 units) and description
+/// (20000), at most 200000 moments, durations and relationships, presentation and plugin JSON
+/// up to 128 KiB (at most 32 plugins), up to 40 tags, embedded images up to 9 MiB, unique
+/// IDs, text titles and notes, duration anchors naming existing moments, and relationships
+/// between distinct existing entities. Lengths are counted in UTF-16 units to match the
+/// editor's JavaScript limits. Returns the first problem found as a readable message.
 fn validate(doc: &Document) -> Result<(), String> {
     if doc.format != "openchronology"
         || doc.version != 1
@@ -253,6 +308,15 @@ fn validate(doc: &Document) -> Result<(), String> {
     }
     Ok(())
 }
+/// Writes a whole document to the SQLite timeline file at `path`, creating the file if needed.
+///
+/// The document is validated first (after converting version-1 legacy durations). An existing
+/// file must be an OpenChronology timeline or an empty SQLite database; anything else is
+/// refused so a mistaken path cannot overwrite an unrelated database. Every table is then
+/// replaced inside one `BEGIN IMMEDIATE` transaction, which takes the write lock up front so no
+/// other writer can interleave; on any error the transaction is rolled back and the file is
+/// left exactly as it was. The indexes (moment overview, duration and arc trees) are rebuilt
+/// from scratch and stamped with a new save token.
 pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
     let mut doc = doc.clone();
     convert_legacy_durations(&mut doc)?;
@@ -261,6 +325,7 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
     let db = Connection::open(path, true)?;
     let id = db.scalar("PRAGMA application_id", &[])?;
     if id != APPLICATION_ID {
+        // A new or empty file has application_id 0 and no schema objects of its own.
         let tables = db.scalar(
             "SELECT count(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'",
             &[],
@@ -287,11 +352,16 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
         ] {
             db.execute(&format!("DROP TABLE IF EXISTS {table}"), &[])?;
         }
+        // One-row tables (the CHECK allows only singleton=1): the title and description, the
+        // presentation settings JSON, the plugin list JSON, and the tags and embedded images.
+        // timeline_meta is kept rather than dropped and its row is upserted below.
         db.execute("CREATE TABLE IF NOT EXISTS timeline_meta(singleton INTEGER PRIMARY KEY CHECK(singleton=1),title TEXT NOT NULL,description TEXT NOT NULL)",&[])?;
         db.execute("CREATE TABLE IF NOT EXISTS timeline_settings(singleton INTEGER PRIMARY KEY CHECK(singleton=1),presentation TEXT NOT NULL)", &[])?;
         db.execute("CREATE TABLE IF NOT EXISTS timeline_plugins(singleton INTEGER PRIMARY KEY CHECK(singleton=1),plugins TEXT NOT NULL)", &[])?;
         db.execute("CREATE TABLE IF NOT EXISTS timeline_extras(singleton INTEGER PRIMARY KEY CHECK(singleton=1),extras TEXT NOT NULL)", &[])?;
         db.execute("DELETE FROM timeline_extras", &[])?;
+        // Always written, with nulls when absent; settings and plugins rows are written only
+        // when present, and a missing row reads back as None.
         let extras = serde_json::json!({"tags": doc.tags, "assets": doc.assets}).to_string();
         if extras.len() > 10 * 1024 * 1024 {
             return Err("Timeline extras exceed 10 MiB".into());
@@ -307,18 +377,28 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
             let json = serde_json::to_string(presentation).map_err(|e| e.to_string())?;
             db.execute("INSERT INTO timeline_settings VALUES(1,?)", &[&json])?;
         }
+        // Moments. The time column sorts by rational value (RATIONAL_V1) and must hold the
+        // canonical reduced form, so equal times are equal strings; STRICT rejects non-TEXT
+        // values. events_time serves ordered range scans by time (the workspace adds
+        // events_time_id on (time, id) for paging).
         db.execute("CREATE TABLE IF NOT EXISTS events(id TEXT PRIMARY KEY,time TEXT NOT NULL COLLATE RATIONAL_V1 CHECK(q_is_canonical(time)=1),metadata TEXT NOT NULL) STRICT",&[])?;
         db.execute(
             "CREATE INDEX IF NOT EXISTS events_time ON events(time COLLATE RATIONAL_V1)",
             &[],
         )?;
+        // The moment overview index: sqlite-rational's augmented tree with one row per
+        // distinct time (value = that time, weight = the moments there), which summarizes a
+        // viewport in a bounded number of node visits. It is emptied and refilled, not dropped.
         db.execute(
             "CREATE VIRTUAL TABLE IF NOT EXISTS points USING rational_index",
             &[],
         )?;
         db.execute("DELETE FROM points", &[])?;
         db.execute("DELETE FROM events", &[])?;
+        // Upsert the single metadata row: inserted in a new file, updated in an existing one.
         db.execute("INSERT INTO timeline_meta VALUES(1,?,?) ON CONFLICT(singleton) DO UPDATE SET title=excluded.title,description=excluded.description",&[&doc.title,&doc.description])?;
+        // q(?) parses and canonicalizes each time (2/4 becomes 1/2) and fails on malformed
+        // input or a zero denominator, which aborts the save.
         for event in &doc.events {
             let metadata = serde_json::to_string(&event.metadata).map_err(|e| e.to_string())?;
             db.execute(
@@ -326,6 +406,8 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
                 &[&event.id, &event.time, &metadata],
             )?;
         }
+        // Fill the overview index: one bucket per distinct time, weighted by its moment count.
+        // Overview groups join back to events by time (workspace.rs) to show single moments.
         db.execute("INSERT INTO points(time,value,weight) SELECT time,time,count(*) FROM events GROUP BY time COLLATE RATIONAL_V1",&[])?;
         create_duration_table(&db)?;
         for duration in &doc.durations {
@@ -337,7 +419,10 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
             relate(&db, r, true)?;
         }
         rebuild_edge_index(&db)?;
+        // A fresh token: no open desktop baseline matches this file any more, so their next
+        // save writes the whole file rather than patching it in place (workspace.rs).
         intervals::set_layout(&db, &intervals::token())?;
+        // Mark the file as an OpenChronology timeline, format version 1 (see check_file).
         db.execute("PRAGMA application_id=1329812556", &[])?;
         db.execute("PRAGMA user_version=1", &[])?;
         db.execute("COMMIT", &[])
@@ -347,12 +432,23 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
     }
     result
 }
+/// Reads a whole timeline file (every moment, duration and relationship) as a document,
+/// validated as on save. Used by `och-convert read`, the desktop app's full-document reads
+/// and the tests. Errors when the file is not a valid timeline.
 pub fn open(path: &Path) -> Result<Document, String> {
     read_document(path, true)
 }
+/// Reads only a file's settings (title, description, presentation, plugins, tags, images),
+/// with empty moment, duration and relationship lists, under the browsing read limits. The
+/// desktop app's `Snapshot::header` uses it, so opening a large file never loads its moments.
 pub fn header_document(path: &Path) -> Result<Document, String> {
     read_document(path, false)
 }
+/// Reads a document from `path`, with or without its entities. All reads happen in one read
+/// transaction, so they see a single consistent state even if another process writes the file
+/// meanwhile. Lists are read one row past their limit (`LIMIT 200001`) so an oversized file
+/// fails validation instead of being silently truncated. Optional tables that older files lack
+/// read as absent.
 fn read_document(path: &Path, include_events: bool) -> Result<Document, String> {
     let mut db = Connection::open(path, false)?;
     if !include_events {
@@ -367,6 +463,8 @@ fn read_document(path: &Path, include_events: bool) -> Result<Document, String> 
         128 * 1024,
     )?;
     let meta = metadata.first().ok_or("Missing timeline metadata")?;
+    // Every moment in time order (then ID). q(time) returns the canonical form, so a file
+    // whose CHECK was bypassed still yields valid times or fails.
     let rows = if include_events {
         db.query(
         "SELECT id,q(time),metadata FROM events ORDER BY time COLLATE RATIONAL_V1,id LIMIT 200001",
@@ -384,6 +482,8 @@ fn read_document(path: &Path, include_events: bool) -> Result<Document, String> 
                 .map_err(|e| e.to_string())?,
         });
     }
+    // Each optional one-row table is read only if it exists as a table; check_file has already
+    // ensured these names are not views.
     let extras: Value = if db.scalar(
         "SELECT count(*) FROM sqlite_schema WHERE name='timeline_extras' AND type='table'",
         &[],
@@ -473,6 +573,7 @@ fn read_document(path: &Path, include_events: bool) -> Result<Document, String> 
                 &[],
             )? != "0"
         {
+            // Every link in primary-key order, so the document lists them deterministically.
             db.query("SELECT a_kind,a_id,b_kind,b_id FROM relationships ORDER BY a_kind,a_id,b_kind,b_id LIMIT 200001", &[])?
                 .into_iter()
                 .map(|r| {
@@ -488,13 +589,22 @@ fn read_document(path: &Path, include_events: bool) -> Result<Document, String> 
     let mut doc = doc;
     convert_legacy_durations(&mut doc)?;
     validate(&doc)?;
+    // Ends the read transaction; nothing was written.
     db.execute("COMMIT", &[])?;
     Ok(doc)
 }
+/// Creates the `durations` table and its anchor indexes if missing.
+///
+/// Each row is one standalone duration as the document stores it: `start_time`/`end_time`
+/// hold a fixed endpoint (canonical rational) and `start_moment`/`end_moment` the ID of the
+/// moment an anchored endpoint follows; `metadata` is its JSON. Written by `save`,
+/// `insert_duration` and sparse saves (workspace.rs); read by `read_durations` and when
+/// resolving `duration_intervals`.
 fn create_duration_table(db: &Connection) -> Result<(), String> {
     // Exactly one of time/moment per endpoint; fixed times are canonical exact rationals.
     db.execute("CREATE TABLE IF NOT EXISTS durations(id TEXT PRIMARY KEY,start_time TEXT COLLATE RATIONAL_V1 CHECK(start_time IS NULL OR q_is_canonical(start_time)=1),start_moment TEXT,end_time TEXT COLLATE RATIONAL_V1 CHECK(end_time IS NULL OR q_is_canonical(end_time)=1),end_moment TEXT,metadata TEXT NOT NULL,CHECK((start_time IS NULL)<>(start_moment IS NULL)),CHECK((end_time IS NULL)<>(end_moment IS NULL))) STRICT", &[])?;
-    // Durations anchored to a moment move with it.
+    // Durations anchored to a moment move with it. These indexes serve the lookups of the
+    // durations following a moment that changed time or was deleted (workspace.rs).
     db.execute(
         "CREATE INDEX IF NOT EXISTS durations_start_moment ON durations(start_moment)",
         &[],
@@ -504,6 +614,9 @@ fn create_duration_table(db: &Connection) -> Result<(), String> {
         &[],
     )
 }
+/// Inserts a duration, or replaces the stored one with the same ID (upsert on the primary
+/// key). Fixed endpoint times are canonicalized with `q()`. Only the `durations` table changes;
+/// callers update `duration_intervals` and its tree afterwards. Errors on an invalid endpoint.
 pub(crate) fn insert_duration(db: &Connection, d: &Duration) -> Result<(), String> {
     let (start_time, start_moment) = endpoint(&d.start)?;
     let (end_time, end_moment) = endpoint(&d.end)?;
@@ -521,6 +634,9 @@ pub(crate) fn insert_duration(db: &Connection, d: &Duration) -> Result<(), Strin
         ],
     )
 }
+/// Reads stored durations back into document form: one by ID (primary-key lookup, at most
+/// 8 MiB), or all of them in ID order with one row past the 200000 limit for validation to
+/// catch. Fixed times come back canonical via `q()`.
 fn read_durations(db: &Connection, id: Option<&str>) -> Result<Vec<Duration>, String> {
     let rows = match id {
         Some(id) => db.query_limited("SELECT id,q(start_time),start_moment,q(end_time),end_moment,metadata FROM durations WHERE id=?", &[id], 1, 8 * 1024 * 1024)?,
@@ -545,6 +661,8 @@ fn read_durations(db: &Connection, id: Option<&str>) -> Result<Vec<Duration>, St
         })
         .collect()
 }
+/// Whether an entity's `tags` metadata array contains any of `tags` (exact string match;
+/// callers pass normalized tags).
 fn has_any_tag(metadata: &Map<String, Value>, tags: &[String]) -> bool {
     metadata
         .get("tags")
@@ -561,6 +679,7 @@ pub enum Membership {
     /// This entity ("m:<id>" or "d:<id>") and its relations: direct, or all reachable.
     Related { start: String, direct: bool },
 }
+/// The "m:<id>" or "d:<id>" key of an entity reference, or None if it is invalid.
 fn ref_key(value: &Value) -> Option<String> {
     let (kind, id) = entity_ref(value).ok()?;
     Some(format!(
@@ -588,6 +707,8 @@ pub fn filter_document(mut doc: Document, membership: &Membership, any: bool) ->
                     graph.entry(b).or_default().push(a);
                 }
             }
+            // Breadth-first search over the undirected links from the start entity; with
+            // `direct` it stops after the first ring of neighbours.
             let mut found: HashSet<String> = HashSet::from([start.clone()]);
             let mut frontier = vec![start.clone()];
             while !frontier.is_empty() {
@@ -604,6 +725,8 @@ pub fn filter_document(mut doc: Document, membership: &Membership, any: bool) ->
             Some(found)
         }
     };
+    // An entity stays when its membership matches the side asked for (`any`: inside, or
+    // not `any`: outside).
     let keep = |key: String, metadata: &Map<String, Value>| {
         let inside = match (&related, membership) {
             (Some(set), _) => set.contains(&key),
@@ -614,6 +737,8 @@ pub fn filter_document(mut doc: Document, membership: &Membership, any: bool) ->
     };
     doc.events
         .retain(|e| keep(format!("m:{}", e.id), &e.metadata));
+    // Anchors become the anchor moment's time, taken from the full document, since that
+    // moment may have been filtered out. A duration whose anchor is missing is dropped.
     let resolve = |endpoint: &Value| match endpoint {
         Value::String(_) => Some(endpoint.clone()),
         _ => endpoint
@@ -647,6 +772,12 @@ pub fn filter_document(mut doc: Document, membership: &Membership, any: bool) ->
     doc
 }
 /// Moves legacy links out of moment metadata in a writable working copy.
+///
+/// Runs only when the file has no `durations` table yet (a file written before standalone
+/// durations). Each `{"id","endId","metadata"}` entry of a moment's `metadata.durations` array
+/// becomes a duration anchored from that moment to `endId`, and the array is removed from the
+/// moment. The SQL equivalent of `convert_legacy_durations`, done in place so the moments never
+/// have to be loaded. Errors if a legacy link ends at its own start moment.
 pub(crate) fn migrate_durations(db: &Connection) -> Result<(), String> {
     if db.scalar(
         "SELECT count(*) FROM sqlite_schema WHERE name='durations' AND type='table'",
@@ -656,10 +787,15 @@ pub(crate) fn migrate_durations(db: &Connection) -> Result<(), String> {
         return Ok(());
     }
     create_duration_table(db)?;
+    // json_each expands each moment's legacy array into one row per link (no rows when the
+    // moment has none); a link ending at its own moment is invalid.
     if db.scalar("SELECT count(*) FROM events s,json_each(s.metadata,'$.durations') d WHERE json_extract(d.value,'$.endId')=s.id", &[])? != "0" {
         return Err("Duration endpoints must be distinct existing moments".into());
     }
+    // One anchored duration per legacy link: from the moment holding it to its endId, with
+    // the link's metadata re-serialized by json() (an empty object when missing).
     db.execute("INSERT INTO durations(id,start_time,start_moment,end_time,end_moment,metadata) SELECT json_extract(d.value,'$.id'),NULL,s.id,NULL,json_extract(d.value,'$.endId'),COALESCE(json(json_extract(d.value,'$.metadata')),'{}') FROM events s,json_each(s.metadata,'$.durations') d", &[])?;
+    // Then strip the legacy key from just the moments that had it.
     db.execute("UPDATE events SET metadata=json_remove(metadata,'$.durations') WHERE json_type(metadata,'$.durations') IS NOT NULL", &[])?;
     Ok(())
 }
@@ -670,6 +806,10 @@ pub(crate) fn duration_by_id(db: &Connection, id: &str) -> Result<Option<Duratio
     }
     Ok(read_durations(db, Some(id))?.into_iter().next())
 }
+/// Groups of moments in the viewport [lower, upper] (both ends included), read directly from a
+/// saved file's `points` index: each group gathers the moments within `threshold` of its first
+/// time ("span" mode; a zero threshold gives one group per distinct time). Only moments, not
+/// the duration bands and arcs the desktop app's `Snapshot::query` adds; the tests use it.
 pub fn overview(
     path: &Path,
     lower: &str,
@@ -678,6 +818,9 @@ pub fn overview(
 ) -> Result<Vec<Group>, String> {
     let db = Connection::open(path, false)?;
     check_file(&db)?;
+    // A summary query on the rational_index virtual table: the hidden lower/upper/threshold/
+    // mode columns take equality constraints as inputs, and each row is one group with its
+    // first and last time, total weight (moments), distinct times and nodes visited.
     let rows=db.query("SELECT time,last_time,weight,distinct_count,visited_nodes FROM points WHERE lower=q(?) AND upper=q(?) AND include_upper=1 AND threshold=q(?) AND mode='span' ORDER BY time",&[lower,upper,threshold])?;
     rows.into_iter()
         .map(|row| {
@@ -699,6 +842,8 @@ pub fn overview(
         })
         .collect()
 }
+/// Whole-file save and open: round trips, atomic failures, legacy schemas, and files crafted
+/// to run SQL or replace unrelated databases.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -965,16 +1110,37 @@ mod tests {
 }
 
 /// Rebuild the interval index entirely in SQLite; anchored endpoints resolve to moment times.
+///
+/// Used by `save` and when the desktop app opens a file with an older index layout. Migrates
+/// legacy durations first, then recreates `duration_intervals` from `durations` and builds a
+/// balanced `duration_nodes` tree over it. Must run inside the caller's transaction (or on a
+/// private copy). Errors when an anchor names a missing moment or there are over 200000
+/// durations.
 fn rebuild_duration_index(db: &Connection) -> Result<(), String> {
     migrate_durations(db)?;
     create_duration_table(db)?;
     db.execute("DROP TABLE IF EXISTS duration_nodes", &[])?;
     db.execute("DROP TABLE IF EXISTS duration_intervals", &[])?;
+    // One row per duration with its endpoints resolved to times:
+    // - ord: the ID of its node in duration_nodes. A rebuild numbers rows densely in
+    //   (first, id) order; later sparse saves assign fresh IDs (intervals.rs), so after edits
+    //   ords are neither dense nor in order.
+    // - id: the duration's ID; start_json/end_json: its endpoints as the document has them
+    //   (a time string, or {"moment": id}), returned to the editor unchanged.
+    // - start_time/end_time: the resolved endpoint times; first/last: the earlier and later of
+    //   the two (an end may precede its start); extent: last - first, its length.
+    // - metadata: the duration's metadata JSON.
     db.execute("CREATE TABLE duration_intervals(ord INTEGER PRIMARY KEY,id TEXT NOT NULL UNIQUE,start_json TEXT NOT NULL,end_json TEXT NOT NULL,start_time TEXT NOT NULL COLLATE RATIONAL_V1,end_time TEXT NOT NULL COLLATE RATIONAL_V1,first TEXT NOT NULL COLLATE RATIONAL_V1,last TEXT NOT NULL COLLATE RATIONAL_V1,metadata TEXT NOT NULL,extent TEXT COLLATE RATIONAL_V1)", &[])?;
+    // Every anchor must name a stored moment (primary-key probes into events).
     if db.scalar("SELECT count(*) FROM durations d WHERE (d.start_moment IS NOT NULL AND NOT EXISTS(SELECT 1 FROM events e WHERE e.id=d.start_moment)) OR (d.end_moment IS NOT NULL AND NOT EXISTS(SELECT 1 FROM events e WHERE e.id=d.end_moment))", &[])? != "0" {
         return Err("Duration anchors must name existing moments".into());
     }
+    // r: each duration with its endpoint JSON (json_quote makes a fixed time a JSON string)
+    // and its resolved times s and e (an anchored endpoint takes its moment's time). The
+    // window function numbers the rows by (earlier endpoint, id) to give each its ord.
     db.execute("WITH r AS (SELECT d.id,CASE WHEN d.start_moment IS NULL THEN json_quote(d.start_time) ELSE json_object('moment',d.start_moment) END AS sj,CASE WHEN d.end_moment IS NULL THEN json_quote(d.end_time) ELSE json_object('moment',d.end_moment) END AS ej,COALESCE(d.start_time,(SELECT e.time FROM events e WHERE e.id=d.start_moment)) AS s,COALESCE(d.end_time,(SELECT e.time FROM events e WHERE e.id=d.end_moment)) AS e,d.metadata FROM durations d) INSERT INTO duration_intervals(ord,id,start_json,end_json,start_time,end_time,first,last,metadata) SELECT row_number() OVER (ORDER BY q_min(s,e) COLLATE RATIONAL_V1,id),id,sj,ej,s,e,q_min(s,e),q_max(s,e),metadata FROM r", &[])?;
+    // Each duration's exact length, compared with the zoom threshold to decide whether it is
+    // drawn as a band or summarized.
     db.execute(
         "UPDATE duration_intervals SET extent=q_sub(last,first)",
         &[],
@@ -991,6 +1157,10 @@ fn rebuild_duration_index(db: &Connection) -> Result<(), String> {
     build_interval_nodes(db, "duration_intervals", "duration_nodes")
 }
 /// Summaries range-scan durations by start (see duration_summaries).
+///
+/// `duration_intervals_first` orders intervals by their earlier endpoint, so the summary
+/// query's "first collapsed start at or after X" probes and its per-group range joins are
+/// index seeks rather than scans. Created if missing, including on files saved before it.
 pub(crate) fn create_start_index(db: &Connection) -> Result<(), String> {
     db.execute(
         "CREATE INDEX IF NOT EXISTS duration_intervals_first ON duration_intervals(first COLLATE RATIONAL_V1)",
@@ -1000,14 +1170,28 @@ pub(crate) fn create_start_index(db: &Connection) -> Result<(), String> {
 /// Balanced augmented nodes over an intervals table ordered by `ord`, with AVL heights. Subtree summaries
 /// (largest start, count, extent bounds) let short intervals collapse without enumerating
 /// dense clusters; see duration_summaries.
+///
+/// Table names are `'static` constants, never input, so splicing them into SQL is safe.
 fn build_interval_nodes(
     db: &Connection,
     intervals: &'static str,
     nodes: &'static str,
 ) -> Result<(), String> {
     db.execute(&format!("DROP TABLE IF EXISTS {nodes}"), &[])?;
+    // One row per tree node, with the same ID as its interval's ord. Each holds summaries of
+    // its whole subtree: min_time (earliest start), max_time (latest end), max_first (latest
+    // start), cnt (intervals), min_extent/max_extent (shortest and longest), and its AVL
+    // height. Window and summary queries prune whole subtrees with them.
     let sql = "CREATE TABLE duration_nodes(id INTEGER PRIMARY KEY,left_id INTEGER,right_id INTEGER,min_time TEXT NOT NULL COLLATE RATIONAL_V1,max_time TEXT NOT NULL COLLATE RATIONAL_V1,max_first TEXT NOT NULL COLLATE RATIONAL_V1,cnt INTEGER NOT NULL,min_extent TEXT NOT NULL COLLATE RATIONAL_V1,max_extent TEXT NOT NULL COLLATE RATIONAL_V1,height INTEGER NOT NULL)";
     db.execute(&sql.replace("duration_nodes", nodes), &[])?;
+    // Builds the balanced tree in one statement. ranges(lo, hi, mid) recursively splits the
+    // ord range [1, n] at its midpoint: mid becomes the node for that subrange, and its children
+    // are the midpoints of [lo, mid-1] and [mid+1, hi]. A node's summaries come from its
+    // subrange: min_time is the first of ord lo and max_first the first of ord hi (ords are in
+    // start order), while max_time and the extent bounds are scanned over the subrange (an
+    // ord range on the primary key), O(n log n) in all. HEIGHT is replaced with the subrange's
+    // bit length, the height of a perfectly balanced subtree. The HAVING clause yields no row,
+    // and so no tree, for an empty table.
     let sql = "WITH RECURSIVE ranges(lo,hi,mid) AS (SELECT 1,count(*),CAST((1+count(*))/2 AS INTEGER) FROM duration_intervals HAVING count(*)>0 UNION ALL SELECT r.lo,r.mid-1,CAST((r.lo+r.mid-1)/2 AS INTEGER) FROM ranges r WHERE r.lo<r.mid UNION ALL SELECT r.mid+1,r.hi,CAST((r.mid+1+r.hi)/2 AS INTEGER) FROM ranges r WHERE r.mid<r.hi) INSERT INTO duration_nodes SELECT mid,CASE WHEN lo<mid THEN CAST((lo+mid-1)/2 AS INTEGER) END,CASE WHEN mid<hi THEN CAST((mid+1+hi)/2 AS INTEGER) END,(SELECT first FROM duration_intervals WHERE ord=lo),(SELECT last FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY last COLLATE RATIONAL_V1 DESC LIMIT 1),(SELECT first FROM duration_intervals WHERE ord=hi),hi-lo+1,(SELECT extent FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY extent COLLATE RATIONAL_V1 LIMIT 1),(SELECT extent FROM duration_intervals WHERE ord BETWEEN lo AND hi ORDER BY extent COLLATE RATIONAL_V1 DESC LIMIT 1),HEIGHT FROM ranges";
     db.execute(
         &sql.replace("HEIGHT", &intervals::balanced_height("(hi-lo+1)"))
@@ -1020,6 +1204,12 @@ fn build_interval_nodes(
     let count = count.parse::<i64>().map_err(|e| e.to_string())?;
     intervals::set_root(db, nodes, (count > 0).then_some((1 + count) / 2))
 }
+/// Creates the `relationships` table if missing: one row per undirected link between two
+/// entities (kind 'moment' or 'duration', and ID), stored once in canonical order (see
+/// `relate`). The primary key on (a_kind, a_id, b_kind, b_id) serves lookups by the first
+/// endpoint and makes repeated links no-ops; the CHECK forbids linking an entity to itself.
+/// `relationships_b` serves lookups by the second endpoint, so finding every link of an
+/// entity is two index seeks.
 pub(crate) fn create_relationship_table(db: &Connection) -> Result<(), String> {
     db.execute("CREATE TABLE IF NOT EXISTS relationships(a_kind TEXT NOT NULL CHECK(a_kind IN ('moment','duration')),a_id TEXT NOT NULL,b_kind TEXT NOT NULL CHECK(b_kind IN ('moment','duration')),b_id TEXT NOT NULL,PRIMARY KEY(a_kind,a_id,b_kind,b_id),CHECK(a_kind<>b_kind OR a_id<>b_id)) STRICT", &[])?;
     db.execute(
@@ -1037,6 +1227,7 @@ pub(crate) fn relate(db: &Connection, r: &Relationship, related: bool) -> Result
     if key(a) > key(b) {
         std::mem::swap(&mut a, &mut b);
     }
+    // INSERT OR IGNORE: linking an already linked pair changes nothing.
     if related {
         db.execute(
             "INSERT OR IGNORE INTO relationships VALUES(?,?,?,?)",
@@ -1051,16 +1242,27 @@ pub(crate) fn relate(db: &Connection, r: &Relationship, related: bool) -> Result
 }
 /// Relationship arcs as fixed intervals between endpoint times (a duration's start), in the
 /// same augmented tree as duration bands. Requires the duration index.
+///
+/// Recreates `edge_intervals` (same columns as `duration_intervals`; `id` is the arc key
+/// "m:a~d:x", the endpoint JSON is `null` and metadata `{}`) and builds `edge_nodes` over it.
 pub(crate) fn rebuild_edge_index(db: &Connection) -> Result<(), String> {
     create_relationship_table(db)?;
-    // Deleting an entity removes its links.
+    // Deleting an entity removes its links: drop every link with an endpoint that no longer
+    // exists (NOT IN subqueries over the events and durations primary keys).
     db.execute("DELETE FROM relationships WHERE (a_kind='moment' AND a_id NOT IN (SELECT id FROM events)) OR (b_kind='moment' AND b_id NOT IN (SELECT id FROM events)) OR (a_kind='duration' AND a_id NOT IN (SELECT id FROM durations)) OR (b_kind='duration' AND b_id NOT IN (SELECT id FROM durations))", &[])?;
     db.execute("DROP TABLE IF EXISTS edge_intervals", &[])?;
     db.execute("CREATE TABLE edge_intervals(ord INTEGER PRIMARY KEY,id TEXT NOT NULL UNIQUE,start_json TEXT NOT NULL,end_json TEXT NOT NULL,start_time TEXT NOT NULL COLLATE RATIONAL_V1,end_time TEXT NOT NULL COLLATE RATIONAL_V1,first TEXT NOT NULL COLLATE RATIONAL_V1,last TEXT NOT NULL COLLATE RATIONAL_V1,metadata TEXT NOT NULL,extent TEXT COLLATE RATIONAL_V1)", &[])?;
+    // places: where each entity sits on the time axis (a moment's time, a duration's start).
+    // r: each link joined to both endpoints' places, keyed "m:<id>~d:<id>" in stored order.
+    // Rows are numbered by (earlier time, key) for ord, as for durations.
     db.execute("WITH places(kind,id,time) AS (SELECT 'moment',id,time FROM events UNION ALL SELECT 'duration',id,start_time FROM duration_intervals), r AS (SELECT CASE r.a_kind WHEN 'moment' THEN 'm:' ELSE 'd:' END||r.a_id||'~'||CASE r.b_kind WHEN 'moment' THEN 'm:' ELSE 'd:' END||r.b_id AS id,pa.time AS s,pb.time AS e FROM relationships r JOIN places pa ON pa.kind=r.a_kind AND pa.id=r.a_id JOIN places pb ON pb.kind=r.b_kind AND pb.id=r.b_id) INSERT INTO edge_intervals(ord,id,start_json,end_json,start_time,end_time,first,last,metadata,extent) SELECT row_number() OVER (ORDER BY q_min(s,e) COLLATE RATIONAL_V1,id),id,'null','null',s,e,q_min(s,e),q_max(s,e),'{}',q_sub(q_max(s,e),q_min(s,e)) FROM r", &[])?;
     build_interval_nodes(db, "edge_intervals", "edge_nodes")
 }
 /// Arcs touching [lower, upper] that are at least as long as the threshold.
+///
+/// Returns `{"edges": [...], "edgesTruncated": bool}` with at most 256 arcs, each with its key,
+/// both endpoints as entity references, its time span and each endpoint's time. Files without
+/// an arc index (it is created by every save and on open) yield no arcs.
 pub(crate) fn edge_window(
     db: &Connection,
     lower: &str,
@@ -1088,7 +1290,14 @@ pub(crate) fn edge_window(
     }
     Ok(serde_json::json!({"edges":edges,"edgesTruncated":more}))
 }
+/// The columns of one duration band, selected from an intervals table aliased `d`: ID,
+/// endpoint JSON, first and last time, a bounded metadata projection, and resolved endpoint
+/// times. The projection keeps only text fields: the title (cut to 512 characters), the notes
+/// (cut to 2000) and other text fields of at most 256 characters, so a band never carries
+/// large metadata to the webview. `band_json` turns a row into JSON.
 pub(crate) const BAND_COLUMNS: &str = "d.id,d.start_json,d.end_json,d.first,d.last,(SELECT json_group_object(key,CASE key WHEN 'title' THEN substr(value,1,512) WHEN 'description' THEN substr(value,1,2000) ELSE value END) FROM json_each(d.metadata) WHERE type='text' AND (key IN ('title','description') OR length(value)<=256)),d.start_time,d.end_time";
+/// One duration band as JSON from a row of `BAND_COLUMNS`, in the shape the editor draws:
+/// `{id, start, end, first, last, metadata, startTime, endTime}`.
 fn band_json(row: &[Option<String>]) -> Result<Value, String> {
     let parse = |text: &Option<String>| -> Result<Value, String> {
         serde_json::from_str(text.as_deref().unwrap_or("null")).map_err(|e| e.to_string())
@@ -1136,10 +1345,19 @@ pub(crate) fn interval_window(
     upper: &str,
     threshold: &str,
 ) -> Result<Vec<Vec<Option<String>>>, String> {
+    // Whether a subtree may hold a match: its earliest start is at or before upper (?1), its
+    // latest end at or after lower (?2), and, unless the threshold (?3) is zero, its longest
+    // interval reaches the threshold.
     let fits = |n: &str| {
         format!("{n}.min_time<=q(?1) COLLATE RATIONAL_V1 AND {n}.max_time>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp({n}.max_extent,q(?3))>=0)")
     };
     // kind 0: a subtree keyed by its earliest start; kind 1: one node keyed by (start, ID).
+    // The anchor row is the root (from interval_roots) if it fits. Each subtree row yields
+    // its children that fit, as subtree rows, and its own interval as a node row, with `hit`
+    // telling whether that interval itself matches (the same test as `fits`, on one
+    // interval). The ORDER BY makes the queue a priority queue on (start, kind, ID): at equal
+    // starts subtrees come out before nodes, so a subtree is expanded before any node that
+    // might sort after its contents. Only hits are returned.
     let walk = format!("WITH RECURSIVE walk(kind,node,start,id,hit) AS (\
         SELECT 0,n.id,n.min_time,'',0 FROM {nodes} n WHERE n.id=(SELECT root FROM interval_roots WHERE name='{nodes}') AND {} \
         UNION ALL SELECT 0,c.id,c.min_time,'',0 FROM walk w JOIN {nodes} p ON p.id=w.node JOIN {nodes} c ON c.id IN (p.left_id,p.right_id) WHERE w.kind=0 AND {} \
@@ -1158,6 +1376,8 @@ pub(crate) fn interval_window(
     if found.is_empty() {
         return Ok(Vec::new());
     }
+    // Fetch the bands for the found ords, passed as one JSON array and expanded with
+    // json_each; ordering by the array index (f.key) keeps the walk's order.
     let ords = serde_json::to_string(&found).map_err(|e| e.to_string())?;
     db.query_limited(
         &format!("SELECT {BAND_COLUMNS} FROM json_each(?1) f JOIN {intervals} d ON d.ord=CAST(f.value AS INTEGER) ORDER BY f.key"),
@@ -1189,6 +1409,10 @@ pub(crate) fn duration_page(
 ) -> Result<Value, String> {
     let take = (limit + 1).to_string();
     let (after_first, after_id) = after.unwrap_or(("", ""));
+    // Keyset pagination: durations starting at or after lower (?1) and ending at or before
+    // upper (?2), strictly after the cursor (?3, ?4) in (first, id) order; an empty cursor
+    // starts at the beginning. The range on `first` can use duration_intervals_first. One row
+    // past the limit tells whether there is a next page.
     let sql = format!("SELECT {BAND_COLUMNS} FROM duration_intervals d WHERE d.first>=q(?1) COLLATE RATIONAL_V1 AND d.last<=q(?2) COLLATE RATIONAL_V1 AND (?3='' OR q_cmp(d.first,q(?3))>0 OR (q_cmp(d.first,q(?3))=0 AND d.id>?4)) ORDER BY d.first COLLATE RATIONAL_V1,d.id LIMIT CAST(?5 AS INTEGER)");
     let rows = db.query_limited(
         &sql,
@@ -1211,6 +1435,8 @@ pub(crate) fn duration_page(
     Ok(serde_json::json!({"durations":durations,"next":next}))
 }
 /// Exact rational helpers evaluated by the sqlite-rational extension.
+///
+/// `sign` runs a query returning one `q_cmp` result (-1, 0 or 1) and parses it.
 fn sign(db: &Connection, sql: &str, parameters: &[&str]) -> Result<i32, String> {
     db.scalar(sql, parameters)?
         .parse::<i32>()
@@ -1220,6 +1446,7 @@ fn sign(db: &Connection, sql: &str, parameters: &[&str]) -> Result<i32, String> 
 fn diff_cmp(db: &Connection, a: &str, b: &str, t: &str) -> Result<i32, String> {
     sign(db, "SELECT q_cmp(q_sub(q(?1),q(?2)),q(?3))", &[a, b, t])
 }
+/// The later of two exact times (`b` when they are equal).
 fn later(db: &Connection, a: &str, b: &str) -> Result<String, String> {
     Ok(if sign(db, "SELECT q_cmp(q(?1),q(?2))", &[a, b])? > 0 {
         a
@@ -1228,6 +1455,8 @@ fn later(db: &Connection, a: &str, b: &str) -> Result<String, String> {
     }
     .to_string())
 }
+/// The group being gathered by `duration_summaries_walk`: its anchor (first start), latest
+/// end, duration count, and the band when it holds a single duration.
 #[cfg(test)]
 type OpenSummary = Option<(String, String, u64, Option<Value>)>;
 /// Adds an entry or whole subtree to the open cluster, closing it first when the start no
@@ -1274,9 +1503,12 @@ fn join_summary(
 }
 /// One summarized cluster of collapsed durations.
 pub(crate) struct DurationSummary {
+    /// The group's anchor (its first start) and its latest end.
     pub first: String,
     pub last: String,
+    /// How many durations it collapses.
     pub count: u64,
+    /// The duration's band when the group holds exactly one, so the editor can still open it.
     pub band: Option<Value>,
 }
 /// Anchored-span summaries of durations shorter than the threshold that intersect
@@ -1297,7 +1529,16 @@ pub(crate) fn duration_summaries(
     if sign(db, "SELECT q_cmp(q(?1),q('0'))", &[threshold])? <= 0 {
         return Ok(Vec::new());
     }
+    // A collapsed duration is shorter than the threshold (?3) and intersects the window: it
+    // ends at or after lower (?1) and starts at or before upper (?2).
     let collapsed = "q_cmp(d.extent,q(?3))<0 AND q_cmp(d.last,q(?1))>=0 AND d.first<=q(?2)";
+    // anchors: the first anchor is the earliest collapsed start at or after lower - threshold;
+    // each next one is the earliest collapsed start at or after the previous anchor plus the
+    // threshold, until none is left (a NULL ends the recursion). Each is an ORDER BY ... LIMIT
+    // 1 seek on duration_intervals_first. groups: for each anchor, the collapsed durations
+    // starting in [anchor, anchor + threshold), counted, with their latest end and the
+    // smallest ord (the duration itself when the group holds one). The final join attaches
+    // that single duration's band columns; larger groups get NULLs there.
     let rows = db.query(
         &format!("WITH RECURSIVE anchors(a) AS (\
            SELECT (SELECT d.first FROM duration_intervals d WHERE d.first>=q_sub(q(?1),q(?3)) AND {collapsed} ORDER BY d.first LIMIT 1) \
@@ -1363,6 +1604,10 @@ pub(crate) fn duration_summaries_walk(
              {BAND_COLUMNS} FROM duration_nodes n JOIN duration_intervals d ON d.ord=n.id WHERE n.id=CAST(?4 AS INTEGER)"),
             &[lower, upper, threshold, &id],
         )?;
+        // Columns 6 to 9 are flags: 6, the subtree lies outside the window; 7, every duration
+        // in it is long enough to be drawn (none collapse); 8, every duration in it collapses
+        // and all its starts lie in the window; 9, this node's own duration collapses and
+        // intersects the window. Band columns start at 10 (first and last at 13 and 14).
         let r = row.first().ok_or("Broken duration index")?;
         let flag = |i: usize| r[i].as_deref() == Some("1");
         let text = |i: usize| r[i].clone().unwrap_or_default();
@@ -1386,11 +1631,15 @@ pub(crate) fn duration_summaries_walk(
             continue;
         }
         let (min, max, max_first) = (text(3), text(4), text(5));
+        // The anchor the subtree's starts are measured from: the open group's, if the subtree's
+        // first start still joins it, else the subtree's own first start.
         let base = match &open {
             Some((anchor, _, _, _)) if diff_cmp(db, &min, anchor, threshold)? < 0 => anchor.clone(),
             _ => min.clone(),
         };
         let count: u64 = text(2).parse().map_err(|_| "Invalid duration count")?;
+        // A wholly collapsed subtree whose starts all fit in one group is consumed whole,
+        // without visiting its nodes; otherwise visit left subtree, node, right subtree in order.
         if flag(8) && diff_cmp(db, &max_first, &base, threshold)? < 0 {
             let single = if count == 1 { Some(band()?) } else { None };
             join_summary(
@@ -1451,6 +1700,9 @@ pub(crate) fn coalesce_groups(
         }
         i += 1;
     }
+    // Merge each group into the previous output group when they share a first time or the
+    // merged block would span less than the threshold. Counts add up; distinct times add up
+    // less one when the two blocks of moments meet at a shared time.
     let mut out: Vec<Value> = Vec::new();
     for g in keyed {
         let merge = match out.last() {

@@ -4,22 +4,38 @@
 //! stays stable, so inserting or removing an interval rewrites only the nodes on its path
 //! (plus rotations) instead of rebuilding the whole index. Nodes are ordered by
 //! (first, ID); each holds the summaries the window and summary queries prune with.
+//! (Removing a node with two children is the one exception to stable IDs: its in-order
+//! successor's interval moves into it, taking its `ord`, and the successor's node is deleted.)
+//!
+//! The trees are built balanced by `build_interval_nodes` (lib.rs) and then edited here by
+//! sparse saves (workspace.rs `apply_changes`). A `Tree` reads nodes on demand, keeps the ones
+//! it touched in memory, and writes them back in `flush`; it runs inside the caller's
+//! transaction, so a failed save leaves the stored tree untouched. Time comparisons are exact,
+//! made by sqlite-rational (`q_cmp`) on the same connection.
 use super::Connection;
 use std::collections::{HashMap, HashSet};
 
 /// Index layout written by this version: AVL interval trees with heights and stored roots.
 pub(crate) const LAYOUT: &str = "2";
 
+/// One tree node in memory: its links and height, its own interval's key fields (from the
+/// intervals table), and its subtree summaries (the nodes table's columns).
 #[derive(Clone)]
 struct Node {
+    /// The node's ID, equal to its interval's `ord`.
     id: i64,
     left: Option<i64>,
     right: Option<i64>,
     height: i64,
+    /// The interval's own ID (the duration ID or arc key), the tiebreak after `first`.
     key: String,
+    /// The interval's earlier and later endpoint times and its length.
     first: String,
     last: String,
     extent: String,
+    /// Subtree summaries, stored as `min_time`, `max_time`, `max_first`, `cnt`,
+    /// `min_extent` and `max_extent`: earliest start, latest end, latest start, size, and
+    /// shortest and longest interval.
     min: String,
     max: String,
     max_first: String,
@@ -38,9 +54,11 @@ pub(crate) struct Interval<'a> {
     pub metadata: &'a str,
 }
 
+/// A subtree's height; 0 for an empty one.
 fn height(n: &Option<Node>) -> i64 {
     n.as_ref().map_or(0, |n| n.height)
 }
+/// Parses a nullable integer column (a child or root ID).
 fn optional(value: &Option<String>) -> Result<Option<i64>, String> {
     value
         .as_deref()
@@ -48,18 +66,26 @@ fn optional(value: &Option<String>) -> Result<Option<i64>, String> {
         .transpose()
 }
 
+/// An open interval tree being edited: the `intervals` table (`duration_intervals` or
+/// `edge_intervals`) and its `nodes` table. Interval rows are written immediately; node changes
+/// are buffered until `flush`.
 pub(crate) struct Tree<'a> {
     db: &'a Connection,
     intervals: &'static str,
     nodes: &'static str,
+    /// The current root, as stored in `interval_roots` until `flush` writes the new one.
     root: Option<i64>,
+    /// Nodes read or changed so far, by ID; changed ones are the in-memory truth.
     cache: HashMap<i64, Node>,
+    /// Nodes to write back, and nodes to delete, at `flush`.
     dirty: HashSet<i64>,
     dropped: HashSet<i64>,
+    /// The last ID handed out by `new_id`, once it has looked up the largest stored one.
     next: Option<i64>,
 }
 
 impl<'a> Tree<'a> {
+    /// Opens the tree whose root `interval_roots` records under the nodes table's name.
     pub fn open(
         db: &'a Connection,
         intervals: &'static str,
@@ -77,15 +103,19 @@ impl<'a> Tree<'a> {
             next: None,
         })
     }
+    /// How many intervals the tree holds (the root's count).
     pub fn size(&mut self) -> Result<i64, String> {
         Ok(self.get(self.root)?.map_or(0, |n| n.cnt))
     }
+    /// Compares two exact times: -1, 0 or 1.
     fn cmp(&self, a: &str, b: &str) -> Result<i32, String> {
         self.db
             .scalar("SELECT q_cmp(q(?1),q(?2))", &[a, b])?
             .parse::<i32>()
             .map_err(|e| e.to_string())
     }
+    /// The larger and smaller of a time and an optional one (a child's summary, absent for a
+    /// missing child).
     fn larger(&self, a: &str, b: Option<&str>) -> Result<String, String> {
         Ok(match b {
             Some(b) if self.cmp(b, a)? > 0 => b.into(),
@@ -109,6 +139,9 @@ impl<'a> Tree<'a> {
             c => c,
         })
     }
+    /// A node by ID, from the cache or else read from the nodes table joined with its
+    /// interval row (both primary-key lookups). `None` for `None`; an error if the row is
+    /// missing or malformed.
     fn get(&mut self, id: Option<i64>) -> Result<Option<Node>, String> {
         let Some(id) = id else { return Ok(None) };
         if let Some(n) = self.cache.get(&id) {
@@ -139,6 +172,8 @@ impl<'a> Tree<'a> {
         self.cache.insert(id, node.clone());
         Ok(Some(node))
     }
+    /// A fresh node and interval ID: one past the largest stored in either table (looked up
+    /// once, both by their integer primary keys), then counting up.
     fn new_id(&mut self) -> Result<i64, String> {
         let next = match self.next {
             Some(n) => n + 1,
@@ -181,6 +216,8 @@ impl<'a> Tree<'a> {
         self.cache.insert(n.id, n.clone());
         Ok(n)
     }
+    /// AVL rotations: lift the left (or right) child above `n`, updating both nodes'
+    /// summaries; returns the new subtree root.
     fn rotate_right(&mut self, mut n: Node) -> Result<i64, String> {
         let mut l = self.get(n.left)?.ok_or("Broken interval index")?;
         n.left = l.right;
@@ -195,6 +232,8 @@ impl<'a> Tree<'a> {
         r.left = Some(n.id);
         Ok(self.update(r)?.id)
     }
+    /// Updates `n` and restores the AVL property at it (child heights differ by at most one)
+    /// with a single or double rotation; returns the subtree's new root.
     fn balance(&mut self, n: Node) -> Result<i64, String> {
         let mut n = self.update(n)?;
         let l = self.get(n.left)?;
@@ -219,6 +258,8 @@ impl<'a> Tree<'a> {
     /// Adds an interval; its ID must not be stored yet.
     pub fn insert(&mut self, interval: &Interval) -> Result<(), String> {
         let id = self.new_id()?;
+        // Store the interval row with canonical times, its earlier and later endpoint and its
+        // length computed exactly in SQL, then read those back for the new leaf.
         self.db.execute(
             &format!("INSERT INTO {}(ord,id,start_json,end_json,start_time,end_time,first,last,metadata,extent) VALUES(CAST(?1 AS INTEGER),?2,?3,?4,q(?5),q(?6),q_min(q(?5),q(?6)),q_max(q(?5),q(?6)),?7,q_sub(q_max(q(?5),q(?6)),q_min(q(?5),q(?6))))", self.intervals),
             &[&id.to_string(), interval.id, interval.start_json, interval.end_json, interval.start, interval.end, interval.metadata],
@@ -252,6 +293,8 @@ impl<'a> Tree<'a> {
         self.root = Some(self.insert_at(self.root, &first, interval.id, id)?);
         Ok(())
     }
+    /// Inserts node `id`, keyed by (`first`, `key`), into the subtree at `at`, rebalancing on
+    /// the way back up; returns the subtree's new root. Errors on a duplicate key.
     fn insert_at(
         &mut self,
         at: Option<i64>,
@@ -272,6 +315,7 @@ impl<'a> Tree<'a> {
     }
     /// Removes the interval with this ID, if stored.
     pub fn remove(&mut self, key: &str) -> Result<bool, String> {
+        // The interval's start locates it in the tree (lookup by the unique `id` column).
         let rows = self.db.query(
             &format!("SELECT first FROM {} WHERE id=?1", self.intervals),
             &[key],
@@ -282,6 +326,8 @@ impl<'a> Tree<'a> {
         self.root = self.remove_at(self.root, &first, key)?;
         Ok(true)
     }
+    /// Removes the interval keyed by (`first`, `key`) from the subtree at `at`, deleting its
+    /// interval row, and rebalances; returns the subtree's new root.
     fn remove_at(
         &mut self,
         at: Option<i64>,
@@ -325,6 +371,8 @@ impl<'a> Tree<'a> {
         }
         self.balance(n).map(Some)
     }
+    /// Unlinks the leftmost node of a subtree (its interval row has already moved) and
+    /// rebalances; returns the subtree's new root.
     fn remove_min(&mut self, at: Option<i64>) -> Result<Option<i64>, String> {
         let mut n = self.get(at)?.ok_or("Broken interval index")?;
         if n.left.is_none() {
@@ -334,12 +382,16 @@ impl<'a> Tree<'a> {
         n.left = self.remove_min(n.left)?;
         self.balance(n).map(Some)
     }
+    /// Marks a node for deletion at `flush`.
     fn drop(&mut self, id: i64) {
         self.cache.remove(&id);
         self.dirty.remove(&id);
         self.dropped.insert(id);
     }
     /// Writes changed nodes and the root.
+    ///
+    /// Deletes dropped nodes, then writes each changed node whole (INSERT OR REPLACE on its ID;
+    /// empty strings bind as NULL children), and records the root in `interval_roots`.
     pub fn flush(&mut self) -> Result<(), String> {
         for id in self.dropped.drain() {
             self.db.execute(
@@ -359,6 +411,10 @@ impl<'a> Tree<'a> {
     }
 }
 
+/// Records a tree's root node (NULL for an empty tree) under its nodes table's name.
+///
+/// `interval_roots` has one row per tree (`duration_nodes`, `edge_nodes`). The window queries
+/// start from it, since after edits the root is no longer the middle ord.
 pub(crate) fn set_root(db: &Connection, nodes: &str, root: Option<i64>) -> Result<(), String> {
     db.execute(
         "CREATE TABLE IF NOT EXISTS interval_roots(name TEXT PRIMARY KEY,root INTEGER) STRICT",
@@ -371,6 +427,9 @@ pub(crate) fn set_root(db: &Connection, nodes: &str, root: Option<i64>) -> Resul
 }
 
 /// Height of a perfectly balanced subtree over `size` intervals (its bit length).
+///
+/// Returns a SQL `CASE` expression over the SQL expression `size`, for subtrees of up to
+/// 2^21 - 1 intervals, which covers the 200000 limit.
 pub(crate) fn balanced_height(size: &str) -> String {
     let mut sql = String::from("CASE");
     for bits in 1..=20 {
@@ -380,6 +439,9 @@ pub(crate) fn balanced_height(size: &str) -> String {
 }
 
 /// A token identifying the saved state; files and baselines with equal tokens are equal.
+///
+/// Made of the time in nanoseconds, the process ID and a per-process counter, so tokens are
+/// unique without coordination.
 pub(crate) fn token() -> String {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -405,6 +467,7 @@ pub(crate) fn layout(db: &Connection) -> Result<Option<(String, String)>, String
     {
         return Ok(None);
     }
+    // Read only after confirming index_layout is a real table, not a view.
     let rows = db.query(
         "SELECT CAST(version AS TEXT),token FROM index_layout WHERE singleton=1",
         &[],
@@ -413,6 +476,9 @@ pub(crate) fn layout(db: &Connection) -> Result<Option<(String, String)>, String
         .first()
         .and_then(|r| Some((r[0].clone()?, r[1].clone()?))))
 }
+/// Records the current index layout (`LAYOUT`) and a save token in the one-row
+/// `index_layout` table. Every save (whole or sparse) writes a new token, to the file and to
+/// the desktop baseline alike, so their tokens match only while they hold the same state.
 pub(crate) fn set_layout(db: &Connection, token: &str) -> Result<(), String> {
     db.execute("CREATE TABLE IF NOT EXISTS index_layout(singleton INTEGER PRIMARY KEY CHECK(singleton=1),version INTEGER NOT NULL,token TEXT NOT NULL) STRICT", &[])?;
     db.execute(

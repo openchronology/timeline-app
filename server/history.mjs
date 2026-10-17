@@ -18,6 +18,14 @@
  * it has not saved itself. An override records the revision from which the copy keeps its
  * own versions of an entity; one without a version is an entity the copy removed. A copy of
  * a copy reads through each level in turn, up to SHARED_LEVELS levels.
+ *
+ * Statements write each level of a lineage into their SQL as literals (timeline IDs and
+ * revision numbers read from the database and checked by `lineage`), so the planner sees
+ * which timeline each branch reads and uses its indexes for it. The indexes they rely on
+ * are in schema.sql: each history table's primary key (timeline, key, since), the partial
+ * unique `_current` indexes (until IS NULL) that saves find current versions by, and the
+ * `_since`/`_until` indexes that comparisons find what changed between revisions by.
+ * See "Saved history" in docs/architecture.md.
  */
 import { validateDocument } from '../dist/core.mjs';
 import { indexReader, lineageOf } from './index-versions.mjs';
@@ -27,13 +35,25 @@ import { RELATIONSHIP_ORDER } from './document-stream.mjs';
 const PAGE = 20000;
 /** How many levels a revision may read through: a copy past that starts its own history. */
 const SHARED_LEVELS = 4;
-/** After every revision number: the versions current at a level. */
+/**
+ * After every revision number (the largest bigint): a level read at CURRENT sees its
+ * current versions (until IS NULL) rather than those of a revision.
+ */
 const CURRENT = '9223372036854775807';
+/** A relationship's key columns, in canonical order (see oc_relationships in schema.sql). */
 const LINK = ['a_kind', 'a_id', 'b_kind', 'b_id'];
 /**
  * Each kind of entity: its history table, its key, its stored value, and its live rows (the
  * saved timeline's index, as read by its indexReader `index`) as the same columns, with the
  * expressions that key them.
+ *
+ * - `values`/`types`: the value columns and their SQL types (none for a relationship, whose
+ *   existence is its value); `same`: the column compared to tell whether a version changed.
+ * - `live(index, scan)`: SQL for the live rows, ending in a WHERE clause callers extend with
+ *   AND; `scan` when reading most of them (see indexReader). Durations come from their
+ *   interval tree's nodes, keyed by the band's ID (a null definition is a legacy row).
+ * - `bytes`/`overrideBytes`: what a version or an override is charged.
+ * - `overrides`: the copy's override table (see the file's header).
  */
 const KINDS = {
   moments: {
@@ -76,7 +96,9 @@ const KINDS = {
     overrideBytes: 'octet_length(a_id)+octet_length(b_id)+32',
   },
 };
+/** Every history table, settings included. */
 const TABLES = [...Object.values(KINDS).map((k) => k.table), 'oc_history_settings'];
+/** `names` qualified by `alias`, comma-separated, for a SELECT list or a row value. */
 const columns = (alias, names) => names.map((name) => `${alias}.${name}`).join(',');
 /**
  * The live row with the key of the row `alias`, if any, as a subquery looked up by that key.
@@ -100,8 +122,12 @@ export function settingsOf({ events, durations, relationships, ...settings }) {
  * `touched` names what the save may have changed: { moments, durations, relationships } (ids,
  * ids, and objects of LINK columns); without it every entity is compared, a page at a time.
  * Returns the bytes of the versions written, which the revision is charged.
+ * Runs in the save's transaction (the timeline row locked). The first time history is kept
+ * as rows (history_since null) it starts at `number`: a timeline then copies its whole
+ * state, while a copy starts as its base and records only its settings.
  */
 export async function recordHistory(client, timelineId, number, settings, touched = null) {
+  // Where its history starts, and the revision it reads through to if it is a copy.
   const { rows } = await client.query(
     `SELECT t.history_since,b.base_revision_id FROM oc_timelines t
     LEFT JOIN oc_history_bases b ON b.timeline_id=t.id WHERE t.id=$1`,
@@ -118,7 +144,11 @@ export async function recordHistory(client, timelineId, number, settings, touche
   if (starting && rows[0].base_revision_id) return bytes;
   return bytes + (await recordEntities(client, KINDS, timelineId, number, starting, touched));
 }
-/** Records the entities of `kinds` (see recordHistory); returns the bytes written. */
+/**
+ * Records the entities of `kinds` (KINDS, read from live rows, or STAGED_KINDS): those
+ * `touched` names, or all of them (when `starting`, or without `touched`). Returns the
+ * bytes written.
+ */
 async function recordEntities(client, kinds, timelineId, number, starting, touched) {
   const levels = await lineage(client, timelineId, CURRENT);
   // A timeline's live rows, read through as a fork's are (staged rows are their own).
@@ -137,6 +167,7 @@ async function recordEntities(client, kinds, timelineId, number, starting, touch
   }
   // A timeline's first versions can outnumber what the planner last saw of these tables;
   // later saves look versions up by key, which needs current statistics.
+  // (ANALYZE samples the tables within the transaction; it takes no lock that blocks writes.)
   if (starting && written > PAGE) await client.query(`ANALYZE ${TABLES.join(',')}`);
   return bytes;
 }
@@ -177,6 +208,7 @@ const STAGED = {
 };
 /** How many entities one statement stages. */
 const STAGE_BATCH = 5000;
+/** A relationship end ({moment} or {duration}) as its [kind, id] columns. */
 const reference = (ref) => ('moment' in ref ? ['moment', ref.moment] : ['duration', ref.duration]);
 /** Each kind, read from its staged rows instead of its live ones. */
 const STAGED_KINDS = Object.fromEntries(
@@ -240,8 +272,13 @@ export async function recordDetachedPatch(client, revisionId, baseRevisionId, pa
   await unstage(client, revisionId);
   return bytes;
 }
-/** A detached revision's history reads through to its base, which must be kept as rows. */
+/**
+ * A detached revision's history reads through to its base, which must be kept as rows:
+ * records `baseRevisionId` as the base of `revisionId` (used as a timeline ID in the history
+ * tables) and returns true, or returns false, writing nothing, when the base is not kept so.
+ */
 async function startDetached(client, revisionId, baseRevisionId) {
+  // history_rows: the base's content is kept as rows (not a snapshot or patch, nor forgotten).
   const base = await client.query('SELECT 1 FROM oc_revisions WHERE id=$1 AND history_rows', [
     baseRevisionId,
   ]);
@@ -252,13 +289,19 @@ async function startDetached(client, revisionId, baseRevisionId) {
   ]);
   return true;
 }
-/** Stages a document's entities (see STAGED) for `id`, until the transaction ends. */
+/**
+ * Stages a document's entities (see STAGED) for `id`, until the transaction ends. The tables
+ * are temporary (private to this connection) and dropped at commit; IF NOT EXISTS lets a
+ * transaction stage more than once (unstage empties them between).
+ */
 async function stage(client, id, document) {
   for (const stage of Object.values(STAGED)) {
     await client.query(
       `CREATE TEMPORARY TABLE IF NOT EXISTS ${stage.table}(${stage.definition}) ON COMMIT DROP`,
     );
     const items = stage.items(document);
+    // A batch of entities sent as one JSON array and expanded in the database, rather than
+    // one parameter per value.
     for (let i = 0; i < items.length; i += STAGE_BATCH)
       await client.query(
         `INSERT INTO ${stage.table}(${stage.columns}) SELECT $1,${stage.values}
@@ -271,19 +314,25 @@ async function stage(client, id, document) {
     `ANALYZE ${Object.entries(STAGED).map(([name, stage]) => `${stage.table}(timeline_id,${KINDS[name].key})`)}`,
   );
 }
+/** Empties the staged rows of `id`, so a later stage in the transaction starts clean. */
 async function unstage(client, id) {
   for (const stage of Object.values(STAGED))
     await client.query(`DELETE FROM ${stage.table} WHERE timeline_id=$1`, [id]);
 }
 
+/** A touched entity (an ID, or an object of LINK columns) as an array of key values. */
 const keyOf = (kind) => (value) =>
   kind.key.length === 1 ? [value] : kind.key.map((column) => value[column]);
 
 /**
  * The levels revision `number` of a timeline reads, as [timeline id, revision number]: the
  * timeline at that number, then the revision it was copied from, and so on.
+ * `number` is a revision number as text, or CURRENT.
  */
 async function lineage(client, timelineId, number) {
+  // Follows base links: each level's base revision (oc_history_bases, by its primary key)
+  // gives the next level's timeline and number (oc_revisions, by its primary key). Copies
+  // read through at most SHARED_LEVELS levels; the depth bound only guards against a cycle.
   const { rows } = await client.query(
     `WITH RECURSIVE l(timeline_id,number,depth) AS (
       SELECT $1::uuid,$2::bigint,0
@@ -301,7 +350,10 @@ async function lineage(client, timelineId, number) {
   });
 }
 
-/** The versions a level sees (see lineage): its current ones, or those of a revision. */
+/**
+ * The versions a level sees (see lineage): its current ones, or those of a revision (valid
+ * at n: since <= n < until, a null until meaning still current). SQL conditions on `alias`.
+ */
 const seen = (alias, [id, n]) =>
   `${alias}.timeline_id='${id}' AND ${alias}.since<=${n} AND ${
     n === CURRENT ? `${alias}.until IS NULL` : `(${alias}.until IS NULL OR ${alias}.until>${n})`
@@ -311,6 +363,13 @@ const seen = (alias, [id, n]) =>
  * The versions of a kind that `levels` see (see lineage), as its key and value columns:
  * each entity from the first level that saved it, unless it removed it there. `filter`
  * narrows the versions and overrides read: SQL given their alias.
+ *
+ * With several levels: a branch per level of the versions it sees and of its overrides (as
+ * rows of the key with null values), tagged with the level's depth. DISTINCT ON (key),
+ * ordered by depth then override, keeps per key the nearest level's row, its version before
+ * its override; an override alone there (the entity removed by that copy) wins and is then
+ * dropped, so it hides deeper levels' versions. Overrides count from their `since`: before
+ * it the copy still read the entity through.
  */
 function visible(kind, levels, filter = () => '') {
   const names = [...kind.key, ...kind.values];
@@ -333,6 +392,7 @@ function visible(kind, levels, filter = () => '') {
  * Returns whether it does; otherwise the copy's first revision copies its state.
  */
 export async function shareHistory(client, timelineId, revisionId) {
+  // Only a revision whose content is kept as rows can be read through to.
   const { rows } = await client.query(
     'SELECT timeline_id,number FROM oc_revisions WHERE id=$1 AND history_rows',
     [revisionId],
@@ -347,14 +407,22 @@ export async function shareHistory(client, timelineId, revisionId) {
   return true;
 }
 
+/**
+ * Records the timeline's settings at revision `number`: ends the current version if they
+ * changed, then adds a version when none is current (changed, or the first). Returns the
+ * bytes added (0 when unchanged).
+ */
 async function recordSettings(client, timelineId, number, settings) {
   const value = JSON.stringify(settings);
+  // The current version, found by the partial unique index oc_history_settings_current.
+  // IS DISTINCT FROM compares the jsonb values (key order does not matter in jsonb).
   await client.query(
     `UPDATE oc_history_settings SET until=$2 WHERE timeline_id=$1 AND until IS NULL
     AND settings IS DISTINCT FROM $3::jsonb`,
     [timelineId, number, value],
   );
   const { rows } = await client.query(
+    // Inserts only when no version is current any more: the unique index allows one.
     `INSERT INTO oc_history_settings(timeline_id,since,settings)
     SELECT $1,$2,$3::jsonb WHERE NOT EXISTS(
       SELECT 1 FROM oc_history_settings WHERE timeline_id=$1 AND until IS NULL)
@@ -369,6 +437,8 @@ async function recordSettings(client, timelineId, number, settings) {
  * at `number` unless unchanged, and their live rows without a current version start one. In
  * a copy, an entity it has not saved before and that now differs from what it reads through
  * to (`levels`) gets an override first: from here on, the copy keeps its own versions.
+ * A page of PAGE keys per round of three statements, each reading the keys from arrays (one
+ * text[] per key column) in a `k` CTE. Returns { bytes, count } of what it wrote.
  */
 async function recordKeys(client, kind, timelineId, number, keys, levels, index) {
   const copy = levels.length > 1;
@@ -381,6 +451,9 @@ async function recordKeys(client, kind, timelineId, number, keys, levels, index)
     const key = (alias) => `(${columns(alias, kind.key)})`;
     const own = (alias) =>
       `SELECT 1 FROM ${kind.overrides} o WHERE o.timeline_id=$1 AND ${key('o')}=${key(alias)}`;
+    // 1. Ends at this revision each key's current version (found by the `_current` partial
+    //    unique index) unless the live row still has the same value; a relationship's
+    //    version ends when the link is gone. The immutability trigger allows this one change.
     await client.query(
       `WITH ${k} UPDATE ${kind.table} h SET until=$2 FROM k
       WHERE h.timeline_id=$1 AND h.until IS NULL AND ${key('h')}=${key('k')}
@@ -390,6 +463,9 @@ async function recordKeys(client, kind, timelineId, number, keys, levels, index)
     );
     if (copy) {
       // What the copy read through to before this save, compared with what it holds now.
+      // 2. (copies only) An override for each key the copy has none for whose presence or
+      //    value now differs from what its levels give: from this revision on, the copy
+      //    keeps its own versions of it. Returns the overrides' bytes.
       const inherited = visible(kind, levels.slice(1), (alias) => `AND ${key(alias)}=${key('k')}`);
       const present = (alias) => `(${alias}.${kind.key[0]} IS NOT NULL)`;
       const { rows } = await client.query(
@@ -406,6 +482,9 @@ async function recordKeys(client, kind, timelineId, number, keys, levels, index)
       );
       bytes += Number(rows[0].bytes);
     }
+    // 3. A new version, from the live row, for each key that has a live row and no current
+    //    version (step 1 ended it, or it is new); in a copy only for keys it overrides, the
+    //    others still reading through to the same value. Returns bytes and count written.
     const { rows } = await client.query(
       `WITH ${k},added AS (
         INSERT INTO ${kind.table}(timeline_id,${kind.key},since${kind.values.map((v) => ',' + v).join('')})
@@ -427,10 +506,15 @@ async function recordKeys(client, kind, timelineId, number, keys, levels, index)
  * Every entity of a kind, a page of keys at a time: the live ones, then those each level
  * sees that are no longer live. A timeline starting history has no versions yet: its live
  * entities are copied as they are (copyAll).
+ * The second part finds removals: an entity a level still sees (the timeline's current
+ * versions, or for a copy, what it reads through to) but that has no live row. Keys are
+ * paged in key order with a cursor (keyset pagination on the primary keys), each page then
+ * recorded by recordKeys.
  */
 async function recordAll(client, kind, timelineId, number, starting, levels, index) {
   if (starting) return copyAll(client, kind, timelineId, number, index);
   const total = { bytes: 0, count: 0 };
+  // Keys after the cursor (the last key of the previous page), compared as a row value.
   const key = (alias) => `(${columns(alias, kind.key)})`;
   const after = (alias, cursor) =>
     cursor ? `AND ${key(alias)}>(${kind.key.map((_, c) => `$${c + 2}`)})` : '';
@@ -471,6 +555,9 @@ async function copyAll(client, kind, timelineId, number, index) {
   const total = { bytes: 0, count: 0 };
   const names = [...kind.key, ...kind.values];
   let cursor = null;
+  // Each statement: a page of live rows after the cursor in key order (`page`), inserted as
+  // versions starting at this revision (`added`), returning how many and their bytes along
+  // with the page's last key, the next cursor. An empty page returns no row.
   for (;;) {
     const after = cursor
       ? `AND (${columns('l', kind.key)})>(${kind.key.map((_, c) => `$${c + 3}`)})`
@@ -499,6 +586,9 @@ async function copyAll(client, kind, timelineId, number, index) {
  * Starts history as rows for every timeline saved before it was kept so (when migrating):
  * their state at their current revision, copied in the database. Timelines that keep no
  * saved history are left without. Returns how many started.
+ * Each statement covers every such timeline at once: their own live rows, joined with their
+ * timeline row, copied as versions starting at the timeline's revision. ON CONFLICT DO
+ * NOTHING skips a version already recorded rather than failing the migration.
  */
 export async function startHistory(client) {
   const starting =
@@ -541,6 +631,7 @@ export async function startHistory(client) {
  * stays, and nothing from `until` on sees them (its saved history stops).
  */
 export async function endHistory(client, timelineId, until) {
+  // Current versions found by each table's `_current` partial unique index.
   for (const table of TABLES)
     await client.query(`UPDATE ${table} SET until=$2 WHERE timeline_id=$1 AND until IS NULL`, [
       timelineId,
@@ -548,7 +639,10 @@ export async function endHistory(client, timelineId, until) {
     ]);
 }
 
-/** Revision `number` of a timeline kept as rows, as a document. */
+/**
+ * Revision `number` of a timeline kept as rows, as a document (validated), read whole; null
+ * when it is not kept as rows.
+ */
 export async function historyDocument(client, timelineId, number) {
   const parts = await historyParts(client, timelineId, number);
   if (!parts) return null;
@@ -567,6 +661,8 @@ export async function historyDocument(client, timelineId, number) {
  * kept as rows.
  */
 export async function historyParts(client, timelineId, number, { stream = false } = {}) {
+  // The settings version valid at the number (by primary key: timeline, since). Every
+  // revision kept as rows has one, so none means the revision is not.
   const settings = await client.query(
     `SELECT settings FROM oc_history_settings
     WHERE timeline_id=$1 AND since<=$2 AND (until IS NULL OR until>$2)`,
@@ -599,11 +695,14 @@ export async function historyParts(client, timelineId, number, { stream = false 
  * which may have kept that revision only for it.
  */
 export async function pruneHistoryRows(client, timelineId) {
+  // Whether the head revision is kept as rows.
   const head = await client.query(
     `SELECT 1 FROM oc_timelines t JOIN oc_revisions r ON r.id=t.head_revision_id
     WHERE t.id=$1 AND r.history_rows`,
     [timelineId],
   );
+  // A version goes when no revision of the timeline kept as rows falls in its range
+  // [since, until). Revisions are found by (timeline_id, number), oc_revisions' unique key.
   for (const table of TABLES)
     await client.query(
       `DELETE FROM ${table} h WHERE h.timeline_id=$1 AND (h.until IS NOT NULL OR NOT $2)
@@ -611,12 +710,15 @@ export async function pruneHistoryRows(client, timelineId) {
         AND r.number>=h.since AND (h.until IS NULL OR r.number<h.until))`,
       [timelineId, head.rows.length > 0],
     );
+  // An override applies from its `since` on: it goes once no kept revision is that late.
   for (const kind of Object.values(KINDS))
     await client.query(
       `DELETE FROM ${kind.overrides} o WHERE o.timeline_id=$1 AND NOT EXISTS(
         SELECT 1 FROM oc_revisions r WHERE r.timeline_id=$1 AND r.history_rows AND r.number>=o.since)`,
       [timelineId],
     );
+  // The base link goes once the timeline has no revision kept as rows; RETURNING names the
+  // base revision's timeline, for the caller to prune in turn.
   const { rows } = await client.query(
     `DELETE FROM oc_history_bases b WHERE b.timeline_id=$1 AND NOT EXISTS(
       SELECT 1 FROM oc_revisions r WHERE r.timeline_id=$1 AND r.history_rows)
@@ -636,6 +738,7 @@ export async function pruneHistoryRows(client, timelineId) {
  * either revision is not kept as rows.
  */
 export async function differences(client, fromId, toId) {
+  // Both revisions by primary key, only if kept as rows.
   const { rows } = await client.query(
     'SELECT id,timeline_id,number::text FROM oc_revisions WHERE id=ANY($1::uuid[]) AND history_rows',
     [[fromId, toId]],
@@ -647,7 +750,12 @@ export async function differences(client, fromId, toId) {
   );
   return comparePages(client, from, to);
 }
+/**
+ * The pages `differences` yields, given both lineages: the settings first (when they
+ * differ), then each kind of entity, a page of candidate keys (see candidates) at a time.
+ */
 async function* comparePages(client, from, to) {
+  // The settings version valid at each revision (each by its primary key, timeline and since).
   const settings = await client.query(
     `SELECT a.settings AS before,b.settings AS after,a.settings=b.settings AS same
     FROM oc_history_settings a,oc_history_settings b
@@ -683,6 +791,12 @@ async function* comparePages(client, from, to) {
  * `cursor`: everything the levels above the first timeline both read saved (up to their
  * revisions), and what that timeline saved between its two revisions. Lineages that share no
  * timeline compare everything they hold.
+ *
+ * `i` and `j` are where the lineages meet: the first level of `from` whose timeline `to`
+ * also reads, and that level in `to`. Every branch reads one timeline's versions or
+ * overrides by the indexes that lead with (timeline_id, since) or (timeline_id, until)
+ * (the primary key for the levels above, which also orders by key). Each branch is cut to
+ * PAGE rows after the cursor in key order, then the union is made distinct and cut to PAGE.
  */
 async function candidates(client, kind, from, to, cursor) {
   const i = from.findIndex(([id]) => to.some(([other]) => other === id));
@@ -711,7 +825,12 @@ async function candidates(client, kind, from, to, cursor) {
   );
   return rows.map((row) => kind.key.map((column) => row[column]));
 }
-/** The keys whose versions differ between two lineages, with both versions. */
+/**
+ * The keys whose versions differ between two lineages, with both versions: of `keys` (a page
+ * of candidates), each entity as both lineages see it (visible), matched by a FULL JOIN on
+ * the key, kept when either side lacks it or their values differ. A relationship's value is
+ * true where present.
+ */
 async function compareKeys(client, kind, from, to, keys) {
   const key = (alias) => `(${columns(alias, kind.key)})`;
   const filter = (alias) => `AND ${key(alias)} IN (SELECT ${kind.key} FROM k)`;
@@ -748,6 +867,8 @@ export async function valuesAt(client, revisionId, name, keys) {
   const columnsOf = (key) => (kind.key.length === 1 ? [key] : kind.key.map((c) => key[c]));
   for (let i = 0; i < keys.length; i += PAGE) {
     const page = keys.slice(i, i + PAGE).map(columnsOf);
+    // The versions the revision's lineage sees of a page of keys (unnested from one text[]
+    // per key column), each looked up through the primary keys.
     const { rows } = await client.query(
       `WITH k AS (SELECT * FROM unnest(${kind.key.map((_, c) => `$${c + 1}::text[]`)}) AS k(${kind.key}))
       ${visible(kind, levels, (alias) => `AND (${columns(alias, kind.key)}) IN (SELECT ${kind.key} FROM k)`)}`,
@@ -767,8 +888,9 @@ export async function valuesAt(client, revisionId, name, keys) {
 }
 /** A key as `differences` gives it, as a string to look values up by. */
 export const keyName = (key) => (typeof key === 'string' ? key : JSON.stringify(key));
-/** The settings of a revision kept as rows. */
+/** The settings of a revision kept as rows, or null when it is not. */
 export async function settingsAt(client, revisionId) {
+  // The revision by primary key, and its timeline's settings version valid at its number.
   const { rows } = await client.query(
     `SELECT s.settings FROM oc_revisions r JOIN oc_history_settings s ON s.timeline_id=r.timeline_id
     AND s.since<=r.number AND (s.until IS NULL OR s.until>r.number) WHERE r.id=$1 AND r.history_rows`,

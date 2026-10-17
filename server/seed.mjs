@@ -19,10 +19,30 @@ import {
   expandSeedDocument,
 } from './seed-data.mjs';
 
+/**
+ * Installs the example timelines, or brings existing ones up to date, in one transaction: any
+ * refusal leaves nothing changed. Safe to run again: timelines are created only when missing,
+ * and each later change to their content is applied once per timeline, recorded in
+ * oc_seed_updates, so an operator's deliberate edits (a plugin removed, say) are not undone.
+ *
+ * Steps: the seed account (trusted, so browsing lists its timelines); the legacy examples,
+ * with the official-plugins and expanded-content updates; the World War II campaigns split
+ * out of the old combined timeline, which then becomes a comparison of them; the
+ * expand-on-hover plugin on all. `manager`, when given, is made a writer of each.
+ * @param {import('pg').Pool} pool
+ * @param {{manager?: string}} options `manager`: the username of an email-verified account
+ * @returns {Promise<{id: string, title: string, created: boolean, updated: boolean}[]>}
+ * @throws {Error} when the seed username, its reserved id or a reserved timeline id belongs
+ *   to someone else, when the manager is not a verified account, or when a campaign moment
+ *   was edited differently in both places
+ */
 export async function seedPlatform(pool, { manager = '' } = {}) {
   const store = new PostgresStore(pool);
   return store.transaction(async (client) => {
+    // One seeding at a time (a transaction-scoped advisory lock), so two runs cannot both
+    // create the account or the timelines.
     await client.query("SELECT pg_advisory_xact_lock(hashtext('openchronology:seed:v1'))");
+    // Either the reserved id or the username "seed" held by any other account refuses.
     const existing = await client.query(
       'SELECT id,username FROM oc_users WHERE id=$1 OR username=$2',
       [SEED_USER_ID, 'seed'],
@@ -31,7 +51,8 @@ export async function seedPlatform(pool, { manager = '' } = {}) {
       throw new Error(
         'The seed username or reserved ID already belongs to another account. No data was changed.',
       );
-    // No password, email or OAuth identity: this account cannot authenticate.
+    // No password, email or OAuth identity: this account cannot authenticate. ON CONFLICT
+    // DO NOTHING keeps an existing seed account as it is.
     await client.query(
       'INSERT INTO oc_users(id,username,password_hash,quota_bypass) VALUES($1,$2,NULL,true) ON CONFLICT(id) DO NOTHING',
       [SEED_USER_ID, 'seed'],
@@ -54,6 +75,7 @@ export async function seedPlatform(pool, { manager = '' } = {}) {
     }
     const result = [];
     for (const [index, { id, document }] of LEGACY_SEED_TIMELINES.entries()) {
+      // The timeline if it exists, locked against saves while it is updated here.
       const previous = await client.query(
         'SELECT owner_id,head_revision_id FROM oc_timelines WHERE id=$1 FOR UPDATE',
         [id],
@@ -71,6 +93,9 @@ export async function seedPlatform(pool, { manager = '' } = {}) {
         await store.checkpoint(client, id, SEED_USER_ID, document, 'save');
       }
       let updated = false;
+      // A one-time update: the insert returns a row only the first time this key is recorded
+      // for this timeline (ON CONFLICT DO NOTHING ... RETURNING), and only then is it applied.
+      // A timeline created just now already has the content, so the marker alone is recorded.
       const enrichment = await client.query(
         "INSERT INTO oc_seed_updates(timeline_id,update_key) VALUES($1,'official-plugins-v1') ON CONFLICT DO NOTHING RETURNING timeline_id",
         [id],
@@ -83,6 +108,8 @@ export async function seedPlatform(pool, { manager = '' } = {}) {
         const timeline = await store.access(id, SEED_USER_ID, client);
         const current = await store.revisionDocument(client, timeline.head_revision_id);
         const enriched = enrichSeedDocument(current, document);
+        // Saved as a new revision on the head: content replaced, revision counter bumped
+        // (as a save does, so open editors see a newer timeline) and a checkpoint recorded.
         if (!isDeepStrictEqual(enriched, current)) {
           await store.replace(client, id, enriched);
           await client.query('UPDATE oc_timelines SET revision=revision+1 WHERE id=$1', [id]);
@@ -113,6 +140,7 @@ export async function seedPlatform(pool, { manager = '' } = {}) {
           updated = true;
         }
       }
+      // The manager becomes a writer, or is raised to one if already a member.
       if (managerId)
         await client.query(
           "INSERT INTO oc_members(timeline_id,user_id,role) VALUES($1,$2,'writer') ON CONFLICT(timeline_id,user_id) DO UPDATE SET role='writer'",
@@ -120,6 +148,9 @@ export async function seedPlatform(pool, { manager = '' } = {}) {
         );
       result.push({ id, title: document.title, created: !previous.rows.length, updated });
     }
+    // World War II was once one timeline; it is now a comparison of two campaign timelines.
+    // The campaigns are split from its current content (or, once it is a comparison, from
+    // the bundled document), and the conversion is a one-time update.
     const war = await store.access(WORLD_WAR_II_ID, SEED_USER_ID, client);
     const current = await store.revisionDocument(client, war.head_revision_id);
     const migration = await client.query(
@@ -142,6 +173,8 @@ export async function seedPlatform(pool, { manager = '' } = {}) {
         );
       let document = documents[index],
         updated = false;
+      // A new campaign takes World War II's sharing settings and members, so converting it
+      // to a comparison shows the same people the same content.
       if (!previous) {
         await client.query(
           'INSERT INTO oc_timelines(id,owner_id,title,visibility,featured,allow_private_forks,publication_restricted) VALUES($1,$2,$3,$4,$5,$6,$7)',
@@ -162,6 +195,8 @@ export async function seedPlatform(pool, { manager = '' } = {}) {
         await store.replace(client, id, document);
         await store.checkpoint(client, id, SEED_USER_ID, document, 'save');
       } else if (migration.rows.length && !war.comparison) {
+        // A campaign timeline that already exists: merge World War II's moments into it by
+        // id, refusing a moment edited differently in the two.
         const saved = await store.revisionDocument(client, previous.head_revision_id);
         const byId = new Map(saved.events.map((event) => [event.id, event]));
         for (const event of document.events) {
@@ -188,6 +223,7 @@ export async function seedPlatform(pool, { manager = '' } = {}) {
         );
       result.push({ id, title: document.title, created: !previous, updated });
     }
+    // Last, World War II itself becomes the comparison of the two campaigns.
     if (migration.rows.length && !war.comparison) {
       const comparison = worldWarComparison(current);
       await store.replace(client, WORLD_WAR_II_ID, comparison);
@@ -199,6 +235,7 @@ export async function seedPlatform(pool, { manager = '' } = {}) {
       ]);
       result.find((entry) => entry.id === WORLD_WAR_II_ID).updated = true;
     }
+    // The expand-on-hover plugin, added once to every example that lacks it.
     for (const entry of result) {
       const update = await client.query(
         "INSERT INTO oc_seed_updates(timeline_id,update_key) VALUES($1,'expand-on-hover-v1') ON CONFLICT DO NOTHING RETURNING timeline_id",
@@ -222,6 +259,8 @@ export async function seedPlatform(pool, { manager = '' } = {}) {
     return result;
   });
 }
+// Run as a script (npm run seed): seeds the database the environment names and reports
+// each timeline as created, updated or preserved.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (!process.env.DATABASE_URL && !process.env.PGDATABASE)
     throw new Error('Set DATABASE_URL or PostgreSQL connection environment variables.');

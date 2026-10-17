@@ -21,6 +21,13 @@ interface ProposalChanges {
   /** Why nothing could be counted: a revision it compares is no longer kept. */
   unavailable?: string;
 }
+/**
+ * A pull request as the server returns it. `revision` is the pull request's own revision
+ * (sent back with updates and resolutions to detect concurrent changes); `base_revision`
+ * the timeline revision it was made against, and `upstreamRevision` the timeline's current
+ * one, which differ when it needs a rebase. The `can*` flags are the server's decision for
+ * this account.
+ */
 interface Proposal {
   id: string;
   title: string;
@@ -47,6 +54,7 @@ interface Source {
   /** The server in use, whose timelines can be compared and whose account is shown. */
   inUse: boolean;
 }
+/** What the dashboard and pull requests need from the editor (app.ts supplies it). */
 interface Host {
   /** A request to the server in use, or to another connected server. */
   api<T>(path: string, method?: string, body?: unknown, origin?: string | null): Promise<T>;
@@ -56,21 +64,33 @@ interface Host {
   chip?(origin: string | null): HTMLElement | null;
   /** The editor's address of a timeline on a server. */
   link?(id: string, origin: string | null): string;
+  /** The signed-in account on the server in use, or null for a guest. */
   user(): { id: string; username: string } | null;
+  /** Whether the server in use is reachable. */
   server(): boolean;
+  /** Whether guests may fork public timelines into the browser (default true). */
   guestCopies?(): boolean;
+  /** The server timeline open in the editor, with this account's permissions on it. */
   timeline(): { id: string; revision: string; canWrite?: boolean; canPropose?: boolean } | null;
+  /** The editor's current document, unsaved edits included, to propose. */
   document(): Promise<TimelineDocument>;
+  /** The pull request being edited in the editor (its working copy), if any. */
   working(): Proposal | null;
+  /** Opens a pull request's proposed document in the editor (read-only unless canUpdate). */
   edit(proposal: Proposal, document: TimelineDocument): void;
+  /** Reloads the open timeline (after a merge changed it). */
   reload(): Promise<void>;
+  /** Starts comparing the given timelines of the server in use. */
   compare?(ids: string[]): void;
+  /** A pull request was opened or updated from the editor. */
   published(proposal: Proposal): void;
 }
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+/** Sets an element's text; server-supplied strings are only ever shown as text, never HTML. */
 const text = (id: string, value: string) => {
   el(id).textContent = value;
 };
+/** A plain (non-submitting) button. */
 function button(label: string, run: () => void) {
   const b = document.createElement('button');
   b.type = 'button';
@@ -83,7 +103,11 @@ function paragraph(text: string) {
   p.textContent = text;
   return p;
 }
-/** What `after` changes from `base`, as the server summarizes it (for older servers). */
+/**
+ * What `after` changes from `base`, as the server summarizes it (for older servers).
+ * Compares moments by ID and JSON, and a fixed list of settings; durations and
+ * relationships are not compared and count as unchanged.
+ */
 function summarize(base: TimelineDocument, after: TimelineDocument): ProposalChanges {
   const before = new Map(base.events.map((e) => [e.id, e])),
     proposed = new Map(after.events.map((e) => [e.id, e]));
@@ -111,6 +135,15 @@ function summarize(base: TimelineDocument, after: TimelineDocument): ProposalCha
     examples,
   };
 }
+/**
+ * Wires the dashboard (timeline lists, stars, comparison selection) and the pull request
+ * dialogs in index.html to the editor. Returns `dashboard`, which reloads every list, and
+ * `propose`, which opens the dialog to propose the editor's changes.
+ *
+ * Each kind of request has its own counter (`request` for the lists, `pullRequest` for the
+ * pull request list and details, `commentRequest` for comments): a response is dropped if
+ * a newer request of its kind started meanwhile, or if the open timeline changed.
+ */
 export function createCommunityUI(host: Host) {
   let browserPage = 1,
     minePage = 1,
@@ -119,10 +152,17 @@ export function createCommunityUI(host: Host) {
     selected: Proposal | null = null,
     request = 0,
     pullRequest = 0,
+    // Where the next page of comments starts; '0' is the beginning, null means no more.
     commentCursor: string | null = '0',
     commentRequest = 0,
     timer: ReturnType<typeof setTimeout> | undefined;
+  /** Timeline IDs chosen for comparison; kept across pages and searches in this tab. */
   const compared = new Set<string>();
+  /**
+   * Redraws the comparison count, enables Compare from two timelines, and disables unchecked
+   * boxes once eight are chosen: the most any account may compare. The account's own
+   * limit (by default four for guests), unlike in the comparison dialog, is not applied here.
+   */
   const compareSelection = () => {
     text('dashboard-compare-count', `${compared.size} selected for comparison`);
     el<HTMLButtonElement>('dashboard-compare').disabled = compared.size < 2;
@@ -137,10 +177,18 @@ export function createCommunityUI(host: Host) {
     compareSelection();
   };
   const error = (id: string, e: unknown) => text(id, e instanceof Error ? e.message : String(e));
+  /** The servers to list: the host's (desktop), or just this server. */
   const sources = (): Source[] =>
     host.sources?.() ?? [
       { origin: null, signedIn: !!host.user(), reachable: host.server(), inUse: true },
     ];
+  /**
+   * Fills one dashboard list (public search, yours, or starred) with its current page from
+   * every listed server: public lists from reachable servers, the others from those signed
+   * in. Results are merged; the page count is the largest of the servers'. Rejects only if
+   * every server failed; a partial failure is shown and the rest listed. Callers bump
+   * `request` first, so the lists loaded together by `dashboard` share one epoch.
+   */
   async function search(scope: 'mine' | 'public' | 'starred') {
     const page = scope === 'mine' ? minePage : scope === 'starred' ? favoritePage : browserPage,
       id =
@@ -242,6 +290,7 @@ export function createCommunityUI(host: Host) {
         card.append(badge);
       }
       card.append(paragraph(t.description.slice(0, 220)));
+      // Starring reloads the dashboard, which brings the new count and the starred list.
       const star = button(`${t.starred ? '★ Starred' : '☆ Star'} · ${t.star_count ?? '0'}`, () => {
         star.disabled = true;
         void host
@@ -261,6 +310,7 @@ export function createCommunityUI(host: Host) {
       star.title = t.source.signedIn ? 'Toggle favorite' : 'Sign in to star timelines';
       star.setAttribute('aria-pressed', String(!!t.starred));
       card.append(star);
+      // Guests can copy a public timeline into their browser to edit it there.
       if (!host.user() && (host.guestCopies?.() ?? true) && t.visibility === 'public') {
         const fork = document.createElement('a');
         fork.href = '#guest-fork/' + t.id;
@@ -293,6 +343,7 @@ export function createCommunityUI(host: Host) {
     el<HTMLButtonElement>(id + '-previous').disabled = page <= 1;
     el<HTMLButtonElement>(id + '-next').disabled = page >= response.pages;
   }
+  /** Reloads the public list alone (paging, sorting, searching), reporting errors. */
   async function refreshBrowser() {
     request++;
     try {
@@ -301,6 +352,10 @@ export function createCommunityUI(host: Host) {
       error('dashboard-error', e);
     }
   }
+  /**
+   * Reloads the whole dashboard: the public list, and yours and starred when signed in to
+   * any listed server. With no reachable server, says so and lists nothing.
+   */
   async function dashboard() {
     request++;
     const signedIn = sources().some((s) => s.signedIn);
@@ -350,6 +405,8 @@ export function createCommunityUI(host: Host) {
     browserPage = 1;
     void refreshBrowser();
   };
+  // Search and tag inputs are debounced by 250 ms; bumping `request` at once discards any
+  // answer to the previous text.
   for (const id of ['dashboard-search', 'dashboard-tag'])
     el(id).oninput = () => {
       clearTimeout(timer);
@@ -358,6 +415,7 @@ export function createCommunityUI(host: Host) {
       timer = setTimeout(() => void refreshBrowser(), 250);
     };
   el('dashboard-signin').onclick = () => el('account-button').click();
+  /** Loads the current page of the open timeline's pull requests into the list dialog. */
   async function pulls() {
     const timeline = host.timeline();
     if (!timeline) return;
@@ -389,6 +447,11 @@ export function createCommunityUI(host: Host) {
     el<HTMLButtonElement>('pull-previous').disabled = pullPage <= 1;
     el<HTMLButtonElement>('pull-next').disabled = pullPage >= result.pages;
   }
+  /**
+   * Appends the next page of the selected pull request's comments, or starts over from the
+   * first page with `reset`. Dropped if another comment request, pull request or timeline
+   * took its place meanwhile.
+   */
   async function comments(reset = false) {
     const timeline = host.timeline(),
       p = selected;
@@ -418,6 +481,11 @@ export function createCommunityUI(host: Host) {
     commentCursor = result.next;
     el('pull-comments-more').hidden = !commentCursor;
   }
+  /**
+   * Opens (or refreshes) the details dialog for a pull request: its description, status,
+   * a summary of its changes with up to 30 examples of each kind (changed moments shown as
+   * truncated before/after JSON), the actions this account may take, and its comments.
+   */
   async function detail(id: string) {
     const timeline = host.timeline();
     if (!timeline) return;
@@ -439,6 +507,7 @@ export function createCommunityUI(host: Host) {
         p.upstreamRevision,
     );
     text('pull-detail-error', '');
+    // Current servers send the summary; older ones sent both documents instead.
     const changes = p.changes ?? summarize(p.base_document!, p.document!);
     const { moments, durations, relationships } = changes;
     el('pull-diff').replaceChildren(
@@ -479,16 +548,23 @@ export function createCommunityUI(host: Host) {
             paragraph('After: ' + JSON.stringify(after).slice(0, 1800)),
           );
       }
+    // A pull request from a fork is updated in the fork, not here.
     el('pull-edit').hidden = !p.canUpdate || !!p.from_fork;
     el('pull-merge').hidden = !p.canMerge;
     el('pull-reject').hidden = !p.canMerge;
     el('pull-close').hidden = !p.canClose;
+    // Rebasing is offered only when the timeline has moved on since the base revision.
     el('pull-rebase').hidden = !p.canUpdate || p.base_revision === p.upstreamRevision;
     el('pull-comment-form').hidden = !host.user();
     if (!el<HTMLDialogElement>('pull-detail-dialog').open)
       el<HTMLDialogElement>('pull-detail-dialog').showModal();
     await comments(true);
   }
+  /**
+   * Resolves the selected pull request (merge, reject, close or rebase), sending its
+   * revision so the server refuses if it changed meanwhile; then refreshes the details and
+   * the list, and after a merge reloads the timeline itself.
+   */
   async function action(action: string) {
     const t = host.timeline(),
       p = selected;
@@ -525,6 +601,7 @@ export function createCommunityUI(host: Host) {
     );
     return validateDocument(result.document);
   }
+  /** Opens a pull request's proposed timeline in the editor and closes the dialogs. */
   function open(p: Proposal) {
     void proposed(p)
       .then((document) => {
@@ -535,6 +612,7 @@ export function createCommunityUI(host: Host) {
       })
       .catch((e) => error('pull-detail-error', e));
   }
+  // Viewing opens the same document with updating turned off.
   el('pull-view').onclick = () => {
     if (selected) open({ ...selected, canUpdate: false });
   };
@@ -552,10 +630,12 @@ export function createCommunityUI(host: Host) {
         a.href = url;
         a.download = 'proposal.ochx';
         a.click();
+        // Revoked after the download has had time to start.
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       })
       .catch((e) => error('pull-detail-error', e));
   };
+  // Each action button is disabled while its request runs, against double submission.
   for (const actionName of ['merge', 'reject', 'close', 'rebase'])
     el('pull-' + actionName).onclick = () => {
       el<HTMLButtonElement>('pull-' + actionName).disabled = true;
@@ -581,6 +661,10 @@ export function createCommunityUI(host: Host) {
       })
       .catch((e) => error('pull-detail-error', e));
   };
+  /**
+   * Opens the proposal dialog, prefilled from the pull request being edited (to update it)
+   * or empty (to open a new one). Does nothing without permission to propose.
+   */
   function propose() {
     const t = host.timeline();
     if (!t?.canPropose) return;
@@ -591,6 +675,9 @@ export function createCommunityUI(host: Host) {
     el<HTMLDialogElement>('proposal-dialog').showModal();
   }
   el('propose-button').onclick = propose;
+  // Sends the editor's whole document as the proposal: a PUT updating the working pull
+  // request (with its revision, so a concurrent update is refused), or a POST opening a new
+  // one against the open revision. Then shows it in the pull request dialogs.
   el<HTMLFormElement>('proposal-form').onsubmit = (event) => {
     event.preventDefault();
     const t = host.timeline();
@@ -621,6 +708,7 @@ export function createCommunityUI(host: Host) {
       .catch((e) => error('proposal-error', e))
       .finally(() => (button.disabled = false));
   };
+  // Closing the list drops any pull request responses still on their way.
   el<HTMLDialogElement>('pull-dialog').addEventListener('close', () => pullRequest++);
   return { dashboard, propose };
 }

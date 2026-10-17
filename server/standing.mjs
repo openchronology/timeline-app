@@ -22,11 +22,19 @@
  * Stars change a timeline's popularity at once; the rest (accounts ageing, forks published,
  * trending ageing out) is caught up by a sweep every quarter of an hour (startStanding).
  */
+/** The age (days) before which no account is established, endorsed or not. */
 export const NEWCOMER_DAYS = 7;
+/** The age (days) at which an account is established without endorsement, and endorses. */
 export const FULL_DAYS = 30;
+/** How far back (days) stars and forks count towards trending. */
 export const TRENDING_DAYS = 30;
 
-/** SQL: whether account `e` (an oc_users alias) endorses what it stars or forks. */
+/**
+ * SQL: whether account `e` (an oc_users alias) endorses what it stars or forks: active, not
+ * marked untrusted, and an administrator, marked trusted, or confirmed (a verified email or a
+ * linked social identity) and at least FULL_DAYS old. FULL_DAYS is a constant interpolated
+ * into the interval, never input.
+ */
 const ENDORSER = (e) => `(NOT ${e}.is_disabled AND ${e}.trust IS DISTINCT FROM 'untrusted' AND
   (${e}.is_admin OR ${e}.trust='trusted' OR ((${e}.email_verified_at IS NOT NULL
     OR EXISTS(SELECT 1 FROM oc_identities i WHERE i.user_id=${e}.id))
@@ -36,8 +44,22 @@ const ENDORSER = (e) => `(NOT ${e}.is_disabled AND ${e}.trust IS DISTINCT FROM '
  * SQL: each account in `$1` with its standing and endorsers, and why, as columns id, standing,
  * endorsers, confirmed, restricted; with `all`, every account (and `$1` null). A few accounts
  * look up their timelines' stars and forks; all of them, one pass over every star and fork.
+ *
+ * Endorsers of an account are counted once each, however many of its public timelines they
+ * starred or publicly forked, and never the account itself. The CASE then gives the standing:
+ * 0 when suspended or untrusted; 1 for administrators and trusted accounts; 0 when not
+ * confirmed, under a moderation restriction (any restricted case it owns), younger than
+ * NEWCOMER_DAYS, or younger than FULL_DAYS with no endorser; otherwise
+ *   min(1, 0.4 + 0.4 * min(age, FULL_DAYS) / FULL_DAYS + 0.1 if two-factor is on
+ *          + min(0.2, 0.02 * endorsers))
+ * with age in fractional days.
+ * @param {boolean} all every account, rather than those in `$1`
+ * @returns {string} the SQL, with one parameter (the account ids, or null with `all`)
  */
 export function standingQuery(all = false) {
+  // Every account: one pass gathering every star and public fork, as (timeline, account)
+  // pairs, grouped by the timeline's owner. A few accounts: per public timeline they own, a
+  // LATERAL subquery over its stars and its public forks.
   const endorsed = all
     ? `SELECT t.owner_id AS id,count(DISTINCT x.user_id) AS endorsers FROM (
         SELECT timeline_id,user_id FROM oc_timeline_stars
@@ -51,6 +73,9 @@ export function standingQuery(all = false) {
       ) x JOIN oc_users e ON e.id=x.id AND e.id<>t.owner_id
       WHERE t.visibility='public' AND t.owner_id=ANY($1) AND ${ENDORSER('e')}
       GROUP BY t.owner_id`;
+  // `target` is the accounts to rate, with whether they have a social sign-in, whether a
+  // restriction is in force on anything they own, and their age in days; `endorsed` their
+  // endorser counts. A LEFT JOIN gives 0 endorsers to accounts nobody endorsed.
   return `WITH target AS (
     SELECT u.*,EXISTS(SELECT 1 FROM oc_identities i WHERE i.user_id=u.id) AS social,
       EXISTS(SELECT 1 FROM oc_moderation_cases mc WHERE mc.owner_id=u.id AND mc.status='restricted') AS restricted,
@@ -72,7 +97,11 @@ export function standingQuery(all = false) {
   FROM target u LEFT JOIN endorsed d USING(id)`;
 }
 
-/** The accounts `ids`' standing as it stands now, and what it rests on (see standingQuery). */
+/**
+ * The accounts `ids`' standing as it stands now, and what it rests on (see standingQuery),
+ * computed fresh rather than read from oc_account_standing; for /admin's list of accounts.
+ * @returns {Promise<{id: string, standing: number, endorsers: number, confirmed: boolean, restricted: boolean}[]>}
+ */
 export async function standingOf(client, ids) {
   return (await client.query(standingQuery(), [ids])).rows;
 }
@@ -80,6 +109,14 @@ export async function standingOf(client, ids) {
 /**
  * Recomputes the standing of the accounts `ids` (all when null). Returns the accounts whose
  * standing changed, so the popularity of what they starred or forked can follow.
+ *
+ * An upsert into oc_account_standing whose DO UPDATE has a WHERE: a row whose standing and
+ * endorsers are unchanged is neither rewritten nor returned, so a sweep over every account
+ * writes (and dirties) only what changed. The data-modifying CTE's RETURNING lists the
+ * accounts inserted or changed.
+ * @param {import('pg').Pool|import('pg').PoolClient} client
+ * @param {string[]|null} ids
+ * @returns {Promise<string[]>} the accounts whose standing or endorser count changed
  */
 export async function refreshStanding(client, ids = null) {
   const { rows } = await client.query(
@@ -100,6 +137,13 @@ export async function refreshStanding(client, ids = null) {
 /**
  * Recomputes the popularity and trending of the timelines `ids` (when null, every timeline
  * with a star or a public fork, or a score to clear).
+ *
+ * `contributions` is each (timeline, account) pair from stars and public forks, dated by its
+ * earliest; `scores` sums the contributing accounts' stored standing (oc_account_standing, so
+ * refresh standing first), leaving out the timeline's owner, and the same over contributions
+ * from the last TRENDING_DAYS; `wanted` adds zeros for timelines that still have a score but
+ * no contribution left. The upsert, like refreshStanding's, skips rows whose scores are
+ * unchanged, and the join to oc_timelines keeps to timelines that exist.
  */
 export async function refreshPopularity(client, ids = null) {
   await client.query(
@@ -133,7 +177,10 @@ export async function refreshPopularity(client, ids = null) {
   );
 }
 
-/** What the accounts `ids` starred or publicly forked: those timelines, and their owners. */
+/**
+ * What the accounts `ids` starred or publicly forked: those timelines, and their owners. UNION
+ * (not UNION ALL) removes a timeline both starred and forked.
+ */
 async function endorsedBy(client, ids) {
   const { rows } = await client.query(
     `SELECT s.timeline_id AS id,t.owner_id FROM oc_timeline_stars s JOIN oc_timelines t ON t.id=s.timeline_id
@@ -150,6 +197,10 @@ async function endorsedBy(client, ids) {
  * star): recomputes it; for those whose standing changed, the standing of the owners they
  * endorse (one step; the sweep follows further), and the popularity of what all of these
  * starred or forked.
+ *
+ * Called inside the caller's transaction by administration.mjs, moderation.mjs, stars.mjs and
+ * seed.mjs. Bounded on purpose: a change ripples one step through endorsements here, and the
+ * sweep carries it further, so one star never recomputes the whole site.
  */
 export async function refreshAccounts(client, ids) {
   const changed = await refreshStanding(client, ids);
@@ -166,13 +217,23 @@ export async function refreshAccounts(client, ids) {
   if (timelines.size) await refreshPopularity(client, [...timelines]);
 }
 
-/** Every account's standing, then every timeline's popularity. */
+/**
+ * Every account's standing, then every timeline's popularity (which reads the standings just
+ * written). Run by startStanding on the pool and once at migration (migrate.mjs, on its
+ * client). On the pool the two statements commit separately, so a reader between them may
+ * see new standings with the old popularity until the second finishes.
+ */
 export async function sweepStanding(pool) {
   await refreshStanding(pool);
   await refreshPopularity(pool);
 }
 
-/** Sweeps every quarter of an hour, starting shortly after startup. */
+/**
+ * Sweeps every quarter of an hour, starting five seconds after startup (platform.mjs). A
+ * failed sweep is logged and the next one tries again. The timers are unref'd so they never
+ * keep the process alive.
+ * @returns {() => void} stops the sweeps
+ */
 export function startStanding(pool, every = 15 * 60 * 1000, log = console) {
   const run = () =>
     sweepStanding(pool).catch((error) => log.error('Account standing failed:', error));

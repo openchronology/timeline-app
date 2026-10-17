@@ -1,18 +1,35 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+/**
+ * Copying a public timeline for a fork kept in the browser (POST
+ * /api/timelines/:id/browser-fork): the complete document of its head, within size limits,
+ * without creating a timeline, revision or fork relationship in the database. See "Guest
+ * editing and complete browser copies" in docs/architecture.md.
+ */
 import { browserEntryCount } from '../dist/browser-copy.mjs';
 import { HttpError } from './store.mjs';
+/** At most 5,000 entries (moments, stack entries and durations) and 4 MiB of JSON. */
 export const BROWSER_FORK_LIMITS = Object.freeze({ events: 5000, bytes: 4 * 1024 * 1024 });
+/** The 413 refusing a copy past the limits. */
 const tooLarge = () =>
   new HttpError(
     413,
     'This timeline exceeds the browser fork limit (5,000 entries, including stack entries, or 4 MiB). Nothing was copied or truncated. View the original read-only, or sign in for a database-backed fork.',
   );
 export class BrowserForks {
+  /** Copies running in this process: at most four at once. */
   active = 0;
+  /** `store` the Store; `auth` the Auth service, whose rate limiter copies share. */
   constructor(store, auth) {
     this.store = store;
     this.auth = auth;
   }
+  /**
+   * The complete document of public timeline `id`'s head, for client `address`: `{document,
+   * source: {id, revision, savedRevision}, limits}`. With `revision` (a revision counter),
+   * the timeline must still be at it (409). Throws 429 when four copies already run or the
+   * client exceeds its rate, 404 for a missing or private timeline, 409 for a comparison,
+   * and 413 past the limits. Reads only; nothing is written.
+   */
   async copy(id, revision, address) {
     if (this.active >= 4)
       throw new HttpError(429, 'Browser copying is busy. Please try again shortly.');
@@ -20,10 +37,16 @@ export class BrowserForks {
     try {
       await this.auth.rateLimit('browser-fork:' + address);
       return await this.store.transaction(async (client) => {
+        // One snapshot for the checks and the document (repeatable read must be set before
+        // the transaction's first query), and a short statement timeout: an anonymous
+        // request must not hold a connection long.
         await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
         await client.query("SET LOCAL statement_timeout='1500ms'");
         // Read only counters, ACL and precomputed size; never decompress a large
         // document to decide whether it is safe to copy.
+        // The timeline (public only) by primary key, joined with its head revision and that
+        // revision's snapshot, if any: the size recorded on the revision when it has one,
+        // otherwise the snapshot's (document_bytes, measured when it was saved).
         const { rows } = await client.query(
           `SELECT t.id,t.comparison,t.revision,t.head_revision_id,t.event_count,coalesce(r.document_bytes,s.document_bytes) AS document_bytes
            FROM oc_timelines t JOIN oc_revisions r ON r.id=t.head_revision_id

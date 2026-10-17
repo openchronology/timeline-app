@@ -9,6 +9,14 @@ import { NEWCOMER_DAYS, FULL_DAYS } from '../../server/standing.mjs';
 /**
  * An account's standing (#103; server/standing.mjs) and what it rests on: browsing lists the
  * public timelines of established accounts, and their stars and forks count for popularity.
+ *
+ * `item.standing` is computed by the server (refreshed periodically, hence "pending the next
+ * update"); this only explains it, mirroring the server's rules, in one line: what makes an
+ * established account so, or every reason another is not.
+ *
+ * @param {object} item an account from /api/admin/users: `standing` (0 to 1), `created_at`,
+ *   `is_admin`, `is_disabled`, `trust`, `endorsers`, `confirmed` and `restricted`
+ * @returns {string}
  */
 function standing(item) {
   const age = (Date.now() - Date.parse(item.created_at)) / 86400000;
@@ -33,6 +41,14 @@ function standing(item) {
   ].filter(Boolean);
   return `Not established: ${reasons.join('; ') || 'pending the next update'}`;
 }
+/**
+ * The administration page's body (/admin), for administrators (the API refuses anyone else).
+ *
+ * Lists users, timelines or report cases, 25 a page, from GET /api/admin/users,
+ * /api/admin/timelines (with `search` and `page`) or /api/admin/reports (with `view` and
+ * `page`), each answering `{items, total}` (users also with the site's `settings`). Every
+ * change is a PATCH to /api/admin/<kind>/<id> (or /api/admin/settings) through `change`.
+ */
 export default function Admin() {
   const [kind, setKind] = useState('users'),
     [search, setSearch] = useState(''),
@@ -40,10 +56,15 @@ export default function Admin() {
     [view, setView] = useState('open'),
     [page, setPage] = useState(1),
     [result, setResult] = useState(null),
+    // The signed-in session, for its CSRF token.
     [session, setSession] = useState(null),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
+    // Bumped after a change, to fetch the list again.
     [reload, setReload] = useState(0);
+  // Fetches the session and the list whenever what is shown changes. A newer fetch replaces
+  // an older one: the cleanup aborts it, and `active` keeps a reply that arrives anyway from
+  // overwriting the newer one (typing in the search starts one per keystroke).
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
@@ -76,6 +97,19 @@ export default function Admin() {
       controller.abort();
     };
   }, [kind, search, view, page, reload]);
+  /**
+   * Applies one administrative change, then reloads the list; a failure is shown above it.
+   *
+   * Sends PATCH /api/admin/<path> with `changes`, plus the password and code from the
+   * confirmation fields: the server applies a change only after a recent sign-in, the current
+   * password and, when on, a second factor (security.fresh in server/administration.mjs). The
+   * session's CSRF token goes in the X-CSRF-Token header, as every write on a cookie session
+   * needs: another site can make the browser send the cookie but cannot read the token. The
+   * code is cleared after a success, since an authenticator code is used once.
+   *
+   * @param {string} path `settings`, `users/<id>`, `timelines/<id>` or `reports/<id>`
+   * @param {object} changes the fields to change, or a report decision
+   */
   async function change(path, changes) {
     if (busy) return;
     setBusy(true);
@@ -116,6 +150,9 @@ export default function Admin() {
         <label>
           Default per-user quota (bytes, or a size such as 500MiB or 2GB; zero makes accounts
           read-only)
+          {/* Keyed by the saved value, so the field shows it again once a reload brings it, and
+              disabled when the environment file sets it. The pattern matches the sizes the
+              server accepts (server/limits.mjs's storageBytes), which checks them again. */}
           <input
             name="quota"
             key={result?.settings?.default_quota_bytes}
@@ -134,6 +171,7 @@ export default function Admin() {
           <button disabled={busy}>Apply site default</button>
         )}
       </form>
+      {/* Read by `change` for every change, rather than asked for each time. */}
       <section className="notice">
         <h2>Confirm administrative changes</h2>
         <p>
@@ -234,6 +272,7 @@ export default function Admin() {
                       });
                     }}
                   >
+                    {/* Uncontrolled fields, read whole with FormData when applied. */}
                     {['is_admin', 'is_disabled', 'quota_bypass'].map((flag) => (
                       <label key={flag} className="checkbox-label">
                         <input type="checkbox" name={flag} defaultChecked={item[flag]} />
@@ -318,6 +357,7 @@ export default function Admin() {
         <span>
           {result?.total ?? 0} results · Page {page}
         </span>
+        {/* 25 a page, as the server lists them; `total` may arrive as a string (a count). */}
         <button
           disabled={!result || page * 25 >= Number(result.total) || busy}
           onClick={() => setPage((p) => p + 1)}

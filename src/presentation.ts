@@ -21,19 +21,34 @@ import type { RulerPolicy, RulerPlan } from './ruler.js';
 export type { PresentationContext } from './view-context.js';
 export { compileCustom, CUSTOM_EXAMPLE, parseNumber, printNumber };
 
+/**
+ * A timeline's saved time display settings, as stored in `.ochx` JSON, `.och` SQLite and
+ * `oc_timelines.presentation`. Numbers are kept as canonical exact strings so they survive
+ * every format without rounding. Displayed value = (stored − origin) / scale.
+ */
 export interface TimePresentation {
   version: 1;
   mode: 'rational' | 'float' | 'scientific' | 'si' | 'gregorian' | 'custom';
+  /** Digits shown by the float, scientific and SI printers (1 to 30). */
   significantDigits: number;
+  /** The unit label printed after numbers and accepted after them when parsing. */
   unit: string;
   /** Stored coordinates per displayed unit, and stored coordinate of displayed zero. */
   scale: string;
   origin: string;
+  /** The fixed timezone offset for Gregorian dates, in minutes east of UTC (±1439). */
   offsetMinutes: number;
+  /**
+   * Whether labels adapt to the view (calendar labels omit what the view makes obvious;
+   * numeric ones switch to Δ offsets when zoomed past their digits). Absent means true.
+   */
   adaptiveLabels?: boolean;
+  /** The ruler's graduation; absent means automatic for the mode. */
   ruler?: RulerPolicy;
+  /** Custom printer/parser source, kept (and syntax-checked) even when another mode is chosen. */
   source?: string;
 }
+/** Exact rational coordinates, unscaled, with no unit: what files without settings mean. */
 export const DEFAULT_PRESENTATION: Readonly<TimePresentation> = Object.freeze({
   version: 1,
   mode: 'rational',
@@ -43,6 +58,7 @@ export const DEFAULT_PRESENTATION: Readonly<TimePresentation> = Object.freeze({
   origin: '0/1',
   offsetMinutes: 0,
 });
+/** The unit menu's choices: stored coordinates are seconds, so each scale is seconds per unit. */
 export const UNIT_PRESETS = [
   { label: 'Coordinates', unit: '', scale: '1' },
   { label: 'Seconds', unit: 's', scale: '1' },
@@ -53,6 +69,12 @@ export const UNIT_PRESETS = [
   { label: 'Millions of Julian years', unit: 'million years', scale: '31557600000000' },
 ] as const;
 
+/**
+ * Checks untrusted settings (from a file, the server or a form) and returns them in
+ * canonical form: scale and origin reduced to canonical exact rationals, and only known
+ * fields kept. Throws a readable error on any invalid field. Custom source is compiled to
+ * check its syntax but never run, which makes this safe on the server.
+ */
 export function validatePresentation(value: unknown): TimePresentation {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new Error('Invalid time presentation settings.');
@@ -79,6 +101,8 @@ export function validatePresentation(value: unknown): TimePresentation {
     raw.origin.length > 8192
   )
     throw new Error('Scale and origin must be exact numbers of at most 8192 characters.');
+  // Decimal or scientific input can expand when written as a reduced fraction (1e-300
+  // becomes a 301-digit denominator), so the canonical form is limited too.
   const scale = parseNumber(raw.scale),
     origin = parseNumber(raw.origin);
   if (scale.toString().length > 8192 || origin.toString().length > 8192)
@@ -108,18 +132,33 @@ export function validatePresentation(value: unknown): TimePresentation {
   };
 }
 
+/**
+ * A presentation ready to use. `print` and `parse` convert between stored rationals and
+ * text; with a viewport context (purpose `axis`, `event` or `input`) labels may adapt to
+ * the view, and parsing reads such labels back relative to the same view. `describe` gives
+ * the line of context shown with adaptive labels (absent for custom code). `rules` plans the
+ * ruler's ticks for a view, in stored coordinates. All of them throw on invalid input.
+ */
 export interface TimePresenter {
   print(time: Q, context?: PresentationContext): string;
   parse(text: string, context?: PresentationContext): Q;
   describe?(context: PresentationContext): string;
   rules(context: PresentationContext): RulerPlan;
 }
+/**
+ * Builds the presenter for some settings (validated here; none means the default). Built-in
+ * modes apply scale and origin around their printers and parsers. Custom code receives raw
+ * stored times instead and handles its own units, so scale and origin are ignored for it
+ * (also when planning its ruler). Throws when the settings are invalid.
+ */
 export function createPresenter(settings?: TimePresentation): TimePresenter {
   const options = settings ? validatePresentation(settings) : DEFAULT_PRESENTATION;
   const scale = options.mode === 'custom' ? Q.one : Q.parse(options.scale),
     origin = options.mode === 'custom' ? Q.zero : Q.parse(options.origin);
   const unit = options.unit.trim(),
     suffix = unit ? ' ' + unit : '';
+  // The view in displayed units, (stored − origin) / scale, which the calendar printer and
+  // ruler planner work in. Only left and span change; pixel widths stay as they are.
   const calendarContext = (context: PresentationContext): PresentationContext => ({
     ...context,
     left: context.left.sub(origin).div(scale),
@@ -132,6 +171,8 @@ export function createPresenter(settings?: TimePresentation): TimePresenter {
       options.ruler ?? { kind: options.mode === 'gregorian' ? 'gregorian' : 'decimal' },
       options.offsetMinutes,
     );
+    // Ticks were planned in displayed units; map them back to stored coordinates. Times
+    // take the full affine map, intervals (differences) only the scale.
     return {
       ...plan,
       ticks: plan.ticks.map((tick) => ({
@@ -163,6 +204,8 @@ export function createPresenter(settings?: TimePresentation): TimePresenter {
           context && options.adaptiveLabels !== false ? calendarContext(context) : undefined,
         );
       if (options.mode === 'rational') return value.toString() + suffix;
+      // Zoomed in past the significant digits, every label would print the same; print each
+      // as its difference from the view's left edge instead, which `describe` names.
       if (
         relativeContext(options, context ? context.left.sub(origin).div(scale) : value, context)
       ) {
@@ -179,6 +222,9 @@ export function createPresenter(settings?: TimePresentation): TimePresenter {
     },
     parse(text, context) {
       validateContext(context);
+      // A Δ label is relative to the view's left edge: parse the difference with the origin
+      // removed (so it is only scaled), then add it to the left edge. Parsing it in a
+      // different view than it was printed in gives a different time.
       if (options.mode !== 'gregorian' && text.trim().startsWith('Δ ')) {
         if (!context) throw new Error('Relative labels require viewport context.');
         return context.left.add(
@@ -199,6 +245,13 @@ export function createPresenter(settings?: TimePresentation): TimePresenter {
   };
 }
 
+/**
+ * Whether numeric labels should be printed as Δ differences from the view's left edge: only
+ * for adaptive float, scientific and SI displays, on the axis or moment labels, and when one
+ * pixel spans less (in displayed units) than the last significant digit of `value` (the
+ * left edge, in displayed units), i.e. when neighbouring labels would print identically.
+ * Never when that value is zero, which has no significant digits to run out of.
+ */
 function relativeContext(
   options: TimePresentation,
   value: Q,

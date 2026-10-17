@@ -35,6 +35,7 @@ export const EXIT = { ok: 0, partial: 1, usage: 2, quota: 3 };
 const VERSION_RATIO = 1.1;
 const sleep = (ms) => new Promise((resume) => setTimeout(resume, ms));
 
+/** The --help text. */
 export const HELP = `Usage: och-import-logs [options] <file | file.gz | -> ...
 
 Imports log files into OpenChronology timelines, one moment per log entry. Files are read
@@ -68,6 +69,7 @@ Exit codes: 0 imported; 1 some entries were refused or could not be saved;
 2 usage or configuration error; 3 the import does not fit the account's storage quota.
 `;
 
+/** The settings a configuration file may hold; any other key is refused as a likely typo. */
 const CONFIG_KEYS = [
   'format',
   'formats',
@@ -80,7 +82,18 @@ const CONFIG_KEYS = [
   'until',
   'multiline',
 ];
-/** Command-line arguments and the configuration file, checked; throws usage errors. */
+/**
+ * Command-line arguments and the configuration file, checked; throws usage errors.
+ * Command-line options win over the configuration file's. The format, its mapping, the routes
+ * and filters are compiled here, so a configuration error stops the import before any file is
+ * read. A writer (API client) is made unless this is a dry run without OCH_API_URL and
+ * OCH_API_KEY (a dry run with them also reports the quota and the timelines' sizes).
+ * @param {string[]} argv the arguments after the program's name
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {Promise<object>} `{help: true}`, or the settings: inputs, formatName,
+ *   definition, zone, year, since and until (ms or null), routes, filters, multiline,
+ *   dryRun, sample, quiet and writer
+ */
 export async function options(argv, env = process.env) {
   const { values, positionals } = parseArgs({
     args: argv,
@@ -146,6 +159,9 @@ export async function options(argv, env = process.env) {
   if (routing.routes.length || routing.default) routes = compileRoutes(routing);
   else if (!dryRun) throw new Error('Give a --timeline, or routes in the configuration.');
   const filters = [...(config.only ?? []), ...(values.only ?? [])].map(parseFilter);
+  // How entries spanning several lines (stack traces) are joined: a regex a new entry's first
+  // line matches (`start`), or one that continuation lines match (`continuation`); one, not
+  // both.
   const multiline = config.multiline ?? formats[formatName]?.multiline ?? null;
   if (multiline !== null) {
     if (
@@ -198,10 +214,14 @@ const counter = (count) =>
   });
 /**
  * Entries of one input: lines (from a gzip file when it starts with the gzip magic), joined
- * by the multi-line rule. Calls `onBytes` with the bytes read from the file.
+ * by the multi-line rule. Calls `onBytes` with the bytes read from the file (compressed
+ * bytes for a gzip file, matching its size on disk, so progress against the files' total is
+ * right). A byte-order mark is dropped, blank lines are skipped, and an entry stops growing
+ * once it reaches MAX_MESSAGE_BYTES: further continuation lines are dropped.
  */
 async function* entries(path, multiline, onBytes) {
   let stream = createReadStream(path).pipe(counter(onBytes));
+  // The first two bytes, read separately, decide whether to decompress.
   const head = await open(path, 'r').then(async (file) => {
     const { buffer, bytesRead } = await file.read(Buffer.alloc(2), 0, 2, 0);
     await file.close();
@@ -254,7 +274,9 @@ export function storageEstimate(timelines) {
   return Math.round(total);
 }
 
+/** A timeline id shortened for the progress line. */
 const short = (id) => id.slice(0, 8);
+/** A byte count in B, KiB, MiB or GiB. */
 const bytesText = (n) =>
   n >= 1 << 30
     ? (n / (1 << 30)).toFixed(1) + ' GiB'
@@ -263,6 +285,7 @@ const bytesText = (n) =>
       : n >= 1024
         ? (n / 1024).toFixed(1) + ' KiB'
         : n + ' B';
+/** A number of seconds as 42s, 3m05s or 1h02m; '?' when unknown. */
 const duration = (seconds) => {
   if (!Number.isFinite(seconds)) return '?';
   const s = Math.round(seconds);
@@ -278,6 +301,14 @@ const duration = (seconds) => {
  * every ten seconds; off when quiet. The final summary is always printed.
  */
 export class Progress {
+  /**
+   * @param {object} options
+   * @param {NodeJS.WritableStream} [options.stream]
+   * @param {boolean} [options.quiet]
+   * @param {number} [options.total] the inputs' total size in bytes, for a percentage and
+   *   an ETA (0 when unknown: a spinner instead)
+   * @param {() => number} [options.now] a millisecond clock, for tests
+   */
   constructor({
     stream = process.stderr,
     quiet = false,
@@ -302,6 +333,7 @@ export class Progress {
       saved: new Map(),
     };
   }
+  /** The progress line: bytes read, entries, moments saved per timeline, rate, time, ETA. */
   line() {
     const s = this.stats,
       elapsed = (this.now() - this.started) / 1000;
@@ -318,6 +350,7 @@ export class Progress {
       .join(' · ');
     return `${read} · ${s.entries} entries · saved ${saved} · ${rate}/s · ${duration(elapsed)}${this.total ? ' · ETA ' + eta : ''}${others ? ' · ' + others : ''}`;
   }
+  /** Draws the progress line if it is time to (every 250 ms on a terminal, else 10 s). */
   tick() {
     if (this.quiet) return;
     const now = this.now();
@@ -325,6 +358,7 @@ export class Progress {
     this.last = now;
     this.stream.write(this.tty ? '\r\x1b[K' + this.line() : this.line() + '\n');
   }
+  /** Clears the progress line and prints `summary`, even when quiet. */
   finish(summary) {
     if (this.tty && !this.quiet && this.last > -Infinity) this.stream.write('\r\x1b[K');
     this.stream.write(summary + '\n');
@@ -377,6 +411,7 @@ async function readAll(settings, progress, each) {
         progress.stats.unrouted++;
         continue;
       }
+      // Its id from its identifying text and time (EntryIds), so a re-import overwrites.
       const built = mapping.build(entry, text, ids.next(format.identity(entry, text), entry.time));
       try {
         checkMoment(built);
@@ -393,7 +428,15 @@ async function readAll(settings, progress, each) {
   }
 }
 
-/** Runs the importer; returns its exit code. */
+/**
+ * Runs the importer; returns its exit code (EXIT). A dry run reads everything once and
+ * prints counts, samples and the storage estimate as JSON. Otherwise, when the account has a
+ * quota, a first pass estimates the storage the import needs and refuses (EXIT.quota,
+ * nothing written) if it does not fit; then importAll reads again and saves.
+ * @param {string[]} argv
+ * @param {{env?, stdout?, stderr?, stdin?}} io for tests
+ * @returns {Promise<number>}
+ */
 export async function main(
   argv = process.argv.slice(2),
   {
@@ -529,7 +572,14 @@ export async function main(
   }
 }
 
-/** Reads and saves: each timeline's batch is sent when full, and reading waits for it. */
+/**
+ * Reads and saves: each timeline's batch is sent when full, and reading waits for it. That
+ * wait is the backpressure: memory holds at most one batch per timeline, and a slow server
+ * slows the reading rather than filling a queue. A batch failing temporarily is retried (up
+ * to 12 attempts, waiting as the server's Retry-After asks or doubling to a minute); one
+ * refused for good is counted as not saved, and the import goes on.
+ * @returns {Promise<number>} EXIT.ok, or EXIT.partial when anything was refused or not saved
+ */
 async function importAll(settings, { stderr, total }) {
   const { writer } = settings;
   const progress = new Progress({ stream: stderr, quiet: settings.quiet, total });

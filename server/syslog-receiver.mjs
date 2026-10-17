@@ -23,14 +23,27 @@ import { MomentIngest } from './moment-ingest.mjs';
 
 /** Syslog messages into moments (syslog.mjs), queued and sent as moment-ingest.mjs does. */
 export class SyslogIngest extends MomentIngest {
+  /**
+   * @param {object} options MomentIngest's, and `timezone`: the zone (an IANA name or offset)
+   *   of timestamps that carry none
+   */
   constructor({ timezone = 'UTC', ...options }) {
     super({ ...options, label: 'syslog' });
     // Classic BSD timestamps carry no zone: read them in this one (UTC unless set).
     this.zone = parseZone(timezone);
+    // A random tag per run, so two runs (or two receivers) receiving in the same millisecond
+    // never make the same moment id; the sequence separates messages within a run.
     this.instance = randomBytes(4).toString('hex');
     this.sequence = 0;
   }
-  /** Parses, routes and queues one message; returns the timelines it went to. */
+  /**
+   * Parses, routes and queues one message; returns the timelines it went to. A message that
+   * does not parse is counted as invalid and dropped.
+   * @param {string} text one syslog message (RFC 5424 or BSD)
+   * @param {number} received when it arrived (ms), for its id and for a timestamp's missing
+   *   year or zone
+   * @returns {string[]}
+   */
   accept(text, received = Date.now()) {
     this.stats.received++;
     let entry;
@@ -46,11 +59,19 @@ export class SyslogIngest extends MomentIngest {
   }
 }
 
-/** UDP and TCP listeners feeding an ingest; resolves once both are listening. */
+/**
+ * UDP and TCP listeners feeding an ingest; resolves once both are listening. UDP takes one
+ * message per datagram (oversized ones counted invalid); TCP takes framed messages
+ * (syslogFrames: octet counting or newline-terminated), closing a connection whose framing
+ * is broken or that is idle for five minutes, with at most `maxConnections` at once.
+ * @returns {Promise<{udp: number, tcp: number, close: () => Promise<void>}>} the bound ports
+ *   (useful with port 0) and a function closing both
+ */
 export async function listenSyslog(
   ingest,
   { host = '127.0.0.1', port = 5514, maxConnections = 256 } = {},
 ) {
+  // A 1 MiB receive buffer absorbs bursts while the process is busy.
   const udp = createSocket({ type: host.includes(':') ? 'udp6' : 'udp4', recvBufferSize: 1 << 20 });
   udp.on('message', (message) => {
     if (message.length <= MAX_MESSAGE_BYTES) ingest.accept(message.toString('utf8'));
@@ -67,6 +88,7 @@ export async function listenSyslog(
         socket.destroy();
       }
     });
+    // A peer's reset ends its connection only; it must not crash the receiver.
     socket.on('error', () => {});
   });
   tcp.maxConnections = maxConnections;
@@ -90,6 +112,13 @@ export async function listenSyslog(
   };
 }
 
+/**
+ * Runs the receiver from the environment (docs/syslog.md): routes from SYSLOG_ROUTES_JSON or
+ * the file SYSLOG_ROUTES (default syslog-routes.json), OCH_API_URL and OCH_API_KEY,
+ * SYSLOG_HOST and SYSLOG_PORT (default 127.0.0.1:5514), SYSLOG_FLUSH_MS, SYSLOG_QUEUE_LIMIT
+ * and SYSLOG_TIMEZONE. Logs its counters every minute. On SIGTERM or SIGINT it stops
+ * listening, sends what is queued (up to ten seconds) and exits 1 if anything was left.
+ */
 export async function main(env = process.env) {
   const config = env.SYSLOG_ROUTES_JSON
     ? JSON.parse(env.SYSLOG_ROUTES_JSON)
