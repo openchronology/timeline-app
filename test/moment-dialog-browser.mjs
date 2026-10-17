@@ -95,7 +95,7 @@ export async function checkMomentDialog(page, restoreDocument) {
   const events = () => input('event-count').textContent();
   const initial = await events();
   await input('add-button').click();
-  assert.equal(await input('moment-heading').textContent(), 'New moment');
+  assert.equal(await input('moment-heading').textContent(), 'New event');
   await input('event-title').fill('Created through modal');
   await input('event-time').fill('10/1');
   await page.waitForFunction(() =>
@@ -154,8 +154,32 @@ export async function checkMomentDialog(page, restoreDocument) {
   const bands = () => page.locator('.duration-band').count();
   const durationDialog = input('duration-dialog');
   const spans = await bands();
-  await input('add-duration-button').click();
+  // ＋ Event opens a new moment; its Duration tab makes it a duration, keeping what was typed
+  // (#209), and its Moment tab makes it a moment again.
+  const newDuration = async () => {
+    await input('add-button').click();
+    await input('inspector').waitFor({ state: 'visible' });
+    await page.locator('#moment-kind [data-kind=duration]').click();
+    await durationDialog.waitFor({ state: 'visible' });
+  };
+  await input('add-button').click();
+  await input('inspector').waitFor({ state: 'visible' });
+  await input('event-title').fill('Changing kind');
+  await input('event-tags').fill('kind, change');
+  await page.locator('#moment-kind [data-kind=duration]').click();
   await durationDialog.waitFor({ state: 'visible' });
+  assert(await input('inspector').isHidden());
+  assert.equal(await input('duration-title').inputValue(), 'Changing kind');
+  assert.equal(await input('duration-tags').inputValue(), 'kind, change');
+  assert.equal(await page.locator('#duration-kind [aria-selected=true]').textContent(), 'Duration');
+  await page.locator('#duration-kind [data-kind=moment]').click();
+  await input('inspector').waitFor({ state: 'visible' });
+  assert(await durationDialog.isHidden());
+  assert.equal(await input('event-title').inputValue(), 'Changing kind');
+  await input('event-cancel').click();
+  await input('inspector').waitFor({ state: 'hidden' });
+  assert.equal(await bands(), spans);
+  await newDuration();
   await input('duration-title').fill('Cancelled span');
   await page.waitForTimeout(400);
   assert.equal(await bands(), spans);
@@ -164,15 +188,14 @@ export async function checkMomentDialog(page, restoreDocument) {
   await durationDialog.waitFor({ state: 'hidden' });
   assert.equal(await bands(), spans);
   for (const dismiss of [() => page.mouse.click(4, 4), () => page.keyboard.press('Escape')]) {
-    await input('add-duration-button').click();
-    await durationDialog.waitFor({ state: 'visible' });
+    await newDuration();
     await input('duration-title').fill('Dismissed span');
     await page.waitForTimeout(400);
     await dismiss();
     await durationDialog.waitFor({ state: 'hidden' });
     assert.equal(await bands(), spans);
   }
-  await input('add-duration-button').click();
+  await newDuration();
   await input('duration-title').fill('Saved span');
   await input('duration-save').click();
   await durationDialog.waitFor({ state: 'hidden' });
@@ -180,6 +203,8 @@ export async function checkMomentDialog(page, restoreDocument) {
   const saved = page.locator('.duration-band').last();
   await saved.click({ position: { x: 4, y: 4 } });
   await durationDialog.waitFor({ state: 'visible' });
+  // An existing duration stays one: its Moment tab is disabled.
+  assert(await page.locator('#duration-kind [data-kind=moment]').isDisabled());
   assert.equal(await input('duration-title').inputValue(), 'Saved span');
   await input('duration-title').fill('Renamed span');
   await input('duration-cancel').click();
@@ -214,7 +239,7 @@ export async function checkMomentDialog(page, restoreDocument) {
   await page.mouse.click(stage.x + stage.width / 2, stage.y + 80, { button: 'right' });
   const menu = input('timeline-menu');
   await menu.waitFor();
-  assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), ['+Moment']);
+  assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), ['＋ Event']);
   await page.keyboard.press('Escape');
   // Durations alone are something to fit, and Fit shows them.
   await load({

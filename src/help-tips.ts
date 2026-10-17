@@ -52,7 +52,7 @@ export const HELP_TIPS: readonly HelpTip[] = [
     selector: '#search-heading',
     topic: 'search',
     about: 'searching',
-    tip: 'Finds moments and durations whose titles or notes contain every word you type.',
+    tip: 'Finds events (moments and durations) whose titles or notes contain every word you type.',
   },
   {
     selector: '#plugins-heading',

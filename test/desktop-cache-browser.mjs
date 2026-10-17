@@ -240,7 +240,7 @@ export async function checkDesktopCache(browser) {
     await page.locator('#search-text').fill('nearby');
     await page.locator('#search-submit').click();
     await page.waitForFunction(() =>
-      /No moments or durations match/.test(document.getElementById('search-status').textContent),
+      /No events match/.test(document.getElementById('search-status').textContent),
     );
     assert.equal(searches.at(-1).text, 'nearby');
     assert.equal(reads, 0);

@@ -19,18 +19,13 @@ export const TOUR_STEPS: readonly TourStep[] = [
   },
   {
     selectors: ['#add-button'],
-    title: 'Add a moment',
-    text: '＋ Moment adds one at the selected time, or in the middle of the view. You can also right-click the timeline, or press and hold it.',
-  },
-  {
-    selectors: ['#add-duration-button'],
-    title: 'Add a duration',
-    text: 'A duration is a period with a start and an end. Either end can follow a moment, and move when it does.',
+    title: 'Add an event',
+    text: 'An event is a moment, at one time, or a duration, a period with a start and an end. ＋ Event adds a moment at the selected time, or in the middle of the view; its Duration tab makes it a duration. You can also right-click the timeline, or press and hold it.',
   },
   {
     selectors: ['#search-button'],
     title: 'Search',
-    text: 'Finds moments and durations by the words in their titles and notes. The / key opens it too.',
+    text: 'Finds events by the words in their titles and notes. The / key opens it too.',
   },
   {
     selectors: ['#separate-button'],

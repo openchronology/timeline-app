@@ -2,7 +2,8 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-Timelines, and the moments, durations, searches and views in them, have addresses that open
+Timelines, and the events (moments and durations), searches and views in them, have addresses
+that open
 them, previews for social sites and search engines, and embeds for other websites. Everything
 here applies to timelines on the server; anyone can follow a link to a public timeline, while
 a private one opens only for its members.
@@ -40,18 +41,18 @@ A timeline's page is at its [address](#addresses). A fragment after it names wha
 
 IDs and words are percent-encoded (`#moment/leg%3A2` for `leg:2`). The address follows what is
 open: opening a moment adds its fragment, and closing it removes it, so the address bar can be
-copied at any time. Moments and durations also have pages of their own,
+copied at any time. Events also have pages of their own,
 `/<username>/<slug>/moments/<id>` and `/<username>/<slug>/durations/<id>`, which open the
 timeline at them the same way. They are what **Share** offers, because social sites and search engines read
 pages but not fragments.
 
 The same fragments work for embeds (`/embed/<id>#moment/…`) and in the editor's own address
-(`#timeline/<id>/moment/…`). A link to a moment or duration that no longer exists opens the
+(`#timeline/<id>/moment/…`). A link to an event that no longer exists opens the
 timeline and says so.
 
 ## Share
 
-**Share** above the timeline, in a moment's or duration's details, under search results and,
+**Share** above the timeline, in an event's details, under search results and,
 for the current view, in the timeline's context menu (**Share this view**) opens the share
 dialog:
 
@@ -70,7 +71,7 @@ Timeline, moment and duration pages describe themselves for link previews (Open 
 Twitter cards) and search engines: a title, a description (the timeline's description, or how
 many moments it has, over what time and by whom; for a moment, its time and notes), the
 canonical address, and a 1200 × 630 preview image. The image shows the title and a strip of the
-timeline's moments, with the shared moment or duration marked on it. Facebook, X, LinkedIn,
+timeline's moments, with the shared event marked on it. Facebook, X, LinkedIn,
 Slack, Discord, iMessage and others show these as a card with a large image.
 
 Previews are made as a guest sees the timeline: a private timeline's preview image is the
@@ -124,7 +125,7 @@ editors that use them) can turn a pasted link into the timeline itself:
 GET /api/oembed?url=https://timescale.info/<username>/<slug>&maxwidth=600&format=json
 ```
 
-It answers a `rich` embed with the iframe above (opening at the page's moment or duration, or at
+It answers a `rich` embed with the iframe above (opening at the page's event, or at
 the link's fragment), its size (at most 800 × 480, within `maxwidth` and `maxheight`), the
 title and owner, and the preview image as its thumbnail. Any of a timeline's addresses will do.
 Only `json` is available; addresses of other sites, and timelines that are not public, are not

@@ -167,7 +167,7 @@ try {
   await frame.locator('#map-offset').fill('-1000');
   await frame
     .locator('#map-summary')
-    .getByText(/This moves the moments and durations selected/)
+    .getByText(/This moves the events selected/)
     .waitFor();
   await frame.locator('#map-status').evaluate(() => (window.mapStatuses = []));
   await frame.locator('#map-submit').click();

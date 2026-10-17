@@ -147,9 +147,9 @@ export default function AccountAccess({ session, account, refresh }) {
       {/* Minors can't turn the warnings off: the server refuses it (#115). */}
       {account?.profile?.minor ? (
         <p className="muted">
-          Timelines, moments and durations labelled as containing nudity, graphic violence or
-          disturbing content open behind a warning, with their images blurred until you show them.
-          Accounts of people under 18 always see these warnings.
+          Timelines and events labelled as containing nudity, graphic violence or disturbing content
+          open behind a warning, with their images blurred until you show them. Accounts of people
+          under 18 always see these warnings.
         </p>
       ) : (
         <label className="checkbox-label">

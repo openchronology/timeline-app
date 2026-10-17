@@ -7,6 +7,11 @@ dialog[open] {
 dialog[open]::backdrop {
   animation: dialog-backdrop-enter 180ms ease-out both;
 }
+/* Switching an event between moment and duration (#209) swaps dialogs in place, unanimated. */
+dialog[open][data-dialog-switched],
+dialog[open][data-dialog-switched]::backdrop {
+  animation: none;
+}
 dialog[open][data-dialog-closing] {
   animation: dialog-exit 140ms ease-in both;
   pointer-events: none;

@@ -6,7 +6,7 @@ Short answers to common questions, from the basics to running your own server. F
 
 ## What is OpenChronology?
 
-A timeline editor. You place moments, durations and the links between them on a line of time, then zoom, search, compare and share. Times are exact: a third of a second stays exactly a third, however far you zoom. It runs on the website, as a desktop app, and as a single offline HTML file. See [what a timeline is](guide.md#what-a-timeline-is).
+A timeline editor. You place events (moments and durations) and the links between them on a line of time, then zoom, search, compare and share. Times are exact: a third of a second stays exactly a third, however far you zoom. It runs on the website, as a desktop app, and as a single offline HTML file. See [what a timeline is](guide.md#what-a-timeline-is).
 
 ## Is it free?
 
@@ -68,7 +68,7 @@ Up to 200,000 moments, and as many durations and relationships. A server's opera
 
 ## How do I move many moments at once?
 
-Right-click (or press and hold) the timeline and choose **Shift or scale times…**. It shifts, stretches or compresses every moment and duration, or those with certain tags, or what is related to one. See [shifting and scaling times](time-mapping.md).
+Right-click (or press and hold) the timeline and choose **Shift or scale times…**. It shifts, stretches or compresses every event, or those with certain tags, or what is related to one. See [shifting and scaling times](time-mapping.md).
 
 ## Who can see my timeline?
 

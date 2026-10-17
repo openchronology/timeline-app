@@ -468,7 +468,11 @@ const SCENARIOS = [
     async run(d, t) {
       await closeDialogs(d);
       await show(d, t.fitted.left, t.fitted.right);
-      const ms = await timed(d, visible('#duration-dialog'), () => d.click('#add-duration-button'));
+      await d.click('#add-button');
+      await d.wait(visible('#inspector'));
+      const ms = await timed(d, visible('#duration-dialog'), () =>
+        d.click('#moment-kind [data-kind=duration]'),
+      );
       await d.click('#duration-cancel');
       await d.wait(hidden('#duration-dialog'));
       return ms;
@@ -482,7 +486,9 @@ const SCENARIOS = [
     async run(d, t) {
       await closeDialogs(d);
       await show(d, t.fitted.left, t.fitted.right);
-      await d.click('#add-duration-button');
+      await d.click('#add-button');
+      await d.wait(visible('#inspector'));
+      await d.click('#moment-kind [data-kind=duration]');
       await d.wait(visible('#duration-dialog'));
       // Choosing "Follows a moment" with the keyboard opens the moment picker.
       await d.focus('[data-endpoint="end"] select');
