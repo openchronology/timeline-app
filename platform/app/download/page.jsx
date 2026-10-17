@@ -17,7 +17,7 @@ import {
   editionFile,
   installCommand,
 } from '../../lib/releases.js';
-import { EDITIONS } from '../../../src/editions.ts';
+import { EDITIONS } from '../../../dist/core.mjs';
 import { latestRelease } from '../../lib/latest-release.js';
 import { siteName } from '../../lib/sharing.js';
 // Rendered per request: what it puts first depends on the visitor's browser.
