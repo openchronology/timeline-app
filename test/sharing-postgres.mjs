@@ -402,6 +402,29 @@ try {
   await settings.waitForURL(origin + named + '/moments/leg%3A2');
   await settings.frameLocator('iframe.editor-frame').locator('#inspector').waitFor();
   await settings.close();
+
+  // A timeline started in the browser is a draft, listed on the dashboard to open (#188).
+  const drafting = await signedIn.newPage();
+  await drafting.goto(origin + '/editor?new=1');
+  const draftEditor = drafting.frameLocator('iframe.editor-frame');
+  await draftEditor.locator('#timeline-title').fill('Browser draft ' + suffix);
+  await draftEditor.locator('#timeline-title').press('Tab');
+  await draftEditor.getByText('Saved in this browser').waitFor();
+  await drafting.goto(origin + '/');
+  const listed = drafting.locator('#dashboard-drafts').getByRole('link', {
+    name: 'Browser draft ' + suffix,
+  });
+  await listed.waitFor();
+  assert.match(await listed.getAttribute('href'), /^\/editor\?draft=[0-9a-f-]{36}$/);
+  await listed.click();
+  await drafting.waitForURL(/\/editor\?draft=/);
+  await drafting.waitForFunction(
+    (title) =>
+      document.querySelector('iframe.editor-frame').contentDocument.getElementById('timeline-title')
+        ?.value === title,
+    'Browser draft ' + suffix,
+  );
+  await drafting.close();
   await signedIn.close();
   await context.close();
   console.log(

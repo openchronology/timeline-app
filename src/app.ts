@@ -141,6 +141,15 @@ import { profilePath, timelinePath } from './addresses.js';
 import { addHelpTips } from './help-tips.js';
 import { startTour } from './tour.js';
 import { momentsText, SAVE_TO_SERVER } from './wording.js';
+import {
+  MAIN_DRAFT,
+  deleteDraft,
+  listDrafts,
+  newDraftId,
+  openDraftDb,
+  recordDraft,
+} from './draft-store.js';
+import type { DraftEntry } from './draft-store.js';
 import { readViewState, viewStorageKey, VIEW_PREFIX } from './view-state.js';
 import type { ViewState } from './view-state.js';
 import type { TimelineLink } from './links.js';
@@ -347,10 +356,60 @@ let proposalSubmissionVersion = 0,
   proposalSubmissionDocument = 0;
 function setDashboard(show: boolean) {
   el('dashboard').hidden = !show;
+  if (show) void showDrafts().catch(() => (el('dashboard-drafts').hidden = true));
   document.body.dataset.dashboard = String(show);
   el('memory-notice').hidden = show || !memoryOnly() || !!remote || !!comparison || !model;
   updateCapacity();
   if (!show) requestRender();
+}
+/** The dashboard's drafts in this browser (#188), each to open or delete. */
+async function showDrafts() {
+  const section = el('dashboard-drafts'),
+    list = el('dashboard-drafts-list');
+  const drafts: DraftEntry[] =
+    session.user && !memoryOnly() && !desktop ? await listDrafts(session.user.id) : [];
+  section.hidden = !drafts.length;
+  list.replaceChildren(
+    ...drafts.map((draft) => {
+      const card = document.createElement('article');
+      card.className = 'dashboard-timeline';
+      card.dataset.draft = draft.id;
+      const open = document.createElement('button');
+      open.type = 'button';
+      open.className = 'draft-open';
+      open.textContent = draft.title || 'Untitled timeline';
+      open.onclick = () => void openDraftById(draft.id).catch(fail);
+      const details = document.createElement('p');
+      details.textContent =
+        momentsText(draft.moments) +
+        (draft.updated ? ' · edited ' + new Date(draft.updated).toLocaleString() : '');
+      details.className = 'field-hint';
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.textContent = 'Delete';
+      remove.setAttribute('aria-label', `Delete the draft “${open.textContent}”`);
+      remove.onclick = () => {
+        if (!confirm(`Delete the draft “${open.textContent}” from this browser for good?`)) return;
+        if (openDraft() === draft.id) draftOf = null;
+        storedDrafts.delete(draft.id);
+        void deleteDraft(draft.id).then(showDrafts).catch(fail);
+      };
+      card.append(open, details, remove);
+      return card;
+    }),
+  );
+}
+/** Opens draft `id` from the dashboard. */
+async function openDraftById(id: string) {
+  if (!mayReplace()) return;
+  const doc = await loadDraft(id);
+  if (!doc) {
+    toast('That draft is no longer in this browser.');
+    return void showDrafts();
+  }
+  historyReplace();
+  sqlitePath = null;
+  loadDocument(validateDocument(doc), id);
 }
 function hasDashboard() {
   return session.dashboard ?? session.server;
@@ -702,7 +761,7 @@ let history: HistoryEntry[] = [],
   future: HistoryEntry[] = [],
   frameRequest = 0,
   frameTimer: ReturnType<typeof setTimeout>,
-  draftTimer: ReturnType<typeof setTimeout>;
+  draftTimer: ReturnType<typeof setTimeout> | undefined;
 let toastTimer: ReturnType<typeof setTimeout>,
   scheduled = false,
   sqlitePath: string | null = null,
@@ -2430,22 +2489,11 @@ function heading() {
 /**
  * Version 1 kept one whole document under "drafts/current". Version 2 keeps a draft record
  * by record (see drafts.ts): its settings under "drafts/settings", embedded assets under
- * "drafts/assets", and one store per kind of entity.
+ * "drafts/assets", and one store per kind of entity. Each draft has a database of its own,
+ * listed with the others (draft-store.ts, #188).
  */
-async function draftDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('openchronology', 2);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      for (const name of ['drafts', ...DRAFT_STORES])
-        if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-async function loadDraft(): Promise<TimelineDocument | null> {
-  const db = await draftDb();
+async function loadDraft(id: string): Promise<TimelineDocument | null> {
+  const db = await openDraftDb(id);
   try {
     return await new Promise((resolve, reject) => {
       const tx = db.transaction(['drafts', ...DRAFT_STORES]);
@@ -2482,23 +2530,30 @@ async function loadDraft(): Promise<TimelineDocument | null> {
     db.close();
   }
 }
-/** The index whose records the stored draft holds, and the assets it last stored. */
-let draftIndex: TimelineIndex | null = null,
-  draftAssets: unknown = null;
+/**
+ * The draft (#188) a timeline in the browser is, once it is one, and that timeline: opening
+ * anything else, however it is opened, leaves the draft.
+ */
+let draftOf: { id: string; model: TimelineIndex } | null = null;
+/** The open timeline's draft, if it is one. */
+const openDraft = () => (draftOf && draftOf.model === model ? draftOf.id : null);
+/** For each draft, the index whose records it holds, and the assets it last stored. */
+const storedDrafts = new Map<string, { index: TimelineIndex; assets: unknown }>();
 /**
  * Stores the open timeline's draft in one transaction: every record when a different
  * timeline was stored last, otherwise only the records its journal names. Returns the
  * time spent on this thread (building and cloning records), which pauses the page.
  */
-async function storeDraft(index: TimelineIndex): Promise<number> {
-  const db = await draftDb();
+async function storeDraft(index: TimelineIndex, id: string): Promise<number> {
+  const db = await openDraftDb(id);
+  let busy = 0;
   try {
-    let busy = 0;
     await new Promise<void>((resolve, reject) => {
       const started = performance.now();
       const tx = db.transaction(['drafts', ...DRAFT_STORES], 'readwrite');
       const drafts = tx.objectStore('drafts');
-      const full = draftIndex !== index;
+      const stored = storedDrafts.get(id),
+        full = stored?.index !== index;
       let writes: DraftWrite[];
       if (full) {
         index.takeChanges();
@@ -2511,14 +2566,13 @@ async function storeDraft(index: TimelineIndex): Promise<number> {
         else tx.objectStore(store).put(value, key);
       drafts.put(draftSettings(index), 'settings');
       // Embedded images can be megabytes; store them again only when they change.
-      if (full || index.assets !== draftAssets) {
+      if (full || index.assets !== stored?.assets) {
         if (index.assets === undefined) drafts.delete('assets');
         else drafts.put(index.assets, 'assets');
       }
       // Later saves queue behind this transaction (IndexedDB runs writers in order), so they
       // can write only their changes as soon as this one is queued.
-      draftIndex = index;
-      draftAssets = index.assets;
+      storedDrafts.set(id, { index, assets: index.assets });
       busy = performance.now() - started;
       // Visible to performance tooling (and the capacity benchmarks).
       if (!full)
@@ -2526,19 +2580,28 @@ async function storeDraft(index: TimelineIndex): Promise<number> {
       tx.oncomplete = () => resolve();
       tx.onabort = tx.onerror = () => {
         // The journal was consumed; the next save rewrites the whole draft.
-        draftIndex = null;
+        storedDrafts.delete(id);
         reject(tx.error);
       };
     });
-    return busy;
   } finally {
     db.close();
   }
+  // The list of drafts says what it holds now.
+  if (session.user)
+    await recordDraft({
+      id,
+      owner: session.user.id,
+      title: index.title,
+      moments: Number(index.points.entryCount),
+      updated: new Date().toISOString(),
+    });
+  return busy;
 }
 async function retainForSignIn() {
   flushEventEdit();
   if (!model || memoryOnly()) return;
-  const db = await draftDb();
+  const db = await openDraftDb(MAIN_DRAFT);
   try {
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction('drafts', 'readwrite');
@@ -2563,6 +2626,8 @@ async function retainForSignIn() {
             ? { id: workingProposal.id, revision: workingProposal.revision }
             : null,
           dirty,
+          // The draft it is, so it is that draft again afterwards (#188).
+          draft: openDraft(),
         },
         'auth-resume',
       );
@@ -2577,7 +2642,7 @@ async function retainForSignIn() {
   }
 }
 async function restoreAfterSignIn() {
-  const db = await draftDb();
+  const db = await openDraftDb(MAIN_DRAFT);
   try {
     const saved = await new Promise<
       | {
@@ -2588,6 +2653,7 @@ async function restoreAfterSignIn() {
           sparseLinks?: { relationship: Relationship; related: boolean }[];
           proposal?: { id: string; revision: string } | null;
           dirty: boolean;
+          draft?: string | null;
         }
       | undefined
     >((resolve, reject) => {
@@ -2599,7 +2665,11 @@ async function restoreAfterSignIn() {
       tx.onabort = tx.onerror = () => reject(tx.error);
     });
     if (!saved) return;
-    loadDocument(validateDocument(saved.document));
+    // Work in the browser comes back as the draft it was; a server timeline's, as its edits.
+    loadDocument(
+      validateDocument(saved.document),
+      saved.remote ? null : typeof saved.draft === 'string' ? saved.draft : newDraftId(),
+    );
     clearTimeout(draftTimer);
     dirty = !!saved.dirty;
     if (
@@ -2666,11 +2736,17 @@ async function restoreAfterSignIn() {
 function persistDraft() {
   // A dialog's unkept preview is not stored; Save or discarding stores the result.
   if (memoryOnly() || remote || desktop || !model || previewing) return;
+  // A timeline becomes a draft of its own when first edited (#188): not the sample, or a new
+  // timeline, until then.
+  if (!openDraft() && !dirty) return;
+  if (!openDraft()) draftOf = { id: newDraftId(), model };
   clearTimeout(draftTimer);
   draftTimer = setTimeout(() => {
-    if (memoryOnly() || remote || !model || sparseWorkspace() || previewing) return;
-    const full = draftIndex !== model;
-    void storeDraft(model)
+    draftTimer = undefined;
+    const id = openDraft();
+    if (memoryOnly() || remote || !model || sparseWorkspace() || previewing || !id) return;
+    const full = storedDrafts.get(id)?.index !== model;
+    void storeDraft(model, id)
       .then((busy) => {
         // The first save of a timeline writes every record; later saves are what edits cost.
         if (!full) {
@@ -2684,6 +2760,14 @@ function persistDraft() {
       });
   }, 700);
 }
+/** Stores the open draft now, if it was waiting to be, before another timeline replaces it. */
+function flushDraft() {
+  const id = openDraft();
+  if (draftTimer === undefined || !id || !model || remote || memoryOnly()) return;
+  clearTimeout(draftTimer);
+  draftTimer = undefined;
+  void storeDraft(model, id).catch(() => {});
+}
 function changed() {
   editVersion++;
   dirty = true;
@@ -2691,7 +2775,11 @@ function changed() {
   requestRender();
   persistDraft();
 }
-function loadDocument(doc: TimelineDocument) {
+/**
+ * Opens `doc` in the browser. As draft `draft` (#188) it is stored as that draft at once;
+ * without one it becomes a new draft when first edited.
+ */
+function loadDocument(doc: TimelineDocument, draft: string | null = null) {
   // Imports start timing when the file is read; other opens start here, before indexing.
   openStarted = pendingOpenStart ?? performance.now();
   pendingOpenStart = null;
@@ -2703,6 +2791,8 @@ function loadDocument(doc: TimelineDocument) {
     );
   stopComparison(false);
   setDashboard(false);
+  // The draft open until now is kept, as it stood (#188).
+  flushDraft();
   workingProposal = null;
   documentRequest++;
   resetTimeSelection();
@@ -2715,6 +2805,7 @@ function loadDocument(doc: TimelineDocument) {
   sqliteSavedVersion = null;
   local = null;
   model = new TimelineIndex(doc);
+  draftOf = draft ? { id: draft, model } : null;
   viewport = Viewport.fit(model.points.minKey(), model.points.maxKey());
   dirty = false;
   history = [];
@@ -5791,8 +5882,11 @@ el<HTMLTextAreaElement>('timeline-description').onchange = () => {
 };
 function mayReplace() {
   flushEventEdit();
+  flushDraft();
   return (
     (!dirty && !(desktop && sqlitePath && sqliteSavedVersion !== editVersion)) ||
+    // A draft in this browser is kept, and listed on the dashboard (#188).
+    (!!openDraft() && !remote && !memoryOnly() && !desktop && !previewing) ||
     confirm('Save or export your changes first if you want to keep them. Replace this timeline?')
   );
 }
@@ -5856,7 +5950,8 @@ input('json-file').onchange = () => {
       historyReplace();
       sqlitePath = null;
       pendingOpenStart = started;
-      loadDocument(doc);
+      // An imported file is a draft of its own at once (#188).
+      loadDocument(doc, memoryOnly() || desktop ? null : newDraftId());
       toast('JSON timeline imported.');
     })
     .catch(fail);
@@ -6399,6 +6494,15 @@ el('publish-button').onclick = () => {
       keptVersions = null;
       remote = result;
       local = null;
+      // A draft saved to the server is on the server now, not a draft (#188).
+      const saved = openDraft();
+      if (saved) {
+        draftOf = null;
+        clearTimeout(draftTimer);
+        draftTimer = undefined;
+        storedDrafts.delete(saved);
+        void deleteDraft(saved).catch(() => {});
+      }
       if (document) model!.assets = undefined;
       if (index && sent) {
         index.accepted(sent, selected?.id);
@@ -7205,11 +7309,15 @@ void (async () => {
       await refreshSession();
       if (session.user) {
         try {
-          const draft = await loadDraft();
+          // The draft asked for (?draft=…, from the dashboard), or the latest edited (#188).
+          const drafts = await listDrafts(session.user.id),
+            asked = new URLSearchParams(location.search).get('draft');
+          const chosen = drafts.find((d) => d.id === asked) ?? (asked ? undefined : drafts[0]);
+          const draft = chosen ? await loadDraft(chosen.id) : null;
           if (draft && !location.hash && !freshTimeline && !sampleTimeline) {
-            loadDocument(validateDocument(draft));
+            loadDocument(validateDocument(draft), chosen!.id);
             setDashboard(!platformEditor);
-          }
+          } else if (asked) toast('That draft is no longer in this browser.');
           await restoreAfterSignIn();
         } catch {
           /* Authenticated browser storage can be unavailable. */

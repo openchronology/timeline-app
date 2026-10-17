@@ -21,7 +21,7 @@ No. Anyone can read public timelines, and anyone can start a timeline in the bro
 It depends on where you work:
 
 - **In the browser without an account:** only in the open tab, until you export it.
-- **In the browser, signed in:** as a draft in that browser, until you save it to the server.
+- **In the browser, signed in:** as a draft in that browser, until you save it to the server. Each timeline you start there is a draft of its own, listed on the home page under **Drafts in this browser**.
 - **On the server:** in the server's database, with its saved history.
 - **In the desktop app:** in `.och` files on your computer.
 
