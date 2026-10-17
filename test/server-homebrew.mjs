@@ -67,6 +67,9 @@ assert.match(await sh('och-import-logs --help'), /^Usage: och-import-logs/);
 // The syslog receiver as a launchd agent (openchronology-agent, #125) delivers a message into
 // a timeline, and stops for good when stopped.
 const agentPlist = `${process.env.HOME}/Library/LaunchAgents/org.openchronology.syslog.plist`;
+// When each step ran and the agent's process, to match against launchd's log on a failure.
+const steps = [];
+const step = (what) => steps.push(`${new Date().toISOString()} ${what}`);
 await checkSyslogService({
   name: 'macOS',
   psql,
@@ -76,20 +79,26 @@ await checkSyslogService({
       `sed -i '' 's|^OCH_API_KEY=.*|OCH_API_KEY=${key}|' "${prefix}/etc/openchronology/syslog.env" && printf '%s' '${routes}' > "${prefix}/etc/openchronology/syslog-routes.json"`,
     ),
   start: async () => {
+    step('start');
     assert.match(await sh('openchronology-agent start syslog'), /openchronology-syslog started/);
+    step('started');
     assert.match(await sh(`plutil -lint "${agentPlist}"`), /OK/);
+    step(await sh('sleep 1; openchronology-agent status syslog', { allowFailure: true }));
   },
   stop: async () => {
+    step('arrived; status');
     const status = await sh('openchronology-agent status syslog', { allowFailure: true });
     if (!/^state = running$/m.test(status))
       assert.fail(
-        status +
+        steps.join('\n') +
+          '\n' +
+          status +
           (await sh(
             `launchctl print "gui/$(id -u)/org.openchronology.syslog"; echo "print: exit $?"; ` +
               `launchctl list | grep -i openchronology; ps ax | grep [s]yslog-receiver; ` +
               `tail -20 "${prefix}/var/log/openchronology-syslog.log"; ` +
               `launchctl print-disabled "gui/$(id -u)" | grep -i openchronology; ` +
-              `log show --last 3m --style compact --info --debug --predicate 'eventMessage CONTAINS "org.openchronology.syslog"' | tail -60`,
+              `log show --last 1m --style compact --info --debug --predicate 'eventMessage CONTAINS[c] "openchronology" OR process == "backgroundtaskmanagementd" OR process == "smd" OR (process == "launchd" AND eventMessage CONTAINS "gui/501")' | grep -v ' log\\[' | tail -150`,
             { allowFailure: true },
           )),
       );
