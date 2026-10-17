@@ -118,7 +118,7 @@ assert.match(
 );
 assert.match(await sh(`tail -5 "${agentLog}"`), /^syslog: stopped/m);
 assert.match(
-  await sh('openchronology-agent start nothing; echo "exit $?"', { allowFailure: true }),
+  await sh('openchronology-agent start nothing 2>&1; echo "exit $?"', { allowFailure: true }),
   /Usage: openchronology-agent[\s\S]*exit 2/,
 );
 
