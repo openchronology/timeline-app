@@ -80,7 +80,17 @@ await checkSyslogService({
     assert.match(await sh(`plutil -lint "${agentPlist}"`), /OK/);
   },
   stop: async () => {
-    assert.match(await sh('openchronology-agent status syslog'), /^state = running$/m);
+    const status = await sh('openchronology-agent status syslog', { allowFailure: true });
+    if (!/^state = running$/m.test(status))
+      assert.fail(
+        status +
+          (await sh(
+            `launchctl print "gui/$(id -u)/org.openchronology.syslog"; echo "print: exit $?"; ` +
+              `launchctl list | grep -i openchronology; ps ax | grep [s]yslog-receiver; ` +
+              `tail -20 "${prefix}/var/log/openchronology-syslog.log"`,
+            { allowFailure: true },
+          )),
+      );
     assert.match(await sh('openchronology-agent stop syslog'), /stopped/);
   },
   // Its log, launchd's account of the agent and the command run directly, for a failure.
