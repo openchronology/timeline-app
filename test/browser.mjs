@@ -9,6 +9,7 @@ import { checkRangeDelete } from './range-delete-browser.mjs';
 import { checkTimeMap } from './time-map-browser.mjs';
 import { checkHelp } from './help-browser.mjs';
 import { checkDurationBackgrounds } from './duration-backgrounds-browser.mjs';
+import { checkLogSeverity } from './log-severity-browser.mjs';
 import { checkHeadings } from './headings-browser.mjs';
 import { checkSuites } from './suites-browser.mjs';
 import { checkTags } from './tags-browser.mjs';
@@ -290,6 +291,7 @@ try {
   await checkHelp(page);
   await checkDurationBackgrounds(page, document);
   await checkHeadings(page, document);
+  await checkLogSeverity(page, document);
   await checkSuites(page, document);
   await checkTags(page, document);
   await checkRelationships(page, document);

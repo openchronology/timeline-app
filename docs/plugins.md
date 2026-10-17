@@ -60,6 +60,8 @@ Plugins combine **JSON host component declarations** and an optional restricted 
 - Ordering: later enabled definitions replace earlier inspector fields with the same key; later marker hooks with a valid, populated image URL take precedence. Empty or invalid URLs fall back to the preceding valid marker effect, or the normal dot.
 - Targets: an optional `targets` array of `"moments"` and/or `"durations"`. Without it, color markers and hover cards apply to moments and [durations](durations.md); every other plugin applies to moments only. Durations use text, notes, color, link and image URL fields, color markers, hover cards and backgrounds (`background.kind: "image"`, which applies to durations only); stacks, shapes, sizes, icons and summary expansion are moment-only.
 
+- Derived metadata: `derive` rules that work out values from the metadata an entity already has, for the other plugins to read ([derived metadata](#derived-metadata)).
+
 A plugin can define fields without a marker effect, or an effect without a new editor field. Additional component kinds require an implementation and security review in the host; they are not arbitrary downloaded UI programs. New capabilities will use versioned contracts.
 
 Example manifest:
@@ -99,6 +101,47 @@ The document's ordered configuration is:
 ```
 
 Read-only server overview queries return the requested plugin metadata for individual markers in the same bounded query. They do not download the full timeline or issue a separate request for each icon. Group summaries do not include arbitrary moment metadata.
+
+## Derived metadata
+
+A plugin can work out metadata from what a moment or duration already has, for the other plugins to read, like middleware between the saved metadata and the plugins that draw it ([#122](https://github.com/openchronology/timeline-app/issues/122)). A rule sets one key from the first of its sources that has a value:
+
+```json
+{
+  "derive": [
+    {
+      "metadataKey": "color",
+      "from": [{ "tag": "severity" }, { "path": "journald.severity" }],
+      "map": { "err": "#bc6663", "warning": "#d6ad4c" }
+    }
+  ]
+}
+```
+
+- **Sources:** `{ "tag": "severity" }` reads the value of a tag such as `severity:err` (here `err`). `{ "path": "journald.severity" }` reads a text, number or true/false at one to four keys joined by dots. Sources are tried in order.
+- **Map:** with a `map`, a source's value becomes the mapped text; a value the map doesn't name passes to the next source. Without one, the value is used as it is.
+- **What the others see:** the key is set before any plugin draws, so the color, shape, icon and heading markers, hover cards and scripts all read it as if it were saved, whatever their order. A script reads a key its own plugin derives with `api.get`. Rules apply in plugin order, and a later rule can read what an earlier one set.
+- **Never over a saved value:** a rule sets its key only where the entity has none, saved or derived earlier. A color chosen for a moment wins over one derived for it.
+- **Never saved:** derived values exist only as the timeline is drawn, in the browser and the desktop app. They are not written into moments, files, revisions or the server, and the details panel and **Additional metadata** show only what is saved. Disabling the plugin removes them.
+- **Viewers:** a server's overview sends what the rules read and nothing more of it (the tags with that prefix, the values at those paths), so read-only viewers see the same. Duration bands carry their tags but not nested metadata, so durations derive from tags.
+- **Limits:** up to eight rules per plugin, 16 sources per rule and 64 mapped values of up to 256 characters each. A rule can't set `title`, `description` or `tags`. Paths don't cross arrays and have no wildcards.
+
+## Log severity colors
+
+Install **Log severity colors** (`log-severity-colors`) to color [imported logs](log-import.md), [syslog](syslog.md) and [journald](journald.md) entries by severity:
+
+| Severity                 | Color                         |
+| ------------------------ | ----------------------------- |
+| `emerg`, `alert`, `crit` | Dark red (`#8f3f3c`)          |
+| `err`                    | Bad, red (`#bc6663`)          |
+| `warning`                | Warning, yellow (`#d6ad4c`)   |
+| `notice`                 | Information, blue (`#7aadc4`) |
+| `info`                   | The default                   |
+| `debug`                  | Disabled, gray (`#9aa49f`)    |
+
+It reads the `severity:<level>` tag every log format adds, and otherwise the severity each format keeps in its own metadata (`syslog.severity`, `journald.severity`, `nginx-combined.severity` and so on), so access logs, which tag no severity, are colored too. It derives the `color` that **Moment colors** reads, and draws that color itself, so it works with or without Moment colors. A color chosen for an entry still wins, and nothing is saved. Durations made from log entries are colored as well.
+
+To color by other values, copy it with **Edit / export definition** and change its sources or map: for example `{ "tag": "status" }` with a map from `5xx` and `4xx` to colors for an access log's status classes.
 
 ## Library API and publishing
 

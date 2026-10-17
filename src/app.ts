@@ -80,6 +80,7 @@ import {
   validateDuration,
   durationPlugins,
   pluginBackground,
+  derivationKeys,
   BACKGROUND_URL_LIMIT,
   momentPlugins,
   refKey,
@@ -985,6 +986,7 @@ async function timelineQuery<T>(query: Record<string, unknown>, signal?: AbortSi
             ...(p.manifest.marker ? [p.manifest.marker.metadataKey] : []),
             ...(p.manifest.hover || p.manifest.source ? ['title', 'description'] : []),
             ...(p.manifest.hover ? ['sources'] : []),
+            ...derivationKeys(p.manifest),
           ]),
       ]),
     ];
