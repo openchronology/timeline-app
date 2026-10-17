@@ -85,8 +85,9 @@ try {
   // The offline file says so beside the brand (#101).
   assert.equal(await page.locator('#edition-chip').textContent(), 'Offline');
   assert(await page.locator('#edition-chip').isVisible());
-  await poll(async () => (await input('storage-badge').textContent()) === 'Offline HTML');
-  assert(await input('memory-notice').isVisible());
+  // The chip says it is offline, so no badge repeats it.
+  await poll(() => input('memory-notice').isVisible());
+  assert(await input('storage-badge').isHidden());
   assert.match(await input('memory-notice').textContent(), /Export an .ochx/);
   assert.match(await input('event-count').textContent(), /0 moments/);
   for (const id of [
@@ -223,6 +224,15 @@ try {
   const opened = Date.now();
   await cfam.goto(pathToFileURL(cfamFile).href);
   assert.equal(await cfam.locator('#edition-chip').textContent(), 'Offline · CFAM');
+  // On a phone or a narrow window the header wraps, and the download menu opens on the screen.
+  for (const width of [390, 640, 1440]) {
+    await cfam.setViewportSize({ width, height: 900 });
+    await cfam.locator('.download-menu summary').click();
+    const menu = await cfam.locator('.download-menu > div').boundingBox();
+    assert(menu.x >= 0 && menu.x + menu.width <= width, `${width}: ${JSON.stringify(menu)}`);
+    await cfam.locator('.download-menu summary').click();
+  }
+  await cfam.setViewportSize({ width: 1440, height: 960 });
   const left = parseTime(await cfam.locator('#exact-left').inputValue()),
     right = parseTime(await cfam.locator('#exact-right').inputValue());
   const span = right.sub(left),

@@ -50,6 +50,10 @@ export async function checkResponsiveTimeline(page) {
           documentWidth: document.documentElement.scrollWidth,
           viewportWidth: innerWidth,
           inspector: getComputedStyle(document.getElementById('inspector')).display,
+          controls: (() => {
+            const c = document.querySelector('.view-toolbar .view-controls');
+            return { scroll: c.scrollWidth, client: c.clientWidth, height: c.clientHeight };
+          })(),
           scale: Number(stage.dataset.uiScale),
           height: rect.height,
         };
@@ -66,6 +70,12 @@ export async function checkResponsiveTimeline(page) {
       assert.equal(geometry.scale, phone ? 0.75 : 1);
       if (viewport.width <= 650)
         assert(geometry.width >= viewport.width - 1, 'Upright phones give the timeline full width');
+      // Upright phones wrap the timeline's controls onto more rows instead of scrolling them.
+      if (viewport.width <= 650)
+        assert(
+          geometry.controls.scroll <= geometry.controls.client + 1 && geometry.controls.height > 50,
+          'Upright phones wrap the timeline controls: ' + JSON.stringify(geometry.controls),
+        );
       if (viewport.height <= 500)
         assert(
           geometry.height >= viewport.height - 60,

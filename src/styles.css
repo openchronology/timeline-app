@@ -1250,7 +1250,7 @@ dialog h3 {
   .brand-mark {
     font-size: 27px;
   }
-  /* The timeline spans the screen, and its controls scroll in one row instead of wrapping. */
+  /* The timeline spans the screen, and its controls wrap onto as many rows as they need. */
   .timeline-card {
     margin: 0 -15px;
     border-left: 0;
@@ -1261,13 +1261,7 @@ dialog h3 {
     padding: 8px 10px;
   }
   .view-toolbar .view-controls {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
     max-width: 100%;
-  }
-  .view-toolbar .view-controls > * {
-    flex: none;
   }
   .timeline-stage {
     height: max(330px, 52svh);
@@ -2168,6 +2162,23 @@ dialog button {
 }
 .download-menu > div a:hover {
   background: #f0f3eb;
+}
+/* Wherever the wrapped header puts Download, its menu opens below the header, across it, so
+   it stays on the screen. (After the rules above, which it overrides.) */
+@media (max-width: 650px) {
+  .app-header {
+    position: relative;
+  }
+  .download-menu {
+    position: static;
+  }
+  .download-menu > div {
+    left: 15px;
+    right: 15px;
+    top: calc(100% - 4px);
+    min-width: 0;
+    max-width: none;
+  }
 }
 
 .calendar-picker-fields {
