@@ -29,6 +29,41 @@ test('slugs and usernames: their rules, and the names the site keeps', () => {
   assert(availableUsername('ada'));
   for (const name of ['login', 'timelines', 'users', 'settings', 'ab', 'Ada'])
     assert(!availableUsername(name), name);
+  // Names that would pass for the site or its staff (#184), as written or spelled around.
+  for (const name of [
+    'api',
+    'admin',
+    'root',
+    'moderator',
+    'staff',
+    'noreply',
+    'ad_min',
+    'time-lines',
+    'sign-in',
+    'admin1',
+    'admin-2',
+    'root_99',
+    'mod1',
+    'openchronology-support',
+    'openchronology2',
+    'open_chronology',
+  ])
+    assert(!availableUsername(name), name);
+  // Names that only contain one, or put a number before it, stay free.
+  for (const name of [
+    'ada',
+    'rootbeer',
+    'staffordshire',
+    'admiral',
+    'team-rocket',
+    '2admin',
+    'ada_2',
+  ])
+    assert(availableUsername(name), name);
+  // An existing account with an official-looking name keeps its addresses: only the site's
+  // pages change them.
+  assert.equal(profilePath('root'), '/root');
+  assert.deepEqual(timelineAddress('/root/voyages'), { owner: 'root', name: 'voyages', rest: '' });
   assert.equal(slugFromTitle('The Fall of Rome (476)'), 'the-fall-of-rome-476');
   assert.equal(slugFromTitle('  Écoles — d’été  '), 'ecoles-d-ete');
   assert.equal(slugFromTitle('東京'), '');

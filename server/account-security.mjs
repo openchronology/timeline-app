@@ -17,7 +17,7 @@ import {
   recoveryHash,
 } from './security-crypto.mjs';
 import { queueMail, flushMail } from './mail.mjs';
-import { RESERVED_NAMES } from '../dist/core.mjs';
+import { availableUsername } from '../dist/core.mjs';
 /**
  * The answer to every request that may send email (registration, a forgotten password, an
  * email address to confirm), whether or not a message is sent, so the answer does not reveal
@@ -143,8 +143,9 @@ export class AccountSecurity {
     const username = typeof body.username === 'string' ? body.username.toLowerCase() : '';
     if (!/^[a-z0-9][a-z0-9_-]{2,31}$/.test(username))
       throw new HttpError(400, 'Use a 3–32 character username.');
-    // Profiles are at /<username> (#148): not the site's own pages.
-    if (RESERVED_NAMES.has(username))
+    // Profiles are at /<username> (#148): not the site's own pages, nor a name that would pass
+    // for the site or its staff (#184).
+    if (!availableUsername(username))
       throw new HttpError(400, 'That username is taken. Choose another.');
     await this.refuseAgain(req);
     const email = emailAddress(body.email),
