@@ -39,6 +39,7 @@ try {
       process.env.UI_DESKTOP_APP ??
         `${process.env.CARGO_TARGET_DIR ?? 'src-tauri/target'}/debug/openchronology-desktop`,
     ),
+    { logs: () => 'tauri-driver:\n' + logs },
   );
   await d.wait(`!!document.getElementById('json-file')`, 60000);
   const document = {
@@ -157,6 +158,8 @@ try {
       await d
         .eval(
           `JSON.stringify({ toast: document.getElementById('toast').textContent, error: document.getElementById('map-error')?.textContent, open: [...document.querySelectorAll('dialog[open]')].map((x) => x.id), view: document.getElementById('markers').dataset.view, markers: document.querySelectorAll('#markers .event-marker').length, first: document.querySelector('#markers .event-marker')?.outerHTML.slice(0, 300), exact: [document.getElementById('exact-left').value, document.getElementById('exact-right').value], storage: document.documentElement.dataset.storage, size: [innerWidth, innerHeight], loading: !document.getElementById('loading-window').hidden, empty: !document.getElementById('empty-window').hidden, count: ${'[...document.querySelectorAll("#markers .event-marker")].reduce((n, m) => n + Number(m.dataset.count), 0)'} })`,
+          // Briefly: when the driver has stalled, the error below is what matters.
+          10000,
         )
         .catch((e) => e.message),
     );

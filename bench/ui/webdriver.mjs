@@ -15,24 +15,42 @@ const KEYS = {
 };
 const key = (name) => KEYS[name] ?? name;
 
-/** A WebDriver session on the app at `application`, through the driver at `url`. */
-export async function webdriverSession(url, application) {
-  const call = async (method, path, body) => {
-    const response = await fetch(url + path, {
-      method,
-      headers: body ? { 'Content-Type': 'application/json' } : {},
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    const reply = await response.json();
+/**
+ * A WebDriver session on the app at `application`, through the driver at `url`. A request the
+ * driver has not answered in `timeout` ms fails, naming it and ending with `logs()` (the
+ * driver's recent output) when given: a stalled driver then fails the run instead of hanging
+ * it (#205). Starting the app may take twice as long.
+ */
+export async function webdriverSession(url, application, { timeout = 60000, logs } = {}) {
+  const call = async (method, path, body, limit = timeout) => {
+    let response, reply;
+    try {
+      response = await fetch(url + path, {
+        method,
+        headers: body ? { 'Content-Type': 'application/json' } : {},
+        body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(limit),
+      });
+      reply = await response.json();
+    } catch (error) {
+      if (error.name !== 'TimeoutError') throw error;
+      throw new Error(
+        `WebDriver ${method} ${path}: no answer in ${limit / 1000} s` + (logs ? '\n' + logs() : ''),
+      );
+    }
     if (!response.ok || reply.value?.error)
       throw new Error(`WebDriver ${method} ${path}: ${reply.value?.message ?? response.status}`);
     return reply.value;
   };
-  const created = await call('POST', '/session', {
-    capabilities: { alwaysMatch: { 'tauri:options': { application } } },
-  });
+  const created = await call(
+    'POST',
+    '/session',
+    { capabilities: { alwaysMatch: { 'tauri:options': { application } } } },
+    2 * timeout,
+  );
   const session = `/session/${created.sessionId}`;
-  const run = (script, args = []) => call('POST', `${session}/execute/sync`, { script, args });
+  const run = (script, args = [], limit) =>
+    call('POST', `${session}/execute/sync`, { script, args }, limit);
   const actions = (list) => call('POST', `${session}/actions`, { actions: list });
   const pointer = (steps) =>
     actions([
@@ -72,8 +90,11 @@ export async function webdriverSession(url, application) {
   };
   const driver = {
     engine: 'webkit',
-    /** Evaluates an expression in the page; promises are awaited (W3C execute). */
-    eval: (expression) => run(`return (${expression});`),
+    /**
+     * Evaluates an expression in the page; promises are awaited (W3C execute). `limit`, in ms,
+     * replaces the session's request time limit.
+     */
+    eval: (expression, limit) => run(`return (${expression});`, [], limit),
     async click(selector, options = {}) {
       // As Playwright does, wait for the element to exist (moments in a new view load later).
       await driver.wait(`!!document.querySelector(${JSON.stringify(selector)})`, 15000);
@@ -184,7 +205,8 @@ export async function webdriverSession(url, application) {
       }
     },
     inject: (source) => run(source),
-    close: () => call('DELETE', session),
+    // Briefly, as runs end with it whether or not the driver has stalled.
+    close: () => call('DELETE', session, undefined, Math.min(timeout, 10000)),
   };
   return driver;
 }

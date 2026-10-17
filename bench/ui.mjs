@@ -880,7 +880,8 @@ async function suite(label, platform, throttle, size, opened) {
       if (env.UI_DEBUG)
         console.log(
           'state',
-          await d.eval(`JSON.stringify({
+          await d.eval(
+            `JSON.stringify({
             open: [...document.querySelectorAll('dialog[open]')].map((x) => x.id),
             groupDetails: !document.getElementById('group-details').hidden,
             eventForm: !document.getElementById('event-form').hidden,
@@ -896,7 +897,9 @@ async function suite(label, platform, throttle, size, opened) {
             title: document.getElementById('event-title').value,
             status: document.getElementById('save-status').textContent,
             count: document.getElementById('event-count').textContent,
-          })`),
+          })`,
+            10000,
+          ),
         );
       await closeDialogs(d).catch(() => {});
     }
@@ -934,14 +937,14 @@ async function startDesktop() {
     if (i > 100) throw new Error('tauri-driver did not start:\n' + logs);
     await delay(100);
   }
-  return { url, app, close: () => driver.kill() };
+  return { url, app, logs: () => 'tauri-driver:\n' + logs, close: () => driver.kill() };
 }
 /**
  * A fresh app per timeline. Timelines over 2,048 moments move into the native SQLite store
  * after opening, as for desktop users; smaller ones stay in memory.
  */
 async function desktopPage(desktop, size, document) {
-  const d = await webdriverSession(desktop.url, desktop.app);
+  const d = await webdriverSession(desktop.url, desktop.app, { logs: desktop.logs });
   await d.wait(`!!document.getElementById('json-file')`, 60000);
   await d.inject(PROBE);
   const t = targets(document);
