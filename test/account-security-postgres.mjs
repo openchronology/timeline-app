@@ -144,6 +144,8 @@ try {
   await owner.request('auth/device/approve', { userCode: device.userCode });
   const recovery = client();
   await recovery.request('session');
+  // An address kept with capitals (as the bootstrap administrator's may be) resets too (#177).
+  await pool.query('UPDATE oc_users SET email=$2 WHERE id=$1', [uid, email.toUpperCase()]);
   await recovery.request('auth/password/forgot', { email });
   const reset = await link('reset'),
     newPassword = 'another unique testing passphrase';
@@ -154,6 +156,7 @@ try {
   });
   assert.equal((await owner.request('session')).user, null);
   await pendingDevice.request('auth/device/poll', { deviceCode: device.deviceCode }, 400);
+  await pool.query('UPDATE oc_users SET email=$2 WHERE id=$1', [uid, email]);
   assert.equal(
     (await pool.query('SELECT mfa_enabled FROM oc_users WHERE id=$1', [uid])).rows[0].mfa_enabled,
     true,

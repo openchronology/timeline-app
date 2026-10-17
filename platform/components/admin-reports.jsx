@@ -45,7 +45,9 @@ const when = (time) => new Date(time).toISOString().slice(0, 16).replace('T', ' 
  */
 export function ReportCase({ item, busy, decide }) {
   // The owner asked for a review of the decision, and no administrator has answered it yet.
-  const appealing = item.status === 'restricted' && item.appealed_at && !item.appeal_decided_at;
+  // A review asked of a decision in force: restricted, or labelled (server/moderation.mjs).
+  const appealing =
+    ['restricted', 'labelled'].includes(item.status) && item.appealed_at && !item.appeal_decided_at;
   // The reason and labels are uncontrolled fields, read from the page when a button is pressed.
   const reason = () => document.getElementById('reason-' + item.id)?.value ?? '';
   return (

@@ -133,6 +133,32 @@ test('Turnstile answers are verified with Cloudflare for the right action and ho
   await refused(challenges.require(answer, 'contribution', { kind: 'api' }));
 });
 
+test('where Turnstile is asked for, proof of work issued to another session does not stand in', async () => {
+  const challenges = new Challenges({
+    provider: 'turnstile',
+    turnstile: { siteKey: 'site', secretKey: 'secret' },
+    origin: 'https://timescale.info',
+    pool: spentAnswers(),
+    difficulty: 2000,
+    key: Buffer.alloc(32),
+    fetcher: async () => ({ ok: true, json: async () => ({ success: false }) }),
+  });
+  // A desktop session is given proof of work, and solves it…
+  const issued = await refused(
+    challenges.require({ headers: {} }, 'register', { kind: 'desktop' }),
+  );
+  assert.equal(issued.provider, 'pow');
+  const work = header({ provider: 'pow', ...issued, number: solve(issued) });
+  // …which a browser without a session, asked for Turnstile, cannot use instead (#177).
+  assert.equal((await refused(challenges.require(work, 'register'))).provider, 'turnstile');
+  assert.equal(
+    (await refused(challenges.require(work, 'register', { kind: 'web' }))).provider,
+    'turnstile',
+  );
+  // The desktop session itself still can.
+  await challenges.require(work, 'register', { kind: 'desktop' });
+});
+
 test('challenges can be turned off, and settings are validated', async () => {
   const off = new Challenges({ provider: 'off' });
   await off.require({ headers: {} }, 'register');

@@ -796,26 +796,30 @@ async function* comparePages(client, from, to) {
  * also reads, and that level in `to`. Every branch reads one timeline's versions or
  * overrides by the indexes that lead with (timeline_id, since) or (timeline_id, until)
  * (the primary key for the levels above, which also orders by key). Each branch is cut to
- * PAGE rows after the cursor in key order, then the union is made distinct and cut to PAGE.
+ * PAGE distinct keys after the cursor in key order, then the union is made distinct and cut to
+ * PAGE.
  */
 async function candidates(client, kind, from, to, cursor) {
   const i = from.findIndex(([id]) => to.some(([other]) => other === id));
   const j = i < 0 ? -1 : to.findIndex(([id]) => id === from[i][0]);
   const above = i < 0 ? [...from, ...to] : [...from.slice(0, i), ...to.slice(0, j)];
   const branches = above.flatMap(([id, n]) => [
-    `SELECT ${kind.key} FROM ${kind.table} WHERE timeline_id='${id}' AND since<=${n}`,
-    `SELECT ${kind.key} FROM ${kind.overrides} WHERE timeline_id='${id}' AND since<=${n}`,
+    `SELECT DISTINCT ${kind.key} FROM ${kind.table} WHERE timeline_id='${id}' AND since<=${n}`,
+    `SELECT DISTINCT ${kind.key} FROM ${kind.overrides} WHERE timeline_id='${id}' AND since<=${n}`,
   ]);
   if (i >= 0 && from[i][1] !== to[j][1]) {
     const [lo, hi] = [BigInt(from[i][1]), BigInt(to[j][1])].sort((x, y) => (x < y ? -1 : 1));
     const between = (column) => `(${column}>${lo} AND ${column}<=${hi})`;
     branches.push(
-      `SELECT ${kind.key} FROM ${kind.table} WHERE timeline_id='${from[i][0]}'
+      `SELECT DISTINCT ${kind.key} FROM ${kind.table} WHERE timeline_id='${from[i][0]}'
       AND (${between('since')} OR ${between('until')})`,
-      `SELECT ${kind.key} FROM ${kind.overrides} WHERE timeline_id='${from[i][0]}' AND ${between('since')}`,
+      `SELECT DISTINCT ${kind.key} FROM ${kind.overrides} WHERE timeline_id='${from[i][0]}' AND ${between('since')}`,
     );
   }
   if (!branches.length) return [];
+  // Each part is distinct before it is cut to a page: history rows repeat a key (one version
+  // after another), and a part cut short of a page's distinct keys would end the scan early
+  // or have the cursor pass keys it never returned.
   const after = cursor ? `AND (${kind.key})>(${kind.key.map((_, c) => `$${c + 1}`)})` : '';
   const { rows } = await client.query(
     `SELECT DISTINCT ${kind.key} FROM (${branches

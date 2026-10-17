@@ -147,10 +147,12 @@ export class Challenges {
     } catch {
       throw this.refuse(purpose, session);
     }
+    // An answer counts only in the kind this request is asked for: where Turnstile is, a
+    // proof of work issued to another kind of session (desktop, API) must not stand in.
     const accepted =
       answer?.provider === 'turnstile' && this.kind(session) === 'turnstile'
         ? await this.verifyTurnstile(answer, purpose, req.clientAddress)
-        : answer?.provider === 'pow'
+        : answer?.provider === 'pow' && this.kind(session) === 'pow'
           ? await this.verifyWork(answer, purpose)
           : false;
     if (!accepted)

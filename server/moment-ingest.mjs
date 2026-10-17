@@ -79,7 +79,9 @@ export class MomentIngest {
         queue.moments.shift();
         this.stats.dropped++;
       }
-      this.schedule(timeline, queue.moments.length >= 500 ? 0 : this.flushMs);
+      // A full batch goes at once, unless the timeline is failing: then its backoff timer
+      // stands, rather than every new message retrying a struggling server.
+      this.schedule(timeline, queue.moments.length >= 500 && !queue.failures ? 0 : this.flushMs);
     }
     return targets;
   }
