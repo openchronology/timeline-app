@@ -112,6 +112,12 @@ try {
     ),
   );
   assert.match(ubuntu, /docker compose up --build --wait/);
+  // Editions (#197) link to their page; this release has no file for them yet.
+  assert.match(
+    windows,
+    /data-edition="cfam".{0,600}href="https:\/\/openchronology\.github\.io\/cfam\/"/s,
+  );
+  assert.doesNotMatch(windows, /openchronology-offline-cfam\.html/);
   const phone = await download('Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X)');
   assert.match(phone, /Use OpenChronology in your browser/);
   assert.match(html, /id="dashboard-browser"/);

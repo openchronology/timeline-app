@@ -59,7 +59,15 @@ Each opening starts with one empty timeline. Add and edit moments, pan and zoom,
 
 The offline bundle excludes the HTTP transport and does not initialize accounts, server sharing, IndexedDB, or SQLite. Its content policy permits only the embedded script and local styles/icon, and blocks network connections and external resources. Metadata containing URLs remains plain text. Calendar conversion uses local code. Use the Tauri edition for SQLite timeline files.
 
-`npm run test:offline:browser` copies only the generated HTML into an empty temporary directory, opens it through `file://` with networking disabled, tests exact editing and JSON exchange, and checks for attempted network calls and external resource requests. GitHub CI runs this test in Chromium, Firefox, and WebKit.
+`npm run test:offline:browser` copies only the generated HTML into an empty temporary directory, opens it through `file://` with networking disabled, tests exact editing and JSON exchange and the CFAM edition's defaults, and checks for attempted network calls and external resource requests. GitHub CI runs this test in Chromium, Firefox, and WebKit.
+
+### Editions
+
+The build also makes an offline file for each edition in `src/editions.ts`, as `dist/openchronology-offline-<edition>.html`. An edition is the same editor with different defaults for its new timelines; files you open or import keep their own settings. Pages publishes each at `https://openchronology.github.io/<edition>/`, releases attach each file, and the website's download page lists them all.
+
+- **CFAM** (<https://openchronology.github.io/cfam/>), for causal factor analysis: new timelines have the [Causal factor analysis suite](docs/plugins.md#plugin-suites) (Moment stacks, Moment shapes and Moment colors) installed and enabled, show [Gregorian dates](docs/time-presentation.md) in the computer's UTC offset, and open on the fortnight around today instead of around 0. The chip beside the brand reads **Offline · CFAM**.
+
+To add an edition, add an entry to `EDITIONS` with its ID (its file name and address), name, description, suites and time display.
 
 ## PostgreSQL deployment
 

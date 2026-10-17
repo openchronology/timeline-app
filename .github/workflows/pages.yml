@@ -1,6 +1,7 @@
 name: Offline editor on openchronology.github.io
 # Each push to main: builds the standalone offline editor, checks it works without a network,
-# and publishes it as openchronology.github.io's index page.
+# and publishes it as openchronology.github.io's index page, and each edition (#197) at
+# openchronology.github.io/<edition>/, such as /cfam/.
 on:
   push:
     branches: [main]
@@ -44,13 +45,21 @@ jobs:
           SOURCE_SHA: ${{ github.sha }}
         run: |
           cp dist/openchronology-offline.html site/index.html
+          published=index.html
+          for file in dist/openchronology-offline-*.html; do
+            edition=${file#dist/openchronology-offline-}
+            edition=${edition%.html}
+            mkdir -p "site/$edition"
+            cp "$file" "site/$edition/index.html"
+            published="$published $edition/index.html"
+          done
           cd site
-          if git diff --quiet -- index.html; then
-            echo "The published offline editor is already current."
+          git add $published
+          if git diff --cached --quiet; then
+            echo "The published offline editors are already current."
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add index.html
           git commit -m "Publish offline editor from openchronology/timeline-app@${SOURCE_SHA}"
           git push origin HEAD:master

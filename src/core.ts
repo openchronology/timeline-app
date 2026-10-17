@@ -77,6 +77,7 @@ import { validateInstalledPlugins, imageURL } from './plugins.js';
 import type { InstalledPlugin } from './plugins.js';
 export * from './plugins.js';
 export * from './suites.js';
+export * from './editions.js';
 export * from './capacity.js';
 export * from './content-labels.js';
 export * from './drafts.js';

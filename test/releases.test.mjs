@@ -8,6 +8,7 @@ import {
   SERVERS,
   OFFLINE,
   assetLink,
+  editionFile,
   assetSize,
   detectDistribution,
   detectPlatform,
@@ -26,6 +27,12 @@ test('the download page offers every file the release workflow attaches', () => 
   );
   assert.deepEqual(SERVERS.map((s) => s.key).sort(), Object.keys(serverTargets).sort());
   for (const server of SERVERS) assert.equal(server.asset, serverPackage(server.key));
+  // Each edition's file, as scripts/offline.mjs names it and Pages publishes it (#197).
+  assert.deepEqual(editionFile({ id: 'cfam', name: 'CFAM' }), {
+    asset: 'openchronology-offline-cfam.html',
+    page: 'https://openchronology.github.io/cfam/',
+    detail: 'CFAM offline file (.html)',
+  });
 });
 
 test('the visitor’s system comes from their browser', () => {

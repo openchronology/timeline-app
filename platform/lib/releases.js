@@ -55,6 +55,20 @@ export const DESKTOP = [
 ];
 /** The editor in one HTML file, for any browser and without a network. */
 export const OFFLINE = { asset: 'openchronology-offline.html' };
+/** Where each offline edition is published: openchronology.github.io/<edition>/. */
+export const EDITION_SITE = 'https://openchronology.github.io';
+/**
+ * An offline edition's file (src/editions.ts, #197), as scripts/offline.mjs names it, and its
+ * page on the organization's site, which is the same file.
+ * @param {{id: string, name: string}} edition
+ */
+export function editionFile(edition) {
+  return {
+    asset: `openchronology-offline-${edition.id}.html`,
+    page: `${EDITION_SITE}/${edition.id}/`,
+    detail: `${edition.name} offline file (.html)`,
+  };
+}
 /**
  * Server packages: each system's .deb, .rpm or FreeBSD .pkg, installed with apt, dnf or pkg
  * (which also install PostgreSQL). More platforms join this list as they are supported.
