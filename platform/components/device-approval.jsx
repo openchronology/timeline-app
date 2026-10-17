@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// Approving the desktop app's sign-in code with the signed-in account.
 import { useState } from 'react';
 import { api } from '../lib/api.js';
 export default function DeviceApproval({ code }) {

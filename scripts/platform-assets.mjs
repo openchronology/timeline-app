@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Copies the editor's built assets and notices from dist/ into platform/public/ for the
+// Next.js platform, adding the Next.js and React licenses to its THIRD_PARTY.txt.
 import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';

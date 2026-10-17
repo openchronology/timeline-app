@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+//! Converts SQLite timeline files for the server (server/files.mjs): `och-convert read FILE`
+//! prints a file's document as JSON, and `och-convert write FILE` saves one from standard input.
+//! Each conversion runs in its own process, under memory and CPU limits on Linux.
 use openchronology_store::Document;
 use std::{
     io::{self, Read},

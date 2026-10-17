@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Signing in: password hashing (scrypt), registration and sign-in with rate limits, issuing
+// and reading session tokens, and the account age rules (#115). Account security, API keys
+// and email build on it (account-security.mjs, api-keys.mjs, mail.mjs).
 import {
   randomBytes,
   randomUUID,

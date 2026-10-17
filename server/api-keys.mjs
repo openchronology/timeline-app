@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// API keys (docs/authentication.md): creating, listing and revoking an account's scoped keys,
+// the sessions requests made with one get, and which routes each scope may use.
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { HttpError } from './store.mjs';
 const hash = (token) => createHash('sha256').update(token).digest('hex');

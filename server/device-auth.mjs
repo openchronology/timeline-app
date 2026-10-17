@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Desktop sign-in by device code: the app starts a request and polls with its device code
+// while the person approves the short user code in a browser where they are signed in.
 import { randomBytes } from 'node:crypto';
 import { tokenHash } from './auth.mjs';
 import { HttpError } from './store.mjs';

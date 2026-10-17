@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Account security: TOTP codes, encrypted MFA and mail data, registration rules, breached
+// password lookups, sending email through Resend and an outbox, and MFA challenges.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';

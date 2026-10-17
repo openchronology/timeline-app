@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Comparing timelines: exact transforms between sources, coincident IDs paged once, server
+// comparison windows and caches, and the union of their plugins.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

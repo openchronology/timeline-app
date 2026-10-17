@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// The editor on a platform page: frames /editor/frame and adds the platform's actions to it,
+// such as stars, forks, sharing and reports.
 import { useRef, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';

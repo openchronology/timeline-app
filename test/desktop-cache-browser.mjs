@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The editor as the desktop app runs it, with the native SQLite store stood in for: views, windows
+// read ahead, native search and tag views, sparse duration saves, and advice when slow.
 import assert from 'node:assert/strict';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
 import { readFile } from 'node:fs/promises';

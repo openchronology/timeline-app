@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Signing in with Google, GitHub or Facebook (OAuth authorization code with PKCE): starting a
+// flow, checking the provider's callback, and linking provider identities to accounts.
 import {
   randomBytes,
   randomUUID,

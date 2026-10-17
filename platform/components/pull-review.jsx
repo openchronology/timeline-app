@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// Reviewing a pull request: its changes and discussion, and merging, closing or rebasing it.
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';

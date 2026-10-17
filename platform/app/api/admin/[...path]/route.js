@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// /api/admin/…: administrators' accounts, timelines, settings and report queue, answered by
+// the platform's HTTP service (server/http.mjs) through server/next-handler.mjs.
 import { dispatchNextRequest } from '../../../../../server/next-handler.mjs';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

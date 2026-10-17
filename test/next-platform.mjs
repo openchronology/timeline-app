@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The Next.js platform in production without a database (npm run test:platform): dashboard,
+// routing, CSP, editor isolation, sessions; in a browser too with PLATFORM_BROWSER_TEST=1.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';

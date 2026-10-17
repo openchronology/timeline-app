@@ -1,0 +1,33 @@
+# platform/app
+
+Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+
+The Next.js App Router application: each folder is a part of the site's address, and a `page.jsx` (a page) or `route.js` (any other response) in it serves that address; a folder in brackets, like `[id]`, matches any value there. Pages render on the server, take their components from [`../components`](../components/README.md) and their helpers from [`../lib`](../lib/README.md), and reach storage through [`server/`](../../server/README.md). A timeline's pages are under `timelines/[id]/`, and `proxy.js` serves them at `/<owner>/<slug>/…` too. These README files are not routes.
+
+## Contents
+
+| File                                | What it is for                                                                                                                                  |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`[owner]/`]([owner]/README.md)     | A profile at `/<username>`.                                                                                                                     |
+| [`account/`](account/README.md)     | The account page at `/account`.                                                                                                                 |
+| [`admin/`](admin/README.md)         | Site administration at `/admin`.                                                                                                                |
+| [`api/`](api/README.md)             | The HTTP API at `/api/…`.                                                                                                                       |
+| [`compare/`](compare/README.md)     | Comparing timelines at `/compare`.                                                                                                              |
+| [`connect/`](connect/README.md)     | Connecting the desktop app to an account.                                                                                                       |
+| [`docs/`](docs/README.md)           | The site's reference documentation, at `/docs/…`.                                                                                               |
+| [`download/`](download/README.md)   | The download page at `/download`.                                                                                                               |
+| [`editor/`](editor/README.md)       | The editor at `/editor`, and the page it frames.                                                                                                |
+| [`embed/`](embed/README.md)         | Public timelines for other sites to frame, at `/embed/<id>`.                                                                                    |
+| [`healthz/`](healthz/README.md)     | The health check at `/healthz`.                                                                                                                 |
+| [`help/`](help/README.md)           | The help at `/help` and its pages.                                                                                                              |
+| [`legal/`](legal/README.md)         | The terms, privacy notice and licenses at `/legal`.                                                                                             |
+| [`login/`](login/README.md)         | Signing in at `/login`.                                                                                                                         |
+| [`plugins/`](plugins/README.md)     | The plugin library at `/plugins`.                                                                                                               |
+| [`timelines/`](timelines/README.md) | A timeline's pages, at `/timelines/<id>/…` or `/<owner>/<slug>/…`.                                                                              |
+| [`users/`](users/README.md)         | Profiles at `/users/<username>`, for names the site's own pages use.                                                                            |
+| [`error.jsx`](error.jsx)            | What a page shows when it fails to load, with a button to try again.                                                                            |
+| [`layout.jsx`](layout.jsx)          | Every page's frame: the header and navigation, the footer with the build, analytics when enabled, and the site's default link-preview metadata. |
+| [`page.jsx`](page.jsx)              | The dashboard at `/`: the signed-in account's timelines, favorites and browser drafts, and public timelines to search and browse.               |
+| [`platform.css`](platform.css)      | The platform pages' styles, sharing the editor's type, color and control tokens so both read as one product.                                    |
+| [`robots.js`](robots.js)            | Serves `/robots.txt`: crawlers may read public pages and oEmbed, but not accounts, the API, embeds or the bare editor.                          |
+| [`sitemap.js`](sitemap.js)          | Serves `/sitemap.xml`: the site's pages, the help, public timelines and the profiles that own them.                                             |

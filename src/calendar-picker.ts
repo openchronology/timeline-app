@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The date and time fields beside a time input on Gregorian timelines, with exact arithmetic
+// and the timeline's zone offset.
 import { Q, parseTimestamp, printTimestamp } from './core.js';
 import { dayNumber, dateParts } from './calendar.js';
 import { parseNumber } from './numeric.js';

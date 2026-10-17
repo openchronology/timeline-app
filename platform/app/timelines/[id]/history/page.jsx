@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// A timeline's saved history at …/history: its checkpoints (each save, sync and merge), a
+// page at a time.
 import Link from 'next/link';
 import { accessibleTimeline } from '../../../../lib/timeline.js';
 import { timelinePath } from '../../../../../src/addresses.ts';

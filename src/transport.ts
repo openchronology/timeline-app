@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Requests to a server's API: by fetch in a browser, or through the desktop app's connections
+// (Tauri), answering challenges, and SQLite import and export with progress.
 import { boundedJSON } from './browser-copy.js';
 import { withChallenges } from './challenge.js';
 let credentials: RequestCredentials = 'same-origin';

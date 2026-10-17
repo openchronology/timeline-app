@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// Signing in and the account page: registration, sign-in by password or provider, two-factor
+// and email checks, password and email changes, active sessions and recovery codes.
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';

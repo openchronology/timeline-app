@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// What a time presentation knows of the view it writes for: the visible window, its width in
+// pixels and what the text is for, validated, and the time one pixel covers.
 import { Rational as Q } from 'rational-ordered-map';
 
 /** Ephemeral display information, in the timeline's stored coordinate units. */

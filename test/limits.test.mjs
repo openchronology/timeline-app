@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Limits from the environment (server/limits.mjs): comparison sources per kind of account,
+// storage sizes, the default quota and the entry limit.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

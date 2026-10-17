@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// SQLite .och file exchange: converts timelines to and from OpenChronology's SQLite file
+// format by running the native och-convert binary (native-store/), at most two at a time.
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdtemp, writeFile, readFile, rm, stat } from 'node:fs/promises';

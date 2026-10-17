@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The desktop targets (Tauri bundle and release asset names), and staging a built package in
+// desktop-artifacts/ with its build identity and, for macOS and Windows, which link GMP and
+// SQLite statically, an archive of those libraries' sources.
 import { mkdir, cp, readFile, writeFile, readdir, mkdtemp, rm } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';

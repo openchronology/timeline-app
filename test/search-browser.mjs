@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Search in the editor, in a dialog that moves the view only to a chosen result.
 import assert from 'node:assert/strict';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
 /** Search runs in a dialog without moving the view; choosing a result moves to it. */

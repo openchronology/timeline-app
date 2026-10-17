@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// The share dialog: a link to the timeline, moment or duration, social sites' share pages,
+// and code to embed a public timeline.
 import { useEffect, useRef, useState } from 'react';
 import { dismissOnBackdrop } from '../../src/dialogs.ts';
 /** Social sites' own share pages: a link to each, without their scripts. */

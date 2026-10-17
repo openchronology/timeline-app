@@ -1,4 +1,6 @@
 name: Offline editor on openchronology.github.io
+# Each push to main: builds the standalone offline editor, checks it works without a network,
+# and publishes it as openchronology.github.io's index page.
 on:
   push:
     branches: [main]

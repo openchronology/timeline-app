@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Installs or updates the public example timelines (npm run seed; docs/seeding.md), owned by a
+// reserved "seed" account that cannot sign in, with SEED_MANAGER's account as a writer.
 import pg from 'pg';
 import { EXPAND_ON_HOVER } from '../dist/core.mjs';
 import { isDeepStrictEqual } from 'node:util';

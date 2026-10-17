@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The core model: exact JSON round trips, viewport and camera precision under gestures,
+// coincident buckets, summaries, and calendar conversion.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// npm run dev: rebuilds the editor as its sources change (and the page when its template or
+// legal texts do) and runs the Next.js platform in development mode.
 import { context } from 'esbuild';
 import { mkdir } from 'node:fs/promises';
 import { watch } from 'node:fs';

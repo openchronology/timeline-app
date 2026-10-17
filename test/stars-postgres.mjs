@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Stars and favorites against PostgreSQL: sign-in and CSRF, concurrent starring, exact counts,
+// private favorites, sorting, pages, and cleanup on delete.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';

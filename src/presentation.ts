@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Time presentation (docs/time-presentation.md): how a timeline's exact stored times are written
+// and read (as rationals, decimals, scientific or SI numbers, Gregorian dates or a custom
+// script), with its unit, scale and origin, and the ruler each draws.
 import { Rational as Q } from 'rational-ordered-map';
 import { compileCustom, CUSTOM_EXAMPLE } from './custom-time.js';
 import {

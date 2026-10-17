@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Human-verification challenges (server/challenge.mjs): signed, single-use proof of work,
+// Turnstile verification with Cloudflare, and their settings.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';

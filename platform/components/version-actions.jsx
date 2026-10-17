@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// Copying a timeline: forking or duplicating it on the server, or forking it in the browser.
 import { useState } from 'react';
 import { api } from '../lib/api.js';
 export default function VersionActions({ timeline, signedIn, onGuestFork }) {

@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The plugin compiler’s sandbox (#157): scripts compile in a worker, and ones that exhaust its
+// time or memory are refused without harming the server.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPluginCompiler } from '../server/plugin-sandbox.mjs';

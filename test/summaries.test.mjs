@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Summaries in the browser index: moments and collapsed durations against a brute-force
+// reference, cached coarsening, and sparse edits.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Q, TimelineIndex, Viewport, validateDocument, coalesceGroups } from '../dist/core.mjs';

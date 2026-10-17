@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Expanding summaries: icons without server assets, fan graduation inside the viewport, and the
+// radial expansion plugin.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { radialPositions } from '../dist/summary-expansion.mjs';

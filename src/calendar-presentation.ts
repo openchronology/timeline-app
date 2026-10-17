@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Gregorian time presentation: stored seconds written and read as calendar dates in a fixed
+// zone offset, exact in inputs and tooltips, and on the chart only as precise as the view shows.
 import { Rational as Q } from 'rational-ordered-map';
 import { parseTimestamp, printTimestamp } from './calendar.js';
 import {

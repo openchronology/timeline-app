@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// One pull request at …/pulls/<id>: its changes and discussion, to review, merge or close
+// (components/pull-review.jsx).
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { accessibleTimeline } from '../../../../../lib/timeline.js';

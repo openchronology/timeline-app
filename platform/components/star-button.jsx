@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// A timeline's star button and count: starring or unstarring it when signed in.
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../lib/api.js';

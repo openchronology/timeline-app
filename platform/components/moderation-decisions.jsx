@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// The account's moderation decisions (#115): what was restricted or labeled and why, and
+// asking for a review.
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { REPORT_TEXT } from '../../server/report-categories.mjs';

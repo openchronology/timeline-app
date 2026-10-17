@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The zoom buttons: animated zooms that land exactly, repeated clicks adding up.
 import assert from 'node:assert/strict';
 import { Q, Viewport } from '../dist/core.mjs';
 

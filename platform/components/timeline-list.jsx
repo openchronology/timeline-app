@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// A page of timelines as cards, with their owners, tags, labels and stars, compare
+// checkboxes and links to more pages.
 import Link from 'next/link';
 import StarButton from './star-button.jsx';
 import { describeLabels } from '../../src/content-labels.ts';

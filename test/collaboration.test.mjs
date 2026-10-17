@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Collaboration on the server: plugin data across snapshots, rebases and structured merges,
+// public browsing and search, access, and proposals with their comments.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';

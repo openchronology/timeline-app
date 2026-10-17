@@ -1,4 +1,7 @@
 name: Tagged release
+# A version tag or published release: builds the desktop and server packages, the offline HTML
+# and matching source, checks every asset (scripts/release-assets.mjs) and attaches them, then
+# publishes the Homebrew formula for a stable release.
 on:
   push:
     tags: ['v*']

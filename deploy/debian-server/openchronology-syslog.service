@@ -1,3 +1,5 @@
+# The syslog receiver (docs/syslog.md) as a systemd service, configured in
+# /etc/openchronology/syslog.env (Debian and RPM packages).
 [Unit]
 Description=OpenChronology syslog receiver
 Documentation=file:///usr/share/doc/openchronology-server/README.Debian

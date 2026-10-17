@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Account security against PostgreSQL: verified registration, browser binding, encrypted MFA
+// and recovery codes, replay and attempt limits, and password resets ending sessions.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';

@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The time axis's ruler: ticks and labels at exact positions, by decimal, Gregorian or custom
+// steps, crossfading between levels as the view zooms.
 import { Rational as Q } from 'rational-ordered-map';
 import { dayNumber, dateParts } from './calendar.js';
 import { decimalExponent, parseNumber } from './numeric.js';

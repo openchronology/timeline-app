@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Plugin suites (#78): the official suites, validation, adding one without changing installed
+// plugins, and searching suite libraries.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

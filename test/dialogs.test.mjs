@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Dialogs that animate closed (src/dialogs.ts): backdrop clicks, Escape and forms, results kept,
+// reduced motion, and focus restored before more input.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { dismissOnBackdrop } from '../dist/dialogs.mjs';

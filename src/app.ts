@@ -1,5 +1,8 @@
-import { calendarPicker } from './calendar-picker.js';
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The editor: the page's controls, dialogs and timeline canvas for every edition (the browser
+// editor, the offline HTML file, the desktop app through Tauri and the website's editor), and
+// opening, drawing, editing, saving and sharing timelines on top of core.ts.
+import { calendarPicker } from './calendar-picker.js';
 import { followLatest } from './follow-latest.js';
 import { createSummaryExpansion } from './summary-expansion.js';
 import { pluginExpand } from './plugins.js';

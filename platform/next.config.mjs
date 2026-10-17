@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The platform's Next.js configuration: a standalone server build, with the files it reads as
+// it runs (dist/, docs/, the legal texts) traced into it.
 import { resolve } from 'node:path';
 export default {
   output: 'standalone',

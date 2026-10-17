@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The PostgreSQL store (PostgresStore): timelines' access checks, saves, indexes, revisions and
+// queries, forks that read through to their source's index, and the repairs migrate.mjs runs
+// (docs/architecture.md).
 import { compareLimit } from './limits.mjs';
 import {
   Q,

@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Capacity advice (src/capacity.ts): when the desktop app or the platform is suggested, from
+// measured speed and size, and the warning near the entry limit.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { advise, record, nearLimit, THRESHOLDS, LIMIT, SAMPLES } from '../dist/core.mjs';

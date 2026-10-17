@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Live updates in the client: browser push refreshes only changed revisions and pauses hidden
+// views; native apps poll metadata instead.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { liveUpdates } from '../dist/live-updates.mjs';

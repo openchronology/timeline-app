@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Site administration at /admin, for administrators only (components/admin.jsx); anyone
+// signed out is sent to sign in first.
 import { redirect } from 'next/navigation';
 import { currentSession } from '../../lib/session.js';
 import Admin from '../../components/admin.jsx';

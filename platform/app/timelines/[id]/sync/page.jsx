@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Syncing a fork with its upstream at …/sync (components/fork-operation.jsx).
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { accessibleTimeline, versionInfo } from '../../../../lib/timeline.js';

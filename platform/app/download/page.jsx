@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The download page at /download (#111): the desktop app for the visitor's system first,
+// then the offline file and the server, from the latest release (lib/releases.js).
 import { headers } from 'next/headers';
 import CopyCommand from '../../components/copy-command.jsx';
 import {

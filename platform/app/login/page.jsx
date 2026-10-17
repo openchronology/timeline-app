@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Signing in at /login, then returning to ?returnTo= when it is one of the site's own pages
+// (lib/navigation.js).
 import Account from '../../components/account.jsx';
 import { safeReturnTo } from '../../lib/navigation.js';
 export const dynamic = 'force-dynamic';

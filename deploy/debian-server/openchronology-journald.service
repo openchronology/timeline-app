@@ -1,3 +1,5 @@
+# The journald follower (docs/journald.md) as a systemd service, configured in
+# /etc/openchronology/journald.env (Debian and RPM packages).
 [Unit]
 Description=OpenChronology journald follower
 Documentation=file:///usr/share/doc/openchronology-server/README.Debian

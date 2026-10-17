@@ -58,8 +58,9 @@ COPY --from=app /app/package.json /out/lib/openchronology/
 COPY --from=app /app/server /out/lib/openchronology/server
 COPY --from=app /app/legal /out/lib/openchronology/legal
 COPY deploy/debian-server/openchronology-server.mjs /out/lib/openchronology/openchronology-server.mjs
-COPY LICENSE NOTICE THIRD_PARTY.md README.md /out/doc/
+# The docs first, so the project's README, not docs/README.md, is the one installed.
 COPY docs /out/doc/
+COPY LICENSE NOTICE THIRD_PARTY.md README.md /out/doc/
 # och-convert's sources and crates, with cargo set to build from them offline.
 COPY native-store /out/native/native-store
 COPY vendor/sqlite-rational /out/native/vendor/sqlite-rational
@@ -69,7 +70,7 @@ COPY deploy/homebrew/cargo-config.toml /out/native/.cargo/config.toml
 COPY deploy/homebrew /out/homebrew
 COPY deploy/debian-server/openchronology.env deploy/debian-server/syslog.env /out/homebrew/
 RUN rm -rf /out/lib/openchronology/node_modules/@img /out/homebrew/cargo-config.toml \
-    /out/homebrew/*.rb.in /out/homebrew/tap-README.md \
+    /out/homebrew/*.rb.in /out/homebrew/tap-README.md /out/homebrew/README.md \
     && tar -C /out -czf /openchronology-server-platform.tar.gz lib doc native homebrew
 
 FROM scratch AS export

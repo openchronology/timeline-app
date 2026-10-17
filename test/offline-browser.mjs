@@ -1,10 +1,12 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The offline HTML file opened from file:// in Playwright (npm run test:offline:browser): the
+// shared browser checks, exact editing and JSON, and no network requests at all.
 import { checkIssues } from './issues-browser.mjs';
 import { checkSearch } from './search-browser.mjs';
 import { checkSummaries } from './summaries-browser.mjs';
 import { checkCapacity } from './capacity-browser.mjs';
 import { checkTags } from './tags-browser.mjs';
 import { checkRelationships } from './relationships-browser.mjs';
-// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
 import { closeMomentDetails, checkMomentDialog } from './moment-dialog-browser.mjs';
 import { checkZoomHelp } from './zoom-help-browser.mjs';

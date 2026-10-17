@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Dialogs that animate out (dialog-motion.css) while keeping the modal's focus trap until the
+// animation ends, and that close on a click on their backdrop.
 /** Keep the native modal/focus trap alive until its exit animation finishes. */
 export function animateDialog(dialog: HTMLDialogElement) {
   const close = dialog.close;

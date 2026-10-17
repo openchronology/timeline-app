@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The plugin library at /plugins: searching and browsing plugins and plugin suites
+// (server/plugins.mjs).
 import Link from 'next/link';
 import Form from 'next/form';
 import { platformServices } from '../../../server/platform.mjs';

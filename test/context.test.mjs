@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Labels in context: Gregorian and numeric labels at every zoom, eras and geological ages, fixed
+// offsets, and custom printers and parsers.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

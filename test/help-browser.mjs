@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Help in the editor (#172): the "?" tips and the guided tour.
 import assert from 'node:assert/strict';
 /**
  * Help in the editor (#172): the "?" buttons show their tips on hover or focus, inside the

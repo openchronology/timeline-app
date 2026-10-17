@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// A view kept across reloads (#128, src/view-state.ts): read back whole, malformed parts dropped,
+// kept per server and timeline.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readViewState, viewStorageKey, VIEW_PREFIX } from '../dist/view-state.mjs';

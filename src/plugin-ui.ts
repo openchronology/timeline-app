@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// How plugins show in the editor: a moment's marker image, shape and heading, and the
+// inspector's inputs for each kind of plugin field (text, images, stacks, colors and the rest).
 import { attachRichText } from './rich-text.js';
 import { imageSource, imagesOffline } from './image-assets.js';
 import {

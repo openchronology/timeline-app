@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The desktop app (Tauri): the commands its editor calls to open, import, browse and save SQLite
+// timeline files through native-store, and to reach servers (server.rs).
 mod server;
 use openchronology_store::{Document, Header, Patch, Query, Snapshot};
 use std::{

@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Entity tags: normalised like timeline tags, and separating a timeline into tracks by tag.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

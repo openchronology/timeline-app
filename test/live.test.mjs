@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The live event stream (server/live.mjs): subscribing before the first revision, access checked
+// before each notification, request checks, and releasing subscriptions.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';

@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The SQLite file converter (och-convert, set as OCH_CONVERTER) and the file import and export
+// routes: exact round trips, bad uploads, CSRF, media types and size limits.
 import assert from 'node:assert/strict';
 import { TimelineFiles } from '../server/files.mjs';
 import {

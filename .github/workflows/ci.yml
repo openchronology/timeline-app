@@ -1,4 +1,8 @@
 name: OpenChronology
+# Every push and pull request: the Docker Compose stack; types and tests with npm, pnpm and
+# Yarn on Node 22 and 24; the platform in Chromium, Firefox and WebKit; PostgreSQL with pgmp
+# and the live-browser suites; UI capacity advice and budgets; and the desktop and server
+# packages (desktop.yml, server-packages.yml).
 on:
   push:
   pull_request:

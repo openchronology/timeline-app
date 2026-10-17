@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Plugins: the built-ins, field kinds, hover cards, colors, stacks, snapshots and hooks,
+// what manifests may not ask for, and the plugin library and its API.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';

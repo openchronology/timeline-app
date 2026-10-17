@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Runs before the site's pages (Next.js's proxy): gives them their content security policy,
+// and serves a timeline's pages at its own address, /<owner>/<slug or id>/…, by rewriting them
+// to /timelines/<id>/… (#148).
 import { NextResponse } from 'next/server';
 import { analyticsPolicy } from '../server/site.mjs';
 import { platformServices } from '../server/platform.mjs';

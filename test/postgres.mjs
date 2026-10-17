@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The HTTP API against PostgreSQL (npm run test:postgres): accounts, access and roles, CSRF,
+// revision conflicts, pages, overviews, OAuth, native approval and SQLite file exchange.
 import pg from 'pg';
 import { readFile } from 'node:fs/promises';
 import { createApplication } from '../server/http.mjs';

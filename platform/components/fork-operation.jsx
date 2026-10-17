@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// Syncing a fork with its upstream, or proposing its saved changes as a pull request.
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../lib/api.js';

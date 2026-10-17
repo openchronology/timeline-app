@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Exact proleptic Gregorian dates: day numbers, and ISO 8601 timestamps to and from stored
+// seconds since the Unix epoch, with fixed zone offsets.
 import { Rational as Q } from 'rational-ordered-map';
 const floorDiv = (n: bigint, d: bigint): bigint => n / d - (n < 0n && n % d !== 0n ? 1n : 0n);
 export function dayNumber(year: bigint, month: bigint, day: bigint): bigint {

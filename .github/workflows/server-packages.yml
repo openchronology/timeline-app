@@ -1,7 +1,9 @@
 name: Server packages
 # Builds the server package for each distribution (scripts/server-package.mjs): .deb for
 # Debian and Ubuntu, .rpm for Rocky/RHEL and Fedora. Each is installed in a fresh container of
-# its distribution (test/server-deb.mjs, test/server-rpm.mjs) and uploaded.
+# its distribution (test/server-deb.mjs, test/server-rpm.mjs) and uploaded. From the
+# platform archive it also builds and tests the FreeBSD packages, the Homebrew formula on
+# macOS and the Windows installer. Called by ci.yml and release.yml.
 on:
   workflow_call:
     inputs:

@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The browser’s cache of server views (src/remote-cache.ts): overscanned and predicted windows,
+// budgets and eviction, stand-ins while loading, pinned edits, and saving.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Q, Viewport, validateDocument } from '../dist/core.mjs';

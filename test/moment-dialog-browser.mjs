@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The moment and duration dialogs: only Save keeps edits; also the helpers other checks use to
+// close the dialog.
 /**
  * Finishes with the moment dialog, keeping what was typed: only Save keeps edits, so with
  * edits under way (applying, shown on the timeline, or a new moment's draft) it saves;

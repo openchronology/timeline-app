@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The link-preview image of a duration's page (lib/preview-image.jsx).
 import { previewImage } from '../../../../../lib/preview-image.jsx';
 import { entityParam } from '../../../../../lib/sharing.js';
 export const runtime = 'nodejs';

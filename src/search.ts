@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Searching a timeline's moments and durations by the words in their titles and text: in memory
+// for local timelines, and the rows a server's search index is rebuilt from.
 import { Rational as Q } from 'rational-ordered-map';
 import { resolveDuration } from './durations.js';
 import { entityTags } from './tags.js';

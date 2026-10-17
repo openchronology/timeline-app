@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Calling the platform's HTTP API from the browser, with the CSRF token and any
+// human-verification challenge it asks for.
 import { withChallenges } from '../../src/challenge.ts';
 export async function api(path, { method = 'GET', data, csrf, signal } = {}) {
   return withChallenges(

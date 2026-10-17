@@ -1,4 +1,7 @@
 -- Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+-- The PostgreSQL schema, applied on every migration (server/migrate.mjs): tables, indexes,
+-- triggers and functions are created when missing and altered forward, so this one file
+-- takes a database of any earlier release to the current one.
 CREATE EXTENSION IF NOT EXISTS pgmp;
 CREATE TABLE IF NOT EXISTS oc_users (
   id uuid PRIMARY KEY, username text UNIQUE NOT NULL, password_hash text NOT NULL,

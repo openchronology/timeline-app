@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Relationships: undirected, canonical links; the index following them; arcs, separations,
+// sparse edits and merges.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Q, TimelineIndex, Viewport, validateDocument, filterDocument } from '../dist/core.mjs';

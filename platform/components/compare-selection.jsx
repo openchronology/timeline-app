@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// Choosing timelines to compare: a checkbox on each listed timeline, and a tray that opens
+// /compare; the choice is kept for the browser tab.
 import { useEffect, useState } from 'react';
 const key = 'openchronology:compare-selection';
 let memorySelection = [];

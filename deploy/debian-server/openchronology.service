@@ -1,3 +1,5 @@
+# The OpenChronology platform as a systemd service (Debian and RPM packages), on the address
+# in /etc/openchronology/openchronology.env.
 [Unit]
 Description=OpenChronology platform
 Documentation=file:///usr/share/doc/openchronology-server/README.Debian

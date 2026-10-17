@@ -1,3 +1,6 @@
+# The platform's Docker image (compose.yml's app service): och-convert, the editor and the
+# Next.js platform built from this checkout with its web source archive, run as a standalone
+# Node.js server on port 5173.
 FROM rust:1-bookworm AS converter
 RUN apt-get update && apt-get install -y --no-install-recommends cmake libsqlite3-dev libgmp-dev && rm -rf /var/lib/apt/lists/*
 WORKDIR /app

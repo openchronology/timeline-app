@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Limits on a server timeline copied into the browser (a browser fork): at most 5,000 entries,
+// stack cards included, and a 4 MiB download, capped while it streams.
 export const BROWSER_COPY_MAX_BYTES = 4 * 1024 * 1024;
 export const BROWSER_COPY_MAX_EVENTS = 5000;
 /** Stack cards and durations also consume UI memory even though they do not add axis points. */

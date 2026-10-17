@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
+// Sends old dashboard links, #timeline/<id> and #desktop/<code>, to their pages.
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 export default function LegacyLinks() {

@@ -1,4 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Checks a release's assets before they are published: node scripts/release-assets.mjs <tag>
+// [dir]. Every expected file must be present, non-empty and built from the tag's commit; then
+// writes SHA256SUMS.txt.
 import { readFile, writeFile, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { releaseVersion } from './build-info.mjs';

@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Comparing timelines at /compare?timelines=<id>,<id>…: two or more, up to the account's
+// limit, in one editor.
 import Editor from '../../components/editor.jsx';
 import { accountCompareLimit, currentSession } from '../../lib/session.js';
 export const dynamic = 'force-dynamic';

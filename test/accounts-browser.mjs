@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Accounts in the editor: sign-in providers, CSRF, revocation, .och files exchanged through the
+// server, the desktop app’s native sign-in, and several servers signed in at once (#85).
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';

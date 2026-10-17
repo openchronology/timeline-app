@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Search terms, and ranking a complete timeline’s matches (titles first) a page at a time.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TimelineIndex, validateDocument, searchTerms, searchIndex } from '../dist/core.mjs';

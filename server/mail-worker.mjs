@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// The mail worker: a process that sends the queued email (mail.mjs) every five seconds, or once
+// with --once. compose.yml and the packages run it as its own service.
 import pg from 'pg';
 import { setTimeout as delay } from 'node:timers/promises';
 import { flushMail, mailFromEnv, encryptionKey } from './mail.mjs';

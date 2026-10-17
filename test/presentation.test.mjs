@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// Showing and entering times: exact numeric, unit, SI and Gregorian printers and parsers, custom
+// code in a restricted sandbox with budgets, and document settings.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
