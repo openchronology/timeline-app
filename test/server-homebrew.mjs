@@ -83,7 +83,14 @@ await checkSyslogService({
     assert.match(await sh('openchronology-agent status syslog'), /^state = running$/m);
     assert.match(await sh('openchronology-agent stop syslog'), /stopped/);
   },
-  logs: () => sh(`tail -40 "${prefix}/var/log/openchronology-syslog.log"`, { allowFailure: true }),
+  // Its log, launchd's account of the agent and the command run directly, for a failure.
+  logs: () =>
+    sh(
+      `ls -l "${prefix}/var/log/openchronology-syslog.log"; tail -40 "${prefix}/var/log/openchronology-syslog.log"; ` +
+        `launchctl print "gui/$(id -u)/org.openchronology.syslog"; cat "${agentPlist}"; ` +
+        `openchronology-agent stop syslog; openchronology-syslog & sleep 5; kill $!`,
+      { allowFailure: true },
+    ),
 });
 assert.match(await sh(`test -e "${agentPlist}" && echo present || echo gone`), /gone/);
 assert.match(
