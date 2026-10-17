@@ -87,7 +87,9 @@ await checkSyslogService({
           (await sh(
             `launchctl print "gui/$(id -u)/org.openchronology.syslog"; echo "print: exit $?"; ` +
               `launchctl list | grep -i openchronology; ps ax | grep [s]yslog-receiver; ` +
-              `tail -20 "${prefix}/var/log/openchronology-syslog.log"`,
+              `tail -20 "${prefix}/var/log/openchronology-syslog.log"; ` +
+              `launchctl print-disabled "gui/$(id -u)" | grep -i openchronology; ` +
+              `log show --last 3m --style compact --info --debug --predicate 'eventMessage CONTAINS "org.openchronology.syslog"' | tail -60`,
             { allowFailure: true },
           )),
       );
