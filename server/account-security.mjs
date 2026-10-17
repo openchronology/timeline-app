@@ -620,7 +620,9 @@ export class AccountSecurity {
         )
       ).rows[0];
       if (!row) throw new HttpError(400, 'Invalid or expired reset link.');
-      if (user.email !== row.email || !user.email_verified_at)
+      // Addresses are compared lowercased: the link holds the address as typed to ask for it,
+      // lowercased, and an account (such as the bootstrap administrator's) may keep capitals.
+      if (user.email?.toLowerCase() !== row.email || !user.email_verified_at)
         throw new HttpError(400, 'This reset link is no longer valid.');
       // The new password, then the sign-out of everything: other reset links, every session,
       // every active API key (revoked, kept for the list), unclaimed desktop sign-ins (so an

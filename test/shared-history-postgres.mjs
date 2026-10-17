@@ -325,6 +325,33 @@ try {
     normal(await store.revisionDocument(pool, copies[4].timeline.head_revision_id)),
     normal(copies[4].document),
   );
+  // Every moment saved twice between two revisions keeps three versions in the range they
+  // compare; with more moments than a page holds as rows, every one is still reported.
+  const many = validateDocument({
+    format: 'openchronology',
+    version: 1,
+    title: 'Many',
+    description: '',
+    events: Array.from({ length: 7000 }, (_, n) => ({
+      id: 'm' + n,
+      time: `${n}/1`,
+      metadata: { title: 'Moment ' + n },
+    })),
+  });
+  const retitled = (document, title) =>
+    validateDocument({
+      ...document,
+      events: document.events.map((e) => ({ ...e, metadata: { title: title + e.id } })),
+    });
+  let busy = await store.create(user, many);
+  created.push(busy.id);
+  const firstRevision = busy.head_revision_id;
+  busy = await store.save(busy.id, user, busy.revision, retitled(many, 'Once '));
+  const twice = retitled(many, 'Twice ');
+  busy = await store.save(busy.id, user, busy.revision, twice);
+  const reported = await rowChanges(firstRevision, busy.head_revision_id);
+  assert.equal(reported.size, 7000, 'every moment saved since is reported');
+  assert.deepEqual(reported, documentChanges(many, twice));
   console.log(
     `PASS shared history: ${saves} random saves over a chain of ${copies.length} forks and duplicates read back revision by revision (${read} revisions); copies are charged what they change; pruning and deletion keep what copies read through to, then free it.`,
   );
