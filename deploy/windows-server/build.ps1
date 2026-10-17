@@ -100,10 +100,13 @@ if ($LASTEXITCODE -ne 0) { throw 'Building och-convert failed' }
 New-Item -ItemType Directory -Force -Path "$stage\app\bin" | Out-Null
 Copy-Item "$repo\native-store\target\release\och-convert.exe" "$stage\app\bin\"
 
-# The server's Windows service (WinSW), the commands, templates and documentation.
+# The Windows services (WinSW: one copy of the wrapper per service, named as its settings
+# file), the commands, templates and documentation.
 New-Item -ItemType Directory -Force -Path "$stage\service" | Out-Null
-Copy-Item $winsw "$stage\service\openchronology-service.exe"
-Copy-Item "$here\openchronology-service.xml" "$stage\service\"
+foreach ($name in 'openchronology-service', 'openchronology-syslog-service', 'openchronology-mail-service') {
+  Copy-Item $winsw "$stage\service\$name.exe"
+  Copy-Item "$here\$name.xml" "$stage\service\"
+}
 Copy-Item "$here\setup.ps1", "$here\remove.ps1", "$here\*.cmd" "$stage\"
 New-Item -ItemType Directory -Force -Path "$stage\templates" | Out-Null
 foreach ($name in 'openchronology.env', 'syslog.env') {
@@ -111,6 +114,8 @@ foreach ($name in 'openchronology.env', 'syslog.env') {
   (Get-Content "$repo\deploy\debian-server\$name" -Raw) `
     -replace '/etc/openchronology', 'C:\ProgramData\OpenChronology' `
     -replace 'sudo systemctl restart openchronology', 'Restart-Service OpenChronology' `
+    -replace 'sudo systemctl enable --now openchronology-syslog', 'Set-Service OpenChronologySyslog -StartupType Automatic; Start-Service OpenChronologySyslog' `
+    -replace 'sudo systemctl enable --now openchronology-mail', 'Set-Service OpenChronologyMail -StartupType Automatic; Start-Service OpenChronologyMail' `
     -replace 'sudo openchronology-', 'openchronology-' |
     Set-Content -Encoding utf8NoBOM "$stage\templates\$name.example"
 }

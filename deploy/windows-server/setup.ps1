@@ -2,7 +2,7 @@
 # Sets up OpenChronology after the Windows installer copies it (#116), as the other packages'
 # setup does: the configuration in %ProgramData%\OpenChronology, the bundled PostgreSQL 17
 # (initialized once and run as the OpenChronologyPostgreSQL service on 127.0.0.1:5442), the
-# database with pgmp, the migration and the OpenChronology service. Run again (an upgrade, or
+# database with pgmp, the migration and the OpenChronology services. Run again (an upgrade, or
 # by hand as an administrator), it keeps the configuration and database, migrates them to this
 # version and starts the services. Written for Windows PowerShell 5.1, present on every
 # Windows. Usage: powershell -ExecutionPolicy Bypass -File setup.ps1 [-InstallDir <dir>]
@@ -58,9 +58,17 @@ try {
     Set-FileAccess $superuserFile @()
     Set-FileAccess $config @('*S-1-5-19:R')
   }
+  # The syslog receiver's configuration (which holds its API key) and its routes, read by its
+  # service's LocalService account: files written later in this folder would not be.
   $syslog = Join-Path $data 'syslog.env'
+  $routes = Join-Path $data 'syslog-routes.json'
   if (-not (Test-Path $syslog)) {
     Copy-Item (Join-Path $InstallDir 'templates\syslog.env.example') $syslog
+    Set-FileAccess $syslog @('*S-1-5-19:R')
+  }
+  if (-not (Test-Path $routes)) {
+    Write-Text $routes "{`n  `"routes`": [],`n  `"default`": null`n}`n"
+    Set-FileAccess $routes @('*S-1-5-19:R')
   }
   $superuser = (Get-Content -Raw $superuserFile).Trim()
   $url = (Select-String -Path $config -Pattern '^DATABASE_URL=postgresql://openchronology:([^@]+)@').Matches
@@ -145,6 +153,22 @@ try {
     }
     throw "The server did not answer; see $logs"
   }
+  # The syslog receiver and email delivery (WinSW, #125): installed once, to start by hand
+  # until configured. An upgrade stopped them; the ones set to start with Windows start again.
+  foreach ($worker in @(
+      @{ Name = 'OpenChronologySyslog'; Wrapper = 'openchronology-syslog-service.exe' },
+      @{ Name = 'OpenChronologyMail'; Wrapper = 'openchronology-mail-service.exe' })) {
+    if (-not (Get-Service $worker.Name -ErrorAction SilentlyContinue)) {
+      & (Join-Path $InstallDir "service\$($worker.Wrapper)") install | Out-Host
+      if ($LASTEXITCODE -ne 0) { throw "Installing the $($worker.Name) service failed" }
+      # Files from before the service existed were readable by administrators only.
+      if ($worker.Name -eq 'OpenChronologySyslog') {
+        foreach ($file in $syslog, $routes) { Set-FileAccess $file @('*S-1-5-19:R') }
+      }
+    } elseif ((Get-Service $worker.Name).StartType -eq 'Automatic') {
+      Restart-Service $worker.Name -Force
+    }
+  }
   if ($existing) { Write-Host "`nOpenChronology is upgraded: its configuration and database are kept, and the database is migrated to this version." }
   Write-Host @"
 
@@ -156,6 +180,9 @@ Next steps, as an administrator:
     which creates the administrator and restarts the server.
   - Put an HTTPS reverse proxy in front of it for public use.
   - Back up AUTH_ENCRYPTION_KEY from that file separately from the database.
+  - For account email, set RESEND_API_KEY and AUTH_EMAIL_FROM there, then start the
+    OpenChronologyMail service; for syslog, configure syslog.env and start
+    OpenChronologySyslog (README.Windows.txt).
 
 See $InstallDir\README.Windows.txt.
 "@

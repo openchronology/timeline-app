@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-# Receives syslog messages into timelines (syslog.md) with syslog.env, until stopped: run it
-# under your own launchd agent or terminal session (README.Homebrew).
+# Receives syslog messages into timelines (syslog.md) with syslog.env, until stopped: in a
+# terminal, or as your launchd agent with `openchronology-agent start syslog` (README.Homebrew).
 OCH_CONFIG=@HOMEBREW_PREFIX@/etc/openchronology/syslog.env NODE_ENV=production \
   exec "@NODE@" --import="@LIBEXEC@/server/load-configuration.mjs" "@LIBEXEC@/server/syslog-receiver.mjs"

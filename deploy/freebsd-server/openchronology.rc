@@ -18,11 +18,12 @@ load_rc_config $name
 : ${openchronology_config:="/usr/local/etc/openchronology/openchronology.env"}
 
 # daemon(8) runs it as the openchronology user, restarts it if it fails and sends its
-# output to syslog. Its configuration is read as systemd reads it (OCH_CONFIG, #118).
+# output to syslog, holding nothing open of the terminal or script that started it (-f).
+# Its configuration is read as systemd reads it (OCH_CONFIG, #118).
 pidfile="/var/run/openchronology/openchronology.pid"
 procname="daemon"
 command="/usr/sbin/daemon"
-command_args="-r -S -T openchronology -P ${pidfile} -u openchronology /usr/bin/env NODE_ENV=production OCH_CONFIG=${openchronology_config} /usr/local/bin/node /usr/local/lib/openchronology/openchronology-server.mjs"
+command_args="-f -r -S -T openchronology -P ${pidfile} -u openchronology /usr/bin/env NODE_ENV=production OCH_CONFIG=${openchronology_config} /usr/local/bin/node /usr/local/lib/openchronology/openchronology-server.mjs"
 openchronology_chdir="/usr/local/lib/openchronology"
 start_precmd="openchronology_prestart"
 

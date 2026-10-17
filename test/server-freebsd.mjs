@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { checkSyslogService, fetchApi } from './server-syslog.mjs';
 
 const run = promisify(execFile);
 const file = resolve(process.argv[2] ?? '');
@@ -75,6 +76,28 @@ assert.match(await (await fetch('http://127.0.0.1:5173/')).text(), /<html/i);
 // The SQLite converter finds its libraries.
 assert.doesNotMatch(await sh('ldd /usr/local/lib/openchronology/bin/och-convert'), /not found/);
 assert.match(await sh('och-import-logs --help'), /^Usage: och-import-logs/);
+
+// The syslog receiver as its rc.d service, run as the openchronology user, delivers a
+// message into a timeline (#125).
+const syslogConfig = '/usr/local/etc/openchronology';
+await checkSyslogService({
+  name: 'FreeBSD',
+  psql,
+  api: fetchApi,
+  configure: (key, routes) =>
+    sh(
+      `sed -i '' 's|^OCH_API_KEY=.*|OCH_API_KEY=${key}|' ${syslogConfig}/syslog.env && printf '%s' '${routes}' > ${syslogConfig}/syslog-routes.json`,
+    ),
+  start: async () => {
+    await sh('sysrc openchronology_syslog_enable=YES && service openchronology_syslog start');
+    assert.match(await sh('service openchronology_syslog status'), /is running/);
+  },
+  stop: async () => {
+    assert.match(await sh('ps -U openchronology -o command='), /server\/syslog-receiver\.mjs/);
+    await sh('service openchronology_syslog stop && sysrc openchronology_syslog_enable=NO');
+  },
+  logs: () => sh('grep openchronology_syslog /var/log/messages | tail -40', { allowFailure: true }),
+});
 
 // The administrator (#118): its password is read whole from the configuration, # and all,
 // and openchronology-reset-admin-password sets it again.

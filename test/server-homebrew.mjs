@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { checkSyslogService, fetchApi } from './server-syslog.mjs';
 
 const run = promisify(execFile);
 const sh = async (script, { allowFailure = false } = {}) => {
@@ -62,6 +63,64 @@ assert.equal(session.server, true, 'The server reaches its database.');
 assert.equal((await fetch('http://127.0.0.1:5173/api/plugins')).status, 200);
 assert.match(await (await fetch('http://127.0.0.1:5173/')).text(), /<html/i);
 assert.match(await sh('och-import-logs --help'), /^Usage: och-import-logs/);
+
+// The syslog receiver as a launchd agent (openchronology-agent, #125) delivers a message into
+// a timeline, keeps running once macOS registers it as a background item, and stops for good
+// when stopped.
+const agentPlist = `${process.env.HOME}/Library/LaunchAgents/org.openchronology.syslog.plist`;
+const agentLog = `${prefix}/var/log/openchronology-syslog.log`;
+// The agent's status, failing with launchd's account of it (and its log) unless it is running.
+const assertRunning = async (when) => {
+  const status = await sh('openchronology-agent status syslog', { allowFailure: true });
+  if (/^state = running$/m.test(status)) return;
+  assert.fail(
+    `${when}: ${status}` +
+      (await sh(
+        `launchctl print-disabled "gui/$(id -u)" | grep -i openchronology; tail -20 "${agentLog}"; ` +
+          `log show --last 2m --style compact --info --debug --predicate 'eventMessage CONTAINS "org.openchronology" OR eventMessage CONTAINS "launchdDidScanPath" OR eventMessage CONTAINS "register-only"' | grep -v ' log\\[' | tail -60`,
+        { allowFailure: true },
+      )),
+  );
+};
+await checkSyslogService({
+  name: 'macOS',
+  psql,
+  api: fetchApi,
+  configure: (key, routes) =>
+    sh(
+      `sed -i '' 's|^OCH_API_KEY=.*|OCH_API_KEY=${key}|' "${prefix}/etc/openchronology/syslog.env" && printf '%s' '${routes}' > "${prefix}/etc/openchronology/syslog-routes.json"`,
+    ),
+  start: async () => {
+    assert.match(await sh('openchronology-agent start syslog'), /openchronology-syslog started/);
+    assert.match(await sh(`plutil -lint "${agentPlist}"`), /OK/);
+    assert.match(
+      await sh('launchctl print-disabled "gui/$(id -u)"'),
+      /"org\.openchronology\.syslog" => enabled/,
+    );
+    // macOS registers a new agent as a background item seconds after it starts; an agent not
+    // enabled explicitly is removed then.
+    await sh('sleep 15');
+    await assertRunning('15 seconds after starting');
+  },
+  stop: async () => {
+    await assertRunning('Before stopping');
+    assert.match(await sh('openchronology-agent stop syslog'), /stopped/);
+  },
+  logs: () =>
+    sh(`tail -40 "${agentLog}"; launchctl print "gui/$(id -u)/org.openchronology.syslog"`, {
+      allowFailure: true,
+    }),
+});
+assert.match(await sh(`test -e "${agentPlist}" && echo present || echo gone`), /gone/);
+assert.match(
+  await sh('openchronology-agent status syslog; echo "exit $?"', { allowFailure: true }),
+  /is not started[\s\S]*exit 3/,
+);
+assert.match(await sh(`tail -5 "${agentLog}"`), /^syslog: stopped/m);
+assert.match(
+  await sh('openchronology-agent start nothing 2>&1; echo "exit $?"', { allowFailure: true }),
+  /Usage: openchronology-agent[\s\S]*exit 2/,
+);
 
 // The administrator (#118): its password is read whole from the configuration, # and all,
 // and openchronology-reset-admin-password sets it again.

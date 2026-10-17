@@ -9,6 +9,7 @@
 import { createSocket } from 'node:dgram';
 import { createServer } from 'node:net';
 import { randomBytes } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import {
@@ -20,6 +21,7 @@ import {
 } from './syslog.mjs';
 import { parseZone } from './log-time.mjs';
 import { MomentIngest } from './moment-ingest.mjs';
+import { loadConfiguration } from './env-file.mjs';
 
 /** Syslog messages into moments (syslog.mjs), queued and sent as moment-ingest.mjs does. */
 export class SyslogIngest extends MomentIngest {
@@ -152,8 +154,20 @@ export async function main(env = process.env) {
       process.exit(drained ? 0 : 1);
     });
 }
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href)
+// Whether this file is the program being run, comparing real paths: Homebrew's command names
+// it through the formula's opt symlink.
+const invoked = (() => {
+  try {
+    return process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
+  } catch {
+    return false;
+  }
+})();
+if (invoked) {
+  // The configuration OCH_CONFIG names (syslog.env), where no service manager passed it.
+  loadConfiguration();
   main().catch((error) => {
     console.error('syslog:', error.message);
     process.exit(1);
   });
+}

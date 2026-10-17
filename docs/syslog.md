@@ -32,6 +32,22 @@ OCH_API_URL=https://timescale.info OCH_API_KEY=och_key_... \
 
 The receiver has no TLS or sender authentication: keep it on a trusted network (Compose publishes it on host loopback only) and relay remote logs to it with a syslog daemon that provides TLS.
 
+## Running it as a service
+
+Every [server package](../README.md#server-packages-debian-ubuntu-rocky-linux-rhel-fedora-freebsd-macos-and-windows) installs the receiver as a service of its system, stopped until you configure it. Set `OCH_API_KEY` in its `syslog.env`, write the routes to `syslog-routes.json` beside it, then start it:
+
+| Installed with                      | Configuration                                    | Start it, and at every boot or login                                                          | Its log                                              |
+| ----------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Debian, Ubuntu, Rocky, RHEL, Fedora | `/etc/openchronology/syslog.env`                 | `sudo systemctl enable --now openchronology-syslog` (systemd)                                 | `journalctl -u openchronology-syslog`                |
+| FreeBSD                             | `/usr/local/etc/openchronology/syslog.env`       | `sysrc openchronology_syslog_enable=YES && service openchronology_syslog start` (rc.d)        | `/var/log/messages`                                  |
+| macOS (Homebrew)                    | `$(brew --prefix)/etc/openchronology/syslog.env` | `openchronology-agent start syslog` (a launchd agent, as `brew services` runs the server)     | `$(brew --prefix)/var/log/openchronology-syslog.log` |
+| Windows                             | `C:\ProgramData\OpenChronology\syslog.env`       | `Set-Service OpenChronologySyslog -StartupType Automatic; Start-Service OpenChronologySyslog` | `C:\ProgramData\OpenChronology\logs`                 |
+| Docker Compose                      | `SYSLOG_API_KEY`, `SYSLOG_ROUTES_FILE`           | `docker compose --profile syslog up -d syslog`                                                | `docker compose logs syslog`                         |
+
+Each runs it as the server's own unprivileged account (`openchronology`, Local Service on Windows, or you on macOS), restarts it if it fails, and stops it cleanly: on `SIGTERM` (Ctrl+C on Windows) the receiver saves what is queued first. Restart the service after editing its configuration. On Linux the [journald follower](journald.md) is a service too, `openchronology-journald`. Account email delivery runs the same way: `openchronology-mail` (systemd), `openchronology_mail` (rc.d), `openchronology-agent start mail` (macOS) and the `OpenChronologyMail` service (Windows).
+
+To run it as a service elsewhere, such as from a checkout, start from the package's definition for your system: [the systemd unit](../deploy/debian-server/openchronology-syslog.service), [the rc.d script](../deploy/freebsd-server/openchronology_syslog.rc), [the launchd agent](../deploy/homebrew/openchronology-agent) or [the WinSW service](../deploy/windows-server/openchronology-syslog-service.xml). Point it at `node server/syslog-receiver.mjs` in your copy, with `OCH_CONFIG` naming a configuration file like `syslog.env` (or the variables above set directly).
+
 ## Routing
 
 ```json
