@@ -204,7 +204,15 @@ Some limits stay the same whatever this setting is:
   request stays below roughly 100,000 moments. Larger timelines grow through saves: the
   platform's editor, the [log importer](log-import.md) and the [syslog receiver](syslog.md)
   all save in batches.
-- `.och` files exchanged with the server are at most 32 MiB.
+- `.och` files exchanged with the server are at most 64 MiB. `TIMELINE_FILE_BYTES` in the
+  environment file changes this: a size from `1MiB` to `1GiB`, such as `128MiB`. An invalid
+  value stops the server at startup. The limit applies to uploads, exports, and the
+  converter's input and output; the converter's memory limit is 512 MiB, or eight times the
+  file limit when that is more. At most two conversions run at once, so a raised limit can
+  briefly use two uploads' worth of server memory, and up to twice the converter's memory
+  limit. An `.och` file is usually larger than the same timeline as `.ochx`, mostly from
+  its indexes: 200,000 moments with a title and a 150-character note make about 61 MB of
+  JSON and a file just over 64 MiB. A conversion stopped by a limit says which one.
 
 ## Name and analytics
 

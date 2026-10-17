@@ -232,6 +232,8 @@ interface Session {
   dashboard?: boolean;
   providers?: string[];
   fileExchange?: boolean;
+  /** The largest .och file the server exchanges, in bytes. */
+  fileLimit?: number;
   /** How many timelines this account may compare at once. */
   compareLimit?: number;
   /** How many moments (durations, relationships) a timeline may hold; null for no limit. */
@@ -6050,7 +6052,7 @@ input('och-file').onchange = () => {
   input('och-file').value = '';
   if (!file || !mayReplace()) return;
   const workspace = documentRequest;
-  void importSqlite(file, session.csrf)
+  void importSqlite(file, session.csrf, session.fileLimit)
     .then((value) => {
       const doc = validateDocument(value);
       if (workspace !== documentRequest) return;

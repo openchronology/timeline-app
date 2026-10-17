@@ -10,6 +10,8 @@ import {
   defaultQuota,
   entryLimit,
   LimitError,
+  mebibytes,
+  timelineFileBytes,
 } from '../server/limits.mjs';
 import { quotaValue } from '../server/administration.mjs';
 
@@ -80,4 +82,19 @@ test('the entry limit comes from TIMELINE_ENTRY_LIMIT: a number from 1000, or un
       (error) => error instanceof LimitError && /TIMELINE_ENTRY_LIMIT/.test(error.message),
       value,
     );
+});
+test('the .och file limit comes from TIMELINE_FILE_BYTES: 1 MiB to 1 GiB, 64 MiB unset (#202)', () => {
+  assert.equal(timelineFileBytes({}), 64 * 1024 * 1024);
+  assert.equal(timelineFileBytes({ TIMELINE_FILE_BYTES: ' ' }), 64 * 1024 * 1024);
+  assert.equal(timelineFileBytes({ TIMELINE_FILE_BYTES: '128MiB' }), 128 * 1024 * 1024);
+  assert.equal(timelineFileBytes({ TIMELINE_FILE_BYTES: '1048576' }), 1024 * 1024);
+  assert.equal(timelineFileBytes({ TIMELINE_FILE_BYTES: '1 GiB' }), 1024 ** 3);
+  for (const value of ['1000000', '2GiB', 'big', '-1'])
+    assert.throws(
+      () => timelineFileBytes({ TIMELINE_FILE_BYTES: value }),
+      (error) => error instanceof LimitError,
+      value,
+    );
+  assert.equal(mebibytes(64 * 1024 * 1024), '64 MiB');
+  assert.equal(mebibytes(1.5 * 1024 * 1024), '1.5 MiB');
 });

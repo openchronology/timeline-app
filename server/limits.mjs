@@ -85,6 +85,23 @@ export function defaultQuota(env = process.env) {
 }
 
 /**
+ * The largest `.och` file exchanged with the server, in bytes, from TIMELINE_FILE_BYTES: a
+ * storage size from 1 MiB to 1 GiB (such as `128MiB`). Unset or empty, 64 MiB (#202). It
+ * bounds uploads, exports and och-convert's input and output, and sets its memory limit.
+ */
+export function timelineFileBytes(env = process.env) {
+  const text = env.TIMELINE_FILE_BYTES?.trim();
+  if (!text) return 64 * 1024 * 1024;
+  const bytes = storageBytes(text);
+  if (bytes < 1024n * 1024n || bytes > 1024n ** 3n)
+    throw new LimitError('TIMELINE_FILE_BYTES must be from 1MiB to 1GiB.');
+  return Number(bytes);
+}
+/** A file limit for messages: `64 MiB`, or `1.5 MiB`. */
+export function mebibytes(bytes) {
+  return `${Number((bytes / 1024 / 1024).toFixed(1))} MiB`;
+}
+/**
  * How many moments a timeline may hold, and as many durations and relationships, from
  * TIMELINE_ENTRY_LIMIT: a whole number from 1,000, or "unlimited" (Infinity). Unset or
  * empty, 200,000.

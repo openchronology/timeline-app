@@ -9,7 +9,11 @@ export async function requestApi<T>(
 ): Promise<T> {
   throw new Error('This offline file uses JSON import and export.');
 }
-export async function importSqlite(_file: File, _csrf?: string | null): Promise<unknown> {
+export async function importSqlite(
+  _file: File,
+  _csrf?: string | null,
+  _limit?: number,
+): Promise<unknown> {
   throw new Error('This offline file exchanges .ochx JSON timelines only.');
 }
 export async function exportSqlite(

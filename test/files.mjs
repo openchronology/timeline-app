@@ -79,12 +79,51 @@ const document = validateDocument({
 const bytes = await converter.convert('write', document);
 assert.equal(bytes.subarray(0, 16).toString(), 'SQLite format 3\0');
 assert.deepEqual(await converter.convert('read', bytes), document);
-for (const input of [
-  Buffer.from('not sqlite'),
-  Buffer.from('SQLite format 3\0garbage'),
-  Buffer.alloc(32 * 1024 * 1024 + 1),
-])
+for (const input of [Buffer.from('not sqlite'), Buffer.from('SQLite format 3\0garbage')])
   await assert.rejects(converter.convert('read', input), (error) => error.status === 400);
+// Files are limited to TIMELINE_FILE_BYTES (64 MiB by default), and a conversion stopped by a
+// limit says which (#202).
+assert.equal(converter.limit, 64 * 1024 * 1024);
+const small = new TimelineFiles(undefined, 1024 * 1024);
+const tooLarge = (message) => (error) => error.status === 413 && error.message === message;
+await assert.rejects(
+  small.convert('read', Buffer.alloc(1024 * 1024 + 1)),
+  tooLarge('SQLite upload exceeds 1 MiB.'),
+);
+const large = (count, note) => ({
+  format: 'openchronology',
+  version: 1,
+  title: 'Large',
+  description: '',
+  events: Array.from({ length: count }, (_, i) => ({
+    id: 'm' + i,
+    time: i + '/1',
+    metadata: { title: 'Moment ' + i, description: note },
+  })),
+});
+// Its JSON is over the limit: the converter refuses it.
+await assert.rejects(
+  small.convert('write', large(4000, 'x'.repeat(300))),
+  tooLarge('SQLite export exceeds 1 MiB.'),
+);
+// Its JSON is under the limit and its file over it: on Linux, the file-size limit stops it.
+if (process.platform === 'linux') {
+  const near = large(3500, 'x'.repeat(200));
+  assert(JSON.stringify(near).length < 1024 * 1024);
+  await assert.rejects(small.convert('write', near), tooLarge('SQLite export exceeds 1 MiB.'));
+}
+// Time and memory, as the converter's process reports them.
+for (const [error, status, message] of [
+  [{ killed: true, signal: 'SIGTERM' }, 422, 'Timeline conversion exceeded its time limit.'],
+  [{ signal: 'SIGXCPU' }, 422, 'Timeline conversion exceeded its time limit.'],
+  [{ signal: 'SIGABRT' }, 413, 'Timeline conversion exceeded its memory limit.'],
+  [{ code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' }, 413, 'Timeline exceeds the 1 MiB file limit.'],
+  [{ code: 1 }, 400, 'Invalid or unsupported timeline file.'],
+]) {
+  const failure = small.failure('read', error, '');
+  assert.deepEqual([failure.status, failure.message], [status, message]);
+}
+assert.equal(small.active, 0);
 await assert.rejects(
   converter.convert('write', { ...document, events: [{ id: 'bad', time: '1/0', metadata: {} }] }),
   (error) => error.status === 400,
@@ -186,7 +225,7 @@ assert.equal(
   (
     await call(
       'files/import',
-      Buffer.alloc(32 * 1024 * 1024 + 1),
+      Buffer.alloc(64 * 1024 * 1024 + 1),
       'application/octet-stream',
       headers,
     )

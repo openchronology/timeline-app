@@ -80,11 +80,16 @@ export async function requestApi<T>(
 }
 /**
  * Uploads a `.och` SQLite file for the server to convert into a timeline document, which it
- * returns (nothing is saved). Refuses files over 32 MiB before uploading (the server
- * enforces its own limit too) and rejects with the server's message on failure.
+ * returns (nothing is saved). Refuses files over `limit` bytes (the session's fileLimit;
+ * 64 MiB by default) before uploading, and rejects with the server's message on failure.
  */
-export async function importSqlite(file: File, csrf?: string | null): Promise<unknown> {
-  if (file.size > 32 * 1024 * 1024) throw new Error('SQLite upload exceeds 32 MiB.');
+export async function importSqlite(
+  file: File,
+  csrf?: string | null,
+  limit = 64 * 1024 * 1024,
+): Promise<unknown> {
+  if (file.size > limit)
+    throw new Error(`SQLite upload exceeds ${Number((limit / 1024 / 1024).toFixed(1))} MiB.`);
   const response = await fetch('/api/files/import', {
     method: 'POST',
     credentials: 'same-origin',

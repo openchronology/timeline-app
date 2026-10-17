@@ -845,6 +845,11 @@ export const schemas = {
         type: 'boolean',
         description: 'Whether the server converts SQLite (.och) timeline files.',
       },
+      fileLimit: {
+        type: 'integer',
+        description:
+          'The largest .och file the server converts, in bytes (`TIMELINE_FILE_BYTES`, 64 MiB by default).',
+      },
       compareLimit: {
         type: 'integer',
         description: 'How many timelines this account (or a guest) may compare at once.',
