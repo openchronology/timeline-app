@@ -289,6 +289,8 @@ if (offlineHtml || desktop) {
     : 'The desktop app: local .och files, and the servers you connect to.';
   edition.hidden = false;
 }
+// The offline file's timeline is always in memory, as its chip and notice say already.
+if (offlineHtml) el('storage-badge').hidden = true;
 if (desktop) {
   for (const link of document.querySelectorAll<HTMLAnchorElement>('.download-menu a'))
     link.onclick = (event) => {
@@ -2442,9 +2444,7 @@ function heading() {
         : 'Private timeline'
       : desktop && sqlitePath
         ? 'Local file'
-        : offlineHtml
-          ? 'Offline HTML'
-          : 'Browser draft',
+        : 'Browser draft',
   );
   text(
     'publish-button',

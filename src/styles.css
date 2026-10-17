@@ -1184,6 +1184,21 @@ dialog h3 {
     flex-wrap: wrap;
     min-width: 0;
   }
+  /* Wherever the wrapped header puts Download, its menu opens below the header, across it,
+     so it stays on the screen. */
+  .app-header {
+    position: relative;
+  }
+  .download-menu {
+    position: static;
+  }
+  .download-menu > div {
+    left: 15px;
+    right: 15px;
+    top: calc(100% - 4px);
+    min-width: 0;
+    max-width: none;
+  }
   .header-right button {
     padding: 0 10px;
   }
