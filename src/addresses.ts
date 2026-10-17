@@ -78,9 +78,58 @@ export const RESERVED_NAMES: ReadonlySet<string> = new Set([
   'www',
 ]);
 
-/** Whether `name` is a username new accounts may take. */
+/**
+ * Names that would pass for the site, its staff or its system addresses (#184). New accounts
+ * cannot take them, nor a spelling of one with hyphens, underscores or a number added. Unlike
+ * RESERVED_NAMES they are not page addresses, so an account that has one keeps its address.
+ */
+export const OFFICIAL_NAMES: ReadonlySet<string> = new Set([
+  'abuse',
+  'admins',
+  'administrators',
+  'anonymous',
+  'auth',
+  'billing',
+  'bot',
+  'everyone',
+  'guest',
+  'hostmaster',
+  'info',
+  'mailerdaemon',
+  'mod',
+  'moderator',
+  'moderators',
+  'mods',
+  'noreply',
+  'null',
+  'oauth',
+  'official',
+  'operator',
+  'owner',
+  'postmaster',
+  'root',
+  'staff',
+  'superuser',
+  'sysadmin',
+  'team',
+  'undefined',
+  'webmaster',
+]);
+
+/**
+ * Whether `name` is a username new accounts may take: it follows USERNAME, and is not one of
+ * the site's own pages (RESERVED_NAMES) or OFFICIAL_NAMES, written plainly or with hyphens and
+ * underscores (`sign-in`, `ad_min`). Nor is it an official name or a site page with a number
+ * after it (`admin1`, `root-2`), or a name starting with "openchronology".
+ */
 export function availableUsername(name: string): boolean {
-  return USERNAME.test(name) && !RESERVED_NAMES.has(name);
+  if (!USERNAME.test(name)) return false;
+  const bare = name.replace(/[-_]/g, ''),
+    stem = bare.replace(/\d+$/, '');
+  return (
+    !bare.startsWith('openchronology') &&
+    ![name, bare, stem].some((n) => RESERVED_NAMES.has(n) || OFFICIAL_NAMES.has(n))
+  );
 }
 /** Whether `slug` may name a timeline: the rule, and not shaped like a timeline's ID. */
 export function validSlug(slug: string): boolean {
@@ -125,6 +174,8 @@ export function timelineAddress(
   if (!named) return null;
   const owner = named[1].toLowerCase(),
     name = named[2].toLowerCase();
-  if (!availableUsername(owner) || !(SLUG.test(name) || TIMELINE_UUID.test(name))) return null;
+  // Any account's name that is not a site page: OFFICIAL_NAMES only limit new accounts.
+  if (!USERNAME.test(owner) || RESERVED_NAMES.has(owner)) return null;
+  if (!(SLUG.test(name) || TIMELINE_UUID.test(name))) return null;
   return { owner, name, rest: named[3] ?? '' };
 }

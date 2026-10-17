@@ -85,6 +85,18 @@ try {
     400,
   );
   assert.equal(reserved.error, 'That username is taken. Choose another.');
+  // Nor names that would pass for the site or its staff (#184).
+  for (const name of ['root', 'Admin_1', 'openchronology-team'])
+    assert.equal(
+      (
+        await owner.request(
+          'auth/register',
+          { username: name, email, password, passwordConfirmation: password, birthYear: 1990 },
+          400,
+        )
+      ).error,
+      'That username is taken. Choose another.',
+    );
   const pending = await owner.request('auth/register', {
     username,
     email,

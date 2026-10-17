@@ -929,7 +929,9 @@ export const schemas = {
     properties: {
       username: {
         ...username,
-        description: username.description + ' Names of the site’s own pages are taken.',
+        description:
+          username.description +
+          ' Names of the site’s own pages are taken, as are names that would pass for the site or its staff (`root`, `moderator`, `admin1`, `open_chronology…`).',
       },
       email,
       password: newPassword,
