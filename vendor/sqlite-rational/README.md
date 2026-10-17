@@ -106,12 +106,28 @@ read-only. Transactions, statement rollback, savepoints, reopen, and attached sc
 are tested. The index owns <name>_nodes and <name>_meta shadow tables; do not edit
 them directly. ALTER TABLE RENAME is not implemented.
 
+To load many rows into a new or emptied index, append them and then build the tree once:
+
+~~~sql
+INSERT INTO points(time,value,weight,mode) VALUES
+  ('1','bucket-2',1,'append'), ('0','bucket-0',2,'append'), ('1/1000000','bucket-1',3,'append');
+INSERT INTO points(mode) VALUES('build');
+~~~
+
+An appended row is stored without being linked into the tree (one write instead of a
+walk from the root), in any order. The build sorts every row by time and writes the
+balanced tree bottom-up, each node once. Until it runs, queries and other changes fail
+with an error naming the build; a build that finds two rows at one rational value fails
+with a constraint error and changes nothing, leaving the rows to correct (or the
+transaction to roll back). Only an empty index, or one still loading, takes appended
+rows. A build at any other time rebuilds the tree from its rows, keeping their rowids.
+
 | Hidden input | Meaning |
 | --- | --- |
 | lower, upper | Rational TEXT bounds; omitted or NULL means unbounded |
 | include_lower, include_upper | INTEGER 0/1; default 1/0 |
 | threshold | Nonnegative rational TEXT; omitted or NULL requests raw rows |
-| mode | span (default) or neighbors |
+| mode | span (default) or neighbors in queries; append or build in an INSERT (above) |
 | visited_nodes | Read-only diagnostic number of node visits |
 
 Pass inputs with equality constraints as shown. Hidden viewport bounds are useful

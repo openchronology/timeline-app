@@ -408,19 +408,24 @@ pub fn save(path: &Path, doc: &Document) -> Result<(), String> {
         }
         // Fill the overview index: one bucket per distinct time, weighted by its moment count.
         // Overview groups join back to events by time (workspace.rs) to show single moments.
-        // One statement per time, as an edit does (workspace.rs): each has the instruction
-        // budget to itself, where one statement for all of a large file's times ran out (#193).
-        for row in db.query(
-            "SELECT time FROM events GROUP BY time COLLATE RATIONAL_V1",
+        // The emptied index takes the buckets appended, unlinked, and builds its tree once from
+        // them sorted, writing each node once (#199); inserting them one by one walked and
+        // rebalanced the tree for each, too slow for och-convert's CPU limit on large files.
+        // Appended a range of 5000 times per statement, so each stays well within the
+        // instruction budget (a statement for 200,000 came within 6% of it).
+        let times = db.query(
+            "SELECT time FROM events GROUP BY time COLLATE RATIONAL_V1 ORDER BY time COLLATE RATIONAL_V1",
             &[],
-        )? {
-            let time = row
-                .into_iter()
-                .next()
-                .flatten()
-                .ok_or("Missing moment time")?;
-            db.execute("INSERT INTO points(time,value,weight) SELECT time,time,count(*) FROM events WHERE time=q(?) COLLATE RATIONAL_V1 GROUP BY time COLLATE RATIONAL_V1",&[&time])?;
+        )?;
+        for range in times.chunks(5000) {
+            let bound = |row: &Vec<Option<String>>| row.first().cloned().flatten();
+            let (Some(first), Some(last)) = (bound(&range[0]), bound(&range[range.len() - 1]))
+            else {
+                return Err("Missing moment time".into());
+            };
+            db.execute("INSERT INTO points(time,value,weight,mode) SELECT time,time,count(*),'append' FROM events WHERE time>=?1 COLLATE RATIONAL_V1 AND time<=?2 COLLATE RATIONAL_V1 GROUP BY time COLLATE RATIONAL_V1",&[&first,&last])?;
         }
+        db.execute("INSERT INTO points(mode) VALUES('build')", &[])?;
         create_duration_table(&db)?;
         for duration in &doc.durations {
             insert_duration(&db, duration)?;

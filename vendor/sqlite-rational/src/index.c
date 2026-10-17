@@ -193,13 +193,21 @@ static int find(Index *v, sqlite3_int64 id, const mpq_t key, sqlite3_int64 *foun
 done:
   node_free(n); return rc;
 }
-static int roots(Index *v, sqlite3_int64 *root, sqlite3_int64 *next) {
+/* Root LOADING: rows were appended (mode 'append') and the tree is not built yet. */
+#define LOADING (-1)
+static int roots_any(Index *v, sqlite3_int64 *root, sqlite3_int64 *next) {
   int rc = sqlite3_step(v->root_get);
   if (rc == SQLITE_ROW) {
     *root = sqlite3_column_int64(v->root_get, 0); *next = sqlite3_column_int64(v->root_get, 1);
-    rc = *root >= 0 && *next > 0 ? SQLITE_OK : SQLITE_CORRUPT;
+    rc = *root >= LOADING && *next > 0 ? SQLITE_OK : SQLITE_CORRUPT;
   } else if (rc == SQLITE_DONE || rc == SQLITE_OK) rc = SQLITE_CORRUPT;
   sqlite3_reset(v->root_get); return rc;
+}
+/* The built tree's root: SQLITE_MISUSE (reported as SQLITE_ERROR) while appended rows wait
+   for a build. */
+static int roots(Index *v, sqlite3_int64 *root, sqlite3_int64 *next) {
+  int rc = roots_any(v, root, next);
+  return rc == SQLITE_OK && *root == LOADING ? SQLITE_MISUSE : rc;
 }
 static int below(Cursor *c, const mpq_t key) {
   int r;
@@ -533,7 +541,11 @@ static int filter(sqlite3_vtab_cursor *cursor, int plan_number, const char *plan
 done:
   if (rc != SQLITE_OK) {
     sqlite3_free(v->base.zErrMsg);
-    v->base.zErrMsg = sqlite3_mprintf("rational_index: invalid query argument or index error (%d)", rc);
+    v->base.zErrMsg = rc == SQLITE_MISUSE
+      ? sqlite3_mprintf("rational_index: appended rows wait for INSERT INTO ...(mode) VALUES('build')")
+      : sqlite3_mprintf("rational_index: invalid query argument or index error (%d)", rc);
+    /* Waiting for a build is an ordinary error to callers; MISUSE only chose the message. */
+    if (rc == SQLITE_MISUSE) rc = SQLITE_ERROR;
   }
   mpq_clears(value, zero, NULL); return rc;
 }
@@ -573,13 +585,155 @@ static int column(sqlite3_vtab_cursor *cursor, sqlite3_context *ctx, int col) {
   }
   return SQLITE_OK;
 }
+/* Bulk loading: the keys of every row, in order, with their ids and weights. */
+typedef struct {
+  sqlite3_int64 *ids, *weights;
+  mpq_t *keys;
+  sqlite3_int64 length;
+} Sorted;
+/* Writes the balanced subtree of sorted[lo..hi] (inclusive) bottom-up, each node once, and
+   returns its root, height, total weight and largest adjacent gap. Midpoints keep sibling
+   heights within one, so the result is a valid AVL tree. */
+static int build_range(Index *v, Sorted *s, sqlite3_int64 lo, sqlite3_int64 hi, sqlite3_int64 *id,
+  int *height, sqlite3_int64 *count, mpq_t gap) {
+  sqlite3_int64 mid = lo + (hi - lo) / 2, left = 0, right = 0, lc = 0, rc_count = 0;
+  int lh = 0, rh = 0, rc = SQLITE_OK;
+  mpq_t lgap, rgap, step;
+  sqlite3_stmt *st = v->save;
+  *id = 0; *height = 0; *count = 0; mpq_set_ui(gap, 0, 1);
+  if (lo > hi) return SQLITE_OK;
+  mpq_inits(lgap, rgap, step, NULL);
+  if (lo < mid) TRY(build_range(v, s, lo, mid - 1, &left, &lh, &lc, lgap));
+  if (mid < hi) TRY(build_range(v, s, mid + 1, hi, &right, &rh, &rc_count, rgap));
+  *count = s->weights[mid];
+  TRY(checked_add(*count, lc, count)); TRY(checked_add(*count, rc_count, count));
+  if (left) {
+    mpq_set(gap, lgap); mpq_sub(step, s->keys[mid], s->keys[mid - 1]);
+    if (mpq_cmp(step, gap) > 0) mpq_set(gap, step);
+  }
+  if (right) {
+    if (mpq_cmp(rgap, gap) > 0) mpq_set(gap, rgap);
+    mpq_sub(step, s->keys[mid + 1], s->keys[mid]);
+    if (mpq_cmp(step, gap) > 0) mpq_set(gap, step);
+  }
+  *height = 1 + (lh > rh ? lh : rh); *id = s->ids[mid];
+  sqlite3_bind_int64(st, 1, left); sqlite3_bind_int64(st, 2, right);
+  sqlite3_bind_int(st, 3, *height);
+  TRY(bind_q(st, 4, s->keys[lo])); TRY(bind_q(st, 5, s->keys[hi]));
+  sqlite3_bind_int64(st, 6, *count); sqlite3_bind_int64(st, 7, hi - lo + 1);
+  TRY(bind_q(st, 8, gap));
+  sqlite3_bind_int64(st, 9, s->ids[lo]); sqlite3_bind_int64(st, 10, *id);
+  TRY(finish(st));
+done:
+  sqlite3_reset(st); sqlite3_clear_bindings(st); mpq_clears(lgap, rgap, step, NULL); return rc;
+}
+/* INSERT INTO t(mode) VALUES('build'): builds the tree from every row, appended or not, in
+   one pass over them sorted by key (O(n log n) to sort, one write per row), and ends loading.
+   Fails with SQLITE_CONSTRAINT when two rows share a key. */
+static int build(Index *v) {
+  Sorted s = {0};
+  sqlite3_stmt *rows = NULL;
+  sqlite3_int64 root = 0, next = 1, capacity = 0, i, count;
+  int rc = SQLITE_OK, height;
+  char *sql = NULL;
+  mpq_t gap;
+  mpq_init(gap);
+  TRY(roots_any(v, &root, &next));
+  sql = sqlite3_mprintf("SELECT id,time,weight FROM %s ORDER BY time COLLATE RATIONAL_V1,id", v->nodes);
+  if (!sql) { rc = SQLITE_NOMEM; goto done; }
+  TRY(sqlite3_prepare_v2(v->db, sql, -1, &rows, NULL));
+  while ((rc = sqlite3_step(rows)) == SQLITE_ROW) {
+    if (s.length == capacity) {
+      sqlite3_int64 more = capacity ? capacity * 2 : 64;
+      sqlite3_int64 *ids = sqlite3_realloc64(s.ids, more * sizeof(*ids));
+      sqlite3_int64 *weights = ids ? sqlite3_realloc64(s.weights, more * sizeof(*weights)) : NULL;
+      mpq_t *keys = weights ? sqlite3_realloc64(s.keys, more * sizeof(*keys)) : NULL;
+      if (ids) s.ids = ids;
+      if (weights) s.weights = weights;
+      if (keys) s.keys = keys;
+      if (!keys) { rc = SQLITE_NOMEM; goto done; }
+      capacity = more;
+    }
+    mpq_init(s.keys[s.length]); s.length++;
+    s.ids[s.length - 1] = sqlite3_column_int64(rows, 0);
+    s.weights[s.length - 1] = sqlite3_column_int64(rows, 2);
+    TRY(q_parse(s.keys[s.length - 1], (const char *)sqlite3_column_text(rows, 1), sqlite3_column_bytes(rows, 1)));
+    if (s.weights[s.length - 1] <= 0) { rc = SQLITE_CORRUPT; goto done; }
+    /* Keys are unique by rational value. */
+    if (s.length > 1 && mpq_equal(s.keys[s.length - 1], s.keys[s.length - 2])) { rc = SQLITE_CONSTRAINT; goto done; }
+  }
+  if (rc != SQLITE_DONE) goto done;
+  rc = SQLITE_OK;
+  TRY(build_range(v, &s, 0, s.length - 1, &root, &height, &count, gap));
+  for (i = 0; i < s.length; i++) if (s.ids[i] >= next) next = s.ids[i] + 1;
+  sqlite3_bind_int64(v->root_set, 1, root); sqlite3_bind_int64(v->root_set, 2, next);
+  TRY(finish(v->root_set));
+done:
+  sqlite3_finalize(rows); sqlite3_free(sql); mpq_clear(gap);
+  for (i = 0; i < s.length; i++) mpq_clear(s.keys[i]);
+  sqlite3_free(s.ids); sqlite3_free(s.weights); sqlite3_free(s.keys); return rc;
+}
+/* INSERT INTO t(time,value,weight,mode) VALUES(…,'append'): stores a row without linking it
+   into the tree, so loading many rows costs one write each; queries and other changes are
+   refused until a build. Only an empty or loading index takes appended rows. */
+static int append_row(Index *v, sqlite3_value **argv, sqlite3_int64 *rowid_out) {
+  sqlite3_int64 root = 0, next = 1, id, weight = 1;
+  int rc = SQLITE_OK;
+  mpq_t key;
+  mpq_init(key);
+  TRY(roots_any(v, &root, &next));
+  if (root != 0 && root != LOADING) { rc = SQLITE_CONSTRAINT; goto done; }
+  if (sqlite3_value_type(argv[1]) != SQLITE_NULL &&
+      (sqlite3_value_type(argv[1]) != SQLITE_INTEGER || sqlite3_value_int64(argv[1]) <= 0)) {
+    rc = SQLITE_CONSTRAINT; goto done;
+  }
+  id = sqlite3_value_type(argv[1]) == SQLITE_NULL ? next : sqlite3_value_int64(argv[1]);
+  if (id >= INT64_MAX) { rc = SQLITE_TOOBIG; goto done; }
+  TRY(argument(key, argv[2]));
+  if (sqlite3_value_type(argv[4]) != SQLITE_NULL) {
+    if (sqlite3_value_type(argv[4]) != SQLITE_INTEGER || sqlite3_value_int64(argv[4]) <= 0) { rc = SQLITE_CONSTRAINT; goto done; }
+    weight = sqlite3_value_int64(argv[4]);
+  }
+  /* A taken id fails the shadow table's primary key. */
+  sqlite3_bind_int64(v->insert, 1, id); TRY(bind_q(v->insert, 2, key));
+  sqlite3_bind_value(v->insert, 3, argv[3]); sqlite3_bind_int64(v->insert, 4, weight);
+  TRY(finish(v->insert));
+  if (id >= next) next = id + 1;
+  sqlite3_bind_int64(v->root_set, 1, LOADING); sqlite3_bind_int64(v->root_set, 2, next);
+  TRY(finish(v->root_set));
+  *rowid_out = id;
+done:
+  sqlite3_reset(v->insert); sqlite3_clear_bindings(v->insert); mpq_clear(key); return rc;
+}
+/* The mode an INSERT names: 0 for none (an ordinary insert), 1 for 'append', 2 for 'build',
+   -1 for anything else. Argument 11 is the hidden mode column. */
+static int insert_mode(int argc, sqlite3_value **argv) {
+  const char *mode;
+  int len;
+  if (argc < 12 || sqlite3_value_type(argv[0]) != SQLITE_NULL || sqlite3_value_type(argv[11]) == SQLITE_NULL) return 0;
+  if (sqlite3_value_type(argv[11]) != SQLITE_TEXT) return -1;
+  mode = (const char *)sqlite3_value_text(argv[11]); len = sqlite3_value_bytes(argv[11]);
+  if (len == 6 && memcmp(mode, "append", 6) == 0) return 1;
+  if (len == 5 && memcmp(mode, "build", 5) == 0) return 2;
+  return -1;
+}
 static int update(sqlite3_vtab *table, int argc, sqlite3_value **argv, sqlite3_int64 *rowid_out) {
   Index *v = (Index *)table;
   Node *old = NULL;
   sqlite3_int64 root = 0, next = 1, id, found, weight = 1;
-  int rc = SQLITE_OK, i, same_key = 0;
+  int rc = SQLITE_OK, i, same_key = 0, mode = insert_mode(argc, argv);
   mpq_t key;
-  mpq_init(key); TRY(roots(v, &root, &next));
+  mpq_init(key);
+  if (mode) {
+    /* Bulk loading: only time, value and weight may accompany 'append'; nothing 'build'. */
+    for (i = mode == 1 ? 5 : 1; i < argc; i++)
+      if (i != 11 && sqlite3_value_type(argv[i]) != SQLITE_NULL) { rc = SQLITE_CONSTRAINT; goto done; }
+    if (mode < 0) rc = SQLITE_CONSTRAINT;
+    else if (mode == 1) rc = append_row(v, argv, rowid_out);
+    else { rc = build(v); *rowid_out = 0; }
+    goto done;
+  }
+  TRY(roots(v, &root, &next));
   if (sqlite3_value_type(argv[0]) != SQLITE_NULL) {
     TRY(node_get(v, sqlite3_value_int64(argv[0]), &old));
     if (!old) { rc = SQLITE_CORRUPT; goto done; }
@@ -656,7 +810,12 @@ done:
   sqlite3_reset(v->insert); sqlite3_clear_bindings(v->insert);
   sqlite3_reset(v->change); sqlite3_clear_bindings(v->change);
   if (rc != SQLITE_OK) {
-    sqlite3_free(v->base.zErrMsg); v->base.zErrMsg = sqlite3_mprintf("rational_index: invalid mutation or index error (%d)", rc);
+    sqlite3_free(v->base.zErrMsg);
+    v->base.zErrMsg = rc == SQLITE_MISUSE
+      ? sqlite3_mprintf("rational_index: appended rows wait for INSERT INTO ...(mode) VALUES('build')")
+      : sqlite3_mprintf("rational_index: invalid mutation or index error (%d)", rc);
+    /* Waiting for a build is an ordinary error to callers; MISUSE only chose the message. */
+    if (rc == SQLITE_MISUSE) rc = SQLITE_ERROR;
   }
   node_free(old); mpq_clear(key); return rc;
 }
