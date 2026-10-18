@@ -7,7 +7,11 @@ import { platformServices } from '../../../server/platform.mjs';
 import { createPluginLibrary, createSuiteLibrary } from '../../../server/plugins.mjs';
 import ReportLink from '../../components/report-link.jsx';
 import HelpTip from '../../components/help-tip.jsx';
+import { pageTitle } from '../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
+export function generateMetadata() {
+  return { title: pageTitle('Plugin library') };
+}
 export default async function Plugins({ searchParams }) {
   const params = await searchParams;
   const search = typeof params.search === 'string' ? params.search.slice(0, 200) : '';

@@ -385,6 +385,7 @@ function setDashboard(show: boolean) {
   if (show) void showDrafts().catch(() => (el('dashboard-drafts').hidden = true));
   document.body.dataset.dashboard = String(show);
   el('memory-notice').hidden = show || !memoryOnly() || !!remote || !!comparison || !model;
+  updatePageTitle();
   updateCapacity();
   if (!show) requestRender();
 }
@@ -2368,6 +2369,28 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('.reveal-image
     remember('images', imagesShown);
     updateSensitive();
   };
+let pageTitled: string | null = null;
+/**
+ * Names the open timeline in the page's title (#210): "Its title · OpenChronology", and on
+ * the website, through the page around the editor, with the site's name. The dashboard, or a
+ * timeline still loading, leaves the page's own title.
+ */
+function updatePageTitle() {
+  const shown = input('timeline-title').value.trim();
+  const name =
+    document.body.dataset.dashboard === 'true' || (!model && !remote && !comparison)
+      ? ''
+      : shown === 'Loading timeline…'
+        ? ''
+        : shown || 'Untitled timeline';
+  if (name === pageTitled) return;
+  pageTitled = name;
+  document.title = name ? `${name} · OpenChronology` : 'OpenChronology — a place for moments';
+  // Also kept here, for a page around the editor that starts listening after this is sent.
+  document.documentElement.dataset.timelineTitle = name;
+  if (platformEditor)
+    window.parent.postMessage({ type: 'openchronology:title', title: name }, location.origin);
+}
 function heading() {
   updateSensitive();
   updateFollowControl();
@@ -2421,6 +2444,7 @@ function heading() {
     model?.description ?? remote?.description ?? '';
   input('timeline-title').disabled = !editable();
   el<HTMLTextAreaElement>('timeline-description').disabled = !editable();
+  updatePageTitle();
   const count = momentCount();
   text(
     'event-count',

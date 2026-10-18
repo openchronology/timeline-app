@@ -7,9 +7,16 @@ import { accessibleTimeline } from '../../../../../lib/timeline.js';
 import { timelinePath } from '../../../../../../src/addresses.ts';
 import { Versioning } from '../../../../../../server/versioning.mjs';
 import RevisionDownload from '../../../../../components/revision-download.jsx';
+import { pageTitle, timelineTitle } from '../../../../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
 /** Checkpoints of timelines up to this many moments are shown inline; larger ones only download. */
 const SHOWN = 5000;
+/** The page's title: what it is, and the timeline's (#210). */
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  const { timeline } = await accessibleTimeline(id);
+  return { title: pageTitle('Saved version', timelineTitle(timeline)) };
+}
 export default async function Saved({ params }) {
   const { id, saved } = await params;
   const { services, user, timeline } = await accessibleTimeline(id);

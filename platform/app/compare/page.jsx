@@ -3,7 +3,11 @@
 // limit, in one editor.
 import Editor from '../../components/editor.jsx';
 import { accountCompareLimit, currentSession } from '../../lib/session.js';
+import { pageTitle, siteName } from '../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
+export function generateMetadata() {
+  return { title: pageTitle('Compare timelines') };
+}
 export default async function ComparePage({ searchParams }) {
   const query = await searchParams;
   const ids = [...new Set((typeof query.timelines === 'string' ? query.timelines : '').split(','))];
@@ -25,7 +29,7 @@ export default async function ComparePage({ searchParams }) {
     );
   return (
     <main className="editor-page">
-      <Editor comparisonIds={ids} />
+      <Editor comparisonIds={ids} siteName={siteName()} />
     </main>
   );
 }

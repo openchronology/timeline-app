@@ -11,6 +11,7 @@ import {
   pageMetadata,
   timelineDescription,
   timelineTitle,
+  siteName,
 } from '../../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
 export async function generateMetadata({ params }) {
@@ -48,6 +49,7 @@ export default async function TimelinePage({ params }) {
     <main className="editor-page">
       <TimelineSummary timeline={timeline} moments={moments} />
       <Editor
+        siteName={siteName()}
         id={id}
         path={timelinePath(timeline)}
         comparisonSources={comparisonSources.map((source) => ({

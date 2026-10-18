@@ -4,7 +4,11 @@
 import { redirect } from 'next/navigation';
 import { currentSession } from '../../lib/session.js';
 import Admin from '../../components/admin.jsx';
+import { pageTitle } from '../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
+export function generateMetadata() {
+  return { title: pageTitle('Administration') };
+}
 export default async function AdminPage() {
   const { user } = await currentSession();
   if (!user) redirect('/login?returnTo=%2Fadmin');

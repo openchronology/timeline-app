@@ -10,7 +10,14 @@ import {
   PULLS_UNAVAILABLE,
   FORK_PULLS_UNAVAILABLE,
 } from '../../../../../../server/collaboration.mjs';
+import { pageTitle, timelineTitle } from '../../../../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
+/** The page's title: what it is, and the timeline's (#210). */
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  const { timeline } = await accessibleTimeline(id);
+  return { title: pageTitle('New pull request', timelineTitle(timeline)) };
+}
 export default async function NewPull({ params }) {
   const { id } = await params;
   const { timeline } = await accessibleTimeline(id);

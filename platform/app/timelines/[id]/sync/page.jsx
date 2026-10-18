@@ -6,7 +6,14 @@ import { accessibleTimeline, versionInfo } from '../../../../lib/timeline.js';
 import { timelinePath } from '../../../../../src/addresses.ts';
 import ForkOperation from '../../../../components/fork-operation.jsx';
 import { Versioning } from '../../../../../server/versioning.mjs';
+import { pageTitle, timelineTitle } from '../../../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
+/** The page's title: what it is, and the timeline's (#210). */
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  const { timeline } = await accessibleTimeline(id);
+  return { title: pageTitle('Sync with the original', timelineTitle(timeline)) };
+}
 export default async function Sync({ params }) {
   const { id } = await params;
   const { services, user, timeline } = await accessibleTimeline(id);

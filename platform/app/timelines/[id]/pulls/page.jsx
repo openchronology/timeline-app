@@ -4,7 +4,14 @@ import Link from 'next/link';
 import { accessibleTimeline } from '../../../../lib/timeline.js';
 import { timelinePath } from '../../../../../src/addresses.ts';
 import { Collaboration, PULLS_UNAVAILABLE } from '../../../../../server/collaboration.mjs';
+import { pageTitle, timelineTitle } from '../../../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
+/** The page's title: what it is, and the timeline's (#210). */
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  const { timeline } = await accessibleTimeline(id);
+  return { title: pageTitle('Pull requests', timelineTitle(timeline)) };
+}
 export default async function Pulls({ params, searchParams }) {
   const { id } = await params,
     query = await searchParams;

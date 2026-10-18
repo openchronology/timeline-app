@@ -2,7 +2,12 @@
 // The editor at /editor: a new (?new=1), sample (?demo=dense), forked (?fork=) or browser
 // draft (?draft=) timeline, with the tour on ?tour=1.
 import Editor from '../../components/editor.jsx';
+import { pageTitle, siteName } from '../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
+/** The editor's own title, until a timeline is open in it (#210). */
+export function generateMetadata() {
+  return { title: pageTitle('Editor') };
+}
 export default async function EditorPage({ searchParams }) {
   const query = await searchParams;
   const forkId =
@@ -13,6 +18,7 @@ export default async function EditorPage({ searchParams }) {
   return (
     <main className="editor-page">
       <Editor
+        siteName={siteName()}
         sample={query.demo === 'dense'}
         fresh={query.new === '1' || !!forkId}
         forkId={forkId}
