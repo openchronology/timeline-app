@@ -14,6 +14,7 @@ import {
   presentTime,
   sharedPath,
   timelineTitle,
+  siteName,
 } from '../../../../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
 async function load(params) {
@@ -48,6 +49,7 @@ export default async function MomentPage({ params }) {
         {event.metadata?.description && <p>{excerpt(event.metadata.description, 4000)}</p>}
       </TimelineSummary>
       <Editor
+        siteName={siteName()}
         id={timeline.id}
         path={timelinePath(timeline)}
         focus={'moment/' + encodeURIComponent(event.id)}

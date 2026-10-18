@@ -28,6 +28,8 @@ export default function Editor({
   signedIn = false,
   comparisonIds,
   comparisonSources = [],
+  // The site's name, for the page's title as the editor names the open timeline (#210).
+  siteName = 'OpenChronology',
   forkId,
   focus,
   // Starts the editor's tour (#172), from the help.
@@ -57,9 +59,38 @@ export default function Editor({
     if (document?.readyState === 'complete' && document.location.pathname === '/editor/frame')
       setActions(document.getElementById('platform-timeline-actions'));
   }, []);
+  // The title naming the editor's timeline while it replaces the page's own, and that one.
+  const titled = useRef(null),
+    pageTitle = useRef(null);
   useEffect(() => {
+    // The page's title names the timeline open in the editor (#210). The page's own title
+    // stays while that is still its timeline, as it names more (such as a moment).
+    const retitle = (title) => {
+      const name = typeof title === 'string' ? title.slice(0, 300) : '';
+      const own = timeline ? timeline.title?.trim() || 'Untitled timeline' : null;
+      if (name && name !== own) {
+        if (titled.current === null) pageTitle.current = document.title;
+        titled.current = `${name} · ${siteName}`;
+        document.title = titled.current;
+      } else if (titled.current !== null) {
+        titled.current = null;
+        document.title = pageTitle.current;
+      }
+    };
+    // Next.js sets a page's title after navigating to it: that becomes the page's own, and
+    // the editor's goes back.
+    const observer = new MutationObserver(() => {
+      if (titled.current === null || document.title === titled.current) return;
+      pageTitle.current = document.title;
+      document.title = titled.current;
+    });
+    observer.observe(document.head, { subtree: true, childList: true, characterData: true });
+    // The frame may have named it before this page listened.
+    const named = frame.current?.contentDocument?.documentElement.dataset.timelineTitle;
+    if (named !== undefined) retitle(named);
     function message(event) {
       if (event.origin !== location.origin || event.source !== frame.current?.contentWindow) return;
+      if (event.data?.type === 'openchronology:title') retitle(event.data.title);
       if (event.data?.type === 'openchronology:local') {
         setLocal(true);
         window.history.replaceState(null, '', '/editor');
@@ -100,8 +131,11 @@ export default function Editor({
         router.replace('/timelines/' + event.data.id);
     }
     window.addEventListener('message', message);
-    return () => window.removeEventListener('message', message);
-  }, [router, id, path, timeline?.visibility, canShare]);
+    return () => {
+      window.removeEventListener('message', message);
+      observer.disconnect();
+    };
+  }, [router, id, path, timeline?.visibility, timeline?.title, canShare, siteName]);
   return (
     <>
       {id &&

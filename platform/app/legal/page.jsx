@@ -3,7 +3,11 @@
 // from the repository's files.
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { pageTitle } from '../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
+export function generateMetadata() {
+  return { title: pageTitle('Terms, privacy and licenses') };
+}
 export default async function LegalPage() {
   const files = [
     ['NOTICE', 'Copyright and software rights'],

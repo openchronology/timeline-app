@@ -6,10 +6,16 @@ import { notFound } from 'next/navigation';
 import { accessibleTimeline } from '../../../../lib/timeline.js';
 import { timelinePath } from '../../../../../src/addresses.ts';
 import TimelineSettings from '../../../../components/timeline-settings.jsx';
-import { siteOrigin } from '../../../../lib/sharing.js';
+import { pageTitle, siteOrigin, timelineTitle } from '../../../../lib/sharing.js';
 import { calendar, printRetention } from '../../../../../server/retention.mjs';
 import { NEWCOMER_DAYS, FULL_DAYS } from '../../../../../server/standing.mjs';
 export const dynamic = 'force-dynamic';
+/** The page's title: what it is, and the timeline's (#210). */
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  const { timeline } = await accessibleTimeline(id);
+  return { title: pageTitle('Sharing & settings', timelineTitle(timeline)) };
+}
 export default async function Settings({ params }) {
   const { id } = await params,
     { services, timeline } = await accessibleTimeline(id);

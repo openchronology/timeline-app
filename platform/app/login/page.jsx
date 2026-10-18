@@ -3,7 +3,11 @@
 // (lib/navigation.js).
 import Account from '../../components/account.jsx';
 import { safeReturnTo } from '../../lib/navigation.js';
+import { pageTitle } from '../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
+export function generateMetadata() {
+  return { title: pageTitle('Sign in') };
+}
 export default async function Login({ searchParams }) {
   const params = await searchParams;
   return (

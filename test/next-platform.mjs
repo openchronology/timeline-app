@@ -138,18 +138,20 @@ try {
   assert(html.includes(`nonce="${nonce}"`), 'Next hydration scripts must use the response nonce');
   const again = await fetch(origin);
   assert.notEqual(again.headers.get('content-security-policy'), csp);
-  for (const path of [
-    '/login',
-    '/account',
-    '/plugins',
-    '/download',
-    '/legal',
-    '/editor',
-    '/?search=history&page=2',
-    '/?owner=seed&search=history&page=2',
+  // Each page's title says what it is, then the site's name (#210).
+  for (const [path, title] of [
+    ['/login', 'Sign in · timescale.test'],
+    ['/account', 'Account · timescale.test'],
+    ['/plugins', 'Plugin library · timescale.test'],
+    ['/download', 'Download · timescale.test'],
+    ['/legal', 'Terms, privacy and licenses · timescale.test'],
+    ['/editor', 'Editor · timescale.test'],
+    ['/?search=history&page=2'],
+    ['/?owner=seed&search=history&page=2'],
   ]) {
     const r = await fetch(origin + path);
     assert.equal(r.status, 200, path);
+    if (title) assert.match(await r.text(), new RegExp(`<title>${title}</title>`), path);
   }
   // The HTTP API (#178): its reference, under the content security policy, and its OpenAPI
   // description, with or without the server's storage.
@@ -270,6 +272,8 @@ try {
       ).contentFrame();
       await frame.waitForFunction(() => document.getElementById('left-bound').value);
       assert.equal(await frame.locator('#dashboard').isVisible(), false);
+      // The page's title follows the timeline open in the editor (#210).
+      await page.waitForFunction(() => document.title === 'Untitled timeline · timescale.test');
       await frame.locator('#json-file').setInputFiles({
         name: 'next-browser.ochx',
         mimeType: 'application/json',
@@ -288,6 +292,7 @@ try {
       await frame.waitForFunction(
         () => document.getElementById('timeline-title').value === 'Imported through Next',
       );
+      await page.waitForFunction(() => document.title === 'Imported through Next · timescale.test');
       await frame.waitForFunction(() => document.querySelector('#markers .event-marker'));
       assert.equal(
         await frame.evaluate(() => document.getElementById('left-bound').value.length > 0),

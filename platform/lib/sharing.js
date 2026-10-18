@@ -11,6 +11,10 @@ import { timelinePath } from '../../src/addresses.ts';
 
 /** The platform's name in titles and link previews (PLATFORM_NAME, or OpenChronology). */
 export { siteName };
+/** A page's title: what it is, then what it belongs to, then the site's name (#210). */
+export function pageTitle(...parts) {
+  return [...parts.filter(Boolean), siteName()].join(' · ');
+}
 
 /** A timeline's id, a UUID, as it appears in a `/timelines/<id>` address. */
 export const TIMELINE_ID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;

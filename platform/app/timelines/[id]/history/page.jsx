@@ -5,7 +5,14 @@ import Link from 'next/link';
 import { accessibleTimeline } from '../../../../lib/timeline.js';
 import { timelinePath } from '../../../../../src/addresses.ts';
 import { Versioning } from '../../../../../server/versioning.mjs';
+import { pageTitle, timelineTitle } from '../../../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
+/** The page's title: what it is, and the timeline's (#210). */
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  const { timeline } = await accessibleTimeline(id);
+  return { title: pageTitle('Saved history', timelineTitle(timeline)) };
+}
 export default async function History({ params, searchParams }) {
   const { id } = await params,
     query = await searchParams;

@@ -4,7 +4,11 @@
 import { notFound, redirect } from 'next/navigation';
 import { currentSession } from '../../../../lib/session.js';
 import DeviceApproval from '../../../../components/device-approval.jsx';
+import { pageTitle } from '../../../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
+export function generateMetadata() {
+  return { title: pageTitle('Connect the desktop app') };
+}
 export default async function Desktop({ params }) {
   const { code } = await params;
   if (!/^[A-Z2-9]{10}$/.test(code)) notFound();
