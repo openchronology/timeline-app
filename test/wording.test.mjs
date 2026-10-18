@@ -42,15 +42,16 @@ test('the editor’s sharing dialog uses the website’s words', () => {
   assert.equal(momentsText(3n), '3 moments');
 });
 
-test('what people read says moment, not event', () => {
-  // English uses of the word, not the app's points in time.
-  const allowed = [/disturbing events/];
+test('what people read calls a moment or a duration an event (#209)', () => {
+  // "Events (moments and durations)" explains the word; a count names each kind on purpose.
+  const allowed = [/[Ee]vents \(moments? (and|or) durations?\)/, /\$\{|…/];
   const found = [];
   const visible = (text, where) => {
     const plain = text.replace(/\s+/g, ' ').trim();
-    // Class names, such as "event-marker stack-marker", are not words.
-    if (/^[a-z0-9-]+( [a-z0-9-]+)*$/.test(plain) && plain.includes('-')) return;
-    if (/\b[Ee]vents?\b/.test(plain) && !allowed.some((a) => a.test(plain)))
+    if (
+      /\b(moments? (and|or) durations?|durations? (and|or) moments?)\b/i.test(plain) &&
+      !allowed.some((a) => a.test(plain))
+    )
       found.push(`${where}: ${plain.slice(0, 120)}`);
   };
   // The editor's markup: text between tags, and labels, titles and placeholders.

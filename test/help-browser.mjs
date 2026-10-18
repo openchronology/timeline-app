@@ -78,11 +78,11 @@ export async function checkHelp(page) {
     'Next has the focus',
   );
   await card.getByRole('button', { name: 'Next' }).click();
-  await at('Add a moment', '#add-button');
+  await at('Add an event', '#add-button');
   await page.keyboard.press('ArrowRight');
-  await at('Add a duration', '#add-duration-button');
+  await at('Search', '#search-button');
   await page.keyboard.press('ArrowLeft');
-  await at('Add a moment', '#add-button');
+  await at('Add an event', '#add-button');
   await card.getByRole('button', { name: 'Back' }).click();
   await at('The timeline', '#timeline-stage');
   await page.keyboard.press('Escape');

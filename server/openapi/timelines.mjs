@@ -25,7 +25,7 @@ const SIGNED_IN_TIMELINE_READ = [{ session: [] }, { desktop: [] }, { apiKey: ['t
 const error = (description) => json(ref('Error'), description);
 const NOT_JSON = { 415: error('The body is not JSON (`Content-Type: application/json`).') };
 
-/** An ID of a moment or duration. */
+/** An ID of an event: a moment or a duration. */
 const ENTITY_ID = { type: 'string', pattern: '^[A-Za-z0-9_.:-]{1,128}$', example: 'm1' };
 const nullable = (schema) => ({ oneOf: [schema, { type: 'null' }] });
 /** A count PostgreSQL gives as a decimal string (a bigint). */
@@ -75,7 +75,7 @@ export const schemas = {
   EntityMetadata: {
     type: 'object',
     description:
-      'What a moment or duration says. The core reads `title`, `description`, `tags` and `content_labels`; plugins keep their own fields here, stored as given.',
+      'What an event (a moment or a duration) says. The core reads `title`, `description`, `tags` and `content_labels`; plugins keep their own fields here, stored as given.',
     properties: {
       title: { type: 'string' },
       description: { type: 'string', description: 'Notes, in Markdown.' },
@@ -215,7 +215,7 @@ export const schemas = {
   SavedComparison: {
     type: 'object',
     description:
-      'A saved comparison: a read-only live view of two to eight timelines. It stores no moments or durations of its own.',
+      'A saved comparison: a read-only live view of two to eight timelines. It stores no events of its own.',
     required: ['sources', 'combined'],
     additionalProperties: false,
     properties: {
@@ -528,7 +528,7 @@ export const schemas = {
       {
         type: 'object',
         title: 'Related entities',
-        description: 'The moments and durations linked directly to an entity.',
+        description: 'The events linked directly to an entity.',
         required: ['kind', 'entity'],
         properties: {
           kind: { const: 'related' },
@@ -546,7 +546,7 @@ export const schemas = {
         type: 'object',
         title: 'Search',
         description:
-          'Moments and durations matching words, 25 a page. Terms are lowercased words of letters and digits (at most eight); punctuation is never syntax.',
+          'Events (moments and durations) matching words, 25 a page. Terms are lowercased words of letters and digits (at most eight); punctuation is never syntax.',
         required: ['kind', 'text'],
         properties: {
           kind: { const: 'search' },
@@ -559,7 +559,7 @@ export const schemas = {
       {
         type: 'object',
         title: 'Tags',
-        description: 'The tags its moments and durations use, most used first (at most 200).',
+        description: 'The tags its events use, most used first (at most 200).',
         required: ['kind'],
         properties: { kind: { const: 'tags' }, revision: ref('Revision') },
       },
@@ -722,7 +722,7 @@ export const schemas = {
   TimelineChanges: {
     type: 'object',
     description:
-      'A sparse save: the settings, and only the moments, durations and relationships that changed. At most 5,000 changed moments and durations together, and 5,000 relationships.',
+      'A sparse save: the settings, and only the moments, durations and relationships that changed. At most 5,000 changed events (moments and durations together), and 5,000 relationships.',
     required: ['revision', 'settings', 'changes'],
     properties: {
       revision: REVISION_BODY,
@@ -1176,7 +1176,7 @@ export const paths = {
       tags: ['Timeline data'],
       summary: 'Read part of a timeline',
       description:
-        'Reads a bounded part of a timeline, by `kind`: moments in a range a page at a time, an overview of a range for drawing it, durations in a range, one moment or duration, the entities related to one, a search of its moments and durations, or the tags it uses. A read, so API keys need only `timelines:read` and sessions no CSRF token. Comparisons are read through their sources (409).',
+        'Reads a bounded part of a timeline, by `kind`: moments in a range a page at a time, an overview of a range for drawing it, durations in a range, one event, the entities related to one, a search of its moments and durations, or the tags it uses. A read, so API keys need only `timelines:read` and sessions no CSRF token. Comparisons are read through their sources (409).',
       security: TIMELINE_READ,
       requestBody: body(ref('TimelineQuery')),
       responses: {
@@ -1221,7 +1221,7 @@ export const paths = {
       tags: ['Timeline data'],
       summary: 'Save what changed',
       description:
-        'A sparse save, for writers: the settings and only the changed moments, durations and relationships (at most 5,000 moments and durations, and 5,000 relationships, per request; at most 16 MiB). Small changes apply in place. Without `base`, a stale `revision` is refused with 409; with it, the save merges onto what was saved since, and conflicts answer 409 with `conflicts`. A save the server stops as too slow answers 503: send fewer changes at a time.',
+        'A sparse save, for writers: the settings and only the changed moments, durations and relationships (at most 5,000 events, and 5,000 relationships, per request; at most 16 MiB). Small changes apply in place. Without `base`, a stale `revision` is refused with 409; with it, the save merges onto what was saved since, and conflicts answer 409 with `conflicts`. A save the server stops as too slow answers 503: send fewer changes at a time.',
       security: TIMELINE_WRITE,
       requestBody: body(ref('TimelineChanges')),
       responses: {
@@ -1279,7 +1279,7 @@ export const paths = {
       tags: ['Timeline data'],
       summary: 'Shift and scale times',
       description:
-        'Shifts and scales the times of every moment and duration, or of those a filter selects, for good, as one save, for writers. A duration’s fixed ends are mapped; ends that follow a moment move with it. A stale `revision` and comparisons are refused with 409. Other saves wait until it finishes; it carries on if the client goes away. With `Accept: application/x-ndjson`, the reply streams JSON lines as it works: `{"progress": …}` (`{"reading": true}`, `{"done", "total"}`, or `{"rebuilding": stage, "done", "total"}`), then `{"result": …}`, or `{"error": {"status", "message"}}` for a failure once streaming. Without it, the reply is the result alone.',
+        'Shifts and scales the times of every event, or of those a filter selects, for good, as one save, for writers. A duration’s fixed ends are mapped; ends that follow a moment move with it. A stale `revision` and comparisons are refused with 409. Other saves wait until it finishes; it carries on if the client goes away. With `Accept: application/x-ndjson`, the reply streams JSON lines as it works: `{"progress": …}` (`{"reading": true}`, `{"done", "total"}`, or `{"rebuilding": stage, "done", "total"}`), then `{"result": …}`, or `{"error": {"status", "message"}}` for a failure once streaming. Without it, the reply is the result alone.',
       security: TIMELINE_WRITE,
       requestBody: body({
         type: 'object',
@@ -1292,7 +1292,7 @@ export const paths = {
       }),
       responses: {
         200: {
-          description: 'How many moments and durations moved, and the timeline as saved.',
+          description: 'How many events (moments and durations) moved, and the timeline as saved.',
           content: {
             'application/json': {
               schema: {

@@ -78,7 +78,7 @@ export async function checkSelection(page, restoreDocument) {
   const cursorBox = await input('time-cursor').boundingBox();
   assert(Math.abs(cursorBox.x + cursorBox.width / 2 - x) < 2);
   assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), [
-    '+Moment',
+    '＋ Event',
     'Fit all',
     'Delete everything in this view…',
     'Shift or scale times…',
@@ -90,7 +90,7 @@ export async function checkSelection(page, restoreDocument) {
   const markerTitle = await marker.getAttribute('aria-label');
   await marker.click({ button: 'right' });
   assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), [
-    '+Moment',
+    '＋ Event',
     'Fit all',
     'Edit',
     'Delete',
@@ -102,7 +102,7 @@ export async function checkSelection(page, restoreDocument) {
   assert.equal(await input('event-title').inputValue(), markerTitle);
   await closeMomentDetails(page);
   await page.mouse.click(x, y, { button: 'right' });
-  await menu.getByRole('menuitem', { name: '+Moment', exact: true }).click();
+  await menu.getByRole('menuitem', { name: '＋ Event', exact: true }).click();
   assert.equal(await input('event-exact').inputValue(), contextTime);
   assert.equal(await input('event-time').inputValue(), contextTime + ' ticks');
   await input('event-title').fill('From context menu');

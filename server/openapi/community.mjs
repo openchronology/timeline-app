@@ -287,7 +287,7 @@ export const paths = {
       tags: ['Reports and moderation'],
       summary: 'Report something to the administrators',
       description:
-        'Reports a timeline, a moment or duration in one, a comment on a pull request, a published plugin or suite, or an account, which the reporter must be able to see (404 otherwise). Reports of the same thing gather in one case; reporting the same thing again replaces the account’s earlier report. One’s own things cannot be reported (400). Signed-out readers can report, sending the sign-in token from `GET /api/session` as the CSRF token, and answer a human-verification challenge first. Limited to ten reports a minute per account, or per address when signed out. The owner is never told who reported.',
+        'Reports a timeline, an event (moment or duration) in one, a comment on a pull request, a published plugin or suite, or an account, which the reporter must be able to see (404 otherwise). Reports of the same thing gather in one case; reporting the same thing again replaces the account’s earlier report. One’s own things cannot be reported (400). Signed-out readers can report, sending the sign-in token from `GET /api/session` as the CSRF token, and answer a human-verification challenge first. Limited to ten reports a minute per account, or per address when signed out. The owner is never told who reported.',
       security: REPORTER,
       parameters: [challengeHeader],
       requestBody: body(ref('ReportRequest'), { description: 'The report, at most 8 KiB.' }),
@@ -717,7 +717,7 @@ export const schemas = {
       },
       {
         type: 'object',
-        title: 'A moment or duration',
+        title: 'An event (a moment or a duration)',
         description: 'Reported in its timeline’s case.',
         required: ['kind', 'timeline', 'id'],
         properties: {
@@ -877,7 +877,7 @@ export const schemas = {
             details: { type: 'string' },
             entity_kind: {
               enum: ['moment', 'duration', null],
-              description: 'The moment or duration a timeline’s report names.',
+              description: 'The event (moment or duration) a timeline’s report names.',
             },
             entity_id: { type: ['string', 'null'] },
             created_at: timestamp,

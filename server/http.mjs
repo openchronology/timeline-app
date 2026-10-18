@@ -1305,7 +1305,7 @@ export function createRequestHandler({
           )
             throw new HttpError(
               400,
-              'Expected a revision and at most 5000 changed moments and durations.',
+              'Expected a revision and at most 5000 changed events (moments and durations).',
             );
           const settings = document({ ...input.settings, events: [] });
           const ids = new Set();

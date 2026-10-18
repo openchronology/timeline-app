@@ -104,7 +104,7 @@ Read-only server overview queries return the requested plugin metadata for indiv
 
 ## Derived metadata
 
-A plugin can work out metadata from what a moment or duration already has, for the other plugins to read, like middleware between the saved metadata and the plugins that draw it ([#122](https://github.com/openchronology/timeline-app/issues/122)). A rule sets one key from the first of its sources that has a value:
+A plugin can work out metadata from what an event (a moment or a duration) already has, for the other plugins to read, like middleware between the saved metadata and the plugins that draw it ([#122](https://github.com/openchronology/timeline-app/issues/122)). A rule sets one key from the first of its sources that has a value:
 
 ```json
 {

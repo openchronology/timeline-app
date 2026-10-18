@@ -66,7 +66,7 @@ Rebuild and rerun the seed command above to enrich examples already in the datab
 The `oc_seed_updates` ledger records `official-plugins-v1` once per seeded timeline.
 Enrichment appends missing official plugins and fills absent shape, size and color
 values for original moment IDs. It preserves existing plugin definitions and disabled
-states, text, exact times, sources, tags, custom events, removed moments and styles.
+states, text, exact times, sources, tags, curator-added moments, removed moments and styles.
 It saves a checkpoint parented to the previous head. Subsequent runs leave later
 plugin removals and settings untouched. The ledger and changes are transactional;
 failed upgrades can safely be retried. Forks are independent and aren't modified.
@@ -74,7 +74,7 @@ failed upgrades can safely be retried. Forks are independent and aren't modified
 ## Time conventions
 
 Historical day markers use exact Unix-second coordinates and Gregorian display.
-Midnight is a date marker, not a claim about the actual UTC time of an event.
+Midnight is a date marker, not a claim about the actual UTC time of what happened.
 The Constantinople dates in the sources are Julian: 29 May 1453 corresponds to
 7 June in proleptic Gregorian. Both forms are retained in the moment metadata
 and notes.
@@ -146,10 +146,10 @@ its own immutable definition history are available above the viewer.
 
 `wwii-campaign-comparison-v1` applies the conversion once, in the same transaction
 as campaign creation. Existing WWII moment IDs, exact times, metadata, plugins and
-removed events are preserved in the split. Unknown curator-added events go to the
+removed moments are preserved in the split. Unknown curator-added moments go to the
 European campaign unless `metadata.campaign` is `pacific`. New campaign timelines inherit the existing WWII visibility, forking policy and collaborators, so splitting a private curated example does not publish its data. The prior full document
 remains in history, parented to the new definition checkpoint. Existing forks are
-untouched. Conflicting edits to an already-existing campaign event stop the
+untouched. Conflicting edits to an already-existing campaign moment stop the
 transaction rather than overwrite content. Later seed runs leave edits alone.
 Public comparisons require public sources, and each source's access is checked
 when opening a comparison. Nested comparisons are not stored; adding an existing

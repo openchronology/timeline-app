@@ -6,7 +6,7 @@ A relationship links two different entities: two moments, two durations, or a mo
 
 Moment details and the duration dialog have a **Related to** section. It lists directly related entities 25 at a time, each with its time or extent; choose one to open it. When more entities are connected through other relationships, the section says how many, e.g. "14 more through other relationships".
 
-To link an entity, open **Add a relationship** and search titles and notes. Choose a result to link it. **×** removes a link. Undo and Redo cover adding and removing links. Deleting a moment or duration removes its links; undoing the deletion restores them.
+To link an entity, open **Add a relationship** and search titles and notes. Choose a result to link it. **×** removes a link. Undo and Redo cover adding and removing links. Deleting an event removes its links; undoing the deletion restores them.
 
 **Separate related** moves the entity and its directly related entities into a track above everything else, like [separating by tags](tags.md). **Separate all connected** also follows relationships transitively: everything reachable through any chain of links moves up. Separated tracks are read-only and draw no arcs; **Rejoin** returns to the whole timeline.
 

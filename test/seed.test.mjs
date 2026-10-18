@@ -212,7 +212,7 @@ test('saved comparison definitions survive validation and reject duplicates, inv
   assert.deepEqual(validateDocument(JSON.parse(JSON.stringify(doc))), doc);
   assert.throws(
     () => validateDocument({ ...doc, events: [LEGACY_SEED_TIMELINES[2].document.events[0]] }),
-    /instead of storing moments or durations/,
+    /instead of storing events/,
   );
   for (const sources of [
     [],

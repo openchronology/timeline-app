@@ -28,12 +28,12 @@ The documentation: how to use OpenChronology, run a server and work on the code.
 | [`log-import.md`](log-import.md)               | Importing historic log files into timelines with `och-import-logs`.                                                                        |
 | [`moderation.md`](moderation.md)               | Reporting content and how the site's administrators review reports (#115).                                                                 |
 | [`plugins.md`](plugins.md)                     | Timeline plugins: installing them, what they can change, writing and publishing your own, and where they run.                              |
-| [`relationships.md`](relationships.md)         | Relationships: undirected links between moments and durations, and how to view and edit them.                                              |
+| [`relationships.md`](relationships.md)         | Relationships: undirected links between events (moments and durations), and how to view and edit them.                                     |
 | [`retention.md`](retention.md)                 | Keeping only a timeline's recent past, not keeping saved history, and deleting everything in a view.                                       |
-| [`search.md`](search.md)                       | Searching a timeline's moments and durations, and how matching differs by where the timeline lives.                                        |
+| [`search.md`](search.md)                       | Searching a timeline's events (moments and durations), and how matching differs by where the timeline lives.                               |
 | [`seeding.md`](seeding.md)                     | Seeding the public example timelines and official plugins on a new installation.                                                           |
 | [`sharing.md`](sharing.md)                     | Sharing timelines: addresses, links, link previews, search engines and embedding in other websites.                                        |
 | [`syslog.md`](syslog.md)                       | Receiving syslog messages into timelines with the syslog receiver and routing rules.                                                       |
-| [`tags.md`](tags.md)                           | Tags on moments and durations, and separating a timeline into tracks by them.                                                              |
-| [`time-mapping.md`](time-mapping.md)           | Shifting and scaling the times of many moments and durations at once (#96).                                                                |
+| [`tags.md`](tags.md)                           | Tags on events, and separating a timeline into tracks by them.                                                                             |
+| [`time-mapping.md`](time-mapping.md)           | Shifting and scaling the times of many events at once (#96).                                                                               |
 | [`time-presentation.md`](time-presentation.md) | How a timeline displays and parses times: built-in formats and units, ruler graduations, and custom scripts.                               |
