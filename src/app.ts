@@ -4890,6 +4890,9 @@ el<HTMLDialogElement>('inspector').addEventListener('close', () => {
   if (!el('duration-dialog').hidden) {
     durationClosed();
     showMomentPanel();
+    // A duration opened by itself leaves no moment or group to put away, nor anything to
+    // redraw (a redraw now could replace a marker someone is about to click).
+    if (el('event-form').hidden && el('group-details').hidden) return;
   }
   forgetLink('moment');
   closeTimelineMenu();
