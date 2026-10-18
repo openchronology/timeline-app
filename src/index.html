@@ -389,99 +389,154 @@ Every point has a place. Explore the spaces between them.</textarea>
       </main>
     </div>
     <dialog id="inspector" class="moment-dialog" aria-labelledby="moment-heading">
-      <div class="inspector-heading">
-        <h2 id="moment-heading">Moment details</h2>
-        <button id="moment-share" class="share-entity" type="button" hidden>Share</button
-        ><button id="moment-report" class="share-entity" type="button" hidden>Report</button
-        ><button id="close-inspector" aria-label="Close moment details">×</button>
-      </div>
-      <div id="moment-kind" class="event-kind" role="tablist" aria-label="Kind of event">
-        <button type="button" role="tab" data-kind="moment">Moment</button
-        ><button type="button" role="tab" data-kind="duration">Duration</button>
-      </div>
-      <p id="moment-sensitive" class="sensitive-note" hidden>
-        <span></span>
-        <button type="button" class="link-button reveal-images">Show images</button>
-      </p>
-      <div id="group-details" hidden>
-        <h2 id="group-title"></h2>
-        <p id="group-note" class="muted"></p>
-        <button id="group-zoom">Zoom into this group</button>
-        <div id="group-events" class="group-events"></div>
-        <p id="group-page-status" class="muted" role="status" aria-live="polite"></p>
-        <button id="group-previous" hidden>Previous page</button>
-        <button id="group-more" hidden>Next 25 moments</button>
-        <section id="group-durations" hidden>
-          <h3>Durations</h3>
-          <div id="group-duration-list" class="group-events"></div>
-          <button id="group-durations-more" hidden>Next 25 durations</button>
-        </section>
-      </div>
-      <form id="event-form" hidden>
-        <label
-          >Title<input
-            id="event-title"
-            maxlength="1000"
-            placeholder="Optional — show a label on the timeline" /></label
-        ><label
-          >Exact time<input
-            id="event-time"
-            required
-            spellcheck="false"
-            placeholder="Time in this timeline’s format"
-        /></label>
-        <p class="field-hint">
-          Uses this timeline’s time display. Leaving the text unchanged preserves the exact
-          coordinate, even when the display rounds it.
-        </p>
-        <details>
-          <summary>Exact rational coordinate</summary>
-          <input
-            id="event-exact"
-            aria-label="Exact rational coordinate"
-            readonly
-            spellcheck="false"
-          />
-        </details>
-        <label
-          >Notes<textarea
-            id="event-description"
-            rows="5"
-            placeholder="What happened here?"
-          ></textarea>
-        </label>
-        <label
-          >Tags<input
-            id="event-tags"
-            maxlength="2000"
-            spellcheck="false"
-            placeholder="Comma-separated, e.g. war, trade"
-        /></label>
-        <fieldset id="event-labels" class="content-labels">
-          <legend>Sensitive content</legend>
-          <label><input type="checkbox" value="nudity" /> Nudity</label>
-          <label><input type="checkbox" value="violence" /> Graphic violence</label>
-          <label><input type="checkbox" value="disturbing" /> Disturbing content</label>
-        </fieldset>
-        <div id="plugin-event-fields"></div>
-        <section id="event-durations"></section>
-        <section id="event-related" class="related-section"></section>
-        <details>
-          <summary>Additional metadata</summary>
-          <label
-            >JSON object<textarea id="event-metadata" rows="6" spellcheck="false">{}</textarea>
-          </label>
-        </details>
-        <div id="event-error" class="form-error" role="alert"></div>
-        <div class="event-actions">
-          <span id="event-edit-status" class="sr-only" role="status"></span>
-          <button id="event-delete" class="button-danger" type="button">Delete</button>
-          <span class="dialog-commit">
-            <button id="event-cancel" type="button">Cancel</button
-            ><button id="event-save" class="button-primary" type="button">Save</button>
-          </span>
+      <!-- One dialog for events (#215): a moment's panel, or a duration's in its place. -->
+      <div id="moment-panel">
+        <div class="inspector-heading">
+          <h2 id="moment-heading">Moment details</h2>
+          <button id="moment-share" class="share-entity" type="button" hidden>Share</button
+          ><button id="moment-report" class="share-entity" type="button" hidden>Report</button
+          ><button id="close-inspector" aria-label="Close moment details">×</button>
         </div>
-      </form>
+        <div id="moment-kind" class="event-kind" role="tablist" aria-label="Kind of event">
+          <button type="button" role="tab" data-kind="moment">Moment</button
+          ><button type="button" role="tab" data-kind="duration">Duration</button>
+        </div>
+        <p id="moment-sensitive" class="sensitive-note" hidden>
+          <span></span>
+          <button type="button" class="link-button reveal-images">Show images</button>
+        </p>
+        <div id="group-details" hidden>
+          <h2 id="group-title"></h2>
+          <p id="group-note" class="muted"></p>
+          <button id="group-zoom">Zoom into this group</button>
+          <div id="group-events" class="group-events"></div>
+          <p id="group-page-status" class="muted" role="status" aria-live="polite"></p>
+          <button id="group-previous" hidden>Previous page</button>
+          <button id="group-more" hidden>Next 25 moments</button>
+          <section id="group-durations" hidden>
+            <h3>Durations</h3>
+            <div id="group-duration-list" class="group-events"></div>
+            <button id="group-durations-more" hidden>Next 25 durations</button>
+          </section>
+        </div>
+        <form id="event-form" hidden>
+          <label
+            >Title<input
+              id="event-title"
+              maxlength="1000"
+              placeholder="Optional — show a label on the timeline" /></label
+          ><label
+            >Exact time<input
+              id="event-time"
+              required
+              spellcheck="false"
+              placeholder="Time in this timeline’s format"
+          /></label>
+          <p class="field-hint">
+            Uses this timeline’s time display. Leaving the text unchanged preserves the exact
+            coordinate, even when the display rounds it.
+          </p>
+          <details>
+            <summary>Exact rational coordinate</summary>
+            <input
+              id="event-exact"
+              aria-label="Exact rational coordinate"
+              readonly
+              spellcheck="false"
+            />
+          </details>
+          <label
+            >Notes<textarea
+              id="event-description"
+              rows="5"
+              placeholder="What happened here?"
+            ></textarea>
+          </label>
+          <label
+            >Tags<input
+              id="event-tags"
+              maxlength="2000"
+              spellcheck="false"
+              placeholder="Comma-separated, e.g. war, trade"
+          /></label>
+          <fieldset id="event-labels" class="content-labels">
+            <legend>Sensitive content</legend>
+            <label><input type="checkbox" value="nudity" /> Nudity</label>
+            <label><input type="checkbox" value="violence" /> Graphic violence</label>
+            <label><input type="checkbox" value="disturbing" /> Disturbing content</label>
+          </fieldset>
+          <div id="plugin-event-fields"></div>
+          <section id="event-durations"></section>
+          <section id="event-related" class="related-section"></section>
+          <details>
+            <summary>Additional metadata</summary>
+            <label
+              >JSON object<textarea id="event-metadata" rows="6" spellcheck="false">{}</textarea>
+            </label>
+          </details>
+          <div id="event-error" class="form-error" role="alert"></div>
+          <div class="event-actions">
+            <span id="event-edit-status" class="sr-only" role="status"></span>
+            <button id="event-delete" class="button-danger" type="button">Delete</button>
+            <span class="dialog-commit">
+              <button id="event-cancel" type="button">Cancel</button
+              ><button id="event-save" class="button-primary" type="button">Save</button>
+            </span>
+          </div>
+        </form>
+      </div>
+      <section id="duration-dialog" class="duration-panel" hidden>
+        <div class="inspector-heading">
+          <h2 id="duration-heading">Duration</h2>
+          <button id="duration-share" class="share-entity" type="button" hidden>Share</button
+          ><button id="duration-report" class="share-entity" type="button" hidden>Report</button
+          ><button id="duration-close" aria-label="Close duration details">×</button>
+        </div>
+        <div id="duration-kind" class="event-kind" role="tablist" aria-label="Kind of event">
+          <button type="button" role="tab" data-kind="moment">Moment</button
+          ><button type="button" role="tab" data-kind="duration">Duration</button>
+        </div>
+        <p id="duration-sensitive" class="sensitive-note" hidden>
+          <span></span>
+          <button type="button" class="link-button reveal-images">Show images</button>
+        </p>
+        <form id="duration-form">
+          <label>Title<input id="duration-title" maxlength="1000" placeholder="Optional" /></label>
+          <div id="duration-endpoints" class="duration-endpoints"></div>
+          <label>Notes<textarea id="duration-description" rows="4"></textarea></label>
+          <label
+            >Tags<input
+              id="duration-tags"
+              maxlength="2000"
+              spellcheck="false"
+              placeholder="Comma-separated, e.g. war, trade"
+          /></label>
+          <fieldset id="duration-labels" class="content-labels">
+            <legend>Sensitive content</legend>
+            <label><input type="checkbox" value="nudity" /> Nudity</label>
+            <label><input type="checkbox" value="violence" /> Graphic violence</label>
+            <label><input type="checkbox" value="disturbing" /> Disturbing content</label>
+          </fieldset>
+          <div id="plugin-duration-fields"></div>
+          <section id="duration-related" class="related-section"></section>
+          <details>
+            <summary>Additional metadata</summary>
+            <label
+              >JSON object<textarea id="duration-metadata" rows="6" spellcheck="false">{}</textarea>
+            </label>
+          </details>
+          <div id="duration-error" class="form-error" role="alert"></div>
+          <div class="event-actions">
+            <button id="duration-delete" class="button-danger" type="button">
+              Delete duration
+            </button>
+            <span class="dialog-commit">
+              <button id="duration-cancel" type="button">Cancel</button
+              ><button id="duration-save" class="button-primary" type="button">Save</button>
+            </span>
+          </div>
+        </form>
+      </section>
     </dialog>
     <dialog id="separate-dialog" aria-labelledby="separate-heading">
       <form id="separate-form">
@@ -583,56 +638,6 @@ Every point has a place. Explore the spaces between them.</textarea>
         <div class="dialog-actions" hidden>
           <button id="search-previous" type="button">Previous</button
           ><button id="search-next" type="button">Next</button>
-        </div>
-      </form>
-    </dialog>
-    <dialog id="duration-dialog" class="moment-dialog" aria-labelledby="duration-heading">
-      <div class="inspector-heading">
-        <h2 id="duration-heading">Duration</h2>
-        <button id="duration-share" class="share-entity" type="button" hidden>Share</button
-        ><button id="duration-report" class="share-entity" type="button" hidden>Report</button
-        ><button data-close="duration-dialog" aria-label="Close duration details">×</button>
-      </div>
-      <div id="duration-kind" class="event-kind" role="tablist" aria-label="Kind of event">
-        <button type="button" role="tab" data-kind="moment">Moment</button
-        ><button type="button" role="tab" data-kind="duration">Duration</button>
-      </div>
-      <p id="duration-sensitive" class="sensitive-note" hidden>
-        <span></span>
-        <button type="button" class="link-button reveal-images">Show images</button>
-      </p>
-      <form id="duration-form">
-        <label>Title<input id="duration-title" maxlength="1000" placeholder="Optional" /></label>
-        <div id="duration-endpoints" class="duration-endpoints"></div>
-        <label>Notes<textarea id="duration-description" rows="4"></textarea></label>
-        <label
-          >Tags<input
-            id="duration-tags"
-            maxlength="2000"
-            spellcheck="false"
-            placeholder="Comma-separated, e.g. war, trade"
-        /></label>
-        <fieldset id="duration-labels" class="content-labels">
-          <legend>Sensitive content</legend>
-          <label><input type="checkbox" value="nudity" /> Nudity</label>
-          <label><input type="checkbox" value="violence" /> Graphic violence</label>
-          <label><input type="checkbox" value="disturbing" /> Disturbing content</label>
-        </fieldset>
-        <div id="plugin-duration-fields"></div>
-        <section id="duration-related" class="related-section"></section>
-        <details>
-          <summary>Additional metadata</summary>
-          <label
-            >JSON object<textarea id="duration-metadata" rows="6" spellcheck="false">{}</textarea>
-          </label>
-        </details>
-        <div id="duration-error" class="form-error" role="alert"></div>
-        <div class="event-actions">
-          <button id="duration-delete" class="button-danger" type="button">Delete duration</button>
-          <span class="dialog-commit">
-            <button id="duration-cancel" type="button">Cancel</button
-            ><button id="duration-save" class="button-primary" type="button">Save</button>
-          </span>
         </div>
       </form>
     </dialog>
