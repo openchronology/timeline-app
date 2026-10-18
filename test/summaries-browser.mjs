@@ -99,7 +99,7 @@ export async function checkSummaries(page, restore) {
     await menu.getByRole('menuitem', { name: 'Edit', exact: true }).click();
     await dialog.waitFor();
     assert.equal(await page.locator('#duration-title').inputValue(), 'Long');
-    await page.locator('[data-close="duration-dialog"]').click();
+    await page.locator('#duration-close').click();
     await dialog.waitFor({ state: 'hidden' });
     assert.equal(await page.locator('.duration-band[data-duration-id="alone"]').count(), 0);
     const alone = page.locator('.event-marker.duration-point[aria-label="Duration: Alone"]');

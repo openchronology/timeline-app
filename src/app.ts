@@ -3608,8 +3608,69 @@ function showMomentDetails(title: string) {
   hoverPreview.hide();
   summaryExpansion.hide();
   text('moment-heading', title);
-  el<HTMLDialogElement>('inspector').showModal();
+  // A duration showing in the dialog gives way to the moment.
+  if (!el('duration-dialog').hidden) durationDialog.close(true);
+  showInspector();
 }
+/**
+ * Opens the event dialog, or keeps it open if it is closing: the wrapper (dialogs.ts) then
+ * stops the exit animation, and older browsers refuse showModal on a dialog already modal.
+ */
+function showInspector() {
+  const dialog = el<HTMLDialogElement>('inspector');
+  if (dialog.open && dialog.dataset.dialogClosing === undefined) return;
+  try {
+    dialog.showModal();
+  } catch {
+    // Already modal: the exit animation was stopped, so it stays open.
+  }
+}
+/**
+ * The event dialog's duration panel (#215), used as the duration's own dialog was: showing it
+ * replaces the moment's panel without changing what is modal, which would restyle the whole
+ * page. Closed, it returns to the moment (or group) it was opened over, or closes the dialog.
+ */
+let durationOverMoment = false;
+const durationDialog = {
+  get open() {
+    return el<HTMLDialogElement>('inspector').open && !el('duration-dialog').hidden;
+  },
+  showModal() {
+    const dialog = el<HTMLDialogElement>('inspector');
+    if (el('duration-dialog').hidden)
+      durationOverMoment = dialog.open && dialog.dataset.dialogClosing === undefined;
+    el('moment-panel').hidden = true;
+    el('duration-dialog').hidden = false;
+    dialog.setAttribute('aria-labelledby', 'duration-heading');
+    showInspector();
+  },
+  /** Ends the duration's session; `keepDialog` when the caller shows a moment next. */
+  close(keepDialog = false) {
+    if (el('duration-dialog').hidden) return;
+    if (!keepDialog && !durationOverMoment) return el<HTMLDialogElement>('inspector').close();
+    durationClosed();
+    showMomentPanel();
+  },
+};
+/** The moment's panel again, in place of the duration's. */
+function showMomentPanel() {
+  el('duration-dialog').hidden = true;
+  el('moment-panel').hidden = false;
+  el('inspector').setAttribute('aria-labelledby', 'moment-heading');
+  durationOverMoment = false;
+}
+el('duration-close').onclick = () => durationDialog.close();
+// Escape on a duration opened over a moment goes back to the moment, as × does.
+el('inspector').addEventListener(
+  'cancel',
+  (event) => {
+    if (!durationDialog.open || !durationOverMoment) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    durationDialog.close();
+  },
+  true,
+);
 function eventForm(event?: PointEvent, time?: Q) {
   if (comparison && !event) return;
   // Opening another entity ends the current session without keeping it.
@@ -3705,11 +3766,6 @@ function fillSharedFields(form: 'event' | 'duration', fields: ReturnType<typeof 
   for (const box of el(form + '-labels').querySelectorAll<HTMLInputElement>('input'))
     box.checked = fields.labels.includes(box.value);
 }
-/** Closes `from` at once, without its exit animation, as `to` opens in its place unanimated. */
-function switchDialog(from: string, to: string) {
-  HTMLDialogElement.prototype.close.call(el<HTMLDialogElement>(from));
-  el(to).dataset.dialogSwitched = '';
-}
 // A new moment becomes a duration from its time, a quarter of the view long.
 el('moment-kind').addEventListener('click', (event) => {
   const tab = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-kind=duration]');
@@ -3717,8 +3773,9 @@ el('moment-kind').addEventListener('click', (event) => {
   const fields = sharedFields('event'),
     start = selectedTime ?? viewport.left.add(viewport.span.div(Q.from(2n)));
   discardMomentEdits();
-  switchDialog('inspector', 'duration-dialog');
   createDuration(start.toString(), start.add(viewport.span.div(Q.from(4n))).toString());
+  // A new event changing kind is not a duration opened over a moment.
+  durationOverMoment = false;
   fillSharedFields('duration', fields);
   flushDurationEdit();
   input('duration-title').focus();
@@ -3730,15 +3787,12 @@ el('duration-kind').addEventListener('click', (event) => {
   flushDurationEdit();
   const fields = sharedFields('duration'),
     band = resolveDuration(openDuration.duration, (id) => model?.momentTime(id));
-  discardDurationEdits();
-  switchDialog('duration-dialog', 'inspector');
+  durationDialog.close(true);
   eventForm(undefined, band ? Q.parse(band.startTime) : undefined);
   fillSharedFields('event', fields);
   queueEventEdit();
   input('event-title').focus();
 });
-for (const id of ['inspector', 'duration-dialog'])
-  el(id).addEventListener('close', () => delete el(id).dataset.dialogSwitched);
 async function groupPage(
   group: FrameGroup,
   after: { time: string; id: string } | null = null,
@@ -4833,6 +4887,13 @@ el('clear-selection').onclick = () => {
 el('close-inspector').onclick = () => el<HTMLDialogElement>('inspector').close();
 el<HTMLDialogElement>('inspector').addEventListener('close', () => {
   if (el<HTMLDialogElement>('inspector').open) return;
+  if (!el('duration-dialog').hidden) {
+    durationClosed();
+    showMomentPanel();
+    // A duration opened by itself leaves no moment or group to put away, nor anything to
+    // redraw (a redraw now could replace a marker someone is about to click).
+    if (el('event-form').hidden && el('group-details').hidden) return;
+  }
   forgetLink('moment');
   closeTimelineMenu();
   // Closed other than by Save: nothing typed since it opened is kept.
@@ -5945,12 +6006,12 @@ function applyEdit(redo: boolean) {
       // Undo applies the opposite of the recorded state; redo reapplies it.
       if (edit.related === redo) index.relate(edit.link.a, edit.link.b);
       else index.unrelate(edit.link.a, edit.link.b);
-      el<HTMLDialogElement>('duration-dialog').close();
+      durationDialog.close();
     } else if ('duration' in edit) {
       const [from, to] = redo ? [edit.before, edit.after] : [edit.after, edit.before];
       if (to) index.putDuration(to);
       else if (from) index.deleteDuration(from.id);
-      el<HTMLDialogElement>('duration-dialog').close();
+      durationDialog.close();
     } else {
       const [from, to] = redo ? [edit.before, edit.after] : [edit.after, edit.before];
       // Replacing a moment in place keeps duration and relationship indexes (see
@@ -6804,7 +6865,7 @@ el('conflict-theirs').onclick = () => {
       if (conflict.kind === 'duration') index.discardDuration(conflict.id);
       if (selected?.id === conflict.id || openDuration?.duration.id === conflict.id) {
         el<HTMLDialogElement>('inspector').close();
-        el<HTMLDialogElement>('duration-dialog').close();
+        durationDialog.close();
         selected = null;
       }
     }
@@ -7590,8 +7651,7 @@ function showDuration(duration: Duration, readOnly: boolean, isNew = false) {
     isNew || !shareable() || !!sparseWorkspace()?.durationChanges.has(duration.id);
   el('duration-report').hidden = el('duration-share').hidden || !!remote?.canShare;
   showEventKind('duration', isNew && !readOnly);
-  const dialog = el<HTMLDialogElement>('duration-dialog');
-  if (!dialog.open) dialog.showModal();
+  durationDialog.showModal();
   if (!isNew && !comparison) reportLink({ kind: 'duration', id: duration.id });
 }
 /** Reads the form into a duration; throws with a user-facing message when incomplete. */
@@ -7670,13 +7730,12 @@ function discardDurationEdits() {
   }
   endPreview(current?.document === documentRequest);
 }
-el<HTMLDialogElement>('duration-dialog').addEventListener('close', () => {
-  if (el<HTMLDialogElement>('duration-dialog').open) return;
+/** A duration's panel closing, other than by Save: nothing typed since it opened is kept. */
+function durationClosed() {
   forgetLink('duration');
-  // Closed other than by Save: nothing typed since it opened is kept.
   discardDurationEdits();
   if (selected && !el('event-form').hidden) refreshDurations();
-});
+}
 /** Removes one dialog session's undo step, whichever stack it is on. */
 function forgetEdit(edit: HistoryEntry) {
   history = history.filter((e) => e !== edit);
@@ -7723,11 +7782,11 @@ el('duration-save').onclick = () => {
     changed();
   }
   endPreview();
-  el<HTMLDialogElement>('duration-dialog').close();
+  durationDialog.close();
 };
 el('duration-cancel').onclick = () => {
   discardDurationEdits();
-  el<HTMLDialogElement>('duration-dialog').close();
+  durationDialog.close();
 };
 el('duration-delete').onclick = () => requestDurationDelete();
 /** Asks to delete the open duration. */
@@ -7748,7 +7807,7 @@ function requestDurationDelete() {
       }
       openDuration = null;
       el<HTMLDialogElement>('delete-dialog').close();
-      el<HTMLDialogElement>('duration-dialog').close();
+      durationDialog.close();
       changed();
     },
   };
@@ -7881,7 +7940,7 @@ function endpointEditor(which: 'start' | 'end') {
     open.disabled = !time;
     open.onclick = () => {
       if (!time) return;
-      el<HTMLDialogElement>('duration-dialog').close();
+      durationDialog.close(true);
       void selectGroup({
         id: endpoint.moment,
         first: time.toString(),
@@ -8645,7 +8704,7 @@ function openEntry(entry: RelatedEntry) {
     void openDurationById(entry.id).catch(fail);
     return;
   }
-  el<HTMLDialogElement>('duration-dialog').close();
+  durationDialog.close(true);
   void selectGroup({
     id: entry.id,
     first: entry.first,
@@ -8735,7 +8794,7 @@ function renderRelated(host: HTMLElement, ref: EntityRef | null, readOnly = fals
           button.type = 'button';
           button.textContent = text;
           button.onclick = () => {
-            el<HTMLDialogElement>('duration-dialog').close();
+            durationDialog.close();
             el<HTMLDialogElement>('inspector').close();
             startSeparation({ related: ref, depth, label });
           };

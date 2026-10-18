@@ -158,6 +158,19 @@ export async function checkIssues(page, restore) {
       .locator('#event-durations .duration-link')
       .filter({ hasText: 'Linked span' })
       .waitFor();
+    // Saved, the duration gave way to the moment it was started from (one dialog, #215);
+    // opened from the moment's list, Escape goes back to the moment too.
+    assert(await page.locator('#moment-panel').isVisible());
+    await page
+      .locator('#event-durations .duration-link')
+      .filter({ hasText: 'Linked span' })
+      .click();
+    await durationDialog.waitFor({ state: 'visible' });
+    assert(await page.locator('#moment-panel').isHidden());
+    await page.keyboard.press('Escape');
+    await durationDialog.waitFor({ state: 'hidden' });
+    assert(await page.locator('#moment-panel').isVisible());
+    assert(await page.locator('#inspector').isVisible());
     await closeMomentDetails(page);
     const band = page.locator('.duration-band');
     await band.waitFor({ state: 'visible' });

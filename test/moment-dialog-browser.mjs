@@ -19,6 +19,8 @@ async function finishMomentDetails(page, keep) {
   for (let attempt = 0; attempt < 5 && (await inspector.isVisible()); attempt++) {
     const state = await inspector.evaluate((node) => ({
       closing: !node.open || 'dialogClosing' in node.dataset,
+      // The dialog may show a duration in place of the moment (#215).
+      duration: !document.getElementById('duration-dialog').hidden,
       editing:
         !document.getElementById('event-form').hidden &&
         /^(Applying edits|Shown on the timeline|Not on the timeline)/.test(
@@ -27,7 +29,13 @@ async function finishMomentDetails(page, keep) {
     }));
     if (!state.closing)
       await page
-        .locator(keep && state.editing ? '#event-save' : '#close-inspector')
+        .locator(
+          state.duration
+            ? '#duration-close'
+            : keep && state.editing
+              ? '#event-save'
+              : '#close-inspector',
+        )
         .click({ timeout: 2000 })
         .catch(() => {});
     await inspector.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {});
@@ -168,7 +176,7 @@ export async function checkMomentDialog(page, restoreDocument) {
   await input('event-tags').fill('kind, change');
   await page.locator('#moment-kind [data-kind=duration]').click();
   await durationDialog.waitFor({ state: 'visible' });
-  assert(await input('inspector').isHidden());
+  assert(await input('moment-panel').isHidden());
   assert.equal(await input('duration-title').inputValue(), 'Changing kind');
   assert.equal(await input('duration-tags').inputValue(), 'kind, change');
   assert.equal(await page.locator('#duration-kind [aria-selected=true]').textContent(), 'Duration');
