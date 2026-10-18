@@ -25,7 +25,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { BUDGETS, COMFORTABLE, Q, Viewport } from '../dist/core.mjs';
 import { generateTimeline } from './generate.mjs';
-import { webdriverSession } from './ui/webdriver.mjs';
+import { startTauriDriver, webdriverSession } from './ui/webdriver.mjs';
 
 const env = process.env;
 const list = (value, fallback) => (value || fallback).split(/[\s,]+/).filter(Boolean);
@@ -925,27 +925,13 @@ async function suite(label, platform, throttle, size, opened) {
  * the app first: npx tauri build --debug --no-bundle (embeds dist/).
  */
 async function startDesktop() {
-  const port = Number(env.UI_WEBDRIVER_PORT ?? 4444),
-    url = `http://127.0.0.1:${port}`;
+  const port = Number(env.UI_WEBDRIVER_PORT ?? 4444);
   const app = resolve(
     env.UI_DESKTOP_APP ??
       `${env.CARGO_TARGET_DIR ?? 'src-tauri/target'}/debug/openchronology-desktop`,
   );
-  const driver = spawn(env.TAURI_DRIVER ?? 'tauri-driver', ['--port', String(port)], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  let logs = '';
-  for (const s of [driver.stdout, driver.stderr])
-    s.on('data', (c) => (logs = (logs + c).slice(-8000)));
-  for (let i = 0; ; i++) {
-    if (driver.exitCode !== null) throw new Error('tauri-driver exited:\n' + logs);
-    try {
-      if ((await fetch(url + '/status', { signal: AbortSignal.timeout(500) })).ok) break;
-    } catch {}
-    if (i > 100) throw new Error('tauri-driver did not start:\n' + logs);
-    await delay(100);
-  }
-  return { url, app, logs: () => 'tauri-driver:\n' + logs, close: () => driver.kill() };
+  const { url, logs, stop } = await startTauriDriver(port);
+  return { url, app, logs, close: stop };
 }
 /**
  * A fresh app per timeline. Timelines over 2,048 moments move into the native SQLite store

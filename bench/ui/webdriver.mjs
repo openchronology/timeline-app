@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // The UI benchmarks' desktop driver: the Tauri app through tauri-driver (W3C WebDriver, which
 // forwards to WebKitWebDriver on Linux). Input is real: W3C pointer, key and wheel actions.
+import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 
 /** W3C key values for the names the scenarios press. */
@@ -14,6 +15,46 @@ const KEYS = {
   Space: ' ',
 };
 const key = (name) => KEYS[name] ?? name;
+
+/**
+ * Starts tauri-driver on `port` (with `args`) and waits until it answers. `logs()` is its
+ * recent output; `stop()` kills it with everything it started, so nothing left running (such as
+ * WebKitWebDriver or the app holding the driver's output open) keeps Node from exiting.
+ */
+export async function startTauriDriver(port, args = []) {
+  const url = `http://127.0.0.1:${port}`;
+  const driver = spawn(
+    process.env.TAURI_DRIVER ?? 'tauri-driver',
+    ['--port', String(port), ...args],
+    {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
+    },
+  );
+  let output = '';
+  for (const s of [driver.stdout, driver.stderr])
+    s.on('data', (c) => (output = (output + c).slice(-8000)));
+  const logs = () => 'tauri-driver:\n' + output;
+  const stop = () => {
+    try {
+      process.kill(-driver.pid, 'SIGKILL');
+    } catch {}
+    driver.stdout.destroy();
+    driver.stderr.destroy();
+  };
+  for (let i = 0; ; i++) {
+    if (driver.exitCode !== null) throw new Error('tauri-driver exited:\n' + output);
+    try {
+      if ((await fetch(url + '/status', { signal: AbortSignal.timeout(500) })).ok) break;
+    } catch {}
+    if (i > 100) {
+      stop();
+      throw new Error('tauri-driver did not start:\n' + output);
+    }
+    await delay(100);
+  }
+  return { url, logs, stop };
+}
 
 /**
  * A WebDriver session on the app at `application`, through the driver at `url`. A request the
