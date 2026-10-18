@@ -6,8 +6,11 @@ import { Q, Viewport } from '../dist/core.mjs';
 export async function checkZoomHelp(page) {
   const stage = page.locator('#timeline-stage');
   const camera = async () => {
-    const left = Q.parse(await page.locator('#exact-left').inputValue());
-    return new Viewport(left, Q.parse(await page.locator('#exact-right').inputValue()).sub(left));
+    const left = Q.parse(await page.locator('#timeline-stage').getAttribute('data-view-left'));
+    return new Viewport(
+      left,
+      Q.parse(await page.locator('#timeline-stage').getAttribute('data-view-right')).sub(left),
+    );
   };
   const width = await stage.evaluate((node) => node.clientWidth - 96);
   const before = await camera();
@@ -16,7 +19,7 @@ export async function checkZoomHelp(page) {
   assert.equal(await stage.getAttribute('data-zooming'), 'true');
   await page.waitForFunction(() => !document.getElementById('timeline-stage').dataset.zooming);
   await page.waitForFunction(
-    (left) => document.getElementById('exact-left').value === left,
+    (left) => document.getElementById('timeline-stage').dataset.viewLeft === left,
     expected.left.toString(),
   );
   assert.equal((await camera()).span.toString(), expected.span.toString());
@@ -33,7 +36,9 @@ export async function checkZoomHelp(page) {
   });
   await page.waitForFunction((span) => {
     const node = document.getElementById('timeline-stage');
-    return !node.dataset.zooming && document.getElementById('exact-left').value === span;
+    return (
+      !node.dataset.zooming && document.getElementById('timeline-stage').dataset.viewLeft === span
+    );
   }, target.left.toString());
   assert.equal((await camera()).span.toString(), target.span.toString());
 

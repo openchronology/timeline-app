@@ -63,13 +63,17 @@ export async function checkPresentation(page, restoreDocument) {
   assert.match(await input('left-bound').inputValue(), /minutes$/);
   assert.match(await input('right-bound').inputValue(), /minutes$/);
   const exactBounds = await Promise.all(
-    ['exact-left', 'exact-right'].map((id) => input(id).inputValue()),
+    ['data-view-left', 'data-view-right'].map((name) => input('timeline-stage').getAttribute(name)),
   );
   await closeMomentDetails(page);
   await input('apply-bounds').click();
   await page.evaluate(() => new Promise(requestAnimationFrame));
   assert.deepEqual(
-    await Promise.all(['exact-left', 'exact-right'].map((id) => input(id).inputValue())),
+    await Promise.all(
+      ['data-view-left', 'data-view-right'].map((name) =>
+        input('timeline-stage').getAttribute(name),
+      ),
+    ),
     exactBounds,
   );
   await input('left-bound').fill('0.1 minutes');
@@ -77,8 +81,8 @@ export async function checkPresentation(page, restoreDocument) {
   await closeMomentDetails(page);
   await input('apply-bounds').click();
   await page.evaluate(() => new Promise(requestAnimationFrame));
-  assert.equal(await input('exact-left').inputValue(), '6/1');
-  assert.equal(await input('exact-right').inputValue(), '120/1');
+  assert.equal(await input('timeline-stage').getAttribute('data-view-left'), '6/1');
+  assert.equal(await input('timeline-stage').getAttribute('data-view-right'), '120/1');
   await input('fit-button').click();
   await page.locator('.event-marker').first().click();
   await input('event-time').fill('1.5 minutes');
@@ -125,8 +129,8 @@ export async function checkPresentation(page, restoreDocument) {
   await closeMomentDetails(page);
   await input('apply-bounds').click();
   await page.evaluate(() => new Promise(requestAnimationFrame));
-  assert.equal(await input('exact-left').inputValue(), '1/3');
-  assert.equal(await input('exact-right').inputValue(), '100/1');
+  assert.equal(await input('timeline-stage').getAttribute('data-view-left'), '1/3');
+  assert.equal(await input('timeline-stage').getAttribute('data-view-right'), '100/1');
   await imported({ ...document, title: 'Custom settings reimported' });
   await closeMomentDetails(page);
   await input('presentation-button').click();

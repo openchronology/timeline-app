@@ -1290,11 +1290,9 @@ function renderAxis() {
       }
     }
   }
-  for (const [id, value] of [
-    ['exact-left', viewport.left.toString()],
-    ['exact-right', viewport.right.toString()],
-  ])
-    if (document.activeElement !== el(id)) input(id).value = value;
+  // The exact view, for tests and benchmarks: the bounds' text may be rounded.
+  stage.dataset.viewLeft = viewport.left.toString();
+  stage.dataset.viewRight = viewport.right.toString();
   for (const [id, time] of [
     ['left-bound', viewport.left],
     ['right-bound', viewport.right],
@@ -5289,18 +5287,6 @@ async function saveDisplaySettings(presentation: TimePresentation) {
     }
   }
 }
-el('apply-exact-bounds').onclick = () => {
-  follow.navigation();
-  cancelZoomAnimation();
-  try {
-    const left = parseTime(input('exact-left').value),
-      right = parseTime(input('exact-right').value);
-    viewport = new Viewport(left, right.sub(left));
-    requestRender();
-  } catch (error) {
-    fail(error);
-  }
-};
 el('group-zoom').onclick = () => {
   if (selectedGroup) {
     zoomGroup(selectedGroup);

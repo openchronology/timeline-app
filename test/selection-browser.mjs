@@ -180,7 +180,7 @@ export async function checkSelection(page, restoreDocument) {
   assert.equal((await exported()).events.length, 2);
   // A held touch opens a menu without submitting a tap or moving the camera.
   await closeMomentDetails(page);
-  const before = await input('exact-left').inputValue();
+  const before = await input('timeline-stage').getAttribute('data-view-left');
   const title = await input('event-title').inputValue();
   await stage.scrollIntoViewIfNeeded();
   const touchBox = await stage.boundingBox();
@@ -214,7 +214,7 @@ export async function checkSelection(page, restoreDocument) {
     bubbles: true,
   });
   await page.mouse.up();
-  assert.equal(await input('exact-left').inputValue(), before);
+  assert.equal(await input('timeline-stage').getAttribute('data-view-left'), before);
   assert.equal(await input('event-title').inputValue(), title);
   await page.keyboard.press('Escape');
   assert.equal((await exported()).presentation.source, source);

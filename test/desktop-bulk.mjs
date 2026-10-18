@@ -61,11 +61,11 @@ try {
   /** Shows exactly [left, right] and waits until it holds `expected` moments, if given. */
   const view = async (left, right, expected) => {
     await d.eval(`(() => {
-      document.getElementById('exact-left').value = '${left}';
-      document.getElementById('exact-right').value = '${right}';
-      document.getElementById('apply-exact-bounds').click();
+      document.getElementById('left-bound').value = '${left}';
+      document.getElementById('right-bound').value = '${right}';
+      document.getElementById('apply-bounds').click();
     })()`);
-    await d.wait(`document.getElementById('exact-left').value === '${left}/1'`);
+    await d.wait(`document.getElementById('timeline-stage').dataset.viewLeft === '${left}/1'`);
     if (expected !== undefined) await d.wait(`${count} === ${expected}`, 30000);
   };
   /** Opens the timeline menu in the middle of the view and chooses `item`. */
@@ -157,7 +157,7 @@ try {
       'state',
       await d
         .eval(
-          `JSON.stringify({ toast: document.getElementById('toast').textContent, error: document.getElementById('map-error')?.textContent, open: [...document.querySelectorAll('dialog[open]')].map((x) => x.id), view: document.getElementById('markers').dataset.view, markers: document.querySelectorAll('#markers .event-marker').length, first: document.querySelector('#markers .event-marker')?.outerHTML.slice(0, 300), exact: [document.getElementById('exact-left').value, document.getElementById('exact-right').value], storage: document.documentElement.dataset.storage, size: [innerWidth, innerHeight], loading: !document.getElementById('loading-window').hidden, empty: !document.getElementById('empty-window').hidden, count: ${'[...document.querySelectorAll("#markers .event-marker")].reduce((n, m) => n + Number(m.dataset.count), 0)'} })`,
+          `JSON.stringify({ toast: document.getElementById('toast').textContent, error: document.getElementById('map-error')?.textContent, open: [...document.querySelectorAll('dialog[open]')].map((x) => x.id), view: document.getElementById('markers').dataset.view, markers: document.querySelectorAll('#markers .event-marker').length, first: document.querySelector('#markers .event-marker')?.outerHTML.slice(0, 300), exact: [document.getElementById('timeline-stage').dataset.viewLeft, document.getElementById('timeline-stage').dataset.viewRight], storage: document.documentElement.dataset.storage, size: [innerWidth, innerHeight], loading: !document.getElementById('loading-window').hidden, empty: !document.getElementById('empty-window').hidden, count: ${'[...document.querySelectorAll("#markers .event-marker")].reduce((n, m) => n + Number(m.dataset.count), 0)'} })`,
           // Briefly: when the driver has stalled, the error below is what matters.
           10000,
         )

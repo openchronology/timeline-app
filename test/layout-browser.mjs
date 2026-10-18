@@ -6,8 +6,8 @@ export async function checkResponsiveTimeline(page) {
   const original = page.viewportSize();
   const bounds = () =>
     page.evaluate(() => [
-      document.getElementById('exact-left').value,
-      document.getElementById('exact-right').value,
+      document.getElementById('timeline-stage').dataset.viewLeft,
+      document.getElementById('timeline-stage').dataset.viewRight,
     ]);
   // This must render without wheel/pointer input, including after a full refresh.
   await page.waitForFunction(

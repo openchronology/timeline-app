@@ -208,11 +208,11 @@ try {
   // Follow latest: an idle viewer moves to moments arriving outside its view.
   await page.locator('#follow-latest-control').waitFor();
   await page.locator('#follow-latest').check();
-  const left = await page.locator('#exact-left').inputValue();
+  const left = await page.locator('#timeline-stage').getAttribute('data-view-left');
   await sendUdp(line('web', 'Far ahead', (now + 30 * 86400) * 1000));
   await visible(5);
   await page.waitForFunction(
-    (before) => document.getElementById('exact-left').value !== before,
+    (before) => document.getElementById('timeline-stage').dataset.viewLeft !== before,
     left,
     { timeout: 30000 },
   );

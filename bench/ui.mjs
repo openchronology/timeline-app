@@ -161,6 +161,8 @@ const loaded = (condition) =>
   `(() => { const s = (window.__loaded ??= { seen: false, frames: 0, start: performance.now() }); if (!(${condition})) return false; const loading = ${visible('#loading-window')}; s.frames++; if (loading) s.seen = true; return !loading && (s.seen || (s.frames > 3 && performance.now() - s.start > 150)); })()`;
 const resetLoaded = (d) => d.eval('delete window.__loaded');
 const value = (selector) => `document.querySelector(${JSON.stringify(selector)}).value`;
+/** The exact left bound of the view, which the bounds' text may round. */
+const viewLeft = `document.getElementById('timeline-stage').dataset.viewLeft`;
 const text = (selector) => `document.querySelector(${JSON.stringify(selector)}).textContent`;
 /**
  * Shows the exact view [left, right] and waits until it is drawn and loaded: on the desktop
@@ -168,11 +170,11 @@ const text = (selector) => `document.querySelector(${JSON.stringify(selector)}).
  */
 async function show(d, left, right) {
   await d.eval(`(() => {
-    document.getElementById('exact-left').value = ${JSON.stringify(left.toString())};
-    document.getElementById('exact-right').value = ${JSON.stringify(right.toString())};
-    document.getElementById('apply-exact-bounds').click();
+    document.getElementById('left-bound').value = ${JSON.stringify(left.toString())};
+    document.getElementById('right-bound').value = ${JSON.stringify(right.toString())};
+    document.getElementById('apply-bounds').click();
   })()`);
-  const there = `${value('#exact-left')} === ${JSON.stringify(left.toString())}`;
+  const there = `${viewLeft} === ${JSON.stringify(left.toString())}`;
   await d.wait(there);
   await resetLoaded(d);
   await d.wait(loaded('true'));
@@ -303,7 +305,7 @@ const SCENARIOS = [
       const before = await d.eval(BOUNDS);
       const ms = await timed(d, changedFrom(before), () => d.click('#fit-button'));
       // Fit all animates; let it land before the next step sets its own view.
-      await d.wait(`${value('#exact-left')} === ${JSON.stringify(t.fitted.left.toString())}`);
+      await d.wait(`${viewLeft} === ${JSON.stringify(t.fitted.left.toString())}`);
       return ms;
     },
   },
@@ -669,7 +671,7 @@ const SCENARIOS = [
  * imported." also use the toast, so a toast alone is not an error).
  */
 async function opened(d, t, timeout = 15 * 60000) {
-  const fitted = `${value('#exact-left')} === ${JSON.stringify(t.fitted.left.toString())}`;
+  const fitted = `${viewLeft} === ${JSON.stringify(t.fitted.left.toString())}`;
   const until = Date.now() + timeout;
   let toastSince = null;
   while (!(await d.eval(fitted))) {
