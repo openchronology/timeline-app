@@ -908,7 +908,9 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
       document.getElementById('markers').style.transform.startsWith('translateY(0px)'),
     );
     const uiBounds = await Promise.all(
-      ['exact-left', 'exact-right'].map((id) => input(id).inputValue()),
+      ['data-view-left', 'data-view-right'].map((name) =>
+        input('timeline-stage').getAttribute(name),
+      ),
     );
     const beforeSize = await page
       .locator('#markers .event-marker')
@@ -928,7 +930,11 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
       .evaluate((b) => b.getBoundingClientRect().width);
     assert(afterSize < beforeSize);
     assert.deepEqual(
-      await Promise.all(['exact-left', 'exact-right'].map((id) => input(id).inputValue())),
+      await Promise.all(
+        ['data-view-left', 'data-view-right'].map((name) =>
+          input('timeline-stage').getAttribute(name),
+        ),
+      ),
       uiBounds,
     );
     await closeMomentDetails(page);

@@ -1,13 +1,12 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Builds the standalone offline editor, dist/openchronology-offline.html: one file with its
 // script and styles inlined, no network transport, a hash-pinned content security policy, and
-// the licenses. Each edition (src/editions.ts, #197) is built the same way beside it, as
-// dist/openchronology-offline-<id>.html.
+// the legal notices, licenses included. Each edition (src/editions.ts, #197) is built the same
+// way beside it, as dist/openchronology-offline-<id>.html.
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { dependencyLicenses } from './licenses.mjs';
 import { withLegal, copyrightBanner } from './legal.mjs';
 
 /** The editions' IDs, from src/editions.ts itself, bundled and loaded here. */
@@ -79,12 +78,6 @@ async function buildEdition(edition) {
     Buffer.from(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#192d25"/><circle cx="16" cy="16" r="10" fill="none" stroke="#c4db98" stroke-width="2"/><path d="M16 8v8l6 4" fill="none" stroke="#c4db98" stroke-width="2"/></svg>',
     ).toString('base64');
-  const licenses = [
-    `LICENSE\n\n${await readFile('LICENSE', 'utf8')}`,
-    ...(await dependencyLicenses()),
-  ];
-  const escape = (text) =>
-    text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
   let html = await withLegal(await readFile('src/index.html', 'utf8'), false);
   html = html
     .replace(
@@ -95,14 +88,10 @@ async function buildEdition(edition) {
     .replace(
       /<link\s+rel="stylesheet"[^>]*\/>/,
       () =>
-        `<style>${css}\nbody[data-offline] .app-layout{grid-template-columns:minmax(0,1fr)}@media(max-width:960px){body[data-offline] .app-layout{grid-template-columns:minmax(0,1fr)}}body[data-offline] .document-toolbar{justify-content:flex-end}.offline-notices{font-size:10px;max-width:100%;padding:0 30px 20px}.offline-notices pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto}</style>`,
+        `<style>${css}\nbody[data-offline] .app-layout{grid-template-columns:minmax(0,1fr)}@media(max-width:960px){body[data-offline] .app-layout{grid-template-columns:minmax(0,1fr)}}body[data-offline] .document-toolbar{justify-content:flex-end}</style>`,
     )
     .replace(/<script\s+type="module"[^>]*><\/script>/, '')
-    .replace(
-      '</body>',
-      () =>
-        `<details class="offline-notices"><summary>Licenses</summary><pre>${escape(licenses.join('\n\n'))}</pre></details>\n<script>${script}</script>\n</body>`,
-    );
+    .replace('</body>', () => `<script>${script}</script>\n</body>`);
   await mkdir('dist', { recursive: true });
   if (/<script\b[^>]*\bsrc=|<link\b[^>]*rel="stylesheet"/i.test(html))
     throw new Error('Offline HTML contains an external asset.');

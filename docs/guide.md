@@ -73,7 +73,7 @@ Drafts stay in this browser only, and only for your account. Save to the server 
 | See everything                 | **Fit all**. **Center axis** brings the axis back to the middle without changing the time shown.                     |
 | Go to an exact stretch of time | Type times into **Left bound** and **Right bound** under the timeline, then **Go**.                                  |
 
-Type the bounds the way the timeline's display writes times. **Exact rational bounds** below them shows and accepts the stored numbers themselves, whatever the display (**Go to exact bounds**). With the Gregorian display, clicking a bound opens a date and time dialog instead.
+Type the bounds the way the timeline's display writes times. To see and type the stored numbers themselves, set **Time display** to **Exact rational**. With the Gregorian display, clicking a bound opens a date and time dialog instead.
 
 **Help** under the timeline lists these controls. The count above the timeline says how many moments are in view.
 

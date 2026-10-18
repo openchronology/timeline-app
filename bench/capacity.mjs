@@ -84,12 +84,12 @@ async function redraws(page, fitted) {
   for (let i = 0; i < SAMPLES; i++) {
     const view = i % 2 ? fitted : new Viewport(fitted.left.add(shift), fitted.span);
     const start = Date.now();
-    // The exact-bounds fields live in a panel that may be closed; apply them directly.
+    // The bounds, in the timeline's exact rational display, applied with Go.
     await page.evaluate(
       ([left, right]) => {
-        document.getElementById('exact-left').value = left;
-        document.getElementById('exact-right').value = right;
-        document.getElementById('apply-exact-bounds').click();
+        document.getElementById('left-bound').value = left;
+        document.getElementById('right-bound').value = right;
+        document.getElementById('apply-bounds').click();
       },
       [view.left.toString(), view.right.toString()],
     );

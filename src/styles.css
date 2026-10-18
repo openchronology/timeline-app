@@ -169,10 +169,6 @@ select:focus-visible {
 textarea {
   resize: vertical;
 }
-.presented-bounds {
-  margin: 12px 0 24px;
-  font-size: 12px;
-}
 #presentation-dialog {
   min-width: min(620px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
@@ -2050,7 +2046,6 @@ body[data-embed] .document-tags,
 body[data-embed] .timeline-actions,
 body[data-embed] .document-meta,
 body[data-embed] .window-bounds,
-body[data-embed] .presented-bounds,
 body[data-embed] #separate-button,
 body[data-embed] #presentation-button,
 body[data-embed] #plugins-button,

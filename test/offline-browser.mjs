@@ -235,8 +235,8 @@ try {
     await cfam.locator('.download-menu summary').click();
   }
   await cfam.setViewportSize({ width: 1440, height: 960 });
-  const left = parseTime(await cfam.locator('#exact-left').inputValue()),
-    right = parseTime(await cfam.locator('#exact-right').inputValue());
+  const left = parseTime(await cfam.locator('#timeline-stage').getAttribute('data-view-left')),
+    right = parseTime(await cfam.locator('#timeline-stage').getAttribute('data-view-right'));
   const span = right.sub(left),
     centre = left.add(span.div(Q.from(2n)));
   // Centred within ten minutes of when it opened, in stored seconds.

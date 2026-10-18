@@ -158,8 +158,8 @@ export async function checkViewportStore(browser) {
       });
     } catch (error) {
       const view = await page.evaluate(() => ({
-        left: document.getElementById('exact-left').value,
-        right: document.getElementById('exact-right').value,
+        left: document.getElementById('timeline-stage').dataset.viewLeft,
+        right: document.getElementById('timeline-stage').dataset.viewRight,
         width: document.getElementById('timeline-stage').clientWidth,
         density: document.getElementById('density').value,
       }));

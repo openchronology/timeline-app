@@ -21,11 +21,11 @@ export async function checkLabelMotion(page, restoreDocument) {
     );
     await frame();
   };
+  /** Shows [left, right], typed as the timeline's display writes times. */
   const go = async (left, right) => {
-    await input('exact-left').evaluate((node) => (node.closest('details').open = true));
-    await input('exact-left').fill(left);
-    await input('exact-right').fill(right);
-    await input('apply-exact-bounds').click();
+    await input('left-bound').fill(left);
+    await input('right-bound').fill(right);
+    await input('apply-bounds').click();
     await frame();
   };
   const capture = async (selector, text, property) =>
@@ -117,14 +117,8 @@ export async function checkLabelMotion(page, restoreDocument) {
       },
     ],
   });
-  const short = [
-    parseTimestamp('2026-10-04T23:59:59Z').toString(),
-    parseTimestamp('2026-10-05T00:00:19Z').toString(),
-  ];
-  const wide = [
-    parseTimestamp('2026-10-04T23:59:13Z').toString(),
-    parseTimestamp('2026-10-05T00:00:53Z').toString(),
-  ];
+  const short = ['2026-10-04T23:59:59Z', '2026-10-05T00:00:19Z'];
+  const wide = ['2026-10-04T23:59:13Z', '2026-10-05T00:00:53Z'];
   await go(...short);
   const later = '.event-label[data-key="event:later"]';
   assert.equal(await page.locator(later + ' .event-time-current').textContent(), '13.7s');

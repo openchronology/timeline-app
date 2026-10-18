@@ -3,6 +3,7 @@
 // identity, and dist/legal.html with the notice, draft terms and policies, and licenses.
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { writeBuildInfo } from './build-info.mjs';
+import { dependencyLicenses } from './licenses.mjs';
 
 export const copyrightBanner =
   '/*! OpenChronology — Copyright (c) 2026 Athan Clark. GPL-3.0-only; see LICENSE. No warranty. */';
@@ -23,10 +24,12 @@ export async function legalMarkup(source = false) {
     ['THIRD_PARTY.md', 'Third-party notices'],
   ];
   const parts = [];
-  for (const [file, title] of documents)
-    parts.push(
-      `<details><summary>${title}</summary><pre>${escape(await readFile(file, 'utf8'))}</pre></details>`,
-    );
+  for (const [file, title] of documents) {
+    let text = await readFile(file, 'utf8');
+    // The license texts of the libraries bundled into the editor travel with every copy of it.
+    if (file === 'THIRD_PARTY.md') text += '\n\n' + (await dependencyLicenses()).join('\n\n');
+    parts.push(`<details><summary>${title}</summary><pre>${escape(text)}</pre></details>`);
+  }
   return `<footer class="legal-notices"><details><summary>© 2026 Athan Clark · OpenChronology · GPLv3 · No warranty · Terms &amp; privacy</summary>${source ? '<p><a href="openchronology-web-source.tar.gz" download>Download matching web source</a></p>' : ''}${parts.join('\n')}</details></footer>`;
 }
 export async function withLegal(html, source = true) {

@@ -26,8 +26,8 @@ export async function checkSummaries(page, restore) {
     const fitted = Viewport.fit(times[0], times.at(-1));
     await page.waitForFunction(
       ([left, right]) =>
-        document.getElementById('exact-left').value === left &&
-        document.getElementById('exact-right').value === right,
+        document.getElementById('timeline-stage').dataset.viewLeft === left &&
+        document.getElementById('timeline-stage').dataset.viewRight === right,
       [fitted.left.toString(), fitted.right.toString()],
     );
   };
@@ -46,7 +46,7 @@ export async function checkSummaries(page, restore) {
         JSON.stringify({
           focused: document.activeElement?.id,
           open: [...document.querySelectorAll('dialog[open]')].map((d) => d.id),
-          exact: document.getElementById('exact-left').value,
+          exact: document.getElementById('timeline-stage').dataset.viewLeft,
         }),
       ),
     );
