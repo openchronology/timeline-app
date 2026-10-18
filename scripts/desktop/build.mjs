@@ -15,8 +15,11 @@ const exec = promisify(execFile),
 if (!targets[target]) throw Error('Unknown desktop target');
 if (tag) {
   if (!releaseVersion.test(tag)) throw Error('Invalid release tag');
-  const commit = (await exec('git', ['rev-parse', 'HEAD'])).stdout.trim();
-  const tagged = (await exec('git', ['rev-parse', tag + '^{commit}'])).stdout.trim();
+  // Container jobs check out the repository as another user, which git refuses to read.
+  const git = async (...args) =>
+    (await exec('git', ['-c', 'safe.directory=*', ...args])).stdout.trim();
+  const commit = await git('rev-parse', 'HEAD');
+  const tagged = await git('rev-parse', tag + '^{commit}');
   if (commit !== tagged) throw Error('The desktop checkout must match the release tag');
   process.env.OCH_BUILD_COMMIT = commit;
   process.env.OCH_BUILD_VERSION = tag;
