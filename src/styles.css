@@ -2272,16 +2272,18 @@ dialog button {
 #datetime-picker summary {
   width: 100%;
 }
+/* Tall enough for its title to read without hovering, which touch screens cannot do (#228). */
 .duration-band {
   position: absolute;
   pointer-events: auto;
-  height: 8px;
-  padding: 0;
+  height: 12px;
+  padding: 0 2px;
   border: 1px solid #fff;
   border-radius: 3px;
   background: #73958b;
   color: #213d33;
   font-size: 9px;
+  line-height: 10px;
   overflow: hidden;
   white-space: nowrap;
   opacity: 0.7;
