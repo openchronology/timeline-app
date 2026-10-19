@@ -587,10 +587,13 @@ main {
 .checkbox-row input {
   width: auto;
 }
-/* Duration backgrounds (#94): images behind everything else on the stage. */
+/* Duration backgrounds (#94): images behind everything else on the stage. The layer's own
+   stacking context keeps the images' z-indexes (which order them among themselves) beneath
+   the axis, arcs and markers drawn after it (#220). */
 .duration-backgrounds {
   position: absolute;
   inset: 0;
+  z-index: 0;
   overflow: hidden;
   pointer-events: none;
 }
@@ -612,6 +615,31 @@ main {
 }
 .duration-background img.loaded {
   opacity: 1;
+}
+/* While a background shows, text sits on frosted white, and lines and markers carry a white
+   halo, setting the timeline apart from whatever image is behind it (#220). */
+.timeline-stage.over-backgrounds .event-label {
+  width: max-content;
+  max-width: 150px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: #ffffffb8;
+  backdrop-filter: blur(3px);
+  text-shadow:
+    0 0 1px #fff,
+    0 0 3px #fff;
+}
+/* Tick labels fade as they get too fine to show, so they take no backing that would stay. */
+.timeline-stage.over-backgrounds :is(.tick-label, .duration-band) {
+  text-shadow:
+    0 0 1px #fff,
+    0 0 3px #fff;
+}
+.timeline-stage.over-backgrounds :is(.axis, .edge-arcs, .event-stem, .event-marker) {
+  filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 2px #fff) drop-shadow(0 0 4px #fff);
+}
+.timeline-stage.over-backgrounds .event-marker.heading-marker {
+  backdrop-filter: blur(4px);
 }
 .axis,
 .markers {

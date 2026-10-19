@@ -8982,6 +8982,8 @@ function renderDurationBackgrounds() {
       entry.box.remove();
       durationBackgrounds.delete(key);
     }
+  // The halo that keeps the timeline readable over the images (#220).
+  el('timeline-stage').classList.toggle('over-backgrounds', stacked.length > 0);
 }
 /** Band elements persist by duration so clicks and hover cards survive re-rendering. */
 const durationButtons = new Map<string, HTMLButtonElement>(),
