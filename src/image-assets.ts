@@ -24,6 +24,12 @@ export async function embedImages(
     p.manifest.fields.filter((f) => f.kind === 'image-url').map((f) => f.metadataKey),
   );
   const urls = new Set<string>();
+  // Plugins' timeline-wide images, such as the timeline's background (#223).
+  for (const p of document.plugins ?? [])
+    for (const value of Object.values(p.settings ?? {})) {
+      const url = imageURL(value);
+      if (url) urls.add(url);
+    }
   // Durations' images too, such as their backgrounds.
   for (const d of document.durations ?? [])
     for (const key of fields) {

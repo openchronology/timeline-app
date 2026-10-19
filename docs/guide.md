@@ -129,6 +129,7 @@ Images come from plugins, and are links to pictures hosted elsewhere:
 
 - **Moment icons** shows a picture as a moment's marker.
 - **Duration backgrounds** shows a picture behind the timeline where a duration lies.
+- **Timeline background** shows one picture behind the whole timeline. Set its address under the plugin in the **Plugins** dialog.
 - **Moment stacks** adds cards with their own pictures inside a moment.
 
 Give each image's HTTPS address. A server keeps only the link, not a copy, and credits the image's host. Exported files include copies, so they work offline. Link only images you may share ([images and copyright](images.md)).
@@ -259,7 +260,7 @@ In the browser, one **Undo** reverts either. On the server, each is saved at onc
 
 **Plugins** opens **Timeline plugins**, the plugins installed on this timeline. **Add plugin** opens the **Plugin library**; **Add to timeline** installs one. Each installed plugin can be turned off with **Enabled**, reordered with **Move up** and **Move down**, or removed with **Remove**. Removing a plugin keeps the data it added.
 
-Plugins belong to the timeline and are saved with it, so everyone who opens it sees the same thing. Official plugins include **Moment icons**, **Moment colors**, **Moment shapes**, **Moment stacks**, **Rich text notes**, **Headings**, **Sources**, **Focus on hover**, **Expand on hover** and **Duration backgrounds**. **Create / import plugin** makes your own, and suites add several at once. **Plugin library** in the header browses everything published. See [plugins](plugins.md).
+Plugins belong to the timeline and are saved with it, so everyone who opens it sees the same thing. Official plugins include **Moment icons**, **Moment colors**, **Moment shapes**, **Moment stacks**, **Rich text notes**, **Headings**, **Sources**, **Focus on hover**, **Expand on hover**, **Duration backgrounds** and **Timeline background**. **Create / import plugin** makes your own, and suites add several at once. **Plugin library** in the header browses everything published. See [plugins](plugins.md).
 
 ## Large timelines
 

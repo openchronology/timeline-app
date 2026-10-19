@@ -603,7 +603,17 @@ main {
   bottom: 0;
   overflow: hidden;
 }
-.duration-background img {
+/* The timeline's own background (#223), beneath the durations' (whose z-indexes start at 1). */
+.timeline-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+.timeline-backdrop img {
+  width: 100%;
+}
+:is(.duration-background, .timeline-backdrop) img {
   position: absolute;
   top: 0;
   height: 100%;
@@ -613,7 +623,7 @@ main {
   opacity: 0;
   transition: opacity 0.3s;
 }
-.duration-background img.loaded {
+:is(.duration-background, .timeline-backdrop) img.loaded {
   opacity: 1;
 }
 /* While a background shows, text sits on frosted white, and lines and markers carry a white
@@ -1560,6 +1570,11 @@ dialog h3 {
   display: flex;
   gap: 6px;
   margin-top: 10px;
+}
+/* A plugin's timeline-wide setting (#223), such as the timeline's background image. */
+.plugin-setting {
+  display: block;
+  margin: 8px 0;
 }
 .plugin-enable {
   display: flex;
@@ -2701,7 +2716,13 @@ dialog button {
 /* Sensitive content (#115): images of a labelled timeline, moment or duration are blurred
    for readers warned of them until they choose to show them. */
 body[data-warnings][data-sensitive]:not([data-images-shown])
-  :is(.event-marker img, .focus-card img, .plugin-image-link img, .duration-background img),
+  :is(
+    .event-marker img,
+    .focus-card img,
+    .plugin-image-link img,
+    .duration-background img,
+    .timeline-backdrop img
+  ),
 body[data-warnings]:not([data-images-shown])
   :is(
     .event-marker[data-sensitive] img,

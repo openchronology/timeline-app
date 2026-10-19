@@ -33,6 +33,13 @@ export interface PluginManifest {
   notes?: { kind: 'markdown' };
   /** An image behind the timeline where a duration lies (durations only). */
   background?: { kind: 'image'; metadataKey: string };
+  /**
+   * Settings of the whole timeline, set in the plugin list rather than on its moments and
+   * durations (#223), such as the address of the timeline's background image.
+   */
+  settings?: PluginSetting[];
+  /** An image behind the whole timeline, beneath durations' backgrounds: a setting's value. */
+  backdrop?: { kind: 'image'; setting: string };
   /** Entities the plugin applies to; omitted means moments, plus durations for colors/cards. */
   targets?: PluginTarget[];
   /** Metadata computed in the browser for the plugins to read, never saved (#122). */
@@ -40,6 +47,12 @@ export interface PluginManifest {
   source?: string;
 }
 export type PluginTarget = 'moments' | 'durations';
+/** A timeline-wide plugin setting: for now, the HTTPS address of an image. */
+export interface PluginSetting {
+  kind: 'image-url';
+  key: string;
+  label: string;
+}
 /** Where a derived value is read: a tag's value (`severity` reads `severity:err`), or a path. */
 export type DerivationSource = { tag: string } | { path: string };
 /**
@@ -55,6 +68,8 @@ export interface PluginDerivation {
 export interface InstalledPlugin {
   manifest: PluginManifest;
   enabled: boolean;
+  /** Values of the manifest's timeline-wide `settings`, by key (#223). */
+  settings?: Record<string, string>;
 }
 export const MOMENT_SHAPE_NAMES = [
   'circle',
@@ -459,6 +474,8 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     'summary',
     'notes',
     'background',
+    'settings',
+    'backdrop',
     'targets',
     'derive',
     'source',
@@ -530,6 +547,28 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     if (background.kind !== 'image') throw new Error('Unsupported background component.');
     result.background = { kind: 'image', metadataKey: key(background.metadataKey) };
   }
+  if (p.settings !== undefined) {
+    if (!Array.isArray(p.settings) || !p.settings.length || p.settings.length > 8)
+      throw new Error('A plugin has one to eight timeline settings.');
+    const settingKeys = new Set<string>();
+    result.settings = p.settings.map((value) => {
+      const setting = object(value, ['kind', 'key', 'label']);
+      if (setting.kind !== 'image-url') throw new Error('Unsupported plugin setting.');
+      const settingKey = key(setting.key);
+      if (settingKeys.has(settingKey)) throw new Error('Duplicate plugin setting.');
+      settingKeys.add(settingKey);
+      return { kind: 'image-url', key: settingKey, label: text(setting.label, 100) };
+    });
+  }
+  if (p.backdrop !== undefined) {
+    const backdrop = object(p.backdrop, ['kind', 'setting']);
+    if (
+      backdrop.kind !== 'image' ||
+      !result.settings?.some((s) => s.key === backdrop.setting && s.kind === 'image-url')
+    )
+      throw new Error("A timeline background reads one of its plugin's image settings.");
+    result.backdrop = { kind: 'image', setting: backdrop.setting as string };
+  }
   if (p.targets !== undefined) {
     if (
       !Array.isArray(p.targets) ||
@@ -563,13 +602,33 @@ export function validateInstalledPlugins(value: unknown): InstalledPlugin[] {
     throw new Error('Expected at most 32 plugins and 128 KiB of settings.');
   const ids = new Set<string>();
   return value.map((raw) => {
-    const entry = object(raw, ['manifest', 'enabled']);
+    const entry = object(raw, ['manifest', 'enabled', 'settings']);
     const manifest = validatePluginManifest(entry.manifest);
     if (typeof entry.enabled !== 'boolean' || ids.has(manifest.id))
       throw new Error('Invalid or duplicate installed plugin.');
     ids.add(manifest.id);
-    return { manifest, enabled: entry.enabled };
+    const settings = pluginSettings(manifest, entry.settings);
+    return { manifest, enabled: entry.enabled, ...(settings ? { settings } : {}) };
   });
+}
+/**
+ * An installed plugin's timeline settings (#223): the values of the settings its manifest
+ * declares, each an HTTPS image address. Values for settings it no longer declares (after an
+ * update, say) are dropped; empty ones are left out. Nothing set gives undefined.
+ */
+function pluginSettings(manifest: PluginManifest, value: unknown) {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new Error('Plugin settings must be an object.');
+  const settings: Record<string, string> = {};
+  for (const setting of manifest.settings ?? []) {
+    const given = (value as Record<string, unknown>)[setting.key];
+    if (given === undefined || given === '') continue;
+    const url = imageURL(given);
+    if (!url) throw new Error(`${setting.label}: enter an HTTPS image address.`);
+    settings[setting.key] = url;
+  }
+  return Object.keys(settings).length ? settings : undefined;
 }
 /** Explicit HTTPS URLs without embedded credentials. Cross-origin images load anonymously with no referrer. */
 export function imageURL(value: unknown): string | null {
@@ -697,6 +756,16 @@ export function durationPlugins(plugins: readonly InstalledPlugin[] = []): Insta
  * A duration's background image: the last enabled background plugin's valid image URL. Bands
  * carry string metadata of at most 256 characters, so a longer URL shows no background.
  */
+/** The image behind the whole timeline (#223): the last enabled plugin's that has one set. */
+export function pluginBackdrop(plugins: readonly InstalledPlugin[] = []): string | null {
+  let image: string | null = null;
+  for (const { manifest, enabled, settings } of plugins)
+    if (enabled && manifest.backdrop) {
+      const candidate = imageURL(settings?.[manifest.backdrop.setting]);
+      if (candidate) image = candidate;
+    }
+  return image;
+}
 export function pluginBackground(
   plugins: readonly InstalledPlugin[] = [],
   stored: Record<string, unknown> = {},
@@ -1036,6 +1105,17 @@ export const DURATION_BACKGROUNDS: PluginManifest = validatePluginManifest({
   background: { kind: 'image', metadataKey: 'backgroundUrl' },
   targets: ['durations'],
 });
+export const TIMELINE_BACKGROUND: PluginManifest = validatePluginManifest({
+  apiVersion: 1,
+  id: 'timeline-background',
+  version: 1,
+  name: 'Timeline background',
+  description:
+    'Show one image behind the whole timeline, beneath any duration backgrounds. Set its address here in the plugin list: it belongs to the whole timeline, not to any one event.',
+  fields: [],
+  settings: [{ kind: 'image-url', key: 'imageUrl', label: 'Background image URL' }],
+  backdrop: { kind: 'image', setting: 'imageUrl' },
+});
 /**
  * Where log imports keep a severity (#122): the `severity:<level>` tag, and the severity in
  * each format's own metadata (server/log-formats.mjs), for formats that tag none (access logs)
@@ -1098,6 +1178,7 @@ export const BUILTIN_PLUGINS: readonly PluginManifest[] = [
   RICH_TEXT_NOTES,
   EXPAND_ON_HOVER,
   DURATION_BACKGROUNDS,
+  TIMELINE_BACKGROUND,
   MOMENT_HEADINGS,
   LOG_SEVERITY_COLORS,
 ];
