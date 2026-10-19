@@ -6,7 +6,8 @@ import { DURATION_BACKGROUNDS } from '../dist/core.mjs';
 /**
  * Duration backgrounds (#94): a duration's image fills the timeline behind it, centered
  * between its visible start and end, smaller durations above larger ones, edges in view
- * fading out; collapsed durations show none.
+ * fading out; collapsed durations show none. The images lie behind the timeline, which carries
+ * a white halo over them (#220).
  */
 export async function checkDurationBackgrounds(page, restore) {
   const png = Buffer.from(
@@ -135,6 +136,30 @@ export async function checkDurationBackgrounds(page, restore) {
   assert.match(inner.mask, /calc\(100% - [1-9][0-9.]*px\), transparent 100%\)$/);
   // The smaller duration is above the larger.
   assert(inner.z > wide.z, 'smaller durations stack above larger ones');
+  // Both lie behind the timeline (#220): made hit-testable for a moment, the backgrounds
+  // still give way to the moment drawn over them.
+  const front = await page.evaluate(() => {
+    const host = document.getElementById('duration-backgrounds'),
+      marker = document.querySelector('#markers .event-marker'),
+      r = marker.getBoundingClientRect();
+    host.style.pointerEvents = 'auto';
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    host.style.pointerEvents = '';
+    return { onMarker: marker.contains(hit), hit: hit?.className };
+  });
+  assert(front.onMarker, `a background covers the moment: ${front.hit}`);
+  // Over them the timeline's text and lines carry a white halo.
+  assert.deepEqual(
+    await page.evaluate(() => {
+      const stage = document.getElementById('timeline-stage');
+      return [
+        stage.classList.contains('over-backgrounds'),
+        getComputedStyle(stage.querySelector('.tick-label')).textShadow.includes('255, 255, 255'),
+        getComputedStyle(document.getElementById('axis')).filter.startsWith('drop-shadow'),
+      ];
+    }),
+    [true, true, true],
+  );
 
   // Its start beyond the view: centered between the view's edge and its end, which alone fades.
   await view(150, 400);
@@ -160,6 +185,12 @@ export async function checkDurationBackgrounds(page, restore) {
   await page.locator('.installed-plugin input[type="checkbox"]').first().uncheck();
   await page.locator('[data-close="plugins-dialog"]').click();
   await page.waitForFunction(() => !document.querySelector('.duration-background'));
+  assert(
+    !(await page.evaluate(() =>
+      document.getElementById('timeline-stage').classList.contains('over-backgrounds'),
+    )),
+    'no halo without backgrounds',
+  );
   await page.unroute(images);
   await load(restore);
   console.log(
