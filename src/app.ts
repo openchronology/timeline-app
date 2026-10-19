@@ -1448,7 +1448,7 @@ function drawFrame() {
     const sourceLane = trackLanes.get(sourceKey ?? '') ?? 0;
     trackLanes.set(sourceKey ?? '', sourceLane + 1);
     const top = (comparison ? sourceLane : lane++) % 4,
-      labelTop = rowOffset + (top < 2 ? 128 - top * 43 : 234 + (top - 2) * 43);
+      labelTop = rowOffset + (top < 2 ? 128 - top * 43 : 272 + (top - 2) * 43);
     button.style.top = '';
     button.style.translate = `0 ${rowOffset}px`;
     stem.style.left = `${(inset() + x) / uiScale}px`;
@@ -9082,7 +9082,8 @@ function renderDurationBands() {
     );
     button.style.left = (inset() + left) / uiScale + 'px';
     button.style.width = Math.max(6, (right - left) / uiScale) + 'px';
-    button.style.top = 202 + (rows.get(band.sourceKey ?? '')?.offset ?? 0) + (i % 3) * 9 + 'px';
+    // Below the axis's tick labels, which they would otherwise hide (#228).
+    button.style.top = 227 + (rows.get(band.sourceKey ?? '')?.offset ?? 0) + (i % 3) * 13 + 'px';
     // What a band says changes with its content, not as the view moves (#68).
     const content = `${contentGeneration()}\u0000${band.first}\u0000${band.last}`;
     if (bandContent.get(button) === content) return;
