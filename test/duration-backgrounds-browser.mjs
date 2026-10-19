@@ -2,12 +2,13 @@
 // Duration backgrounds (#94): a duration’s image drawn behind the timeline it spans.
 import assert from 'node:assert/strict';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
-import { DURATION_BACKGROUNDS } from '../dist/core.mjs';
+import { DURATION_BACKGROUNDS, TIMELINE_BACKGROUND } from '../dist/core.mjs';
 /**
  * Duration backgrounds (#94): a duration's image fills the timeline behind it, centered
  * between its visible start and end, smaller durations above larger ones, edges in view
- * fading out; collapsed durations show none. The images lie behind the timeline, which carries
- * a white halo over them (#220).
+ * fading out over a fixed width, narrow ones fading away (#222); collapsed durations show none.
+ * The images lie behind the timeline, which carries a white halo over them (#220). The
+ * timeline's own background, set in the plugin list, lies beneath them all (#223).
  */
 export async function checkDurationBackgrounds(page, restore) {
   const png = Buffer.from(
@@ -40,7 +41,10 @@ export async function checkDurationBackgrounds(page, restore) {
     version: 1,
     title: 'Duration backgrounds',
     description: '',
-    plugins: [{ manifest: DURATION_BACKGROUNDS, enabled: true }],
+    plugins: [
+      { manifest: DURATION_BACKGROUNDS, enabled: true },
+      { manifest: TIMELINE_BACKGROUND, enabled: true },
+    ],
     events: [{ id: 'm', time: '120/1', metadata: { title: 'A moment' } }],
     durations: [
       {
@@ -60,14 +64,25 @@ export async function checkDurationBackgrounds(page, restore) {
       { id: 'plain', start: '60/1', end: '240/1', metadata: { title: 'No image' } },
     ],
   });
+  // A redraw still pending from a change (to the plugins, say) rewrites the bounds from the
+  // view it shows, so fields filled straight after are tried again until the view moves.
   const view = async (left, right) => {
-    await page.locator('#left-bound').fill(String(left));
-    await page.locator('#right-bound').fill(String(right));
-    await page.locator('#apply-bounds').click();
-    await page.waitForFunction(
-      (expected) => document.getElementById('markers').dataset.view === expected,
-      `${left}/1 ${right}/1`,
-    );
+    const expected = `${left}/1 ${right}/1`;
+    for (let attempt = 0; ; attempt++) {
+      await page.locator('#left-bound').fill(String(left));
+      await page.locator('#right-bound').fill(String(right));
+      await page.locator('#apply-bounds').click();
+      try {
+        await page.waitForFunction(
+          (expected) => document.getElementById('markers').dataset.view === expected,
+          expected,
+          { timeout: attempt < 2 ? 3000 : 30000 },
+        );
+        return;
+      } catch (error) {
+        if (attempt >= 2) throw error;
+      }
+    }
   };
   /** Each background's place, its image's place and size, its fade and its stacking. */
   const backgrounds = () =>
@@ -88,6 +103,7 @@ export async function checkDurationBackgrounds(page, restore) {
               imageHeight: img.height,
               mask: box.style.maskImage || box.style.webkitMaskImage,
               z: Number(box.style.zIndex),
+              opacity: Number(getComputedStyle(box).opacity),
               loaded: box.querySelector('img').classList.contains('loaded'),
               stage: { width: stage.width, height: stage.height },
             },
@@ -134,6 +150,9 @@ export async function checkDurationBackgrounds(page, restore) {
     /^linear-gradient\(to right, transparent 0(px)?, (rgb\(0, 0, 0\)|#000) [1-9]/,
   );
   assert.match(inner.mask, /calc\(100% - [1-9][0-9.]*px\), transparent 100%\)$/);
+  // Its edges fade over 48 pixels, however wide it is (#222), and it shows in full.
+  assert.match(inner.mask, /(rgb\(0, 0, 0\)|#000) 48px, (rgb\(0, 0, 0\)|#000) calc\(100% - 48px\)/);
+  assert.equal(inner.opacity, 1);
   // The smaller duration is above the larger.
   assert(inner.z > wide.z, 'smaller durations stack above larger ones');
   // Both lie behind the timeline (#220): made hit-testable for a moment, the backgrounds
@@ -170,6 +189,23 @@ export async function checkDurationBackgrounds(page, restore) {
   near(shown.inner.center, after.right / 2, 'inner center with its start beyond the view');
   assert.match(shown.inner.mask, /transparent 0(px)?, (rgb\(0, 0, 0\)|#000) 0px/);
 
+  // Narrowing, a background fades out, as the ruler's finest marks do: from full at four fades
+  // wide (192 pixels) to nothing at two (96), while its band still shows (#222).
+  const stageWidth = shown.inner.stage.width;
+  const narrow = async (pixels) => {
+    const span = Math.round((100 * stageWidth) / pixels);
+    await view(100 - Math.round(span / 4), 100 - Math.round(span / 4) + span);
+    return { shown: await backgrounds(), band: await band('inner') };
+  };
+  let seen = await narrow(140);
+  const width = seen.band.right - seen.band.left,
+    t = (width - 96) / 96;
+  assert(width > 96 && width < 192, `inner is ${width} pixels wide`);
+  near(seen.shown.inner.opacity * 100, t * t * (3 - 2 * t) * 100, 'opacity in hundredths');
+  seen = await narrow(60);
+  assert.equal(seen.shown.inner, undefined, 'a duration narrower than two fades shows no image');
+  assert(seen.band.right - seen.band.left > 24, 'while its band still shows');
+
   // The images follow the timeline's size.
   const size = page.viewportSize();
   await page.setViewportSize({ width: Math.round(size.width * 0.7), height: size.height });
@@ -191,9 +227,53 @@ export async function checkDurationBackgrounds(page, restore) {
     )),
     'no halo without backgrounds',
   );
+
+  // The timeline's own background (#223) is set in the plugin list, not on any event.
+  const setting = page.locator('.installed-plugin input[data-plugin-setting="imageUrl"]');
+  const backdrop = () =>
+    page.evaluate(() => {
+      const box = document.querySelector('.timeline-backdrop'),
+        stage = document.getElementById('timeline-stage').getBoundingClientRect();
+      if (!box) return null;
+      const img = box.querySelector('img').getBoundingClientRect();
+      return {
+        z: getComputedStyle(box).zIndex,
+        loaded: box.querySelector('img').classList.contains('loaded'),
+        fills: Math.abs(img.width - stage.width) < 1.5 && Math.abs(img.height - stage.height) < 1.5,
+        halo: document.getElementById('timeline-stage').classList.contains('over-backgrounds'),
+      };
+    });
+  await page.locator('#plugins-button').click();
+  await setting.fill('http://backgrounds.example/sky.png');
+  await setting.dispatchEvent('change');
+  await page.getByText('Enter an HTTPS image address.').waitFor();
+  assert.equal(await backdrop(), null);
+  await setting.fill(url('sky'));
+  await setting.dispatchEvent('change');
+  await page.locator('[data-close="plugins-dialog"]').click();
+  await page.waitForFunction(() => document.querySelector('.timeline-backdrop img.loaded'));
+  assert.deepEqual(await backdrop(), { z: '0', loaded: true, fills: true, halo: true });
+  // Beneath the durations' backgrounds, once those show again.
+  await page.locator('#plugins-button').click();
+  await page.locator('.installed-plugin input[type="checkbox"]').first().check();
+  await page.locator('[data-close="plugins-dialog"]').click();
+  // Once redrawn with the durations' backgrounds, so the view's fields hold still.
+  await view(50, 250);
+  await page.waitForFunction(
+    () => document.querySelectorAll('.duration-background img.loaded').length === 2,
+  );
+  shown = await backgrounds();
+  assert(Math.min(shown.wide.z, shown.inner.z) > 0, 'durations above the timeline background');
+  // Cleared, it goes.
+  await page.locator('#plugins-button').click();
+  assert.equal(await setting.inputValue(), url('sky'));
+  await setting.fill('');
+  await setting.dispatchEvent('change');
+  await page.locator('[data-close="plugins-dialog"]').click();
+  await page.waitForFunction(() => !document.querySelector('.timeline-backdrop'));
   await page.unroute(images);
   await load(restore);
   console.log(
-    'PASS duration backgrounds: images fill the timeline centered on each duration’s visible part, smaller above larger, edges in view fading, none for collapsed durations.',
+    'PASS duration backgrounds: images fill the timeline centered on each duration’s visible part, smaller above larger, edges in view fading over a fixed width, narrow ones fading away, none for collapsed durations; the timeline background beneath them, set in the plugin list.',
   );
 }

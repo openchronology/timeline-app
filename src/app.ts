@@ -81,6 +81,8 @@ import {
   validateDuration,
   durationPlugins,
   pluginBackground,
+  pluginBackdrop,
+  imageURL,
   derivationKeys,
   BACKGROUND_URL_LIMIT,
   momentPlugins,
@@ -3288,7 +3290,39 @@ function showInstalledPlugins() {
     action('Remove', false, () =>
       changePlugins(installedPlugins().filter((p) => p.manifest.id !== entry.manifest.id)),
     );
-    item.append(name, description, toggle, actions);
+    // Timeline-wide settings (#223), such as the timeline's background image: set here, as
+    // they belong to no moment or duration. A change is saved like any plugin change.
+    const settings = (entry.manifest.settings ?? []).map((setting) => {
+      const label = document.createElement('label');
+      label.className = 'plugin-setting';
+      const field = document.createElement('input');
+      field.type = 'url';
+      field.placeholder = 'https://…';
+      field.value = entry.settings?.[setting.key] ?? '';
+      field.disabled = !editable();
+      field.dataset.pluginSetting = setting.key;
+      const problem = document.createElement('span');
+      problem.className = 'form-error';
+      problem.setAttribute('role', 'alert');
+      field.onchange = () => {
+        const value = field.value.trim();
+        if (value && !imageURL(value)) {
+          problem.textContent = 'Enter an HTTPS image address.';
+          return;
+        }
+        problem.textContent = '';
+        changePlugins(
+          installedPlugins().map((p) =>
+            p.manifest.id === entry.manifest.id
+              ? { ...p, settings: { ...p.settings, [setting.key]: value } }
+              : p,
+          ),
+        );
+      };
+      label.append(setting.label, field, problem);
+      return label;
+    });
+    item.append(name, description, ...settings, toggle, actions);
     list.append(item);
   });
 }
@@ -8906,20 +8940,59 @@ function renderEdgeArcs() {
  * timeline over the part of the duration in view. The image fills the stage, keeping its
  * aspect ratio, centered vertically and horizontally between the duration's visible start
  * and end (a view's edge standing in for an end beyond it). Smaller durations show above
- * larger ones, and edges inside the view fade out so backgrounds blend. Collapsed durations
- * are summaries, not bands, so they show none. Elements persist by duration, so images keep
- * loading while the view moves.
+ * larger ones, and edges inside the view fade out over a fixed width so backgrounds blend.
+ * A duration too narrow to show its picture fades out as it narrows, as the ruler's finest
+ * marks do (#222); collapsed durations are summaries, not bands, so they show none. Beneath
+ * them all lies the timeline's own background (#223). Elements persist by duration, so
+ * images keep loading while the view moves.
  */
 const durationBackgrounds = new Map<
   string,
   { box: HTMLDivElement; img: HTMLImageElement; source: string; mask: string }
 >();
+/** How far each edge of a duration's background fades, in pixels (#222). */
+const BACKGROUND_FADE = 48;
+/** A box holding one background image, which shows once it has loaded. */
+function backgroundBox(className: string, source: string) {
+  const box = document.createElement('div');
+  box.className = className;
+  const img = document.createElement('img');
+  img.alt = '';
+  img.crossOrigin = 'anonymous';
+  img.referrerPolicy = 'no-referrer';
+  img.decoding = 'async';
+  img.onload = () => img.classList.add('loaded');
+  img.onerror = () => img.classList.remove('loaded');
+  img.src = source;
+  box.append(img);
+  return { box, img };
+}
+let timelineBackdrop: { box: HTMLDivElement; img: HTMLImageElement; source: string } | null = null;
+/** The timeline's own background (#223): the whole stage, beneath durations' backgrounds. */
+function renderTimelineBackdrop(host: HTMLElement) {
+  const source = imageSource(pluginBackdrop(installedPlugins()));
+  if (timelineBackdrop && timelineBackdrop.source !== source) {
+    timelineBackdrop.box.remove();
+    timelineBackdrop = null;
+  }
+  if (source && !timelineBackdrop) {
+    timelineBackdrop = { ...backgroundBox('timeline-backdrop', source), source };
+    host.prepend(timelineBackdrop.box);
+  }
+  return !!timelineBackdrop;
+}
+/** The opacity of a background `width` pixels wide: none at two fades wide, full at four. */
+function backgroundOpacity(width: number) {
+  const t = Math.max(0, Math.min(1, (width - 2 * BACKGROUND_FADE) / (2 * BACKGROUND_FADE)));
+  return t * t * (3 - 2 * t);
+}
 function renderDurationBackgrounds() {
   const host = el('duration-backgrounds');
   const plugins = durationPlugins(installedPlugins());
   const shown = new Set<string>();
   const full = stageWidth();
   const stacked: { box: HTMLDivElement; extent: Q }[] = [];
+  const backdrop = renderTimelineBackdrop(host);
   if (plugins.some((p) => p.enabled && p.manifest.background))
     for (const band of frame.durations ?? []) {
       const source = imageSource(pluginBackground(plugins, band.metadata));
@@ -8927,37 +9000,30 @@ function renderDurationBackgrounds() {
       const start = inset() + viewport.x(parsedTime(band.first), width()),
         end = inset() + viewport.x(parsedTime(band.last), width());
       const left = Math.max(0, start),
-        right = Math.min(full, end);
-      if (right <= left) continue;
+        right = Math.min(full, end),
+        opacity = backgroundOpacity(end - start);
+      if (right <= left || opacity === 0) continue;
       const key = (band.sourceKey ?? '') + '\u0000' + band.id;
       shown.add(key);
       let entry = durationBackgrounds.get(key);
       if (!entry || entry.source !== source) {
         entry?.box.remove();
-        const box = document.createElement('div');
-        box.className = 'duration-background';
+        const { box, img } = backgroundBox('duration-background', source);
         box.dataset.durationId = band.id;
-        const img = document.createElement('img');
-        img.alt = '';
-        img.crossOrigin = 'anonymous';
-        img.referrerPolicy = 'no-referrer';
-        img.decoding = 'async';
-        img.onload = () => img.classList.add('loaded');
-        img.onerror = () => img.classList.remove('loaded');
-        img.src = source;
-        box.append(img);
         host.append(box);
         entry = { box, img, source, mask: '' };
         durationBackgrounds.set(key, entry);
       }
       const { box, img } = entry;
       markSensitive(box, band.metadata);
+      box.style.opacity = opacity === 1 ? '' : opacity.toFixed(3);
       box.style.left = left + 'px';
       box.style.width = right - left + 'px';
       img.style.width = full + 'px';
       img.style.left = (left + right) / 2 - full / 2 - left + 'px';
-      // Edges in view fade to transparency; an edge where the duration goes on does not.
-      const fade = Math.min(64, (right - left) / 4),
+      // Edges in view fade to transparency over a fixed width; an edge where the duration
+      // goes on does not. Narrower than two fades, the duration has already faded out.
+      const fade = Math.min(BACKGROUND_FADE, (right - left) / 2),
         from = start > 0 ? fade : 0,
         to = end < full ? fade : 0;
       const mask =
@@ -8983,7 +9049,7 @@ function renderDurationBackgrounds() {
       durationBackgrounds.delete(key);
     }
   // The halo that keeps the timeline readable over the images (#220).
-  el('timeline-stage').classList.toggle('over-backgrounds', stacked.length > 0);
+  el('timeline-stage').classList.toggle('over-backgrounds', backdrop || stacked.length > 0);
 }
 /** Band elements persist by duration so clicks and hover cards survive re-rendering. */
 const durationButtons = new Map<string, HTMLButtonElement>(),
