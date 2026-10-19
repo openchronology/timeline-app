@@ -281,21 +281,22 @@ try {
   const tab = await context.newPage();
   const editor = () => tab.frameLocator('iframe.editor-frame');
   await tab.goto(origin + base + '#moment/leg%3A2');
-  await editor().locator('#inspector').waitFor({ state: 'visible' });
-  assert.equal(await editor().locator('#event-title').inputValue(), 'Storm ' + suffix);
-  assert(await editor().locator('#event-title').isDisabled());
-  await editor().locator('#close-inspector').click();
+  // A guest reads it in the reader (#233), with nothing to edit.
+  await editor().locator('#reader-panel').waitFor({ state: 'visible' });
+  assert.equal(await editor().locator('#reader-title').textContent(), 'Storm ' + suffix);
+  assert(!(await editor().locator('#moment-panel').isVisible()));
+  await editor().locator('#reader-close').click();
   await tab.waitForFunction((path) => location.hash === '' && location.pathname === path, base);
   // Opening a moment puts it in the address.
   await tab.goto(origin + momentPath);
-  await editor().locator('#inspector').waitFor({ state: 'visible' });
-  assert.equal(await editor().locator('#event-title').inputValue(), 'Storm ' + suffix);
+  await editor().locator('#reader-panel').waitFor({ state: 'visible' });
+  assert.equal(await editor().locator('#reader-title').textContent(), 'Storm ' + suffix);
   await tab.waitForFunction(
     (path) => location.pathname + location.hash === path,
     base + '#moment/leg%3A2',
   );
   // Its share button offers the moment's own page.
-  await editor().locator('#moment-share').click();
+  await editor().locator('#reader-share').click();
   const dialog = tab.locator('.share-dialog');
   await dialog.waitFor({ state: 'visible' });
   assert.equal(
@@ -316,8 +317,8 @@ try {
   await dialog.waitFor({ state: 'hidden' });
   // A duration link, which guests open as the server keeps it.
   await tab.goto(origin + base + '#duration/crossing');
-  await editor().locator('#duration-dialog').waitFor({ state: 'visible' });
-  assert.equal(await editor().locator('#duration-title').inputValue(), 'The crossing');
+  // It takes the moment's place in the reader.
+  await editor().locator('#reader-title', { hasText: 'The crossing' }).waitFor();
   // A search link, and sharing its results.
   await tab.goto(origin + base + '#search/storm');
   await editor().locator('#search-dialog').waitFor({ state: 'visible' });
@@ -361,11 +362,11 @@ try {
   await new Promise((done) => embedder.listen(0, 'localhost', done));
   await host.goto(`http://localhost:${embedder.address().port}/`);
   const embedded = host.frameLocator('iframe');
-  await embedded.locator('#inspector').waitFor({ state: 'visible' });
-  assert.equal(await embedded.locator('#event-title').inputValue(), 'Storm ' + suffix);
-  assert(await embedded.locator('#event-title').isDisabled());
+  await embedded.locator('#reader-panel').waitFor({ state: 'visible' });
+  assert.equal(await embedded.locator('#reader-title').textContent(), 'Storm ' + suffix);
+  assert(!(await embedded.locator('#view-mode-control').isVisible()));
   assert(!(await embedded.locator('#add-button').isVisible()));
-  assert(!(await embedded.locator('#moment-share').isVisible()));
+  assert(!(await embedded.locator('#reader-share').isVisible()));
   assert.equal(await embedded.locator('#embed-open').getAttribute('href'), momentPath);
   assert(!requests.some((r) => r.url().endsWith('/api/session')));
   for (const request of requests) assert.equal(await request.headerValue('cookie'), null);

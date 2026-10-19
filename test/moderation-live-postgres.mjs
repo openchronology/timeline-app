@@ -144,9 +144,9 @@ try {
   await reader.mouse.click(12, 450);
   await dialog.waitFor({ state: 'hidden' });
   assert(await reader.evaluate(() => window.closing), 'The dialog animates closed.');
-  // …and a moment in it, from the moment's details.
+  // …and a moment in it, from the reader (#233).
   await reader.goto(`${origin}/timelines/${created.id}/moments/m1`);
-  await editor.locator('#moment-report').click();
+  await editor.locator('#reader-report').click();
   await dialog.waitFor();
   assert.equal(await dialog.locator('.share-title').textContent(), 'The reported moment');
   await dialog.getByLabel('Graphic violence or gore').check();

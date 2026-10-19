@@ -902,6 +902,187 @@ dialog.moment-dialog {
   width: min(680px, calc(100vw - 30px));
   min-width: 0;
 }
+/* The reader (#233): a moment or duration read at full size, as a large hover card, in place
+   of the event dialog's form. Full screen on phones. */
+dialog.moment-dialog.reading {
+  width: min(1100px, calc(100vw - 30px));
+}
+.reader-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.reader-panel[hidden] {
+  display: none;
+}
+.moment-dialog .reader-panel h2 {
+  margin: 0;
+  font-size: 30px;
+}
+.reader-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.reader-panel figure {
+  margin: 0;
+}
+.reader-panel figcaption {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.reader-image img {
+  display: block;
+  width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #1b2a2108;
+}
+.moment-dialog p.reader-when {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 14px;
+  color: var(--ink);
+}
+.reader-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.reader-tags li {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--hover);
+  font-size: 12px;
+}
+.reader-notes {
+  max-width: 75ch;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.7;
+}
+.moment-dialog .reader-notes p {
+  color: var(--ink);
+  font-size: 16px;
+}
+.reader-details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 14px;
+}
+.reader-details dt {
+  color: var(--muted);
+}
+.reader-details dd {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.reader-section h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+.reader-links {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+:is(.reader-stack, .reader-gallery) {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.reader-stack article {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.reader-stack h4 {
+  margin: 6px 0 0;
+}
+:is(.reader-stack, .reader-gallery) img {
+  width: 100%;
+  max-height: 160px;
+  object-fit: cover;
+  border-radius: 7px;
+}
+@media (max-width: 650px) {
+  dialog.moment-dialog.reading {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 0;
+    padding: 18px 16px;
+  }
+  .reader-details {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .reader-details dd {
+    margin-bottom: 8px;
+  }
+}
+/* The view mode switch (#233), atop the editor for those who can edit. */
+.view-mode-switch {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin-right: 10px;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.view-mode-switch input {
+  appearance: none;
+  position: relative;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--hover);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.view-mode-switch input::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px #0003;
+  transition: transform 0.15s;
+}
+.view-mode-switch input:checked {
+  border-color: var(--green);
+  background: var(--green);
+}
+.view-mode-switch input:checked::before {
+  transform: translateX(16px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .view-mode-switch input,
+  .view-mode-switch input::before {
+    transition: none;
+  }
+}
+.view-mode-switch[hidden] {
+  display: none;
+}
 .inspector-heading {
   display: flex;
   align-items: center;
@@ -2737,6 +2918,7 @@ body[data-warnings][data-sensitive]:not([data-images-shown])
     .event-marker img,
     .focus-card img,
     .plugin-image-link img,
+    .reader-panel img,
     .duration-background img,
     .timeline-backdrop img
   ),
@@ -2745,6 +2927,7 @@ body[data-warnings]:not([data-images-shown])
     .event-marker[data-sensitive] img,
     .focus-card[data-sensitive] img,
     dialog[data-sensitive] .plugin-image-link img,
+    dialog[data-sensitive] .reader-panel img,
     .duration-background[data-sensitive] img
   ) {
   filter: blur(14px) saturate(0.6);

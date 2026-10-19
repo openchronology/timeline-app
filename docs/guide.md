@@ -114,6 +114,22 @@ Your edits show on the timeline as you type. **Save** keeps them. **Cancel**, Es
 
 On the website, **Share** in the panel links to the moment, and **Report** tells the site's administrators about a problem with it.
 
+### Reading a timeline
+
+When you can't edit a timeline, a moment or duration opens in the **reader** instead of the details panel. The reader is a full-size version of its hover card. It shows:
+
+- its pictures, credited to where they're hosted;
+- its time, or a duration's span;
+- its tags;
+- its notes (formatted with **Rich text notes**);
+- what its plugins record, such as sources or dating notes;
+- its stack's entries;
+- what it's related to (select one to read it next).
+
+On phones the reader fills the screen. **Share** and **Report** are there too.
+
+If you can edit, turn on **View mode** at the top to read the timeline the same way. It hides the editing controls, so nothing changes by accident. Turn it off to edit again. This browser remembers the setting.
+
 ### Durations
 
 Choose the **Duration** tab of **＋ Event** to create a duration. Click a band to open it. The **Duration** dialog has a **Title**, **Notes**, **Tags**, **Sensitive content** and **Related to**, as for moments, and a **Start** and an **End**:
