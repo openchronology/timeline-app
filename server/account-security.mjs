@@ -368,7 +368,7 @@ export class AccountSecurity {
   }
   /**
    * Adds an email address to an account without a confirmed one: a signed-in account
-   * (`session`, which then needs a recent sign-in) or a new social account in the middle of its
+   * (`session`, confirmed as for any security change) or a new social account in the middle of its
    * `email` sign-in challenge. `body` has the email, and for an account without a year of birth,
    * the year (#115). Emails a confirmation link bound to this browser's `oc_verify` proof,
    * replacing any earlier one. An address already used by another account gets the generic
@@ -648,20 +648,24 @@ export class AccountSecurity {
   }
   /**
    * The check every security change makes, inside its transaction `c` with `user` locked: the
-   * session began within five minutes, it is still live (not revoked, expired or idle) and, if
-   * two-factor authentication is on, completed it; the current password (`body.password`) when
-   * the account has one; and, when `requireFactor` and two-factor authentication is on, a fresh
-   * authenticator or recovery code (`body.code`), which it consumes. Someone who finds a signed-
-   * in browser, or steals a session, cannot change security settings with it alone. Throws 403
-   * for the session, 401 for the password or code.
+   * session is still live (not revoked, expired or idle) and, if two-factor authentication is
+   * on, completed it; the current password (`body.password`) when the account has one, which
+   * confirms the person at any time in the session, or else (an account signed up through a
+   * provider, with no password) a session that began within five minutes; and, when
+   * `requireFactor` and two-factor authentication is on, a fresh authenticator or recovery code
+   * (`body.code`), which it consumes. Someone who finds a signed-in browser, or steals a
+   * session, cannot change security settings with it alone. Throws 403 for the session, 401 for
+   * the password or code.
    */
   async fresh(c, user, session, body, requireFactor = true) {
-    if (
-      !session ||
-      !Number.isFinite(new Date(session.created_at).getTime()) ||
-      Date.now() - new Date(session.created_at).getTime() > 5 * 60000
-    )
-      throw new HttpError(403, 'Sign out and sign in again before changing security settings.');
+    if (!session) throw new HttpError(403, 'Sign in before changing security settings.');
+    // Without a password there is nothing to re-enter: a sign-in through the provider just now
+    // confirms the person instead.
+    if (!user.password_hash && !(Date.now() - new Date(session.created_at).getTime() <= 5 * 60000))
+      throw new HttpError(
+        403,
+        'Your sign-in is more than five minutes old. Sign out and sign in again to confirm it is you.',
+      );
     // Re-checks the session in this transaction: one revoked (by another security change, say)
     // since the request began no longer counts. The boolean parameter makes mfa_verified
     // required only for an account with two-factor authentication on.
@@ -671,7 +675,11 @@ export class AccountSecurity {
         [session.token_hash, user.id, !!user.mfa_enabled],
       )
     ).rows[0];
-    if (!live) throw new HttpError(403, 'Sign in again before changing security settings.');
+    if (!live)
+      throw new HttpError(
+        403,
+        'This session has ended. Sign in again to change security settings.',
+      );
     if (user.password_hash && !(await passwordMatches(body.password ?? '', user.password_hash)))
       throw new HttpError(401, 'Current password is incorrect.');
     if (user.mfa_enabled && requireFactor && !(await this.factor(c, user, body.code)))

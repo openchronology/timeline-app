@@ -14,7 +14,7 @@ import HelpTip from './help-tip.jsx';
  * change is a request to /api/auth/… with the session's CSRF token, followed by `refresh()` so
  * the page shows the result. Changes that grant or remove access (creating a key, unlinking a
  * provider, deleting the account) also send the current password and, when on, a two-factor
- * code: the server asks for a recent sign-in confirmed with them (security.fresh).
+ * code, which confirm the change (security.fresh). A failure shows beside what caused it.
  *
  * @param {object} props
  * @param {object} props.session GET /api/session's answer (its `csrf` and `user`)
@@ -23,30 +23,33 @@ import HelpTip from './help-tip.jsx';
  * @param {() => Promise<object>} props.refresh reads the session and account again
  */
 export default function AccountAccess({ session, account, refresh }) {
-  const [error, setError] = useState(''),
+  // The last failure, `{ where, text }`, shown beside the form or list (`where`) that caused it.
+  const [error, setError] = useState(null),
     [busy, setBusy] = useState(false),
     // A key just created: its secret, shown once and never again (the server keeps a hash).
     [token, setToken] = useState(null),
     // The avatar being edited (an address or a data: URL), previewed before it is saved.
     [avatar, setAvatar] = useState(account?.profile?.avatarUrl ?? '');
   /**
-   * Sends one change to /api/<path>, then reads the account again; a failure is shown at the
-   * end of the section. One at a time: a click while one is being sent is ignored.
+   * Sends one change to /api/<path>, then reads the account again; a failure is shown beside
+   * `where`. One at a time: a click while one is being sent is ignored.
+   * @param {string} where the form or list the change came from: avatar, sensitive, keys,
+   *   unlink or delete
    * @param {string} path the API path, after /api/
    * @param {string} method its HTTP method
    * @param {object} [data] the JSON body
    * @returns {Promise<object|undefined>} the server's answer, or nothing when it failed
    */
-  async function action(path, method, data) {
+  async function action(where, path, method, data) {
     if (busy) return;
     setBusy(true);
-    setError('');
+    setError(null);
     try {
       const r = await api(path, { method, csrf: session.csrf, data });
       await refresh();
       return r;
     } catch (e) {
-      setError(e.message);
+      setError({ where, text: e.message });
     } finally {
       setBusy(false);
     }
@@ -57,11 +60,18 @@ export default function AccountAccess({ session, account, refresh }) {
    * The answer's `token` is the key itself, shown once; the form is cleared, so the password
    * is not left in it.
    */
+  /** The failure from `where`, if the last one came from there. */
+  const failure = (where) =>
+    error?.where === where && (
+      <p className="error" role="alert">
+        {error.text}
+      </p>
+    );
   async function create(e) {
     e.preventDefault();
     const form = e.currentTarget,
       d = new FormData(form);
-    const r = await action('auth/api-keys', 'POST', {
+    const r = await action('keys', 'auth/api-keys', 'POST', {
       name: d.get('name'),
       days: Number(d.get('days')),
       scopes: d.has('write') ? ['timelines:read', 'timelines:write'] : ['timelines:read'],
@@ -102,7 +112,7 @@ export default function AccountAccess({ session, account, refresh }) {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          void action('auth/profile', 'PATCH', { avatarUrl: avatar });
+          void action('avatar', 'auth/profile', 'PATCH', { avatarUrl: avatar });
         }}
       >
         <label>
@@ -127,7 +137,7 @@ export default function AccountAccess({ session, account, refresh }) {
               e.target.value = '';
               if (!f) return;
               if (f.size > 262144) {
-                setError('Avatar exceeds 256 KiB.');
+                setError({ where: 'avatar', text: 'Avatar exceeds 256 KiB.' });
                 return;
               }
               const reader = new FileReader();
@@ -142,6 +152,7 @@ export default function AccountAccess({ session, account, refresh }) {
             Clear avatar
           </button>
         </div>
+        {failure('avatar')}
       </form>
       <h2>Sensitive content</h2>
       {/* Minors can't turn the warnings off: the server refuses it (#115). */}
@@ -158,13 +169,16 @@ export default function AccountAccess({ session, account, refresh }) {
             checked={!!account?.profile?.showSensitive}
             disabled={busy}
             onChange={(e) =>
-              void action('auth/profile', 'PATCH', { showSensitive: e.target.checked })
+              void action('sensitive', 'auth/profile', 'PATCH', {
+                showSensitive: e.target.checked,
+              })
             }
           />
           Show sensitive content without warnings (labelled nudity, graphic violence and disturbing
           content, and their images)
         </label>
       )}
+      {failure('sensitive')}
       <h2>
         API keys
         <HelpTip topic="api#calling-it" about="API keys">
@@ -198,8 +212,8 @@ export default function AccountAccess({ session, account, refresh }) {
           Authenticator or recovery code (if enabled)
           <input name="code" autoComplete="one-time-code" />
         </label>
-        <p className="muted">Key creation requires a sign-in within the last five minutes.</p>
         <button disabled={busy}>Create API key</button>
+        {failure('keys')}
       </form>
       {token && (
         <div className="notice">
@@ -221,7 +235,7 @@ export default function AccountAccess({ session, account, refresh }) {
             {/* Revoking (POST) stops the key but keeps it listed; removing (DELETE) forgets it. */}
             <button
               disabled={busy || !!k.revoked_at}
-              onClick={() => action('auth/api-keys/' + k.id, 'POST', {})}
+              onClick={() => action('keys', 'auth/api-keys/' + k.id, 'POST', {})}
             >
               Revoke
             </button>
@@ -229,7 +243,7 @@ export default function AccountAccess({ session, account, refresh }) {
               disabled={busy}
               onClick={() => {
                 if (confirm('Remove this API key permanently? It will immediately stop working.'))
-                  void action('auth/api-keys/' + k.id, 'DELETE');
+                  void action('keys', 'auth/api-keys/' + k.id, 'DELETE');
               }}
             >
               Remove
@@ -246,7 +260,7 @@ export default function AccountAccess({ session, account, refresh }) {
         onSubmit={(e) => {
           e.preventDefault();
           const d = new FormData(e.currentTarget);
-          void action('auth/identities/unlink', 'POST', {
+          void action('unlink', 'auth/identities/unlink', 'POST', {
             provider: d.get('provider'),
             password: d.get('password'),
             code: d.get('code'),
@@ -270,10 +284,8 @@ export default function AccountAccess({ session, account, refresh }) {
           <input name="code" autoComplete="one-time-code" />
         </label>
         <button disabled={busy || !account?.identities?.length}>Unlink provider</button>
+        {failure('unlink')}
       </form>
-      <p className="error" role="alert">
-        {error}
-      </p>
       <h2>Delete your account</h2>
       <p className="muted">
         Deletes your account and what is yours: your timelines (with their saved history, pull
@@ -288,7 +300,7 @@ export default function AccountAccess({ session, account, refresh }) {
           const d = new FormData(e.currentTarget);
           if (busy) return;
           setBusy(true);
-          setError('');
+          setError(null);
           try {
             // Not through action(): there is no account left to refresh afterwards.
             await api('auth/account', {
@@ -303,8 +315,8 @@ export default function AccountAccess({ session, account, refresh }) {
               },
             });
             window.location.assign('/');
-          } catch (failure) {
-            setError(failure.message);
+          } catch (e) {
+            setError({ where: 'delete', text: e.message });
             setBusy(false);
           }
         }}
@@ -324,6 +336,7 @@ export default function AccountAccess({ session, account, refresh }) {
         <button className="danger" disabled={busy}>
           Delete my account
         </button>
+        {failure('delete')}
       </form>
     </section>
   );

@@ -339,7 +339,7 @@ export class Moderation {
         .rows[0];
       if (!actor?.is_admin || actor.is_disabled)
         throw new HttpError(403, 'Administrator access required.');
-      // A recent sign-in, the password, and a second factor when on; 403 otherwise.
+      // The password (or a recent sign-in without one), and a second factor when on.
       await this.auth.security.fresh(c, actor, session, value);
       // The case, locked so two administrators deciding it at once are serialized: the
       // second sees the first's status and is refused.

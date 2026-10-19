@@ -219,6 +219,16 @@ export default function Account({ returnTo = '/', login = false }) {
   // Whether to show the guest's forms: no account yet, or a step that an emailed link or a
   // challenge put the page in even while a session exists.
   const anonymous = !session?.user || ['mfa', 'email', 'verify', 'reset'].includes(mode);
+  // The server's message or failure: beside the security form when signed in (the account
+  // page's other sections show their own), else under the sign-in forms.
+  const feedback = (
+    <>
+      <p role="status">{message}</p>
+      <p className="error" role="alert">
+        {error}
+      </p>
+    </>
+  );
   return (
     <div className="account-card">
       <h1>
@@ -424,8 +434,9 @@ export default function Account({ returnTo = '/', login = false }) {
               : 'An authenticator app provides a second sign-in factor.'}
           </p>
           <p className="muted">
-            For security changes, sign in within the last five minutes. Enter your current password
-            if this account has one; if MFA is enabled, enter a fresh code.
+            Security changes ask for your current password and, with two-factor authentication on, a
+            fresh code. An account without a password (signed up through Google, GitHub or Facebook)
+            confirms them with a sign-in in the last five minutes instead.
           </p>
           <form onSubmit={securityForm}>
             {account?.security?.has_password && (
@@ -512,6 +523,7 @@ export default function Account({ returnTo = '/', login = false }) {
               </button>
             </details>
           </form>
+          {feedback}
           <h2>Active sessions</h2>
           {account?.sessions.map((s, i) => (
             <p key={i}>
@@ -551,10 +563,7 @@ export default function Account({ returnTo = '/', login = false }) {
           <button onClick={() => setCodes(null)}>I have stored these codes</button>
         </section>
       )}
-      <p role="status">{message}</p>
-      <p className="error" role="alert">
-        {error}
-      </p>
+      {anonymous && feedback}
       <p className="muted">
         <Link href="/legal">Terms and privacy notices</Link> are available before registration.
       </p>

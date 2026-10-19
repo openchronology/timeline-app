@@ -101,8 +101,8 @@ export default function Admin() {
    * Applies one administrative change, then reloads the list; a failure is shown above it.
    *
    * Sends PATCH /api/admin/<path> with `changes`, plus the password and code from the
-   * confirmation fields: the server applies a change only after a recent sign-in, the current
-   * password and, when on, a second factor (security.fresh in server/administration.mjs). The
+   * confirmation fields: the server applies a change only with the current password (or, without
+   * one, a recent sign-in) and, when on, a second factor (security.fresh in server/administration.mjs). The
    * session's CSRF token goes in the X-CSRF-Token header, as every write on a cookie session
    * needs: another site can make the browser send the cookie but cannot read the token. The
    * code is cleared after a success, since an authenticator code is used once.
@@ -175,8 +175,9 @@ export default function Admin() {
       <section className="notice">
         <h2>Confirm administrative changes</h2>
         <p>
-          Sign in within the last five minutes. Changes require your current password and, if
-          enabled, a fresh authenticator or recovery code.
+          Changes require your current password and, if enabled, a fresh authenticator or recovery
+          code. Without a password (signed up through a provider), sign in again within five minutes
+          of the change.
         </p>
         <label>
           Current password

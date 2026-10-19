@@ -58,9 +58,10 @@ The last active administrator cannot be suspended or demoted. Private timelines
 are available to site administrators for management; private-fork publication
 restrictions still apply. Operators should disclose their access to private data.
 
-Admin mutations require a recent interactive session (five minutes), the current
-password where one exists, and a fresh authenticator/recovery code when MFA is
-enabled. Sign out and back in if confirmation expires. Mutations are recorded in
+Admin mutations require a live interactive session, the current password, and a
+fresh authenticator/recovery code when MFA is enabled. An administrator without a
+password (signed up through a provider) instead signs in again within five minutes
+of the change. Mutations are recorded in
 `oc_admin_audit` without passwords or codes. Suspension/demotion revokes sessions,
 API keys, and pending desktop login requests. Access checks query live account
 state instead of trusting a browser-supplied role.
