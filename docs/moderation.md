@@ -54,7 +54,7 @@ Each case shows:
 - its owner;
 - the latest twenty reports: their categories, details, who reported them (or "signed out"), and the event named.
 
-Decisions use the same confirmation as other administration changes: a sign-in within the last five minutes, the current password, and a fresh authenticator or recovery code when two-factor authentication is on. Each decision is recorded in `oc_admin_audit` (action `reports`).
+Decisions use the same confirmation as other administration changes: the current password (or, for an account without one, a sign-in within the last five minutes) and a fresh authenticator or recovery code when two-factor authentication is on. Each decision is recorded in `oc_admin_audit` (action `reports`).
 
 ### Dismiss
 

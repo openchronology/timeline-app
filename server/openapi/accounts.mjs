@@ -29,7 +29,7 @@ const ANYONE = [{}];
 const SIGN_IN_TOKEN =
   'Before signing in, send `X-CSRF-Token` equal to the sign-in token: the `csrf` that `GET /api/session` returns along with its `oc_login` cookie (valid ten minutes). A caller that is already signed in sends its session’s CSRF token instead.';
 const FRESH =
-  'Like every security change, it needs a sign-in within the last five minutes (else 403), the current `password` when the account has one (else 401), and, with two-factor authentication on, a fresh `code` from the authenticator or a recovery code (else 401).';
+  'Like every security change, it needs a live session, the current `password` when the account has one (else 401) or, for an account without a password, a sign-in within the last five minutes (else 403), and, with two-factor authentication on, a fresh `code` from the authenticator or a recovery code (else 401).';
 const COOKIE_NAMES =
   'Cookie names take the `__Host-` prefix (and `Secure`) when the server is on HTTPS.';
 
@@ -959,7 +959,7 @@ export const schemas = {
   },
   SecurityConfirmation: {
     type: 'object',
-    description: 'What a security change needs besides a recent sign-in.',
+    description: 'What confirms a security change.',
     properties: { password: currentPassword, code: factorCode },
   },
   TwoFactorSetup: {

@@ -51,7 +51,7 @@ const notJson = {
 
 /** How administration changes are confirmed (account-security.mjs `fresh`). */
 const CONFIRMED =
-  'For administrators only, and confirmed: the session must have signed in within the last five minutes (403 otherwise), and the body carries the current `password` (unless the account has none, as a social-only sign-in) and, with two-factor authentication on, a fresh authenticator or recovery `code` (401 when either is wrong). Each change is recorded in the administration audit. Limited to ten changes a minute per administrator.';
+  'For administrators only, and confirmed: the body carries the current `password` (an account without one, as a social-only sign-in, must instead have signed in within the last five minutes; 403 otherwise) and, with two-factor authentication on, a fresh authenticator or recovery `code` (401 when either is wrong). Each change is recorded in the administration audit. Limited to ten changes a minute per administrator.';
 
 const confirmation = {
   password: {

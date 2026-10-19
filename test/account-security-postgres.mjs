@@ -217,8 +217,32 @@ try {
     code: enabled.recoveryCodes[2],
   });
   assert.equal((await afterReset.request('auth/account')).security.mfa_enabled, false);
+  // The password confirms a security change at any time in a live session: no need to sign in
+  // again first, however long ago the session began.
+  const age = (interval) =>
+    pool.query(`UPDATE oc_sessions SET created_at=now()-interval '${interval}' WHERE user_id=$1`, [
+      uid,
+    ]);
+  await age('1 hour');
+  const keyInput = { name: 'Old session', days: 1, scopes: ['timelines:read'] };
+  await afterReset.request('auth/api-keys', { ...keyInput, password: 'wrong' }, 401);
+  assert(
+    (await afterReset.request('auth/api-keys', { ...keyInput, password: newPassword }, 201)).token,
+  );
+  assert(
+    (await afterReset.request('auth/api-keys', { ...keyInput, password: newPassword }, 201)).token,
+  );
+  // An account with no password (signed up through a provider) has nothing to re-enter, so it
+  // still needs a sign-in within five minutes.
+  await pool.query('UPDATE oc_users SET password_hash=NULL WHERE id=$1', [uid]);
+  assert.match(
+    (await afterReset.request('auth/api-keys', keyInput, 403)).error,
+    /more than five minutes old/,
+  );
+  await age('1 minute');
+  assert((await afterReset.request('auth/api-keys', keyInput, 201)).token);
   console.log(
-    'PostgreSQL account security: verified registration, browser binding, encrypted MFA, recovery/replay, attempt limits, reset/session revocation passed.',
+    'PostgreSQL account security: verified registration, browser binding, encrypted MFA, recovery/replay, attempt limits, reset/session revocation, password confirmation passed.',
   );
 } finally {
   if (uid) await pool.query('DELETE FROM oc_users WHERE id=$1', [uid]);

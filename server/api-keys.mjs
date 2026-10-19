@@ -92,7 +92,7 @@ export class ApiKeys {
   }
   /**
    * Creates a key for the signed-in account from `value` (keyInput). Like any security change it
-   * needs a recent sign-in, the current password and, with two-factor authentication on, a fresh
+   * needs the current password (or, without one, a recent sign-in) and, with two-factor authentication on, a fresh
    * code (AccountSecurity.fresh). Result: the key, shown this once. Throws 409 at 100 keys.
    */
   async create(session, value) {

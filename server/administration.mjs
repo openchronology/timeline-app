@@ -3,8 +3,8 @@
  * Site administration (/admin; docs/administration.md): the installation administrator
  * created at migration, storage quotas, the account checks other modules use before writes,
  * and the Administration class behind /api/admin/users, /api/admin/timelines and
- * /api/admin/settings. Every change by an administrator is confirmed with a recent sign-in,
- * the password and a second factor, serialized on one advisory lock, and written to
+ * /api/admin/settings. Every change by an administrator is confirmed with the password (or a
+ * recent sign-in, without one) and a second factor, serialized on one advisory lock, and written to
  * oc_admin_audit.
  */
 import { randomUUID } from 'node:crypto';
@@ -225,8 +225,8 @@ export class Administration {
     };
   }
   /**
-   * An administrator's change, confirmed with `password` and `code` in `value` (a recent
-   * sign-in, the password, and a second factor when on; security.fresh):
+   * An administrator's change, confirmed with `password` and `code` in `value` (the
+   * password, or a recent sign-in without one, and a second factor when on; security.fresh):
    * - `users` (`id` an account): is_admin, is_disabled, quota_bypass, quota_bytes, trust.
    *   Suspending or demoting ends the account's sessions, API keys and pending desktop
    *   sign-ins; the last active administrator cannot be suspended or demoted (409).

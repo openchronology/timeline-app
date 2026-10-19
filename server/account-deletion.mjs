@@ -40,7 +40,7 @@ export async function deleteAccount({ store, auth, session, value }) {
       .rows[0];
     if (!user) throw new HttpError(401, 'Sign in to delete your account.');
     if (value.confirm !== user.username) throw new HttpError(400, 'Type your username to confirm.');
-    // As for any sensitive change: a recent sign-in, the password, and a code if two-factor
+    // As for any sensitive change: the password (or a recent sign-in without one), and a code if two-factor
     // authentication is on (account-security.mjs).
     await auth.security.fresh(c, user, session, value);
     if (
