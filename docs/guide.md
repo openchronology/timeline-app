@@ -260,7 +260,7 @@ In the browser, one **Undo** reverts either. On the server, each is saved at onc
 
 **Plugins** opens **Timeline plugins**, the plugins installed on this timeline. **Add plugin** opens the **Plugin library**; **Add to timeline** installs one. Each installed plugin can be turned off with **Enabled**, reordered with **Move up** and **Move down**, or removed with **Remove**. Removing a plugin keeps the data it added.
 
-Plugins belong to the timeline and are saved with it, so everyone who opens it sees the same thing. Official plugins include **Moment icons**, **Moment colors**, **Moment shapes**, **Moment stacks**, **Rich text notes**, **Headings**, **Sources**, **Focus on hover**, **Expand on hover**, **Duration backgrounds** and **Timeline background**. **Create / import plugin** makes your own, and suites add several at once. **Plugin library** in the header browses everything published. See [plugins](plugins.md).
+Plugins belong to the timeline and are saved with it, so everyone who opens it sees the same thing. Official plugins include **Moment icons**, **Moment colors**, **Moment shapes**, **Moment stacks**, **Rich text notes**, **Headings**, **Sources**, **Focus on hover**, **Expand on hover**, **Duration backgrounds**, **Timeline background** and **Timeline theme** (the timeline's colors and fonts, set under the plugin in the **Plugins** dialog). **Create / import plugin** makes your own, and suites add several at once. **Plugin library** in the header browses everything published. See [plugins](plugins.md).
 
 ## Large timelines
 

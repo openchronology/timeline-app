@@ -565,9 +565,12 @@ main {
   padding: 0;
   accent-color: #285742;
 }
+/* A timeline theme (#230) sets the --timeline-* properties on the stage; each falls back to
+   the usual look. */
 .timeline-stage {
   position: relative;
   height: 365px;
+  background: var(--timeline-background, transparent);
   touch-action: none;
   user-select: none;
   overflow: hidden;
@@ -633,20 +636,21 @@ main {
   max-width: 150px;
   padding: 0 4px;
   border-radius: 4px;
-  background: #ffffffb8;
+  background: var(--timeline-halo-backing, #ffffffb8);
   backdrop-filter: blur(3px);
   text-shadow:
-    0 0 1px #fff,
-    0 0 3px #fff;
+    0 0 1px var(--timeline-halo, #fff),
+    0 0 3px var(--timeline-halo, #fff);
 }
 /* Tick labels fade as they get too fine to show, so they take no backing that would stay. */
 .timeline-stage.over-backgrounds :is(.tick-label, .duration-band) {
   text-shadow:
-    0 0 1px #fff,
-    0 0 3px #fff;
+    0 0 1px var(--timeline-halo, #fff),
+    0 0 3px var(--timeline-halo, #fff);
 }
 .timeline-stage.over-backgrounds :is(.axis, .edge-arcs, .event-stem, .event-marker) {
-  filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 2px #fff) drop-shadow(0 0 4px #fff);
+  filter: drop-shadow(0 0 1px var(--timeline-halo, #fff))
+    drop-shadow(0 0 2px var(--timeline-halo, #fff)) drop-shadow(0 0 4px var(--timeline-halo, #fff));
 }
 .timeline-stage.over-backgrounds .event-marker.heading-marker {
   backdrop-filter: blur(4px);
@@ -662,7 +666,7 @@ main {
   left: 48px;
   right: 48px;
   top: 192px;
-  border-top: 1px solid #aebda7;
+  border-top: 1px solid var(--timeline-measure-soft, #aebda7);
 }
 .axis-tick {
   position: absolute;
@@ -675,8 +679,8 @@ main {
   inset: 0;
   background: repeating-linear-gradient(
     to bottom,
-    #e7ece2 0,
-    #e7ece2 3px,
+    var(--timeline-measure-faint, #e7ece2) 0,
+    var(--timeline-measure-faint, #e7ece2) 3px,
     transparent 3px,
     transparent 7px
   );
@@ -685,15 +689,15 @@ main {
   position: absolute;
   top: 152px;
   height: 9px;
-  border-left: 1px solid #b5c2ad;
+  border-left: 1px solid var(--timeline-measure-soft, #b5c2ad);
 }
 .tick-label {
   position: absolute;
   top: 177px;
   transform: translateX(-50%);
   font-size: 10px;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  color: #87947f;
+  font-family: var(--timeline-measure-font, ui-monospace, SFMono-Regular, Consolas, monospace);
+  color: var(--timeline-measure, #87947f);
   max-width: 105px;
   text-overflow: ellipsis;
   overflow: hidden;
@@ -705,7 +709,7 @@ main {
   width: 22px;
   height: 22px;
   border: 4px solid #fff;
-  background: #547d5b;
+  background: var(--timeline-marker, #547d5b);
   border-radius: 50%;
   padding: 0;
   transform: translateX(-50%);
@@ -715,13 +719,13 @@ main {
 }
 .event-marker:hover,
 .event-marker:focus-visible {
-  background: #214f38;
+  background: var(--timeline-marker-strong, #214f38);
   box-shadow: 0 0 0 5px #e7efdf;
   z-index: 5;
   transform: translateX(-50%);
 }
 .event-marker.selected {
-  background: #173c28;
+  background: var(--timeline-marker-selected, #173c28);
   box-shadow: 0 0 0 5px #e3eccb;
 }
 .event-marker.group {
@@ -735,7 +739,7 @@ main {
   align-items: center;
   justify-content: center;
   font-weight: 650;
-  background: #3b654a;
+  background: var(--timeline-marker-group, #3b654a);
   box-shadow: 0 0 0 1px #b8caaa;
 }
 .event-marker.group.large {
@@ -751,7 +755,8 @@ main {
   text-align: center;
   font-size: 11px;
   font-weight: 500;
-  color: #4c654c;
+  font-family: var(--timeline-text-font, inherit);
+  color: var(--timeline-text, #4c654c);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -759,7 +764,7 @@ main {
 }
 .event-label small {
   display: block;
-  color: #9aa690;
+  color: var(--timeline-text-soft, #9aa690);
   font-size: 9px;
   font-family: ui-monospace, monospace;
   margin-top: 5px;
@@ -767,7 +772,7 @@ main {
 .event-stem {
   position: absolute;
   width: 1px;
-  background: #d4dfcc;
+  background: var(--timeline-measure-faint, #d4dfcc);
   pointer-events: none;
 }
 .stack-label {
@@ -1576,6 +1581,16 @@ dialog h3 {
   display: block;
   margin: 8px 0;
 }
+.plugin-setting-color {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.plugin-setting-color input[type='color'] {
+  width: 44px;
+  height: 30px;
+  padding: 2px;
+}
 .plugin-enable {
   display: flex;
   align-items: center;
@@ -2279,8 +2294,8 @@ dialog button {
   padding: 0;
   border: 1px solid #fff;
   border-radius: 3px;
-  background: #73958b;
-  color: #213d33;
+  background: var(--timeline-duration, #73958b);
+  color: var(--timeline-duration-text, #213d33);
   font-size: 9px;
   overflow: hidden;
   white-space: nowrap;
@@ -2493,9 +2508,9 @@ dialog button {
   padding: 0.12em 0.45em;
   border: 0;
   border-radius: 4px;
-  background: #fbfcf9e6;
+  background: var(--timeline-heading-backing, #fbfcf9e6);
   box-shadow: none;
-  color: #1d3528;
+  color: var(--timeline-text, #1d3528);
   font-weight: 700;
   line-height: 1.15;
   white-space: nowrap;
@@ -2506,12 +2521,12 @@ dialog button {
 }
 .event-marker.heading-marker:hover,
 .event-marker.heading-marker:focus-visible {
-  color: #0f2a1c;
+  color: var(--timeline-text, #0f2a1c);
   box-shadow: 0 0 0 2px #c4d8b2;
   z-index: 5;
 }
 .event-marker.heading-marker.selected {
-  background: #fbfcf9e6;
+  background: var(--timeline-heading-backing, #fbfcf9e6);
   box-shadow: 0 0 0 2px #173c28;
 }
 .event-marker.heading-marker[data-heading='h1'] {
@@ -2537,7 +2552,7 @@ dialog button {
 .event-marker.duration-point {
   border-radius: 7px;
   width: 30px;
-  background: #73958b;
+  background: var(--timeline-duration, #73958b);
 }
 #group-durations h3 {
   font-size: 14px;
@@ -2631,7 +2646,7 @@ dialog button {
 }
 .edge-arc {
   fill: none;
-  stroke: #8aa79b;
+  stroke: var(--timeline-measure, #8aa79b);
   stroke-width: 1.5;
   opacity: 0.65;
   pointer-events: stroke;

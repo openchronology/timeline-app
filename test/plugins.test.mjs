@@ -18,6 +18,9 @@ import {
   DURATION_BACKGROUNDS,
   TIMELINE_BACKGROUND,
   pluginBackdrop,
+  TIMELINE_THEME,
+  pluginTheme,
+  settingValue,
   MOMENT_HEADINGS,
   pluginHeading,
   fontValue,
@@ -60,6 +63,7 @@ import {
   derivationKeys,
   durationOverview,
 } from '../dist/core.mjs';
+import { themeProperties, textOn } from '../dist/timeline-theme.mjs';
 import { createPluginLibrary } from '../server/plugins.mjs';
 import { createApplication } from '../server/http.mjs';
 import { PostgresStore } from '../server/store.mjs';
@@ -418,7 +422,7 @@ test('public plugin API works without accounts or PostgreSQL and validates its i
   // Twelve to a page: the thirteenth and on are on the next.
   assert.deepEqual(
     (await request(app, '/api/plugins?page=2')).body.plugins.map((p) => p.id),
-    ['rich-text-notes', 'moment-sources', 'timeline-background'],
+    ['rich-text-notes', 'moment-sources', 'timeline-background', 'timeline-theme'],
   );
   assert.equal((await request(app, '/api/plugins?search=absent&page=1&limit=1')).body.total, 0);
   const response = await request(app, '/api/plugins/search', 'POST', {
@@ -836,6 +840,78 @@ test('timeline background: one image for the whole timeline, set on the plugin (
     second,
   );
   assert.equal(pluginBackdrop([installed, { manifest: other, enabled: true }]), image);
+});
+test('timeline theme: colors and fonts for the whole timeline, set on the plugin (#230)', () => {
+  assert(isOfficialPlugin(TIMELINE_THEME));
+  assert.deepEqual(TIMELINE_THEME.fields, []);
+  assert.equal(TIMELINE_THEME.settings.length, 8);
+  const [installed] = validateInstalledPlugins([
+    {
+      manifest: TIMELINE_THEME,
+      enabled: true,
+      settings: { textColor: '#AABBCC', measureFont: ' Georgia, serif ', haloColor: '' },
+    },
+  ]);
+  // Colors are kept in lower case, fonts trimmed, and empty values left out.
+  assert.deepEqual(installed.settings, { textColor: '#aabbcc', measureFont: 'Georgia, serif' });
+  assert.deepEqual(pluginTheme([installed]), { text: '#aabbcc', measureFont: 'Georgia, serif' });
+  assert.deepEqual(pluginTheme([{ ...installed, enabled: false }]), {});
+  // Each value is checked by its setting's kind.
+  for (const [key, bad, message] of [
+    ['textColor', 'red', /color such as/],
+    ['textColor', '#abc', /color such as/],
+    ['textFont', 'url(https://fonts.example/a.woff)', /font names/],
+    ['textFont', 'Georgia; color: red', /font names/],
+    ['backgroundColor', 'https://images.example/a.jpg', /color such as/],
+  ])
+    assert.throws(
+      () =>
+        validateInstalledPlugins([
+          { manifest: TIMELINE_THEME, enabled: true, settings: { [key]: bad } },
+        ]),
+      message,
+    );
+  const color = TIMELINE_THEME.settings[0];
+  assert.equal(settingValue(color, '#00FF00'), '#00ff00');
+  assert.equal(settingValue(color, 'https://images.example/a.jpg'), null);
+  // A theme's roles read its own settings of the right kind.
+  for (const change of [
+    { theme: {} },
+    { theme: { text: 'missing' } },
+    { theme: { text: 'textFont' } },
+    { theme: { textFont: 'textColor' } },
+    { theme: { sparkle: 'textColor' } },
+    { settings: [{ kind: 'gradient', key: 'textColor', label: 'Gradient' }] },
+  ])
+    assert.throws(() => validatePluginManifest({ ...TIMELINE_THEME, ...change }));
+  // The last enabled plugin that sets a role wins it; others keep the earlier one's.
+  const other = validatePluginManifest({ ...TIMELINE_THEME, id: 'other-theme' });
+  assert.deepEqual(
+    pluginTheme([
+      installed,
+      {
+        manifest: other,
+        enabled: true,
+        settings: { textColor: '#010203', markerColor: '#aa0000' },
+      },
+    ]),
+    { text: '#010203', measureFont: 'Georgia, serif', marker: '#aa0000' },
+  );
+  // As the stage's properties: the roles set, with their shades; nothing for the rest.
+  assert.deepEqual(themeProperties({}), {});
+  assert.deepEqual(
+    themeProperties({ text: '#112233', duration: '#000000', measureFont: 'serif' }),
+    {
+      '--timeline-text': '#112233',
+      '--timeline-text-soft': 'color-mix(in srgb, #112233 65%, transparent)',
+      '--timeline-measure-font': 'serif',
+      '--timeline-duration': '#000000',
+      '--timeline-duration-text': '#ffffff',
+    },
+  );
+  assert.equal(textOn('#ffffff'), '#1b1f1c');
+  assert.equal(textOn('#73958b'), '#1b1f1c');
+  assert.equal(textOn('#1f3a5f'), '#ffffff');
 });
 
 test('headings: a level makes a moment a heading, in its font or Times New Roman', () => {
