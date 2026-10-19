@@ -26,8 +26,8 @@ export async function embedImages(
   const urls = new Set<string>();
   // Plugins' timeline-wide images, such as the timeline's background (#223).
   for (const p of document.plugins ?? [])
-    for (const value of Object.values(p.settings ?? {})) {
-      const url = imageURL(value);
+    for (const setting of p.manifest.settings ?? []) {
+      const url = setting.kind === 'image-url' && imageURL(p.settings?.[setting.key]);
       if (url) urls.add(url);
     }
   // Durations' images too, such as their backgrounds.

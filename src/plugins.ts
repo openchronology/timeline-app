@@ -40,6 +40,8 @@ export interface PluginManifest {
   settings?: PluginSetting[];
   /** An image behind the whole timeline, beneath durations' backgrounds: a setting's value. */
   backdrop?: { kind: 'image'; setting: string };
+  /** The timeline's colors and fonts (#230): each theme role's setting, by role. */
+  theme?: PluginTheme;
   /** Entities the plugin applies to; omitted means moments, plus durations for colors/cards. */
   targets?: PluginTarget[];
   /** Metadata computed in the browser for the plugins to read, never saved (#122). */
@@ -47,12 +49,30 @@ export interface PluginManifest {
   source?: string;
 }
 export type PluginTarget = 'moments' | 'durations';
-/** A timeline-wide plugin setting: for now, the HTTPS address of an image. */
+/** A timeline-wide plugin setting: the HTTPS address of an image, a color or a font family. */
 export interface PluginSetting {
-  kind: 'image-url';
+  kind: 'image-url' | 'color' | 'font';
   key: string;
   label: string;
 }
+/**
+ * What a theme can set on the timeline (#230): label text and the measure (axis, tick marks
+ * and their times) each a color and a font, the halo's color, the default marker and duration
+ * colors, and the background color.
+ */
+export const THEME_ROLES = [
+  'text',
+  'textFont',
+  'measure',
+  'measureFont',
+  'halo',
+  'marker',
+  'duration',
+  'background',
+] as const;
+export type ThemeRole = (typeof THEME_ROLES)[number];
+export type PluginTheme = Partial<Record<ThemeRole, string>>;
+const themeKind = (role: ThemeRole) => (role.endsWith('Font') ? 'font' : 'color');
 /** Where a derived value is read: a tag's value (`severity` reads `severity:err`), or a path. */
 export type DerivationSource = { tag: string } | { path: string };
 /**
@@ -476,6 +496,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     'background',
     'settings',
     'backdrop',
+    'theme',
     'targets',
     'derive',
     'source',
@@ -553,11 +574,16 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     const settingKeys = new Set<string>();
     result.settings = p.settings.map((value) => {
       const setting = object(value, ['kind', 'key', 'label']);
-      if (setting.kind !== 'image-url') throw new Error('Unsupported plugin setting.');
+      if (typeof setting.kind !== 'string' || !Object.hasOwn(SETTING_VALUES, setting.kind))
+        throw new Error('Unsupported plugin setting.');
       const settingKey = key(setting.key);
       if (settingKeys.has(settingKey)) throw new Error('Duplicate plugin setting.');
       settingKeys.add(settingKey);
-      return { kind: 'image-url', key: settingKey, label: text(setting.label, 100) };
+      return {
+        kind: setting.kind as PluginSetting['kind'],
+        key: settingKey,
+        label: text(setting.label, 100),
+      };
     });
   }
   if (p.backdrop !== undefined) {
@@ -568,6 +594,18 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     )
       throw new Error("A timeline background reads one of its plugin's image settings.");
     result.backdrop = { kind: 'image', setting: backdrop.setting as string };
+  }
+  if (p.theme !== undefined) {
+    const theme = object(p.theme, [...THEME_ROLES]);
+    const roles = THEME_ROLES.filter((role) => theme[role] !== undefined);
+    if (!roles.length)
+      throw new Error("A theme sets at least one of the timeline's colors or fonts.");
+    result.theme = {};
+    for (const role of roles) {
+      if (!result.settings?.some((s) => s.key === theme[role] && s.kind === themeKind(role)))
+        throw new Error(`A theme's ${role} reads one of its plugin's ${themeKind(role)} settings.`);
+      result.theme[role] = theme[role] as string;
+    }
   }
   if (p.targets !== undefined) {
     if (
@@ -611,10 +649,24 @@ export function validateInstalledPlugins(value: unknown): InstalledPlugin[] {
     return { manifest, enabled: entry.enabled, ...(settings ? { settings } : {}) };
   });
 }
+/** Each kind of timeline setting's value, and what to say of one that isn't. */
+const SETTING_VALUES: Record<
+  PluginSetting['kind'],
+  { value: (given: unknown) => string | null; expected: string }
+> = {
+  'image-url': { value: (given) => imageURL(given), expected: 'enter an HTTPS image address.' },
+  color: { value: (given) => colorValue(given), expected: 'enter a color such as #1f3a5f.' },
+  font: { value: (given) => fontValue(given), expected: 'use font names separated by commas.' },
+};
+/** A timeline setting's value as saved, or null when it isn't one of its kind. */
+export function settingValue(setting: PluginSetting, given: unknown): string | null {
+  return SETTING_VALUES[setting.kind].value(given);
+}
 /**
  * An installed plugin's timeline settings (#223): the values of the settings its manifest
- * declares, each an HTTPS image address. Values for settings it no longer declares (after an
- * update, say) are dropped; empty ones are left out. Nothing set gives undefined.
+ * declares, each an HTTPS image address, a color or a font family list by its kind. Values for
+ * settings it no longer declares (after an update, say) are dropped; empty ones are left out.
+ * Nothing set gives undefined.
  */
 function pluginSettings(manifest: PluginManifest, value: unknown) {
   if (value === undefined) return undefined;
@@ -624,9 +676,9 @@ function pluginSettings(manifest: PluginManifest, value: unknown) {
   for (const setting of manifest.settings ?? []) {
     const given = (value as Record<string, unknown>)[setting.key];
     if (given === undefined || given === '') continue;
-    const url = imageURL(given);
-    if (!url) throw new Error(`${setting.label}: enter an HTTPS image address.`);
-    settings[setting.key] = url;
+    const valid = settingValue(setting, given);
+    if (!valid) throw new Error(`${setting.label}: ${SETTING_VALUES[setting.kind].expected}`);
+    settings[setting.key] = valid;
   }
   return Object.keys(settings).length ? settings : undefined;
 }
@@ -756,6 +808,22 @@ export function durationPlugins(plugins: readonly InstalledPlugin[] = []): Insta
  * A duration's background image: the last enabled background plugin's valid image URL. Bands
  * carry string metadata of at most 256 characters, so a longer URL shows no background.
  */
+/**
+ * The timeline's theme (#230): for each role, the last enabled theme plugin's value that is
+ * set. Roles none sets keep the default look.
+ */
+export function pluginTheme(plugins: readonly InstalledPlugin[] = []): PluginTheme {
+  const theme: PluginTheme = {};
+  for (const { manifest, enabled, settings } of plugins)
+    if (enabled && manifest.theme)
+      for (const role of THEME_ROLES) {
+        const key = manifest.theme[role],
+          setting = manifest.settings?.find((s) => s.key === key);
+        const value = setting && settingValue(setting, settings?.[setting.key]);
+        if (value) theme[role] = value;
+      }
+  return theme;
+}
 /** The image behind the whole timeline (#223): the last enabled plugin's that has one set. */
 export function pluginBackdrop(plugins: readonly InstalledPlugin[] = []): string | null {
   let image: string | null = null;
@@ -1116,6 +1184,35 @@ export const TIMELINE_BACKGROUND: PluginManifest = validatePluginManifest({
   settings: [{ kind: 'image-url', key: 'imageUrl', label: 'Background image URL' }],
   backdrop: { kind: 'image', setting: 'imageUrl' },
 });
+export const TIMELINE_THEME: PluginManifest = validatePluginManifest({
+  apiVersion: 1,
+  id: 'timeline-theme',
+  version: 1,
+  name: 'Timeline theme',
+  description:
+    "Choose the timeline's colors and fonts: its labels, its measure (the axis, tick marks and their times), the halo that keeps them readable over images, the default marker and duration colors, and a background color. Set them here in the plugin list; anything left blank keeps the usual look, and colors chosen for events still win.",
+  fields: [],
+  settings: [
+    { kind: 'color', key: 'textColor', label: 'Label color' },
+    { kind: 'font', key: 'textFont', label: 'Label font' },
+    { kind: 'color', key: 'measureColor', label: 'Measure color' },
+    { kind: 'font', key: 'measureFont', label: 'Measure font' },
+    { kind: 'color', key: 'haloColor', label: 'Halo color' },
+    { kind: 'color', key: 'markerColor', label: 'Marker color' },
+    { kind: 'color', key: 'durationColor', label: 'Duration color' },
+    { kind: 'color', key: 'backgroundColor', label: 'Background color' },
+  ],
+  theme: {
+    text: 'textColor',
+    textFont: 'textFont',
+    measure: 'measureColor',
+    measureFont: 'measureFont',
+    halo: 'haloColor',
+    marker: 'markerColor',
+    duration: 'durationColor',
+    background: 'backgroundColor',
+  },
+});
 /**
  * Where log imports keep a severity (#122): the `severity:<level>` tag, and the severity in
  * each format's own metadata (server/log-formats.mjs), for formats that tag none (access logs)
@@ -1179,6 +1276,7 @@ export const BUILTIN_PLUGINS: readonly PluginManifest[] = [
   EXPAND_ON_HOVER,
   DURATION_BACKGROUNDS,
   TIMELINE_BACKGROUND,
+  TIMELINE_THEME,
   MOMENT_HEADINGS,
   LOG_SEVERITY_COLORS,
 ];

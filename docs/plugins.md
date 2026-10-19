@@ -76,9 +76,29 @@ A plugin may declare up to eight `settings`: values for the whole timeline, set 
 }
 ```
 
-- **Kinds:** a setting is an HTTPS image address (`image-url`) for now.
-- **Values:** an address that isn't HTTPS is refused. Empty values, and values for settings the manifest no longer declares, are dropped.
+- **Kinds:** a setting is an HTTPS image address (`image-url`), a color (`color`, `#rrggbb`) or a font family list (`font`, names of installed fonts separated by commas, as for heading fonts).
+- **Values:** a value that isn't one of its kind is refused: an address that isn't HTTPS, a color by name, or a font list with anything but font names (such as a URL). Empty values, and values for settings the manifest no longer declares, are dropped.
 - **Backdrop:** `backdrop` shows an image setting's value behind the whole timeline. When several enabled plugins set one, the last one wins.
+- **Theme:** `theme` maps parts of the timeline's look to settings; see [Timeline theme](#timeline-theme).
+
+## Timeline theme
+
+Install **Timeline theme** to choose the timeline's colors and fonts. Like the timeline background, it belongs to the whole timeline, so it's set in the **Plugins** dialog under the plugin:
+
+| Setting          | What it changes                                                                                                                |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Label color      | Event labels and headings; their dates take a lighter shade.                                                                   |
+| Label font       | Event labels.                                                                                                                  |
+| Measure color    | The axis, tick marks, tick labels, guide lines, stems and relationship arcs.                                                   |
+| Measure font     | Tick labels.                                                                                                                   |
+| Halo color       | The glow and frosted backing that keep text and lines readable over images and background colors.                              |
+| Marker color     | Moment and summary markers (summaries take a darker shade). A color chosen on a moment still wins.                             |
+| Duration color   | Duration bands (with dark or light text to suit) and collapsed durations on the axis. A color chosen on a duration still wins. |
+| Background color | The timeline's background, beneath any images. The halo shows over it, as over an image.                                       |
+
+Colors are picked with the browser's color picker; **Use default** clears one. Fonts are typed or picked from the suggestions, and only fonts installed on the viewer's device are used: no web font is downloaded. Anything left blank keeps the usual look.
+
+A plugin's `theme` names the setting for each part it sets: `text`, `textFont`, `measure`, `measureFont`, `halo`, `marker`, `duration` and `background`. Font parts read `font` settings, and the rest read `color` settings. When several enabled plugins set the same part, the last one wins.
 
 ## UI capability API v1
 

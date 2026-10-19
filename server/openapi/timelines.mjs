@@ -283,7 +283,7 @@ export const schemas = {
               type: 'object',
               additionalProperties: { type: 'string', maxLength: 4096 },
               description:
-                'Values of the timeline-wide settings its manifest declares (such as the timeline’s background image address), by key. Values for undeclared settings are dropped.',
+                'Values of the timeline-wide settings its manifest declares (such as the timeline’s background image address, or its theme’s colors and fonts), by key. Values for undeclared settings are dropped.',
             },
           },
         },

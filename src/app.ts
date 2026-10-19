@@ -16,6 +16,7 @@ import { createCommunityUI } from './community-ui.js';
 import { createSuiteUI } from './suite-ui.js';
 import type { Proposal } from './community-ui.js';
 import { configureImages, imageSource, embedImages } from './image-assets.js';
+import { themeProperties } from './timeline-theme.js';
 import './styles.css';
 import {
   renderPluginMarker,
@@ -82,7 +83,9 @@ import {
   durationPlugins,
   pluginBackground,
   pluginBackdrop,
-  imageURL,
+  pluginTheme,
+  settingValue,
+  HEADING_FONTS,
   derivationKeys,
   BACKGROUND_URL_LIMIT,
   momentPlugins,
@@ -124,6 +127,7 @@ import type {
   RulerPlan,
   InstalledPlugin,
   PluginManifest,
+  PluginSetting,
 } from './core.js';
 import { ViewportCache, RemoteWorkspace, regroup, applyChanges } from './remote-cache.js';
 import type { SavingChanges } from './remote-cache.js';
@@ -3290,24 +3294,19 @@ function showInstalledPlugins() {
     action('Remove', false, () =>
       changePlugins(installedPlugins().filter((p) => p.manifest.id !== entry.manifest.id)),
     );
-    // Timeline-wide settings (#223), such as the timeline's background image: set here, as
-    // they belong to no moment or duration. A change is saved like any plugin change.
+    // Timeline-wide settings (#223), such as the timeline's background image or its theme's
+    // colors and fonts (#230): set here, as they belong to no moment or duration. A change is
+    // saved like any plugin change; clearing one goes back to the default.
     const settings = (entry.manifest.settings ?? []).map((setting) => {
       const label = document.createElement('label');
       label.className = 'plugin-setting';
-      const field = document.createElement('input');
-      field.type = 'url';
-      field.placeholder = 'https://…';
-      field.value = entry.settings?.[setting.key] ?? '';
-      field.disabled = !editable();
-      field.dataset.pluginSetting = setting.key;
+      const current = entry.settings?.[setting.key] ?? '';
       const problem = document.createElement('span');
       problem.className = 'form-error';
       problem.setAttribute('role', 'alert');
-      field.onchange = () => {
-        const value = field.value.trim();
-        if (value && !imageURL(value)) {
-          problem.textContent = 'Enter an HTTPS image address.';
+      const save = (value: string) => {
+        if (value && !settingValue(setting, value)) {
+          problem.textContent = SETTING_PROBLEMS[setting.kind];
           return;
         }
         problem.textContent = '';
@@ -3319,12 +3318,61 @@ function showInstalledPlugins() {
           ),
         );
       };
+      const field = document.createElement('input');
+      field.disabled = !editable();
+      field.dataset.pluginSetting = setting.key;
+      if (setting.kind === 'color') {
+        // A color input always holds a color, so "Use default" is how one is cleared.
+        field.type = 'color';
+        field.value = current || '#000000';
+        field.onchange = () => save(field.value);
+        const state = document.createElement('span');
+        state.className = 'field-hint';
+        state.textContent = current ? current : 'Default';
+        const reset = document.createElement('button');
+        reset.type = 'button';
+        reset.textContent = 'Use default';
+        reset.disabled = !current || !editable();
+        reset.onclick = () => save('');
+        const row = document.createElement('span');
+        row.className = 'plugin-setting-color';
+        row.append(field, state, reset);
+        label.append(setting.label, row, problem);
+        return label;
+      }
+      if (setting.kind === 'font') {
+        field.type = 'text';
+        field.maxLength = 200;
+        field.spellcheck = false;
+        field.placeholder = 'Default font';
+        field.setAttribute('list', 'theme-fonts');
+      } else {
+        field.type = 'url';
+        field.placeholder = 'https://…';
+      }
+      field.value = current;
+      field.onchange = () => save(field.value.trim());
       label.append(setting.label, field, problem);
       return label;
     });
+    if (installed.some((p) => p.manifest.settings?.some((s) => s.kind === 'font')))
+      list.append(themeFontList());
     item.append(name, description, ...settings, toggle, actions);
     list.append(item);
   });
+}
+/** What to say of a timeline setting that isn't a value of its kind. */
+const SETTING_PROBLEMS: Record<PluginSetting['kind'], string> = {
+  'image-url': 'Enter an HTTPS image address.',
+  color: 'Choose a color.',
+  font: 'Use font names separated by commas, such as Georgia, serif.',
+};
+/** Fonts suggested for a theme's font settings: the heading fonts (any installed one works). */
+function themeFontList() {
+  const fonts = document.createElement('datalist');
+  fonts.id = 'theme-fonts';
+  for (const font of HEADING_FONTS) fonts.append(new Option(font.label, font.value));
+  return fonts;
 }
 /**
  * The official plugins ship with every build, so the library works without a server: the
@@ -8981,6 +9029,23 @@ function renderTimelineBackdrop(host: HTMLElement) {
   }
   return !!timelineBackdrop;
 }
+let appliedTheme = '';
+/**
+ * The timeline's theme (#230): its colors and fonts as the stage's `--timeline-*` properties,
+ * changed only when the theme does. Says whether it gives the stage a background color.
+ */
+function renderTimelineTheme(stage: HTMLElement) {
+  const theme = pluginTheme(installedPlugins());
+  const properties = themeProperties(theme),
+    key = JSON.stringify(properties);
+  if (key !== appliedTheme) {
+    appliedTheme = key;
+    const names = Array.from({ length: stage.style.length }, (_, i) => stage.style.item(i));
+    for (const name of names) if (name.startsWith('--timeline-')) stage.style.removeProperty(name);
+    for (const [name, value] of Object.entries(properties)) stage.style.setProperty(name, value);
+  }
+  return !!theme.background;
+}
 /** The opacity of a background `width` pixels wide: none at two fades wide, full at four. */
 function backgroundOpacity(width: number) {
   const t = Math.max(0, Math.min(1, (width - 2 * BACKGROUND_FADE) / (2 * BACKGROUND_FADE)));
@@ -9048,8 +9113,11 @@ function renderDurationBackgrounds() {
       entry.box.remove();
       durationBackgrounds.delete(key);
     }
-  // The halo that keeps the timeline readable over the images (#220).
-  el('timeline-stage').classList.toggle('over-backgrounds', backdrop || stacked.length > 0);
+  // The halo that keeps the timeline readable over the images (#220), and over a theme's
+  // background color (#230).
+  const stage = el('timeline-stage'),
+    colored = renderTimelineTheme(stage);
+  stage.classList.toggle('over-backgrounds', backdrop || colored || stacked.length > 0);
 }
 /** Band elements persist by duration so clicks and hover cards survive re-rendering. */
 const durationButtons = new Map<string, HTMLButtonElement>(),
