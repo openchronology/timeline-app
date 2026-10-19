@@ -16,6 +16,8 @@ import {
   PLUGIN_EXAMPLE,
   MOMENT_ICONS,
   DURATION_BACKGROUNDS,
+  TIMELINE_BACKGROUND,
+  pluginBackdrop,
   MOMENT_HEADINGS,
   pluginHeading,
   fontValue,
@@ -416,7 +418,7 @@ test('public plugin API works without accounts or PostgreSQL and validates its i
   // Twelve to a page: the thirteenth and on are on the next.
   assert.deepEqual(
     (await request(app, '/api/plugins?page=2')).body.plugins.map((p) => p.id),
-    ['rich-text-notes', 'moment-sources'],
+    ['rich-text-notes', 'moment-sources', 'timeline-background'],
   );
   assert.equal((await request(app, '/api/plugins?search=absent&page=1&limit=1')).body.total, 0);
   const response = await request(app, '/api/plugins/search', 'POST', {
@@ -785,6 +787,55 @@ test('duration backgrounds: an image behind durations only, the last valid one w
   );
   // An invalid later one falls back to the earlier.
   assert.equal(pluginBackground(both, { backgroundUrl: image, otherUrl: 'nope' }), image);
+});
+test('timeline background: one image for the whole timeline, set on the plugin (#223)', () => {
+  assert(isOfficialPlugin(TIMELINE_BACKGROUND));
+  // Nothing to set on events: its one setting belongs to the installed plugin.
+  assert.deepEqual(TIMELINE_BACKGROUND.fields, []);
+  assert.deepEqual(TIMELINE_BACKGROUND.settings, [
+    { kind: 'image-url', key: 'imageUrl', label: 'Background image URL' },
+  ]);
+  const image = 'https://images.example/sky.jpg';
+  const [installed] = validateInstalledPlugins([
+    { manifest: TIMELINE_BACKGROUND, enabled: true, settings: { imageUrl: image } },
+  ]);
+  assert.deepEqual(installed.settings, { imageUrl: image });
+  assert.equal(pluginBackdrop([installed]), image);
+  assert.equal(pluginBackdrop([{ ...installed, enabled: false }]), null);
+  // Empty values and settings the manifest doesn't declare are left out; bad addresses refused.
+  assert.equal(
+    validateInstalledPlugins([
+      { manifest: TIMELINE_BACKGROUND, enabled: true, settings: { imageUrl: '', other: 'x' } },
+    ])[0].settings,
+    undefined,
+  );
+  for (const bad of ['http://images.example/a.jpg', 'javascript:alert(1)', 3])
+    assert.throws(
+      () =>
+        validateInstalledPlugins([
+          { manifest: TIMELINE_BACKGROUND, enabled: true, settings: { imageUrl: bad } },
+        ]),
+      /HTTPS image address/,
+    );
+  assert.throws(() =>
+    validateInstalledPlugins([{ manifest: TIMELINE_BACKGROUND, enabled: true, settings: [] }]),
+  );
+  // A backdrop reads one of its plugin's own image settings, and settings are image addresses.
+  for (const change of [
+    { backdrop: { kind: 'image', setting: 'missing' } },
+    { backdrop: { kind: 'video', setting: 'imageUrl' } },
+    { settings: [{ kind: 'text', key: 'imageUrl', label: 'Text' }] },
+    { settings: [] },
+  ])
+    assert.throws(() => validatePluginManifest({ ...TIMELINE_BACKGROUND, ...change }));
+  // The last enabled plugin with one set wins.
+  const other = validatePluginManifest({ ...TIMELINE_BACKGROUND, id: 'other-background' });
+  const second = 'https://images.example/sea.jpg';
+  assert.equal(
+    pluginBackdrop([installed, { manifest: other, enabled: true, settings: { imageUrl: second } }]),
+    second,
+  );
+  assert.equal(pluginBackdrop([installed, { manifest: other, enabled: true }]), image);
 });
 
 test('headings: a level makes a moment a heading, in its font or Times New Roman', () => {

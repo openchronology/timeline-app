@@ -47,9 +47,38 @@ Install **Duration backgrounds** to show an image behind the timeline wherever a
   - If an end lies beyond the view, the view's edge stands in for it.
   - If both ends lie beyond the view, the image fills the timeline.
 - **Collapsed durations:** a duration too short to draw as a band is summarized, and it shows no background.
-- **Stacking:** smaller durations show above larger ones. An edge inside the view fades to transparency, so backgrounds blend into each other; an edge where the duration continues past the view does not fade.
+- **Narrow durations:** like the ruler's finest marks, a background fades out as its duration narrows on screen: it shows in full while the duration is at least 192 pixels wide, fades as it narrows, and is gone below 96 pixels, while its band still shows.
+- **Stacking:** smaller durations show above larger ones, and all of them lie behind the timeline's axis, links and moments. An edge inside the view fades to transparency over 48 pixels, however wide the duration, so backgrounds blend into each other; an edge where the duration continues past the view does not fade.
+- **Readability:** while any background shows, moment labels sit on frosted white, and the axis, links and markers carry a white halo, so they stand out from any image.
 - **Address length:** duration bands carry string metadata of at most 256 characters, so a longer image address shows nothing, and the duration dialog says so.
 - **Offline:** exports embed copies of background images, as for icons, so the offline edition can show them.
+
+## Timeline background
+
+Install **Timeline background** to show one image behind the whole timeline, beneath any duration backgrounds. It belongs to the timeline rather than to any event, so its address is set in the **Plugins** dialog, under the plugin, not in an event's details: enter a public HTTPS image URL, or clear the field to remove the image. Like any plugin change, save the timeline to keep it.
+
+The image covers the timeline, keeping its aspect ratio, and stays put as you pan and zoom. Exports embed a copy, as for other images.
+
+### Timeline settings
+
+A plugin may declare up to eight `settings`: values for the whole timeline, set in the plugin list. They are kept on the installed plugin, not in its manifest or in any event's metadata:
+
+```json
+{
+  "manifest": {
+    "id": "timeline-background",
+    "settings": [{ "kind": "image-url", "key": "imageUrl", "label": "Background image URL" }],
+    "backdrop": { "kind": "image", "setting": "imageUrl" },
+    "…": "…"
+  },
+  "enabled": true,
+  "settings": { "imageUrl": "https://images.example/sky.jpg" }
+}
+```
+
+- **Kinds:** a setting is an HTTPS image address (`image-url`) for now.
+- **Values:** an address that isn't HTTPS is refused. Empty values, and values for settings the manifest no longer declares, are dropped.
+- **Backdrop:** `backdrop` shows an image setting's value behind the whole timeline. When several enabled plugins set one, the last one wins.
 
 ## UI capability API v1
 

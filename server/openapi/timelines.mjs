@@ -279,6 +279,12 @@ export const schemas = {
           properties: {
             manifest: { type: 'object', description: 'The plugin’s manifest (apiVersion 1).' },
             enabled: { type: 'boolean' },
+            settings: {
+              type: 'object',
+              additionalProperties: { type: 'string', maxLength: 4096 },
+              description:
+                'Values of the timeline-wide settings its manifest declares (such as the timeline’s background image address), by key. Values for undeclared settings are dropped.',
+            },
           },
         },
       },
