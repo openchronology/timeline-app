@@ -43,6 +43,20 @@ export async function checkRelationships(page, restore) {
     // One arc for the existing link.
     await page.locator('.edge-arc').first().waitFor();
     assert.equal(await page.locator('.edge-arc').count(), 1);
+    // Beneath it, its halo stroke (#232), along the same path and shown only over backgrounds.
+    assert.deepEqual(
+      await page.evaluate(() => {
+        const arc = document.querySelector('.edge-arc'),
+          halo = document.querySelector('.edge-arc-halo');
+        return [
+          document.querySelectorAll('.edge-arc-halo').length,
+          halo.nextElementSibling === arc,
+          halo.getAttribute('d') === arc.getAttribute('d'),
+          getComputedStyle(halo).display,
+        ];
+      }),
+      [1, true, true, 'none'],
+    );
     // Link Alpha to Bravo by searching from Alpha's details.
     await page.getByRole('button', { name: 'Alpha', exact: true }).click({ force: true });
     await related.getByText('No relationships yet.').waitFor();

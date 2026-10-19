@@ -167,17 +167,22 @@ export async function checkDurationBackgrounds(page, restore) {
     return { onMarker: marker.contains(hit), hit: hit?.className };
   });
   assert(front.onMarker, `a background covers the moment: ${front.hit}`);
-  // Over them the timeline's text and lines carry a white halo.
+  // Over them the timeline's text and lines carry a white halo: a filter on markers, but
+  // shadows on the axis's lines rather than a filter on its whole layer, which lagged (#232).
   assert.deepEqual(
     await page.evaluate(() => {
-      const stage = document.getElementById('timeline-stage');
+      const stage = document.getElementById('timeline-stage'),
+        style = (selector) => getComputedStyle(stage.querySelector(selector));
       return [
         stage.classList.contains('over-backgrounds'),
-        getComputedStyle(stage.querySelector('.tick-label')).textShadow.includes('255, 255, 255'),
-        getComputedStyle(document.getElementById('axis')).filter.startsWith('drop-shadow'),
+        style('.tick-label').textShadow.includes('255, 255, 255'),
+        style('.axis-baseline').boxShadow.includes('255, 255, 255'),
+        style('.event-marker').filter.startsWith('drop-shadow'),
+        getComputedStyle(document.getElementById('axis')).filter,
+        getComputedStyle(document.getElementById('edge-arcs')).filter,
       ];
     }),
-    [true, true, true],
+    [true, true, true, true, 'none', 'none'],
   );
 
   // Its start beyond the view: centered between the view's edge and its end, which alone fades.

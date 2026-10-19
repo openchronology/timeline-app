@@ -8933,7 +8933,10 @@ function describeLabel(ref: EntityRef) {
 }
 /** Relationship arcs between endpoint times; arcs to off-screen entities run off the edge. */
 /** Arc elements persist by relationship: a moving view only reshapes them (#68). */
-const edgeArcs = new Map<string, { path: SVGPathElement; title: SVGTitleElement; named: string }>();
+const edgeArcs = new Map<
+  string,
+  { path: SVGPathElement; halo: SVGPathElement; title: SVGTitleElement; named: string }
+>();
 function renderEdgeArcs() {
   const svg = el('edge-arcs');
   svg.querySelector('.edge-limit')?.remove();
@@ -8954,15 +8957,17 @@ function renderEdgeArcs() {
       path.dataset.edgeId = edge.id;
       const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
       path.append(title);
-      svg.append(path);
-      arc = { path, title, named: '' };
+      // Beneath it, a wider stroke in the halo's color, shown over backgrounds (#232).
+      const halo = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      halo.setAttribute('class', 'edge-arc-halo');
+      svg.append(halo, path);
+      arc = { path, halo, title, named: '' };
       edgeArcs.set(edge.id, arc);
     }
     shown.add(edge.id);
-    arc.path.setAttribute(
-      'd',
-      `M ${xa} ${axis} Q ${(xa + xb) / 2} ${axis - 2 * lift} ${xb} ${axis}`,
-    );
+    const d = `M ${xa} ${axis} Q ${(xa + xb) / 2} ${axis - 2 * lift} ${xb} ${axis}`;
+    arc.path.setAttribute('d', d);
+    arc.halo.setAttribute('d', d);
     // Names change only with the timeline's content, not as the view moves.
     if (arc.named !== generation) {
       arc.title.textContent = `${name(edge.a)} ↔ ${name(edge.b)}`;
@@ -8972,6 +8977,7 @@ function renderEdgeArcs() {
   for (const [id, arc] of edgeArcs)
     if (!shown.has(id)) {
       arc.path.remove();
+      arc.halo.remove();
       edgeArcs.delete(id);
     }
   if (frame.edgesTruncated) {
