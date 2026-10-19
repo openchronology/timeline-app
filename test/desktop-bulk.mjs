@@ -7,39 +7,21 @@
 // machine WebKitGTK may draw nothing without WEBKIT_DISABLE_DMABUF_RENDERER=1 and
 // WEBKIT_DISABLE_COMPOSITING_MODE=1.
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
-import { setTimeout as delay } from 'node:timers/promises';
-import { webdriverSession } from '../bench/ui/webdriver.mjs';
+import { startTauriDriver, webdriverSession } from '../bench/ui/webdriver.mjs';
 
-const port = Number(process.env.UI_WEBDRIVER_PORT ?? 4446),
-  url = `http://127.0.0.1:${port}`;
 // Its own ports, apart from the UI benchmarks' (4444, and 4445 for the native driver).
-const driver = spawn(
-  process.env.TAURI_DRIVER ?? 'tauri-driver',
-  ['--port', String(port), '--native-port', String(port + 1)],
-  { stdio: ['ignore', 'pipe', 'pipe'] },
-);
-let logs = '';
-for (const s of [driver.stdout, driver.stderr])
-  s.on('data', (c) => (logs = (logs + c).slice(-8000)));
+const port = Number(process.env.UI_WEBDRIVER_PORT ?? 4446);
+const driver = await startTauriDriver(port, ['--native-port', String(port + 1)]);
 let d;
 try {
-  for (let i = 0; ; i++) {
-    if (driver.exitCode !== null) throw new Error('tauri-driver exited:\n' + logs);
-    try {
-      if ((await fetch(url + '/status', { signal: AbortSignal.timeout(500) })).ok) break;
-    } catch {}
-    if (i > 100) throw new Error('tauri-driver did not start:\n' + logs);
-    await delay(100);
-  }
   d = await webdriverSession(
-    url,
+    driver.url,
     resolve(
       process.env.UI_DESKTOP_APP ??
         `${process.env.CARGO_TARGET_DIR ?? 'src-tauri/target'}/debug/openchronology-desktop`,
     ),
-    { logs: () => 'tauri-driver:\n' + logs },
+    { logs: driver.logs },
   );
   await d.wait(`!!document.getElementById('json-file')`, 60000);
   const document = {
@@ -166,5 +148,5 @@ try {
   throw error;
 } finally {
   await d?.close().catch(() => {});
-  driver.kill();
+  driver.stop();
 }
