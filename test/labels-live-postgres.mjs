@@ -172,17 +172,16 @@ try {
   await compared.locator('#sensitive-gate').waitFor();
   assert.match(await compared.locator('#sensitive-gate').textContent(), /graphic violence/);
 
-  // In an unlabelled timeline, only a labelled moment's images are blurred, and its details
-  // say why.
+  // In an unlabelled timeline, only a labelled moment's images are blurred, and the reader
+  // (#233) says why.
   await reader.goto(`${origin}/timelines/${history}`);
   await frame.locator('.event-marker[aria-label="Massacre"] img').waitFor({ state: 'attached' });
   assert(await gate.isHidden());
   assert(await blurred(frame, 'Massacre'));
   assert(!(await blurred(frame, 'Market')));
   await frame.locator('.event-marker[aria-label="Massacre"]').click();
-  await frame.locator('#moment-sensitive').waitFor();
-  assert.match(await frame.locator('#moment-sensitive').textContent(), /graphic violence/);
-  assert(await frame.locator('#event-labels').isVisible(), 'Readers see the labels it has.');
+  await frame.locator('#reader-sensitive').waitFor();
+  assert.match(await frame.locator('#reader-sensitive').textContent(), /graphic violence/);
 
   // Its owner sees their own timeline as it is, and labels a moment and the timeline.
   const ownerTab = await tab(await signIn());

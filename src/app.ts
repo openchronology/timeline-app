@@ -38,6 +38,7 @@ import {
 import type { DraftWrite } from './drafts.js';
 import type { Advice, Measurements, Platform } from './capacity.js';
 import { createHoverPreview } from './hover-preview.js';
+import { renderReader } from './event-reader.js';
 import {
   Q,
   entryLimit,
@@ -811,7 +812,22 @@ let pluginSearchRequest = 0;
 let pluginSearchTimer: ReturnType<typeof setTimeout> | undefined;
 let pluginPage = 1;
 const memoryOnly = () => !desktop && (offlineHtml || !session.user);
-const editable = () => !embedded && !comparison && !!model && (!remote || remote.canEdit);
+/** Whether the open timeline can be edited here, view mode aside. */
+const mayEdit = () => !embedded && !comparison && !!model && (!remote || remote.canEdit);
+/**
+ * View mode (#233): someone who can edit reads the timeline as its viewers do, its moments and
+ * durations opening in the reader. Remembered in this browser.
+ */
+let viewMode = (() => {
+  try {
+    return localStorage.getItem('openchronology:view-mode') === '1';
+  } catch {
+    return false;
+  }
+})();
+const editable = () => !viewMode && mayEdit();
+/** Moments and durations open in the reader for anyone not editing, outside comparisons. */
+const reading = () => !comparison && !editable();
 /**
  * Room beside the ruler for markers at the bounds. Narrow stages, such as phones held upright,
  * keep less so the timeline itself gets the width.
@@ -2285,6 +2301,10 @@ function showLabels(
   }
   // Readers see the labels as the notice; there is nothing for them to set.
   el(field).hidden = readOnly && !labels.length;
+  sensitiveNote(note, labels);
+}
+/** The dialog's notice of an entity's sensitive-content `labels` (#115), and its images' blur. */
+function sensitiveNote(note: string, labels: string[]) {
   const shown = [...new Set([...labels, ...timelineLabels()])];
   el(note).hidden = !warned() || !shown.length;
   el(note).querySelector('span')!.textContent =
@@ -2397,6 +2417,8 @@ function updatePageTitle() {
 }
 function heading() {
   updateSensitive();
+  el('view-mode-control').hidden = !mayEdit();
+  input('view-mode').checked = viewMode;
   updateFollowControl();
   // Where the open timeline lives, for tests and benchmarks (bench/ui.mjs).
   document.documentElement.dataset.storage =
@@ -3687,6 +3709,7 @@ el<HTMLTextAreaElement>('event-metadata').addEventListener('input', refreshPlugi
 function showMomentDetails(title: string) {
   hoverPreview.hide();
   summaryExpansion.hide();
+  hideReader();
   text('moment-heading', title);
   // A duration showing in the dialog gives way to the moment.
   if (!el('duration-dialog').hidden) durationDialog.close(true);
@@ -3717,6 +3740,7 @@ const durationDialog = {
   },
   showModal() {
     const dialog = el<HTMLDialogElement>('inspector');
+    hideReader();
     if (el('duration-dialog').hidden)
       durationOverMoment = dialog.open && dialog.dataset.dialogClosing === undefined;
     el('moment-panel').hidden = true;
@@ -3732,6 +3756,74 @@ const durationDialog = {
     showMomentPanel();
   },
 };
+/** What the reader shows (#233), for sharing and reporting it. */
+let reader: { kind: 'moment' | 'duration'; id: string; title: string } | null = null;
+/**
+ * Opens a moment or duration in the reader, in place of the event dialog's panels: what it
+ * says, as a full-size hover card, with its relationships to follow.
+ */
+function showReader(
+  kind: 'moment' | 'duration',
+  id: string,
+  metadata: Record<string, unknown>,
+  when: string,
+) {
+  hoverPreview.hide();
+  summaryExpansion.hide();
+  if (!el('duration-dialog').hidden) durationDialog.close(true);
+  const untitled = kind === 'moment' ? 'Untitled moment' : 'Untitled duration';
+  const title = (typeof metadata.title === 'string' && metadata.title.trim()) || untitled;
+  reader = { kind, id, title };
+  text('reader-title', title);
+  const plugins = installedPlugins();
+  renderReader(el('reader-body'), {
+    kind,
+    metadata,
+    plugins: kind === 'moment' ? momentPlugins(plugins) : durationPlugins(plugins),
+    when,
+    markdown: pluginRichText(plugins),
+  });
+  sensitiveNote('reader-sensitive', contentLabels(metadata[CONTENT_LABELS_KEY]));
+  renderRelated(el('reader-related'), kind === 'moment' ? { moment: id } : { duration: id }, true);
+  el('reader-share').hidden = !shareable();
+  el('reader-report').hidden = el('reader-share').hidden || !!remote?.canShare;
+  el('moment-panel').hidden = true;
+  el('reader-panel').hidden = false;
+  el('inspector').classList.add('reading');
+  el('inspector').setAttribute('aria-labelledby', 'reader-title');
+  el('reader-body').scrollTop = 0;
+  showInspector();
+  reportLink({ kind, id });
+}
+/** The event dialog's own panels again, in place of the reader. */
+function hideReader() {
+  if (el('reader-panel').hidden) return;
+  el('reader-panel').hidden = true;
+  el('inspector').classList.remove('reading');
+  el('moment-panel').hidden = false;
+  el('inspector').setAttribute('aria-labelledby', 'moment-heading');
+  reader = null;
+}
+el('reader-close').onclick = () => el<HTMLDialogElement>('inspector').close();
+el('reader-share').onclick = () => {
+  if (reader) requestShare({ kind: reader.kind, id: reader.id }, reader.title);
+};
+el('reader-report').onclick = () => {
+  if (reader) requestReport(reader.kind, reader.id, reader.title);
+};
+el('view-mode').addEventListener('change', () => {
+  viewMode = input('view-mode').checked;
+  try {
+    if (viewMode) localStorage.setItem('openchronology:view-mode', '1');
+    else localStorage.removeItem('openchronology:view-mode');
+  } catch {
+    /* Without storage it lasts until the page closes. */
+  }
+  // What was open was opened for the other mode.
+  el<HTMLDialogElement>('inspector').close();
+  heading();
+  render();
+});
 /** The moment's panel again, in place of the duration's. */
 function showMomentPanel() {
   el('duration-dialog').hidden = true;
@@ -3758,6 +3850,11 @@ function eventForm(event?: PointEvent, time?: Q) {
   if (event && !comparison) {
     sparseWorkspace()?.load(event);
     event = model?.byId.get(event.id) ?? event;
+  }
+  if (event && reading()) {
+    selected = event;
+    requestRender();
+    return showReader('moment', event.id, event.metadata, presented(Q.parse(event.time), 'event'));
   }
   pendingEventEdit = false;
   eventEditHistory = null;
@@ -7687,6 +7784,15 @@ async function openDurationById(id: string, known?: DurationBand) {
   showDuration(duration, !editable());
 }
 function showDuration(duration: Duration, readOnly: boolean, isNew = false) {
+  if (!isNew && reading()) {
+    const band =
+      frame.durations?.find((b) => b.id === duration.id && !b.sourceKey) ??
+      resolveDuration(duration, (id) => model?.momentTime(id));
+    const when = band
+      ? `${presented(Q.parse(band.first), 'event')} → ${presented(Q.parse(band.last), 'event')}`
+      : '';
+    return showReader('duration', duration.id, duration.metadata, when);
+  }
   // Opening another entity ends the current session without keeping it.
   discardDurationEdits();
   openDuration = { duration, readOnly, edit: null, isNew, document: documentRequest };

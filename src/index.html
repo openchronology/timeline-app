@@ -208,7 +208,10 @@
             <a id="owner-label">Local workspace</a>
           </div>
           <div class="file-actions">
-            <button id="import-button">Import</button><button id="export-button">Export</button
+            <!-- For those who can edit (#233): read the timeline as viewers do. -->
+            <label id="view-mode-control" class="view-mode-switch" hidden
+              ><input id="view-mode" type="checkbox" role="switch" /> View mode</label
+            ><button id="import-button">Import</button><button id="export-button">Export</button
             ><button id="och-import" hidden>Import .och</button
             ><button id="och-export" hidden>Export .och ↗</button
             ><button id="sqlite-open" hidden>Open</button
@@ -379,6 +382,21 @@ Every point has a place. Explore the spaces between them.</textarea>
     </div>
     <dialog id="inspector" class="moment-dialog" aria-labelledby="moment-heading">
       <!-- One dialog for events (#215): a moment's panel, or a duration's in its place. -->
+      <!-- Or, for reading (#233), the reader in place of both. -->
+      <article id="reader-panel" class="reader-panel" hidden aria-labelledby="reader-title">
+        <div class="inspector-heading">
+          <h2 id="reader-title"></h2>
+          <button id="reader-share" class="share-entity" type="button" hidden>Share</button
+          ><button id="reader-report" class="share-entity" type="button" hidden>Report</button
+          ><button id="reader-close" aria-label="Close">×</button>
+        </div>
+        <p id="reader-sensitive" class="sensitive-note" hidden>
+          <span></span>
+          <button type="button" class="link-button reveal-images">Show images</button>
+        </p>
+        <div id="reader-body" class="reader-body"></div>
+        <div id="reader-related" class="related-section"></div>
+      </article>
       <div id="moment-panel">
         <div class="inspector-heading">
           <h2 id="moment-heading">Moment details</h2>
