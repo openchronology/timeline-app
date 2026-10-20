@@ -72,6 +72,7 @@ Drafts stay in this browser only, and only for your account. Save to the server 
 | Make dots and labels larger    | Ctrl-scroll, pinch on a trackpad, or pinch with one finger above the other. Only their size on screen changes.       |
 | See everything                 | **Fit all**. **Center axis** brings the axis back to the middle without changing the time shown.                     |
 | Go to an exact stretch of time | Type times into **Left bound** and **Right bound** under the timeline, then **Go**.                                  |
+| Give the timeline more room    | **Full screen**, or `F`, fills the window with the timeline and its toolbar. **Exit full screen** or Escape leaves.  |
 
 Type the bounds the way the timeline's display writes times. To see and type the stored numbers themselves, set **Time display** to **Exact rational**. With the Gregorian display, clicking a bound opens a date and time dialog instead.
 
@@ -294,11 +295,12 @@ A notice under the header suggests another way to open a timeline when it gets s
 | Left and Right arrows               | Pan through time (timeline focused).                                       |
 | Up and Down arrows                  | Move up and down (timeline focused).                                       |
 | `+` or `=`, and `-`                 | Zoom in and out (timeline focused).                                        |
+| `F`                                 | Enter or leave full screen (timeline focused).                             |
 | `/`                                 | Open search.                                                               |
 | Ctrl+Z (⌘Z)                         | Undo.                                                                      |
 | Ctrl+Shift+Z or Ctrl+Y (⌘ on macOS) | Redo.                                                                      |
 | Alt+Down                            | In a time field with the Gregorian display, open the date and time dialog. |
-| Escape                              | Close the open menu, dialog or preview card.                               |
+| Escape                              | Close the open menu, dialog or preview card, or leave full screen.         |
 | Up, Down, Home and End              | Move through the timeline's right-click menu.                              |
 
 Undo and redo work outside text fields; inside one, they undo your typing.
