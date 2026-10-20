@@ -646,9 +646,21 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     await closeMomentDetails(page);
     await page.getByRole('button', { name: 'With icon', exact: true }).click();
     const rootIcon = input('plugin-event-fields').locator(':scope > [data-metadata-key="iconUrl"]');
-    const inputBox = await rootIcon.locator('input').boundingBox();
-    const hintBox = await rootIcon.locator('.field-hint').boundingBox();
-    assert(hintBox.y >= inputBox.y + inputBox.height, 'Icon help must be below its input');
+    // Measured once its layout has settled: WebKit could measure it mid-layout, just opened.
+    await rootIcon.evaluate(
+      (field) =>
+        new Promise((done, fail) => {
+          const end = performance.now() + 5000;
+          const check = () => {
+            const input = field.querySelector('input').getBoundingClientRect();
+            const hint = field.querySelector('.field-hint').getBoundingClientRect();
+            if (hint.top >= input.bottom) done();
+            else if (performance.now() > end) fail(new Error('Icon help must be below its input'));
+            else requestAnimationFrame(check);
+          };
+          check();
+        }),
+    );
     const add = page.getByRole('button', { name: 'Add entry to stack', exact: true });
     await add.click();
     await add.click();
