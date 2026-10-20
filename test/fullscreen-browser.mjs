@@ -51,7 +51,9 @@ export async function checkFullscreen(page) {
   };
   const left = async () => {
     await page.waitForFunction(
-      () => !document.documentElement.classList.contains('timeline-fullscreen'),
+      () =>
+        !document.documentElement.classList.contains('timeline-fullscreen') &&
+        !document.fullscreenElement,
     );
     await page.waitForFunction(
       (height) => Math.abs(document.getElementById('timeline-stage').clientHeight - height) < 1,
@@ -109,9 +111,13 @@ export async function checkFullscreen(page) {
   await stage.focus();
   await page.keyboard.press('F');
   await full();
+  await page
+    .waitForFunction(() => document.fullscreenElement, null, { timeout: 5000 })
+    .catch(() => {});
   await page.evaluate(() => {
     if (document.fullscreenElement) return document.exitFullscreen();
-    document.dispatchEvent(new Event('fullscreenchange'));
+    // Where the browser refused its full screen, its controls can't leave it either.
+    document.getElementById('fullscreen-button').click();
   });
   await left();
   console.log(
