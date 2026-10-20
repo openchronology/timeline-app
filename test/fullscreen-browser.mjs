@@ -85,7 +85,10 @@ export async function checkFullscreen(page) {
     }),
     'The help dialog shows above the full-screen timeline',
   );
-  await page.keyboard.press('Escape');
+  // Without the browser's full screen, Escape closes the dialog and stays. With it, Firefox and
+  // WebKit spend Escape on leaving their full screen, so the dialog's own button closes it.
+  if (await page.evaluate(() => !document.fullscreenElement)) await page.keyboard.press('Escape');
+  else await page.locator('#timeline-help-dialog form button').click();
   await page.locator('#timeline-help-dialog').waitFor({ state: 'hidden' });
   assert.ok(
     await page.evaluate(() => document.documentElement.classList.contains('timeline-fullscreen')),
