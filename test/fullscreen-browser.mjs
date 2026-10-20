@@ -36,6 +36,10 @@ export async function checkFullscreen(page) {
     await page.waitForFunction(() =>
       document.documentElement.classList.contains('timeline-fullscreen'),
     );
+    // The browser's own full screen comes a moment later, where it is granted at all.
+    await page
+      .waitForFunction(() => document.fullscreenElement, null, { timeout: 5000 })
+      .catch(() => {});
     await page.waitForFunction(
       (height) => document.getElementById('timeline-stage').clientHeight > height,
       before,
@@ -105,15 +109,20 @@ export async function checkFullscreen(page) {
   await stage.focus();
   await page.keyboard.press('Escape');
   await left();
-  assert.equal(await page.evaluate(() => !!document.fullscreenElement), false);
+
+  // Left before the browser has finished entering its full screen, the window is given back
+  // once it has.
+  await stage.focus();
+  await page.keyboard.press('f');
+  await page.keyboard.press('Escape');
+  await left();
+  await page.waitForTimeout(1000);
+  await left();
 
   // Leaving the browser's full screen by its own means leaves the timeline's too.
   await stage.focus();
   await page.keyboard.press('F');
   await full();
-  await page
-    .waitForFunction(() => document.fullscreenElement, null, { timeout: 5000 })
-    .catch(() => {});
   await page.evaluate(() => {
     if (document.fullscreenElement) return document.exitFullscreen();
     // Where the browser refused its full screen, its controls can't leave it either.

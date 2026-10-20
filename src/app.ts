@@ -5057,41 +5057,42 @@ el('center-vertical').onclick = () => {
  * layout, so it works where the browser's own full screen is refused, as in an embed without
  * allow="fullscreen"; where it is allowed, the browser's chrome is hidden too.
  */
-// Whether the browser's own full screen is ours to follow. Leaving clears it at once, so the
-// browser's late notice of that exit can't undo a quick return to full screen.
+// Whether the browser's own full screen is ours to follow: set once it is granted, and
+// cleared on leaving, so the browser's late notice of that exit can't undo a quick return.
 let browserFullscreen = false;
+const fullscreen = () => document.documentElement.classList.contains('timeline-fullscreen');
 function setFullscreen(on: boolean) {
   document.documentElement.classList.toggle('timeline-fullscreen', on);
   const button = el('fullscreen-button');
   button.textContent = on ? 'Exit full screen' : 'Full screen';
   button.setAttribute('aria-pressed', String(on));
 }
-function toggleFullscreen(
-  on = !document.documentElement.classList.contains('timeline-fullscreen'),
-) {
+function toggleFullscreen(on = !fullscreen()) {
   setFullscreen(on);
   browserFullscreen = false;
-  if (on) document.documentElement.requestFullscreen?.().catch(() => {});
+  if (on)
+    document.documentElement
+      .requestFullscreen?.()
+      .then(() => {
+        // Granted after the timeline had already left: give the window back, now that the
+        // browser has finished entering and can leave.
+        if (!fullscreen()) return document.exitFullscreen();
+        browserFullscreen = true;
+      })
+      .catch(() => {});
   else if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   stage.focus();
 }
 el('fullscreen-button').onclick = () => toggleFullscreen();
 // Leaving the browser's full screen (Escape, or its own controls) leaves ours as well.
 document.addEventListener('fullscreenchange', () => {
-  if (document.fullscreenElement) {
-    // Granted after the timeline had already left full screen: give the window back too.
-    if (document.documentElement.classList.contains('timeline-fullscreen'))
-      browserFullscreen = true;
-    else document.exitFullscreen().catch(() => {});
-  } else if (browserFullscreen) {
-    browserFullscreen = false;
-    setFullscreen(false);
-  }
+  if (document.fullscreenElement || !browserFullscreen) return;
+  browserFullscreen = false;
+  setFullscreen(false);
 });
 // Without the browser's full screen, Escape still leaves; open dialogs and menus take it first.
 document.addEventListener('keydown', (event) => {
-  if (event.key !== 'Escape' || event.defaultPrevented) return;
-  if (!document.documentElement.classList.contains('timeline-fullscreen')) return;
+  if (event.key !== 'Escape' || event.defaultPrevented || !fullscreen()) return;
   if (document.querySelector('dialog[open]') || !el('timeline-menu').hidden) return;
   event.preventDefault();
   toggleFullscreen(false);
