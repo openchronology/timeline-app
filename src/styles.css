@@ -648,9 +648,27 @@ main {
     0 0 1px var(--timeline-halo, #fff),
     0 0 3px var(--timeline-halo, #fff);
 }
-.timeline-stage.over-backgrounds :is(.axis, .edge-arcs, .event-stem, .event-marker) {
+/* Markers and stems take the halo as a filter, which follows their shapes. The axis's lines
+   and the arcs, whose layers fill the stage, take box-shadows and halo strokes instead: a filter
+   on a whole layer is drawn again on every frame, which made panning lag (#232). */
+.timeline-stage.over-backgrounds :is(.event-stem, .event-marker) {
   filter: drop-shadow(0 0 1px var(--timeline-halo, #fff))
     drop-shadow(0 0 2px var(--timeline-halo, #fff)) drop-shadow(0 0 4px var(--timeline-halo, #fff));
+}
+.timeline-stage.over-backgrounds :is(.axis-baseline, .tick-notch) {
+  box-shadow: 0 0 2px 1px var(--timeline-halo, #fff);
+}
+.edge-arc-halo {
+  display: none;
+  fill: none;
+  stroke: var(--timeline-halo, #fff);
+  stroke-width: 5;
+  stroke-linecap: round;
+  opacity: 0.8;
+  pointer-events: none;
+}
+.timeline-stage.over-backgrounds .edge-arc-halo {
+  display: inline;
 }
 .timeline-stage.over-backgrounds .event-marker.heading-marker {
   backdrop-filter: blur(4px);
