@@ -1,8 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 /**
  * How a platform presents itself: its name (PLATFORM_NAME, such as `timescale.info`) in its
- * header, page titles and link previews, and Google Analytics (GOOGLE_ANALYTICS_ID), which
- * visitors' browsers load only once they accept it.
+ * header, page titles and link previews, where visitors can support it (SUPPORT_URL), and
+ * Google Analytics (GOOGLE_ANALYTICS_ID), which visitors' browsers load only once they accept it.
  */
 export class SiteError extends Error {}
 
@@ -21,6 +21,22 @@ export function siteName(env = process.env) {
   } catch {
     return 'OpenChronology';
   }
+}
+/** Where visitors can support the platform, if it says; null shows no Support link. */
+export function supportUrl(env = process.env) {
+  const value = (env.SUPPORT_URL ?? '').trim();
+  if (!value) return null;
+  let url = null;
+  try {
+    url = new URL(value);
+  } catch {
+    // Refused below.
+  }
+  if (!url || url.protocol !== 'https:' || url.username || url.password || value.length > 500)
+    throw new SiteError(
+      'SUPPORT_URL must be an https:// address, such as https://github.com/sponsors/you.',
+    );
+  return url.href;
 }
 const MEASUREMENT = /^G-[A-Z0-9]{4,20}$/;
 /** The Google Analytics 4 measurement ID, if analytics are enabled. */

@@ -41,8 +41,10 @@ for (const key of Object.keys(env))
     ['DATABASE_URL', 'PLUGIN_LIBRARY', 'FEATURED_TIMELINES'].includes(key)
   )
     delete env[key];
-// A named platform with Google Analytics (#100, #101); next-postgres checks neither is set.
+// A named platform with a Support link and Google Analytics (#100, #101, #249); next-postgres
+// checks none is set.
 env.PLATFORM_NAME = 'timescale.test';
+env.SUPPORT_URL = 'https://example.com/support';
 env.RELEASES_API_URL = `http://127.0.0.1:${github.address().port}/latest`;
 env.GOOGLE_ANALYTICS_ID = 'G-TEST12345';
 env.PORT = String(port);
@@ -129,6 +131,11 @@ try {
   assert.match(html, /◷ <!-- -->timescale\.test<\/a>|◷ timescale\.test<\/a>/);
   assert.match(html, /<title>timescale\.test · OpenChronology<\/title>/);
   assert.match(html, /Powered by OpenChronology/);
+  assert.match(
+    html,
+    /<a href="https:\/\/example\.com\/support" class="support-link">♥ Support<\/a>/,
+  );
+  assert.match(html, /<a href="https:\/\/example\.com\/support">Support this site<\/a>/);
   const csp = dashboard.headers.get('content-security-policy');
   assert.match(csp, /script-src [^;]*https:\/\/www\.googletagmanager\.com/);
   assert.match(csp, /connect-src [^;]*https:\/\/\*\.google-analytics\.com/);

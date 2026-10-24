@@ -24,7 +24,7 @@ import {
   LimitError,
   timelineFileBytes,
 } from './limits.mjs';
-import { analyticsId, platformName, SiteError } from './site.mjs';
+import { analyticsId, platformName, SiteError, supportUrl } from './site.mjs';
 import { applyEnvironmentQuota } from './administration.mjs';
 /**
  * Where the services are kept: a global symbol rather than a module variable, so every copy
@@ -124,6 +124,7 @@ async function initialize() {
     timelineFileBytes();
     defaultQuota();
     platformName();
+    supportUrl();
     analyticsId();
   } catch (error) {
     if (error instanceof LimitError || error instanceof SiteError)

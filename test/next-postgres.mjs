@@ -28,7 +28,13 @@ const env = {
 for (const key of Object.keys(env))
   if (
     key.startsWith('OAUTH_') ||
-    ['PLUGIN_LIBRARY', 'FEATURED_TIMELINES', 'PLATFORM_NAME', 'GOOGLE_ANALYTICS_ID'].includes(key)
+    [
+      'PLUGIN_LIBRARY',
+      'FEATURED_TIMELINES',
+      'PLATFORM_NAME',
+      'SUPPORT_URL',
+      'GOOGLE_ANALYTICS_ID',
+    ].includes(key)
   )
     delete env[key];
 // GitHub cannot be reached: the download page links to the latest release by name.
@@ -107,7 +113,7 @@ try {
     homeHtml = await home.text();
   assert.match(homeHtml, /◷ <!-- -->openchronology<\/a>|◷ openchronology<\/a>/);
   assert.match(homeHtml, /<title>OpenChronology<\/title>/);
-  assert.doesNotMatch(homeHtml, /Powered by OpenChronology|Analytics settings/);
+  assert.doesNotMatch(homeHtml, /Powered by OpenChronology|Analytics settings|Support this site/);
   assert.doesNotMatch(home.headers.get('content-security-policy'), /google/);
   const download = await (
     await fetch(origin + '/download', { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh)' } })
