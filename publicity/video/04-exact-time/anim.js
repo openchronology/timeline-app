@@ -780,7 +780,7 @@ SCENES[8] = function (lt, q) {
     rect(-20, -24, 360, 210, C.ground, { op: 0.94 }) +
       txt(160, 52, 'Every time is a fraction. Nothing rounds.', { size: 11, weight: 700 }) +
       wordmark(160, 86, 16) +
-      txt(160, 116, 'Source: github.com/openchronology · GPL v3', {
+      txt(160, 116, 'Source: github.com/openchronology/timeline-app · GPL v3', {
         size: 6.4,
         mono: true,
         fill: C.accent,

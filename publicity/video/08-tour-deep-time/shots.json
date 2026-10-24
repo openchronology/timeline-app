@@ -52,13 +52,13 @@
       ]
     },
     {
-      "id": "s6a",
-      "dur": 10.18,
+      "id": "s6",
+      "dur": 20.79,
       "keys": [
         { "t": 0, "view": [-402990595200, 7258204800] },
         { "t": 0.91, "view": [-402990595200, 7258204800] },
-        { "t": 5.41, "view": [-203528539.99999976, 112047460] },
-        { "t": 10.18, "view": [-203528539.99999976, 112047460] }
+        { "t": 6.88, "view": [-14182944, -14182936] },
+        { "t": 20.79, "view": [-14182944, -14182936] }
       ],
       "actions": [
         { "t": 7.88, "do": "click", "selector": "#presentation-button" },
@@ -70,28 +70,6 @@
         { "t": 9.58, "do": "click", "selector": "#presentation-save" },
         {
           "t": 9.58,
-          "do": "eval",
-          "js": "(()=>{const iso=(t)=>{const w=Math.floor(t),f=t-w;return new Date(w*1000).toISOString().replace('.000Z','')+(f>0?f.toFixed(6).slice(1):'')+'Z';};window.addEventListener('click',(e)=>{if(e.target.id!=='apply-bounds')return;for(const id of ['left-bound','right-bound']){const el=document.getElementById(id),m=/^(\\S+) million years$/.exec(el.value);if(m)el.value=iso(946684800+Number(m[1])*31557600000000);}},true);})()"
-        }
-      ]
-    },
-    {
-      "id": "s6b",
-      "dur": 10.61,
-      "keys": [
-        { "t": 0, "view": [-203528539.99999976, 112047460] },
-        { "t": 1.09, "view": [-203528539.99999976, 112047460] },
-        { "t": 4.59, "view": [-14182944, -14182936] },
-        { "t": 10.61, "view": [-14182944, -14182936] }
-      ],
-      "setup": [
-        { "do": "click", "selector": "#presentation-button" },
-        {
-          "do": "eval",
-          "js": "(()=>{const m=document.getElementById('presentation-mode');m.value='gregorian';m.dispatchEvent(new Event('change'));const e=document.getElementById('presentation-epoch');e.value='unix';e.dispatchEvent(new Event('change'));})()"
-        },
-        { "do": "click", "selector": "#presentation-save" },
-        {
           "do": "eval",
           "js": "(()=>{const iso=(t)=>{const w=Math.floor(t),f=t-w;return new Date(w*1000).toISOString().replace('.000Z','')+(f>0?f.toFixed(6).slice(1):'')+'Z';};window.addEventListener('click',(e)=>{if(e.target.id!=='apply-bounds')return;for(const id of ['left-bound','right-bound']){const el=document.getElementById(id),m=/^(\\S+) million years$/.exec(el.value);if(m)el.value=iso(946684800+Number(m[1])*31557600000000);}},true);})()"
         }

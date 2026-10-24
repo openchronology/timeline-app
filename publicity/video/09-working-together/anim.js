@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-/* Video 8, Working together (publicity/8-working-together.md): one timeline card, "Our town's
+/* Video 9, Working together (publicity/9-working-together.md): one timeline card, "Our town's
    history", followed through a class project. Faceless figures wear role badges (Owner, Writer,
    Contributor, Viewer, Reader); arrows are proposals and a branch line is a fork. Scenes are
    pure functions of scene time lt; q("word") is when that word is said. */
@@ -912,7 +912,13 @@ SCENES[7] = function (lt, q) {
   s += G(
     rect(-20, -2, 360, 190, C.ground, { op: 0.97 }) +
       txt(160, 70, 'Build it together', { size: 14, weight: 700 }) +
-      wordmark(160, 100, 12),
+      wordmark(160, 100, 12) +
+      txt(160, 122, 'github.com/openchronology/timeline-app', {
+        size: 6,
+        mono: true,
+        fill: C.accent,
+        weight: 500,
+      }),
     { o: e, ty: (1 - e) * 8 },
   );
   return s;

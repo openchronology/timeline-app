@@ -97,7 +97,7 @@
 
 ### Scene 7 · 2:30 – 2:45 · Install the package
 
-**FRAME:** The full stack lit, with the end card: "Install the package", the ◷ wordmark, "docs: Docker deployment · administration".
+**FRAME:** The full stack lit, with the end card: "Install the package", the ◷ wordmark, "docs: Docker deployment · administration". The end card also gives the source: "github.com/openchronology/timeline-app".
 
 **MOTION:** Every band lights; the end card fades in and holds.
 

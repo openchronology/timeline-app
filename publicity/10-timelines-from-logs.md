@@ -97,7 +97,7 @@
 
 ### Scene 7 · 2:32 – 2:45 · Point your syslog at it
 
-**FRAME:** A terminal line: `*.* @@timeline.example:5514`, then the end card: "Point your syslog at it", the ◷ wordmark, and "docs: log import · syslog · journald".
+**FRAME:** A terminal line: `*.* @@timeline.example:5514`, then the end card: "Point your syslog at it", the ◷ wordmark, and "docs: log import · syslog · journald". The end card also gives the source: "github.com/openchronology/timeline-app".
 
 **MOTION:** The line types; the end card fades in and holds.
 

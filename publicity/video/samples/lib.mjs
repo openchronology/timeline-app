@@ -40,6 +40,8 @@ export function m(id, time, title, o = {}) {
     'headingLevel',
     'approximateAgeYears',
     'datePrecision',
+    'historicalDate',
+    'calendar',
     'stack',
   ])
     if (o[key] !== undefined) metadata[key] = o[key];

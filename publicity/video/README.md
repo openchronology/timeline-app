@@ -2,9 +2,9 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-The source of the ten explainer videos, after CMR Scanner's leadership-brief video: every frame is drawn in SVG as a pure function of time, and each element appears on the word in the narration that introduces it. One folder per video holds only its scenes (`anim.js`) and settings; everything they share is in [`common/`](common/README.md). Each video's scenes, acts, on-screen text and narration are read straight from its script in [`publicity/`](../README.md), so the script stays the one place they're written.
+The source of the eleven explainer videos, after CMR Scanner's leadership-brief video: every frame is drawn in SVG as a pure function of time, and each element appears on the word in the narration that introduces it. One folder per video holds only its scenes (`anim.js`) and settings; everything they share is in [`common/`](common/README.md). Each video's scenes, acts, on-screen text and narration are read straight from its script in [`publicity/`](../README.md), so the script stays the one place they're written.
 
-The tours (Videos 5, 6, 7 and 9) also show the real app: [`common/capture.mjs`](common/capture.mjs) opens a sample timeline from [`samples/`](samples/README.md) in the built editor and records each shot frame by frame, and the scenes place those frames in a browser window.
+The tours (Videos 5, 6, 7 and 8) and the logs video (10) also show the real app: [`common/capture.mjs`](common/capture.mjs) opens a sample timeline from [`samples/`](samples/README.md) in the built editor and records each shot frame by frame, and the scenes place those frames in a browser window.
 
 Narration recordings, trimmed audio, captured shots, rendered frames and MP4s are not in git (see `.gitignore`).
 
@@ -21,10 +21,11 @@ Narration recordings, trimmed audio, captured shots, rendered frames and MP4s ar
 | [`04-exact-time/`](04-exact-time/README.md)                                 | Video 4: Exact time, rational numbers.                                                      |
 | [`05-tour-usa/`](05-tour-usa/README.md)                                     | Video 5: Tour, the United States.                                                           |
 | [`06-tour-a-story/`](06-tour-a-story/README.md)                             | Video 6: Tour, a story's timeline.                                                          |
-| [`07-tour-deep-time/`](07-tour-deep-time/README.md)                         | Video 7: Tour, deep time.                                                                   |
-| [`08-working-together/`](08-working-together/README.md)                     | Video 8: Working together.                                                                  |
-| [`09-timelines-from-logs/`](09-timelines-from-logs/README.md)               | Video 9: Timelines from logs.                                                               |
-| [`10-run-your-own-server/`](10-run-your-own-server/README.md)               | Video 10: Run your own server.                                                              |
+| [`07-tour-a-canon/`](07-tour-a-canon/README.md)                             | Video 7: Tour, keeping a canon (Middle-earth).                                              |
+| [`08-tour-deep-time/`](08-tour-deep-time/README.md)                         | Video 8: Tour, deep time.                                                                   |
+| [`09-working-together/`](09-working-together/README.md)                     | Video 9: Working together.                                                                  |
+| [`10-timelines-from-logs/`](10-timelines-from-logs/README.md)               | Video 10: Timelines from logs.                                                              |
+| [`11-run-your-own-server/`](11-run-your-own-server/README.md)               | Video 11: Run your own server.                                                              |
 
 ## Making a video
 

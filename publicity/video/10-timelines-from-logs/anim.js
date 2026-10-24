@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-/* Video 9, Timelines from logs (publicity/9-timelines-from-logs.md): log lines becoming moments,
+/* Video 10, Timelines from logs (publicity/10-timelines-from-logs.md): log lines becoming moments,
    the importer's and the live streams' commands as they'd be typed, the real editor on the
    sample incident (samples/incident.mjs) for the investigation, and the guarantees: exact
    times, retention and scale. Scenes are pure functions of scene time lt; q("word") is when
@@ -989,6 +989,12 @@ SCENES[7] = function (lt, q) {
         size: 6.5,
         mono: true,
         fill: C.accent,
+        weight: 500,
+      }) +
+      txt(160, 134, 'github.com/openchronology/timeline-app', {
+        size: 6,
+        mono: true,
+        fill: C.soft,
         weight: 500,
       }),
     { o: e, ty: (1 - e) * 6 },

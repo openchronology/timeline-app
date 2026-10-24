@@ -84,7 +84,7 @@
 
 ### Scene 6 · 2:12 – 2:30 · Yours until you publish
 
-**FRAME:** Two icons: a laptop with ".och" files ("Desktop app: files on your computer"), and a padlock over a browser ("On a server: private until you share it"). End card: "Keep your canon straight", the ◷ wordmark.
+**FRAME:** Two icons: a laptop with ".och" files ("Desktop app: files on your computer"), and a padlock over a browser ("On a server: private until you share it"). End card: "Keep your canon straight", the ◷ wordmark. The end card also gives the source: "github.com/openchronology/timeline-app".
 
 **MOTION:** Icons pop in; the end card rises and holds.
 

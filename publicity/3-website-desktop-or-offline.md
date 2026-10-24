@@ -97,7 +97,7 @@
 
 ### Scene 7 · 2:16 – 2:30 · Choose
 
-**FRAME:** End card: three lines with icons, "Share it → the website", "Keep it on your computer → the desktop app", "Never online → the offline file", and beneath them "Download · timescale.info".
+**FRAME:** End card: three lines with icons, "Share it → the website", "Keep it on your computer → the desktop app", "Never online → the offline file", and beneath them "Download · timescale.info". The end card also gives the source: "github.com/openchronology/timeline-app".
 
 **MOTION:** The lines tick in one by one; the address holds.
 

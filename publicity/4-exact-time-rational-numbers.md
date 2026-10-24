@@ -108,7 +108,7 @@
 
 ### Scene 8 · 2:38 – 3:00 · Exact, and open
 
-**FRAME:** The ruler again with three labels: "4.54 billion years ago", "1969-07-20 20:17:40", "+1/3 s". End card: "Every time is a fraction. Nothing rounds." the ◷ wordmark, and "Source: github.com/openchronology · GPL v3".
+**FRAME:** The ruler again with three labels: "4.54 billion years ago", "1969-07-20 20:17:40", "+1/3 s". End card: "Every time is a fraction. Nothing rounds." the ◷ wordmark, and "Source: github.com/openchronology/timeline-app · GPL v3".
 
 **MOTION:** The three labels slide together onto one axis; the end card fades in and holds.
 

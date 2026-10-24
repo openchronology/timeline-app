@@ -84,9 +84,9 @@
 
 ### Scene 6 · 2:00 – 2:30 · One second, exactly
 
-**FRAME:** The zoom continues to a few seconds around Apollo 11's landing. Then **Time display** changes to Gregorian: the ruler that read in millions of years now reads "1969-07-20 20:17:40", and the moment hasn't moved. End card: "From eons to seconds", the ◷ wordmark.
+**FRAME:** The zoom continues to a few seconds around Apollo 11's landing. Then **Time display** changes to Gregorian: the ruler that read in millions of years now reads 1969-07-20, 20:17, with the landing on its 40 s tick (and a panel beside the frame reads "1969-07-20 20:17:40 UTC"), and the moment hasn't moved. End card: "From eons to seconds", the ◷ wordmark. The end card also gives the source: "github.com/openchronology/timeline-app".
 
-**MOTION:** The zoom carries on toward the landing; at about a ten-year view **Time display** changes to Gregorian (the ruler that read millions of years reads 1964–1973, and the landing hasn't moved); the zoom continues in dates down to a few seconds; the end card rises and holds.
+**MOTION:** The zoom carries on, still in millions of years, down to a few seconds around the landing: the ruler counts the last of them as offsets (Δ 7 s, Δ 8 s, Δ 9 s). On arriving, **Time display** changes to Gregorian: the same ruler now reads 1969-07-20, 20:17, and the landing sits on its 40 s tick, where it was. The end card rises and holds.
 
 **OST:** "From eons to seconds."
 
@@ -128,4 +128,4 @@
 1. **Can I show "Ma" and "Ga" instead?** Set the unit in **Time display** (for example "Ma" with a scale of a million Julian years); a custom printer can switch units with the zoom.
 2. **Why relative to 2000?** The **Geological ages** plugin records ages before 2000 CE; set the origin to 1950 for "before present" (BP) if your sources use it.
 3. **How precise are these ages?** As precise as the sources (Appendix B); the timeline stores exactly what you enter and never rounds it.
-4. **Can students add to it?** Yes: share it, and let them fork it or propose changes (Video 8).
+4. **Can students add to it?** Yes: share it, and let them fork it or propose changes (Video 9).

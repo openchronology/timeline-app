@@ -1,9 +1,9 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-/* Video 7, Tour: deep time (publicity/7-tour-deep-time.md): the real app, captured, making one
-   long zoom from Fit all over Earth's 4.5 billion years down to the second of the Apollo 11
-   landing, then changing Time display to Gregorian without moving the view. The callouts,
-   the depth gauge and the inset sit around the browser frame. Scenes are pure functions of
-   scene time lt; q("word") is when that word is said.
+/* Video 8, Tour: deep time (publicity/8-tour-deep-time.md): the real app, captured, making one
+   long zoom from Fit all over Earth's 4.5 billion years, in million years all the way, down to
+   a few seconds around the Apollo 11 landing, then changing Time display to Gregorian without
+   moving the view. The callouts, the depth gauge and the inset sit around the browser frame.
+   Scenes are pure functions of scene time lt; q("word") is when that word is said.
 
    PATH is the camera: each scene's shots, with keyframed views in million years from 2000 CE
    (the sample's display) at scene times. shots.json is written from it (the same views in
@@ -19,7 +19,6 @@ var V_FIT = [-5448, 908], // Fit all, as the app sets it
   V_PHAN = [-570, 30],
   V_HUMAN = [-7.6, 0.4],
   V_HIST = [-0.0128, 0.0002],
-  V_DECADE = [APOLLO - 6 * YR, APOLLO + 4 * YR],
   V_SECOND = [APOLLO - 4 * SEC, APOLLO + 4 * SEC];
 
 /* The browser frame and where the app's chart lies in its 1920 × 1080 capture. */
@@ -120,20 +119,18 @@ function PATH(id, q) {
     // The narration names farming two seconds in: start the move as the scene opens.
     return [{ id: 's5', from: 0, dur: d, keys: move(V_HUMAN, V_HIST, 0.3, q('farming'), d) }];
   }
-  // Scene 6: down to a decade around the landing (the furthest "million years" still reads
-  // cleanly: below about a year the ruler can only print offsets like "Δ 1e-13 million
-  // years"), change Time display to Gregorian, then on down to the second in dates.
+  // Scene 6: one zoom, still in million years, down to a few seconds around the landing (the
+  // ruler counts them as offsets from a round base: "Δ 7 s"); then, on arriving, Time display
+  // changes to Gregorian through the real dialog, and the view doesn't move.
   var c = q('change'),
-    split = c + 2.4,
     z6 = q('still') - 0.2,
-    z7 = Math.max(split + 0.4, q('moves') + 1.3),
-    z7end = Math.min(d - 1, Math.max(z7 + 3.5, q('seconds')));
+    z6end = c - 0.9;
   return [
     {
-      id: 's6a',
+      id: 's6',
       from: 0,
-      dur: split,
-      keys: move(V_HIST, V_DECADE, z6, Math.min(z6 + 4.5, c - 1.2), split),
+      dur: d,
+      keys: move(V_HIST, V_SECOND, z6, z6end, d),
       actions: [
         { t: c + 0.1, do: 'click', selector: '#presentation-button' },
         { t: c + 0.9, do: 'eval', js: GREGORIAN_JS },
@@ -141,24 +138,11 @@ function PATH(id, q) {
         { t: c + 1.8, do: 'eval', js: BOUNDS_AS_DATES_JS },
       ],
     },
-    {
-      id: 's6b',
-      from: split,
-      dur: d - split,
-      keys: move(V_DECADE, V_SECOND, z7 - split, z7end - split, d - split),
-      setup: [
-        { do: 'click', selector: '#presentation-button' },
-        { do: 'eval', js: GREGORIAN_JS },
-        { do: 'click', selector: '#presentation-save' },
-        { do: 'eval', js: BOUNDS_AS_DATES_JS },
-      ],
-    },
   ];
 }
-/** The end card waits for the zoom to land on the second. */
+/** The end card waits for the zoom to land and the display to change. */
 function endCard(q) {
-  var sh = PATH(6, q)[1];
-  return Math.max(q('one'), sh.from + sh.keys[2].t + 1.4);
+  return Math.max(q('one'), q('change') + 4);
 }
 /** The view and the shot frame at scene time lt. */
 function camera(id, q, lt) {
@@ -492,13 +476,11 @@ SCENES[6] = function (lt, q) {
   var cam = camera(6, q, lt),
     v = cam.v,
     s = '';
-  var c = q('change'),
-    flipped = lt >= c + 1.8;
+  var c = q('change');
   // A plumb line through the landing: the ruler changes, the moment doesn't move.
   var ax = atX(v, APOLLO);
-  var z7 = PATH(6, q)[1];
-  z7 = z7.from + z7.keys[1].t;
-  var pl = P(lt, c - 1, 0.5) * (1 - P(lt, z7 + 0.3, 0.6));
+  var landed = PATH(6, q)[0].keys[2].t;
+  var pl = P(lt, landed, 0.5);
   s += G(
     '<path d="M' +
       ax.toFixed(2) +
@@ -515,7 +497,7 @@ SCENES[6] = function (lt, q) {
   );
   // How the landing reads, before and after.
   var ry = 134,
-    r = P(lt, c - 1, 0.5);
+    r = P(lt, landed + 0.2, 0.5);
   var before =
     txt(COL, ry, '−0.000030448', {
       size: 5.6,
@@ -550,6 +532,15 @@ SCENES[6] = function (lt, q) {
   var e = P(lt, endCard(q), 0.9);
   s +=
     G(rect(-20, -1, 360, 200, C.ground), { o: 0.94 * e }) +
-    G(wordmark(160, 84, 16), { o: e, ty: (1 - e) * 6 });
+    G(
+      wordmark(160, 84, 16) +
+        txt(160, 104, 'github.com/openchronology/timeline-app', {
+          size: 5.6,
+          mono: true,
+          fill: C.soft,
+          weight: 500,
+        }),
+      { o: e, ty: (1 - e) * 6 },
+    );
   return finish(lt, q, app(cam) + gauge(v), s, true);
 };
