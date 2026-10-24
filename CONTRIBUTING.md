@@ -15,6 +15,7 @@ OpenChronology is one codebase for four editions: the website (a Next.js platfor
 | [`legal/`](legal/README.md)                  | The hosted site's terms, privacy policy, copyright policy and launch checklist.                                                         |
 | [`native-store/`](native-store/README.md)    | The native SQLite store (Rust) behind the desktop app and `och-convert`.                                                                |
 | [`platform/`](platform/README.md)            | The website: Next.js pages and API routes over the server.                                                                              |
+| [`publicity/`](publicity/README.md)          | The explainer video series: the audience analysis, each video's script and storyboard, and the source that renders them.                |
 | [`scripts/`](scripts/README.md)              | Build, packaging and release scripts.                                                                                                   |
 | [`server/`](server/README.md)                | The Node server: the HTTP API, the PostgreSQL store, accounts, moderation, and log receivers and importers.                             |
 | [`src/`](src/README.md)                      | The editor every edition shares, and its core: exact times, the timeline index, durations, tags, plugins.                               |

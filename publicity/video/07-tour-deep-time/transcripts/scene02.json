@@ -1,0 +1,1035 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:04,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 4000
+			},
+			"text": " The Earth forms about 4 and a half billion years ago.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.95191,
+					"t_dtw": -1
+				},
+				{
+					"text": " The",
+					"timestamps": {
+						"from": "00:00:00,270",
+						"to": "00:00:00,270"
+					},
+					"offsets": {
+						"from": 270,
+						"to": 270
+					},
+					"id": 383,
+					"p": 0.792565,
+					"t_dtw": -1
+				},
+				{
+					"text": " Earth",
+					"timestamps": {
+						"from": "00:00:00,280",
+						"to": "00:00:00,540"
+					},
+					"offsets": {
+						"from": 280,
+						"to": 540
+					},
+					"id": 3668,
+					"p": 0.759035,
+					"t_dtw": -1
+				},
+				{
+					"text": " forms",
+					"timestamps": {
+						"from": "00:00:00,730",
+						"to": "00:00:01,160"
+					},
+					"offsets": {
+						"from": 730,
+						"to": 1160
+					},
+					"id": 5107,
+					"p": 0.987837,
+					"t_dtw": -1
+				},
+				{
+					"text": " about",
+					"timestamps": {
+						"from": "00:00:01,170",
+						"to": "00:00:01,620"
+					},
+					"offsets": {
+						"from": 1170,
+						"to": 1620
+					},
+					"id": 546,
+					"p": 0.995116,
+					"t_dtw": -1
+				},
+				{
+					"text": " 4",
+					"timestamps": {
+						"from": "00:00:01,620",
+						"to": "00:00:01,860"
+					},
+					"offsets": {
+						"from": 1620,
+						"to": 1860
+					},
+					"id": 604,
+					"p": 0.504531,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:01,880",
+						"to": "00:00:02,160"
+					},
+					"offsets": {
+						"from": 1880,
+						"to": 2160
+					},
+					"id": 290,
+					"p": 0.440296,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:02,160",
+						"to": "00:00:02,200"
+					},
+					"offsets": {
+						"from": 2160,
+						"to": 2200
+					},
+					"id": 257,
+					"p": 0.956244,
+					"t_dtw": -1
+				},
+				{
+					"text": " half",
+					"timestamps": {
+						"from": "00:00:02,420",
+						"to": "00:00:02,610"
+					},
+					"offsets": {
+						"from": 2420,
+						"to": 2610
+					},
+					"id": 2063,
+					"p": 0.980898,
+					"t_dtw": -1
+				},
+				{
+					"text": " billion",
+					"timestamps": {
+						"from": "00:00:02,610",
+						"to": "00:00:03,230"
+					},
+					"offsets": {
+						"from": 2610,
+						"to": 3230
+					},
+					"id": 2997,
+					"p": 0.991877,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:03,230",
+						"to": "00:00:03,510"
+					},
+					"offsets": {
+						"from": 3230,
+						"to": 3510
+					},
+					"id": 812,
+					"p": 0.998393,
+					"t_dtw": -1
+				},
+				{
+					"text": " ago",
+					"timestamps": {
+						"from": "00:00:03,670",
+						"to": "00:00:03,730"
+					},
+					"offsets": {
+						"from": 3670,
+						"to": 3730
+					},
+					"id": 2084,
+					"p": 0.99843,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,000",
+						"to": "00:00:04,000"
+					},
+					"offsets": {
+						"from": 4000,
+						"to": 4000
+					},
+					"id": 13,
+					"p": 0.802837,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_200]",
+					"timestamps": {
+						"from": "00:00:04,000",
+						"to": "00:00:04,000"
+					},
+					"offsets": {
+						"from": 4000,
+						"to": 4000
+					},
+					"id": 50563,
+					"p": 0.0466512,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,000",
+				"to": "00:00:06,880"
+			},
+			"offsets": {
+				"from": 4000,
+				"to": 6880
+			},
+			"text": " About a billion years later there's life.",
+			"tokens": [
+				{
+					"text": " About",
+					"timestamps": {
+						"from": "00:00:04,280",
+						"to": "00:00:04,420"
+					},
+					"offsets": {
+						"from": 4280,
+						"to": 4420
+					},
+					"id": 7994,
+					"p": 0.982246,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:04,420",
+						"to": "00:00:04,500"
+					},
+					"offsets": {
+						"from": 4420,
+						"to": 4500
+					},
+					"id": 257,
+					"p": 0.998037,
+					"t_dtw": -1
+				},
+				{
+					"text": " billion",
+					"timestamps": {
+						"from": "00:00:04,500",
+						"to": "00:00:05,090"
+					},
+					"offsets": {
+						"from": 4500,
+						"to": 5090
+					},
+					"id": 2997,
+					"p": 0.996816,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:05,090",
+						"to": "00:00:05,510"
+					},
+					"offsets": {
+						"from": 5090,
+						"to": 5510
+					},
+					"id": 812,
+					"p": 0.999234,
+					"t_dtw": -1
+				},
+				{
+					"text": " later",
+					"timestamps": {
+						"from": "00:00:05,510",
+						"to": "00:00:05,930"
+					},
+					"offsets": {
+						"from": 5510,
+						"to": 5930
+					},
+					"id": 1568,
+					"p": 0.994922,
+					"t_dtw": -1
+				},
+				{
+					"text": " there",
+					"timestamps": {
+						"from": "00:00:05,930",
+						"to": "00:00:06,200"
+					},
+					"offsets": {
+						"from": 5930,
+						"to": 6200
+					},
+					"id": 612,
+					"p": 0.973821,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:06,420",
+						"to": "00:00:06,510"
+					},
+					"offsets": {
+						"from": 6420,
+						"to": 6510
+					},
+					"id": 338,
+					"p": 0.991533,
+					"t_dtw": -1
+				},
+				{
+					"text": " life",
+					"timestamps": {
+						"from": "00:00:06,510",
+						"to": "00:00:06,880"
+					},
+					"offsets": {
+						"from": 6510,
+						"to": 6880
+					},
+					"id": 1204,
+					"p": 0.975068,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:06,880",
+						"to": "00:00:06,880"
+					},
+					"offsets": {
+						"from": 6880,
+						"to": 6880
+					},
+					"id": 13,
+					"p": 0.507555,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_344]",
+					"timestamps": {
+						"from": "00:00:06,880",
+						"to": "00:00:06,880"
+					},
+					"offsets": {
+						"from": 6880,
+						"to": 6880
+					},
+					"id": 50707,
+					"p": 0.147195,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:06,880",
+				"to": "00:00:10,960"
+			},
+			"offsets": {
+				"from": 6880,
+				"to": 10960
+			},
+			"text": " Microbial mats that left stromatolites behind.",
+			"tokens": [
+				{
+					"text": " Micro",
+					"timestamps": {
+						"from": "00:00:07,160",
+						"to": "00:00:07,390"
+					},
+					"offsets": {
+						"from": 7160,
+						"to": 7390
+					},
+					"id": 4527,
+					"p": 0.926789,
+					"t_dtw": -1
+				},
+				{
+					"text": "bial",
+					"timestamps": {
+						"from": "00:00:07,390",
+						"to": "00:00:07,790"
+					},
+					"offsets": {
+						"from": 7390,
+						"to": 7790
+					},
+					"id": 25200,
+					"p": 0.681,
+					"t_dtw": -1
+				},
+				{
+					"text": " mats",
+					"timestamps": {
+						"from": "00:00:07,790",
+						"to": "00:00:08,170"
+					},
+					"offsets": {
+						"from": 7790,
+						"to": 8170
+					},
+					"id": 46054,
+					"p": 0.949681,
+					"t_dtw": -1
+				},
+				{
+					"text": " that",
+					"timestamps": {
+						"from": "00:00:08,350",
+						"to": "00:00:08,590"
+					},
+					"offsets": {
+						"from": 8350,
+						"to": 8590
+					},
+					"id": 326,
+					"p": 0.997718,
+					"t_dtw": -1
+				},
+				{
+					"text": " left",
+					"timestamps": {
+						"from": "00:00:08,590",
+						"to": "00:00:08,990"
+					},
+					"offsets": {
+						"from": 8590,
+						"to": 8990
+					},
+					"id": 1364,
+					"p": 0.995609,
+					"t_dtw": -1
+				},
+				{
+					"text": " st",
+					"timestamps": {
+						"from": "00:00:08,990",
+						"to": "00:00:09,080"
+					},
+					"offsets": {
+						"from": 8990,
+						"to": 9080
+					},
+					"id": 336,
+					"p": 0.936523,
+					"t_dtw": -1
+				},
+				{
+					"text": "rom",
+					"timestamps": {
+						"from": "00:00:09,300",
+						"to": "00:00:09,490"
+					},
+					"offsets": {
+						"from": 9300,
+						"to": 9490
+					},
+					"id": 398,
+					"p": 0.991557,
+					"t_dtw": -1
+				},
+				{
+					"text": "at",
+					"timestamps": {
+						"from": "00:00:09,490",
+						"to": "00:00:09,690"
+					},
+					"offsets": {
+						"from": 9490,
+						"to": 9690
+					},
+					"id": 265,
+					"p": 0.991941,
+					"t_dtw": -1
+				},
+				{
+					"text": "ol",
+					"timestamps": {
+						"from": "00:00:09,690",
+						"to": "00:00:09,890"
+					},
+					"offsets": {
+						"from": 9690,
+						"to": 9890
+					},
+					"id": 349,
+					"p": 0.991114,
+					"t_dtw": -1
+				},
+				{
+					"text": "ites",
+					"timestamps": {
+						"from": "00:00:09,890",
+						"to": "00:00:10,290"
+					},
+					"offsets": {
+						"from": 9890,
+						"to": 10290
+					},
+					"id": 2737,
+					"p": 0.980913,
+					"t_dtw": -1
+				},
+				{
+					"text": " behind",
+					"timestamps": {
+						"from": "00:00:10,290",
+						"to": "00:00:10,400"
+					},
+					"offsets": {
+						"from": 10290,
+						"to": 10400
+					},
+					"id": 2157,
+					"p": 0.994059,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:10,960",
+						"to": "00:00:10,960"
+					},
+					"offsets": {
+						"from": 10960,
+						"to": 10960
+					},
+					"id": 13,
+					"p": 0.967407,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_548]",
+					"timestamps": {
+						"from": "00:00:10,960",
+						"to": "00:00:10,960"
+					},
+					"offsets": {
+						"from": 10960,
+						"to": 10960
+					},
+					"id": 50911,
+					"p": 0.212623,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:10,960",
+				"to": "00:00:16,320"
+			},
+			"offsets": {
+				"from": 10960,
+				"to": 16320
+			},
+			"text": " Around 2.4 billion years ago, their oxygen starts to fill the air.",
+			"tokens": [
+				{
+					"text": " Around",
+					"timestamps": {
+						"from": "00:00:11,240",
+						"to": "00:00:11,500"
+					},
+					"offsets": {
+						"from": 11240,
+						"to": 11500
+					},
+					"id": 16824,
+					"p": 0.982259,
+					"t_dtw": -1
+				},
+				{
+					"text": " 2",
+					"timestamps": {
+						"from": "00:00:11,690",
+						"to": "00:00:11,810"
+					},
+					"offsets": {
+						"from": 11690,
+						"to": 11810
+					},
+					"id": 362,
+					"p": 0.991456,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:11,810",
+						"to": "00:00:12,080"
+					},
+					"offsets": {
+						"from": 11810,
+						"to": 12080
+					},
+					"id": 13,
+					"p": 0.988054,
+					"t_dtw": -1
+				},
+				{
+					"text": "4",
+					"timestamps": {
+						"from": "00:00:12,090",
+						"to": "00:00:12,260"
+					},
+					"offsets": {
+						"from": 12090,
+						"to": 12260
+					},
+					"id": 19,
+					"p": 0.998262,
+					"t_dtw": -1
+				},
+				{
+					"text": " billion",
+					"timestamps": {
+						"from": "00:00:12,420",
+						"to": "00:00:13,040"
+					},
+					"offsets": {
+						"from": 12420,
+						"to": 13040
+					},
+					"id": 2997,
+					"p": 0.99304,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:13,040",
+						"to": "00:00:13,520"
+					},
+					"offsets": {
+						"from": 13040,
+						"to": 13520
+					},
+					"id": 812,
+					"p": 0.999661,
+					"t_dtw": -1
+				},
+				{
+					"text": " ago",
+					"timestamps": {
+						"from": "00:00:13,520",
+						"to": "00:00:13,840"
+					},
+					"offsets": {
+						"from": 13520,
+						"to": 13840
+					},
+					"id": 2084,
+					"p": 0.999691,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:13,840",
+						"to": "00:00:13,980"
+					},
+					"offsets": {
+						"from": 13840,
+						"to": 13980
+					},
+					"id": 11,
+					"p": 0.935344,
+					"t_dtw": -1
+				},
+				{
+					"text": " their",
+					"timestamps": {
+						"from": "00:00:13,980",
+						"to": "00:00:14,340"
+					},
+					"offsets": {
+						"from": 13980,
+						"to": 14340
+					},
+					"id": 511,
+					"p": 0.822367,
+					"t_dtw": -1
+				},
+				{
+					"text": " oxygen",
+					"timestamps": {
+						"from": "00:00:14,340",
+						"to": "00:00:14,470"
+					},
+					"offsets": {
+						"from": 14340,
+						"to": 14470
+					},
+					"id": 11863,
+					"p": 0.993895,
+					"t_dtw": -1
+				},
+				{
+					"text": " starts",
+					"timestamps": {
+						"from": "00:00:15,110",
+						"to": "00:00:15,190"
+					},
+					"offsets": {
+						"from": 15110,
+						"to": 15190
+					},
+					"id": 4940,
+					"p": 0.992339,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:15,210",
+						"to": "00:00:15,340"
+					},
+					"offsets": {
+						"from": 15210,
+						"to": 15340
+					},
+					"id": 284,
+					"p": 0.997075,
+					"t_dtw": -1
+				},
+				{
+					"text": " fill",
+					"timestamps": {
+						"from": "00:00:15,340",
+						"to": "00:00:15,630"
+					},
+					"offsets": {
+						"from": 15340,
+						"to": 15630
+					},
+					"id": 6070,
+					"p": 0.99667,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:15,630",
+						"to": "00:00:15,840"
+					},
+					"offsets": {
+						"from": 15630,
+						"to": 15840
+					},
+					"id": 262,
+					"p": 0.998466,
+					"t_dtw": -1
+				},
+				{
+					"text": " air",
+					"timestamps": {
+						"from": "00:00:15,840",
+						"to": "00:00:16,050"
+					},
+					"offsets": {
+						"from": 15840,
+						"to": 16050
+					},
+					"id": 1633,
+					"p": 0.998159,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:16,050",
+						"to": "00:00:16,300"
+					},
+					"offsets": {
+						"from": 16050,
+						"to": 16300
+					},
+					"id": 13,
+					"p": 0.987457,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_816]",
+					"timestamps": {
+						"from": "00:00:16,320",
+						"to": "00:00:16,320"
+					},
+					"offsets": {
+						"from": 16320,
+						"to": 16320
+					},
+					"id": 51179,
+					"p": 0.299473,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:16,320",
+				"to": "00:00:19,440"
+			},
+			"offsets": {
+				"from": 16320,
+				"to": 19440
+			},
+			"text": " For about 3 billion years, that's what life is.",
+			"tokens": [
+				{
+					"text": " For",
+					"timestamps": {
+						"from": "00:00:16,530",
+						"to": "00:00:16,530"
+					},
+					"offsets": {
+						"from": 16530,
+						"to": 16530
+					},
+					"id": 1114,
+					"p": 0.980733,
+					"t_dtw": -1
+				},
+				{
+					"text": " about",
+					"timestamps": {
+						"from": "00:00:16,600",
+						"to": "00:00:16,860"
+					},
+					"offsets": {
+						"from": 16600,
+						"to": 16860
+					},
+					"id": 546,
+					"p": 0.999336,
+					"t_dtw": -1
+				},
+				{
+					"text": " 3",
+					"timestamps": {
+						"from": "00:00:17,050",
+						"to": "00:00:17,090"
+					},
+					"offsets": {
+						"from": 17050,
+						"to": 17090
+					},
+					"id": 513,
+					"p": 0.768592,
+					"t_dtw": -1
+				},
+				{
+					"text": " billion",
+					"timestamps": {
+						"from": "00:00:17,090",
+						"to": "00:00:17,580"
+					},
+					"offsets": {
+						"from": 17090,
+						"to": 17580
+					},
+					"id": 2997,
+					"p": 0.988772,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:17,580",
+						"to": "00:00:17,930"
+					},
+					"offsets": {
+						"from": 17580,
+						"to": 17930
+					},
+					"id": 812,
+					"p": 0.999735,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:17,930",
+						"to": "00:00:18,070"
+					},
+					"offsets": {
+						"from": 17930,
+						"to": 18070
+					},
+					"id": 11,
+					"p": 0.717297,
+					"t_dtw": -1
+				},
+				{
+					"text": " that",
+					"timestamps": {
+						"from": "00:00:18,070",
+						"to": "00:00:18,340"
+					},
+					"offsets": {
+						"from": 18070,
+						"to": 18340
+					},
+					"id": 326,
+					"p": 0.993623,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:18,340",
+						"to": "00:00:18,490"
+					},
+					"offsets": {
+						"from": 18340,
+						"to": 18490
+					},
+					"id": 338,
+					"p": 0.998913,
+					"t_dtw": -1
+				},
+				{
+					"text": " what",
+					"timestamps": {
+						"from": "00:00:18,490",
+						"to": "00:00:18,770"
+					},
+					"offsets": {
+						"from": 18490,
+						"to": 18770
+					},
+					"id": 644,
+					"p": 0.998864,
+					"t_dtw": -1
+				},
+				{
+					"text": " life",
+					"timestamps": {
+						"from": "00:00:18,770",
+						"to": "00:00:19,050"
+					},
+					"offsets": {
+						"from": 18770,
+						"to": 19050
+					},
+					"id": 1204,
+					"p": 0.99709,
+					"t_dtw": -1
+				},
+				{
+					"text": " is",
+					"timestamps": {
+						"from": "00:00:19,050",
+						"to": "00:00:19,190"
+					},
+					"offsets": {
+						"from": 19050,
+						"to": 19190
+					},
+					"id": 318,
+					"p": 0.999237,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:19,190",
+						"to": "00:00:19,440"
+					},
+					"offsets": {
+						"from": 19190,
+						"to": 19440
+					},
+					"id": 13,
+					"p": 0.959616,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_972]",
+					"timestamps": {
+						"from": "00:00:19,440",
+						"to": "00:00:19,440"
+					},
+					"offsets": {
+						"from": 19440,
+						"to": 19440
+					},
+					"id": 51335,
+					"p": 0.0569151,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

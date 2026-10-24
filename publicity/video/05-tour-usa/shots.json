@@ -1,0 +1,104 @@
+{
+  "sample": "../samples/usa.ochx",
+  "size": [1280, 720],
+  "scale": 1.5,
+  "shots": [
+    {
+      "id": "sweep",
+      "dur": 0.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-6250000000, 1300000000]
+        }
+      ]
+    },
+    {
+      "id": "war",
+      "dur": 8,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-6250000000, 1300000000]
+        },
+        {
+          "t": 7,
+          "view": [-3479241600, -3274128000]
+        }
+      ]
+    },
+    {
+      "id": "april",
+      "dur": 4,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3479241600, -3274128000]
+        },
+        {
+          "t": 3.2,
+          "view": [-3306355200, -3303244800]
+        }
+      ]
+    },
+    {
+      "id": "rights",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-6250000000, 1300000000]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.4,
+          "do": "separate",
+          "tags": ["rights"]
+        }
+      ]
+    },
+    {
+      "id": "reader",
+      "dur": 6,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const v = document.getElementById('view-mode'); if (!v.checked) v.click(); })()"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-509328000, -431481600]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.5,
+          "do": "eval",
+          "js": "document.querySelector('#markers .event-marker[aria-label=\"Brown v. Board of Education\"]').click()"
+        },
+        {
+          "t": 4,
+          "do": "click",
+          "selector": "#reader-related .related-entity:has-text(\"Civil Rights Act\")"
+        }
+      ]
+    },
+    {
+      "id": "moon",
+      "dur": 11,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-6250000000, 1300000000]
+        },
+        {
+          "t": 9.5,
+          "view": [-14186282, -14155682]
+        }
+      ]
+    }
+  ]
+}
