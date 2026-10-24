@@ -96,6 +96,28 @@ var LOOKS = {
     acts: ['#d9a441', '#e0603a', '#7f9bd6', '#7fb88a', '#c08ae0'],
     serif: true,
   },
+  // A canon's keeper: deep forest green and gold.
+  lore: {
+    ground: '#10201a',
+    card: '#17291f',
+    text: '#ece4c8',
+    soft: '#a7a58c',
+    line: '#2f4a3a',
+    faint: '#1a2f24',
+    accent: '#c9a54a',
+    moment: '#c9a54a',
+    strong: '#e6c66a',
+    duration: '#3d5a48',
+    durationText: '#ece4c8',
+    arc: '#c9a54a',
+    select: '#e6c66a',
+    amber: '#c9a54a',
+    red: '#c96a4a',
+    blue: '#6fa3d8',
+    green: '#8fc46a',
+    acts: ['#c9a54a', '#8fc46a', '#6fa3d8', '#c96a4a', '#a7a58c'],
+    serif: true,
+  },
   // Deep time: a night sky over the geological column.
   strata: {
     ground: '#0d1020',

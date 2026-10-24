@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// A made-up incident for the logs video (Video 9): three hours of syslog from four hosts, shaped
+// A made-up incident for the logs video (Video 10): three hours of syslog from four hosts, shaped
 // exactly as the syslog receiver and log importer make moments (tags, the syslog metadata,
 // microsecond times), around an outage: a backup job fills the database's disk, PostgreSQL
 // stops writing, and the web servers return 502s until the disk is cleared. The hosts, names

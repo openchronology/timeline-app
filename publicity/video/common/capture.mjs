@@ -9,7 +9,8 @@
 // shots.json: { "sample": "../samples/usa.ochx", "shots": [ { "id": "fit", "dur": 5,
 //   "keys": [ { "t": 0, "view": [left, right] }, { "t": 4, "view": [left, right] } ],
 //   "actions": [ { "t": 1, "do": "open", "title": "Brown v. Board of Education" } ] } ] }
-// Views are in the sample's stored coordinates (seconds, as numbers or decimal strings).
+// Views are in the sample's stored coordinates (seconds, as numbers or decimal strings). A sample
+// with a custom time display also gives `boundFormat` (see customBound below).
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, resolve, join } from 'node:path';
@@ -68,7 +69,13 @@ const ratio = (s) => {
   const [n, d = '1'] = String(s).split('/');
   return Number(n) / Number(d);
 };
+// A custom display's bounds are typed as the sample's own code prints them: shots.json gives
+// that as `boundFormat`, the source of a function of the stored time (a number).
+const customBound = config.boundFormat
+  ? new Function('t', `return (${config.boundFormat})(t);`)
+  : null;
 function boundText(t) {
+  if (customBound) return customBound(t);
   if (presentation.mode === 'gregorian') {
     const whole = Math.floor(t),
       frac = t - whole;

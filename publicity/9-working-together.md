@@ -95,7 +95,7 @@
 
 ### Scene 7 · 2:14 – 2:30 · Build it together
 
-**FRAME:** The whole cast around the card, now public, with a **Report** flag icon small at the edge ("Report: to the site's moderators"). End card: "Build it together", the ◷ wordmark.
+**FRAME:** The whole cast around the card, now public, with a **Report** flag icon small at the edge ("Report: to the site's moderators"). End card: "Build it together", the ◷ wordmark. The end card also gives the source: "github.com/openchronology/timeline-app".
 
 **MOTION:** The card glows; the end card rises and holds.
 

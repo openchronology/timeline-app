@@ -59,7 +59,7 @@
 
 ### Scene 4 · 0:58 – 1:15 · Free, and where you want it
 
-**FRAME:** Three icons in a row under the axis: a browser window ("Website"), a laptop ("Desktop app"), a single file ("Offline file"). Beneath them, a chip: "Free software · GPL v3". Then the end card: the ◷ openchronology wordmark, "timescale.info", and a line: "Next: How to see a timeline · and a video for what you do".
+**FRAME:** Three icons in a row under the axis: a browser window ("Website"), a laptop ("Desktop app"), a single file ("Offline file"). Beneath them, a chip: "Free software · GPL v3". Then the end card: the ◷ openchronology wordmark, "timescale.info", and a line: "Next: How to see a timeline · and a video for what you do". The end card also gives the source: "github.com/openchronology/timeline-app".
 
 **MOTION:** Icons pop in; the chip slides up; the end card fades in over them and holds.
 
@@ -87,7 +87,7 @@
 | Scene | Claim                                                          | Source                                                                                               |
 | ----- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | 2     | Every time is stored exactly, as a fraction                    | [Guide: exact times](../docs/guide.md#exact-times)                                                   |
-| 2     | Billions of years to fractions of a second on one line         | Arbitrary-precision rationals; the deep-time tour (Video 7) shows it                                 |
+| 2     | Billions of years to fractions of a second on one line         | Arbitrary-precision rationals; the deep-time tour (Video 8) shows it                                 |
 | 4     | Free software, GPL version 3, no paid features                 | [Licensing](../docs/licensing.md), [FAQ](../docs/faq.md#is-it-free)                                  |
 | 4     | Website, desktop app, offline file that never uses the network | [Guide: the desktop app and the offline file](../docs/guide.md#the-desktop-app-and-the-offline-file) |
 

@@ -1,0 +1,101 @@
+1
+00:00:00,860 --> 00:00:06,230
+A canon outgrows any one book. Tolkien's
+runs from the Years of the Trees to the
+
+2
+00:00:06,280 --> 00:00:11,810
+Fourth Age, across The Silmarillion,
+The Hobbit and The Lord of the Rings.
+
+3
+00:00:11,860 --> 00:00:16,800
+Here it is on one timeline: each Age a
+band, each event tagged with the book
+
+4
+00:00:16,850 --> 00:00:18,258
+that tells it.
+
+5
+00:00:19,748 --> 00:00:23,608
+Its years aren't ours, so
+the timeline counts its own.
+
+6
+00:00:23,658 --> 00:00:27,728
+A few lines of display code
+print each Age's reckoning,
+
+7
+00:00:27,778 --> 00:00:32,708
+the Second Age, then the Third, and
+read them back when you type a date.
+
+8
+00:00:32,758 --> 00:00:36,199
+Your world's calendar can
+be written the same way.
+
+9
+00:00:37,669 --> 00:00:41,559
+Follow one thread through
+all of it. Separate by tags,
+
+10
+00:00:41,609 --> 00:00:46,099
+choose the One Ring, and its whole
+history rises into a track of its own:
+
+11
+00:00:46,149 --> 00:00:50,499
+forged in the Second Age, lost for
+two and a half thousand years,
+
+12
+00:00:50,549 --> 00:00:55,371
+found, and carried to its end.
+Each step is linked to the next.
+
+13
+00:00:56,831 --> 00:01:02,471
+A canon is only as good as its sources.
+Each event here records which book tells
+
+14
+00:01:02,521 --> 00:01:08,371
+it and how sure its date is. The fall
+of Gondolin's year comes from later
+
+15
+00:01:08,421 --> 00:01:13,371
+annals, not The Silmarillion itself.
+The One Ring's forging is about sixteen
+
+16
+00:01:13,421 --> 00:01:18,645
+hundred. Disagreements stay visible
+instead of being smoothed over.
+
+17
+00:01:20,115 --> 00:01:25,635
+Zoom from millennia down to single days.
+The war that ends the Third Age fills
+
+18
+00:01:25,685 --> 00:01:29,455
+just over a year, and each day keeps
+the calendar the hobbits used,
+
+19
+00:01:29,505 --> 00:01:33,241
+the Shire Reckoning, beside the Age's own.
+
+20
+00:01:34,761 --> 00:01:38,771
+Whatever world you're keeping,
+keep its canon in one place,
+
+21
+00:01:38,821 --> 00:01:41,136
+with every date's source beside it.

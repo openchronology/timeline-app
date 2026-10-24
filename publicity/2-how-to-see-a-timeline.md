@@ -96,7 +96,7 @@
 
 ### Scene 7 · 2:18 – 2:30 · Over to you
 
-**FRAME:** The sample timeline, fully explored. The end card: "Open a public timeline · no account needed", the ◷ openchronology wordmark, and "Next: tours of real timelines".
+**FRAME:** The sample timeline, fully explored. The end card: "Open a public timeline · no account needed", the ◷ openchronology wordmark, and "Next: tours of real timelines". The end card also gives the source: "github.com/openchronology/timeline-app".
 
 **MOTION:** The sample zooms out to Fit all; the end card rises and holds.
 

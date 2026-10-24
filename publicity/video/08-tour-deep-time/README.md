@@ -1,6 +1,6 @@
 # Tour: Deep Time
 
-The source for the video of [`7-tour-deep-time.md`](../../7-tour-deep-time.md), in the **strata** look. Build, narrate, render and encode it as [the pipeline's README](../README.md) describes. Narration, trimmed audio, captured shots, frames and the MP4 are not in git.
+The source for the video of [`8-tour-deep-time.md`](../../8-tour-deep-time.md), in the **strata** look. Build, narrate, render and encode it as [the pipeline's README](../README.md) describes. Narration, trimmed audio, captured shots, frames and the MP4 are not in git.
 
 ## Contents
 

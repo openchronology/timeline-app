@@ -84,7 +84,7 @@
 
 ### Scene 6 · 2:12 – 2:30 · Your class's timeline
 
-**FRAME:** The capture shrinks to the left half. On the right, three short lines with icons: "Read it: no account needed", "Build one: as a class, or one each", "Share it: a link, or embedded in your class page". End card: "Next: Working together".
+**FRAME:** The capture shrinks to the left half. On the right, three short lines with icons: "Read it: no account needed", "Build one: as a class, or one each", "Share it: a link, or embedded in your class page". End card: "Next: Working together". The end card also gives the source: "github.com/openchronology/timeline-app".
 
 **MOTION:** The lines tick in; the end card rises and holds.
 
@@ -128,4 +128,4 @@
 1. **Can my students use it without accounts?** Yes, to read public timelines and to make one in the browser and export it. Students 13 and older can sign up to save to the server.
 2. **Can I use this sample?** Yes: import `usa.ochx`; then edit it, or publish it from your own account.
 3. **Can I add pictures?** Yes, with the **Moment icons** and **Duration backgrounds** plugins (the **History education** suite installs them together); link images you may share.
-4. **What stops students vandalizing a shared timeline?** Only writers can save; contributors propose changes for review. See Video 8.
+4. **What stops students vandalizing a shared timeline?** Only writers can save; contributors propose changes for review. See Video 9.

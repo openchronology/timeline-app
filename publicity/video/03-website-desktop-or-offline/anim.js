@@ -823,7 +823,13 @@ SCENES[7] = function (lt, q) {
     '<path d="M100 120H220" stroke="' +
       C.line +
       '" stroke-width="0.6"/>' +
-      txt(160, 138, 'Download · timescale.info', { size: 9, weight: 700 }),
+      txt(160, 138, 'Download · timescale.info', { size: 9, weight: 700 }) +
+      txt(160, 151, 'github.com/openchronology/timeline-app', {
+        size: 5.8,
+        mono: true,
+        fill: C.soft,
+        weight: 500,
+      }),
     da,
   );
   return s;

@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-/* Video 10, Run your own server (publicity/10-run-your-own-server.md): the hosting stack
+/* Video 11, Run your own server (publicity/11-run-your-own-server.md): the hosting stack
    (CLIENTS → REVERSE PROXY → OPENCHRONOLOGY → POSTGRESQL) stays in place on the left through
    every scene and lights the layer each scene is about, while the right shows the packages,
    the documented commands in terminals, the configuration file, the administration pages and
@@ -971,6 +971,12 @@ SCENES[7] = function (lt, q) {
         size: 5.6,
         mono: true,
         fill: C.accent,
+        weight: 500,
+      }) +
+      txt(cx, 128, 'github.com/openchronology/timeline-app', {
+        size: 5.6,
+        mono: true,
+        fill: C.soft,
         weight: 500,
       }),
     { o: e, ty: (1 - e) * 5 },

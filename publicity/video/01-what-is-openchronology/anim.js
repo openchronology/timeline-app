@@ -231,11 +231,17 @@ SCENES[4] = function (lt, q) {
   // The end card.
   var e = P(lt, q('start'), 0.8);
   s += G(
-    rect(0, 0, 320, 180, C.ground, { op: 0.92 }) +
+    rect(0, 0, 320, 180, C.ground, { op: 0.97 }) +
       wordmark(160, 70, 16) +
       txt(160, 92, 'timescale.info', { size: 8, mono: true, fill: C.accent, weight: 500 }) +
       txt(160, 120, 'Next: How to see a timeline', { size: 7.5 }) +
-      txt(160, 131, 'and a video for what you do', { size: 6.5, fill: C.soft, weight: 500 }),
+      txt(160, 131, 'and a video for what you do', { size: 6.5, fill: C.soft, weight: 500 }) +
+      txt(160, 146, 'github.com/openchronology/timeline-app', {
+        size: 5.6,
+        mono: true,
+        fill: C.soft,
+        weight: 500,
+      }),
     { o: e },
   );
   return s;

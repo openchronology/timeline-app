@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Writes this tour's shots.json from the camera path in anim.js (PATH) and the narration's cues in
 // timeline.js, so the captured zooms stay on the words after a new recording. Then capture again.
-// Usage (from the repository root): node publicity/video/07-tour-deep-time/shots.mjs publicity/video/07-tour-deep-time
+// Usage (from the repository root): node publicity/video/08-tour-deep-time/shots.mjs publicity/video/08-tour-deep-time
 import { readFileSync, writeFileSync } from 'node:fs';
 import vm from 'node:vm';
 const folder = process.argv[2];

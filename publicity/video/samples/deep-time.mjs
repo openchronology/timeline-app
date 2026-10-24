@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Deep time: Earth's 4.5 billion years down to the Apollo 11 landing, for the deep-time tour
-// (Video 7). Eon and era boundaries are from the International Chronostratigraphic Chart
+// (Video 8). Eon and era boundaries are from the International Chronostratigraphic Chart
 // (ICS, v2023/09), in its colours; other ages are rounded figures from standard references,
 // each moment noting its approximate age with the Geological ages plugin. Times are exact
 // offsets from 2000 CE, so 66 million years ago is exactly 66,000,000 Julian years before it.

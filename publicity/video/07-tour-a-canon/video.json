@@ -1,0 +1,10 @@
+{
+  "script": "../../7-tour-a-canon-middle-earth.md",
+  "look": "lore",
+  "say": {
+    "Silmarillion": "Sill-MAR-illion",
+    "Déagol": "DAY-a-gol",
+    "Gondolin": "GON-doh-lin",
+    "Rethe": "Reeth"
+  }
+}
