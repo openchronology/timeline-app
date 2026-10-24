@@ -45,13 +45,13 @@
 
 ## ACT 2 · KEEPING IT STRAIGHT (0:46 – 1:40)
 
-### Scene 3 · 0:46 – 1:10 · One thread through three Ages
+### Scene 3 · 0:46 – 1:10 · One thread through two Ages
 
 **FRAME:** **Separate by tags** with "the one ring": a track rises above the rest holding the forging, Isildur taking it, its loss, Déagol, Bilbo, the farewell party, Frodo leaving Bag End and its destruction. Beside the frame, the thread is listed step by step, each step joined to the next.
 
 **MOTION:** The tagged moments lift into the track; the list's links light left to right along the thread.
 
-**OST:** "One thread, three Ages."
+**OST:** "One thread, two Ages."
 
 **VO:**
 "Follow one thread through all of it. Separate by tags, choose the One Ring, and its whole history rises into a track of its own: forged in the Second Age, lost for two and a half thousand years, found, and carried to its end. Each step is linked to the next."
