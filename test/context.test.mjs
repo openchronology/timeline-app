@@ -293,3 +293,58 @@ test('geological ages continue beyond millions with parseable billions and trill
     assert(format.parse(label).equals(point));
   }
 });
+
+test('Δ offsets in a large time unit read in a smaller one, and parse back exactly (#242)', () => {
+  // Millions of years from 2000 CE, as the deep-time sample counts.
+  const format = createPresenter({
+    ...DEFAULT_PRESENTATION,
+    mode: 'float',
+    unit: 'million years',
+    scale: '31557600000000',
+    origin: '946684800',
+    significantDigits: 5,
+  });
+  const landing = Q.from(-14182940n);
+  for (const [span, pattern] of [
+    [Q.from(8n), /^Δ \d+(\.\d+)? s$/],
+    [Q.from(1n, 4n), /^Δ \d+(\.\d+)? m?s$/],
+    [Q.from(3n * 3600n), /^Δ \d+(\.\d+)? hours?$/],
+    [Q.from(40n * 86400n), /^Δ \d+(\.\d+)? days?$/],
+  ]) {
+    const ctx = {
+      left: landing.sub(span.div(Q.from(2n))),
+      span,
+      widthPixels: 1200,
+      purpose: 'axis',
+    };
+    // The ruler's labelled ticks fall on round offsets in the finer unit, and read back.
+    const ticks = format.rules(ctx).ticks.filter((tick) => tick.label);
+    assert(ticks.length >= 2);
+    for (const tick of ticks) {
+      const label = format.print(tick.time, ctx);
+      assert.match(label, pattern);
+      assert.match(label, /^Δ -?\d+(\.\d{1,3})? /, `${label} is round`);
+      assert(format.parse(label, ctx).equals(tick.time), `${label} reads back`);
+    }
+    // The base is short: a decimal with the digits the view needs, not a huge fraction.
+    const base = format.describe(ctx);
+    assert.match(base, /^Δ from ≈? ?-0\.000030\d+ million years$/);
+    assert(base.length < 60, base);
+  }
+  // A view longer than one displayed unit keeps the display's own unit.
+  const story = createPresenter({
+    ...DEFAULT_PRESENTATION,
+    mode: 'float',
+    unit: 'AR',
+    scale: '31557600',
+    significantDigits: 5,
+  });
+  const decade = {
+    left: Q.from(41959n * 3155760n),
+    span: Q.from(10n * 31557600n),
+    widthPixels: 1200,
+    purpose: 'axis',
+  };
+  const year = decade.left.add(Q.from(3n * 31557600n));
+  assert.equal(story.print(year, decade), 'Δ 3 AR');
+});

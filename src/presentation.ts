@@ -164,8 +164,48 @@ export function createPresenter(settings?: TimePresentation): TimePresenter {
     left: context.left.sub(origin).div(scale),
     span: context.span.div(scale),
   });
+  // When Δ offsets read in a finer time unit (#242), they count from a round base, a whole
+  // number of that unit's powers of ten past the origin, so labels read "Δ 1 s, Δ 2 s" and
+  // don't change while panning within a step; the ruler steps in that unit too. Otherwise
+  // they count from the view's left edge.
+  const finerFor = (context?: PresentationContext) =>
+    context &&
+    options.mode !== 'si' &&
+    relativeContext(options, context.left.sub(origin).div(scale), context)
+      ? finerUnit(scale, context.span)
+      : null;
+  const finerScale = (finer: NonNullable<ReturnType<typeof finerUnit>>) =>
+    finer === 'seconds' ? Q.one : Q.parse(finer.scale);
+  const relativeBase = (context: PresentationContext): Q => {
+    const finer = finerFor(context);
+    if (!finer) return context.left;
+    const step = finerScale(finer),
+      span = context.span.div(step);
+    let exponent = decimalExponent(span);
+    if (power(exponent).compare(span) < 0) exponent++;
+    const block = power(exponent).mul(step);
+    return origin.add(context.left.sub(origin).div(block).floor().mul(block));
+  };
   const rules = (context: PresentationContext): RulerPlan => {
     validateContext(context);
+    const finer = finerFor(context);
+    if (finer) {
+      const step = finerScale(finer);
+      const plan = planRuler(
+        { ...context, left: context.left.sub(origin).div(step), span: context.span.div(step) },
+        { kind: 'decimal' },
+        options.offsetMinutes,
+      );
+      return {
+        ...plan,
+        ticks: plan.ticks.map((tick) => ({
+          ...tick,
+          time: origin.add(tick.time.mul(step)),
+          interval: tick.interval.mul(step),
+          labels: tick.labels.map((label) => ({ ...label, interval: label.interval.mul(step) })),
+        })),
+      };
+    }
     const plan = planRuler(
       calendarContext(context),
       options.ruler ?? { kind: options.mode === 'gregorian' ? 'gregorian' : 'decimal' },
@@ -191,7 +231,7 @@ export function createPresenter(settings?: TimePresentation): TimePresenter {
       return options.mode === 'gregorian' && options.adaptiveLabels !== false
         ? describeCalendar(options.offsetMinutes, calendarContext(context))
         : relativeContext(options, context.left.sub(origin).div(scale), context)
-          ? `Δ from ${context.left.sub(origin).div(scale).toString()}${suffix}`
+          ? `Δ from ${baseText(relativeBase(context).sub(origin).div(scale), unitsPerPixel(context).div(scale), options.significantDigits)}${suffix}`
           : '';
     },
     print(time, context) {
@@ -210,6 +250,18 @@ export function createPresenter(settings?: TimePresentation): TimePresenter {
         relativeContext(options, context ? context.left.sub(origin).div(scale) : value, context)
       ) {
         const delta = time.sub(context!.left).div(scale);
+        // In a large time unit, the offsets read in a smaller one (#242).
+        const finer = finerFor(context);
+        if (finer === 'seconds')
+          return 'Δ ' + printSI(time.sub(relativeBase(context!)), options.significantDigits, 's');
+        if (finer) {
+          const amount = printNumber(
+            time.sub(relativeBase(context!)).div(finerScale(finer)),
+            options.significantDigits,
+          );
+          // "1 hour", not "1 hours" (the presets' units are plural).
+          return `Δ ${amount} ${/^-?1$/.test(amount) ? finer.unit.slice(0, -1) : finer.unit}`;
+        }
         return (
           'Δ ' +
           (options.mode === 'si'
@@ -227,6 +279,18 @@ export function createPresenter(settings?: TimePresentation): TimePresenter {
       // different view than it was printed in gives a different time.
       if (options.mode !== 'gregorian' && text.trim().startsWith('Δ ')) {
         if (!context) throw new Error('Relative labels require viewport context.');
+        const offset = text.trim().slice(2).trim();
+        // An offset in a smaller time unit than the display's (#242), from its round base.
+        if (finerFor(context) && !(unit && offset.endsWith(unit))) {
+          const base = relativeBase(context);
+          for (const preset of UNIT_PRESETS)
+            for (const name of [preset.unit, preset.unit.slice(0, -1)])
+              if (preset.unit && preset.unit !== 's' && offset.endsWith(' ' + name))
+                return base.add(
+                  parseNumber(offset.slice(0, -name.length)).mul(Q.parse(preset.scale)),
+                );
+          return base.add(parseSI(offset, 's'));
+        }
         return context.left.add(
           createPresenter({ ...options, origin: '0/1' }).parse(text.trim().slice(2)),
         );
@@ -245,6 +309,44 @@ export function createPresenter(settings?: TimePresentation): TimePresenter {
   };
 }
 
+/**
+ * The finer time unit Δ offsets read in when a display counts in a large one (#242): only
+ * when the view is shorter than one displayed unit (so offsets in it would be small
+ * fractions) and the display's scale is one of the unit presets (whose stored coordinates
+ * are seconds), the largest preset smaller than it that the view spans at least once, or
+ * 'seconds' (printed with SI prefixes) when the view is shorter than a minute. Null when
+ * the display's scale isn't a preset, or nothing finer exists.
+ */
+function finerUnit(scale: Q, span: Q): (typeof UNIT_PRESETS)[number] | 'seconds' | null {
+  if (
+    span.compare(scale) >= 0 ||
+    !UNIT_PRESETS.some((preset) => preset.unit && Q.parse(preset.scale).equals(scale))
+  )
+    return null;
+  let best: (typeof UNIT_PRESETS)[number] | null = null;
+  for (const preset of UNIT_PRESETS) {
+    if (!preset.unit || preset.unit === 's') continue;
+    const step = Q.parse(preset.scale);
+    if (step.compare(scale) < 0 && span.compare(step) >= 0)
+      if (!best || step.compare(Q.parse(best.scale)) > 0) best = preset;
+  }
+  if (best) return best;
+  return scale.compare(Q.one) > 0 ? 'seconds' : null;
+}
+/**
+ * The base Δ labels are relative to, for the line of context: a decimal with just the
+ * digits the view resolves (one pixel spans `pixel`), marked ≈ when it isn't exact, rather
+ * than a fraction of huge integers. Δ labels still parse against the exact view.
+ */
+function baseText(base: Q, pixel: Q, significantDigits: number): string {
+  if (base.denominator === 1n) return base.toString();
+  const digits = Math.min(
+    30,
+    Math.max(significantDigits, decimalExponent(base) - decimalExponent(pixel) + 3),
+  );
+  const text = printNumber(base, digits);
+  return parseNumber(text).equals(base) ? text : '≈ ' + text;
+}
 /**
  * Whether numeric labels should be printed as Δ differences from the view's left edge: only
  * for adaptive float, scientific and SI displays, on the axis or moment labels, and when one
