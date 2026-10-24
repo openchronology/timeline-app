@@ -1,0 +1,15 @@
+# Narration, and everything derived from it, stays out of git; the alignment (transcripts/,
+# cuts.json), timeline.js and captions.srt are committed so frames render without audio.
+audio/
+wav/
+trim/
+mix.wav
+# Captured shots of the real app, render output and the tools.
+shots/
+frames/
+stills/
+page.html
+*.mp4
+common/whisper/
+common/tts/
+__pycache__/

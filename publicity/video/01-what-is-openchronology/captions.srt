@@ -1,0 +1,58 @@
+1
+00:00:00,860 --> 00:00:04,040
+Everything that matters
+happened at some point in time:
+
+2
+00:00:04,090 --> 00:00:08,932
+a war, a story you're writing,
+the hour your server went down.
+
+3
+00:00:10,392 --> 00:00:13,782
+OpenChronology puts them
+on one line you can zoom,
+
+4
+00:00:13,832 --> 00:00:17,002
+from billions of years down
+to a fraction of a second.
+
+5
+00:00:17,052 --> 00:00:22,532
+Every time is stored exactly, as a fraction,
+so nothing blurs or rounds however
+
+6
+00:00:22,582 --> 00:00:23,853
+far you go.
+
+7
+00:00:25,303 --> 00:00:30,553
+Students follow a country's history.
+Writers keep their story's chronology
+
+8
+00:00:30,603 --> 00:00:34,663
+straight. Teachers show four and
+a half billion years of Earth,
+
+9
+00:00:34,713 --> 00:00:38,404
+and how thin the slice holding
+all of human history is.
+
+10
+00:00:39,974 --> 00:00:45,214
+It's free software. Use it on
+the website, in the desktop app,
+
+11
+00:00:45,264 --> 00:00:48,744
+or as a single file that
+never touches the network.
+
+12
+00:00:48,794 --> 00:00:53,605
+Start with how to read a timeline,
+then pick the video for what you do.

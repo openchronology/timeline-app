@@ -1,0 +1,167 @@
+1
+00:00:00,880 --> 00:00:04,800
+Ask almost any computer to
+add a tenth and two tenths,
+
+2
+00:00:04,850 --> 00:00:18,950
+and it says 0.30000000000000004.
+That's not a bug in your language.
+
+3
+00:00:19,000 --> 00:00:22,490
+Most software stores numbers
+as binary floating point,
+
+4
+00:00:22,540 --> 00:00:28,090
+with a fixed number of digits, and a
+tenth can't be written exactly in binary.
+
+5
+00:00:28,140 --> 00:00:29,800
+So it rounds.
+
+6
+00:00:31,270 --> 00:00:37,100
+Times are numbers too. A computer usually
+stores a moment as a count of seconds,
+
+7
+00:00:37,150 --> 00:00:42,700
+or milliseconds, from the start
+of 1970. And with floating point,
+
+8
+00:00:42,750 --> 00:00:47,776
+the further a time is from 1970,
+the coarser that count gets.
+
+9
+00:00:49,406 --> 00:00:54,166
+Today, a double-precision time can tell
+apart moments a quarter of a microsecond
+
+10
+00:00:54,216 --> 00:00:59,046
+apart. At the dinosaurs' extinction,
+sixty-six million years ago,
+
+11
+00:00:59,096 --> 00:01:02,526
+its steps are a quarter of a
+second. At Earth's formation,
+
+12
+00:01:02,576 --> 00:01:08,406
+they're sixteen seconds: two events ten
+seconds apart become the same time.
+
+13
+00:01:08,456 --> 00:01:11,686
+For a timeline that
+spans billions of years,
+
+14
+00:01:11,736 --> 00:01:13,649
+that's not good enough.
+
+15
+00:01:15,109 --> 00:01:19,659
+A rational number is a fraction:
+one whole number over another.
+
+16
+00:01:19,709 --> 00:01:26,419
+A tenth is one over ten, exactly. A
+tenth plus two tenths is three tenths,
+
+17
+00:01:26,469 --> 00:01:29,919
+exactly. A third of a
+second is one over three,
+
+18
+00:01:29,969 --> 00:01:35,909
+and stays exactly a third. And because
+the whole numbers can be as large as they
+
+19
+00:01:35,959 --> 00:01:39,523
+need to be, there's no point
+where precision runs out.
+
+20
+00:01:40,963 --> 00:01:45,393
+OpenChronology stores every
+time this way. In the editor,
+
+21
+00:01:45,443 --> 00:01:49,633
+in the database on the server,
+and in the desktop app's files,
+
+22
+00:01:49,683 --> 00:01:53,653
+a time is a reduced fraction
+of arbitrary-size integers.
+
+23
+00:01:53,703 --> 00:01:57,151
+Saving, exporting and
+importing never round it.
+
+24
+00:01:58,571 --> 00:02:03,671
+So you can zoom as far as you like. Put
+a moment at a third of a second and zoom
+
+25
+00:02:03,721 --> 00:02:07,721
+in a billion times: it's
+still exactly at a third.
+
+26
+00:02:07,771 --> 00:02:11,180
+The same goes four and a
+half billion years ago.
+
+27
+00:02:12,640 --> 00:02:17,950
+Rounding happens only when a time is
+shown. A timeline's time display reads the
+
+28
+00:02:18,000 --> 00:02:22,590
+same exact value as a fraction,
+in SI units, or as a date.
+
+29
+00:02:22,640 --> 00:02:27,590
+A date that isn't a whole second keeps
+its remainder as a fraction in braces.
+
+30
+00:02:27,640 --> 00:02:31,600
+Leave a field as it is,
+and the exact value stays;
+
+31
+00:02:31,650 --> 00:02:35,160
+type a new time, and
+you've chosen a new one.
+
+32
+00:02:36,630 --> 00:02:40,610
+Billions of years, a single
+second, and a third of one,
+
+33
+00:02:40,660 --> 00:02:44,350
+on the same line, with no
+rounding anywhere they're kept.
+
+34
+00:02:44,400 --> 00:02:48,676
+It's free software, so you can
+read exactly how it's done.

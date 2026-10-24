@@ -1,0 +1,1092 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:08,240"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 8240
+			},
+			"text": " Zoom into the 1860s and the civil war opens up. Fort Sumter, the Emancipation Proclamation,",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.994475,
+					"t_dtw": -1
+				},
+				{
+					"text": " Zoom",
+					"timestamps": {
+						"from": "00:00:00,030",
+						"to": "00:00:00,410"
+					},
+					"offsets": {
+						"from": 30,
+						"to": 410
+					},
+					"id": 40305,
+					"p": 0.906769,
+					"t_dtw": -1
+				},
+				{
+					"text": " into",
+					"timestamps": {
+						"from": "00:00:00,410",
+						"to": "00:00:00,820"
+					},
+					"offsets": {
+						"from": 410,
+						"to": 820
+					},
+					"id": 656,
+					"p": 0.986098,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:00,820",
+						"to": "00:00:01,130"
+					},
+					"offsets": {
+						"from": 820,
+						"to": 1130
+					},
+					"id": 262,
+					"p": 0.997699,
+					"t_dtw": -1
+				},
+				{
+					"text": " 1860",
+					"timestamps": {
+						"from": "00:00:01,130",
+						"to": "00:00:02,300"
+					},
+					"offsets": {
+						"from": 1130,
+						"to": 2300
+					},
+					"id": 37637,
+					"p": 0.542629,
+					"t_dtw": -1
+				},
+				{
+					"text": "s",
+					"timestamps": {
+						"from": "00:00:02,350",
+						"to": "00:00:02,460"
+					},
+					"offsets": {
+						"from": 2350,
+						"to": 2460
+					},
+					"id": 82,
+					"p": 0.931793,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:02,460",
+						"to": "00:00:02,770"
+					},
+					"offsets": {
+						"from": 2460,
+						"to": 2770
+					},
+					"id": 290,
+					"p": 0.949765,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,770",
+						"to": "00:00:03,080"
+					},
+					"offsets": {
+						"from": 2770,
+						"to": 3080
+					},
+					"id": 262,
+					"p": 0.992314,
+					"t_dtw": -1
+				},
+				{
+					"text": " civil",
+					"timestamps": {
+						"from": "00:00:03,080",
+						"to": "00:00:03,590"
+					},
+					"offsets": {
+						"from": 3080,
+						"to": 3590
+					},
+					"id": 3026,
+					"p": 0.469599,
+					"t_dtw": -1
+				},
+				{
+					"text": " war",
+					"timestamps": {
+						"from": "00:00:03,590",
+						"to": "00:00:03,900"
+					},
+					"offsets": {
+						"from": 3590,
+						"to": 3900
+					},
+					"id": 1175,
+					"p": 0.997132,
+					"t_dtw": -1
+				},
+				{
+					"text": " opens",
+					"timestamps": {
+						"from": "00:00:03,900",
+						"to": "00:00:04,260"
+					},
+					"offsets": {
+						"from": 3900,
+						"to": 4260
+					},
+					"id": 9808,
+					"p": 0.998028,
+					"t_dtw": -1
+				},
+				{
+					"text": " up",
+					"timestamps": {
+						"from": "00:00:04,610",
+						"to": "00:00:04,610"
+					},
+					"offsets": {
+						"from": 4610,
+						"to": 4610
+					},
+					"id": 510,
+					"p": 0.997449,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,820",
+						"to": "00:00:04,960"
+					},
+					"offsets": {
+						"from": 4820,
+						"to": 4960
+					},
+					"id": 13,
+					"p": 0.92969,
+					"t_dtw": -1
+				},
+				{
+					"text": " Fort",
+					"timestamps": {
+						"from": "00:00:04,960",
+						"to": "00:00:05,250"
+					},
+					"offsets": {
+						"from": 4960,
+						"to": 5250
+					},
+					"id": 6401,
+					"p": 0.460031,
+					"t_dtw": -1
+				},
+				{
+					"text": " Sum",
+					"timestamps": {
+						"from": "00:00:05,250",
+						"to": "00:00:05,460"
+					},
+					"offsets": {
+						"from": 5250,
+						"to": 5460
+					},
+					"id": 5060,
+					"p": 0.960113,
+					"t_dtw": -1
+				},
+				{
+					"text": "ter",
+					"timestamps": {
+						"from": "00:00:05,460",
+						"to": "00:00:05,510"
+					},
+					"offsets": {
+						"from": 5460,
+						"to": 5510
+					},
+					"id": 353,
+					"p": 0.997815,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:05,570",
+						"to": "00:00:05,840"
+					},
+					"offsets": {
+						"from": 5570,
+						"to": 5840
+					},
+					"id": 11,
+					"p": 0.791317,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:05,970",
+						"to": "00:00:06,080"
+					},
+					"offsets": {
+						"from": 5970,
+						"to": 6080
+					},
+					"id": 262,
+					"p": 0.807741,
+					"t_dtw": -1
+				},
+				{
+					"text": " E",
+					"timestamps": {
+						"from": "00:00:06,080",
+						"to": "00:00:06,160"
+					},
+					"offsets": {
+						"from": 6080,
+						"to": 6160
+					},
+					"id": 412,
+					"p": 0.9081,
+					"t_dtw": -1
+				},
+				{
+					"text": "man",
+					"timestamps": {
+						"from": "00:00:06,160",
+						"to": "00:00:06,370"
+					},
+					"offsets": {
+						"from": 6160,
+						"to": 6370
+					},
+					"id": 805,
+					"p": 0.998392,
+					"t_dtw": -1
+				},
+				{
+					"text": "c",
+					"timestamps": {
+						"from": "00:00:06,400",
+						"to": "00:00:06,440"
+					},
+					"offsets": {
+						"from": 6400,
+						"to": 6440
+					},
+					"id": 66,
+					"p": 0.998593,
+					"t_dtw": -1
+				},
+				{
+					"text": "ipation",
+					"timestamps": {
+						"from": "00:00:06,490",
+						"to": "00:00:07,050"
+					},
+					"offsets": {
+						"from": 6490,
+						"to": 7050
+					},
+					"id": 25857,
+					"p": 0.99779,
+					"t_dtw": -1
+				},
+				{
+					"text": " Pro",
+					"timestamps": {
+						"from": "00:00:07,050",
+						"to": "00:00:07,290"
+					},
+					"offsets": {
+						"from": 7050,
+						"to": 7290
+					},
+					"id": 1041,
+					"p": 0.983662,
+					"t_dtw": -1
+				},
+				{
+					"text": "clamation",
+					"timestamps": {
+						"from": "00:00:07,290",
+						"to": "00:00:07,710"
+					},
+					"offsets": {
+						"from": 7290,
+						"to": 7710
+					},
+					"id": 20931,
+					"p": 0.998618,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:08,240",
+						"to": "00:00:08,240"
+					},
+					"offsets": {
+						"from": 8240,
+						"to": 8240
+					},
+					"id": 11,
+					"p": 0.900866,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_412]",
+					"timestamps": {
+						"from": "00:00:08,240",
+						"to": "00:00:08,240"
+					},
+					"offsets": {
+						"from": 8240,
+						"to": 8240
+					},
+					"id": 50775,
+					"p": 0.189126,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:08,240",
+				"to": "00:00:14,640"
+			},
+			"offsets": {
+				"from": 8240,
+				"to": 14640
+			},
+			"text": " the Three Days of Gettysburg, Lincoln's address there that November, the surrender at a pomatox,",
+			"tokens": [
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:08,280",
+						"to": "00:00:08,450"
+					},
+					"offsets": {
+						"from": 8280,
+						"to": 8450
+					},
+					"id": 262,
+					"p": 0.898215,
+					"t_dtw": -1
+				},
+				{
+					"text": " Three",
+					"timestamps": {
+						"from": "00:00:08,450",
+						"to": "00:00:08,800"
+					},
+					"offsets": {
+						"from": 8450,
+						"to": 8800
+					},
+					"id": 7683,
+					"p": 0.58162,
+					"t_dtw": -1
+				},
+				{
+					"text": " Days",
+					"timestamps": {
+						"from": "00:00:08,800",
+						"to": "00:00:09,090"
+					},
+					"offsets": {
+						"from": 8800,
+						"to": 9090
+					},
+					"id": 12579,
+					"p": 0.971955,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:09,090",
+						"to": "00:00:09,230"
+					},
+					"offsets": {
+						"from": 9090,
+						"to": 9230
+					},
+					"id": 286,
+					"p": 0.994351,
+					"t_dtw": -1
+				},
+				{
+					"text": " Getty",
+					"timestamps": {
+						"from": "00:00:09,230",
+						"to": "00:00:09,580"
+					},
+					"offsets": {
+						"from": 9230,
+						"to": 9580
+					},
+					"id": 7136,
+					"p": 0.992528,
+					"t_dtw": -1
+				},
+				{
+					"text": "sburg",
+					"timestamps": {
+						"from": "00:00:09,580",
+						"to": "00:00:09,950"
+					},
+					"offsets": {
+						"from": 9580,
+						"to": 9950
+					},
+					"id": 30359,
+					"p": 0.999247,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:09,950",
+						"to": "00:00:10,090"
+					},
+					"offsets": {
+						"from": 9950,
+						"to": 10090
+					},
+					"id": 11,
+					"p": 0.878892,
+					"t_dtw": -1
+				},
+				{
+					"text": " Lincoln",
+					"timestamps": {
+						"from": "00:00:10,090",
+						"to": "00:00:10,540"
+					},
+					"offsets": {
+						"from": 10090,
+						"to": 10540
+					},
+					"id": 12406,
+					"p": 0.99073,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:10,590",
+						"to": "00:00:10,730"
+					},
+					"offsets": {
+						"from": 10590,
+						"to": 10730
+					},
+					"id": 338,
+					"p": 0.993498,
+					"t_dtw": -1
+				},
+				{
+					"text": " address",
+					"timestamps": {
+						"from": "00:00:10,730",
+						"to": "00:00:11,230"
+					},
+					"offsets": {
+						"from": 10730,
+						"to": 11230
+					},
+					"id": 2209,
+					"p": 0.763903,
+					"t_dtw": -1
+				},
+				{
+					"text": " there",
+					"timestamps": {
+						"from": "00:00:11,230",
+						"to": "00:00:11,580"
+					},
+					"offsets": {
+						"from": 11230,
+						"to": 11580
+					},
+					"id": 612,
+					"p": 0.986907,
+					"t_dtw": -1
+				},
+				{
+					"text": " that",
+					"timestamps": {
+						"from": "00:00:11,590",
+						"to": "00:00:11,870"
+					},
+					"offsets": {
+						"from": 11590,
+						"to": 11870
+					},
+					"id": 326,
+					"p": 0.99444,
+					"t_dtw": -1
+				},
+				{
+					"text": " November",
+					"timestamps": {
+						"from": "00:00:11,870",
+						"to": "00:00:12,410"
+					},
+					"offsets": {
+						"from": 11870,
+						"to": 12410
+					},
+					"id": 3389,
+					"p": 0.994058,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:12,490",
+						"to": "00:00:12,500"
+					},
+					"offsets": {
+						"from": 12490,
+						"to": 12500
+					},
+					"id": 11,
+					"p": 0.97862,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:12,800",
+						"to": "00:00:12,800"
+					},
+					"offsets": {
+						"from": 12800,
+						"to": 12800
+					},
+					"id": 262,
+					"p": 0.940085,
+					"t_dtw": -1
+				},
+				{
+					"text": " surrender",
+					"timestamps": {
+						"from": "00:00:13,060",
+						"to": "00:00:13,210"
+					},
+					"offsets": {
+						"from": 13060,
+						"to": 13210
+					},
+					"id": 16908,
+					"p": 0.988074,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:13,290",
+						"to": "00:00:13,440"
+					},
+					"offsets": {
+						"from": 13290,
+						"to": 13440
+					},
+					"id": 379,
+					"p": 0.568324,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:13,440",
+						"to": "00:00:13,510"
+					},
+					"offsets": {
+						"from": 13440,
+						"to": 13510
+					},
+					"id": 257,
+					"p": 0.630752,
+					"t_dtw": -1
+				},
+				{
+					"text": " p",
+					"timestamps": {
+						"from": "00:00:13,600",
+						"to": "00:00:13,680"
+					},
+					"offsets": {
+						"from": 13600,
+						"to": 13680
+					},
+					"id": 279,
+					"p": 0.448856,
+					"t_dtw": -1
+				},
+				{
+					"text": "om",
+					"timestamps": {
+						"from": "00:00:13,680",
+						"to": "00:00:13,750"
+					},
+					"offsets": {
+						"from": 13680,
+						"to": 13750
+					},
+					"id": 296,
+					"p": 0.973771,
+					"t_dtw": -1
+				},
+				{
+					"text": "at",
+					"timestamps": {
+						"from": "00:00:14,140",
+						"to": "00:00:14,140"
+					},
+					"offsets": {
+						"from": 14140,
+						"to": 14140
+					},
+					"id": 265,
+					"p": 0.773259,
+					"t_dtw": -1
+				},
+				{
+					"text": "ox",
+					"timestamps": {
+						"from": "00:00:14,210",
+						"to": "00:00:14,400"
+					},
+					"offsets": {
+						"from": 14210,
+						"to": 14400
+					},
+					"id": 1140,
+					"p": 0.841298,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:14,400",
+						"to": "00:00:14,610"
+					},
+					"offsets": {
+						"from": 14400,
+						"to": 14610
+					},
+					"id": 11,
+					"p": 0.903132,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_732]",
+					"timestamps": {
+						"from": "00:00:14,640",
+						"to": "00:00:14,640"
+					},
+					"offsets": {
+						"from": 14640,
+						"to": 14640
+					},
+					"id": 51095,
+					"p": 0.284603,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:14,640",
+				"to": "00:00:20,600"
+			},
+			"offsets": {
+				"from": 14640,
+				"to": 20600
+			},
+			"text": " and five days later, his assassination. At this distance you can see how close together",
+			"tokens": [
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:14,700",
+						"to": "00:00:14,920"
+					},
+					"offsets": {
+						"from": 14700,
+						"to": 14920
+					},
+					"id": 290,
+					"p": 0.9771,
+					"t_dtw": -1
+				},
+				{
+					"text": " five",
+					"timestamps": {
+						"from": "00:00:14,920",
+						"to": "00:00:15,300"
+					},
+					"offsets": {
+						"from": 14920,
+						"to": 15300
+					},
+					"id": 1936,
+					"p": 0.965677,
+					"t_dtw": -1
+				},
+				{
+					"text": " days",
+					"timestamps": {
+						"from": "00:00:15,300",
+						"to": "00:00:15,630"
+					},
+					"offsets": {
+						"from": 15300,
+						"to": 15630
+					},
+					"id": 1528,
+					"p": 0.99819,
+					"t_dtw": -1
+				},
+				{
+					"text": " later",
+					"timestamps": {
+						"from": "00:00:15,750",
+						"to": "00:00:16,140"
+					},
+					"offsets": {
+						"from": 15750,
+						"to": 16140
+					},
+					"id": 1568,
+					"p": 0.998913,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:16,140",
+						"to": "00:00:16,330"
+					},
+					"offsets": {
+						"from": 16140,
+						"to": 16330
+					},
+					"id": 11,
+					"p": 0.981684,
+					"t_dtw": -1
+				},
+				{
+					"text": " his",
+					"timestamps": {
+						"from": "00:00:16,330",
+						"to": "00:00:16,610"
+					},
+					"offsets": {
+						"from": 16330,
+						"to": 16610
+					},
+					"id": 465,
+					"p": 0.998011,
+					"t_dtw": -1
+				},
+				{
+					"text": " assassination",
+					"timestamps": {
+						"from": "00:00:16,610",
+						"to": "00:00:17,840"
+					},
+					"offsets": {
+						"from": 16610,
+						"to": 17840
+					},
+					"id": 18898,
+					"p": 0.994137,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:17,840",
+						"to": "00:00:18,160"
+					},
+					"offsets": {
+						"from": 17840,
+						"to": 18160
+					},
+					"id": 13,
+					"p": 0.98757,
+					"t_dtw": -1
+				},
+				{
+					"text": " At",
+					"timestamps": {
+						"from": "00:00:18,160",
+						"to": "00:00:18,280"
+					},
+					"offsets": {
+						"from": 18160,
+						"to": 18280
+					},
+					"id": 1629,
+					"p": 0.878502,
+					"t_dtw": -1
+				},
+				{
+					"text": " this",
+					"timestamps": {
+						"from": "00:00:18,280",
+						"to": "00:00:18,530"
+					},
+					"offsets": {
+						"from": 18280,
+						"to": 18530
+					},
+					"id": 428,
+					"p": 0.999474,
+					"t_dtw": -1
+				},
+				{
+					"text": " distance",
+					"timestamps": {
+						"from": "00:00:18,530",
+						"to": "00:00:18,890"
+					},
+					"offsets": {
+						"from": 18530,
+						"to": 18890
+					},
+					"id": 5253,
+					"p": 0.99946,
+					"t_dtw": -1
+				},
+				{
+					"text": " you",
+					"timestamps": {
+						"from": "00:00:19,200",
+						"to": "00:00:19,200"
+					},
+					"offsets": {
+						"from": 19200,
+						"to": 19200
+					},
+					"id": 345,
+					"p": 0.978245,
+					"t_dtw": -1
+				},
+				{
+					"text": " can",
+					"timestamps": {
+						"from": "00:00:19,380",
+						"to": "00:00:19,380"
+					},
+					"offsets": {
+						"from": 19380,
+						"to": 19380
+					},
+					"id": 460,
+					"p": 0.998649,
+					"t_dtw": -1
+				},
+				{
+					"text": " see",
+					"timestamps": {
+						"from": "00:00:19,460",
+						"to": "00:00:19,560"
+					},
+					"offsets": {
+						"from": 19460,
+						"to": 19560
+					},
+					"id": 766,
+					"p": 0.999247,
+					"t_dtw": -1
+				},
+				{
+					"text": " how",
+					"timestamps": {
+						"from": "00:00:19,560",
+						"to": "00:00:19,740"
+					},
+					"offsets": {
+						"from": 19560,
+						"to": 19740
+					},
+					"id": 703,
+					"p": 0.996691,
+					"t_dtw": -1
+				},
+				{
+					"text": " close",
+					"timestamps": {
+						"from": "00:00:19,740",
+						"to": "00:00:20,050"
+					},
+					"offsets": {
+						"from": 19740,
+						"to": 20050
+					},
+					"id": 1969,
+					"p": 0.999439,
+					"t_dtw": -1
+				},
+				{
+					"text": " together",
+					"timestamps": {
+						"from": "00:00:20,050",
+						"to": "00:00:20,140"
+					},
+					"offsets": {
+						"from": 20050,
+						"to": 20140
+					},
+					"id": 1978,
+					"p": 0.996341,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_1030]",
+					"timestamps": {
+						"from": "00:00:20,600",
+						"to": "00:00:20,600"
+					},
+					"offsets": {
+						"from": 20600,
+						"to": 20600
+					},
+					"id": 51393,
+					"p": 0.61872,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:20,600",
+				"to": "00:00:21,280"
+			},
+			"offsets": {
+				"from": 20600,
+				"to": 21280
+			},
+			"text": " they were.",
+			"tokens": [
+				{
+					"text": " they",
+					"timestamps": {
+						"from": "00:00:20,660",
+						"to": "00:00:20,930"
+					},
+					"offsets": {
+						"from": 20660,
+						"to": 20930
+					},
+					"id": 484,
+					"p": 0.951237,
+					"t_dtw": -1
+				},
+				{
+					"text": " were",
+					"timestamps": {
+						"from": "00:00:20,930",
+						"to": "00:00:21,260"
+					},
+					"offsets": {
+						"from": 20930,
+						"to": 21260
+					},
+					"id": 547,
+					"p": 0.998751,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:21,260",
+						"to": "00:00:21,270"
+					},
+					"offsets": {
+						"from": 21260,
+						"to": 21270
+					},
+					"id": 13,
+					"p": 0.92688,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_1064]",
+					"timestamps": {
+						"from": "00:00:21,280",
+						"to": "00:00:21,280"
+					},
+					"offsets": {
+						"from": 21280,
+						"to": 21280
+					},
+					"id": 51427,
+					"p": 0.223147,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

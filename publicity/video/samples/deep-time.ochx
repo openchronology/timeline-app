@@ -1,0 +1,565 @@
+{
+ "format": "openchronology",
+ "version": 1,
+ "title": "Deep time: 4.5 billion years of Earth",
+ "description": "Earth's history on one line, from its formation to a single second in 1969. Eons and eras are durations in the colours of the International Chronostratigraphic Chart; times are exact offsets from 2000 CE, shown in millions of years.",
+ "presentation": {
+  "mode": "float",
+  "unit": "million years",
+  "scale": "31557600000000/1",
+  "origin": "946684800/1",
+  "version": 1,
+  "offsetMinutes": 0,
+  "significantDigits": 5
+ },
+ "tags": [
+  "geology",
+  "deep time",
+  "science",
+  "education"
+ ],
+ "plugins": [
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "rich-text-notes",
+    "version": 1,
+    "name": "Rich text notes",
+    "description": "Edit moment and stack notes visually, storing portable Markdown. Hover cards render safe headings, emphasis, lists, code and HTTPS links. HTML and images are not executed.",
+    "fields": [],
+    "notes": {
+     "kind": "markdown"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-colors",
+    "version": 2,
+    "name": "Moment colors",
+    "description": "Choose muted semantic swatches or a custom color for moments and stack entries while preserving their white borders.",
+    "fields": [
+     {
+      "kind": "color",
+      "metadataKey": "color",
+      "label": "Moment color"
+     }
+    ],
+    "marker": {
+     "kind": "color",
+     "metadataKey": "color"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.color(api.get(\"color\")); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-sources",
+    "version": 1,
+    "name": "Sources",
+    "description": "Show and edit a series of source links for moments and stack entries.",
+    "fields": [
+     {
+      "kind": "links",
+      "metadataKey": "sources",
+      "label": "Sources"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "geological-ages",
+    "version": 1,
+    "name": "Geological ages",
+    "description": "Record an approximate geological age in years before reference year 2000 CE. This annotation does not change the exact coordinate or claim a more precise scientific estimate.",
+    "fields": [
+     {
+      "kind": "text",
+      "metadataKey": "approximateAgeYears",
+      "label": "Approximate age (years before 2000 CE)"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "expand-on-hover",
+    "version": 1,
+    "name": "Expand on hover",
+    "description": "Hover or focus a summary of two to five moments to fan out its members radially for individual inspection. Larger summaries stay collapsed.",
+    "fields": [],
+    "summary": {
+     "kind": "radial"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.expand(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "timeline-theme",
+    "version": 1,
+    "name": "Timeline theme",
+    "description": "Choose the timeline's colors and fonts: its labels, its measure (the axis, tick marks and their times), the halo that keeps them readable over images, the default marker and duration colors, and a background color. Set them here in the plugin list; anything left blank keeps the usual look, and colors chosen for events still win.",
+    "fields": [],
+    "settings": [
+     {
+      "kind": "color",
+      "key": "textColor",
+      "label": "Label color"
+     },
+     {
+      "kind": "font",
+      "key": "textFont",
+      "label": "Label font"
+     },
+     {
+      "kind": "color",
+      "key": "measureColor",
+      "label": "Measure color"
+     },
+     {
+      "kind": "font",
+      "key": "measureFont",
+      "label": "Measure font"
+     },
+     {
+      "kind": "color",
+      "key": "haloColor",
+      "label": "Halo color"
+     },
+     {
+      "kind": "color",
+      "key": "markerColor",
+      "label": "Marker color"
+     },
+     {
+      "kind": "color",
+      "key": "durationColor",
+      "label": "Duration color"
+     },
+     {
+      "kind": "color",
+      "key": "backgroundColor",
+      "label": "Background color"
+     }
+    ],
+    "theme": {
+     "text": "textColor",
+     "textFont": "textFont",
+     "measure": "measureColor",
+     "measureFont": "measureFont",
+     "halo": "haloColor",
+     "marker": "markerColor",
+     "duration": "durationColor",
+     "background": "backgroundColor"
+    }
+   },
+   "enabled": true,
+   "settings": {
+    "textColor": "#e8ecf5",
+    "measureColor": "#7cc4e8",
+    "haloColor": "#0d1020",
+    "markerColor": "#e8ecf5",
+    "durationColor": "#3a4a7a",
+    "backgroundColor": "#0d1020"
+   }
+  }
+ ],
+ "events": [
+  {
+   "id": "earth",
+   "time": "-143271503053315200/1",
+   "metadata": {
+    "title": "Earth forms",
+    "description": "From the solar nebula, about 4.54 billion years ago.",
+    "tags": [
+     "earth"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Age_of_Earth"
+    ],
+    "color": "#f2b84c",
+    "approximateAgeYears": "4,540,000,000"
+   }
+  },
+  {
+   "id": "zircon",
+   "time": "-138979669453315200/1",
+   "metadata": {
+    "title": "Oldest known minerals",
+    "description": "Zircon crystals from the Jack Hills of Western Australia.",
+    "tags": [
+     "earth"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Jack_Hills"
+    ],
+    "approximateAgeYears": "4,404,000,000"
+   }
+  },
+  {
+   "id": "stromatolites",
+   "time": "-109820447053315200/1",
+   "metadata": {
+    "title": "Early life: stromatolites",
+    "description": "Microbial mats in the Dresser Formation, Western Australia: some of the oldest widely accepted evidence of life.",
+    "tags": [
+     "life"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Stromatolite"
+    ],
+    "color": "#8fd18a",
+    "approximateAgeYears": "3,480,000,000"
+   }
+  },
+  {
+   "id": "oxygen",
+   "time": "-75738239053315200/1",
+   "metadata": {
+    "title": "The Great Oxidation",
+    "description": "Oxygen made by cyanobacteria begins to build up in the atmosphere.",
+    "tags": [
+     "earth",
+     "life"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Great_Oxidation_Event"
+    ],
+    "color": "#7cc4e8",
+    "approximateAgeYears": "2,400,000,000"
+   }
+  },
+  {
+   "id": "snowball",
+   "time": "-22721471053315200/1",
+   "metadata": {
+    "title": "Snowball Earth",
+    "description": "The Sturtian glaciation begins; ice may have reached the equator.",
+    "tags": [
+     "earth"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Snowball_Earth"
+    ],
+    "color": "#e8ecf5",
+    "approximateAgeYears": "720,000,000"
+   }
+  },
+  {
+   "id": "cambrian",
+   "time": "-17003233933315200/1",
+   "metadata": {
+    "title": "The Cambrian explosion",
+    "description": "Most major animal groups appear in the fossil record within a few tens of millions of years.",
+    "tags": [
+     "life"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Cambrian_explosion"
+    ],
+    "color": "#8fd18a",
+    "approximateAgeYears": "538,800,000"
+   }
+  },
+  {
+   "id": "plants",
+   "time": "-14832071053315200/1",
+   "metadata": {
+    "title": "Plants reach land",
+    "tags": [
+     "life"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Evolutionary_history_of_plants"
+    ],
+    "color": "#8fd18a",
+    "approximateAgeYears": "470,000,000"
+   }
+  },
+  {
+   "id": "tetrapods",
+   "time": "-11834099053315200/1",
+   "metadata": {
+    "title": "Fish walk: Tiktaalik",
+    "description": "A fish with limb-like fins, between fish and the first four-legged animals.",
+    "tags": [
+     "life"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tiktaalik"
+    ],
+    "color": "#8fd18a",
+    "approximateAgeYears": "375,000,000"
+   }
+  },
+  {
+   "id": "great-dying",
+   "time": "-7949421608515200/1",
+   "metadata": {
+    "title": "The Great Dying",
+    "description": "The end-Permian extinction, the largest known: most marine species disappear.",
+    "tags": [
+     "extinction"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Permian–Triassic_extinction_event"
+    ],
+    "color": "#e8645a",
+    "approximateAgeYears": "251,902,000"
+   }
+  },
+  {
+   "id": "dinosaurs",
+   "time": "-7352919853315200/1",
+   "metadata": {
+    "title": "First dinosaurs",
+    "tags": [
+     "life"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Dinosaur"
+    ],
+    "color": "#8fd18a",
+    "approximateAgeYears": "233,000,000"
+   }
+  },
+  {
+   "id": "k-pg",
+   "time": "-2082800653315200/1",
+   "metadata": {
+    "title": "The asteroid",
+    "description": "The Chicxulub impact ends the age of the non-avian dinosaurs.",
+    "tags": [
+     "extinction"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Cretaceous–Paleogene_extinction_event"
+    ],
+    "color": "#e8645a",
+    "approximateAgeYears": "66,000,000"
+   }
+  },
+  {
+   "id": "hominins",
+   "time": "-220902253315200/1",
+   "metadata": {
+    "title": "Earliest hominins",
+    "description": "Sahelanthropus, among the earliest known members of the human lineage.",
+    "tags": [
+     "humans"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sahelanthropus"
+    ],
+    "color": "#f2d45c",
+    "approximateAgeYears": "7,000,000"
+   }
+  },
+  {
+   "id": "sapiens",
+   "time": "-9466333315200/1",
+   "metadata": {
+    "title": "Homo sapiens",
+    "description": "Fossils from Jebel Irhoud, Morocco, about 300,000 years old.",
+    "tags": [
+     "humans"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Jebel_Irhoud"
+    ],
+    "color": "#f2d45c",
+    "approximateAgeYears": "300,000"
+   }
+  },
+  {
+   "id": "farming",
+   "time": "-377744515200/1",
+   "metadata": {
+    "title": "Farming begins",
+    "description": "In the Fertile Crescent, about 12,000 years ago.",
+    "tags": [
+     "humans"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Neolithic_Revolution"
+    ],
+    "color": "#f2d45c",
+    "approximateAgeYears": "12,000"
+   }
+  },
+  {
+   "id": "writing",
+   "time": "-163152835200/1",
+   "metadata": {
+    "title": "Writing",
+    "description": "Cuneiform in Mesopotamia, about 3200 BCE.",
+    "tags": [
+     "humans"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Cuneiform"
+    ],
+    "color": "#f2d45c",
+    "approximateAgeYears": "5,200"
+   }
+  },
+  {
+   "id": "pyramid",
+   "time": "-142955971200/1",
+   "metadata": {
+    "title": "The Great Pyramid",
+    "description": "Built for Khufu, about 2560 BCE.",
+    "tags": [
+     "humans"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Great_Pyramid_of_Giza"
+    ],
+    "color": "#f2d45c",
+    "approximateAgeYears": "4,560"
+   }
+  },
+  {
+   "id": "apollo",
+   "time": "-14182940/1",
+   "metadata": {
+    "title": "Apollo 11 lands on the Moon",
+    "description": "20:17:40 UTC, July 20, 1969: on the same line as the Earth's formation, to the second.",
+    "tags": [
+     "humans"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Apollo_11"
+    ],
+    "color": "#f2d45c"
+   }
+  }
+ ],
+ "durations": [
+  {
+   "id": "hadean",
+   "start": "-144123558253315200/1",
+   "end": "-127208684653315200/1",
+   "metadata": {
+    "title": "Hadean",
+    "tags": [
+     "eon"
+    ],
+    "color": "#ae027e"
+   }
+  },
+  {
+   "id": "archean",
+   "start": "-127208684653315200/1",
+   "end": "-78893999053315200/1",
+   "metadata": {
+    "title": "Archean",
+    "tags": [
+     "eon"
+    ],
+    "color": "#f0047f"
+   }
+  },
+  {
+   "id": "proterozoic",
+   "start": "-78893999053315200/1",
+   "end": "-17003233933315200/1",
+   "metadata": {
+    "title": "Proterozoic",
+    "tags": [
+     "eon"
+    ],
+    "color": "#f73563"
+   }
+  },
+  {
+   "id": "phanerozoic",
+   "start": "-17003233933315200/1",
+   "end": "946684800/1",
+   "metadata": {
+    "title": "Phanerozoic",
+    "tags": [
+     "eon"
+    ],
+    "color": "#9ad9dd"
+   }
+  },
+  {
+   "id": "paleozoic",
+   "start": "-17003233933315200/1",
+   "end": "-7949421608515200/1",
+   "metadata": {
+    "title": "Paleozoic",
+    "tags": [
+     "era"
+    ],
+    "color": "#99c08d"
+   }
+  },
+  {
+   "id": "mesozoic",
+   "start": "-7949421608515200/1",
+   "end": "-2082800653315200/1",
+   "metadata": {
+    "title": "Mesozoic",
+    "tags": [
+     "era"
+    ],
+    "color": "#67c5ca"
+   }
+  },
+  {
+   "id": "cenozoic",
+   "start": "-2082800653315200/1",
+   "end": "946684800/1",
+   "metadata": {
+    "title": "Cenozoic",
+    "tags": [
+     "era"
+    ],
+    "color": "#f2f91d"
+   }
+  }
+ ],
+ "relationships": [
+  {
+   "a": {
+    "moment": "oxygen"
+   },
+   "b": {
+    "moment": "stromatolites"
+   }
+  },
+  {
+   "a": {
+    "moment": "k-pg"
+   },
+   "b": {
+    "moment": "dinosaurs"
+   }
+  },
+  {
+   "a": {
+    "moment": "great-dying"
+   },
+   "b": {
+    "duration": "mesozoic"
+   }
+  }
+ ]
+}

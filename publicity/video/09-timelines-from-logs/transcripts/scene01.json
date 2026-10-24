@@ -1,0 +1,757 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:06,320"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 6320
+			},
+			"text": " When something breaks, the first question is always, \"What happened, and in what order?\"",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.989923,
+					"t_dtw": -1
+				},
+				{
+					"text": " When",
+					"timestamps": {
+						"from": "00:00:00,060",
+						"to": "00:00:00,290"
+					},
+					"offsets": {
+						"from": 60,
+						"to": 290
+					},
+					"id": 1649,
+					"p": 0.966785,
+					"t_dtw": -1
+				},
+				{
+					"text": " something",
+					"timestamps": {
+						"from": "00:00:00,290",
+						"to": "00:00:00,950"
+					},
+					"offsets": {
+						"from": 290,
+						"to": 950
+					},
+					"id": 1223,
+					"p": 0.990835,
+					"t_dtw": -1
+				},
+				{
+					"text": " breaks",
+					"timestamps": {
+						"from": "00:00:00,950",
+						"to": "00:00:01,230"
+					},
+					"offsets": {
+						"from": 950,
+						"to": 1230
+					},
+					"id": 9457,
+					"p": 0.991401,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,560",
+						"to": "00:00:01,560"
+					},
+					"offsets": {
+						"from": 1560,
+						"to": 1560
+					},
+					"id": 11,
+					"p": 0.88612,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:01,580",
+						"to": "00:00:01,740"
+					},
+					"offsets": {
+						"from": 1580,
+						"to": 1740
+					},
+					"id": 262,
+					"p": 0.946174,
+					"t_dtw": -1
+				},
+				{
+					"text": " first",
+					"timestamps": {
+						"from": "00:00:01,740",
+						"to": "00:00:01,930"
+					},
+					"offsets": {
+						"from": 1740,
+						"to": 1930
+					},
+					"id": 717,
+					"p": 0.993896,
+					"t_dtw": -1
+				},
+				{
+					"text": " question",
+					"timestamps": {
+						"from": "00:00:02,090",
+						"to": "00:00:02,540"
+					},
+					"offsets": {
+						"from": 2090,
+						"to": 2540
+					},
+					"id": 1808,
+					"p": 0.992812,
+					"t_dtw": -1
+				},
+				{
+					"text": " is",
+					"timestamps": {
+						"from": "00:00:02,540",
+						"to": "00:00:02,850"
+					},
+					"offsets": {
+						"from": 2540,
+						"to": 2850
+					},
+					"id": 318,
+					"p": 0.987259,
+					"t_dtw": -1
+				},
+				{
+					"text": " always",
+					"timestamps": {
+						"from": "00:00:02,850",
+						"to": "00:00:03,430"
+					},
+					"offsets": {
+						"from": 2850,
+						"to": 3430
+					},
+					"id": 1464,
+					"p": 0.985401,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,860",
+						"to": "00:00:03,910"
+					},
+					"offsets": {
+						"from": 3860,
+						"to": 3910
+					},
+					"id": 11,
+					"p": 0.51462,
+					"t_dtw": -1
+				},
+				{
+					"text": " \"",
+					"timestamps": {
+						"from": "00:00:03,910",
+						"to": "00:00:03,940"
+					},
+					"offsets": {
+						"from": 3910,
+						"to": 3940
+					},
+					"id": 366,
+					"p": 0.508423,
+					"t_dtw": -1
+				},
+				{
+					"text": "What",
+					"timestamps": {
+						"from": "00:00:04,010",
+						"to": "00:00:04,190"
+					},
+					"offsets": {
+						"from": 4010,
+						"to": 4190
+					},
+					"id": 2061,
+					"p": 0.835002,
+					"t_dtw": -1
+				},
+				{
+					"text": " happened",
+					"timestamps": {
+						"from": "00:00:04,190",
+						"to": "00:00:04,470"
+					},
+					"offsets": {
+						"from": 4190,
+						"to": 4470
+					},
+					"id": 3022,
+					"p": 0.987052,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:04,800",
+						"to": "00:00:04,800"
+					},
+					"offsets": {
+						"from": 4800,
+						"to": 4800
+					},
+					"id": 11,
+					"p": 0.163121,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:04,820",
+						"to": "00:00:04,980"
+					},
+					"offsets": {
+						"from": 4820,
+						"to": 4980
+					},
+					"id": 290,
+					"p": 0.987814,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:04,980",
+						"to": "00:00:05,100"
+					},
+					"offsets": {
+						"from": 4980,
+						"to": 5100
+					},
+					"id": 287,
+					"p": 0.996101,
+					"t_dtw": -1
+				},
+				{
+					"text": " what",
+					"timestamps": {
+						"from": "00:00:05,100",
+						"to": "00:00:05,360"
+					},
+					"offsets": {
+						"from": 5100,
+						"to": 5360
+					},
+					"id": 644,
+					"p": 0.995723,
+					"t_dtw": -1
+				},
+				{
+					"text": " order",
+					"timestamps": {
+						"from": "00:00:05,360",
+						"to": "00:00:05,680"
+					},
+					"offsets": {
+						"from": 5360,
+						"to": 5680
+					},
+					"id": 1502,
+					"p": 0.983128,
+					"t_dtw": -1
+				},
+				{
+					"text": "?\"",
+					"timestamps": {
+						"from": "00:00:06,270",
+						"to": "00:00:06,320"
+					},
+					"offsets": {
+						"from": 6270,
+						"to": 6320
+					},
+					"id": 1701,
+					"p": 0.898469,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_316]",
+					"timestamps": {
+						"from": "00:00:06,320",
+						"to": "00:00:06,320"
+					},
+					"offsets": {
+						"from": 6320,
+						"to": 6320
+					},
+					"id": 50679,
+					"p": 0.139723,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:06,320",
+				"to": "00:00:10,440"
+			},
+			"offsets": {
+				"from": 6320,
+				"to": 10440
+			},
+			"text": " The answers are in your logs, spread over every host.",
+			"tokens": [
+				{
+					"text": " The",
+					"timestamps": {
+						"from": "00:00:06,380",
+						"to": "00:00:06,570"
+					},
+					"offsets": {
+						"from": 6380,
+						"to": 6570
+					},
+					"id": 383,
+					"p": 0.987276,
+					"t_dtw": -1
+				},
+				{
+					"text": " answers",
+					"timestamps": {
+						"from": "00:00:06,590",
+						"to": "00:00:07,190"
+					},
+					"offsets": {
+						"from": 6590,
+						"to": 7190
+					},
+					"id": 7429,
+					"p": 0.998839,
+					"t_dtw": -1
+				},
+				{
+					"text": " are",
+					"timestamps": {
+						"from": "00:00:07,190",
+						"to": "00:00:07,450"
+					},
+					"offsets": {
+						"from": 7190,
+						"to": 7450
+					},
+					"id": 389,
+					"p": 0.998731,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:07,450",
+						"to": "00:00:07,560"
+					},
+					"offsets": {
+						"from": 7450,
+						"to": 7560
+					},
+					"id": 287,
+					"p": 0.998437,
+					"t_dtw": -1
+				},
+				{
+					"text": " your",
+					"timestamps": {
+						"from": "00:00:07,900",
+						"to": "00:00:07,940"
+					},
+					"offsets": {
+						"from": 7900,
+						"to": 7940
+					},
+					"id": 534,
+					"p": 0.998811,
+					"t_dtw": -1
+				},
+				{
+					"text": " logs",
+					"timestamps": {
+						"from": "00:00:08,040",
+						"to": "00:00:08,250"
+					},
+					"offsets": {
+						"from": 8040,
+						"to": 8250
+					},
+					"id": 17259,
+					"p": 0.996668,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:08,330",
+						"to": "00:00:08,490"
+					},
+					"offsets": {
+						"from": 8330,
+						"to": 8490
+					},
+					"id": 11,
+					"p": 0.934835,
+					"t_dtw": -1
+				},
+				{
+					"text": " spread",
+					"timestamps": {
+						"from": "00:00:08,490",
+						"to": "00:00:09,000"
+					},
+					"offsets": {
+						"from": 8490,
+						"to": 9000
+					},
+					"id": 4104,
+					"p": 0.99623,
+					"t_dtw": -1
+				},
+				{
+					"text": " over",
+					"timestamps": {
+						"from": "00:00:09,010",
+						"to": "00:00:09,360"
+					},
+					"offsets": {
+						"from": 9010,
+						"to": 9360
+					},
+					"id": 625,
+					"p": 0.994679,
+					"t_dtw": -1
+				},
+				{
+					"text": " every",
+					"timestamps": {
+						"from": "00:00:09,360",
+						"to": "00:00:09,750"
+					},
+					"offsets": {
+						"from": 9360,
+						"to": 9750
+					},
+					"id": 790,
+					"p": 0.998738,
+					"t_dtw": -1
+				},
+				{
+					"text": " host",
+					"timestamps": {
+						"from": "00:00:10,140",
+						"to": "00:00:10,140"
+					},
+					"offsets": {
+						"from": 10140,
+						"to": 10140
+					},
+					"id": 2583,
+					"p": 0.994061,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:10,180",
+						"to": "00:00:10,440"
+					},
+					"offsets": {
+						"from": 10180,
+						"to": 10440
+					},
+					"id": 13,
+					"p": 0.984314,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_522]",
+					"timestamps": {
+						"from": "00:00:10,440",
+						"to": "00:00:10,440"
+					},
+					"offsets": {
+						"from": 10440,
+						"to": 10440
+					},
+					"id": 50885,
+					"p": 0.205359,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:10,440",
+				"to": "00:00:15,120"
+			},
+			"offsets": {
+				"from": 10440,
+				"to": 15120
+			},
+			"text": " Open Chronology turns each log entry into a moment on one timeline.",
+			"tokens": [
+				{
+					"text": " Open",
+					"timestamps": {
+						"from": "00:00:10,500",
+						"to": "00:00:10,770"
+					},
+					"offsets": {
+						"from": 10500,
+						"to": 10770
+					},
+					"id": 4946,
+					"p": 0.987261,
+					"t_dtw": -1
+				},
+				{
+					"text": " Chron",
+					"timestamps": {
+						"from": "00:00:10,770",
+						"to": "00:00:11,180"
+					},
+					"offsets": {
+						"from": 10770,
+						"to": 11180
+					},
+					"id": 8750,
+					"p": 0.463482,
+					"t_dtw": -1
+				},
+				{
+					"text": "ology",
+					"timestamps": {
+						"from": "00:00:11,240",
+						"to": "00:00:11,610"
+					},
+					"offsets": {
+						"from": 11240,
+						"to": 11610
+					},
+					"id": 1435,
+					"p": 0.998506,
+					"t_dtw": -1
+				},
+				{
+					"text": " turns",
+					"timestamps": {
+						"from": "00:00:11,610",
+						"to": "00:00:12,030"
+					},
+					"offsets": {
+						"from": 11610,
+						"to": 12030
+					},
+					"id": 4962,
+					"p": 0.99194,
+					"t_dtw": -1
+				},
+				{
+					"text": " each",
+					"timestamps": {
+						"from": "00:00:12,030",
+						"to": "00:00:12,360"
+					},
+					"offsets": {
+						"from": 12030,
+						"to": 12360
+					},
+					"id": 1123,
+					"p": 0.997874,
+					"t_dtw": -1
+				},
+				{
+					"text": " log",
+					"timestamps": {
+						"from": "00:00:12,360",
+						"to": "00:00:12,610"
+					},
+					"offsets": {
+						"from": 12360,
+						"to": 12610
+					},
+					"id": 2604,
+					"p": 0.970791,
+					"t_dtw": -1
+				},
+				{
+					"text": " entry",
+					"timestamps": {
+						"from": "00:00:12,610",
+						"to": "00:00:13,030"
+					},
+					"offsets": {
+						"from": 12610,
+						"to": 13030
+					},
+					"id": 5726,
+					"p": 0.99863,
+					"t_dtw": -1
+				},
+				{
+					"text": " into",
+					"timestamps": {
+						"from": "00:00:13,030",
+						"to": "00:00:13,360"
+					},
+					"offsets": {
+						"from": 13030,
+						"to": 13360
+					},
+					"id": 656,
+					"p": 0.997234,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:13,360",
+						"to": "00:00:13,440"
+					},
+					"offsets": {
+						"from": 13360,
+						"to": 13440
+					},
+					"id": 257,
+					"p": 0.998894,
+					"t_dtw": -1
+				},
+				{
+					"text": " moment",
+					"timestamps": {
+						"from": "00:00:13,440",
+						"to": "00:00:13,870"
+					},
+					"offsets": {
+						"from": 13440,
+						"to": 13870
+					},
+					"id": 2589,
+					"p": 0.996628,
+					"t_dtw": -1
+				},
+				{
+					"text": " on",
+					"timestamps": {
+						"from": "00:00:14,100",
+						"to": "00:00:14,100"
+					},
+					"offsets": {
+						"from": 14100,
+						"to": 14100
+					},
+					"id": 319,
+					"p": 0.993032,
+					"t_dtw": -1
+				},
+				{
+					"text": " one",
+					"timestamps": {
+						"from": "00:00:14,300",
+						"to": "00:00:14,350"
+					},
+					"offsets": {
+						"from": 14300,
+						"to": 14350
+					},
+					"id": 530,
+					"p": 0.993564,
+					"t_dtw": -1
+				},
+				{
+					"text": " timeline",
+					"timestamps": {
+						"from": "00:00:14,350",
+						"to": "00:00:14,910"
+					},
+					"offsets": {
+						"from": 14350,
+						"to": 14910
+					},
+					"id": 15264,
+					"p": 0.936477,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:15,070",
+						"to": "00:00:15,080"
+					},
+					"offsets": {
+						"from": 15070,
+						"to": 15080
+					},
+					"id": 13,
+					"p": 0.960735,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_756]",
+					"timestamps": {
+						"from": "00:00:15,120",
+						"to": "00:00:15,120"
+					},
+					"offsets": {
+						"from": 15120,
+						"to": 15120
+					},
+					"id": 51119,
+					"p": 0.199338,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

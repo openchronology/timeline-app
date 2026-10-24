@@ -1,0 +1,937 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:04,580"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 4580
+			},
+			"text": " To zoom, scroll, or pinch with two fingers side by side.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.992496,
+					"t_dtw": -1
+				},
+				{
+					"text": " To",
+					"timestamps": {
+						"from": "00:00:00,070",
+						"to": "00:00:00,190"
+					},
+					"offsets": {
+						"from": 70,
+						"to": 190
+					},
+					"id": 1675,
+					"p": 0.920474,
+					"t_dtw": -1
+				},
+				{
+					"text": " zoom",
+					"timestamps": {
+						"from": "00:00:00,190",
+						"to": "00:00:00,540"
+					},
+					"offsets": {
+						"from": 190,
+						"to": 540
+					},
+					"id": 19792,
+					"p": 0.874084,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:00,770",
+						"to": "00:00:00,770"
+					},
+					"offsets": {
+						"from": 770,
+						"to": 770
+					},
+					"id": 11,
+					"p": 0.955112,
+					"t_dtw": -1
+				},
+				{
+					"text": " scroll",
+					"timestamps": {
+						"from": "00:00:00,850",
+						"to": "00:00:01,340"
+					},
+					"offsets": {
+						"from": 850,
+						"to": 1340
+					},
+					"id": 10743,
+					"p": 0.948845,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,340",
+						"to": "00:00:01,440"
+					},
+					"offsets": {
+						"from": 1340,
+						"to": 1440
+					},
+					"id": 11,
+					"p": 0.485536,
+					"t_dtw": -1
+				},
+				{
+					"text": " or",
+					"timestamps": {
+						"from": "00:00:01,560",
+						"to": "00:00:01,630"
+					},
+					"offsets": {
+						"from": 1560,
+						"to": 1630
+					},
+					"id": 393,
+					"p": 0.952061,
+					"t_dtw": -1
+				},
+				{
+					"text": " pinch",
+					"timestamps": {
+						"from": "00:00:01,750",
+						"to": "00:00:02,050"
+					},
+					"offsets": {
+						"from": 1750,
+						"to": 2050
+					},
+					"id": 25394,
+					"p": 0.996033,
+					"t_dtw": -1
+				},
+				{
+					"text": " with",
+					"timestamps": {
+						"from": "00:00:02,140",
+						"to": "00:00:02,440"
+					},
+					"offsets": {
+						"from": 2140,
+						"to": 2440
+					},
+					"id": 351,
+					"p": 0.981446,
+					"t_dtw": -1
+				},
+				{
+					"text": " two",
+					"timestamps": {
+						"from": "00:00:02,440",
+						"to": "00:00:02,680"
+					},
+					"offsets": {
+						"from": 2440,
+						"to": 2680
+					},
+					"id": 734,
+					"p": 0.939605,
+					"t_dtw": -1
+				},
+				{
+					"text": " fingers",
+					"timestamps": {
+						"from": "00:00:02,680",
+						"to": "00:00:03,240"
+					},
+					"offsets": {
+						"from": 2680,
+						"to": 3240
+					},
+					"id": 9353,
+					"p": 0.993292,
+					"t_dtw": -1
+				},
+				{
+					"text": " side",
+					"timestamps": {
+						"from": "00:00:03,240",
+						"to": "00:00:03,560"
+					},
+					"offsets": {
+						"from": 3240,
+						"to": 3560
+					},
+					"id": 1735,
+					"p": 0.979254,
+					"t_dtw": -1
+				},
+				{
+					"text": " by",
+					"timestamps": {
+						"from": "00:00:03,560",
+						"to": "00:00:03,720"
+					},
+					"offsets": {
+						"from": 3560,
+						"to": 3720
+					},
+					"id": 416,
+					"p": 0.85654,
+					"t_dtw": -1
+				},
+				{
+					"text": " side",
+					"timestamps": {
+						"from": "00:00:03,720",
+						"to": "00:00:03,960"
+					},
+					"offsets": {
+						"from": 3720,
+						"to": 3960
+					},
+					"id": 1735,
+					"p": 0.99774,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,580",
+						"to": "00:00:04,580"
+					},
+					"offsets": {
+						"from": 4580,
+						"to": 4580
+					},
+					"id": 13,
+					"p": 0.958342,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_229]",
+					"timestamps": {
+						"from": "00:00:04,580",
+						"to": "00:00:04,580"
+					},
+					"offsets": {
+						"from": 4580,
+						"to": 4580
+					},
+					"id": 50592,
+					"p": 0.206474,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,580",
+				"to": "00:00:06,900"
+			},
+			"offsets": {
+				"from": 4580,
+				"to": 6900
+			},
+			"text": " Zoom in on a summary and it opens up",
+			"tokens": [
+				{
+					"text": " Zoom",
+					"timestamps": {
+						"from": "00:00:04,650",
+						"to": "00:00:04,910"
+					},
+					"offsets": {
+						"from": 4650,
+						"to": 4910
+					},
+					"id": 40305,
+					"p": 0.992049,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:04,910",
+						"to": "00:00:05,070"
+					},
+					"offsets": {
+						"from": 4910,
+						"to": 5070
+					},
+					"id": 287,
+					"p": 0.993479,
+					"t_dtw": -1
+				},
+				{
+					"text": " on",
+					"timestamps": {
+						"from": "00:00:05,070",
+						"to": "00:00:05,140"
+					},
+					"offsets": {
+						"from": 5070,
+						"to": 5140
+					},
+					"id": 319,
+					"p": 0.997154,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:05,310",
+						"to": "00:00:05,310"
+					},
+					"offsets": {
+						"from": 5310,
+						"to": 5310
+					},
+					"id": 257,
+					"p": 0.997569,
+					"t_dtw": -1
+				},
+				{
+					"text": " summary",
+					"timestamps": {
+						"from": "00:00:05,430",
+						"to": "00:00:05,920"
+					},
+					"offsets": {
+						"from": 5430,
+						"to": 5920
+					},
+					"id": 10638,
+					"p": 0.977535,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:05,920",
+						"to": "00:00:06,160"
+					},
+					"offsets": {
+						"from": 5920,
+						"to": 6160
+					},
+					"id": 290,
+					"p": 0.639502,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:06,160",
+						"to": "00:00:06,210"
+					},
+					"offsets": {
+						"from": 6160,
+						"to": 6210
+					},
+					"id": 340,
+					"p": 0.996926,
+					"t_dtw": -1
+				},
+				{
+					"text": " opens",
+					"timestamps": {
+						"from": "00:00:06,330",
+						"to": "00:00:06,640"
+					},
+					"offsets": {
+						"from": 6330,
+						"to": 6640
+					},
+					"id": 9808,
+					"p": 0.996702,
+					"t_dtw": -1
+				},
+				{
+					"text": " up",
+					"timestamps": {
+						"from": "00:00:06,720",
+						"to": "00:00:06,900"
+					},
+					"offsets": {
+						"from": 6720,
+						"to": 6900
+					},
+					"id": 510,
+					"p": 0.978948,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_345]",
+					"timestamps": {
+						"from": "00:00:06,900",
+						"to": "00:00:06,900"
+					},
+					"offsets": {
+						"from": 6900,
+						"to": 6900
+					},
+					"id": 50708,
+					"p": 0.457947,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:06,900",
+				"to": "00:00:08,740"
+			},
+			"offsets": {
+				"from": 6900,
+				"to": 8740
+			},
+			"text": " into the moments inside it.",
+			"tokens": [
+				{
+					"text": " into",
+					"timestamps": {
+						"from": "00:00:06,970",
+						"to": "00:00:07,190"
+					},
+					"offsets": {
+						"from": 6970,
+						"to": 7190
+					},
+					"id": 656,
+					"p": 0.998178,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:07,190",
+						"to": "00:00:07,400"
+					},
+					"offsets": {
+						"from": 7190,
+						"to": 7400
+					},
+					"id": 262,
+					"p": 0.99923,
+					"t_dtw": -1
+				},
+				{
+					"text": " moments",
+					"timestamps": {
+						"from": "00:00:07,410",
+						"to": "00:00:07,900"
+					},
+					"offsets": {
+						"from": 7410,
+						"to": 7900
+					},
+					"id": 7188,
+					"p": 0.987854,
+					"t_dtw": -1
+				},
+				{
+					"text": " inside",
+					"timestamps": {
+						"from": "00:00:07,920",
+						"to": "00:00:08,320"
+					},
+					"offsets": {
+						"from": 7920,
+						"to": 8320
+					},
+					"id": 2641,
+					"p": 0.993555,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:08,460",
+						"to": "00:00:08,500"
+					},
+					"offsets": {
+						"from": 8460,
+						"to": 8500
+					},
+					"id": 340,
+					"p": 0.997778,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:08,500",
+						"to": "00:00:08,740"
+					},
+					"offsets": {
+						"from": 8500,
+						"to": 8740
+					},
+					"id": 13,
+					"p": 0.990943,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_437]",
+					"timestamps": {
+						"from": "00:00:08,740",
+						"to": "00:00:08,740"
+					},
+					"offsets": {
+						"from": 8740,
+						"to": 8740
+					},
+					"id": 50800,
+					"p": 0.774406,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:08,740",
+				"to": "00:00:12,300"
+			},
+			"offsets": {
+				"from": 8740,
+				"to": 12300
+			},
+			"text": " Drag to move along the line or up and down.",
+			"tokens": [
+				{
+					"text": " Drag",
+					"timestamps": {
+						"from": "00:00:08,810",
+						"to": "00:00:09,100"
+					},
+					"offsets": {
+						"from": 8810,
+						"to": 9100
+					},
+					"id": 12697,
+					"p": 0.99467,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:09,100",
+						"to": "00:00:09,270"
+					},
+					"offsets": {
+						"from": 9100,
+						"to": 9270
+					},
+					"id": 284,
+					"p": 0.998026,
+					"t_dtw": -1
+				},
+				{
+					"text": " move",
+					"timestamps": {
+						"from": "00:00:09,270",
+						"to": "00:00:09,640"
+					},
+					"offsets": {
+						"from": 9270,
+						"to": 9640
+					},
+					"id": 1445,
+					"p": 0.99902,
+					"t_dtw": -1
+				},
+				{
+					"text": " along",
+					"timestamps": {
+						"from": "00:00:09,640",
+						"to": "00:00:10,080"
+					},
+					"offsets": {
+						"from": 9640,
+						"to": 10080
+					},
+					"id": 1863,
+					"p": 0.998658,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:10,080",
+						"to": "00:00:10,360"
+					},
+					"offsets": {
+						"from": 10080,
+						"to": 10360
+					},
+					"id": 262,
+					"p": 0.999184,
+					"t_dtw": -1
+				},
+				{
+					"text": " line",
+					"timestamps": {
+						"from": "00:00:10,360",
+						"to": "00:00:10,700"
+					},
+					"offsets": {
+						"from": 10360,
+						"to": 10700
+					},
+					"id": 1627,
+					"p": 0.99823,
+					"t_dtw": -1
+				},
+				{
+					"text": " or",
+					"timestamps": {
+						"from": "00:00:10,740",
+						"to": "00:00:10,930"
+					},
+					"offsets": {
+						"from": 10740,
+						"to": 10930
+					},
+					"id": 393,
+					"p": 0.642832,
+					"t_dtw": -1
+				},
+				{
+					"text": " up",
+					"timestamps": {
+						"from": "00:00:11,050",
+						"to": "00:00:11,250"
+					},
+					"offsets": {
+						"from": 11050,
+						"to": 11250
+					},
+					"id": 510,
+					"p": 0.998315,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:11,380",
+						"to": "00:00:11,710"
+					},
+					"offsets": {
+						"from": 11380,
+						"to": 11710
+					},
+					"id": 290,
+					"p": 0.995621,
+					"t_dtw": -1
+				},
+				{
+					"text": " down",
+					"timestamps": {
+						"from": "00:00:11,720",
+						"to": "00:00:12,300"
+					},
+					"offsets": {
+						"from": 11720,
+						"to": 12300
+					},
+					"id": 866,
+					"p": 0.999687,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:12,300",
+						"to": "00:00:12,300"
+					},
+					"offsets": {
+						"from": 12300,
+						"to": 12300
+					},
+					"id": 13,
+					"p": 0.956723,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_615]",
+					"timestamps": {
+						"from": "00:00:12,300",
+						"to": "00:00:12,300"
+					},
+					"offsets": {
+						"from": 12300,
+						"to": 12300
+					},
+					"id": 50978,
+					"p": 0.794176,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:12,300",
+				"to": "00:00:16,780"
+			},
+			"offsets": {
+				"from": 12300,
+				"to": 16780
+			},
+			"text": " On a keyboard, the arrow keys pan and plus and minus zoom.",
+			"tokens": [
+				{
+					"text": " On",
+					"timestamps": {
+						"from": "00:00:12,370",
+						"to": "00:00:12,490"
+					},
+					"offsets": {
+						"from": 12370,
+						"to": 12490
+					},
+					"id": 1550,
+					"p": 0.998978,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:12,500",
+						"to": "00:00:12,580"
+					},
+					"offsets": {
+						"from": 12500,
+						"to": 12580
+					},
+					"id": 257,
+					"p": 0.995353,
+					"t_dtw": -1
+				},
+				{
+					"text": " keyboard",
+					"timestamps": {
+						"from": "00:00:12,580",
+						"to": "00:00:13,340"
+					},
+					"offsets": {
+						"from": 12580,
+						"to": 13340
+					},
+					"id": 10586,
+					"p": 0.99463,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:13,340",
+						"to": "00:00:13,540"
+					},
+					"offsets": {
+						"from": 13340,
+						"to": 13540
+					},
+					"id": 11,
+					"p": 0.914662,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:13,540",
+						"to": "00:00:13,730"
+					},
+					"offsets": {
+						"from": 13540,
+						"to": 13730
+					},
+					"id": 262,
+					"p": 0.908963,
+					"t_dtw": -1
+				},
+				{
+					"text": " arrow",
+					"timestamps": {
+						"from": "00:00:13,860",
+						"to": "00:00:14,120"
+					},
+					"offsets": {
+						"from": 13860,
+						"to": 14120
+					},
+					"id": 15452,
+					"p": 0.992863,
+					"t_dtw": -1
+				},
+				{
+					"text": " keys",
+					"timestamps": {
+						"from": "00:00:14,120",
+						"to": "00:00:14,350"
+					},
+					"offsets": {
+						"from": 14120,
+						"to": 14350
+					},
+					"id": 8251,
+					"p": 0.937364,
+					"t_dtw": -1
+				},
+				{
+					"text": " pan",
+					"timestamps": {
+						"from": "00:00:14,440",
+						"to": "00:00:14,810"
+					},
+					"offsets": {
+						"from": 14440,
+						"to": 14810
+					},
+					"id": 3425,
+					"p": 0.717019,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:14,940",
+						"to": "00:00:15,160"
+					},
+					"offsets": {
+						"from": 14940,
+						"to": 15160
+					},
+					"id": 290,
+					"p": 0.861702,
+					"t_dtw": -1
+				},
+				{
+					"text": " plus",
+					"timestamps": {
+						"from": "00:00:15,160",
+						"to": "00:00:15,560"
+					},
+					"offsets": {
+						"from": 15160,
+						"to": 15560
+					},
+					"id": 5556,
+					"p": 0.956918,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:15,560",
+						"to": "00:00:15,830"
+					},
+					"offsets": {
+						"from": 15560,
+						"to": 15830
+					},
+					"id": 290,
+					"p": 0.802706,
+					"t_dtw": -1
+				},
+				{
+					"text": " minus",
+					"timestamps": {
+						"from": "00:00:15,830",
+						"to": "00:00:16,260"
+					},
+					"offsets": {
+						"from": 15830,
+						"to": 16260
+					},
+					"id": 20208,
+					"p": 0.996333,
+					"t_dtw": -1
+				},
+				{
+					"text": " zoom",
+					"timestamps": {
+						"from": "00:00:16,260",
+						"to": "00:00:16,320"
+					},
+					"offsets": {
+						"from": 16260,
+						"to": 16320
+					},
+					"id": 19792,
+					"p": 0.94363,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:16,780",
+						"to": "00:00:16,780"
+					},
+					"offsets": {
+						"from": 16780,
+						"to": 16780
+					},
+					"id": 13,
+					"p": 0.970971,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_839]",
+					"timestamps": {
+						"from": "00:00:16,780",
+						"to": "00:00:16,780"
+					},
+					"offsets": {
+						"from": 16780,
+						"to": 16780
+					},
+					"id": 51202,
+					"p": 0.323958,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

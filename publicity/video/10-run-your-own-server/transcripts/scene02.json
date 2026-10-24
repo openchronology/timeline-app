@@ -1,0 +1,757 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:06,160"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 6160
+			},
+			"text": " Every release comes with server packages for Debian, Ubuntu, Rocky Linux and Rel,",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.983314,
+					"t_dtw": -1
+				},
+				{
+					"text": " Every",
+					"timestamps": {
+						"from": "00:00:00,070",
+						"to": "00:00:00,320"
+					},
+					"offsets": {
+						"from": 70,
+						"to": 320
+					},
+					"id": 3887,
+					"p": 0.926839,
+					"t_dtw": -1
+				},
+				{
+					"text": " release",
+					"timestamps": {
+						"from": "00:00:00,320",
+						"to": "00:00:00,770"
+					},
+					"offsets": {
+						"from": 320,
+						"to": 770
+					},
+					"id": 2650,
+					"p": 0.996118,
+					"t_dtw": -1
+				},
+				{
+					"text": " comes",
+					"timestamps": {
+						"from": "00:00:00,770",
+						"to": "00:00:01,090"
+					},
+					"offsets": {
+						"from": 770,
+						"to": 1090
+					},
+					"id": 2058,
+					"p": 0.997801,
+					"t_dtw": -1
+				},
+				{
+					"text": " with",
+					"timestamps": {
+						"from": "00:00:01,090",
+						"to": "00:00:01,300"
+					},
+					"offsets": {
+						"from": 1090,
+						"to": 1300
+					},
+					"id": 351,
+					"p": 0.995877,
+					"t_dtw": -1
+				},
+				{
+					"text": " server",
+					"timestamps": {
+						"from": "00:00:01,370",
+						"to": "00:00:01,760"
+					},
+					"offsets": {
+						"from": 1370,
+						"to": 1760
+					},
+					"id": 4382,
+					"p": 0.959191,
+					"t_dtw": -1
+				},
+				{
+					"text": " packages",
+					"timestamps": {
+						"from": "00:00:01,760",
+						"to": "00:00:02,400"
+					},
+					"offsets": {
+						"from": 1760,
+						"to": 2400
+					},
+					"id": 10392,
+					"p": 0.977705,
+					"t_dtw": -1
+				},
+				{
+					"text": " for",
+					"timestamps": {
+						"from": "00:00:02,400",
+						"to": "00:00:02,700"
+					},
+					"offsets": {
+						"from": 2400,
+						"to": 2700
+					},
+					"id": 329,
+					"p": 0.96103,
+					"t_dtw": -1
+				},
+				{
+					"text": " Debian",
+					"timestamps": {
+						"from": "00:00:02,700",
+						"to": "00:00:03,020"
+					},
+					"offsets": {
+						"from": 2700,
+						"to": 3020
+					},
+					"id": 26062,
+					"p": 0.957461,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,320",
+						"to": "00:00:03,500"
+					},
+					"offsets": {
+						"from": 3320,
+						"to": 3500
+					},
+					"id": 11,
+					"p": 0.970475,
+					"t_dtw": -1
+				},
+				{
+					"text": " Ubuntu",
+					"timestamps": {
+						"from": "00:00:03,500",
+						"to": "00:00:03,940"
+					},
+					"offsets": {
+						"from": 3500,
+						"to": 3940
+					},
+					"id": 14949,
+					"p": 0.955802,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:04,320",
+						"to": "00:00:04,320"
+					},
+					"offsets": {
+						"from": 4320,
+						"to": 4320
+					},
+					"id": 11,
+					"p": 0.990347,
+					"t_dtw": -1
+				},
+				{
+					"text": " Rocky",
+					"timestamps": {
+						"from": "00:00:04,440",
+						"to": "00:00:04,890"
+					},
+					"offsets": {
+						"from": 4440,
+						"to": 4890
+					},
+					"id": 24534,
+					"p": 0.431087,
+					"t_dtw": -1
+				},
+				{
+					"text": " Linux",
+					"timestamps": {
+						"from": "00:00:04,890",
+						"to": "00:00:05,460"
+					},
+					"offsets": {
+						"from": 4890,
+						"to": 5460
+					},
+					"id": 7020,
+					"p": 0.861576,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:05,460",
+						"to": "00:00:05,800"
+					},
+					"offsets": {
+						"from": 5460,
+						"to": 5800
+					},
+					"id": 290,
+					"p": 0.75603,
+					"t_dtw": -1
+				},
+				{
+					"text": " Rel",
+					"timestamps": {
+						"from": "00:00:05,800",
+						"to": "00:00:06,040"
+					},
+					"offsets": {
+						"from": 5800,
+						"to": 6040
+					},
+					"id": 4718,
+					"p": 0.0746494,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:06,160",
+						"to": "00:00:06,160"
+					},
+					"offsets": {
+						"from": 6160,
+						"to": 6160
+					},
+					"id": 11,
+					"p": 0.959734,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_308]",
+					"timestamps": {
+						"from": "00:00:06,160",
+						"to": "00:00:06,160"
+					},
+					"offsets": {
+						"from": 6160,
+						"to": 6160
+					},
+					"id": 50671,
+					"p": 0.119237,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:06,160",
+				"to": "00:00:10,960"
+			},
+			"offsets": {
+				"from": 6160,
+				"to": 10960
+			},
+			"text": " Fedora, FreeBSD, macOS through Homebrew, and Windows,",
+			"tokens": [
+				{
+					"text": " Fedora",
+					"timestamps": {
+						"from": "00:00:06,230",
+						"to": "00:00:06,760"
+					},
+					"offsets": {
+						"from": 6230,
+						"to": 6760
+					},
+					"id": 32245,
+					"p": 0.982394,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:06,760",
+						"to": "00:00:06,960"
+					},
+					"offsets": {
+						"from": 6760,
+						"to": 6960
+					},
+					"id": 11,
+					"p": 0.985802,
+					"t_dtw": -1
+				},
+				{
+					"text": " FreeBSD",
+					"timestamps": {
+						"from": "00:00:06,960",
+						"to": "00:00:07,650"
+					},
+					"offsets": {
+						"from": 6960,
+						"to": 7650
+					},
+					"id": 35841,
+					"p": 0.966293,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:07,670",
+						"to": "00:00:07,860"
+					},
+					"offsets": {
+						"from": 7670,
+						"to": 7860
+					},
+					"id": 11,
+					"p": 0.991641,
+					"t_dtw": -1
+				},
+				{
+					"text": " macOS",
+					"timestamps": {
+						"from": "00:00:07,860",
+						"to": "00:00:08,330"
+					},
+					"offsets": {
+						"from": 7860,
+						"to": 8330
+					},
+					"id": 40017,
+					"p": 0.871924,
+					"t_dtw": -1
+				},
+				{
+					"text": " through",
+					"timestamps": {
+						"from": "00:00:08,380",
+						"to": "00:00:09,060"
+					},
+					"offsets": {
+						"from": 8380,
+						"to": 9060
+					},
+					"id": 832,
+					"p": 0.959547,
+					"t_dtw": -1
+				},
+				{
+					"text": " Home",
+					"timestamps": {
+						"from": "00:00:09,060",
+						"to": "00:00:09,190"
+					},
+					"offsets": {
+						"from": 9060,
+						"to": 9190
+					},
+					"id": 5995,
+					"p": 0.680713,
+					"t_dtw": -1
+				},
+				{
+					"text": "brew",
+					"timestamps": {
+						"from": "00:00:09,480",
+						"to": "00:00:09,850"
+					},
+					"offsets": {
+						"from": 9480,
+						"to": 9850
+					},
+					"id": 11269,
+					"p": 0.987283,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:09,850",
+						"to": "00:00:10,070"
+					},
+					"offsets": {
+						"from": 9850,
+						"to": 10070
+					},
+					"id": 11,
+					"p": 0.822025,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:10,070",
+						"to": "00:00:10,130"
+					},
+					"offsets": {
+						"from": 10070,
+						"to": 10130
+					},
+					"id": 290,
+					"p": 0.893613,
+					"t_dtw": -1
+				},
+				{
+					"text": " Windows",
+					"timestamps": {
+						"from": "00:00:10,560",
+						"to": "00:00:10,940"
+					},
+					"offsets": {
+						"from": 10560,
+						"to": 10940
+					},
+					"id": 3964,
+					"p": 0.991904,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:10,960",
+						"to": "00:00:10,960"
+					},
+					"offsets": {
+						"from": 10960,
+						"to": 10960
+					},
+					"id": 11,
+					"p": 0.525328,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_548]",
+					"timestamps": {
+						"from": "00:00:10,960",
+						"to": "00:00:10,960"
+					},
+					"offsets": {
+						"from": 10960,
+						"to": 10960
+					},
+					"id": 50911,
+					"p": 0.233984,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:10,960",
+				"to": "00:00:15,920"
+			},
+			"offsets": {
+				"from": 10960,
+				"to": 15920
+			},
+			"text": " plus a Docker Compose setup for anything else, each with checksums to verify.",
+			"tokens": [
+				{
+					"text": " plus",
+					"timestamps": {
+						"from": "00:00:11,030",
+						"to": "00:00:11,270"
+					},
+					"offsets": {
+						"from": 11030,
+						"to": 11270
+					},
+					"id": 5556,
+					"p": 0.975247,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:11,270",
+						"to": "00:00:11,330"
+					},
+					"offsets": {
+						"from": 11270,
+						"to": 11330
+					},
+					"id": 257,
+					"p": 0.996305,
+					"t_dtw": -1
+				},
+				{
+					"text": " Docker",
+					"timestamps": {
+						"from": "00:00:11,340",
+						"to": "00:00:11,760"
+					},
+					"offsets": {
+						"from": 11340,
+						"to": 11760
+					},
+					"id": 25716,
+					"p": 0.792182,
+					"t_dtw": -1
+				},
+				{
+					"text": " Comp",
+					"timestamps": {
+						"from": "00:00:11,840",
+						"to": "00:00:12,110"
+					},
+					"offsets": {
+						"from": 11840,
+						"to": 12110
+					},
+					"id": 3082,
+					"p": 0.651674,
+					"t_dtw": -1
+				},
+				{
+					"text": "ose",
+					"timestamps": {
+						"from": "00:00:12,110",
+						"to": "00:00:12,340"
+					},
+					"offsets": {
+						"from": 12110,
+						"to": 12340
+					},
+					"id": 577,
+					"p": 0.992777,
+					"t_dtw": -1
+				},
+				{
+					"text": " setup",
+					"timestamps": {
+						"from": "00:00:12,340",
+						"to": "00:00:12,730"
+					},
+					"offsets": {
+						"from": 12340,
+						"to": 12730
+					},
+					"id": 9058,
+					"p": 0.759983,
+					"t_dtw": -1
+				},
+				{
+					"text": " for",
+					"timestamps": {
+						"from": "00:00:12,730",
+						"to": "00:00:12,960"
+					},
+					"offsets": {
+						"from": 12730,
+						"to": 12960
+					},
+					"id": 329,
+					"p": 0.997638,
+					"t_dtw": -1
+				},
+				{
+					"text": " anything",
+					"timestamps": {
+						"from": "00:00:12,960",
+						"to": "00:00:13,540"
+					},
+					"offsets": {
+						"from": 12960,
+						"to": 13540
+					},
+					"id": 1997,
+					"p": 0.995564,
+					"t_dtw": -1
+				},
+				{
+					"text": " else",
+					"timestamps": {
+						"from": "00:00:13,580",
+						"to": "00:00:13,880"
+					},
+					"offsets": {
+						"from": 13580,
+						"to": 13880
+					},
+					"id": 2073,
+					"p": 0.99666,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:13,880",
+						"to": "00:00:14,000"
+					},
+					"offsets": {
+						"from": 13880,
+						"to": 14000
+					},
+					"id": 11,
+					"p": 0.78705,
+					"t_dtw": -1
+				},
+				{
+					"text": " each",
+					"timestamps": {
+						"from": "00:00:14,280",
+						"to": "00:00:14,370"
+					},
+					"offsets": {
+						"from": 14280,
+						"to": 14370
+					},
+					"id": 1123,
+					"p": 0.985101,
+					"t_dtw": -1
+				},
+				{
+					"text": " with",
+					"timestamps": {
+						"from": "00:00:14,370",
+						"to": "00:00:14,620"
+					},
+					"offsets": {
+						"from": 14370,
+						"to": 14620
+					},
+					"id": 351,
+					"p": 0.998856,
+					"t_dtw": -1
+				},
+				{
+					"text": " checks",
+					"timestamps": {
+						"from": "00:00:14,640",
+						"to": "00:00:14,920"
+					},
+					"offsets": {
+						"from": 14640,
+						"to": 14920
+					},
+					"id": 8794,
+					"p": 0.860715,
+					"t_dtw": -1
+				},
+				{
+					"text": "ums",
+					"timestamps": {
+						"from": "00:00:15,320",
+						"to": "00:00:15,320"
+					},
+					"offsets": {
+						"from": 15320,
+						"to": 15320
+					},
+					"id": 5700,
+					"p": 0.988462,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:15,360",
+						"to": "00:00:15,460"
+					},
+					"offsets": {
+						"from": 15360,
+						"to": 15460
+					},
+					"id": 284,
+					"p": 0.999047,
+					"t_dtw": -1
+				},
+				{
+					"text": " verify",
+					"timestamps": {
+						"from": "00:00:15,460",
+						"to": "00:00:15,920"
+					},
+					"offsets": {
+						"from": 15460,
+						"to": 15920
+					},
+					"id": 11767,
+					"p": 0.998885,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:15,920",
+						"to": "00:00:15,920"
+					},
+					"offsets": {
+						"from": 15920,
+						"to": 15920
+					},
+					"id": 13,
+					"p": 0.973175,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_796]",
+					"timestamps": {
+						"from": "00:00:15,920",
+						"to": "00:00:15,920"
+					},
+					"offsets": {
+						"from": 15920,
+						"to": 15920
+					},
+					"id": 51159,
+					"p": 0.0363888,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

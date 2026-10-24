@@ -1,0 +1,534 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:03,260"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 3260
+			},
+			"text": " The packages and the guides are with every release.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.987365,
+					"t_dtw": -1
+				},
+				{
+					"text": " The",
+					"timestamps": {
+						"from": "00:00:00,100",
+						"to": "00:00:00,200"
+					},
+					"offsets": {
+						"from": 100,
+						"to": 200
+					},
+					"id": 383,
+					"p": 0.700161,
+					"t_dtw": -1
+				},
+				{
+					"text": " packages",
+					"timestamps": {
+						"from": "00:00:00,210",
+						"to": "00:00:00,780"
+					},
+					"offsets": {
+						"from": 210,
+						"to": 780
+					},
+					"id": 10392,
+					"p": 0.960118,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:00,780",
+						"to": "00:00:00,990"
+					},
+					"offsets": {
+						"from": 780,
+						"to": 990
+					},
+					"id": 290,
+					"p": 0.991172,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:00,990",
+						"to": "00:00:01,150"
+					},
+					"offsets": {
+						"from": 990,
+						"to": 1150
+					},
+					"id": 262,
+					"p": 0.969829,
+					"t_dtw": -1
+				},
+				{
+					"text": " guides",
+					"timestamps": {
+						"from": "00:00:01,210",
+						"to": "00:00:01,630"
+					},
+					"offsets": {
+						"from": 1210,
+						"to": 1630
+					},
+					"id": 17555,
+					"p": 0.991017,
+					"t_dtw": -1
+				},
+				{
+					"text": " are",
+					"timestamps": {
+						"from": "00:00:01,630",
+						"to": "00:00:01,840"
+					},
+					"offsets": {
+						"from": 1630,
+						"to": 1840
+					},
+					"id": 389,
+					"p": 0.989238,
+					"t_dtw": -1
+				},
+				{
+					"text": " with",
+					"timestamps": {
+						"from": "00:00:01,840",
+						"to": "00:00:02,120"
+					},
+					"offsets": {
+						"from": 1840,
+						"to": 2120
+					},
+					"id": 351,
+					"p": 0.984855,
+					"t_dtw": -1
+				},
+				{
+					"text": " every",
+					"timestamps": {
+						"from": "00:00:02,120",
+						"to": "00:00:02,480"
+					},
+					"offsets": {
+						"from": 2120,
+						"to": 2480
+					},
+					"id": 790,
+					"p": 0.994556,
+					"t_dtw": -1
+				},
+				{
+					"text": " release",
+					"timestamps": {
+						"from": "00:00:02,480",
+						"to": "00:00:02,980"
+					},
+					"offsets": {
+						"from": 2480,
+						"to": 2980
+					},
+					"id": 2650,
+					"p": 0.995968,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:02,980",
+						"to": "00:00:03,100"
+					},
+					"offsets": {
+						"from": 2980,
+						"to": 3100
+					},
+					"id": 13,
+					"p": 0.88997,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_163]",
+					"timestamps": {
+						"from": "00:00:03,260",
+						"to": "00:00:03,260"
+					},
+					"offsets": {
+						"from": 3260,
+						"to": 3260
+					},
+					"id": 50526,
+					"p": 0.0278822,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:03,660",
+				"to": "00:00:09,760"
+			},
+			"offsets": {
+				"from": 3660,
+				"to": 9760
+			},
+			"text": " Install it for your school, your team or your community, and the timeline stay on your own server.",
+			"tokens": [
+				{
+					"text": " Install",
+					"timestamps": {
+						"from": "00:00:03,760",
+						"to": "00:00:03,900"
+					},
+					"offsets": {
+						"from": 3760,
+						"to": 3900
+					},
+					"id": 15545,
+					"p": 0.990014,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:03,900",
+						"to": "00:00:04,010"
+					},
+					"offsets": {
+						"from": 3900,
+						"to": 4010
+					},
+					"id": 340,
+					"p": 0.998163,
+					"t_dtw": -1
+				},
+				{
+					"text": " for",
+					"timestamps": {
+						"from": "00:00:04,090",
+						"to": "00:00:04,350"
+					},
+					"offsets": {
+						"from": 4090,
+						"to": 4350
+					},
+					"id": 329,
+					"p": 0.998692,
+					"t_dtw": -1
+				},
+				{
+					"text": " your",
+					"timestamps": {
+						"from": "00:00:04,350",
+						"to": "00:00:04,720"
+					},
+					"offsets": {
+						"from": 4350,
+						"to": 4720
+					},
+					"id": 534,
+					"p": 0.998352,
+					"t_dtw": -1
+				},
+				{
+					"text": " school",
+					"timestamps": {
+						"from": "00:00:04,720",
+						"to": "00:00:05,300"
+					},
+					"offsets": {
+						"from": 4720,
+						"to": 5300
+					},
+					"id": 1524,
+					"p": 0.983719,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:05,300",
+						"to": "00:00:05,470"
+					},
+					"offsets": {
+						"from": 5300,
+						"to": 5470
+					},
+					"id": 11,
+					"p": 0.927969,
+					"t_dtw": -1
+				},
+				{
+					"text": " your",
+					"timestamps": {
+						"from": "00:00:05,470",
+						"to": "00:00:05,810"
+					},
+					"offsets": {
+						"from": 5470,
+						"to": 5810
+					},
+					"id": 534,
+					"p": 0.801246,
+					"t_dtw": -1
+				},
+				{
+					"text": " team",
+					"timestamps": {
+						"from": "00:00:05,810",
+						"to": "00:00:06,160"
+					},
+					"offsets": {
+						"from": 5810,
+						"to": 6160
+					},
+					"id": 1074,
+					"p": 0.996827,
+					"t_dtw": -1
+				},
+				{
+					"text": " or",
+					"timestamps": {
+						"from": "00:00:06,160",
+						"to": "00:00:06,240"
+					},
+					"offsets": {
+						"from": 6160,
+						"to": 6240
+					},
+					"id": 393,
+					"p": 0.941183,
+					"t_dtw": -1
+				},
+				{
+					"text": " your",
+					"timestamps": {
+						"from": "00:00:06,240",
+						"to": "00:00:06,370"
+					},
+					"offsets": {
+						"from": 6240,
+						"to": 6370
+					},
+					"id": 534,
+					"p": 0.986764,
+					"t_dtw": -1
+				},
+				{
+					"text": " community",
+					"timestamps": {
+						"from": "00:00:06,420",
+						"to": "00:00:06,760"
+					},
+					"offsets": {
+						"from": 6420,
+						"to": 6760
+					},
+					"id": 2055,
+					"p": 0.957522,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:07,370",
+						"to": "00:00:07,390"
+					},
+					"offsets": {
+						"from": 7370,
+						"to": 7390
+					},
+					"id": 11,
+					"p": 0.690518,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:07,390",
+						"to": "00:00:07,570"
+					},
+					"offsets": {
+						"from": 7390,
+						"to": 7570
+					},
+					"id": 290,
+					"p": 0.502055,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:07,640",
+						"to": "00:00:07,680"
+					},
+					"offsets": {
+						"from": 7640,
+						"to": 7680
+					},
+					"id": 262,
+					"p": 0.979619,
+					"t_dtw": -1
+				},
+				{
+					"text": " timeline",
+					"timestamps": {
+						"from": "00:00:07,680",
+						"to": "00:00:08,260"
+					},
+					"offsets": {
+						"from": 7680,
+						"to": 8260
+					},
+					"id": 15264,
+					"p": 0.77839,
+					"t_dtw": -1
+				},
+				{
+					"text": " stay",
+					"timestamps": {
+						"from": "00:00:08,260",
+						"to": "00:00:08,570"
+					},
+					"offsets": {
+						"from": 8260,
+						"to": 8570
+					},
+					"id": 2652,
+					"p": 0.899595,
+					"t_dtw": -1
+				},
+				{
+					"text": " on",
+					"timestamps": {
+						"from": "00:00:08,570",
+						"to": "00:00:08,710"
+					},
+					"offsets": {
+						"from": 8570,
+						"to": 8710
+					},
+					"id": 319,
+					"p": 0.995173,
+					"t_dtw": -1
+				},
+				{
+					"text": " your",
+					"timestamps": {
+						"from": "00:00:08,710",
+						"to": "00:00:08,780"
+					},
+					"offsets": {
+						"from": 8710,
+						"to": 8780
+					},
+					"id": 534,
+					"p": 0.991336,
+					"t_dtw": -1
+				},
+				{
+					"text": " own",
+					"timestamps": {
+						"from": "00:00:09,260",
+						"to": "00:00:09,260"
+					},
+					"offsets": {
+						"from": 9260,
+						"to": 9260
+					},
+					"id": 898,
+					"p": 0.994336,
+					"t_dtw": -1
+				},
+				{
+					"text": " server",
+					"timestamps": {
+						"from": "00:00:09,290",
+						"to": "00:00:09,740"
+					},
+					"offsets": {
+						"from": 9290,
+						"to": 9740
+					},
+					"id": 4382,
+					"p": 0.997922,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:09,740",
+						"to": "00:00:09,760"
+					},
+					"offsets": {
+						"from": 9740,
+						"to": 9760
+					},
+					"id": 13,
+					"p": 0.949004,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_488]",
+					"timestamps": {
+						"from": "00:00:09,760",
+						"to": "00:00:09,760"
+					},
+					"offsets": {
+						"from": 9760,
+						"to": 9760
+					},
+					"id": 50851,
+					"p": 0.0990748,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,730 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:06,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 6000
+			},
+			"text": " Open a moment to read it. Brown v. Board of Education. What the court decided, where that",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.994355,
+					"t_dtw": -1
+				},
+				{
+					"text": " Open",
+					"timestamps": {
+						"from": "00:00:00,060",
+						"to": "00:00:00,420"
+					},
+					"offsets": {
+						"from": 60,
+						"to": 420
+					},
+					"id": 4946,
+					"p": 0.720231,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:00,420",
+						"to": "00:00:00,520"
+					},
+					"offsets": {
+						"from": 420,
+						"to": 520
+					},
+					"id": 257,
+					"p": 0.99548,
+					"t_dtw": -1
+				},
+				{
+					"text": " moment",
+					"timestamps": {
+						"from": "00:00:00,520",
+						"to": "00:00:01,150"
+					},
+					"offsets": {
+						"from": 520,
+						"to": 1150
+					},
+					"id": 2589,
+					"p": 0.971799,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:01,150",
+						"to": "00:00:01,360"
+					},
+					"offsets": {
+						"from": 1150,
+						"to": 1360
+					},
+					"id": 284,
+					"p": 0.997855,
+					"t_dtw": -1
+				},
+				{
+					"text": " read",
+					"timestamps": {
+						"from": "00:00:01,360",
+						"to": "00:00:01,490"
+					},
+					"offsets": {
+						"from": 1360,
+						"to": 1490
+					},
+					"id": 1100,
+					"p": 0.998315,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:02,000",
+						"to": "00:00:02,000"
+					},
+					"offsets": {
+						"from": 2000,
+						"to": 2000
+					},
+					"id": 340,
+					"p": 0.991355,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:02,130",
+						"to": "00:00:02,230"
+					},
+					"offsets": {
+						"from": 2130,
+						"to": 2230
+					},
+					"id": 13,
+					"p": 0.695451,
+					"t_dtw": -1
+				},
+				{
+					"text": " Brown",
+					"timestamps": {
+						"from": "00:00:02,230",
+						"to": "00:00:02,580"
+					},
+					"offsets": {
+						"from": 2230,
+						"to": 2580
+					},
+					"id": 4373,
+					"p": 0.553219,
+					"t_dtw": -1
+				},
+				{
+					"text": " v",
+					"timestamps": {
+						"from": "00:00:02,600",
+						"to": "00:00:02,660"
+					},
+					"offsets": {
+						"from": 2600,
+						"to": 2660
+					},
+					"id": 410,
+					"p": 0.277146,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:02,700",
+						"to": "00:00:02,830"
+					},
+					"offsets": {
+						"from": 2700,
+						"to": 2830
+					},
+					"id": 13,
+					"p": 0.691655,
+					"t_dtw": -1
+				},
+				{
+					"text": " Board",
+					"timestamps": {
+						"from": "00:00:02,920",
+						"to": "00:00:03,250"
+					},
+					"offsets": {
+						"from": 2920,
+						"to": 3250
+					},
+					"id": 5926,
+					"p": 0.980844,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:03,290",
+						"to": "00:00:03,360"
+					},
+					"offsets": {
+						"from": 3290,
+						"to": 3360
+					},
+					"id": 286,
+					"p": 0.992354,
+					"t_dtw": -1
+				},
+				{
+					"text": " Education",
+					"timestamps": {
+						"from": "00:00:03,450",
+						"to": "00:00:03,860"
+					},
+					"offsets": {
+						"from": 3450,
+						"to": 3860
+					},
+					"id": 7868,
+					"p": 0.98348,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,270",
+						"to": "00:00:04,270"
+					},
+					"offsets": {
+						"from": 4270,
+						"to": 4270
+					},
+					"id": 13,
+					"p": 0.604651,
+					"t_dtw": -1
+				},
+				{
+					"text": " What",
+					"timestamps": {
+						"from": "00:00:04,310",
+						"to": "00:00:04,380"
+					},
+					"offsets": {
+						"from": 4310,
+						"to": 4380
+					},
+					"id": 1867,
+					"p": 0.640135,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:04,440",
+						"to": "00:00:04,460"
+					},
+					"offsets": {
+						"from": 4440,
+						"to": 4460
+					},
+					"id": 262,
+					"p": 0.981611,
+					"t_dtw": -1
+				},
+				{
+					"text": " court",
+					"timestamps": {
+						"from": "00:00:04,520",
+						"to": "00:00:04,690"
+					},
+					"offsets": {
+						"from": 4520,
+						"to": 4690
+					},
+					"id": 2184,
+					"p": 0.583853,
+					"t_dtw": -1
+				},
+				{
+					"text": " decided",
+					"timestamps": {
+						"from": "00:00:04,800",
+						"to": "00:00:05,270"
+					},
+					"offsets": {
+						"from": 4800,
+						"to": 5270
+					},
+					"id": 3066,
+					"p": 0.961198,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:05,270",
+						"to": "00:00:05,320"
+					},
+					"offsets": {
+						"from": 5270,
+						"to": 5320
+					},
+					"id": 11,
+					"p": 0.939953,
+					"t_dtw": -1
+				},
+				{
+					"text": " where",
+					"timestamps": {
+						"from": "00:00:05,610",
+						"to": "00:00:05,680"
+					},
+					"offsets": {
+						"from": 5610,
+						"to": 5680
+					},
+					"id": 810,
+					"p": 0.607765,
+					"t_dtw": -1
+				},
+				{
+					"text": " that",
+					"timestamps": {
+						"from": "00:00:05,680",
+						"to": "00:00:05,920"
+					},
+					"offsets": {
+						"from": 5680,
+						"to": 5920
+					},
+					"id": 326,
+					"p": 0.842444,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_300]",
+					"timestamps": {
+						"from": "00:00:06,000",
+						"to": "00:00:06,000"
+					},
+					"offsets": {
+						"from": 6000,
+						"to": 6000
+					},
+					"id": 50663,
+					"p": 0.302049,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:06,000",
+				"to": "00:00:13,280"
+			},
+			"offsets": {
+				"from": 6000,
+				"to": 13280
+			},
+			"text": " comes from and what it's link to. Follow a link to the Civil Rights Act 10 years later and keep going.",
+			"tokens": [
+				{
+					"text": " comes",
+					"timestamps": {
+						"from": "00:00:06,060",
+						"to": "00:00:06,470"
+					},
+					"offsets": {
+						"from": 6060,
+						"to": 6470
+					},
+					"id": 2058,
+					"p": 0.995623,
+					"t_dtw": -1
+				},
+				{
+					"text": " from",
+					"timestamps": {
+						"from": "00:00:06,470",
+						"to": "00:00:06,850"
+					},
+					"offsets": {
+						"from": 6470,
+						"to": 6850
+					},
+					"id": 422,
+					"p": 0.999298,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:06,850",
+						"to": "00:00:07,130"
+					},
+					"offsets": {
+						"from": 6850,
+						"to": 7130
+					},
+					"id": 290,
+					"p": 0.579721,
+					"t_dtw": -1
+				},
+				{
+					"text": " what",
+					"timestamps": {
+						"from": "00:00:07,130",
+						"to": "00:00:07,400"
+					},
+					"offsets": {
+						"from": 7130,
+						"to": 7400
+					},
+					"id": 644,
+					"p": 0.998997,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:07,460",
+						"to": "00:00:07,520"
+					},
+					"offsets": {
+						"from": 7460,
+						"to": 7520
+					},
+					"id": 340,
+					"p": 0.698672,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:07,880",
+						"to": "00:00:07,880"
+					},
+					"offsets": {
+						"from": 7880,
+						"to": 7880
+					},
+					"id": 338,
+					"p": 0.984097,
+					"t_dtw": -1
+				},
+				{
+					"text": " link",
+					"timestamps": {
+						"from": "00:00:08,130",
+						"to": "00:00:08,260"
+					},
+					"offsets": {
+						"from": 8130,
+						"to": 8260
+					},
+					"id": 2792,
+					"p": 0.696149,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:08,260",
+						"to": "00:00:08,420"
+					},
+					"offsets": {
+						"from": 8260,
+						"to": 8420
+					},
+					"id": 284,
+					"p": 0.990958,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:08,480",
+						"to": "00:00:08,760"
+					},
+					"offsets": {
+						"from": 8480,
+						"to": 8760
+					},
+					"id": 13,
+					"p": 0.969825,
+					"t_dtw": -1
+				},
+				{
+					"text": " Follow",
+					"timestamps": {
+						"from": "00:00:08,760",
+						"to": "00:00:09,180"
+					},
+					"offsets": {
+						"from": 8760,
+						"to": 9180
+					},
+					"id": 7281,
+					"p": 0.933999,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:09,180",
+						"to": "00:00:09,250"
+					},
+					"offsets": {
+						"from": 9180,
+						"to": 9250
+					},
+					"id": 257,
+					"p": 0.995315,
+					"t_dtw": -1
+				},
+				{
+					"text": " link",
+					"timestamps": {
+						"from": "00:00:09,250",
+						"to": "00:00:09,530"
+					},
+					"offsets": {
+						"from": 9250,
+						"to": 9530
+					},
+					"id": 2792,
+					"p": 0.998658,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:09,530",
+						"to": "00:00:09,670"
+					},
+					"offsets": {
+						"from": 9530,
+						"to": 9670
+					},
+					"id": 284,
+					"p": 0.998746,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:09,670",
+						"to": "00:00:09,850"
+					},
+					"offsets": {
+						"from": 9670,
+						"to": 9850
+					},
+					"id": 262,
+					"p": 0.960023,
+					"t_dtw": -1
+				},
+				{
+					"text": " Civil",
+					"timestamps": {
+						"from": "00:00:09,870",
+						"to": "00:00:09,880"
+					},
+					"offsets": {
+						"from": 9870,
+						"to": 9880
+					},
+					"id": 7511,
+					"p": 0.965687,
+					"t_dtw": -1
+				},
+				{
+					"text": " Rights",
+					"timestamps": {
+						"from": "00:00:10,310",
+						"to": "00:00:10,650"
+					},
+					"offsets": {
+						"from": 10310,
+						"to": 10650
+					},
+					"id": 6923,
+					"p": 0.995939,
+					"t_dtw": -1
+				},
+				{
+					"text": " Act",
+					"timestamps": {
+						"from": "00:00:10,650",
+						"to": "00:00:10,880"
+					},
+					"offsets": {
+						"from": 10650,
+						"to": 10880
+					},
+					"id": 2191,
+					"p": 0.984306,
+					"t_dtw": -1
+				},
+				{
+					"text": " 10",
+					"timestamps": {
+						"from": "00:00:10,880",
+						"to": "00:00:11,130"
+					},
+					"offsets": {
+						"from": 10880,
+						"to": 11130
+					},
+					"id": 838,
+					"p": 0.75942,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:11,130",
+						"to": "00:00:11,280"
+					},
+					"offsets": {
+						"from": 11130,
+						"to": 11280
+					},
+					"id": 812,
+					"p": 0.992477,
+					"t_dtw": -1
+				},
+				{
+					"text": " later",
+					"timestamps": {
+						"from": "00:00:11,610",
+						"to": "00:00:11,920"
+					},
+					"offsets": {
+						"from": 11610,
+						"to": 11920
+					},
+					"id": 1568,
+					"p": 0.970413,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:11,920",
+						"to": "00:00:12,060"
+					},
+					"offsets": {
+						"from": 11920,
+						"to": 12060
+					},
+					"id": 290,
+					"p": 0.743496,
+					"t_dtw": -1
+				},
+				{
+					"text": " keep",
+					"timestamps": {
+						"from": "00:00:12,080",
+						"to": "00:00:12,340"
+					},
+					"offsets": {
+						"from": 12080,
+						"to": 12340
+					},
+					"id": 1394,
+					"p": 0.955416,
+					"t_dtw": -1
+				},
+				{
+					"text": " going",
+					"timestamps": {
+						"from": "00:00:12,440",
+						"to": "00:00:12,960"
+					},
+					"offsets": {
+						"from": 12440,
+						"to": 12960
+					},
+					"id": 1016,
+					"p": 0.854307,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:12,960",
+						"to": "00:00:13,280"
+					},
+					"offsets": {
+						"from": 12960,
+						"to": 13280
+					},
+					"id": 13,
+					"p": 0.883816,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_664]",
+					"timestamps": {
+						"from": "00:00:13,280",
+						"to": "00:00:13,280"
+					},
+					"offsets": {
+						"from": 13280,
+						"to": 13280
+					},
+					"id": 51027,
+					"p": 0.0289875,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

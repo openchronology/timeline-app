@@ -1,0 +1,11 @@
+{
+  "script": "../../6-tour-a-storys-timeline.md",
+  "look": "parchment",
+  "say": {
+    "Mirelle": "Mih-rell"
+  },
+  "minDur": {
+    "4": 18,
+    "5": 21
+  }
+}
