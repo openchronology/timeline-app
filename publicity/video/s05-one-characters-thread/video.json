@@ -1,0 +1,14 @@
+{
+  "script": "../../shorts/5-one-characters-thread.md",
+  "format": "vertical",
+  "look": "parchment",
+  "pace": 1.0,
+  "silence": 0.2,
+  "lead": 0.15,
+  "tail": 0.3,
+  "hold": 2.0,
+  "say": {
+    "Mirelle's": "[Mirelle's](/mɪɹˈɛlz/)",
+    "Mirelle": "[Mirelle](/mɪɹˈɛl/)"
+  }
+}

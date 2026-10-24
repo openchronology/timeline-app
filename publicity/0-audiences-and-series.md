@@ -45,7 +45,7 @@ The same facts are true for everyone; what changes is the order, the example and
 
 ## 2 · The series
 
-Eleven videos. Three are for everyone; the rest each answer one audience. All are 16:9, with the important text inside the centre square so they can be cut to 1:1 and 9:16 for social feeds.
+Eleven videos. Three are for everyone; the rest each answer one audience. All are 16:9. The social feeds get their own cuts rather than crops: eight vertical [shorts](shorts/0-shorts-audiences-and-series.md), each made for one community on TikTok, YouTube Shorts and Reels.
 
 | #   | Title                                    | For                          | Runtime | Goal                                                               | Ends on                                     |
 | --- | ---------------------------------------- | ---------------------------- | ------- | ------------------------------------------------------------------ | ------------------------------------------- |
@@ -100,5 +100,5 @@ What changes is the ground and the accent, so each video feels made for its audi
 
 ## 5 · Production
 
-- **Narration:** each script's Appendix A is the voice session. Until it's recorded, a scratch voice (Piper, offline) reads it, so the timing, captions and cues can be checked; a real recording replaces it with the same alignment step. Read at a steady pace, around 145 words a minute.
+- **Narration:** each script's Appendix A is the voice session. Until it's recorded, a scratch voice (Kokoro, offline) reads it, so the timing, captions and cues can be checked; a real recording replaces it with the same alignment step. Read at a steady pace, around 145 words a minute.
 - **Pipeline:** see [`video/README.md`](video/README.md). Each scene is a pure function of time, cued to the word in the narration that introduces it, rendered to frames in Playwright and encoded with captions.

@@ -1,0 +1,339 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:04,540"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 4540
+			},
+			"text": " And at the start of the climb, a backup job writing to the database's own disk.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.911464,
+					"t_dtw": -1
+				},
+				{
+					"text": " And",
+					"timestamps": {
+						"from": "00:00:00,180",
+						"to": "00:00:00,180"
+					},
+					"offsets": {
+						"from": 180,
+						"to": 180
+					},
+					"id": 843,
+					"p": 0.544524,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:00,300"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 300
+					},
+					"id": 379,
+					"p": 0.955817,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:00,430"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 430
+					},
+					"id": 262,
+					"p": 0.998784,
+					"t_dtw": -1
+				},
+				{
+					"text": " start",
+					"timestamps": {
+						"from": "00:00:00,500",
+						"to": "00:00:00,790"
+					},
+					"offsets": {
+						"from": 500,
+						"to": 790
+					},
+					"id": 923,
+					"p": 0.998811,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:00,790",
+						"to": "00:00:00,910"
+					},
+					"offsets": {
+						"from": 790,
+						"to": 910
+					},
+					"id": 286,
+					"p": 0.99819,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:00,910",
+						"to": "00:00:01,090"
+					},
+					"offsets": {
+						"from": 910,
+						"to": 1090
+					},
+					"id": 262,
+					"p": 0.989483,
+					"t_dtw": -1
+				},
+				{
+					"text": " climb",
+					"timestamps": {
+						"from": "00:00:01,090",
+						"to": "00:00:01,330"
+					},
+					"offsets": {
+						"from": 1090,
+						"to": 1330
+					},
+					"id": 12080,
+					"p": 0.92245,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,560",
+						"to": "00:00:01,560"
+					},
+					"offsets": {
+						"from": 1560,
+						"to": 1560
+					},
+					"id": 11,
+					"p": 0.77807,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:01,660",
+						"to": "00:00:01,660"
+					},
+					"offsets": {
+						"from": 1660,
+						"to": 1660
+					},
+					"id": 257,
+					"p": 0.899643,
+					"t_dtw": -1
+				},
+				{
+					"text": " backup",
+					"timestamps": {
+						"from": "00:00:01,700",
+						"to": "00:00:02,300"
+					},
+					"offsets": {
+						"from": 1700,
+						"to": 2300
+					},
+					"id": 11559,
+					"p": 0.836235,
+					"t_dtw": -1
+				},
+				{
+					"text": " job",
+					"timestamps": {
+						"from": "00:00:02,300",
+						"to": "00:00:02,550"
+					},
+					"offsets": {
+						"from": 2300,
+						"to": 2550
+					},
+					"id": 1693,
+					"p": 0.989492,
+					"t_dtw": -1
+				},
+				{
+					"text": " writing",
+					"timestamps": {
+						"from": "00:00:02,750",
+						"to": "00:00:03,050"
+					},
+					"offsets": {
+						"from": 2750,
+						"to": 3050
+					},
+					"id": 3597,
+					"p": 0.922757,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:03,060",
+						"to": "00:00:03,170"
+					},
+					"offsets": {
+						"from": 3060,
+						"to": 3170
+					},
+					"id": 284,
+					"p": 0.967239,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:03,170",
+						"to": "00:00:03,340"
+					},
+					"offsets": {
+						"from": 3170,
+						"to": 3340
+					},
+					"id": 262,
+					"p": 0.989085,
+					"t_dtw": -1
+				},
+				{
+					"text": " database",
+					"timestamps": {
+						"from": "00:00:03,340",
+						"to": "00:00:03,810"
+					},
+					"offsets": {
+						"from": 3340,
+						"to": 3810
+					},
+					"id": 6831,
+					"p": 0.937672,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:03,810",
+						"to": "00:00:03,920"
+					},
+					"offsets": {
+						"from": 3810,
+						"to": 3920
+					},
+					"id": 338,
+					"p": 0.989612,
+					"t_dtw": -1
+				},
+				{
+					"text": " own",
+					"timestamps": {
+						"from": "00:00:03,920",
+						"to": "00:00:04,090"
+					},
+					"offsets": {
+						"from": 3920,
+						"to": 4090
+					},
+					"id": 898,
+					"p": 0.992379,
+					"t_dtw": -1
+				},
+				{
+					"text": " disk",
+					"timestamps": {
+						"from": "00:00:04,090",
+						"to": "00:00:04,310"
+					},
+					"offsets": {
+						"from": 4090,
+						"to": 4310
+					},
+					"id": 11898,
+					"p": 0.942559,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,310",
+						"to": "00:00:04,480"
+					},
+					"offsets": {
+						"from": 4310,
+						"to": 4480
+					},
+					"id": 13,
+					"p": 0.947211,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_227]",
+					"timestamps": {
+						"from": "00:00:04,540",
+						"to": "00:00:04,540"
+					},
+					"offsets": {
+						"from": 4540,
+						"to": 4540
+					},
+					"id": 50590,
+					"p": 0.0226586,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

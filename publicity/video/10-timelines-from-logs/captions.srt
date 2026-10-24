@@ -1,141 +1,141 @@
 1
-00:00:00,860 --> 00:00:04,660
+00:00:01,040 --> 00:00:04,050
 When something breaks, the
 first question is always:
 
 2
-00:00:04,710 --> 00:00:09,240
+00:00:04,100 --> 00:00:09,510
 what happened, and in what order?
 The answers are in your logs,
 
 3
-00:00:09,290 --> 00:00:15,100
+00:00:09,560 --> 00:00:15,080
 spread over every host. OpenChronology
 turns each log entry into a moment on one
 
 4
-00:00:15,150 --> 00:00:16,517
+00:00:15,130 --> 00:00:16,452
 timeline.
 
 5
-00:00:18,017 --> 00:00:22,157
+00:00:18,032 --> 00:00:22,282
 For logs you already have,
 there's a command-line importer.
 
 6
-00:00:22,207 --> 00:00:26,497
+00:00:22,332 --> 00:00:25,592
 Point it at syslog files,
 Apache or nginx logs,
 
 7
-00:00:26,547 --> 00:00:31,967
+00:00:25,642 --> 00:00:32,602
 JSON lines or the journal, gzipped or
 not, and try it with a dry run first.
 
 8
-00:00:32,017 --> 00:00:35,357
+00:00:32,652 --> 00:00:35,242
 Each entry keeps its fields
 as tags and metadata,
 
 9
-00:00:35,407 --> 00:00:37,779
+00:00:35,292 --> 00:00:37,533
 and its severity.
 
 10
-00:00:39,249 --> 00:00:45,439
+00:00:38,973 --> 00:00:45,943
 Or stream them as they happen. A syslog
 receiver listens on UDP and TCP,
 
 11
-00:00:45,489 --> 00:00:48,199
+00:00:45,993 --> 00:00:49,223
 and a journal follower
 reads the systemd journal,
 
 12
-00:00:48,249 --> 00:00:53,679
+00:00:49,273 --> 00:00:55,193
 here or over SSH. Routing rules send
 each entry to the right timeline,
 
 13
-00:00:53,729 --> 00:00:57,589
+00:00:55,243 --> 00:00:58,997
 and anyone with it open watches
 the new entries arrive.
 
 14
-00:00:59,039 --> 00:01:03,509
+00:01:00,727 --> 00:01:05,197
 Here's one night's incident: three
 hours of syslog from four hosts,
 
 15
-00:01:03,559 --> 00:01:08,549
+00:01:05,247 --> 00:01:10,987
 about two thousand three hundred entries.
 From a distance they're summaries.
 
 16
-00:01:08,599 --> 00:01:11,949
+00:01:11,037 --> 00:01:14,597
 Zoom into the outage, and
 the colours tell the story:
 
 17
-00:01:11,999 --> 00:01:15,269
+00:01:14,647 --> 00:01:17,457
 a run of red five-oh-twos
 from both web servers,
 
 18
-00:01:15,319 --> 00:01:19,176
+00:01:17,507 --> 00:01:21,809
 and just before them, critical
 errors from the database.
 
 19
-00:01:20,596 --> 00:01:26,496
+00:01:23,499 --> 00:01:28,039
 Separate by tags, choose the database
 host, and its entries get a track of their
 
 20
-00:01:26,546 --> 00:01:31,066
+00:01:28,089 --> 00:01:32,159
 own: disk usage climbing for forty
 minutes, then no space left,
 
 21
-00:01:31,116 --> 00:01:36,656
+00:01:32,209 --> 00:01:38,689
 and PostgreSQL stops. Go back to the
 start of the climb and there's a backup
 
 22
-00:01:36,706 --> 00:01:41,816
+00:01:38,739 --> 00:01:43,899
 job, writing to the database's own disk.
 Add what you found as moments of your
 
 23
-00:01:41,866 --> 00:01:46,243
+00:01:43,949 --> 00:01:48,691
 own, link cause to effect, and the
 timeline becomes the write-up.
 
 24
-00:01:47,893 --> 00:01:52,983
+00:01:50,421 --> 00:01:55,191
 Every entry keeps its exact time, to
 the microsecond where the log has it,
 
 25
-00:01:53,033 --> 00:01:58,213
+00:01:55,241 --> 00:02:00,511
 so entries from different hosts sort
 correctly. A timeline that keeps growing
 
 26
-00:01:58,263 --> 00:02:02,753
+00:02:00,561 --> 00:02:06,041
 can keep only its recent past,
 such as the last ninety days.
 
 27
-00:02:02,803 --> 00:02:07,052
+00:02:06,091 --> 00:02:10,013
 And one timeline holds up to
 two hundred thousand entries.
 
 28
-00:02:08,512 --> 00:02:12,052
+00:02:11,723 --> 00:02:14,963
 Point your syslog at it, and
 the next time something breaks,
 
 29
-00:02:12,102 --> 00:02:14,355
+00:02:15,013 --> 00:02:17,340
 the timeline is already there.

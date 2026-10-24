@@ -1,0 +1,450 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:04,600"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 4600
+			},
+			"text": " Make it public, and anyone can read it with one link, no account needed.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.885502,
+					"t_dtw": -1
+				},
+				{
+					"text": " Make",
+					"timestamps": {
+						"from": "00:00:00,280",
+						"to": "00:00:00,280"
+					},
+					"offsets": {
+						"from": 280,
+						"to": 280
+					},
+					"id": 6889,
+					"p": 0.965775,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:00,380"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 380
+					},
+					"id": 340,
+					"p": 0.996942,
+					"t_dtw": -1
+				},
+				{
+					"text": " public",
+					"timestamps": {
+						"from": "00:00:00,420",
+						"to": "00:00:00,840"
+					},
+					"offsets": {
+						"from": 420,
+						"to": 840
+					},
+					"id": 1171,
+					"p": 0.997253,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:00,840",
+						"to": "00:00:00,940"
+					},
+					"offsets": {
+						"from": 840,
+						"to": 940
+					},
+					"id": 11,
+					"p": 0.551382,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:01,150",
+						"to": "00:00:01,160"
+					},
+					"offsets": {
+						"from": 1150,
+						"to": 1160
+					},
+					"id": 290,
+					"p": 0.973072,
+					"t_dtw": -1
+				},
+				{
+					"text": " anyone",
+					"timestamps": {
+						"from": "00:00:01,160",
+						"to": "00:00:01,490"
+					},
+					"offsets": {
+						"from": 1160,
+						"to": 1490
+					},
+					"id": 2687,
+					"p": 0.996451,
+					"t_dtw": -1
+				},
+				{
+					"text": " can",
+					"timestamps": {
+						"from": "00:00:01,490",
+						"to": "00:00:01,650"
+					},
+					"offsets": {
+						"from": 1490,
+						"to": 1650
+					},
+					"id": 460,
+					"p": 0.996835,
+					"t_dtw": -1
+				},
+				{
+					"text": " read",
+					"timestamps": {
+						"from": "00:00:01,650",
+						"to": "00:00:01,870"
+					},
+					"offsets": {
+						"from": 1650,
+						"to": 1870
+					},
+					"id": 1100,
+					"p": 0.992923,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:01,870",
+						"to": "00:00:01,990"
+					},
+					"offsets": {
+						"from": 1870,
+						"to": 1990
+					},
+					"id": 340,
+					"p": 0.992795,
+					"t_dtw": -1
+				},
+				{
+					"text": " with",
+					"timestamps": {
+						"from": "00:00:02,000",
+						"to": "00:00:02,230"
+					},
+					"offsets": {
+						"from": 2000,
+						"to": 2230
+					},
+					"id": 351,
+					"p": 0.985415,
+					"t_dtw": -1
+				},
+				{
+					"text": " one",
+					"timestamps": {
+						"from": "00:00:02,230",
+						"to": "00:00:02,400"
+					},
+					"offsets": {
+						"from": 2230,
+						"to": 2400
+					},
+					"id": 530,
+					"p": 0.978731,
+					"t_dtw": -1
+				},
+				{
+					"text": " link",
+					"timestamps": {
+						"from": "00:00:02,400",
+						"to": "00:00:02,600"
+					},
+					"offsets": {
+						"from": 2400,
+						"to": 2600
+					},
+					"id": 2792,
+					"p": 0.99813,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,600",
+						"to": "00:00:02,640"
+					},
+					"offsets": {
+						"from": 2600,
+						"to": 2640
+					},
+					"id": 11,
+					"p": 0.500056,
+					"t_dtw": -1
+				},
+				{
+					"text": " no",
+					"timestamps": {
+						"from": "00:00:02,870",
+						"to": "00:00:02,920"
+					},
+					"offsets": {
+						"from": 2870,
+						"to": 2920
+					},
+					"id": 645,
+					"p": 0.8946,
+					"t_dtw": -1
+				},
+				{
+					"text": " account",
+					"timestamps": {
+						"from": "00:00:02,920",
+						"to": "00:00:03,490"
+					},
+					"offsets": {
+						"from": 2920,
+						"to": 3490
+					},
+					"id": 1848,
+					"p": 0.993961,
+					"t_dtw": -1
+				},
+				{
+					"text": " needed",
+					"timestamps": {
+						"from": "00:00:03,490",
+						"to": "00:00:03,720"
+					},
+					"offsets": {
+						"from": 3490,
+						"to": 3720
+					},
+					"id": 2622,
+					"p": 0.997042,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,600",
+						"to": "00:00:04,600"
+					},
+					"offsets": {
+						"from": 4600,
+						"to": 4600
+					},
+					"id": 13,
+					"p": 0.956242,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_230]",
+					"timestamps": {
+						"from": "00:00:04,600",
+						"to": "00:00:04,600"
+					},
+					"offsets": {
+						"from": 4600,
+						"to": 4600
+					},
+					"id": 50593,
+					"p": 0.0113698,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,600",
+				"to": "00:00:06,520"
+			},
+			"offsets": {
+				"from": 4600,
+				"to": 6520
+			},
+			"text": " Students can even fork their own copy.",
+			"tokens": [
+				{
+					"text": " Students",
+					"timestamps": {
+						"from": "00:00:04,900",
+						"to": "00:00:05,050"
+					},
+					"offsets": {
+						"from": 4900,
+						"to": 5050
+					},
+					"id": 14882,
+					"p": 0.997814,
+					"t_dtw": -1
+				},
+				{
+					"text": " can",
+					"timestamps": {
+						"from": "00:00:05,050",
+						"to": "00:00:05,210"
+					},
+					"offsets": {
+						"from": 5050,
+						"to": 5210
+					},
+					"id": 460,
+					"p": 0.999458,
+					"t_dtw": -1
+				},
+				{
+					"text": " even",
+					"timestamps": {
+						"from": "00:00:05,210",
+						"to": "00:00:05,430"
+					},
+					"offsets": {
+						"from": 5210,
+						"to": 5430
+					},
+					"id": 772,
+					"p": 0.997946,
+					"t_dtw": -1
+				},
+				{
+					"text": " fork",
+					"timestamps": {
+						"from": "00:00:05,430",
+						"to": "00:00:05,540"
+					},
+					"offsets": {
+						"from": 5430,
+						"to": 5540
+					},
+					"id": 15563,
+					"p": 0.992583,
+					"t_dtw": -1
+				},
+				{
+					"text": " their",
+					"timestamps": {
+						"from": "00:00:05,750",
+						"to": "00:00:05,930"
+					},
+					"offsets": {
+						"from": 5750,
+						"to": 5930
+					},
+					"id": 511,
+					"p": 0.9995,
+					"t_dtw": -1
+				},
+				{
+					"text": " own",
+					"timestamps": {
+						"from": "00:00:05,930",
+						"to": "00:00:06,090"
+					},
+					"offsets": {
+						"from": 5930,
+						"to": 6090
+					},
+					"id": 898,
+					"p": 0.999588,
+					"t_dtw": -1
+				},
+				{
+					"text": " copy",
+					"timestamps": {
+						"from": "00:00:06,090",
+						"to": "00:00:06,310"
+					},
+					"offsets": {
+						"from": 6090,
+						"to": 6310
+					},
+					"id": 4866,
+					"p": 0.999712,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:06,310",
+						"to": "00:00:06,520"
+					},
+					"offsets": {
+						"from": 6310,
+						"to": 6520
+					},
+					"id": 13,
+					"p": 0.873894,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_326]",
+					"timestamps": {
+						"from": "00:00:06,520",
+						"to": "00:00:06,520"
+					},
+					"offsets": {
+						"from": 6520,
+						"to": 6520
+					},
+					"id": 50689,
+					"p": 0.105062,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

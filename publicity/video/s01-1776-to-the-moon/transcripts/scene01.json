@@ -1,0 +1,227 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:03,840"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 3840
+			},
+			"text": " This is 230 years of American history on one line.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.88088,
+					"t_dtw": -1
+				},
+				{
+					"text": " This",
+					"timestamps": {
+						"from": "00:00:00,280",
+						"to": "00:00:00,290"
+					},
+					"offsets": {
+						"from": 280,
+						"to": 290
+					},
+					"id": 770,
+					"p": 0.918268,
+					"t_dtw": -1
+				},
+				{
+					"text": " is",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:00,450"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 450
+					},
+					"id": 318,
+					"p": 0.99756,
+					"t_dtw": -1
+				},
+				{
+					"text": " 230",
+					"timestamps": {
+						"from": "00:00:00,450",
+						"to": "00:00:01,140"
+					},
+					"offsets": {
+						"from": 450,
+						"to": 1140
+					},
+					"id": 18395,
+					"p": 0.940544,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:01,140",
+						"to": "00:00:01,520"
+					},
+					"offsets": {
+						"from": 1140,
+						"to": 1520
+					},
+					"id": 812,
+					"p": 0.900744,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:01,520",
+						"to": "00:00:01,670"
+					},
+					"offsets": {
+						"from": 1520,
+						"to": 1670
+					},
+					"id": 286,
+					"p": 0.995456,
+					"t_dtw": -1
+				},
+				{
+					"text": " American",
+					"timestamps": {
+						"from": "00:00:01,670",
+						"to": "00:00:02,280"
+					},
+					"offsets": {
+						"from": 1670,
+						"to": 2280
+					},
+					"id": 1605,
+					"p": 0.997086,
+					"t_dtw": -1
+				},
+				{
+					"text": " history",
+					"timestamps": {
+						"from": "00:00:02,280",
+						"to": "00:00:02,790"
+					},
+					"offsets": {
+						"from": 2280,
+						"to": 2790
+					},
+					"id": 2106,
+					"p": 0.94077,
+					"t_dtw": -1
+				},
+				{
+					"text": " on",
+					"timestamps": {
+						"from": "00:00:03,040",
+						"to": "00:00:03,040"
+					},
+					"offsets": {
+						"from": 3040,
+						"to": 3040
+					},
+					"id": 319,
+					"p": 0.494364,
+					"t_dtw": -1
+				},
+				{
+					"text": " one",
+					"timestamps": {
+						"from": "00:00:03,130",
+						"to": "00:00:03,340"
+					},
+					"offsets": {
+						"from": 3130,
+						"to": 3340
+					},
+					"id": 530,
+					"p": 0.934299,
+					"t_dtw": -1
+				},
+				{
+					"text": " line",
+					"timestamps": {
+						"from": "00:00:03,340",
+						"to": "00:00:03,690"
+					},
+					"offsets": {
+						"from": 3340,
+						"to": 3690
+					},
+					"id": 1627,
+					"p": 0.997109,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:03,760",
+						"to": "00:00:03,780"
+					},
+					"offsets": {
+						"from": 3760,
+						"to": 3780
+					},
+					"id": 13,
+					"p": 0.964811,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_192]",
+					"timestamps": {
+						"from": "00:00:03,840",
+						"to": "00:00:03,840"
+					},
+					"offsets": {
+						"from": 3840,
+						"to": 3840
+					},
+					"id": 50555,
+					"p": 0.0483725,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

@@ -4,6 +4,9 @@
 
 Usage: python3 common/captions.py <video folder>
 
+burned() gives a vertical video's burned-in captions, a few words at a time; build.py puts them
+in its page.
+
 Words said beyond the script (a longer phrasing in a take) are kept; mishearings are not.
 Without an alignment, the estimated word times from build.py are used.
 """
@@ -42,12 +45,10 @@ def ts(t):
     return f"{ms // 3600000:02d}:{ms // 60000 % 60:02d}:{ms // 1000 % 60:02d},{ms % 1000:03d}"
 
 
-def main(folder):
-    folder = os.path.abspath(folder)
-    cfg = json.load(open(os.path.join(folder, "video.json")))
+def timed_words(folder, cfg, TL):
+    """Each scene's words in the script's spelling, with the time each is said: [(scene, [(word, t)])]."""
     vo = {sc["id"]: sc["vo"] for sc in parse_script(os.path.join(folder, cfg["script"]))}
-    TL = json.loads(re.search(r"var TL = (.*);\s*$", open(os.path.join(folder, "timeline.js")).read(), re.S).group(1))
-    cues = []
+    out = []
     for sc in TL["scenes"]:
         i = sc["id"]
         script = vo[i].split()
@@ -77,19 +78,48 @@ def main(folder):
                 words.append((w, times.get(k, times.get(len(times) - 1, 0))))
                 if norm(w):
                     k += 1
+        out.append((sc, [(w, round(base + t, 3)) for w, t in words]))
+    return out
+
+
+def burned(folder, cfg, TL):
+    """The burned-in captions of a vertical video: a few words at a time, each with when it's said.
+    [[start, end, [[word, t], ...]], ...]"""
+    cues = []
+    for sc, words in timed_words(folder, cfg, TL):
+        chunk = []
+        for w, t in words:
+            if chunk and (len(chunk) >= 3 or len(" ".join(x for x, _ in chunk + [(w, t)])) > 18
+                          or re.search(r"[.,;:!?—]$", chunk[-1][0])):
+                cues.append([chunk[0][1], t, [list(x) for x in chunk]])
+                chunk = []
+            chunk.append((w, t))
+        if chunk:
+            cues.append([chunk[0][1], round(sc["start"] + sc["voice"] + sc["speech"] + 0.25, 3), [list(x) for x in chunk]])
+    for a, b in zip(cues, cues[1:]):
+        a[1] = round(min(a[1], b[0]), 3)
+    return cues
+
+
+def main(folder):
+    folder = os.path.abspath(folder)
+    cfg = json.load(open(os.path.join(folder, "video.json")))
+    TL = json.loads(re.search(r"var TL = (.*);\s*$", open(os.path.join(folder, "timeline.js")).read(), re.S).group(1))
+    cues = []
+    for sc, words in timed_words(folder, cfg, TL):
         chunk = []
 
         def flush(end):
             if chunk:
-                cues.append([base + chunk[0][1], end, " ".join(w for w, _ in chunk)])
+                cues.append([chunk[0][1], end, " ".join(w for w, _ in chunk)])
 
         for w, t in words:
             text = " ".join(x for x, _ in chunk + [(w, t)])
             if chunk and (len(text) > 80 or (len(text) > 50 and re.search(r"[.,;:]$", chunk[-1][0]))):
-                flush(base + t - 0.05)
+                flush(t - 0.05)
                 chunk = []
             chunk.append((w, t))
-        flush(base + sc["speech"] + 0.4)
+        flush(sc["start"] + sc["voice"] + sc["speech"] + 0.4)
     lines = []
     for n, (a, b, text) in enumerate(cues, 1):
         if n < len(cues):

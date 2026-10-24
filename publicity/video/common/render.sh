@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-# Renders a video's frames/NNNNN.jpg (1920x1080) from its page.html, in the Playwright image.
+# Renders a video's frames/NNNNN.jpg (1920x1080, or 1080x1920 for a short) from its page.html, in the Playwright image.
 # Usage: common/render.sh <video folder> [from_seconds to_seconds [outdir]]   (default: all of it)
 # Mounts the repository so render.mjs finds the repository's own playwright package.
 set -e

@@ -512,12 +512,7 @@ SCENES[6] = function (lt, q) {
     rect(0, 0, 320, 172, C.ground, { op: 0.94 }) +
       txt(160, 70, 'Keep your canon straight', { size: 14, weight: 700, serif: true }) +
       wordmark(160, 100, 11) +
-      txt(160, 116, 'github.com/openchronology/timeline-app', {
-        size: 5.8,
-        mono: true,
-        fill: C.soft,
-        weight: 500,
-      }),
+      addresses(160, 116, 5.8),
     { o: e, ty: (1 - e) * 6 },
   );
   return s;
