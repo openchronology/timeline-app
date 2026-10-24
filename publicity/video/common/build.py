@@ -12,6 +12,10 @@ minute, so frames can be drafted before anything is recorded.
 
 video.json: {"script": "../../2-how-to-see-a-timeline.md", "look": "paper",
              "minDur": {"3": 9.5}, "hold": 3.0}
+
+A short gives "format": "vertical": a 1080 × 1920 page (a 180 × 320 stage), the narration's
+words burned in as captions (captions.py's burned()), and usually a tighter "lead" and "tail"
+(the silence before and after each scene's speech).
 """
 import json, os, re, sys
 
@@ -124,6 +128,8 @@ def main(folder):
     cuts_path = os.path.join(folder, "cuts.json")
     cuts = json.load(open(cuts_path)) if os.path.exists(cuts_path) else {}
     min_dur = {int(k): v for k, v in cfg.get("minDur", {}).items()}
+    vertical = cfg.get("format") == "vertical"
+    lead, tail = cfg.get("lead", LEAD), cfg.get("tail", TAIL)
     scenes, t, estimated = [], 0.0, []
     for k, sc in enumerate(scenes_md):
         i, last = sc["id"], k == len(scenes_md) - 1
@@ -134,9 +140,9 @@ def main(folder):
         else:
             words, speech = estimated_words(sc["vo"])
             estimated.append(i)
-        dur = max(LEAD + speech + TAIL, min_dur.get(i, 0)) + (cfg.get("hold", 3.0) if last else 0)
+        dur = max(lead + speech + tail, min_dur.get(i, 0)) + (cfg.get("hold", 3.0) if last else 0)
         scenes.append(dict(id=i, act=sc["act"], ost=sc["ost"], start=round(t, 3), dur=round(dur, 3),
-                           voice=LEAD, speech=round(speech, 3), words=words, last=last))
+                           voice=lead, speech=round(speech, 3), words=words, last=last))
         t += dur
     acts = []
     for sc in scenes:
@@ -150,13 +156,19 @@ def main(folder):
         "var TL = " + json.dumps(tl) + ";\n")
     write_readme(folder, cfg)
     shots = os.path.join(folder, "shots.js")
+    # A short is 1080 × 1920, with its captions burned in; the others are 1920 × 1080.
+    (w, h), caps = ((320, 180), "")
+    if vertical:
+        from captions import burned
+        (w, h), caps = (180, 320), "var CAPS = " + json.dumps(burned(folder, cfg, tl)) + ";\n"
     page = ('<!doctype html><html><head><meta charset="utf-8">'
             '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700'
             '&family=IBM+Plex+Mono:wght@400;500;600&family=EB+Garamond:ital,wght@0,500;0,600;0,700;1,500&display=block">'
-            '<style>html,body{margin:0;background:#000}svg{display:block;width:1920px;height:1080px}</style></head>'
-            '<body><svg id="stage" viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" '
+            f'<style>html,body{{margin:0;background:#000}}svg{{display:block;width:{w * 6}px;height:{h * 6}px}}</style></head>'
+            f'<body><svg id="stage" viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg" '
             'xmlns:xlink="http://www.w3.org/1999/xlink"></svg><script>\n'
             f"var LOOK = {json.dumps(cfg.get('look', 'paper'))};\n"
+            + (f"var FORMAT = 'vertical';\n" + caps if vertical else "")
             + open(os.path.join(COMMON, "core.js")).read()
             + open(os.path.join(folder, "timeline.js")).read()
             + (open(shots).read() if os.path.exists(shots) else "")

@@ -29,7 +29,7 @@ var LANDING = -14182940,
   STEP = LANDING + 23915;
 SCENES[2] = function (lt, q) {
   var s = '';
-  var tz0 = q('zoom') - 0.4,
+  var tz0 = q(['zoom', 'consume']) - 0.4,
     tz1 = Math.min(q.end, tz0 + 9);
   var z = smooth((lt - tz0) / (tz1 - tz0));
   var span = lerpLog(330 * 31557600, 9 * 3600, z);
@@ -233,15 +233,9 @@ SCENES[4] = function (lt, q) {
   s += G(
     rect(0, 0, 320, 180, C.ground, { op: 0.97 }) +
       wordmark(160, 70, 16) +
-      txt(160, 92, 'timescale.info', { size: 8, mono: true, fill: C.accent, weight: 500 }) +
       txt(160, 120, 'Next: How to see a timeline', { size: 7.5 }) +
       txt(160, 131, 'and a video for what you do', { size: 6.5, fill: C.soft, weight: 500 }) +
-      txt(160, 146, 'github.com/openchronology/timeline-app', {
-        size: 5.6,
-        mono: true,
-        fill: C.soft,
-        weight: 500,
-      }),
+      addresses(160, 92, 6.4),
     { o: e },
   );
   return s;

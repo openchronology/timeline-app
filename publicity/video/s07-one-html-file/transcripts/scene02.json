@@ -1,0 +1,534 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:03,580"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 3580
+			},
+			"text": " carry it on a stick, and open it on a machine that's never been online.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.930477,
+					"t_dtw": -1
+				},
+				{
+					"text": " carry",
+					"timestamps": {
+						"from": "00:00:00,320",
+						"to": "00:00:00,370"
+					},
+					"offsets": {
+						"from": 320,
+						"to": 370
+					},
+					"id": 3283,
+					"p": 0.708427,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:00,370",
+						"to": "00:00:00,510"
+					},
+					"offsets": {
+						"from": 370,
+						"to": 510
+					},
+					"id": 340,
+					"p": 0.997173,
+					"t_dtw": -1
+				},
+				{
+					"text": " on",
+					"timestamps": {
+						"from": "00:00:00,510",
+						"to": "00:00:00,650"
+					},
+					"offsets": {
+						"from": 510,
+						"to": 650
+					},
+					"id": 319,
+					"p": 0.998464,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:00,650",
+						"to": "00:00:00,720"
+					},
+					"offsets": {
+						"from": 650,
+						"to": 720
+					},
+					"id": 257,
+					"p": 0.995118,
+					"t_dtw": -1
+				},
+				{
+					"text": " stick",
+					"timestamps": {
+						"from": "00:00:00,720",
+						"to": "00:00:00,980"
+					},
+					"offsets": {
+						"from": 720,
+						"to": 980
+					},
+					"id": 4859,
+					"p": 0.998923,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,140",
+						"to": "00:00:01,200"
+					},
+					"offsets": {
+						"from": 1140,
+						"to": 1200
+					},
+					"id": 11,
+					"p": 0.649878,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:01,340",
+						"to": "00:00:01,380"
+					},
+					"offsets": {
+						"from": 1340,
+						"to": 1380
+					},
+					"id": 290,
+					"p": 0.847948,
+					"t_dtw": -1
+				},
+				{
+					"text": " open",
+					"timestamps": {
+						"from": "00:00:01,380",
+						"to": "00:00:01,570"
+					},
+					"offsets": {
+						"from": 1380,
+						"to": 1570
+					},
+					"id": 1280,
+					"p": 0.989083,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:01,650",
+						"to": "00:00:01,750"
+					},
+					"offsets": {
+						"from": 1650,
+						"to": 1750
+					},
+					"id": 340,
+					"p": 0.986781,
+					"t_dtw": -1
+				},
+				{
+					"text": " on",
+					"timestamps": {
+						"from": "00:00:01,750",
+						"to": "00:00:01,870"
+					},
+					"offsets": {
+						"from": 1750,
+						"to": 1870
+					},
+					"id": 319,
+					"p": 0.987155,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:01,870",
+						"to": "00:00:01,930"
+					},
+					"offsets": {
+						"from": 1870,
+						"to": 1930
+					},
+					"id": 257,
+					"p": 0.99296,
+					"t_dtw": -1
+				},
+				{
+					"text": " machine",
+					"timestamps": {
+						"from": "00:00:01,930",
+						"to": "00:00:02,390"
+					},
+					"offsets": {
+						"from": 1930,
+						"to": 2390
+					},
+					"id": 4572,
+					"p": 0.995904,
+					"t_dtw": -1
+				},
+				{
+					"text": " that",
+					"timestamps": {
+						"from": "00:00:02,390",
+						"to": "00:00:02,520"
+					},
+					"offsets": {
+						"from": 2390,
+						"to": 2520
+					},
+					"id": 326,
+					"p": 0.909467,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:02,610",
+						"to": "00:00:02,680"
+					},
+					"offsets": {
+						"from": 2610,
+						"to": 2680
+					},
+					"id": 338,
+					"p": 0.990781,
+					"t_dtw": -1
+				},
+				{
+					"text": " never",
+					"timestamps": {
+						"from": "00:00:02,680",
+						"to": "00:00:02,900"
+					},
+					"offsets": {
+						"from": 2680,
+						"to": 2900
+					},
+					"id": 1239,
+					"p": 0.989049,
+					"t_dtw": -1
+				},
+				{
+					"text": " been",
+					"timestamps": {
+						"from": "00:00:02,930",
+						"to": "00:00:03,110"
+					},
+					"offsets": {
+						"from": 2930,
+						"to": 3110
+					},
+					"id": 587,
+					"p": 0.996597,
+					"t_dtw": -1
+				},
+				{
+					"text": " online",
+					"timestamps": {
+						"from": "00:00:03,110",
+						"to": "00:00:03,390"
+					},
+					"offsets": {
+						"from": 3110,
+						"to": 3390
+					},
+					"id": 2691,
+					"p": 0.975314,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:03,400",
+						"to": "00:00:03,490"
+					},
+					"offsets": {
+						"from": 3400,
+						"to": 3490
+					},
+					"id": 13,
+					"p": 0.971842,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_179]",
+					"timestamps": {
+						"from": "00:00:03,580",
+						"to": "00:00:03,580"
+					},
+					"offsets": {
+						"from": 3580,
+						"to": 3580
+					},
+					"id": 50542,
+					"p": 0.0136296,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:03,580",
+				"to": "00:00:08,180"
+			},
+			"offsets": {
+				"from": 3580,
+				"to": 8180
+			},
+			"text": " It never uses the network. No account, nothing to install.",
+			"tokens": [
+				{
+					"text": " It",
+					"timestamps": {
+						"from": "00:00:03,780",
+						"to": "00:00:03,780"
+					},
+					"offsets": {
+						"from": 3780,
+						"to": 3780
+					},
+					"id": 632,
+					"p": 0.983566,
+					"t_dtw": -1
+				},
+				{
+					"text": " never",
+					"timestamps": {
+						"from": "00:00:03,910",
+						"to": "00:00:04,280"
+					},
+					"offsets": {
+						"from": 3910,
+						"to": 4280
+					},
+					"id": 1239,
+					"p": 0.996369,
+					"t_dtw": -1
+				},
+				{
+					"text": " uses",
+					"timestamps": {
+						"from": "00:00:04,280",
+						"to": "00:00:04,560"
+					},
+					"offsets": {
+						"from": 4280,
+						"to": 4560
+					},
+					"id": 3544,
+					"p": 0.997742,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:04,920",
+						"to": "00:00:04,980"
+					},
+					"offsets": {
+						"from": 4920,
+						"to": 4980
+					},
+					"id": 262,
+					"p": 0.997615,
+					"t_dtw": -1
+				},
+				{
+					"text": " network",
+					"timestamps": {
+						"from": "00:00:04,980",
+						"to": "00:00:05,680"
+					},
+					"offsets": {
+						"from": 4980,
+						"to": 5680
+					},
+					"id": 3127,
+					"p": 0.993419,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,680",
+						"to": "00:00:05,970"
+					},
+					"offsets": {
+						"from": 5680,
+						"to": 5970
+					},
+					"id": 13,
+					"p": 0.843647,
+					"t_dtw": -1
+				},
+				{
+					"text": " No",
+					"timestamps": {
+						"from": "00:00:06,010",
+						"to": "00:00:06,300"
+					},
+					"offsets": {
+						"from": 6010,
+						"to": 6300
+					},
+					"id": 1400,
+					"p": 0.723162,
+					"t_dtw": -1
+				},
+				{
+					"text": " account",
+					"timestamps": {
+						"from": "00:00:06,300",
+						"to": "00:00:07,050"
+					},
+					"offsets": {
+						"from": 6300,
+						"to": 7050
+					},
+					"id": 1848,
+					"p": 0.995206,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:07,050",
+						"to": "00:00:07,440"
+					},
+					"offsets": {
+						"from": 7050,
+						"to": 7440
+					},
+					"id": 11,
+					"p": 0.755073,
+					"t_dtw": -1
+				},
+				{
+					"text": " nothing",
+					"timestamps": {
+						"from": "00:00:07,440",
+						"to": "00:00:07,750"
+					},
+					"offsets": {
+						"from": 7440,
+						"to": 7750
+					},
+					"id": 2147,
+					"p": 0.903977,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:07,750",
+						"to": "00:00:07,830"
+					},
+					"offsets": {
+						"from": 7750,
+						"to": 7830
+					},
+					"id": 284,
+					"p": 0.999382,
+					"t_dtw": -1
+				},
+				{
+					"text": " install",
+					"timestamps": {
+						"from": "00:00:08,020",
+						"to": "00:00:08,160"
+					},
+					"offsets": {
+						"from": 8020,
+						"to": 8160
+					},
+					"id": 2721,
+					"p": 0.999163,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:08,160",
+						"to": "00:00:08,180"
+					},
+					"offsets": {
+						"from": 8160,
+						"to": 8180
+					},
+					"id": 13,
+					"p": 0.967131,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_409]",
+					"timestamps": {
+						"from": "00:00:08,180",
+						"to": "00:00:08,180"
+					},
+					"offsets": {
+						"from": 8180,
+						"to": 8180
+					},
+					"id": 50772,
+					"p": 0.123881,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

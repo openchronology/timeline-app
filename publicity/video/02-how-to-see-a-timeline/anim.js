@@ -942,15 +942,10 @@ SCENES[7] = function (lt, q) {
   var keep = title() + voyage(v, {});
   var e = P(lt, q('open') - 0.2, 0.8);
   var endCard =
-    card(66, 119, 188, 53, { rx: 4 }) +
-    wordmark(160, 134, 10) +
-    txt(160, 146, 'Open a public timeline · no account needed', { size: 6.4 }) +
-    txt(160, 156, 'Next: tours of real timelines', { size: 5.6, fill: C.soft, weight: 500 }) +
-    txt(160, 166, 'github.com/openchronology/timeline-app', {
-      size: 5.2,
-      mono: true,
-      fill: C.accent,
-      weight: 500,
-    });
+    card(66, 111, 188, 65, { rx: 4 }) +
+    wordmark(160, 126, 10) +
+    txt(160, 138, 'Open a public timeline · no account needed', { size: 6.4 }) +
+    txt(160, 148, 'Next: tours of real timelines', { size: 5.6, fill: C.soft, weight: 500 }) +
+    addresses(160, 159, 5.2);
   return { svg: rise(endCard, e, 10), keep: keep, keepIn: true };
 };

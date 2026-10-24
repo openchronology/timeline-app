@@ -2,7 +2,8 @@
   "script": "../../6-tour-a-storys-timeline.md",
   "look": "parchment",
   "say": {
-    "Mirelle": "Mih-rell"
+    "Mirelle's": "[Mirelle's](/mɪɹˈɛlz/)",
+    "Mirelle": "[Mirelle](/mɪɹˈɛl/)"
   },
   "minDur": {
     "4": 18,

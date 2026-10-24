@@ -1,0 +1,366 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:02,500"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 2500
+			},
+			"text": " Writing a story with a big cast.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.831556,
+					"t_dtw": -1
+				},
+				{
+					"text": " Writing",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:00,550"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 550
+					},
+					"id": 22183,
+					"p": 0.652863,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:00,550",
+						"to": "00:00:00,630"
+					},
+					"offsets": {
+						"from": 550,
+						"to": 630
+					},
+					"id": 257,
+					"p": 0.995691,
+					"t_dtw": -1
+				},
+				{
+					"text": " story",
+					"timestamps": {
+						"from": "00:00:00,630",
+						"to": "00:00:01,020"
+					},
+					"offsets": {
+						"from": 630,
+						"to": 1020
+					},
+					"id": 1621,
+					"p": 0.928185,
+					"t_dtw": -1
+				},
+				{
+					"text": " with",
+					"timestamps": {
+						"from": "00:00:01,020",
+						"to": "00:00:01,290"
+					},
+					"offsets": {
+						"from": 1020,
+						"to": 1290
+					},
+					"id": 351,
+					"p": 0.998182,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:01,350",
+						"to": "00:00:01,400"
+					},
+					"offsets": {
+						"from": 1350,
+						"to": 1400
+					},
+					"id": 257,
+					"p": 0.997196,
+					"t_dtw": -1
+				},
+				{
+					"text": " big",
+					"timestamps": {
+						"from": "00:00:01,400",
+						"to": "00:00:01,650"
+					},
+					"offsets": {
+						"from": 1400,
+						"to": 1650
+					},
+					"id": 1263,
+					"p": 0.977232,
+					"t_dtw": -1
+				},
+				{
+					"text": " cast",
+					"timestamps": {
+						"from": "00:00:01,650",
+						"to": "00:00:01,770"
+					},
+					"offsets": {
+						"from": 1650,
+						"to": 1770
+					},
+					"id": 3350,
+					"p": 0.996951,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:02,040",
+						"to": "00:00:02,490"
+					},
+					"offsets": {
+						"from": 2040,
+						"to": 2490
+					},
+					"id": 13,
+					"p": 0.712777,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_125]",
+					"timestamps": {
+						"from": "00:00:02,500",
+						"to": "00:00:02,500"
+					},
+					"offsets": {
+						"from": 2500,
+						"to": 2500
+					},
+					"id": 50488,
+					"p": 0.0264181,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:02,500",
+				"to": "00:00:04,500"
+			},
+			"offsets": {
+				"from": 2500,
+				"to": 4500
+			},
+			"text": " Here's how to check one character at a time.",
+			"tokens": [
+				{
+					"text": " Here",
+					"timestamps": {
+						"from": "00:00:02,710",
+						"to": "00:00:02,710"
+					},
+					"offsets": {
+						"from": 2710,
+						"to": 2710
+					},
+					"id": 3423,
+					"p": 0.996681,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:02,800",
+						"to": "00:00:02,810"
+					},
+					"offsets": {
+						"from": 2800,
+						"to": 2810
+					},
+					"id": 338,
+					"p": 0.99682,
+					"t_dtw": -1
+				},
+				{
+					"text": " how",
+					"timestamps": {
+						"from": "00:00:02,810",
+						"to": "00:00:02,960"
+					},
+					"offsets": {
+						"from": 2810,
+						"to": 2960
+					},
+					"id": 703,
+					"p": 0.998388,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:02,960",
+						"to": "00:00:03,060"
+					},
+					"offsets": {
+						"from": 2960,
+						"to": 3060
+					},
+					"id": 284,
+					"p": 0.999142,
+					"t_dtw": -1
+				},
+				{
+					"text": " check",
+					"timestamps": {
+						"from": "00:00:03,060",
+						"to": "00:00:03,320"
+					},
+					"offsets": {
+						"from": 3060,
+						"to": 3320
+					},
+					"id": 2198,
+					"p": 0.997535,
+					"t_dtw": -1
+				},
+				{
+					"text": " one",
+					"timestamps": {
+						"from": "00:00:03,320",
+						"to": "00:00:03,470"
+					},
+					"offsets": {
+						"from": 3320,
+						"to": 3470
+					},
+					"id": 530,
+					"p": 0.99204,
+					"t_dtw": -1
+				},
+				{
+					"text": " character",
+					"timestamps": {
+						"from": "00:00:03,470",
+						"to": "00:00:03,940"
+					},
+					"offsets": {
+						"from": 3470,
+						"to": 3940
+					},
+					"id": 2095,
+					"p": 0.998523,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:03,940",
+						"to": "00:00:04,030"
+					},
+					"offsets": {
+						"from": 3940,
+						"to": 4030
+					},
+					"id": 379,
+					"p": 0.995047,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:04,040",
+						"to": "00:00:04,090"
+					},
+					"offsets": {
+						"from": 4040,
+						"to": 4090
+					},
+					"id": 257,
+					"p": 0.997567,
+					"t_dtw": -1
+				},
+				{
+					"text": " time",
+					"timestamps": {
+						"from": "00:00:04,090",
+						"to": "00:00:04,260"
+					},
+					"offsets": {
+						"from": 4090,
+						"to": 4260
+					},
+					"id": 640,
+					"p": 0.999502,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,500",
+						"to": "00:00:04,500"
+					},
+					"offsets": {
+						"from": 4500,
+						"to": 4500
+					},
+					"id": 13,
+					"p": 0.970981,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_225]",
+					"timestamps": {
+						"from": "00:00:04,500",
+						"to": "00:00:04,500"
+					},
+					"offsets": {
+						"from": 4500,
+						"to": 4500
+					},
+					"id": 50588,
+					"p": 0.0547077,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

@@ -532,15 +532,6 @@ SCENES[6] = function (lt, q) {
   var e = P(lt, endCard(q), 0.9);
   s +=
     G(rect(-20, -1, 360, 200, C.ground), { o: 0.94 * e }) +
-    G(
-      wordmark(160, 84, 16) +
-        txt(160, 104, 'github.com/openchronology/timeline-app', {
-          size: 5.6,
-          mono: true,
-          fill: C.soft,
-          weight: 500,
-        }),
-      { o: e, ty: (1 - e) * 6 },
-    );
+    G(wordmark(160, 84, 16) + addresses(160, 104, 5.6), { o: e, ty: (1 - e) * 6 });
   return finish(lt, q, app(cam) + gauge(v), s, true);
 };
