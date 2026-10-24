@@ -4,6 +4,8 @@ Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
 The explainer video series: who it's for, a script and storyboard for each video, and the source that renders them. Start with [the audiences and the series](0-audiences-and-series.md), which says why there are eleven videos and how each one is made for its audience. Each script gives every scene's picture (`FRAME`), movement (`MOTION`), on-screen text (`OST`) and narration (`VO`), then the narration alone for the voice session, the claims with their sources, and the questions the audience will ask.
 
+The [shorts](shorts/README.md) are eight vertical cuts for TikTok, YouTube Shorts and Reels, each taking one fact from an explainer to the feed where its audience is.
+
 ## Contents
 
 | File                                                                   | What it is for                                                                                            |
@@ -20,4 +22,5 @@ The explainer video series: who it's for, a script and storyboard for each video
 | [`9-working-together.md`](9-working-together.md)                       | Video 9, for classes and communities: sharing, roles, pull requests, forks and history.                   |
 | [`10-timelines-from-logs.md`](10-timelines-from-logs.md)               | Video 10, for operations: logs into timelines, and an incident investigated in the real app.              |
 | [`11-run-your-own-server.md`](11-run-your-own-server.md)               | Video 11, for administrators: the footprint, packages, configuration, running and upgrading.              |
+| [`shorts/`](shorts/README.md)                                          | The eight vertical shorts: what the feeds demand, their audiences, and a script for each.                 |
 | [`video/`](video/README.md)                                            | The pipeline and each video's animation source, the tours' sample timelines and their captured shots.     |

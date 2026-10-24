@@ -491,12 +491,7 @@ SCENES[6] = function (lt, q) {
   s += rise(
     txt(160, 104, 'Keep your canon', { size: 14, weight: 700, serif: true }) +
       wordmark(160, 124, 10) +
-      txt(160, 137, 'github.com/openchronology/timeline-app', {
-        size: 5.8,
-        mono: true,
-        fill: C.soft,
-        weight: 500,
-      }),
+      addresses(160, 137, 5.8),
     e,
     6,
   );

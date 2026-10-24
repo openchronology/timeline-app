@@ -1,0 +1,451 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:07,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 7000
+			},
+			"text": " This is the real thing at true scale, from the Earth forming all the way down to a single second on one line you consume.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.888147,
+					"t_dtw": -1
+				},
+				{
+					"text": " This",
+					"timestamps": {
+						"from": "00:00:00,280",
+						"to": "00:00:00,310"
+					},
+					"offsets": {
+						"from": 280,
+						"to": 310
+					},
+					"id": 770,
+					"p": 0.96859,
+					"t_dtw": -1
+				},
+				{
+					"text": " is",
+					"timestamps": {
+						"from": "00:00:00,310",
+						"to": "00:00:00,460"
+					},
+					"offsets": {
+						"from": 310,
+						"to": 460
+					},
+					"id": 318,
+					"p": 0.997786,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:00,460",
+						"to": "00:00:00,690"
+					},
+					"offsets": {
+						"from": 460,
+						"to": 690
+					},
+					"id": 262,
+					"p": 0.993612,
+					"t_dtw": -1
+				},
+				{
+					"text": " real",
+					"timestamps": {
+						"from": "00:00:00,690",
+						"to": "00:00:01,000"
+					},
+					"offsets": {
+						"from": 690,
+						"to": 1000
+					},
+					"id": 1103,
+					"p": 0.994964,
+					"t_dtw": -1
+				},
+				{
+					"text": " thing",
+					"timestamps": {
+						"from": "00:00:01,000",
+						"to": "00:00:01,370"
+					},
+					"offsets": {
+						"from": 1000,
+						"to": 1370
+					},
+					"id": 1517,
+					"p": 0.999222,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:01,450",
+						"to": "00:00:01,530"
+					},
+					"offsets": {
+						"from": 1450,
+						"to": 1530
+					},
+					"id": 379,
+					"p": 0.758333,
+					"t_dtw": -1
+				},
+				{
+					"text": " true",
+					"timestamps": {
+						"from": "00:00:01,540",
+						"to": "00:00:01,850"
+					},
+					"offsets": {
+						"from": 1540,
+						"to": 1850
+					},
+					"id": 2081,
+					"p": 0.928095,
+					"t_dtw": -1
+				},
+				{
+					"text": " scale",
+					"timestamps": {
+						"from": "00:00:01,850",
+						"to": "00:00:02,050"
+					},
+					"offsets": {
+						"from": 1850,
+						"to": 2050
+					},
+					"id": 5046,
+					"p": 0.994306,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,240",
+						"to": "00:00:02,360"
+					},
+					"offsets": {
+						"from": 2240,
+						"to": 2360
+					},
+					"id": 11,
+					"p": 0.436153,
+					"t_dtw": -1
+				},
+				{
+					"text": " from",
+					"timestamps": {
+						"from": "00:00:02,520",
+						"to": "00:00:02,530"
+					},
+					"offsets": {
+						"from": 2520,
+						"to": 2530
+					},
+					"id": 422,
+					"p": 0.67963,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,530",
+						"to": "00:00:02,650"
+					},
+					"offsets": {
+						"from": 2530,
+						"to": 2650
+					},
+					"id": 262,
+					"p": 0.993758,
+					"t_dtw": -1
+				},
+				{
+					"text": " Earth",
+					"timestamps": {
+						"from": "00:00:02,650",
+						"to": "00:00:02,840"
+					},
+					"offsets": {
+						"from": 2650,
+						"to": 2840
+					},
+					"id": 3668,
+					"p": 0.665594,
+					"t_dtw": -1
+				},
+				{
+					"text": " forming",
+					"timestamps": {
+						"from": "00:00:03,000",
+						"to": "00:00:03,340"
+					},
+					"offsets": {
+						"from": 3000,
+						"to": 3340
+					},
+					"id": 14583,
+					"p": 0.924515,
+					"t_dtw": -1
+				},
+				{
+					"text": " all",
+					"timestamps": {
+						"from": "00:00:03,480",
+						"to": "00:00:03,600"
+					},
+					"offsets": {
+						"from": 3480,
+						"to": 3600
+					},
+					"id": 477,
+					"p": 0.815498,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:03,600",
+						"to": "00:00:03,710"
+					},
+					"offsets": {
+						"from": 3600,
+						"to": 3710
+					},
+					"id": 262,
+					"p": 0.983089,
+					"t_dtw": -1
+				},
+				{
+					"text": " way",
+					"timestamps": {
+						"from": "00:00:03,710",
+						"to": "00:00:03,840"
+					},
+					"offsets": {
+						"from": 3710,
+						"to": 3840
+					},
+					"id": 835,
+					"p": 0.983483,
+					"t_dtw": -1
+				},
+				{
+					"text": " down",
+					"timestamps": {
+						"from": "00:00:03,840",
+						"to": "00:00:04,000"
+					},
+					"offsets": {
+						"from": 3840,
+						"to": 4000
+					},
+					"id": 866,
+					"p": 0.90688,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:04,000",
+						"to": "00:00:04,160"
+					},
+					"offsets": {
+						"from": 4000,
+						"to": 4160
+					},
+					"id": 284,
+					"p": 0.863115,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:04,200",
+						"to": "00:00:04,280"
+					},
+					"offsets": {
+						"from": 4200,
+						"to": 4280
+					},
+					"id": 257,
+					"p": 0.965548,
+					"t_dtw": -1
+				},
+				{
+					"text": " single",
+					"timestamps": {
+						"from": "00:00:04,280",
+						"to": "00:00:04,580"
+					},
+					"offsets": {
+						"from": 4280,
+						"to": 4580
+					},
+					"id": 2060,
+					"p": 0.984287,
+					"t_dtw": -1
+				},
+				{
+					"text": " second",
+					"timestamps": {
+						"from": "00:00:04,580",
+						"to": "00:00:04,970"
+					},
+					"offsets": {
+						"from": 4580,
+						"to": 4970
+					},
+					"id": 1218,
+					"p": 0.660713,
+					"t_dtw": -1
+				},
+				{
+					"text": " on",
+					"timestamps": {
+						"from": "00:00:04,990",
+						"to": "00:00:05,020"
+					},
+					"offsets": {
+						"from": 4990,
+						"to": 5020
+					},
+					"id": 319,
+					"p": 0.583585,
+					"t_dtw": -1
+				},
+				{
+					"text": " one",
+					"timestamps": {
+						"from": "00:00:05,280",
+						"to": "00:00:05,360"
+					},
+					"offsets": {
+						"from": 5280,
+						"to": 5360
+					},
+					"id": 530,
+					"p": 0.987379,
+					"t_dtw": -1
+				},
+				{
+					"text": " line",
+					"timestamps": {
+						"from": "00:00:05,360",
+						"to": "00:00:05,650"
+					},
+					"offsets": {
+						"from": 5360,
+						"to": 5650
+					},
+					"id": 1627,
+					"p": 0.996865,
+					"t_dtw": -1
+				},
+				{
+					"text": " you",
+					"timestamps": {
+						"from": "00:00:05,650",
+						"to": "00:00:05,870"
+					},
+					"offsets": {
+						"from": 5650,
+						"to": 5870
+					},
+					"id": 345,
+					"p": 0.992494,
+					"t_dtw": -1
+				},
+				{
+					"text": " consume",
+					"timestamps": {
+						"from": "00:00:05,870",
+						"to": "00:00:06,400"
+					},
+					"offsets": {
+						"from": 5870,
+						"to": 6400
+					},
+					"id": 15000,
+					"p": 0.678139,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:06,410",
+						"to": "00:00:06,530"
+					},
+					"offsets": {
+						"from": 6410,
+						"to": 6530
+					},
+					"id": 13,
+					"p": 0.962314,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_350]",
+					"timestamps": {
+						"from": "00:00:07,000",
+						"to": "00:00:07,000"
+					},
+					"offsets": {
+						"from": 7000,
+						"to": 7000
+					},
+					"id": 50713,
+					"p": 0.0646535,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

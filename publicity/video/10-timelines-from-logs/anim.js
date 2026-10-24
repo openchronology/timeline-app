@@ -991,12 +991,7 @@ SCENES[7] = function (lt, q) {
         fill: C.accent,
         weight: 500,
       }) +
-      txt(160, 134, 'github.com/openchronology/timeline-app', {
-        size: 6,
-        mono: true,
-        fill: C.soft,
-        weight: 500,
-      }),
+      addresses(160, 134, 6),
     { o: e, ty: (1 - e) * 6 },
   );
   return s;

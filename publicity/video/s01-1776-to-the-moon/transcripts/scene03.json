@@ -1,0 +1,408 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:04,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 4000
+			},
+			"text": " At 2017 and 42nd UTC, the eagle lands.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.885594,
+					"t_dtw": -1
+				},
+				{
+					"text": " At",
+					"timestamps": {
+						"from": "00:00:00,180",
+						"to": "00:00:00,180"
+					},
+					"offsets": {
+						"from": 180,
+						"to": 180
+					},
+					"id": 1629,
+					"p": 0.912118,
+					"t_dtw": -1
+				},
+				{
+					"text": " 2017",
+					"timestamps": {
+						"from": "00:00:00,290",
+						"to": "00:00:01,260"
+					},
+					"offsets": {
+						"from": 290,
+						"to": 1260
+					},
+					"id": 2177,
+					"p": 0.614587,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:01,260",
+						"to": "00:00:01,530"
+					},
+					"offsets": {
+						"from": 1260,
+						"to": 1530
+					},
+					"id": 290,
+					"p": 0.908678,
+					"t_dtw": -1
+				},
+				{
+					"text": " 42",
+					"timestamps": {
+						"from": "00:00:01,530",
+						"to": "00:00:02,070"
+					},
+					"offsets": {
+						"from": 1530,
+						"to": 2070
+					},
+					"id": 5433,
+					"p": 0.410563,
+					"t_dtw": -1
+				},
+				{
+					"text": "nd",
+					"timestamps": {
+						"from": "00:00:02,070",
+						"to": "00:00:02,240"
+					},
+					"offsets": {
+						"from": 2070,
+						"to": 2240
+					},
+					"id": 358,
+					"p": 0.484959,
+					"t_dtw": -1
+				},
+				{
+					"text": " UTC",
+					"timestamps": {
+						"from": "00:00:02,240",
+						"to": "00:00:02,520"
+					},
+					"offsets": {
+						"from": 2240,
+						"to": 2520
+					},
+					"id": 18119,
+					"p": 0.982591,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,520",
+						"to": "00:00:02,630"
+					},
+					"offsets": {
+						"from": 2520,
+						"to": 2630
+					},
+					"id": 11,
+					"p": 0.924872,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,920",
+						"to": "00:00:02,960"
+					},
+					"offsets": {
+						"from": 2920,
+						"to": 2960
+					},
+					"id": 262,
+					"p": 0.907179,
+					"t_dtw": -1
+				},
+				{
+					"text": " eagle",
+					"timestamps": {
+						"from": "00:00:02,960",
+						"to": "00:00:03,360"
+					},
+					"offsets": {
+						"from": 2960,
+						"to": 3360
+					},
+					"id": 31176,
+					"p": 0.631881,
+					"t_dtw": -1
+				},
+				{
+					"text": " lands",
+					"timestamps": {
+						"from": "00:00:03,360",
+						"to": "00:00:03,690"
+					},
+					"offsets": {
+						"from": 3360,
+						"to": 3690
+					},
+					"id": 8604,
+					"p": 0.99786,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,000",
+						"to": "00:00:04,000"
+					},
+					"offsets": {
+						"from": 4000,
+						"to": 4000
+					},
+					"id": 13,
+					"p": 0.952813,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_200]",
+					"timestamps": {
+						"from": "00:00:04,000",
+						"to": "00:00:04,000"
+					},
+					"offsets": {
+						"from": 4000,
+						"to": 4000
+					},
+					"id": 50563,
+					"p": 0.0275102,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,000",
+				"to": "00:00:07,000"
+			},
+			"offsets": {
+				"from": 4000,
+				"to": 7000
+			},
+			"text": " Six and a half hours later, the first step.",
+			"tokens": [
+				{
+					"text": " Six",
+					"timestamps": {
+						"from": "00:00:04,260",
+						"to": "00:00:04,260"
+					},
+					"offsets": {
+						"from": 4260,
+						"to": 4260
+					},
+					"id": 9699,
+					"p": 0.862546,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:04,290",
+						"to": "00:00:04,520"
+					},
+					"offsets": {
+						"from": 4290,
+						"to": 4520
+					},
+					"id": 290,
+					"p": 0.916586,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:04,520",
+						"to": "00:00:04,600"
+					},
+					"offsets": {
+						"from": 4520,
+						"to": 4600
+					},
+					"id": 257,
+					"p": 0.975241,
+					"t_dtw": -1
+				},
+				{
+					"text": " half",
+					"timestamps": {
+						"from": "00:00:04,600",
+						"to": "00:00:04,920"
+					},
+					"offsets": {
+						"from": 4600,
+						"to": 4920
+					},
+					"id": 2063,
+					"p": 0.997857,
+					"t_dtw": -1
+				},
+				{
+					"text": " hours",
+					"timestamps": {
+						"from": "00:00:04,950",
+						"to": "00:00:05,370"
+					},
+					"offsets": {
+						"from": 4950,
+						"to": 5370
+					},
+					"id": 2250,
+					"p": 0.998447,
+					"t_dtw": -1
+				},
+				{
+					"text": " later",
+					"timestamps": {
+						"from": "00:00:05,370",
+						"to": "00:00:05,800"
+					},
+					"offsets": {
+						"from": 5370,
+						"to": 5800
+					},
+					"id": 1568,
+					"p": 0.998323,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:05,800",
+						"to": "00:00:06,000"
+					},
+					"offsets": {
+						"from": 5800,
+						"to": 6000
+					},
+					"id": 11,
+					"p": 0.924627,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:06,000",
+						"to": "00:00:06,170"
+					},
+					"offsets": {
+						"from": 6000,
+						"to": 6170
+					},
+					"id": 262,
+					"p": 0.978978,
+					"t_dtw": -1
+				},
+				{
+					"text": " first",
+					"timestamps": {
+						"from": "00:00:06,210",
+						"to": "00:00:06,530"
+					},
+					"offsets": {
+						"from": 6210,
+						"to": 6530
+					},
+					"id": 717,
+					"p": 0.997754,
+					"t_dtw": -1
+				},
+				{
+					"text": " step",
+					"timestamps": {
+						"from": "00:00:06,530",
+						"to": "00:00:06,630"
+					},
+					"offsets": {
+						"from": 6530,
+						"to": 6630
+					},
+					"id": 2239,
+					"p": 0.998921,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:06,920",
+						"to": "00:00:06,980"
+					},
+					"offsets": {
+						"from": 6920,
+						"to": 6980
+					},
+					"id": 13,
+					"p": 0.974901,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_350]",
+					"timestamps": {
+						"from": "00:00:07,000",
+						"to": "00:00:07,000"
+					},
+					"offsets": {
+						"from": 7000,
+						"to": 7000
+					},
+					"id": 50713,
+					"p": 0.336022,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

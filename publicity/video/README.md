@@ -2,9 +2,11 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-The source of the eleven explainer videos, after CMR Scanner's leadership-brief video: every frame is drawn in SVG as a pure function of time, and each element appears on the word in the narration that introduces it. One folder per video holds only its scenes (`anim.js`) and settings; everything they share is in [`common/`](common/README.md). Each video's scenes, acts, on-screen text and narration are read straight from its script in [`publicity/`](../README.md), so the script stays the one place they're written.
+The source of the eleven explainer videos and the eight vertical shorts, after CMR Scanner's leadership-brief video: every frame is drawn in SVG as a pure function of time, and each element appears on the word in the narration that introduces it. One folder per video holds only its scenes (`anim.js`) and settings; everything they share is in [`common/`](common/README.md). Each video's scenes, acts, on-screen text and narration are read straight from its script in [`publicity/`](../README.md), so the script stays the one place they're written.
 
 The tours (Videos 5, 6, 7 and 8) and the logs video (10) also show the real app: [`common/capture.mjs`](common/capture.mjs) opens a sample timeline from [`samples/`](samples/README.md) in the built editor and records each shot frame by frame, and the scenes place those frames in a browser window.
+
+The shorts (`s01-…` to `s08-…`, scripts in [`publicity/shorts/`](../shorts/README.md)) use the same pipeline with `"format": "vertical"` in their `video.json`: a 1080 × 1920 stage, the narration burned in as captions a few words at a time, a headline from each scene's on-screen text, and the real app captured at phone size.
 
 Narration recordings, trimmed audio, captured shots, rendered frames and MP4s are not in git (see `.gitignore`).
 
@@ -26,13 +28,21 @@ Narration recordings, trimmed audio, captured shots, rendered frames and MP4s ar
 | [`09-working-together/`](09-working-together/README.md)                     | Video 9: Working together.                                                                  |
 | [`10-timelines-from-logs/`](10-timelines-from-logs/README.md)               | Video 10: Timelines from logs.                                                              |
 | [`11-run-your-own-server/`](11-run-your-own-server/README.md)               | Video 11: Run your own server.                                                              |
+| [`s01-1776-to-the-moon/`](s01-1776-to-the-moon/README.md)                   | Short 1: 1776 to one second on the Moon.                                                    |
+| [`s02-the-last-six-seconds/`](s02-the-last-six-seconds/README.md)           | Short 2: you're the last six seconds.                                                       |
+| [`s03-point-one-plus-point-two/`](s03-point-one-plus-point-two/README.md)   | Short 3: 0.1 + 0.2 isn't 0.3.                                                               |
+| [`s04-the-ring-in-the-river/`](s04-the-ring-in-the-river/README.md)         | Short 4: the Ring sat in a river for 2,460 years.                                           |
+| [`s05-one-characters-thread/`](s05-one-characters-thread/README.md)         | Short 5: check one character's thread.                                                      |
+| [`s06-a-class-timeline/`](s06-a-class-timeline/README.md)                   | Short 6: a class timeline nobody can wreck.                                                 |
+| [`s07-one-html-file/`](s07-one-html-file/README.md)                         | Short 7: a whole app in one HTML file.                                                      |
+| [`s08-paged-at-2-58/`](s08-paged-at-2-58/README.md)                         | Short 8: 2:58 a.m., everything's down.                                                      |
 
 ## Making a video
 
 Needs Docker (the `linuxserver/ffmpeg`, `debian:13`, `python:3.12-slim` and `mcr.microsoft.com/playwright:v1.58.2-noble` images), Python 3, and the repository's `node_modules` and `dist/` (`npm ci`, `npm run build:editor`). From `publicity/video/`, for a video folder `V`:
 
 ```sh
-python3 common/narrate.py V      # scratch narration with Piper (skip if you've recorded audio/sceneNN.mp3)
+python3 common/narrate.py V      # scratch narration with Kokoro (skip if you've recorded audio/sceneNN.mp3)
 python3 common/prepare.py V      # trim and align each clip (the first run builds whisper.cpp: a few minutes)
 python3 common/build.py V        # timeline.js, page.html and V/README.md
 python3 common/captions.py V     # captions.srt

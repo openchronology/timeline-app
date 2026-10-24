@@ -1,0 +1,339 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:04,040"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 4040
+			},
+			"text": " Squeeze all four and a half billion years of Earth's history into a single day.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.934439,
+					"t_dtw": -1
+				},
+				{
+					"text": " Squ",
+					"timestamps": {
+						"from": "00:00:00,180",
+						"to": "00:00:00,180"
+					},
+					"offsets": {
+						"from": 180,
+						"to": 180
+					},
+					"id": 5056,
+					"p": 0.857938,
+					"t_dtw": -1
+				},
+				{
+					"text": "ee",
+					"timestamps": {
+						"from": "00:00:00,260",
+						"to": "00:00:00,300"
+					},
+					"offsets": {
+						"from": 260,
+						"to": 300
+					},
+					"id": 1453,
+					"p": 0.996886,
+					"t_dtw": -1
+				},
+				{
+					"text": "ze",
+					"timestamps": {
+						"from": "00:00:00,370",
+						"to": "00:00:00,420"
+					},
+					"offsets": {
+						"from": 370,
+						"to": 420
+					},
+					"id": 2736,
+					"p": 0.999334,
+					"t_dtw": -1
+				},
+				{
+					"text": " all",
+					"timestamps": {
+						"from": "00:00:00,420",
+						"to": "00:00:00,580"
+					},
+					"offsets": {
+						"from": 420,
+						"to": 580
+					},
+					"id": 477,
+					"p": 0.996459,
+					"t_dtw": -1
+				},
+				{
+					"text": " four",
+					"timestamps": {
+						"from": "00:00:00,610",
+						"to": "00:00:00,760"
+					},
+					"offsets": {
+						"from": 610,
+						"to": 760
+					},
+					"id": 1440,
+					"p": 0.818766,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:00,890",
+						"to": "00:00:01,020"
+					},
+					"offsets": {
+						"from": 890,
+						"to": 1020
+					},
+					"id": 290,
+					"p": 0.84771,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:01,020",
+						"to": "00:00:01,080"
+					},
+					"offsets": {
+						"from": 1020,
+						"to": 1080
+					},
+					"id": 257,
+					"p": 0.959314,
+					"t_dtw": -1
+				},
+				{
+					"text": " half",
+					"timestamps": {
+						"from": "00:00:01,080",
+						"to": "00:00:01,320"
+					},
+					"offsets": {
+						"from": 1080,
+						"to": 1320
+					},
+					"id": 2063,
+					"p": 0.999438,
+					"t_dtw": -1
+				},
+				{
+					"text": " billion",
+					"timestamps": {
+						"from": "00:00:01,320",
+						"to": "00:00:01,740"
+					},
+					"offsets": {
+						"from": 1320,
+						"to": 1740
+					},
+					"id": 2997,
+					"p": 0.985243,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:01,740",
+						"to": "00:00:02,040"
+					},
+					"offsets": {
+						"from": 1740,
+						"to": 2040
+					},
+					"id": 812,
+					"p": 0.991647,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:02,040",
+						"to": "00:00:02,140"
+					},
+					"offsets": {
+						"from": 2040,
+						"to": 2140
+					},
+					"id": 286,
+					"p": 0.936147,
+					"t_dtw": -1
+				},
+				{
+					"text": " Earth",
+					"timestamps": {
+						"from": "00:00:02,140",
+						"to": "00:00:02,340"
+					},
+					"offsets": {
+						"from": 2140,
+						"to": 2340
+					},
+					"id": 3668,
+					"p": 0.914396,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:02,430",
+						"to": "00:00:02,450"
+					},
+					"offsets": {
+						"from": 2430,
+						"to": 2450
+					},
+					"id": 338,
+					"p": 0.992954,
+					"t_dtw": -1
+				},
+				{
+					"text": " history",
+					"timestamps": {
+						"from": "00:00:02,450",
+						"to": "00:00:02,820"
+					},
+					"offsets": {
+						"from": 2450,
+						"to": 2820
+					},
+					"id": 2106,
+					"p": 0.98576,
+					"t_dtw": -1
+				},
+				{
+					"text": " into",
+					"timestamps": {
+						"from": "00:00:03,080",
+						"to": "00:00:03,140"
+					},
+					"offsets": {
+						"from": 3080,
+						"to": 3140
+					},
+					"id": 656,
+					"p": 0.854009,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:03,140",
+						"to": "00:00:03,190"
+					},
+					"offsets": {
+						"from": 3140,
+						"to": 3190
+					},
+					"id": 257,
+					"p": 0.998199,
+					"t_dtw": -1
+				},
+				{
+					"text": " single",
+					"timestamps": {
+						"from": "00:00:03,210",
+						"to": "00:00:03,590"
+					},
+					"offsets": {
+						"from": 3210,
+						"to": 3590
+					},
+					"id": 2060,
+					"p": 0.997923,
+					"t_dtw": -1
+				},
+				{
+					"text": " day",
+					"timestamps": {
+						"from": "00:00:03,590",
+						"to": "00:00:03,790"
+					},
+					"offsets": {
+						"from": 3590,
+						"to": 3790
+					},
+					"id": 1110,
+					"p": 0.995537,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:03,790",
+						"to": "00:00:03,930"
+					},
+					"offsets": {
+						"from": 3790,
+						"to": 3930
+					},
+					"id": 13,
+					"p": 0.940311,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_202]",
+					"timestamps": {
+						"from": "00:00:04,040",
+						"to": "00:00:04,040"
+					},
+					"offsets": {
+						"from": 4040,
+						"to": 4040
+					},
+					"id": 50565,
+					"p": 0.0185582,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

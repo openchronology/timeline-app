@@ -4,7 +4,8 @@
    durations, summaries, relationships), icons, and renderAt(t), which draws the header,
    progress bar and the scene at time t. Each video's anim.js fills SCENES; build.py puts
    LOOK, this file, TL (timeline.js) and anim.js into page.html. Frames are pure functions of
-   time, so any one can be rendered on its own. The stage is 320 × 180 units (1920 × 1080). */
+   time, so any one can be rendered on its own. The stage is 320 × 180 units (1920 × 1080), or
+   180 × 320 (1080 × 1920) for a short, whose frame is drawn by renderShort. */
 
 /* ---------- looks ---------- */
 var LOOKS = {
@@ -938,6 +939,25 @@ function wordmark(x, y, size) {
   );
 }
 
+/** Where to find it, for every end card: the website, then the source, centred on x. */
+function addresses(x, y, size, o) {
+  o = o || {};
+  return (
+    txt(x, y, 'https://timescale.info', {
+      size: size * 1.15,
+      mono: true,
+      fill: C.accent,
+      weight: 600,
+    }) +
+    txt(x, y + size * 1.9, 'github.com/openchronology/timeline-app', {
+      size: size,
+      mono: true,
+      fill: o.fill || C.soft,
+      weight: 500,
+    })
+  );
+}
+
 /* ---------- a captured shot of the real app (tours) ---------- */
 /* SHOTS (from shots.js, written by capture.mjs) gives each shot's frame count and size. The
    frame at shot time st is shots/<id>/NNNN.jpg, held on its last frame afterwards. */
@@ -968,6 +988,144 @@ function appWindow(x, y, w, id, st, o) {
   );
 }
 
+/* ---------- a short's frame (FORMAT 'vertical', 180 × 320) ---------- */
+var VERTICAL = typeof FORMAT !== 'undefined' && FORMAT === 'vertical';
+/* What TikTok's, YouTube Shorts' and Reels' own overlays leave clear (1080 × 1920: x 60–900,
+   y 216–1440): the feed's tabs above, the caption and music below, the buttons at the right.
+   Keep every word inside it; pictures may run past it. */
+var SAFE = { x0: 10, x1: 150, y0: 36, y1: 240, cx: 80 };
+/** The real app as it looks on a phone, at (x, y), w wide: a captured shot (its height from
+    the shot's size) in a phone's rounded screen and bezel. */
+function phoneShot(x, y, w, id, st, o) {
+  o = o || {};
+  var sh = (typeof SHOTS !== 'undefined' && SHOTS[id]) || { width: 9, height: 16 };
+  var h = (w * sh.height) / sh.width,
+    r = w * 0.07,
+    b = w * 0.035;
+  var clip = 'ph-' + String(id).replace(/[^a-z0-9]/gi, '') + '-' + Math.round(x * 10);
+  return (
+    '<g>' +
+    rect(x - b - 0.8, y - b + 1.6, w + 2 * b + 1.6, h + 2 * b, '#000', { rx: r + b, op: 0.22 }) +
+    rect(x - b, y - b, w + 2 * b, h + 2 * b, o.bezel || '#15191c', { rx: r + b }) +
+    '<clipPath id="' +
+    clip +
+    '"><rect x="' +
+    x +
+    '" y="' +
+    y +
+    '" width="' +
+    w +
+    '" height="' +
+    h +
+    '" rx="' +
+    r +
+    '"/></clipPath><image href="' +
+    shotFrame(id, st) +
+    '" x="' +
+    x +
+    '" y="' +
+    y +
+    '" width="' +
+    w +
+    '" height="' +
+    h +
+    '" clip-path="url(#' +
+    clip +
+    ')" preserveAspectRatio="xMidYMid slice"/></g>'
+  );
+}
+/** The end every short shares, p from 0 to 1: the wordmark, a line of its own, and where the
+    source is. */
+function shortEnd(p, line) {
+  return rise(
+    wordmark(SAFE.cx, 128, 13) +
+      (line ? txt(SAFE.cx, 150, line, { size: 9, weight: 700, serif: C.serif }) : '') +
+      txt(SAFE.cx, 164, 'Free and open source', { size: 6, fill: C.soft, weight: 600 }) +
+      rect(SAFE.cx - 66, 170, 132, 24, C.card, { rx: 5, stroke: C.line }) +
+      addresses(SAFE.cx, 180, 5),
+    p,
+    8,
+  );
+}
+/** The burned-in caption at t: a few words at a time (CAPS, from captions.py), the word being
+    said lit, outlined so it reads over anything. */
+function shortCaption(t) {
+  if (typeof CAPS === 'undefined') return '';
+  var cue = null;
+  for (var i = 0; i < CAPS.length; i++) if (t >= CAPS[i][0] && t < CAPS[i][1]) cue = CAPS[i];
+  if (!cue) return '';
+  var spans = cue[2]
+    .map(function (w, k) {
+      var lit = t >= w[1] && (k === cue[2].length - 1 || t < cue[2][k + 1][1]);
+      return '<tspan fill="' + (lit ? C.select : C.text) + '">' + esc(w[0]) + ' </tspan>';
+    })
+    .join('');
+  var p = ease(clamp01((t - cue[0]) / 0.12));
+  return (
+    '<g transform="translate(' +
+    SAFE.cx +
+    ' 226) scale(' +
+    (0.9 + 0.1 * p).toFixed(3) +
+    ')"><text x="0" y="0" font-family="' +
+    FONT +
+    '" font-size="14" font-weight="700" text-anchor="middle" stroke="' +
+    C.ground +
+    '" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">' +
+    spans +
+    '</text></g>'
+  );
+}
+/** A short's headline (the scene's on-screen text): one line if it fits, else two of about
+    equal width. */
+function shortHeadline(s) {
+  if (!s) return '';
+  var room = SAFE.x1 - SAFE.x0,
+    words = s.split(' '),
+    lines = [s];
+  if (textWidth(s, 11.5) > room) {
+    var best = 1;
+    for (var k = 1; k < words.length; k++) {
+      var d = Math.abs(
+        textWidth(words.slice(0, k).join(' '), 11.5) - textWidth(words.slice(k).join(' '), 11.5),
+      );
+      var bd = Math.abs(
+        textWidth(words.slice(0, best).join(' '), 11.5) -
+          textWidth(words.slice(best).join(' '), 11.5),
+      );
+      if (d < bd) best = k;
+    }
+    lines = [words.slice(0, best).join(' '), words.slice(best).join(' ')];
+  }
+  return lines
+    .map(function (l, i) {
+      return txt(SAFE.cx, 50 + i * 13, l, { size: 11.5, weight: 700, serif: C.serif });
+    })
+    .join('');
+}
+/** Draws a short's frame at t: the headline, the scene and the caption. The first frame is
+    already whole (it's the one the feed shows before playing), scenes cut quickly, and a
+    headline the next scene repeats stays put across the cut. */
+function renderShort(sc, lt, t, body) {
+  var k = TL.scenes.indexOf(sc),
+    prev = TL.scenes[k - 1],
+    next = TL.scenes[k + 1];
+  var fadeIn = k === 0 ? 1 : P(lt, 0, 0.2),
+    fadeOut = sc.last ? 1 : 1 - clamp01((lt - (sc.dur - 0.15)) / 0.15),
+    fade = Math.min(fadeIn, fadeOut);
+  var head = Math.min(
+    prev && prev.ost === sc.ost ? 1 : fadeIn,
+    next && next.ost === sc.ost ? 1 : fadeOut,
+  );
+  var out = '<rect width="180" height="320" fill="' + C.ground + '"/>';
+  if (body && typeof body === 'object') {
+    var kIn = body.keepIn ? 1 : fadeIn,
+      kOut = body.keepOut ? 1 : fadeOut;
+    out += G(body.svg, { o: fade }) + G(body.keep, { o: Math.min(kIn, kOut) });
+    if (!body.noHeadline) out += G(shortHeadline(sc.ost), { o: head });
+  } else out += G(body, { o: fade }) + G(shortHeadline(sc.ost), { o: head });
+  return out + shortCaption(t);
+}
+
 /* ---------- the frame ---------- */
 var SCENES = {};
 function sceneAt(t) {
@@ -983,6 +1141,10 @@ function renderAt(t) {
     lt = t - sc.start;
   var q = cuesFor(sc);
   var body = SCENES[sc.id](lt, q);
+  if (VERTICAL) {
+    document.getElementById('stage').innerHTML = renderShort(sc, lt, t, body);
+    return q.missing;
+  }
   var fade = Math.min(P(lt, 0, 0.4), sc.last ? 1 : 1 - clamp01((lt - (sc.dur - 0.3)) / 0.3));
   var out = '<rect width="320" height="180" fill="' + C.ground + '"/>';
   if (!sc.bare)
