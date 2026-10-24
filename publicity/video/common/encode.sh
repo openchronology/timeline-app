@@ -1,7 +1,8 @@
 #!/bin/sh
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-# Encodes a video's frames/, mix.wav and captions.srt into an MP4: H.264 1080p30, AAC, and an
-# English caption track. Without mix.wav, the MP4 is silent (a draft for checking timing).
+# Encodes a video's frames/, mix.wav and captions.srt into an MP4: H.264 at 30 fps (1920x1080,
+# or 1080x1920 for a short), AAC, and an English caption track. Without mix.wav, the MP4 is
+# silent (a draft for checking timing).
 # Usage: common/encode.sh <video folder> [output.mp4]
 set -e
 cd "$1"

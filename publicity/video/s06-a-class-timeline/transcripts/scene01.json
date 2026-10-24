@@ -1,0 +1,338 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:04,340"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 4340
+			},
+			"text": " 30 students, one class timeline, and nobody can wreck it.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.925529,
+					"t_dtw": -1
+				},
+				{
+					"text": " 30",
+					"timestamps": {
+						"from": "00:00:00,320",
+						"to": "00:00:00,420"
+					},
+					"offsets": {
+						"from": 320,
+						"to": 420
+					},
+					"id": 1542,
+					"p": 0.875876,
+					"t_dtw": -1
+				},
+				{
+					"text": " students",
+					"timestamps": {
+						"from": "00:00:00,420",
+						"to": "00:00:00,930"
+					},
+					"offsets": {
+						"from": 420,
+						"to": 930
+					},
+					"id": 2444,
+					"p": 0.982111,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:00,970",
+						"to": "00:00:01,060"
+					},
+					"offsets": {
+						"from": 970,
+						"to": 1060
+					},
+					"id": 11,
+					"p": 0.965978,
+					"t_dtw": -1
+				},
+				{
+					"text": " one",
+					"timestamps": {
+						"from": "00:00:01,270",
+						"to": "00:00:01,320"
+					},
+					"offsets": {
+						"from": 1270,
+						"to": 1320
+					},
+					"id": 530,
+					"p": 0.860406,
+					"t_dtw": -1
+				},
+				{
+					"text": " class",
+					"timestamps": {
+						"from": "00:00:01,320",
+						"to": "00:00:01,660"
+					},
+					"offsets": {
+						"from": 1320,
+						"to": 1660
+					},
+					"id": 1398,
+					"p": 0.960076,
+					"t_dtw": -1
+				},
+				{
+					"text": " timeline",
+					"timestamps": {
+						"from": "00:00:01,660",
+						"to": "00:00:02,200"
+					},
+					"offsets": {
+						"from": 1660,
+						"to": 2200
+					},
+					"id": 15264,
+					"p": 0.984297,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,200",
+						"to": "00:00:02,270"
+					},
+					"offsets": {
+						"from": 2200,
+						"to": 2270
+					},
+					"id": 11,
+					"p": 0.822487,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:02,430",
+						"to": "00:00:02,630"
+					},
+					"offsets": {
+						"from": 2430,
+						"to": 2630
+					},
+					"id": 290,
+					"p": 0.930941,
+					"t_dtw": -1
+				},
+				{
+					"text": " nobody",
+					"timestamps": {
+						"from": "00:00:02,630",
+						"to": "00:00:03,140"
+					},
+					"offsets": {
+						"from": 2630,
+						"to": 3140
+					},
+					"id": 8168,
+					"p": 0.995066,
+					"t_dtw": -1
+				},
+				{
+					"text": " can",
+					"timestamps": {
+						"from": "00:00:03,210",
+						"to": "00:00:03,320"
+					},
+					"offsets": {
+						"from": 3210,
+						"to": 3320
+					},
+					"id": 460,
+					"p": 0.998237,
+					"t_dtw": -1
+				},
+				{
+					"text": " wreck",
+					"timestamps": {
+						"from": "00:00:03,870",
+						"to": "00:00:03,870"
+					},
+					"offsets": {
+						"from": 3870,
+						"to": 3870
+					},
+					"id": 15228,
+					"p": 0.96998,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:04,030",
+						"to": "00:00:04,050"
+					},
+					"offsets": {
+						"from": 4030,
+						"to": 4050
+					},
+					"id": 340,
+					"p": 0.999268,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,340",
+						"to": "00:00:04,340"
+					},
+					"offsets": {
+						"from": 4340,
+						"to": 4340
+					},
+					"id": 13,
+					"p": 0.952952,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_217]",
+					"timestamps": {
+						"from": "00:00:04,340",
+						"to": "00:00:04,340"
+					},
+					"offsets": {
+						"from": 4340,
+						"to": 4340
+					},
+					"id": 50580,
+					"p": 0.0163352,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,340",
+				"to": "00:00:05,180"
+			},
+			"offsets": {
+				"from": 4340,
+				"to": 5180
+			},
+			"text": " Here's how.",
+			"tokens": [
+				{
+					"text": " Here",
+					"timestamps": {
+						"from": "00:00:04,630",
+						"to": "00:00:04,630"
+					},
+					"offsets": {
+						"from": 4630,
+						"to": 4630
+					},
+					"id": 3423,
+					"p": 0.997664,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:04,660",
+						"to": "00:00:04,770"
+					},
+					"offsets": {
+						"from": 4660,
+						"to": 4770
+					},
+					"id": 338,
+					"p": 0.998959,
+					"t_dtw": -1
+				},
+				{
+					"text": " how",
+					"timestamps": {
+						"from": "00:00:04,770",
+						"to": "00:00:04,970"
+					},
+					"offsets": {
+						"from": 4770,
+						"to": 4970
+					},
+					"id": 703,
+					"p": 0.993824,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,010",
+						"to": "00:00:05,180"
+					},
+					"offsets": {
+						"from": 5010,
+						"to": 5180
+					},
+					"id": 13,
+					"p": 0.89748,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_259]",
+					"timestamps": {
+						"from": "00:00:05,180",
+						"to": "00:00:05,180"
+					},
+					"offsets": {
+						"from": 5180,
+						"to": 5180
+					},
+					"id": 50622,
+					"p": 0.0473681,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

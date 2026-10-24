@@ -1,7 +1,4 @@
 {
   "script": "../../5-tour-the-united-states.md",
-  "look": "archive",
-  "say": {
-    "Brown versus Board": "Brown versus Board"
-  }
+  "look": "archive"
 }

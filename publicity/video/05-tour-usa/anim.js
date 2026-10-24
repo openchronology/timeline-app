@@ -441,12 +441,7 @@ SCENES[6] = function (lt, q) {
     rect(-20, -24, 360, 210, C.ground) +
       wordmark(160, 72, 16) +
       txt(160, 98, 'Next: Working together', { size: 8, serif: true }) +
-      txt(160, 114, 'github.com/openchronology/timeline-app', {
-        size: 6,
-        mono: true,
-        fill: C.soft,
-        weight: 500,
-      }),
+      addresses(160, 114, 6),
     { o: e, ty: (1 - e) * 6 },
   );
   return s;

@@ -1,0 +1,10 @@
+{
+  "script": "../../shorts/3-point-one-plus-point-two.md",
+  "format": "vertical",
+  "look": "terminal",
+  "pace": 0.85,
+  "silence": 0.2,
+  "lead": 0.15,
+  "tail": 0.3,
+  "hold": 2.0
+}

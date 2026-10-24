@@ -1,0 +1,17 @@
+{
+  "sample": "../samples/usa.ochx",
+  "size": [1280, 720],
+  "scale": 1.5,
+  "shots": [
+    {
+      "id": "editor",
+      "dur": 0.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-6250000000, 1300000000]
+        }
+      ]
+    }
+  ]
+}

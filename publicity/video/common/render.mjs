@@ -3,25 +3,43 @@
 // Usage (in the video's folder): node ../common/render.mjs <fps> <workers> [from] [to] [outdir]
 // or, for a few stills to check: node ../common/render.mjs <fps> <workers> --at 3.5,12,40 [outdir]
 import { chromium } from 'playwright';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 
 const fps = +process.argv[2] || 30,
   workers = +process.argv[3] || 6;
 const out = process.argv[6] || `${process.cwd()}/frames`;
 mkdirSync(out, { recursive: true });
+// A short (video.json's "format": "vertical") is 1080 × 1920.
+const vertical = JSON.parse(readFileSync('video.json', 'utf8')).format === 'vertical';
+const viewport = vertical ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 };
 const browser = await chromium.launch({ args: ['--allow-file-access-from-files'] });
+const FACES = ['Saira Condensed', 'IBM Plex Mono', 'EB Garamond'];
 async function newPage() {
-  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
-  await page.goto(`file://${process.cwd()}/page.html`);
-  // Fonts load only when first used; load every face the scenes use before drawing any frame.
-  await page.evaluate(() =>
-    Promise.all(
-      ['Saira Condensed', 'IBM Plex Mono', 'EB Garamond'].flatMap((family) =>
-        [400, 500, 600, 700].map((weight) => document.fonts.load(`${weight} 12px "${family}"`)),
-      ),
-    ),
-  );
-  await page.evaluate(() => document.fonts.ready);
+  const page = await browser.newPage({ viewport });
+  // Fonts load only when first used; load every face the scenes use before drawing any frame,
+  // and reload the page if one didn't arrive (it can time out when the machine is busy).
+  for (let attempt = 1; ; attempt++) {
+    await page.goto(`file://${process.cwd()}/page.html`);
+    await page.evaluate(
+      (faces) =>
+        Promise.all(
+          faces.flatMap((family) =>
+            [400, 500, 600, 700].map((weight) => document.fonts.load(`${weight} 12px "${family}"`)),
+          ),
+        ),
+      FACES,
+    );
+    await page.evaluate(() => document.fonts.ready);
+    const ok = await page.evaluate(
+      (faces) =>
+        faces.every((f) => document.fonts.check(`600 12px "${f}"`)) &&
+        [...document.fonts].filter((f) => f.status === 'loaded').length >= faces.length,
+      FACES,
+    );
+    if (ok) break;
+    if (attempt === 5) throw new Error('web fonts did not load');
+    console.log('fonts not loaded; reloading', attempt);
+  }
   await page.waitForTimeout(500);
   return page;
 }

@@ -913,12 +913,7 @@ SCENES[7] = function (lt, q) {
     rect(-20, -2, 360, 190, C.ground, { op: 0.97 }) +
       txt(160, 70, 'Build it together', { size: 14, weight: 700 }) +
       wordmark(160, 100, 12) +
-      txt(160, 122, 'github.com/openchronology/timeline-app', {
-        size: 6,
-        mono: true,
-        fill: C.accent,
-        weight: 500,
-      }),
+      addresses(160, 122, 6),
     { o: e, ty: (1 - e) * 8 },
   );
   return s;

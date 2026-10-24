@@ -1,132 +1,132 @@
 1
-00:00:00,890 --> 00:00:05,870
+00:00:00,950 --> 00:00:06,750
 Running your own OpenChronology server
 takes one application and one PostgreSQL
 
 2
-00:00:05,920 --> 00:00:11,230
+00:00:06,800 --> 00:00:12,900
 database, with an extension that stores
 times as exact rational numbers.
 
 3
-00:00:11,280 --> 00:00:16,080
+00:00:12,950 --> 00:00:16,750
 Put it behind your usual
 HTTPS proxy, and browsers,
 
 4
-00:00:16,130 --> 00:00:19,093
+00:00:16,800 --> 00:00:20,526
 phones and the desktop
 app all connect to it.
 
 5
-00:00:20,563 --> 00:00:23,943
+00:00:22,256 --> 00:00:25,316
 Every release comes with
 server packages for Debian,
 
 6
-00:00:23,993 --> 00:00:28,303
+00:00:25,366 --> 00:00:30,236
 Ubuntu, Rocky Linux and
 RHEL, Fedora, FreeBSD,
 
 7
-00:00:28,353 --> 00:00:34,023
+00:00:30,286 --> 00:00:35,066
 macOS through Homebrew, and Windows,
 plus a Docker Compose setup for anything
 
 8
-00:00:34,073 --> 00:00:37,042
+00:00:35,116 --> 00:00:38,354
 else, each with checksums to verify.
 
 9
-00:00:38,462 --> 00:00:43,722
+00:00:40,084 --> 00:00:45,794
 Check the download, then install the
 package. On first install it creates its
 
 10
-00:00:43,772 --> 00:00:48,812
+00:00:45,844 --> 00:00:50,714
 service user, its configuration and a
 database with the extension in place,
 
 11
-00:00:48,862 --> 00:00:53,532
+00:00:50,764 --> 00:00:55,234
 and starts the server. With
 Docker, it's one compose command,
 
 12
-00:00:53,582 --> 00:00:56,469
+00:00:55,284 --> 00:00:58,442
 and the database runs
 in its own container.
 
 13
-00:00:57,939 --> 00:01:03,539
+00:01:00,202 --> 00:01:06,332
 Then make it yours, in one configuration
 file. Set the address it's served at,
 
 14
-00:01:03,589 --> 00:01:09,209
+00:01:06,382 --> 00:01:12,732
 and a name for your site. The first
 administrator account is created from it.
 
 15
-00:01:09,259 --> 00:01:13,639
+00:01:12,782 --> 00:01:16,742
 Register Google, GitHub or Facebook
 if you want those sign-ins,
 
 16
-00:01:13,689 --> 00:01:19,660
+00:01:16,792 --> 00:01:22,129
 and add email, which turns on password
 recovery and two-factor authentication.
 
 17
-00:01:21,140 --> 00:01:24,970
+00:01:23,759 --> 00:01:27,259
 Day to day, the administration
 pages cover accounts,
 
 18
-00:01:25,020 --> 00:01:30,090
+00:01:27,309 --> 00:01:33,369
 storage limits, featured timelines, and
 a queue of what readers have reported.
 
 19
-00:01:30,140 --> 00:01:35,350
+00:01:33,419 --> 00:01:38,069
 One thing to tell your users: private
 timelines are hidden from other users,
 
 20
-00:01:35,400 --> 00:01:38,366
+00:01:38,119 --> 00:01:41,202
 but not from you, the
 people who run the server.
 
 21
-00:01:39,836 --> 00:01:44,516
+00:01:42,682 --> 00:01:47,532
 Upgrading is the same three steps
 every time: back up the database,
 
 22
-00:01:44,566 --> 00:01:47,766
+00:01:47,582 --> 00:01:50,892
 install the new package,
 and run the migration,
 
 23
-00:01:47,816 --> 00:01:51,216
+00:01:50,942 --> 00:01:54,452
 which updates the schema
 and restarts the server.
 
 24
-00:01:51,266 --> 00:01:55,446
+00:01:54,502 --> 00:01:58,410
 Backups are yours to schedule,
 as with any database.
 
 25
-00:01:56,946 --> 00:02:00,556
+00:02:00,020 --> 00:02:03,870
 The packages and the guides
 are with every release.
 
 26
-00:02:00,606 --> 00:02:04,186
+00:02:03,920 --> 00:02:06,960
 Install it for your school,
 your team or your community,
 
 27
-00:02:04,236 --> 00:02:07,093
+00:02:07,010 --> 00:02:10,048
 and the timelines stay on your own server.

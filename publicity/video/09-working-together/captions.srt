@@ -1,138 +1,138 @@
 1
-00:00:00,870 --> 00:00:04,370
+00:00:01,130 --> 00:00:04,330
 Every timeline you save to
 a server starts private:
 
 2
-00:00:04,420 --> 00:00:09,040
+00:00:04,380 --> 00:00:08,920
 only you can open it. When it's
 ready, its owner can make it public,
 
 3
-00:00:09,090 --> 00:00:12,920
+00:00:08,970 --> 00:00:11,940
 and then anyone can read
 it, find it in search,
 
 4
-00:00:12,970 --> 00:00:14,600
+00:00:11,990 --> 00:00:13,855
 and follow its history.
 
 5
-00:00:16,030 --> 00:00:20,110
+00:00:15,565 --> 00:00:18,895
 Share it with a link, to the
 whole timeline, to one moment,
 
 6
-00:00:20,160 --> 00:00:25,530
+00:00:18,945 --> 00:00:23,945
 or to exactly the view you're looking at.
 Or embed it on your class page or your
 
 7
-00:00:25,580 --> 00:00:30,334
+00:00:23,995 --> 00:00:28,869
 community's site, where readers can
 explore it without leaving the page.
 
 8
-00:00:31,854 --> 00:00:35,934
+00:00:30,319 --> 00:00:34,589
 Add collaborators by their
 username, each with a role.
 
 9
-00:00:35,984 --> 00:00:41,684
+00:00:34,639 --> 00:00:40,629
 A viewer can read a private timeline.
 A contributor can propose changes.
 
 10
-00:00:41,734 --> 00:00:46,234
+00:00:40,679 --> 00:00:45,559
 A writer can save changes and
 review what others propose.
 
 11
-00:00:46,284 --> 00:00:49,784
+00:00:45,609 --> 00:00:48,459
 Only the owner decides
 who's in, who can see it,
 
 12
-00:00:49,834 --> 00:00:51,692
+00:00:48,509 --> 00:00:50,494
 and whether it's deleted.
 
 13
-00:00:53,142 --> 00:00:56,932
+00:00:52,224 --> 00:00:56,004
 Students don't need to be
 trusted with the whole timeline.
 
 14
-00:00:56,982 --> 00:01:00,972
+00:00:56,054 --> 00:00:59,634
 As contributors, their
 changes become pull requests:
 
 15
-00:01:01,022 --> 00:01:04,372
+00:00:59,684 --> 00:01:03,334
 a proposal showing what they
 add, remove and change,
 
 16
-00:01:04,422 --> 00:01:08,812
+00:01:03,384 --> 00:01:07,084
 with a discussion underneath.
 A writer talks it through,
 
 17
-00:01:08,862 --> 00:01:12,642
+00:01:07,134 --> 00:01:11,304
 then merges it or rejects
 it. On a public timeline,
 
 18
-00:01:12,692 --> 00:01:15,498
+00:01:11,354 --> 00:01:13,928
 anyone signed in can propose.
 
 19
-00:01:16,958 --> 00:01:23,178
+00:01:15,358 --> 00:01:22,478
 Want to take it somewhere new? Fork it.
 A fork is your own copy that remembers
 
 20
-00:01:23,228 --> 00:01:26,148
+00:01:22,528 --> 00:01:25,418
 where it came from: bring in
 the original's later changes,
 
 21
-00:01:26,198 --> 00:01:31,418
+00:01:25,468 --> 00:01:30,628
 and offer yours back when they're ready.
 Students without an account can fork it
 
 22
-00:01:31,468 --> 00:01:34,323
+00:01:30,678 --> 00:01:34,144
 in the browser and export their work.
 
 23
-00:01:35,833 --> 00:01:39,623
+00:01:35,824 --> 00:01:39,804
 When two people save at
 once, their edits merge.
 
 24
-00:01:39,673 --> 00:01:44,003
+00:01:39,854 --> 00:01:43,894
 Only when both changed the same thing
 differently does it stop and ask whose to
 
 25
-00:01:44,053 --> 00:01:48,373
+00:01:43,944 --> 00:01:49,034
 keep. And every save is a revision
 in the timeline's history,
 
 26
-00:01:48,423 --> 00:01:51,150
+00:01:49,084 --> 00:01:51,741
 so you can always go back to how it was.
 
 27
-00:01:52,640 --> 00:01:57,780
+00:01:53,291 --> 00:01:58,901
 And if something doesn't belong, anyone
 can report it to the site's moderators.
 
 28
-00:01:57,830 --> 00:02:01,620
+00:01:58,951 --> 00:02:01,831
 Start a timeline, invite your
 class or your community,
 
 29
-00:02:01,670 --> 00:02:03,482
+00:02:01,881 --> 00:02:03,506
 and build it together.
