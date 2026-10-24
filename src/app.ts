@@ -52,6 +52,7 @@ import {
   screenQ,
   wheelZoomFactor,
   createPresenter,
+  tickLabel,
   validateInstalledPlugins,
   validatePluginManifest,
   pluginMarker,
@@ -1268,24 +1269,22 @@ function renderAxis() {
     );
     notch.style.borderColor = `rgb(${color.join(',')})`;
     tick.append(notch);
-    const labels = new Map<string, { opacity: number; interval: Q }>();
-    for (const label of rule.labels) {
-      const spacing = Math.max(
-        1,
-        Math.min(1000000, viewport.x(viewport.left.add(label.interval), width())),
-      );
-      const printed = axisLabel(time, 'axis', spacing);
-      const existing = labels.get(printed);
-      labels.set(printed, {
-        opacity: label.opacity + (existing?.opacity ?? 0),
-        interval: label.interval,
-      });
-    }
-    for (const [printed, label] of labels) {
+    // One label per tick: crossfading versions that print differently would overlap (#241).
+    const label = tickLabel(
+      rule.labels.map((version) => ({
+        text: axisLabel(
+          time,
+          'axis',
+          Math.max(1, Math.min(1000000, viewport.x(viewport.left.add(version.interval), width()))),
+        ),
+        opacity: version.opacity,
+      })),
+    );
+    if (label) {
       const value = document.createElement('span');
       value.className = 'tick-label';
       value.style.opacity = label.opacity.toString();
-      value.textContent = printed;
+      value.textContent = label.text;
       value.title = presented(time) + '\nExact: ' + time.toString();
       tick.append(value);
     }

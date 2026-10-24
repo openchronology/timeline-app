@@ -9,6 +9,7 @@ import {
   DEFAULT_PRESENTATION,
   createPresenter,
   planRuler,
+  tickLabel,
   validateRulerPolicy,
   parseTimestamp,
   printTimestamp,
@@ -292,4 +293,43 @@ test('smaller text on screen fits more labelled marks, with minor marks kept apa
   for (let i = 1; i < tiny.ticks.length; i++)
     assert(tiny.ticks[i].time.sub(tiny.ticks[i - 1].time).compare(Q.from(3n, 5n)) >= 0);
   assert.throws(() => planRuler({ ...context(0n, 30n, 300), textScale: 0 }), /text scale/);
+});
+
+test('a tick draws one label, even while versions printing differently crossfade (#241)', () => {
+  // An 8-hour view at 1280 px sits midway between half-hour and hourly labels: the hour
+  // ticks carry both "20:00" and "20h", which drawn together read like "20000".
+  const format = createPresenter({ ...DEFAULT_PRESENTATION, mode: 'gregorian' });
+  const ctx = context(parseTimestamp('1969-07-20T19:30:00Z'), Q.from(8n * 3600n), 1280);
+  const hour = tickAt(format.rules(ctx), parseTimestamp('1969-07-20T20:00:00Z'));
+  const versions = hour.labels.map((label) => ({
+    text: format.print(hour.time, {
+      ...ctx,
+      spacingPixels: Number(label.interval.mul(Q.from(1280n)).div(ctx.span).floor().numerator),
+    }),
+    opacity: label.opacity,
+  }));
+  assert.deepEqual(new Set(versions.map((v) => v.text)), new Set(['20:00', '20h']));
+  const drawn = tickLabel(versions);
+  const strongest = versions.reduce((a, b) => (b.opacity > a.opacity ? b : a));
+  assert.equal(drawn.text, strongest.text);
+  assert(Math.abs(drawn.opacity - versions.reduce((sum, v) => sum + v.opacity, 0)) < 1e-9);
+  // The same text from two versions is one label with both weights; none is none.
+  assert.deepEqual(
+    tickLabel([
+      { text: '21:00', opacity: 0.25 },
+      { text: '21:00', opacity: 0.5 },
+    ]),
+    {
+      text: '21:00',
+      opacity: 0.75,
+    },
+  );
+  assert.equal(
+    tickLabel([
+      { text: 'a', opacity: 0.2 },
+      { text: 'b', opacity: 0.3 },
+    ]).text,
+    'b',
+  );
+  assert.equal(tickLabel([]), null);
 });

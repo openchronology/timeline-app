@@ -432,3 +432,29 @@ export function planRuler(
   if (ticks.length > MAX_TICKS) throw new Error('Ruler exceeds its visible tick budget.');
   return { ticks, graduation: fine.graduation };
 }
+
+/**
+ * The one label to draw at a tick, from its versions as printed (#241). While two levels
+ * crossfade, a tick carries two versions, whose text can differ ("20:00" for half-hour
+ * steps, "20h" for hourly ones); drawn together at one place they overlap and read as
+ * neither. Versions printing the same text add their weights; of differing ones the
+ * stronger is drawn alone, with every version's weight, so the label switches over midway
+ * through the zoom instead of two showing at once. Null when there are none.
+ */
+export function tickLabel(
+  versions: { text: string; opacity: number }[],
+): { text: string; opacity: number } | null {
+  const weights = new Map<string, number>();
+  for (const { text, opacity } of versions) weights.set(text, (weights.get(text) ?? 0) + opacity);
+  let best: string | null = null;
+  for (const [text, weight] of weights)
+    if (best === null || weight > weights.get(best)!) best = text;
+  if (best === null) return null;
+  return {
+    text: best,
+    opacity: Math.min(
+      1,
+      versions.reduce((sum, v) => sum + v.opacity, 0),
+    ),
+  };
+}

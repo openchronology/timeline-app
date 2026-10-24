@@ -103,7 +103,7 @@ export * from './addresses.js';
 export * from './wording.js';
 export type { TimelineLink } from './links.js';
 export type { DifferenceUnit, TimeDifference } from './difference.js';
-export { planRuler, validateRulerPolicy } from './ruler.js';
+export { planRuler, tickLabel, validateRulerPolicy } from './ruler.js';
 export type { RulerPolicy, RulerTick, RulerPlan } from './ruler.js';
 export { parseTimestamp, printTimestamp } from './calendar.js';
 import { validateTags, entityTags, normalizeEntityTags } from './tags.js';
