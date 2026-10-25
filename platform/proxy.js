@@ -100,11 +100,14 @@ export async function proxy(request) {
   // Content-Security-Policy to put the nonce on the scripts it writes.
   headers.set('x-nonce', nonce);
   headers.set('Content-Security-Policy', policy);
+  // The rewrite is to this server's own page, on the plain http it listens on. Behind an HTTPS
+  // proxy that says so (X-Forwarded-Proto), request.url has the https scheme, which Next.js
+  // takes for another server: it proxied the request to https on itself, which failed (#255).
+  const target = request.nextUrl.clone();
+  target.protocol = 'http:';
+  target.pathname = `/timelines/${id}${address?.rest ?? ''}`;
   const response = address?.owner
-    ? NextResponse.rewrite(
-        new URL(`/timelines/${id}${address.rest}${request.nextUrl.search}`, request.url),
-        { request: { headers } },
-      )
+    ? NextResponse.rewrite(target, { request: { headers } })
     : NextResponse.next({ request: { headers } });
   // The headers the browser gets: the policy itself; no guessing a response's type from its
   // content (nosniff); no Referer sent to other sites, so private timelines' addresses do not

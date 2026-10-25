@@ -31,6 +31,7 @@ The Next.js App Router application: each folder is a part of the site's address,
 | [`icon.svg`](icon.svg)              | The tab icon.                                                                                                                                                 |
 | [`layout.jsx`](layout.jsx)          | Every page's frame: the header with the logo and navigation, the footer with the build, analytics when enabled, and the site's default link-preview metadata. |
 | [`manifest.js`](manifest.js)        | Serves `/manifest.webmanifest`: the name, colors and icons for installing the site as an app.                                                                 |
+| [`not-found.jsx`](not-found.jsx)    | The page for an address with nothing the visitor may see, missing or private, answered 404: a guest is offered to sign in and return.                         |
 | [`page.jsx`](page.jsx)              | The dashboard at `/`: the signed-in account's timelines, favorites and browser drafts, and public timelines to search and browse.                             |
 | [`platform.css`](platform.css)      | The platform pages' styles, sharing the editor's type, color and control tokens so both read as one product.                                                  |
 | [`robots.js`](robots.js)            | Serves `/robots.txt`: crawlers may read public pages and oEmbed, but not accounts, the API, embeds or the bare editor.                                        |

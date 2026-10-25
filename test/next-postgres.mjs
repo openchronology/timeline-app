@@ -62,7 +62,7 @@ function client(ip) {
   const cookies = new Map();
   let csrf;
   return {
-    async request(path, { method = 'GET', data, status = 200, headers = false } = {}) {
+    async request(path, { method = 'GET', data, status = 200, headers = false, send = {} } = {}) {
       const res = await fetch(origin + path, {
         method,
         redirect: 'manual',
@@ -72,6 +72,7 @@ function client(ip) {
           ...(cookies.size ? { Cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join('; ') } : {}),
           ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
           ...(data !== undefined ? { 'Content-Type': 'application/json' } : {}),
+          ...send,
         },
         ...(data !== undefined ? { body: JSON.stringify(data) } : {}),
       });
@@ -184,6 +185,12 @@ try {
     legacy = '/timelines/' + timeline.id,
     base = '/' + ownerName + '/' + timeline.id,
     api = '/api' + legacy;
+  // Behind an HTTPS proxy that says so (X-Forwarded-Proto), the address still opens the
+  // timeline's page, rather than Next.js proxying the rewrite to https on itself (#255).
+  assert.match(
+    await owner.request(base, { send: { 'X-Forwarded-Proto': 'https' } }),
+    new RegExp(term),
+  );
   const ownDashboard = await owner.request('/');
   assert.match(ownDashboard, /id="dashboard-mine"/);
   assert(ownDashboard.includes(`href="${base}"`));
@@ -199,7 +206,10 @@ try {
     !(await guest.request(profileUrl)).includes(`href="${base}"`),
     'Private favorites leaked into public profile',
   );
-  await guest.request(base, { status: 404 });
+  // A private timeline is not found for a guest, whose page offers to sign in and return.
+  const hidden = await guest.request(base, { status: 404 });
+  assert.match(hidden, /it’s a private timeline you can’t open/);
+  assert(hidden.includes('/login?returnTo=' + encodeURIComponent(base)));
   await guest.request(legacy, { status: 404 });
   await guest.request(api + '/document', { status: 404 });
   await contributor.request(base + '/settings', { status: 404 });
