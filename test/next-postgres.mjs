@@ -349,13 +349,25 @@ try {
   await pool.query('UPDATE oc_timelines SET preparing_revision_id=head_revision_id WHERE id=$1', [
     fork.id,
   ]);
-  const waiting = await contributor.request(forkBase);
-  assert.match(waiting, /Preparing your copy/);
-  assert(!waiting.includes('/editor/frame#timeline/' + fork.id));
-  await contributor.request(forkBase + '/history', { status: 307 });
-  assert.equal((await contributor.request(forkApi)).preparing, true);
-  await contributor.request(forkApi + '/document', { status: 409 });
-  await pool.query('UPDATE oc_timelines SET preparing_revision_id=NULL WHERE id=$1', [fork.id]);
+  // A request refused for a copy being prepared starts preparing it again (store.access), which
+  // would finish and clear this mark partway through the checks (#280). Its row held locked
+  // here makes that retry skip it (FOR UPDATE SKIP LOCKED) until the mark is cleared below.
+  const held = await pool.connect();
+  await held.query('BEGIN');
+  try {
+    await held.query('SELECT 1 FROM oc_timelines WHERE id=$1 FOR UPDATE', [fork.id]);
+    const waiting = await contributor.request(forkBase);
+    assert.match(waiting, /Preparing your copy/);
+    assert(!waiting.includes('/editor/frame#timeline/' + fork.id));
+    await contributor.request(forkBase + '/history', { status: 307 });
+    assert.equal((await contributor.request(forkApi)).preparing, true);
+    await contributor.request(forkApi + '/document', { status: 409 });
+    await held.query('UPDATE oc_timelines SET preparing_revision_id=NULL WHERE id=$1', [fork.id]);
+  } finally {
+    // Released even when a check fails, so the pool can end.
+    await held.query('COMMIT');
+    held.release();
+  }
   assert((await contributor.request(forkBase)).includes('/editor/frame#timeline/'));
   assert.match(await contributor.request(forkBase + '/pulls/new'), /Open pull request/);
   assert.match(await contributor.request(forkBase + '/sync'), /Sync saved fork/);
