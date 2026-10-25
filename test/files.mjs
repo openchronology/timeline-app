@@ -138,12 +138,25 @@ console.log(
 // Exercise the HTTP boundary in-process, so this also runs without permission to bind sockets.
 const { Readable } = await import('node:stream');
 const { createApplication } = await import('../server/http.mjs');
+const { POLICY_VERSION } = await import('../server/policies.mjs');
 const token = 'a'.repeat(64),
   csrf = 'b'.repeat(64);
 const pool = {
   async query(sql) {
     if (sql.startsWith('SELECT s.csrf'))
-      return { rows: [{ id: 'user', username: 'user', csrf, token_hash: 'hash', kind: 'web' }] };
+      // An account that agreed to the terms in force (#277), so it may upload.
+      return {
+        rows: [
+          {
+            id: 'user',
+            username: 'user',
+            csrf,
+            token_hash: 'hash',
+            kind: 'web',
+            terms_version: POLICY_VERSION,
+          },
+        ],
+      };
     if (sql.startsWith('UPDATE oc_sessions') || sql.startsWith('DELETE FROM oc_auth_attempts'))
       return { rows: [] };
     if (sql.startsWith('INSERT INTO oc_auth_attempts')) return { rows: [{ count: 1 }] };
