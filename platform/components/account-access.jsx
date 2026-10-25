@@ -1,45 +1,23 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
-// The account page's access settings: profile picture, sensitive content, linked sign-in
-// methods, API keys, and deleting the account.
+// The account page's cards beside its security settings: the profile picture and sensitive
+// content, API keys, linked sign-in methods, and deleting the account.
 import { useState } from 'react';
 import { api } from '../lib/api.js';
 import HelpTip from './help-tip.jsx';
+
 /**
- * The account page's second half, under its security settings (Account renders it once the
- * account is loaded): storage used, the profile picture, sensitive content, API keys, linked
- * providers and deleting the account.
- *
- * Everything shown comes from the `account` that Account read (GET /api/auth/account); each
- * change is a request to /api/auth/… with the session's CSRF token, followed by `refresh()` so
- * the page shows the result. Changes that grant or remove access (creating a key, unlinking a
- * provider, deleting the account) also send the current password and, when on, a two-factor
- * code, which confirm the change (security.fresh). A failure shows beside what caused it.
- *
- * @param {object} props
- * @param {object} props.session GET /api/session's answer (its `csrf` and `user`)
- * @param {object} props.account GET /api/auth/account's answer: `profile` (`avatarUrl`,
- *   `minor`, `showSensitive`), `usage`, `keys` and `identities`
- * @param {() => Promise<object>} props.refresh reads the session and account again
+ * One card's changes: `action(where, path, method, data)` sends one to /api/<path> with the
+ * session's CSRF token, then reads the account again; a failure is kept with `where`, the form
+ * or list it came from, and `failure(where)` shows it there. One at a time: a click while one
+ * is being sent is ignored.
+ * @param {object} session GET /api/session's answer (its `csrf`)
+ * @param {() => Promise<object>} refresh reads the session and account again
  */
-export default function AccountAccess({ session, account, refresh }) {
-  // The last failure, `{ where, text }`, shown beside the form or list (`where`) that caused it.
+export function useAccountAction(session, refresh) {
   const [error, setError] = useState(null),
-    [busy, setBusy] = useState(false),
-    // A key just created: its secret, shown once and never again (the server keeps a hash).
-    [token, setToken] = useState(null),
-    // The avatar being edited (an address or a data: URL), previewed before it is saved.
-    [avatar, setAvatar] = useState(account?.profile?.avatarUrl ?? '');
-  /**
-   * Sends one change to /api/<path>, then reads the account again; a failure is shown beside
-   * `where`. One at a time: a click while one is being sent is ignored.
-   * @param {string} where the form or list the change came from: avatar, sensitive, keys,
-   *   unlink or delete
-   * @param {string} path the API path, after /api/
-   * @param {string} method its HTTP method
-   * @param {object} [data] the JSON body
-   * @returns {Promise<object|undefined>} the server's answer, or nothing when it failed
-   */
+    [busy, setBusy] = useState(false);
+  /** @returns {Promise<object|undefined>} the server's answer, or nothing when it failed */
   async function action(where, path, method, data) {
     if (busy) return;
     setBusy(true);
@@ -54,107 +32,150 @@ export default function AccountAccess({ session, account, refresh }) {
       setBusy(false);
     }
   }
-  /**
-   * Creates an API key: POST /api/auth/api-keys with its name, lifetime in days, scopes (always
-   * reading timelines, and writing them when chosen) and the confirmation password and code.
-   * The answer's `token` is the key itself, shown once; the form is cleared, so the password
-   * is not left in it.
-   */
-  /** The failure from `where`, if the last one came from there. */
   const failure = (where) =>
     error?.where === where && (
       <p className="error" role="alert">
         {error.text}
       </p>
     );
-  async function create(e) {
-    e.preventDefault();
-    const form = e.currentTarget,
-      d = new FormData(form);
-    const r = await action('keys', 'auth/api-keys', 'POST', {
-      name: d.get('name'),
-      days: Number(d.get('days')),
-      scopes: d.has('write') ? ['timelines:read', 'timelines:write'] : ['timelines:read'],
-      password: d.get('password'),
-      code: d.get('code'),
-    });
-    if (r?.token) {
-      setToken(r.token);
-      form.reset();
-    }
-  }
+  return { action, busy, setBusy, failure, fail: (where, text) => setError({ where, text }) };
+}
+
+/**
+ * The fields that confirm a change which grants or removes access: the current password, when
+ * the account has one, and a code, when two-factor authentication is on (security.fresh). An
+ * account without a password confirms with a sign-in in the last five minutes instead.
+ * @param {object} props
+ * @param {object} props.security the account's `security` (`has_password`, `mfa_enabled`)
+ */
+export function Confirmation({ security }) {
   return (
-    <section>
-      <h2>Profile and account access</h2>
-      {session.user.isAdmin && (
-        <p>
-          <a href="/admin">Site administration</a>
-        </p>
-      )}
-      <p>
-        {/* Administrators and accounts allowed past the limit have none. */}
-        Storage: {Number(account?.usage?.used_bytes ?? 0).toLocaleString()} bytes used ·{' '}
-        {account?.usage?.quota_bypass || account?.usage?.is_admin
-          ? 'Unlimited'
-          : Number(account?.usage?.effective_quota_bytes ?? 0).toLocaleString() + ' byte limit'}
-      </p>
-      {avatar && (
-        // The preview loads the address without a Referer, so the image's host learns nothing
-        // about the account page. Not as a CORS request: most image hosts send no CORS headers,
-        // and such an image would not show (#193).
-        <img
-          className="account-avatar"
-          src={avatar}
-          alt="Your avatar"
-          referrerPolicy="no-referrer"
-        />
-      )}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void action('avatar', 'auth/profile', 'PATCH', { avatarUrl: avatar });
-        }}
-      >
+    <>
+      {security?.has_password && (
         <label>
-          Avatar image URL
+          Current password
           <input
-            value={avatar}
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            maxLength={1024}
+            required
+          />
+        </label>
+      )}
+      {security?.mfa_enabled && (
+        <label>
+          Authenticator or recovery code
+          <input name="code" autoComplete="one-time-code" maxLength={40} required />
+        </label>
+      )}
+    </>
+  );
+}
+
+/**
+ * A change kept closed until it is chosen: a button that opens its form beneath it.
+ * @param {object} props
+ * @param {string} props.label the button's text
+ * @param {string} [props.className] the button's class, such as "danger"
+ * @param {import('react').ReactNode} props.children the form
+ */
+export function Disclosure({ label, className = '', children }) {
+  return (
+    <details className="account-disclosure">
+      <summary className={'button ' + className}>{label}</summary>
+      <div className="account-disclosure-body">{children}</div>
+    </details>
+  );
+}
+
+/**
+ * The profile card: the picture (uploaded, or an address), previewed before it is saved, and
+ * whether sensitive content shows without its warnings.
+ * @param {object} props
+ * @param {object} props.session GET /api/session's answer
+ * @param {object} props.account GET /api/auth/account's answer (`profile`: `avatarUrl`, `minor`,
+ *   `showSensitive`)
+ * @param {() => Promise<object>} props.refresh reads the session and account again
+ */
+export function ProfileCard({ session, account, refresh }) {
+  const { action, busy, failure, fail } = useAccountAction(session, refresh);
+  const saved = account?.profile?.avatarUrl ?? '';
+  // The picture being edited (an address or a data: URL), previewed until it is saved.
+  const [avatar, setAvatar] = useState(saved);
+  const save = (avatarUrl) =>
+    action('avatar', 'auth/profile', 'PATCH', { avatarUrl }).then(() => setAvatar(avatarUrl));
+  return (
+    <section className="settings-card" id="profile">
+      <h2>Profile</h2>
+      <div className="avatar-row">
+        {avatar ? (
+          // The preview loads the address without a Referer, so the image's host learns nothing
+          // about the account page. Not as a CORS request: most image hosts send no CORS headers,
+          // and such an image would not show (#193).
+          <img
+            className="account-avatar"
+            src={avatar}
+            alt="Your avatar"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <span className="account-avatar placeholder" aria-hidden="true">
+            {session.user.username[0].toUpperCase()}
+          </span>
+        )}
+        <div className="actions">
+          <label className="button">
+            Upload picture
+            <input
+              className="sr-only"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(e) => {
+                // An uploaded picture becomes a data: URL, saved like an address; the server
+                // checks its size and that it really is a PNG, JPEG or WebP. Clearing the input
+                // lets the same file be chosen again.
+                const f = e.target.files?.[0];
+                e.target.value = '';
+                if (!f) return;
+                if (f.size > 262144) return fail('avatar', 'Avatar exceeds 256 KiB.');
+                const reader = new FileReader();
+                reader.onload = () => setAvatar(String(reader.result));
+                reader.readAsDataURL(f);
+              }}
+            />
+          </label>
+          {saved && avatar === saved && (
+            <button disabled={busy} onClick={() => void save('')}>
+              Remove
+            </button>
+          )}
+        </div>
+      </div>
+      <p className="muted">PNG, JPEG or WebP, up to 256 KiB.</p>
+      <Disclosure label="Use an image address">
+        <label>
+          Image address
+          <input
+            value={avatar.startsWith('data:') ? '' : avatar}
             onChange={(e) => setAvatar(e.target.value)}
             maxLength={2048}
             placeholder="https://…"
           />
         </label>
-        <label>
-          Or upload PNG, JPEG or WebP (256 KiB maximum)
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={(e) => {
-              // An uploaded picture becomes a data: URL, saved like an address; the server checks
-              // its size and that it really is a PNG, JPEG or WebP. Clearing the input lets the
-              // same file be chosen again.
-              const f = e.target.files?.[0];
-              e.target.value = '';
-              if (!f) return;
-              if (f.size > 262144) {
-                setError({ where: 'avatar', text: 'Avatar exceeds 256 KiB.' });
-                return;
-              }
-              const reader = new FileReader();
-              reader.onload = () => setAvatar(String(reader.result));
-              reader.readAsDataURL(f);
-            }}
-          />
-        </label>
+      </Disclosure>
+      {avatar !== saved && (
         <div className="actions">
-          <button disabled={busy}>Save avatar</button>
-          <button type="button" disabled={busy} onClick={() => setAvatar('')}>
-            Clear avatar
+          <button className="primary" disabled={busy} onClick={() => void save(avatar)}>
+            Save picture
+          </button>
+          <button disabled={busy} onClick={() => setAvatar(saved)}>
+            Cancel
           </button>
         </div>
-        {failure('avatar')}
-      </form>
-      <h2>Sensitive content</h2>
+      )}
+      {failure('avatar')}
+      <h3>Sensitive content</h3>
       {/* Minors can't turn the warnings off: the server refuses it (#115). */}
       {account?.profile?.minor ? (
         <p className="muted">
@@ -174,47 +195,64 @@ export default function AccountAccess({ session, account, refresh }) {
               })
             }
           />
-          Show sensitive content without warnings (labelled nudity, graphic violence and disturbing
-          content, and their images)
+          Show labelled nudity, graphic violence and disturbing content, and their images, without
+          warnings
         </label>
       )}
       {failure('sensitive')}
+    </section>
+  );
+}
+
+/**
+ * The API keys card: the account's keys, each to revoke or remove, and a form for a new one
+ * whose secret is shown once (the server keeps only a hash).
+ * @param {object} props
+ * @param {object} props.session GET /api/session's answer
+ * @param {object} props.account GET /api/auth/account's answer (`keys`, `security`)
+ * @param {() => Promise<object>} props.refresh reads the session and account again
+ */
+export function ApiKeysCard({ session, account, refresh }) {
+  const { action, busy, failure } = useAccountAction(session, refresh);
+  // A key just created: its secret, shown once and never again.
+  const [token, setToken] = useState(null);
+  /**
+   * Creates a key: POST /api/auth/api-keys with its name, lifetime in days, scopes (always
+   * reading timelines, and writing them when chosen) and the confirmation. The form is
+   * cleared and closed, so the password is not left in it.
+   */
+  async function create(e) {
+    e.preventDefault();
+    const form = e.currentTarget,
+      d = new FormData(form);
+    const r = await action('keys', 'auth/api-keys', 'POST', {
+      name: d.get('name'),
+      days: Number(d.get('days')),
+      scopes: d.has('write') ? ['timelines:read', 'timelines:write'] : ['timelines:read'],
+      password: d.get('password'),
+      code: d.get('code'),
+    });
+    if (r?.token) {
+      setToken(r.token);
+      form.reset();
+      form.closest('details')?.removeAttribute('open');
+    }
+  }
+  const keys = account?.keys ?? [];
+  return (
+    <section className="settings-card wide" id="api-keys">
       <h2>
         API keys
         <HelpTip topic="api#calling-it" about="API keys">
           For programs: a key reaches your timelines through the HTTP API, with the scopes you
-          choose.
+          choose. Keys act with your timeline permissions and storage limit, and cannot manage
+          accounts or the site. Send a key over HTTPS in the Authorization header, never in a URL.
         </HelpTip>
       </h2>
-      <p>
-        Keys act with your timeline permissions and storage limit. They cannot manage accounts or
-        the site. Use HTTPS and send the key in the Authorization header; never put it in a URL. The{' '}
-        <a href="/docs/api">HTTP API reference</a> lists what they can do.
+      <p className="muted">
+        For programs that read or change your timelines through the <a href="/docs/api">HTTP API</a>
+        .
       </p>
-      <form onSubmit={create}>
-        <label>
-          Key name
-          <input name="name" maxLength={80} required placeholder="Aggregation service" />
-        </label>
-        <label>
-          Expires after (days)
-          <input name="days" type="number" min="1" max="365" defaultValue="90" required />
-        </label>
-        <label className="checkbox-label">
-          <input name="write" type="checkbox" />
-          Allow timeline writes (reads are always included)
-        </label>
-        <label>
-          Current password
-          <input name="password" type="password" autoComplete="current-password" />
-        </label>
-        <label>
-          Authenticator or recovery code (if enabled)
-          <input name="code" autoComplete="one-time-code" />
-        </label>
-        <button disabled={busy}>Create API key</button>
-        {failure('keys')}
-      </form>
       {token && (
         <div className="notice">
           <h3>Copy this key now</h3>
@@ -223,69 +261,157 @@ export default function AccountAccess({ session, account, refresh }) {
           <button onClick={() => setToken(null)}>I have stored the key</button>
         </div>
       )}
-      {(account?.keys ?? []).map((k) => (
-        <article key={k.id}>
-          <h3>{k.name}</h3>
-          <p>
-            {k.prefix}… · {k.scopes.join(', ')} · Expires{' '}
-            {new Date(k.expires_at).toLocaleDateString()} ·{' '}
-            {k.revoked_at ? 'Revoked' : new Date(k.expires_at) < new Date() ? 'Expired' : 'Active'}
-          </p>
+      {keys.length ? (
+        <ul className="settings-list">
+          {keys.map((k) => (
+            <li key={k.id}>
+              <div>
+                <strong>{k.name}</strong>
+                <span className="muted">
+                  {' '}
+                  {k.prefix}… · {k.scopes.join(', ')} · Expires{' '}
+                  {new Date(k.expires_at).toLocaleDateString()}
+                </span>
+              </div>
+              <span className="status-badge">
+                {k.revoked_at
+                  ? 'Revoked'
+                  : new Date(k.expires_at) < new Date()
+                    ? 'Expired'
+                    : 'Active'}
+              </span>
+              <div className="actions">
+                {/* Revoking (POST) stops the key but keeps it listed; removing (DELETE) forgets
+                    it. */}
+                <button
+                  disabled={busy || !!k.revoked_at}
+                  onClick={() => action('keys', 'auth/api-keys/' + k.id, 'POST', {})}
+                >
+                  Revoke
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() => {
+                    if (
+                      confirm('Remove this API key permanently? It will immediately stop working.')
+                    )
+                      void action('keys', 'auth/api-keys/' + k.id, 'DELETE');
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>No API keys yet.</p>
+      )}
+      <Disclosure label="New API key">
+        <form onSubmit={create} className="settings-form">
+          <label>
+            Key name
+            <input name="name" maxLength={80} required placeholder="Aggregation service" />
+          </label>
+          <label>
+            Expires after (days)
+            <input name="days" type="number" min="1" max="365" defaultValue="90" required />
+          </label>
+          <label className="checkbox-label">
+            <input name="write" type="checkbox" />
+            Allow timeline writes (reads are always included)
+          </label>
+          <Confirmation security={account?.security} />
           <div className="actions">
-            {/* Revoking (POST) stops the key but keeps it listed; removing (DELETE) forgets it. */}
-            <button
-              disabled={busy || !!k.revoked_at}
-              onClick={() => action('keys', 'auth/api-keys/' + k.id, 'POST', {})}
-            >
-              Revoke
-            </button>
-            <button
-              disabled={busy}
-              onClick={() => {
-                if (confirm('Remove this API key permanently? It will immediately stop working.'))
-                  void action('keys', 'auth/api-keys/' + k.id, 'DELETE');
-              }}
-            >
-              Remove
+            <button className="primary" disabled={busy}>
+              Create API key
             </button>
           </div>
-        </article>
-      ))}
-      <h2>Linked sign-in methods</h2>
-      <p>
-        Use the existing provider buttons to link Google, GitHub or Facebook. To remove a linked
-        provider, confirm your current credentials below.
-      </p>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const d = new FormData(e.currentTarget);
-          void action('unlink', 'auth/identities/unlink', 'POST', {
-            provider: d.get('provider'),
-            password: d.get('password'),
-            code: d.get('code'),
-          });
-        }}
-      >
-        <label>
-          Linked provider
-          <select name="provider">
-            {(account?.identities ?? []).map((p) => (
-              <option key={p}>{p}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Current password
-          <input name="password" type="password" autoComplete="current-password" />
-        </label>
-        <label>
-          Authenticator or recovery code
-          <input name="code" autoComplete="one-time-code" />
-        </label>
-        <button disabled={busy || !account?.identities?.length}>Unlink provider</button>
-        {failure('unlink')}
-      </form>
+        </form>
+      </Disclosure>
+      {failure('keys')}
+    </section>
+  );
+}
+
+const PROVIDERS = { github: 'GitHub', google: 'Google', facebook: 'Facebook' };
+
+/**
+ * The sign-in methods card: each provider the site offers, linked (to unlink, confirmed by the
+ * current credentials) or not (to link, through `link`, which opens the provider).
+ * @param {object} props
+ * @param {object} props.session GET /api/session's answer (`providers`)
+ * @param {object} props.account GET /api/auth/account's answer (`identities`, `security`)
+ * @param {() => Promise<object>} props.refresh reads the session and account again
+ * @param {(name: string) => void} props.link starts linking a provider
+ * @param {boolean} props.linking a link has been started
+ */
+export function SignInMethodsCard({ session, account, refresh, link, linking }) {
+  const { action, busy, failure } = useAccountAction(session, refresh);
+  const identities = account?.identities ?? [];
+  // Linked providers the site no longer offers are still listed, so they can be unlinked.
+  const names = [...new Set([...(session.providers ?? []), ...identities])];
+  return (
+    <section className="settings-card" id="sign-in">
+      <h2>Sign-in methods</h2>
+      <ul className="settings-list">
+        <li>
+          <strong>Password</strong>
+          <span className="status-badge">{account?.security?.has_password ? 'Set' : 'None'}</span>
+        </li>
+        {names.map((name) => (
+          <li key={name}>
+            <strong>{PROVIDERS[name] ?? name}</strong>
+            {identities.includes(name) ? (
+              <>
+                <span className="status-badge on">Linked</span>
+                <Disclosure label="Unlink">
+                  <form
+                    className="settings-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const d = new FormData(e.currentTarget);
+                      void action('unlink', 'auth/identities/unlink', 'POST', {
+                        provider: name,
+                        password: d.get('password'),
+                        code: d.get('code'),
+                      });
+                    }}
+                  >
+                    <Confirmation security={account?.security} />
+                    <button disabled={busy}>Unlink {PROVIDERS[name] ?? name}</button>
+                  </form>
+                </Disclosure>
+              </>
+            ) : (
+              <>
+                <span className="status-badge">Not linked</span>
+                <button disabled={busy || linking} onClick={() => link(name)}>
+                  Link
+                </button>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+      {!names.length && <p className="muted">This site offers no other ways to sign in.</p>}
+      {failure('unlink')}
+    </section>
+  );
+}
+
+/**
+ * The danger zone: deleting the account and everything that is its own, confirmed by typing
+ * the username and by the current credentials. On success the browser goes to the home page.
+ * @param {object} props
+ * @param {object} props.session GET /api/session's answer
+ * @param {object} props.account GET /api/auth/account's answer (`security`)
+ * @param {() => Promise<object>} props.refresh reads the session and account again
+ */
+export function DeleteAccountCard({ session, account, refresh }) {
+  const { busy, setBusy, failure, fail } = useAccountAction(session, refresh);
+  return (
+    <section className="settings-card wide danger-zone" id="delete">
       <h2>Delete your account</h2>
       <p className="muted">
         Deletes your account and what is yours: your timelines (with their saved history, pull
@@ -294,50 +420,45 @@ export default function AccountAccess({ session, account, refresh }) {
         methods. Changes already merged into other people’s timelines stay there. Export what you
         want to keep first. This cannot be undone.
       </p>
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const d = new FormData(e.currentTarget);
-          if (busy) return;
-          setBusy(true);
-          setError(null);
-          try {
-            // Not through action(): there is no account left to refresh afterwards.
-            await api('auth/account', {
-              method: 'DELETE',
-              csrf: session.csrf,
-              data: {
-                confirm: d.get('confirm'),
-                // Only what was given: an account with no password (signed up through a
-                // provider), or without two-factor authentication, sends none.
-                ...(d.get('password') ? { password: d.get('password') } : {}),
-                ...(d.get('code') ? { code: d.get('code') } : {}),
-              },
-            });
-            window.location.assign('/');
-          } catch (e) {
-            setError({ where: 'delete', text: e.message });
-            setBusy(false);
-          }
-        }}
-      >
-        <label>
-          Type your username to confirm
-          <input name="confirm" autoComplete="off" required />
-        </label>
-        <label>
-          Current password (if your account has one)
-          <input name="password" type="password" autoComplete="current-password" />
-        </label>
-        <label>
-          Authenticator or recovery code (if two-factor authentication is on)
-          <input name="code" autoComplete="one-time-code" />
-        </label>
-        <button className="danger" disabled={busy}>
-          Delete my account
-        </button>
-        {failure('delete')}
-      </form>
+      <Disclosure label="Delete my account…" className="danger">
+        <form
+          className="settings-form"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const d = new FormData(e.currentTarget);
+            if (busy) return;
+            setBusy(true);
+            try {
+              // Not through action(): there is no account left to refresh afterwards.
+              await api('auth/account', {
+                method: 'DELETE',
+                csrf: session.csrf,
+                data: {
+                  confirm: d.get('confirm'),
+                  // Only what was given: an account with no password (signed up through a
+                  // provider), or without two-factor authentication, sends none.
+                  ...(d.get('password') ? { password: d.get('password') } : {}),
+                  ...(d.get('code') ? { code: d.get('code') } : {}),
+                },
+              });
+              window.location.assign('/');
+            } catch (e) {
+              fail('delete', e.message);
+              setBusy(false);
+            }
+          }}
+        >
+          <label>
+            Type your username to confirm
+            <input name="confirm" autoComplete="off" required />
+          </label>
+          <Confirmation security={account?.security} />
+          <button className="danger" disabled={busy}>
+            Delete my account
+          </button>
+        </form>
+      </Disclosure>
+      {failure('delete')}
     </section>
   );
 }

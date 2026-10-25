@@ -5,16 +5,23 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import AccountAccess from './account-access.jsx';
+import {
+  ApiKeysCard,
+  Confirmation,
+  DeleteAccountCard,
+  Disclosure,
+  ProfileCard,
+  SignInMethodsCard,
+} from './account-access.jsx';
 import { api } from '../lib/api.js';
 import ModerationDecisions from './moderation-decisions.jsx';
 import { profilePath } from '../../src/addresses.ts';
 import HelpTip from './help-tip.jsx';
 /**
  * The sign-in page (/login) and the account page (/account) in one component: a guest sees the
- * form for the current step (`mode`), a signed-in account its security settings and sessions,
- * its profile, API keys and linked sign-ins (AccountAccess), and moderation decisions about its
- * content.
+ * form for the current step (`mode`), a signed-in account its settings (AccountSettings): a
+ * summary, then cards for its profile, security, sessions, sign-in methods and API keys
+ * (account-access.jsx), deleting it, and moderation decisions about its content.
  *
  * It reads GET /api/session (`{server, user, csrf, providers, security, challenge}`) and,
  * when signed in, GET /api/auth/account (`{security, profile, usage, keys, identities,
@@ -219,8 +226,8 @@ export default function Account({ returnTo = '/', login = false }) {
   // Whether to show the guest's forms: no account yet, or a step that an emailed link or a
   // challenge put the page in even while a session exists.
   const anonymous = !session?.user || ['mfa', 'email', 'verify', 'reset'].includes(mode);
-  // The server's message or failure: beside the security form when signed in (the account
-  // page's other sections show their own), else under the sign-in forms.
+  // The server's message or failure: at the top of the account page (its cards show their
+  // own), else under the sign-in forms.
   const feedback = (
     <>
       <p role="status">{message}</p>
@@ -229,32 +236,46 @@ export default function Account({ returnTo = '/', login = false }) {
       </p>
     </>
   );
+  if (session?.user && !anonymous)
+    return (
+      <AccountSettings
+        session={session}
+        account={account}
+        refresh={refresh}
+        busy={busy}
+        action={action}
+        securityForm={securityForm}
+        setup={setup}
+        codes={codes}
+        clearCodes={() => setCodes(null)}
+        signOut={() => {
+          setSetup(null);
+          setCodes(null);
+          void action('auth/logout');
+        }}
+        link={provider}
+        feedback={feedback}
+      />
+    );
   return (
     <div className="account-card">
       <h1>
-        {session?.user && !anonymous
-          ? '@' + session.user.username
-          : ({
-              register: 'Create account',
-              forgot: 'Recover your password',
-              reset: 'Choose a new password',
-              verify: 'Confirm email',
-              mfa: 'Two-factor authentication',
-              email: 'Confirm your email address',
-            }[mode] ?? 'Sign in')}
+        {{
+          register: 'Create account',
+          forgot: 'Recover your password',
+          reset: 'Choose a new password',
+          verify: 'Confirm email',
+          mfa: 'Two-factor authentication',
+          email: 'Confirm your email address',
+        }[mode] ?? 'Sign in'}
       </h1>
-      {session?.user && !anonymous && (
-        <p>
-          <Link href={profilePath(session.user.username)}>Your public profile</Link>
-        </p>
-      )}
       {!session && !error && <p role="status">Loading your session…</p>}
       {session?.server === false && (
         <p className="notice">
           Server accounts are unavailable. <Link href="/editor">Open a local timeline</Link>.
         </p>
       )}
-      {session?.server && anonymous && (
+      {session?.server && (
         <form onSubmit={submit}>
           {['login', 'register'].includes(mode) && (
             <label>
@@ -366,7 +387,7 @@ export default function Account({ returnTo = '/', login = false }) {
           </div>
         </form>
       )}
-      {session?.server && anonymous && (
+      {session?.server && (
         <div className="actions">
           {mode !== 'login' && (
             <button
@@ -400,158 +421,103 @@ export default function Account({ returnTo = '/', login = false }) {
       {session?.server && ['login', 'register'].includes(mode) && (
         <div className="actions">
           {(session.providers ?? []).map((name) => (
-            <button
-              key={name}
-              // A provider already linked to the account can't be linked again.
-              disabled={busy || account?.identities.includes(name)}
-              onClick={() => provider(name)}
-            >
-              {session.user ? 'Link' : 'Continue with'}{' '}
-              {name === 'github' ? 'GitHub' : name === 'facebook' ? 'Facebook' : 'Google'}
+            <button key={name} disabled={busy} onClick={() => provider(name)}>
+              Continue with {PROVIDERS[name] ?? name}
             </button>
           ))}
         </div>
       )}
-      {session?.user && !anonymous && (
-        <section>
-          <h2>
-            Account security
-            <HelpTip
-              topic="authentication#two-factor-authentication-and-recovery"
-              about="account security"
-            >
-              Two-factor authentication asks for a code from an app as well as your password.
-            </HelpTip>
-          </h2>
-          <p>
-            {account?.security?.email ?? 'No email address'}
-            {account?.security?.email_verified_at ? ' · verified' : ''}
-          </p>
-          <p>
-            Two-factor authentication: {account?.security?.mfa_enabled ? 'enabled' : 'not enabled'}.{' '}
-            {account?.security?.mfa_enabled
-              ? `${account.security.recovery_remaining} recovery codes remain.`
-              : 'An authenticator app provides a second sign-in factor.'}
-          </p>
+      {feedback}
+      <p className="muted">
+        <Link href="/legal">Terms and privacy notices</Link> are available before registration.
+      </p>
+    </div>
+  );
+}
+
+const PROVIDERS = { github: 'GitHub', google: 'Google', facebook: 'Facebook' };
+
+/** Bytes as people read them: B, KiB, MiB or GiB, to a tenth below ten. */
+function size(bytes) {
+  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+  let value = Number(bytes),
+    unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return `${unit && value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+}
+
+/**
+ * The signed-in account page: a summary across the top (picture, name, email, storage, and
+ * links to the profile, administration and signing out), then its settings as cards, two
+ * columns wide on a wide screen. Each change opens its own small form, asking for only what it
+ * needs. The security and sessions cards send their changes through Account's `action`
+ * (`securityForm` reads the pressed button's path), whose answer shows in `feedback`.
+ */
+function AccountSettings({
+  session,
+  account,
+  refresh,
+  busy,
+  action,
+  securityForm,
+  setup,
+  codes,
+  clearCodes,
+  signOut,
+  link,
+  feedback,
+}) {
+  const security = account?.security;
+  const usage = account?.usage;
+  const unlimited = usage?.quota_bypass || usage?.is_admin;
+  const quota = Number(usage?.effective_quota_bytes ?? 0);
+  const used = Number(usage?.used_bytes ?? 0);
+  const avatar = account?.profile?.avatarUrl;
+  return (
+    <div className="account-page">
+      <header className="account-summary">
+        {avatar ? (
+          <img className="account-avatar" src={avatar} alt="" referrerPolicy="no-referrer" />
+        ) : (
+          <span className="account-avatar placeholder" aria-hidden="true">
+            {session.user.username[0].toUpperCase()}
+          </span>
+        )}
+        <div className="account-identity">
+          <h1>@{session.user.username}</h1>
           <p className="muted">
-            Security changes ask for your current password and, with two-factor authentication on, a
-            fresh code. An account without a password (signed up through Google, GitHub or Facebook)
-            confirms them with a sign-in in the last five minutes instead.
+            {security?.email ?? 'No email address'}
+            {security?.email && (
+              <span className={'status-badge' + (security.email_verified_at ? ' on' : '')}>
+                {security.email_verified_at ? 'Verified' : 'Unconfirmed'}
+              </span>
+            )}
           </p>
-          <form onSubmit={securityForm}>
-            {account?.security?.has_password && (
-              <label>
-                Current password
-                <input
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  maxLength={1024}
-                  required
-                />
-              </label>
+        </div>
+        {usage && (
+          <div className="storage-meter">
+            <span>
+              Storage: {size(used)}
+              {unlimited ? ' · unlimited' : ` of ${size(quota)}`}
+            </span>
+            {!unlimited && quota > 0 && (
+              <meter min={0} max={quota} value={Math.min(used, quota)} high={quota * 0.9}>
+                {Math.round((used / quota) * 100)}%
+              </meter>
             )}
-            {/* A code confirms changes once two-factor authentication is on, and confirms the
-                authenticator itself while it is being set up. */}
-            {(account?.security?.mfa_enabled || setup) && (
-              <label>
-                Authenticator or recovery code
-                <input name="code" autoComplete="one-time-code" maxLength={40} required />
-              </label>
-            )}
-            {setup && (
-              <div className="notice">
-                <p>Add this key to your authenticator app, then enter its six-digit code.</p>
-                <code>{setup.secret}</code>
-                <p>
-                  <a href={setup.uri}>Open in an authenticator app</a>
-                </p>
-              </div>
-            )}
-            <div className="actions">
-              {!account?.security?.mfa_enabled ? (
-                <button
-                  disabled={busy || !session.security?.mfa}
-                  value={setup ? 'auth/mfa/enable' : 'auth/mfa/setup'}
-                >
-                  {setup ? 'Confirm and enable MFA' : 'Set up two-factor authentication'}
-                </button>
-              ) : (
-                <>
-                  <button disabled={busy} value="auth/mfa/recovery">
-                    Replace recovery codes
-                  </button>
-                  <button disabled={busy} value="auth/mfa/disable">
-                    Disable two-factor authentication
-                  </button>
-                </>
-              )}
-            </div>
-            <details>
-              <summary>Change password</summary>
-              <label>
-                New password
-                <input
-                  name="newPassword"
-                  type="password"
-                  autoComplete="new-password"
-                  minLength={15}
-                  maxLength={1024}
-                />
-              </label>
-              <label>
-                Confirm new password
-                <input
-                  name="passwordConfirmation"
-                  type="password"
-                  autoComplete="new-password"
-                  maxLength={1024}
-                />
-              </label>
-              <button disabled={busy} value="auth/password/change">
-                Change password and sign out
-              </button>
-            </details>
-            <details>
-              <summary>Change email</summary>
-              <label>
-                New email address
-                <input name="email" type="email" autoComplete="email" maxLength={254} />
-              </label>
-              <button disabled={busy} value="auth/email/change">
-                Send email confirmation
-              </button>
-            </details>
-          </form>
-          {feedback}
-          <h2>Active sessions</h2>
-          {account?.sessions.map((s, i) => (
-            <p key={i}>
-              {s.kind === 'desktop' ? 'Desktop' : 'Browser'}
-              {s.current ? ' (this session)' : ''} · {new Date(s.created_at).toLocaleString()}
-            </p>
-          ))}
-          <div className="actions">
-            <button disabled={busy} onClick={() => action('auth/revoke-others')}>
-              Sign out other sessions
-            </button>
-            <button
-              disabled={busy}
-              onClick={() => {
-                setSetup(null);
-                setCodes(null);
-                void action('auth/logout');
-              }}
-            >
-              Sign out
-            </button>
           </div>
-        </section>
-      )}
-      {session?.user && !anonymous && account && (
-        <AccountAccess session={session} account={account} refresh={refresh} />
-      )}
-      {session?.user && !anonymous && <ModerationDecisions session={session} />}
+        )}
+        <nav className="actions" aria-label="Account">
+          <Link href={profilePath(session.user.username)}>Your public profile</Link>
+          {session.user.isAdmin && <a href="/admin">Site administration</a>}
+          <button disabled={busy} onClick={signOut}>
+            Sign out
+          </button>
+        </nav>
+      </header>
       {codes && (
         <section className="notice">
           <h2>Save your recovery codes</h2>
@@ -560,13 +526,188 @@ export default function Account({ returnTo = '/', login = false }) {
             codes will not be displayed again.
           </p>
           <pre>{codes.join('\n')}</pre>
-          <button onClick={() => setCodes(null)}>I have stored these codes</button>
+          <button onClick={clearCodes}>I have stored these codes</button>
         </section>
       )}
-      {anonymous && feedback}
-      <p className="muted">
-        <Link href="/legal">Terms and privacy notices</Link> are available before registration.
-      </p>
+      <div className="account-feedback">{feedback}</div>
+      <ModerationDecisions session={session} />
+      {!account ? (
+        <p role="status">Loading your account…</p>
+      ) : (
+        <div className="settings-grid">
+          <ProfileCard session={session} account={account} refresh={refresh} />
+          <section className="settings-card" id="security">
+            <h2>
+              Security
+              <HelpTip
+                topic="authentication#two-factor-authentication-and-recovery"
+                about="account security"
+              >
+                Changes ask for your current password and, with two-factor authentication on, a
+                fresh code. An account without a password (signed up through Google, GitHub or
+                Facebook) confirms them with a sign-in in the last five minutes instead.
+              </HelpTip>
+            </h2>
+            <ul className="settings-list">
+              <li>
+                <strong>Email</strong>
+                <span className="muted">{security?.email ?? 'None'}</span>
+                <Disclosure label="Change">
+                  <form className="settings-form" onSubmit={securityForm}>
+                    <label>
+                      New email address
+                      <input
+                        name="email"
+                        type="email"
+                        autoComplete="email"
+                        maxLength={254}
+                        required
+                      />
+                    </label>
+                    <Confirmation security={security} />
+                    <button disabled={busy} value="auth/email/change">
+                      Send email confirmation
+                    </button>
+                  </form>
+                </Disclosure>
+              </li>
+              <li>
+                <strong>Password</strong>
+                <span className="muted">{security?.has_password ? 'Set' : 'None'}</span>
+                <Disclosure label="Change">
+                  <form className="settings-form" onSubmit={securityForm}>
+                    <label>
+                      New password
+                      <input
+                        name="newPassword"
+                        type="password"
+                        autoComplete="new-password"
+                        minLength={15}
+                        maxLength={1024}
+                        required
+                      />
+                    </label>
+                    <label>
+                      Confirm new password
+                      <input
+                        name="passwordConfirmation"
+                        type="password"
+                        autoComplete="new-password"
+                        maxLength={1024}
+                        required
+                      />
+                    </label>
+                    <Confirmation security={security} />
+                    <button disabled={busy} value="auth/password/change">
+                      Change password and sign out
+                    </button>
+                  </form>
+                </Disclosure>
+              </li>
+              <li>
+                <strong>Two-factor authentication</strong>
+                <span className={'status-badge' + (security?.mfa_enabled ? ' on' : '')}>
+                  {security?.mfa_enabled ? 'On' : 'Off'}
+                </span>
+                {!security?.mfa_enabled && !setup && (
+                  <Disclosure label="Set up">
+                    <form className="settings-form" onSubmit={securityForm}>
+                      <p className="muted">
+                        An authenticator app gives a code to enter after your password.
+                      </p>
+                      <Confirmation security={security} />
+                      <button disabled={busy || !session.security?.mfa} value="auth/mfa/setup">
+                        Continue
+                      </button>
+                    </form>
+                  </Disclosure>
+                )}
+              </li>
+              {security?.mfa_enabled && (
+                <li>
+                  <strong>Recovery codes</strong>
+                  <span className="muted">{security.recovery_remaining} left</span>
+                  <Disclosure label="Replace">
+                    <form className="settings-form" onSubmit={securityForm}>
+                      <p className="muted">This also signs out your other sessions.</p>
+                      <Confirmation security={security} />
+                      <button disabled={busy} value="auth/mfa/recovery">
+                        Replace recovery codes
+                      </button>
+                    </form>
+                  </Disclosure>
+                  <Disclosure label="Turn off two-factor" className="danger">
+                    <form className="settings-form" onSubmit={securityForm}>
+                      <p className="muted">This also signs out your other sessions.</p>
+                      <Confirmation security={security} />
+                      <button className="danger" disabled={busy} value="auth/mfa/disable">
+                        Turn off two-factor authentication
+                      </button>
+                    </form>
+                  </Disclosure>
+                </li>
+              )}
+            </ul>
+            {setup && (
+              <form className="notice settings-form" onSubmit={securityForm}>
+                <p>Add this key to your authenticator app, then enter its six-digit code.</p>
+                <code>{setup.secret}</code>
+                <p>
+                  <a href={setup.uri}>Open in an authenticator app</a>
+                </p>
+                {security?.has_password && (
+                  <label>
+                    Current password
+                    <input
+                      name="password"
+                      type="password"
+                      autoComplete="current-password"
+                      maxLength={1024}
+                      required
+                    />
+                  </label>
+                )}
+                <label>
+                  Code from the app
+                  <input name="code" autoComplete="one-time-code" maxLength={40} required />
+                </label>
+                <button className="primary" disabled={busy} value="auth/mfa/enable">
+                  Confirm and turn on
+                </button>
+              </form>
+            )}
+          </section>
+          <section className="settings-card" id="sessions">
+            <h2>Sessions</h2>
+            <ul className="settings-list">
+              {account.sessions.map((s, i) => (
+                <li key={i}>
+                  <strong>{s.kind === 'desktop' ? 'Desktop app' : 'Browser'}</strong>
+                  <span className="muted">since {new Date(s.created_at).toLocaleString()}</span>
+                  {s.current && <span className="status-badge on">This session</span>}
+                </li>
+              ))}
+            </ul>
+            <div className="actions">
+              <button
+                disabled={busy || account.sessions.length < 2}
+                onClick={() => action('auth/revoke-others')}
+              >
+                Sign out other sessions
+              </button>
+            </div>
+          </section>
+          <SignInMethodsCard
+            session={session}
+            account={account}
+            refresh={refresh}
+            link={link}
+            linking={busy}
+          />
+          <ApiKeysCard session={session} account={account} refresh={refresh} />
+          <DeleteAccountCard session={session} account={account} refresh={refresh} />
+        </div>
+      )}
     </div>
   );
 }

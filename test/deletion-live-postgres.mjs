@@ -132,6 +132,8 @@ try {
 
   // Then the account, from Account: the username must be typed, and the password given.
   await tab.goto(`${origin}/account`);
+  // The form is closed until chosen (#263).
+  await tab.getByText('Delete my account…', { exact: true }).click();
   const form = tab.locator('form', { has: tab.getByRole('button', { name: 'Delete my account' }) });
   await form.getByLabel('Type your username to confirm').fill('not-' + leaving.username);
   await form.getByLabel(/Current password/).fill(password);
