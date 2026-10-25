@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs><radialGradient id="och-tile" gradientUnits="userSpaceOnUse" cx="102" cy="90" r="205"><stop offset="0" stop-color="#21392f"/><stop offset="1" stop-color="#142520"/></radialGradient></defs>
+  <rect x="0" y="0" width="256" height="256" rx="56" fill="url(#och-tile)"/>
+  <g transform="translate(0 0) scale(1)">
+  <defs>
+    <radialGradient id="och-ring" gradientUnits="userSpaceOnUse" cx="84" cy="74" r="200"><stop offset="0" stop-color="#d8e9b3"/><stop offset="1" stop-color="#a3c175"/></radialGradient>
+    <radialGradient id="och-gold" gradientUnits="userSpaceOnUse" cx="128" cy="84" r="150"><stop offset="0" stop-color="#f8dc9c"/><stop offset="1" stop-color="#dea24a"/></radialGradient>
+    <mask id="och-cuts"><rect width="256" height="256" fill="#fff"/><path d="M128 128 228 28M128 128 228 228" stroke="#000" stroke-width="11"/></mask>
+  </defs>
+  <g fill="none" stroke-width="26" mask="url(#och-cuts)">
+    <path d="M186 70A82 82 0 1 0 186 186" stroke="url(#och-ring)"/>
+    <path d="M186 70A82 82 0 0 1 186 186" stroke="url(#och-gold)"/>
+  </g>
+  <path d="M128 82V128H170" fill="none" stroke="url(#och-gold)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

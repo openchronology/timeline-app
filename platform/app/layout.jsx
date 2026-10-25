@@ -17,8 +17,12 @@ export function generateMetadata() {
     description,
     openGraph: { type: 'website', siteName: siteName(), locale: 'en_US', description },
     twitter: { card: 'summary_large_image' },
+    // Added to an iPhone's home screen, the site opens on its own, under its name.
+    appleWebApp: { capable: true, title: siteName(), statusBarStyle: 'black-translucent' },
   };
 }
+// The browser's toolbar and the phone's status bar take the header's color.
+export const viewport = { themeColor: '#192d25' };
 export default async function RootLayout({ children }) {
   const build = JSON.parse(
     await readFile(
@@ -35,7 +39,8 @@ export default async function RootLayout({ children }) {
       <body>
         <header className="platform-header">
           <a href="/" className="brand">
-            ◷ {name ?? 'openchronology'}
+            <img src="/logo-mark.svg" alt="" width="28" height="28" />
+            {name ?? 'openchronology'}
           </a>
           <nav aria-label="Platform navigation">
             <a href="/editor?new=1">＋ New timeline</a>

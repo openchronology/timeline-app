@@ -105,7 +105,7 @@ try {
   // Unnamed and without analytics: OpenChronology's name, and no Google hosts allowed.
   const home = await fetch(origin + '/'),
     homeHtml = await home.text();
-  assert.match(homeHtml, /◷ <!-- -->openchronology<\/a>|◷ openchronology<\/a>/);
+  assert.match(homeHtml, /src="\/logo-mark\.svg"[^>]*\/>(<!-- -->)?openchronology<\/a>/);
   assert.match(homeHtml, /<title>OpenChronology<\/title>/);
   assert.doesNotMatch(homeHtml, /Powered by OpenChronology|Analytics settings/);
   assert.doesNotMatch(home.headers.get('content-security-policy'), /google/);

@@ -271,6 +271,11 @@ label {
   color: #c4db98;
   line-height: 1;
 }
+.brand-mark svg {
+  display: block;
+  width: 1em;
+  height: 1em;
+}
 .brand-version {
   margin-left: 10px;
   font-family: ui-monospace, monospace;
