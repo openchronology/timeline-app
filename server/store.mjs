@@ -1012,11 +1012,17 @@ export class PostgresStore {
           // timeline's indexes; LATERAL runs it once for the row, which is read only while
           // still stale. `same` compares with the stored text so an unchanged one is not
           // rewritten (rewriting it would rewrite the GIN-indexed search vector too).
-          const { rows } = await this.pool.query(
-            `SELECT t.revision,x.text,t.event_text IS NOT DISTINCT FROM x.text AS same FROM oc_timelines t
-            CROSS JOIN LATERAL (SELECT oc_event_text(t.id) AS text) x WHERE t.id=$1 AND t.event_text_stale`,
-            [id],
-          );
+          // In a REPEATABLE READ transaction: oc_events is volatile, so under READ COMMITTED
+          // each of its lookups would see saves and deletions committed during the walk, and a
+          // node removed meanwhile would read as a broken index (#261).
+          const { rows } = await this.transaction(async (c) => {
+            await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY');
+            return c.query(
+              `SELECT t.revision,x.text,t.event_text IS NOT DISTINCT FROM x.text AS same FROM oc_timelines t
+              CROSS JOIN LATERAL (SELECT oc_event_text(t.id) AS text) x WHERE t.id=$1 AND t.event_text_stale`,
+              [id],
+            );
+          });
           if (!rows[0]) continue;
           // Optimistic: `revision=` the one read, so a save that committed meanwhile (and
           // left the text stale again) is not marked fresh; its own refresh follows.

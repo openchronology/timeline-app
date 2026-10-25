@@ -175,8 +175,50 @@ try {
   const empty = await store.create(owner, document([]));
   timelines.push(empty.id);
   assert.equal(await built(empty.id), '');
+
+  // A timeline deleted (or saved, or one a fork reads through to changed) while its text is
+  // being rebuilt: the rebuild reads one snapshot, so it finishes on the index it started
+  // with and its update finds no row, rather than looking up nodes and moments removed
+  // midway and logging a broken index (#261). Holding oc_moments locked stops the rebuild
+  // at its first moment, after it has read the timeline's root and nodes; the deletion
+  // commits there.
+  const doomed = await store.create(
+    owner,
+    document([{ id: 'gone', time: '1/1', metadata: { title: 'Gone' } }]),
+  );
+  timelines.push(doomed.id);
+  await pool.query('UPDATE oc_timelines SET event_text_stale=true WHERE id=$1', [doomed.id]);
+  const logged = [];
+  const consoleError = console.error;
+  console.error = (...args) =>
+    logged.push(args.map((a) => [a, a?.where].filter(Boolean).join(' ')).join(' '));
+  store.textDelay = 0;
+  const locker = await pool.connect();
+  try {
+    await locker.query('BEGIN');
+    await locker.query('LOCK TABLE oc_moments IN ACCESS EXCLUSIVE MODE');
+    const refreshing = store.refreshText(doomed.id);
+    const until = Date.now() + 10000;
+    while (
+      !(
+        await pool.query(
+          "SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%oc_event_text(t.id)%'",
+        )
+      ).rows.length
+    )
+      assert(Date.now() < until, 'the rebuild waits for the moments');
+    await locker.query('DELETE FROM oc_timelines WHERE id=$1', [doomed.id]);
+    await locker.query('COMMIT');
+    await refreshing;
+  } finally {
+    await locker.query('ROLLBACK');
+    locker.release();
+    console.error = consoleError;
+    delete store.textDelay;
+  }
+  assert.deepEqual(logged, [], 'a rebuild of a deleted timeline ends quietly');
   console.log(
-    'PASS catalogue text: durations by start then moments by time, stacked entries, parts and the whole capped, the same built in the database (stopping once full), from a document and through a fork.',
+    'PASS catalogue text: durations by start then moments by time, stacked entries, parts and the whole capped, the same built in the database (stopping once full), from a document and through a fork; a timeline deleted during its rebuild ends it quietly.',
   );
 } finally {
   await store.idle();
