@@ -6298,11 +6298,13 @@ function fitDescription() {
 }
 el('timeline-description').addEventListener('input', fitDescription);
 // A new width rewraps it; only the width, so its own height change doesn't call back forever.
+// The height changes in the next frame, not during the observer's own delivery, which would
+// leave notifications undelivered (WebKit reports a ResizeObserver loop).
 let descriptionWidth = 0;
 new ResizeObserver(([entry]) => {
   if (entry.contentRect.width === descriptionWidth) return;
   descriptionWidth = entry.contentRect.width;
-  fitDescription();
+  requestAnimationFrame(fitDescription);
 }).observe(el('timeline-description'));
 el<HTMLTextAreaElement>('timeline-description').onchange = () => {
   if (!editable()) return;
