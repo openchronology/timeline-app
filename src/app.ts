@@ -2491,6 +2491,7 @@ function heading() {
     : (model?.title ?? remote?.title ?? 'Loading timeline…');
   el<HTMLTextAreaElement>('timeline-description').value =
     model?.description ?? remote?.description ?? '';
+  fitDescription();
   input('timeline-title').disabled = !editable();
   el<HTMLTextAreaElement>('timeline-description').disabled = !editable();
   updatePageTitle();
@@ -6286,6 +6287,23 @@ input('timeline-title').onchange = () => {
   model!.title = input('timeline-title').value;
   changed();
 };
+/**
+ * The description shows in full under the title, as tall as its text, rather than scrolling
+ * inside one line: its height follows its content as it is filled, typed and rewrapped.
+ */
+function fitDescription() {
+  const description = el<HTMLTextAreaElement>('timeline-description');
+  description.style.height = 'auto';
+  description.style.height = `${description.scrollHeight}px`;
+}
+el('timeline-description').addEventListener('input', fitDescription);
+// A new width rewraps it; only the width, so its own height change doesn't call back forever.
+let descriptionWidth = 0;
+new ResizeObserver(([entry]) => {
+  if (entry.contentRect.width === descriptionWidth) return;
+  descriptionWidth = entry.contentRect.width;
+  fitDescription();
+}).observe(el('timeline-description'));
 el<HTMLTextAreaElement>('timeline-description').onchange = () => {
   if (!editable()) return;
   model!.description = el<HTMLTextAreaElement>('timeline-description').value;

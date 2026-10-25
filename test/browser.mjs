@@ -193,6 +193,20 @@ try {
   });
   await poll(async () => (await input('timeline-title').inputValue()) === document.title);
   await poll(async () => (await markers.count()) === 3);
+  // A long description shows in full under the title, without a scroll of its own. (Only
+  // typed, not changed: the document keeps its own.)
+  const description = await page.evaluate(() => {
+    const field = document.getElementById('timeline-description');
+    const before = field.value;
+    field.value = 'A long description of this timeline. '.repeat(40);
+    field.dispatchEvent(new Event('input'));
+    const shown = { height: field.clientHeight, content: field.scrollHeight };
+    field.value = before;
+    field.dispatchEvent(new Event('input'));
+    return shown;
+  });
+  assert(description.height > 60, JSON.stringify(description));
+  assert(description.content <= description.height + 1, JSON.stringify(description));
   assert((await page.locator('.tick-label').first().textContent()).length > 0);
   const downloadPromise = page.waitForEvent('download');
   await closeMomentDetails(page);

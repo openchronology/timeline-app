@@ -505,6 +505,8 @@ main {
   background: transparent;
   padding: 0;
   min-height: 26px;
+  /* As tall as its text (app.ts sizes it): the whole description, without a scroll of its own. */
+  overflow: hidden;
 }
 .document-meta {
   display: flex;
