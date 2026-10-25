@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// Signing in with Google, GitHub or Facebook (OAuth authorization code with PKCE): starting a
-// flow, checking the provider's callback, and linking provider identities to accounts.
+// Signing in with Google, GitHub, Facebook or Microsoft (OAuth authorization code with PKCE):
+// starting a flow, checking the provider's callback, and linking provider identities to accounts.
 import {
   randomBytes,
   randomUUID,
@@ -19,14 +19,21 @@ const secret = () => randomBytes(32).toString('hex');
  * intercepted on its way back is useless without it.
  */
 export const pkce = (verifier) => createHash('sha256').update(verifier).digest('base64url');
+/** The tenant Microsoft gives personal (consumer) Microsoft accounts' tokens. */
+export const MICROSOFT_CONSUMERS = '9188040d-6c67-4c5b-b112-36a304b66dad';
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /**
- * The configured identity providers from `env`: each of Google, GitHub and Facebook whose
- * client ID and secret are both set (Facebook also needs OAUTH_FACEBOOK_GRAPH_VERSION). Throws
- * at start-up on half a configuration rather than quietly disabling the provider.
+ * The configured identity providers from `env`: each of Google, GitHub, Facebook and Microsoft
+ * whose client ID and secret are both set (Facebook also needs OAUTH_FACEBOOK_GRAPH_VERSION).
+ * Microsoft's OAUTH_MICROSOFT_TENANT says whose accounts may sign in: `organizations` (the
+ * default: any work or school account), `common` (those and personal Microsoft accounts),
+ * `consumers` (personal accounts only), or one tenant by its ID or a domain name of it (one
+ * school's accounts only). OAUTH_MICROSOFT_LABEL names its button. Throws at start-up on half a
+ * configuration or an invalid tenant rather than quietly disabling the provider.
  */
 export function providersFromEnv(env = process.env) {
   const providers = {};
-  for (const name of ['google', 'github', 'facebook']) {
+  for (const name of ['google', 'github', 'facebook', 'microsoft']) {
     const prefix = `OAUTH_${name.toUpperCase()}_`,
       clientId = env[prefix + 'CLIENT_ID'],
       clientSecret = env[prefix + 'CLIENT_SECRET'];
@@ -37,6 +44,20 @@ export function providersFromEnv(env = process.env) {
           'Set OAUTH_FACEBOOK_GRAPH_VERSION to the version configured for your Meta app.',
         );
       providers[name] = { clientId, clientSecret, ...(name === 'facebook' ? { version } : {}) };
+      if (name === 'microsoft') {
+        const tenant = (env.OAUTH_MICROSOFT_TENANT || 'organizations').trim().toLowerCase();
+        if (
+          !['organizations', 'common', 'consumers'].includes(tenant) &&
+          !GUID.test(tenant) &&
+          !/^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(tenant)
+        )
+          throw new Error(
+            'Set OAUTH_MICROSOFT_TENANT to organizations, common, consumers, a tenant ID or a domain.',
+          );
+        providers.microsoft.tenant = tenant;
+        providers.microsoft.label =
+          (env.OAUTH_MICROSOFT_LABEL ?? '').trim().slice(0, 60) || 'Microsoft';
+      }
     } else if (clientId || clientSecret)
       throw new Error(`Configure both ${prefix}CLIENT_ID and CLIENT_SECRET.`);
   }
@@ -46,18 +67,24 @@ export function providersFromEnv(env = process.env) {
 export class OAuth {
   /**
    * `auth` is the Auth instance; `providers` comes from providersFromEnv; `fetcher` is
-   * injectable for tests. `keys` caches Google's signing keys for an hour.
+   * injectable for tests. `keys` caches each provider's signing keys (by their URL) for an hour;
+   * `tenants` caches the tenant ID a Microsoft tenant domain stands for.
    */
   constructor(auth, providers = {}, fetcher = fetch) {
     this.auth = auth;
     this.pool = auth.pool;
     this.providers = providers;
     this.fetch = fetcher;
-    this.keys = null;
+    this.keys = new Map();
+    this.tenants = new Map();
   }
   /** The names of the configured providers, for the sign-in page's buttons. */
   names() {
     return Object.keys(this.providers);
+  }
+  /** Button names other than the provider's own: Microsoft's OAUTH_MICROSOFT_LABEL. */
+  labels() {
+    return this.providers.microsoft ? { microsoft: this.providers.microsoft.label } : {};
   }
   /**
    * Fetches JSON from a provider: no redirects (a provider endpoint redirecting elsewhere is
@@ -150,7 +177,9 @@ export class OAuth {
         ? 'https://accounts.google.com/o/oauth2/v2/auth'
         : provider === 'github'
           ? 'https://github.com/login/oauth/authorize'
-          : `https://www.facebook.com/${config.version}/dialog/oauth`,
+          : provider === 'microsoft'
+            ? `https://login.microsoftonline.com/${encodeURIComponent(config.tenant)}/oauth2/v2.0/authorize`
+            : `https://www.facebook.com/${config.version}/dialog/oauth`,
     );
     for (const [key, value] of Object.entries({
       client_id: config.clientId,
@@ -158,7 +187,7 @@ export class OAuth {
       response_type: 'code',
       state,
       scope:
-        provider === 'google'
+        provider === 'google' || provider === 'microsoft'
           ? 'openid profile'
           : provider === 'github'
             ? 'read:user'
@@ -171,63 +200,148 @@ export class OAuth {
       url.searchParams.set('code_challenge', pkce(verifier));
       url.searchParams.set('code_challenge_method', 'S256');
     }
-    if (provider === 'google') url.searchParams.set('nonce', nonce);
+    if (provider === 'google' || provider === 'microsoft') url.searchParams.set('nonce', nonce);
     return { url: url.href, cookie: this.auth.nonceCookie('oauth', browser) };
   }
   /**
-   * Verifies a Google ID token and returns its subject (the stable Google account id). Checks:
-   * RS256 only (refusing `none` or HMAC algorithm confusion), a signature by one of Google's
-   * published keys (refetched when the cache is an hour old or lacks the token's key id), the
-   * issuer, the audience (this app's client id), the nonce stored with the flow (binding the token
-   * to this sign-in), expiry, an issue time not in the future (a minute's tolerance) and a
-   * well-formed subject. Throws 502 on any failure.
+   * The claims of the ID token `token` once its signature checks out against the provider's
+   * keys at `keysUrl`: RS256 only (refusing `none` or HMAC algorithm confusion), signed by one of
+   * the published keys (refetched when the cache is an hour old or lacks the token's key id).
+   * `name` words the errors. Throws 502 on any failure; the claims themselves are the caller's to
+   * check.
    */
-  async googleClaims(token, config, nonce) {
+  async signedClaims(token, keysUrl, name) {
     if (typeof token !== 'string' || token.length > 32768)
-      throw new HttpError(502, 'Invalid Google identity token.');
+      throw new HttpError(502, `Invalid ${name} identity token.`);
     const segments = token.split('.');
-    if (segments.length !== 3) throw new HttpError(502, 'Invalid Google identity token.');
+    if (segments.length !== 3) throw new HttpError(502, `Invalid ${name} identity token.`);
     let header, claims;
     try {
       header = JSON.parse(Buffer.from(segments[0], 'base64url'));
       claims = JSON.parse(Buffer.from(segments[1], 'base64url'));
     } catch {
-      throw new HttpError(502, 'Invalid Google identity token.');
+      throw new HttpError(502, `Invalid ${name} identity token.`);
     }
     if (!header || !claims || typeof header !== 'object' || typeof claims !== 'object')
-      throw new HttpError(502, 'Invalid Google identity token.');
+      throw new HttpError(502, `Invalid ${name} identity token.`);
     if (header.alg !== 'RS256' || typeof header.kid !== 'string')
-      throw new HttpError(502, 'Invalid Google token algorithm.');
-    if (
-      !this.keys ||
-      this.keys.expires < Date.now() ||
-      !this.keys.values.some((k) => k.kid === header.kid)
-    ) {
-      const result = await this.json('https://www.googleapis.com/oauth2/v3/certs');
-      if (!Array.isArray(result.keys)) throw new HttpError(502, 'Invalid Google signing keys.');
-      this.keys = { values: result.keys, expires: Date.now() + 3600000 };
+      throw new HttpError(502, `Invalid ${name} token algorithm.`);
+    let keys = this.keys.get(keysUrl);
+    if (!keys || keys.expires < Date.now() || !keys.values.some((k) => k.kid === header.kid)) {
+      const result = await this.json(keysUrl);
+      if (!Array.isArray(result.keys)) throw new HttpError(502, `Invalid ${name} signing keys.`);
+      keys = { values: result.keys, expires: Date.now() + 3600000 };
+      this.keys.set(keysUrl, keys);
     }
-    const jwk = this.keys.values.find((k) => k.kid === header.kid && k.kty === 'RSA');
+    const jwk = keys.values.find((k) => k.kid === header.kid && k.kty === 'RSA');
+    let valid = false;
+    try {
+      // Only the key's modulus and exponent: a published key's other fields (x5c, use…) play
+      // no part in checking a signature.
+      valid =
+        !!jwk &&
+        verify(
+          'RSA-SHA256',
+          Buffer.from(segments[0] + '.' + segments[1]),
+          createPublicKey({ key: { kty: 'RSA', n: jwk.n, e: jwk.e }, format: 'jwk' }),
+          Buffer.from(segments[2], 'base64url'),
+        );
+    } catch {
+      valid = false;
+    }
+    if (!valid) throw new HttpError(502, `${name} identity verification failed.`);
+    return claims;
+  }
+  /**
+   * Whether an ID token's times hold: unexpired, issued no later than a minute from now, and not
+   * before its `nbf` (when it has one, with the same minute's tolerance).
+   */
+  static current(claims) {
+    const now = Date.now() / 1000;
+    return (
+      typeof claims.exp === 'number' &&
+      claims.exp > now &&
+      typeof claims.iat === 'number' &&
+      claims.iat <= now + 60 &&
+      (claims.nbf === undefined || (typeof claims.nbf === 'number' && claims.nbf <= now + 60))
+    );
+  }
+  /**
+   * Verifies a Google ID token and returns its subject (the stable Google account id): the
+   * signature (signedClaims), the issuer, the audience (this app's client id), the nonce stored
+   * with the flow (binding the token to this sign-in), its times and a well-formed subject.
+   * Throws 502 on any failure.
+   */
+  async googleClaims(token, config, nonce) {
+    const claims = await this.signedClaims(
+      token,
+      'https://www.googleapis.com/oauth2/v3/certs',
+      'Google',
+    );
     if (
-      !jwk ||
-      !verify(
-        'RSA-SHA256',
-        Buffer.from(segments[0] + '.' + segments[1]),
-        createPublicKey({ key: jwk, format: 'jwk' }),
-        Buffer.from(segments[2], 'base64url'),
-      ) ||
       !['https://accounts.google.com', 'accounts.google.com'].includes(claims.iss) ||
       claims.aud !== config.clientId ||
       claims.nonce !== nonce ||
-      typeof claims.exp !== 'number' ||
-      claims.exp <= Date.now() / 1000 ||
-      typeof claims.iat !== 'number' ||
-      claims.iat > Date.now() / 1000 + 60 ||
+      !OAuth.current(claims) ||
       typeof claims.sub !== 'string' ||
       !/^[A-Za-z0-9_-]{1,255}$/.test(claims.sub)
     )
       throw new HttpError(502, 'Google identity verification failed.');
     return claims.sub;
+  }
+  /**
+   * The tenant ID the configured Microsoft tenant must match, or null when any tenant may sign in
+   * (`common`, `organizations`). A tenant given by a domain name is looked up once, from its
+   * OpenID configuration's issuer.
+   */
+  async microsoftTenant(config) {
+    if (config.tenant === 'consumers') return MICROSOFT_CONSUMERS;
+    if (['common', 'organizations'].includes(config.tenant)) return null;
+    if (GUID.test(config.tenant)) return config.tenant;
+    if (!this.tenants.has(config.tenant)) {
+      const found = await this.json(
+        `https://login.microsoftonline.com/${encodeURIComponent(config.tenant)}/v2.0/.well-known/openid-configuration`,
+      );
+      const tid = /^https:\/\/login\.microsoftonline\.com\/([0-9a-f-]{36})\/v2\.0$/.exec(
+        String(found.issuer ?? ''),
+      )?.[1];
+      if (!tid || !GUID.test(tid)) throw new HttpError(502, 'Invalid Microsoft tenant.');
+      this.tenants.set(config.tenant, tid);
+    }
+    return this.tenants.get(config.tenant);
+  }
+  /**
+   * Verifies a Microsoft (Entra ID) ID token and returns its subject, `<tid>:<oid>`: the
+   * account's object ID in its tenant, the same for that person whichever app asks (unlike
+   * `sub`) and never reassigned (unlike an email address or username). Checks the signature
+   * against the configured tenant's keys (signedClaims); the issuer, which names the token's own
+   * tenant (`https://login.microsoftonline.com/<tid>/v2.0`, so for a multi-tenant app it is
+   * checked with the token's `tid` substituted); the tenant (the configured one, or with
+   * `organizations` anything but personal accounts); the audience, the nonce, its times and
+   * well-formed IDs. Throws 502 on any failure.
+   */
+  async microsoftClaims(token, config, nonce) {
+    const claims = await this.signedClaims(
+      token,
+      `https://login.microsoftonline.com/${encodeURIComponent(config.tenant)}/discovery/v2.0/keys`,
+      'Microsoft',
+    );
+    const tid = typeof claims.tid === 'string' ? claims.tid.toLowerCase() : '',
+      oid = typeof claims.oid === 'string' ? claims.oid.toLowerCase() : '',
+      required = await this.microsoftTenant(config);
+    if (
+      !GUID.test(tid) ||
+      !GUID.test(oid) ||
+      claims.iss !== `https://login.microsoftonline.com/${tid}/v2.0` ||
+      (required
+        ? tid !== required
+        : config.tenant === 'organizations' && tid === MICROSOFT_CONSUMERS) ||
+      claims.aud !== config.clientId ||
+      claims.nonce !== nonce ||
+      !OAuth.current(claims)
+    )
+      throw new HttpError(502, 'Microsoft identity verification failed.');
+    return `${tid}:${oid}`;
   }
   /**
    * The provider's redirect back. Spends the flow record matching `state` and this browser,
@@ -267,7 +381,9 @@ export class OAuth {
         ? 'https://oauth2.googleapis.com/token'
         : provider === 'github'
           ? 'https://github.com/login/oauth/access_token'
-          : `https://graph.facebook.com/${config.version}/oauth/access_token`;
+          : provider === 'microsoft'
+            ? `https://login.microsoftonline.com/${encodeURIComponent(config.tenant)}/oauth2/v2.0/token`
+            : `https://graph.facebook.com/${config.version}/oauth/access_token`;
     const form = new URLSearchParams({
       client_id: config.clientId,
       client_secret: config.clientSecret,
@@ -287,11 +403,18 @@ export class OAuth {
             },
             body: form.toString(),
           });
-    if (typeof tokens.access_token !== 'string' || tokens.access_token.length > 16384)
+    // Microsoft's identity is all in its ID token, so its access token (for Microsoft Graph,
+    // which this app never calls) is not needed.
+    if (
+      provider !== 'microsoft' &&
+      (typeof tokens.access_token !== 'string' || tokens.access_token.length > 16384)
+    )
       throw new HttpError(502, 'Missing provider access token.');
     let subject;
     if (provider === 'google')
       subject = await this.googleClaims(tokens.id_token, config, flow.nonce);
+    else if (provider === 'microsoft')
+      subject = await this.microsoftClaims(tokens.id_token, config, flow.nonce);
     else {
       const identityUrl = new URL(
         provider === 'github'

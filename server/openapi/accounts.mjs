@@ -392,7 +392,7 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Start signing in with a provider',
       description: [
-        'Begins signing in with Google, GitHub or Facebook, or with `link: true`, linking one to the signed-in account (which needs a sign-in within the last five minutes). Send the browser to the `url` returned; the provider returns it to `GET /api/auth/{provider}/callback` within ten minutes.',
+        'Begins signing in with Google, GitHub, Facebook or Microsoft (a work, school or personal Microsoft account, as the server’s tenant setting allows), or with `link: true`, linking one to the signed-in account (which needs a sign-in within the last five minutes). Send the browser to the `url` returned; the provider returns it to `GET /api/auth/{provider}/callback` within ten minutes.',
         SIGN_IN_TOKEN,
       ].join('\n\n'),
       security: SIGN_IN,
@@ -865,6 +865,12 @@ export const schemas = {
         items: ref('SignInProvider'),
         description: 'The sign-in providers this server offers.',
       },
+      providerLabels: {
+        type: 'object',
+        additionalProperties: { type: 'string', maxLength: 60 },
+        description:
+          'What the sign-in page calls a provider whose button is named otherwise, by provider: `microsoft`, such as “School account” (OAUTH_MICROSOFT_LABEL, else “Microsoft”).',
+      },
       directory: {
         oneOf: [
           {
@@ -937,10 +943,10 @@ export const schemas = {
       },
     },
   },
-  SignInProvider: { type: 'string', enum: ['google', 'github', 'facebook'] },
+  SignInProvider: { type: 'string', enum: ['google', 'github', 'facebook', 'microsoft'] },
   IdentityProvider: {
     type: 'string',
-    enum: ['google', 'github', 'facebook', 'ldap'],
+    enum: ['google', 'github', 'facebook', 'microsoft', 'ldap'],
     description:
       'A way to sign in linked to an account: a sign-in provider, or `ldap` for a directory account.',
   },

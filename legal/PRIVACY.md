@@ -17,7 +17,7 @@ hashes when password login is used, verified email addresses, encrypted authenti
 secrets, hashed single-use recovery codes, confirmation/reset proofs, encrypted
 transactional email jobs, linked identity-provider names and subject
 identifiers, session records, and authorization-flow records. Password hashes are
-not plaintext passwords. Google, GitHub, or Facebook sign-in contacts the provider
+not plaintext passwords. Google, GitHub, Facebook or Microsoft sign-in contacts the provider
 you choose; the provider can observe that authentication. The application uses
 provider credentials server-side and does not give provider tokens to timeline
 plugins. Provider privacy notices also apply to their own services.
@@ -39,8 +39,10 @@ learning models. Its use of information received from Google APIs adheres to the
 [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy),
 including the Limited Use requirements. To remove it, unlink Google from Account →
 Sign-in methods, or delete your account; you can also revoke the service's access at
-https://myaccount.google.com/permissions. The same applies to GitHub and Facebook
-sign-in, which keep only that provider's account identifier.
+https://myaccount.google.com/permissions. The same applies to GitHub, Facebook and
+Microsoft sign-in, which keep only that provider's account identifier (for Microsoft, the
+account's tenant and object IDs; never its name or email address), and use it only to
+sign you in.
 
 Resend processes recipient addresses and account verification, recovery, and security
 notification email content for delivery. The server checks new passwords against
