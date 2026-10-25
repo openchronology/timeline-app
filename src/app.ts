@@ -934,6 +934,8 @@ function prefetchWindow() {
   const source = local ?? remote;
   if (!source || comparison || saving || document.hidden) return;
   if (windowInFlight || comparisonInFlight || prefetching) return;
+  // The view's own window goes first: predictions wait until it has arrived (#218).
+  if (!remoteCache.get(viewport, remoteCache.plan(viewport, width(), pixels()))) return;
   const [query] = remoteCache.predict(viewport, width(), pixels(), motion);
   if (!query) return;
   const key = remoteCacheKey,
@@ -1145,6 +1147,8 @@ function requestRender(refreshFrame = true) {
     if (stageWidth() <= 96 || stageHeight() === 0) {
       // An open drawn later than this measures the wait, not the device.
       openStarted = null;
+      // The window this render would have fetched is still wanted when it draws (#218).
+      pendingFrameRefresh ||= refresh;
       return;
     }
     currentInset = stageWidth() < 600 ? 20 : 48;
@@ -1759,6 +1763,7 @@ function render(refreshFrame = true) {
       windowInFlight = true;
       const controller = (windowController = new AbortController());
       const started = performance.now();
+      let answered = false;
       void timelineQuery<Frame>(
         {
           kind: 'overview',
@@ -1776,6 +1781,7 @@ function render(refreshFrame = true) {
             (local ?? remote)?.revision !== revision
           )
             return;
+          answered = true;
           remoteCache.store(query, result);
           persistWindows();
           if (local) {
@@ -1788,6 +1794,7 @@ function render(refreshFrame = true) {
           el('loading-window').hidden = true;
         })
         .catch((error) => {
+          answered = true;
           // Refused access also forgets the windows stored for the timeline.
           if (remote?.id === id && session.user && [401, 403, 404].includes(error?.status))
             void windowStore
@@ -1814,7 +1821,9 @@ function render(refreshFrame = true) {
         })
         .finally(() => {
           windowInFlight = false;
-          if (request !== frameRequest && (remote || local)) requestRender();
+          // A later view, or a reply for a revision or timeline no longer open, still needs
+          // its own window: without one the view would stay loading (#218).
+          if ((request !== frameRequest || !answered) && (remote || local)) requestRender();
         });
     }, 70);
   } else {
