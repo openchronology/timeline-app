@@ -931,11 +931,40 @@ var ICON = {
 };
 
 /** The OpenChronology wordmark: the ◷ mark and the name. */
+/** The logo (logo/logo.svg): its mark on the dark green tile, `w` wide, centred on (cx, cy).
+    The tile keeps it legible on every look's ground, light or dark. */
+function logo(cx, cy, w) {
+  var k = w / 256;
+  return (
+    '<g transform="translate(' +
+    (cx - w / 2) +
+    ' ' +
+    (cy - w / 2) +
+    ') scale(' +
+    k +
+    ')">' +
+    '<defs><radialGradient id="lg-tile" gradientUnits="userSpaceOnUse" cx="102" cy="90" r="205">' +
+    '<stop offset="0" stop-color="#21392f"/><stop offset="1" stop-color="#142520"/></radialGradient>' +
+    '<radialGradient id="lg-ring" gradientUnits="userSpaceOnUse" cx="84" cy="74" r="200">' +
+    '<stop offset="0" stop-color="#d8e9b3"/><stop offset="1" stop-color="#a3c175"/></radialGradient>' +
+    '<radialGradient id="lg-gold" gradientUnits="userSpaceOnUse" cx="128" cy="84" r="150">' +
+    '<stop offset="0" stop-color="#f8dc9c"/><stop offset="1" stop-color="#dea24a"/></radialGradient>' +
+    '<mask id="lg-cuts"><rect width="256" height="256" fill="#fff"/>' +
+    '<path d="M128 128 228 28M128 128 228 228" stroke="#000" stroke-width="11"/></mask></defs>' +
+    '<rect width="256" height="256" rx="56" fill="url(#lg-tile)"/>' +
+    '<g fill="none" stroke-width="26" mask="url(#lg-cuts)">' +
+    '<path d="M186 70A82 82 0 1 0 186 186" stroke="url(#lg-ring)"/>' +
+    '<path d="M186 70A82 82 0 0 1 186 186" stroke="url(#lg-gold)"/></g>' +
+    '<path d="M128 82V128H170" fill="none" stroke="url(#lg-gold)" stroke-width="16" ' +
+    'stroke-linecap="round" stroke-linejoin="round"/></g>'
+  );
+}
+/** The logo and the name beside it, the pair centred on x, the name's baseline at y. */
 function wordmark(x, y, size) {
   size = size || 12;
   return (
-    txt(x - size * 3.1, y, '◷', { size: size * 1.05, fill: C.accent, weight: 600 }) +
-    txt(x + size * 0.35, y, 'openchronology', { size: size, weight: 700, fill: C.text })
+    logo(x - size * 3.55, y - size * 0.36, size * 1.45) +
+    txt(x + size * 0.45, y, 'openchronology', { size: size, weight: 700, fill: C.text })
   );
 }
 
