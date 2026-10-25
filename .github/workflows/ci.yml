@@ -281,6 +281,7 @@ jobs:
       - run: node test/ldap-postgres.mjs
         env:
           LDAP_TEST_REQUIRED: '1'
+      - run: node test/microsoft-postgres.mjs
       - run: node test/challenge-postgres.mjs
       - run: node test/moderation-postgres.mjs
       - run: node test/standing-postgres.mjs
