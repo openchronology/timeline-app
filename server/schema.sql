@@ -1304,13 +1304,17 @@ ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS event_text_stale boolean NOT N
 -- store.mjs builds it from a whole document). Both are read in order and the text stops once
 -- full, so its cost follows the text, not the timeline (#135): durations through their start
 -- index, moments a page at a time walking the moment tree (oc_events, which reads through
--- for forks).
+-- for forks). A timeline of at most 50,000 moments sorts all their IDs at once instead and
+-- reads the moments a page at a time by ID: each step of the walk is a statement of its own
+-- (several for a fork, through each level it reads), so for such a timeline sorting them all
+-- costs far less (#285), and the text still stops once full.
 -- Called by store.mjs's catalogue refresh after the save commits; reads only. Forks are handed
 -- to oc_event_text_lineage (generated below from this definition).
 -- A function earlier versions of this schema defined.
 DROP FUNCTION IF EXISTS oc_text_parts(jsonb,boolean);
 CREATE OR REPLACE FUNCTION oc_event_text(tid uuid) RETURNS text LANGUAGE plpgsql STABLE AS $$
-DECLARE parts text[]:='{}'; total bigint:=0; part text; page jsonb[]; after_time mpq; after_id text;
+DECLARE parts text[]:='{}'; total bigint:=0; part text; page jsonb[]; ids text[]; next integer:=1;
+  after_time mpq; after_id text;
 BEGIN
   -- Durations first, in start order (first_key, then exact start, then ID in "C" order): each
   -- one's title and then its description, when they are strings. total counts the joined
@@ -1322,11 +1326,23 @@ BEGIN
     parts:=parts||part; total:=total+length(part)+1;
     IF total>1048576 THEN RETURN left(array_to_string(parts,' '),1048576); END IF;
   END LOOP;
-  -- Then moments in time order, 1000 at a time through the (time, ID) cursor of the moment
-  -- walk: each moment's title and description, followed by those of its stacked entries (the
-  -- items of its array-valued metadata fields, by field and then item order).
+  -- Then moments in time order (then ID, "C" order, as the moment tree's nodes keep them),
+  -- 1000 at a time: for a timeline of at most 50,000, the IDs of all of them sorted at once
+  -- (ids) and then each page's moments by ID; for a larger one, through the (time, ID) cursor
+  -- of the moment walk. Each moment's title and description, followed by those of its
+  -- stacked entries (the items of its array-valued metadata fields, by field and then item
+  -- order).
+  IF (SELECT event_count<=50000 FROM oc_timelines WHERE id=tid) THEN
+    SELECT coalesce(array_agg(m.id ORDER BY m.time,m.id COLLATE "C"),'{}') INTO ids FROM oc_moments m WHERE m.timeline_id=tid AND NOT m.hidden;
+  END IF;
   LOOP
-    SELECT array_agg(e ORDER BY o) INTO page FROM oc_events(tid,NULL,NULL,after_time,after_id,1000) WITH ORDINALITY p(e,o);
+    IF ids IS NOT NULL THEN
+      SELECT array_agg(m.event ORDER BY u.o) INTO page FROM unnest(ids[next:next+999]) WITH ORDINALITY u(id,o)
+        JOIN (SELECT m.id,m.event FROM oc_moments m WHERE m.timeline_id=tid AND NOT m.hidden AND m.id=ANY(ids[next:next+999])) m ON m.id=u.id;
+      next:=next+1000;
+    ELSE
+      SELECT array_agg(e ORDER BY o) INTO page FROM oc_events(tid,NULL,NULL,after_time,after_id,1000) WITH ORDINALITY p(e,o);
+    END IF;
     EXIT WHEN page IS NULL;
     FOR part IN SELECT left(x.v,4096) FROM unnest(page) WITH ORDINALITY u(e,ord)
       CROSS JOIN LATERAL (
@@ -1856,12 +1872,15 @@ BEGIN
   src:=pg_get_functiondef('oc_event_text(uuid)'::regprocedure);
   src:=oc_rewrite(src,'oc_event_text(','oc_event_text_lineage(');
   -- Planned for the timeline's own levels: plans for any timeline can only guess at them.
-  -- Its moments come from oc_events, which reads through for forks itself.
+  -- Walked, its moments come from oc_events, which reads through for forks itself.
   src:=oc_rewrite(src,'LANGUAGE plpgsql','LANGUAGE plpgsql SET plan_cache_mode=force_custom_plan');
   src:=oc_rewrite(src,'DECLARE parts','DECLARE tids uuid[]; clocks bigint[]; parts');
   src:=oc_rewrite(src,E'after_id text;\nBEGIN\n',E'after_id text;\nBEGIN\n  SELECT ' || lineage || E' INTO tids,clocks FROM oc_timelines WHERE id=tid;\n');
   src:=oc_rewrite(src,'FROM oc_duration_nodes d CROSS JOIN','FROM oc_duration_nodes_at(tids,clocks) d CROSS JOIN');
   src:=oc_rewrite(src,'WHERE d.timeline_id=tid AND x.v IS NOT NULL','WHERE x.v IS NOT NULL');
+  -- Sorted by ID first, its moments are those of oc_moments_at for its levels too.
+  src:=oc_rewrite(src,'INTO ids FROM oc_moments m WHERE m.timeline_id=tid AND NOT m.hidden;','INTO ids FROM oc_moments_at(tids,clocks) m;');
+  src:=oc_rewrite(src,'FROM oc_moments m WHERE m.timeline_id=tid AND NOT m.hidden AND m.id=ANY','FROM oc_moments_at(tids,clocks) m WHERE m.id=ANY');
   EXECUTE src;
   -- Reading through levels looks costly enough to the planner to compile its queries, which
   -- takes far longer than running them. Their plans are kept per connection: one made while a
@@ -1885,6 +1904,9 @@ BEGIN
   EXECUTE regexp_replace(src,E'\nBEGIN\n',E'\nBEGIN\n  IF EXISTS(SELECT 1 FROM oc_timelines WHERE id=tid AND index_bases<>''{}'') THEN RETURN QUERY SELECT * FROM oc_recent_times_lineage(tid,oldest); RETURN; END IF;\n');
   src:=pg_get_functiondef('oc_event_text(uuid)'::regprocedure);
   EXECUTE regexp_replace(src,E'\nBEGIN\n',E'\nBEGIN\n  IF EXISTS(SELECT 1 FROM oc_timelines WHERE id=tid AND index_bases<>''{}'') THEN RETURN oc_event_text_lineage(tid); END IF;\n');
+  -- A whole read sorts enough rows for the planner to compile its plan, which takes longer
+  -- than running it (#285).
+  ALTER FUNCTION oc_event_text(uuid) SET jit=off;
 END $do$;
 
 -- Optional saved history (#136). A timeline that does not keep saved history (keep_history

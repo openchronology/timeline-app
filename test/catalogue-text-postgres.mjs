@@ -4,7 +4,8 @@
 // order), each moment followed by its stacked entries, each part at most 4096 characters and
 // the whole at most 1 MiB. The database builds it after saves (oc_event_text, read in order
 // and stopped once full, #135); a whole document written builds the same in Node
-// (eventSearchText). Both, and a fork's, must equal the reference below.
+// (eventSearchText). Both, and a fork's, must equal the reference below, whether the
+// database sorts the moments or walks their tree (#285).
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -47,8 +48,27 @@ function reference(document) {
 }
 const stored = async (id) =>
   (await pool.query('SELECT event_text FROM oc_timelines WHERE id=$1', [id])).rows[0].event_text;
-const built = async (id) =>
-  (await pool.query('SELECT oc_event_text($1) AS text', [id])).rows[0].text;
+/**
+ * The text oc_event_text builds for `id`, both ways it reads moments: sorting all their IDs
+ * (a timeline of at most 50,000) and walking the moment tree (larger ones, as a count above
+ * that has it read, inside a transaction rolled back), which must agree (#285).
+ */
+async function built(id) {
+  const client = await pool.connect();
+  const text = async () =>
+    (await client.query('SELECT oc_event_text($1) AS text', [id])).rows[0].text;
+  try {
+    const sorted = await text();
+    await client.query('BEGIN');
+    await client.query('UPDATE oc_timelines SET event_count=50001 WHERE id=$1', [id]);
+    const walked = await text();
+    await client.query('ROLLBACK');
+    assert.equal(walked, sorted, 'walking the moment tree builds the same');
+    return sorted;
+  } finally {
+    client.release();
+  }
+}
 const document = (events, durations = []) =>
   validateDocument({
     format: 'openchronology',
@@ -180,8 +200,8 @@ try {
   // being rebuilt: the rebuild reads one snapshot, so it finishes on the index it started
   // with and its update finds no row, rather than looking up nodes and moments removed
   // midway and logging a broken index (#261). Holding oc_moments locked stops the rebuild
-  // at its first moment, after it has read the timeline's root and nodes; the deletion
-  // commits there.
+  // at its first read of the moments, after it has read the timeline's row and durations;
+  // the deletion commits there.
   const doomed = await store.create(
     owner,
     document([{ id: 'gone', time: '1/1', metadata: { title: 'Gone' } }]),

@@ -11,6 +11,7 @@ Benchmarks: how latency, saves and interactions grow with timeline size on each 
 | [`ui/`](ui/README.md)              | Helpers for the UI benchmarks: the in-page probe, the desktop WebDriver driver and the desktop image.                                      |
 | [`capacity.mjs`](capacity.mjs)     | Measures how the in-browser editor copes with large timelines in Chromium, at full speed and throttled, and what each platform stores.     |
 | [`fork-reads.mjs`](fork-reads.mjs) | Times reads and saves on a fork that reads through to its source's index (#145), against the same on the source.                           |
+| [`fork-text.mjs`](fork-text.mjs)   | Times rebuilding a fork's catalogue text after its source has been saved many times (#285), against the same on the source.                |
 | [`fork-save.mjs`](fork-save.mjs)   | Times forking a large timeline and saving to the fork, including forks of forks past the index's read-through levels.                      |
 | [`generate.mjs`](generate.mjs)     | Generates deterministic benchmark timelines and workloads: the same size and seed always give the same document.                           |
 | [`report.mjs`](report.mjs)         | Combines the tinybench and criterion results into one self-contained HTML report, a chart per operation.                                   |
