@@ -35,7 +35,11 @@ export class BrowserForks {
       throw new HttpError(429, 'Browser copying is busy. Please try again shortly.');
     this.active++;
     try {
-      await this.auth.rateLimit('browser-fork:' + address);
+      await this.auth.rateLimit(
+        'browser-fork:' + address,
+        10,
+        'Too many copies. Please wait a minute.',
+      );
       return await this.store.transaction(async (client) => {
         // One snapshot for the checks and the document (repeatable read must be set before
         // the transaction's first query), and a short statement timeout: an anonymous

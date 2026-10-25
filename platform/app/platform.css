@@ -165,6 +165,100 @@ input[type='radio'] {
 .platform-header a.support-link {
   color: #f2c879;
 }
+/* The header's end: the visitor's account, after the navigation. A guest's Sign in and Sign
+   up, or the account's menu, which drops down as a light panel. */
+.platform-header > nav {
+  margin-left: auto;
+}
+.header-account {
+  display: flex;
+  gap: 8px;
+}
+.platform-header .button.primary {
+  background: #c4db98;
+  border-color: #c4db98;
+  color: #192d25;
+}
+.platform-header .button.primary:hover {
+  background: #d6e8b0;
+  border-color: #d6e8b0;
+  color: #192d25;
+}
+.account-menu {
+  position: relative;
+}
+.platform-header .account-menu-button {
+  gap: 8px;
+  padding: 0 10px 0 4px;
+  min-height: 36px;
+  border-radius: 999px;
+}
+.menu-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #c4db98;
+  color: #192d25;
+  font-weight: 700;
+}
+.account-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 10px 30px #10201a33;
+}
+.account-menu-heading {
+  margin: 4px 10px 8px;
+  font-size: 13px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.account-menu-heading strong {
+  color: var(--ink);
+}
+.platform-header .account-menu-list :is(a, button) {
+  justify-content: flex-start;
+  min-height: 0;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: left;
+  text-decoration: none;
+}
+.platform-header .account-menu-list :is(a, button):hover,
+.platform-header .account-menu-list :is(a, button):focus-visible {
+  background: var(--hover);
+  color: var(--ink);
+}
+.account-menu-list hr {
+  width: 100%;
+  margin: 6px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 520px) {
+  /* On a phone the menu's button is the picture alone. */
+  .account-menu-name {
+    display: none;
+  }
+}
 .brand {
   display: inline-flex;
   align-items: center;
@@ -327,6 +421,15 @@ body:has(.editor-page) > .platform-footer {
     padding: 14px;
     gap: 12px;
     flex-wrap: wrap;
+  }
+  /* The brand and the account on the first row, the navigation beneath. */
+  .platform-header > nav {
+    order: 3;
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+  .platform-header > :is(.account-menu, .header-account) {
+    margin-left: auto;
   }
   .brand {
     font-size: 18px;

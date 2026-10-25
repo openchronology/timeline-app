@@ -10,6 +10,8 @@ import { AccountSecurity } from './account-security.mjs';
 import { mailFromEnv, encryptionKey } from './mail.mjs';
 import { HttpError } from './store.mjs';
 const scrypt = promisify(scryptCallback);
+/** The refusal a rate limit gives unless its caller names another. */
+const SIGN_IN_LIMIT = 'Too many sign-in attempts. Please wait a minute.';
 /** Password derivations running now in this process (see derive). */
 let passwordWork = 0;
 /**
@@ -114,12 +116,11 @@ export class Auth {
    * which bounds the map's memory under a flood of distinct addresses without refusing everyone
    * else (#193); rateLimit, in the database, still counts every key. Throws 429.
    */
-  throttle(key, maximum = 10) {
+  throttle(key, maximum = 10, message = SIGN_IN_LIMIT) {
     const now = Date.now();
     for (const [k, v] of this.attempts) if (v.expires < now) this.attempts.delete(k);
     const old = this.attempts.get(key) ?? { count: 0, expires: now + 60000 };
-    if (old.count++ >= maximum)
-      throw new HttpError(429, 'Too many sign-in attempts. Please wait a minute.');
+    if (old.count++ >= maximum) throw new HttpError(429, message);
     // A Map iterates in insertion order: its first key is the oldest.
     if (!this.attempts.has(key) && this.attempts.size >= 10000)
       this.attempts.delete(this.attempts.keys().next().value);
@@ -200,11 +201,12 @@ export class Auth {
   /**
    * The shared rate limit: at most `maximum` attempts a minute for the key `ip`, which is a
    * client address or a prefixed key such as `account:<username>`, `email:<address>` or
-   * `mfa-ip:<address>`. The memory throttle answers first; then a counter in oc_auth_attempts
+   * `mfa-ip:<address>`, with `message` for the refusal (the sign-in one by default). The
+   * memory throttle answers first; then a counter in oc_auth_attempts
    * enforces the limit across every server instance. Throws 429.
    */
-  async rateLimit(ip, maximum = 10) {
-    this.throttle(ip, maximum);
+  async rateLimit(ip, maximum = 10, message = SIGN_IN_LIMIT) {
+    this.throttle(ip, maximum, message);
     // Expired windows are removed first (oc_attempts_expiry serves this), so the upsert below
     // starts a new one-minute window rather than counting on from an old one.
     await this.pool.query('DELETE FROM oc_auth_attempts WHERE expires_at<=now()');
@@ -216,8 +218,7 @@ export class Auth {
       "INSERT INTO oc_auth_attempts(key,count,expires_at) VALUES($1,1,now()+interval '1 minute') ON CONFLICT(key) DO UPDATE SET count=oc_auth_attempts.count+1 RETURNING count",
       [tokenHash(ip)],
     );
-    if (rows[0].count > maximum)
-      throw new HttpError(429, 'Too many sign-in attempts. Please wait a minute.');
+    if (rows[0].count > maximum) throw new HttpError(429, message);
   }
   /**
    * The Set-Cookie value for the web session cookie: HTTP-only, SameSite=Lax, lasting fourteen

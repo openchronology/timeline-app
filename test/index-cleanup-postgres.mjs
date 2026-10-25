@@ -19,6 +19,8 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
   store = new PostgresStore(pool),
   versions = new Versioning(store);
 const user = randomUUID(),
+  // Every fork is another account's: an administrator's, who may fork private timelines.
+  users = [user],
   created = [];
 const { randomDocument, randomPatch } = randomEdits(83);
 const order = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -39,11 +41,11 @@ const queries = [
   { kind: 'tags' },
   { kind: 'search', text: 'note', page: 1 },
 ];
-/** What a reader sees of timeline `id`. */
-async function observe(id) {
+/** What `reader` sees of timeline `id`. */
+async function observe(id, reader = user) {
   const results = [];
   for (const q of queries) {
-    const r = await store.query(id, user, q);
+    const r = await store.query(id, reader, q);
     delete r.revision;
     delete r.visitedNodes;
     if (r.groups) r.groups = r.groups.map(({ visitedNodes, ...rest }) => rest);
@@ -52,7 +54,7 @@ async function observe(id) {
     results.push(r);
   }
   const text = (await pool.query('SELECT oc_event_text($1) AS text', [id])).rows[0].text;
-  return { results, text, document: normal((await store.snapshot(id, user)).document) };
+  return { results, text, document: normal((await store.snapshot(id, reader)).document) };
 }
 /** Rows of timeline `id` in `table`s (live or retired). */
 async function count(id, suffix = '', where = 'true') {
@@ -113,8 +115,8 @@ try {
     'cleanup_' + user.slice(0, 8),
   ]);
   const family = new Map();
-  const track = (name, timeline, document) => {
-    family.set(name, { timeline, document });
+  const track = (name, timeline, document, owner = user) => {
+    family.set(name, { timeline, document, owner });
     created.push(timeline.id);
   };
   const source = randomDocument('Source');
@@ -123,11 +125,18 @@ try {
     await store.snapshot(family.get('source').timeline.id, user)
   ).document;
   const fork = async (name, from) => {
-    const entry = family.get(from);
+    const entry = family.get(from),
+      owner = randomUUID();
+    users.push(owner);
+    await pool.query(
+      'INSERT INTO oc_users(id,username,email_verified_at,is_admin) VALUES($1,$2,now(),true)',
+      [owner, 'cleanup_' + owner.slice(0, 8)],
+    );
     track(
       name,
-      await versions.copy(entry.timeline.id, user, { revision: entry.timeline.revision }),
+      await versions.copy(entry.timeline.id, owner, { revision: entry.timeline.revision }),
       entry.document,
+      owner,
     );
   };
   let step = 0;
@@ -141,8 +150,8 @@ try {
       return;
     }
     entry.timeline = whole
-      ? await store.save(entry.timeline.id, user, entry.timeline.revision, next)
-      : await store.save(entry.timeline.id, user, entry.timeline.revision, undefined, patch);
+      ? await store.save(entry.timeline.id, entry.owner, entry.timeline.revision, next)
+      : await store.save(entry.timeline.id, entry.owner, entry.timeline.revision, undefined, patch);
     entry.document = next;
   }
   const editAll = async (rounds) => {
@@ -155,7 +164,7 @@ try {
       const fresh = await store.create(user, entry.document);
       created.push(fresh.id);
       assert.deepEqual(
-        await observe(entry.timeline.id),
+        await observe(entry.timeline.id, entry.owner),
         await observe(fresh.id),
         `${name} reads as a rebuild ${label}`,
       );
@@ -206,7 +215,7 @@ try {
     // Its rows so far are the same rows: it reads as its document meanwhile.
     if (pages % 5 === 0)
       assert.deepEqual(
-        normal((await store.snapshot(cId, user)).document),
+        normal((await store.snapshot(cId, family.get('c').owner)).document),
         normal(family.get('c').document),
         `c reads its document while compacting (page ${pages})`,
       );
@@ -238,7 +247,7 @@ try {
         .slice(from, from + 50)
         .map((e) => ({ id: e.id, event: { ...e, metadata: { title: 'Rewritten ' + e.id } } })),
     };
-    d.timeline = await store.save(d.timeline.id, user, d.timeline.revision, undefined, patch);
+    d.timeline = await store.save(d.timeline.id, d.owner, d.timeline.revision, undefined, patch);
     d.document = validateDocument(applyPatch(d.document, patch));
     if (from + 50 < half.length)
       assert.equal((await lineageOf(pool, dId)).index_bases.length, 1, 'not yet half');
@@ -292,7 +301,7 @@ try {
     await pool.query('DELETE FROM oc_timelines WHERE id=$1', [id]);
     await store.transaction((c) => store.removeHistory(c, id)).catch(() => {});
   }
-  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=$1', [user]);
-  await pool.query('DELETE FROM oc_users WHERE id=$1', [user]);
+  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=ANY($1)', [users]);
+  await pool.query('DELETE FROM oc_users WHERE id=ANY($1)', [users]);
   await pool.end();
 }

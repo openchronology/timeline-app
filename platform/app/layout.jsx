@@ -1,10 +1,13 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// Every page's frame: the site's header and navigation, its footer with the build, a Support
-// link and analytics when enabled; also the site's default metadata for link previews.
+// Every page's frame: the site's header with its navigation and the visitor's account (sign in
+// and sign up, or the account's menu), its footer with the build, a Support link and analytics
+// when enabled; also the site's default metadata for link previews.
 import './platform.css';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import Analytics, { AnalyticsSettings } from '../components/analytics.jsx';
+import AccountMenu from '../components/account-menu.jsx';
+import { currentSession } from '../lib/session.js';
 import { headers } from 'next/headers';
 import { siteOrigin } from '../lib/sharing.js';
 import { analyticsId, platformName, siteName, supportUrl } from '../../server/site.mjs';
@@ -35,7 +38,22 @@ export default async function RootLayout({ children }) {
   // Where visitors can support the platform (SUPPORT_URL): a link in the header and footer.
   const support = supportUrl();
   const analytics = analyticsId();
-  const nonce = analytics ? (await headers()).get('x-nonce') : null;
+  // Read for every page, so each renders per request: its header shows who is visiting.
+  const request = await headers();
+  const nonce = analytics ? request.get('x-nonce') : null;
+  // Who is visiting, for the header's end: a guest is offered to sign in, and to sign up when
+  // the site takes registrations; an account gets its menu. Without accounts, neither.
+  let user = null,
+    accounts = false,
+    registration = false;
+  try {
+    const current = await currentSession();
+    user = current.user;
+    accounts = !!current.services.auth;
+    registration = !!current.services.auth?.security?.available;
+  } catch (error) {
+    console.error(error);
+  }
   return (
     <html lang="en">
       <body>
@@ -47,7 +65,6 @@ export default async function RootLayout({ children }) {
           <nav aria-label="Platform navigation">
             <a href="/editor?new=1">＋ New timeline</a>
             <a href="/plugins">Plugin library</a>
-            <a href="/account">Account</a>
             <a href="/download">Download</a>
             <a href="/help">Help</a>
             {support ? (
@@ -56,6 +73,24 @@ export default async function RootLayout({ children }) {
               </a>
             ) : null}
           </nav>
+          {user ? (
+            <AccountMenu
+              username={user.username}
+              avatarUrl={user.avatarUrl}
+              isAdmin={user.isAdmin}
+            />
+          ) : accounts ? (
+            <div className="header-account">
+              <a href="/login" className="button">
+                Sign in
+              </a>
+              {registration && (
+                <a href="/login?mode=register" className="button primary">
+                  Sign up
+                </a>
+              )}
+            </div>
+          ) : null}
         </header>
         {children}
         <footer className="platform-footer">

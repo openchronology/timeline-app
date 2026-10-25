@@ -24,13 +24,19 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
   versions = new Versioning(store),
   pulls = new Collaboration(store);
 const owner = randomUUID(),
+  // Two other accounts, which fork and propose (an account has one fork of a timeline);
+  // timelines they own map to them.
+  other = randomUUID(),
+  third = randomUUID(),
+  owners = new Map(),
   timelines = [];
+const ownerOf = (id) => owners.get(id) ?? owner;
 const order = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const normal = (d) => ({
   ...d,
   events: [...d.events].sort((a, b) => order(a.id, b.id)),
 });
-const snapshot = async (id) => normal((await store.snapshot(id, owner)).document);
+const snapshot = async (id) => normal((await store.snapshot(id, ownerOf(id))).document);
 const saved = async (revisionId) => normal(await store.revisionDocument(pool, revisionId));
 /** History versions (and overrides) a timeline holds. */
 const versionsOf = async (id) => {
@@ -65,7 +71,7 @@ const charged = async (revisionId) =>
 const keep = (id, on) =>
   store.transaction(async (c) => {
     await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [id]);
-    if (on) await store.startHistory(c, id, owner);
+    if (on) await store.startHistory(c, id, ownerOf(id));
     else await store.stopHistory(c, id);
   });
 const moment = (i, title = 'Moment ' + i) => ({
@@ -85,7 +91,7 @@ const document = validateDocument({
 const settings = { ...document, events: [], durations: undefined, relationships: undefined };
 /** Saves `count` moments from `from` with a new title, in place. */
 const edit = (t, from, count, title) =>
-  store.save(t.id, owner, t.revision, undefined, {
+  store.save(t.id, ownerOf(t.id), t.revision, undefined, {
     settings,
     changes: Array.from({ length: count }, (_, i) => ({
       id: 'm' + (from + i),
@@ -98,19 +104,36 @@ try {
     'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass) VALUES($1,$2,now(),true)',
     [owner, 'optional_' + owner.slice(0, 8)],
   );
+  for (const id of [other, third])
+    await pool.query(
+      'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass) VALUES($1,$2,now(),true)',
+      [id, 'optional_' + id.slice(0, 8)],
+    );
+  /** Timeline `t` forked by `account`. */
+  const forkAs = async (t, account) => {
+    const copy = await versions.copy(t.id, account, { revision: t.revision });
+    timelines.push(copy.id);
+    owners.set(copy.id, account);
+    return copy;
+  };
+  /** Timeline `id` made public, so the other accounts may fork it and propose to it. */
+  const publish = async (id) => {
+    await pool.query("UPDATE oc_timelines SET visibility='public' WHERE id=$1", [id]);
+    return store.access(id, ownerOf(id));
+  };
   let t = await store.create(owner, document);
   timelines.push(t.id);
+  t = await publish(t.id);
   assert.equal(t.keep_history, true, 'kept by default');
   t = await edit(t, 0, 5, 'First');
   t = await edit(t, 10, 5, 'Second');
   const firstEdits = await snapshot(t.id);
   // A fork reads through to this revision; a pull request is based on the next.
-  let fork = await versions.copy(t.id, owner, { revision: t.revision });
-  timelines.push(fork.id);
+  let fork = await forkAs(t, other);
   const forkBase = fork.fork_base_revision_id;
   t = await edit(t, 20, 5, 'Third');
   const proposed = { ...(await snapshot(t.id)), description: 'Proposed' };
-  const proposal = await pulls.create(t.id, owner, {
+  const proposal = await pulls.create(t.id, other, {
     title: 'A change',
     body: '',
     baseRevision: t.revision,
@@ -167,7 +190,7 @@ try {
   await keep(t.id, false);
 
   // The pull request made before still rebases onto the head and merges.
-  const rebased = await pulls.resolve(t.id, proposal.id, owner, {
+  const rebased = await pulls.resolve(t.id, proposal.id, other, {
     action: 'rebase',
     revision: proposal.revision,
   });
@@ -203,7 +226,7 @@ try {
 
   // Pull requests into it say why they cannot be opened.
   await assert.rejects(
-    pulls.create(t.id, owner, {
+    pulls.create(t.id, other, {
       title: 'Another',
       body: '',
       baseRevision: t.revision,
@@ -214,8 +237,7 @@ try {
 
   // A copy inherits the setting and reads the same; it syncs while upstream has not moved,
   // then says why it cannot.
-  let copy = await versions.copy(t.id, owner, { revision: t.revision });
-  timelines.push(copy.id);
+  let copy = await forkAs(t, third);
   assert.equal(copy.keep_history, false);
   assert.deepEqual(await snapshot(copy.id), await snapshot(t.id));
   assert.equal(await versionsOf(copy.id), 0);
@@ -224,29 +246,29 @@ try {
       .length,
     0,
   );
-  assert.equal(await versions.syncBlocked(copy.id, owner), null);
-  copy = await versions.sync(copy.id, owner, { revision: copy.revision });
+  assert.equal(await versions.syncBlocked(copy.id, third), null);
+  copy = await versions.sync(copy.id, third, { revision: copy.revision });
   t = await edit(t, 50, 5, 'Upstream moved');
-  assert.equal(await versions.syncBlocked(copy.id, owner), SYNC_UNAVAILABLE);
+  assert.equal(await versions.syncBlocked(copy.id, third), SYNC_UNAVAILABLE);
   await assert.rejects(
-    versions.sync(copy.id, owner, { revision: copy.revision }),
+    versions.sync(copy.id, third, { revision: copy.revision }),
     (e) => e.status === 409 && e.message === SYNC_UNAVAILABLE,
   );
   // The fork made while history was kept still syncs from the revision kept for it.
-  fork = await store.access(fork.id, owner);
-  assert.equal(await versions.syncBlocked(fork.id, owner), null);
-  fork = await versions.sync(fork.id, owner, { revision: fork.revision });
+  fork = await store.access(fork.id, other);
+  assert.equal(await versions.syncBlocked(fork.id, other), null);
+  fork = await versions.sync(fork.id, other, { revision: fork.revision });
   assert.deepEqual(await snapshot(fork.id), await snapshot(t.id), 'synced');
 
   // A fork that keeps no history cannot propose its changes.
   let upstream = await store.create(owner, document);
   timelines.push(upstream.id);
-  let quiet = await versions.copy(upstream.id, owner, { revision: upstream.revision });
-  timelines.push(quiet.id);
+  upstream = await publish(upstream.id);
+  let quiet = await forkAs(upstream, other);
   await keep(quiet.id, false);
-  quiet = await edit(await store.access(quiet.id, owner), 0, 3, 'Quiet');
+  quiet = await edit(await store.access(quiet.id, other), 0, 3, 'Quiet');
   await assert.rejects(
-    pulls.create(upstream.id, owner, {
+    pulls.create(upstream.id, other, {
       title: 'From a fork',
       body: '',
       sourceTimelineId: quiet.id,
@@ -265,7 +287,7 @@ try {
   // Migrating leaves timelines without saved history alone.
   await startHistory(pool);
   assert.equal(await versionsOf(copy.id), 0);
-  assert.equal((await store.access(copy.id, owner)).history_since, null);
+  assert.equal((await store.access(copy.id, third)).history_since, null);
 
   // Starting it again records the current state as a new revision, with one copy.
   const usedOff = await used();
@@ -291,7 +313,7 @@ try {
   );
   await assert.rejects(store.revisionDocument(pool, latest[1].id), (e) => e.status === 409);
   // Pull requests work again.
-  await pulls.create(t.id, owner, {
+  await pulls.create(t.id, other, {
     title: 'Again',
     body: '',
     baseRevision: t.revision,
@@ -300,15 +322,14 @@ try {
 
   // A copy whose history others still read through to: turning it off keeps that, and
   // turning it on again compares what it holds with what it reads through to.
-  let middle = await versions.copy(upstream.id, owner, { revision: upstream.revision });
-  timelines.push(middle.id);
+  let middle = await forkAs(upstream, third);
   middle = await edit(middle, 0, 4, 'Middle');
-  middle = await store.save(middle.id, owner, middle.revision, undefined, {
+  middle = await store.save(middle.id, third, middle.revision, undefined, {
     settings,
     changes: [{ id: 'm5', event: null }],
   });
-  const leaf = await versions.copy(middle.id, owner, { revision: middle.revision });
-  timelines.push(leaf.id);
+  middle = await publish(middle.id);
+  const leaf = await forkAs(middle, other);
   const leafDocument = await snapshot(leaf.id);
   middle = await edit(middle, 10, 4, 'Middle later');
   await keep(middle.id, false);
@@ -316,8 +337,8 @@ try {
   assert.deepEqual(await saved(leaf.head_revision_id), leafDocument);
   middle = await store.save(
     middle.id,
-    owner,
-    (await store.access(middle.id, owner)).revision,
+    third,
+    (await store.access(middle.id, third)).revision,
     undefined,
     {
       settings,
@@ -328,7 +349,7 @@ try {
     },
   );
   await keep(middle.id, true);
-  middle = await store.access(middle.id, owner);
+  middle = await store.access(middle.id, third);
   const restarted = middle.head_revision_id;
   const restartedDocument = await snapshot(middle.id);
   assert.deepEqual(await saved(restarted), restartedDocument);
@@ -361,8 +382,8 @@ try {
       await c.query('DELETE FROM oc_timelines WHERE id=$1', [id]);
       await store.removeHistory(c, id);
     });
-  await pool.query('DELETE FROM oc_proposals WHERE author_id=$1', [owner]);
-  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=$1', [owner]);
-  await pool.query('DELETE FROM oc_users WHERE id=$1', [owner]);
+  await pool.query('DELETE FROM oc_proposals WHERE author_id=ANY($1)', [[owner, other, third]]);
+  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=ANY($1)', [[owner, other, third]]);
+  await pool.query('DELETE FROM oc_users WHERE id=ANY($1)', [[owner, other, third]]);
   await pool.end();
 }

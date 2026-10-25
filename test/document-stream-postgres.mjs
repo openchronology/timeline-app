@@ -20,6 +20,7 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
   store = new PostgresStore(pool),
   versions = new Versioning(store);
 const owner = randomUUID(),
+  forker = randomUUID(),
   timelines = [];
 /** The text of a stream, and how many parts it came in. */
 async function collect(chunks) {
@@ -48,28 +49,28 @@ const normal = (d) => ({
     : {}),
 });
 const wrapped = ({ document, ...rest }) => ({ ...rest, document: normal(document) });
-/** The timeline streamed whole and alone equals snapshot. */
-async function checkLive(name, id) {
-  const whole = sent(await store.snapshot(id, owner));
-  const streamed = await collect(store.snapshotChunks(id, owner));
+/** The timeline streamed whole and alone equals snapshot, read by `user`. */
+async function checkLive(name, id, user = owner) {
+  const whole = sent(await store.snapshot(id, user));
+  const streamed = await collect(store.snapshotChunks(id, user));
   assert.deepEqual(wrapped(streamed.value), wrapped(whole), `${name}: {timeline, document}`);
   assert.deepEqual(
-    normal((await collect(store.snapshotChunks(id, owner, { documentOnly: true }))).value),
+    normal((await collect(store.snapshotChunks(id, user, { documentOnly: true }))).value),
     normal(whole.document),
     `${name}: the document alone`,
   );
   return streamed.parts;
 }
-/** A revision streamed equals it read whole. */
-async function checkRevision(name, id, savedId) {
-  const whole = sent(await versions.historical(id, savedId, owner));
+/** A revision streamed equals it read whole, read by `user`. */
+async function checkRevision(name, id, savedId, user = owner) {
+  const whole = sent(await versions.historical(id, savedId, user));
   assert.deepEqual(
-    wrapped((await collect(store.revisionChunks(id, savedId, owner))).value),
+    wrapped((await collect(store.revisionChunks(id, savedId, user))).value),
     wrapped(whole),
     `${name}: {document}`,
   );
   assert.deepEqual(
-    normal((await collect(store.revisionChunks(id, savedId, owner, { documentOnly: true }))).value),
+    normal((await collect(store.revisionChunks(id, savedId, user, { documentOnly: true }))).value),
     normal(whole.document),
     `${name}: the document alone`,
   );
@@ -80,6 +81,11 @@ try {
     owner,
     'stream_' + owner.slice(0, 8),
   ]);
+  // An administrator, who may fork the private timeline.
+  await pool.query(
+    'INSERT INTO oc_users(id,username,quota_bypass,is_admin) VALUES($1,$2,true,true)',
+    [forker, 'stream_' + forker.slice(0, 8)],
+  );
   // Large enough for several pages of each cursor and several parts of text.
   const document = generateTimeline(6000);
   let t = await store.create(owner, document);
@@ -100,14 +106,14 @@ try {
   await checkRevision('head kept as rows', t.id, t.head_revision_id);
 
   // A fork reads through to its source; its revisions read through to its source's.
-  let fork = await versions.copy(t.id, owner, { revision: t.revision });
+  let fork = await versions.copy(t.id, forker, { revision: t.revision });
   timelines.push(fork.id);
-  fork = await store.save(fork.id, owner, fork.revision, undefined, {
+  fork = await store.save(fork.id, forker, fork.revision, undefined, {
     settings,
     changes: [{ id: document.events[10].id, event: null }],
   });
-  await checkLive('fork', fork.id);
-  await checkRevision('fork revision', fork.id, fork.head_revision_id);
+  await checkLive('fork', fork.id, forker);
+  await checkRevision('fork revision', fork.id, fork.head_revision_id, forker);
 
   // A revision stored as a document, from before history was kept as rows.
   const legacy = await store.transaction((c) =>
@@ -121,16 +127,16 @@ try {
     await c.query('SELECT 1 FROM oc_timelines WHERE id=$1 FOR UPDATE', [fork.id]);
     await store.stopHistory(c, fork.id);
   });
-  fork = await store.save(fork.id, owner, fork.revision, undefined, {
+  fork = await store.save(fork.id, forker, fork.revision, undefined, {
     settings,
     changes: [{ id: document.events[11].id, event: null }],
   });
-  await checkRevision('head without saved history', fork.id, fork.head_revision_id);
+  await checkRevision('head without saved history', fork.id, fork.head_revision_id, forker);
   const { rows: past } = await pool.query(
     'SELECT id FROM oc_revisions WHERE timeline_id=$1 AND number IS NOT NULL AND id<>$2 LIMIT 1',
     [fork.id, fork.head_revision_id],
   );
-  const refused = store.revisionChunks(fork.id, past[0].id, owner);
+  const refused = store.revisionChunks(fork.id, past[0].id, forker);
   await assert.rejects(refused.next(), (e) => e.status === 409);
   await assert.rejects(store.snapshotChunks(randomUUID(), owner).next(), (e) => e.status === 404);
 
@@ -167,7 +173,7 @@ try {
       await c.query('DELETE FROM oc_timelines WHERE id=$1', [id]);
       await store.removeHistory(c, id);
     });
-  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=$1', [owner]);
-  await pool.query('DELETE FROM oc_users WHERE id=$1', [owner]);
+  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=ANY($1)', [[owner, forker]]);
+  await pool.query('DELETE FROM oc_users WHERE id=ANY($1)', [[owner, forker]]);
   await pool.end();
 }

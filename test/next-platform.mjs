@@ -374,8 +374,9 @@ try {
       await tip.hover();
       await page.locator('#tip-plugins').waitFor({ state: 'visible' });
       assert.equal(await tip.getAttribute('href'), '/help/plugins');
-      await page.getByRole('link', { name: 'Account', exact: true }).click();
-      await page.waitForURL(origin + '/account');
+      // Without server accounts, the header offers no sign-in and no account menu (#265).
+      assert.equal(await page.locator('.header-account, .account-menu').count(), 0);
+      await page.goto(origin + '/account');
       await page.getByText('Server accounts are unavailable.').waitFor();
       // The header's Download goes to the download page; its commands can be copied.
       await page.getByRole('link', { name: 'Download', exact: true }).click();

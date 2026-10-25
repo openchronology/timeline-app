@@ -15,7 +15,9 @@ if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
   store = new PostgresStore(pool),
   versions = new Versioning(store);
+// The owner, and two accounts forking its timeline (an account keeps one fork of each).
 const user = randomUUID(),
+  forkers = [randomUUID(), randomUUID()],
   created = [];
 const TABLES = [
   'oc_moments',
@@ -48,10 +50,11 @@ async function lookupIndex(sql, params) {
 }
 try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
-  await pool.query(
-    'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass) VALUES($1,$2,now(),true)',
-    [user, 'statistics_' + user.slice(0, 8)],
-  );
+  for (const id of [user, ...forkers])
+    await pool.query(
+      'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass) VALUES($1,$2,now(),true)',
+      [id, 'statistics_' + id.slice(0, 8)],
+    );
   setEntryLimit(Infinity);
   // Small writes leave statistics to autovacuum.
   let before = await analyzed();
@@ -66,9 +69,11 @@ try {
   for (const [table, time] of Object.entries(after))
     assert(time > before[table], `${table} analyzed after a large create`);
   before = after;
+  // Public, so other accounts may fork it.
+  await pool.query("UPDATE oc_timelines SET visibility='public' WHERE id=$1", [large.id]);
   // A fork that copies its index (one that may read through to no level).
   store.indexLevels = 0;
-  const fork = await versions.copy(large.id, user, { revision: large.revision });
+  const fork = await versions.copy(large.id, forkers[0], { revision: large.revision });
   created.push(fork.id);
   // A large copy's index is copied after answering (see fork-preparing-postgres.mjs).
   await store.idle();
@@ -102,7 +107,7 @@ try {
   // retiring many refreshes statistics before it returns, so lookups count them; one
   // retiring a few leaves them to autovacuum.
   delete store.indexLevels;
-  const reader = await versions.copy(large.id, user, { revision: large.revision });
+  const reader = await versions.copy(large.id, forkers[1], { revision: large.revision });
   created.push(reader.id);
   assert.equal(reader.preparing, false, 'a fork reads through instead');
   const document = generateTimeline(25000);
@@ -131,7 +136,9 @@ try {
     await pool.query('DELETE FROM oc_timelines WHERE id=$1', [id]);
     await store.transaction((c) => store.removeHistory(c, id)).catch(() => {});
   }
-  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=$1', [user]);
-  await pool.query('DELETE FROM oc_users WHERE id=$1', [user]);
+  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=ANY($1::uuid[])', [
+    [user, ...forkers],
+  ]);
+  await pool.query('DELETE FROM oc_users WHERE id=ANY($1::uuid[])', [[user, ...forkers]]);
   await pool.end();
 }

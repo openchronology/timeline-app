@@ -401,9 +401,29 @@ export const schemas = {
       },
       canWrite: { type: 'boolean', description: 'May save it.' },
       canEdit: { type: 'boolean', description: 'May edit a copy of it (to save or propose).' },
-      canPropose: { type: 'boolean', description: 'May open pull requests on it.' },
+      canPropose: {
+        type: 'boolean',
+        description: 'May open pull requests on it: for those who may not save it.',
+      },
       canShare: { type: 'boolean', description: 'May manage its settings, members and deletion.' },
-      canFork: { type: 'boolean' },
+      canFork: {
+        type: 'boolean',
+        description: 'May fork it: someone else’s timeline they may copy.',
+      },
+      canDuplicate: {
+        type: 'boolean',
+        description: 'May duplicate it: their own timeline.',
+      },
+      forkChanged: {
+        type: 'boolean',
+        description:
+          'A fork with saves of its own since it was made, which it may propose upstream.',
+      },
+      existing: {
+        type: 'boolean',
+        description:
+          'From `POST /api/timelines/{id}/fork`: the caller’s fork made before, answered instead of a new one.',
+      },
       first: {
         ...nullable(ref('Rational')),
         description: 'With `GET /api/timelines/{id}`: its earliest moment’s time.',

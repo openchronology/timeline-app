@@ -1142,16 +1142,15 @@ export function createRequestHandler({
         if (forkAction && uuid.test(forkAction[1])) {
           auth.require(session, req);
           if (method !== 'POST') throw new HttpError(405, 'Method not allowed.');
-          await auth.rateLimit('forks:' + userId);
+          await auth.rateLimit('forks:' + userId, 10, 'Too many copies. Please wait a minute.');
           const versions = new Versioning(store),
             input = await body(req, 4096);
-          return response(
-            res,
-            forkAction[2] === 'sync' ? 200 : 201,
+          const result =
             forkAction[2] === 'sync'
               ? await versions.sync(forkAction[1], userId, input)
-              : await versions.copy(forkAction[1], userId, input, forkAction[2] === 'duplicate'),
-          );
+              : await versions.copy(forkAction[1], userId, input, forkAction[2] === 'duplicate');
+          // A new copy is created (201); a sync, or a fork the caller already had, is not.
+          return response(res, forkAction[2] === 'sync' || result.existing ? 200 : 201, result);
         }
         // A timeline's .ochx file, streamed, named by the end of its address: the editor
         // downloads large timelines from here, and browsers that name a download after its

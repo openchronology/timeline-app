@@ -17,6 +17,8 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
   store = new PostgresStore(pool),
   versions = new Versioning(store);
 const owner = randomUUID(),
+  // An administrator, who may fork the owner's private timeline.
+  forker = randomUUID(),
   timelines = [];
 const versionsOf = async (id) =>
   Number(
@@ -36,6 +38,10 @@ try {
     owner,
     'history_' + owner.slice(0, 8),
   ]);
+  await pool.query(
+    'INSERT INTO oc_users(id,username,email_verified_at,is_admin) VALUES($1,$2,now(),true)',
+    [forker, 'history_' + forker.slice(0, 8)],
+  );
   const moment = (i, title = 'Moment ' + i) => ({
     id: 'm' + i,
     time: `${i}/1`,
@@ -168,7 +174,7 @@ try {
   );
 
   // A fork refers to the head; deleting the timeline keeps what the fork's base sees.
-  const fork = await versions.copy(t.id, owner, { revision: t.revision });
+  const fork = await versions.copy(t.id, forker, { revision: t.revision });
   timelines.push(fork.id);
   const base = t.head_revision_id;
   await store.transaction(async (c) => {
@@ -203,7 +209,7 @@ try {
     await pool.query('DELETE FROM oc_timelines WHERE id=$1', [id]);
     await store.transaction((c) => store.removeHistory(c, id)).catch(() => {});
   }
-  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=$1', [owner]);
-  await pool.query('DELETE FROM oc_users WHERE id=$1', [owner]);
+  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=ANY($1)', [[owner, forker]]);
+  await pool.query('DELETE FROM oc_users WHERE id=ANY($1)', [[owner, forker]]);
   await pool.end();
 }
