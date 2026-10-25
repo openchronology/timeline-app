@@ -17,4 +17,5 @@ Helpers the platform's pages and components share. Files that import `server-onl
 | [`releases.js`](releases.js)             | What the download page offers: desktop apps, the offline file and server packages, with their release asset names.                             |
 | [`session.js`](session.js)               | The visitor's session on a server-rendered page, and how many timelines they may compare.                                                      |
 | [`sharing.js`](sharing.js)               | What shared links show: titles, descriptions, preview facts, embed code and addresses, for public timelines only where a guest would see them. |
+| [`sitemap.js`](sitemap.js)               | The sitemap (`/sitemap.xml` and its pages): the site's pages, then every public timeline and every profile that owns one, 45,000 to a page.    |
 | [`timeline.js`](timeline.js)             | Loads the timeline a page names as its visitor may see it, redirecting its other addresses, and the facts pages give their components.         |
