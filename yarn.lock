@@ -842,6 +842,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"ldapts@npm:9.2.0":
+  version: 9.2.0
+  resolution: "ldapts@npm:9.2.0"
+  dependencies:
+    strict-event-emitter-types: "npm:2.0.0"
+  checksum: 10c0/113c206e6cb2b17988d516118f0708b476f8afefbb35170f1f1fe34c740993941f5831fcd5bacb710321eb7e544ec4e9fd99e06dcdc8c4e161d5b107ab2e3e85
+  languageName: node
+  linkType: hard
+
 "minipass@npm:^7.0.4, minipass@npm:^7.1.2":
   version: 7.1.3
   resolution: "minipass@npm:7.1.3"
@@ -964,6 +973,7 @@ __metadata:
   dependencies:
     "@tauri-apps/cli": "npm:2.12.1"
     esbuild: "npm:0.25.12"
+    ldapts: "npm:9.2.0"
     next: "npm:16.3.8"
     pg: "npm:8.23.1"
     playwright: "npm:1.58.2"
@@ -1288,6 +1298,13 @@ __metadata:
   version: 4.2.0
   resolution: "split2@npm:4.2.0"
   checksum: 10c0/b292beb8ce9215f8c642bb68be6249c5a4c7f332fc8ecadae7be5cbdf1ea95addc95f0459ef2e7ad9d45fd1064698a097e4eb211c83e772b49bc0ee423e91534
+  languageName: node
+  linkType: hard
+
+"strict-event-emitter-types@npm:2.0.0":
+  version: 2.0.0
+  resolution: "strict-event-emitter-types@npm:2.0.0"
+  checksum: 10c0/7a2985b81908c2a7d1de10afe3be1de3423b8ce6188dc32aeb3dbaf66d4ac3f11029d6931c67d972a3bb976bbd04d27ee090eeed1cbd089c5ba3e899a04ed1b7
   languageName: node
   linkType: hard
 

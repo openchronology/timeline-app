@@ -338,9 +338,11 @@ const PROVIDERS = { github: 'GitHub', google: 'Google', facebook: 'Facebook' };
 
 /**
  * The sign-in methods card: each provider the site offers, linked (to unlink, confirmed by the
- * current credentials) or not (to link, through `link`, which opens the provider).
+ * current credentials) or not (to link, through `link`, which opens the provider). A directory
+ * account (`ldap`, when the site offers directory sign-in) links with its own username and
+ * password instead, through POST /api/auth/ldap/link.
  * @param {object} props
- * @param {object} props.session GET /api/session's answer (`providers`)
+ * @param {object} props.session GET /api/session's answer (`providers`, `directory`)
  * @param {object} props.account GET /api/auth/account's answer (`identities`, `security`)
  * @param {() => Promise<object>} props.refresh reads the session and account again
  * @param {(name: string) => void} props.link starts linking a provider
@@ -350,7 +352,15 @@ export function SignInMethodsCard({ session, account, refresh, link, linking }) 
   const { action, busy, failure } = useAccountAction(session, refresh);
   const identities = account?.identities ?? [];
   // Linked providers the site no longer offers are still listed, so they can be unlinked.
-  const names = [...new Set([...(session.providers ?? []), ...identities])];
+  const names = [
+    ...new Set([
+      ...(session.providers ?? []),
+      ...(session.directory ? ['ldap'] : []),
+      ...identities,
+    ]),
+  ];
+  const label = (name) =>
+    name === 'ldap' ? (session.directory?.label ?? 'Directory account') : (PROVIDERS[name] ?? name);
   return (
     <section className="settings-card" id="sign-in">
       <h2>Sign-in methods</h2>
@@ -361,7 +371,7 @@ export function SignInMethodsCard({ session, account, refresh, link, linking }) 
         </li>
         {names.map((name) => (
           <li key={name}>
-            <strong>{PROVIDERS[name] ?? name}</strong>
+            <strong>{label(name)}</strong>
             {identities.includes(name) ? (
               <>
                 <span className="status-badge on">Linked</span>
@@ -379,7 +389,44 @@ export function SignInMethodsCard({ session, account, refresh, link, linking }) 
                     }}
                   >
                     <Confirmation security={account?.security} />
-                    <button disabled={busy}>Unlink {PROVIDERS[name] ?? name}</button>
+                    <button disabled={busy}>Unlink {label(name)}</button>
+                  </form>
+                </Disclosure>
+              </>
+            ) : name === 'ldap' ? (
+              <>
+                <span className="status-badge">Not linked</span>
+                <Disclosure label="Link">
+                  <form
+                    className="settings-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const d = new FormData(e.currentTarget);
+                      void action('link', 'auth/ldap/link', 'POST', {
+                        username: d.get('username'),
+                        password: d.get('password'),
+                      });
+                    }}
+                  >
+                    <label>
+                      Username
+                      <input name="username" autoComplete="off" maxLength={256} required />
+                    </label>
+                    <label>
+                      Password
+                      <input
+                        name="password"
+                        type="password"
+                        autoComplete="off"
+                        maxLength={1024}
+                        required
+                      />
+                    </label>
+                    <p className="muted">
+                      Within five minutes of signing in. Your directory password is checked, not
+                      kept.
+                    </p>
+                    <button disabled={busy}>Link {label(name)}</button>
                   </form>
                 </Disclosure>
               </>
@@ -396,6 +443,7 @@ export function SignInMethodsCard({ session, account, refresh, link, linking }) 
       </ul>
       {!names.length && <p className="muted">This site offers no other ways to sign in.</p>}
       {failure('unlink')}
+      {failure('link')}
     </section>
   );
 }
