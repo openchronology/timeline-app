@@ -167,6 +167,8 @@ try {
     ['/plugins', 'Plugin library · timescale.test'],
     ['/download', 'Download · timescale.test'],
     ['/legal', 'Terms, privacy and licenses · timescale.test'],
+    ['/terms', 'Terms of service · timescale.test'],
+    ['/privacy', 'Privacy policy · timescale.test'],
     ['/editor', 'Editor · timescale.test'],
     ['/?search=history&page=2'],
     ['/?owner=seed&search=history&page=2'],

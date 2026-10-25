@@ -17,6 +17,9 @@ export default async function sitemap() {
     { url: origin + '/download', changeFrequency: 'weekly' },
     { url: origin + '/docs/api', changeFrequency: 'weekly' },
     { url: origin + '/help', changeFrequency: 'weekly' },
+    { url: origin + '/terms', changeFrequency: 'monthly' },
+    { url: origin + '/privacy', changeFrequency: 'monthly' },
+    { url: origin + '/legal', changeFrequency: 'monthly' },
     // The help's pages (#172).
     ...[...(await helpPages().catch(() => new Map())).keys()].map((slug) => ({
       url: `${origin}/help/${slug}`,

@@ -309,7 +309,7 @@ export default function Account({ returnTo = '/', login = false }) {
                 required
               />
               <span className="field-hint">
-                Only the year is kept, to set up your account (see the privacy notice).
+                Only the year is kept, to set up your account (see the privacy policy).
               </span>
             </label>
           )}
@@ -429,7 +429,8 @@ export default function Account({ returnTo = '/', login = false }) {
       )}
       {feedback}
       <p className="muted">
-        <Link href="/legal">Terms and privacy notices</Link> are available before registration.
+        The <Link href="/terms">terms of service</Link> and{' '}
+        <Link href="/privacy">privacy policy</Link> are available before registration.
       </p>
     </div>
   );

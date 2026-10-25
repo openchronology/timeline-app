@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Legal notices in the built pages: the copyright banner for bundles, the footer with the build
-// identity, and dist/legal.html with the notice, draft terms and policies, and licenses.
+// identity, and dist/legal.html with the notice, the hosted service's terms and policies, and licenses.
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { writeBuildInfo } from './build-info.mjs';
 import { dependencyLicenses } from './licenses.mjs';
@@ -16,10 +16,10 @@ const escape = (s) =>
 export async function legalMarkup(source = false) {
   const documents = [
     ['NOTICE', 'Copyright and software rights'],
-    ['legal/TERMS.md', 'Hosted service terms (draft)'],
-    ['legal/PRIVACY.md', 'Privacy notice (draft)'],
-    ['legal/COPYRIGHT.md', 'Copyright, abuse, and security reports (draft)'],
-    ['legal/LAUNCH.md', 'Operator details pending before launch'],
+    ['legal/TERMS.md', 'Hosted service terms'],
+    ['legal/PRIVACY.md', 'Privacy policy'],
+    ['legal/COPYRIGHT.md', 'Copyright, abuse, and security reports'],
+    ['legal/LAUNCH.md', 'Operator checklist'],
     ['LICENSE', 'GNU General Public License version 3'],
     ['THIRD_PARTY.md', 'Third-party notices'],
   ];
@@ -52,7 +52,7 @@ export async function buildLegal() {
   const content = await legalMarkup(true);
   await writeFile(
     'dist/legal.html',
-    `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OpenChronology / timescale.info legal notices</title><link rel="stylesheet" href="app.css"><body><main><h1>OpenChronology / timescale.info</h1><p>Copyright © 2026 Athan Clark, an individual. Software: GPLv3. Hosted policies are drafts pending operator details.</p>${content}</main></body></html>`,
+    `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OpenChronology / timescale.info legal notices</title><link rel="stylesheet" href="app.css"><body><main><h1>OpenChronology / timescale.info</h1><p>Copyright © 2026 Athan Clark, an individual. Software: GPLv3. The policies below apply to the hosted service at timescale.info.</p>${content}</main></body></html>`,
   );
   await writeFile('dist/LICENSE.txt', await readFile('LICENSE'));
   await writeFile('dist/NOTICE.txt', await readFile('NOTICE'));

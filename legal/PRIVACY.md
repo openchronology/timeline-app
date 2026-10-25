@@ -1,8 +1,14 @@
-# timescale.info — privacy notice
+# timescale.info — privacy policy
 
-Draft version: 2026-10-15. Not yet effective. Responsible operator: Athan Clark,
-an individual. Public privacy contact, hosting providers, hosting region, and
-backup/log retention schedules are pending confirmation; see LAUNCH.md.
+Effective 25 October 2026. This policy describes how the hosted service at
+https://timescale.info, and the desktop app when connected to it, collects, uses,
+shares and keeps information. The service is operated by Athan Clark, an individual
+(the "operator"). For any privacy question or request, write to
+**privacy@timescale.info**.
+
+The service runs on a server rented from DigitalOcean in the United States, which
+holds its database, files and logs; information you give it is stored and processed
+there.
 
 ## Information and purposes
 
@@ -15,6 +21,26 @@ not plaintext passwords. Google, GitHub, or Facebook sign-in contacts the provid
 you choose; the provider can observe that authentication. The application uses
 provider credentials server-side and does not give provider tokens to timeline
 plugins. Provider privacy notices also apply to their own services.
+
+## Google user data
+
+If you choose **Sign in with Google** (or link Google to your account), the service
+asks Google only for the `openid` and `profile` scopes. From Google's answer it keeps
+just one thing: your Google account's stable identifier (the ID token's subject), linked
+to your timescale.info account so that you can sign in with Google again. It does not
+keep your name, email address, profile picture or any other Google profile data; it
+does not request access to Gmail, Drive, contacts, calendars or any other Google service;
+and it discards Google's access and ID tokens as soon as your identity is verified. Your
+account gets a generated username, which you can change.
+
+The service uses Google user data only to sign you in. It does not sell it, use it for
+advertising, share it with anyone, or use it to train artificial intelligence or machine
+learning models. Its use of information received from Google APIs adheres to the
+[Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy),
+including the Limited Use requirements. To remove it, unlink Google from Account →
+Sign-in methods, or delete your account; you can also revoke the service's access at
+https://myaccount.google.com/permissions. The same applies to GitHub and Facebook
+sign-in, which keep only that provider's account identifier.
 
 Resend processes recipient addresses and account verification, recovery, and security
 notification email content for delivery. The server checks new passwords against
@@ -54,17 +80,17 @@ who decided, any review request and its outcome, as a record. Reports and decisi
 kept while needed to moderate and as required by law.
 
 IP addresses are processed for connection handling and abuse prevention; temporary
-authentication rate-limit keys are hashed. Hosting providers and reverse proxies
-may generate request and security logs. The deployment must document their actual
-fields, recipients, and retention before this notice becomes effective. Support,
+authentication rate-limit keys are hashed. The web server (nginx) logs each request's
+IP address, time, address requested, response status and size, referring page and
+browser identification; these logs are rotated daily and deleted after 14 days. The
+application's own service log records errors and operational events and is limited
+in size, so its oldest entries are removed as it fills. Support,
 privacy, and abuse reports may contain the information you provide and are used
 to respond and investigate. If the operator turns on Cloudflare Turnstile for
 human-verification challenges (instead of the built-in proof of work), your browser
 loads Cloudflare's challenge when one is asked for, and Cloudflare receives network
 and device information to tell people from automated traffic, under its own privacy
-policy. The application includes no advertising or analytics
-integration; a deployment adding either must update this notice and meet applicable
-consent requirements before doing so.
+policy. The service includes no advertising, and analytics only as described below.
 
 ## Local storage, cookies, and offline editions
 
@@ -74,7 +100,7 @@ expiry and become invalid after one day of inactivity. Users can revoke sessions
 The browser keeps editing drafts and authentication-return state in local storage
 facilities. Clearing site storage removes local drafts and can sign you out.
 The application does not include advertising cookies or cross-site tracking code.
-If the operator enables Google Analytics, the site first asks whether you allow
+The site uses Google Analytics, but first asks whether you allow
 analytics cookies. Only if you accept does your browser load Google's script, which
 sets Google Analytics cookies and sends Google the pages you visit, with network and
 device information. Google signals and ad personalization are turned off, and
@@ -133,11 +159,14 @@ sign-in methods, sessions and security records. Kept: changes already merged int
 people's timelines, which are part of their history (it names an account that no longer
 exists), others' forks of your timelines, and moderation records, which no longer name
 you. The last administrator of an installation cannot delete their account. Other
-requests, such as about content of yours elsewhere, go to the privacy contact. Expired login flows and sessions are cleaned by authentication
+requests, such as about content of yours elsewhere, go to privacy@timescale.info. Expired login flows and sessions are cleaned by authentication
 operations, rather than guaranteed immediate physical erasure at expiry.
 
-Backup deletion and log retention depend on the deployment and must be specified
-before public launch. Necessary legal holds may delay deletion with limited access.
+The operator takes copies of the database (backups) before upgrades, kept on the
+service's server with restricted access. Data you delete can remain in a backup taken
+before the deletion until that backup is deleted; backups are used only to restore the
+service. Logs are kept as described above. Necessary legal holds may delay deletion
+with limited access.
 Recipient copies, search engines, and files you export are outside the operator's
 control. Export your timelines before deletion; keep local backups if needed.
 
@@ -147,9 +176,9 @@ privacy regulator. The operator will verify requests without requiring unnecessa
 information and respond within applicable deadlines. Service delivery, security,
 and legal obligations are the purposes; where GDPR applies, the intended bases are
 contract necessity, legitimate interests in secure operation subject to balancing,
-and legal obligations, with consent for optional processing where required. Hosting
-locations, international-transfer mechanisms, and any required representatives must
-be confirmed before offering the service in jurisdictions requiring them.
+and legal obligations, with consent for optional processing where required. Send
+requests to privacy@timescale.info. Information is processed in the United States;
+using the service from elsewhere transfers your information there.
 
 Accounts are for people aged 13 or older; the service does not knowingly offer
 accounts to children under 13. A sign-up giving a year of birth under 13 is refused,
@@ -166,5 +195,10 @@ advertising. The year of birth is used only for these settings and the age requi
 This is not a claim that an age question alone satisfies children's privacy or
 online-safety laws.
 
-Material privacy changes must describe the new practices before they take effect;
-existing data must not be repurposed incompatibly without the necessary legal basis.
+## Changes and contact
+
+Material changes to this policy are announced on the service before they take effect,
+with the new effective date; existing data is not repurposed incompatibly without the
+necessary legal basis. Questions, requests and complaints about privacy:
+**privacy@timescale.info**. Security reports and copyright or abuse reports: see the
+[copyright, abuse and security page](/legal#copyright).

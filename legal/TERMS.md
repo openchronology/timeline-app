@@ -1,14 +1,15 @@
 # timescale.info — terms of service
 
-Draft version: 2026-10-15. Not yet effective. Operator: Athan Clark, an individual.
-Contact and jurisdiction: pending operator confirmation; see LAUNCH.md.
+Effective 25 October 2026. Operator: Athan Clark, an individual (the "operator").
+Contact: **privacy@timescale.info**. The [privacy policy](/privacy) describes how
+information is handled.
 These terms cover the hosted service at timescale.info and desktop connections
 to that service. Independent installations have their own operators and policies.
 
 ## Accounts and use of the service
 
-When these terms become effective, creating an account or using authenticated
-hosting services constitutes agreement to these terms. Public visitors may read
+Creating an account or using authenticated hosting services constitutes agreement to
+these terms. Public visitors may read
 timelines without an account. Keep credentials and connected identity-provider
 accounts secure, provide truthful information, and report unauthorized access.
 An account is personal unless you are authorized to act for an organization.
@@ -136,7 +137,7 @@ to the authorities (in the US, to NCMEC). Immediate action may be necessary; unl
 or harmful material need not remain available. Where practicable, the operator will
 provide an opportunity to export lawful data. This discretion does not transfer
 ownership of user data. Copyright complaints and repeat infringement are handled under
-COPYRIGHT.md.
+the [copyright and abuse policy](/legal#copyright).
 
 The service uses no automated content detection. Two automatic measures shape what
 appears, not whether it is allowed: browsing ranks public timelines with an account
@@ -170,7 +171,7 @@ change or be interrupted and does not promise perpetual hosting, particular
 storage capacity, recovery of every version, or a service-level guarantee.
 You can delete, through the interface, the timelines you own, your comments, and
 your account (Account → Delete your account), which deletes what it owns and wrote,
-as PRIVACY.md describes. Other data requests go to the operator; see PRIVACY.md.
+as the [privacy policy](/privacy) describes. Other data requests go to privacy@timescale.info.
 
 To the extent permitted by applicable law, the service is provided as available,
 without promises of uninterrupted availability or fitness for a particular purpose.
@@ -192,5 +193,4 @@ assignment will be disclosed; it is not assumed by these terms. Material service
 policy changes will receive prospective notice before taking effect, except when
 immediate changes are necessary for law or security. Archived policy versions
 should remain available. No arbitration clause or exclusive forum is imposed by
-this draft; governing-law details await operator confirmation, and mandatory rights
-under applicable law remain available.
+these terms, and mandatory rights under applicable law remain available.
