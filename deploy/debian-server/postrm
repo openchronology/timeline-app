@@ -1,11 +1,11 @@
 #!/bin/sh
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-# Purging removes the configuration (including AUTH_ENCRYPTION_KEY). The database is never
-# dropped automatically.
+# Purging removes the configuration (including AUTH_ENCRYPTION_KEY) and cached downloads. The
+# database is never dropped automatically.
 set -e
 [ -d /run/systemd/system ] && systemctl daemon-reload >/dev/null 2>&1 || true
 if [ "$1" = purge ]; then
-  rm -rf /etc/openchronology /var/lib/openchronology
+  rm -rf /etc/openchronology /var/lib/openchronology /var/cache/openchronology
   cat <<MSG
 
 The OpenChronology configuration was removed. The PostgreSQL database and the openchronology

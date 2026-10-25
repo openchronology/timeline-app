@@ -13,6 +13,8 @@ import {
   queryParam,
   timelineId,
   errors,
+  cachedDownload,
+  CACHED_DOWNLOAD,
   PUBLIC,
   TIMELINE_READ,
   TIMELINE_WRITE,
@@ -874,7 +876,8 @@ const sqliteFile = (description) => ({
   description,
   headers: {
     'Content-Disposition': {
-      description: '`attachment; filename="timeline.och"`',
+      description:
+        '`attachment; filename="timeline.och"`; with the export cache, named after the timeline’s title.',
       schema: { type: 'string' },
     },
   },
@@ -1123,7 +1126,8 @@ export const paths = {
       tags: ['Timeline data'],
       summary: 'Download a timeline whole',
       description:
-        'Its metadata and whole document, streamed as it is read (moments by ID, durations by start). With `download=1`, the document alone, as an `.ochx` file named after its title. Guests get public timelines only, through the browser fork limits (5,000 entries, 4 MiB) and its rate limit; larger timelines are read a window at a time with `POST /api/timelines/{id}/query`.',
+        'Its metadata and whole document, streamed as it is read (moments by ID, durations by start). With `download=1`, the document alone, as an `.ochx` file named after its title. Guests get public timelines only, through the browser fork limits (5,000 entries, 4 MiB) and its rate limit; larger timelines are read a window at a time with `POST /api/timelines/{id}/query`.' +
+        CACHED_DOWNLOAD.replace(' A server', ' With `download=1`, a server'),
       security: TIMELINE_READ,
       parameters: [
         queryParam('download', 'With `1`: the document alone, as an attachment.', {
@@ -1145,6 +1149,7 @@ export const paths = {
             },
           },
         },
+        ...cachedDownload(),
         ...errors(403, 404, 409, 413, 429),
       },
     },
@@ -1162,7 +1167,8 @@ export const paths = {
       tags: ['Timeline data'],
       summary: 'Download a timeline as an .ochx file',
       description:
-        'The document alone, streamed, as an attachment named by the end of the address (so browsers that name downloads after their address name it too). For signed-in callers.',
+        'The document alone, streamed, as an attachment named by the end of the address (so browsers that name downloads after their address name it too). For signed-in callers.' +
+        CACHED_DOWNLOAD,
       security: SIGNED_IN_TIMELINE_READ,
       responses: {
         200: {
@@ -1175,6 +1181,7 @@ export const paths = {
           },
           content: { 'application/json': { schema: ref('TimelineDocument') } },
         },
+        ...cachedDownload({ redirect: true }),
         ...errors(401, 403, 404, 409, 429),
       },
     },
@@ -1186,10 +1193,13 @@ export const paths = {
       tags: ['Timeline data'],
       summary: 'Download a timeline as a SQLite file',
       description:
-        'The timeline as a desktop `.och` file (at most the server’s file limit, 64 MiB by default; 413 beyond it), for signed-in callers; ten a minute per client address. Comparisons cannot be downloaded: download their sources.',
+        'The timeline as a desktop `.och` file (at most the server’s file limit, 64 MiB by default; 413 beyond it), for signed-in callers; ten a minute per client address. Comparisons cannot be downloaded: download their sources.' +
+        CACHED_DOWNLOAD +
+        ' The rate limit then applies to making a file, not to sending a cached one.',
       security: SIGNED_IN_TIMELINE_READ,
       responses: {
         200: sqliteFile('The SQLite file.'),
+        ...cachedDownload(),
         ...errors(401, 403, 404, 409, 413, 429, 503),
         422: error('Converting it took too long.'),
       },
