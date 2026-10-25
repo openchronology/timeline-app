@@ -86,7 +86,7 @@ try {
   console.log(JSON.stringify({ size, label: 'create', seconds: seconds(started) }));
   await store.idle();
   started = performance.now();
-  let fork = await versions.copy(source.id, user, { revision: source.revision });
+  let fork = await versions.copy(source.id, user, { revision: source.revision }, true);
   ids.push(fork.id);
   console.log(
     JSON.stringify({ size, label: 'fork', seconds: seconds(started), preparing: fork.preparing }),

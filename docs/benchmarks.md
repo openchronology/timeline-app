@@ -111,6 +111,21 @@ Measured at 200,000 moments on an 8-core virtual machine with PostgreSQL 17:
 
 Before, the catalogue text refresh after a large save to a new fork could also exceed the 30 s statement limit; it now takes about 5 s at this size.
 
+## Catalogue text on forks
+
+`node bench/fork-text.mjs [moments] [source saves] [moments per save]` (with `BENCH_DATABASE_URL`; default 5,000, 100 and 20) creates a timeline, copies it (the copy reads through to it), saves the source that many times, saves the copy once, and times rebuilding each one's catalogue text (`oc_event_text`, as the refresh after a save runs it), the median of five runs. It also checks the copy's text against that of a timeline created from the copy's document.
+
+Walking the moment tree takes a statement per step, and on a fork several: one per level it looks through, a live and then a retired version at each. A timeline of at most 50,000 moments now sorts all their IDs in one query and reads the moments by ID a page at a time instead, still stopping once the text is full; larger ones still walk, as sorting every moment would then cost more than reading 1 MiB of text (#285). Compiling the rebuild's plans (JIT) is turned off too: it took longer than running them. Measured on a 16-core virtual machine with PostgreSQL 16:
+
+| Moments (source saves) | Source, before | Source, now | Fork, before | Fork, now |
+| ---------------------- | -------------: | ----------: | -----------: | --------: |
+| 5,000 (100)            |    0.29–0.35 s | 0.15–0.18 s |       1.95 s |    0.25 s |
+| 20,000 (200)           |         1.13 s |      0.72 s |       5.71 s |    0.60 s |
+| 50,000 (200)           |         1.10 s |      1.18 s |       7.58 s |    0.78 s |
+| 200,000 (20, walked)   |         0.72 s |      0.72 s |        3.2 s |     3.2 s |
+
+The first rebuild on a connection, which compiled its plans, took about 2.2 s before at 5,000 moments and 0.3 s now (3.0 s and 1.7 s at 200,000, where the rebuild walks as before). The 5,000 and 200,000 rows are interleaved runs on the same data, the others single runs of the benchmark.
+
 ## Interactions
 
 `bench/ui.mjs` drives the editor with real input and times each interaction. In Chromium the input comes from Playwright's mouse, keyboard and touch. In the desktop app it comes from W3C WebDriver actions, through `tauri-driver` and WebKitWebDriver. Timing runs from the input event that triggers the result (a click on release, a key on its press, each wheel step) to the frame in which the result is painted. For zooming and panning, that is the frame showing the moments at the new view, which the editor records on `#markers` as it draws them; the axis and the bounds fields can move a frame earlier. The editor's capacity advice times navigation the same way. This is how Event Timing measures interactions, so the time a button is held down is not counted. For continuous gestures it records the longest frame while the gesture runs. An injected probe (`bench/ui/probe.js`) does the timing in the page, with no browser-specific APIs and no `eval`, so it works the same in both engines and under the editor's content security policy.
