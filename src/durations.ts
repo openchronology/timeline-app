@@ -218,6 +218,38 @@ export function durationTree(
   }
   return build(0, bands.length);
 }
+/**
+ * The row each band is drawn in beneath the axis, so that no two that overlap in time share
+ * one: by start, then the longer first, each takes the first row whose bands have all ended
+ * by its start (a band ending where another starts leaves the row to it). Bands of separate
+ * groups (`group`: a comparison's timelines, each with rows of its own) are packed apart.
+ * Returns each band's row by its position in `bands`.
+ */
+export function durationLanes(bands: { first: string; last: string; group?: string }[]): number[] {
+  const order = bands
+    .map((band, index) => ({
+      index,
+      group: band.group ?? '',
+      first: Q.parse(band.first),
+      last: Q.parse(band.last),
+    }))
+    .sort(
+      (a, b) =>
+        a.group.localeCompare(b.group) || a.first.compare(b.first) || b.last.compare(a.last),
+    );
+  const lanes = new Array<number>(bands.length);
+  // Each group's rows, by the end of the band last placed in each.
+  const ends = new Map<string, Q[]>();
+  for (const band of order) {
+    const rows = ends.get(band.group) ?? [];
+    ends.set(band.group, rows);
+    let row = rows.findIndex((end) => end.compare(band.first) <= 0);
+    if (row < 0) row = rows.push(band.last) - 1;
+    else rows[row] = band.last;
+    lanes[band.index] = row;
+  }
+  return lanes;
+}
 /** A duration is drawn as a band only while its extent reaches the grouping distance. */
 export function collapses(band: { first: string; last: string }, threshold: Q | null) {
   return threshold !== null && Q.parse(band.last).sub(Q.parse(band.first)).compare(threshold) < 0;
