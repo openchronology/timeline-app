@@ -8,7 +8,6 @@ The Node server behind the platform: the HTTP API, the PostgreSQL store with its
 
 | File                                                   | What it is for                                                                                                                                                  |
 | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`openapi/`](openapi/README.md)                        | The HTTP API's OpenAPI 3.1 description, served at /api/openapi.json and shown at /docs/api.                                                                     |
 | [`account-deletion.mjs`](account-deletion.mjs)         | Deleting one's own account and what it owns (#166), keeping what it already merged into others' timelines.                                                      |
 | [`account-security.mjs`](account-security.mjs)         | Registration with an age check, email confirmation, password resets, two-factor authentication and recovery codes, and changes to an account's sign-in details. |
 | [`administration.mjs`](administration.mjs)             | Site administration (/admin): listing and changing accounts and timelines, storage quotas, and creating the first administrator on installation.                |
@@ -29,6 +28,7 @@ The Node server behind the platform: the HTTP API, the PostgreSQL store with its
 | [`incremental.mjs`](incremental.mjs)                   | Applying a sparse patch to a timeline's stored index without loading the whole timeline.                                                                        |
 | [`index-versions.mjs`](index-versions.mjs)             | Versioned index rows (#145), so a fork reads its source's index as it was when forked.                                                                          |
 | [`journald-receiver.mjs`](journald-receiver.mjs)       | Follows the systemd journal and appends its entries to timelines as moments (docs/journald.md).                                                                 |
+| [`ldap.mjs`](ldap.mjs)                                 | Signing in with a directory account (LDAP or Active Directory): settings, the search and bind, and the identity it becomes.                                     |
 | [`limits.mjs`](limits.mjs)                             | Limits operators set in the environment: comparisons, entries per timeline and the default storage quota.                                                       |
 | [`live.mjs`](live.mjs)                                 | One PostgreSQL LISTEN connection per process, telling live viewers when timelines change.                                                                       |
 | [`load-configuration.mjs`](load-configuration.mjs)     | Loads the OCH_CONFIG configuration before a script runs, for services started without systemd.                                                                  |
@@ -45,6 +45,7 @@ The Node server behind the platform: the HTTP API, the PostgreSQL store with its
 | [`moment-ingest.mjs`](moment-ingest.mjs)               | The per-timeline queues that send live log streams' moments in batches, retrying on failure.                                                                    |
 | [`next-handler.mjs`](next-handler.mjs)                 | Hands Next.js API requests to the server's request handler, or explains why the platform cannot start.                                                          |
 | [`oauth.mjs`](oauth.mjs)                               | Signing in with Google, GitHub or Facebook, and linking those identities to accounts.                                                                           |
+| [`openapi/`](openapi/README.md)                        | The HTTP API's OpenAPI 3.1 description, served at /api/openapi.json and shown at /docs/api.                                                                     |
 | [`platform.mjs`](platform.mjs)                         | Starts the platform's services once per process from the environment: database pool, store, accounts, plugins and background jobs.                              |
 | [`plugin-sandbox.mjs`](plugin-sandbox.mjs)             | Compiling plugin scripts in bounded worker threads (#157) to refuse ones that do not compile.                                                                   |
 | [`plugins.mjs`](plugins.mjs)                           | The plugin and plugin-suite libraries: built-in, official and published entries, searched and versioned.                                                        |

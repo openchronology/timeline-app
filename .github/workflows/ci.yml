@@ -277,6 +277,10 @@ jobs:
       - run: node test/limits-postgres.mjs
       - run: node test/admin-reset-postgres.mjs
       - run: node test/account-security-postgres.mjs
+      # Directory sign-in against an OpenLDAP container the test starts (Docker is on the runner).
+      - run: node test/ldap-postgres.mjs
+        env:
+          LDAP_TEST_REQUIRED: '1'
       - run: node test/challenge-postgres.mjs
       - run: node test/moderation-postgres.mjs
       - run: node test/standing-postgres.mjs

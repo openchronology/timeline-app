@@ -23,7 +23,7 @@ When several servers are connected, the desktop shows which server each item com
 
 Desktop timeline links name their server too: `#server/<origin>/timeline/<id>`. Disconnecting from the server in use keeps its open timeline as an unsaved local copy and switches to the next server.
 
-Accounts support username/password and Google, GitHub and Facebook sign-in. Private timelines and explicit viewer/contributor/writer memberships apply equally to browser and desktop requests. Public timelines can be viewed without signing in. Open **Your OpenChronology account** to see active sessions and sign out every other session. Social accounts initially receive a generated username, shown in the account button and usable for sharing.
+Accounts support username/password, Google, GitHub and Facebook sign-in, and directory (LDAP / Active Directory) sign-in on servers that configure it. Private timelines and explicit viewer/contributor/writer memberships apply equally to browser and desktop requests. Public timelines can be viewed without signing in. Open **Your OpenChronology account** to see active sessions and sign out every other session. Social accounts initially receive a generated username, shown in the account button and usable for sharing.
 
 ## Configure timescale.info
 
@@ -42,6 +42,32 @@ Google uses a confidential **Web application** OAuth client and the `openid prof
 References: [Google web authorization](https://developers.google.com/identity/protocols/oauth2/web-server), [Google identity verification](https://developers.google.com/identity/openid-connect/openid-connect), [GitHub authorization](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps), [Facebook manual login flow](https://developers.facebook.com/docs/facebook-login/guides/advanced/manual-flow/), [Facebook secure requests](https://developers.facebook.com/docs/graph-api/guides/secure-requests/).
 
 Do not register desktop callback URLs with these providers. The provider login always completes on the web server. The desktop uses the account established there.
+
+## Directory sign-in (LDAP and Active Directory)
+
+A server for a school or organisation can let people sign in with the accounts they already have in its directory: Active Directory, OpenLDAP, 389 Directory Server, FreeIPA or another LDAP server (#286). **Sign in with** the configured label (for example "School account") then appears on `/login`, beside any social providers. It is off unless `LDAP_URL` is set.
+
+| Setting                   | Meaning                                                                                                                                                                                                        |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LDAP_URL`                | The directory: `ldaps://dc.school.example` (port 636), or `ldap://…` with `LDAP_STARTTLS=1`. Plain `ldap://` without STARTTLS is refused unless `LDAP_ALLOW_INSECURE=1`, since passwords would cross in clear. |
+| `LDAP_STARTTLS`           | `1` to upgrade an `ldap://` connection with STARTTLS.                                                                                                                                                          |
+| `LDAP_TLS_CA`             | A PEM file of the certificate authority that signed the directory's certificate, when it is not publicly trusted (an internal CA). Certificates are always verified; TLS 1.2 is the minimum.                   |
+| `LDAP_BIND_DN`            | The service account the server searches with, such as `CN=openchronology,OU=Service,DC=school,DC=example`. Leave it and the password empty for an anonymous search, where the directory allows one.            |
+| `LDAP_BIND_PASSWORD`      | That service account's password. Give the account read access only.                                                                                                                                            |
+| `LDAP_BASE_DN`            | Where to look for people, such as `DC=school,DC=example` or `OU=Students,DC=school,DC=example`. Required.                                                                                                      |
+| `LDAP_USER_FILTER`        | How a typed username finds its account; `{username}` is replaced by the escaped name. Default, for Active Directory: `(&(objectClass=user)(sAMAccountName={username}))`. OpenLDAP: `(uid={username})`.         |
+| `LDAP_USERNAME_ATTRIBUTE` | The attribute a new account's OpenChronology username is taken from (default `sAMAccountName`; `uid` for OpenLDAP).                                                                                            |
+| `LDAP_REQUIRED_GROUP`     | Optionally, the DN of a group a person must belong to (through `memberOf`; OpenLDAP needs its `memberof` overlay).                                                                                             |
+| `LDAP_NESTED_GROUPS`      | `1` on Active Directory to count membership through nested groups too.                                                                                                                                         |
+| `LDAP_LABEL`              | What the sign-in button calls it (default "Directory account"), at most 40 characters.                                                                                                                         |
+
+Signing in looks the person up with the service account (exactly one entry must match), then binds to the directory as that entry with the password they typed; an empty password is refused before anything is sent, since many directories treat it as an anonymous bind. The password is used only for that bind: it is not stored, logged or sent anywhere else. Unknown names, wrong passwords and people outside the required group all get the same "Username or password is incorrect." Directory sign-ins share the password sign-in's rate limits (ten a minute per address and per name) and its human-verification challenge after repeated failures. The server refuses to start with an incomplete or unsafe configuration.
+
+A directory account is held as the provider identity `ldap`, keyed by Active Directory's `objectGUID` (or the standard `entryUUID`, else the entry's DN), so renaming the account in the directory keeps it. The first sign-in creates an account named after the directory account when that username is free and allowed (lowercased, with dots and spaces as hyphens), else a generated one. Like a new social account, it then gives an email address to confirm and a year of birth before it can sign in, so the server needs email configured (Resend). Two-factor authentication, suspensions and session rules apply as for any account. An existing account can link a directory account on **Account → Sign-in methods** within five minutes of signing in, and unlink it as it unlinks a social provider. Matching email addresses never merge accounts.
+
+The desktop app signs in to such a server through **Sign in using your browser**, which completes on the website.
+
+Schools on Microsoft 365 whose accounts are only in Entra ID (formerly Azure AD) have no LDAP directory to point at; they will need a Microsoft OpenID Connect provider instead (#292).
 
 ## Browser and desktop flow
 
@@ -104,7 +130,7 @@ TOTP is opt-in and is not phishing resistant. Passkeys/WebAuthn would be a stron
 
 ## Verification
 
-Core tests cover browser-bound CSRF, PKCE, Google JWT signatures/claims, malformed upstream responses, one-use OAuth callbacks and web/native session separation. The PostgreSQL GitHub CI job runs the real HTTP account, sharing, identity-linking, device approval, idle/absolute expiry, revocation and SQLite exchange tests with mocked provider HTTP responses. Native tests check credential removal, URL restrictions and connection changes. No live provider credentials are needed in CI. Actual provider registrations and the live `timescale.info` deployment must be configured by the operator before provider login can work publicly.
+Core tests cover browser-bound CSRF, PKCE, Google JWT signatures/claims, malformed upstream responses, one-use OAuth callbacks, web/native session separation, and directory filter escaping, settings and identities. `test/ldap-postgres.mjs` signs in against a real OpenLDAP server (a Docker container it starts itself, or `LDAP_TEST_URL`), and skips when neither is available. The PostgreSQL GitHub CI job runs the real HTTP account, sharing, identity-linking, device approval, idle/absolute expiry, revocation and SQLite exchange tests with mocked provider HTTP responses. Native tests check credential removal, URL restrictions and connection changes. No live provider credentials are needed in CI. Actual provider registrations and the live `timescale.info` deployment must be configured by the operator before provider login can work publicly.
 
 ## Next.js platform integration
 

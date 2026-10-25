@@ -234,8 +234,9 @@ An ID that is not a measurement ID is refused at startup. Mention analytics in y
 ## Account settings
 
 `/account` includes password changes, verified email changes, MFA/recovery codes,
-session revocation, Google/GitHub/Facebook linking and unlinking, and avatar
-settings. OAuth provider registrations and Resend configuration are described in
+session revocation, Google/GitHub/Facebook and directory-account linking and
+unlinking, and avatar settings. OAuth provider registrations, directory (LDAP and
+Active Directory) sign-in and Resend configuration are described in
 [authentication](authentication.md). Linking uses the existing explicit OAuth
 flow; unlinking requires fresh confirmation and retains at least one sign-in
 method. Avatars accept HTTPS image URLs or PNG/JPEG/WebP uploads up to 256 KiB.
