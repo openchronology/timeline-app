@@ -219,6 +219,8 @@ Some limits stay the same whatever this setting is:
 
 `PLATFORM_NAME` (for example `timescale.info`) replaces "openchronology" in the platform's header. It is also used as the site name in page titles, link previews and oEmbed responses, and the footer then adds "Powered by OpenChronology". When it is empty, OpenChronology's name is shown. The name is at most 60 characters, and the server refuses to start if it is longer.
 
+`SUPPORT_URL` is where visitors can support the platform, such as `https://github.com/sponsors/you`, an Open Collective page or a page of your own. When it is set, the header ends with a **♥ Support** link and the footer has **Support this site**. When it is empty, neither appears. It must be an `https://` address; the server refuses to start with anything else.
+
 `GOOGLE_ANALYTICS_ID` enables Google Analytics 4 with a measurement ID such as `G-ABC123DEF4`. When it is empty, nothing changes: pages load no analytics, and the content security policy allows no Google hosts. When it is set:
 
 - The content security policy allows Google's tag script and measurement endpoints.

@@ -1,8 +1,14 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// The platform’s name and Google Analytics (server/site.mjs), off unless configured.
+// The platform’s name, Support link and Google Analytics (server/site.mjs), off unless configured.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { analyticsId, analyticsPolicy, platformName, siteName } from '../server/site.mjs';
+import {
+  analyticsId,
+  analyticsPolicy,
+  platformName,
+  siteName,
+  supportUrl,
+} from '../server/site.mjs';
 
 test('a platform names itself, or shows OpenChronology', () => {
   assert.equal(platformName({}), null);
@@ -13,6 +19,23 @@ test('a platform names itself, or shows OpenChronology', () => {
   for (const name of ['x'.repeat(61), '<b>bold</b>', 'two\nlines'])
     assert.throws(() => platformName({ PLATFORM_NAME: name }), /PLATFORM_NAME/);
   assert.equal(siteName({ PLATFORM_NAME: 'x'.repeat(61) }), 'OpenChronology');
+});
+
+test('a platform links to where it can be supported, over HTTPS only', () => {
+  assert.equal(supportUrl({}), null);
+  assert.equal(supportUrl({ SUPPORT_URL: ' ' }), null);
+  assert.equal(
+    supportUrl({ SUPPORT_URL: ' https://github.com/sponsors/openchronology ' }),
+    'https://github.com/sponsors/openchronology',
+  );
+  for (const url of [
+    'http://example.com/support',
+    'javascript:alert(1)',
+    'github.com/sponsors/you',
+    'https://user:secret@example.com/',
+    'https://example.com/' + 'x'.repeat(500),
+  ])
+    assert.throws(() => supportUrl({ SUPPORT_URL: url }), /SUPPORT_URL/);
 });
 
 test('Google Analytics is off unless a measurement ID is set', () => {

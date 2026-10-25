@@ -1,13 +1,13 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// Every page's frame: the site's header and navigation, its footer with the build, and
-// analytics when enabled; also the site's default metadata for link previews.
+// Every page's frame: the site's header and navigation, its footer with the build, a Support
+// link and analytics when enabled; also the site's default metadata for link previews.
 import './platform.css';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import Analytics, { AnalyticsSettings } from '../components/analytics.jsx';
 import { headers } from 'next/headers';
 import { siteOrigin } from '../lib/sharing.js';
-import { analyticsId, platformName, siteName } from '../../server/site.mjs';
+import { analyticsId, platformName, siteName, supportUrl } from '../../server/site.mjs';
 export function generateMetadata() {
   const description = 'Exact timelines, shared on your terms.';
   return {
@@ -28,6 +28,8 @@ export default async function RootLayout({ children }) {
   );
   // A platform's own name replaces OpenChronology's in its header (PLATFORM_NAME).
   const name = platformName();
+  // Where visitors can support the platform (SUPPORT_URL): a link in the header and footer.
+  const support = supportUrl();
   const analytics = analyticsId();
   const nonce = analytics ? (await headers()).get('x-nonce') : null;
   return (
@@ -43,12 +45,22 @@ export default async function RootLayout({ children }) {
             <a href="/account">Account</a>
             <a href="/download">Download</a>
             <a href="/help">Help</a>
+            {support ? (
+              <a href={support} className="support-link">
+                ♥ Support
+              </a>
+            ) : null}
           </nav>
         </header>
         {children}
         <footer className="platform-footer">
           © 2026 Athan Clark · GPLv3 · No warranty ·{' '}
           <a href="/legal">Terms, privacy &amp; licenses</a> · <a href="/help">Help</a> ·{' '}
+          {support ? (
+            <>
+              <a href={support}>Support this site</a> ·{' '}
+            </>
+          ) : null}
           <a href="/docs/api">HTTP API</a> ·{' '}
           <a href="/openchronology-web-source.tar.gz" download>
             Source
