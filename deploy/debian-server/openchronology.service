@@ -26,6 +26,8 @@ ProtectHome=yes
 ProtectKernelTunables=yes
 ProtectControlGroups=yes
 RestrictSUIDSGID=yes
+# /var/cache/openchronology (CACHE_DIRECTORY), where downloads are cached (EXPORT_CACHE).
+CacheDirectory=openchronology
 
 [Install]
 WantedBy=multi-user.target
