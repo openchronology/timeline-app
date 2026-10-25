@@ -334,7 +334,12 @@ export function ApiKeysCard({ session, account, refresh }) {
   );
 }
 
-const PROVIDERS = { github: 'GitHub', google: 'Google', facebook: 'Facebook' };
+const PROVIDERS = {
+  github: 'GitHub',
+  google: 'Google',
+  facebook: 'Facebook',
+  microsoft: 'Microsoft',
+};
 
 /**
  * The sign-in methods card: each provider the site offers, linked (to unlink, confirmed by the
@@ -342,7 +347,8 @@ const PROVIDERS = { github: 'GitHub', google: 'Google', facebook: 'Facebook' };
  * account (`ldap`, when the site offers directory sign-in) links with its own username and
  * password instead, through POST /api/auth/ldap/link.
  * @param {object} props
- * @param {object} props.session GET /api/session's answer (`providers`, `directory`)
+ * @param {object} props.session GET /api/session's answer (`providers`, `providerLabels`,
+ *   `directory`)
  * @param {object} props.account GET /api/auth/account's answer (`identities`, `security`)
  * @param {() => Promise<object>} props.refresh reads the session and account again
  * @param {(name: string) => void} props.link starts linking a provider
@@ -360,7 +366,9 @@ export function SignInMethodsCard({ session, account, refresh, link, linking }) 
     ]),
   ];
   const label = (name) =>
-    name === 'ldap' ? (session.directory?.label ?? 'Directory account') : (PROVIDERS[name] ?? name);
+    name === 'ldap'
+      ? (session.directory?.label ?? 'Directory account')
+      : (session.providerLabels?.[name] ?? PROVIDERS[name] ?? name);
   return (
     <section className="settings-card" id="sign-in">
       <h2>Sign-in methods</h2>

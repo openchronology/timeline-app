@@ -516,6 +516,8 @@ export function createRequestHandler({
               : null,
             csrf: session?.csrf ?? nonce,
             providers: oauth?.names() ?? [],
+            // Buttons named otherwise than their provider (OAUTH_MICROSOFT_LABEL).
+            providerLabels: oauth?.labels() ?? {},
             // Directory sign-in, when configured: what the sign-in page calls it.
             directory: directory ? { label: directory.label } : null,
             ...(auth
@@ -769,7 +771,7 @@ export function createRequestHandler({
           auth.require(session, req);
           await auth.rateLimit('unlink:' + userId);
           const value = await body(req, 8192);
-          if (!['google', 'github', 'facebook', 'ldap'].includes(value.provider))
+          if (!['google', 'github', 'facebook', 'microsoft', 'ldap'].includes(value.provider))
             throw new HttpError(400, 'Unknown provider.');
           await auth.security.transaction(async (c) => {
             // The account locked, so two unlinks at once cannot each see the other identity
@@ -881,9 +883,8 @@ export function createRequestHandler({
         // Social sign-in (oauth.mjs): starting it (signed out with the login nonce, or signed in
         // recently with the CSRF token to link a provider), and the provider's redirect back,
         // which ends a session already open once a new one is issued.
-        const providerRoute = /^\/api\/auth\/(google|github|facebook)\/(start|callback)$/.exec(
-          pathname,
-        );
+        const providerRoute =
+          /^\/api\/auth\/(google|github|facebook|microsoft)\/(start|callback)$/.exec(pathname);
         if (providerRoute?.[2] === 'start' && method === 'POST') {
           const started = await oauth.start(req, providerRoute[1], await body(req), session);
           return response(res, 200, { url: started.url }, { 'Set-Cookie': started.cookie });

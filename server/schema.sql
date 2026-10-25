@@ -77,16 +77,17 @@ CREATE TABLE IF NOT EXISTS oc_identities (
   user_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE, PRIMARY KEY(provider,subject),
   UNIQUE(user_id,provider)
 );
--- Directory accounts (ldap.mjs, #286) are identities too, as provider 'ldap': the CHECK is
+-- Directory accounts (ldap.mjs, #286) are identities too, as provider 'ldap', and Microsoft
+-- accounts (#292) as 'microsoft', whose subject is '<tenant id>:<object id>': the CHECK is
 -- replaced; a re-run drops and re-adds the same one.
 ALTER TABLE oc_identities DROP CONSTRAINT IF EXISTS oc_identities_provider_check;
 ALTER TABLE oc_identities ADD CONSTRAINT oc_identities_provider_check
-  CHECK(provider IN ('google','github','facebook','ldap'));
+  CHECK(provider IN ('google','github','facebook','microsoft','ldap'));
 -- A provider sign-in in progress (oauth.mjs): inserted by start, and deleted with RETURNING
 -- by the callback, so each flow is used once; 10 minutes.
 --   state_hash: SHA-256 of the OAuth state; browser_hash: hash of the oc_oauth cookie, which
 --   binds the flow to the browser that started it (against login CSRF); verifier: the PKCE
---   code verifier; nonce: the OpenID nonce Google's ID token must carry; return_to: the app
+--   code verifier; nonce: the OpenID nonce Google's or Microsoft's ID token must carry; return_to: the app
 --   page to go back to; link_user, link_session: set when linking a provider to the
 --   signed-in account, whose same session must finish the flow.
 CREATE TABLE IF NOT EXISTS oc_oauth_flows (

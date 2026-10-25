@@ -1,11 +1,12 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Signing in (server/auth.mjs, server/oauth.mjs): provider settings and PKCE, anonymous sign-in,
-// session expiry, Google and Facebook token checks, OAuth state, and older password hashes.
+// session expiry, Google, Microsoft and Facebook token checks, OAuth state, and older password
+// hashes.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign, createHmac, scryptSync } from 'node:crypto';
 import { Auth, tokenHash, passwordMatches } from '../server/auth.mjs';
-import { OAuth, pkce, providersFromEnv } from '../server/oauth.mjs';
+import { MICROSOFT_CONSUMERS, OAuth, pkce, providersFromEnv } from '../server/oauth.mjs';
 
 const rejects = (status) => (error) => error.status === status;
 test('provider configuration fails closed and PKCE follows the RFC vector', () => {
@@ -22,6 +23,29 @@ test('provider configuration fails closed and PKCE follows the RFC vector', () =
     }).facebook.version,
     'v23.0',
   );
+  // Microsoft: work and school accounts by default; a tenant by name, ID or domain; a label.
+  const microsoft = (env) =>
+    providersFromEnv({
+      OAUTH_MICROSOFT_CLIENT_ID: 'id',
+      OAUTH_MICROSOFT_CLIENT_SECRET: 'secret',
+      ...env,
+    }).microsoft;
+  assert.deepEqual(microsoft({}), {
+    clientId: 'id',
+    clientSecret: 'secret',
+    tenant: 'organizations',
+    label: 'Microsoft',
+  });
+  for (const tenant of ['common', 'consumers', 'school.example', 'contoso.onmicrosoft.com'])
+    assert.equal(microsoft({ OAUTH_MICROSOFT_TENANT: tenant }).tenant, tenant);
+  assert.equal(
+    microsoft({ OAUTH_MICROSOFT_TENANT: '7D1C3A5E-0B2F-4C6D-8E9A-1B2C3D4E5F60' }).tenant,
+    '7d1c3a5e-0b2f-4c6d-8e9a-1b2c3d4e5f60',
+  );
+  assert.equal(microsoft({ OAUTH_MICROSOFT_LABEL: ' School account ' }).label, 'School account');
+  for (const tenant of ['../common', 'a b', 'localhost', 'https://login.example/x'])
+    assert.throws(() => microsoft({ OAUTH_MICROSOFT_TENANT: tenant }), /OAUTH_MICROSOFT_TENANT/);
+  assert.throws(() => providersFromEnv({ OAUTH_MICROSOFT_CLIENT_ID: 'id' }));
   assert.equal(
     pkce('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'),
     'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
@@ -136,6 +160,138 @@ test('Google tokens require the provider signature, issuer, audience, nonce and 
   );
   await assert.rejects(
     oauth.googleClaims('bad.bad.bad', { clientId: 'client' }, 'nonce'),
+    rejects(502),
+  );
+});
+test('Microsoft tokens require the tenant key signature, issuer, tenant, audience, nonce and times', async () => {
+  const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const other = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const jwk = { ...publicKey.export({ format: 'jwk' }), kid: 'ms-key', use: 'sig', x5c: ['…'] };
+  const school = '7d1c3a5e-0b2f-4c6d-8e9a-1b2c3d4e5f60',
+    another = '11111111-2222-4333-8444-555555555555',
+    oid = '0a1b2c3d-4e5f-4061-8273-94a5b6c7d8e9';
+  const now = Math.floor(Date.now() / 1000),
+    claims = {
+      iss: `https://login.microsoftonline.com/${school}/v2.0`,
+      tid: school,
+      oid,
+      sub: 'pairwise',
+      aud: 'client',
+      nonce: 'nonce',
+      iat: now,
+      nbf: now,
+      exp: now + 60,
+    };
+  const requests = [];
+  const oauth = new OAuth(new Auth(null, 'https://timescale.info'), {}, async (url) => {
+    requests.push(String(url));
+    if (String(url).endsWith('/v2.0/.well-known/openid-configuration'))
+      return new Response(
+        JSON.stringify({ issuer: `https://login.microsoftonline.com/${school}/v2.0` }),
+      );
+    assert.match(
+      String(url),
+      /^https:\/\/login\.microsoftonline\.com\/[^/]+\/discovery\/v2\.0\/keys$/,
+    );
+    return new Response(JSON.stringify({ keys: [jwk] }));
+  });
+  const jwt = (changes = {}, header = {}, key = privateKey) => {
+    const data = [
+      Buffer.from(JSON.stringify({ alg: 'RS256', kid: 'ms-key', ...header })).toString('base64url'),
+      Buffer.from(JSON.stringify({ ...claims, ...changes })).toString('base64url'),
+    ].join('.');
+    return data + '.' + sign('RSA-SHA256', Buffer.from(data), key).toString('base64url');
+  };
+  const config = (tenant) => ({ clientId: 'client', tenant });
+  // Any work or school tenant: its own issuer, the subject is tenant and object ID.
+  assert.equal(
+    await oauth.microsoftClaims(jwt(), config('organizations'), 'nonce'),
+    `${school}:${oid}`,
+  );
+  assert.equal(requests[0], 'https://login.microsoftonline.com/organizations/discovery/v2.0/keys');
+  // Upper-case IDs are the same IDs, kept in lower case.
+  assert.equal(
+    await oauth.microsoftClaims(
+      jwt({ oid: oid.toUpperCase(), tid: school.toUpperCase() }),
+      config('organizations'),
+      'nonce',
+    ),
+    `${school}:${oid}`,
+  );
+  const another_ = jwt({ tid: another, iss: `https://login.microsoftonline.com/${another}/v2.0` });
+  assert.equal(
+    await oauth.microsoftClaims(another_, config('common'), 'nonce'),
+    `${another}:${oid}`,
+  );
+  // One tenant only, by ID or by domain (looked up once).
+  assert.equal(await oauth.microsoftClaims(jwt(), config(school), 'nonce'), `${school}:${oid}`);
+  await assert.rejects(oauth.microsoftClaims(another_, config(school), 'nonce'), rejects(502));
+  assert.equal(
+    await oauth.microsoftClaims(jwt(), config('school.example'), 'nonce'),
+    `${school}:${oid}`,
+  );
+  await assert.rejects(
+    oauth.microsoftClaims(another_, config('school.example'), 'nonce'),
+    rejects(502),
+  );
+  assert.equal(requests.filter((u) => u.includes('openid-configuration')).length, 1);
+  // Personal accounts: only under common or consumers.
+  const personal = jwt({
+    tid: MICROSOFT_CONSUMERS,
+    iss: `https://login.microsoftonline.com/${MICROSOFT_CONSUMERS}/v2.0`,
+  });
+  await assert.rejects(
+    oauth.microsoftClaims(personal, config('organizations'), 'nonce'),
+    rejects(502),
+  );
+  assert.equal(
+    await oauth.microsoftClaims(personal, config('consumers'), 'nonce'),
+    `${MICROSOFT_CONSUMERS}:${oid}`,
+  );
+  await assert.rejects(oauth.microsoftClaims(jwt(), config('consumers'), 'nonce'), rejects(502));
+  assert.equal(
+    await oauth.microsoftClaims(personal, config('common'), 'nonce'),
+    `${MICROSOFT_CONSUMERS}:${oid}`,
+  );
+  for (const changed of [
+    // An issuer for another tenant than the token's own, or not Microsoft's.
+    { iss: `https://login.microsoftonline.com/${another}/v2.0` },
+    { iss: 'https://login.microsoftonline.com/{tenantid}/v2.0' },
+    { iss: 'https://attacker.example/v2.0' },
+    { aud: 'other' },
+    { nonce: 'other' },
+    { exp: now - 1 },
+    { iat: now + 120 },
+    { nbf: now + 120 },
+    { nbf: 'soon' },
+    { oid: undefined },
+    { oid: 'not-a-guid' },
+    { tid: undefined },
+  ])
+    await assert.rejects(
+      oauth.microsoftClaims(jwt(changed), config('organizations'), 'nonce'),
+      rejects(502),
+      JSON.stringify(changed),
+    );
+  // Algorithm confusion, another key, a broken signature and a broken token.
+  await assert.rejects(
+    oauth.microsoftClaims(jwt({}, { alg: 'none' }), config('organizations'), 'nonce'),
+    rejects(502),
+  );
+  await assert.rejects(
+    oauth.microsoftClaims(jwt({}, { alg: 'HS256' }), config('organizations'), 'nonce'),
+    rejects(502),
+  );
+  await assert.rejects(
+    oauth.microsoftClaims(jwt({}, {}, other.privateKey), config('organizations'), 'nonce'),
+    rejects(502),
+  );
+  await assert.rejects(
+    oauth.microsoftClaims(jwt({}, { kid: 'unknown' }), config('organizations'), 'nonce'),
+    rejects(502),
+  );
+  await assert.rejects(
+    oauth.microsoftClaims('bad.bad.bad', config('organizations'), 'nonce'),
     rejects(502),
   );
 });

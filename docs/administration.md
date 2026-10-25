@@ -318,7 +318,7 @@ Every account agrees to the terms of service and privacy policy in force: at reg
 ## Account settings
 
 `/account` includes password changes, verified email changes, MFA/recovery codes,
-session revocation, Google/GitHub/Facebook and directory-account linking and
+session revocation, Google/GitHub/Facebook/Microsoft and directory-account linking and
 unlinking, and avatar settings. OAuth provider registrations, directory (LDAP and
 Active Directory) sign-in and Resend configuration are described in
 [authentication](authentication.md). Linking uses the existing explicit OAuth

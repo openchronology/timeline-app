@@ -457,7 +457,7 @@ export default function Account({ returnTo = '/', login = false }) {
           )}
           {(session.providers ?? []).map((name) => (
             <button key={name} disabled={busy} onClick={() => provider(name)}>
-              Continue with {PROVIDERS[name] ?? name}
+              Continue with {session.providerLabels?.[name] ?? PROVIDERS[name] ?? name}
             </button>
           ))}
         </div>
@@ -471,7 +471,12 @@ export default function Account({ returnTo = '/', login = false }) {
   );
 }
 
-const PROVIDERS = { github: 'GitHub', google: 'Google', facebook: 'Facebook' };
+const PROVIDERS = {
+  github: 'GitHub',
+  google: 'Google',
+  facebook: 'Facebook',
+  microsoft: 'Microsoft',
+};
 
 /** Bytes as people read them: B, KiB, MiB or GiB, to a tenth below ten. */
 function size(bytes) {

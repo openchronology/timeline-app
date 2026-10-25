@@ -64,6 +64,7 @@ test('server deployments expose a guest dashboard without database storage and r
     user: null,
     csrf: null,
     providers: [],
+    providerLabels: {},
     directory: null,
     fileExchange: false,
     fileLimit: 64 * 1024 * 1024,

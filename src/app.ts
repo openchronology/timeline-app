@@ -260,6 +260,8 @@ interface Session {
   server: boolean;
   dashboard?: boolean;
   providers?: string[];
+  /** Buttons named otherwise than their provider: Microsoft's OAUTH_MICROSOFT_LABEL. */
+  providerLabels?: Record<string, string>;
   fileExchange?: boolean;
   /** The largest .och file the server exchanges, in bytes. */
   fileLimit?: number;
@@ -6611,13 +6613,21 @@ el('account-button').onclick = () => {
     for (const button of document.querySelectorAll<HTMLButtonElement>('[data-provider]')) {
       button.hidden = desktop || !(session.providers ?? []).includes(button.dataset.provider!);
       button.disabled = false;
-      button.textContent = `${session.user ? 'Link' : 'Continue with'} ${button.dataset.provider === 'github' ? 'GitHub' : button.dataset.provider === 'facebook' ? 'Facebook' : 'Google'}`;
+      const name = button.dataset.provider!;
+      button.textContent = `${session.user ? 'Link' : 'Continue with'} ${session.providerLabels?.[name] ?? PROVIDER_NAMES[name] ?? name}`;
     }
     el('account-sessions').hidden = !session.user;
     if (session.user) await accountSessions();
     if (!el<HTMLDialogElement>('account-dialog').open)
       el<HTMLDialogElement>('account-dialog').showModal();
   })().catch(fail);
+};
+/** The sign-in providers' own names, for their buttons. */
+const PROVIDER_NAMES: Record<string, string> = {
+  google: 'Google',
+  github: 'GitHub',
+  facebook: 'Facebook',
+  microsoft: 'Microsoft',
 };
 /** Lists timelines again, if the dashboard is shown: who is signed in where changed. */
 function refreshDashboard() {
