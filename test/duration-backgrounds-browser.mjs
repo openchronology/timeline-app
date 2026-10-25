@@ -8,7 +8,8 @@ import { DURATION_BACKGROUNDS, TIMELINE_BACKGROUND } from '../dist/core.mjs';
  * between its visible start and end, smaller durations above larger ones, edges in view
  * fading out over a fixed width, narrow ones fading away (#222); collapsed durations show none.
  * The images lie behind the timeline, which carries a white halo over them (#220). The
- * timeline's own background, set in the plugin list, lies beneath them all (#223).
+ * timeline's own background, set in the plugin list, lies beneath them all (#223). A
+ * duration's menu fits it in the view (#268).
  */
 export async function checkDurationBackgrounds(page, restore) {
   const png = Buffer.from(
@@ -276,6 +277,22 @@ export async function checkDurationBackgrounds(page, restore) {
   await setting.dispatchEvent('change');
   await page.locator('[data-close="plugins-dialog"]').click();
   await page.waitForFunction(() => !document.querySelector('.timeline-backdrop'));
+  // A duration's menu fits it in the view, with Fit all's margin (#268): 100 to 200 spans
+  // 80 to 220, give or take the view's rounding to whole pixels.
+  await page.locator('.duration-band[data-duration-id="inner"]').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Fit in view' }).click();
+  const fitted = async () =>
+    page.evaluate(() =>
+      document
+        .getElementById('markers')
+        .dataset.view.split(' ')
+        .map((q) => q.split('/').reduce((n, d) => Number(n) / Number(d))),
+    );
+  await page.waitForFunction(
+    () => !document.getElementById('markers').dataset.view.startsWith('50/1'),
+  );
+  const [left, right] = await fitted();
+  assert(Math.abs(left - 80) < 1 && Math.abs(right - 220) < 1, `fitted to ${left} … ${right}`);
   await page.unroute(images);
   await load(restore);
   console.log(
