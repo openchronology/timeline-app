@@ -60,7 +60,11 @@ export async function checkDrafts(browser) {
   });
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  // WebKit fails a request still in flight when the test navigates away "due to access control
+  // checks" (#271): a cancellation of the page being left, not an error of the page.
+  page.on('pageerror', (e) => {
+    if (!/ due to access control checks\.$/.test(e.message)) errors.push(e.message);
+  });
   const stored = () =>
     page.evaluate(
       () =>
