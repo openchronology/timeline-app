@@ -3,6 +3,7 @@
 // routes: exact round trips, bad uploads, CSRF, media types and size limits.
 import assert from 'node:assert/strict';
 import { TimelineFiles } from '../server/files.mjs';
+import { generateTimeline } from '../bench/generate.mjs';
 import {
   validateDocument,
   DEFAULT_PRESENTATION,
@@ -127,6 +128,21 @@ assert.equal(small.active, 0);
 await assert.rejects(
   converter.convert('write', { ...document, events: [{ id: 'bad', time: '1/0', metadata: {} }] }),
   (error) => error.status === 400,
+);
+// A large, realistic timeline (clustered and coincident times, durations, relationships) is
+// written within the converter's per-statement instruction budget and read back whole. Before
+// the overview index was built in bulk (#199), 20,000 such moments ran out of budget and
+// failed with "rational_index: invalid mutation or index error (9)" (#296).
+const generated = generateTimeline(20000);
+const generatedBack = await converter.convert('read', await converter.convert('write', generated));
+assert.deepEqual(
+  [generatedBack.events.length, generatedBack.durations.length, generatedBack.relationships.length],
+  [generated.events.length, generated.durations.length, generated.relationships.length],
+);
+const last = generated.events.at(-1);
+assert.deepEqual(
+  generatedBack.events.find((event) => event.id === last.id),
+  last,
 );
 assert.equal(converter.active, 0);
 const unavailable = new TimelineFiles('/nonexistent/och-convert');
