@@ -382,7 +382,9 @@ let liveTransitionPending = false,
   animateLiveFrame = false;
 const retiringNodes = new Set<HTMLElement>();
 let comparison: ComparisonView | null = null;
-let comparisonBefore: { viewport: Viewport; verticalOffset: number; uiScale: number } | null = null;
+// The view before a comparison: its vertical offset is kept from the centred one, as the stage
+// may change size meanwhile.
+let comparisonBefore: { viewport: Viewport; verticalShift: number; uiScale: number } | null = null;
 let comparisonController: AbortController | undefined;
 let comparisonInFlight = false;
 let workingProposal: Proposal | null = null;
@@ -846,7 +848,7 @@ const baseScale = () => (compactScreen.matches ? 0.75 : 1);
 /** Opens the contents at the stage's base scale, with the axis where it sits at full size. */
 function resetScale() {
   uiScale = scaledFor = baseScale();
-  verticalOffset = 192 * (1 - uiScale);
+  verticalOffset = centeredOffset();
 }
 /** The base scale last applied; turning a phone moves an unscaled timeline to the new base. */
 let scaledFor = 1;
@@ -859,11 +861,28 @@ let stageSize: { width: number; height: number } | null = null;
 new ResizeObserver(() => {
   const next = { width: stage.clientWidth, height: stage.clientHeight };
   if (stageSize && next.width === stageSize.width && next.height === stageSize.height) return;
+  // A stage that grows or shrinks (full screen, a resized window) does so about its centre,
+  // so the timeline keeps its place from the centre rather than from the top.
+  if (stageSize) verticalOffset += (next.height - stageSize.height) / 2;
   stageSize = next;
   requestRender();
 }).observe(stage);
 const stageWidth = () => stageSize?.width ?? stage.clientWidth,
   stageHeight = () => stageSize?.height ?? stage.clientHeight;
+/**
+ * The vertical offset that centres the timeline in the stage: its axis, at 192 in the
+ * contents' own units, or a comparison's rows (the middle of their axes) while they fit, and
+ * else its first row at the top.
+ */
+function centeredOffset() {
+  const plan = comparisonRows();
+  const axes = [...plan.rows.values()].map((row) => 192 + row.offset);
+  if (!axes.length) return stageHeight() / 2 - 192 * uiScale;
+  const height = plan.total * uiScale;
+  if (height > stageHeight()) return 0;
+  const middle = (Math.min(...axes) + Math.max(...axes)) / 2;
+  return Math.max(0, Math.min(stageHeight() - height, stageHeight() / 2 - middle * uiScale));
+}
 const width = () => Math.max(1, stageWidth() - 2 * inset()),
   // Grouping follows marker size, which is smaller at a compact base scale.
   pixels = () => Math.round(Number(input('density').value) * baseScale());
@@ -1603,9 +1622,9 @@ function drawFrame() {
       removeMomentLabel(label, animateLiveFrame);
       stackLabels.delete(key);
     }
-  const centeredOffset = 192 * (1 - uiScale);
-  verticalMinimum = Math.min(centeredOffset, stageHeight() - bottomExtent * uiScale - 24);
-  verticalMaximum = Math.max(centeredOffset, -topExtent * uiScale + 24);
+  const centered = centeredOffset();
+  verticalMinimum = Math.min(centered, stageHeight() - bottomExtent * uiScale - 24);
+  verticalMaximum = Math.max(centered, -topExtent * uiScale + 24);
   const clamped = Math.max(verticalMinimum, Math.min(verticalMaximum, verticalOffset));
   if (clamped !== verticalOffset) {
     verticalOffset = clamped;
@@ -1972,7 +1991,12 @@ function startComparison(sources: ComparisonSource[], presentation: TimePresenta
   cancelZoomAnimation();
   flushEventEdit();
   const view = new ComparisonView(sources, presentation);
-  if (!comparisonBefore) comparisonBefore = { viewport: viewport.clone(), verticalOffset, uiScale };
+  if (!comparisonBefore)
+    comparisonBefore = {
+      viewport: viewport.clone(),
+      verticalShift: verticalOffset - centeredOffset(),
+      uiScale,
+    };
   comparison?.dispose();
   comparisonController?.abort();
   windowController?.abort();
@@ -2079,8 +2103,8 @@ function stopComparison(restore = true) {
   el<HTMLDialogElement>('inspector').close();
   if (restore && comparisonBefore) {
     viewport = comparisonBefore.viewport;
-    verticalOffset = comparisonBefore.verticalOffset;
     uiScale = comparisonBefore.uiScale;
+    verticalOffset = centeredOffset() + comparisonBefore.verticalShift;
   }
   comparisonBefore = null;
   if (restore) {
@@ -4451,7 +4475,7 @@ function fit() {
           baseScale(),
           Math.max(0.25, (stage.clientHeight - 48) / (comparison.tracks.length * 340)),
         );
-    verticalOffset = 0;
+    verticalOffset = centeredOffset();
     requestRender();
     return;
   }
@@ -5048,7 +5072,7 @@ el('zoom-out').onclick = () => zoom(Q.from(5n, 4n));
 el('fit-button').onclick = fit;
 el('center-vertical').onclick = () => {
   follow.navigation();
-  verticalOffset = 192 * (1 - uiScale);
+  verticalOffset = centeredOffset();
   requestRender(false);
 };
 /**
@@ -7627,7 +7651,7 @@ el<HTMLInputElement>('compare-combined').onchange = () => {
         baseScale(),
         Math.max(0.25, (stage.clientHeight - 48) / (comparison.tracks.length * 340)),
       );
-  verticalOffset = 0;
+  verticalOffset = centeredOffset();
   requestRender();
 };
 input('compare-file').onchange = async () => {
