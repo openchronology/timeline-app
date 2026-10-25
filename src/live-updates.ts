@@ -121,8 +121,13 @@ export function liveUpdates(host: Host) {
     try {
       for (const source of sources) {
         if (document.hidden || closed) break;
+        // A source that left the screen during the pass (another timeline opened, perhaps on
+        // another server) is not checked, and an answer for one that left is ignored (#240).
+        const shown = () => host.sources().some((s) => s.id === source.id);
+        if (!shown()) continue;
         try {
           const latest = await host.check(source.id);
+          if (!shown()) continue;
           if (
             typeof latest.revision === 'string' &&
             /^\d+$/.test(latest.revision) &&
@@ -130,6 +135,7 @@ export function liveUpdates(host: Host) {
           )
             pending.set(source.id, latest.revision);
         } catch (error) {
+          if (!shown()) continue;
           if (
             (error as { status?: number }).status === 403 ||
             (error as { status?: number }).status === 404

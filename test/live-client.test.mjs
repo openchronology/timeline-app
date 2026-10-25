@@ -104,3 +104,40 @@ test('native live refresh polls metadata without requiring EventSource or fetchi
     globalThis.EventSource = oldSource;
   }
 });
+test('native polling skips a source that left the screen and ignores its late answer', async () => {
+  const oldDocument = globalThis.document,
+    oldSource = globalThis.EventSource;
+  const document = new EventTarget();
+  document.hidden = false;
+  globalThis.document = document;
+  globalThis.EventSource = undefined;
+  let shown = [
+    { id: 'a', revision: '1' },
+    { id: 'b', revision: '1' },
+  ];
+  const checked = [],
+    denied = [];
+  const controller = liveUpdates({
+    sources: () => shown,
+    available: () => true,
+    native: () => true,
+    async check(id) {
+      checked.push(id);
+      // Another timeline opens while the first check is answered: neither source is shown.
+      shown = [{ id: 'c', revision: '1' }];
+      throw Object.assign(new Error('Not found'), { status: 404 });
+    },
+    refresh: async () => {},
+    denied: (id) => denied.push(id),
+  });
+  try {
+    await controller.update();
+    await settle();
+    assert.deepEqual(checked, ['a']);
+    assert.deepEqual(denied, []);
+  } finally {
+    controller.close();
+    globalThis.document = oldDocument;
+    globalThis.EventSource = oldSource;
+  }
+});
