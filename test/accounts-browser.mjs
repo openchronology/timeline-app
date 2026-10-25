@@ -415,7 +415,23 @@ export async function checkAccounts(browser) {
       await nativePage.locator('#account-button').textContent(),
       '@elsewhere · second.example',
     );
-    assert.deepEqual(await requestsTo('https://timescale.info'), []);
+    // Nothing goes to the first server once the switch is made. A revision check of its
+    // timeline, still open behind the dashboard, may go out just before the click (#240).
+    const sent = await nativePage.evaluate(() =>
+      window.nativeCalls
+        .filter((c) => c.command === 'desktop_request')
+        .map((c) => [c.args.server, c.args.path]),
+    );
+    const switched = sent.findIndex(([server]) => server === 'https://second.example');
+    assert(switched >= 0);
+    assert.deepEqual(
+      sent.filter(
+        ([server, path], i) =>
+          server === 'https://timescale.info' &&
+          (i > switched || path !== 'timelines/00000000-0000-0000-0000-000000000001/revision'),
+      ),
+      [],
+    );
     assert(
       (await requestsTo('https://second.example')).includes(
         'timelines/00000000-0000-0000-0000-000000000002',
