@@ -3,7 +3,6 @@
 // routes: exact round trips, bad uploads, CSRF, media types and size limits.
 import assert from 'node:assert/strict';
 import { TimelineFiles } from '../server/files.mjs';
-import { generateTimeline } from '../bench/generate.mjs';
 import {
   validateDocument,
   DEFAULT_PRESENTATION,
@@ -132,18 +131,22 @@ await assert.rejects(
 // A large, realistic timeline (clustered and coincident times, durations, relationships) is
 // written within the converter's per-statement instruction budget and read back whole. Before
 // the overview index was built in bulk (#199), 20,000 such moments ran out of budget and
-// failed with "rational_index: invalid mutation or index error (9)" (#296).
-const generated = generateTimeline(20000);
-const generatedBack = await converter.convert('read', await converter.convert('write', generated));
-assert.deepEqual(
-  [generatedBack.events.length, generatedBack.durations.length, generatedBack.relationships.length],
-  [generated.events.length, generated.durations.length, generated.relationships.length],
-);
-const last = generated.events.at(-1);
-assert.deepEqual(
-  generatedBack.events.find((event) => event.id === last.id),
-  last,
-);
+// failed with "rational_index: invalid mutation or index error (9)" (#296). The generator is in
+// bench/, which the container image leaves out; the desktop job runs this with it.
+const generator = await import('../bench/generate.mjs').catch(() => null);
+if (generator) {
+  const generated = generator.generateTimeline(20000);
+  const back = await converter.convert('read', await converter.convert('write', generated));
+  assert.deepEqual(
+    [back.events.length, back.durations.length, back.relationships.length],
+    [generated.events.length, generated.durations.length, generated.relationships.length],
+  );
+  const last = generated.events.at(-1);
+  assert.deepEqual(
+    back.events.find((event) => event.id === last.id),
+    last,
+  );
+} else console.log('SKIP large generated timeline: bench/generate.mjs is not in this image.');
 assert.equal(converter.active, 0);
 const unavailable = new TimelineFiles('/nonexistent/och-convert');
 await assert.rejects(unavailable.convert('read', bytes), (error) => error.status === 503);
