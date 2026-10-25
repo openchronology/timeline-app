@@ -192,6 +192,12 @@ try {
     new RegExp(term),
   );
   const ownDashboard = await owner.request('/');
+  // The header's end: a signed-in account's menu, and a guest's Sign in (no Sign up, as
+  // this server takes no registrations without email).
+  assert.match(ownDashboard, new RegExp('class="account-menu-name">' + ownerName + '<'));
+  const guestHome = await guest.request('/');
+  assert.match(guestHome, /<a href="\/login" class="button">Sign in<\/a>/);
+  assert.doesNotMatch(guestHome, /account-menu-button/);
   assert.match(ownDashboard, /id="dashboard-mine"/);
   assert(ownDashboard.includes(`href="${base}"`));
   assert.doesNotMatch(await guest.request('/'), /id="dashboard-mine"/);
