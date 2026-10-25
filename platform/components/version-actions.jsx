@@ -28,15 +28,17 @@ export default function VersionActions({ timeline, signedIn, onGuestFork }) {
       <a target="_top" href={timeline.path + '/history'}>
         History
       </a>
+      {/* Someone else's timeline is forked; one's own is duplicated (#259). A fork already
+          made is opened again. */}
       {timeline.canFork && (
-        <>
-          <button disabled={busy} onClick={() => copy('fork')}>
-            Fork on server
-          </button>
-          <button disabled={busy} onClick={() => copy('duplicate')}>
-            Duplicate
-          </button>
-        </>
+        <button disabled={busy} onClick={() => copy('fork')}>
+          Fork on server
+        </button>
+      )}
+      {timeline.canDuplicate && (
+        <button disabled={busy} onClick={() => copy('duplicate')}>
+          Duplicate
+        </button>
       )}
       {!signedIn && timeline.visibility === 'public' && (
         <button onClick={onGuestFork}>Fork in browser</button>
@@ -60,9 +62,12 @@ export default function VersionActions({ timeline, signedIn, onGuestFork }) {
               <a target="_top" href={timeline.path + '/sync'}>
                 Sync upstream
               </a>
-              <a target="_top" href={timeline.path + '/pulls/new'}>
-                Propose saved changes
-              </a>
+              {/* Only once the fork has saved changes of its own to propose. */}
+              {timeline.forkChanged && (
+                <a target="_top" href={timeline.path + '/pulls/new'}>
+                  Propose saved changes
+                </a>
+              )}
             </>
           )}
         </>

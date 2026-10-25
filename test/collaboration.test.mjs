@@ -146,7 +146,7 @@ test('structured merges combine time and metadata field edits and identify confl
     (e) => e.status === 409 && e.conflicts.includes('moment a.metadata.title'),
   );
 });
-test('access distinguishes local contributor edits from write access, including public forks', async () => {
+test('access distinguishes local contributor edits from write access, and forking from duplicating', async () => {
   const pool = {
     query: async () => ({ rows: [{ id, role: 'contributor', visibility: 'private' }] }),
   };
@@ -161,6 +161,17 @@ test('access distinguishes local contributor edits from write access, including 
   assert(!(await store.access(id, null)).canEdit);
   pool.query = async () => ({ rows: [{ id, role: null, visibility: 'private' }] });
   await assert.rejects(store.access(id, author), (e) => e.status === 404);
+  // Whoever can save it doesn't propose to it; its owner duplicates it and others fork (#259).
+  pool.query = async () => ({
+    rows: [{ id, role: 'owner', owner_id: author, visibility: 'public' }],
+  });
+  const own = await store.access(id, author);
+  assert(own.canWrite && !own.canPropose && !own.canFork && own.canDuplicate);
+  pool.query = async () => ({
+    rows: [{ id, role: 'writer', owner_id: id, visibility: 'public' }],
+  });
+  const writer = await store.access(id, author);
+  assert(writer.canWrite && !writer.canPropose && writer.canFork && !writer.canDuplicate);
 });
 test('merges require write access, an open unchanged proposal, and an unchanged upstream base', async () => {
   let role = 'contributor',

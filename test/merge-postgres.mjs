@@ -18,6 +18,10 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
   versions = new Versioning(store),
   pulls = new Collaboration(store);
 const user = randomUUID(),
+  // Each round's fork and pull requests are another account's (one fork of a timeline to an
+  // account); timelines saved by someone other than `user` map to their owner.
+  users = [user],
+  owners = new Map(),
   created = [];
 const { random, randomDocument, randomPatch } = randomEdits(113);
 const order = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -61,7 +65,13 @@ async function edit(timeline, document, saves) {
     } catch {
       continue;
     }
-    timeline = await store.save(timeline.id, user, timeline.revision, undefined, patch);
+    timeline = await store.save(
+      timeline.id,
+      owners.get(timeline.id) ?? user,
+      timeline.revision,
+      undefined,
+      patch,
+    );
     document = next;
   }
   return { timeline, document };
@@ -77,7 +87,13 @@ async function touch(timeline, document, id, change) {
   };
   const next = validateDocument(applyPatch(document, patch));
   return {
-    timeline: await store.save(timeline.id, user, timeline.revision, undefined, patch),
+    timeline: await store.save(
+      timeline.id,
+      owners.get(timeline.id) ?? user,
+      timeline.revision,
+      undefined,
+      patch,
+    ),
     document: next,
   };
 }
@@ -92,7 +108,13 @@ async function savePatch({ timeline, document }, parts) {
   };
   const next = validateDocument(applyPatch(document, patch));
   return {
-    timeline: await store.save(timeline.id, user, timeline.revision, undefined, patch),
+    timeline: await store.save(
+      timeline.id,
+      owners.get(timeline.id) ?? user,
+      timeline.revision,
+      undefined,
+      patch,
+    ),
     document: next,
   };
 }
@@ -142,7 +164,7 @@ const CRAFTED = [
   // The same field changed differently: a conflict.
   (e) => [titled(e, 'One'), titled(e, 'Other')],
 ];
-const snapshot = async (id) => (await store.snapshot(id, user)).document;
+const snapshot = async (id) => (await store.snapshot(id, owners.get(id) ?? user)).document;
 // Merges made entity by entity rebuild no index and keep a rebase as rows of its changes.
 const calls = { replace: 0, documents: 0 };
 for (const [method, counter] of [
@@ -162,13 +184,23 @@ try {
   ]);
   let upstream = await store.create(user, randomDocument('Merges'));
   created.push(upstream.id);
+  // Public, so anyone may fork it and propose to it.
+  await pool.query("UPDATE oc_timelines SET visibility='public' WHERE id=$1", [upstream.id]);
+  upstream = await store.access(upstream.id, user);
   let upstreamDocument = await snapshot(upstream.id);
   const tally = { sync: 0, merge: 0, rebase: 0, conflicts: 0 };
   const ROUNDS = 45;
   for (let round = 0; round < ROUNDS; round++) {
-    // A fork, then independent edits on both sides.
-    const fork = await versions.copy(upstream.id, user, { revision: upstream.revision });
+    // Another account's fork, then independent edits on both sides.
+    const other = randomUUID();
+    users.push(other);
+    await pool.query('INSERT INTO oc_users(id,username,email_verified_at) VALUES($1,$2,now())', [
+      other,
+      'merge_' + other.slice(0, 8),
+    ]);
+    const fork = await versions.copy(upstream.id, other, { revision: upstream.revision });
     created.push(fork.id);
+    owners.set(fork.id, other);
     const base = upstreamDocument;
     let side = await edit(fork, base, 1 + Math.floor(random() * 4));
     ({ timeline: upstream, document: upstreamDocument } = await edit(
@@ -217,12 +249,12 @@ try {
       // The fork takes upstream's changes.
       want = expected(base, side.document, upstreamDocument);
       got = await outcome(
-        () => versions.sync(side.timeline.id, user, { revision: side.timeline.revision }),
+        () => versions.sync(side.timeline.id, other, { revision: side.timeline.revision }),
         () => snapshot(side.timeline.id),
       );
     } else if (operation === 'merge') {
       // Upstream takes the fork's pull request.
-      const p = await pulls.create(upstream.id, user, {
+      const p = await pulls.create(upstream.id, other, {
         title: 'Round ' + round,
         body: '',
         sourceTimelineId: side.timeline.id,
@@ -264,7 +296,7 @@ try {
           applyPatch(upstreamDocument, randomPatch(upstreamDocument, ++step)),
         );
       const earlier = await store.access(upstream.id, user);
-      const p = await pulls.create(upstream.id, user, {
+      const p = await pulls.create(upstream.id, other, {
         title: 'Round ' + round,
         body: '',
         baseRevision: earlier.revision,
@@ -291,8 +323,8 @@ try {
       ));
       want = expected(before, document, upstreamDocument);
       got = await outcome(
-        () => pulls.resolve(upstream.id, p.id, user, { action: 'rebase', revision: p.revision }),
-        async () => (await pulls.document(upstream.id, p.id, user)).document,
+        () => pulls.resolve(upstream.id, p.id, other, { action: 'rebase', revision: p.revision }),
+        async () => (await pulls.document(upstream.id, p.id, other)).document,
       );
     }
     assert.deepEqual(got, want, `round ${round}: ${operation}`);
@@ -317,7 +349,7 @@ try {
     await pool.query('DELETE FROM oc_timelines WHERE id=$1', [id]);
     await store.transaction((c) => store.removeHistory(c, id)).catch(() => {});
   }
-  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=$1', [user]);
-  await pool.query('DELETE FROM oc_users WHERE id=$1', [user]);
+  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=ANY($1)', [users]);
+  await pool.query('DELETE FROM oc_users WHERE id=ANY($1)', [users]);
   await pool.end();
 }

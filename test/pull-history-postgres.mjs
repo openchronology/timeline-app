@@ -14,7 +14,9 @@ if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
   store = new PostgresStore(pool),
   pulls = new Collaboration(store);
+// The owner, and a contributor proposing changes (an owner saves directly instead).
 const owner = randomUUID(),
+  author = randomUUID(),
   timelines = [];
 const order = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const normal = (d) => ({ ...d, events: [...d.events].sort((a, b) => order(a.id, b.id)) });
@@ -22,10 +24,11 @@ const count = async (sql, params) => Number((await pool.query(sql, params)).rows
 try {
   const schema = await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8');
   await pool.query(schema);
-  await pool.query('INSERT INTO oc_users(id,username,email_verified_at) VALUES($1,$2,now())', [
-    owner,
-    'pulls_' + owner.slice(0, 8),
-  ]);
+  for (const id of [owner, author])
+    await pool.query('INSERT INTO oc_users(id,username,email_verified_at) VALUES($1,$2,now())', [
+      id,
+      'pulls_' + id.slice(0, 8),
+    ]);
   const moment = (i, title = 'Moment ' + i) => ({
     id: 'm' + i,
     time: `${i}/1`,
@@ -43,6 +46,10 @@ try {
   const size = Buffer.byteLength(JSON.stringify(original));
   let t = await store.create(owner, original);
   timelines.push(t.id);
+  await pool.query("INSERT INTO oc_members(timeline_id,user_id,role) VALUES($1,$2,'contributor')", [
+    t.id,
+    author,
+  ]);
   const snapshots = await count('SELECT count(*) AS n FROM oc_snapshots');
 
   // A submitted timeline is kept as rows reading through to the head, charged its changes.
@@ -57,7 +64,7 @@ try {
     ],
     relationships: [...original.relationships, { a: { moment: 'm5' }, b: { moment: 'm400' } }],
   });
-  let p = await pulls.create(t.id, owner, {
+  let p = await pulls.create(t.id, author, {
     title: 'Proposal',
     body: 'Changes',
     baseRevision: t.revision,
@@ -118,7 +125,7 @@ try {
     ...proposed,
     events: proposed.events.map((e) => (e.id === 'm6' ? moment(6, 'Also edited') : e)),
   });
-  p = await pulls.update(t.id, p.id, owner, {
+  p = await pulls.update(t.id, p.id, author, {
     title: p.title,
     body: p.body,
     baseRevision: p.base_revision,
@@ -131,7 +138,7 @@ try {
   // Rebasing onto a changed upstream keeps the result as rows against the new head.
   const upstream = validateDocument({ ...original, description: 'Changed upstream' });
   t = await store.save(t.id, owner, t.revision, upstream);
-  p = await pulls.resolve(t.id, p.id, owner, { action: 'rebase', revision: p.revision });
+  p = await pulls.resolve(t.id, p.id, author, { action: 'rebase', revision: p.revision });
   kept = await source(p.source_revision_id);
   assert.equal(kept.kind, 'rebase');
   assert.equal(kept.history_rows, true);
@@ -156,7 +163,7 @@ try {
   const detached = (
     await pool.query(
       "SELECT id FROM oc_revisions WHERE timeline_id=id AND kind IN ('proposal','rebase') AND author_id=$1",
-      [owner],
+      [author],
     )
   ).rows.map((r) => r.id);
   assert.equal(detached.length, 3);
@@ -211,7 +218,9 @@ try {
     await pool.query('DELETE FROM oc_timelines WHERE id=$1', [id]);
     await store.transaction((c) => store.removeHistory(c, id)).catch(() => {});
   }
-  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=$1', [owner]);
-  await pool.query('DELETE FROM oc_users WHERE id=$1', [owner]);
+  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=ANY($1::uuid[])', [
+    [owner, author],
+  ]);
+  await pool.query('DELETE FROM oc_users WHERE id=ANY($1::uuid[])', [[owner, author]]);
   await pool.end();
 }

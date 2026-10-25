@@ -345,7 +345,7 @@ export class Collaboration {
       ...p,
       changes: await this.changes(p.base_revision_id, p.source_revision_id),
       canMerge: t.canWrite && p.status === 'open',
-      canUpdate: !!t.canPropose && p.author_id === userId && p.status === 'open',
+      canUpdate: !!t.canEdit && p.author_id === userId && p.status === 'open',
       canClose: p.status === 'open' && (t.canWrite || p.author_id === userId),
       upstreamRevision: t.revision,
       source: source
@@ -538,7 +538,8 @@ export class Collaboration {
       );
       const p = rows[0];
       if (!p) throw new HttpError(404, 'Pull request unavailable.');
-      if (!t.canPropose || p.author_id !== userId)
+      // Its author, who may still edit it (a contributor then may since have become a writer).
+      if (!t.canEdit || p.author_id !== userId)
         throw new HttpError(
           403,
           'Only the author with contributor access can update this proposal.',
@@ -614,7 +615,7 @@ export class Collaboration {
       if (p.status !== 'open' || p.revision !== value.revision)
         throw new HttpError(409, 'Pull request changed or is already closed.');
       if (value.action === 'rebase') {
-        if (!t.canPropose || p.author_id !== userId)
+        if (!t.canEdit || p.author_id !== userId)
           throw new HttpError(403, 'Only the author can rebase.');
         const parents = [p.source_revision_id, t.head_revision_id];
         // The proposal's changes merged into upstream's head, entity by entity, and kept as

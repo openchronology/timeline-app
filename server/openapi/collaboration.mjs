@@ -104,12 +104,13 @@ export const paths = {
       tags: [FORKS],
       summary: 'Fork a timeline',
       description:
-        'Copies the timeline’s saved head into a new timeline owned by the caller, linked to it as upstream so it can sync and propose pull requests. The fork starts private, and stays private when upstream is private. Its saved history and index read through to upstream’s instead of being copied, so it opens at once; a large copy may answer with `preparing` true while the rest of its index is copied. Anyone signed in may fork a public timeline; a private one needs its owner, or the owner’s *Allow invited readers to fork* setting.',
+        'Copies the timeline’s saved head into a new timeline owned by the caller, linked to it as upstream so it can sync and propose pull requests. The fork starts private, and stays private when upstream is private. Its saved history and index read through to upstream’s instead of being copied, so it opens at once; a large copy may answer with `preparing` true while the rest of its index is copied. Anyone signed in may fork someone else’s public timeline; a private one needs the owner’s *Allow invited readers to fork* setting (or an administrator). An owner duplicates their own timeline instead (403 here). An account has one fork of a timeline: forking it again answers that fork (200, with `existing` true) and copies nothing.',
       security: TIMELINE_WRITE,
       parameters: [timelineId],
       requestBody: body(ref('CopyRequest')),
       responses: {
         201: json(ref('TimelineMetadata'), 'The new fork’s metadata (without time bounds).'),
+        200: json(ref('TimelineMetadata'), 'The caller’s existing fork, opened again.'),
         ...errors(400, 401, 403, 404, 409, 413, 429),
       },
     },
@@ -120,7 +121,7 @@ export const paths = {
       tags: [FORKS],
       summary: 'Duplicate a timeline',
       description:
-        'Like a fork, but the copy has no upstream link or merge ancestry: an independent timeline owned by the caller. It shares saved history with its source the same way.',
+        'Like a fork, but for the timeline’s owner (403 for anyone else, who forks it): the copy has no upstream link or merge ancestry, an independent timeline. It shares saved history with its source the same way.',
       security: TIMELINE_WRITE,
       parameters: [timelineId],
       requestBody: body(ref('CopyRequest')),
