@@ -127,6 +127,9 @@ try {
   await directoryAdmin.unbind();
 
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
+  // Earlier suites in the same database sign in from this address too: start with its
+  // sign-in throttle clear, so the refusals below meet 401s rather than the rate limit.
+  await pool.query('DELETE FROM oc_auth_attempts');
   const key = Buffer.alloc(32, 41),
     messages = [],
     mailer = {
