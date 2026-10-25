@@ -17,11 +17,12 @@ The build, development and release scripts, run with Node from the repository ro
 | [`dev.mjs`](dev.mjs)                           | `npm run dev`: rebuilds the editor as its sources change and runs the Next.js platform in development mode.                                  |
 | [`homebrew-formula.mjs`](homebrew-formula.mjs) | Renders the Homebrew formula from `deploy/homebrew/openchronology-server.rb.in` for a platform archive.                                      |
 | [`html.mjs`](html.mjs)                         | Writes `dist/index.html`, the editor's page with its legal footer, and `dist/legal.html`.                                                    |
+| [`icons.mjs`](icons.mjs)                       | Draws every icon from `logo/`: the favicons, the phone and web-app icons, and the desktop app's icons.                                       |
 | [`legal.mjs`](legal.mjs)                       | The legal notices in built pages: the bundles' copyright banner, the footer with the build identity, and the legal page.                     |
 | [`licenses.mjs`](licenses.mjs)                 | Collects the license texts of the bundled browser dependencies (rational-ordered-map and fraction.js).                                       |
 | [`npm-ci.mjs`](npm-ci.mjs)                     | Runs `npm ci` with Yarn's lockfile set aside, so npm does not rewrite it; CI installs with this.                                             |
 | [`offline.mjs`](offline.mjs)                   | Builds `dist/openchronology-offline.html`: one self-contained file with no network transport and a hash-pinned content security policy.      |
-| [`platform-assets.mjs`](platform-assets.mjs)   | Copies the editor's built assets and notices into `platform/public/` for the Next.js platform.                                               |
+| [`platform-assets.mjs`](platform-assets.mjs)   | Copies the editor's built assets and notices, and the web-app icons, into `platform/public/` for the Next.js platform.                       |
 | [`release-assets.mjs`](release-assets.mjs)     | Checks that a release's assets are all present and built from the tag's commit, then writes `SHA256SUMS.txt`.                                |
 | [`server-package.mjs`](server-package.mjs)     | Builds the server packages with Docker into `server-artifacts/`: .deb, .rpm, and the platform archive FreeBSD and Homebrew build from.       |
 | [`server-targets.mjs`](server-targets.mjs)     | The server package targets (format, base image, PostgreSQL version) and their file names and version numbering.                              |

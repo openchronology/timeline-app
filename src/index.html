@@ -8,6 +8,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#192d25" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDMyIDMyIj48bWFzayBpZD0ib2NoLWN1dHMiPjxyZWN0IHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik0xNiAxNiAzMCAyTTE2IDE2IDMwIDMwIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMiIvPjwvbWFzaz48cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHJ4PSI2IiBmaWxsPSIjMTkyZDI1Ii8+PGcgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSI0IiBtYXNrPSJ1cmwoI29jaC1jdXRzKSI+PHBhdGggZD0iTTIzLjQgOC42QTEwLjUgMTAuNSAwIDEgMCAyMy40IDIzLjQiIHN0cm9rZT0iI2M0ZGI5OCIvPjxwYXRoIGQ9Ik0yMy40IDguNkExMC41IDEwLjUgMCAwIDEgMjMuNCAyMy40IiBzdHJva2U9IiNmMmM4NzkiLz48L2c+PHBhdGggZD0iTTE2IDkuNVYxNkgyMSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjJjODc5IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg=="
+    />
     <title>OpenChronology — a place for moments</title>
     <link rel="stylesheet" href="./app.css" />
     <script type="module" src="./app.js"></script>
@@ -15,9 +20,35 @@
   <body>
     <header class="app-header">
       <a id="dashboard-home" class="brand" href="#"
-        ><span class="brand-mark" aria-hidden="true">◷</span>openchronology<span
-          class="brand-version"
-          >01</span
+        ><span class="brand-mark" aria-hidden="true"
+          ><svg viewBox="0 0 256 256" focusable="false">
+            <defs>
+              <radialGradient id="och-ring" gradientUnits="userSpaceOnUse" cx="84" cy="74" r="200">
+                <stop offset="0" stop-color="#d8e9b3" />
+                <stop offset="1" stop-color="#a3c175" />
+              </radialGradient>
+              <radialGradient id="och-gold" gradientUnits="userSpaceOnUse" cx="128" cy="84" r="150">
+                <stop offset="0" stop-color="#f8dc9c" />
+                <stop offset="1" stop-color="#dea24a" />
+              </radialGradient>
+              <mask id="och-cuts">
+                <rect width="256" height="256" fill="#fff" />
+                <path d="M128 128 228 28M128 128 228 228" stroke="#000" stroke-width="11" />
+              </mask>
+            </defs>
+            <g fill="none" stroke-width="26" mask="url(#och-cuts)">
+              <path d="M186 70A82 82 0 1 0 186 186" stroke="url(#och-ring)" />
+              <path d="M186 70A82 82 0 0 1 186 186" stroke="url(#och-gold)" />
+            </g>
+            <path
+              d="M128 82V128H170"
+              fill="none"
+              stroke="url(#och-gold)"
+              stroke-width="16"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            /></svg></span
+        >openchronology<span class="brand-version">01</span
         ><span id="edition-chip" class="edition-chip" hidden></span
       ></a>
       <div class="header-right">

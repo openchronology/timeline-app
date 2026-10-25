@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <mask id="och-cuts"><rect width="32" height="32" fill="#fff"/><path d="M16 16 30 2M16 16 30 30" stroke="#000" stroke-width="2"/></mask>
+  <rect width="32" height="32" rx="6" fill="#192d25"/>
+  <g fill="none" stroke-width="4" mask="url(#och-cuts)">
+    <path d="M23.4 8.6A10.5 10.5 0 1 0 23.4 23.4" stroke="#c4db98"/>
+    <path d="M23.4 8.6A10.5 10.5 0 0 1 23.4 23.4" stroke="#f2c879"/>
+  </g>
+  <path d="M16 9.5V16H21" fill="none" stroke="#f2c879" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

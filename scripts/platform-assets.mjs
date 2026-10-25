@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Copies the editor's built assets and notices from dist/ into platform/public/ for the
-// Next.js platform, adding the Next.js and React licenses to its THIRD_PARTY.txt.
-import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
+// Next.js platform, with the web app icons from platform/icons/ (scripts/icons.mjs), adding the
+// Next.js and React licenses to its THIRD_PARTY.txt.
+import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 const require = createRequire(import.meta.url);
@@ -18,6 +19,8 @@ export async function syncPlatformAssets() {
     'openchronology-web-source.tar.gz',
   ])
     await cp('dist/' + file, 'platform/public/' + file);
+  for (const file of await readdir('platform/icons'))
+    if (file !== 'README.md') await cp('platform/icons/' + file, 'platform/public/' + file);
   const notices = [await readFile('dist/THIRD_PARTY.txt', 'utf8')];
   for (const [name, license] of [
     ['next', 'license.md'],

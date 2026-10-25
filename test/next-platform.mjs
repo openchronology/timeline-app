@@ -128,7 +128,22 @@ try {
   assert.doesNotMatch(html, /id="dashboard-mine"/);
   assert.doesNotMatch(html, /id="timeline-stage"/);
   assert.match(html, /href="\/editor\?new=1"/);
-  assert.match(html, /◷ <!-- -->timescale\.test<\/a>|◷ timescale\.test<\/a>/);
+  assert.match(html, /src="\/logo-mark\.svg"[^>]*\/>(<!-- -->)?timescale\.test<\/a>/);
+  // The tab, home-screen and web-app icons (scripts/icons.mjs), each linked and served.
+  assert.match(html, /<link rel="icon" href="\/favicon\.ico/);
+  assert.match(html, /<link rel="icon" href="\/icon\.svg[^"]*" type="image\/svg\+xml"/);
+  assert.match(html, /<link rel="apple-touch-icon" href="\/apple-icon\.png/);
+  assert.match(html, /<link rel="manifest" href="\/manifest\.webmanifest"/);
+  assert.match(html, /<meta name="theme-color" content="#192d25"/);
+  const manifest = await (await fetch(origin + '/manifest.webmanifest')).json();
+  assert.equal(manifest.name, 'timescale.test');
+  for (const icon of manifest.icons) {
+    const r = await fetch(origin + icon.src);
+    assert.equal(r.status, 200, icon.src);
+    assert.equal(r.headers.get('content-type'), icon.type, icon.src);
+  }
+  for (const path of ['/favicon.ico', '/apple-icon.png', '/logo-mark.svg'])
+    assert.equal((await fetch(origin + path)).status, 200, path);
   assert.match(html, /<title>timescale\.test · OpenChronology<\/title>/);
   assert.match(html, /Powered by OpenChronology/);
   assert.match(

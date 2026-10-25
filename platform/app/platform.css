@@ -166,6 +166,9 @@ input[type='radio'] {
   color: #f2c879;
 }
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   font-size: 18px;
   font-weight: 550;
   letter-spacing: -0.045em;

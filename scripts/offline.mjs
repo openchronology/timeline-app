@@ -73,17 +73,12 @@ async function buildEdition(edition) {
     .text.replace(/<\/style/gi, '<\\/style');
   const hash = createHash('sha256').update(script).digest('base64');
   const policy = `default-src 'none'; script-src 'sha256-${hash}'; script-src-attr 'none'; style-src 'unsafe-inline'; connect-src 'none'; img-src data:; font-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'`;
-  const icon =
-    'data:image/svg+xml;base64,' +
-    Buffer.from(
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#192d25"/><circle cx="16" cy="16" r="10" fill="none" stroke="#c4db98" stroke-width="2"/><path d="M16 8v8l6 4" fill="none" stroke="#c4db98" stroke-width="2"/></svg>',
-    ).toString('base64');
   let html = await withLegal(await readFile('src/index.html', 'utf8'), false);
   html = html
     .replace(
       '<meta charset="utf-8" />',
       () =>
-        `<meta charset="utf-8" />\n<meta http-equiv="Content-Security-Policy" content="${policy}">\n<meta name="referrer" content="no-referrer">\n<link rel="icon" href="${icon}">`,
+        `<meta charset="utf-8" />\n<meta http-equiv="Content-Security-Policy" content="${policy}">\n<meta name="referrer" content="no-referrer">`,
     )
     .replace(
       /<link\s+rel="stylesheet"[^>]*\/>/,
