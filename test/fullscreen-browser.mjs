@@ -6,12 +6,22 @@ import assert from 'node:assert/strict';
  * The button and the F key enter full screen, where the card covers the viewport and the
  * stage fills what its toolbar and footer leave; dialogs still open above it. The button,
  * Escape and leaving the browser's own full screen all leave, restoring the stage's height.
+ * The stage grows about its centre, so the timeline keeps its place from the middle, and
+ * Center axis puts the axis in the middle of the taller stage.
  */
 export async function checkFullscreen(page) {
   const stage = page.locator('#timeline-stage');
   const button = page.locator('#fullscreen-button');
   const before = (await stage.boundingBox()).height;
   const viewport = page.viewportSize();
+  /** How far the axis is below the middle of the stage, in pixels. */
+  const fromMiddle = () =>
+    page.evaluate(() => {
+      const stage = document.getElementById('timeline-stage').getBoundingClientRect();
+      const axis = document.querySelector('.axis-baseline').getBoundingClientRect();
+      return axis.top - (stage.top + stage.height / 2);
+    });
+  const placed = await fromMiddle();
   const covers = () =>
     page.evaluate(() => {
       const card = document.querySelector('.timeline-card').getBoundingClientRect();
@@ -76,6 +86,15 @@ export async function checkFullscreen(page) {
     const stage = document.getElementById('timeline-stage');
     const layer = stage.querySelector('#axis');
     return layer && Math.abs(layer.getBoundingClientRect().width - stage.clientWidth) < 2;
+  });
+  // The stage grew about its middle: the timeline is as far from it as before, and Center
+  // axis puts the axis there.
+  assert.ok(Math.abs((await fromMiddle()) - placed) < 2, 'The timeline keeps its place');
+  await page.locator('#center-vertical').click();
+  await page.waitForFunction(() => {
+    const stage = document.getElementById('timeline-stage').getBoundingClientRect();
+    const axis = document.querySelector('.axis-baseline').getBoundingClientRect();
+    return Math.abs(axis.top - (stage.top + stage.height / 2)) < 2;
   });
   // A dialog opens above the card, and Escape closes it before leaving full screen.
   await page.locator('#timeline-help-button').click();

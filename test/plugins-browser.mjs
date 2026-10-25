@@ -899,26 +899,32 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
       'Offscreen branch entries must not retain DOM nodes',
     );
     const initialCount = await input('visible-count').textContent();
+    const initialTransform = await page.evaluate(
+      () => document.getElementById('markers').style.transform,
+    );
     await input('timeline-stage').scrollIntoViewIfNeeded();
     const stageBox = await input('timeline-stage').boundingBox();
     await page.mouse.move(stageBox.x + 20, stageBox.y + stageBox.height / 2);
     await page.keyboard.down('Alt');
     await page.mouse.wheel(0, -7200);
     await page.keyboard.up('Alt');
-    await page.waitForFunction(() => {
-      const transform = document.getElementById('markers').style.transform;
-      return transform && !transform.startsWith('translateY(0px)');
-    });
+    await page.waitForFunction(
+      (initial) => document.getElementById('markers').style.transform !== initial,
+      initialTransform,
+    );
     assert((await page.locator('.stack-marker').count()) < 12);
     assert.equal(await input('visible-count').textContent(), initialCount);
     assert(
       (await page.locator('.stack-marker[data-stack-entry="child-100"]').count()) > 0,
       'Vertical pan reveals deep stack entries',
     );
+    // Centering puts the axis in the middle of the stage, whatever its height.
     await input('center-vertical').click();
-    await page.waitForFunction(() =>
-      document.getElementById('markers').style.transform.startsWith('translateY(0px)'),
-    );
+    await page.waitForFunction(() => {
+      const stage = document.getElementById('timeline-stage').getBoundingClientRect();
+      const axis = document.querySelector('.axis-baseline').getBoundingClientRect();
+      return Math.abs(axis.top - (stage.top + stage.height / 2)) < 2;
+    });
     const uiBounds = await Promise.all(
       ['data-view-left', 'data-view-right'].map((name) =>
         input('timeline-stage').getAttribute(name),
