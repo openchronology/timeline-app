@@ -49,22 +49,27 @@ export interface PluginManifest {
   source?: string;
 }
 export type PluginTarget = 'moments' | 'durations';
-/** A timeline-wide plugin setting: the HTTPS address of an image, a color or a font family. */
+/**
+ * A timeline-wide plugin setting: the HTTPS address of an image, a color, a font family, or a
+ * text size (a percentage of the usual size, #267).
+ */
 export interface PluginSetting {
-  kind: 'image-url' | 'color' | 'font';
+  kind: 'image-url' | 'color' | 'font' | 'text-size';
   key: string;
   label: string;
 }
 /**
  * What a theme can set on the timeline (#230): label text and the measure (axis, tick marks
- * and their times) each a color and a font, the halo's color, the default marker and duration
- * colors, and the background color.
+ * and their times) each a color, a font and a size (#267), the halo's color, the default
+ * marker and duration colors, and the background color.
  */
 export const THEME_ROLES = [
   'text',
   'textFont',
+  'textSize',
   'measure',
   'measureFont',
+  'measureSize',
   'halo',
   'marker',
   'duration',
@@ -72,7 +77,8 @@ export const THEME_ROLES = [
 ] as const;
 export type ThemeRole = (typeof THEME_ROLES)[number];
 export type PluginTheme = Partial<Record<ThemeRole, string>>;
-const themeKind = (role: ThemeRole) => (role.endsWith('Font') ? 'font' : 'color');
+const themeKind = (role: ThemeRole): PluginSetting['kind'] =>
+  role.endsWith('Font') ? 'font' : role.endsWith('Size') ? 'text-size' : 'color';
 /** Where a derived value is read: a tag's value (`severity` reads `severity:err`), or a path. */
 export type DerivationSource = { tag: string } | { path: string };
 /**
@@ -142,6 +148,20 @@ export const DEFAULT_HEADING_FONT = HEADING_FONTS[0].value;
  * A CSS font family list: names of installed fonts, optionally quoted, separated by commas.
  * Nothing else (no URLs, functions or other properties), and no web font is downloaded.
  */
+/** The text sizes a theme can choose (#267), as percentages of the usual size. */
+export const TEXT_SIZE = { min: 50, max: 200 } as const;
+/**
+ * A text size as saved: a whole percentage of the usual size, from TEXT_SIZE.min to .max, as
+ * a string ("125"); a number or a string with a trailing "%" is accepted. Anything else is
+ * null.
+ */
+export function textSizeValue(value: unknown): string | null {
+  const text = typeof value === 'number' ? String(value) : typeof value === 'string' ? value : '';
+  const match = /^\s*(\d{1,3})\s*%?\s*$/.exec(text);
+  if (!match) return null;
+  const percent = Number(match[1]);
+  return percent >= TEXT_SIZE.min && percent <= TEXT_SIZE.max ? String(percent) : null;
+}
 export function fontValue(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const text = value.trim();
@@ -569,8 +589,8 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     result.background = { kind: 'image', metadataKey: key(background.metadataKey) };
   }
   if (p.settings !== undefined) {
-    if (!Array.isArray(p.settings) || !p.settings.length || p.settings.length > 8)
-      throw new Error('A plugin has one to eight timeline settings.');
+    if (!Array.isArray(p.settings) || !p.settings.length || p.settings.length > 12)
+      throw new Error('A plugin has one to twelve timeline settings.');
     const settingKeys = new Set<string>();
     result.settings = p.settings.map((value) => {
       const setting = object(value, ['kind', 'key', 'label']);
@@ -599,7 +619,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     const theme = object(p.theme, [...THEME_ROLES]);
     const roles = THEME_ROLES.filter((role) => theme[role] !== undefined);
     if (!roles.length)
-      throw new Error("A theme sets at least one of the timeline's colors or fonts.");
+      throw new Error("A theme sets at least one of the timeline's colors, fonts or sizes.");
     result.theme = {};
     for (const role of roles) {
       if (!result.settings?.some((s) => s.key === theme[role] && s.kind === themeKind(role)))
@@ -657,6 +677,10 @@ const SETTING_VALUES: Record<
   'image-url': { value: (given) => imageURL(given), expected: 'enter an HTTPS image address.' },
   color: { value: (given) => colorValue(given), expected: 'enter a color such as #1f3a5f.' },
   font: { value: (given) => fontValue(given), expected: 'use font names separated by commas.' },
+  'text-size': {
+    value: (given) => textSizeValue(given),
+    expected: `choose a size from ${TEXT_SIZE.min}% to ${TEXT_SIZE.max}%.`,
+  },
 };
 /** A timeline setting's value as saved, or null when it isn't one of its kind. */
 export function settingValue(setting: PluginSetting, given: unknown): string | null {
@@ -1184,7 +1208,8 @@ export const TIMELINE_BACKGROUND: PluginManifest = validatePluginManifest({
   settings: [{ kind: 'image-url', key: 'imageUrl', label: 'Background image URL' }],
   backdrop: { kind: 'image', setting: 'imageUrl' },
 });
-export const TIMELINE_THEME: PluginManifest = validatePluginManifest({
+/** The first Timeline theme (#230), with colors and fonts but no sizes; kept for its URL. */
+const LEGACY_TIMELINE_THEME: PluginManifest = validatePluginManifest({
   apiVersion: 1,
   id: 'timeline-theme',
   version: 1,
@@ -1211,6 +1236,30 @@ export const TIMELINE_THEME: PluginManifest = validatePluginManifest({
     marker: 'markerColor',
     duration: 'durationColor',
     background: 'backgroundColor',
+  },
+});
+/** Timeline theme 2 (#267) adds the labels' and the measure's text sizes. */
+export const TIMELINE_THEME: PluginManifest = validatePluginManifest({
+  ...LEGACY_TIMELINE_THEME,
+  version: 2,
+  description:
+    "Choose the timeline's colors, fonts and text sizes: its labels, its measure (the axis, tick marks and their times), the halo that keeps them readable over images, the default marker and duration colors, and a background color. Set them here in the plugin list; anything left blank keeps the usual look, and colors chosen for events still win.",
+  settings: [
+    { kind: 'color', key: 'textColor', label: 'Label color' },
+    { kind: 'font', key: 'textFont', label: 'Label font' },
+    { kind: 'text-size', key: 'textSize', label: 'Label size' },
+    { kind: 'color', key: 'measureColor', label: 'Measure color' },
+    { kind: 'font', key: 'measureFont', label: 'Measure font' },
+    { kind: 'text-size', key: 'measureSize', label: 'Measure size' },
+    { kind: 'color', key: 'haloColor', label: 'Halo color' },
+    { kind: 'color', key: 'markerColor', label: 'Marker color' },
+    { kind: 'color', key: 'durationColor', label: 'Duration color' },
+    { kind: 'color', key: 'backgroundColor', label: 'Background color' },
+  ],
+  theme: {
+    ...LEGACY_TIMELINE_THEME.theme,
+    textSize: 'textSize',
+    measureSize: 'measureSize',
   },
 });
 /**
@@ -1276,6 +1325,7 @@ export const BUILTIN_PLUGINS: readonly PluginManifest[] = [
   EXPAND_ON_HOVER,
   DURATION_BACKGROUNDS,
   TIMELINE_BACKGROUND,
+  LEGACY_TIMELINE_THEME,
   TIMELINE_THEME,
   MOMENT_HEADINGS,
   LOG_SEVERITY_COLORS,
