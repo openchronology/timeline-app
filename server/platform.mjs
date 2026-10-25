@@ -26,6 +26,7 @@ import {
 } from './limits.mjs';
 import { analyticsId, platformName, SiteError, supportUrl } from './site.mjs';
 import { applyEnvironmentQuota } from './administration.mjs';
+import { ExportCacheError, exportCacheSettings } from './export-cache.mjs';
 /**
  * Where the services are kept: a global symbol rather than a module variable, so every copy
  * of this module the framework loads (route bundles, hot reloads) shares one pool and one set
@@ -84,8 +85,8 @@ async function pluginLibrary(path) {
 }
 /**
  * Builds the services from the environment (APP_ORIGIN, DATABASE_URL or the PG variables,
- * limits, PLUGIN_LIBRARY, OAuth providers, FEATURED_TIMELINES, TRUST_PROXY, challenge
- * settings) and starts the background work. Without a database the platform serves the
+ * limits, PLUGIN_LIBRARY, OAuth providers, FEATURED_TIMELINES, TRUST_PROXY, challenge and
+ * export cache settings) and starts the background work. Without a database the platform serves the
  * static app and the plugin library only.
  */
 async function initialize() {
@@ -126,8 +127,13 @@ async function initialize() {
     platformName();
     supportUrl();
     analyticsId();
+    exportCacheSettings();
   } catch (error) {
-    if (error instanceof LimitError || error instanceof SiteError)
+    if (
+      error instanceof LimitError ||
+      error instanceof SiteError ||
+      error instanceof ExportCacheError
+    )
       throw new ConfigurationError(error.message);
     throw error;
   }

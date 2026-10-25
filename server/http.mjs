@@ -39,6 +39,7 @@ import { OAuth, providersFromEnv } from './oauth.mjs';
 import { mailFromEnv, encryptionKey } from './mail.mjs';
 import { DeviceAuth } from './device-auth.mjs';
 import { TimelineFiles } from './files.mjs';
+import { exportCacheFromEnv } from './export-cache.mjs';
 import { openApiDocument } from './openapi/index.mjs';
 import { siteName } from './site.mjs';
 import { HttpError, PostgresStore, restrictedTimeline, withoutImageCopies } from './store.mjs';
@@ -168,26 +169,34 @@ function bound(value) {
   }
 }
 /**
- * Answers 200 with `chunks` (an async generator of text, a document-stream.mjs document) as
- * the body, written as it is read: the server never holds the whole of it. Errors before the
- * first part answer as usual (thrown); later ones end the response early. A response that can
- * take a stream itself (the Next.js adapter, next-handler.mjs) is handed it.
+ * Answers `status` (200) with `chunks` (an async generator of text, a document-stream.mjs
+ * document, or of bytes, a cached file) as the body, written as it is read: the server never
+ * holds the whole of it. Errors before the first part answer as usual (thrown); later ones end
+ * the response early. A response that can take a stream itself (the Next.js adapter,
+ * next-handler.mjs) is handed it.
  */
-async function streamResponse(res, chunks, headers = {}) {
+async function streamResponse(res, chunks, headers = {}, status = 200) {
   const first = await chunks.next();
   const values = {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
     ...headers,
   };
-  if (res.streamBody) return res.streamBody(200, values, first, chunks);
-  res.writeHead(200, values);
+  if (res.streamBody) return res.streamBody(status, values, first, chunks);
+  res.writeHead(status, values);
   try {
     for (let part = first; !part.done && !res.destroyed; part = await chunks.next())
       if (!res.write(part.value))
+        // Whichever comes first; the other listener is removed, so a long download that
+        // waits often does not pile them up.
         await new Promise((resolve) => {
-          res.once('drain', resolve);
-          res.once('close', resolve);
+          const go = () => {
+            res.off('drain', go);
+            res.off('close', go);
+            resolve();
+          };
+          res.once('drain', go);
+          res.once('close', go);
         });
     res.end();
   } catch (error) {
@@ -294,6 +303,8 @@ export function createRequestHandler({
   compareLimits: limits = compareLimitsFromEnv(),
   // How many entries of each kind a timeline holds (TIMELINE_ENTRY_LIMIT); Infinity for none.
   entryLimit: entries = entryLimitFromEnv(),
+  // Downloads kept to serve again (#204; export-cache.mjs), or null for none.
+  exportCache = exportCacheFromEnv({ pool }),
 } = {}) {
   setEntryLimit(entries);
   const library = createPluginLibrary(plugins, pool);
@@ -319,6 +330,40 @@ export function createRequestHandler({
   const moderation = store ? new Moderation(store, auth, administration) : null;
   const collaboration = store ? new Collaboration(store) : null;
   const browserForks = store ? new BrowserForks(store, auth) : null;
+  /**
+   * The files downloads are made from, for the export cache (export-cache.mjs respond): the
+   * parts of the file and whether, once complete, it is the content of the key asked for. The
+   * live timeline's (`r<revision>`) is of the revision read, which a save landing between the
+   * check and the read makes newer; a saved revision's never changes.
+   */
+  const liveFile = (id, userId, revision) => {
+    let read;
+    return {
+      chunks: store.snapshotChunks(id, userId, {
+        documentOnly: true,
+        accessed: (t) => (read = t.revision),
+      }),
+      matches: () => String(read) === String(revision),
+    };
+  };
+  const savedFile = (id, savedId, userId) => ({
+    chunks: store.revisionChunks(id, savedId, userId, { documentOnly: true }),
+    matches: () => true,
+  });
+  // A SQLite file is made whole in memory (och-convert); rate-limited per address, as
+  // without the cache.
+  const sqliteFile = (req, id, userId, revision) => {
+    let read;
+    return {
+      chunks: (async function* () {
+        await auth.rateLimit('file-download:' + req.clientAddress);
+        const snapshot = await store.snapshot(id, userId);
+        read = snapshot.timeline.revision;
+        yield await converter.convert('write', snapshot.document);
+      })(),
+      matches: () => String(read) === String(revision),
+    };
+  };
   // The OpenAPI document, built on first request and kept.
   let apiDescription = null;
   return async (req, res) => {
@@ -1096,6 +1141,21 @@ export function createRequestHandler({
           if (history[2]) {
             revisionId(history[2]);
             const file = download(new URL(req.url, origin), 'timeline-' + history[2]);
+            if (file && exportCache) {
+              const t = await store.access(history[1], userId);
+              if (!t.comparison)
+                return await exportCache.respond(req, res, {
+                  timeline: t,
+                  version: 's' + history[2],
+                  format: 'ochx',
+                  filename: 'timeline-' + history[2],
+                  redirect: true,
+                  // A revision since forgotten (saved history stopped) is not served.
+                  check: () => store.revisionReadable(history[1], history[2]),
+                  produce: () => savedFile(history[1], history[2], userId),
+                  stream: streamResponse,
+                });
+            }
             return await streamResponse(
               res,
               store.revisionChunks(history[1], history[2], userId, { documentOnly: !!file }),
@@ -1159,6 +1219,19 @@ export function createRequestHandler({
           /^\/api\/timelines\/([a-f0-9-]{36})\/export\/([a-z0-9-]{1,70})\.ochx$/.exec(pathname);
         if (exported && method === 'GET') {
           if (!userId) throw new HttpError(401, 'Sign in to export a timeline from the server.');
+          if (exportCache) {
+            const t = await store.access(exported[1], userId);
+            if (!t.comparison)
+              return await exportCache.respond(req, res, {
+                timeline: t,
+                version: 'r' + t.revision,
+                format: 'ochx',
+                filename: exported[2],
+                redirect: true,
+                produce: () => liveFile(t.id, userId, t.revision),
+                stream: streamResponse,
+              });
+          }
           return await streamResponse(
             res,
             store.snapshotChunks(exported[1], userId, { documentOnly: true }),
@@ -1201,10 +1274,17 @@ export function createRequestHandler({
             });
           }
           // Named from its title, as the editor names the files it exports.
-          const file = download(
-            new URL(req.url, origin),
-            fileName((await store.access(id, userId)).title, 'timeline-' + id),
-          );
+          const t = await store.access(id, userId);
+          const file = download(new URL(req.url, origin), fileName(t.title, 'timeline-' + id));
+          if (file && exportCache && !t.comparison)
+            return await exportCache.respond(req, res, {
+              timeline: t,
+              version: 'r' + t.revision,
+              format: 'ochx',
+              filename: fileName(t.title, 'timeline-' + id),
+              produce: () => liveFile(id, userId, t.revision),
+              stream: streamResponse,
+            });
           return await streamResponse(
             res,
             store.snapshotChunks(id, userId, { documentOnly: !!file }),
@@ -1214,13 +1294,24 @@ export function createRequestHandler({
         // The timeline as a SQLite file: signed in, rate-limited per address; not for
         // comparisons.
         if (action === 'file' && method === 'GET') {
-          if ((await store.access(id, userId)).comparison)
+          const t = await store.access(id, userId);
+          if (t.comparison)
             throw new HttpError(409, 'Export individual comparison sources instead.');
           if (!session)
             throw new HttpError(
               401,
               'Sign in to download SQLite timelines. Guests can export .ochx browser forks.',
             );
+          // Made once per revision with the cache (the rate limit then applies to making it).
+          if (exportCache && converter.enabled)
+            return await exportCache.respond(req, res, {
+              timeline: t,
+              version: 'r' + t.revision,
+              format: 'och',
+              filename: fileName(t.title, 'timeline'),
+              produce: () => sqliteFile(req, id, userId, t.revision),
+              stream: streamResponse,
+            });
           await auth.rateLimit('file-download:' + req.clientAddress);
           const snapshot = await store.snapshot(id, userId);
           return fileResponse(res, await converter.convert('write', snapshot.document));
@@ -1560,6 +1651,8 @@ export function createRequestHandler({
             await c.query('DELETE FROM oc_timelines WHERE id=$1', [id]);
             await store.removeHistory(c, id);
           });
+          // Its cached downloads go with it (the sweep catches any this misses).
+          await exportCache?.forget(id);
           return response(res, 200, { ok: true });
         }
         // Sharing and settings: visibility, private forks, retention, saved history, content
@@ -1650,7 +1743,10 @@ export function createRequestHandler({
               ],
             );
           });
-          return response(res, 200, await retentionInfo(store, await store.metadata(id, userId)));
+          const updated = await store.metadata(id, userId);
+          // Made private: its downloads handed out at the cache's public address go.
+          if (updated.visibility !== 'public') await exportCache?.forget(id, { published: true });
+          return response(res, 200, await retentionInfo(store, updated));
         }
         // Members: listed, added (or their role changed: ON CONFLICT updates it) and removed by
         // the owner or an administrator (canShare above). 'editor' is accepted as the old name

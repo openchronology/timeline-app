@@ -12,6 +12,8 @@ import {
   queryParam,
   timelineId,
   errors,
+  cachedDownload,
+  CACHED_DOWNLOAD,
   TIMELINE_READ,
   TIMELINE_WRITE,
 } from './common.mjs';
@@ -208,7 +210,8 @@ export const paths = {
       tags: [FORKS],
       summary: 'Read a saved revision',
       description:
-        'The timeline as it was saved at that checkpoint, streamed as `{"document": …}`. With `download=1` it is the bare document, sent as an attachment named `timeline-<saved>.ochx`. Only this timeline’s checkpoints are found; one whose content is not kept answers 409.',
+        'The timeline as it was saved at that checkpoint, streamed as `{"document": …}`. With `download=1` it is the bare document, sent as an attachment named `timeline-<saved>.ochx`. Only this timeline’s checkpoints are found; one whose content is not kept answers 409.' +
+        CACHED_DOWNLOAD.replace(' A server', ' With `download=1`, a server'),
       security: TIMELINE_READ,
       parameters: [
         timelineId,
@@ -237,6 +240,7 @@ export const paths = {
             },
           },
         },
+        ...cachedDownload({ redirect: true }),
         ...errors(400, 403, 404, 409, 429),
       },
     },

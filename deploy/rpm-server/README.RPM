@@ -87,7 +87,7 @@ Remove
 (/etc/openchronology, including AUTH_ENCRYPTION_KEY), the database and the system user
 remain; delete them with:
 
-    sudo rm -rf /etc/openchronology /var/lib/openchronology
+    sudo rm -rf /etc/openchronology /var/lib/openchronology /var/cache/openchronology
     sudo -u postgres dropdb openchronology
     sudo -u postgres dropuser openchronology
     sudo userdel openchronology

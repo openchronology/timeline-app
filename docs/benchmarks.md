@@ -126,6 +126,19 @@ Walking the moment tree takes a statement per step, and on a fork several: one p
 
 The first rebuild on a connection, which compiled its plans, took about 2.2 s before at 5,000 moments and 0.3 s now (3.0 s and 1.7 s at 200,000, where the rebuild walks as before). The 5,000 and 200,000 rows are interleaved runs on the same data, the others single runs of the benchmark.
 
+## Cached downloads
+
+`node bench/export-cache.mjs [moments]` (with `BENCH_DATABASE_URL`; default 100,000; `OCH_CONVERTER` adds the `.och` file) creates a timeline and times downloading its `.ochx` file through the HTTP server to the last byte: without the [export cache](administration.md#cached-downloads) (the median of five), the first download with it (made from the database and written to the cache as it is sent), and the next ones (the median of five, read from the cache). Measured on a 16-core virtual machine with PostgreSQL 16, the cache on local disk:
+
+| Moments | `.ochx` size | Without the cache | First download | From the cache |
+| ------: | -----------: | ----------------: | -------------: | -------------: |
+|   5,000 |       0.9 MB |            0.15 s |         0.22 s |         0.04 s |
+|  20,000 |       3.5 MB |            0.32 s |         0.39 s |         0.08 s |
+| 100,000 |        18 MB |             1.4 s |          1.7 s |         0.26 s |
+| 200,000 |        36 MB |             2.6 s |          2.6 s |         0.46 s |
+
+A cached file is read from disk, so its time follows its size and the connection, not the database. At 5,000 moments the `.och` file (1.7 MB) took 2.3 s to convert and 0.06 s from the cache.
+
 ## Interactions
 
 `bench/ui.mjs` drives the editor with real input and times each interaction. In Chromium the input comes from Playwright's mouse, keyboard and touch. In the desktop app it comes from W3C WebDriver actions, through `tauri-driver` and WebKitWebDriver. Timing runs from the input event that triggers the result (a click on release, a key on its press, each wheel step) to the frame in which the result is painted. For zooming and panning, that is the frame showing the moments at the new view, which the editor records on `#markers` as it draws them; the axis and the bounds fields can move a frame earlier. The editor's capacity advice times navigation the same way. This is how Event Timing measures interactions, so the time a button is held down is not counted. For continuous gestures it records the longest frame while the gesture runs. An injected probe (`bench/ui/probe.js`) does the timing in the page, with no browser-specific APIs and no `eval`, so it works the same in both engines and under the editor's content security policy.

@@ -55,8 +55,8 @@ export async function dispatchNextRequest(request, handler) {
     },
     /**
      * Takes a body read a part at a time (streamResponse in http.mjs): `first`, then the
-     * rest of `chunks`, pulled as the client reads, so neither is held whole; a client that
-     * stops reading closes them.
+     * rest of `chunks` (text or bytes), pulled as the client reads, so neither is held whole;
+     * a client that stops reading closes them.
      */
     streamBody(code, values, first, chunks) {
       res.writeHead(code, values);
@@ -69,7 +69,11 @@ export async function dispatchNextRequest(request, handler) {
             const part = next ?? (await chunks.next());
             next = null;
             if (part.done) controller.close();
-            else controller.enqueue(encoder.encode(part.value));
+            // Text from a document stream; bytes from a cached file (export-cache.mjs).
+            else
+              controller.enqueue(
+                typeof part.value === 'string' ? encoder.encode(part.value) : part.value,
+              );
           } catch (error) {
             controller.error(error);
           }
