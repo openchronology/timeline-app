@@ -109,6 +109,7 @@ import {
   mapTime,
   mappedEntities,
   unchangedMapping,
+  durationLanes,
 } from './core.js';
 import type {
   EntityRef,
@@ -9331,6 +9332,10 @@ function renderDurationBands() {
   const rows = comparisonRows().rows;
   const plugins = durationPlugins(installedPlugins());
   const shown = new Set<string>();
+  // Each band's row beneath the axis, so that none overlapping in time share one (#269).
+  const lanes = durationLanes(
+    (frame.durations ?? []).map((band) => ({ ...band, group: band.sourceKey })),
+  );
   (frame.durations ?? []).forEach((band, i) => {
     const left = Math.max(0, viewport.x(parsedTime(band.first), width())),
       right = Math.min(width(), viewport.x(parsedTime(band.last), width()));
@@ -9354,7 +9359,7 @@ function renderDurationBands() {
     button.style.left = (inset() + left) / uiScale + 'px';
     button.style.width = Math.max(6, (right - left) / uiScale) + 'px';
     // Below the axis's tick labels, which they would otherwise hide (#228).
-    button.style.top = 227 + (rows.get(band.sourceKey ?? '')?.offset ?? 0) + (i % 3) * 13 + 'px';
+    button.style.top = 227 + (rows.get(band.sourceKey ?? '')?.offset ?? 0) + lanes[i] * 13 + 'px';
     // What a band says changes with its content, not as the view moves (#68).
     const content = `${contentGeneration()}\u0000${band.first}\u0000${band.last}`;
     if (bandContent.get(button) === content) return;

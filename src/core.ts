@@ -52,6 +52,7 @@ export {
   durationTree,
   durationWindow,
   durationSummaries,
+  durationLanes,
   collapses,
 } from './durations.js';
 export {
