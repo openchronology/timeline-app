@@ -75,6 +75,32 @@ export const errors = (...codes) =>
   Object.fromEntries(codes.map((code) => [String(code), json(ref('Error'), ERRORS[code])]));
 
 /**
+ * What a whole-timeline download may also answer when the server keeps an export cache
+ * (#204, docs/administration.md "Cached downloads"): part of the cached file for a `Range`
+ * (206), nothing for a matching `If-None-Match` (304), a range past its end (416), and with
+ * `redirect`, the file's public address for a public timeline (302).
+ */
+export const cachedDownload = ({ redirect = false } = {}) => ({
+  ...(redirect
+    ? {
+        302: {
+          description:
+            'With the export cache and its public address configured, a public timeline’s cached file is downloaded from there.',
+          headers: { Location: { description: 'The file’s address.', schema: { type: 'string' } } },
+        },
+      }
+    : {}),
+  206: { description: 'With the export cache: the part of the cached file a `Range` asks for.' },
+  304: {
+    description: 'With the export cache: unchanged since the `ETag` given in `If-None-Match`.',
+  },
+  416: { description: 'With the export cache: the `Range` is past the end of the file.' },
+});
+/** A sentence on the export cache, for whole-timeline downloads' descriptions. */
+export const CACHED_DOWNLOAD =
+  ' A server with the export cache makes each revision’s file once and sends it again from the cache, with an `ETag` and byte ranges.';
+
+/**
  * Who may call an operation (its `security`):
  * - PUBLIC: anyone; signed-in callers may see more.
  * - TIMELINE_READ / TIMELINE_WRITE: timeline endpoints, which API keys may also call with the

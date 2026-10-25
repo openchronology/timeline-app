@@ -1763,12 +1763,15 @@ export class PostgresStore {
   /**
    * The timeline as `userId` may see it, as JSON text a part at a time from one snapshot
    * (document-stream.mjs): `{timeline, document}` as snapshot gives it, or with `documentOnly`
-   * the document alone (an .ochx file). Access is checked before anything is yielded.
+   * the document alone (an .ochx file). Access is checked before anything is yielded;
+   * `accessed`, when given, is called with the timeline as access read it in the snapshot.
    */
-  snapshotChunks(id, userId, { documentOnly = false } = {}) {
+  snapshotChunks(id, userId, { documentOnly = false, accessed } = {}) {
     const store = this;
     return inSnapshot(this.pool, async function* (c) {
       const t = await store.access(id, userId, c);
+      // Told the timeline read (the export cache checks its revision).
+      accessed?.(t);
       yield* store.liveChunks(c, t, documentOnly ? {} : { timeline: t });
     });
   }
@@ -1872,6 +1875,20 @@ export class PostgresStore {
         yield documentOnly ? document : `{"document":${document}}`;
       }
     });
+  }
+  /**
+   * Whether saved revision `savedId` of timeline `id` can still be read as revisionChunks
+   * reads it: one of its numbered revisions, with its content kept, or its head (read from
+   * the live index). Access is the caller's to check.
+   */
+  async revisionReadable(id, savedId) {
+    const { rows } = await this.pool.query(
+      `SELECT 1 FROM oc_revisions r JOIN oc_timelines t ON t.id=r.timeline_id
+      WHERE r.timeline_id=$1 AND r.id=$2 AND r.number IS NOT NULL AND
+      (num_nonnulls(r.snapshot_id,r.patch)+r.history_rows::int>0 OR t.head_revision_id=r.id)`,
+      [id, savedId],
+    );
+    return rows.length > 0;
   }
   /**
    * The timeline's links (read by `rows`, its indexReader), in a document's order

@@ -215,6 +215,86 @@ Some limits stay the same whatever this setting is:
   its indexes: 200,000 moments with a title and a 150-character note make about 61 MB of
   JSON and a file just over 64 MiB. A conversion stopped by a limit says which one.
 
+## Cached downloads
+
+Downloading a whole timeline (`.ochx` or `.och`) makes the file from the database each time,
+which at 100,000 moments takes over a second. With the export cache, the server keeps each
+file it makes for a revision and sends that file to the next person who downloads the same
+revision. A save makes a new revision, so the next download is made fresh and kept in turn.
+The cache covers the editor's **Export** of large timelines (`/api/timelines/{id}/export/…`),
+`.ochx` downloads with `?download=1` (of a timeline or of a saved revision), and `.och`
+files (`/api/timelines/{id}/file`). Comparisons are not cached: they are read from their
+sources.
+
+Measured on the [benchmark timelines](benchmarks.md#cached-downloads) (`bench/export-cache.mjs`),
+to the last byte:
+
+| Moments | `.ochx` size | Without the cache | First download | From the cache |
+| ------: | -----------: | ----------------: | -------------: | -------------: |
+|  20,000 |       3.5 MB |            0.32 s |         0.39 s |         0.08 s |
+| 100,000 |        18 MB |             1.4 s |          1.7 s |         0.26 s |
+| 200,000 |        36 MB |             2.6 s |          2.6 s |         0.46 s |
+
+The first download of a revision is sent as it is made, as without the cache, while it is
+written to the cache beside it. A file is only kept once it is complete, and only for the
+revision it was asked for: a save landing while it is made makes it a newer revision's, sent
+but not kept.
+
+**Who may download is checked on every download**, cached or not, exactly as without the
+cache: a cached file of a private timeline goes only to those who may see it. A saved
+revision whose content was later forgotten (saved history turned off) is no longer served.
+
+Settings in the environment file:
+
+- `EXPORT_CACHE`: `disk`, `s3` or `off`. Unset, the cache is on (`disk`) when it has a
+  directory, and off otherwise. The Debian and RPM packages' service gives it one
+  (systemd's `CacheDirectory`, `/var/cache/openchronology/exports`), so it is on there by
+  default. Set `off` to turn it off.
+- `EXPORT_CACHE_DIR`: the directory for `disk`. With `s3`, where files are written before
+  they are uploaded (the system's temporary directory when unset).
+- `EXPORT_CACHE_MAX_BYTES`: the most the cache holds, a size such as `10GB` or `500MiB`
+  (at least `1MiB`). Unset, 2 GiB. When a new file takes it past the limit, the files
+  downloaded least recently are removed until it fits. A file larger than the whole limit is
+  sent but not kept.
+- `EXPORT_CACHE_PUBLIC_URL`: an address where the cache's files can be downloaded directly:
+  a web server or CDN in front of `EXPORT_CACHE_DIR`, or the bucket's public address (or a CDN
+  in front of it). When set, downloads of **public** timelines' files, once cached, redirect
+  there (`302`) from the editor's export address and saved revisions' downloads, so the
+  file is served by that server rather than by OpenChronology. A file's address is
+  `<EXPORT_CACHE_PUBLIC_URL>/<key>`: its folder (32 random hexadecimal digits) and file name
+  under the directory, or the bucket key (with `EXPORT_CACHE_S3_PREFIX`). Private
+  timelines' files are never redirected: OpenChronology checks access and sends them itself.
+- For `s3` (AWS S3, Cloudflare R2, DigitalOcean Spaces, MinIO, SeaweedFS or another
+  S3-compatible store):
+  - `EXPORT_CACHE_S3_ENDPOINT`: the service's address, such as `https://s3.us-east-1.amazonaws.com`,
+    `https://<account>.r2.cloudflarestorage.com` or `https://nyc3.digitaloceanspaces.com`;
+  - `EXPORT_CACHE_S3_REGION`: `us-east-1` unless set (R2 uses `auto`);
+  - `EXPORT_CACHE_S3_BUCKET` and `EXPORT_CACHE_S3_PREFIX` (such as `exports/`);
+  - `EXPORT_CACHE_S3_ACCESS_KEY_ID` and `EXPORT_CACHE_S3_SECRET_ACCESS_KEY`: a key allowed
+    to put, get and delete objects under the prefix, and nothing else;
+  - `EXPORT_CACHE_S3_PATH_STYLE`: `1` (the default) addresses the bucket in the path
+    (`https://endpoint/bucket/key`), `0` as a host name (`https://bucket.endpoint/key`).
+
+A setting the server cannot use stops it at startup, saying which. If the cache's directory
+cannot be written, it logs why and serves downloads without the cache.
+
+**The files are named so they can't be guessed**, with 32 random hexadecimal digits each, but
+a server or CDN in front of the cache's directory or bucket serves every file in it, private
+timelines' included, to anyone who has its address. OpenChronology never hands out a private
+timeline's file address, so keep directory listings off (and the bucket's listing private).
+When a timeline is deleted, its cached files go at once. When one that was handed out at the
+public address stops being public (made private by its owner, or restricted by moderators),
+its files go within ten minutes (the cache sweeps every ten minutes as downloads arrive). A
+CDN may keep its own copy until that copy expires: the files are sent with
+`Cache-Control: public, max-age=31536000, immutable` from S3, so set a shorter lifetime at
+the CDN if that matters, or purge it. A storage provider or CDN that holds cached files is
+a processor of timelines' contents: name it in your privacy notice.
+
+Several servers can share one cache (one database, one bucket or shared directory): a
+revision is made and stored by one of them, and the others send their own copy while it is
+being made. A download that starts on the same server while the file is being made waits
+for it and is then sent from the cache.
+
 ## Name and analytics
 
 `PLATFORM_NAME` (for example `timescale.info`) replaces "openchronology" in the platform's header. It is also used as the site name in page titles, link previews and oEmbed responses, and the footer then adds "Powered by OpenChronology". When it is empty, OpenChronology's name is shown. The name is at most 60 characters, and the server refuses to start if it is longer.

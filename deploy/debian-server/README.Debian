@@ -36,6 +36,10 @@ Edit /etc/openchronology/openchronology.env, then `sudo systemctl restart opench
     again (or with a new one written there), run `sudo openchronology-reset-admin-password`.
   - Sign-in providers, human verification, quotas: see the comments in the file and
     authentication.md, administration.md in this directory.
+  - Cached downloads: whole-timeline .ochx and .och downloads are kept per revision in
+    /var/cache/openchronology/exports, at most 2 GiB (EXPORT_CACHE_MAX_BYTES), or in an
+    S3-compatible bucket (EXPORT_CACHE=s3); EXPORT_CACHE=off turns it off. See "Cached
+    downloads" in administration.md.
 
 Back up AUTH_ENCRYPTION_KEY apart from the database: without it, enrolled authenticator
 secrets cannot be decrypted. Do not change it once accounts exist.

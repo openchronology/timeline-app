@@ -86,8 +86,22 @@ oEmbed answer has no thumbnail: it opens behind its warning.
 
 - `/robots.txt` lets crawlers read pages but not the API, accounts, the bare editor or embeds,
   and names the sitemap.
-- `/sitemap.xml` lists public timelines, most recently changed first, and their owners'
-  profiles: up to 45,000 timelines and 4,000 profiles.
+- `/sitemap.xml` is a sitemap index: it names the pages of the sitemap under `/sitemap/`, so
+  it covers the site however many timelines it has.
+  - `/sitemap/pages.xml` lists the site's own pages (the dashboard, plugins, download, the API
+    reference, the help and each of its pages, the terms, privacy policy and legal notices).
+  - `/sitemap/timelines-<id>.xml` pages list every public timeline, 45,000 to a page, and
+    `/sitemap/profiles-<id>.xml` pages every profile that owns one (an account that isn't
+    suspended), each with when it last changed. The index gives each page the latest change
+    on it, so a crawler can tell which pages to read again.
+  - Each page is read from its first ID on, by an index range, and the index reads each
+    public timeline's ID once; neither skips through rows, so they stay quick with millions
+    of timelines.
+- To tell Google about it, open [Search Console](https://search.google.com/search-console)
+  for the site's domain (verified by a DNS record or an HTML file), choose **Sitemaps**, and
+  submit `sitemap.xml`. Google reads the index and then each page it names; the report shows
+  how many addresses it found. `robots.txt` names the sitemap too, which other search engines
+  (and Google) also follow.
 - Each timeline page includes its title, description, owner and first 50 moments as text, for
   screen readers and crawlers; each moment links to its own page.
 

@@ -2133,3 +2133,23 @@ CREATE INDEX IF NOT EXISTS oc_proposals_base_revision ON oc_proposals(base_revis
 CREATE INDEX IF NOT EXISTS oc_proposals_source_revision ON oc_proposals(source_revision_id) WHERE source_revision_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS oc_proposals_merged_revision ON oc_proposals(merged_revision_id) WHERE merged_revision_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS oc_revisions_snapshot ON oc_revisions(snapshot_id) WHERE snapshot_id IS NOT NULL;
+-- Cached downloads (#204; export-cache.mjs): one row per .ochx or .och file kept for a
+-- timeline at one version, `key` being `<timeline>:<version>:<format>` (version `r<revision>`
+-- for the live timeline, `s<saved revision id>` for a saved one). `object` names its file in
+-- the cache's directory or bucket (`<random hex>/<file name>`); `bytes` is NULL while it is
+-- being built (the row is the build's claim). `published`: handed out at the cache's public
+-- address, so swept away if the timeline stops being public. No foreign key: a deleted
+-- timeline's rows stay until the sweep removes their files with them.
+CREATE TABLE IF NOT EXISTS oc_export_cache (
+  key text PRIMARY KEY,
+  timeline_id uuid NOT NULL,
+  object text NOT NULL,
+  format text NOT NULL CHECK(format IN ('ochx','och')),
+  bytes bigint,
+  published boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  accessed_at timestamptz NOT NULL DEFAULT now()
+);
+-- A timeline's entries (forgetting them), and the eviction order.
+CREATE INDEX IF NOT EXISTS oc_export_cache_timeline ON oc_export_cache(timeline_id);
+CREATE INDEX IF NOT EXISTS oc_export_cache_accessed ON oc_export_cache(accessed_at);

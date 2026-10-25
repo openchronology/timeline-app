@@ -26,6 +26,8 @@ const env = {
   NEXT_TELEMETRY_DISABLED: '1',
   PORT: String(port),
   HOSTNAME: '127.0.0.1',
+  // One timeline or profile to a sitemap page, so the sitemap's paging is exercised.
+  SITEMAP_PAGE_SIZE: '1',
 };
 for (const key of Object.keys(env))
   if (key.startsWith('OAUTH_') || ['PLUGIN_LIBRARY', 'FEATURED_TIMELINES'].includes(key))
@@ -83,6 +85,25 @@ function client(ip) {
 const meta = (html, key) =>
   new RegExp(`<meta (?:property|name)="${key}" content="([^"]*)"`).exec(html)?.[1] ?? null;
 const unescape = (text) => text.replaceAll('&amp;', '&').replaceAll('&quot;', '"');
+/**
+ * Every address the sitemap lists, read from its index and then each page it names (#287),
+ * checking that no page holds more than SITEMAP_PAGE_SIZE timelines or profiles.
+ */
+async function sitemapAddresses(visitor) {
+  const index = await visitor.request('/sitemap.xml');
+  assert.match(index, /^<\?xml [^>]*>\n<sitemapindex /);
+  const pages = [...index.matchAll(/<sitemap><loc>([^<]*)<\/loc>/g)].map((m) => m[1]);
+  assert.equal(pages[0], origin + '/sitemap/pages.xml');
+  const addresses = [];
+  for (const page of pages) {
+    assert(page.startsWith(origin + '/sitemap/'), page);
+    const xml = await visitor.request(page.slice(origin.length));
+    const locs = [...xml.matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]);
+    if (page !== pages[0]) assert(locs.length <= 1, `${page} holds ${locs.length}`);
+    addresses.push(...locs);
+  }
+  return addresses;
+}
 
 const owner = client('192.0.2.111'),
   guest = client('192.0.2.112');
@@ -154,7 +175,7 @@ try {
   assert.match(privateEmbed.headers.get('content-security-policy'), /frame-ancestors \*/);
   await owner.request('/embed/' + timelineId, { status: 404 });
   await guest.request('/api/oembed?url=' + encodeURIComponent(origin + base), { status: 404 });
-  assert(!(await guest.request('/sitemap.xml')).includes(timelineId));
+  assert(!(await sitemapAddresses(guest)).some((a) => a.includes(timelineId)));
   const privateImage = await guest.request(base + '/opengraph-image', { raw: true });
   assert.equal(privateImage.headers.get('content-type'), 'image/png');
   // An ID-only moment lookup, as links use.
@@ -268,9 +289,14 @@ try {
   assert.match(robots, /Disallow: \/api\//);
   assert.match(robots, /Allow: \/api\/oembed/);
   assert(robots.includes(`Sitemap: ${origin}/sitemap.xml`));
-  const sitemap = await guest.request('/sitemap.xml');
-  assert(sitemap.includes(`<loc>${origin + base}</loc>`));
-  assert(sitemap.includes(`<loc>${origin}/${username}</loc>`));
+  const sitemap = await sitemapAddresses(guest);
+  assert(sitemap.includes(origin + base));
+  assert(sitemap.includes(`${origin}/${username}`));
+  assert(sitemap.includes(origin + '/privacy'));
+  assert.equal(new Set(sitemap).size, sitemap.length, 'No address is listed twice.');
+  // A page that isn't one of the sitemap's is not found.
+  await guest.request('/sitemap/timelines-not-an-id.xml', { status: 404 });
+  await guest.request('/sitemap/other.xml', { status: 404 });
   const profile = await guest.request('/' + username);
   assert.equal(meta(profile, 'og:title'), '@' + username);
 

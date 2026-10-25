@@ -71,7 +71,7 @@ OpenChronology was removed. Its configuration (/etc/openchronology, including
 AUTH_ENCRYPTION_KEY), the PostgreSQL database and the openchronology system user remain.
 To delete them as well:
 
-  sudo rm -rf /etc/openchronology /var/lib/openchronology
+  sudo rm -rf /etc/openchronology /var/lib/openchronology /var/cache/openchronology
   sudo -u postgres dropdb openchronology
   sudo -u postgres dropuser openchronology
   sudo userdel openchronology

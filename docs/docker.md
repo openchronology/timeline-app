@@ -38,6 +38,8 @@ Public timelines can be [embedded](sharing.md#embedding) in any site. Set `EMBED
 
 To supply an additional plugin catalogue, bind-mount its JSON file into `app` read-only and set `PLUGIN_LIBRARY` to its container path. See [plugins.md](plugins.md). Setting a host path without mounting it is insufficient.
 
+The [export cache](administration.md#cached-downloads) is off in Compose unless configured. To keep downloads on disk, mount a volume the app container can write into `app` and set `EXPORT_CACHE_DIR` to its path, or set `EXPORT_CACHE=s3` and the `EXPORT_CACHE_S3_*` settings for a bucket.
+
 ## Upgrades and backups
 
 Back up before upgrading. A plain SQL backup includes the extension declaration, account data, and timelines; restore it into a database with pgmp installed and the application stopped.

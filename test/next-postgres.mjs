@@ -524,10 +524,14 @@ try {
   );
   assert.equal(embedded.author_url, origin + profileUrl);
   assert(embedded.html.includes('/embed/' + timeline.id));
-  assert(
-    (await guest.request('/sitemap.xml')).includes(`<loc>${origin}${address}</loc>`),
-    'The sitemap lists its address.',
-  );
+  // The sitemap index names its pages (#287); one of them lists the address.
+  const sitemapPages = [
+    ...(await guest.request('/sitemap.xml')).matchAll(/<sitemap><loc>([^<]*)<\/loc>/g),
+  ].map((m) => m[1].slice(origin.length));
+  let listed = false;
+  for (const page of sitemapPages)
+    if ((await guest.request(page)).includes(`<loc>${origin}${address}</loc>`)) listed = true;
+  assert(listed, 'The sitemap lists its address.');
   // Another slug: the old one still leads to it, until another of its owner's timelines
   // takes it; a slug its owner already uses is refused.
   timeline = await owner.request(api + '/settings', {
