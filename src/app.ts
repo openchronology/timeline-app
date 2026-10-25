@@ -3809,6 +3809,7 @@ function showReader(
   });
   sensitiveNote('reader-sensitive', contentLabels(metadata[CONTENT_LABELS_KEY]));
   renderRelated(el('reader-related'), kind === 'moment' ? { moment: id } : { duration: id }, true);
+  el('reader-fit').hidden = kind !== 'duration';
   el('reader-share').hidden = !shareable();
   el('reader-report').hidden = el('reader-share').hidden || !!remote?.canShare;
   el('moment-panel').hidden = true;
@@ -3829,6 +3830,9 @@ function hideReader() {
   reader = null;
 }
 el('reader-close').onclick = () => el<HTMLDialogElement>('inspector').close();
+el('reader-fit').onclick = () => {
+  if (reader?.kind === 'duration') fitDuration(reader.id);
+};
 el('reader-share').onclick = () => {
   if (reader) requestShare({ kind: reader.kind, id: reader.id }, reader.title);
 };
@@ -4458,6 +4462,19 @@ function animateView(destination: Viewport, automatic = false) {
   };
   zoomAnimation = requestAnimationFrame(tick);
 }
+/**
+ * Fits duration `id` in the view, with the same margin as Fit all (#268): from its band in the
+ * window (a comparison's included), else from the document. Does nothing for one unknown here.
+ */
+function fitDuration(id: string) {
+  const band =
+    frame.durations?.find((b) => b.id === id && !b.sourceKey) ??
+    frame.durations?.find((b) => b.id === id) ??
+    (model?.durations.has(id)
+      ? resolveDuration(model.durations.get(id)!, (moment) => model!.momentTime(moment))
+      : null);
+  if (band) navigate(Viewport.fit(Q.parse(band.first), Q.parse(band.last)));
+}
 function navigate(view: Viewport, manual = true) {
   if (manual) follow.navigation();
   cancelZoomAnimation();
@@ -4635,6 +4652,11 @@ function showTimelineMenu(
       }
     });
   }
+  if (duration)
+    add('Fit in view', () => {
+      fitDuration(duration);
+      details.close();
+    });
   if (duration && editable()) {
     add('Edit', () => void openDurationById(duration).catch(fail));
     add(
@@ -7912,6 +7934,8 @@ function showDuration(duration: Duration, readOnly: boolean, isNew = false) {
     readOnly && comparison ? null : { duration: duration.id },
     readOnly,
   );
+  // A new duration has no place on the timeline yet to fit.
+  el('duration-fit').hidden = isNew;
   el('duration-share').hidden =
     isNew || !shareable() || !!sparseWorkspace()?.durationChanges.has(duration.id);
   el('duration-report').hidden = el('duration-share').hidden || !!remote?.canShare;
@@ -8801,6 +8825,9 @@ if (platformEditor && window.parent !== window)
 el('moment-share').onclick = () => {
   if (selected)
     requestShare({ kind: 'moment', id: selected.id }, selected.metadata.title || 'Moment');
+};
+el('duration-fit').onclick = () => {
+  if (openDuration) fitDuration(openDuration.duration.id);
 };
 el('duration-share').onclick = () => {
   if (openDuration)

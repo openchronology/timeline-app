@@ -82,7 +82,7 @@ export async function checkSummaries(page, restore) {
     await bounds('0', '1000');
     // At this zoom the one-unit durations collapse; the long one stays a band.
     await page.locator('.duration-band[data-duration-id="long"]').waitFor();
-    // A duration's menu offers Edit, which opens it, and Delete.
+    // A duration's menu offers Fit in view (#268), Edit, which opens it, and Delete.
     const menu = page.locator('#timeline-menu');
     // Near its start: markers may cover the middle of the band.
     await page
@@ -91,6 +91,7 @@ export async function checkSummaries(page, restore) {
     assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), [
       '＋ Event',
       'Fit all',
+      'Fit in view',
       'Edit',
       'Delete',
       'Delete everything in this view…',
