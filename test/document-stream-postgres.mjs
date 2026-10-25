@@ -22,6 +22,11 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
 const owner = randomUUID(),
   forker = randomUUID(),
   timelines = [];
+/**
+ * Streams a failed check may leave open, closed before cleanup: pool.end() would otherwise
+ * wait on their connections forever, and the failure would never be reported (#238).
+ */
+let refused, early;
 /** The text of a stream, and how many parts it came in. */
 async function collect(chunks) {
   let text = '',
@@ -136,7 +141,7 @@ try {
     'SELECT id FROM oc_revisions WHERE timeline_id=$1 AND number IS NOT NULL AND id<>$2 LIMIT 1',
     [fork.id, fork.head_revision_id],
   );
-  const refused = store.revisionChunks(fork.id, past[0].id, forker);
+  refused = store.revisionChunks(fork.id, past[0].id, forker);
   await assert.rejects(refused.next(), (e) => e.status === 409);
   await assert.rejects(store.snapshotChunks(randomUUID(), owner).next(), (e) => e.status === 404);
 
@@ -155,10 +160,13 @@ try {
   timelines.push(comparison.id);
   await checkLive('comparison', comparison.id);
 
-  // Closed after its first part, a stream gives its connection back.
+  // Closed after its first part, a stream gives its connection back. Background work (the
+  // catalogue text refreshes the saves above scheduled) borrows connections from the same
+  // pool, so it is finished first or it would change the count meanwhile.
+  await store.idle();
   const idle = () => pool.totalCount - pool.idleCount;
   const before = idle();
-  const early = store.snapshotChunks(t.id, owner);
+  early = store.snapshotChunks(t.id, owner);
   await early.next();
   assert.equal(idle(), before + 1, 'holds a connection while open');
   await early.return();
@@ -167,6 +175,8 @@ try {
     'PASS document streams: timelines (forks, empty, comparisons) and saved revisions (kept as rows, stored as documents, heads without history) stream to what reading them whole gives, unavailable ones fail first, and closed streams release their connection.',
   );
 } finally {
+  await refused?.return();
+  await early?.return();
   await store.idle();
   for (const id of timelines.reverse())
     await store.transaction(async (c) => {
