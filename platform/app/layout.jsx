@@ -1,12 +1,15 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Every page's frame: the site's header with its navigation and the visitor's account (sign in
-// and sign up, or the account's menu), its footer with the build, a Support link and analytics
+// and sign up, or the account's menu) and, for an account that has not agreed to the terms in
+// force, a request to (#277), its footer with the build, a Support link and analytics
 // when enabled; also the site's default metadata for link previews.
 import './platform.css';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import Analytics, { AnalyticsSettings } from '../components/analytics.jsx';
 import AccountMenu from '../components/account-menu.jsx';
+import TermsPrompt from '../components/terms-prompt.jsx';
+import { POLICY_VERSION } from '../../server/policies.mjs';
 import { currentSession } from '../lib/session.js';
 import { headers } from 'next/headers';
 import { siteOrigin } from '../lib/sharing.js';
@@ -92,6 +95,7 @@ export default async function RootLayout({ children }) {
             </div>
           ) : null}
         </header>
+        {user?.termsRequired ? <TermsPrompt version={POLICY_VERSION} /> : null}
         {children}
         <footer className="platform-footer">
           © 2026 Athan Clark · GPLv3 · No warranty · <a href="/terms">Terms</a> ·{' '}

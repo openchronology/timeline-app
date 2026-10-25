@@ -18,10 +18,10 @@ const random = () => {
 const arcs = (frame) => frame.edges.map((e) => `${e.id} ${e.first} ${e.last}`).sort();
 try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
-  await pool.query('INSERT INTO oc_users(id,username,email_verified_at) VALUES($1,$2,now())', [
-    user,
-    'links_' + user.slice(0, 8),
-  ]);
+  await pool.query(
+    'INSERT INTO oc_users(id,username,email_verified_at,terms_version) VALUES($1,$2,now(),oc_policy_version())',
+    [user, 'links_' + user.slice(0, 8)],
+  );
   const store = new PostgresStore(pool);
   const events = Array.from({ length: 150 }, (_, i) => ({
     id: 'm' + i,

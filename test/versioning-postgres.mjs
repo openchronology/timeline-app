@@ -32,10 +32,10 @@ try {
   await pool.query(schema);
   await pool.query(schema);
   for (const [i, id] of users.entries())
-    await pool.query('INSERT INTO oc_users(id,username) VALUES($1,$2)', [
-      id,
-      'version_' + id.slice(0, 8) + '_' + i,
-    ]);
+    await pool.query(
+      'INSERT INTO oc_users(id,username,terms_version) VALUES($1,$2,oc_policy_version())',
+      [id, 'version_' + id.slice(0, 8) + '_' + i],
+    );
   const doc = validateDocument({
     ...demo(),
     title: 'Fork fixture',

@@ -52,7 +52,7 @@ try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
   for (const id of [user, ...forkers])
     await pool.query(
-      'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass) VALUES($1,$2,now(),true)',
+      'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass,terms_version) VALUES($1,$2,now(),true,oc_policy_version())',
       [id, 'statistics_' + id.slice(0, 8)],
     );
   setEntryLimit(Infinity);

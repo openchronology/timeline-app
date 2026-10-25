@@ -29,10 +29,10 @@ const shape = (frame) => ({
 });
 try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
-  await pool.query('INSERT INTO oc_users(id,username,email_verified_at) VALUES($1,$2,now())', [
-    user,
-    'summaries_' + user.slice(0, 8),
-  ]);
+  await pool.query(
+    'INSERT INTO oc_users(id,username,email_verified_at,terms_version) VALUES($1,$2,now(),oc_policy_version())',
+    [user, 'summaries_' + user.slice(0, 8)],
+  );
   const store = new PostgresStore(pool);
   let compared = 0;
   const seen = { mixed: 0, clusters: 0, singles: 0, bands: 0 };

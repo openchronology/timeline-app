@@ -45,8 +45,8 @@ async function user(name, admin = false) {
   const id = randomUUID();
   ids.push(id);
   await pool.query(
-    `INSERT INTO oc_users(id,username,email,email_verified_at,password_hash,is_admin,quota_bypass,created_at)
-    VALUES($1,$2,$3,now(),$4,$5,true,now()-interval '40 days')`,
+    `INSERT INTO oc_users(id,username,email,email_verified_at,password_hash,is_admin,quota_bypass,created_at,terms_version)
+    VALUES($1,$2,$3,now(),$4,$5,true,now()-interval '40 days',oc_policy_version())`,
     [
       id,
       `${name}_${suffix}`,

@@ -33,10 +33,10 @@ const calendar = {
 try {
   const account = async (name) => {
     const id = randomUUID();
-    await pool.query('INSERT INTO oc_users(id,username,email_verified_at) VALUES($1,$2,now())', [
-      id,
-      `${name}_${id.slice(0, 8)}`,
-    ]);
+    await pool.query(
+      'INSERT INTO oc_users(id,username,email_verified_at,terms_version) VALUES($1,$2,now(),oc_policy_version())',
+      [id, `${name}_${id.slice(0, 8)}`],
+    );
     users.push(id);
     return id;
   };

@@ -82,13 +82,13 @@ async function checkRevision(name, id, savedId, user = owner) {
 }
 try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
-  await pool.query('INSERT INTO oc_users(id,username,quota_bypass) VALUES($1,$2,true)', [
-    owner,
-    'stream_' + owner.slice(0, 8),
-  ]);
+  await pool.query(
+    'INSERT INTO oc_users(id,username,quota_bypass,terms_version) VALUES($1,$2,true,oc_policy_version())',
+    [owner, 'stream_' + owner.slice(0, 8)],
+  );
   // An administrator, who may fork the private timeline.
   await pool.query(
-    'INSERT INTO oc_users(id,username,quota_bypass,is_admin) VALUES($1,$2,true,true)',
+    'INSERT INTO oc_users(id,username,quota_bypass,is_admin,terms_version) VALUES($1,$2,true,true,oc_policy_version())',
     [forker, 'stream_' + forker.slice(0, 8)],
   );
   // Large enough for several pages of each cursor and several parts of text.

@@ -94,7 +94,7 @@ async function seedPostgres() {
   try {
     await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
     const { rows } = await pool.query(
-      `INSERT INTO oc_users(id,username,email_verified_at) VALUES(gen_random_uuid(),'bench',now())
+      `INSERT INTO oc_users(id,username,email_verified_at,terms_version) VALUES(gen_random_uuid(),'bench',now(),oc_policy_version())
        ON CONFLICT(username) DO UPDATE SET username=EXCLUDED.username RETURNING id`,
     );
     const user = rows[0].id;

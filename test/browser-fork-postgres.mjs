@@ -18,10 +18,10 @@ const store = new PostgresStore(pool),
 const copies = new BrowserForks(store, auth);
 try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
-  await pool.query('INSERT INTO oc_users(id,username) VALUES($1,$2)', [
-    owner,
-    'browser_copy_' + owner.slice(0, 8),
-  ]);
+  await pool.query(
+    'INSERT INTO oc_users(id,username,terms_version) VALUES($1,$2,oc_policy_version())',
+    [owner, 'browser_copy_' + owner.slice(0, 8)],
+  );
   const document = structuredClone(SEED_TIMELINES[0].document);
   const timeline = await store.create(owner, document);
   ids.push(timeline.id);

@@ -21,6 +21,7 @@ import { setTimelineStar } from './stars.mjs';
 import { Administration, usage, requireDataProvider, avatarValue } from './administration.mjs';
 import { Moderation } from './moderation.mjs';
 import { deleteAccount } from './account-deletion.mjs';
+import { POLICY_VERSION, agreed, requireAgreed, requireAgreement } from './policies.mjs';
 import { mapTimes } from './time-map.mjs';
 import { saveBase } from './save-merge.mjs';
 import { authorizeKey, keyRequestRead } from './api-keys.mjs';
@@ -454,6 +455,9 @@ export function createRequestHandler({
                   // Sensitive content (#115): minors are always warned; adults may choose.
                   minor: minor(session.birth_year),
                   showSensitive: !!session.show_sensitive && !minor(session.birth_year),
+                  // It has not agreed to the terms and privacy policy in force (#277): it is
+                  // asked to before it can change anything (policies.mjs requireAgreed).
+                  termsRequired: session.kind !== 'api' && !agreed(session),
                 }
               : null,
             csrf: session?.csrf ?? nonce,
@@ -466,6 +470,8 @@ export function createRequestHandler({
                     registration: auth.security.available,
                   },
                   challenge: (await auth.security.pending(req))?.purpose ?? null,
+                  // The version of the terms and privacy policy that agreeing agrees to (#277).
+                  terms: POLICY_VERSION,
                 }
               : {}),
             fileExchange: !!pool && converter.enabled,
@@ -534,6 +540,9 @@ export function createRequestHandler({
         if ((req.headers.authorization ?? '').startsWith('Bearer och_key_') && !session)
           throw new HttpError(401, 'API key is expired, revoked, or invalid.');
         authorizeKey(session, pathname, method);
+        // An account that has not agreed to the terms and privacy policy in force may still
+        // read, sign out, manage and delete itself, but not change anything else (#277).
+        requireAgreed(session, pathname, method);
         if (session?.kind === 'api')
           await auth.rateLimit(
             'api-key:' + session.api_key_id,
@@ -844,6 +853,19 @@ export function createRequestHandler({
             200,
             await devices.approve(session, req, (await body(req)).userCode),
           );
+        // Agreeing to the terms and privacy policy in force (#277): a signed-in browser or desktop
+        // session, with the CSRF token; `acceptTerms` is the version agreed to.
+        if (pathname === '/api/auth/terms' && method === 'POST') {
+          if (!session || session.kind === 'api')
+            throw new HttpError(401, 'Sign in to agree to the terms.');
+          auth.require(session, req);
+          requireAgreement((await body(req, 4096)).acceptTerms);
+          await pool.query(
+            'UPDATE oc_users SET terms_version=$2,terms_accepted_at=now() WHERE id=$1',
+            [userId, POLICY_VERSION],
+          );
+          return response(res, 200, { terms: POLICY_VERSION });
+        }
         // Deleting one's own account (#166; account-deletion.mjs).
         if (pathname === '/api/auth/account' && method === 'DELETE') {
           auth.require(session, req);
@@ -1751,6 +1773,8 @@ export function createRequestHandler({
               ? TOO_SLOW
               : error.message,
         ...(status === 428 && error.challenge ? { challenge: error.challenge } : {}),
+        // A write refused until the account agrees to this version of the terms (#277).
+        ...(status === 403 && error.terms ? { terms: error.terms } : {}),
         ...(status === 409 && Array.isArray(error.conflicts)
           ? { conflicts: error.conflicts.slice(0, 100), conflictCount: error.conflicts.length }
           : {}),

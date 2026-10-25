@@ -59,7 +59,7 @@ export async function checkSyslogService({
   const user = randomUUID();
   const token = `och_key_${randomBytes(16).toString('hex')}_${randomBytes(32).toString('hex')}`;
   await psql(
-    `INSERT INTO oc_users(id,username,email_verified_at) VALUES('${user}','syslog_${user.slice(0, 8)}',now())`,
+    `INSERT INTO oc_users(id,username,email_verified_at,terms_version) VALUES('${user}','syslog_${user.slice(0, 8)}',now(),oc_policy_version())`,
   );
   await psql(
     `INSERT INTO oc_api_keys(id,user_id,name,prefix,token_hash,scopes,expires_at) VALUES('${randomUUID()}','${user}','syslog','${token.slice(0, 20)}','${createHash('sha256').update(token).digest('hex')}',ARRAY['timelines:read','timelines:write'],now()+interval '1 day')`,

@@ -73,7 +73,7 @@ async function account(name, admin = false) {
     username = `${name}_${suffix}`;
   ids.push(id);
   await pool.query(
-    'INSERT INTO oc_users(id,username,email_verified_at,password_hash,is_admin,quota_bypass) VALUES($1,$2,now(),$3,$4,true)',
+    'INSERT INTO oc_users(id,username,email_verified_at,password_hash,is_admin,quota_bypass,terms_version) VALUES($1,$2,now(),$3,$4,true,oc_policy_version())',
     [id, username, await passwordHash(password), admin],
   );
   return { id, username };

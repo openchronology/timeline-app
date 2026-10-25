@@ -9,6 +9,7 @@ import { Auth, passwordHash, passwordMatches } from '../server/auth.mjs';
 import { bootstrapInstallation } from '../server/administration.mjs';
 import { createApplication } from '../server/http.mjs';
 import { validateDocument } from '../dist/core.mjs';
+import { POLICY_VERSION } from '../server/policies.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const schema = await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8');
@@ -41,7 +42,7 @@ async function user(name) {
   const id = randomUUID();
   ids.push(id);
   await pool.query(
-    'INSERT INTO oc_users(id,username,password_hash,email_verified_at) VALUES($1,$2,$3,now())',
+    'INSERT INTO oc_users(id,username,password_hash,email_verified_at,terms_version) VALUES($1,$2,$3,now(),oc_policy_version())',
     [id, name + '_' + suffix, await passwordHash(password)],
   );
   const u = (await pool.query('SELECT * FROM oc_users WHERE id=$1', [id])).rows[0];
@@ -115,6 +116,11 @@ try {
     concurrent = await user('concurrent');
   await request('admin/users', 'GET', undefined, owner.headers, 403);
   await request('admin/users', 'GET', undefined, admin);
+  // The installation's first administrator has agreed to nothing yet: asked on first sign-in
+  // like anyone (#277), it may read but not change settings until it agrees.
+  assert.equal((await request('session', 'GET', undefined, admin)).user.termsRequired, true);
+  await request('admin/settings', 'PATCH', { default_quota_bytes: '0', password }, admin, 403);
+  await request('auth/terms', 'POST', { acceptTerms: POLICY_VERSION }, admin);
   await request(
     'admin/settings',
     'PATCH',

@@ -20,7 +20,7 @@ const id = randomUUID(),
   username = 'reset_' + id.slice(0, 8);
 try {
   await pool.query(
-    'INSERT INTO oc_users(id,username,email_verified_at,password_hash,is_admin) VALUES($1,$2,now(),$3,true)',
+    'INSERT INTO oc_users(id,username,email_verified_at,password_hash,is_admin,terms_version) VALUES($1,$2,now(),$3,true,oc_policy_version())',
     [id, username, await passwordHash('the-forgotten-password-123')],
   );
   for (const token of ['one', 'two'])

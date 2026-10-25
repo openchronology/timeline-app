@@ -51,7 +51,7 @@ try {
   const managerId = randomUUID(),
     manager = `seed_manager_${managerId.slice(0, 8)}`;
   await client.query(
-    'INSERT INTO oc_users(id,username,email,email_verified_at) VALUES($1,$2,$3,now())',
+    'INSERT INTO oc_users(id,username,email,email_verified_at,terms_version) VALUES($1,$2,$3,now(),oc_policy_version())',
     [managerId, manager, `${manager}@example.test`],
   );
   assert.ok((await seedPlatform(adapter, { manager })).every((t) => t.created));

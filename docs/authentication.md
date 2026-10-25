@@ -25,6 +25,16 @@ Desktop timeline links name their server too: `#server/<origin>/timeline/<id>`. 
 
 Accounts support username/password and Google, GitHub and Facebook sign-in. Private timelines and explicit viewer/contributor/writer memberships apply equally to browser and desktop requests. Public timelines can be viewed without signing in. Open **Your OpenChronology account** to see active sessions and sign out every other session. Social accounts initially receive a generated username, shown in the account button and usable for sharing.
 
+## Agreeing to the terms
+
+Every account agrees to the terms of service and privacy policy in force (#277; `server/policies.mjs`):
+
+- **Registering with a password** needs the unticked **I agree to the terms of service and have read the privacy policy** box. The form sends the version shown (`acceptTerms`, the policies' effective date from `/api/session`'s `terms`), and the server refuses a missing or older one with 400. The version and time are kept with the pending registration and copied to the account it becomes.
+- **A new account from Google, GitHub or Facebook** exists before it has agreed, but cannot sign in until it confirms an email address, and the same box is required at that step (`POST /api/auth/email/enroll`).
+- **Existing accounts**, made before the version in force (or before an administrator ran the bootstrap), have none recorded: `/api/session` reports `user.termsRequired`, and a panel under the header on every page asks them to agree (`POST /api/auth/terms`). Until they do, the server refuses their browser and desktop sessions' changes with 403 and `terms`. Still allowed: every read (and the query and search POSTs), signing out, the rest of the account's own settings and security under `/api/auth/` except creating API keys, deleting the account or its timelines, exporting a file, reporting and asking for a moderation review. API keys made before keep working, so integrations do not stop until their owner signs in.
+
+Each account keeps `terms_version` and `terms_accepted_at`. When either policy changes materially, set `POLICY_VERSION` (and `oc_policy_version()` in `schema.sql`, which a test keeps equal) to the new effective date: every account is then asked again.
+
 ## Configure timescale.info
 
 Build the app, apply `npm run migrate` using a migration database account, and serve it behind an HTTPS reverse proxy. Set `APP_ORIGIN=https://timescale.info` with no trailing slash. The existing schema migration is idempotent and adds identity, device approval, throttle and session columns to older installations.

@@ -82,6 +82,13 @@ const email = {
   maxLength: 254,
   description: 'An email address (trimmed and lowercased).',
 };
+// Agreeing to the terms of service and privacy policy (#277; server/policies.mjs).
+const acceptTerms = {
+  type: 'string',
+  example: '2026-10-25',
+  description:
+    'Agreement to the terms of service and privacy policy: the version shown, which is the session’s `terms` (their effective date). Refused (400) when missing or not the version in force.',
+};
 const birthYear = {
   type: 'integer',
   minimum: 1900,
@@ -241,7 +248,7 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Give an email address to confirm',
       description: [
-        'The `email` step of a sign-in: an account without a confirmed email address (such as one new from a sign-in provider) gives one, and confirms it with the emailed link (`POST /api/auth/email/verify`) before it can sign in. Needs the `oc_challenge` cookie of that step. A new account gives its year of birth here too; one under 13 is closed.',
+        'The `email` step of a sign-in: an account without a confirmed email address (such as one new from a sign-in provider) gives one, and confirms it with the emailed link (`POST /api/auth/email/verify`) before it can sign in. Needs the `oc_challenge` cookie of that step. A new account gives its year of birth here too (one under 13 is closed), and agrees to the terms of service and privacy policy (`acceptTerms`).',
         SIGN_IN_TOKEN,
         'Always asks for human verification (428), since it sends email to an address the requester types. The answer is the same whether or not another account has the address.',
       ].join('\n\n'),
@@ -256,6 +263,12 @@ export const paths = {
             ...birthYear,
             description:
               birthYear.description + ' Required when the account has no year of birth yet.',
+          },
+          acceptTerms: {
+            ...acceptTerms,
+            description:
+              acceptTerms.description +
+              ' Required in the `email` step of a new account that has not agreed yet.',
           },
           password: currentPassword,
           code: factorCode,
@@ -725,6 +738,24 @@ export const paths = {
       },
     },
   },
+  '/api/auth/terms': {
+    post: {
+      operationId: 'agreeToTerms',
+      tags: ['Account'],
+      summary: 'Agree to the terms',
+      description:
+        'Agrees to the terms of service and privacy policy in force, for an account made before they took effect or before a newer version (`SessionUser.termsRequired`). Records the version and the time.',
+      security: SIGNED_IN,
+      requestBody: body({ type: 'object', required: ['acceptTerms'], properties: { acceptTerms } }),
+      responses: {
+        200: json(
+          { type: 'object', required: ['terms'], properties: { terms: { type: 'string' } } },
+          'Agreed.',
+        ),
+        ...errors(400, 401, 403, 413, 503),
+      },
+    },
+  },
   '/api/auth/account': {
     get: {
       operationId: 'getAccount',
@@ -814,6 +845,12 @@ export const schemas = {
       },
       dashboard: { type: 'boolean', const: true },
       user: { oneOf: [ref('SessionUser'), { type: 'null' }] },
+      terms: {
+        type: 'string',
+        example: '2026-10-25',
+        description:
+          'The version of the terms of service and privacy policy in force (their effective date), which agreeing to them sends as `acceptTerms`. Absent without accounts.',
+      },
       csrf: {
         type: ['string', 'null'],
         pattern: '^[a-f0-9]{64}$',
@@ -877,6 +914,11 @@ export const schemas = {
         type: 'boolean',
         description: 'Whether sensitive content shows without a warning (never for minors).',
       },
+      termsRequired: {
+        type: 'boolean',
+        description:
+          'The account has not agreed to the terms of service and privacy policy in force (`POST /api/auth/terms`). Until it does, its browser and desktop sessions may read, export, sign out, report, ask for a review and manage or delete the account and its timelines, and other changes are refused with 403 and `terms`. API keys are not affected.',
+      },
     },
   },
   SignInProvider: { type: 'string', enum: ['google', 'github', 'facebook'] },
@@ -930,7 +972,7 @@ export const schemas = {
   },
   RegistrationRequest: {
     type: 'object',
-    required: ['username', 'email', 'password', 'passwordConfirmation', 'birthYear'],
+    required: ['username', 'email', 'password', 'passwordConfirmation', 'birthYear', 'acceptTerms'],
     properties: {
       username: {
         ...username,
@@ -942,6 +984,7 @@ export const schemas = {
       password: newPassword,
       passwordConfirmation: confirmation,
       birthYear,
+      acceptTerms,
     },
   },
   Registered: {

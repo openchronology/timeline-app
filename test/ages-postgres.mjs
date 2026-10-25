@@ -13,6 +13,7 @@ import { createApplication } from '../server/http.mjs';
 import { searchTimelines } from '../server/collaboration.mjs';
 import { sweepStanding } from '../server/standing.mjs';
 import { digest } from '../server/security-crypto.mjs';
+import { POLICY_VERSION } from '../server/policies.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
@@ -70,8 +71,8 @@ async function account(name, born) {
   const id = randomUUID();
   ids.push(id);
   await pool.query(
-    `INSERT INTO oc_users(id,username,email,email_verified_at,password_hash,birth_year,quota_bypass,created_at)
-    VALUES($1,$2,$3,now(),$4,$5,true,now()-interval '40 days')`,
+    `INSERT INTO oc_users(id,username,email,email_verified_at,password_hash,birth_year,quota_bypass,created_at,terms_version)
+    VALUES($1,$2,$3,now(),$4,$5,true,now()-interval '40 days',oc_policy_version())`,
     [id, `${name}_${suffix}`, `${name}_${suffix}@example.test`, await passwordHash(password), born],
   );
   const issued = await auth.issue(
@@ -112,6 +113,7 @@ try {
     email: `young_${suffix}@example.test`,
     password,
     passwordConfirmation: password,
+    acceptTerms: POLICY_VERSION,
   };
   await visitor.request('auth/register', 'POST', signup, 400);
   const refused = await visitor.request(
@@ -138,10 +140,10 @@ try {
   // A social sign-in's new account gives it at the email step, before it can sign in.
   const social = async (born, expected) => {
     const id = randomUUID();
-    await pool.query('INSERT INTO oc_users(id,username,password_hash) VALUES($1,$2,NULL)', [
-      id,
-      `github_${randomBytes(8).toString('hex')}`,
-    ]);
+    await pool.query(
+      'INSERT INTO oc_users(id,username,password_hash,terms_version) VALUES($1,$2,NULL,oc_policy_version())',
+      [id, `github_${randomBytes(8).toString('hex')}`],
+    );
     ids.push(id);
     const c = client();
     await c.request('session');

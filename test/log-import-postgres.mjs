@@ -46,7 +46,7 @@ const run = async (...argv) => {
 };
 try {
   await pool.query(
-    'INSERT INTO oc_users(id,username,email_verified_at,quota_bytes) VALUES($1,$2,now(),$3)',
+    'INSERT INTO oc_users(id,username,email_verified_at,quota_bytes,terms_version) VALUES($1,$2,now(),$3,oc_policy_version())',
     [owner, 'importer_' + owner.slice(0, 8), 1 << 30],
   );
   await pool.query(

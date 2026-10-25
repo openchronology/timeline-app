@@ -136,6 +136,11 @@ export const schemas = {
         ...ref('HumanChallenge'),
         description: 'With 428: the human-verification challenge to answer.',
       },
+      terms: {
+        type: 'string',
+        description:
+          'With 403: the account must first agree to this version of the terms of service and privacy policy (`POST /api/auth/terms`).',
+      },
       conflicts: {
         type: 'array',
         items: {},

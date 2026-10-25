@@ -45,7 +45,7 @@ async function user(name, { admin = false } = {}) {
     username = name + '_' + suffix;
   ids.push(id);
   await pool.query(
-    'INSERT INTO oc_users(id,username,email,password_hash,email_verified_at,is_admin,quota_bypass) VALUES($1,$2,$3,$4,now(),$5,true)',
+    'INSERT INTO oc_users(id,username,email,password_hash,email_verified_at,is_admin,quota_bypass,terms_version) VALUES($1,$2,$3,$4,now(),$5,true,oc_policy_version())',
     [id, username, username + '@example.test', await passwordHash(password), admin],
   );
   const u = (await pool.query('SELECT * FROM oc_users WHERE id=$1', [id])).rows[0];

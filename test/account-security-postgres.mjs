@@ -7,6 +7,7 @@ import pg from 'pg';
 import { createApplication } from '../server/http.mjs';
 import { flushMail } from '../server/mail.mjs';
 import { totp, unseal } from '../server/security-crypto.mjs';
+import { POLICY_VERSION } from '../server/policies.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
@@ -75,13 +76,27 @@ try {
   await stranger.request('session');
   await owner.request(
     'auth/register',
-    { username, email, password, passwordConfirmation: 'mismatch', birthYear: 1990 },
+    {
+      username,
+      email,
+      password,
+      passwordConfirmation: 'mismatch',
+      birthYear: 1990,
+      acceptTerms: POLICY_VERSION,
+    },
     400,
   );
   // Profiles are at /<username> (#148): not names the site's own pages use.
   const reserved = await owner.request(
     'auth/register',
-    { username: 'Login', email, password, passwordConfirmation: password, birthYear: 1990 },
+    {
+      username: 'Login',
+      email,
+      password,
+      passwordConfirmation: password,
+      birthYear: 1990,
+      acceptTerms: POLICY_VERSION,
+    },
     400,
   );
   assert.equal(reserved.error, 'That username is taken. Choose another.');
@@ -91,7 +106,14 @@ try {
       (
         await owner.request(
           'auth/register',
-          { username: name, email, password, passwordConfirmation: password, birthYear: 1990 },
+          {
+            username: name,
+            email,
+            password,
+            passwordConfirmation: password,
+            birthYear: 1990,
+            acceptTerms: POLICY_VERSION,
+          },
           400,
         )
       ).error,
@@ -103,6 +125,7 @@ try {
     password,
     passwordConfirmation: password,
     birthYear: 1990,
+    acceptTerms: POLICY_VERSION,
   });
   assert(pending.verificationRequired);
   assert.equal(pending.user, undefined);
@@ -124,7 +147,7 @@ try {
   const takenEmail = 'taken_' + email,
     freeEmail = 'free_' + email;
   await pool.query(
-    'INSERT INTO oc_users(id,username,email,email_verified_at) VALUES(gen_random_uuid(),$1,$2,now())',
+    'INSERT INTO oc_users(id,username,email,email_verified_at,terms_version) VALUES(gen_random_uuid(),$1,$2,now(),oc_policy_version())',
     ['taken_' + suffix, takenEmail],
   );
   const changes = async () =>

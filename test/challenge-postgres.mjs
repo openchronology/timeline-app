@@ -7,6 +7,7 @@ import { readFile } from 'node:fs/promises';
 import pg from 'pg';
 import { createApplication } from '../server/http.mjs';
 import { passwordHash } from '../server/auth.mjs';
+import { POLICY_VERSION } from '../server/policies.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
@@ -78,8 +79,8 @@ async function account(name, { admin = false, age = '0 days' } = {}) {
   const id = randomUUID(),
     username = name + '_' + suffix;
   await pool.query(
-    `INSERT INTO oc_users(id,username,password_hash,email,email_verified_at,is_admin,created_at)
-    VALUES($1,$2,$3,$4,now(),$5,now()-$6::interval)`,
+    `INSERT INTO oc_users(id,username,password_hash,email,email_verified_at,is_admin,created_at,terms_version)
+    VALUES($1,$2,$3,$4,now(),$5,now()-$6::interval,oc_policy_version())`,
     [id, username, await passwordHash(password), username + '@example.test', admin, age],
   );
   created.push(id);
@@ -98,6 +99,7 @@ try {
     password,
     passwordConfirmation: password,
     birthYear: 1990,
+    acceptTerms: POLICY_VERSION,
   };
   const refused = await visitor.request('auth/register', signup, 428, { solveChallenge: false });
   assert.equal(refused.challenge.provider, 'pow');

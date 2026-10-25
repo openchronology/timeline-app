@@ -18,10 +18,10 @@ let reader;
 try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
   for (const id of users)
-    await pool.query('INSERT INTO oc_users(id,username) VALUES($1,$2)', [
-      id,
-      'compare_' + id.slice(0, 8),
-    ]);
+    await pool.query(
+      'INSERT INTO oc_users(id,username,terms_version) VALUES($1,$2,oc_policy_version())',
+      [id, 'compare_' + id.slice(0, 8)],
+    );
   for (const [i, owner] of [users[0], users[1], users[2]].entries()) {
     const timeline = await store.create(owner, {
       format: 'openchronology',

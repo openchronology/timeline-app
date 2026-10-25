@@ -49,12 +49,12 @@ async function check(name, id, spec, table, root, keys) {
 }
 try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
-  await pool.query('INSERT INTO oc_users(id,username,quota_bypass) VALUES($1,$2,true)', [
-    owner,
-    'paths_' + owner.slice(0, 8),
-  ]);
   await pool.query(
-    'INSERT INTO oc_users(id,username,quota_bypass,is_admin) VALUES($1,$2,true,true)',
+    'INSERT INTO oc_users(id,username,quota_bypass,terms_version) VALUES($1,$2,true,oc_policy_version())',
+    [owner, 'paths_' + owner.slice(0, 8)],
+  );
+  await pool.query(
+    'INSERT INTO oc_users(id,username,quota_bypass,is_admin,terms_version) VALUES($1,$2,true,true,oc_policy_version())',
     [forker, 'paths_' + forker.slice(0, 8)],
   );
   const document = validateDocument({

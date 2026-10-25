@@ -17,6 +17,7 @@ import {
   recoveryHash,
 } from './security-crypto.mjs';
 import { queueMail, flushMail } from './mail.mjs';
+import { POLICY_VERSION, requireAgreement } from './policies.mjs';
 import { availableUsername } from '../dist/core.mjs';
 /**
  * The answer to every request that may send email (registration, a forgotten password, an
@@ -130,8 +131,9 @@ export class AccountSecurity {
       });
   }
   /**
-   * Registration: `body` has the username, email, password and its confirmation and the year of
-   * birth. It creates a pending registration and emails a confirmation link, not an account or
+   * Registration: `body` has the username, email, password and its confirmation, the year of
+   * birth and `acceptTerms`, the version of the terms and privacy policy agreed to (#277;
+   * policies.mjs requireAgreement). It creates a pending registration and emails a confirmation link, not an account or
    * a session: the account is created by verify, in the browser that registered. The answer is
    * the same whether or not the username or email was free (generic), so registration cannot be
    * used to find out who has an account. Result: that answer plus the `oc_verify` proof cookie
@@ -148,6 +150,7 @@ export class AccountSecurity {
     if (!availableUsername(username))
       throw new HttpError(400, 'That username is taken. Choose another.');
     await this.refuseAgain(req);
+    requireAgreement(body.acceptTerms);
     const email = emailAddress(body.email),
       password = newPassword(body.password, body.passwordConfirmation, username),
       born = await this.ageChecked(req, body.birthYear);
@@ -172,11 +175,12 @@ export class AccountSecurity {
         return;
       // Pending signups confer no account/session and cannot claim an existing identity.
       // Stored: the hashes of the emailed token and of the browser's proof, the account's
-      // future id, its password hash and year of birth, expiring in 24 hours. Several pending
+      // future id, its password hash, year of birth and the terms agreed to (and when), expiring
+      // in 24 hours. Several pending
       // registrations for one name may exist; the first confirmed wins (see verify).
       await c.query(
-        "INSERT INTO oc_registrations(token_hash,id,username,email,password_hash,browser_hash,birth_year,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,now()+interval '24 hours')",
-        [digest(token), randomUUID(), username, email, hash, digest(proof), born],
+        "INSERT INTO oc_registrations(token_hash,id,username,email,password_hash,browser_hash,birth_year,terms_version,terms_accepted_at,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,now(),now()+interval '24 hours')",
+        [digest(token), randomUUID(), username, email, hash, digest(proof), born, POLICY_VERSION],
       );
       await queueMail(c, this.key, {
         to: email,
@@ -370,7 +374,8 @@ export class AccountSecurity {
    * Adds an email address to an account without a confirmed one: a signed-in account
    * (`session`, confirmed as for any security change) or a new social account in the middle of its
    * `email` sign-in challenge. `body` has the email, and for an account without a year of birth,
-   * the year (#115). Emails a confirmation link bound to this browser's `oc_verify` proof,
+   * the year (#115); a new social account also agrees to the terms here, before it can sign in
+   * (`acceptTerms`, #277). Emails a confirmation link bound to this browser's `oc_verify` proof,
    * replacing any earlier one. An address already used by another account gets the generic
    * answer and no email. Result: the generic answer and the proof cookie. Throws 400, 401, 403
    * (age), 429.
@@ -414,6 +419,15 @@ export class AccountSecurity {
         if (tooYoung) throw tooYoung;
         if (born === null) throw new HttpError(400, 'Give your year of birth.');
         await c.query('UPDATE oc_users SET birth_year=$2 WHERE id=$1', [userId, born]);
+      }
+      // A social account agrees to the terms in force before it can sign in (#277); one that
+      // agreed already (an earlier attempt) is asked again only for a newer version.
+      if (!session && user.terms_version !== POLICY_VERSION) {
+        requireAgreement(body.acceptTerms);
+        await c.query('UPDATE oc_users SET terms_version=$2,terms_accepted_at=now() WHERE id=$1', [
+          userId,
+          POLICY_VERSION,
+        ]);
       }
       // Another account has this address (oc_users_email, case-insensitive): stop quietly, so
       // the generic answer does not reveal it. The year of birth saved above still commits.
@@ -481,8 +495,16 @@ export class AccountSecurity {
         // Creates the account with its email already confirmed. If the username or address was
         // taken since registration, the unique indexes refuse it (23505, handled below).
         await c.query(
-          'INSERT INTO oc_users(id,username,email,email_verified_at,password_hash,birth_year) VALUES($1,$2,$3,now(),$4,$5)',
-          [signup.id, signup.username, signup.email, signup.password_hash, signup.birth_year],
+          'INSERT INTO oc_users(id,username,email,email_verified_at,password_hash,birth_year,terms_version,terms_accepted_at) VALUES($1,$2,$3,now(),$4,$5,$6,$7)',
+          [
+            signup.id,
+            signup.username,
+            signup.email,
+            signup.password_hash,
+            signup.birth_year,
+            signup.terms_version,
+            signup.terms_accepted_at,
+          ],
         );
         // Uses up this registration and any other pending one for the same name or address,
         // which could no longer be confirmed anyway.

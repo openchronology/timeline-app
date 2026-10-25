@@ -178,10 +178,10 @@ for (const [method, counter] of [
     })(store[method]);
 try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
-  await pool.query('INSERT INTO oc_users(id,username,email_verified_at) VALUES($1,$2,now())', [
-    user,
-    'merge_' + user.slice(0, 8),
-  ]);
+  await pool.query(
+    'INSERT INTO oc_users(id,username,email_verified_at,terms_version) VALUES($1,$2,now(),oc_policy_version())',
+    [user, 'merge_' + user.slice(0, 8)],
+  );
   let upstream = await store.create(user, randomDocument('Merges'));
   created.push(upstream.id);
   // Public, so anyone may fork it and propose to it.
@@ -194,10 +194,10 @@ try {
     // Another account's fork, then independent edits on both sides.
     const other = randomUUID();
     users.push(other);
-    await pool.query('INSERT INTO oc_users(id,username,email_verified_at) VALUES($1,$2,now())', [
-      other,
-      'merge_' + other.slice(0, 8),
-    ]);
+    await pool.query(
+      'INSERT INTO oc_users(id,username,email_verified_at,terms_version) VALUES($1,$2,now(),oc_policy_version())',
+      [other, 'merge_' + other.slice(0, 8)],
+    );
     const fork = await versions.copy(upstream.id, other, { revision: upstream.revision });
     created.push(fork.id);
     owners.set(fork.id, other);

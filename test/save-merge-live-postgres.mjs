@@ -83,7 +83,7 @@ try {
   }
   assert(!exited, logs);
   await pool.query(
-    'INSERT INTO oc_users(id,username,email_verified_at,password_hash,quota_bypass) VALUES($1,$2,now(),$3,true)',
+    'INSERT INTO oc_users(id,username,email_verified_at,password_hash,quota_bypass,terms_version) VALUES($1,$2,now(),$3,true,oc_policy_version())',
     [owner, username, await passwordHash(password)],
   );
   const day = 86400;

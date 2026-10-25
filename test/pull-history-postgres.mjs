@@ -25,10 +25,10 @@ try {
   const schema = await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8');
   await pool.query(schema);
   for (const id of [owner, author])
-    await pool.query('INSERT INTO oc_users(id,username,email_verified_at) VALUES($1,$2,now())', [
-      id,
-      'pulls_' + id.slice(0, 8),
-    ]);
+    await pool.query(
+      'INSERT INTO oc_users(id,username,email_verified_at,terms_version) VALUES($1,$2,now(),oc_policy_version())',
+      [id, 'pulls_' + id.slice(0, 8)],
+    );
   const moment = (i, title = 'Moment ' + i) => ({
     id: 'm' + i,
     time: `${i}/1`,

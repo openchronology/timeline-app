@@ -122,7 +122,7 @@ assert.equal(await adminMatches(), true);
 // Reinstalling takes the upgrade path: configuration and database are kept, and the
 // administrator is told what to review and to run openchronology-migrate.
 await psql(
-  "INSERT INTO oc_users(id,username,email_verified_at) VALUES(gen_random_uuid(),'kept',now())",
+  "INSERT INTO oc_users(id,username,email_verified_at,terms_version) VALUES(gen_random_uuid(),'kept',now(),oc_policy_version())",
 );
 const key = /^AUTH_ENCRYPTION_KEY=.*$/m.exec(config)[0];
 const upgrade = await sh(`env ASSUME_ALWAYS_YES=yes pkg install -f -y ${file} 2>&1`);

@@ -147,7 +147,7 @@ export class Auth {
     // day of inactivity, a disabled account, an unconfirmed email, and, when two-factor
     // authentication is on, a session that never completed it.
     const { rows } = await client.query(
-      `SELECT s.csrf,s.token_hash,s.kind,s.created_at,s.mfa_verified,u.id,u.username,u.mfa_enabled,u.email_verified_at,u.is_admin,u.avatar_url,u.birth_year,u.show_sensitive FROM oc_sessions s JOIN oc_users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.kind=$2 AND s.expires_at>now() AND s.last_seen_at>now()-interval '1 day' AND NOT u.is_disabled AND u.email_verified_at IS NOT NULL AND (NOT u.mfa_enabled OR s.mfa_verified)`,
+      `SELECT s.csrf,s.token_hash,s.kind,s.created_at,s.mfa_verified,u.id,u.username,u.mfa_enabled,u.email_verified_at,u.is_admin,u.avatar_url,u.birth_year,u.show_sensitive,u.terms_version FROM oc_sessions s JOIN oc_users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.kind=$2 AND s.expires_at>now() AND s.last_seen_at>now()-interval '1 day' AND NOT u.is_disabled AND u.email_verified_at IS NOT NULL AND (NOT u.mfa_enabled OR s.mfa_verified)`,
       [tokenHash(token), bearer ? 'desktop' : 'web'],
     );
     // Keeps the session alive for the idle limit. The five-minute condition makes most requests

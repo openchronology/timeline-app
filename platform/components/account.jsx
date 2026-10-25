@@ -345,6 +345,18 @@ export default function Account({ returnTo = '/', login = false }) {
               </p>
             </>
           )}
+          {/* Agreeing to the terms (#277): required to create an account, by password or, at
+              its email step, by a provider; the value is the version shown, which the server
+              checks is the one in force. */}
+          {['register', 'email'].includes(mode) && (
+            <label className="checkbox-label">
+              <input type="checkbox" name="acceptTerms" value={session?.terms ?? ''} required />
+              <span>
+                I agree to the <Link href="/terms">terms of service</Link> and have read the{' '}
+                <Link href="/privacy">privacy policy</Link>.
+              </span>
+            </label>
+          )}
           {mode === 'register' && (
             <p>
               Email confirmation is required. Open the confirmation link in this browser, then sign
@@ -429,8 +441,8 @@ export default function Account({ returnTo = '/', login = false }) {
       )}
       {feedback}
       <p className="muted">
-        The <Link href="/terms">terms of service</Link> and{' '}
-        <Link href="/privacy">privacy policy</Link> are available before registration.
+        Creating an account, with a password or a provider, asks you to agree to the{' '}
+        <Link href="/terms">terms of service</Link> and <Link href="/privacy">privacy policy</Link>.
       </p>
     </div>
   );

@@ -40,8 +40,8 @@ const LAST = [
 ];
 try {
   await pool.query(
-    `INSERT INTO oc_users(id,username,email,email_verified_at,password_hash,is_admin,quota_bypass)
-    VALUES($1,$2,$3,now(),$4,true,true)`,
+    `INSERT INTO oc_users(id,username,email,email_verified_at,password_hash,is_admin,quota_bypass,terms_version)
+    VALUES($1,$2,$3,now(),$4,true,true,oc_policy_version())`,
     [userId, 'openapi_' + suffix, `openapi_${suffix}@example.test`, await passwordHash('x')],
   );
   const issued = await new Auth(pool, origin).issue(
