@@ -105,7 +105,8 @@ export default async function RootLayout({ children }) {
           <a href="/docs/api">HTTP API</a> ·{' '}
           <a href="/openchronology-web-source.tar.gz" download>
             Source
-          </a>
+          </a>{' '}
+          · <a href="https://github.com/openchronology/timeline-app">GitHub</a>
           {' · '}
           <span className="build-identity">Build: {build.label}</span>
           {name ? ' · Powered by OpenChronology' : ''}

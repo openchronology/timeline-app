@@ -146,6 +146,8 @@ try {
     assert.equal((await fetch(origin + path)).status, 200, path);
   assert.match(html, /<title>timescale\.test · OpenChronology<\/title>/);
   assert.match(html, /Powered by OpenChronology/);
+  // The footer links to the source repository (#276).
+  assert.match(html, /href="https:\/\/github\.com\/openchronology\/timeline-app">GitHub<\/a>/);
   assert.match(
     html,
     /<a href="https:\/\/example\.com\/support" class="support-link">♥ Support<\/a>/,
