@@ -16,7 +16,7 @@ import { createCommunityUI } from './community-ui.js';
 import { createSuiteUI } from './suite-ui.js';
 import type { Proposal } from './community-ui.js';
 import { configureImages, imageSource, embedImages } from './image-assets.js';
-import { themeProperties } from './timeline-theme.js';
+import { themeProperties, themeScales } from './timeline-theme.js';
 import './styles.css';
 import {
   renderPluginMarker,
@@ -87,6 +87,7 @@ import {
   pluginBackdrop,
   pluginTheme,
   settingValue,
+  TEXT_SIZE,
   HEADING_FONTS,
   derivationKeys,
   BACKGROUND_URL_LIMIT,
@@ -886,7 +887,10 @@ function centeredOffset() {
 }
 const width = () => Math.max(1, stageWidth() - 2 * inset()),
   // Grouping follows marker size, which is smaller at a compact base scale.
-  pixels = () => Math.round(Number(input('density').value) * baseScale());
+  // Wider labels (the theme's label size, #267) group moments sooner, so labels sharing a row
+  // stay apart.
+  pixels = () =>
+    Math.round(Number(input('density').value) * baseScale() * Math.max(1, textScales().text));
 function toast(message: string) {
   text('toast', message);
   el('toast').hidden = false;
@@ -1181,7 +1185,8 @@ function viewContext(
     span: viewport.span,
     widthPixels: width(),
     purpose,
-    ...(purpose === 'axis' ? { textScale: uiScale } : {}),
+    // Larger tick labels (the theme's measure size, #267) need more room between ticks.
+    ...(purpose === 'axis' ? { textScale: uiScale * textScales().measure } : {}),
     ...(spacingPixels === undefined ? {} : { spacingPixels }),
   };
 }
@@ -1370,6 +1375,10 @@ function drawFrame() {
     cursor.setAttribute('aria-label', `Selected time: ${presented(selectedTime, 'input')}`);
   }
   const expandSummaries = pluginExpand(activePlugins());
+  // Label rows and stems make room for the theme's label size (#267): a label block is 32
+  // pixels tall at the usual size, with 11 between rows.
+  const labelHeight = 32 * textScales().text,
+    labelRow = labelHeight + 11;
   const container = el('markers');
   const branches = el('stack-markers');
   const stackRetained = new Set<string>();
@@ -1491,14 +1500,18 @@ function drawFrame() {
     const sourceLane = trackLanes.get(sourceKey ?? '') ?? 0;
     trackLanes.set(sourceKey ?? '', sourceLane + 1);
     const top = (comparison ? sourceLane : lane++) % 4,
-      labelTop = rowOffset + (top < 2 ? 128 - top * 43 : 272 + (top - 2) * 43);
+      labelTop =
+        rowOffset + (top < 2 ? 160 - labelHeight - top * labelRow : 272 + (top - 2) * labelRow);
     button.style.top = '';
     button.style.translate = `0 ${rowOffset}px`;
     stem.style.left = `${(inset() + x) / uiScale}px`;
-    stem.style.top = `${top < 2 ? labelTop + 32 : rowOffset + 201}px`;
-    stem.style.height = `${top < 2 ? rowOffset + 181 - labelTop - 32 : labelTop - rowOffset - 201}px`;
+    stem.style.top = `${top < 2 ? labelTop + labelHeight : rowOffset + 201}px`;
+    stem.style.height = `${top < 2 ? rowOffset + 181 - labelTop - labelHeight : labelTop - rowOffset - 201}px`;
     caption.style.left = `${(inset() + x) / uiScale}px`;
     caption.style.top = `${labelTop}px`;
+    // Rows of larger labels can reach past the stage: they can be panned into view.
+    topExtent = Math.min(topExtent, labelTop);
+    bottomExtent = Math.max(bottomExtent, labelTop + labelHeight);
     label.title.textContent =
       count > 1n ? summaryName(group) : span ? (span.metadata.title ?? '') : (group.title ?? '');
     caption.hidden =
@@ -1589,7 +1602,7 @@ function drawFrame() {
           child.button.style.borderColor = '';
           renderPluginShape(child.button, pluginShape(activePlugins(), entry.metadata));
           child.caption.style.left = `${(inset() + x) / uiScale}px`;
-          child.caption.style.top = `${direction < 0 ? y - 45 : y + 16}px`;
+          child.caption.style.top = `${direction < 0 ? y - 13 - labelHeight : y + 16}px`;
           child.title.textContent = title;
           child.caption.hidden = !title.trim();
           child.stem.style.left = `${(inset() + x) / uiScale}px`;
@@ -3396,6 +3409,24 @@ function showInstalledPlugins() {
         label.append(setting.label, row, problem);
         return label;
       }
+      if (setting.kind === 'text-size') {
+        // A size is picked from steps of the usual size (#267); "Default" clears it.
+        const sizes = document.createElement('select');
+        sizes.disabled = !editable();
+        sizes.dataset.pluginSetting = setting.key;
+        const steps = ['75', '90', '110', '125', '150', '175', '200'];
+        if (current && !steps.includes(current)) steps.push(current);
+        sizes.append(
+          new Option('Default (100%)', ''),
+          ...steps
+            .sort((a, b) => Number(a) - Number(b))
+            .map((step) => new Option(`${step}%`, step)),
+        );
+        sizes.value = current;
+        sizes.onchange = () => save(sizes.value);
+        label.append(setting.label, sizes, problem);
+        return label;
+      }
       if (setting.kind === 'font') {
         field.type = 'text';
         field.maxLength = 200;
@@ -3422,6 +3453,7 @@ const SETTING_PROBLEMS: Record<PluginSetting['kind'], string> = {
   'image-url': 'Enter an HTTPS image address.',
   color: 'Choose a color.',
   font: 'Use font names separated by commas, such as Georgia, serif.',
+  'text-size': `Choose a size from ${TEXT_SIZE.min}% to ${TEXT_SIZE.max}%.`,
 };
 /** Fonts suggested for a theme's font settings: the heading fonts (any installed one works). */
 function themeFontList() {
@@ -3507,15 +3539,32 @@ async function searchPlugins() {
           : '');
       const button = document.createElement('button');
       button.type = 'button';
-      const present = installedPlugins().some((p) => p.manifest.id === manifest.id);
-      button.textContent = present ? 'Installed' : 'Add to timeline';
-      button.disabled = present || !editable();
+      const present = installedPlugins().find((p) => p.manifest.id === manifest.id);
+      // An older version installed can be updated in place, keeping its order, whether it is
+      // enabled and the settings the newer one still declares (Timeline theme 2 adds sizes).
+      const update = !!present && present.manifest.version < manifest.version;
+      button.textContent = update
+        ? `Update to v${manifest.version}`
+        : present
+          ? 'Installed'
+          : 'Add to timeline';
+      button.disabled = (!!present && !update) || !editable();
       button.onclick = () => {
         if (doc !== documentRequest) return;
         try {
-          changePlugins([...installedPlugins(), { manifest, enabled: true }]);
+          changePlugins(
+            update
+              ? installedPlugins().map((p) =>
+                  p.manifest.id === manifest.id ? { ...p, manifest } : p,
+                )
+              : [...installedPlugins(), { manifest, enabled: true }],
+          );
           el<HTMLDialogElement>('plugin-library-dialog').close();
-          toast(`${manifest.name} is now active on this timeline.`);
+          toast(
+            update
+              ? `${manifest.name} is updated to v${manifest.version} on this timeline.`
+              : `${manifest.name} is now active on this timeline.`,
+          );
         } catch (error) {
           text('plugin-library-error', error instanceof Error ? error.message : String(error));
         }
@@ -9270,6 +9319,10 @@ function renderTimelineBackdrop(host: HTMLElement) {
   return !!timelineBackdrop;
 }
 let appliedTheme = '';
+/** How large the theme draws label and tick text (#267): 1 is the usual size. */
+function textScales() {
+  return themeScales(pluginTheme(installedPlugins()));
+}
 /**
  * The timeline's theme (#230): its colors and fonts as the stage's `--timeline-*` properties,
  * changed only when the theme does. Says whether it gives the stage a background color.

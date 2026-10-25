@@ -21,6 +21,7 @@ import {
   TIMELINE_THEME,
   pluginTheme,
   settingValue,
+  textSizeValue,
   MOMENT_HEADINGS,
   pluginHeading,
   fontValue,
@@ -63,7 +64,7 @@ import {
   derivationKeys,
   durationOverview,
 } from '../dist/core.mjs';
-import { themeProperties, textOn } from '../dist/timeline-theme.mjs';
+import { themeProperties, themeScales, textOn } from '../dist/timeline-theme.mjs';
 import { createPluginLibrary } from '../server/plugins.mjs';
 import { createApplication } from '../server/http.mjs';
 import { PostgresStore } from '../server/store.mjs';
@@ -844,7 +845,7 @@ test('timeline background: one image for the whole timeline, set on the plugin (
 test('timeline theme: colors and fonts for the whole timeline, set on the plugin (#230)', () => {
   assert(isOfficialPlugin(TIMELINE_THEME));
   assert.deepEqual(TIMELINE_THEME.fields, []);
-  assert.equal(TIMELINE_THEME.settings.length, 8);
+  assert.equal(TIMELINE_THEME.settings.length, 10);
   const [installed] = validateInstalledPlugins([
     {
       manifest: TIMELINE_THEME,
@@ -912,6 +913,66 @@ test('timeline theme: colors and fonts for the whole timeline, set on the plugin
   assert.equal(textOn('#ffffff'), '#1b1f1c');
   assert.equal(textOn('#73958b'), '#1b1f1c');
   assert.equal(textOn('#1f3a5f'), '#ffffff');
+});
+test('timeline theme sizes: label and measure text sizes, as percentages (#267)', () => {
+  assert.equal(TIMELINE_THEME.version, 2);
+  // Version 1, without sizes, stays available, so timelines that installed it keep working.
+  const first = BUILTIN_PLUGINS.find((p) => p.id === 'timeline-theme' && p.version === 1);
+  assert.equal(first.settings.length, 8);
+  assert.equal(first.theme.textSize, undefined);
+  const [old] = validateInstalledPlugins([
+    { manifest: first, enabled: true, settings: { textColor: '#112233' } },
+  ]);
+  assert.deepEqual(pluginTheme([old]), { text: '#112233' });
+  // Sizes are whole percentages from 50 to 200, kept as strings.
+  for (const [given, saved] of [
+    ['125', '125'],
+    [150, '150'],
+    [' 75% ', '75'],
+    ['50', '50'],
+    ['200', '200'],
+    ['49', null],
+    ['201', null],
+    ['1.5', null],
+    ['large', null],
+    ['', null],
+    [null, null],
+  ])
+    assert.equal(textSizeValue(given), saved, String(given));
+  const [installed] = validateInstalledPlugins([
+    {
+      manifest: TIMELINE_THEME,
+      enabled: true,
+      settings: { textSize: '150%', measureSize: 75, textColor: '#112233' },
+    },
+  ]);
+  assert.deepEqual(installed.settings, {
+    textSize: '150',
+    measureSize: '75',
+    textColor: '#112233',
+  });
+  const theme = pluginTheme([installed]);
+  assert.deepEqual(theme, { text: '#112233', textSize: '150', measureSize: '75' });
+  assert.deepEqual(themeScales(theme), { text: 1.5, measure: 0.75 });
+  assert.deepEqual(themeScales({}), { text: 1, measure: 1 });
+  assert.deepEqual(themeProperties({ textSize: '150', measureSize: '75' }), {
+    '--timeline-text-scale': '1.5',
+    '--timeline-measure-scale': '0.75',
+  });
+  assert.throws(
+    () =>
+      validateInstalledPlugins([
+        { manifest: TIMELINE_THEME, enabled: true, settings: { textSize: '300' } },
+      ]),
+    /size from 50% to 200%/,
+  );
+  // A size role reads a size setting, and a color or font role can't.
+  for (const theme of [
+    { textSize: 'textColor' },
+    { text: 'textSize' },
+    { textFont: 'measureSize' },
+  ])
+    assert.throws(() => validatePluginManifest({ ...TIMELINE_THEME, theme }));
 });
 
 test('headings: a level makes a moment a heading, in its font or Times New Roman', () => {

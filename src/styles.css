@@ -741,10 +741,11 @@ html.timeline-fullscreen .timeline-stage {
   position: absolute;
   top: 177px;
   transform: translateX(-50%);
-  font-size: 10px;
+  /* The theme's measure size (#267) scales the tick labels; the ruler spaces them to suit. */
+  font-size: calc(10px * var(--timeline-measure-scale, 1));
   font-family: var(--timeline-measure-font, ui-monospace, SFMono-Regular, Consolas, monospace);
   color: var(--timeline-measure, #87947f);
-  max-width: 105px;
+  max-width: calc(105px * var(--timeline-measure-scale, 1));
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
@@ -796,10 +797,11 @@ html.timeline-fullscreen .timeline-stage {
 }
 .event-label {
   position: absolute;
-  width: 150px;
+  /* The theme's label size (#267) scales labels; their rows and stems are spaced to suit. */
+  width: calc(150px * var(--timeline-text-scale, 1));
   transform: translateX(-50%);
   text-align: center;
-  font-size: 11px;
+  font-size: calc(11px * var(--timeline-text-scale, 1));
   font-weight: 500;
   font-family: var(--timeline-text-font, inherit);
   color: var(--timeline-text, #4c654c);
@@ -811,9 +813,9 @@ html.timeline-fullscreen .timeline-stage {
 .event-label small {
   display: block;
   color: var(--timeline-text-soft, #9aa690);
-  font-size: 9px;
+  font-size: calc(9px * var(--timeline-text-scale, 1));
   font-family: ui-monospace, monospace;
-  margin-top: 5px;
+  margin-top: calc(5px * var(--timeline-text-scale, 1));
 }
 .event-stem {
   position: absolute;

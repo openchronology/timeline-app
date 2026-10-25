@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// A timeline's theme (#230): the colors and fonts a theme plugin sets, as the `--timeline-*`
-// properties the stylesheet reads on the timeline's stage, with the shades worked out from them.
+// A timeline's theme (#230): the colors, fonts and text sizes (#267) a theme plugin sets, as the
+// `--timeline-*` properties the stylesheet reads on the timeline's stage, with the shades worked
+// out from them.
 import type { PluginTheme } from './plugins.js';
 
 const mix = (color: string, percent: number, other = 'transparent') =>
@@ -15,6 +16,15 @@ export function textOn(color: string) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.18 ? '#1b1f1c' : '#ffffff';
 }
 
+/**
+ * How large a theme draws the labels' and the measure's text (#267): 1 is the usual size. The
+ * layout spaces label rows, stems and tick labels by these.
+ */
+export function themeScales(theme: PluginTheme) {
+  const scale = (percent?: string) => (percent ? Number(percent) / 100 : 1);
+  return { text: scale(theme.textSize), measure: scale(theme.measureSize) };
+}
+
 /** The stage's custom properties for a theme; roles it doesn't set are left out. */
 export function themeProperties(theme: PluginTheme): Record<string, string> {
   const properties: Record<string, string> = {};
@@ -24,12 +34,14 @@ export function themeProperties(theme: PluginTheme): Record<string, string> {
     set('text-soft', mix(theme.text, 65));
   }
   if (theme.textFont) set('text-font', theme.textFont);
+  if (theme.textSize) set('text-scale', String(themeScales(theme).text));
   if (theme.measure) {
     set('measure', theme.measure);
     set('measure-soft', mix(theme.measure, 70));
     set('measure-faint', mix(theme.measure, 30));
   }
   if (theme.measureFont) set('measure-font', theme.measureFont);
+  if (theme.measureSize) set('measure-scale', String(themeScales(theme).measure));
   if (theme.halo) {
     set('halo', theme.halo);
     set('halo-backing', mix(theme.halo, 72));

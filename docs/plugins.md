@@ -2,7 +2,7 @@
 
 Open **Plugins** beside **Time display**. The dialog lists this timeline's installed plugins, in application order. **Add plugin** opens the server catalogue with search and twelve results per page. Add, enable, disable, remove, and reorder take effect immediately in the browser's rational map. Save the timeline to persist these settings to the server or a file.
 
-Plugins belong to a timeline, not a user account or the application as a whole. Viewers use the timeline's saved plugins but cannot change them. Installed entries contain a version-pinned manifest snapshot and an enabled flag. Order and settings survive `.ochx`, `.och`, PostgreSQL snapshots and browser drafts. A server catalogue update does not silently change an existing timeline's plugin. Upgrade by installing a newer definition explicitly. **Edit / export definition** opens the saved manifest and script; edits apply only to this timeline until published.
+Plugins belong to a timeline, not a user account or the application as a whole. Viewers use the timeline's saved plugins but cannot change them. Installed entries contain a version-pinned manifest snapshot and an enabled flag. Order and settings survive `.ochx`, `.och`, PostgreSQL snapshots and browser drafts. A server catalogue update does not silently change an existing timeline's plugin. Upgrade explicitly: **Update to v…** in the plugin library replaces an older installed version in place. **Edit / export definition** opens the saved manifest and script; edits apply only to this timeline until published.
 
 The standalone HTML runs saved official and custom plugins entirely locally. Create/import/edit/export definitions works there too; online catalogue discovery and publishing are hidden. It never fetches scripts or external images. Tauri uses the configured OpenChronology server (by default `https://timescale.info`) for the same catalogue; it retains installed definitions in local `.och` files. Disconnecting from the server does not discard installed plugins. External images use network access only in the connected app; embedded copies work offline.
 
@@ -61,7 +61,7 @@ The image covers the timeline, keeping its aspect ratio, and stays put as you pa
 
 ### Timeline settings
 
-A plugin may declare up to eight `settings`: values for the whole timeline, set in the plugin list. They are kept on the installed plugin, not in its manifest or in any event's metadata:
+A plugin may declare up to twelve `settings`: values for the whole timeline, set in the plugin list. They are kept on the installed plugin, not in its manifest or in any event's metadata:
 
 ```json
 {
@@ -76,29 +76,33 @@ A plugin may declare up to eight `settings`: values for the whole timeline, set 
 }
 ```
 
-- **Kinds:** a setting is an HTTPS image address (`image-url`), a color (`color`, `#rrggbb`) or a font family list (`font`, names of installed fonts separated by commas, as for heading fonts).
+- **Kinds:** a setting is an HTTPS image address (`image-url`), a color (`color`, `#rrggbb`), a font family list (`font`, names of installed fonts separated by commas, as for heading fonts) or a text size (`text-size`, a whole percentage of the usual size from 50 to 200, saved as a string such as `"125"`).
 - **Values:** a value that isn't one of its kind is refused: an address that isn't HTTPS, a color by name, or a font list with anything but font names (such as a URL). Empty values, and values for settings the manifest no longer declares, are dropped.
 - **Backdrop:** `backdrop` shows an image setting's value behind the whole timeline. When several enabled plugins set one, the last one wins.
 - **Theme:** `theme` maps parts of the timeline's look to settings; see [Timeline theme](#timeline-theme).
 
 ## Timeline theme
 
-Install **Timeline theme** to choose the timeline's colors and fonts. Like the timeline background, it belongs to the whole timeline, so it's set in the **Plugins** dialog under the plugin:
+Install **Timeline theme** to choose the timeline's colors, fonts and text sizes. Like the timeline background, it belongs to the whole timeline, so it's set in the **Plugins** dialog under the plugin:
 
 | Setting          | What it changes                                                                                                                |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | Label color      | Event labels and headings; their dates take a lighter shade.                                                                   |
 | Label font       | Event labels.                                                                                                                  |
+| Label size       | Event labels and their dates, from 75% to 200% of the usual size.                                                              |
 | Measure color    | The axis, tick marks, tick labels, guide lines, stems and relationship arcs.                                                   |
 | Measure font     | Tick labels.                                                                                                                   |
+| Measure size     | Tick labels, from 75% to 200% of the usual size.                                                                               |
 | Halo color       | The glow and frosted backing that keep text and lines readable over images and background colors.                              |
 | Marker color     | Moment and summary markers (summaries take a darker shade). A color chosen on a moment still wins.                             |
 | Duration color   | Duration bands (with dark or light text to suit) and collapsed durations on the axis. A color chosen on a duration still wins. |
 | Background color | The timeline's background, beneath any images. The halo shows over it, as over an image.                                       |
 
-Colors are picked with the browser's color picker; **Use default** clears one. Fonts are typed or picked from the suggestions, and only fonts installed on the viewer's device are used: no web font is downloaded. Anything left blank keeps the usual look.
+Colors are picked with the browser's color picker; **Use default** clears one. Fonts are typed or picked from the suggestions, and only fonts installed on the viewer's device are used: no web font is downloaded. Sizes are picked from a list; **Default (100%)** clears one. Anything left blank keeps the usual look.
 
-A plugin's `theme` names the setting for each part it sets: `text`, `textFont`, `measure`, `measureFont`, `halo`, `marker`, `duration` and `background`. Font parts read `font` settings, and the rest read `color` settings. When several enabled plugins set the same part, the last one wins.
+Larger labels keep their room: rows of labels move apart and away from the axis, their stems lengthen to reach them, moments group into summaries sooner so labels sharing a row don't run into each other, and rows that reach past the timeline can be panned into view. Larger tick labels space the ticks further apart. Timelines that installed the first version of the theme (without sizes) keep working. **Update to v2** beside it in the **Plugin library** adds the sizes in place, keeping its colors and fonts; the library offers this for any plugin it has a newer version of.
+
+A plugin's `theme` names the setting for each part it sets: `text`, `textFont`, `textSize`, `measure`, `measureFont`, `measureSize`, `halo`, `marker`, `duration` and `background`. Font parts read `font` settings, size parts read `text-size` settings, and the rest read `color` settings. When several enabled plugins set the same part, the last one wins.
 
 ## UI capability API v1
 
