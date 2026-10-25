@@ -242,6 +242,33 @@ try {
     data: { visibility: 'public' },
   });
   await guest.request('/timelines/' + privateFork.id, { status: 404 });
+  // An account has one fork of a timeline (#259): forking again opens it, copying nothing.
+  const again = await contributor.request(api + '/fork', {
+    method: 'POST',
+    data: { revision: timeline.revision },
+  });
+  assert.equal(again.id, privateFork.id);
+  assert.equal(again.existing, true);
+  // An owner duplicates their own timeline rather than forking it; others fork, not duplicate.
+  await owner.request(api + '/fork', {
+    method: 'POST',
+    status: 403,
+    data: { revision: timeline.revision },
+  });
+  await contributor.request(api + '/duplicate', {
+    method: 'POST',
+    status: 403,
+    data: { revision: timeline.revision },
+  });
+  const duplicate = await owner.request(api + '/duplicate', {
+    method: 'POST',
+    status: 201,
+    data: { revision: timeline.revision },
+  });
+  timelines.push(duplicate.id);
+  assert.equal(duplicate.upstream_id, null);
+  // The private fork goes, so that the public timeline's fork below is a new one.
+  await contributor.request('/api/timelines/' + privateFork.id, { method: 'DELETE' });
   timeline = await owner.request(api + '/settings', {
     method: 'PATCH',
     data: { visibility: 'public' },

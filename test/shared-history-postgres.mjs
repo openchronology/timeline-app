@@ -18,7 +18,11 @@ if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
   store = new PostgresStore(pool),
   versions = new Versioning(store);
+// The upstream's owner, and two more accounts down the chain (forking is for others' timelines).
 const user = randomUUID(),
+  forker = randomUUID(),
+  second = randomUUID(),
+  accounts = [user, forker, second],
   created = [];
 const { random, randomDocument, randomPatch } = randomEdits(71);
 const order = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -139,33 +143,43 @@ const charged = async (revision) =>
   );
 try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
-  await pool.query('INSERT INTO oc_users(id,username,email_verified_at) VALUES($1,$2,now())', [
-    user,
-    'shared_' + user.slice(0, 8),
-  ]);
+  for (const id of accounts)
+    await pool.query('INSERT INTO oc_users(id,username,email_verified_at) VALUES($1,$2,now())', [
+      id,
+      'shared_' + id.slice(0, 8),
+    ]);
   const original = randomDocument('Shared');
   const size = Buffer.byteLength(JSON.stringify(original));
-  // Each timeline with the document it holds, and every saved revision with its document.
+  // Each timeline with its owner and the document it holds, and every saved revision with
+  // its document.
   const copies = [];
   const revisions = new Map();
-  const track = (timeline, document) => {
+  const track = (timeline, owner, document) => {
     revisions.set(timeline.head_revision_id, document);
-    return { timeline, document };
+    return { timeline, owner, document };
   };
-  copies.push(track(await store.create(user, original), original));
+  copies.push(track(await store.create(user, original), user, original));
   created.push(copies[0].timeline.id);
 
-  /** Copies timeline `from` (a fork, or a duplicate), checking it shares or copies history. */
-  async function copy(from, duplicate, shares) {
+  /**
+   * Copies timeline `from` as `owner` (a fork by another account, or a duplicate by its
+   * owner), checking it shares or copies history.
+   */
+  async function copy(from, duplicate, shares, owner) {
     const source = copies[from];
+    // Public, so another account may fork it.
+    if (!duplicate)
+      await pool.query("UPDATE oc_timelines SET visibility='public' WHERE id=$1", [
+        source.timeline.id,
+      ]);
     const timeline = await versions.copy(
       source.timeline.id,
-      user,
+      owner,
       { revision: source.timeline.revision },
       duplicate,
     );
     created.push(timeline.id);
-    copies.push(track(timeline, source.document));
+    copies.push(track(timeline, owner, source.document));
     await sameIndex(source.timeline.id, timeline.id);
     const rows = await rowsOf(timeline.id);
     const bytes = await charged(timeline.head_revision_id);
@@ -190,8 +204,14 @@ try {
     }
     entry.timeline =
       step % 9 === 0
-        ? await store.save(entry.timeline.id, user, entry.timeline.revision, next)
-        : await store.save(entry.timeline.id, user, entry.timeline.revision, undefined, patch);
+        ? await store.save(entry.timeline.id, entry.owner, entry.timeline.revision, next)
+        : await store.save(
+            entry.timeline.id,
+            entry.owner,
+            entry.timeline.revision,
+            undefined,
+            patch,
+          );
     entry.document = next;
     revisions.set(entry.timeline.head_revision_id, next);
     return true;
@@ -199,7 +219,7 @@ try {
 
   let saves = 0;
   for (let step = 1; step <= 200; step++) {
-    if (step === 20) await copy(0, false, true); // A fork: two levels.
+    if (step === 20) await copy(0, false, true, forker); // A fork: two levels.
     if (step === 21) {
       // The upstream changes and the untouched fork syncs, rebuilding it from a document.
       const { document } = copies[0];
@@ -207,22 +227,22 @@ try {
       const settings = { ...document, events: [], durations: undefined, relationships: undefined };
       assert(await edit(0, step, { settings, changes: [{ id: first.id, event: first }] }));
       const fork = copies[1];
-      fork.timeline = await versions.sync(fork.timeline.id, user, {
+      fork.timeline = await versions.sync(fork.timeline.id, fork.owner, {
         revision: fork.timeline.revision,
       });
-      fork.document = (await store.snapshot(fork.timeline.id, user)).document;
+      fork.document = (await store.snapshot(fork.timeline.id, fork.owner)).document;
       assert.deepEqual(normal(fork.document), normal(copies[0].document), 'synced');
       revisions.set(fork.timeline.head_revision_id, fork.document);
       continue;
     }
-    if (step === 60) await copy(1, true, true); // A duplicate of the fork: three levels.
-    if (step === 100) await copy(2, false, true); // Four levels.
-    if (step === 140) await copy(3, false, false); // Five would be too many: it copies.
+    if (step === 60) await copy(1, true, true, forker); // A duplicate of the fork: three levels.
+    if (step === 100) await copy(2, false, true, second); // Four levels.
+    if (step === 140) await copy(3, false, false, user); // Five would be too many: it copies.
     if (await edit(Math.floor(random() * copies.length), step)) saves++;
   }
-  for (const { timeline, document } of copies)
+  for (const { timeline, owner, document } of copies)
     assert.deepEqual(
-      normal((await store.snapshot(timeline.id, user)).document),
+      normal((await store.snapshot(timeline.id, owner)).document),
       normal(document),
       'live state',
     );
@@ -360,7 +380,7 @@ try {
     await pool.query('DELETE FROM oc_timelines WHERE id=$1', [id]);
     await store.transaction((c) => store.removeHistory(c, id)).catch(() => {});
   }
-  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=$1', [user]);
-  await pool.query('DELETE FROM oc_users WHERE id=$1', [user]);
+  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=ANY($1::uuid[])', [accounts]);
+  await pool.query('DELETE FROM oc_users WHERE id=ANY($1::uuid[])', [accounts]);
   await pool.end();
 }

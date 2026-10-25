@@ -24,6 +24,9 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
   store = new PostgresStore(pool),
   versions = new Versioning(store);
 const user = randomUUID(),
+  // Administrators, who may fork the family's private timelines (an account forks a
+  // timeline once, and never its own).
+  forkers = [randomUUID(), randomUUID(), randomUUID()],
   created = [];
 const { randomDocument, randomPatch } = randomEdits(71);
 const order = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -58,11 +61,11 @@ const queries = [
   ...['m2', 'm150', 'm299'].map((id) => ({ kind: 'moment', id })),
   ...['d1', 'd20'].map((id) => ({ kind: 'duration', id })),
 ];
-/** Everything a reader can see: the store's queries, the database's walks, the rows. */
-async function observe(id) {
+/** Everything `owner` can see: the store's queries, the database's walks, the rows. */
+async function observe(id, owner) {
   const results = [];
   for (const q of queries) {
-    const r = await store.query(id, user, q);
+    const r = await store.query(id, owner, q);
     delete r.revision;
     delete r.visitedNodes;
     if (r.groups) r.groups = r.groups.map(({ visitedNodes, ...rest }) => rest);
@@ -71,10 +74,10 @@ async function observe(id) {
     if (r.results) r.results.sort((a, b) => order(a.kind + a.id, b.kind + b.id));
     results.push(r);
   }
-  const { first, last } = await store.metadata(id, user);
+  const { first, last } = await store.metadata(id, owner);
   const recent = [
-    (await store.recent(id, user, 'last')).times,
-    (await store.recent(id, user, 'first')).times,
+    (await store.recent(id, owner, 'last')).times,
+    (await store.recent(id, owner, 'first')).times,
   ];
   const text = (await pool.query('SELECT oc_event_text($1) AS text', [id])).rows[0].text;
   const index = await reader(id);
@@ -175,31 +178,40 @@ try {
     user,
     'through_' + user.slice(0, 8),
   ]);
-  // Each timeline with the document it holds, and each saved revision with its document.
+  for (const id of forkers)
+    await pool.query(
+      'INSERT INTO oc_users(id,username,email_verified_at,is_admin) VALUES($1,$2,now(),true)',
+      [id, 'through_' + id.slice(0, 8)],
+    );
+  // Each timeline with its owner and the document it holds, and each saved revision with its
+  // document.
   const family = [];
   const revisions = new Map();
-  const track = (name, timeline, document) => {
+  const track = (name, timeline, document, owner) => {
     revisions.set(timeline.head_revision_id, document);
-    const entry = { name, timeline, document };
+    const entry = { name, timeline, document, owner };
     family.push(entry);
     created.push(timeline.id);
     return entry;
   };
-  const source = track('source', await store.create(user, randomDocument('Source')), null);
+  const source = track('source', await store.create(user, randomDocument('Source')), null, user);
   source.document = (await store.snapshot(source.timeline.id, user)).document;
   revisions.set(source.timeline.head_revision_id, source.document);
-  /** Forks (or duplicates) `from`: read through to it at its clock, `depth` levels deep. */
-  async function copy(name, from, depth, duplicate = false) {
+  /**
+   * `owner` forks (or duplicates) `from`: read through to it at its clock, `depth` levels
+   * deep.
+   */
+  async function copy(name, from, depth, owner, duplicate = false) {
     const { rows } = await pool.query('SELECT index_clock FROM oc_timelines WHERE id=$1', [
       from.timeline.id,
     ]);
     const timeline = await versions.copy(
       from.timeline.id,
-      user,
+      owner,
       { revision: from.timeline.revision },
       duplicate,
     );
-    const entry = track(name, timeline, from.document);
+    const entry = track(name, timeline, from.document, owner);
     const lineage = await lineageOf(pool, timeline.id);
     assert.equal(lineage.index_bases.length, depth, `${name} reads through ${depth} levels`);
     const levels = await lineageOf(pool, from.timeline.id);
@@ -231,7 +243,7 @@ try {
       assert.equal(pinned.rows[0].index_pinned, null, 'released');
     }
     assert.deepEqual(
-      normal((await store.snapshot(timeline.id, user)).document),
+      normal((await store.snapshot(timeline.id, owner)).document),
       normal(from.document),
       `${name} holds its source's document`,
     );
@@ -245,13 +257,13 @@ try {
       next = validateDocument(applyPatch(entry.document, patch));
     } catch {
       await assert.rejects(
-        store.save(entry.timeline.id, user, entry.timeline.revision, undefined, patch),
+        store.save(entry.timeline.id, entry.owner, entry.timeline.revision, undefined, patch),
       );
       return;
     }
     entry.timeline = whole
-      ? await store.save(entry.timeline.id, user, entry.timeline.revision, next)
-      : await store.save(entry.timeline.id, user, entry.timeline.revision, undefined, patch);
+      ? await store.save(entry.timeline.id, entry.owner, entry.timeline.revision, next)
+      : await store.save(entry.timeline.id, entry.owner, entry.timeline.revision, undefined, patch);
     entry.document = next;
     revisions.set(entry.timeline.head_revision_id, next);
   }
@@ -260,7 +272,7 @@ try {
     for (const entry of family) {
       const id = entry.timeline.id;
       assert.deepEqual(
-        normal((await store.snapshot(id, user)).document),
+        normal((await store.snapshot(id, entry.owner)).document),
         normal(entry.document),
         `${entry.name}'s document at step ${step}`,
       );
@@ -268,8 +280,8 @@ try {
       const fresh = await store.create(user, entry.document);
       created.push(fresh.id);
       assert.deepEqual(
-        await observe(id),
-        await observe(fresh.id),
+        await observe(id, entry.owner),
+        await observe(fresh.id, user),
         `${entry.name} reads as a rebuild at step ${step}`,
       );
       assert.deepEqual(
@@ -282,13 +294,13 @@ try {
 
   let forkWhole = null;
   for (let step = 1; step <= 90; step++) {
-    if (step === 3) await copy('fork', source, 1);
-    if (step === 12) await copy('fork of fork', family[1], 2);
-    if (step === 21) await copy('duplicate', family[2], 3, true);
-    if (step === INDEX_LEVELS * 10 - 9) await copy('deepest', family[3], INDEX_LEVELS);
+    if (step === 3) await copy('fork', source, 1, forkers[0]);
+    if (step === 12) await copy('fork of fork', family[1], 2, forkers[1]);
+    if (step === 21) await copy('duplicate', family[2], 3, forkers[1], true);
+    if (step === INDEX_LEVELS * 10 - 9) await copy('deepest', family[3], INDEX_LEVELS, forkers[2]);
     // Past INDEX_LEVELS, a copy copies its source's own rows and reads through to the rest.
-    if (step === 45) await copy('copied', family[4], INDEX_LEVELS);
-    if (step === 50) await copy('second fork', source, 1);
+    if (step === 45) await copy('copied', family[4], INDEX_LEVELS, forkers[0]);
+    if (step === 50) await copy('second fork', source, 1, forkers[2]);
     for (const entry of family)
       // The source is now and then saved whole (retiring every row its forks read).
       await edit(entry, step, entry === source && step % 30 === 0);
@@ -348,7 +360,7 @@ try {
     await pool.query('DELETE FROM oc_timelines WHERE id=$1', [id]);
     await store.transaction((c) => store.removeHistory(c, id)).catch(() => {});
   }
-  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=$1', [user]);
-  await pool.query('DELETE FROM oc_users WHERE id=$1', [user]);
+  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=ANY($1)', [[user, ...forkers]]);
+  await pool.query('DELETE FROM oc_users WHERE id=ANY($1)', [[user, ...forkers]]);
   await pool.end();
 }

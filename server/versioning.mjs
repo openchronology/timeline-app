@@ -87,7 +87,9 @@ export class Versioning {
    * new timeline as access gives it. The source stays locked while copied: its history is
    * shared (shareHistory) and its index read through to (shareIndex), or, when it cannot
    * be, rebuilt from the head's document; the copy's first revision then records it.
-   * Throws 401 when signed out, 400 for a malformed request, 403 when forking is not allowed.
+   * Throws 401 when signed out, 400 for a malformed request, 403 when copying is not allowed:
+   * only an owner duplicates, and only someone else forks. A fork of a timeline the
+   * caller already has a fork of answers that fork, with `existing` true, and copies nothing.
    */
   async copy(id, userId, input, duplicate = false) {
     if (!userId) throw new HttpError(401, 'Sign in to fork a timeline.');
@@ -95,11 +97,33 @@ export class Versioning {
       throw new HttpError(400, 'Provide the current timeline revision.');
     expectedRevision(input.revision);
     const newId = randomUUID();
+    // A fork of a timeline the caller already has a fork of: that fork, opened again.
+    let existing = null;
     await this.store.transaction(async (c) => {
       await lockTimelines(c, [id]);
       const upstream = await this.store.access(id, userId, c);
-      if (!upstream.canFork)
-        throw new HttpError(403, 'The owner must enable forking for this private timeline.');
+      // An owner duplicates their own timeline; anyone else forks it.
+      if (duplicate && !upstream.canDuplicate)
+        throw new HttpError(403, 'Only its owner can duplicate a timeline. Fork it instead.');
+      if (!duplicate && !upstream.canFork)
+        throw new HttpError(
+          403,
+          upstream.canDuplicate
+            ? 'This timeline is yours: duplicate it to make a copy.'
+            : 'The owner must enable forking for this private timeline.',
+        );
+      // One fork of a timeline to an account (#259), as the upstream lock keeps two at once
+      // from both finding none.
+      if (!duplicate) {
+        const { rows } = await c.query(
+          'SELECT id FROM oc_timelines WHERE upstream_id=$1 AND owner_id=$2 ORDER BY created_at LIMIT 1',
+          [id, userId],
+        );
+        if (rows.length) {
+          existing = rows[0].id;
+          return;
+        }
+      }
       if (upstream.revision !== input.revision)
         throw new HttpError(409, 'Timeline changed. Reload before copying.');
       // A copy keeps saved history if its source does. A fork records its upstream and the
@@ -143,6 +167,7 @@ export class Versioning {
         duplicate ? [] : [upstream.head_revision_id],
       );
     });
+    if (existing) return { ...(await this.store.access(existing, userId)), existing: true };
     return this.store.access(newId, userId, this.pool, { preparing: true });
   }
   /**

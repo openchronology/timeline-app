@@ -381,7 +381,8 @@ export class PostgresStore {
    * the row read is the locked one), or the pool. Returns the timeline row (without its
    * catalogue text and vector) with `owner` (username), `starred`, `role` ('admin', 'owner',
    * or the membership role), `moderation` (the restricting case, if any), `labels` and the
-   * permission flags `canWrite`, `canPropose`, `canEdit`, `canShare` and `canFork`. A
+   * permission flags `canWrite`, `canPropose`, `canEdit`, `canShare`, `canFork` and
+   * `canDuplicate`, and for a fork `forkChanged` (it has saves of its own to propose). A
    * comparison also needs every source to be visible to `userId` (404 otherwise), and is
    * never writable or forkable: it is rebuilt from its sources.
    */
@@ -437,10 +438,24 @@ export class PostgresStore {
       );
     }
     const { search_document, event_text, ...metadata } = timeline;
-    // Writing needs a writing role; proposing and editing need a signed-in person with any
-    // contributing role, or a public timeline; forking needs a signed-in person and a public
-    // timeline, ownership (or administration), or a private timeline that allows forks.
-    // Nothing of a comparison but sharing is permitted.
+    // Writing needs a writing role. Proposing is for those who can't write: a signed-in person
+    // with the contributor role, or any on a public timeline; editing (to save or propose)
+    // needs either. Copying is duplicating one's own timeline, or forking someone else's
+    // (#259): public, or private with forks allowed for those it is shared with, or by an
+    // administrator. Nothing of a comparison but sharing is permitted.
+    const canWrite =
+      !timeline.comparison && ['owner', 'admin', 'writer', 'editor'].includes(timeline.role);
+    const owns = !!userId && timeline.owner_id === userId;
+    const canDuplicate = !timeline.comparison && owns;
+    // A fork with saves of its own since it was made, which it may propose upstream.
+    const forkChanged =
+      !!timeline.upstream_id &&
+      (
+        await client.query(
+          "SELECT EXISTS(SELECT 1 FROM oc_revisions WHERE timeline_id=$1 AND kind NOT IN ('fork','duplicate','sync')) AS changed",
+          [timeline.id],
+        )
+      ).rows[0].changed;
     return {
       preparing: !!timeline.preparing_revision_id,
       ...metadata,
@@ -449,13 +464,12 @@ export class PostgresStore {
         ...(timeline.content_labels ?? []),
         ...(timeline.moderator_labels ?? []),
       ]),
-      canWrite:
-        !timeline.comparison && ['owner', 'admin', 'writer', 'editor'].includes(timeline.role),
+      canWrite,
       canPropose:
         !timeline.comparison &&
         !!userId &&
-        (['owner', 'admin', 'writer', 'editor', 'contributor'].includes(timeline.role) ||
-          timeline.visibility === 'public'),
+        !canWrite &&
+        (timeline.role === 'contributor' || timeline.visibility === 'public'),
       canEdit:
         !timeline.comparison &&
         !!userId &&
@@ -465,9 +479,12 @@ export class PostgresStore {
       canFork:
         !timeline.comparison &&
         !!userId &&
+        !owns &&
         (timeline.visibility === 'public' ||
-          ['owner', 'admin'].includes(timeline.role) ||
+          timeline.role === 'admin' ||
           timeline.allow_private_forks),
+      canDuplicate,
+      forkChanged,
     };
   }
   /**

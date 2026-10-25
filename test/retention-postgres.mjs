@@ -42,7 +42,8 @@ try {
   };
   const owner = await account('keeper'),
     writer = await account('writer'),
-    stranger = await account('stranger');
+    stranger = await account('stranger'),
+    forker = await account('forker');
   // "Now", two years ahead: everything saved during the test is old history by then.
   const now = Date.now() + 2 * YEAR * 1000,
     at = (secondsAgo) => `${Math.floor(now / 1000) - secondsAgo}/1`;
@@ -251,7 +252,9 @@ try {
   };
   const busy = await store.create(owner, busyDocument);
   timelines.push(busy.id);
-  const busyFork = await new Versioning(store).copy(busy.id, owner, { revision: busy.revision });
+  // Public, so another account may fork it.
+  await pool.query("UPDATE oc_timelines SET visibility='public' WHERE id=$1", [busy.id]);
+  const busyFork = await new Versioning(store).copy(busy.id, forker, { revision: busy.revision });
   timelines.push(busyFork.id);
   for (const timeline of [busy.id, busyFork.id])
     await pool.query('UPDATE oc_timelines SET retention_seconds=$2 WHERE id=$1', [
@@ -266,8 +269,10 @@ try {
         ])
       ).rows[0].count,
     );
+  // Each read by its own owner.
+  const ownerOf = (timeline) => (timeline === busyFork.id ? forker : owner);
   const ids = async (timeline) =>
-    (await store.snapshot(timeline, owner)).document.events.map((e) => e.id).sort();
+    (await store.snapshot(timeline, ownerOf(timeline))).document.events.map((e) => e.id).sort();
   const save = store.save;
   let interrupted = false;
   store.save = async function (timeline, ...rest) {
@@ -294,7 +299,7 @@ try {
       await ids(timeline),
       timeline === busy.id ? ['edge', 'kept', 'late'] : ['edge', 'kept'],
     );
-    assert.equal((await store.snapshot(timeline, owner)).document.durations, undefined);
+    assert.equal((await store.snapshot(timeline, ownerOf(timeline))).document.durations, undefined);
   }
   store.save = save;
   assert(interrupted);

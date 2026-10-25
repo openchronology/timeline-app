@@ -17,6 +17,7 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
   store = new PostgresStore(pool),
   versions = new Versioning(store);
 const owner = randomUUID(),
+  forker = randomUUID(),
   timelines = [];
 const LIMIT = 1048576;
 const byText = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -63,6 +64,11 @@ try {
     owner,
     'catalogue_' + owner.slice(0, 8),
   ]);
+  // An administrator, who may fork the private timeline.
+  await pool.query(
+    'INSERT INTO oc_users(id,username,quota_bypass,is_admin) VALUES($1,$2,true,true)',
+    [forker, 'catalogue_' + forker.slice(0, 8)],
+  );
   // Shared times, IDs whose "C" order differs from other collations, stacked entries, parts
   // longer than 4096 characters.
   const ids = ['b', 'B', 'a', 'A', '_x', 'm-1', 'm.2', 'Z9'];
@@ -106,7 +112,7 @@ try {
   assert.equal(await stored(t.id), expected, 'written from the document');
   assert.equal(await built(t.id), expected, 'built in the database');
   // A fork builds the same through its levels; both follow incremental saves.
-  const fork = await versions.copy(t.id, owner, { revision: t.revision });
+  const fork = await versions.copy(t.id, forker, { revision: t.revision });
   timelines.push(fork.id);
   assert.equal(await built(fork.id), expected, 'a fork');
   const settings = { ...small, events: [], durations: undefined };
@@ -179,7 +185,7 @@ try {
       await c.query('DELETE FROM oc_timelines WHERE id=$1', [id]);
       await store.removeHistory(c, id);
     });
-  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=$1', [owner]);
-  await pool.query('DELETE FROM oc_users WHERE id=$1', [owner]);
+  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=ANY($1)', [[owner, forker]]);
+  await pool.query('DELETE FROM oc_users WHERE id=ANY($1)', [[owner, forker]]);
   await pool.end();
 }

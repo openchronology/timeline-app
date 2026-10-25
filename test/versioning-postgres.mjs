@@ -115,15 +115,15 @@ try {
     ).rows[0],
     { history_rows: true, base_revision_id: upstream.head_revision_id, moments: 0 },
   );
-  const duplicate = await versions.copy(
-    upstream.id,
-    contributor,
-    { revision: upstream.revision },
-    true,
+  // Only its owner duplicates a timeline; others fork it (#259).
+  await rejected(
+    () => versions.copy(upstream.id, contributor, { revision: upstream.revision }, true),
+    403,
   );
+  const duplicate = await versions.copy(upstream.id, owner, { revision: upstream.revision }, true);
   timelines.push(duplicate.id);
   assert.equal(duplicate.upstream_id, null);
-  assert.equal((await versions.history(duplicate.id, contributor)).revisions[0].parents.length, 0);
+  assert.equal((await versions.history(duplicate.id, owner)).revisions[0].parents.length, 0);
   const originalFork = fork.head_revision_id;
   const changed = validateDocument({
     ...doc,
@@ -301,18 +301,18 @@ try {
     1,
   );
   const raced = await Promise.allSettled([
-    store.save(duplicate.id, contributor, duplicate.revision, {
+    store.save(duplicate.id, owner, duplicate.revision, {
       ...doc,
       title: 'First concurrent save',
     }),
-    store.save(duplicate.id, contributor, duplicate.revision, {
+    store.save(duplicate.id, owner, duplicate.revision, {
       ...doc,
       title: 'Second concurrent save',
     }),
   ]);
   assert.equal(raced.filter((r) => r.status === 'fulfilled').length, 1);
   assert.equal(raced.find((r) => r.status === 'rejected').reason.status, 409);
-  assert.equal((await versions.history(duplicate.id, contributor)).revisions.length, 2);
+  assert.equal((await versions.history(duplicate.id, owner)).revisions.length, 2);
   console.log(
     'PASS immutable PostgreSQL history, private/public forks, independent copies, pinned proposals, explicit updates, merge ancestry, repeated sync, conflict rollback, privacy and upstream deletion.',
   );

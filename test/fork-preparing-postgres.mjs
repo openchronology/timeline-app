@@ -20,6 +20,7 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
   store = new PostgresStore(pool),
   versions = new Versioning(store);
 const user = randomUUID(),
+  forker = randomUUID(),
   created = [];
 const order = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const key = (r) => JSON.stringify([r.a, r.b]);
@@ -78,10 +79,13 @@ async function prepared(id) {
   await store.prepare(id);
   return rebuilds;
 }
-/** A fork of `timeline` whose index is left for later, not yet prepared. */
+/**
+ * A duplicate of `timeline` (its owner's copy, as an account forks a timeline once) whose
+ * index is left for later, not yet prepared.
+ */
 async function heldFork(timeline) {
   hold();
-  const fork = await versions.copy(timeline.id, user, { revision: timeline.revision });
+  const fork = await versions.copy(timeline.id, user, { revision: timeline.revision }, true);
   release();
   created.push(fork.id);
   assert(fork.preparing, 'answered before its index is copied');
@@ -94,6 +98,11 @@ try {
     'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass) VALUES($1,$2,now(),true)',
     [user, 'preparing_' + user.slice(0, 8)],
   );
+  // An administrator, who may fork the private timelines.
+  await pool.query(
+    'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass,is_admin) VALUES($1,$2,now(),true,true)',
+    [forker, 'preparing_' + forker.slice(0, 8)],
+  );
   setEntryLimit(Infinity);
   const document = generateTimeline(25000);
   let source = await store.create(user, document);
@@ -104,13 +113,13 @@ try {
   // A small copy is ready when answered.
   const small = await store.create(user, generateTimeline(1000));
   created.push(small.id);
-  const smallFork = await versions.copy(small.id, user, { revision: small.revision });
+  const smallFork = await versions.copy(small.id, forker, { revision: small.revision });
   created.push(smallFork.id);
   assert.equal(smallFork.preparing, false);
-  // A copy of a fork that hides some of what it reads through to: it copies both levels,
+  // A copy of a copy that hides some of what it reads through to: it copies both levels,
   // and drops the hidden rows once it reads through to nothing.
   delete store.indexLevels;
-  let reader = await versions.copy(small.id, user, { revision: small.revision });
+  let reader = await versions.copy(small.id, user, { revision: small.revision }, true);
   created.push(reader.id);
   const smallDocument = await snapshot(small.id);
   reader = await store.save(reader.id, user, reader.revision, undefined, {
@@ -123,7 +132,7 @@ try {
     [reader.id],
   );
   assert.equal(hiding[0].n, '20');
-  const copyOfReader = await versions.copy(reader.id, user, { revision: reader.revision });
+  const copyOfReader = await versions.copy(reader.id, user, { revision: reader.revision }, true);
   created.push(copyOfReader.id);
   assert.equal(copyOfReader.preparing, false);
   assert.deepEqual(await snapshot(copyOfReader.id), await snapshot(reader.id));
@@ -148,7 +157,7 @@ try {
   for (const attempt of [
     () => store.snapshot(fork.id, user),
     () => store.save(fork.id, user, fork.revision, undefined, { settings, changes: [] }),
-    () => versions.copy(fork.id, user, { revision: fork.revision }),
+    () => versions.copy(fork.id, user, { revision: fork.revision }, true),
     () => versions.sync(fork.id, user, { revision: fork.revision }),
   ])
     await assert.rejects(attempt, stillPreparing);
@@ -285,7 +294,7 @@ try {
     await pool.query('DELETE FROM oc_timelines WHERE id=$1', [id]);
     await store.transaction((c) => store.removeHistory(c, id)).catch(() => {});
   }
-  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=$1', [user]);
-  await pool.query('DELETE FROM oc_users WHERE id=$1', [user]);
+  await pool.query('DELETE FROM oc_storage_entries WHERE user_id=ANY($1)', [[user, forker]]);
+  await pool.query('DELETE FROM oc_users WHERE id=ANY($1)', [[user, forker]]);
   await pool.end();
 }
