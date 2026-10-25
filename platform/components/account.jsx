@@ -42,8 +42,9 @@ export default function Account({ returnTo = '/', login = false }) {
     [error, setError] = useState(''),
     [message, setMessage] = useState(''),
     [busy, setBusy] = useState(false),
-    // The guest's step: login, register, forgot, reset, verify, or a challenge the server set
-    // after the password (mfa: a second factor; email: an address to confirm first).
+    // The guest's step: login, register, forgot, reset, verify, directory (signing in with a
+    // directory account), or a challenge the server set after the password (mfa: a second
+    // factor; email: an address to confirm first).
     [mode, setMode] = useState('login'),
     // The token from an emailed link (#verify=… or #reset=…), sent with that step's form.
     [token, setToken] = useState(''),
@@ -115,6 +116,7 @@ export default function Account({ returnTo = '/', login = false }) {
     const fields = Object.fromEntries(new FormData(event.currentTarget));
     const path = {
       login: 'login',
+      directory: 'ldap',
       register: 'register',
       mfa: 'mfa/complete',
       email: 'email/enroll',
@@ -267,6 +269,7 @@ export default function Account({ returnTo = '/', login = false }) {
           verify: 'Confirm email',
           mfa: 'Two-factor authentication',
           email: 'Confirm your email address',
+          directory: `Sign in with ${session?.directory?.label ?? 'a directory account'}`,
         }[mode] ?? 'Sign in'}
       </h1>
       {!session && !error && <p role="status">Loading your session…</p>}
@@ -277,6 +280,12 @@ export default function Account({ returnTo = '/', login = false }) {
       )}
       {session?.server && (
         <form onSubmit={submit}>
+          {mode === 'directory' && (
+            <label>
+              {session.directory?.label ?? 'Directory account'} username
+              <input name="username" autoComplete="username" maxLength={256} required />
+            </label>
+          )}
           {['login', 'register'].includes(mode) && (
             <label>
               Username
@@ -313,14 +322,16 @@ export default function Account({ returnTo = '/', login = false }) {
               </span>
             </label>
           )}
-          {['login', 'register', 'reset'].includes(mode) && (
+          {['login', 'directory', 'register', 'reset'].includes(mode) && (
             <label>
               Password
               <input
                 name="password"
                 type="password"
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                minLength={mode === 'login' ? 1 : 15}
+                autoComplete={
+                  ['login', 'directory'].includes(mode) ? 'current-password' : 'new-password'
+                }
+                minLength={['login', 'directory'].includes(mode) ? 1 : 15}
                 maxLength={1024}
                 required
               />
@@ -387,6 +398,7 @@ export default function Account({ returnTo = '/', login = false }) {
               {
                 {
                   login: 'Sign in',
+                  directory: 'Sign in',
                   register: 'Create account',
                   email: 'Send confirmation',
                   mfa: 'Verify code',
@@ -432,6 +444,17 @@ export default function Account({ returnTo = '/', login = false }) {
       )}
       {session?.server && ['login', 'register'].includes(mode) && (
         <div className="actions">
+          {session.directory && (
+            <button
+              disabled={busy}
+              onClick={() => {
+                setMode('directory');
+                setError('');
+              }}
+            >
+              Sign in with {session.directory.label}
+            </button>
+          )}
           {(session.providers ?? []).map((name) => (
             <button key={name} disabled={busy} onClick={() => provider(name)}>
               Continue with {PROVIDERS[name] ?? name}

@@ -368,7 +368,9 @@ section {
 .platform-footer {
   padding: 20px 28px;
   font-size: 12px;
+  line-height: 1.8;
   color: var(--muted);
+  text-align: center;
 }
 .legal-document pre {
   white-space: pre-wrap;
@@ -745,7 +747,10 @@ dialog::backdrop {
   width: auto;
 }
 
+/* Kept on one line where it fits; a long development label still wraps anywhere. */
 .build-identity {
+  display: inline-block;
+  max-width: 100%;
   overflow-wrap: anywhere;
 }
 /* Human-verification check (src/challenge.ts), shown when the server asks for one. */

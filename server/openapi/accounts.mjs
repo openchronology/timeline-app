@@ -176,6 +176,46 @@ export const paths = {
       },
     },
   },
+  '/api/auth/ldap': {
+    post: {
+      operationId: 'signInWithDirectory',
+      tags: ['Sign-in'],
+      summary: 'Sign in with a directory account',
+      description: [
+        'Only when the server configures directory sign-in (LDAP or Active Directory; `directory` in `GET /api/session`), else 404. The server finds the account with `username` in its directory and checks `password` by binding as it; nothing about the password is kept. A first sign-in creates an account, named after the directory account when that username is free, which then gives and confirms an email address (the `email` step) as a new social sign-in does.',
+        SIGN_IN_TOKEN,
+        'Answers, cookies, steps, human verification and limits are as for `POST /api/auth/login`; 502 when the directory cannot be reached.',
+      ].join('\n\n'),
+      security: SIGN_IN,
+      parameters: [clientHeader, challengeHeader],
+      requestBody: body(ref('DirectorySignInRequest')),
+      responses: {
+        200: {
+          ...json({ oneOf: [ref('SignedIn'), ref('SignInStep')] }, 'Signed in, or the next step.'),
+          headers: setCookie(
+            'As for `POST /api/auth/login`: `oc_session` signed in from a browser, or `oc_challenge` for a further step. ' +
+              COOKIE_NAMES,
+          ),
+        },
+        ...errors(400, 401, 403, 404, 413, 428, 429, 502, 503),
+      },
+    },
+  },
+  '/api/auth/ldap/link': {
+    post: {
+      operationId: 'linkDirectoryAccount',
+      tags: ['Account security'],
+      summary: 'Link a directory account',
+      description:
+        'Adds a directory account (checked as `POST /api/auth/ldap` checks it) to the ways to sign in to this account. Needs a sign-in within the last five minutes (else 403); 409 when the directory account belongs to another account, or this one already links a different one. Unlinking is `POST /api/auth/identities/unlink` with `provider: ldap`.',
+      security: SIGNED_IN,
+      requestBody: body(ref('DirectorySignInRequest')),
+      responses: {
+        200: json(ref('Ok'), 'Linked.'),
+        ...errors(400, 401, 403, 404, 409, 413, 429, 502, 503),
+      },
+    },
+  },
   '/api/auth/register': {
     post: {
       operationId: 'register',
@@ -645,14 +685,14 @@ export const paths = {
       tags: ['Account security'],
       summary: 'Unlink a sign-in provider',
       description:
-        'Removes a provider from the ways to sign in to this account. An account keeps at least one: a password or another provider (409). Linking is `POST /api/auth/{provider}/start` with `link: true`. ' +
+        'Removes a provider from the ways to sign in to this account. An account keeps at least one: a password or another provider (409). Linking is `POST /api/auth/{provider}/start` with `link: true`, or `POST /api/auth/ldap/link` for a directory account. ' +
         FRESH,
       security: SIGNED_IN,
       requestBody: body({
         type: 'object',
         required: ['provider'],
         properties: {
-          provider: ref('SignInProvider'),
+          provider: ref('IdentityProvider'),
           password: currentPassword,
           code: factorCode,
         },
@@ -862,6 +902,24 @@ export const schemas = {
         items: ref('SignInProvider'),
         description: 'The sign-in providers this server offers.',
       },
+      directory: {
+        oneOf: [
+          {
+            type: 'object',
+            required: ['label'],
+            properties: {
+              label: {
+                type: 'string',
+                maxLength: 40,
+                description: 'What the sign-in page calls it, such as “School account”.',
+              },
+            },
+          },
+          { type: 'null' },
+        ],
+        description:
+          'Directory (LDAP or Active Directory) sign-in through `POST /api/auth/ldap`, when the server configures it; else null.',
+      },
       security: {
         type: 'object',
         description:
@@ -922,6 +980,30 @@ export const schemas = {
     },
   },
   SignInProvider: { type: 'string', enum: ['google', 'github', 'facebook'] },
+  IdentityProvider: {
+    type: 'string',
+    enum: ['google', 'github', 'facebook', 'ldap'],
+    description:
+      'A way to sign in linked to an account: a sign-in provider, or `ldap` for a directory account.',
+  },
+  DirectorySignInRequest: {
+    type: 'object',
+    required: ['username', 'password'],
+    properties: {
+      username: {
+        type: 'string',
+        minLength: 1,
+        maxLength: 256,
+        description: 'The directory account’s name, as the directory knows it.',
+      },
+      password: {
+        type: 'string',
+        minLength: 1,
+        maxLength: 1024,
+        description: 'The directory account’s password.',
+      },
+    },
+  },
   SignInRequest: {
     type: 'object',
     required: ['username', 'password'],
@@ -1181,7 +1263,7 @@ export const schemas = {
       keys: { type: 'array', items: ref('ApiKey') },
       identities: {
         type: 'array',
-        items: ref('SignInProvider'),
+        items: ref('IdentityProvider'),
         description: 'The sign-in providers linked to the account.',
       },
       sessions: { type: 'array', items: ref('AccountSession') },

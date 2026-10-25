@@ -77,6 +77,11 @@ CREATE TABLE IF NOT EXISTS oc_identities (
   user_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE, PRIMARY KEY(provider,subject),
   UNIQUE(user_id,provider)
 );
+-- Directory accounts (ldap.mjs, #286) are identities too, as provider 'ldap': the CHECK is
+-- replaced; a re-run drops and re-adds the same one.
+ALTER TABLE oc_identities DROP CONSTRAINT IF EXISTS oc_identities_provider_check;
+ALTER TABLE oc_identities ADD CONSTRAINT oc_identities_provider_check
+  CHECK(provider IN ('google','github','facebook','ldap'));
 -- A provider sign-in in progress (oauth.mjs): inserted by start, and deleted with RETURNING
 -- by the callback, so each flow is used once; 10 minutes.
 --   state_hash: SHA-256 of the OAuth state; browser_hash: hash of the oc_oauth cookie, which

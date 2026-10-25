@@ -339,10 +339,11 @@ export class OAuth {
    * grants access to an account. With `linkUser`, the identity is attached to that account
    * (refused with 409 if it belongs to another, or if the account already has a different
    * identity at that provider, from the UNIQUE(user_id,provider) constraint). Without it, an
-   * unknown identity gets a new account with a generated username and no password; it has no
+   * unknown identity gets a new account with no password, named `preferred` when that username
+   * is free (a directory account's own name, ldap.mjs), else a generated one; it has no
    * confirmed email yet, so it must give one before it can have a session.
    */
-  async identity(provider, subject, linkUser) {
+  async identity(provider, subject, linkUser, preferred = null) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -361,13 +362,27 @@ export class OAuth {
         const id = linkUser ?? randomUUID();
         if (linkUser)
           user = (await client.query('SELECT id,username FROM oc_users WHERE id=$1', [id])).rows[0];
-        else
-          user = (
+        else {
+          // The preferred name if no account (nor a pending registration) has it; ON CONFLICT
+          // covers an account taking it meanwhile.
+          if (
+            preferred &&
+            !(await client.query('SELECT 1 FROM oc_registrations WHERE username=$1', [preferred]))
+              .rows.length
+          )
+            user = (
+              await client.query(
+                'INSERT INTO oc_users(id,username,password_hash) VALUES($1,$2,NULL) ON CONFLICT(username) DO NOTHING RETURNING id,username',
+                [id, preferred],
+              )
+            ).rows[0];
+          user ??= (
             await client.query(
               'INSERT INTO oc_users(id,username,password_hash) VALUES($1,$2,NULL) RETURNING id,username',
               [id, `${provider}_${randomBytes(8).toString('hex')}`],
             )
           ).rows[0];
+        }
         // Claims the identity. If a concurrent callback for the same identity won the race,
         // DO NOTHING returns no row: the account just created is removed again and the winner's
         // account is used instead.

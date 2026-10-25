@@ -37,6 +37,7 @@ import { isIP } from 'node:net';
 import { minor, Auth } from './auth.mjs';
 import { Challenges } from './challenge.mjs';
 import { OAuth, providersFromEnv } from './oauth.mjs';
+import { Directory, directoryFromEnv } from './ldap.mjs';
 import { mailFromEnv, encryptionKey } from './mail.mjs';
 import { DeviceAuth } from './device-auth.mjs';
 import { TimelineFiles } from './files.mjs';
@@ -281,6 +282,10 @@ export function createRequestHandler({
   origin = 'http://localhost:5173',
   staticDir = resolve('dist'),
   providers = providersFromEnv(),
+  // Directory (LDAP / Active Directory) sign-in settings (ldap.mjs); null for none.
+  directory: directorySettings = directoryFromEnv(),
+  // Makes the directory's ldapts clients; injectable for tests.
+  directoryClient,
   converter = new TimelineFiles(),
   fetcher = fetch,
   mailer = mailFromEnv(),
@@ -308,6 +313,10 @@ export function createRequestHandler({
         })
       : null,
     oauth = auth ? new OAuth(auth, providers, fetcher) : null,
+    directory =
+      auth && directorySettings
+        ? new Directory(auth, oauth, directorySettings, directoryClient)
+        : null,
     challenges = new Challenges({
       ...(challengeSettings ?? { provider: 'off' }),
       pool,
@@ -462,6 +471,8 @@ export function createRequestHandler({
               : null,
             csrf: session?.csrf ?? nonce,
             providers: oauth?.names() ?? [],
+            // Directory sign-in, when configured: what the sign-in page calls it.
+            directory: directory ? { label: directory.label } : null,
             ...(auth
               ? {
                   security: {
@@ -495,26 +506,33 @@ export function createRequestHandler({
         // already open (signing in as someone else), else the login nonce; then the
         // human-verification challenge (always to register; to sign in after repeated
         // failures from the address or for the account). Rate limits are in auth.signIn. A
-        // session already open is ended once the new one is issued.
-        if (['/api/auth/login', '/api/auth/register'].includes(pathname) && method === 'POST') {
+        // session already open is ended once the new one is issued. A directory sign-in
+        // (/api/auth/ldap, ldap.mjs) is checked the same way, its failures counted under its
+        // own `ldap:` names.
+        if (
+          ['/api/auth/login', '/api/auth/register', '/api/auth/ldap'].includes(pathname) &&
+          method === 'POST'
+        ) {
+          if (pathname === '/api/auth/ldap' && !directory)
+            throw new HttpError(404, 'Directory sign-in is not configured.');
           const previous = await auth.session(req);
           if (previous) auth.require(previous, req);
           else auth.requireLogin(req);
           const register = pathname.endsWith('/register'),
+            ldap = pathname.endsWith('/ldap'),
             input = await body(req, 8192),
-            username = typeof input.username === 'string' ? input.username.toLowerCase() : '';
+            username =
+              (ldap ? 'ldap:' : '') +
+              (typeof input.username === 'string' ? input.username.trim().toLowerCase() : '');
           if (register) await challenges.require(req, 'register', previous);
           else if (await challenges.signInNeeded(req.clientAddress, username))
             await challenges.require(req, 'sign-in', previous);
+          const kind = req.headers['x-oc-client'] === 'desktop' ? 'desktop' : 'web';
           let result;
           try {
-            result = await auth.signIn(
-              input,
-              register,
-              req.clientAddress,
-              req.headers['x-oc-client'] === 'desktop' ? 'desktop' : 'web',
-              req,
-            );
+            result = ldap
+              ? await directory.signIn(req, input, kind)
+              : await auth.signIn(input, register, req.clientAddress, kind, req);
           } catch (error) {
             if (!register && error.status === 401)
               await challenges.signInFailed(req.clientAddress, username);
@@ -694,13 +712,19 @@ export function createRequestHandler({
           auth.require(session, req);
           return response(res, 200, await auth.keys.revoke(userId, apiKey[1], method === 'DELETE'));
         }
+        // Linking a directory account (ldap.mjs): signed in within five minutes, with the CSRF
+        // token and the directory account's own username and password.
+        if (pathname === '/api/auth/ldap/link' && method === 'POST') {
+          if (!directory) throw new HttpError(404, 'Directory sign-in is not configured.');
+          return response(res, 200, await directory.link(req, await body(req, 8192), session));
+        }
         // Unlinking a social sign-in: signed in, with the CSRF token, a rate limit and a fresh
         // confirmation (security.fresh), refused when it would leave no way to sign in.
         if (pathname === '/api/auth/identities/unlink' && method === 'POST') {
           auth.require(session, req);
           await auth.rateLimit('unlink:' + userId);
           const value = await body(req, 8192);
-          if (!['google', 'github', 'facebook'].includes(value.provider))
+          if (!['google', 'github', 'facebook', 'ldap'].includes(value.provider))
             throw new HttpError(400, 'Unknown provider.');
           await auth.security.transaction(async (c) => {
             // The account locked, so two unlinks at once cannot each see the other identity
