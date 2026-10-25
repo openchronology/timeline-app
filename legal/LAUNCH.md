@@ -1,11 +1,12 @@
 # Operator publication checklist
 
-These policies are reviewable drafts, not assertions that timescale.info is
-already operating or that legal registrations have been completed. They intentionally
-avoid invented contact addresses, corporate status, hosting vendors, and jurisdiction.
-Copyright and GPL software licensing take effect independently of this draft status.
+The terms, privacy policy and copyright policy took effect on 25 October 2026, with
+privacy@timescale.info as the contact, DigitalOcean (United States) as the host, nginx
+logs kept 14 days and database backups taken before upgrades. They do not assert that
+legal registrations have been completed. Copyright and GPL software licensing apply
+independently.
 
-Before making the hosted policies effective:
+Still to do (items already done are kept for reference):
 
 - Supply Athan Clark's monitored support/privacy/abuse/security contact and required
   operator/business mailing information. A service address can avoid publishing a

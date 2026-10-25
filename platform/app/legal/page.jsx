@@ -11,10 +11,10 @@ export function generateMetadata() {
 export default async function LegalPage() {
   const files = [
     ['NOTICE', 'Copyright and software rights'],
-    ['legal/TERMS.md', 'Service terms (draft)'],
-    ['legal/PRIVACY.md', 'Privacy notice (draft)'],
+    ['legal/TERMS.md', 'Terms of service'],
+    ['legal/PRIVACY.md', 'Privacy policy'],
     ['legal/COPYRIGHT.md', 'Copyright, abuse and security reports'],
-    ['legal/LAUNCH.md', 'Operator details pending'],
+    ['legal/LAUNCH.md', 'Operator checklist'],
     ['LICENSE', 'GNU General Public License version 3'],
     ['THIRD_PARTY.md', 'Third-party attribution'],
   ];
@@ -30,8 +30,8 @@ export default async function LegalPage() {
     <main className="platform">
       <h1>Terms, privacy and software licenses</h1>
       <p>
-        Hosted-service policies are drafts pending operator details. Software licensing is effective
-        independently.
+        The <a href="/terms">terms of service</a> and <a href="/privacy">privacy policy</a> also
+        have pages of their own. Software licensing applies independently of them.
       </p>
       {documents.map((d) => (
         <details className="legal-document" key={d.title} id={d.id}>

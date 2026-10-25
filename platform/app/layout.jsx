@@ -94,8 +94,9 @@ export default async function RootLayout({ children }) {
         </header>
         {children}
         <footer className="platform-footer">
-          © 2026 Athan Clark · GPLv3 · No warranty ·{' '}
-          <a href="/legal">Terms, privacy &amp; licenses</a> · <a href="/help">Help</a> ·{' '}
+          © 2026 Athan Clark · GPLv3 · No warranty · <a href="/terms">Terms</a> ·{' '}
+          <a href="/privacy">Privacy</a> · <a href="/legal">Licenses</a> · <a href="/help">Help</a>{' '}
+          ·{' '}
           {support ? (
             <>
               <a href={support}>Support this site</a> ·{' '}

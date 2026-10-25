@@ -1,14 +1,14 @@
 # Copyright, abuse, and security reporting
 
-Draft version: 2026-10-15. Operator: Athan Clark, an individual.
-Public reporting email and, if used, designated-agent details are pending.
-This draft does not assert that a DMCA agent has been registered or that a safe
-harbor automatically applies.
+Effective 25 October 2026. Operator: Athan Clark, an individual. Contact for
+copyright notices, abuse and security reports: **privacy@timescale.info**. No DMCA
+designated agent has been registered, and this page does not assert that a safe harbor
+automatically applies.
 
 Anyone can report a timeline, moment, duration, comment, published plugin or suite, or
 account with **Report**, choosing "Copyright infringement" and describing the work and
 why its use is unauthorized; no account is needed. A formal notice, such as a US DMCA
-notice, goes to the operator contact once it is published, as described below.
+notice, goes to privacy@timescale.info, as described below.
 
 Images on timelines are links to where their owners host them, not copies stored by
 the service (docs/images.md). A complaint about a linked image can ask for the link to

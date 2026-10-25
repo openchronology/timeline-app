@@ -2,7 +2,7 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-`/legal`: the service terms, privacy notice, copyright and abuse reports, the GPL and third-party attributions, read as they are from the repository's `NOTICE`, `LICENSE`, `THIRD_PARTY.md` and `legal/` files.
+`/legal`: the service terms, privacy policy, copyright and abuse reports, the GPL and third-party attributions, read as they are from the repository's `NOTICE`, `LICENSE`, `THIRD_PARTY.md` and `legal/` files.
 
 ## Contents
 

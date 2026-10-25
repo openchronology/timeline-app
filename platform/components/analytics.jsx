@@ -66,7 +66,7 @@ export default function Analytics({ id, nonce }) {
     <aside className="analytics-consent" role="dialog" aria-label="Analytics">
       <p>
         May this site use Google Analytics cookies to count visits and see which pages are used?
-        Your timelines are never sent. See the <a href="/legal">privacy notice</a>.
+        Your timelines are never sent. See the <a href="/privacy">privacy policy</a>.
       </p>
       <div className="actions">
         <button type="button" onClick={() => choose(false)}>

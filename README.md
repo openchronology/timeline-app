@@ -240,9 +240,10 @@ User timelines and original user scripts retain their owners' rights.
 
 The [licensing and source distribution guide](docs/licensing.md) explains release
 source bundles. [Service terms](legal/TERMS.md), [privacy](legal/PRIVACY.md), and
-[copyright/abuse reporting](legal/COPYRIGHT.md) for timescale.info are drafts; complete
-[operator details](legal/LAUNCH.md) before public adoption. Notices are embedded in
-the web, desktop, and standalone HTML interfaces; the server also serves `/legal.html`.
+[copyright/abuse reporting](legal/COPYRIGHT.md) for timescale.info took effect on 25 October
+2026; [the operator checklist](legal/LAUNCH.md) lists what remains. Notices are embedded in
+the web, desktop, and standalone HTML interfaces; the server also serves `/legal.html`, and
+the platform serves `/terms`, `/privacy` and `/legal`.
 
 Public historical examples can be installed with `docker compose run --rm seed`
 after the stack starts, or `npm run seed` / `pnpm seed` / `yarn seed` with a migrated
