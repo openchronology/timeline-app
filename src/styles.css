@@ -481,6 +481,9 @@ main {
 }
 .title-input {
   display: block;
+  resize: none;
+  overflow: hidden;
+  overflow-wrap: break-word;
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 34px;
   letter-spacing: -0.04em;
@@ -964,8 +967,13 @@ dialog.moment-dialog.reading {
   display: none;
 }
 .moment-dialog .reader-panel h2 {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
   font-size: 30px;
+  line-height: 1.2;
+  /* Long titles wrap between words; a word breaks only when it can't fit on a line at all. */
+  overflow-wrap: break-word;
 }
 .reader-body {
   display: flex;
@@ -1062,6 +1070,18 @@ dialog.moment-dialog.reading {
   border-radius: 7px;
 }
 @media (max-width: 650px) {
+  /* On a phone the reader's buttons keep their row at the top, × at the corner, and the title
+     takes the full width below them rather than a narrow column beside them. */
+  .reader-panel .inspector-heading {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 8px;
+  }
+  .moment-dialog .reader-panel h2 {
+    order: 1;
+    flex-basis: 100%;
+    font-size: 26px;
+  }
   dialog.moment-dialog.reading {
     width: 100vw;
     max-width: 100vw;

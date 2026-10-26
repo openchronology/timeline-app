@@ -6375,11 +6375,26 @@ input('timeline-title').onchange = () => {
  * inside one line: its height follows its content as it is filled, typed and rewrapped.
  */
 function fitDescription() {
-  const description = el<HTMLTextAreaElement>('timeline-description');
-  description.style.height = 'auto';
-  description.style.height = `${description.scrollHeight}px`;
+  // The title too: a long one wraps under itself on a narrow screen instead of running off it.
+  for (const id of ['timeline-title', 'timeline-description']) {
+    const area = el<HTMLTextAreaElement>(id);
+    area.style.height = 'auto';
+    area.style.height = `${area.scrollHeight}px`;
+  }
 }
 el('timeline-description').addEventListener('input', fitDescription);
+// The title is one line of text that wraps: Enter commits it, and pasted line breaks become
+// spaces.
+el<HTMLTextAreaElement>('timeline-title').addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' || event.isComposing) return;
+  event.preventDefault();
+  (event.currentTarget as HTMLTextAreaElement).blur();
+});
+el<HTMLTextAreaElement>('timeline-title').addEventListener('input', (event) => {
+  const title = event.currentTarget as HTMLTextAreaElement;
+  if (/[\r\n]/.test(title.value)) title.value = title.value.replace(/\s*[\r\n]+\s*/g, ' ');
+  fitDescription();
+});
 // A new width rewraps it; only the width, so its own height change doesn't call back forever.
 // The height changes in the next frame, not during the observer's own delivery, which would
 // leave notifications undelivered (WebKit reports a ResizeObserver loop).
