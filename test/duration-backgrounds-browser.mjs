@@ -278,6 +278,31 @@ export async function checkDurationBackgrounds(page, restore) {
   await setting.dispatchEvent('change');
   await page.locator('[data-close="plugins-dialog"]').click();
   await page.waitForFunction(() => !document.querySelector('.timeline-backdrop'));
+  // A scroll's event arrives a frame after the scroll: one for a scroll that ended before the
+  // menu opened, as when a right-click follows it at once, must not close the menu (#308).
+  const afterScroll = await page.evaluate(async () => {
+    const band = document.querySelector('.duration-band[data-duration-id="inner"]');
+    const before = window.scrollY;
+    window.scrollTo(0, before > 0 ? 0 : 40);
+    const scrolled = window.scrollY !== before;
+    const rect = band.getBoundingClientRect();
+    band.dispatchEvent(
+      new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+      }),
+    );
+    for (let i = 0; i < 2; i++) await new Promise(requestAnimationFrame);
+    return { scrolled, open: !document.getElementById('timeline-menu').hidden };
+  });
+  assert.deepEqual(afterScroll, { scrolled: true, open: true });
+  // A press outside it closes it.
+  await page.evaluate(() =>
+    document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })),
+  );
+  await page.waitForFunction(() => document.getElementById('timeline-menu').hidden);
   // A duration's menu fits it in the view, with Fit all's margin (#268): 100 to 200 spans
   // 80 to 220, give or take the view's rounding to whole pixels.
   await page.locator('.duration-band[data-duration-id="inner"]').click({ button: 'right' });

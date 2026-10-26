@@ -769,6 +769,8 @@ reducedMotion.addEventListener('change', () => {
     for (const label of [...momentLabels.values(), ...stackLabels.values()]) finishTimeFade(label);
 });
 let menuGeneration = 0;
+/** What the open timeline menu was opened on, and where it was then (see closeMenuOnScroll). */
+let menuAnchor: { node: Element; left: number; top: number } | null = null;
 let longPressTimer: ReturnType<typeof setTimeout> | undefined;
 let longPressed = false;
 let frame: Frame = { groups: [], visitedNodes: 0 },
@@ -4513,7 +4515,11 @@ function animateView(destination: Viewport, automatic = false) {
       cancelZoomAnimation();
       return;
     }
-    const progress = Math.min(1, Math.max(0, (now - started) / 220));
+    // The first frame advances at least one frame interval. Input arrives at the start of a
+    // frame, after that frame's timestamp, so `now - started` is zero or less on the first tick:
+    // it would redraw the unchanged view at full cost and the zoom would show a frame late
+    // (#319).
+    const progress = Math.min(1, Math.max(1000 / 60, now - started) / 220);
     if (progress === 1) {
       cancelZoomAnimation();
       navigate(destination, false);
@@ -4591,10 +4597,9 @@ function fit() {
   requestRender();
 }
 
-/** Where the page was scrolled when the timeline menu opened. */
-let menuScroll = { x: 0, y: 0 };
 function closeTimelineMenu() {
   menuGeneration++;
+  menuAnchor = null;
   const menu = el('timeline-menu');
   if (menu.contains(document.activeElement)) stage.focus({ preventScroll: true });
   if (menu.matches(':popover-open')) menu.hidePopover();
@@ -4684,6 +4689,12 @@ function showTimelineMenu(
   closeTimelineMenu();
   const menu = el('timeline-menu');
   const details = el<HTMLDialogElement>('inspector');
+  // Read before the menu shows, so the menu itself is not what lies under the point.
+  const node = document.elementFromPoint(x, y);
+  if (node) {
+    const rect = node.getBoundingClientRect();
+    menuAnchor = { node, left: rect.left, top: rect.top };
+  }
   (details.open ? details : document.body).append(menu);
   menu.replaceChildren();
   const add = (label: string, action: () => void) => {
@@ -4771,7 +4782,6 @@ function showTimelineMenu(
   menu.hidden = false;
   menu.popover = 'manual';
   menu.showPopover();
-  menuScroll = { x: window.scrollX, y: window.scrollY };
   const bounds = menu.getBoundingClientRect();
   menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - bounds.width - 4))}px`;
   menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - bounds.height - 4))}px`;
@@ -4909,17 +4919,21 @@ document.addEventListener('pointerdown', (event) => {
   if (!el('timeline-menu').contains(event.target as Node)) closeTimelineMenu();
 });
 window.addEventListener('resize', closeTimelineMenu);
-// Scrolling closes the menu, but not a page scroll that ended before it opened: its event
-// arrives a frame later, as when scrolling to a band and right-clicking it at once (#308).
-window.addEventListener(
-  'scroll',
-  (event) => {
-    const page = event.target === document || event.target === document.documentElement;
-    if (page && window.scrollX === menuScroll.x && window.scrollY === menuScroll.y) return;
-    closeTimelineMenu();
-  },
-  true,
-);
+/**
+ * Scrolling closes the menu once what it was opened on has moved, or gone. A scroll event can
+ * arrive a frame after the scroll itself, so one for a scroll that ended before the menu opened
+ * (a press or right-click straight after scrolling) would otherwise close it at once (#308).
+ */
+function closeMenuOnScroll() {
+  if (el('timeline-menu').hidden) return;
+  if (menuAnchor?.node.isConnected) {
+    const rect = menuAnchor.node.getBoundingClientRect();
+    if (Math.abs(rect.left - menuAnchor.left) < 1 && Math.abs(rect.top - menuAnchor.top) < 1)
+      return;
+  }
+  closeTimelineMenu();
+}
+window.addEventListener('scroll', closeMenuOnScroll, true);
 window.addEventListener('blur', () => {
   clearTimeout(longPressTimer);
   closeTimelineMenu();
