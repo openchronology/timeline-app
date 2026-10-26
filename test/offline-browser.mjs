@@ -248,9 +248,15 @@ try {
   await cfam.locator('#plugins-button').click();
   const installed = cfam.locator('#installed-plugins .installed-plugin');
   await cfam.waitForFunction(
-    () => document.querySelectorAll('#installed-plugins .installed-plugin').length === 3,
+    () => document.querySelectorAll('#installed-plugins .installed-plugin').length === 5,
   );
-  for (const [i, name] of ['Moment stacks', 'Moment shapes', 'Moment colors'].entries()) {
+  for (const [i, name] of [
+    'Moment stacks',
+    'Moment shapes',
+    'Moment colors',
+    'Presumptive outline',
+    'Relationship arrows',
+  ].entries()) {
     assert.match(await installed.nth(i).locator('strong').textContent(), new RegExp(name));
     assert(await installed.nth(i).locator('input[type=checkbox]').isChecked());
   }
