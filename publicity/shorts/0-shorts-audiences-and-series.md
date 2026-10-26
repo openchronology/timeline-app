@@ -51,7 +51,7 @@ Of the explainers' ten audiences, five gather on short-form feeds in communities
 
 Ten shorts. Three storyboard shapes, so the feed doesn't see the same video twice:
 
-- **The zoom** (1, 4, 5, 8, 9): the real app on a phone, one continuous gesture from far out to one exact thing, with captions over it.
+- **The zoom** (1, 4, 5, 8, 9, 12): the real app on a phone, one continuous gesture from far out to one exact thing, with captions over it.
 - **The stat** (2, 3, 10): one surprising number, built up in animation, then the app as the proof.
 - **The how-to** (6, 7): a problem their community has, and the two or three steps that solve it, as interface cards.
 
@@ -67,6 +67,7 @@ Ten shorts. Three storyboard shapes, so the feed doesn't see the same video twic
 | 8   | **2 a.m. Everything's down.**           | Zoom   | Developers, operations | Terminal  | ~0:35   | "2 a.m. Everything's down. What broke first?"     | 10 · Logs            |
 | 9   | **I asked an AI to build a timeline**   | Zoom   | AI, developers         | Terminal  | ~0:41   | "I asked an AI to build a timeline"               | 12 · AI, automation  |
 | 10  | **Why did it happen?**                  | Stat   | Investigators, safety  | Terminal  | ~0:43   | "Why did it happen?"                              | 13 · Investigations  |
+| 12  | **Closer to the Moon than the pyramid** | Zoom   | History, everyone      | Archive   | ~0:42   | "Cleopatra lived closer to the Moon landing…"     | 15 · Ancient Egypt   |
 
 **Order of release (suggested):** 1 and 2 first (the widest feeds, and both end on the same line from eons to seconds), then 4 and 3 (the strongest single facts), then 5, 8, 6 and 7, then 9 and 10. Two or three a week; post each on all three platforms the same day.
 
