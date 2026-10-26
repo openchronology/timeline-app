@@ -4900,22 +4900,24 @@ window.addEventListener('blur', () => {
   closeTimelineMenu();
 });
 
-// Pointer Events give mouse dragging, single-touch panning and two-touch anchored scaling.
+// Pointer Events give mouse dragging, single-touch panning and two-touch anchored zooming.
 const pointers = new Map<number, { x: number; y: number }>();
 /**
- * A two-finger gesture does one thing, chosen when the second finger lands: fingers side by side
- * (up to 60° from horizontal) zoom time; fingers stacked vertically resize the contents.
- * Coordinates are CSS pixels of the current layout, so the choice follows the screen orientation.
+ * Two fingers hold the timeline: the times under them stay under them horizontally, so their
+ * horizontal separation zooms time, and the contents follow their midpoint up and down. They never
+ * resize the contents, which only the size buttons (and Ctrl-scroll) do: a vertical pinch was too
+ * easy to make by accident. Fingers less than ZOOM_HOLD pixels apart horizontally when the second
+ * one lands cannot hold a span of time, so they pan instead. Coordinates are CSS pixels of the
+ * current layout, so this follows the screen orientation.
  */
-const RESIZE_PINCH_SLOPE = Math.tan((60 * Math.PI) / 180);
+const ZOOM_HOLD = 40;
 let gesture: {
     view: Viewport;
     mid: number;
     midY: number;
     vertical: number;
-    distance: number;
-    scale: number;
-    mode: 'pan' | 'zoom' | 'resize';
+    dx: number;
+    mode: 'pan' | 'zoom';
   } | null = null,
   press: { id: number; x: number; y: number; time: number; target: EventTarget | null } | null =
     null,
@@ -4929,10 +4931,8 @@ function metrics() {
   return {
     mid: p.length === 1 ? localX(p[0].x) : localX((p[0].x + p[1].x) / 2),
     midY: p.length === 1 ? p[0].y : (p[0].y + p[1].y) / 2,
-    // Euclidean separation: drifting between axes during a pinch does not change its factor.
-    distance: p.length < 2 ? 1 : Math.max(1, Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y)),
+    // Horizontal separation only: the fingers hold times, and time runs horizontally.
     dx: p.length < 2 ? 0 : Math.abs(p[0].x - p[1].x),
-    dy: p.length < 2 ? 0 : Math.abs(p[0].y - p[1].y),
   };
 }
 function resetGesture() {
@@ -4940,13 +4940,12 @@ function resetGesture() {
     gesture = null;
     return;
   }
-  const { dx, dy, ...start } = metrics();
+  const start = metrics();
   gesture = {
     view: viewport.clone(),
     vertical: verticalOffset,
-    scale: uiScale,
     ...start,
-    mode: pointers.size < 2 ? 'pan' : dy > dx * RESIZE_PINCH_SLOPE ? 'resize' : 'zoom',
+    mode: pointers.size < 2 || start.dx < ZOOM_HOLD ? 'pan' : 'zoom',
   };
 }
 stage.addEventListener(
@@ -5006,11 +5005,8 @@ stage.addEventListener('pointermove', (event) => {
   if (!moved || longPressed) return;
   follow.navigation();
   stage.classList.add('dragging');
-  if (gesture.mode === 'resize' && gesture.distance >= 20)
-    uiScale = Math.max(0.2, Math.min(3, (gesture.scale * now.distance) / gesture.distance));
-  const anchor = gesture.midY - stage.getBoundingClientRect().top;
-  verticalOffset =
-    anchor - ((anchor - gesture.vertical) * uiScale) / gesture.scale + now.midY - gesture.midY;
+  verticalOffset = gesture.vertical + now.midY - gesture.midY;
+  // Fingers pinched almost together still hold a sliver of time rather than an instant.
   const next =
     gesture.mode === 'pan'
       ? gesture.view.pan(now.mid - gesture.mid, width())
@@ -5018,9 +5014,7 @@ stage.addEventListener('pointermove', (event) => {
           gesture.mid,
           now.mid,
           width(),
-          gesture.mode === 'zoom' && gesture.distance >= 20
-            ? screenQ(gesture.distance).div(screenQ(now.distance))
-            : Q.from(1n),
+          screenQ(gesture.dx).div(screenQ(Math.max(4, now.dx))),
         );
   if (next.left.compare(viewport.left) === 0 && next.span.compare(viewport.span) === 0)
     requestRender(false);
@@ -5153,6 +5147,10 @@ el('tour-button').onclick = () => {
 el('guide-button').onclick = () => openHelp(helpAddress('guide'));
 el('zoom-in').onclick = () => zoom(Q.from(4n, 5n));
 el('zoom-out').onclick = () => zoom(Q.from(5n, 4n));
+// The contents' size (markers, labels, ruler and stack spacing), around the stage's middle: only
+// these buttons and Ctrl-scroll change it, never a touch gesture.
+el('size-up').onclick = () => scaleContents(uiScale * 1.25, stage.clientHeight / 2);
+el('size-down').onclick = () => scaleContents(uiScale / 1.25, stage.clientHeight / 2);
 el('fit-button').onclick = fit;
 el('center-vertical').onclick = () => {
   follow.navigation();
