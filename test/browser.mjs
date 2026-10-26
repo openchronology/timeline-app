@@ -292,7 +292,9 @@ try {
     await closeMomentDetails(page);
     await input('fit-button').click();
     await poll(async () => (await markers.count()) === 3);
-    // Fit all animates the view: tap the marker once it has stopped moving.
+    // Fit all animates the view: tap the marker once it is on screen and has stopped moving.
+    // A taller toolbar (wider fonts wrap it) can push the stage below the fold.
+    await markers.first().scrollIntoViewIfNeeded();
     let m = await markers.first().boundingBox(),
       last = null;
     await poll(async () => {
