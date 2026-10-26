@@ -84,7 +84,7 @@ const owner = randomUUID(),
     await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'),
     // Index rows written directly here record a clock, as the server's writes do.
     "SELECT set_config('oc.clock','1',true);",
-    `INSERT INTO oc_users(id,username,password_hash) VALUES(${value(owner)},'sql-oracle','unused');`,
+    `INSERT INTO oc_users(id,username,password_hash,terms_version) VALUES(${value(owner)},'sql-oracle','unused',oc_policy_version());`,
     `INSERT INTO oc_timelines(id,owner_id,title,root,event_count,presentation,plugins) VALUES(${value(id)},${value(owner)},'Oracle',${tree.root},${tree.count},${value(JSON.stringify(document.presentation))}::jsonb,${value(JSON.stringify(document.plugins))}::jsonb);`,
   ];
 // Tree nodes name their moments, which live in their own rows.

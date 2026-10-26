@@ -84,7 +84,7 @@ try {
   }
   assert(!exited, logs);
   await pool.query(
-    'INSERT INTO oc_users(id,username,email_verified_at,password_hash,quota_bypass) VALUES($1,$2,now(),$3,true)',
+    'INSERT INTO oc_users(id,username,email_verified_at,password_hash,quota_bypass,terms_version) VALUES($1,$2,now(),$3,true,oc_policy_version())',
     [owner, username, await passwordHash(password)],
   );
   const store = new PostgresStore(pool);
@@ -220,7 +220,7 @@ try {
     ['teen', year - 15],
   ])
     await pool.query(
-      'INSERT INTO oc_users(id,username,email_verified_at,password_hash,birth_year,show_sensitive) VALUES($1,$2,now(),$3,$4,true)',
+      'INSERT INTO oc_users(id,username,email_verified_at,password_hash,birth_year,show_sensitive,terms_version) VALUES($1,$2,now(),$3,$4,true,oc_policy_version())',
       [randomUUID(), `${name}_${username}`, await passwordHash(password), born],
     );
   const adult = await tab(await signIn('adult_' + username));

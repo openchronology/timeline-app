@@ -30,7 +30,8 @@
 CREATE EXTENSION IF NOT EXISTS pgmp;
 -- Accounts (auth.mjs, account-security.mjs, oauth.mjs, administration.mjs and most other
 -- modules). Columns added further down: email and two-factor fields, administration and
--- quota fields, trust (#103), birth_year and show_sensitive (#115).
+-- quota fields, trust (#103), birth_year and show_sensitive (#115), terms_version and
+-- terms_accepted_at (#277).
 --   username: lower case, 3-32 of [a-z0-9_-] (checked in auth.mjs and account-security.mjs).
 --   password_hash: "scrypt:<version>:<salt>:<hash>", upgraded to the current version at
 --   sign-in; NULL (allowed below) for an account that signs in only through a provider.
@@ -2069,6 +2070,17 @@ ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS birth_year smallint CHECK(birth_ye
 ALTER TABLE oc_registrations ADD COLUMN IF NOT EXISTS birth_year smallint CHECK(birth_year BETWEEN 1900 AND 2200);
 -- show_sensitive: an adult's choice to see labelled content without its warning.
 ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS show_sensitive boolean NOT NULL DEFAULT false;
+-- Agreeing to the terms of service and privacy policy (#277; policies.mjs): the version an
+-- account agreed to (their effective date, POLICY_VERSION) and when; null for one that has
+-- not agreed, which is asked to before it can change anything. A pending registration keeps
+-- what was agreed to at sign-up, for the account it becomes.
+ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS terms_version text;
+-- The version in force, as policies.mjs POLICY_VERSION has it (a test keeps them equal); for
+-- SQL that makes accounts which agreed, such as the tests'.
+CREATE OR REPLACE FUNCTION oc_policy_version() RETURNS text LANGUAGE sql IMMUTABLE AS $$ SELECT '2026-10-25' $$;
+ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS terms_accepted_at timestamptz;
+ALTER TABLE oc_registrations ADD COLUMN IF NOT EXISTS terms_version text;
+ALTER TABLE oc_registrations ADD COLUMN IF NOT EXISTS terms_accepted_at timestamptz;
 -- A browser refused an account for its age (#166): asked again within a day, it is refused
 -- again, so a child cannot simply go back and give another year (the FTC's guidance on
 -- neutral age screens). Keyed by a hash of the browser's sign-in nonce.

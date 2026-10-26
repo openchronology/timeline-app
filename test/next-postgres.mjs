@@ -10,6 +10,7 @@ import pg from 'pg';
 import { randomUUID } from 'node:crypto';
 import { passwordHash } from '../server/auth.mjs';
 import { demo, PLUGIN_EXAMPLE } from '../dist/core.mjs';
+import { POLICY_VERSION } from '../server/policies.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
@@ -134,7 +135,7 @@ try {
     await client.request('/api/session');
     const id = randomUUID();
     await pool.query(
-      'INSERT INTO oc_users(id,username,email,email_verified_at,password_hash) VALUES($1,$2,$3,now(),$4)',
+      'INSERT INTO oc_users(id,username,email,email_verified_at,password_hash,terms_version) VALUES($1,$2,$3,now(),$4,oc_policy_version())',
       [
         id,
         username,
@@ -195,6 +196,27 @@ try {
   // The header's end: a signed-in account's menu, and a guest's Sign in (no Sign up, as
   // this server takes no registrations without email).
   assert.match(ownDashboard, new RegExp('class="account-menu-name">' + ownerName + '<'));
+  // Agreeing to the terms (#277): an account that has not agreed to the version in force is
+  // asked to on every page, and may not change anything until it does.
+  assert.doesNotMatch(ownDashboard, /class="terms-prompt"/);
+  await pool.query('UPDATE oc_users SET terms_version=NULL WHERE username=$1', [
+    'nextcontrib_' + suffix,
+  ]);
+  const asked = await contributor.request('/');
+  assert.match(asked, /class="terms-prompt"/);
+  assert.match(asked, new RegExp(`name="acceptTerms" value="${POLICY_VERSION}"`));
+  const notYet = await contributor.request('/api/timelines', {
+    method: 'POST',
+    data: document,
+    status: 403,
+  });
+  assert.equal(notYet.terms, POLICY_VERSION);
+  assert.equal((await contributor.request('/api/session')).user.termsRequired, true);
+  await contributor.request('/api/auth/terms', {
+    method: 'POST',
+    data: { acceptTerms: POLICY_VERSION },
+  });
+  assert.doesNotMatch(await contributor.request('/'), /class="terms-prompt"/);
   const guestHome = await guest.request('/');
   assert.match(guestHome, /<a href="\/login" class="button">Sign in<\/a>/);
   assert.doesNotMatch(guestHome, /account-menu-button/);

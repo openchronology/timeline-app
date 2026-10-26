@@ -101,12 +101,12 @@ const edit = (t, from, count, title) =>
 try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
   await pool.query(
-    'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass) VALUES($1,$2,now(),true)',
+    'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass,terms_version) VALUES($1,$2,now(),true,oc_policy_version())',
     [owner, 'optional_' + owner.slice(0, 8)],
   );
   for (const id of [other, third])
     await pool.query(
-      'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass) VALUES($1,$2,now(),true)',
+      'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass,terms_version) VALUES($1,$2,now(),true,oc_policy_version())',
       [id, 'optional_' + id.slice(0, 8)],
     );
   /** Timeline `t` forked by `account`. */

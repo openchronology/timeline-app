@@ -17,6 +17,7 @@ import {
   MOMENT_SHAPES,
   TimelineIndex,
 } from '../dist/core.mjs';
+import { POLICY_VERSION } from '../server/policies.mjs';
 if (!process.env.DATABASE_URL)
   throw new Error('DATABASE_URL must refer to a dedicated test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -138,7 +139,20 @@ async function completeSocial(c, email) {
   const pending = await c.request('session');
   if (!pending.user) {
     assert.equal(pending.challenge, 'email');
-    await c.request('auth/email/enroll', 'POST', { email, birthYear: 1990 });
+    // A new social account agrees to the terms in force before it can sign in (#277).
+    const refused = await c.request('auth/email/enroll', 'POST', { email, birthYear: 1990 }, 400);
+    assert.match(refused.error, /Agree to the terms/);
+    await c.request(
+      'auth/email/enroll',
+      'POST',
+      { email, birthYear: 1990, acceptTerms: '2020-01-01' },
+      400,
+    );
+    await c.request('auth/email/enroll', 'POST', {
+      email,
+      birthYear: 1990,
+      acceptTerms: POLICY_VERSION,
+    });
     await confirmEmail(c, email);
     await c.request('session');
     const url = new URL((await c.request('auth/github/start', 'POST', {})).url);
@@ -176,6 +190,7 @@ try {
       password,
       passwordConfirmation: password,
       birthYear: 1990,
+      acceptTerms: POLICY_VERSION,
     });
     assert.equal(pending.verificationRequired, true);
     assert.equal((await c.request('session')).user, null);

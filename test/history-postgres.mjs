@@ -34,12 +34,12 @@ const versionsOf = async (id) =>
   );
 try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
-  await pool.query('INSERT INTO oc_users(id,username,email_verified_at) VALUES($1,$2,now())', [
-    owner,
-    'history_' + owner.slice(0, 8),
-  ]);
   await pool.query(
-    'INSERT INTO oc_users(id,username,email_verified_at,is_admin) VALUES($1,$2,now(),true)',
+    'INSERT INTO oc_users(id,username,email_verified_at,terms_version) VALUES($1,$2,now(),oc_policy_version())',
+    [owner, 'history_' + owner.slice(0, 8)],
+  );
+  await pool.query(
+    'INSERT INTO oc_users(id,username,email_verified_at,is_admin,terms_version) VALUES($1,$2,now(),true,oc_policy_version())',
     [forker, 'history_' + forker.slice(0, 8)],
   );
   const moment = (i, title = 'Moment ' + i) => ({

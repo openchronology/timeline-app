@@ -19,6 +19,7 @@ import { createApplication } from '../server/http.mjs';
 import { flushMail } from '../server/mail.mjs';
 import { passwordHash } from '../server/auth.mjs';
 import { directoryFromEnv } from '../server/ldap.mjs';
+import { POLICY_VERSION } from '../server/policies.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 
 let container = null,
@@ -228,7 +229,12 @@ try {
   assert.equal(account.username, ana.uid.replace('.', '-'));
   assert.equal(account.password_hash, null);
   const anaEmail = `ana-${suffix}@school.example`;
-  await browser.request('auth/email/enroll', { email: anaEmail, birthYear: 1985 });
+  // Like a social account, a new directory account agrees to the terms at this step (#277).
+  await browser.request('auth/email/enroll', {
+    email: anaEmail,
+    birthYear: 1985,
+    acceptTerms: POLICY_VERSION,
+  });
   await confirm(browser, anaEmail);
   const signedIn = await browser.request('auth/ldap', {
     username: ana.uid.toUpperCase(),
@@ -248,7 +254,7 @@ try {
   const ownerName = 'owner_' + suffix,
     ownerPassword = 'an ordinary account passphrase';
   await pool.query(
-    'INSERT INTO oc_users(id,username,password_hash,email,email_verified_at,birth_year) VALUES(gen_random_uuid(),$1,$2,$3,now(),1980)',
+    'INSERT INTO oc_users(id,username,password_hash,email,email_verified_at,birth_year,terms_version) VALUES(gen_random_uuid(),$1,$2,$3,now(),1980,oc_policy_version())',
     [ownerName, await passwordHash(ownerPassword), ownerName + '@example.test'],
   );
   const owner = client();

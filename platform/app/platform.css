@@ -1480,3 +1480,17 @@ main.help {
     transform: none;
   }
 }
+/* Asking an account to agree to the terms in force (#277; terms-prompt.jsx). */
+.terms-prompt {
+  margin: 16px max(16px, calc((100% - 960px) / 2)) 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+.terms-prompt p {
+  margin: 0 0 10px;
+}
+.terms-prompt .error:empty {
+  display: none;
+}

@@ -8,8 +8,10 @@ to that service. Independent installations have their own operators and policies
 
 ## Accounts and use of the service
 
-Creating an account or using authenticated hosting services constitutes agreement to
-these terms. Public visitors may read
+You agree to these terms when you create an account (with a password or a sign-in
+provider) or, for an account made before this version, when you are asked to on your next
+visit; the service records the version you agreed to and when. Until an account agrees, it
+can still read, export, manage or delete itself, but not save or share anything else. Public visitors may read
 timelines without an account. Keep credentials and connected identity-provider
 accounts secure, provide truthful information, and report unauthorized access.
 An account is personal unless you are authorized to act for an organization.

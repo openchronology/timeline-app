@@ -19,7 +19,7 @@ try {
   const account = async (admin) => {
     const id = randomUUID();
     await pool.query(
-      'INSERT INTO oc_users(id,username,email,email_verified_at,is_admin) VALUES($1,$2,$3,now(),$4)',
+      'INSERT INTO oc_users(id,username,email,email_verified_at,is_admin,terms_version) VALUES($1,$2,$3,now(),$4,oc_policy_version())',
       [id, 'limits_' + id.slice(0, 8), id.slice(0, 8) + '@example.test', admin],
     );
     users.push(id);

@@ -14,6 +14,7 @@ import { createApplication } from '../server/http.mjs';
 import { flushMail } from '../server/mail.mjs';
 import { passwordHash } from '../server/auth.mjs';
 import { MICROSOFT_CONSUMERS, pkce, providersFromEnv } from '../server/oauth.mjs';
+import { POLICY_VERSION } from '../server/policies.mjs';
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const school = '7d1c3a5e-0b2f-4c6d-8e9a-1b2c3d4e5f60';
@@ -177,8 +178,8 @@ try {
   await browser.request('auth/email/enroll', {
     email: anaEmail,
     birthYear: 1985,
-    // The terms agreement (#277) where this server asks for it.
-    ...(pending.terms ? { acceptTerms: pending.terms } : {}),
+    // A new account agrees to the terms in force at this step (#277).
+    acceptTerms: POLICY_VERSION,
   });
   await confirm(browser, anaEmail);
   // Confirmed, the account signs in with Microsoft again to have its session.
@@ -227,7 +228,7 @@ try {
   const ownerName = 'msowner_' + Date.now().toString(36),
     ownerPassword = 'an ordinary account passphrase';
   await pool.query(
-    'INSERT INTO oc_users(id,username,password_hash,email,email_verified_at,birth_year) VALUES(gen_random_uuid(),$1,$2,$3,now(),1980)',
+    'INSERT INTO oc_users(id,username,password_hash,email,email_verified_at,birth_year,terms_version) VALUES(gen_random_uuid(),$1,$2,$3,now(),1980,oc_policy_version())',
     [ownerName, await passwordHash(ownerPassword), ownerName + '@example.test'],
   );
   // Agreed to the terms (#277), where this server records agreement.

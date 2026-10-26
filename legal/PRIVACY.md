@@ -10,6 +10,10 @@ The service runs on a server rented from DigitalOcean in the United States, whic
 holds its database, files and logs; information you give it is stored and processed
 there.
 
+When you create an account, or are asked to on a later visit, the service records which
+version of the terms of service and this policy you agreed to (their effective date) and
+when, as a record of that agreement, kept with the account.
+
 ## Information and purposes
 
 The hosted service stores account usernames and identifiers, salted password

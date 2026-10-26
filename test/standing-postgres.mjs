@@ -43,8 +43,8 @@ async function account(name, days, { confirmed = true, admin = false } = {}) {
   const id = randomUUID();
   ids.push(id);
   await pool.query(
-    `INSERT INTO oc_users(id,username,email,email_verified_at,password_hash,is_admin,quota_bypass,created_at)
-    VALUES($1,$2,$3,$4,$5,$6,true,now()-$7::interval)`,
+    `INSERT INTO oc_users(id,username,email,email_verified_at,password_hash,is_admin,quota_bypass,created_at,terms_version)
+    VALUES($1,$2,$3,$4,$5,$6,true,now()-$7::interval,oc_policy_version())`,
     [
       id,
       `${name}_${suffix}`,

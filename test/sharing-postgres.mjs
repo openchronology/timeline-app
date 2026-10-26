@@ -121,7 +121,7 @@ try {
   await owner.request('/api/session');
   userId = randomUUID();
   await pool.query(
-    'INSERT INTO oc_users(id,username,email,email_verified_at,password_hash) VALUES($1,$2,$3,now(),$4)',
+    'INSERT INTO oc_users(id,username,email,email_verified_at,password_hash,terms_version) VALUES($1,$2,$3,now(),$4,oc_policy_version())',
     [
       userId,
       username,

@@ -4,6 +4,7 @@ import 'server-only';
 import { headers } from 'next/headers';
 import { platformServices } from '../../server/platform.mjs';
 import { compareLimit, compareLimits } from '../../server/limits.mjs';
+import { agreed } from '../../server/policies.mjs';
 /**
  * Who is reading the page being rendered, from the request's cookie (or desktop bearer token).
  *
@@ -12,9 +13,10 @@ import { compareLimit, compareLimits } from '../../server/limits.mjs';
  * the platform runs without accounts (no `services.auth`).
  *
  * @returns {Promise<{services: object, session: object|null, user: {id: string,
- *   username: string, isAdmin: boolean, avatarUrl: string}|null}>} the platform's services,
- *   the raw session row (with its CSRF token, MFA state and so on) and the few fields of the
- *   user that pages and client components need.
+ *   username: string, isAdmin: boolean, avatarUrl: string, termsRequired: boolean}|null}>}
+ *   the platform's services, the raw session row (with its CSRF token, MFA state and so on)
+ *   and the few fields of the user that pages and client components need; `termsRequired` when
+ *   it has not agreed to the terms in force (#277).
  */
 export async function currentSession() {
   const services = await platformServices();
@@ -35,6 +37,7 @@ export async function currentSession() {
           username: session.username,
           isAdmin: !!session.is_admin,
           avatarUrl: session.avatar_url ?? '',
+          termsRequired: !agreed(session),
         }
       : null,
   };

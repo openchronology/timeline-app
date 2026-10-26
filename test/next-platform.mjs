@@ -253,7 +253,11 @@ try {
     try {
       const page = await browser.newPage({ viewport: { width: 1440, height: 960 } }),
         errors = [];
-      page.on('pageerror', (error) => errors.push(error.message));
+      // WebKit fails a request still in flight when the page reloads "due to access control
+      // checks" (#271), such as Next.js prefetching a link: a cancellation, not an error.
+      page.on('pageerror', (error) => {
+        if (!/ due to access control checks\.$/.test(error.message)) errors.push(error.message);
+      });
       // Google Analytics loads only once a visitor allows it, and stops when they decline.
       const tags = [];
       await page.route('https://www.googletagmanager.com/**', (route) => {
@@ -286,6 +290,23 @@ try {
       await page.reload();
       await page.waitForFunction(() => window.tagLoaded === true);
       assert.equal(await consent.count(), 0);
+      // Declining after allowing stops it: the page reloads without it, and so do later ones.
+      await page.getByRole('button', { name: 'Analytics settings' }).click();
+      await Promise.all([
+        page.waitForEvent('load'),
+        consent.getByRole('button', { name: 'Decline' }).click(),
+      ]);
+      await page.locator('#dashboard-browser').waitFor();
+      await page.reload();
+      await page.locator('#dashboard-browser').waitFor();
+      await page.waitForTimeout(300);
+      assert.equal(await page.evaluate(() => window.tagLoaded), undefined);
+      assert.equal(await consent.count(), 0);
+      assert.equal(tags.length, 2);
+      // Allowed again, for the rest of this test.
+      await page.getByRole('button', { name: 'Analytics settings' }).click();
+      await consent.getByRole('button', { name: 'Allow analytics' }).click();
+      await page.waitForFunction(() => window.tagLoaded === true);
       await page.locator('#dashboard-browser').waitFor();
       assert.equal(await page.locator('#dashboard-mine').count(), 0);
       await page.getByLabel('Search timelines').fill('history');

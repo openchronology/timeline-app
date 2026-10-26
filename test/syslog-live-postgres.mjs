@@ -115,7 +115,7 @@ let browser, listening, ingest;
 const now = Math.floor(Date.now() / 1000);
 try {
   await pool.query(
-    'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass) VALUES($1,$2,now(),true)',
+    'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass,terms_version) VALUES($1,$2,now(),true,oc_policy_version())',
     [owner, 'syslog_' + owner.slice(0, 8)],
   );
   await pool.query(

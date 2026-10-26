@@ -144,10 +144,10 @@ const charged = async (revision) =>
 try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
   for (const id of accounts)
-    await pool.query('INSERT INTO oc_users(id,username,email_verified_at) VALUES($1,$2,now())', [
-      id,
-      'shared_' + id.slice(0, 8),
-    ]);
+    await pool.query(
+      'INSERT INTO oc_users(id,username,email_verified_at,terms_version) VALUES($1,$2,now(),oc_policy_version())',
+      [id, 'shared_' + id.slice(0, 8)],
+    );
   const original = randomDocument('Shared');
   const size = Buffer.byteLength(JSON.stringify(original));
   // Each timeline with its owner and the document it holds, and every saved revision with

@@ -39,7 +39,7 @@ const moment = (id, title, extra = {}) => ({
 });
 try {
   await pool.query(
-    'INSERT INTO oc_users(id,username,email,email_verified_at,password_hash,quota_bypass) VALUES($1,$2,$3,now(),$4,true)',
+    'INSERT INTO oc_users(id,username,email,email_verified_at,password_hash,quota_bypass,terms_version) VALUES($1,$2,$3,now(),$4,true,oc_policy_version())',
     [
       owner,
       'merge_' + owner.slice(0, 8),

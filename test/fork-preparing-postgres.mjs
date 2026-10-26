@@ -95,12 +95,12 @@ async function heldFork(timeline) {
 try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
   await pool.query(
-    'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass) VALUES($1,$2,now(),true)',
+    'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass,terms_version) VALUES($1,$2,now(),true,oc_policy_version())',
     [user, 'preparing_' + user.slice(0, 8)],
   );
   // An administrator, who may fork the private timelines.
   await pool.query(
-    'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass,is_admin) VALUES($1,$2,now(),true,true)',
+    'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass,is_admin,terms_version) VALUES($1,$2,now(),true,true,oc_policy_version())',
     [forker, 'preparing_' + forker.slice(0, 8)],
   );
   setEntryLimit(Infinity);

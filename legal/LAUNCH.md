@@ -13,8 +13,11 @@ Still to do (items already done are kept for reference):
   residential address where permitted. Confirm governing jurisdiction and applicable
   consumer/privacy rules; get legal review appropriate to the intended user regions.
 - Replace draft labels with an effective date and archive prior policy versions.
-  Establish a notice/acceptance process for account creation, including social login;
-  the current interface presents policies but does not record contractual acceptance.
+  Done: every new account agrees to the terms and privacy policy in force, with a password
+  or a provider, and existing accounts are asked on their next visit; the version and time
+  are recorded (server/policies.mjs, docs/authentication.md). When either policy changes
+  materially, change POLICY_VERSION (and oc_policy_version() in schema.sql) to the new
+  effective date, so every account is asked again.
 - Configure Resend with a verified sending domain, scoped API key, SPF/DKIM and
   appropriate DMARC. Back up the authentication encryption key separately, run
   the delivery worker, and test confirmation, recovery, and MFA end to end.

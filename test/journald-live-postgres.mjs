@@ -94,7 +94,7 @@ async function until(timeline, count) {
 }
 try {
   await pool.query(
-    'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass) VALUES($1,$2,now(),true)',
+    'INSERT INTO oc_users(id,username,email_verified_at,quota_bypass,terms_version) VALUES($1,$2,now(),true,oc_policy_version())',
     [owner, 'journald_' + owner.slice(0, 8)],
   );
   await pool.query(

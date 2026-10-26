@@ -21,10 +21,10 @@ let app;
 try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
   for (const [i, id] of ids.entries())
-    await pool.query('INSERT INTO oc_users(id,username,email_verified_at) VALUES($1,$2,now())', [
-      id,
-      username + i,
-    ]);
+    await pool.query(
+      'INSERT INTO oc_users(id,username,email_verified_at,terms_version) VALUES($1,$2,now(),oc_policy_version())',
+      [id, username + i],
+    );
   for (const [i, id] of tids.slice(0, 5).entries())
     await pool.query(
       `INSERT INTO oc_timelines(id,owner_id,title,visibility,created_at) VALUES($1,$2,$3,$4,now()+$5*interval '1 day')`,

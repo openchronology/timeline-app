@@ -16,10 +16,10 @@ const owner = randomUUID(),
 let app;
 try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
-  await pool.query('INSERT INTO oc_users(id,username,email_verified_at) VALUES($1,$2,now())', [
-    owner,
-    'follow_' + owner.slice(0, 8),
-  ]);
+  await pool.query(
+    'INSERT INTO oc_users(id,username,email_verified_at,terms_version) VALUES($1,$2,now(),oc_policy_version())',
+    [owner, 'follow_' + owner.slice(0, 8)],
+  );
   const store = new PostgresStore(pool);
   let doc = validateDocument({
     ...demo(),

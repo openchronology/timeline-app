@@ -49,10 +49,10 @@ const clockOf = async (id) =>
   (await pool.query('SELECT index_clock::text AS c FROM oc_timelines WHERE id=$1', [id])).rows[0].c;
 try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
-  await pool.query('INSERT INTO oc_users(id,username,email_verified_at) VALUES($1,$2,now())', [
-    user,
-    'versions_' + user.slice(0, 8),
-  ]);
+  await pool.query(
+    'INSERT INTO oc_users(id,username,email_verified_at,terms_version) VALUES($1,$2,now(),oc_policy_version())',
+    [user, 'versions_' + user.slice(0, 8)],
+  );
   /** A random save to `entry` (sparse, or every ninth a whole document). */
   let step = 0;
   async function save(entry) {

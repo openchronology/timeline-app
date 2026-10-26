@@ -117,10 +117,10 @@ function timeline(round) {
 try {
   await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
   await pool.query(PREVIOUS);
-  await pool.query('INSERT INTO oc_users(id,username,email_verified_at) VALUES($1,$2,now())', [
-    user,
-    'summaries_' + user.slice(0, 8),
-  ]);
+  await pool.query(
+    'INSERT INTO oc_users(id,username,email_verified_at,terms_version) VALUES($1,$2,now(),oc_policy_version())',
+    [user, 'summaries_' + user.slice(0, 8)],
+  );
   store = new PostgresStore(pool);
   let compared = 0,
     groups = 0;

@@ -760,7 +760,7 @@ async function startPlatform() {
     await delay(200);
   }
   const { rows } = await pool.query(
-    `INSERT INTO oc_users(id,username,email_verified_at,quota_bypass) VALUES(gen_random_uuid(),'bench_ui',now(),true)
+    `INSERT INTO oc_users(id,username,email_verified_at,quota_bypass,terms_version) VALUES(gen_random_uuid(),'bench_ui',now(),true,oc_policy_version())
      ON CONFLICT(username) DO UPDATE SET email_verified_at=now(),quota_bypass=true RETURNING *`,
   );
   const user = rows[0],
