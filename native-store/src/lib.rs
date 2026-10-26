@@ -1456,10 +1456,10 @@ pub(crate) fn edge_window(
 }
 /// The columns of one duration band, selected from an intervals table aliased `d`: ID,
 /// endpoint JSON, first and last time, a bounded metadata projection, and resolved endpoint
-/// times. The projection keeps only text fields: the title (cut to 512 characters), the notes
-/// (cut to 2000) and other text fields of at most 256 characters, so a band never carries
-/// large metadata to the webview. `band_json` turns a row into JSON.
-pub(crate) const BAND_COLUMNS: &str = "d.id,d.start_json,d.end_json,d.first,d.last,(SELECT json_group_object(key,CASE key WHEN 'title' THEN substr(value,1,512) WHEN 'description' THEN substr(value,1,2000) ELSE value END) FROM json_each(d.metadata) WHERE type='text' AND (key IN ('title','description') OR length(value)<=256)),d.start_time,d.end_time";
+/// times. The projection keeps the title (cut to 512 characters), the notes (cut to 2000),
+/// other text fields of at most 256 characters, and arrays of at most 1024 characters as JSON
+/// (such as relationship arrows, #326), so a band never carries large metadata to the webview. `band_json` turns a row into JSON.
+pub(crate) const BAND_COLUMNS: &str = "d.id,d.start_json,d.end_json,d.first,d.last,(SELECT json_group_object(key,CASE WHEN type='array' THEN json(value) WHEN key='title' THEN substr(value,1,512) WHEN key='description' THEN substr(value,1,2000) ELSE value END) FROM json_each(d.metadata) WHERE (type='text' AND (key IN ('title','description') OR length(value)<=256)) OR (type='array' AND key NOT IN ('tags','content_labels') AND length(value)<=1024)),d.start_time,d.end_time";
 /// One duration band as JSON from a row of `BAND_COLUMNS`, in the shape the editor draws:
 /// `{id, start, end, first, last, metadata, startTime, endTime}`.
 fn band_json(row: &[Option<String>]) -> Result<Value, String> {

@@ -63,6 +63,11 @@ import {
   derivedMetadata,
   derivationKeys,
   durationOverview,
+  RELATIONSHIP_ARROWS,
+  readRelationshipArrows,
+  arcArrowheads,
+  arrowsToward,
+  pluginDrawsArrows,
 } from '../dist/core.mjs';
 import { themeProperties, themeScales, textOn } from '../dist/timeline-theme.mjs';
 import { createPluginLibrary } from '../server/plugins.mjs';
@@ -88,6 +93,7 @@ test('every field kind reads wrong-shaped metadata without throwing (#157)', () 
     'links',
     'heading',
     'font',
+    'relationship-arrows',
   ])
     assert(kinds.has(kind), kind);
   const keys = new Set([
@@ -127,6 +133,7 @@ test('every field kind reads wrong-shaped metadata without throwing (#157)', () 
       pluginHeading(plugins, metadata);
       pluginMarker(plugins, metadata);
       pluginBackground(plugins, metadata);
+      arrowsToward(plugins, metadata, 'm:a');
       pluginFocus(plugins);
       pluginExpand(plugins);
       pluginMetadata(plugins, metadata);
@@ -423,7 +430,13 @@ test('public plugin API works without accounts or PostgreSQL and validates its i
   // Twelve to a page: the thirteenth and on are on the next.
   assert.deepEqual(
     (await request(app, '/api/plugins?page=2')).body.plugins.map((p) => p.id),
-    ['rich-text-notes', 'moment-sources', 'timeline-background', 'timeline-theme'],
+    [
+      'relationship-arrows',
+      'rich-text-notes',
+      'moment-sources',
+      'timeline-background',
+      'timeline-theme',
+    ],
   );
   assert.equal((await request(app, '/api/plugins?search=absent&page=1&limit=1')).body.total, 0);
   const response = await request(app, '/api/plugins/search', 'POST', {
@@ -973,6 +986,154 @@ test('timeline theme sizes: label and measure text sizes, as percentages (#267)'
     { textFont: 'measureSize' },
   ])
     assert.throws(() => validatePluginManifest({ ...TIMELINE_THEME, theme }));
+});
+
+test('relationship arrows: what each end says, read tolerantly and drawn as a union (#326)', () => {
+  assert(isOfficialPlugin(RELATIONSHIP_ARROWS));
+  assert.deepEqual(
+    [RELATIONSHIP_ARROWS.id, RELATIONSHIP_ARROWS.version],
+    ['relationship-arrows', 1],
+  );
+  assert.deepEqual(pluginTargets(RELATIONSHIP_ARROWS), ['moments', 'durations']);
+  const plugins = [installed(RELATIONSHIP_ARROWS)];
+  const field = {
+    kind: 'relationship-arrows',
+    metadataKey: 'arrows',
+    label: 'Relationship arrows',
+  };
+  for (const target of [momentPlugins(plugins), durationPlugins(plugins)])
+    assert.deepEqual(pluginFields(target), [field]);
+  assert(pluginDrawsArrows(plugins));
+  assert(!pluginDrawsArrows([{ ...plugins[0], enabled: false }]));
+  assert(!pluginDrawsArrows([]));
+
+  // Reading never throws: odd entries are unreadable and keep their places.
+  const stored = [
+    { target: { moment: 'b' }, arrow: 'to' },
+    { target: { moment: 'b' }, arrow: 'sideways' },
+    { target: { duration: 'd' }, arrow: 'both' },
+    { target: { moment: 'b', duration: 'd' }, arrow: 'to' },
+    { target: { event: 'b' }, arrow: 'to' },
+    { target: { moment: 'bad id!' }, arrow: 'to' },
+    { target: { moment: 'c' }, arrow: 'from', extra: 1 },
+    null,
+    'to',
+    [],
+    { target: { moment: 'c' }, arrow: 'none' },
+  ];
+  assert.deepEqual(readRelationshipArrows(stored), {
+    entries: [
+      { target: { moment: 'b' }, arrow: 'to', index: 0 },
+      { target: { duration: 'd' }, arrow: 'both', index: 2 },
+      { target: { moment: 'c' }, arrow: 'none', index: 10 },
+    ],
+    unreadable: 8,
+  });
+  assert.deepEqual(readRelationshipArrows(undefined), { entries: [], unreadable: 0 });
+  for (const value of [null, 'x', 7, {}, true])
+    assert.deepEqual(readRelationshipArrows(value), { entries: [], unreadable: 1 });
+
+  // From A's point of view: "to" is an arrowhead at B's end, "from" at A's, "both" at both.
+  const says = (arrow) => ({ arrows: [{ target: { moment: 'b' }, arrow }] });
+  const arc = (a, b) =>
+    arcArrowheads({ key: 'm:a', plugins, metadata: a }, { key: 'm:b', plugins, metadata: b });
+  assert.deepEqual(arc(says('to'), {}), { a: false, b: true });
+  assert.deepEqual(arc(says('from'), {}), { a: true, b: false });
+  assert.deepEqual(arc(says('both'), {}), { a: true, b: true });
+  assert.deepEqual(arc(says('none'), {}), { a: false, b: false });
+  const back = (arrow) => ({ arrows: [{ target: { moment: 'a' }, arrow }] });
+  // The union of both ends: A says both and B says "to" A; each says "to" the other.
+  assert.deepEqual(arc(says('both'), back('to')), { a: true, b: true });
+  assert.deepEqual(arc(says('to'), back('to')), { a: true, b: true });
+  assert.deepEqual(arc(says('to'), back('from')), { a: false, b: true });
+  assert.deepEqual(arc(says('none'), back('none')), { a: false, b: false });
+  // An end whose metadata isn't at hand says nothing; nor do entries for other entities,
+  // unreadable ones, or a disabled plugin.
+  assert.deepEqual(arc(null, back('to')), { a: true, b: false });
+  assert.deepEqual(arc(null, null), { a: false, b: false });
+  assert.deepEqual(arc({ arrows: [{ target: { moment: 'zz' }, arrow: 'both' }] }, {}), {
+    a: false,
+    b: false,
+  });
+  assert.deepEqual(arc({ arrows: stored }, {}), { a: false, b: true });
+  assert.deepEqual(arc({ arrows: 'both' }, { arrows: { a: 'to' } }), { a: false, b: false });
+  assert.deepEqual(
+    arcArrowheads(
+      { key: 'm:a', plugins: [{ ...plugins[0], enabled: false }], metadata: says('both') },
+      { key: 'm:b', plugins: [], metadata: back('both') },
+    ),
+    { a: false, b: false },
+  );
+  // A moment and a duration: each read with its own plugins.
+  assert.deepEqual(
+    arcArrowheads(
+      {
+        key: 'd:d',
+        plugins: durationPlugins(plugins),
+        metadata: { arrows: [{ target: { moment: 'a' }, arrow: 'to' }] },
+      },
+      { key: 'm:a', plugins: momentPlugins(plugins), metadata: {} },
+    ),
+    { a: false, b: true },
+  );
+  assert.deepEqual(arrowsToward(plugins, says('both'), 'm:b'), { self: true, other: true });
+
+  // Overviews carry the entries: moments' plugin projection, and duration bands' small arrays.
+  assert.deepEqual(pluginMetadata(plugins, says('to')), says('to'));
+  assert.deepEqual(durationOverview({ title: 'Span', ...says('from'), n: 1 }), {
+    title: 'Span',
+    ...says('from'),
+  });
+  assert.deepEqual(durationOverview({ big: ['x'.repeat(2000)], tags: ['a'] }), { tags: ['a'] });
+
+  // The field kind is general plugin API, validated; stacks don't take it.
+  const custom = validatePluginManifest({
+    apiVersion: 1,
+    id: 'causes',
+    version: 1,
+    name: 'Causes',
+    description: 'Arrows from causes.',
+    fields: [{ kind: 'relationship-arrows', metadataKey: 'causes', label: 'Causes' }],
+  });
+  assert.deepEqual(pluginTargets(custom), ['moments', 'durations']);
+  assert.deepEqual(
+    arrowsToward(
+      [installed(custom)],
+      { causes: [{ target: { moment: 'x' }, arrow: 'to' }] },
+      'm:x',
+    ),
+    { self: false, other: true },
+  );
+  assert.throws(() =>
+    validatePluginManifest({
+      ...custom,
+      fields: [{ kind: 'relationship-arrow', metadataKey: 'causes', label: 'Causes' }],
+    }),
+  );
+  // A saved timeline keeps every entry, dangling or unreadable, whether or not the plugin is on.
+  const doc = {
+    format: 'openchronology',
+    version: 1,
+    title: 'Arrows',
+    description: '',
+    plugins: [{ ...plugins[0], enabled: false }],
+    events: [
+      { id: 'a', time: '0/1', metadata: { title: 'A', arrows: stored } },
+      { id: 'b', time: '1/1', metadata: { title: 'B' } },
+    ],
+    durations: [
+      {
+        id: 'd',
+        start: '1/1',
+        end: '2/1',
+        metadata: { arrows: [{ target: { moment: 'gone' }, arrow: 'to' }] },
+      },
+    ],
+    relationships: [{ a: { moment: 'a' }, b: { moment: 'b' } }],
+  };
+  const saved = validateDocument(JSON.parse(JSON.stringify(doc)));
+  assert.deepEqual(saved.events[0].metadata.arrows, stored);
+  assert.deepEqual(saved.durations[0].metadata.arrows, doc.durations[0].metadata.arrows);
 });
 
 test('headings: a level makes a moment a heading, in its font or Times New Roman', () => {

@@ -587,7 +587,8 @@ export function durationSummaries(
 
 /**
  * Viewport bands carry a bounded projection: title, a notes preview, short text fields that
- * plugins such as colors read, and tags. Full metadata is fetched when a duration is opened.
+ * plugins such as colors read, small arrays (at most 1,024 characters as JSON) such as
+ * relationship arrows (#326), and tags. Full metadata is fetched when a duration is opened.
  */
 export function durationOverview(metadata: Metadata): Metadata {
   const result: Metadata = {};
@@ -596,15 +597,17 @@ export function durationOverview(metadata: Metadata): Metadata {
     result.description = metadata.description.slice(0, 2000);
   let size = JSON.stringify(result).length;
   for (const [key, value] of Object.entries(metadata))
-    if (
-      key !== 'title' &&
-      key !== 'description' &&
-      typeof value === 'string' &&
-      value.length <= 256
-    ) {
+    if (['title', 'description', 'tags', CONTENT_LABELS_KEY].includes(key)) continue;
+    else if (typeof value === 'string' && value.length <= 256) {
       size += key.length + value.length + 6;
       if (size > 4096) break;
       result[key] = value;
+    } else if (Array.isArray(value)) {
+      const json = JSON.stringify(value);
+      if (json.length > 1024) continue;
+      size += key.length + json.length + 4;
+      if (size > 4096) break;
+      result[key] = JSON.parse(json);
     }
   // Its tags, which plugins may derive values from (#122), such as a log entry's severity.
   if (Array.isArray(metadata.tags)) {
