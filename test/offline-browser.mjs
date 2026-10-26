@@ -16,6 +16,7 @@ import { checkRuler } from './ruler-browser.mjs';
 import { checkSelection } from './selection-browser.mjs';
 import { checkLabelMotion } from './label-motion-browser.mjs';
 import { checkPlugins } from './plugins-browser.mjs';
+import { checkEllipseShape } from './ellipse-shape-browser.mjs';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -182,6 +183,7 @@ try {
   await checkSelection(page, document);
   await checkLabelMotion(page, document);
   await checkPlugins(page, document, true);
+  await checkEllipseShape(page, document);
   await checkIssues(page, document);
   await checkSearch(page, document);
   await checkSummaries(page, document);
