@@ -22,6 +22,7 @@ import {
   renderPluginMarker,
   renderPluginFields,
   renderPluginShape,
+  renderPluginOutline,
   renderPluginHeading,
 } from './plugin-ui.js';
 import { attachRichText } from './rich-text.js';
@@ -58,6 +59,7 @@ import {
   pluginMarker,
   pluginColor,
   pluginShape,
+  pluginOutline,
   pluginHeading,
   pluginSize,
   PLUGIN_EXAMPLE,
@@ -625,6 +627,7 @@ const summaryExpansion = createSummaryExpansion(stage, {
     const heading = pluginHeading(activePlugins(), event.metadata);
     if (heading) {
       renderPluginShape(button, 'circle');
+      renderPluginOutline(button, 'solid');
       renderPluginHeading(button, heading, event.metadata.title ?? '');
       button.classList.add('heading-marker');
     } else {
@@ -634,6 +637,7 @@ const summaryExpansion = createSummaryExpansion(stage, {
       button.style.backgroundColor = pluginColor(activePlugins(), event.metadata) ?? '';
       button.dataset.size = pluginSize(activePlugins(), event.metadata);
       renderPluginShape(button, pluginShape(activePlugins(), event.metadata));
+      renderPluginOutline(button, pluginOutline(activePlugins(), event.metadata));
     }
     button.title = `${event.metadata.title || 'Untitled moment'} · ${presented(Q.parse(event.time))}`;
     hoverPreview.update(button, activePlugins(), event.metadata);
@@ -1493,6 +1497,7 @@ function drawFrame() {
     const heading = count === 1n && !span ? pluginHeading(plugins, metadata) : null;
     if (heading) {
       renderPluginShape(button, 'circle');
+      renderPluginOutline(button, 'solid');
       button.style.backgroundColor = '';
       button.dataset.size = 'medium';
       renderPluginHeading(button, heading, group.title ?? '');
@@ -1505,6 +1510,8 @@ function drawFrame() {
       button.style.backgroundColor = color ?? '';
       button.dataset.size = count === 1n && !span ? pluginSize(plugins, metadata) : 'medium';
       renderPluginShape(button, count === 1n && !span ? pluginShape(plugins, metadata) : 'circle');
+      // Dashed for a presumptive moment or collapsed duration (#325); summaries stay solid.
+      renderPluginOutline(button, count === 1n ? pluginOutline(plugins, metadata) : 'solid');
     }
     button.style.borderColor = '';
     button.setAttribute(
@@ -1616,6 +1623,7 @@ function drawFrame() {
           child.button.style.backgroundColor = color ?? '';
           child.button.style.borderColor = '';
           renderPluginShape(child.button, pluginShape(activePlugins(), entry.metadata));
+          renderPluginOutline(child.button, pluginOutline(activePlugins(), entry.metadata));
           child.caption.style.left = `${(inset() + x) / uiScale}px`;
           child.caption.style.top = `${direction < 0 ? y - 13 - labelHeight : y + 16}px`;
           child.title.textContent = title;
@@ -9560,6 +9568,8 @@ function renderDurationBands() {
       others = members.length - 1;
     button.dataset.grouped = String(members.length);
     button.style.backgroundColor = pluginColor(plugins, band.metadata) ?? '';
+    // A presumptive duration (#325) has a dashed border; a band standing for several, solid.
+    renderPluginOutline(button, others ? 'solid' : pluginOutline(plugins, band.metadata));
     button.textContent = (band.metadata.title ?? '') + (others ? ` + ${others} more` : '');
     button.setAttribute(
       'aria-label',

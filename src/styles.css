@@ -1016,6 +1016,21 @@ dialog.moment-dialog.reading {
   background: var(--hover);
   font-size: 12px;
 }
+.reader-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* A toggle that is on (#325), such as Presumptive (unconfirmed). */
+.reader-flags li {
+  padding: 1px 10px;
+  border: 1px dashed var(--ink);
+  border-radius: 999px;
+  font-size: 12px;
+}
 .reader-notes {
   max-width: 75ch;
   color: var(--ink);
@@ -2077,6 +2092,20 @@ body[data-platform-editor] .app-header {
 .marker-outline {
   z-index: 1;
 }
+/* Presumptive (#325): dark dashes over the white border, so they show on light and dark
+   backgrounds and against any marker color. Circles and icons dash their CSS border; other
+   shapes dash a copy of their SVG outline (renderPluginOutline). Kept while focused. */
+.event-marker[data-outline='dashed']:not(.shaped),
+.event-marker[data-outline='dashed']:not(.shaped):focus-visible {
+  outline: 2px dashed var(--ink);
+  outline-offset: -3px;
+}
+.marker-dashes {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.25;
+  stroke-dasharray: 3.5 2.5;
+}
 
 .comparison-settings {
   padding: 16px 20px;
@@ -2587,6 +2616,13 @@ dialog button {
 .duration-more:focus-visible {
   background: color-mix(in srgb, var(--timeline-duration, #73958b) 32%, transparent);
   z-index: 3;
+}
+/* A presumptive duration (#325): dark dashes over a wider white border, as on markers. */
+.duration-band[data-outline='dashed'],
+.duration-band[data-outline='dashed']:focus-visible {
+  border: 2px solid #fff;
+  outline: 2px dashed var(--ink);
+  outline-offset: -2px;
 }
 /* A band standing for several nearly identical spans (#316) is outlined twice. */
 .duration-band[data-grouped]:not([data-grouped='1']) {

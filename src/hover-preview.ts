@@ -2,7 +2,14 @@
 // The card shown on hovering a moment: its image, title and text, built by the editor from the
 // moment's plugin fields.
 import { imageSource } from './image-assets.js';
-import { pluginFocus, pluginMarker, pluginColor, pluginRichText, imageURL } from './plugins.js';
+import {
+  pluginFocus,
+  pluginMarker,
+  pluginColor,
+  pluginOutline,
+  pluginRichText,
+  imageURL,
+} from './plugins.js';
 import { renderMarkdown } from './rich-text.js';
 import type { InstalledPlugin } from './plugins.js';
 
@@ -192,7 +199,12 @@ export function createHoverPreview(
       img.src = url;
     }
     if (!url) img.removeAttribute('src');
-    card.style.borderColor = pluginColor(entry.plugins, entry.metadata) ?? '';
+    // A presumptive moment or duration (#325) has a dashed card, as its marker is dashed,
+    // darker than the usual border unless it has a color.
+    const dashed = pluginOutline(entry.plugins, entry.metadata) === 'dashed';
+    card.style.borderStyle = dashed ? 'dashed' : '';
+    card.style.borderColor =
+      pluginColor(entry.plugins, entry.metadata) ?? (dashed ? 'var(--muted)' : '');
     card.setAttribute('aria-hidden', 'false');
     if (position()) card.classList.add('open');
   };

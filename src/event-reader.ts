@@ -3,7 +3,7 @@
 // the editor's form. A full-size hover card: its images, time, tags, notes, the plugins' fields
 // with their values, and its stack's entries. Built from text nodes, links and images only.
 import { imageSource } from './image-assets.js';
-import { imageURL, pluginBackground, pluginMarker, stackEntries } from './plugins.js';
+import { imageURL, pluginBackground, pluginMarker, stackEntries, toggleValue } from './plugins.js';
 import { renderMarkdown } from './rich-text.js';
 import { entityTags } from './tags.js';
 import type { InstalledPlugin } from './plugins.js';
@@ -81,6 +81,27 @@ function links(values: unknown) {
   return list.children.length ? list : null;
 }
 
+/**
+ * The labels of the toggle fields that are on (#325), such as "Presumptive (unconfirmed)", as
+ * a list of flags; null when none is.
+ */
+function flags(plugins: readonly InstalledPlugin[], metadata: Record<string, unknown>) {
+  const list = document.createElement('ul');
+  list.className = 'reader-flags';
+  const seen = new Set<string>();
+  for (const plugin of plugins)
+    if (plugin.enabled)
+      for (const field of plugin.manifest.fields)
+        if (field.kind === 'toggle' && !seen.has(field.metadataKey)) {
+          seen.add(field.metadataKey);
+          if (!toggleValue(metadata[field.metadataKey])) continue;
+          const li = document.createElement('li');
+          li.textContent = field.label;
+          list.append(li);
+        }
+  return list.children.length ? list : null;
+}
+
 function section(heading: string, ...content: Node[]) {
   const box = document.createElement('section');
   box.className = 'reader-section';
@@ -129,11 +150,13 @@ export function renderReader(host: HTMLElement, entity: ReaderEntity) {
     }
     host.append(list);
   }
+  const flagged = flags(plugins, metadata);
+  if (flagged) host.append(flagged);
 
   const description = textOf(metadata.description);
   if (description) host.append(notes(description, entity.markdown));
 
-  // Plugins' fields that say something: text, notes, links and stacks.
+  // Plugins' fields that say something: text, notes, links and stacks (toggles are flags).
   const seen = new Set<string>();
   const details = document.createElement('dl');
   details.className = 'reader-details';
@@ -167,6 +190,8 @@ export function renderReader(host: HTMLElement, entity: ReaderEntity) {
           const title = document.createElement('h4');
           title.textContent = textOf(entry.metadata.title) || 'Untitled entry';
           card.append(title);
+          const entryFlags = flags(plugins, entry.metadata);
+          if (entryFlags) card.append(entryFlags);
           const text = textOf(entry.metadata.description) || textOf(entry.metadata.notes);
           if (text) card.append(notes(text, entity.markdown));
           list.append(card);
