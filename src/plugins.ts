@@ -1347,7 +1347,7 @@ const LEGACY_MOMENT_SHAPES: PluginManifest = validatePluginManifest({
   source:
     'function render(moment: string, api: PluginAPI): string { return api.shape(api.get("shape")); }',
 });
-const MOMENT_SHAPES_2 = validatePluginManifest({
+export const MOMENT_SHAPES_2 = validatePluginManifest({
   ...LEGACY_MOMENT_SHAPES,
   version: 2,
   fields: [

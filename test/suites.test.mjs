@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import {
   OFFICIAL_SUITES,
   CAUSAL_FACTOR_ANALYSIS,
+  CAUSAL_FACTOR_ANALYSIS_1,
   HISTORY_EDUCATION,
   MOMENT_ICONS,
   MOMENT_COLORS,
@@ -25,8 +26,21 @@ import { createApplication } from '../server/http.mjs';
 test('the official suites package official plugins as the issue lists them', () => {
   assert.deepEqual(
     CAUSAL_FACTOR_ANALYSIS.plugins.map((p) => p.id),
-    ['moment-stacks', 'moment-shapes', 'moment-colors'],
+    [
+      'moment-stacks',
+      'moment-shapes',
+      'moment-colors',
+      'presumptive-outline',
+      'relationship-arrows',
+    ],
   );
+  assert.equal(CAUSAL_FACTOR_ANALYSIS.version, 2);
+  assert.equal(CAUSAL_FACTOR_ANALYSIS.plugins.find((p) => p.id === 'moment-shapes').version, 3);
+  assert.deepEqual(
+    CAUSAL_FACTOR_ANALYSIS_1.plugins.map((p) => `${p.id}@${p.version}`),
+    ['moment-stacks@2', 'moment-shapes@2', 'moment-colors@2'],
+  );
+  assert.ok(isOfficialSuite(CAUSAL_FACTOR_ANALYSIS_1));
   assert.deepEqual(
     HISTORY_EDUCATION.plugins.map((p) => p.id),
     [
@@ -97,7 +111,7 @@ test('adding a suite appends what is missing and never changes an installed plug
   const { plugins, added, kept } = addSuite(installed, CAUSAL_FACTOR_ANALYSIS);
   assert.deepEqual(
     added.map((p) => p.id),
-    ['moment-stacks', 'moment-shapes'],
+    ['moment-stacks', 'moment-shapes', 'presumptive-outline', 'relationship-arrows'],
   );
   assert.deepEqual(
     kept.map((p) => p.id),
@@ -105,13 +119,13 @@ test('adding a suite appends what is missing and never changes an installed plug
   );
   assert.deepEqual(plugins.slice(0, 2), installed);
   assert.deepEqual(plugins[2], { manifest: MOMENT_STACKS, enabled: true });
-  assert.equal(plugins.length, 4);
+  assert.equal(plugins.length, 6);
   // A timeline holds at most 32 plugins.
   const full = Array.from({ length: 31 }, (_, i) => ({
     manifest: { ...MOMENT_ICONS, id: 'filler-' + i },
     enabled: true,
   }));
-  assert.throws(() => addSuite(full, CAUSAL_FACTOR_ANALYSIS), /at most 32 plugins; remove 2/);
+  assert.throws(() => addSuite(full, CAUSAL_FACTOR_ANALYSIS), /at most 32 plugins; remove 4/);
 });
 
 test('suite libraries search names, descriptions and plugin names, newest versions first', async () => {
