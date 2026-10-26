@@ -516,9 +516,9 @@ impl Snapshot {
                 // joined to that moment by time (events_time index) to send its ID, title
                 // (cut to 512 characters) and metadata: whole when it is at most 2048 bytes,
                 // otherwise only the plugin keys in ?1 (text fields, descriptions cut to 512
-                // characters, toggles that are on, and small arrays), or {} if even that exceeds 2048 bytes. More
+                // characters, and small arrays), or {} if even that exceeds 2048 bytes. More
                 // than 1025 groups fails the row budget rather than truncating the frame.
-                let rows=db.query_limited("SELECT p.time,p.last_time,p.weight,p.distinct_count,p.visited_nodes,e.id,CASE WHEN json_valid(e.metadata) THEN substr(json_extract(e.metadata,'$.title'),1,512) END,CASE WHEN length(CAST(e.metadata AS BLOB))<=2048 THEN e.metadata ELSE (SELECT CASE WHEN length(projected)<=2048 THEN projected ELSE '{}' END FROM (SELECT json_group_object(j.key,CASE WHEN j.type='text' THEN substr(j.value,1,CASE WHEN j.key='description' THEN 512 ELSE 10000 END) WHEN j.type='true' THEN json('true') ELSE json(j.value) END) AS projected FROM json_each(e.metadata) j WHERE j.key IN (SELECT value FROM json_each(?)) AND (j.type='text' OR j.type='true' OR (j.type='array' AND length(j.value)<=2048)))) END FROM points p LEFT JOIN events e ON p.weight=1 AND e.time=p.time COLLATE RATIONAL_V1 WHERE p.lower=q(?) AND p.upper=q(?) AND p.include_upper=1 AND p.threshold=q(?) AND p.mode='span' ORDER BY p.time COLLATE RATIONAL_V1 LIMIT 1026",&[&metadata_keys,&q.lower,&q.upper,&threshold],1025,BUDGET)?;
+                let rows=db.query_limited("SELECT p.time,p.last_time,p.weight,p.distinct_count,p.visited_nodes,e.id,CASE WHEN json_valid(e.metadata) THEN substr(json_extract(e.metadata,'$.title'),1,512) END,CASE WHEN length(CAST(e.metadata AS BLOB))<=2048 THEN e.metadata ELSE (SELECT CASE WHEN length(projected)<=2048 THEN projected ELSE '{}' END FROM (SELECT json_group_object(j.key,CASE WHEN j.type='text' THEN substr(j.value,1,CASE WHEN j.key='description' THEN 512 ELSE 10000 END) ELSE json(j.value) END) AS projected FROM json_each(e.metadata) j WHERE j.key IN (SELECT value FROM json_each(?)) AND (j.type='text' OR (j.type='array' AND length(j.value)<=2048)))) END FROM points p LEFT JOIN events e ON p.weight=1 AND e.time=p.time COLLATE RATIONAL_V1 WHERE p.lower=q(?) AND p.upper=q(?) AND p.include_upper=1 AND p.threshold=q(?) AND p.mode='span' ORDER BY p.time COLLATE RATIONAL_V1 LIMIT 1026",&[&metadata_keys,&q.lower,&q.upper,&threshold],1025,BUDGET)?;
                 let mut groups = Vec::new();
                 let mut visited = 0u64;
                 for row in rows {
@@ -1433,32 +1433,38 @@ mod relationship_tests {
             .query(&serde_json::from_value(value).unwrap())
             .unwrap()
     }
-    /// Arrowhead toggles (#326) reach the view: a moment's, even when its metadata is too
-    /// large to send whole, and a duration band's. Only `true` is a toggle that is on.
+    /// Relationship arrows (#326) reach the view with the arcs: a moment's, even when its
+    /// metadata is too large to send whole, and a duration band's (small arrays), with entries
+    /// kept as stored, readable or not.
     #[test]
-    fn overviews_carry_toggles_that_are_on() {
+    fn overviews_carry_relationship_arrows() {
+        let arrows = json!([{"target":{"moment":"a"},"arrow":"to"},{"target":7,"arrow":"up"}]);
         let doc: Document = serde_json::from_value(json!({
             "format":"openchronology","version":1,"title":"Arrows","description":"",
             "events":[
-                {"id":"a","time":"0/1","metadata":{"title":"A","arrowHere":true,"notes":"x".repeat(4096)}},
-                {"id":"b","time":"100/1","metadata":{"title":"B","arrowHere":1}}
+                {"id":"a","time":"0/1","metadata":{"title":"A","arrows":[{"target":{"duration":"x"},"arrow":"both"}],"notes":"x".repeat(4096)}},
+                {"id":"b","time":"100/1","metadata":{"title":"B"}}
             ],
-            "durations":[{"id":"x","start":"50/1","end":"60/1","metadata":{"title":"X","arrowHere":true,"other":false}}]
+            "durations":[{"id":"x","start":"50/1","end":"60/1","metadata":{"title":"X","arrows":arrows,"tags":["t"],"big":["y".repeat(2000)]}}],
+            "relationships":[{"a":{"duration":"x"},"b":{"moment":"a"}}]
         }))
         .unwrap();
         let snapshot = Snapshot::from_document(&doc).unwrap();
         let frame = query(
             &snapshot,
-            json!({"kind":"overview","lower":"-10/1","upper":"400/1","threshold":"1/1","metadata_keys":["arrowHere"]}),
+            json!({"kind":"overview","lower":"-10/1","upper":"400/1","threshold":"1/1","metadata_keys":["arrows"]}),
         );
         let groups = frame["groups"].as_array().unwrap();
-        let group = |id: &str| groups.iter().find(|g| g["id"] == id).unwrap().clone();
-        assert_eq!(group("a")["metadata"], json!({"arrowHere":true}));
-        assert_eq!(group("b")["metadata"]["arrowHere"], json!(1));
+        let a = groups.iter().find(|g| g["id"] == "a").unwrap();
+        assert_eq!(
+            a["metadata"],
+            json!({"arrows":[{"target":{"duration":"x"},"arrow":"both"}]})
+        );
         assert_eq!(
             frame["durations"][0]["metadata"],
-            json!({"title":"X","arrowHere":true})
+            json!({"title":"X","arrows":arrows})
         );
+        assert_eq!(frame["edges"].as_array().unwrap().len(), 1);
     }
     #[test]
     fn relationships_round_trip_draw_arcs_page_and_follow_edits() {

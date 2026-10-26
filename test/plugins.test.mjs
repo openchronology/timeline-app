@@ -64,9 +64,10 @@ import {
   derivationKeys,
   durationOverview,
   RELATIONSHIP_ARROWS,
-  pluginArrowhead,
-  arrowheadKeys,
-  toggleValue,
+  readRelationshipArrows,
+  arcArrowheads,
+  arrowsToward,
+  pluginDrawsArrows,
 } from '../dist/core.mjs';
 import { themeProperties, themeScales, textOn } from '../dist/timeline-theme.mjs';
 import { createPluginLibrary } from '../server/plugins.mjs';
@@ -92,7 +93,7 @@ test('every field kind reads wrong-shaped metadata without throwing (#157)', () 
     'links',
     'heading',
     'font',
-    'toggle',
+    'relationship-arrows',
   ])
     assert(kinds.has(kind), kind);
   const keys = new Set([
@@ -132,7 +133,7 @@ test('every field kind reads wrong-shaped metadata without throwing (#157)', () 
       pluginHeading(plugins, metadata);
       pluginMarker(plugins, metadata);
       pluginBackground(plugins, metadata);
-      assert.equal(typeof pluginArrowhead(plugins, metadata), 'boolean');
+      arrowsToward(plugins, metadata, 'm:a');
       pluginFocus(plugins);
       pluginExpand(plugins);
       pluginMetadata(plugins, metadata);
@@ -987,7 +988,7 @@ test('timeline theme sizes: label and measure text sizes, as percentages (#267)'
     assert.throws(() => validatePluginManifest({ ...TIMELINE_THEME, theme }));
 });
 
-test('relationship arrows: an Arrow here toggle on moments and durations (#326)', () => {
+test('relationship arrows: what each end says, read tolerantly and drawn as a union (#326)', () => {
   assert(isOfficialPlugin(RELATIONSHIP_ARROWS));
   assert.deepEqual(
     [RELATIONSHIP_ARROWS.id, RELATIONSHIP_ARROWS.version],
@@ -995,69 +996,144 @@ test('relationship arrows: an Arrow here toggle on moments and durations (#326)'
   );
   assert.deepEqual(pluginTargets(RELATIONSHIP_ARROWS), ['moments', 'durations']);
   const plugins = [installed(RELATIONSHIP_ARROWS)];
-  // The toggle is a field of moments and of durations.
+  const field = {
+    kind: 'relationship-arrows',
+    metadataKey: 'arrows',
+    label: 'Relationship arrows',
+  };
   for (const target of [momentPlugins(plugins), durationPlugins(plugins)])
-    assert.deepEqual(pluginFields(target), [
-      { kind: 'toggle', metadataKey: 'arrowHere', label: 'Arrow here' },
-    ]);
-  assert.deepEqual(arrowheadKeys(durationPlugins(plugins)), ['arrowHere']);
-  // On only when stored as true; anything else reads as off.
-  assert.equal(pluginArrowhead(plugins, { arrowHere: true }), true);
-  for (const value of [undefined, false, 'true', 1, 'yes', {}, [true]]) {
-    assert.equal(toggleValue(value), false);
-    assert.equal(pluginArrowhead(plugins, { arrowHere: value }), false);
-  }
-  // Disabled or removed, nothing is drawn, and arcs skip the lookup.
-  const disabled = [{ ...plugins[0], enabled: false }];
-  assert.equal(pluginArrowhead(disabled, { arrowHere: true }), false);
-  assert.deepEqual(arrowheadKeys(disabled), []);
-  assert.equal(pluginArrowhead([], { arrowHere: true }), false);
-  // Overviews carry the toggle when it is on, and nothing for odd values.
-  assert.deepEqual(pluginMetadata(plugins, { arrowHere: true, other: true }), { arrowHere: true });
-  assert.deepEqual(pluginMetadata(plugins, { arrowHere: 'yes' }), { arrowHere: 'yes' });
-  assert.deepEqual(pluginMetadata(plugins, { arrowHere: 1 }), {});
-  assert.deepEqual(durationOverview({ title: 'Span', arrowHere: true, n: 1 }), {
-    title: 'Span',
-    arrowHere: true,
+    assert.deepEqual(pluginFields(target), [field]);
+  assert(pluginDrawsArrows(plugins));
+  assert(!pluginDrawsArrows([{ ...plugins[0], enabled: false }]));
+  assert(!pluginDrawsArrows([]));
+
+  // Reading never throws: odd entries are unreadable and keep their places.
+  const stored = [
+    { target: { moment: 'b' }, arrow: 'to' },
+    { target: { moment: 'b' }, arrow: 'sideways' },
+    { target: { duration: 'd' }, arrow: 'both' },
+    { target: { moment: 'b', duration: 'd' }, arrow: 'to' },
+    { target: { event: 'b' }, arrow: 'to' },
+    { target: { moment: 'bad id!' }, arrow: 'to' },
+    { target: { moment: 'c' }, arrow: 'from', extra: 1 },
+    null,
+    'to',
+    [],
+    { target: { moment: 'c' }, arrow: 'none' },
+  ];
+  assert.deepEqual(readRelationshipArrows(stored), {
+    entries: [
+      { target: { moment: 'b' }, arrow: 'to', index: 0 },
+      { target: { duration: 'd' }, arrow: 'both', index: 2 },
+      { target: { moment: 'c' }, arrow: 'none', index: 10 },
+    ],
+    unreadable: 8,
   });
-  // The field kind and the arrowhead component are general plugin API, validated.
+  assert.deepEqual(readRelationshipArrows(undefined), { entries: [], unreadable: 0 });
+  for (const value of [null, 'x', 7, {}, true])
+    assert.deepEqual(readRelationshipArrows(value), { entries: [], unreadable: 1 });
+
+  // From A's point of view: "to" is an arrowhead at B's end, "from" at A's, "both" at both.
+  const says = (arrow) => ({ arrows: [{ target: { moment: 'b' }, arrow }] });
+  const arc = (a, b) =>
+    arcArrowheads({ key: 'm:a', plugins, metadata: a }, { key: 'm:b', plugins, metadata: b });
+  assert.deepEqual(arc(says('to'), {}), { a: false, b: true });
+  assert.deepEqual(arc(says('from'), {}), { a: true, b: false });
+  assert.deepEqual(arc(says('both'), {}), { a: true, b: true });
+  assert.deepEqual(arc(says('none'), {}), { a: false, b: false });
+  const back = (arrow) => ({ arrows: [{ target: { moment: 'a' }, arrow }] });
+  // The union of both ends: A says both and B says "to" A; each says "to" the other.
+  assert.deepEqual(arc(says('both'), back('to')), { a: true, b: true });
+  assert.deepEqual(arc(says('to'), back('to')), { a: true, b: true });
+  assert.deepEqual(arc(says('to'), back('from')), { a: false, b: true });
+  assert.deepEqual(arc(says('none'), back('none')), { a: false, b: false });
+  // An end whose metadata isn't at hand says nothing; nor do entries for other entities,
+  // unreadable ones, or a disabled plugin.
+  assert.deepEqual(arc(null, back('to')), { a: true, b: false });
+  assert.deepEqual(arc(null, null), { a: false, b: false });
+  assert.deepEqual(arc({ arrows: [{ target: { moment: 'zz' }, arrow: 'both' }] }, {}), {
+    a: false,
+    b: false,
+  });
+  assert.deepEqual(arc({ arrows: stored }, {}), { a: false, b: true });
+  assert.deepEqual(arc({ arrows: 'both' }, { arrows: { a: 'to' } }), { a: false, b: false });
+  assert.deepEqual(
+    arcArrowheads(
+      { key: 'm:a', plugins: [{ ...plugins[0], enabled: false }], metadata: says('both') },
+      { key: 'm:b', plugins: [], metadata: back('both') },
+    ),
+    { a: false, b: false },
+  );
+  // A moment and a duration: each read with its own plugins.
+  assert.deepEqual(
+    arcArrowheads(
+      {
+        key: 'd:d',
+        plugins: durationPlugins(plugins),
+        metadata: { arrows: [{ target: { moment: 'a' }, arrow: 'to' }] },
+      },
+      { key: 'm:a', plugins: momentPlugins(plugins), metadata: {} },
+    ),
+    { a: false, b: true },
+  );
+  assert.deepEqual(arrowsToward(plugins, says('both'), 'm:b'), { self: true, other: true });
+
+  // Overviews carry the entries: moments' plugin projection, and duration bands' small arrays.
+  assert.deepEqual(pluginMetadata(plugins, says('to')), says('to'));
+  assert.deepEqual(durationOverview({ title: 'Span', ...says('from'), n: 1 }), {
+    title: 'Span',
+    ...says('from'),
+  });
+  assert.deepEqual(durationOverview({ big: ['x'.repeat(2000)], tags: ['a'] }), { tags: ['a'] });
+
+  // The field kind is general plugin API, validated; stacks don't take it.
   const custom = validatePluginManifest({
     apiVersion: 1,
-    id: 'effects',
+    id: 'causes',
     version: 1,
-    name: 'Effects',
-    description: 'Arrows at effects.',
-    fields: [{ kind: 'toggle', metadataKey: 'isEffect', label: 'Effect' }],
-    relationships: { kind: 'arrowhead', metadataKey: 'isEffect' },
+    name: 'Causes',
+    description: 'Arrows from causes.',
+    fields: [{ kind: 'relationship-arrows', metadataKey: 'causes', label: 'Causes' }],
   });
   assert.deepEqual(pluginTargets(custom), ['moments', 'durations']);
-  assert(pluginArrowhead([installed(custom)], { isEffect: true }));
-  for (const relationships of [
-    { kind: 'label', metadataKey: 'isEffect' },
-    { kind: 'arrowhead', metadataKey: 'title' },
-    { kind: 'arrowhead' },
-    { kind: 'arrowhead', metadataKey: 'isEffect', extra: 1 },
-  ])
-    assert.throws(() => validatePluginManifest({ ...custom, relationships }));
+  assert.deepEqual(
+    arrowsToward(
+      [installed(custom)],
+      { causes: [{ target: { moment: 'x' }, arrow: 'to' }] },
+      'm:x',
+    ),
+    { self: false, other: true },
+  );
   assert.throws(() =>
     validatePluginManifest({
       ...custom,
-      fields: [{ kind: 'switch', metadataKey: 'isEffect', label: 'Effect' }],
+      fields: [{ kind: 'relationship-arrow', metadataKey: 'causes', label: 'Causes' }],
     }),
   );
-  // A saved timeline keeps its toggles whether or not the plugin is installed.
+  // A saved timeline keeps every entry, dangling or unreadable, whether or not the plugin is on.
   const doc = {
     format: 'openchronology',
     version: 1,
     title: 'Arrows',
     description: '',
-    plugins: disabled,
-    events: [{ id: 'a', time: '0/1', metadata: { title: 'A', arrowHere: true } }],
-    durations: [{ id: 'd', start: '1/1', end: '2/1', metadata: { arrowHere: true } }],
+    plugins: [{ ...plugins[0], enabled: false }],
+    events: [
+      { id: 'a', time: '0/1', metadata: { title: 'A', arrows: stored } },
+      { id: 'b', time: '1/1', metadata: { title: 'B' } },
+    ],
+    durations: [
+      {
+        id: 'd',
+        start: '1/1',
+        end: '2/1',
+        metadata: { arrows: [{ target: { moment: 'gone' }, arrow: 'to' }] },
+      },
+    ],
+    relationships: [{ a: { moment: 'a' }, b: { moment: 'b' } }],
   };
   const saved = validateDocument(JSON.parse(JSON.stringify(doc)));
-  assert.equal(saved.events[0].metadata.arrowHere, true);
-  assert.equal(saved.durations[0].metadata.arrowHere, true);
+  assert.deepEqual(saved.events[0].metadata.arrows, stored);
+  assert.deepEqual(saved.durations[0].metadata.arrows, doc.durations[0].metadata.arrows);
 });
 
 test('headings: a level makes a moment a heading, in its font or Times New Roman', () => {

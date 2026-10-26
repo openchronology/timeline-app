@@ -21,10 +21,172 @@ import {
   HEADING_FONTS,
   DEFAULT_HEADING_FONT,
   fontValue,
-  toggleValue,
+  readRelationshipArrows,
 } from './plugins.js';
-import type { HeadingLevel } from './plugins.js';
+import type { ArrowDirection, HeadingLevel, PluginField } from './plugins.js';
 import type { InstalledPlugin, StackEntry } from './plugins.js';
+/** What a relationship-arrows field (#326) knows of the entity's relationships. */
+export interface RelationshipContext {
+  /**
+   * The entity's directly related entities: names by reference key ("m:<id>" or "d:<id>"),
+   * and whether that is all of them (a very linked entity may list only some).
+   */
+  related(): Promise<{ entities: Map<string, string>; complete: boolean }>;
+  /** An entity's name, when the view has it. */
+  name(key: string): string | null;
+  /**
+   * What the other end's own arrows say of its link to this entity, when its metadata is at
+   * hand: an arrowhead at its own end (`self`) or at this entity's end (`other`).
+   */
+  theirs(key: string): { self: boolean; other: boolean } | null;
+}
+/**
+ * A relationship-arrows field (#326): one row per stored entry, naming the other end of one
+ * of the entity's relationships and the arrow chosen for it, with × to remove it. Choosing a
+ * related entity from the list adds an entry. An entry whose relationship no longer exists is
+ * outlined in red and says so; an unreadable one says that. Both stay as stored until removed,
+ * and a value that isn't a list is shown but not edited.
+ */
+function renderRelationshipArrows(
+  section: HTMLElement,
+  field: PluginField,
+  metadata: Record<string, unknown>,
+  editable: boolean,
+  onChange: (key: string, value: unknown) => void,
+  context: RelationshipContext | undefined,
+) {
+  const raw = metadata[field.metadataKey];
+  const stored: unknown[] = Array.isArray(raw) ? JSON.parse(JSON.stringify(raw)) : [];
+  const fixed = raw !== undefined && !Array.isArray(raw);
+  const heading = document.createElement('h3');
+  heading.textContent = field.label;
+  const list = document.createElement('ul');
+  list.className = 'relationship-arrows';
+  const add = document.createElement('select');
+  add.setAttribute('aria-label', 'Add an arrow to a relationship');
+  add.dataset.pluginKey = field.metadataKey;
+  const hint = document.createElement('p');
+  hint.className = 'field-hint';
+  section.append(heading, list, add, hint);
+  let related: { entities: Map<string, string>; complete: boolean } | null = null;
+  const commit = () => onChange(field.metadataKey, stored.length ? stored : '');
+  const name = (key: string) =>
+    related?.entities.get(key) ||
+    context?.name(key) ||
+    (key.startsWith('m:') ? 'Moment ' : 'Duration ') + key.slice(2);
+  const choices: Record<ArrowDirection, (other: string) => string> = {
+    none: () => 'No arrow',
+    to: (other) => `This event → ${other}`,
+    from: (other) => `${other} → this event`,
+    both: (other) => `This event ↔ ${other}`,
+  };
+  const draw = () => {
+    list.replaceChildren();
+    const read = readRelationshipArrows(stored);
+    const targets = new Set<string>();
+    stored.forEach((_, index) => {
+      const item = document.createElement('li');
+      item.className = 'relationship-arrow';
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.textContent = '×';
+      remove.hidden = !editable || fixed;
+      remove.onclick = () => {
+        stored.splice(index, 1);
+        commit();
+        draw();
+      };
+      const entry = read.entries.find((e) => e.index === index);
+      if (!entry) {
+        item.classList.add('unreadable');
+        const note = document.createElement('span');
+        note.className = 'field-hint';
+        note.textContent = "Unreadable entry: it isn't drawn.";
+        remove.setAttribute('aria-label', 'Remove the unreadable entry');
+        item.append(note, remove);
+        list.append(item);
+        return;
+      }
+      const key =
+        'moment' in entry.target ? 'm:' + entry.target.moment : 'd:' + entry.target.duration;
+      targets.add(key);
+      const other = name(key);
+      item.dataset.target = key;
+      const label = document.createElement('label');
+      label.textContent = other;
+      const select = document.createElement('select');
+      select.disabled = !editable || fixed;
+      for (const arrow of Object.keys(choices) as ArrowDirection[])
+        select.append(new Option(choices[arrow](other), arrow));
+      select.value = entry.arrow;
+      select.onchange = () => {
+        (stored[index] as Record<string, unknown>).arrow = select.value;
+        commit();
+      };
+      label.append(select);
+      remove.setAttribute('aria-label', `Remove the arrow with ${other}`);
+      item.append(label, remove);
+      // Only a full list of relationships tells that one is gone.
+      if (related?.complete && !related.entities.has(key)) {
+        item.classList.add('dangling');
+        const note = document.createElement('p');
+        note.className = 'field-hint';
+        note.textContent = 'No relationship with this entity. It isn’t drawn.';
+        item.append(note);
+      }
+      const theirs = context?.theirs(key);
+      if (theirs && (theirs.self || theirs.other)) {
+        const note = document.createElement('p');
+        note.className = 'field-hint relationship-arrow-theirs';
+        note.textContent = `${other} adds ${
+          theirs.self && theirs.other
+            ? 'arrowheads at both ends'
+            : theirs.other
+              ? 'an arrowhead at this event'
+              : `an arrowhead at ${other}`
+        }.`;
+        item.append(note);
+      }
+      list.append(item);
+    });
+    add.replaceChildren(new Option('Add an arrow…', ''));
+    for (const [key, title] of related?.entities ?? [])
+      if (!targets.has(key)) add.append(new Option(title, key));
+    add.hidden = !editable || fixed;
+    add.disabled = add.options.length === 1;
+    hint.textContent = fixed
+      ? "This value can't be read, so it can't be edited here. Edit it under Additional metadata instead."
+      : !related && context
+        ? 'Loading relationships…'
+        : !stored.length && !related?.entities.size
+          ? 'Link this event to another under Related to, then choose an arrow for it here.'
+          : '';
+  };
+  add.onchange = () => {
+    const key = add.value;
+    if (!key) return;
+    stored.push({
+      target: key.startsWith('m:') ? { moment: key.slice(2) } : { duration: key.slice(2) },
+      arrow: 'to',
+    });
+    commit();
+    draw();
+    list.querySelector<HTMLSelectElement>('li:last-child select')?.focus();
+  };
+  // Relationships change in the Related to section beside this, so they are read again
+  // whenever the list of choices is opened.
+  const load = () =>
+    context
+      ?.related()
+      .then((found) => {
+        related = found;
+        draw();
+      })
+      .catch(() => {});
+  add.onfocus = () => void load();
+  draw();
+  void load();
+}
 
 /**
  * An image element for plugin pictures: fetched without credentials or a referrer (the
@@ -96,7 +258,9 @@ export function renderPluginMarker(
  * field has rules (links, fonts, image URLs); the caller stores it. `openImage` opens an
  * image's original, `confirmDelete` asks before removing a stack entry, and `inheritedTime`
  * is the time a stack's entries share. `child` is set for the fields inside a stack entry,
- * which can't hold stacks of their own. With `editable` false everything is read-only.
+ * which can't hold stacks of their own (nor relationship arrows: they aren't relationship
+ * endpoints). `relationships` tells relationship-arrows fields about the entity's links.
+ * With `editable` false everything is read-only.
  */
 export function renderPluginFields(
   container: HTMLElement,
@@ -108,33 +272,16 @@ export function renderPluginFields(
   confirmDelete: (title: string, remove: () => void) => void,
   inheritedTime: () => string = () => '',
   child = false,
+  relationships?: RelationshipContext,
 ) {
   container.replaceChildren();
-  // Stack entries aren't relationship endpoints, so they have no arrowhead toggles (#326).
-  const endpointOnly = new Set(
-    plugins.flatMap((p) =>
-      p.manifest.relationships ? [p.manifest.relationships.metadataKey] : [],
-    ),
-  );
   for (const field of pluginFields(plugins)) {
-    if (field.kind === 'stack' && child) continue;
-    if (child && endpointOnly.has(field.metadataKey)) continue;
+    if ((field.kind === 'stack' || field.kind === 'relationship-arrows') && child) continue;
     const section = document.createElement('section');
     section.className = 'plugin-field';
     section.dataset.metadataKey = field.metadataKey;
-    if (field.kind === 'toggle') {
-      // A checkbox: on is stored as true, and off removes the key. Any other stored value
-      // reads as off and is kept until the box is changed.
-      const label = document.createElement('label');
-      label.className = 'plugin-toggle';
-      const box = document.createElement('input');
-      box.type = 'checkbox';
-      box.checked = toggleValue(metadata[field.metadataKey]);
-      box.disabled = !editable;
-      box.dataset.pluginKey = field.metadataKey;
-      box.onchange = () => onChange(field.metadataKey, box.checked);
-      label.append(box, document.createTextNode(field.label));
-      section.append(label);
+    if (field.kind === 'relationship-arrows') {
+      renderRelationshipArrows(section, field, metadata, editable, onChange, relationships);
       container.append(section);
       continue;
     }

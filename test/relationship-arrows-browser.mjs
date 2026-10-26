@@ -1,13 +1,14 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// Relationship arrows (#326): arrowheads on arcs where they end at an event with Arrow here on.
+// Relationship arrows (#326): arrowheads on arcs, as either end's arrows say.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
 import { RELATIONSHIP_ARROWS } from '../dist/core.mjs';
 /**
- * Relationship arrows (#326): with the plugin enabled, an arc draws an arrowhead at each end
- * whose moment or duration has Arrow here on, colored like the arc and highlighted with it,
- * and none at an end beyond the view; disabled, arcs draw as before and the toggles are kept.
+ * Relationship arrows (#326): with the plugin enabled, an arc draws the arrowheads its two
+ * ends' arrows say (their union), colored and highlighted with the arc, and none at an end
+ * beyond the view; disabled, arcs draw as before and the entries are kept. Moment details
+ * list the entries, add one for a related entity, and outline one whose relationship is gone.
  */
 export async function checkRelationshipArrows(page, restore) {
   const load = async (doc) => {
@@ -34,6 +35,10 @@ export async function checkRelationshipArrows(page, restore) {
     await page.locator('#apply-bounds').click();
     await page.evaluate(() => new Promise(requestAnimationFrame));
   };
+  const open = async (name) => {
+    await page.getByRole('button', { name, exact: true }).click({ force: true });
+    await page.waitForFunction((n) => document.getElementById('event-title').value === n, name);
+  };
   /** Each arc's arrowheads (how many triangles) and hover text, by relationship. */
   const arcs = () =>
     page.evaluate(() =>
@@ -51,6 +56,17 @@ export async function checkRelationshipArrows(page, restore) {
         }),
       ),
     );
+  const heads = (id, count) =>
+    page.waitForFunction(
+      ([id, count]) => {
+        const arc = document.querySelector(`.edge-arc[data-edge-id="${id}"]`);
+        const next = arc?.nextElementSibling;
+        const d = next?.classList.contains('edge-arrows') ? next.getAttribute('d') : '';
+        return arc && d.split('M').length - 1 === count;
+      },
+      [id, count],
+    );
+  const to = (kind, id, arrow) => ({ target: { [kind]: id }, arrow });
   const doc = (enabled) => ({
     format: 'openchronology',
     version: 1,
@@ -58,12 +74,29 @@ export async function checkRelationshipArrows(page, restore) {
     description: '',
     plugins: [{ manifest: RELATIONSHIP_ARROWS, enabled }],
     events: [
-      { id: 'a', time: '10/1', metadata: { title: 'Alpha' } },
-      { id: 'b', time: '50/1', metadata: { title: 'Bravo', arrowHere: true } },
-      { id: 'c', time: '90/1', metadata: { title: 'Charlie', arrowHere: 'yes' } },
+      {
+        id: 'a',
+        time: '10/1',
+        metadata: {
+          title: 'Alpha',
+          // To Bravo; both ways with Charlie, which it isn't related to; and an unreadable one.
+          arrows: [to('moment', 'b', 'to'), to('moment', 'c', 'both'), { target: 7, arrow: 'x' }],
+        },
+      },
+      { id: 'b', time: '50/1', metadata: { title: 'Bravo', arrows: [to('moment', 'a', 'to')] } },
+      {
+        id: 'c',
+        time: '90/1',
+        metadata: { title: 'Charlie', arrows: [to('moment', 'b', 'from')] },
+      },
     ],
     durations: [
-      { id: 'd', start: '130/1', end: '150/1', metadata: { title: 'Delta', arrowHere: true } },
+      {
+        id: 'd',
+        start: '130/1',
+        end: '150/1',
+        metadata: { title: 'Delta', arrows: [to('moment', 'a', 'to')] },
+      },
     ],
     relationships: [
       { a: { moment: 'a' }, b: { moment: 'b' } },
@@ -83,19 +116,20 @@ export async function checkRelationshipArrows(page, restore) {
     });
     assert.equal(await page.locator('.edge-arrows').count(), 0);
 
-    // Enabled: a head where each arc meets Bravo or Delta. Charlie's odd value reads as off.
+    // Enabled: Alpha says "to" Bravo and Bravo "to" Alpha, so their arc has both ends (the
+    // union); Charlie's "from" Bravo is a head at Charlie; Delta's "to" Alpha one at Alpha.
     await load(doc(true));
     await bounds('0', '160');
     await page.waitForFunction(() => document.querySelectorAll('.edge-arrows').length === 3);
     assert.deepEqual(await arcs(), {
-      'd:d~m:a': { heads: 1, title: 'Alpha → Delta' },
-      'm:a~m:b': { heads: 1, title: 'Alpha → Bravo' },
-      'm:b~m:c': { heads: 1, title: 'Charlie → Bravo' },
+      'd:d~m:a': { heads: 1, title: 'Delta → Alpha' },
+      'm:a~m:b': { heads: 2, title: 'Alpha ↔ Bravo' },
+      'm:b~m:c': { heads: 1, title: 'Bravo → Charlie' },
     });
     // Colored like its arc, and highlighted with it on hover.
     const look = () =>
       page.evaluate(() => {
-        const arc = document.querySelector('.edge-arc[data-edge-id="m:a~m:b"]');
+        const arc = document.querySelector('.edge-arc[data-edge-id="m:b~m:c"]');
         const arrows = arc.nextElementSibling;
         return {
           stroke: getComputedStyle(arc).stroke,
@@ -108,14 +142,14 @@ export async function checkRelationshipArrows(page, restore) {
     assert.equal(rest.fill, rest.stroke);
     assert.equal(rest.opacity, rest.arcOpacity);
     const peak = await page.evaluate(() => {
-      const arc = document.querySelector('.edge-arc[data-edge-id="m:a~m:b"]');
+      const arc = document.querySelector('.edge-arc[data-edge-id="m:b~m:c"]');
       const point = arc.getPointAtLength(arc.getTotalLength() / 2);
       const screen = point.matrixTransform(arc.getScreenCTM());
       return { x: screen.x, y: screen.y };
     });
     await page.mouse.move(peak.x, peak.y);
     await page.waitForFunction(() =>
-      document.querySelector('.edge-arc[data-edge-id="m:a~m:b"]').matches(':hover'),
+      document.querySelector('.edge-arc[data-edge-id="m:b~m:c"]').matches(':hover'),
     );
     const hovered = await look();
     assert.notEqual(hovered.stroke, rest.stroke);
@@ -123,49 +157,72 @@ export async function checkRelationshipArrows(page, restore) {
     assert.equal(hovered.opacity, '1');
     await page.mouse.move(5, 5);
 
-    // Arrow here on Charlie: the arc between two arrows' ends has a head at each.
-    await page.getByRole('button', { name: 'Charlie', exact: true }).click({ force: true });
-    await page.waitForFunction(() => document.getElementById('event-title').value === 'Charlie');
-    const toggle = page.locator('#plugin-event-fields input[data-plugin-key="arrowHere"]');
-    assert.equal(await toggle.isChecked(), false);
-    await toggle.check();
+    // Moment details list the entries. Charlie's arrow, changed to none: no head on that arc.
+    const fields = page.locator('#plugin-event-fields');
+    await open('Charlie');
+    const row = (target) => fields.locator(`.relationship-arrow[data-target="${target}"]`);
+    assert.equal(await row('m:b').locator('select').inputValue(), 'from');
+    await row('m:b').locator('select').selectOption('none');
     await closeMomentDetails(page);
-    await page.waitForFunction(
-      () =>
-        document
-          .querySelector('.edge-arc[data-edge-id="m:b~m:c"]')
-          .nextElementSibling.getAttribute('d')
-          .split('M').length === 3,
+    await heads('m:b~m:c', 0);
+
+    // Bravo adds an arrow for Charlie, one of its relationships: "to" it, by default.
+    await open('Bravo');
+    const add = fields.getByLabel('Add an arrow to a relationship');
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll('#plugin-event-fields select[data-plugin-key] option')]
+        .map((o) => o.value)
+        .includes('m:c'),
     );
-    assert.deepEqual((await arcs())['m:b~m:c'], { heads: 2, title: 'Bravo ↔ Charlie' });
-    // Saved as true; off removes the key.
-    const charlie = (saved) => saved.events.find((e) => e.id === 'c').metadata;
-    assert.equal(charlie(await exported()).arrowHere, true);
-    await page.getByRole('button', { name: 'Charlie', exact: true }).click({ force: true });
-    await page.waitForFunction(() => document.getElementById('event-title').value === 'Charlie');
-    await toggle.uncheck();
+    assert.deepEqual(
+      await add.locator('option').evaluateAll((options) => options.map((o) => o.value)),
+      ['', 'm:c'],
+      'only relationships without an arrow are offered',
+    );
+    await add.selectOption('m:c');
+    await row('m:c').waitFor();
+    assert.equal(await row('m:c').locator('select').inputValue(), 'to');
     await closeMomentDetails(page);
-    assert.equal('arrowHere' in charlie(await exported()), false);
-    await page.waitForFunction(() => document.querySelectorAll('.edge-arrows').length === 3);
+    await heads('m:b~m:c', 1);
+    const bravo = (await exported()).events.find((e) => e.id === 'b').metadata.arrows;
+    assert.deepEqual(bravo, [to('moment', 'a', 'to'), to('moment', 'c', 'to')]);
 
-    // An end beyond the view draws no head: Delta is off to the right here.
-    await bounds('0', '100');
-    await page.waitForFunction(() => {
-      const arc = document.querySelector('.edge-arc[data-edge-id="d:d~m:a"]');
-      return arc && !arc.nextElementSibling?.classList.contains('edge-arrows');
-    });
-    assert.equal((await arcs())['m:a~m:b'].heads, 1);
+    // Alpha's arrow for Charlie has no relationship: outlined, said so, and not drawn; its
+    // unreadable entry says that. Both are kept until removed.
+    await open('Alpha');
+    await fields.locator('.relationship-arrow.dangling[data-target="m:c"]').waitFor();
+    assert.match(await row('m:c').textContent(), /No relationship with this entity/);
+    assert.notEqual(
+      await row('m:c').evaluate((li) => getComputedStyle(li).borderColor),
+      await row('m:b').evaluate((li) => getComputedStyle(li).borderColor),
+    );
+    assert.equal(await row('m:b').locator('.relationship-arrow-theirs').count(), 1);
+    assert.match(
+      await fields.locator('.relationship-arrow.unreadable').textContent(),
+      /Unreadable/,
+    );
+    await row('m:c').getByRole('button', { name: 'Remove the arrow with Charlie' }).click();
+    await closeMomentDetails(page);
+    assert.deepEqual((await exported()).events.find((e) => e.id === 'a').metadata.arrows, [
+      to('moment', 'b', 'to'),
+      { target: 7, arrow: 'x' },
+    ]);
 
-    // Disabling the plugin keeps the toggles but draws no heads.
+    // An end beyond the view draws no head: Alpha is off to the left here.
+    await bounds('40', '160');
+    await heads('d:d~m:a', 0);
+    await heads('m:a~m:b', 1);
+
+    // Disabling the plugin keeps the entries but draws no heads.
     await load(doc(false));
     await bounds('0', '160');
     await page.waitForFunction(() => document.querySelectorAll('.edge-arc').length === 3);
     assert.equal(await page.locator('.edge-arrows').count(), 0);
     const saved = await exported();
-    assert.equal(saved.events.find((e) => e.id === 'b').metadata.arrowHere, true);
-    assert.equal(saved.durations[0].metadata.arrowHere, true);
+    assert.deepEqual(saved.events[0].metadata.arrows, doc(false).events[0].metadata.arrows);
+    assert.deepEqual(saved.durations[0].metadata.arrows, [to('moment', 'a', 'to')]);
     console.log(
-      'PASS relationship arrows: arrowheads only with the plugin enabled, at the ends with Arrow here on, colored and highlighted with their arc, none beyond the view, toggled in details.',
+      'PASS relationship arrows: heads only with the plugin enabled, the union of both ends, colored and highlighted with their arc, none beyond the view, entries edited and added in details, a gone relationship outlined.',
     );
   } finally {
     await page.mouse.move(5, 5);
