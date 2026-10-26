@@ -365,7 +365,7 @@ A suite is a named package of plugins that are added to a timeline together. In 
 
 Two official suites are included in every build, so they are available offline and on a desktop without a server:
 
-- **Causal factor analysis**: Moment stacks, Moment shapes and Moment colors, to stack contributing factors on a moment and tell kinds of factor apart.
+- **Causal factor analysis**: Moment stacks, Moment shapes, Moment colors, Presumptive outline and Relationship arrows, to stack contributing factors on a moment, tell kinds of factor apart, draw conditions as ellipses and unconfirmed items dashed, and show cause and effect with arrows. Version 2 added the last two plugins and Moment shapes 3. Version 1 (Moment stacks, Moment shapes 2 and Moment colors) is still served and recognized as official. Adding version 2 to a timeline that already has version 1's plugins adds the two new ones and keeps its installed Moment shapes, as adding a suite never changes an installed plugin; reinstall Moment shapes from the catalogue to draw ellipses.
 - **History education**: Moment icons, Duration backgrounds, Expand on hover, Rich text notes and Headings.
 
 **Adding a suite** appends the plugins of the suite that the timeline does not have yet, enabled, in the suite's order. A plugin the timeline already has stays as it is, with its version and whether it is enabled, so adding a suite never changes an installed plugin. A timeline still holds at most 32 plugins. Save the timeline to keep the result, as with any plugin change.

@@ -8,12 +8,15 @@ import {
   validatePluginManifest,
   MOMENT_STACKS,
   MOMENT_SHAPES,
+  MOMENT_SHAPES_2,
   MOMENT_COLORS,
   MOMENT_ICONS,
   DURATION_BACKGROUNDS,
   EXPAND_ON_HOVER,
   RICH_TEXT_NOTES,
   MOMENT_HEADINGS,
+  PRESUMPTIVE_OUTLINE,
+  RELATIONSHIP_ARROWS,
 } from './plugins.js';
 import type { InstalledPlugin, PluginManifest } from './plugins.js';
 
@@ -116,14 +119,29 @@ export function addSuite(
   };
 }
 
-export const CAUSAL_FACTOR_ANALYSIS: PluginSuite = validatePluginSuite({
+/** Version 1 of the suite as published, with Moment shapes 2; still served and recognized. */
+export const CAUSAL_FACTOR_ANALYSIS_1: PluginSuite = validatePluginSuite({
   apiVersion: 1,
   id: 'causal-factor-analysis',
   version: 1,
   name: 'Causal factor analysis',
   description:
     'Trace how factors lead to an outcome: stack contributing factors on a moment, and tell kinds of factor apart by shape and color.',
-  plugins: [MOMENT_STACKS, MOMENT_SHAPES, MOMENT_COLORS],
+  plugins: [MOMENT_STACKS, MOMENT_SHAPES_2, MOMENT_COLORS],
+});
+/**
+ * Version 2 draws an Events and Causal Factors chart's conventions: ellipses for conditions
+ * (Moment shapes 3, #324), dashed outlines for presumptive items (#325), and arrowheads on
+ * relationships (#326).
+ */
+export const CAUSAL_FACTOR_ANALYSIS: PluginSuite = validatePluginSuite({
+  apiVersion: 1,
+  id: 'causal-factor-analysis',
+  version: 2,
+  name: 'Causal factor analysis',
+  description:
+    'Trace how factors lead to an outcome: stack contributing factors on a moment, tell kinds of factor apart by shape and color, draw conditions as ellipses and unconfirmed items dashed, and show cause and effect with arrows.',
+  plugins: [MOMENT_STACKS, MOMENT_SHAPES, MOMENT_COLORS, PRESUMPTIVE_OUTLINE, RELATIONSHIP_ARROWS],
 });
 export const HISTORY_EDUCATION: PluginSuite = validatePluginSuite({
   apiVersion: 1,
@@ -134,7 +152,11 @@ export const HISTORY_EDUCATION: PluginSuite = validatePluginSuite({
     'Teach a period with pictures and structure: moment icons, backgrounds for eras, summaries that fan out on hover, rich notes, and headings for chapters and parts.',
   plugins: [MOMENT_ICONS, DURATION_BACKGROUNDS, EXPAND_ON_HOVER, RICH_TEXT_NOTES, MOMENT_HEADINGS],
 });
-export const OFFICIAL_SUITES: readonly PluginSuite[] = [CAUSAL_FACTOR_ANALYSIS, HISTORY_EDUCATION];
+export const OFFICIAL_SUITES: readonly PluginSuite[] = [
+  CAUSAL_FACTOR_ANALYSIS,
+  CAUSAL_FACTOR_ANALYSIS_1,
+  HISTORY_EDUCATION,
+];
 export function isOfficialSuite(suite: PluginSuite): boolean {
   return OFFICIAL_SUITES.some((official) => JSON.stringify(official) === JSON.stringify(suite));
 }
