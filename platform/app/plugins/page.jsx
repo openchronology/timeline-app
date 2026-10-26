@@ -10,7 +10,7 @@ import HelpTip from '../../components/help-tip.jsx';
 import { pageTitle } from '../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
 export function generateMetadata() {
-  return { title: pageTitle('Plugin library') };
+  return { title: pageTitle('Plugin library'), alternates: { canonical: '/plugins' } };
 }
 export default async function Plugins({ searchParams }) {
   const params = await searchParams;

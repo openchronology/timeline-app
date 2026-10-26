@@ -22,11 +22,12 @@ import { latestRelease } from '../../lib/latest-release.js';
 import { siteName } from '../../lib/sharing.js';
 // Rendered per request: what it puts first depends on the visitor's browser.
 export const dynamic = 'force-dynamic';
-/** The page's title and description. */
+/** The page's title, description and canonical address. */
 export function generateMetadata() {
   return {
     title: `Download · ${siteName()}`,
     description: 'The OpenChronology desktop app for Windows, macOS and Linux, and the server.',
+    alternates: { canonical: '/download' },
   };
 }
 /** The desktop app's operating systems, by the key `detectPlatform` gives. */

@@ -12,6 +12,9 @@ import BrowserDrafts from '../components/browser-drafts.jsx';
 import { profilePath } from '../../src/addresses.ts';
 // Rendered for every request: it depends on who is signed in and on the query.
 export const dynamic = 'force-dynamic';
+// One address for search engines, whatever the query: searches, tags, sorts and pages are views
+// of the same dashboard.
+export const metadata = { alternates: { canonical: '/' } };
 /** A page number from the address: a whole number from 1 to 10,000, or 1 when it is not one. */
 const pageNumber = (value) =>
   Math.max(1, Math.min(10000, Number.isSafeInteger(Number(value)) ? Number(value) : 1));
