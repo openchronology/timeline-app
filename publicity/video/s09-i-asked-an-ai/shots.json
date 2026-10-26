@@ -1,0 +1,32 @@
+{
+  "sample": "../samples/star-wars.ochx",
+  "size": [360, 600],
+  "scale": 3,
+  "boundFormat": "t => { const x = t / 31557600; return (-x).toFixed(4) + ' ABY BBY'; }",
+  "shots": [
+    {
+      "id": "zoom",
+      "dur": 19,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-1673000000000, 70000000000]
+        },
+        {
+          "t": 8,
+          "view": [-1673000000000, 70000000000]
+        },
+        {
+          "t": 18,
+          "view": [-142009200, 157788000]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const s = document.getElementById('timeline-stage'); const r = s.getBoundingClientRect(); const now = Number(s.dataset.uiScale) || 1; const d = -Math.log(1.25 / now) / 0.002; s.dispatchEvent(new WheelEvent('wheel', { deltaY: d, ctrlKey: true, clientX: r.left + r.width / 2, clientY: r.top + 0.5 * r.height, bubbles: true, cancelable: true })); })()"
+        }
+      ]
+    }
+  ]
+}

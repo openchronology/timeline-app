@@ -1,0 +1,547 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:03,840"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 3840
+			},
+			"text": " and the app itself, built mostly by AI agents,",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.90454,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:00,310",
+						"to": "00:00:00,400"
+					},
+					"offsets": {
+						"from": 310,
+						"to": 400
+					},
+					"id": 290,
+					"p": 0.295088,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:00,400",
+						"to": "00:00:00,790"
+					},
+					"offsets": {
+						"from": 400,
+						"to": 790
+					},
+					"id": 262,
+					"p": 0.993591,
+					"t_dtw": -1
+				},
+				{
+					"text": " app",
+					"timestamps": {
+						"from": "00:00:00,790",
+						"to": "00:00:01,150"
+					},
+					"offsets": {
+						"from": 790,
+						"to": 1150
+					},
+					"id": 598,
+					"p": 0.986043,
+					"t_dtw": -1
+				},
+				{
+					"text": " itself",
+					"timestamps": {
+						"from": "00:00:01,150",
+						"to": "00:00:01,250"
+					},
+					"offsets": {
+						"from": 1150,
+						"to": 1250
+					},
+					"id": 2346,
+					"p": 0.996329,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,090",
+						"to": "00:00:02,090"
+					},
+					"offsets": {
+						"from": 2090,
+						"to": 2090
+					},
+					"id": 11,
+					"p": 0.438988,
+					"t_dtw": -1
+				},
+				{
+					"text": " built",
+					"timestamps": {
+						"from": "00:00:02,120",
+						"to": "00:00:02,330"
+					},
+					"offsets": {
+						"from": 2120,
+						"to": 2330
+					},
+					"id": 3170,
+					"p": 0.788755,
+					"t_dtw": -1
+				},
+				{
+					"text": " mostly",
+					"timestamps": {
+						"from": "00:00:02,330",
+						"to": "00:00:02,640"
+					},
+					"offsets": {
+						"from": 2330,
+						"to": 2640
+					},
+					"id": 4632,
+					"p": 0.99594,
+					"t_dtw": -1
+				},
+				{
+					"text": " by",
+					"timestamps": {
+						"from": "00:00:02,640",
+						"to": "00:00:02,800"
+					},
+					"offsets": {
+						"from": 2640,
+						"to": 2800
+					},
+					"id": 416,
+					"p": 0.986641,
+					"t_dtw": -1
+				},
+				{
+					"text": " AI",
+					"timestamps": {
+						"from": "00:00:02,800",
+						"to": "00:00:02,960"
+					},
+					"offsets": {
+						"from": 2800,
+						"to": 2960
+					},
+					"id": 9552,
+					"p": 0.971351,
+					"t_dtw": -1
+				},
+				{
+					"text": " agents",
+					"timestamps": {
+						"from": "00:00:02,960",
+						"to": "00:00:03,480"
+					},
+					"offsets": {
+						"from": 2960,
+						"to": 3480
+					},
+					"id": 6554,
+					"p": 0.981031,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,480",
+						"to": "00:00:03,730"
+					},
+					"offsets": {
+						"from": 3480,
+						"to": 3730
+					},
+					"id": 11,
+					"p": 0.663819,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_192]",
+					"timestamps": {
+						"from": "00:00:03,840",
+						"to": "00:00:03,840"
+					},
+					"offsets": {
+						"from": 3840,
+						"to": 3840
+					},
+					"id": 50555,
+					"p": 0.0598505,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:03,840",
+				"to": "00:00:07,220"
+			},
+			"offsets": {
+				"from": 3840,
+				"to": 7220
+			},
+			"text": " Claude and OpenAI's, and reviewed by a human.",
+			"tokens": [
+				{
+					"text": " Claude",
+					"timestamps": {
+						"from": "00:00:04,150",
+						"to": "00:00:04,280"
+					},
+					"offsets": {
+						"from": 4150,
+						"to": 4280
+					},
+					"id": 40559,
+					"p": 0.267409,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:04,280",
+						"to": "00:00:04,500"
+					},
+					"offsets": {
+						"from": 4280,
+						"to": 4500
+					},
+					"id": 290,
+					"p": 0.916724,
+					"t_dtw": -1
+				},
+				{
+					"text": " Open",
+					"timestamps": {
+						"from": "00:00:04,500",
+						"to": "00:00:04,790"
+					},
+					"offsets": {
+						"from": 4500,
+						"to": 4790
+					},
+					"id": 4946,
+					"p": 0.908073,
+					"t_dtw": -1
+				},
+				{
+					"text": "AI",
+					"timestamps": {
+						"from": "00:00:04,790",
+						"to": "00:00:04,930"
+					},
+					"offsets": {
+						"from": 4790,
+						"to": 4930
+					},
+					"id": 20185,
+					"p": 0.675174,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:04,930",
+						"to": "00:00:05,020"
+					},
+					"offsets": {
+						"from": 4930,
+						"to": 5020
+					},
+					"id": 338,
+					"p": 0.896052,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:05,020",
+						"to": "00:00:05,090"
+					},
+					"offsets": {
+						"from": 5020,
+						"to": 5090
+					},
+					"id": 11,
+					"p": 0.716936,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:05,090",
+						"to": "00:00:05,450"
+					},
+					"offsets": {
+						"from": 5090,
+						"to": 5450
+					},
+					"id": 290,
+					"p": 0.892664,
+					"t_dtw": -1
+				},
+				{
+					"text": " reviewed",
+					"timestamps": {
+						"from": "00:00:05,960",
+						"to": "00:00:06,220"
+					},
+					"offsets": {
+						"from": 5960,
+						"to": 6220
+					},
+					"id": 11765,
+					"p": 0.991429,
+					"t_dtw": -1
+				},
+				{
+					"text": " by",
+					"timestamps": {
+						"from": "00:00:06,220",
+						"to": "00:00:06,350"
+					},
+					"offsets": {
+						"from": 6220,
+						"to": 6350
+					},
+					"id": 416,
+					"p": 0.99404,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:06,430",
+						"to": "00:00:06,490"
+					},
+					"offsets": {
+						"from": 6430,
+						"to": 6490
+					},
+					"id": 257,
+					"p": 0.997567,
+					"t_dtw": -1
+				},
+				{
+					"text": " human",
+					"timestamps": {
+						"from": "00:00:06,490",
+						"to": "00:00:06,930"
+					},
+					"offsets": {
+						"from": 6490,
+						"to": 6930
+					},
+					"id": 1692,
+					"p": 0.998414,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:06,930",
+						"to": "00:00:07,200"
+					},
+					"offsets": {
+						"from": 6930,
+						"to": 7200
+					},
+					"id": 13,
+					"p": 0.904728,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_361]",
+					"timestamps": {
+						"from": "00:00:07,220",
+						"to": "00:00:07,220"
+					},
+					"offsets": {
+						"from": 7220,
+						"to": 7220
+					},
+					"id": 50724,
+					"p": 0.159614,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:07,220",
+				"to": "00:00:08,680"
+			},
+			"offsets": {
+				"from": 7220,
+				"to": 8680
+			},
+			"text": " It's free and open source.",
+			"tokens": [
+				{
+					"text": " It",
+					"timestamps": {
+						"from": "00:00:07,260",
+						"to": "00:00:07,340"
+					},
+					"offsets": {
+						"from": 7260,
+						"to": 7340
+					},
+					"id": 632,
+					"p": 0.991862,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:07,460",
+						"to": "00:00:07,460"
+					},
+					"offsets": {
+						"from": 7460,
+						"to": 7460
+					},
+					"id": 338,
+					"p": 0.99907,
+					"t_dtw": -1
+				},
+				{
+					"text": " free",
+					"timestamps": {
+						"from": "00:00:07,540",
+						"to": "00:00:07,700"
+					},
+					"offsets": {
+						"from": 7540,
+						"to": 7700
+					},
+					"id": 1479,
+					"p": 0.999104,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:07,700",
+						"to": "00:00:07,880"
+					},
+					"offsets": {
+						"from": 7700,
+						"to": 7880
+					},
+					"id": 290,
+					"p": 0.992793,
+					"t_dtw": -1
+				},
+				{
+					"text": " open",
+					"timestamps": {
+						"from": "00:00:07,880",
+						"to": "00:00:08,120"
+					},
+					"offsets": {
+						"from": 7880,
+						"to": 8120
+					},
+					"id": 1280,
+					"p": 0.994399,
+					"t_dtw": -1
+				},
+				{
+					"text": " source",
+					"timestamps": {
+						"from": "00:00:08,120",
+						"to": "00:00:08,390"
+					},
+					"offsets": {
+						"from": 8120,
+						"to": 8390
+					},
+					"id": 2723,
+					"p": 0.876087,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:08,680",
+						"to": "00:00:08,680"
+					},
+					"offsets": {
+						"from": 8680,
+						"to": 8680
+					},
+					"id": 13,
+					"p": 0.988197,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_434]",
+					"timestamps": {
+						"from": "00:00:08,680",
+						"to": "00:00:08,680"
+					},
+					"offsets": {
+						"from": 8680,
+						"to": 8680
+					},
+					"id": 50797,
+					"p": 0.24064,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

@@ -1,8 +1,8 @@
 # OpenChronology — Shorts: Audiences and the Series
 
-**What this is:** the plan behind the vertical shorts for TikTok, YouTube Shorts and Instagram Reels: what those feeds demand, who on them would care, and how each short is built to be watched there. Each short's script and storyboard is its own file (`1-…` to `8-…`), in the same format as the explainer videos' (`FRAME`, `MOTION`, `OST`, `VO` per scene, then the narration alone, the claims and their sources), with one more appendix: how to post it.
+**What this is:** the plan behind the vertical shorts for TikTok, YouTube Shorts and Instagram Reels: what those feeds demand, who on them would care, and how each short is built to be watched there. Each short's script and storyboard is its own file (`1-…` to `10-…`), in the same format as the explainer videos' (`FRAME`, `MOTION`, `OST`, `VO` per scene, then the narration alone, the claims and their sources), with one more appendix: how to post it.
 
-**How they relate to the explainers:** the explainers (`publicity/1-…` to `11-…`) teach; a short earns attention. Each short takes one surprising fact or one satisfying motion from an explainer and ends where that explainer begins, so a viewer who wants more has somewhere to go.
+**How they relate to the explainers:** the explainers (`publicity/1-…` to `13-…`) teach; a short earns attention. Each short takes one surprising fact or one satisfying motion from an explainer and ends where that explainer begins, so a viewer who wants more has somewhere to go.
 
 ---
 
@@ -25,15 +25,17 @@
 
 Of the explainers' ten audiences, five gather on short-form feeds in communities with their own hooks. The other five (administrators, privacy-minded users, most of the operations crowd) are better reached by the explainers, the README and forums; two shorts still reach their curious edges.
 
-| Feed community                                              | Explainers' audiences                | What stops their scroll                                               | What they share                                              | Their short                 |
-| ----------------------------------------------------------- | ------------------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------- |
-| **History and "did you know"** (#history, #historytok)      | Curious newcomers, students (A, B)   | Scale: a big span collapsing to one exact moment                      | "I didn't know it was that close"                            | 1 · 1776 to the Moon        |
-| **Science and space** (#science, #sciencetok)               | Science enthusiasts, students (E, B) | A number they can feel: deep time as one day                          | The one stat ("we're the last six seconds")                  | 2 · The last six seconds    |
-| **Developers** (#programming, #techtok)                     | Technical minds (F), operators (H)   | A familiar wound: `0.1 + 0.2`, an outage at 2 a.m.                    | The "this is why" moment; tagging a colleague                | 3 · `0.1 + 0.2`; 8 · 2 a.m. |
-| **Fandoms and lore** (#lotr, #tolkien, #booktok)            | Canon developers (D)                 | A fact about the canon they love, with a number                       | Corrections and debate in the comments (welcome: engagement) | 4 · The Ring in the river   |
-| **Writers and worldbuilders** (#writingtok, #worldbuilding) | Writers, game masters (D)            | Their own problem named: keeping many characters' threads straight    | Saving it for later; "I need this for my book"               | 5 · One character's thread  |
-| **Teachers** (#teachersoftiktok, #edutok)                   | Teachers, communities (C, J)         | A classroom problem solved in one step, free, no sign-up to read      | Sending it to colleagues                                     | 6 · A class timeline        |
-| **Privacy and offline** (#privacy, #opensource)             | Privacy-minded users (G)             | A surprising artifact: a whole app in one file that never goes online | "Open source" and "no account" are their own share triggers  | 7 · One HTML file           |
+| Feed community                                              | Explainers' audiences                | What stops their scroll                                               | What they share                                               | Their short                 |
+| ----------------------------------------------------------- | ------------------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------- | --------------------------- |
+| **History and "did you know"** (#history, #historytok)      | Curious newcomers, students (A, B)   | Scale: a big span collapsing to one exact moment                      | "I didn't know it was that close"                             | 1 · 1776 to the Moon        |
+| **Science and space** (#science, #sciencetok)               | Science enthusiasts, students (E, B) | A number they can feel: deep time as one day                          | The one stat ("we're the last six seconds")                   | 2 · The last six seconds    |
+| **Developers** (#programming, #techtok)                     | Technical minds (F), operators (H)   | A familiar wound: `0.1 + 0.2`, an outage at 2 a.m.                    | The "this is why" moment; tagging a colleague                 | 3 · `0.1 + 0.2`; 8 · 2 a.m. |
+| **Fandoms and lore** (#lotr, #tolkien, #booktok)            | Canon developers (D)                 | A fact about the canon they love, with a number                       | Corrections and debate in the comments (welcome: engagement)  | 4 · The Ring in the river   |
+| **Writers and worldbuilders** (#writingtok, #worldbuilding) | Writers, game masters (D)            | Their own problem named: keeping many characters' threads straight    | Saving it for later; "I need this for my book"                | 5 · One character's thread  |
+| **Teachers** (#teachersoftiktok, #edutok)                   | Teachers, communities (C, J)         | A classroom problem solved in one step, free, no sign-up to read      | Sending it to colleagues                                      | 6 · A class timeline        |
+| **Privacy and offline** (#privacy, #opensource)             | Privacy-minded users (G)             | A surprising artifact: a whole app in one file that never goes online | "Open source" and "no account" are their own share triggers   | 7 · One HTML file           |
+| **AI and automation** (#ai, #programming)                   | Technical minds (F), all             | A familiar experiment with a real result: one prompt, a whole galaxy  | The candid twist: the app is built the same way, and reviewed | 9 · I asked an AI           |
+| **Safety and investigations** (#safety, #rootcause)         | Investigators (H)                    | The question they're always asked: why did it happen?                 | The method, drawn cleanly; sending it to their team           | 10 · Why did it happen?     |
 
 ### What changes from the explainers
 
@@ -47,10 +49,10 @@ Of the explainers' ten audiences, five gather on short-form feeds in communities
 
 ## 3 · The series
 
-Eight shorts. Three storyboard shapes, so the feed doesn't see the same video twice:
+Ten shorts. Three storyboard shapes, so the feed doesn't see the same video twice:
 
-- **The zoom** (1, 4, 5, 8): the real app on a phone, one continuous gesture from far out to one exact thing, with captions over it.
-- **The stat** (2, 3): one surprising number, built up in animation, then the app as the proof.
+- **The zoom** (1, 4, 5, 8, 9): the real app on a phone, one continuous gesture from far out to one exact thing, with captions over it.
+- **The stat** (2, 3, 10): one surprising number, built up in animation, then the app as the proof.
 - **The how-to** (6, 7): a problem their community has, and the two or three steps that solve it, as interface cards.
 
 | #   | Title                                   | Shape  | For                    | Look      | Runtime | The hook (frame 0 and the first sentence)         | Points to explainer  |
@@ -63,8 +65,10 @@ Eight shorts. Three storyboard shapes, so the feed doesn't see the same video tw
 | 6   | **A class timeline nobody can wreck**   | How-to | Teachers               | Paper     | ~0:33   | "30 students. 1 timeline. Nobody can wreck it."   | 9 · Working together |
 | 7   | **A whole app in one HTML file**        | How-to | Privacy, open source   | Paper     | ~0:27   | "This entire app is one HTML file"                | 3 · Editions         |
 | 8   | **2 a.m. Everything's down.**           | Zoom   | Developers, operations | Terminal  | ~0:35   | "2 a.m. Everything's down. What broke first?"     | 10 · Logs            |
+| 9   | **I asked an AI to build a timeline**   | Zoom   | AI, developers         | Terminal  | ~0:41   | "I asked an AI to build a timeline"               | 12 · AI, automation  |
+| 10  | **Why did it happen?**                  | Stat   | Investigators, safety  | Terminal  | ~0:43   | "Why did it happen?"                              | 13 · Investigations  |
 
-**Order of release (suggested):** 1 and 2 first (the widest feeds, and both end on the same line from eons to seconds), then 4 and 3 (the strongest single facts), then 5, 8, 6 and 7. Two or three a week; post each on all three platforms the same day.
+**Order of release (suggested):** 1 and 2 first (the widest feeds, and both end on the same line from eons to seconds), then 4 and 3 (the strongest single facts), then 5, 8, 6 and 7, then 9 and 10. Two or three a week; post each on all three platforms the same day.
 
 ---
 

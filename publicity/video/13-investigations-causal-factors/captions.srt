@@ -1,0 +1,189 @@
+1
+00:00:01,200 --> 00:00:04,970
+Something went wrong, and
+someone was hurt. What happened,
+
+2
+00:00:05,020 --> 00:00:10,430
+in what order, and why? Investigators
+answer with an events and causal factors
+
+3
+00:00:10,480 --> 00:00:14,750
+chart: the events in sequence,
+the conditions beneath them,
+
+4
+00:00:14,800 --> 00:00:17,040
+and the causal factors marked.
+
+5
+00:00:20,860 --> 00:00:25,990
+A made-up case: on a warehouse night shift,
+a forklift reversing out of an aisle
+
+6
+00:00:26,040 --> 00:00:31,260
+strikes a picker crossing its end. Each
+primary event is a moment at its exact
+
+7
+00:00:31,310 --> 00:00:37,020
+time, from statements, badge
+records, telematics and cameras.
+
+8
+00:00:37,070 --> 00:00:41,970
+The collision is camera seven's frame,
+nine and nine twenty-fifths seconds past
+
+9
+00:00:42,020 --> 00:00:46,550
+two thirty-four, stored exactly.
+Where accounts disagree,
+
+10
+00:00:46,600 --> 00:00:48,557
+both stay, with notes.
+
+11
+00:00:50,337 --> 00:00:54,287
+Conditions held over time: ten-hour
+night shifts since Monday,
+
+12
+00:00:54,337 --> 00:00:58,237
+the aisle-end light out
+since Tuesday, no spotter.
+
+13
+00:00:58,287 --> 00:01:03,127
+Each is a duration beneath the events,
+all still there at the collision.
+
+14
+00:01:03,177 --> 00:01:08,045
+And the collision's moment stack keeps
+its conditions and evidence together.
+
+15
+00:01:09,785 --> 00:01:13,365
+Relationships link each condition
+and event to what it led to,
+
+16
+00:01:13,415 --> 00:01:18,625
+drawn as arcs. Open the collision,
+choose Separate all connected,
+
+17
+00:01:18,675 --> 00:01:21,525
+and the chain behind it
+lifts onto its own track,
+
+18
+00:01:21,575 --> 00:01:24,126
+away from the routine records.
+
+19
+00:01:25,846 --> 00:01:28,686
+Then the analysis, which
+is the investigator's,
+
+20
+00:01:28,736 --> 00:01:34,466
+not the software's. Give each causal
+factor the Bad color and a causal factor
+
+21
+00:01:34,516 --> 00:01:40,356
+tag, and the root cause one more. Write
+the reasoning and its evidence in the
+
+22
+00:01:40,406 --> 00:01:44,476
+notes. What isn't confirmed, like
+the driver's fatigue or the horn,
+
+23
+00:01:44,526 --> 00:01:47,477
+is tagged presumptive, in a muted color.
+
+24
+00:01:49,167 --> 00:01:53,797
+Some of it is approximate today.
+Conditions use a stadium,
+
+25
+00:01:53,847 --> 00:01:58,837
+since there's no oval shape yet.
+Presumptive items are muted,
+
+26
+00:01:58,887 --> 00:02:03,027
+not dashed. And relationships
+have no direction or label,
+
+27
+00:02:03,077 --> 00:02:07,737
+so time order and tags carry
+cause and effect. An ellipse,
+
+28
+00:02:07,787 --> 00:02:11,652
+dashed outlines and directed,
+labelled links are planned.
+
+29
+00:02:13,292 --> 00:02:18,482
+Compare puts the written procedure on
+the same axis as the night itself.
+
+30
+00:02:18,532 --> 00:02:21,582
+As planned: an eight-hour
+shift, a lighting walk,
+
+31
+00:02:21,632 --> 00:02:25,592
+a spotter on duty, a break
+at two. As it happened:
+
+32
+00:02:25,642 --> 00:02:29,127
+a longer shift, no walk,
+no spotter, no break.
+
+33
+00:02:32,702 --> 00:02:37,502
+Then the review. A colleague proposes
+corrections as a pull request,
+
+34
+00:02:37,552 --> 00:02:42,652
+the lead merges it, and saved
+history keeps every revision.
+
+35
+00:02:42,702 --> 00:02:48,652
+Export .ochx for the report,
+or keep a desktop .och file.
+
+36
+00:02:48,702 --> 00:02:52,502
+Timelines start private, access
+is given person by person,
+
+37
+00:02:52,552 --> 00:02:56,483
+and a self-hosted server
+keeps it in-house.
+
+38
+00:02:58,033 --> 00:03:02,113
+Every investigation is a
+timeline. Build it once,
+
+39
+00:03:02,163 --> 00:03:04,719
+carefully, and let everyone check it.

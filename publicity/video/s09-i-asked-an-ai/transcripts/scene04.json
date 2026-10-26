@@ -1,0 +1,339 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:04,700"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 4700
+			},
+			"text": " Zoom from 36,000 years before the Battle of Yavin all the way to the films.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.918622,
+					"t_dtw": -1
+				},
+				{
+					"text": " Zoom",
+					"timestamps": {
+						"from": "00:00:00,280",
+						"to": "00:00:00,280"
+					},
+					"offsets": {
+						"from": 280,
+						"to": 280
+					},
+					"id": 40305,
+					"p": 0.957348,
+					"t_dtw": -1
+				},
+				{
+					"text": " from",
+					"timestamps": {
+						"from": "00:00:00,360",
+						"to": "00:00:00,560"
+					},
+					"offsets": {
+						"from": 360,
+						"to": 560
+					},
+					"id": 422,
+					"p": 0.995287,
+					"t_dtw": -1
+				},
+				{
+					"text": " 36",
+					"timestamps": {
+						"from": "00:00:00,560",
+						"to": "00:00:00,980"
+					},
+					"offsets": {
+						"from": 560,
+						"to": 980
+					},
+					"id": 4570,
+					"p": 0.969287,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:00,980",
+						"to": "00:00:01,120"
+					},
+					"offsets": {
+						"from": 980,
+						"to": 1120
+					},
+					"id": 11,
+					"p": 0.925256,
+					"t_dtw": -1
+				},
+				{
+					"text": "000",
+					"timestamps": {
+						"from": "00:00:01,120",
+						"to": "00:00:01,760"
+					},
+					"offsets": {
+						"from": 1120,
+						"to": 1760
+					},
+					"id": 830,
+					"p": 0.997347,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:01,760",
+						"to": "00:00:02,130"
+					},
+					"offsets": {
+						"from": 1760,
+						"to": 2130
+					},
+					"id": 812,
+					"p": 0.996324,
+					"t_dtw": -1
+				},
+				{
+					"text": " before",
+					"timestamps": {
+						"from": "00:00:02,130",
+						"to": "00:00:02,500"
+					},
+					"offsets": {
+						"from": 2130,
+						"to": 2500
+					},
+					"id": 878,
+					"p": 0.964239,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,500",
+						"to": "00:00:02,680"
+					},
+					"offsets": {
+						"from": 2500,
+						"to": 2680
+					},
+					"id": 262,
+					"p": 0.946788,
+					"t_dtw": -1
+				},
+				{
+					"text": " Battle",
+					"timestamps": {
+						"from": "00:00:02,680",
+						"to": "00:00:02,980"
+					},
+					"offsets": {
+						"from": 2680,
+						"to": 2980
+					},
+					"id": 5838,
+					"p": 0.823318,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:03,030",
+						"to": "00:00:03,160"
+					},
+					"offsets": {
+						"from": 3030,
+						"to": 3160
+					},
+					"id": 286,
+					"p": 0.994177,
+					"t_dtw": -1
+				},
+				{
+					"text": " Y",
+					"timestamps": {
+						"from": "00:00:03,160",
+						"to": "00:00:03,220"
+					},
+					"offsets": {
+						"from": 3160,
+						"to": 3220
+					},
+					"id": 575,
+					"p": 0.98529,
+					"t_dtw": -1
+				},
+				{
+					"text": "avin",
+					"timestamps": {
+						"from": "00:00:03,220",
+						"to": "00:00:03,430"
+					},
+					"offsets": {
+						"from": 3220,
+						"to": 3430
+					},
+					"id": 20637,
+					"p": 0.917345,
+					"t_dtw": -1
+				},
+				{
+					"text": " all",
+					"timestamps": {
+						"from": "00:00:03,670",
+						"to": "00:00:03,670"
+					},
+					"offsets": {
+						"from": 3670,
+						"to": 3670
+					},
+					"id": 477,
+					"p": 0.376083,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:03,790",
+						"to": "00:00:03,860"
+					},
+					"offsets": {
+						"from": 3790,
+						"to": 3860
+					},
+					"id": 262,
+					"p": 0.998026,
+					"t_dtw": -1
+				},
+				{
+					"text": " way",
+					"timestamps": {
+						"from": "00:00:03,860",
+						"to": "00:00:04,050"
+					},
+					"offsets": {
+						"from": 3860,
+						"to": 4050
+					},
+					"id": 835,
+					"p": 0.998969,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:04,050",
+						"to": "00:00:04,170"
+					},
+					"offsets": {
+						"from": 4050,
+						"to": 4170
+					},
+					"id": 284,
+					"p": 0.997004,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:04,170",
+						"to": "00:00:04,350"
+					},
+					"offsets": {
+						"from": 4170,
+						"to": 4350
+					},
+					"id": 262,
+					"p": 0.99681,
+					"t_dtw": -1
+				},
+				{
+					"text": " films",
+					"timestamps": {
+						"from": "00:00:04,350",
+						"to": "00:00:04,700"
+					},
+					"offsets": {
+						"from": 4350,
+						"to": 4700
+					},
+					"id": 7328,
+					"p": 0.93828,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,700",
+						"to": "00:00:04,700"
+					},
+					"offsets": {
+						"from": 4700,
+						"to": 4700
+					},
+					"id": 13,
+					"p": 0.84508,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_235]",
+					"timestamps": {
+						"from": "00:00:04,700",
+						"to": "00:00:04,700"
+					},
+					"offsets": {
+						"from": 4700,
+						"to": 4700
+					},
+					"id": 50598,
+					"p": 0.0862914,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,325 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:05,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 5000
+			},
+			"text": " I check the result, 98 moments of canon and legends, every era on one line.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.899776,
+					"t_dtw": -1
+				},
+				{
+					"text": " I",
+					"timestamps": {
+						"from": "00:00:00,030",
+						"to": "00:00:00,060"
+					},
+					"offsets": {
+						"from": 30,
+						"to": 60
+					},
+					"id": 314,
+					"p": 0.975818,
+					"t_dtw": -1
+				},
+				{
+					"text": " check",
+					"timestamps": {
+						"from": "00:00:00,280",
+						"to": "00:00:00,350"
+					},
+					"offsets": {
+						"from": 280,
+						"to": 350
+					},
+					"id": 2198,
+					"p": 0.803319,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:00,410",
+						"to": "00:00:00,560"
+					},
+					"offsets": {
+						"from": 410,
+						"to": 560
+					},
+					"id": 262,
+					"p": 0.998932,
+					"t_dtw": -1
+				},
+				{
+					"text": " result",
+					"timestamps": {
+						"from": "00:00:00,700",
+						"to": "00:00:01,000"
+					},
+					"offsets": {
+						"from": 700,
+						"to": 1000
+					},
+					"id": 1255,
+					"p": 0.990711,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,000",
+						"to": "00:00:01,230"
+					},
+					"offsets": {
+						"from": 1000,
+						"to": 1230
+					},
+					"id": 11,
+					"p": 0.108212,
+					"t_dtw": -1
+				},
+				{
+					"text": " 98",
+					"timestamps": {
+						"from": "00:00:01,600",
+						"to": "00:00:01,830"
+					},
+					"offsets": {
+						"from": 1600,
+						"to": 1830
+					},
+					"id": 9661,
+					"p": 0.818389,
+					"t_dtw": -1
+				},
+				{
+					"text": " moments",
+					"timestamps": {
+						"from": "00:00:01,830",
+						"to": "00:00:02,330"
+					},
+					"offsets": {
+						"from": 1830,
+						"to": 2330
+					},
+					"id": 7188,
+					"p": 0.860295,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:02,330",
+						"to": "00:00:02,460"
+					},
+					"offsets": {
+						"from": 2330,
+						"to": 2460
+					},
+					"id": 286,
+					"p": 0.994325,
+					"t_dtw": -1
+				},
+				{
+					"text": " canon",
+					"timestamps": {
+						"from": "00:00:02,550",
+						"to": "00:00:02,840"
+					},
+					"offsets": {
+						"from": 2550,
+						"to": 2840
+					},
+					"id": 18061,
+					"p": 0.819175,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:02,840",
+						"to": "00:00:03,010"
+					},
+					"offsets": {
+						"from": 2840,
+						"to": 3010
+					},
+					"id": 290,
+					"p": 0.809527,
+					"t_dtw": -1
+				},
+				{
+					"text": " legends",
+					"timestamps": {
+						"from": "00:00:03,010",
+						"to": "00:00:03,380"
+					},
+					"offsets": {
+						"from": 3010,
+						"to": 3380
+					},
+					"id": 24901,
+					"p": 0.903181,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,400",
+						"to": "00:00:03,470"
+					},
+					"offsets": {
+						"from": 3400,
+						"to": 3470
+					},
+					"id": 11,
+					"p": 0.878163,
+					"t_dtw": -1
+				},
+				{
+					"text": " every",
+					"timestamps": {
+						"from": "00:00:03,710",
+						"to": "00:00:03,960"
+					},
+					"offsets": {
+						"from": 3710,
+						"to": 3960
+					},
+					"id": 790,
+					"p": 0.892567,
+					"t_dtw": -1
+				},
+				{
+					"text": " era",
+					"timestamps": {
+						"from": "00:00:03,960",
+						"to": "00:00:04,210"
+					},
+					"offsets": {
+						"from": 3960,
+						"to": 4210
+					},
+					"id": 6980,
+					"p": 0.934304,
+					"t_dtw": -1
+				},
+				{
+					"text": " on",
+					"timestamps": {
+						"from": "00:00:04,210",
+						"to": "00:00:04,380"
+					},
+					"offsets": {
+						"from": 4210,
+						"to": 4380
+					},
+					"id": 319,
+					"p": 0.99137,
+					"t_dtw": -1
+				},
+				{
+					"text": " one",
+					"timestamps": {
+						"from": "00:00:04,380",
+						"to": "00:00:04,630"
+					},
+					"offsets": {
+						"from": 4380,
+						"to": 4630
+					},
+					"id": 530,
+					"p": 0.992746,
+					"t_dtw": -1
+				},
+				{
+					"text": " line",
+					"timestamps": {
+						"from": "00:00:04,630",
+						"to": "00:00:04,940"
+					},
+					"offsets": {
+						"from": 4630,
+						"to": 4940
+					},
+					"id": 1627,
+					"p": 0.991747,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,000",
+						"to": "00:00:05,000"
+					},
+					"offsets": {
+						"from": 5000,
+						"to": 5000
+					},
+					"id": 13,
+					"p": 0.951688,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_250]",
+					"timestamps": {
+						"from": "00:00:05,000",
+						"to": "00:00:05,000"
+					},
+					"offsets": {
+						"from": 5000,
+						"to": 5000
+					},
+					"id": 50613,
+					"p": 0.124565,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}
