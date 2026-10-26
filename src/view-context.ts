@@ -11,6 +11,13 @@ export interface PresentationContext {
   readonly purpose: 'axis' | 'event' | 'input' | 'tooltip';
   readonly spacingPixels?: number;
   /**
+   * The exact time between the labels this text is drawn for, in stored units: a ruler
+   * tick's interval. When given, it is the label resolution itself, rather than the
+   * floating-point pixel spacing times the time per pixel, which can land a hair either side of
+   * a calendar threshold and flip a label between "1997" and "1997-01" as the view moves.
+   */
+  readonly labelInterval?: Q;
+  /**
    * How large the timeline's text appears on screen relative to its normal size (1). Ruler
    * labels need room for their apparent size, not a fixed number of pixels.
    */
@@ -40,6 +47,11 @@ export function validateContext(context?: PresentationContext): PresentationCont
   )
     throw new Error('Invalid presentation label spacing.');
   if (
+    context.labelInterval !== undefined &&
+    (!(context.labelInterval instanceof Q) || context.labelInterval.compare(Q.zero) <= 0)
+  )
+    throw new Error('Invalid presentation label interval.');
+  if (
     context.textScale !== undefined &&
     (!Number.isFinite(context.textScale) || context.textScale < 0.1 || context.textScale > 10)
   )
@@ -48,4 +60,17 @@ export function validateContext(context?: PresentationContext): PresentationCont
 }
 export function unitsPerPixel(context: PresentationContext): Q {
   return context.span.div(Q.parseDecimal(context.widthPixels.toString()));
+}
+/**
+ * The time between labels, which decides how much detail a label shows: the context's exact
+ * label interval, else the time per pixel times the label spacing (115 pixels on the ruler, 6
+ * for moments, unless the context says otherwise).
+ */
+export function labelResolution(context: PresentationContext): Q {
+  return (
+    context.labelInterval ??
+    unitsPerPixel(context).mul(
+      Q.parseDecimal((context.spacingPixels ?? (context.purpose === 'axis' ? 115 : 6)).toString()),
+    )
+  );
 }

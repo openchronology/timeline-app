@@ -11,7 +11,7 @@ import {
   printSI,
   parseSI,
 } from './numeric.js';
-import { unitsPerPixel } from './view-context.js';
+import { labelResolution, unitsPerPixel } from './view-context.js';
 import type { PresentationContext } from './view-context.js';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -105,15 +105,11 @@ function deepYear(year: string): string {
   return eraYear(year);
 }
 /**
- * The time between neighbouring labels in this view: seconds per pixel times the label
- * spacing (115 pixels on the ruler, 6 for moments, unless the context says otherwise). A
- * label never needs fields finer than this.
+ * The time between neighbouring labels in this view (labelResolution): a ruler tick's exact
+ * interval, else seconds per pixel times the label spacing. A label never needs fields finer
+ * than this.
  */
-function precision(context: PresentationContext): Q {
-  return unitsPerPixel(context).mul(
-    Q.parseDecimal((context.spacingPixels ?? (context.purpose === 'axis' ? 115 : 6)).toString()),
-  );
-}
+const precision = labelResolution;
 /** `mm-dd` when the year is the view's left-edge year (parseCalendar fills it in), else a full date. */
 function abbreviatedDate(p: ReturnType<typeof parts>, base: ReturnType<typeof parts>): string {
   return p.year === base.year ? `${p.month}-${p.day}` : date(p);

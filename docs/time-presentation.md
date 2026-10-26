@@ -137,14 +137,14 @@ For example, `api.replace(api.timestamp(time), "T", " ")` prints a space separat
 
 Custom printers **and parsers** receive context through their existing `api` argument, without access to a browser or context object:
 
-| Helper                                    | Result                                                                                      |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `hasView()`                               | Whether context was supplied                                                                |
-| `viewLeft()`, `viewRight()`, `viewSpan()` | Exact rationals in stored coordinate units                                                  |
-| `viewWidth()`                             | Drawable width in CSS pixels                                                                |
-| `unitsPerPixel()`                         | Exact `span / width`                                                                        |
-| `labelResolution()`                       | Exact `unitsPerPixel × spacingPixels`; defaults to 115 pixels for a ruler and six otherwise |
-| `purpose()`                               | `axis`, `event`, `input`, or `tooltip`; `input` without context                             |
+| Helper                                    | Result                                                                                                                                      |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hasView()`                               | Whether context was supplied                                                                                                                |
+| `viewLeft()`, `viewRight()`, `viewSpan()` | Exact rationals in stored coordinate units                                                                                                  |
+| `viewWidth()`                             | Drawable width in CSS pixels                                                                                                                |
+| `unitsPerPixel()`                         | Exact `span / width`                                                                                                                        |
+| `labelResolution()`                       | The time between labels: a ruler tick's exact interval, else `unitsPerPixel × spacingPixels`, with 115 pixels for a ruler and six otherwise |
+| `purpose()`                               | `axis`, `event`, `input`, or `tooltip`; `input` without context                                                                             |
 
 Existing two-argument source functions remain compatible. Bounds helpers fail clearly without context, and returned rationals obey the same arithmetic budgets. For example:
 

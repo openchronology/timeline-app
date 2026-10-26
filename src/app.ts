@@ -1182,6 +1182,7 @@ function timelinePresenter() {
 function viewContext(
   purpose: PresentationContext['purpose'],
   spacingPixels?: number,
+  labelInterval?: Q,
 ): PresentationContext {
   return {
     left: viewport.left,
@@ -1191,15 +1192,17 @@ function viewContext(
     // Larger tick labels (the theme's measure size, #267) need more room between ticks.
     ...(purpose === 'axis' ? { textScale: uiScale * textScales().measure } : {}),
     ...(spacingPixels === undefined ? {} : { spacingPixels }),
+    ...(labelInterval === undefined ? {} : { labelInterval }),
   };
 }
 function presented(
   q: Q,
   purpose: PresentationContext['purpose'] = 'tooltip',
   spacingPixels?: number,
+  labelInterval?: Q,
 ): string {
   try {
-    return timelinePresenter().print(q, viewContext(purpose, spacingPixels));
+    return timelinePresenter().print(q, viewContext(purpose, spacingPixels, labelInterval));
   } catch (error) {
     // A failed custom label cannot prevent timeline access or mutate an event.
     return (
@@ -1214,9 +1217,9 @@ function axisLabel(
   q: Q,
   purpose: PresentationContext['purpose'] = 'axis',
   spacingPixels?: number,
+  labelInterval?: Q,
 ): string {
-  const context = viewContext(purpose, spacingPixels);
-  const full = presented(q, purpose, spacingPixels);
+  const full = presented(q, purpose, spacingPixels, labelInterval);
   return full.length <= 27 ? full : full.slice(0, 24) + '…';
 }
 const displayedBounds = new Map<string, { text: string; time: Q }>();
@@ -1304,10 +1307,13 @@ function renderAxis() {
     // One label per tick: crossfading versions that print differently would overlap (#241).
     const label = tickLabel(
       rule.labels.map((version) => ({
+        // The interval itself decides the label's detail, exactly: its pixel spacing is a
+        // float that lands either side of a calendar threshold as the view moves.
         text: axisLabel(
           time,
           'axis',
           Math.max(1, Math.min(1000000, viewport.x(viewport.left.add(version.interval), width()))),
+          version.interval,
         ),
         opacity: version.opacity,
       })),

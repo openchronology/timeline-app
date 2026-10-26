@@ -163,6 +163,7 @@ export function createPresenter(settings?: TimePresentation): TimePresenter {
     ...context,
     left: context.left.sub(origin).div(scale),
     span: context.span.div(scale),
+    ...(context.labelInterval ? { labelInterval: context.labelInterval.div(scale) } : {}),
   });
   // When Δ offsets read in a finer time unit (#242), they count from a round base, a whole
   // number of that unit's powers of ten past the origin, so labels read "Δ 1 s, Δ 2 s" and
