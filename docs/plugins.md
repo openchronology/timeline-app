@@ -114,6 +114,7 @@ Plugins combine **JSON host component declarations** and an optional restricted 
 - Targets: an optional `targets` array of `"moments"` and/or `"durations"`. Without it, color markers and hover cards apply to moments and [durations](durations.md); every other plugin applies to moments only. Durations use text, notes, color, link and image URL fields, color markers, hover cards and backgrounds (`background.kind: "image"`, which applies to durations only); stacks, shapes, sizes, icons and summary expansion are moment-only.
 
 - Derived metadata: `derive` rules that work out values from the metadata an entity already has, for the other plugins to read ([derived metadata](#derived-metadata)).
+- Added shapes: an optional `shapes` array of the shapes added after the first twelve that the plugin draws, currently only `"ellipse"`. A shape field, shape marker or `api.shape(...)` of a plugin that doesn't list one treats it as unknown, as before it existed; the field's selector offers the plugin's shapes.
 
 A plugin can define fields without a marker effect, or an effect without a new editor field. Additional component kinds require an implementation and security review in the host; they are not arbitrary downloaded UI programs. New capabilities will use versioned contracts.
 
@@ -253,7 +254,9 @@ Install **Focus on hover** to expand a single moment or stack entry into an anim
 
 ## Moment shapes
 
-Install **Moment shapes** to add a shape selector to each moment and stack entry. The `shape` metadata field accepts `circle`, `diamond`, `square`, `triangle`, `pentagon`, `hexagon`, `octagon`, `star`, `terminator`, `process`, `document`, and `parallelogram`. SVG outlines retain a white border with the color and icon plugins. Group summaries remain circles, since they represent multiple moments with potentially different shapes.
+Install **Moment shapes** to add a shape selector to each moment and stack entry. The `shape` metadata field accepts `circle`, `diamond`, `square`, `triangle`, `pentagon`, `hexagon`, `octagon`, `star`, `terminator`, `process`, `document`, `parallelogram`, and, from version 3, `ellipse`. SVG outlines retain a white border with the color and icon plugins. Group summaries remain circles, since they represent multiple moments with potentially different shapes.
+
+Moment shapes version 3 adds **ellipse**: a horizontal oval, wider than tall, for the conditions of an Events and Causal Factors chart. It is as wide as the moment's size and about three-fifths as tall, and an icon inside it is cropped to the oval, as in the other shapes. Version 3's manifest lists it as `"shapes": ["ellipse"]`. Versions 1 and 2 remain supported and unchanged: a timeline pinned to one of them treats a stored `ellipse` as an unknown shape, drawing a circle and leaving the stored value as it is, until Moment shapes is reinstalled from the catalogue.
 
 ## Authoring scripts
 

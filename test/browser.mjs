@@ -14,6 +14,7 @@ import { checkFullscreen } from './fullscreen-browser.mjs';
 import { checkViewMode } from './view-mode-browser.mjs';
 import { checkLogSeverity } from './log-severity-browser.mjs';
 import { checkHeadings } from './headings-browser.mjs';
+import { checkEllipseShape } from './ellipse-shape-browser.mjs';
 import { checkSuites } from './suites-browser.mjs';
 import { checkTags } from './tags-browser.mjs';
 import { checkRelationships } from './relationships-browser.mjs';
@@ -328,6 +329,7 @@ try {
   await checkViewMode(page, document);
   await checkFullscreen(page);
   await checkHeadings(page, document);
+  await checkEllipseShape(page, document);
   await checkLogSeverity(page, document);
   await checkSuites(page, document);
   await checkTags(page, document);

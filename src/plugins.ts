@@ -46,6 +46,11 @@ export interface PluginManifest {
   targets?: PluginTarget[];
   /** Metadata computed in the browser for the plugins to read, never saved (#122). */
   derive?: PluginDerivation[];
+  /**
+   * Shapes added after the first twelve that the plugin draws (#324). A shape a plugin
+   * doesn't list is unknown to it, as it was before the shape existed.
+   */
+  shapes?: AddedShape[];
   source?: string;
 }
 export type PluginTarget = 'moments' | 'durations';
@@ -110,10 +115,28 @@ export const MOMENT_SHAPE_NAMES = [
   'process',
   'document',
   'parallelogram',
+  'ellipse',
 ] as const;
 export type MomentShape = (typeof MOMENT_SHAPE_NAMES)[number];
-export function shapeValue(value: unknown): MomentShape | null {
-  return typeof value === 'string' && (MOMENT_SHAPE_NAMES as readonly string[]).includes(value)
+/**
+ * Shapes added after the first twelve (#324). A plugin draws one only when its manifest lists
+ * it in `shapes`, so a timeline pinned to an older version treats it as an unknown shape.
+ */
+export const ADDED_SHAPES = ['ellipse'] as const;
+export type AddedShape = (typeof ADDED_SHAPES)[number];
+/** The shapes a plugin can draw: the first twelve and those its manifest adds. */
+export function shapeNames(manifest?: Pick<PluginManifest, 'shapes'>): MomentShape[] {
+  const added: readonly string[] = manifest?.shapes ?? [];
+  return MOMENT_SHAPE_NAMES.filter(
+    (name) => !(ADDED_SHAPES as readonly string[]).includes(name) || added.includes(name),
+  );
+}
+/** A shape the plugin can draw (one of the first twelve without a manifest), or null. */
+export function shapeValue(
+  value: unknown,
+  manifest?: Pick<PluginManifest, 'shapes'>,
+): MomentShape | null {
+  return typeof value === 'string' && (shapeNames(manifest) as string[]).includes(value)
     ? (value as MomentShape)
     : null;
 }
@@ -274,7 +297,7 @@ function manifestEffects(manifest: PluginManifest, metadata: Record<string, unkn
               : '';
         }
         case 'shape': {
-          const shape = shapeValue(text());
+          const shape = shapeValue(text(), manifest);
           return JSON.stringify(shape ? { shape } : {});
         }
         case 'size': {
@@ -323,7 +346,7 @@ function manifestEffects(manifest: PluginManifest, metadata: Record<string, unkn
       effects.size = size;
     }
     if (raw.shape !== undefined) {
-      const shape = shapeValue(raw.shape);
+      const shape = shapeValue(raw.shape, manifest);
       if (!shape) throw new Error('Invalid shape.');
       effects.shape = shape;
     }
@@ -365,7 +388,7 @@ function scriptEffects(
   for (const { manifest, enabled } of plugins)
     if (enabled) {
       if (manifest.marker?.kind === 'shape') {
-        const shape = shapeValue(metadata[manifest.marker.metadataKey]);
+        const shape = shapeValue(metadata[manifest.marker.metadataKey], manifest);
         if (shape) effects.shape = shape;
       }
       if (manifest.marker?.kind === 'color') {
@@ -519,6 +542,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     'theme',
     'targets',
     'derive',
+    'shapes',
     'source',
   ]);
   if (
@@ -638,6 +662,16 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     result.targets = p.targets as PluginTarget[];
   }
   if (p.derive !== undefined) result.derive = derivations(p.derive);
+  if (p.shapes !== undefined) {
+    if (
+      !Array.isArray(p.shapes) ||
+      !p.shapes.length ||
+      p.shapes.some((s) => !(ADDED_SHAPES as readonly unknown[]).includes(s)) ||
+      new Set(p.shapes).size !== p.shapes.length
+    )
+      throw new Error(`A plugin's added shapes are among: ${ADDED_SHAPES.join(', ')}.`);
+    result.shapes = p.shapes as AddedShape[];
+  }
   // The script is only checked here to be text of at most 16 KiB. It is compiled before it
   // runs, in the browser; the server compiles scripts it is given only in a sandbox (#157,
   // server/plugin-sandbox.mjs), and never runs them.
@@ -1152,7 +1186,7 @@ const LEGACY_MOMENT_SHAPES: PluginManifest = validatePluginManifest({
   source:
     'function render(moment: string, api: PluginAPI): string { return api.shape(api.get("shape")); }',
 });
-export const MOMENT_SHAPES = validatePluginManifest({
+const MOMENT_SHAPES_2 = validatePluginManifest({
   ...LEGACY_MOMENT_SHAPES,
   version: 2,
   fields: [
@@ -1161,6 +1195,17 @@ export const MOMENT_SHAPES = validatePluginManifest({
   ],
   source:
     'function render(moment: string, api: PluginAPI): string { return api.merge(api.shape(api.get("shape")), api.size(api.get("shapeSize"))); }',
+});
+/**
+ * Moment shapes 3 (#324) adds the ellipse, a horizontal oval for the conditions of an Events
+ * and Causal Factors chart. Versions 1 and 2 draw a stored ellipse as an unknown shape.
+ */
+export const MOMENT_SHAPES = validatePluginManifest({
+  ...MOMENT_SHAPES_2,
+  version: 3,
+  description:
+    'Choose geometric and flowchart symbols for moments and stack entries: decisions, processes, documents, conditions and more.',
+  shapes: ['ellipse'],
 });
 export const PLUGIN_EXAMPLE = {
   apiVersion: 1,
@@ -1312,6 +1357,7 @@ const LEGACY_PLUGINS = [MOMENT_ICONS, MOMENT_STACKS, MOMENT_COLORS, FOCUS_ON_HOV
 export const BUILTIN_PLUGINS: readonly PluginManifest[] = [
   ...LEGACY_PLUGINS,
   LEGACY_MOMENT_SHAPES,
+  MOMENT_SHAPES_2,
   MOMENT_ICONS,
   MOMENT_STACKS,
   MOMENT_COLORS,
