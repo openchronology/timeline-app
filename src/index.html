@@ -690,6 +690,36 @@ Every point has a place. Explore the spaces between them.</textarea>
         </div>
       </form>
     </dialog>
+    <!-- Durations behind a grouped band or a "more" chip (#316): searchable, sorted, paged. -->
+    <dialog id="duration-list" class="search-dialog" aria-labelledby="duration-list-heading">
+      <form id="duration-list-form">
+        <div class="dialog-heading">
+          <h2 id="duration-list-heading">Durations in this view</h2>
+          <button type="button" data-close="duration-list" aria-label="Close the list">×</button>
+        </div>
+        <div class="search-row">
+          <input
+            id="duration-list-text"
+            type="search"
+            maxlength="200"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Show only durations whose title contains"
+            placeholder="Words in titles"
+          /><select id="duration-list-sort" aria-label="Order">
+            <option value="extent">Longest first</option>
+            <option value="start">By start</option>
+            <option value="title">By title</option>
+          </select>
+        </div>
+        <p id="duration-list-status" class="field-hint" role="status" aria-live="polite"></p>
+        <ol id="duration-list-results" class="search-results"></ol>
+        <div class="dialog-actions" hidden>
+          <button id="duration-list-previous" type="button">Previous</button
+          ><button id="duration-list-next" type="button">Next</button>
+        </div>
+      </form>
+    </dialog>
     <dialog id="moment-picker" class="search-dialog" aria-labelledby="moment-picker-heading">
       <form id="moment-picker-form">
         <div class="dialog-heading">

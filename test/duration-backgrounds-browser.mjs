@@ -62,7 +62,8 @@ export async function checkDurationBackgrounds(page, restore) {
       },
       // Far too short to draw as a band at these views: summarized, so no background.
       { id: 'tiny', start: '150/1', end: '150001/1000', metadata: { backgroundUrl: url('tiny') } },
-      { id: 'plain', start: '60/1', end: '240/1', metadata: { title: 'No image' } },
+      // Far enough from "inner" at every zoom here not to be drawn as one band with it (#316).
+      { id: 'plain', start: '20/1', end: '280/1', metadata: { title: 'No image' } },
     ],
   });
   // A redraw still pending from a change (to the plugins, say) rewrites the bounds from the

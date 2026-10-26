@@ -39,7 +39,23 @@ Earlier files stored a duration as a link in its starting moment's metadata (`{"
 
 ## Storage and queries
 
-Durations have a separate interval query, so a period crossing the viewport is visible even when both endpoints are outside the moment cache. The browser, PostgreSQL and SQLite build augmented balanced interval trees over exact rational bounds, resolving anchors to their moments' times. Database queries prune subtrees outside the viewport and return at most 256 bands, with an explicit notice when more match. Desktop files return bands and arcs in start order and stop at the 257th match. Bands use three compact visual lanes; intersecting bands can overlap.
+Durations have a separate interval query, so a period crossing the viewport is visible even when both endpoints are outside the moment cache. The browser, PostgreSQL and SQLite build augmented balanced interval trees over exact rational bounds, resolving anchors to their moments' times. Queries prune subtrees outside the viewport and return at most 256 bands, in start order. Arcs stop at the 257th match.
+
+When more than 256 durations touch a window, every store keeps its **256 longest** (then by start and ID) and reports how many touch it (`durationsTotal`, counted up to 10,000; `durationsTotalMore` beyond), so an era starting after thousands of short spans is still sent:
+
+- **PostgreSQL and SQLite** rank the window's first 10,001 matches in start order, which also counts them: a dense window costs at most 10,001 matches. Past that many, the longest are chosen among those.
+- **The browser** finds the exact 256 longest best-first, without visiting every match: a priority queue of subtrees ranked by the best duration each could hold (its longest extent, earliest start and the first ID at that start, all cached on the node), so the work follows the 256 kept and the tree's height. It counts a subtree whose durations all touch the window and reach the threshold from its cached size (each node also caches its smallest end). Exact comparisons reuse each rational's cached numerator and denominator. A drag over 5,000 identical spans computes each frame in about 3 ms.
+
+## Dense windows
+
+Bands are drawn beneath the axis, in rows, so that no two overlapping in time share one ([#269](https://github.com/openchronology/timeline-app/issues/269)). When many durations touch the view ([#316](https://github.com/openchronology/timeline-app/issues/316)):
+
+- **Near-identical spans share one band.** Durations whose start and end are both closer than the grouping distance (**Group within**) to a band's are drawn as that band, labeled "_Title_ + 2,340 more" and outlined twice. Choosing it lists them. Grouping compares distances in time, so it changes with zoom but never with panning.
+- **Rows go longest first.** Bands claim rows in order of length, then start, title and ID, so an era sits on the first row and the details inside it below. The order depends only on the durations, so panning never reshuffles the rows.
+- **At most what fits.** Only as many rows are drawn as fit beneath a centered axis: at least three, and at most eight on a phone or sixteen elsewhere. The bands that would need more, and any durations the window holds beyond the 256 sent, sit behind one **＋1,234 more durations ▾** chip on the next row, spanning the hidden bands. Choosing it lists them.
+- **The list.** A grouped band lists its spans; the chip lists every duration touching the view (from the server or desktop file when it holds more than were sent). The list pages 25 at a time, filters by words in titles, and sorts longest first, by start or by title. Each entry opens the duration, or **Fit in view** fits the view to it. In a comparison, the chip lists the bands its timelines sent, and a notice gives how many touch the window.
+
+The list is the timeline query `{"kind": "durations", "overlapping": true, "lower", "upper", "threshold", "text", "sort": "extent" | "start" | "title", "offset", "limit"}`, answering `{durations, next, total, totalMore?}` with `next` the next page's offset. Offsets stop at 10,000, so a page costs at most 10,001 rows; `total` counts matches the same way.
 
 ## Summaries
 

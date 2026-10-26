@@ -110,7 +110,11 @@ import {
   mapTime,
   mappedEntities,
   unchangedMapping,
-  durationLanes,
+  arrangeDurations,
+  compareDurationRank,
+  durationCountText,
+  collapses,
+  DURATION_COUNT_CAP,
   arcPath,
 } from './core.js';
 import type {
@@ -4534,8 +4538,9 @@ function animateView(destination: Viewport, automatic = false) {
  * Fits duration `id` in the view, with the same margin as Fit all (#268): from its band in the
  * window (a comparison's included), else from the document. Does nothing for one unknown here.
  */
-function fitDuration(id: string) {
+function fitDuration(id: string, known?: DurationBand) {
   const band =
+    known ??
     frame.durations?.find((b) => b.id === id && !b.sourceKey) ??
     frame.durations?.find((b) => b.id === id) ??
     (model?.durations.has(id)
@@ -4586,6 +4591,8 @@ function fit() {
   requestRender();
 }
 
+/** Where the page was scrolled when the timeline menu opened. */
+let menuScroll = { x: 0, y: 0 };
 function closeTimelineMenu() {
   menuGeneration++;
   const menu = el('timeline-menu');
@@ -4764,6 +4771,7 @@ function showTimelineMenu(
   menu.hidden = false;
   menu.popover = 'manual';
   menu.showPopover();
+  menuScroll = { x: window.scrollX, y: window.scrollY };
   const bounds = menu.getBoundingClientRect();
   menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - bounds.width - 4))}px`;
   menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - bounds.height - 4))}px`;
@@ -4901,7 +4909,17 @@ document.addEventListener('pointerdown', (event) => {
   if (!el('timeline-menu').contains(event.target as Node)) closeTimelineMenu();
 });
 window.addEventListener('resize', closeTimelineMenu);
-window.addEventListener('scroll', closeTimelineMenu, true);
+// Scrolling closes the menu, but not a page scroll that ended before it opened: its event
+// arrives a frame later, as when scrolling to a band and right-clicking it at once (#308).
+window.addEventListener(
+  'scroll',
+  (event) => {
+    const page = event.target === document || event.target === document.documentElement;
+    if (page && window.scrollX === menuScroll.x && window.scrollY === menuScroll.y) return;
+    closeTimelineMenu();
+  },
+  true,
+);
 window.addEventListener('blur', () => {
   clearTimeout(longPressTimer);
   closeTimelineMenu();
@@ -9447,21 +9465,48 @@ function renderDurationBackgrounds() {
 }
 /** Band elements persist by duration so clicks and hover cards survive re-rendering. */
 const durationButtons = new Map<string, HTMLButtonElement>(),
-  bandContent = new WeakMap<HTMLButtonElement, string>();
+  bandContent = new WeakMap<HTMLButtonElement, string>(),
+  moreChips = new Map<string, HTMLButtonElement>();
+/**
+ * How many rows of bands are drawn beneath the axis before the rest go into a "more" chip
+ * (#316): what fits under the ruler with the axis centered (bands start 35 pixels below the
+ * axis, rows are 13 apart), so it doesn't change as the view pans; at least three, and at most
+ * eight on a phone or sixteen otherwise.
+ */
+function durationRows() {
+  const fit = Math.floor((stageHeight() / 2 / uiScale - 45) / 13);
+  return Math.max(3, Math.min(compactScreen.matches ? 8 : 16, fit));
+}
+/**
+ * The window's duration bands (#316): spans that nearly coincide drawn as one band ("Title +
+ * 12 more"), rows claimed longest first without overlap (#269), at most durationRows() of
+ * them, and the rest, with any the window holds beyond those sent, behind a "＋N more
+ * durations" chip that lists them.
+ */
 function renderDurationBands() {
   const host = el('duration-bands');
   host.querySelector('.duration-limit')?.remove();
   const rows = comparisonRows().rows;
   const plugins = durationPlugins(installedPlugins());
   const shown = new Set<string>();
-  // Each band's row beneath the axis, so that none overlapping in time share one (#269).
-  const lanes = durationLanes(
-    (frame.durations ?? []).map((band) => ({ ...band, group: band.sourceKey })),
+  const bands = (frame.durations ?? []).filter(
+    (band) =>
+      viewport.x(parsedTime(band.first), width()) <= width() &&
+      viewport.x(parsedTime(band.last), width()) >= 0,
   );
-  (frame.durations ?? []).forEach((band, i) => {
+  const spanNumber = viewport.span.toApproximateNumber();
+  const maxRows = durationRows();
+  const { shown: arranged, hidden } = arrangeDurations(
+    bands,
+    (span) => (span.toApproximateNumber() / spanNumber) * width(),
+    pixels(),
+    maxRows,
+  );
+  const top = (source: string | undefined, row: number) =>
+    227 + (rows.get(source ?? '')?.offset ?? 0) + row * 13 + 'px';
+  for (const { band, members, row } of arranged) {
     const left = Math.max(0, viewport.x(parsedTime(band.first), width())),
       right = Math.min(width(), viewport.x(parsedTime(band.last), width()));
-    if (right < left) return;
     const key = (band.sourceKey ?? '') + '\u0000' + band.id;
     shown.add(key);
     let button = durationButtons.get(key);
@@ -9470,43 +9515,303 @@ function renderDurationBands() {
       button.type = 'button';
       button.className = 'duration-band';
       button.dataset.durationId = band.id;
-      button.onclick = () => void openDurationById(band.id).catch(fail);
       durationButtons.set(key, button);
       host.append(button);
     }
+    // A band standing for several opens their list; one alone opens itself.
+    button.onclick =
+      members.length > 1
+        ? () =>
+            openDurationList({
+              kind: 'bands',
+              bands: members,
+              heading: 'Durations spanning nearly this time',
+            })
+        : () => void openDurationById(band.id).catch(fail);
     button.classList.toggle(
       'search-hit',
-      searchHit?.kind === 'duration' && searchHit.id === band.id && !band.sourceKey,
+      searchHit?.kind === 'duration' &&
+        members.some((m) => m.id === searchHit!.id) &&
+        !band.sourceKey,
     );
     button.style.left = (inset() + left) / uiScale + 'px';
     button.style.width = Math.max(6, (right - left) / uiScale) + 'px';
     // Below the axis's tick labels, which they would otherwise hide (#228).
-    button.style.top = 227 + (rows.get(band.sourceKey ?? '')?.offset ?? 0) + lanes[i] * 13 + 'px';
+    button.style.top = top(band.sourceKey, row);
     // What a band says changes with its content, not as the view moves (#68).
-    const content = `${contentGeneration()}\u0000${band.first}\u0000${band.last}`;
-    if (bandContent.get(button) === content) return;
+    const content = `${contentGeneration()}\u0000${band.first}\u0000${band.last}\u0000${members.length}`;
+    if (bandContent.get(button) === content) continue;
     bandContent.set(button, content);
+    const title = band.metadata.title || 'Untitled duration',
+      others = members.length - 1;
+    button.dataset.grouped = String(members.length);
     button.style.backgroundColor = pluginColor(plugins, band.metadata) ?? '';
-    button.textContent = band.metadata.title ?? '';
-    button.setAttribute('aria-label', 'Duration: ' + (band.metadata.title || 'Untitled duration'));
+    button.textContent = (band.metadata.title ?? '') + (others ? ` + ${others} more` : '');
+    button.setAttribute(
+      'aria-label',
+      'Duration: ' +
+        title +
+        (others ? `, and ${others} more spanning nearly the same time; opens their list` : ''),
+    );
     button.title =
       (band.metadata.title || 'Duration') +
+      (others ? ` + ${others} more` : '') +
       ' · ' +
       presented(parsedTime(band.first)) +
       ' → ' +
       presented(parsedTime(band.last));
     hoverPreview.update(button, plugins, band.metadata, 1n, 'Untitled duration');
-  });
+  }
   for (const [key, button] of durationButtons)
     if (!shown.has(key)) {
       button.remove();
       durationButtons.delete(key);
     }
-  if (frame.durationsTruncated) {
+  // The chips: one per timeline with hidden bands; the window's own also counts those the
+  // server or file didn't send.
+  const loaded = frame.durations?.length ?? 0,
+    unsent = frame.durationsTruncated && frame.durationsTotal ? frame.durationsTotal - loaded : 0,
+    chips = new Map(hidden.map((h) => [h.source, h.bands]));
+  if (unsent > 0 && !comparison && !chips.has('')) chips.set('', []);
+  const chipKeys = new Set<string>();
+  for (const [source, left] of chips) {
+    const count = left.length + (source === '' && !comparison ? Math.max(0, unsent) : 0);
+    if (!count) continue;
+    chipKeys.add(source);
+    let chip = moreChips.get(source);
+    if (!chip) {
+      chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'duration-more';
+      chip.setAttribute('aria-haspopup', 'dialog');
+      moreChips.set(source, chip);
+      host.append(chip);
+    }
+    // Across the hidden bands' visible extent, or the whole width for unsent ones.
+    const xs = left.flatMap((band) => [
+      Math.max(0, viewport.x(parsedTime(band.first), width())),
+      Math.min(width(), viewport.x(parsedTime(band.last), width())),
+    ]);
+    const from = xs.length && !unsent ? Math.min(...xs) : 0,
+      to = xs.length && !unsent ? Math.max(...xs) : width();
+    const used = Math.max(
+      -1,
+      ...arranged.filter((a) => (a.band.sourceKey ?? '') === source).map((a) => a.row),
+    );
+    chip.style.left = (inset() + from) / uiScale + 'px';
+    chip.style.width = Math.max(150, (to - from) / uiScale) + 'px';
+    chip.style.top = top(source || undefined, Math.min(maxRows, used + 1));
+    const label = durationCountText(
+      count,
+      source === '' && !comparison && !!frame.durationsTotalMore,
+    );
+    chip.dataset.count = String(count);
+    chip.textContent = `＋${label} more ${count === 1 ? 'duration' : 'durations'} ▾`;
+    chip.setAttribute('aria-label', `${label} more durations in this view; opens their list`);
+    chip.onclick = () =>
+      openDurationList(
+        comparison || !frame.durationsTruncated
+          ? { kind: 'bands', bands: left, heading: 'More durations in this view' }
+          : {
+              kind: 'window',
+              lower: viewport.left.toString(),
+              upper: viewport.right.toString(),
+              threshold: bandThreshold().toString(),
+              heading: 'Durations in this view',
+            },
+      );
+  }
+  for (const [key, chip] of moreChips)
+    if (!chipKeys.has(key)) {
+      chip.remove();
+      moreChips.delete(key);
+    }
+  // A comparison can't list what its timelines didn't send; it says how many there are.
+  if (comparison && frame.durationsTruncated) {
     const notice = document.createElement('span');
     notice.className = 'duration-limit';
-    notice.textContent =
-      'Showing the first 256 durations in this window. Zoom in to narrow the selection.';
+    notice.textContent = `${durationCountText(
+      frame.durationsTotal ?? loaded,
+      !!frame.durationsTotalMore,
+    )} durations touch this window; zoom in to see more of them.`;
     host.append(notice);
   }
 }
+/** The shortest duration drawn as a band at this zoom: the grouping distance in time. */
+function bandThreshold() {
+  return viewport.span.mul(screenQ(pixels())).div(screenQ(width()));
+}
+/** What the duration list shows: given bands, or every duration touching a window. */
+type DurationListSource =
+  | { kind: 'bands'; bands: DurationBand[]; heading: string }
+  | { kind: 'window'; lower: string; upper: string; threshold: string; heading: string };
+interface DurationListPage {
+  durations: DurationBand[];
+  next: number | null;
+  total: number;
+  totalMore?: boolean;
+}
+const DURATION_LIST_PAGE = 25;
+let durationList: { source: DurationListSource; offset: number; request: number } | null = null;
+/**
+ * A page of the duration list (#316): the given bands, or a window's durations from the
+ * timeline (the server or the desktop file, or the document in memory), filtered by words in
+ * titles and sorted longest first, by start or by title.
+ */
+async function durationListPage(
+  source: DurationListSource,
+  words: string,
+  sort: string,
+  offset: number,
+): Promise<DurationListPage> {
+  const index = !sparseWorkspace() ? model : null;
+  if (source.kind === 'window' && !index && (local ?? remote))
+    return timelineQuery<DurationListPage>({
+      kind: 'durations',
+      overlapping: true,
+      lower: source.lower,
+      upper: source.upper,
+      threshold: source.threshold,
+      text: words,
+      sort,
+      offset,
+      limit: DURATION_LIST_PAGE,
+      revision: (local ?? remote)!.revision,
+    });
+  let bands: DurationBand[];
+  if (source.kind === 'bands') bands = source.bands;
+  else {
+    const lower = Q.parse(source.lower),
+      upper = Q.parse(source.upper),
+      threshold = Q.parse(source.threshold);
+    bands = index
+      ? [...index.durations.values()]
+          .map((d) => resolveDuration(d, (id) => index.momentTime(id)))
+          .filter(
+            (b): b is DurationBand =>
+              !!b &&
+              Q.parse(b.first).compare(upper) <= 0 &&
+              Q.parse(b.last).compare(lower) >= 0 &&
+              !collapses(b, threshold),
+          )
+      : (frame.durations ?? []);
+  }
+  const needle = words.trim().toLowerCase();
+  const matching = needle
+    ? bands.filter((b) =>
+        String(b.metadata.title ?? '')
+          .toLowerCase()
+          .includes(needle),
+      )
+    : [...bands];
+  const title = (b: DurationBand) => String(b.metadata.title ?? '').toLowerCase();
+  matching.sort(
+    sort === 'start'
+      ? (a, b) => Q.parse(a.first).compare(Q.parse(b.first)) || (a.id < b.id ? -1 : 1)
+      : sort === 'title'
+        ? (a, b) =>
+            (title(a) < title(b) ? -1 : title(a) > title(b) ? 1 : 0) ||
+            Q.parse(a.first).compare(Q.parse(b.first)) ||
+            (a.id < b.id ? -1 : 1)
+        : compareDurationRank,
+  );
+  return {
+    durations: matching.slice(offset, offset + DURATION_LIST_PAGE),
+    next: matching.length > offset + DURATION_LIST_PAGE ? offset + DURATION_LIST_PAGE : null,
+    total: Math.min(matching.length, DURATION_COUNT_CAP),
+    ...(matching.length > DURATION_COUNT_CAP ? { totalMore: true } : {}),
+  };
+}
+/** Opens the duration list (#316) on `source`, from its first page. */
+function openDurationList(source: DurationListSource) {
+  durationList = { source, offset: 0, request: 0 };
+  text('duration-list-heading', source.heading);
+  input('duration-list-text').value = '';
+  el<HTMLSelectElement>('duration-list-sort').value = 'extent';
+  const dialog = el<HTMLDialogElement>('duration-list');
+  if (!dialog.open) dialog.showModal();
+  void renderDurationList();
+}
+async function renderDurationList() {
+  if (!durationList) return;
+  const state = durationList,
+    request = ++state.request;
+  const words = input('duration-list-text').value,
+    sort = el<HTMLSelectElement>('duration-list-sort').value;
+  text('duration-list-status', 'Loading…');
+  try {
+    const page = await durationListPage(state.source, words, sort, state.offset);
+    if (durationList !== state || request !== state.request) return;
+    const list = el('duration-list-results');
+    list.replaceChildren();
+    for (const band of page.durations) {
+      const item = document.createElement('li');
+      item.className = 'duration-list-item';
+      const open = document.createElement('button');
+      open.type = 'button';
+      open.className = 'search-result';
+      const name = document.createElement('strong');
+      name.textContent = band.metadata.title || 'Untitled duration';
+      const meta = document.createElement('span');
+      meta.className = 'search-meta';
+      meta.textContent = `${presented(Q.parse(band.first))} → ${presented(Q.parse(band.last))}`;
+      open.append(name, meta);
+      open.onclick = () => {
+        el<HTMLDialogElement>('duration-list').close();
+        void openDurationById(band.id, band).catch(fail);
+      };
+      const fitButton = document.createElement('button');
+      fitButton.type = 'button';
+      fitButton.textContent = 'Fit in view';
+      fitButton.setAttribute('aria-label', `Fit ${name.textContent} in view`);
+      fitButton.onclick = () => {
+        el<HTMLDialogElement>('duration-list').close();
+        fitDuration(band.id, band);
+      };
+      item.append(open, fitButton);
+      list.append(item);
+    }
+    const total = durationCountText(page.total, page.totalMore);
+    text(
+      'duration-list-status',
+      page.total === 0
+        ? 'No durations match.'
+        : `${total} ${page.total === 1 ? 'duration' : 'durations'}` +
+            (page.next !== null || state.offset > 0
+              ? ` · ${state.offset + 1}–${state.offset + page.durations.length}`
+              : ''),
+    );
+    el<HTMLButtonElement>('duration-list-previous').disabled = state.offset === 0;
+    el<HTMLButtonElement>('duration-list-next').disabled = page.next === null;
+    el('duration-list-previous').parentElement!.hidden = state.offset === 0 && page.next === null;
+  } catch (error) {
+    if (durationList === state && request === state.request)
+      text('duration-list-status', error instanceof Error ? error.message : String(error));
+  }
+}
+let durationListTyping: ReturnType<typeof setTimeout> | undefined;
+el('duration-list-text').addEventListener('input', () => {
+  clearTimeout(durationListTyping);
+  durationListTyping = setTimeout(() => {
+    if (!durationList) return;
+    durationList.offset = 0;
+    void renderDurationList();
+  }, 200);
+});
+el('duration-list-sort').addEventListener('change', () => {
+  if (!durationList) return;
+  durationList.offset = 0;
+  void renderDurationList();
+});
+el('duration-list-form').addEventListener('submit', (event) => event.preventDefault());
+el('duration-list-previous').onclick = () => {
+  if (!durationList) return;
+  durationList.offset = Math.max(0, durationList.offset - DURATION_LIST_PAGE);
+  void renderDurationList();
+};
+el('duration-list-next').onclick = () => {
+  if (!durationList) return;
+  durationList.offset += DURATION_LIST_PAGE;
+  void renderDurationList();
+};
+el('duration-list').addEventListener('close', () => (durationList = null));

@@ -162,6 +162,7 @@ The runs cover:
 
 - the in-memory browser editor, at full speed and with the CPU throttled 4×, whose comfortable sizes are 10,000 and 1,000 moments;
 - the platform: the production Next.js server with PostgreSQL, signed in as a `bench_ui` user, whose comfortable size is the 200,000-moment limit;
+- in the browser (Chromium), **dense-durations**, run last because it opens a document of its own: a drag across 5,000 durations over the same time beside 18 longer staggered ones, which the editor groups and caps every frame ([#316](https://github.com/openchronology/timeline-app/issues/316)), timed by its longest frame;
 - the desktop app (WebKitGTK on Linux), whose comfortable size is also the limit. Timelines over 2,048 moments move into the native SQLite store after opening, as for desktop users; smaller ones stay in memory. Pinch gestures are measured in Chromium only, through its DevTools touch input; the desktop driver sends mouse, keyboard and wheel input.
 
 Each interaction is measured `UI_SAMPLES` times (default 5) and judged by its median.

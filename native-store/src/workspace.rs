@@ -136,6 +136,14 @@ pub struct Query {
     /// Restricts a search to one kind of entity ("moment").
     #[serde(default)]
     pub only: Option<String>,
+    /// Lists the durations touching the window instead of those inside it (#316), from
+    /// `offset`, sorted by `sort` ("extent", "start" or "title").
+    #[serde(default)]
+    pub overlapping: bool,
+    #[serde(default)]
+    pub offset: Option<usize>,
+    #[serde(default)]
+    pub sort: Option<String>,
 }
 /// A private temporary directory, removed with the last snapshot that uses it.
 struct Directory(PathBuf);
@@ -375,7 +383,9 @@ impl Snapshot {
     ///   `threshold` is the distance actually used (at least 1/1024 of the viewport).
     /// - "events" with `id`: that moment, if it is still at time `lower`; without: a page of
     ///   up to 100 moments in [lower, upper] in (time, ID) order: `{events, next}`.
-    /// - "durations": a page of durations wholly inside [lower, upper]: `{durations, next}`.
+    /// - "durations": a page of durations wholly inside [lower, upper]: `{durations, next}`;
+    ///   with `overlapping`, those touching it, sorted, searched and paged by offset:
+    ///   `{durations, next, total, totalMore?}` (#316).
     /// - "duration": one duration by ID with its full metadata: `{duration}`.
     /// - "search": a page of 25 moments and durations matching `text`.
     /// - "tags": the 200 most used tags with their counts.
@@ -445,6 +455,31 @@ impl Snapshot {
                 kind,
                 id,
                 after.map(|c| (c.time.as_str(), c.id.as_str())),
+                q.limit.unwrap_or(25).clamp(1, 100),
+            );
+        }
+        if q.kind == "durations" && q.overlapping {
+            let offset = q.offset.unwrap_or(0);
+            let sort = q.sort.as_deref().unwrap_or("extent");
+            if offset >= super::DURATION_COUNT_CAP
+                || !["extent", "start", "title"].contains(&sort)
+                || q.text.chars().count() > 200
+            {
+                return Err("Invalid duration list".into());
+            }
+            let threshold = if q.threshold.is_empty() {
+                "0"
+            } else {
+                q.threshold.as_str()
+            };
+            return super::duration_list(
+                &db,
+                &q.lower,
+                &q.upper,
+                threshold,
+                q.text.trim(),
+                sort,
+                offset,
                 q.limit.unwrap_or(25).clamp(1, 100),
             );
         }
@@ -1840,6 +1875,82 @@ mod duration_tests {
             .collect();
         bands.sort();
         bands
+    }
+    #[test]
+    fn dense_windows_keep_their_longest_durations_count_them_and_list_them() {
+        // #316: 3,000 durations over the same span, an era, and staggered spans longer than
+        // those but starting after them, so the first 256 by start order would leave them out.
+        let mut durations =
+            vec![json!({"id":"era","start":"0/1","end":"1000/1","metadata":{"title":"Era"}})];
+        for i in 0..3000 {
+            durations.push(json!({"id":format!("same{i:04}"),"start":"100/1","end":"900/1","metadata":{"title":format!("Same {i}")}}));
+        }
+        for i in 0..18 {
+            durations.push(json!({"id":format!("stair{i:02}"),"start":format!("{}/1",105 + i * 80),"end":format!("{}/1",1000 + i * 90),"metadata":{"title":format!("Stair {i}")}}));
+        }
+        let doc: Document = serde_json::from_value(json!({"format":"openchronology","version":1,"title":"Dense","description":"","events":[],"durations":durations})).unwrap();
+        let snapshot = Snapshot::from_document(&doc).unwrap();
+        let frame = snapshot
+            .query(
+                &serde_json::from_value(
+                    json!({"kind":"overview","lower":"0/1","upper":"3000/1","threshold":"0/1"}),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let bands = frame["durations"].as_array().unwrap();
+        assert_eq!(bands.len(), 256);
+        assert_eq!(frame["durationsTruncated"], true);
+        assert_eq!(frame["durationsTotal"], 3019);
+        // The longest are kept, in start order: the era and every staircase span, though they
+        // start after all 3,000 of the others.
+        let ids: Vec<&str> = bands.iter().map(|b| b["id"].as_str().unwrap()).collect();
+        assert_eq!(ids[0], "era");
+        for i in 0..18 {
+            assert!(
+                ids.contains(&format!("stair{i:02}").as_str()),
+                "stair{i:02}"
+            );
+        }
+        let firsts: Vec<f64> = bands
+            .iter()
+            .map(|b| {
+                b["first"]
+                    .as_str()
+                    .unwrap()
+                    .split('/')
+                    .next()
+                    .unwrap()
+                    .parse()
+                    .unwrap()
+            })
+            .collect();
+        assert!(firsts.windows(2).all(|w| w[0] <= w[1]));
+        // The list: every duration touching the window, longest first, searched and paged.
+        let list = |extra: Value| {
+            let mut q = json!({"kind":"durations","overlapping":true,"lower":"0/1","upper":"3000/1","threshold":"0/1","limit":25});
+            q.as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            snapshot.query(&serde_json::from_value(q).unwrap()).unwrap()
+        };
+        let first = list(json!({}));
+        assert_eq!(first["total"], 3019);
+        assert_eq!(first["durations"][0]["id"], "stair17");
+        assert_eq!(first["next"], 25);
+        assert_eq!(
+            list(json!({"offset":25}))["durations"]
+                .as_array()
+                .unwrap()
+                .len(),
+            25
+        );
+        let stairs = list(json!({"text":"STAIR 1","sort":"title"}));
+        assert_eq!(stairs["total"], 9);
+        assert_eq!(stairs["durations"][0]["id"], "stair01");
+        assert!(snapshot
+            .query(&serde_json::from_value(json!({"kind":"durations","overlapping":true,"lower":"0/1","upper":"1/1","sort":"sideways"})).unwrap())
+            .is_err());
     }
     #[test]
     fn legacy_links_convert_and_anchored_bands_follow_sparse_moment_edits() {

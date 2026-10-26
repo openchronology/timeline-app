@@ -664,7 +664,54 @@ const SCENARIOS = [
       return since(d, `${count} > ${before}`, () => ctx.addMoment());
     },
   },
+  {
+    // Last: it opens a document of its own (#316). Dragging across 5,000 durations over the
+    // same time, beside staggered longer ones: they are grouped and capped every frame.
+    name: 'dense-durations',
+    group: 'navigation',
+    budget: 'frame',
+    platforms: ['browser'],
+    engines: ['chromium'],
+    async run(d) {
+      await closeDialogs(d);
+      await d.setFile('#json-file', 'dense.ochx', JSON.stringify(denseDocument(5000)));
+      await d.wait(`document.getElementById('timeline-title').value === 'Dense durations'`);
+      await d.click('#fit-button');
+      await d.wait(`document.querySelector('.duration-more') !== null`);
+      // Let Fit all's animation land before dragging.
+      await delay(800);
+      const stage = await d.box('#timeline-stage');
+      const y = stage.y + 60;
+      return longestFrame(d, () =>
+        d.drag(stage.x + stage.width * 0.3, y, stage.x + stage.width * 0.7, y),
+      );
+    },
+  },
 ];
+/** `same` durations over the same span and 18 staggered longer ones (#316). */
+function denseDocument(same) {
+  return {
+    format: 'openchronology',
+    version: 1,
+    title: 'Dense durations',
+    description: '',
+    events: [],
+    durations: [
+      ...Array.from({ length: same }, (_, i) => ({
+        id: 'same' + i,
+        start: '100/1',
+        end: '900/1',
+        metadata: { title: 'Same ' + i },
+      })),
+      ...Array.from({ length: 18 }, (_, i) => ({
+        id: 'stair' + i,
+        start: `${105 + i * 80}/1`,
+        end: `${1000 + i * 90}/1`,
+        metadata: { title: 'Stair ' + i },
+      })),
+    ],
+  };
+}
 
 /**
  * Waits until the editor shows the fitted timeline. If it shows a message instead and still

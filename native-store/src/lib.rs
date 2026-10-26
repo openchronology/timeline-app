@@ -1471,28 +1471,53 @@ fn band_json(row: &[Option<String>]) -> Result<Value, String> {
     )
 }
 /// Viewport bands: durations at least as long as the threshold (shorter ones are summarized),
-/// with a bounded projection of title, a notes preview, and short text fields.
+/// with a bounded projection of title, a notes preview, and short text fields. A dense window
+/// keeps its 256 longest (#316), as src/durations.ts durationWindow and the PostgreSQL store
+/// do: the walk's matches in start order up to one past DURATION_COUNT_CAP (which counts them),
+/// ranked longest first, then by start and ID, returned in start order.
 fn duration_window(
     db: &Connection,
     lower: &str,
     upper: &str,
     threshold: &str,
 ) -> Result<Value, String> {
-    let rows = interval_window(
-        db,
-        "duration_intervals",
-        "duration_nodes",
-        lower,
-        upper,
-        threshold,
-    )?;
-    let more = rows.len() > 256;
+    let walk = format!(
+        "{} SELECT node FROM walk WHERE kind=1 AND hit LIMIT {}",
+        interval_walk("duration_intervals", "duration_nodes"),
+        DURATION_COUNT_CAP + 1
+    );
+    let found: Vec<String> = db
+        .query(&walk, &[upper, lower, threshold])?
+        .into_iter()
+        .filter_map(|r| r[0].clone())
+        .collect();
+    let total = found.len();
     let mut bands = Vec::new();
-    for row in rows.into_iter().take(256) {
-        bands.push(band_json(&row)?);
+    if total > 0 {
+        let ords = serde_json::to_string(&found).map_err(|e| e.to_string())?;
+        let rows = db.query_limited(
+            &format!("SELECT * FROM (SELECT {BAND_COLUMNS} FROM json_each(?1) f JOIN duration_intervals d ON d.ord=CAST(f.value AS INTEGER) ORDER BY d.extent COLLATE RATIONAL_V1 DESC,d.first COLLATE RATIONAL_V1,d.id LIMIT 256) ORDER BY 4 COLLATE RATIONAL_V1,1"),
+            &[&ords],
+            256,
+            8 * 1024 * 1024,
+        )?;
+        for row in rows {
+            bands.push(band_json(&row)?);
+        }
     }
-    Ok(serde_json::json!({"durations":bands,"durationsTruncated":more}))
+    let mut result = serde_json::json!({"durations":bands,"durationsTruncated":total > 256});
+    // How many touch the window, when some were left out.
+    if total > 256 {
+        result["durationsTotal"] = serde_json::json!(total.min(DURATION_COUNT_CAP));
+        if total > DURATION_COUNT_CAP {
+            result["durationsTotalMore"] = serde_json::json!(true);
+        }
+    }
+    Ok(result)
 }
+/// How far a window's durations are counted past the bands sent (src/durations.ts
+/// DURATION_COUNT_CAP): a count at the cap reads as "10,000+".
+pub(crate) const DURATION_COUNT_CAP: usize = 10000;
 /// Rows of an interval tree touching [lower, upper] and at least as long as the threshold, in
 /// start order (then ID, as the browser lists them), at most 257 (callers report truncation
 /// past 256).
@@ -1509,28 +1534,9 @@ pub(crate) fn interval_window(
     upper: &str,
     threshold: &str,
 ) -> Result<Vec<Vec<Option<String>>>, String> {
-    // Whether a subtree may hold a match: its earliest start is at or before upper (?1), its
-    // latest end at or after lower (?2), and, unless the threshold (?3) is zero, its longest
-    // interval reaches the threshold.
-    let fits = |n: &str| {
-        format!("{n}.min_time<=q(?1) COLLATE RATIONAL_V1 AND {n}.max_time>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp({n}.max_extent,q(?3))>=0)")
-    };
-    // kind 0: a subtree keyed by its earliest start; kind 1: one node keyed by (start, ID).
-    // The anchor row is the root (from interval_roots) if it fits. Each subtree row yields
-    // its children that fit, as subtree rows, and its own interval as a node row, with `hit`
-    // telling whether that interval itself matches (the same test as `fits`, on one
-    // interval). The ORDER BY makes the queue a priority queue on (start, kind, ID): at equal
-    // starts subtrees come out before nodes, so a subtree is expanded before any node that
-    // might sort after its contents. Only hits are returned.
-    let walk = format!("WITH RECURSIVE walk(kind,node,start,id,hit) AS (\
-        SELECT 0,n.id,n.min_time,'',0 FROM {nodes} n WHERE n.id=(SELECT root FROM interval_roots WHERE name='{nodes}') AND {} \
-        UNION ALL SELECT 0,c.id,c.min_time,'',0 FROM walk w JOIN {nodes} p ON p.id=w.node JOIN {nodes} c ON c.id IN (p.left_id,p.right_id) WHERE w.kind=0 AND {} \
-        UNION ALL SELECT 1,d.ord,d.first,d.id,d.first<=q(?1) COLLATE RATIONAL_V1 AND d.last>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp(d.extent,q(?3))>=0) \
-          FROM walk w JOIN {intervals} d ON d.ord=w.node WHERE w.kind=0 \
-        ORDER BY 3 COLLATE RATIONAL_V1,1,4) \
-      SELECT node FROM walk WHERE kind=1 AND hit LIMIT 257",
-        fits("n"),
-        fits("c")
+    let walk = format!(
+        "{} SELECT node FROM walk WHERE kind=1 AND hit LIMIT 257",
+        interval_walk(intervals, nodes)
     );
     let found: Vec<String> = db
         .query(&walk, &[upper, lower, threshold])?
@@ -1550,6 +1556,33 @@ pub(crate) fn interval_window(
         8 * 1024 * 1024,
     )
 }
+/// The recursive walk interval_window and interval_count follow with their SELECT: a CTE
+/// `walk(kind, node, start, id, hit)` over tree `nodes` of table `intervals`, with upper
+/// (?1), lower (?2) and the threshold (?3) as parameters.
+fn interval_walk(intervals: &str, nodes: &str) -> String {
+    // Whether a subtree may hold a match: its earliest start is at or before upper (?1), its
+    // latest end at or after lower (?2), and, unless the threshold (?3) is zero, its longest
+    // interval reaches the threshold.
+    let fits = |n: &str| {
+        format!("{n}.min_time<=q(?1) COLLATE RATIONAL_V1 AND {n}.max_time>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp({n}.max_extent,q(?3))>=0)")
+    };
+    // kind 0: a subtree keyed by its earliest start; kind 1: one node keyed by (start, ID).
+    // The anchor row is the root (from interval_roots) if it fits. Each subtree row yields
+    // its children that fit, as subtree rows, and its own interval as a node row, with `hit`
+    // telling whether that interval itself matches (the same test as `fits`, on one
+    // interval). The ORDER BY makes the queue a priority queue on (start, kind, ID): at equal
+    // starts subtrees come out before nodes, so a subtree is expanded before any node that
+    // might sort after its contents. Only hits are returned.
+    format!("WITH RECURSIVE walk(kind,node,start,id,hit) AS (\
+        SELECT 0,n.id,n.min_time,'',0 FROM {nodes} n WHERE n.id=(SELECT root FROM interval_roots WHERE name='{nodes}') AND {} \
+        UNION ALL SELECT 0,c.id,c.min_time,'',0 FROM walk w JOIN {nodes} p ON p.id=w.node JOIN {nodes} c ON c.id IN (p.left_id,p.right_id) WHERE w.kind=0 AND {} \
+        UNION ALL SELECT 1,d.ord,d.first,d.id,d.first<=q(?1) COLLATE RATIONAL_V1 AND d.last>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp(d.extent,q(?3))>=0) \
+          FROM walk w JOIN {intervals} d ON d.ord=w.node WHERE w.kind=0 \
+        ORDER BY 3 COLLATE RATIONAL_V1,1,4)",
+        fits("n"),
+        fits("c")
+    )
+}
 /// The previous single recursive query, kept as a reference for interval_window.
 #[cfg(test)]
 pub(crate) fn interval_window_query(
@@ -1562,6 +1595,65 @@ pub(crate) fn interval_window_query(
 ) -> Result<Vec<Vec<Option<String>>>, String> {
     let sql = format!("WITH RECURSIVE visible AS (SELECT n.* FROM {nodes} n WHERE id=(SELECT root FROM interval_roots WHERE name='{nodes}') AND min_time<=q(?1) COLLATE RATIONAL_V1 AND max_time>=q(?2) COLLATE RATIONAL_V1 UNION ALL SELECT n.* FROM visible p JOIN {nodes} n ON n.id IN(p.left_id,p.right_id) WHERE n.min_time<=q(?1) COLLATE RATIONAL_V1 AND n.max_time>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp(n.max_extent,q(?3))>=0)) SELECT {BAND_COLUMNS} FROM visible v JOIN {intervals} d ON d.ord=v.id WHERE d.first<=q(?1) COLLATE RATIONAL_V1 AND d.last>=q(?2) COLLATE RATIONAL_V1 AND (q_cmp(q(?3),q('0'))=0 OR q_cmp(d.extent,q(?3))>=0) LIMIT 257");
     db.query_limited(&sql, &[upper, lower, threshold], 257, 8 * 1024 * 1024)
+}
+/// The durations touching [lower, upper] and at least `threshold` long, as the bands drawn
+/// there (#316): `limit` from `offset`, optionally only those whose title contains `text`
+/// (ignoring ASCII case), longest first ("extent"), by start ("start") or by title
+/// ("title"), with how many match counted up to DURATION_COUNT_CAP: `{durations, next,
+/// total, totalMore?}`, `next` being the next page's offset.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn duration_list(
+    db: &Connection,
+    lower: &str,
+    upper: &str,
+    threshold: &str,
+    text: &str,
+    sort: &str,
+    offset: usize,
+    limit: usize,
+) -> Result<Value, String> {
+    let order = match sort {
+        "start" => "d.first COLLATE RATIONAL_V1,d.id",
+        "title" => "lower(coalesce(json_extract(d.metadata,'$.title'),'')),d.first COLLATE RATIONAL_V1,d.id",
+        _ => "d.extent COLLATE RATIONAL_V1 DESC,d.first COLLATE RATIONAL_V1,d.id",
+    };
+    // Touching the window (?1 lower, ?2 upper), reaching the threshold (?3) unless it is zero,
+    // and, given text (?4), with a title containing it.
+    let filter = "d.first<=q(?2) COLLATE RATIONAL_V1 AND d.last>=q(?1) COLLATE RATIONAL_V1 \
+        AND (q_cmp(q(?3),q('0'))=0 OR q_cmp(d.extent,q(?3))>=0) \
+        AND (?4='' OR instr(lower(coalesce(json_extract(d.metadata,'$.title'),'')),lower(?4))>0)";
+    let take = (limit + 1).to_string();
+    let skip = offset.to_string();
+    let rows = db.query_limited(
+        &format!("SELECT {BAND_COLUMNS} FROM duration_intervals d WHERE {filter} ORDER BY {order} LIMIT CAST(?5 AS INTEGER) OFFSET CAST(?6 AS INTEGER)"),
+        &[lower, upper, threshold, text, &take, &skip],
+        limit + 1,
+        8 * 1024 * 1024,
+    )?;
+    let total: usize = db
+        .scalar(
+            &format!(
+                "SELECT count(*) FROM (SELECT 1 FROM duration_intervals d WHERE {filter} LIMIT {})",
+                DURATION_COUNT_CAP + 1
+            ),
+            &[lower, upper, threshold, text],
+        )?
+        .parse()
+        .map_err(|e: std::num::ParseIntError| e.to_string())?;
+    let more = rows.len() > limit;
+    let mut durations = Vec::new();
+    for row in rows.into_iter().take(limit) {
+        durations.push(band_json(&row)?);
+    }
+    let mut result = serde_json::json!({
+        "durations": durations,
+        "next": if more { Some(offset + limit) } else { None },
+        "total": total.min(DURATION_COUNT_CAP),
+    });
+    if total > DURATION_COUNT_CAP {
+        result["totalMore"] = serde_json::json!(true);
+    }
+    Ok(result)
 }
 /// Durations wholly inside [lower, upper], in start order after an exact (start, ID) cursor.
 pub(crate) fn duration_page(

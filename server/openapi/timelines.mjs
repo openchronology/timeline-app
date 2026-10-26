@@ -555,6 +555,29 @@ export const schemas = {
       },
       {
         type: 'object',
+        title: 'Durations touching a window',
+        description:
+          'The durations touching the window and at least `threshold` long, as drawn there (#316): optionally only those whose title contains `text` (ignoring case), longest first, by start or by title, a page of `limit` from `offset`. `total` counts the matches up to 10,000; `totalMore` says there are more.',
+        required: ['kind', 'overlapping', 'lower', 'upper'],
+        properties: {
+          kind: { const: 'durations' },
+          overlapping: { const: true },
+          revision: ref('Revision'),
+          lower: ref('Rational'),
+          upper: ref('Rational'),
+          threshold: {
+            ...ref('Rational'),
+            description: 'The shortest duration listed; 0 for all.',
+          },
+          text: { type: 'string', maxLength: 200 },
+          sort: { enum: ['extent', 'start', 'title'], default: 'extent' },
+          offset: { type: 'integer', minimum: 0, maximum: 9999, default: 0 },
+          limit: { type: 'integer', minimum: 1, maximum: 100, default: 25 },
+          filter: ref('ViewFilter'),
+        },
+      },
+      {
+        type: 'object',
         title: 'Related entities',
         description: 'The events linked directly to an entity.',
         required: ['kind', 'entity'],
@@ -644,8 +667,24 @@ export const schemas = {
               },
             },
           },
-          durations: { type: 'array', items: ref('DurationBand'), maxItems: 256 },
+          durations: {
+            type: 'array',
+            items: ref('DurationBand'),
+            maxItems: 256,
+            description:
+              'In start order. When more touch the window, its 256 longest (then by start and ID), among the first 10,001 by start.',
+          },
           durationsTruncated: { type: 'boolean' },
+          durationsTotal: {
+            type: 'integer',
+            maximum: 10000,
+            description:
+              'When truncated: how many durations touch the window, counted up to 10,000.',
+          },
+          durationsTotalMore: {
+            type: 'boolean',
+            description: 'More than 10,000 touch the window.',
+          },
           edges: { type: 'array', items: ref('EdgeBand'), maxItems: 256 },
           edgesTruncated: { type: 'boolean' },
           threshold: { ...ref('Rational'), description: 'The threshold used.' },
@@ -659,9 +698,16 @@ export const schemas = {
         properties: {
           durations: { type: 'array', items: ref('DurationBand') },
           next: {
-            type: ['object', 'null'],
+            type: ['object', 'integer', 'null'],
+            description:
+              'The next page: a cursor for durations in a range, an offset for durations touching a window.',
             properties: { first: ref('Rational'), id: { type: 'string' } },
           },
+          total: {
+            type: 'integer',
+            description: 'Durations touching a window: how many match, up to 10,000.',
+          },
+          totalMore: { type: 'boolean' },
           revision: ref('Revision'),
         },
       },

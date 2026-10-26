@@ -55,6 +55,10 @@ export {
   durationSummaries,
   durationLanes,
   collapses,
+  arrangeDurations,
+  compareDurationRank,
+  durationCountText,
+  DURATION_COUNT_CAP,
 } from './durations.js';
 export {
   DEFAULT_ENTRY_LIMIT,
@@ -63,7 +67,13 @@ export {
   setEntryLimit,
   withinEntryLimit,
 } from './entry-limit.js';
-export type { Duration, DurationBand, DurationEndpoint, DurationSummary } from './durations.js';
+export type {
+  Duration,
+  DurationBand,
+  DurationEndpoint,
+  DurationSummary,
+  ArrangedDuration,
+} from './durations.js';
 export {
   searchTerms,
   searchText,
@@ -191,6 +201,12 @@ export interface FrameGroup {
 export interface Frame {
   durations?: DurationBand[];
   durationsTruncated?: boolean;
+  /**
+   * When durations were left out (`durationsTruncated`), how many touch the window, counted up
+   * to DURATION_COUNT_CAP; `durationsTotalMore` when there are more than that (#316).
+   */
+  durationsTotal?: number;
+  durationsTotalMore?: boolean;
   /** Relationship arcs touching the window, longer than the grouping distance. */
   edges?: EdgeBand[];
   edgesTruncated?: boolean;

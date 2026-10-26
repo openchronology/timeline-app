@@ -56,6 +56,7 @@ import {
   setEntryLimit,
   contentLabels,
   timeMapping,
+  DURATION_COUNT_CAP,
 } from '../dist/core.mjs';
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 /**
@@ -1604,6 +1605,52 @@ export function createRequestHandler({
                 text: input.text,
                 page,
                 ...(input.only ? { only: input.only } : {}),
+                ...(input.revision ? { revision: input.revision } : {}),
+              }),
+            );
+          }
+          // The durations touching a window, as drawn there (#316): searchable, sorted, paged
+          // by offset up to the counting cap.
+          if (input.kind === 'durations' && input.overlapping === true) {
+            const lower = bound(input.lower),
+              upper = bound(input.upper),
+              threshold = input.threshold == null ? '0' : bound(input.threshold),
+              limit = input.limit ?? 25,
+              offset = input.offset ?? 0,
+              sort = input.sort ?? 'extent',
+              text = input.text ?? '';
+            if (
+              lower === null ||
+              upper === null ||
+              threshold === null ||
+              !Number.isInteger(limit) ||
+              limit < 1 ||
+              limit > 100 ||
+              !Number.isInteger(offset) ||
+              offset < 0 ||
+              offset >= DURATION_COUNT_CAP ||
+              !['extent', 'start', 'title'].includes(sort) ||
+              typeof text !== 'string' ||
+              text.length > 200
+            )
+              throw new HttpError(
+                400,
+                'A list of durations needs bounds, a limit, an offset, a sort and short text.',
+              );
+            return response(
+              res,
+              200,
+              await store.query(id, userId, {
+                kind: 'durations',
+                overlapping: true,
+                lower,
+                upper,
+                threshold,
+                limit,
+                offset,
+                sort,
+                text: text.trim(),
+                ...(filter ? { filter } : {}),
                 ...(input.revision ? { revision: input.revision } : {}),
               }),
             );
