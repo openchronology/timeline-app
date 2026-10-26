@@ -292,7 +292,13 @@ try {
     await closeMomentDetails(page);
     await input('fit-button').click();
     await poll(async () => (await markers.count()) === 3);
-    const m = await markers.first().boundingBox();
+    // Fit all animates the view: tap the marker once it has stopped moving.
+    let m = await markers.first().boundingBox(),
+      last = null;
+    await poll(async () => {
+      [last, m] = [m, await markers.first().boundingBox()];
+      return last && m && last.x === m.x && last.y === m.y;
+    });
     await page.touchscreen.tap(m.x + m.width / 2, m.y + m.height / 2);
     await poll(() => input('event-form').isVisible());
     assert.equal(await input('event-title').inputValue(), 'First');
