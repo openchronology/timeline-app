@@ -5,7 +5,7 @@
 import { Rational as Q } from 'rational-ordered-map';
 import { parseTimestamp, printTimestamp } from './calendar.js';
 import { fixedDecimal, parseNumber, printNumber } from './numeric.js';
-import { validateContext, unitsPerPixel } from './view-context.js';
+import { labelResolution, validateContext, unitsPerPixel } from './view-context.js';
 import type { PresentationContext } from './view-context.js';
 
 // This is a small language interpreter, not a JavaScript execution sandbox.
@@ -382,14 +382,11 @@ function call(name: string, args: Value[], context?: PresentationContext): Value
         return context.widthPixels;
       case 'unitsPerPixel':
         return unitsPerPixel(context);
-      // labelResolution: the time between labels, exactly unitsPerPixel × spacing, with the
-      // spacing defaulting to 115 pixels for ruler labels and 6 otherwise.
+      // labelResolution: the time between labels: a ruler tick's exact interval, else
+      // unitsPerPixel × spacing, with the spacing defaulting to 115 pixels for ruler labels and 6
+      // otherwise.
       default:
-        return unitsPerPixel(context).mul(
-          Q.parseDecimal(
-            (context.spacingPixels ?? (context.purpose === 'axis' ? 115 : 6)).toString(),
-          ),
-        );
+        return labelResolution(context);
     }
   }
   switch (name) {

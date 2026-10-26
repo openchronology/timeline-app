@@ -10,7 +10,9 @@ import {
   compileCustom,
   parseTimestamp,
   TimelineIndex,
+  tickLabel,
   validateDocument,
+  Viewport,
 } from '../dist/core.mjs';
 const settings = { ...DEFAULT_PRESENTATION, mode: 'gregorian' };
 const left = parseTimestamp('2026-10-05T00:00:00Z');
@@ -347,4 +349,45 @@ test('Δ offsets in a large time unit read in a smaller one, and parse back exac
   };
   const year = decade.left.add(Q.from(3n * 31557600n));
   assert.equal(story.print(year, decade), 'Δ 3 AR');
+});
+
+test('a ruler tick keeps its label as the view zooms across a calendar threshold (#313)', () => {
+  // The app labels each tick version for its exact interval; its pixel spacing is a float that
+  // landed either side of the year threshold and flipped 1997 CE and 1997-01 CE.
+  const format = createPresenter(settings),
+    at = parseTimestamp('1997-01-01T00:00:00Z'),
+    width = 358,
+    month = 2629800;
+  const label = (span) => {
+    const view = new Viewport(at.sub(span.div(Q.from(3n))), span),
+      ctx = { left: view.left, span, widthPixels: width, purpose: 'axis', textScale: 1 };
+    const tick = format.rules(ctx).ticks.find((t) => t.time.equals(at));
+    return tickLabel(
+      tick.labels.map((version) => ({
+        text: format.print(at, {
+          ...ctx,
+          spacingPixels: view.x(view.left.add(version.interval), width),
+          labelInterval: version.interval,
+        }),
+        opacity: version.opacity,
+      })),
+    ).text;
+  };
+  // From four months to two and a half years, in twentieths of a month.
+  const labels = [];
+  for (let i = 80; i <= 600; i++) labels.push(label(Q.from(BigInt(Math.round((i * month) / 20)))));
+  assert.equal(labels[0], '1997-01 CE');
+  assert.deepEqual(
+    labels.filter((text, i) => i && text !== labels[i - 1]),
+    ['1997 CE'],
+    'the label changes once, from 1997-01 CE to 1997 CE',
+  );
+  // A custom format's labelResolution is the exact interval too.
+  const custom = compileCustom(`function print(time: Rational, api: TimeAPI): string {
+  return api.exact(api.labelResolution());
+}
+function parse(text: string, api: TimeAPI): Rational { return api.rational(text); }`);
+  const axis = { ...context(86400n, 'axis'), spacingPixels: 33.3 };
+  assert.equal(custom.print(at, { ...axis, labelInterval: Q.from(31557600n) }), '31557600/1');
+  assert.throws(() => format.print(at, { ...axis, labelInterval: Q.zero }), /label interval/);
 });

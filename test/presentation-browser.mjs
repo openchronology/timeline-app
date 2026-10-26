@@ -233,11 +233,15 @@ export async function checkPresentation(page, restoreDocument) {
   await closeMomentDetails(page);
   await input('apply-bounds').click();
   await page.evaluate(() => new Promise(requestAnimationFrame));
+  // Ten-second labels read minutes and seconds. Where the view is narrow enough that minute
+  // labels are fading in, the minute's own tick reads as a minute label (exactly one minute
+  // apart, #313) rather than by float luck either way.
+  const minuteLabels = await page.locator('.tick-label').allTextContents();
   assert(
-    (await page.locator('.tick-label').allTextContents()).every((label) =>
-      /^\d{2}m \d{2}s$/.test(label),
-    ),
+    minuteLabels.every((label) => /^\d{2}m \d{2}s$/.test(label) || label === '00m'),
+    minuteLabels.join(' | '),
   );
+  assert(minuteLabels.filter((label) => /s$/.test(label)).length >= 5);
   assert.deepEqual(await page.locator('.event-label .event-time-current').allTextContents(), [
     '00m 03.5s',
     '00m 13.7s',
