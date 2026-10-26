@@ -3,9 +3,10 @@
 // reversing out of a narrow aisle on a warehouse's night shift strikes a stock picker crossing
 // the aisle end. Laid out as an Events and Causal Factors chart with the Causal factor analysis
 // plugins: primary events as `process` shapes, the incident a red `diamond`, lasting conditions
-// as durations and point-in-time ones as `terminator`, the evidence and conditions on the
+// as durations and point-in-time ones as `ellipse`, the evidence and conditions on the
 // collision in a moment stack, causal factors in the Bad color with a `causal factor` tag, and
-// unconfirmed items tagged `presumptive` in a muted color. Relationships link each condition and
+// unconfirmed items tagged `presumptive` and drawn with Presumptive outline's dashed outline.
+// Relationships link each condition and
 // event to what it led to. The warehouse, its people and every record are invented; a seeded
 // generator makes the same routine records every time.
 import { m, d, rel, plugins } from './lib.mjs';
@@ -30,8 +31,7 @@ function random(seed) {
 // Moment colors' swatches.
 const BAD = '#bc6663',
   WARNING = '#d6ad4c',
-  INFORMATION = '#7aadc4',
-  DISABLED = '#9aa49f';
+  INFORMATION = '#7aadc4';
 
 export function investigation(core) {
   const primary = (id, time, title, notes, o = {}) =>
@@ -53,7 +53,7 @@ export function investigation(core) {
   const condition = (id, time, title, notes, o = {}) =>
     m(id, time, title, {
       tags: ['condition', ...(o.tags ?? [])],
-      shape: 'terminator',
+      shape: 'ellipse',
       color: o.color ?? WARNING,
       notes,
     });
@@ -107,7 +107,7 @@ export function investigation(core) {
     m('picker-statement', at(16, 2, 30), 'Picker crosses (statement)', {
       tags: ['primary event', 'presumptive'],
       shape: 'process',
-      color: DISABLED,
+      presumptive: true,
       datePrecision: 'About 02:30, from memory',
       notes:
         "**Unconfirmed.** The picker's statement puts this at about 02:30. Camera 7 shows 02:33:20; the camera's clock was checked against the network time afterwards, so the camera's time is used.",
@@ -121,7 +121,7 @@ export function investigation(core) {
     m('horn', at(16, 2, 33, 56), 'Horn sounded? (driver)', {
       tags: ['primary event', 'presumptive'],
       shape: 'process',
-      color: DISABLED,
+      presumptive: true,
       notes:
         "**Unconfirmed.** The driver says he sounded the horn before reversing. The picker heard no horn, and camera 7 has no sound. Kept as presumptive until it's confirmed or ruled out.",
     }),
@@ -145,7 +145,7 @@ export function investigation(core) {
           metadata: {
             title: 'Condition: aisle end dark',
             description: 'The light at the end of aisle 14 had been out since Tuesday.',
-            shape: 'terminator',
+            shape: 'ellipse',
             color: BAD,
           },
         },
@@ -154,7 +154,7 @@ export function investigation(core) {
           metadata: {
             title: 'Condition: no spotter',
             description: 'The procedure requires one for reversing out of narrow aisles.',
-            shape: 'terminator',
+            shape: 'ellipse',
             color: BAD,
           },
         },
@@ -164,8 +164,9 @@ export function investigation(core) {
             title: 'Presumptive: fatigue',
             description:
               'The seventh hour of a 10-hour shift, with no break after 01:00. Fatigue not confirmed.',
-            shape: 'terminator',
-            color: DISABLED,
+            shape: 'ellipse',
+            color: WARNING,
+            presumptive: true,
           },
         },
         {
@@ -263,25 +264,38 @@ export function investigation(core) {
     }),
     d('fatigue', at(16, 1, 0), at(16, 2, 34, 9, [9, 25]), 'Driver fatigue (unconfirmed)', {
       tags: ['condition', 'presumptive'],
-      color: DISABLED,
+      color: WARNING,
+      presumptive: true,
       notes:
         '**Presumptive.** The driver was in the sixth and seventh hours of a 10-hour shift, with no rest break taken after 01:00. Fatigue is possible but not confirmed.',
     }),
   ];
-  const relationships = [
-    rel('risk-review', 'd:long-shifts'),
-    rel('d:long-shifts', 'd:fatigue'),
-    rel('risk-review', 'sick-call'),
-    rel('sick-call', 'd:no-spotter'),
-    rel('fault-report', 'd:light-out'),
-    rel('d:fatigue', 'reverses'),
-    rel('run-start', 'enters'),
-    rel('enters', 'reverses'),
-    rel('reverses', 'collision'),
-    rel('crosses', 'collision'),
-    rel('d:light-out', 'collision'),
-    rel('d:no-spotter', 'collision'),
+  // Each link, cause first. Relationships are undirected; the arrow from cause to effect is
+  // Relationship arrows' drawing convention, kept on the cause's own metadata.
+  const links = [
+    ['risk-review', 'd:long-shifts'],
+    ['d:long-shifts', 'd:fatigue'],
+    ['risk-review', 'sick-call'],
+    ['sick-call', 'd:no-spotter'],
+    ['fault-report', 'd:light-out'],
+    ['d:fatigue', 'reverses'],
+    ['run-start', 'enters'],
+    ['enters', 'reverses'],
+    ['reverses', 'collision'],
+    ['crosses', 'collision'],
+    ['d:light-out', 'collision'],
+    ['d:no-spotter', 'collision'],
   ];
+  const ref = (id) => (id.startsWith('d:') ? { duration: id.slice(2) } : { moment: id });
+  const entity = (id) =>
+    id.startsWith('d:')
+      ? durations.find((x) => x.id === id.slice(2))
+      : events.find((x) => x.id === id);
+  for (const [cause, effect] of links) {
+    const { metadata } = entity(cause);
+    (metadata.arrows ??= []).push({ target: ref(effect), arrow: 'to' });
+  }
+  const relationships = links.map(([a, b]) => rel(a, b));
   return {
     format: 'openchronology',
     version: 1,
@@ -302,6 +316,8 @@ export function investigation(core) {
       core.MOMENT_STACKS,
       core.MOMENT_SHAPES,
       core.MOMENT_COLORS,
+      core.PRESUMPTIVE_OUTLINE,
+      core.RELATIONSHIP_ARROWS,
       core.RICH_TEXT_NOTES,
       core.DATING_CONTEXT,
     ),

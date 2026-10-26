@@ -43,6 +43,8 @@ export function m(id, time, title, o = {}) {
     'historicalDate',
     'calendar',
     'stack',
+    'presumptive',
+    'arrows',
   ])
     if (o[key] !== undefined) metadata[key] = o[key];
   return { id, time, metadata };
@@ -55,7 +57,8 @@ export function d(id, start, end, title, o = {}) {
     ...(o.tags ? { tags: o.tags } : {}),
   };
   if (o.sources) metadata.sources = o.sources;
-  if (o.color) metadata.color = o.color;
+  for (const key of ['color', 'presumptive', 'arrows'])
+    if (o[key] !== undefined) metadata[key] = o[key];
   return { id, start, end, metadata };
 }
 /** A relationship between two entities: ids beginning "d:" are durations. */

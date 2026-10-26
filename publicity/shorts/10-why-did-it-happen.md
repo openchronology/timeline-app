@@ -10,7 +10,7 @@
 - About 116 words, an investigator explaining the method to a colleague: plain and steady. Someone was hurt in the case, so no jokes.
 - **The case is the sample `publicity/video/samples/investigation.ochx`**, made up: a forklift reversing out of aisle 14 on a night shift strikes a picker crossing the aisle end. Scenes 2–4 draw it in the motif, with the shapes the app uses (`process` rectangles for events, a red `diamond` for the collision, durations for conditions); Scene 5 is the real app at phone size, in `phoneShot`: the last three minutes with their arcs, bands and the collision's stack. A small note on screen in Scene 2 says the case is made up.
 - The app holds the chart; the investigator decides what the causal factors are. The narration says "you mark", never that the app finds them.
-- Relationships are undirected arcs in the app; the drawn arcs in Scene 4 have no arrowheads either.
+- The drawn arcs in Scene 4 have arrowheads at the effect, as Relationship arrows draws them in the app; the root cause is an ellipse, as Moment shapes 3 draws conditions. The phone in Scene 5 shows the same arrows, and the presumptive fatigue band with Presumptive outline's dashed outline.
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### Scene 4 · 0:23 – 0:32 · Causes
 
-**FRAME:** Arcs draw from each band and event to the diamond. Two bands and their arcs turn bright red, with chips "causal factor"; the rest dim. A "root cause" chip appears on a small stadium at the left edge, "no risk review of the longer shifts".
+**FRAME:** Arcs, each with an arrowhead at the diamond, draw from each band and event to it. Two bands and their arcs turn bright red, with chips "causal factor"; the rest dim. A "root cause" chip appears beside a small ellipse at the left edge, "no risk review of the longer shifts".
 
 **MOTION:** The arcs draw on "link"; the chain lights up on "mark"; the chips pop; the root cause chip last, on "root".
 
@@ -70,7 +70,7 @@
 
 ### Scene 5 · 0:32 – 0:37 · On a phone
 
-**FRAME:** The phone, the real app on the case: the last three minutes, arcs linking the events to the collision, the conditions as bands beneath, and the collision's moment stack below it. A chip: "the real app".
+**FRAME:** The phone, the real app on the case: the last three minutes, arcs with arrowheads linking the events to the collision, the presumptive fatigue band dashed, the conditions as bands beneath, and the collision's moment stack below it. A chip: "the real app".
 
 **MOTION:** The phone rises in; the chip ticks in on "chain".
 
@@ -110,14 +110,14 @@
 
 ## Appendix B · Claims and where they come from
 
-| Scene | Claim                                                                                                  | Source                                                                            |
-| ----- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
-| 1–4   | The case: FL-3, aisle 14, the collision at 02:34:09; the events' times; the conditions; the root cause | `investigation.mjs` (made up); [Video 13](../13-investigations-causal-factors.md) |
-| 2     | Events as Moment shapes `process`, the collision a `diamond` in the Bad color                          | [Plugins: Moment shapes](../../docs/plugins.md)                                   |
-| 3     | Conditions as durations beneath the axis                                                               | [Durations](../../docs/durations.md)                                              |
-| 4     | Links as relationships, drawn as arcs (undirected, unlabeled); causal factors marked by color and tag  | [Relationships](../../docs/relationships.md); [Tags](../../docs/tags.md)          |
-| 5     | The real app on a phone: relationships as arcs, durations beneath, the collision's moment stack        | [Relationships](../../docs/relationships.md); [Plugins](../../docs/plugins.md)    |
-| 6     | Events and causal factors charting is an established method                                            | [Video 13](../13-investigations-causal-factors.md), Appendix D                    |
+| Scene | Claim                                                                                                        | Source                                                                            |
+| ----- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| 1–4   | The case: FL-3, aisle 14, the collision at 02:34:09; the events' times; the conditions; the root cause       | `investigation.mjs` (made up); [Video 13](../13-investigations-causal-factors.md) |
+| 2     | Events as Moment shapes `process`, the collision a `diamond` in the Bad color                                | [Plugins: Moment shapes](../../docs/plugins.md)                                   |
+| 3     | Conditions as durations beneath the axis                                                                     | [Durations](../../docs/durations.md)                                              |
+| 4     | Links as relationships, drawn as arcs with arrowheads (Relationship arrows); causal factors by color and tag | [Relationships](../../docs/relationships.md); [Plugins](../../docs/plugins.md)    |
+| 5     | The real app on a phone: relationships as arcs, durations beneath, the collision's moment stack              | [Relationships](../../docs/relationships.md); [Plugins](../../docs/plugins.md)    |
+| 6     | Events and causal factors charting is an established method                                                  | [Video 13](../13-investigations-causal-factors.md), Appendix D                    |
 
 ## Appendix C · Posting
 
