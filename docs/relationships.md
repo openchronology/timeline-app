@@ -12,7 +12,7 @@ To link an entity, open **Add a relationship** and search titles and notes. Choo
 
 ## Arcs
 
-Each relationship is drawn as an arc above the axis between its two entities: at a moment's time, or at a duration's start. An arc whose other end is outside the view runs off the edge of the timeline. Arcs shorter than the grouping distance are not drawn, because both ends are inside one summary at that zoom; zooming in reveals them. A window shows at most 256 arcs, with a notice when more cross it. Hover over an arc to see what it connects.
+Each relationship is drawn as an arc above the axis between its two entities: at a moment's time, or at a duration's start. An arc whose other end is outside the view runs off the edge of the timeline. Only the part over the timeline is drawn, as the same curve, so an arc whose ends are far off screen stays at the same height as the view pans. Arcs shorter than the grouping distance are not drawn, because both ends are inside one summary at that zoom; zooming in reveals them. A window shows at most 256 arcs, with a notice when more cross it. Hover over an arc to see what it connects.
 
 Arcs never require the whole timeline. Each relationship is indexed as a fixed interval between its endpoints' times, in the same augmented interval tree used for [duration bands](durations.md#storage-and-queries). A viewport query visits only subtrees that touch the window and skips subtrees made entirely of arcs shorter than the threshold.
 
