@@ -181,7 +181,7 @@ Each interaction is measured `UI_SAMPLES` times (default 5) and judged by its me
 `node bench/ui.mjs --gate` exits with an error on any budget missed within a comfortable size, and on any advice gap, apart from the known misses. In CI, the gate allows 1.5× the budgets (`UI_TOLERANCE`) for slower shared runners:
 
 - the browser and the platform at 1,000 and 10,000 moments;
-- the browser throttled 4× at 1,000 moments, its comfortable size there;
+- the browser throttled 4× at 1,000 moments, its comfortable size there. Keyboard zoom alone is allowed 2× (300 ms) there: since late October 2026 CI's runners measure it at 246–262 ms, up from 166–197 ms, with no code change found to explain it, until it is profiled ([#319](https://github.com/openchronology/timeline-app/issues/319)). A scenario's `gateTolerance` sets such an exception; its product budget is unchanged;
 - the browser past its comfortable sizes, at 20,000 moments and at 2,000 throttled 4×: wherever an interaction misses its budget, the advice must be showing;
 - the desktop app at 1,000 moments (in memory) and 10,000 moments (SQLite), under Xvfb, allowing 3×: software rendering on shared runners is slow and varies widely (opening search took 96 ms on a laptop and 140–173 ms in CI). This gate guards against breakage, such as an interaction that fails or never finishes, and gross regressions. Navigation and new durations are reported there, not gated: in software they vary severalfold between runners, and the WebDriver path now and then loses a wheel or key input.
 
