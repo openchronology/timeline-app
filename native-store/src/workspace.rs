@@ -1434,6 +1434,39 @@ mod relationship_tests {
             .query(&serde_json::from_value(value).unwrap())
             .unwrap()
     }
+    /// Relationship arrows (#326) reach the view with the arcs: a moment's, even when its
+    /// metadata is too large to send whole, and a duration band's (small arrays), with entries
+    /// kept as stored, readable or not.
+    #[test]
+    fn overviews_carry_relationship_arrows() {
+        let arrows = json!([{"target":{"moment":"a"},"arrow":"to"},{"target":7,"arrow":"up"}]);
+        let doc: Document = serde_json::from_value(json!({
+            "format":"openchronology","version":1,"title":"Arrows","description":"",
+            "events":[
+                {"id":"a","time":"0/1","metadata":{"title":"A","arrows":[{"target":{"duration":"x"},"arrow":"both"}],"notes":"x".repeat(4096)}},
+                {"id":"b","time":"100/1","metadata":{"title":"B"}}
+            ],
+            "durations":[{"id":"x","start":"50/1","end":"60/1","metadata":{"title":"X","arrows":arrows,"tags":["t"],"big":["y".repeat(2000)]}}],
+            "relationships":[{"a":{"duration":"x"},"b":{"moment":"a"}}]
+        }))
+        .unwrap();
+        let snapshot = Snapshot::from_document(&doc).unwrap();
+        let frame = query(
+            &snapshot,
+            json!({"kind":"overview","lower":"-10/1","upper":"400/1","threshold":"1/1","metadata_keys":["arrows"]}),
+        );
+        let groups = frame["groups"].as_array().unwrap();
+        let a = groups.iter().find(|g| g["id"] == "a").unwrap();
+        assert_eq!(
+            a["metadata"],
+            json!({"arrows":[{"target":{"duration":"x"},"arrow":"both"}]})
+        );
+        assert_eq!(
+            frame["durations"][0]["metadata"],
+            json!({"title":"X","arrows":arrows})
+        );
+        assert_eq!(frame["edges"].as_array().unwrap().len(), 1);
+    }
     #[test]
     fn relationships_round_trip_draw_arcs_page_and_follow_edits() {
         let snapshot = Snapshot::from_document(&doc()).unwrap();

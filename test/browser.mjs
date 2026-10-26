@@ -17,6 +17,7 @@ import { checkHeadings } from './headings-browser.mjs';
 import { checkSuites } from './suites-browser.mjs';
 import { checkTags } from './tags-browser.mjs';
 import { checkRelationships } from './relationships-browser.mjs';
+import { checkRelationshipArrows } from './relationship-arrows-browser.mjs';
 import { checkDenseDurations } from './dense-durations-browser.mjs';
 import { checkPresumptive } from './presumptive-browser.mjs';
 import assert from 'node:assert/strict';
@@ -333,6 +334,7 @@ try {
   await checkSuites(page, document);
   await checkTags(page, document);
   await checkRelationships(page, document);
+  await checkRelationshipArrows(page, document);
   await checkDenseDurations(page, document);
   await checkPresumptive(page, document);
   await checkAccounts(browser);

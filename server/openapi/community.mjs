@@ -608,6 +608,7 @@ export const schemas = {
           'links',
           'heading',
           'font',
+          'relationship-arrows',
         ],
       },
       metadataKey: metadataKey,

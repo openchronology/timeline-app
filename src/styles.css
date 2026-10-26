@@ -1768,6 +1768,34 @@ dialog h3 {
   gap: 8px;
   margin-bottom: 0;
 }
+/* Relationship arrows (#326): one row per entry; a gone relationship is outlined in red. */
+.relationship-arrows {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.relationship-arrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 4px 8px;
+  border: 1px solid #d8dfd2;
+  border-radius: 8px;
+  padding: 8px;
+}
+.relationship-arrow > p {
+  grid-column: 1 / -1;
+}
+.relationship-arrow.dangling,
+.relationship-arrow.unreadable {
+  border-color: #bc6663;
+  box-shadow: 0 0 0 1px #bc6663;
+}
+.relationship-arrow.dangling > p {
+  color: #8f3f3c;
+}
 .moment-dialog .plugin-field .field-hint {
   margin: 8px 0 0;
   line-height: 1.5;
@@ -2983,6 +3011,22 @@ dialog button {
   stroke: var(--green);
   stroke-width: 3;
   opacity: 1;
+}
+/* Arrowheads (#326) follow their arc, which comes just before them, and its hover. */
+.edge-arrows {
+  fill: var(--timeline-measure, #8aa79b);
+  opacity: 0.65;
+  pointer-events: none;
+}
+.edge-arc:hover + .edge-arrows {
+  fill: var(--green);
+  opacity: 1;
+}
+.timeline-stage.over-backgrounds .edge-arrows {
+  stroke: var(--timeline-halo, #fff);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  paint-order: stroke;
 }
 .edge-limit {
   font-size: 11px;

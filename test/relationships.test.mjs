@@ -10,6 +10,7 @@ import {
   validateDocument,
   filterDocument,
   arcPath,
+  arrowheadPath,
 } from '../dist/core.mjs';
 import { RemoteWorkspace } from '../dist/remote-cache.mjs';
 import { applyPatch } from '../server/store.mjs';
@@ -171,4 +172,48 @@ test('an arc is drawn only over the stage, as the same parabola, wherever its en
   assert.equal(arcPath(300, 100, 192, 40, -64, 464), whole);
   assert.equal(arcPath(1000, 2000, 192, 40, -64, 464), '');
   assert.equal(arcPath(-2000, -1000, 192, 40, -64, 464), '');
+});
+
+test('an arrowhead sits on its arc near the end, pointing into it along the tangent (#326)', () => {
+  const parabola = (xa, xb, lift, x) => {
+    const t = (x - Math.min(xa, xb)) / Math.abs(xb - xa);
+    return 192 - 4 * lift * t * (1 - t);
+  };
+  for (const [x, other, lift] of [
+    [100, 300, 78],
+    [300, 100, 78],
+    [50, 90, 30],
+    [0, 4000, 150],
+  ]) {
+    const d = arrowheadPath(x, other, 192, lift);
+    assert.match(d, /^M [-\d. ]+ L [-\d. ]+ L [-\d. ]+ Z$/);
+    const [tx, ty, ax, ay, bx, by] = d.match(/-?[\d.]+/g).map(Number);
+    // The tip is on the arc, about 12 pixels from the end, toward the other end.
+    assert(Math.abs(ty - parabola(x, other, lift, tx)) < 0.05, d);
+    assert(Math.abs(Math.hypot(tx - x, ty - 192) - 12) < 1.5, d);
+    assert(Math.sign(tx - x) === Math.sign(other - x), d);
+    // It points into the end: from the middle of its base, along the tangent there.
+    const mx = (ax + bx) / 2,
+      my = (ay + by) / 2;
+    assert(Math.abs(Math.hypot(tx - mx, ty - my) - 9) < 0.05, d);
+    assert(Math.abs(Math.hypot(ax - bx, ay - by) - 9) < 0.05, d);
+    const slope =
+      (parabola(x, other, lift, tx + 1e-4) - parabola(x, other, lift, tx - 1e-4)) / 2e-4;
+    assert(Math.abs((ty - my) / (tx - mx) - slope) < 0.02, d);
+    assert(Math.sign(x - tx) === Math.sign(tx - mx) && ty >= my, d);
+  }
+  // Mirrored at the other end of the same arc.
+  const [l, r] = [arrowheadPath(100, 300, 192, 78), arrowheadPath(300, 100, 192, 78)].map((d) =>
+    d.match(/-?[\d.]+/g).map(Number),
+  );
+  // Its tip, and its corners (in the other order, as the triangle is mirrored).
+  for (const [i, j] of [
+    [0, 0],
+    [2, 4],
+    [4, 2],
+  ]) {
+    assert(Math.abs(l[i] - (400 - r[j])) < 0.02);
+    assert(Math.abs(l[i + 1] - r[j + 1]) < 0.02);
+  }
+  assert.equal(arrowheadPath(100, 100, 192, 18), '');
 });

@@ -17,7 +17,8 @@ export interface PluginField {
     | 'links'
     | 'heading'
     | 'font'
-    | 'toggle';
+    | 'toggle'
+    | 'relationship-arrows';
   metadataKey: string;
   label: string;
 }
@@ -184,6 +185,108 @@ export function textSizeValue(value: unknown): string | null {
   if (!match) return null;
   const percent = Number(match[1]);
   return percent >= TEXT_SIZE.min && percent <= TEXT_SIZE.max ? String(percent) : null;
+}
+/**
+ * Which ends of a relationship an entity's arrow puts arrowheads on (#326), from its own point
+ * of view: "to" the other end, "from" it (at its own end), "both", or "none".
+ */
+export const ARROW_DIRECTIONS = ['none', 'to', 'from', 'both'] as const;
+export type ArrowDirection = (typeof ARROW_DIRECTIONS)[number];
+/** The other end of one of an entity's relationships, as the relationships array names it. */
+export type ArrowTarget = { moment: string } | { duration: string };
+export interface RelationshipArrow {
+  target: ArrowTarget;
+  arrow: ArrowDirection;
+}
+/**
+ * A relationship-arrows field's entries (#326) as drawing and the editor read them: whatever
+ * metadata holds, reading never throws. An entry is read when it is exactly an object of a
+ * target (`{"moment": "<id>"}` or `{"duration": "<id>"}`) and an arrow ("none", "to", "from"
+ * or "both"); any other entry, or a value that is not an array, is unreadable. Each read entry
+ * keeps its index in the stored array, so the editor changes and removes entries in place and
+ * keeps the unreadable ones as they are.
+ */
+export function readRelationshipArrows(value: unknown): {
+  entries: (RelationshipArrow & { index: number })[];
+  unreadable: number;
+} {
+  if (value === undefined) return { entries: [], unreadable: 0 };
+  if (!Array.isArray(value)) return { entries: [], unreadable: 1 };
+  const entries: (RelationshipArrow & { index: number })[] = [];
+  value.forEach((raw, index) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
+    const entry = raw as Record<string, unknown>;
+    if (
+      Object.keys(entry).length !== 2 ||
+      !(ARROW_DIRECTIONS as readonly unknown[]).includes(entry.arrow)
+    )
+      return;
+    const target = entry.target as Record<string, unknown> | null;
+    if (
+      !target ||
+      typeof target !== 'object' ||
+      Array.isArray(target) ||
+      Object.keys(target).length !== 1
+    )
+      return;
+    const id = target.moment ?? target.duration;
+    if (typeof id !== 'string' || !/^[A-Za-z0-9_.:-]{1,128}$/.test(id)) return;
+    entries.push({
+      target: 'moment' in target ? { moment: id } : { duration: id },
+      arrow: entry.arrow as ArrowDirection,
+      index,
+    });
+  });
+  return { entries, unreadable: value.length - entries.length };
+}
+/** "m:<id>" or "d:<id>", as relationships key their endpoints. */
+function targetKey(target: ArrowTarget) {
+  return 'moment' in target ? 'm:' + target.moment : 'd:' + target.duration;
+}
+/**
+ * What an entity's enabled relationship-arrows fields say of its link to `other` (#326): the
+ * ends with an arrowhead, `self` its own end and `other` the other one. Unreadable entries and
+ * entries for other entities say nothing.
+ */
+export function arrowsToward(
+  plugins: readonly InstalledPlugin[],
+  metadata: Record<string, unknown>,
+  other: string,
+): { self: boolean; other: boolean } {
+  const ends = { self: false, other: false };
+  for (const { manifest, enabled } of plugins)
+    if (enabled)
+      for (const field of manifest.fields)
+        if (field.kind === 'relationship-arrows')
+          for (const { target, arrow } of readRelationshipArrows(metadata[field.metadataKey])
+            .entries)
+            if (targetKey(target) === other) {
+              if (arrow === 'from' || arrow === 'both') ends.self = true;
+              if (arrow === 'to' || arrow === 'both') ends.other = true;
+            }
+  return ends;
+}
+/**
+ * The arrowheads on the arc between entities `a` and `b` (reference keys, "m:<id>" or
+ * "d:<id>") (#326): the union of what each end says of the other, each end read with its own
+ * plugins (moments' or durations'). Metadata that isn't at hand (null) says nothing.
+ */
+export function arcArrowheads(
+  a: { key: string; plugins: readonly InstalledPlugin[]; metadata: Record<string, unknown> | null },
+  b: { key: string; plugins: readonly InstalledPlugin[]; metadata: Record<string, unknown> | null },
+): { a: boolean; b: boolean } {
+  const fromA = a.metadata ? arrowsToward(a.plugins, a.metadata, b.key) : null,
+    fromB = b.metadata ? arrowsToward(b.plugins, b.metadata, a.key) : null;
+  return {
+    a: !!fromA?.self || !!fromB?.other,
+    b: !!fromA?.other || !!fromB?.self,
+  };
+}
+/** Whether any enabled plugin draws relationship arrows: without one, arcs skip the lookup. */
+export function pluginDrawsArrows(plugins: readonly InstalledPlugin[] = []): boolean {
+  return plugins.some(
+    (p) => p.enabled && p.manifest.fields.some((f) => f.kind === 'relationship-arrows'),
+  );
 }
 export function fontValue(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -592,6 +695,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
         'heading',
         'font',
         'toggle',
+        'relationship-arrows',
       ].includes(f.kind as string)
     )
       throw new Error('Unsupported plugin component.');
@@ -843,7 +947,10 @@ export function pluginTargets(manifest: PluginManifest): PluginTarget[] {
     manifest.targets ??
     (manifest.background
       ? ['durations']
-      : manifest.marker?.kind === 'color' || manifest.marker?.kind === 'outline' || manifest.hover
+      : manifest.marker?.kind === 'color' ||
+          manifest.marker?.kind === 'outline' ||
+          manifest.hover ||
+          manifest.fields.some((f) => f.kind === 'relationship-arrows')
         ? ['moments', 'durations']
         : ['moments'])
   );
@@ -855,6 +962,7 @@ const DURATION_FIELDS = new Set<PluginField['kind']>([
   'links',
   'image-url',
   'toggle',
+  'relationship-arrows',
 ]);
 /** The subset of each plugin that applies to duration bands and their editor. */
 export function durationPlugins(plugins: readonly InstalledPlugin[] = []): InstalledPlugin[] {
@@ -973,7 +1081,9 @@ export function pluginMetadata(
         else if (metadata[name] === true) result[name] = true; // A toggle that is on (#325).
       for (const field of manifest.fields)
         if (
-          (field.kind === 'stack' || field.kind === 'links') &&
+          (field.kind === 'stack' ||
+            field.kind === 'links' ||
+            field.kind === 'relationship-arrows') &&
           Array.isArray(metadata[field.metadataKey])
         )
           result[field.metadataKey] = metadata[field.metadataKey];
@@ -1237,6 +1347,16 @@ export const MOMENT_HEADINGS: PluginManifest = validatePluginManifest({
   marker: { kind: 'heading', metadataKey: 'headingLevel' },
   targets: ['moments'],
 });
+export const RELATIONSHIP_ARROWS: PluginManifest = validatePluginManifest({
+  apiVersion: 1,
+  id: 'relationship-arrows',
+  version: 1,
+  name: 'Relationship arrows',
+  description:
+    "Draw arrowheads on relationship arcs, such as from causes to their effect. In an event's details, choose one of its relationships and an arrow toward the other end, toward this one, or both ways; an arc shows what either end chose. Arrows are a drawing convention kept on the events: relationships stay undirected, and separating by relationships does not follow them.",
+  fields: [{ kind: 'relationship-arrows', metadataKey: 'arrows', label: 'Relationship arrows' }],
+  targets: ['moments', 'durations'],
+});
 export const DURATION_BACKGROUNDS: PluginManifest = validatePluginManifest({
   apiVersion: 1,
   id: 'duration-backgrounds',
@@ -1397,6 +1517,7 @@ export const BUILTIN_PLUGINS: readonly PluginManifest[] = [
   MOMENT_HEADINGS,
   LOG_SEVERITY_COLORS,
   PRESUMPTIVE_OUTLINE,
+  RELATIONSHIP_ARROWS,
 ];
 
 /** A page of a plugin library: the newest version of each plugin matching a search. */

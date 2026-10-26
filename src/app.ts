@@ -25,6 +25,7 @@ import {
   renderPluginOutline,
   renderPluginHeading,
 } from './plugin-ui.js';
+import type { RelationshipContext } from './plugin-ui.js';
 import { attachRichText } from './rich-text.js';
 import { pluginRichText } from './plugins.js';
 import { dismissOnBackdrop } from './dialogs.js';
@@ -86,6 +87,9 @@ import {
   validateDuration,
   durationPlugins,
   pluginBackground,
+  arcArrowheads,
+  arrowsToward,
+  pluginDrawsArrows,
   pluginBackdrop,
   pluginTheme,
   settingValue,
@@ -118,6 +122,7 @@ import {
   collapses,
   DURATION_COUNT_CAP,
   arcPath,
+  arrowheadPath,
 } from './core.js';
 import type {
   EntityRef,
@@ -3310,6 +3315,8 @@ function refreshPluginFields() {
         el('delete-cancel').focus();
       },
       () => input('event-time').value,
+      false,
+      selected ? relationshipContext({ moment: selected.id }) : undefined,
     );
   } catch {
     /* Preserve incomplete raw JSON while editing. */
@@ -8262,6 +8269,9 @@ function renderDurationPluginFields() {
       window.open(url, '_blank', 'noopener,noreferrer');
     },
     (title, remove) => remove(),
+    undefined,
+    false,
+    current.isNew ? undefined : relationshipContext({ duration: current.duration.id }),
   );
   // Bands carry short metadata only: a longer background address would show nothing.
   for (const { manifest, enabled } of durationPlugins(installedPlugins())) {
@@ -9111,6 +9121,42 @@ async function relatedPage(ref: EntityRef, after: { kind: string; id: string } |
     direct: page.direct ?? page.related.length,
   };
 }
+/**
+ * What a relationship-arrows field (#326) knows of an entity's links: its direct relations,
+ * read page by page as the Related to section reads them (up to 1,000), names, and what the
+ * other end's own arrows say when its metadata is in memory.
+ */
+function relationshipContext(ref: EntityRef): RelationshipContext {
+  const own = refKey(ref);
+  return {
+    async related() {
+      const entities = new Map<string, string>();
+      let after: { kind: string; id: string } | null = null;
+      for (let page = 0; page < 40; page++) {
+        const found = await relatedPage(ref, after);
+        for (const e of found.related)
+          entities.set(
+            entryKey(e),
+            e.title || (e.kind === 'moment' ? 'Untitled moment' : 'Untitled duration'),
+          );
+        if (!found.next) return { entities, complete: true };
+        after = found.next;
+      }
+      return { entities, complete: false };
+    },
+    name: (key) => describe(key)?.title || null,
+    theirs(key) {
+      const other = refFromKey(key);
+      const metadata =
+        'moment' in other
+          ? model?.byId.get(other.moment)?.metadata
+          : model?.durations.get(other.duration)?.metadata;
+      if (!metadata) return null;
+      const plugins = 'moment' in other ? activePlugins() : durationPlugins(installedPlugins());
+      return arrowsToward(plugins, metadata, own);
+    },
+  };
+}
 function entryKey(e: { kind: string; id: string }) {
   return (e.kind === 'moment' ? 'm:' : 'd:') + e.id;
 }
@@ -9288,14 +9334,62 @@ function describeLabel(ref: EntityRef) {
 /** Arc elements persist by relationship: a moving view only reshapes them (#68). */
 const edgeArcs = new Map<
   string,
-  { path: SVGPathElement; halo: SVGPathElement; title: SVGTitleElement; named: string }
+  {
+    path: SVGPathElement;
+    halo: SVGPathElement;
+    title: SVGTitleElement;
+    named: string;
+    arrows?: SVGPathElement;
+  }
 >();
+/**
+ * The ends of an arc that draw an arrowhead (#326): the union of what its two entities'
+ * relationship-arrows fields say, read from the metadata the view already has (the timeline
+ * in memory, or the frame's moments and bands), or null when no enabled plugin draws arrows.
+ * An entity whose metadata isn't at hand, such as one off screen or inside a summary of a
+ * server timeline, says nothing.
+ */
+function arrowheadLookup(): ((a: EntityRef, b: EntityRef) => { a: boolean; b: boolean }) | null {
+  const installed = installedPlugins();
+  if (comparison || !pluginDrawsArrows(installed)) return null;
+  const moments = activePlugins(),
+    durations = durationPlugins(installed);
+  let shown: Map<string, Record<string, unknown>> | null = null;
+  const fromFrame = (key: string) => {
+    if (!shown) {
+      shown = new Map();
+      for (const group of frame.groups) {
+        if (group.id && group.metadata) shown.set('m:' + group.id, group.metadata);
+        if (group.duration) shown.set('d:' + group.duration.id, group.duration.metadata);
+      }
+      for (const band of frame.durations ?? []) shown.set('d:' + band.id, band.metadata);
+    }
+    return shown.get(key);
+  };
+  const end = (ref: EntityRef) => {
+    const key = refKey(ref);
+    return 'moment' in ref
+      ? {
+          key,
+          plugins: moments,
+          metadata: model?.byId.get(ref.moment)?.metadata ?? fromFrame(key) ?? null,
+        }
+      : {
+          key,
+          plugins: durations,
+          metadata: model?.durations.get(ref.duration)?.metadata ?? fromFrame(key) ?? null,
+        };
+  };
+  return (a, b) => arcArrowheads(end(a), end(b));
+}
 function renderEdgeArcs() {
   const svg = el('edge-arcs');
   svg.querySelector('.edge-limit')?.remove();
   const axis = 192,
     generation = contentGeneration(),
-    shown = new Set<string>();
+    shown = new Set<string>(),
+    arrowhead = arrowheadLookup(),
+    right = stageWidth() / uiScale;
   const name = (ref: EntityRef) =>
     describe(refKey(ref))?.title || ('moment' in ref ? 'Moment' : 'Duration');
   for (const edge of comparison ? [] : (frame.edges ?? [])) {
@@ -9321,19 +9415,50 @@ function renderEdgeArcs() {
     // Only the part over the stage, so an endpoint far off screen never puts a coordinate
     // millions of pixels away (which browsers draw coarsely, flickering as the view pans).
     const margin = 64,
-      d = arcPath(xa, xb, axis, lift, -margin, stageWidth() / uiScale + margin);
+      d = arcPath(xa, xb, axis, lift, -margin, right + margin);
     arc.path.setAttribute('d', d);
     arc.halo.setAttribute('d', d);
-    // Names change only with the timeline's content, not as the view moves.
-    if (arc.named !== generation) {
-      arc.title.textContent = `${name(edge.a)} ↔ ${name(edge.b)}`;
-      arc.named = generation;
+    // Arrowheads (#326) at the ends either entity's arrows point to, drawn in the arcs' own
+    // coordinates so they scale with the content; an end beyond the view draws none.
+    const ends = arrowhead?.(edge.a, edge.b),
+      toA = !!ends?.a,
+      toB = !!ends?.b;
+    const heads = [
+      toA && xa >= 0 && xa <= right ? arrowheadPath(xa, xb, axis, lift) : '',
+      toB && xb >= 0 && xb <= right ? arrowheadPath(xb, xa, axis, lift) : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    if (heads && d) {
+      if (!arc.arrows) {
+        // Right after its arc, so hovering the arc highlights them too (styles.css).
+        arc.arrows = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        arc.arrows.setAttribute('class', 'edge-arrows');
+        arc.path.after(arc.arrows);
+      }
+      arc.arrows.setAttribute('d', heads);
+    } else if (arc.arrows) {
+      arc.arrows.remove();
+      arc.arrows = undefined;
+    }
+    // Names change only with the timeline's content and arrows, not as the view moves. With
+    // an arrowhead at exactly one end, the name reads toward it.
+    const named = `${generation}:${toA}:${toB}`;
+    if (arc.named !== named) {
+      arc.title.textContent =
+        toA === toB
+          ? `${name(edge.a)} ↔ ${name(edge.b)}`
+          : toB
+            ? `${name(edge.a)} → ${name(edge.b)}`
+            : `${name(edge.b)} → ${name(edge.a)}`;
+      arc.named = named;
     }
   }
   for (const [id, arc] of edgeArcs)
     if (!shown.has(id)) {
       arc.path.remove();
       arc.halo.remove();
+      arc.arrows?.remove();
       edgeArcs.delete(id);
     }
   if (frame.edgesTruncated) {
