@@ -587,7 +587,8 @@ export function durationSummaries(
 
 /**
  * Viewport bands carry a bounded projection: title, a notes preview, short text fields that
- * plugins such as colors read, and tags. Full metadata is fetched when a duration is opened.
+ * plugins such as colors read, toggles that are on (stored as `true`, such as the arrowhead
+ * toggle, #326), and tags. Full metadata is fetched when a duration is opened.
  */
 export function durationOverview(metadata: Metadata): Metadata {
   const result: Metadata = {};
@@ -605,6 +606,10 @@ export function durationOverview(metadata: Metadata): Metadata {
       size += key.length + value.length + 6;
       if (size > 4096) break;
       result[key] = value;
+    } else if (value === true && key.length <= 64) {
+      size += key.length + 8;
+      if (size > 4096) break;
+      result[key] = true;
     }
   // Its tags, which plugins may derive values from (#122), such as a log entry's severity.
   if (Array.isArray(metadata.tags)) {

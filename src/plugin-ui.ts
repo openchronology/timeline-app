@@ -21,6 +21,7 @@ import {
   HEADING_FONTS,
   DEFAULT_HEADING_FONT,
   fontValue,
+  toggleValue,
 } from './plugins.js';
 import type { HeadingLevel } from './plugins.js';
 import type { InstalledPlugin, StackEntry } from './plugins.js';
@@ -109,11 +110,34 @@ export function renderPluginFields(
   child = false,
 ) {
   container.replaceChildren();
+  // Stack entries aren't relationship endpoints, so they have no arrowhead toggles (#326).
+  const endpointOnly = new Set(
+    plugins.flatMap((p) =>
+      p.manifest.relationships ? [p.manifest.relationships.metadataKey] : [],
+    ),
+  );
   for (const field of pluginFields(plugins)) {
     if (field.kind === 'stack' && child) continue;
+    if (child && endpointOnly.has(field.metadataKey)) continue;
     const section = document.createElement('section');
     section.className = 'plugin-field';
     section.dataset.metadataKey = field.metadataKey;
+    if (field.kind === 'toggle') {
+      // A checkbox: on is stored as true, and off removes the key. Any other stored value
+      // reads as off and is kept until the box is changed.
+      const label = document.createElement('label');
+      label.className = 'plugin-toggle';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = toggleValue(metadata[field.metadataKey]);
+      box.disabled = !editable;
+      box.dataset.pluginKey = field.metadataKey;
+      box.onchange = () => onChange(field.metadataKey, box.checked);
+      label.append(box, document.createTextNode(field.label));
+      section.append(label);
+      container.append(section);
+      continue;
+    }
     if (field.kind === 'links') {
       const heading = document.createElement('label');
       heading.textContent = field.label;

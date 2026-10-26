@@ -608,6 +608,7 @@ export const schemas = {
           'links',
           'heading',
           'font',
+          'toggle',
         ],
       },
       metadataKey: metadataKey,
@@ -639,6 +640,11 @@ export const schemas = {
       background: {
         ...component('image', true),
         description: 'An image behind the timeline where a duration lies.',
+      },
+      relationships: {
+        ...component('arrowhead', true),
+        description:
+          'An arrowhead on each relationship arc where it ends at an entity whose toggle at metadataKey is true.',
       },
       targets: {
         type: 'array',

@@ -34,6 +34,25 @@ Install **Headings** to let a moment act as a heading or marker, such as "Part O
 
 The plugin's marker is `{ "kind": "heading", "metadataKey": "headingLevel" }`, and its font comes from the manifest's `font` field. Both the `heading` and `font` field kinds are available to other plugins.
 
+## Relationship arrows
+
+Install **Relationship arrows** to show which way a chain of [relationships](relationships.md) reads, such as from causes to their effect. It adds an **Arrow here** checkbox to moment details and to the duration dialog. Its metadata key is `arrowHere`:
+
+```json
+{ "title": "Pump failure", "arrowHere": true }
+```
+
+- **Arrowheads:** every relationship arc that ends at a moment or duration with Arrow here on draws an arrowhead at that end: at the moment's time, or at the duration's start, where the arc ends. An arc with both ends on draws two.
+- **Look:** an arrowhead sits on its arc just short of the end, so the marker there doesn't cover it, and points into the end along the arc. It takes the arc's color, highlights with it when the arc is hovered, and grows and shrinks with the content as the timeline is scaled (**A−** and **A+**).
+- **Edges of the view:** an arc whose end lies beyond the view shows no arrowhead for that end.
+- **Hover text:** with an arrow at exactly one end, the arc's hover text reads toward it, such as "Pump failure → Flood"; otherwise it reads "A ↔ B" as before.
+- **Direction belongs to the event, not the link.** Relationships stay undirected and carry no data of their own, so the toggle is on the moment or duration, and every arc ending there shows an arrowhead. An event that is the effect of one link and the cause of another can't show both. Arrows are a convention for reading the chart; the app doesn't analyze them, and **Separate related** and **Separate all connected** don't follow them.
+- **Stack entries** aren't relationship endpoints, so they have no Arrow here checkbox. Separated tracks draw no arcs, so they show no arrowheads.
+- **Disabling:** disabling or removing the plugin draws arcs as before and keeps the stored `arrowHere` values.
+- **Cost:** the arrowheads read the toggle from the metadata the view already has for the arcs in the window (at most 256), not from the whole timeline. On a server timeline, a moment shown inside a summary has no metadata of its own in the view, so its end shows no arrowhead until zooming in shows it on its own.
+
+The manifest declares the toggle as a `toggle` field and draws with `"relationships": { "kind": "arrowhead", "metadataKey": "arrowHere" }`. Both are available to other plugins. A plugin with `relationships` and no `targets` applies to moments and durations.
+
 ## Duration backgrounds
 
 Install **Duration backgrounds** to show an image behind the timeline wherever a [duration](durations.md) lies. Its duration field is `backgroundUrl`, a public HTTPS image URL, as for moment icons:
@@ -108,10 +127,11 @@ A plugin's `theme` names the setting for each part it sets: `text`, `textFont`, 
 
 Plugins combine **JSON host component declarations** and an optional restricted script. Their source is interpreted locally, without arbitrary JavaScript execution, HTML, CSS, imports, event handlers or application API endpoints. They cannot obtain account credentials, access the DOM, call the server, or execute arbitrary code. The host is responsible for rendering, validating URLs, field input and lifecycle cleanup. API v1 supports:
 
-- Inspector fields: `text`, `multiline`, `image-url`, `stack`, `shape`, `size`, `color`, `links`, `heading` and `font`, each bound to one top-level moment metadata key.
+- Inspector fields: `text`, `multiline`, `image-url`, `stack`, `shape`, `size`, `color`, `links`, `heading`, `font` and `toggle`, each bound to one top-level moment metadata key. A `toggle` is a checkbox: on is stored as `true`, and off removes the key. Any other stored value reads as off and is kept until the box is changed.
 - Marker effects: an `image`, `color`, `shape` or `heading` bound to metadata, plus hover cards and restricted scripted effects.
+- Relationship effects: `relationships.kind: "arrowhead"` draws an arrowhead on each arc where it ends at an entity whose `metadataKey` is `true` ([Relationship arrows](#relationship-arrows)).
 - Ordering: later enabled definitions replace earlier inspector fields with the same key; later marker hooks with a valid, populated image URL take precedence. Empty or invalid URLs fall back to the preceding valid marker effect, or the normal dot.
-- Targets: an optional `targets` array of `"moments"` and/or `"durations"`. Without it, color markers and hover cards apply to moments and [durations](durations.md); every other plugin applies to moments only. Durations use text, notes, color, link and image URL fields, color markers, hover cards and backgrounds (`background.kind: "image"`, which applies to durations only); stacks, shapes, sizes, icons and summary expansion are moment-only.
+- Targets: an optional `targets` array of `"moments"` and/or `"durations"`. Without it, color markers, hover cards and arrowheads apply to moments and [durations](durations.md); every other plugin applies to moments only. Durations use text, notes, color, link, image URL and toggle fields, color markers, hover cards and backgrounds (`background.kind: "image"`, which applies to durations only); stacks, shapes, sizes, icons and summary expansion are moment-only.
 
 - Derived metadata: `derive` rules that work out values from the metadata an entity already has, for the other plugins to read ([derived metadata](#derived-metadata)).
 

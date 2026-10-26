@@ -16,7 +16,8 @@ export interface PluginField {
     | 'size'
     | 'links'
     | 'heading'
-    | 'font';
+    | 'font'
+    | 'toggle';
   metadataKey: string;
   label: string;
 }
@@ -33,6 +34,11 @@ export interface PluginManifest {
   notes?: { kind: 'markdown' };
   /** An image behind the timeline where a duration lies (durations only). */
   background?: { kind: 'image'; metadataKey: string };
+  /**
+   * What the plugin draws on relationship arcs (#326): an arrowhead at each end whose moment
+   * or duration has its toggle at `metadataKey` on.
+   */
+  relationships?: { kind: 'arrowhead'; metadataKey: string };
   /**
    * Settings of the whole timeline, set in the plugin list rather than on its moments and
    * durations (#223), such as the address of the timeline's background image.
@@ -161,6 +167,10 @@ export function textSizeValue(value: unknown): string | null {
   if (!match) return null;
   const percent = Number(match[1]);
   return percent >= TEXT_SIZE.min && percent <= TEXT_SIZE.max ? String(percent) : null;
+}
+/** A toggle field's value: on only when stored as `true`; anything else reads as off. */
+export function toggleValue(value: unknown): boolean {
+  return value === true;
 }
 export function fontValue(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -514,6 +524,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     'summary',
     'notes',
     'background',
+    'relationships',
     'settings',
     'backdrop',
     'theme',
@@ -546,6 +557,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
         'links',
         'heading',
         'font',
+        'toggle',
       ].includes(f.kind as string)
     )
       throw new Error('Unsupported plugin component.');
@@ -587,6 +599,11 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     const background = object(p.background, ['kind', 'metadataKey']);
     if (background.kind !== 'image') throw new Error('Unsupported background component.');
     result.background = { kind: 'image', metadataKey: key(background.metadataKey) };
+  }
+  if (p.relationships !== undefined) {
+    const relationships = object(p.relationships, ['kind', 'metadataKey']);
+    if (relationships.kind !== 'arrowhead') throw new Error('Unsupported relationship component.');
+    result.relationships = { kind: 'arrowhead', metadataKey: key(relationships.metadataKey) };
   }
   if (p.settings !== undefined) {
     if (!Array.isArray(p.settings) || !p.settings.length || p.settings.length > 12)
@@ -794,7 +811,7 @@ export function pluginTargets(manifest: PluginManifest): PluginTarget[] {
     manifest.targets ??
     (manifest.background
       ? ['durations']
-      : manifest.marker?.kind === 'color' || manifest.hover
+      : manifest.marker?.kind === 'color' || manifest.hover || manifest.relationships
         ? ['moments', 'durations']
         : ['moments'])
   );
@@ -805,6 +822,7 @@ const DURATION_FIELDS = new Set<PluginField['kind']>([
   'color',
   'links',
   'image-url',
+  'toggle',
 ]);
 /** The subset of each plugin that applies to duration bands and their editor. */
 export function durationPlugins(plugins: readonly InstalledPlugin[] = []): InstalledPlugin[] {
@@ -871,6 +889,27 @@ export function pluginBackground(
     }
   return image;
 }
+/**
+ * Whether a relationship arc draws an arrowhead at an entity (#326): an enabled plugin's
+ * `relationships` arrowhead toggle is on in its metadata.
+ */
+export function pluginArrowhead(
+  plugins: readonly InstalledPlugin[] = [],
+  metadata: Record<string, unknown> = {},
+): boolean {
+  return plugins.some(
+    ({ manifest, enabled }) =>
+      enabled &&
+      manifest.relationships?.kind === 'arrowhead' &&
+      toggleValue(metadata[manifest.relationships.metadataKey]),
+  );
+}
+/** The metadata keys of enabled arrowhead toggles: none means arcs draw no arrowheads. */
+export function arrowheadKeys(plugins: readonly InstalledPlugin[] = []): string[] {
+  return plugins.flatMap(({ manifest, enabled }) =>
+    enabled && manifest.relationships ? [manifest.relationships.metadataKey] : [],
+  );
+}
 /** The longest background URL a duration band carries (see durationOverview). */
 export const BACKGROUND_URL_LIMIT = 256;
 /** Moment rendering ignores plugins that explicitly target only durations. */
@@ -920,6 +959,12 @@ export function pluginMetadata(
       ])
         if (typeof metadata[name] === 'string')
           result[name] = (metadata[name] as string).slice(0, 10000);
+      // Toggles that are on, such as the arrowhead toggle (#326).
+      for (const name of [
+        ...manifest.fields.filter((f) => f.kind === 'toggle').map((f) => f.metadataKey),
+        ...(manifest.relationships ? [manifest.relationships.metadataKey] : []),
+      ])
+        if (toggleValue(metadata[name])) result[name] = true;
       for (const field of manifest.fields)
         if (
           (field.kind === 'stack' || field.kind === 'links') &&
@@ -1186,6 +1231,17 @@ export const MOMENT_HEADINGS: PluginManifest = validatePluginManifest({
   marker: { kind: 'heading', metadataKey: 'headingLevel' },
   targets: ['moments'],
 });
+export const RELATIONSHIP_ARROWS: PluginManifest = validatePluginManifest({
+  apiVersion: 1,
+  id: 'relationship-arrows',
+  version: 1,
+  name: 'Relationship arrows',
+  description:
+    'Turn on Arrow here on an event to draw an arrowhead where each of its relationship arcs ends at it, such as at the effect in a chain of causes. The arrow belongs to the event, not to any one link, and separating by relationships does not follow it.',
+  fields: [{ kind: 'toggle', metadataKey: 'arrowHere', label: 'Arrow here' }],
+  relationships: { kind: 'arrowhead', metadataKey: 'arrowHere' },
+  targets: ['moments', 'durations'],
+});
 export const DURATION_BACKGROUNDS: PluginManifest = validatePluginManifest({
   apiVersion: 1,
   id: 'duration-backgrounds',
@@ -1329,6 +1385,7 @@ export const BUILTIN_PLUGINS: readonly PluginManifest[] = [
   TIMELINE_THEME,
   MOMENT_HEADINGS,
   LOG_SEVERITY_COLORS,
+  RELATIONSHIP_ARROWS,
 ];
 
 /** A page of a plugin library: the newest version of each plugin matching a search. */

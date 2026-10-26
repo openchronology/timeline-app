@@ -205,3 +205,40 @@ export function arcPath(
     y1 = y(x1);
   return `M ${x0} ${y0} Q ${xm} ${2 * y(xm) - (y0 + y1) / 2} ${x1} ${y1}`;
 }
+/**
+ * An arrowhead (#326) where the arc of `arcPath` ends at `x`, its other end at `other`: a
+ * triangle `length` pixels long and as wide, its tip on the arc `gap` pixels from the endpoint
+ * (so the marker there doesn't cover it), pointing into the endpoint along the arc's tangent.
+ * Empty when the two ends coincide.
+ */
+export function arrowheadPath(
+  x: number,
+  other: number,
+  axis: number,
+  lift: number,
+  length = 9,
+  gap = 12,
+): string {
+  const span = Math.abs(other - x),
+    toward = Math.sign(other - x);
+  if (!(span > 0)) return '';
+  // How far along the axis the tip is: the gap, measured along the arc's slope at its end.
+  const along = Math.min(gap / Math.hypot(1, (4 * lift) / span), span / 2),
+    t = along / span;
+  const tipX = x + toward * along,
+    tipY = axis - 4 * lift * t * (1 - t);
+  // The tangent there, heading back toward the endpoint (down to the axis).
+  const dx = -toward * span,
+    dy = 4 * lift * (1 - 2 * t),
+    norm = Math.hypot(dx, dy);
+  const ux = dx / norm,
+    uy = dy / norm,
+    half = length / 2;
+  const bx = tipX - ux * length,
+    by = tipY - uy * length;
+  const n = (v: number) => Math.round(v * 100) / 100;
+  return (
+    `M ${n(tipX)} ${n(tipY)} L ${n(bx - uy * half)} ${n(by + ux * half)} ` +
+    `L ${n(bx + uy * half)} ${n(by - ux * half)} Z`
+  );
+}

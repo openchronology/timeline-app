@@ -1753,6 +1753,16 @@ dialog h3 {
   gap: 8px;
   margin-bottom: 0;
 }
+/* A toggle field: its checkbox beside its label. */
+.plugin-field .plugin-toggle,
+.moment-dialog .plugin-field .plugin-toggle {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.plugin-field .plugin-toggle input {
+  width: auto;
+}
 .moment-dialog .plugin-field .field-hint {
   margin: 8px 0 0;
   line-height: 1.5;
@@ -2947,6 +2957,22 @@ dialog button {
   stroke: var(--green);
   stroke-width: 3;
   opacity: 1;
+}
+/* Arrowheads (#326) follow their arc, which comes just before them, and its hover. */
+.edge-arrows {
+  fill: var(--timeline-measure, #8aa79b);
+  opacity: 0.65;
+  pointer-events: none;
+}
+.edge-arc:hover + .edge-arrows {
+  fill: var(--green);
+  opacity: 1;
+}
+.timeline-stage.over-backgrounds .edge-arrows {
+  stroke: var(--timeline-halo, #fff);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  paint-order: stroke;
 }
 .edge-limit {
   font-size: 11px;

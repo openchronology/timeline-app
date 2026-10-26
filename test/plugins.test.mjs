@@ -63,6 +63,10 @@ import {
   derivedMetadata,
   derivationKeys,
   durationOverview,
+  RELATIONSHIP_ARROWS,
+  pluginArrowhead,
+  arrowheadKeys,
+  toggleValue,
 } from '../dist/core.mjs';
 import { themeProperties, themeScales, textOn } from '../dist/timeline-theme.mjs';
 import { createPluginLibrary } from '../server/plugins.mjs';
@@ -88,6 +92,7 @@ test('every field kind reads wrong-shaped metadata without throwing (#157)', () 
     'links',
     'heading',
     'font',
+    'toggle',
   ])
     assert(kinds.has(kind), kind);
   const keys = new Set([
@@ -127,6 +132,7 @@ test('every field kind reads wrong-shaped metadata without throwing (#157)', () 
       pluginHeading(plugins, metadata);
       pluginMarker(plugins, metadata);
       pluginBackground(plugins, metadata);
+      assert.equal(typeof pluginArrowhead(plugins, metadata), 'boolean');
       pluginFocus(plugins);
       pluginExpand(plugins);
       pluginMetadata(plugins, metadata);
@@ -423,7 +429,13 @@ test('public plugin API works without accounts or PostgreSQL and validates its i
   // Twelve to a page: the thirteenth and on are on the next.
   assert.deepEqual(
     (await request(app, '/api/plugins?page=2')).body.plugins.map((p) => p.id),
-    ['rich-text-notes', 'moment-sources', 'timeline-background', 'timeline-theme'],
+    [
+      'relationship-arrows',
+      'rich-text-notes',
+      'moment-sources',
+      'timeline-background',
+      'timeline-theme',
+    ],
   );
   assert.equal((await request(app, '/api/plugins?search=absent&page=1&limit=1')).body.total, 0);
   const response = await request(app, '/api/plugins/search', 'POST', {
@@ -973,6 +985,79 @@ test('timeline theme sizes: label and measure text sizes, as percentages (#267)'
     { textFont: 'measureSize' },
   ])
     assert.throws(() => validatePluginManifest({ ...TIMELINE_THEME, theme }));
+});
+
+test('relationship arrows: an Arrow here toggle on moments and durations (#326)', () => {
+  assert(isOfficialPlugin(RELATIONSHIP_ARROWS));
+  assert.deepEqual(
+    [RELATIONSHIP_ARROWS.id, RELATIONSHIP_ARROWS.version],
+    ['relationship-arrows', 1],
+  );
+  assert.deepEqual(pluginTargets(RELATIONSHIP_ARROWS), ['moments', 'durations']);
+  const plugins = [installed(RELATIONSHIP_ARROWS)];
+  // The toggle is a field of moments and of durations.
+  for (const target of [momentPlugins(plugins), durationPlugins(plugins)])
+    assert.deepEqual(pluginFields(target), [
+      { kind: 'toggle', metadataKey: 'arrowHere', label: 'Arrow here' },
+    ]);
+  assert.deepEqual(arrowheadKeys(durationPlugins(plugins)), ['arrowHere']);
+  // On only when stored as true; anything else reads as off.
+  assert.equal(pluginArrowhead(plugins, { arrowHere: true }), true);
+  for (const value of [undefined, false, 'true', 1, 'yes', {}, [true]]) {
+    assert.equal(toggleValue(value), false);
+    assert.equal(pluginArrowhead(plugins, { arrowHere: value }), false);
+  }
+  // Disabled or removed, nothing is drawn, and arcs skip the lookup.
+  const disabled = [{ ...plugins[0], enabled: false }];
+  assert.equal(pluginArrowhead(disabled, { arrowHere: true }), false);
+  assert.deepEqual(arrowheadKeys(disabled), []);
+  assert.equal(pluginArrowhead([], { arrowHere: true }), false);
+  // Overviews carry the toggle when it is on, and nothing for odd values.
+  assert.deepEqual(pluginMetadata(plugins, { arrowHere: true, other: true }), { arrowHere: true });
+  assert.deepEqual(pluginMetadata(plugins, { arrowHere: 'yes' }), { arrowHere: 'yes' });
+  assert.deepEqual(pluginMetadata(plugins, { arrowHere: 1 }), {});
+  assert.deepEqual(durationOverview({ title: 'Span', arrowHere: true, n: 1 }), {
+    title: 'Span',
+    arrowHere: true,
+  });
+  // The field kind and the arrowhead component are general plugin API, validated.
+  const custom = validatePluginManifest({
+    apiVersion: 1,
+    id: 'effects',
+    version: 1,
+    name: 'Effects',
+    description: 'Arrows at effects.',
+    fields: [{ kind: 'toggle', metadataKey: 'isEffect', label: 'Effect' }],
+    relationships: { kind: 'arrowhead', metadataKey: 'isEffect' },
+  });
+  assert.deepEqual(pluginTargets(custom), ['moments', 'durations']);
+  assert(pluginArrowhead([installed(custom)], { isEffect: true }));
+  for (const relationships of [
+    { kind: 'label', metadataKey: 'isEffect' },
+    { kind: 'arrowhead', metadataKey: 'title' },
+    { kind: 'arrowhead' },
+    { kind: 'arrowhead', metadataKey: 'isEffect', extra: 1 },
+  ])
+    assert.throws(() => validatePluginManifest({ ...custom, relationships }));
+  assert.throws(() =>
+    validatePluginManifest({
+      ...custom,
+      fields: [{ kind: 'switch', metadataKey: 'isEffect', label: 'Effect' }],
+    }),
+  );
+  // A saved timeline keeps its toggles whether or not the plugin is installed.
+  const doc = {
+    format: 'openchronology',
+    version: 1,
+    title: 'Arrows',
+    description: '',
+    plugins: disabled,
+    events: [{ id: 'a', time: '0/1', metadata: { title: 'A', arrowHere: true } }],
+    durations: [{ id: 'd', start: '1/1', end: '2/1', metadata: { arrowHere: true } }],
+  };
+  const saved = validateDocument(JSON.parse(JSON.stringify(doc)));
+  assert.equal(saved.events[0].metadata.arrowHere, true);
+  assert.equal(saved.durations[0].metadata.arrowHere, true);
 });
 
 test('headings: a level makes a moment a heading, in its font or Times New Roman', () => {
