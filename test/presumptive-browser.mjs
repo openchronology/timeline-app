@@ -110,6 +110,12 @@ export async function checkPresumptive(page, restore) {
         },
       },
       { id: 'odd', time: '500/1', metadata: { title: 'Odd', presumptive: 'yes' } },
+      // A condition, as an Events and Causal Factors chart draws one (Moment shapes 3).
+      {
+        id: 'ellipse',
+        time: '600/1',
+        metadata: { title: 'Condition', shape: 'ellipse', presumptive: true },
+      },
     ],
     durations: [
       {
@@ -159,6 +165,7 @@ export async function checkPresumptive(page, restore) {
         plain: marker('#markers .event-marker[data-first="200/1"]'),
         icon: marker('#markers .event-marker[data-first="400/1"]'),
         odd: marker('#markers .event-marker[data-first="500/1"]'),
+        ellipse: marker('#markers .event-marker[data-first="600/1"]'),
         maybe: marker('.stack-marker[data-stack-entry="maybe"]'),
         sure: marker('.stack-marker[data-stack-entry="sure"]'),
         condition: marker('.duration-band[data-duration-id="condition"]'),
@@ -186,7 +193,7 @@ export async function checkPresumptive(page, restore) {
         `${key}: the dashes or the white between them stand out (${name})`,
       );
     }
-    for (const key of ['star', 'maybe']) {
+    for (const key of ['star', 'maybe', 'ellipse']) {
       const m = shown[key];
       assert.equal(m.outline, 'dashed', `${key} (${name})`);
       assert(m.shaped, key);
@@ -218,7 +225,7 @@ export async function checkPresumptive(page, restore) {
   await page.locator('#right-bound').fill('100000');
   await page.locator('#apply-bounds').click();
   await page.waitForFunction(() =>
-    [...document.querySelectorAll('#markers .event-marker')].some((m) => m.dataset.count === '6'),
+    [...document.querySelectorAll('#markers .event-marker')].some((m) => m.dataset.count === '7'),
   );
   assert.equal(await page.locator('#markers .event-marker.group[data-outline]').count(), 0);
 
@@ -320,7 +327,17 @@ export async function checkPresumptive(page, restore) {
   await load({ ...exported, title: 'Presumptive reimported' });
   await waitForMarkers();
   const reimported = await look();
-  for (const key of ['circle', 'star', 'plain', 'icon', 'maybe', 'sure', 'condition', 'known'])
+  for (const key of [
+    'circle',
+    'star',
+    'plain',
+    'icon',
+    'ellipse',
+    'maybe',
+    'sure',
+    'condition',
+    'known',
+  ])
     assert.equal(reimported[key].outline, 'dashed', key);
 
   // The reader flags it.
