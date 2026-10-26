@@ -365,6 +365,115 @@ section {
 .account-card label {
   margin: 14px 0;
 }
+/* Signing in and creating an account (/login): a narrow card, providers first, then the
+   password form, with one rhythm of spacing between fields. */
+.auth-card {
+  max-width: 420px;
+  margin: 40px auto;
+  padding: 32px;
+}
+.auth-header {
+  margin-bottom: 24px;
+  text-align: center;
+}
+.auth-mark {
+  display: block;
+  margin: 0 auto 12px;
+}
+.auth-header h1 {
+  margin: 0 0 6px;
+  font-size: 30px;
+  line-height: 1.2;
+}
+.auth-header p {
+  margin: 0;
+}
+.auth-providers {
+  display: grid;
+  gap: 10px;
+}
+.auth-providers button {
+  width: 100%;
+  min-height: 44px;
+  gap: 10px;
+  font-size: 14px;
+}
+.provider-icon {
+  flex: none;
+}
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--line);
+}
+.auth-card .auth-form > label,
+.auth-form .auth-field {
+  margin: 16px 0 0;
+}
+.auth-form > label > input,
+.auth-form .auth-field input {
+  margin-top: 6px;
+}
+.auth-form .field-hint {
+  display: block;
+  margin-top: 6px;
+  font-weight: 400;
+}
+.auth-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.auth-card .auth-label-row label {
+  margin: 0;
+}
+.auth-label-row .link-button {
+  font-size: 12px;
+}
+.auth-form > p {
+  margin: 16px 0 0;
+}
+.auth-submit {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 20px;
+  font-size: 14px;
+}
+.auth-card > [role='status'],
+.auth-card > .error {
+  margin: 12px 0 0;
+  text-align: center;
+}
+.auth-card > [role='status']:empty,
+.auth-card > .error:empty {
+  margin: 0;
+}
+.auth-switch {
+  margin: 20px 0 0;
+  font-size: 13px;
+  text-align: center;
+}
+.auth-legal {
+  margin: 16px 0 0;
+  font-size: 12px;
+  text-align: center;
+}
+@media (max-width: 520px) {
+  .auth-card {
+    margin: 16px auto;
+    padding: 24px 20px;
+  }
+}
 .platform-footer {
   padding: 20px 28px;
   font-size: 12px;

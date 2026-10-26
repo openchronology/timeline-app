@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import ProviderIcon from './provider-icon.jsx';
 import {
   ApiKeysCard,
   Confirmation,
@@ -259,34 +260,75 @@ export default function Account({ returnTo = '/', login = false }) {
         feedback={feedback}
       />
     );
+  // Signing in and creating an account offer the site's providers first, then the password
+  // form; the other steps (recovery, confirmation, two-factor) show only their own form.
+  const entry = ['login', 'register'].includes(mode);
+  const providers = session?.server && entry ? (session.providers ?? []) : [];
+  const directory = session?.server && entry ? session.directory : null;
+  const label = (name) => session?.providerLabels?.[name] ?? PROVIDERS[name] ?? name;
+  const go = (next) => {
+    setMode(next);
+    setError('');
+  };
   return (
-    <div className="account-card">
-      <h1>
-        {{
-          register: 'Create account',
-          forgot: 'Recover your password',
-          reset: 'Choose a new password',
-          verify: 'Confirm email',
-          mfa: 'Two-factor authentication',
-          email: 'Confirm your email address',
-          directory: `Sign in with ${session?.directory?.label ?? 'a directory account'}`,
-        }[mode] ?? 'Sign in'}
-      </h1>
+    <div className="account-card auth-card">
+      <header className="auth-header">
+        <img className="auth-mark" src="/logo-mark.svg" alt="" width="44" height="44" />
+        <h1>
+          {{
+            register: 'Create your account',
+            forgot: 'Recover your password',
+            reset: 'Choose a new password',
+            verify: 'Confirm email',
+            mfa: 'Two-factor authentication',
+            email: 'Confirm your email address',
+            directory: `Sign in with ${session?.directory?.label ?? 'a directory account'}`,
+          }[mode] ?? 'Sign in'}
+        </h1>
+        {mode === 'login' && (
+          <p className="muted">Welcome back. Sign in to save and share timelines.</p>
+        )}
+        {mode === 'register' && (
+          <p className="muted">Save timelines to your account and share them with anyone.</p>
+        )}
+        {mode === 'forgot' && <p className="muted">We'll email a link to choose a new password.</p>}
+      </header>
       {!session && !error && <p role="status">Loading your session…</p>}
       {session?.server === false && (
         <p className="notice">
           Server accounts are unavailable. <Link href="/editor">Open a local timeline</Link>.
         </p>
       )}
+      {(providers.length > 0 || directory) && (
+        <>
+          <div className="auth-providers">
+            {providers.map((name) => (
+              <button key={name} type="button" disabled={busy} onClick={() => provider(name)}>
+                <ProviderIcon name={name} />
+                <span>Continue with {label(name)}</span>
+              </button>
+            ))}
+            {directory && (
+              <button type="button" disabled={busy} onClick={() => go('directory')}>
+                <ProviderIcon name="ldap" />
+                <span>Sign in with {directory.label}</span>
+              </button>
+            )}
+          </div>
+          <div className="auth-divider" role="separator">
+            <span>or {mode === 'register' ? 'sign up' : 'sign in'} with a password</span>
+          </div>
+        </>
+      )}
       {session?.server && (
-        <form onSubmit={submit}>
+        <form className="auth-form" onSubmit={submit}>
           {mode === 'directory' && (
             <label>
               {session.directory?.label ?? 'Directory account'} username
               <input name="username" autoComplete="username" maxLength={256} required />
             </label>
           )}
-          {['login', 'register'].includes(mode) && (
+          {entry && (
             <label>
               Username
               <input
@@ -323,9 +365,23 @@ export default function Account({ returnTo = '/', login = false }) {
             </label>
           )}
           {['login', 'directory', 'register', 'reset'].includes(mode) && (
-            <label>
-              Password
+            <div className="auth-field">
+              <div className="auth-label-row">
+                <label htmlFor="auth-password">Password</label>
+                {/* Recovery needs email sending; without it the link is left out. */}
+                {mode === 'login' && session.security?.email && (
+                  <button
+                    type="button"
+                    className="link-button"
+                    disabled={busy}
+                    onClick={() => go('forgot')}
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
               <input
+                id="auth-password"
                 name="password"
                 type="password"
                 autoComplete={
@@ -335,26 +391,24 @@ export default function Account({ returnTo = '/', login = false }) {
                 maxLength={1024}
                 required
               />
-            </label>
+            </div>
           )}
           {['register', 'reset'].includes(mode) && (
-            <>
-              <label>
-                Confirm password
-                <input
-                  name="passwordConfirmation"
-                  type="password"
-                  autoComplete="new-password"
-                  minLength={15}
-                  maxLength={1024}
-                  required
-                />
-              </label>
-              <p className="muted">
-                Use a unique passphrase of at least 15 characters. Password managers and pasted
+            <label>
+              Confirm password
+              <input
+                name="passwordConfirmation"
+                type="password"
+                autoComplete="new-password"
+                minLength={15}
+                maxLength={1024}
+                required
+              />
+              <span className="field-hint">
+                A unique passphrase of at least 15 characters. Password managers and pasted
                 passwords are supported.
-              </p>
-            </>
+              </span>
+            </label>
           )}
           {/* Agreeing to the terms (#277): required to create an account, by password or, at
               its email step, by a provider; the value is the version shown, which the server
@@ -369,19 +423,19 @@ export default function Account({ returnTo = '/', login = false }) {
             </label>
           )}
           {mode === 'register' && (
-            <p>
+            <p className="muted">
               Email confirmation is required. Open the confirmation link in this browser, then sign
               in.
             </p>
           )}
           {mode === 'email' && (
-            <p>
+            <p className="muted">
               A verified address is required before this account can sign in. Confirm the emailed
               link in this browser, then sign in again.
             </p>
           )}
           {mode === 'verify' && (
-            <p>
+            <p className="muted">
               Confirm only if you requested this registration or email change. Confirmation will not
               sign you in automatically.
             </p>
@@ -392,81 +446,72 @@ export default function Account({ returnTo = '/', login = false }) {
               <input name="code" autoComplete="one-time-code" maxLength={40} required />
             </label>
           )}
-          <div className="actions">
-            {/* No token yet (the session is loading) means the server would refuse it. */}
-            <button className="primary" disabled={busy || !session?.csrf}>
+          {/* No token yet (the session is loading) means the server would refuse it. */}
+          <button className="primary auth-submit" disabled={busy || !session?.csrf}>
+            {
               {
-                {
-                  login: 'Sign in',
-                  directory: 'Sign in',
-                  register: 'Create account',
-                  email: 'Send confirmation',
-                  mfa: 'Verify code',
-                  verify: 'Confirm email',
-                  forgot: 'Send reset link',
-                  reset: 'Reset password',
-                }[mode]
-              }
-            </button>
-          </div>
+                login: 'Sign in',
+                directory: 'Sign in',
+                register: 'Create account',
+                email: 'Send confirmation',
+                mfa: 'Verify code',
+                verify: 'Confirm email',
+                forgot: 'Send reset link',
+                reset: 'Reset password',
+              }[mode]
+            }
+          </button>
         </form>
       )}
+      {feedback}
       {session?.server && (
-        <div className="actions">
-          {mode !== 'login' && (
+        <p className="auth-switch">
+          {mode === 'login' ? (
+            session.security?.registration && (
+              <>
+                New here?{' '}
+                <button
+                  type="button"
+                  className="link-button"
+                  disabled={busy}
+                  onClick={() => go('register')}
+                >
+                  Create an account
+                </button>
+              </>
+            )
+          ) : mode === 'register' ? (
+            <>
+              Already have an account?{' '}
+              <button
+                type="button"
+                className="link-button"
+                disabled={busy}
+                onClick={() => go('login')}
+              >
+                Sign in
+              </button>
+            </>
+          ) : (
             <button
+              type="button"
+              className="link-button"
               disabled={busy}
-              onClick={() => {
-                setMode('login');
-                setError('');
-              }}
+              onClick={() => go('login')}
             >
               Back to sign in
             </button>
           )}
-          {mode === 'login' && (
-            <>
-              <button
-                disabled={busy || !session.security?.registration}
-                onClick={() => {
-                  setMode('register');
-                  setError('');
-                }}
-              >
-                Create account
-              </button>
-              <button disabled={busy || !session.security?.email} onClick={() => setMode('forgot')}>
-                Forgot password?
-              </button>
-            </>
-          )}
-        </div>
+        </p>
       )}
-      {session?.server && ['login', 'register'].includes(mode) && (
-        <div className="actions">
-          {session.directory && (
-            <button
-              disabled={busy}
-              onClick={() => {
-                setMode('directory');
-                setError('');
-              }}
-            >
-              Sign in with {session.directory.label}
-            </button>
-          )}
-          {(session.providers ?? []).map((name) => (
-            <button key={name} disabled={busy} onClick={() => provider(name)}>
-              Continue with {session.providerLabels?.[name] ?? PROVIDERS[name] ?? name}
-            </button>
-          ))}
-        </div>
+      {/* Creating an account asks with its own checkbox; signing in only mentions it. */}
+      {mode === 'login' && (
+        <p className="muted auth-legal">
+          Creating an account, with a password or a provider, asks you to agree to the{' '}
+          <Link href="/terms">terms of service</Link> and{' '}
+          <Link href="/privacy">privacy policy</Link>.
+        </p>
       )}
-      {feedback}
-      <p className="muted">
-        Creating an account, with a password or a provider, asks you to agree to the{' '}
-        <Link href="/terms">terms of service</Link> and <Link href="/privacy">privacy policy</Link>.
-      </p>
     </div>
   );
 }
