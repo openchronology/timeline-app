@@ -2,7 +2,7 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-The scripts and storyboards of OpenChronology's vertical shorts for TikTok, YouTube Shorts and Instagram Reels: 9:16, under 45 seconds, captions burned in, each taking one fact or motion from an explainer (`publicity/1-…` to `13-…`) to the feed where its audience is. Start with [the series plan](0-shorts-audiences-and-series.md). Each is rendered from [`publicity/video/`](../video/README.md) (folders `s01-…` to `s10-…`), which reads its scenes, on-screen text and narration straight from these files.
+The scripts and storyboards of OpenChronology's vertical shorts for TikTok, YouTube Shorts and Instagram Reels: 9:16, under 45 seconds, captions burned in, each taking one fact or motion from an explainer (`publicity/1-…` to `14-…`) to the feed where its audience is. Start with [the series plan](0-shorts-audiences-and-series.md). Each is rendered from [`publicity/video/`](../video/README.md) (folders `s01-…` to `s10-…`), which reads its scenes, on-screen text and narration straight from these files.
 
 ## Contents
 
@@ -19,4 +19,5 @@ The scripts and storyboards of OpenChronology's vertical shorts for TikTok, YouT
 | [`8-paged-at-2-58.md`](8-paged-at-2-58.md)                             | Short 8: an outage at 2:58 a.m., found on a timeline of syslog.                        |
 | [`9-i-asked-an-ai.md`](9-i-asked-an-ai.md)                             | Short 9: one prompt and an API key build the Star Wars timeline.                       |
 | [`10-why-did-it-happen.md`](10-why-did-it-happen.md)                   | Short 10: events, conditions and causal factors, on a made-up case.                    |
+| [`11-1503-days.md`](11-1503-days.md)                                   | Short 11: Lincoln's 1,503 days as president, 1,458 of them at war.                     |
 | [`12-closer-to-the-moon.md`](12-closer-to-the-moon.md)                 | Short 12: Cleopatra lived closer to the Moon landing than to the Great Pyramid.        |
