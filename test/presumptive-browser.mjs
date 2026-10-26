@@ -50,7 +50,8 @@ export async function checkPresumptive(page, restore) {
       body: png,
     }),
   );
-  const load = async (doc) => {
+  /** Loads a timeline; ours (not the one restored at the end) have a moment at 0. */
+  const load = async (doc, ours = true) => {
     await closeMomentDetails(page);
     await page.locator('#json-file').setInputFiles({
       name: 'presumptive.ochx',
@@ -61,6 +62,7 @@ export async function checkPresumptive(page, restore) {
       (title) => document.getElementById('timeline-title').value === title,
       doc.title,
     );
+    if (!ours) return;
     await page.locator('#fit-button').click();
     await page.locator('#markers .event-marker[data-first="0/1"]').waitFor();
   };
@@ -350,7 +352,7 @@ export async function checkPresumptive(page, restore) {
   await waitForMarkers();
   assert.equal(await page.locator('[data-outline], .marker-dashes').count(), 0);
   await page.unroute(images);
-  await load(restore);
+  await load(restore, false);
   console.log(
     'PASS presumptive outline: moments of any shape, icons, stack entries and durations dashed on light and dark backgrounds, summaries solid, edited by checkbox, flagged in the reader, kept by export.',
   );
