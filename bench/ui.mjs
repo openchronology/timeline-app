@@ -330,6 +330,7 @@ const SCENARIOS = [
     async run(d, t) {
       await show(d, t.fitted.left, t.fitted.right);
       const stage = await d.box('#timeline-stage');
+      // Fingers stacked vertically hold the timeline and pan it; they no longer resize it.
       const frame = await longestFrame(d, () =>
         d.pinch(stage.x + stage.width / 2, stage.y + stage.height / 2, 'y', 60, 110),
       );

@@ -273,14 +273,22 @@ try {
     );
     await poll(async () => (await span()).compare(before) > 0);
     assert.equal(await scale(), size);
-    // Fingers stacked vertically resize the contents without changing the time span.
+    // Fingers stacked vertically never resize the contents, and too close together sideways to
+    // hold a span of time, they don't zoom either: they pan.
     const fixed = await span();
     await pinch(
       [touch(b.x + 300, 1, -30), touch(b.x + 310, 2, 30)],
       [touch(b.x + 290, 1, -60), touch(b.x + 320, 2, 60)],
     );
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(await scale(), size);
+    assert.equal((await span()).compare(fixed), 0);
+    // Size is the buttons' job: A＋ enlarges the contents and A− shrinks them back, leaving time.
+    await input('size-up').click();
     await poll(async () => Number(await scale()) > Number(size));
     assert.equal((await span()).compare(fixed), 0);
+    await input('size-down').click();
+    await poll(async () => Math.abs(Number(await scale()) - Number(size)) < 1e-9);
     await closeMomentDetails(page);
     await input('fit-button').click();
     await poll(async () => (await markers.count()) === 3);
