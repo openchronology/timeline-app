@@ -12,7 +12,7 @@ import {
   stackEntry,
   COLOR_SWATCHES,
   colorValue,
-  MOMENT_SHAPE_NAMES,
+  shapeNames,
   shapeValue,
   MOMENT_SIZES,
   sizeValue,
@@ -352,7 +352,11 @@ export function renderPluginFields(
       select.setAttribute('aria-label', field.label);
       select.disabled = !editable;
       select.dataset.pluginKey = field.metadataKey;
-      for (const shape of field.kind === 'size' ? MOMENT_SIZES : MOMENT_SHAPE_NAMES) {
+      // The shapes of the plugin whose field this is (the last enabled one declaring it).
+      const owner = [...plugins]
+        .reverse()
+        .find((p) => p.enabled && p.manifest.fields.includes(field));
+      for (const shape of field.kind === 'size' ? MOMENT_SIZES : shapeNames(owner?.manifest)) {
         const option = document.createElement('option');
         option.value = shape;
         option.textContent = shape[0].toUpperCase() + shape.slice(1);
@@ -361,7 +365,7 @@ export function renderPluginFields(
       select.value =
         field.kind === 'size'
           ? (sizeValue(metadata[field.metadataKey]) ?? 'medium')
-          : (shapeValue(metadata[field.metadataKey]) ?? 'circle');
+          : (shapeValue(metadata[field.metadataKey], owner?.manifest) ?? 'circle');
       select.onchange = () => onChange(field.metadataKey, select.value);
       label.append(select);
       section.append(label);
@@ -843,6 +847,7 @@ const SHAPE_PATHS: Record<string, string> = {
   process: 'M2 5 H22 V19 H2 Z',
   document: 'M2 3 H22 V19 Q17 15 12 19 Q7 23 2 19 Z',
   parallelogram: 'M7 4 H23 L17 20 H1 Z',
+  ellipse: 'M0.5 12 A11.5 7 0 1 0 23.5 12 A11.5 7 0 1 0 0.5 12 Z',
 };
 /**
  * A moment shown as a heading (#110): its marker is its title, at the heading's level and in
@@ -890,6 +895,7 @@ export function renderPluginShape(button: HTMLButtonElement, shape: string) {
     process: 'inset(14% 0)',
     document: 'polygon(0 0,100% 0,100% 85%,75% 75%,50% 85%,25% 100%,0 85%)',
     parallelogram: 'polygon(25% 0,100% 0,75% 100%,0 100%)',
+    ellipse: 'ellipse(50% 30% at 50% 50%)',
   };
   button.style.setProperty('--marker-clip', clips[shape] ?? 'circle(50%)');
   button.querySelectorAll('.marker-shape').forEach((node) => node.remove());

@@ -11,6 +11,7 @@ import {
   sourceLinks,
   MOMENT_SHAPES,
   MOMENT_SHAPE_NAMES,
+  shapeNames,
   pluginShape,
   pluginSize,
   PLUGIN_EXAMPLE,
@@ -644,6 +645,75 @@ test('community publication namespaces immutable versions and rolls back quota/c
     (error) => error.status === 409,
   );
   assert.equal(commands.at(-1), 'ROLLBACK');
+});
+
+test('the ellipse is a Moment shapes 3 shape; pinned versions 1 and 2 treat it as unknown', () => {
+  assert.equal(MOMENT_SHAPES.version, 3);
+  assert.deepEqual(MOMENT_SHAPES.shapes, ['ellipse']);
+  assert(isOfficialPlugin(MOMENT_SHAPES));
+  const versions = BUILTIN_PLUGINS.filter((p) => p.id === 'moment-shapes');
+  assert.deepEqual(
+    versions.map((p) => p.version),
+    [1, 2, 3],
+  );
+  const older = versions.filter((p) => p.version < 3);
+  for (const manifest of older) {
+    // Older pinned definitions validate exactly as they did, with no added shapes.
+    assert.equal(manifest.shapes, undefined);
+    assert.deepEqual(validatePluginManifest(JSON.parse(JSON.stringify(manifest))), manifest);
+    assert(isOfficialPlugin(manifest));
+    assert.equal(pluginShape([installed(manifest)], { shape: 'ellipse' }), 'circle');
+    assert.equal(pluginShape([installed(manifest)], { shape: 'terminator' }), 'terminator');
+    assert(!shapeNames(manifest).includes('ellipse'));
+  }
+  assert.deepEqual(shapeNames(MOMENT_SHAPES), [...MOMENT_SHAPE_NAMES]);
+  assert.equal(shapeNames().length, 12);
+  // Version 3 draws a stored ellipse; one stored under version 2 is kept and drawn once upgraded.
+  const doc = validateDocument({ ...demo(), plugins: [installed(older[1])] });
+  doc.events[0].metadata.shape = 'ellipse';
+  const reloaded = validateDocument(JSON.parse(JSON.stringify(doc)));
+  assert.equal(reloaded.events[0].metadata.shape, 'ellipse');
+  assert.equal(pluginShape(reloaded.plugins, reloaded.events[0].metadata), 'circle');
+  assert.equal(pluginShape([installed(MOMENT_SHAPES)], reloaded.events[0].metadata), 'ellipse');
+  assert.equal(pluginSize([installed(MOMENT_SHAPES)], { shapeSize: 'large' }), 'large');
+  // Scripts: api.shape("ellipse") counts only in a plugin whose manifest lists the ellipse.
+  const script = {
+    ...PLUGIN_EXAMPLE,
+    source: 'function render(m,api) { return api.shape("ellipse"); }',
+  };
+  assert.equal(pluginShape([installed(validatePluginManifest(script))]), 'circle');
+  assert.equal(
+    pluginShape([installed(validatePluginManifest({ ...script, shapes: ['ellipse'] }))]),
+    'ellipse',
+  );
+  // Even a literal effect string is checked against the plugin's shapes.
+  const literal = {
+    ...PLUGIN_EXAMPLE,
+    source: 'function render(m,api) { return \'{"shape":"ellipse"}\'; }',
+  };
+  assert.equal(pluginShape([installed(validatePluginManifest(literal))]), 'circle');
+  // A declarative custom shape marker opts in the same way.
+  const custom = {
+    apiVersion: 1,
+    id: 'condition-shapes',
+    version: 1,
+    name: 'Condition shapes',
+    description: 'Ovals for conditions.',
+    fields: [{ kind: 'shape', metadataKey: 'form', label: 'Form' }],
+    marker: { kind: 'shape', metadataKey: 'form' },
+  };
+  assert.equal(
+    pluginShape([installed(validatePluginManifest(custom))], { form: 'ellipse' }),
+    'circle',
+  );
+  assert.equal(
+    pluginShape([installed(validatePluginManifest({ ...custom, shapes: ['ellipse'] }))], {
+      form: 'ellipse',
+    }),
+    'ellipse',
+  );
+  for (const shapes of [[], ['circle'], ['ellipse', 'ellipse'], ['oval'], 'ellipse', [1]])
+    assert.throws(() => validatePluginManifest({ ...custom, shapes }), /added shapes/);
 });
 
 test('shape sizes are bounded, opt-in and retained in exported timeline metadata', () => {
