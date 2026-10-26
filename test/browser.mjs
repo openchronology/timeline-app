@@ -20,6 +20,7 @@ import { checkTags } from './tags-browser.mjs';
 import { checkRelationships } from './relationships-browser.mjs';
 import { checkRelationshipArrows } from './relationship-arrows-browser.mjs';
 import { checkDenseDurations } from './dense-durations-browser.mjs';
+import { checkPresumptive } from './presumptive-browser.mjs';
 import assert from 'node:assert/strict';
 import { closeMomentDetails, checkMomentDialog } from './moment-dialog-browser.mjs';
 import { checkZoomHelp } from './zoom-help-browser.mjs';
@@ -337,6 +338,7 @@ try {
   await checkRelationships(page, document);
   await checkRelationshipArrows(page, document);
   await checkDenseDurations(page, document);
+  await checkPresumptive(page, document);
   await checkAccounts(browser);
   await checkChallenges(browser);
   await checkCommunity(browser);

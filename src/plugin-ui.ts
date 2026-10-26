@@ -21,9 +21,10 @@ import {
   HEADING_FONTS,
   DEFAULT_HEADING_FONT,
   fontValue,
+  toggleValue,
   readRelationshipArrows,
 } from './plugins.js';
-import type { ArrowDirection, HeadingLevel, PluginField } from './plugins.js';
+import type { ArrowDirection, HeadingLevel, OutlineStyle, PluginField } from './plugins.js';
 import type { InstalledPlugin, StackEntry } from './plugins.js';
 /** What a relationship-arrows field (#326) knows of the entity's relationships. */
 export interface RelationshipContext {
@@ -436,6 +437,22 @@ export function renderPluginFields(
       };
       label.append(select);
       section.append(label, custom, hint);
+      container.append(section);
+      continue;
+    }
+    if (field.kind === 'toggle') {
+      // A checkbox (#325): checked stores `true`, unchecked removes the key. Any other stored
+      // value reads as off and is kept until the box is changed.
+      const label = document.createElement('label');
+      label.className = 'plugin-toggle';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = toggleValue(metadata[field.metadataKey]);
+      box.disabled = !editable;
+      box.dataset.pluginKey = field.metadataKey;
+      box.onchange = () => onChange(field.metadataKey, box.checked);
+      label.append(box, document.createTextNode(field.label));
+      section.append(label);
       container.append(section);
       continue;
     }
@@ -922,4 +939,26 @@ export function renderPluginShape(button: HTMLButtonElement, shape: string) {
   button.querySelector('.marker-outline')?.remove();
   button.prepend(svg);
   button.append(outline);
+}
+/**
+ * Outlines a marker (#325), after renderPluginShape has drawn it: dashed adds dark dashes over
+ * its white border, so the dashes show on light and dark backgrounds and against any color.
+ * A circle (or an icon) dashes its CSS border (the `data-outline` attribute); any other shape
+ * gets a dashed copy of its SVG outline's path, so every shape, present or future, is dashed
+ * the same way. Solid removes them.
+ */
+export function renderPluginOutline(button: HTMLElement, outline: OutlineStyle) {
+  button.querySelectorAll('.marker-dashes').forEach((node) => node.remove());
+  if (outline !== 'dashed') {
+    delete button.dataset.outline;
+    return;
+  }
+  button.dataset.outline = 'dashed';
+  const border = button.querySelector<SVGPathElement>('.marker-outline path');
+  if (!border) return;
+  const dashes = border.cloneNode(false) as SVGPathElement;
+  dashes.classList.add('marker-dashes');
+  dashes.removeAttribute('stroke');
+  dashes.removeAttribute('stroke-width');
+  border.after(dashes);
 }

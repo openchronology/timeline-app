@@ -64,6 +64,10 @@ import {
   derivedMetadata,
   derivationKeys,
   durationOverview,
+  PRESUMPTIVE_OUTLINE,
+  pluginOutline,
+  toggleValue,
+  outlineValue,
   RELATIONSHIP_ARROWS,
   readRelationshipArrows,
   arcArrowheads,
@@ -94,6 +98,7 @@ test('every field kind reads wrong-shaped metadata without throwing (#157)', () 
     'links',
     'heading',
     'font',
+    'toggle',
     'relationship-arrows',
   ])
     assert(kinds.has(kind), kind);
@@ -132,6 +137,7 @@ test('every field kind reads wrong-shaped metadata without throwing (#157)', () 
       assert.equal(typeof pluginShape(plugins, metadata), 'string');
       assert.equal(typeof pluginSize(plugins, metadata), 'string');
       pluginHeading(plugins, metadata);
+      assert(['solid', 'dashed'].includes(pluginOutline(plugins, metadata)));
       pluginMarker(plugins, metadata);
       pluginBackground(plugins, metadata);
       arrowsToward(plugins, metadata, 'm:a');
@@ -432,6 +438,7 @@ test('public plugin API works without accounts or PostgreSQL and validates its i
   assert.deepEqual(
     (await request(app, '/api/plugins?page=2')).body.plugins.map((p) => p.id),
     [
+      'presumptive-outline',
       'relationship-arrows',
       'rich-text-notes',
       'moment-sources',
@@ -1381,4 +1388,104 @@ test('derived metadata: computed for the plugins to read, never over what an ent
     ),
     null,
   );
+});
+
+test('presumptive outline: a toggle draws moments, entries and durations dashed (#325)', () => {
+  assert(isOfficialPlugin(PRESUMPTIVE_OUTLINE));
+  assert.deepEqual(pluginTargets(PRESUMPTIVE_OUTLINE), ['moments', 'durations']);
+  const plugins = [installed(PRESUMPTIVE_OUTLINE)];
+  // The toggle is on for true (or the text "true"); anything else, or nothing, is off.
+  for (const value of [true, 'true']) assert.equal(toggleValue(value), true);
+  for (const value of [undefined, false, 'false', 'yes', 1, '', null, [], {}])
+    assert.equal(toggleValue(value), false, String(value));
+  assert.equal(pluginOutline(plugins, { presumptive: true }), 'dashed');
+  assert.equal(pluginOutline(plugins, { presumptive: 'true' }), 'dashed');
+  for (const value of [undefined, false, 'yes', 1, null, [], {}])
+    assert.equal(pluginOutline(plugins, { presumptive: value }), 'solid');
+  assert.equal(pluginOutline([{ ...plugins[0], enabled: false }], { presumptive: true }), 'solid');
+  assert.equal(pluginOutline([], { presumptive: true }), 'solid');
+  // It works alongside shapes and colors, which it leaves as they are.
+  const withShapes = [installed(MOMENT_SHAPES), installed(MOMENT_COLORS), ...plugins];
+  const metadata = { shape: 'star', color: '#bc6663', presumptive: true };
+  assert.equal(pluginShape(withShapes, metadata), 'star');
+  assert.equal(pluginColor(withShapes, metadata), '#bc6663');
+  assert.equal(pluginOutline(withShapes, metadata), 'dashed');
+  // Durations: the toggle field and the outline marker, read from a band's projection.
+  const [forDurations] = durationPlugins(plugins);
+  assert.deepEqual(forDurations.manifest.fields, [
+    { kind: 'toggle', metadataKey: 'presumptive', label: 'Presumptive (unconfirmed)' },
+  ]);
+  assert.deepEqual(forDurations.manifest.marker, PRESUMPTIVE_OUTLINE.marker);
+  const band = durationOverview({ title: 'Fire', presumptive: true, off: false, n: 3 });
+  assert.deepEqual(band, { title: 'Fire', presumptive: true });
+  assert.equal(pluginOutline(durationPlugins(plugins), band), 'dashed');
+  // Overviews carry a toggle that is on, and nothing else of it.
+  assert.deepEqual(pluginMetadata(plugins, { presumptive: true, other: true }), {
+    presumptive: true,
+  });
+  assert.deepEqual(pluginMetadata(plugins, { presumptive: false }), {});
+  // Stack entries keep it (a stack is projected whole).
+  const stacked = [installed(MOMENT_STACKS), ...plugins];
+  const stack = [{ id: 'e', metadata: { title: 'Entry', presumptive: true } }];
+  assert.deepEqual(pluginMetadata(stacked, { stack }).stack, stack);
+  assert.equal(pluginOutline(stacked, stack[0].metadata), 'dashed');
+});
+
+test('outline effects: a manifest marker or a script, validated (#325)', () => {
+  // A custom plugin can use the toggle field and outline marker, or script an outline.
+  const custom = validatePluginManifest({
+    apiVersion: 1,
+    id: 'unconfirmed',
+    version: 1,
+    name: 'Unconfirmed',
+    description: 'Dashed while a status is "unconfirmed".',
+    fields: [{ kind: 'text', metadataKey: 'status', label: 'Status' }],
+    source:
+      'function render(moment: string, api: PluginAPI): string { return api.get("status") === "unconfirmed" ? api.outline("dashed") : api.none(); }',
+  });
+  checkPluginScript(custom);
+  assert.equal(pluginOutline([installed(custom)], { status: 'unconfirmed' }), 'dashed');
+  assert.equal(pluginOutline([installed(custom)], { status: 'confirmed' }), 'solid');
+  // An unknown style contributes nothing; a later plugin's solid wins over an earlier dashed.
+  const scripted = (style) =>
+    installed({
+      ...custom,
+      id: 'style-' + style,
+      source: `function render(moment: string, api: PluginAPI): string { return api.outline("${style}"); }`,
+    });
+  assert.equal(pluginOutline([scripted('dotted')], {}), 'solid');
+  assert.equal(
+    pluginOutline([installed(PRESUMPTIVE_OUTLINE), scripted('solid')], { presumptive: true }),
+    'solid',
+  );
+  // A literal effect is validated too: a bad outline discards the script's effects.
+  const effect = JSON.stringify(JSON.stringify({ outline: 'wavy', shape: 'star' }));
+  const literal = installed({
+    ...custom,
+    source: `function render(moment: string, api: PluginAPI): string { return ${effect}; }`,
+  });
+  assert.equal(pluginShape([literal], {}), 'circle');
+  assert.equal(outlineValue('dashed'), 'dashed');
+  assert.equal(outlineValue('wavy'), null);
+  // Field and marker kinds validate.
+  validatePluginManifest({
+    ...PRESUMPTIVE_OUTLINE,
+    fields: [{ kind: 'toggle', metadataKey: 'unverified', label: 'Unverified' }],
+    marker: { kind: 'outline', metadataKey: 'unverified' },
+  });
+  assert.throws(() =>
+    validatePluginManifest({
+      ...PRESUMPTIVE_OUTLINE,
+      marker: { kind: 'outline', metadataKey: '__proto__' },
+    }),
+  );
+  assert.throws(() =>
+    validatePluginManifest({
+      ...PRESUMPTIVE_OUTLINE,
+      fields: [{ kind: 'checkbox', metadataKey: 'presumptive', label: 'x' }],
+    }),
+  );
+  // Without targets, an outline marker applies to moments and durations, like colors.
+  const { targets: _targets, ...untargeted } = PRESUMPTIVE_OUTLINE;
+  assert.deepEqual(pluginTargets(validatePluginManifest(untargeted)), ['moments', 'durations']);
 });

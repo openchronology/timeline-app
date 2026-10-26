@@ -17,6 +17,7 @@ export interface PluginField {
     | 'links'
     | 'heading'
     | 'font'
+    | 'toggle'
     | 'relationship-arrows';
   metadataKey: string;
   label: string;
@@ -28,7 +29,10 @@ export interface PluginManifest {
   name: string;
   description: string;
   fields: PluginField[];
-  marker?: { kind: 'image' | 'color' | 'shape' | 'size' | 'heading'; metadataKey: string };
+  marker?: {
+    kind: 'image' | 'color' | 'shape' | 'size' | 'heading' | 'outline';
+    metadataKey: string;
+  };
   hover?: { kind: 'card' };
   summary?: { kind: 'radial' };
   notes?: { kind: 'markdown' };
@@ -147,6 +151,25 @@ export function sizeValue(value: unknown): MomentSize | null {
   return typeof value === 'string' && (MOMENT_SIZES as readonly string[]).includes(value)
     ? (value as MomentSize)
     : null;
+}
+/**
+ * How a marker or duration band is outlined (#325): `solid`, the usual look, or `dashed`, as
+ * charts draw presumptive (unconfirmed) events and conditions.
+ */
+export const OUTLINE_STYLES = ['solid', 'dashed'] as const;
+export type OutlineStyle = (typeof OUTLINE_STYLES)[number];
+export function outlineValue(value: unknown): OutlineStyle | null {
+  return typeof value === 'string' && (OUTLINE_STYLES as readonly string[]).includes(value)
+    ? (value as OutlineStyle)
+    : null;
+}
+/**
+ * A toggle field's value (#325): on when the metadata holds `true` (or the text `"true"`, as
+ * hand-written metadata might), off for anything else, missing or not. Its editor stores
+ * `true` and removes the key when switched off.
+ */
+export function toggleValue(value: unknown): boolean {
+  return value === true || value === 'true';
 }
 /** Heading levels a moment can take (#110): shown as its title alone, sized by level. */
 export const HEADING_LEVELS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const;
@@ -303,6 +326,7 @@ type Effects = {
   card?: boolean;
   expand?: boolean;
   heading?: { level: HeadingLevel; font: string };
+  outline?: OutlineStyle;
 };
 /** The text at a source: a tag's value, or a text, number or true/false at a path. */
 function sourceValue(source: DerivationSource, metadata: Record<string, unknown>): string | null {
@@ -411,6 +435,10 @@ function manifestEffects(manifest: PluginManifest, metadata: Record<string, unkn
           const color = colorValue(text());
           return JSON.stringify(color ? { color } : {});
         }
+        case 'outline': {
+          const outline = outlineValue(text());
+          return JSON.stringify(outline ? { outline } : {});
+        }
         case 'icon': {
           const key = text();
           if (!manifest.fields.some((f) => f.metadataKey === key && f.kind === 'image-url'))
@@ -439,7 +467,7 @@ function manifestEffects(manifest: PluginManifest, metadata: Record<string, unkn
       typeof raw !== 'object' ||
       Array.isArray(raw) ||
       Object.keys(raw).some(
-        (k) => !['shape', 'size', 'color', 'icon', 'card', 'expand'].includes(k),
+        (k) => !['shape', 'size', 'color', 'icon', 'card', 'expand', 'outline'].includes(k),
       )
     )
       throw new Error('Invalid plugin effects.');
@@ -457,6 +485,11 @@ function manifestEffects(manifest: PluginManifest, metadata: Record<string, unkn
       const color = colorValue(raw.color);
       if (!color) throw new Error('Invalid color.');
       effects.color = color;
+    }
+    if (raw.outline !== undefined) {
+      const outline = outlineValue(raw.outline);
+      if (!outline) throw new Error('Invalid outline.');
+      effects.outline = outline;
     }
     if (raw.expand !== undefined) {
       if (typeof raw.expand !== 'boolean') throw new Error('Invalid expansion flag.');
@@ -498,6 +531,8 @@ function scriptEffects(
         const color = colorValue(metadata[manifest.marker.metadataKey]);
         if (color) effects.color = color;
       }
+      if (manifest.marker?.kind === 'outline' && toggleValue(metadata[manifest.marker.metadataKey]))
+        effects.outline = 'dashed';
       if (manifest.marker?.kind === 'image') {
         const icon = imageURL(metadata[manifest.marker.metadataKey]);
         if (icon) effects.icon = icon;
@@ -528,6 +563,16 @@ export function pluginShape(
   metadata: Record<string, unknown> = {},
 ): MomentShape {
   return scriptEffects(plugins, metadata).shape ?? 'circle';
+}
+/**
+ * How a moment, stack entry or duration is outlined (#325): dashed where an enabled outline
+ * marker's toggle is on or a script asks for it, otherwise solid. Later plugins win.
+ */
+export function pluginOutline(
+  plugins: readonly InstalledPlugin[] = [],
+  metadata: Record<string, unknown> = {},
+): OutlineStyle {
+  return scriptEffects(plugins, metadata).outline ?? 'solid';
 }
 export function pluginSize(
   plugins: readonly InstalledPlugin[] = [],
@@ -673,6 +718,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
         'links',
         'heading',
         'font',
+        'toggle',
         'relationship-arrows',
       ].includes(f.kind as string)
     )
@@ -692,9 +738,12 @@ export function validatePluginManifest(value: unknown): PluginManifest {
   };
   if (p.marker !== undefined) {
     const m = object(p.marker, ['kind', 'metadataKey']);
-    if (m.kind !== 'image' && m.kind !== 'color' && m.kind !== 'shape' && m.kind !== 'heading')
+    if (!['image', 'color', 'shape', 'heading', 'outline'].includes(m.kind as string))
       throw new Error('Unsupported marker component.');
-    result.marker = { kind: m.kind, metadataKey: key(m.metadataKey) };
+    result.marker = {
+      kind: m.kind as NonNullable<PluginManifest['marker']>['kind'],
+      metadataKey: key(m.metadataKey),
+    };
   }
   if (p.hover !== undefined) {
     const hover = object(p.hover, ['kind']);
@@ -923,9 +972,9 @@ export const GEOLOGICAL_AGES: PluginManifest = validatePluginManifest({
   source: 'function render(moment: string, api: PluginAPI): string { return api.none(); }',
 });
 /**
- * Colors and hover cards apply to durations by default, and backgrounds only to them; stacks,
- * shapes, sizes, icons and summary expansion are moment-only. Older saved manifests have no
- * targets and follow this.
+ * Colors, outlines and hover cards apply to durations by default, and backgrounds only to
+ * them; stacks, shapes, sizes, icons and summary expansion are moment-only. Older saved
+ * manifests have no targets and follow this.
  */
 export function pluginTargets(manifest: PluginManifest): PluginTarget[] {
   return (
@@ -933,6 +982,7 @@ export function pluginTargets(manifest: PluginManifest): PluginTarget[] {
     (manifest.background
       ? ['durations']
       : manifest.marker?.kind === 'color' ||
+          manifest.marker?.kind === 'outline' ||
           manifest.hover ||
           manifest.fields.some((f) => f.kind === 'relationship-arrows')
         ? ['moments', 'durations']
@@ -945,6 +995,7 @@ const DURATION_FIELDS = new Set<PluginField['kind']>([
   'color',
   'links',
   'image-url',
+  'toggle',
   'relationship-arrows',
 ]);
 /** The subset of each plugin that applies to duration bands and their editor. */
@@ -964,7 +1015,7 @@ export function durationPlugins(plugins: readonly InstalledPlugin[] = []): Insta
               ...f,
               label: f.label.replace(/^Moment (\w)/, (_, c) => c.toUpperCase()),
             })),
-          ...(marker?.kind === 'color' ? { marker } : {}),
+          ...(marker?.kind === 'color' || marker?.kind === 'outline' ? { marker } : {}),
         },
       };
     });
@@ -1061,6 +1112,7 @@ export function pluginMetadata(
       ])
         if (typeof metadata[name] === 'string')
           result[name] = (metadata[name] as string).slice(0, 10000);
+        else if (metadata[name] === true) result[name] = true; // A toggle that is on (#325).
       for (const field of manifest.fields)
         if (
           (field.kind === 'stack' ||
@@ -1469,6 +1521,22 @@ export const LOG_SEVERITY_COLORS: PluginManifest = validatePluginManifest({
   ],
   marker: { kind: 'color', metadataKey: 'color' },
 });
+/**
+ * Presumptive outline (#325): marks moments, stack entries and durations as presumptive (not
+ * yet confirmed by evidence), drawn with a dashed outline, as events and causal factors charts
+ * draw presumptive events and conditions.
+ */
+export const PRESUMPTIVE_OUTLINE: PluginManifest = validatePluginManifest({
+  apiVersion: 1,
+  id: 'presumptive-outline',
+  version: 1,
+  name: 'Presumptive outline',
+  description:
+    'Mark moments, stack entries and durations as presumptive: not yet confirmed by evidence. They are drawn with a dashed outline, whatever their shape, color or icon, as events and causal factors charts draw presumptive events and conditions.',
+  fields: [{ kind: 'toggle', metadataKey: 'presumptive', label: 'Presumptive (unconfirmed)' }],
+  marker: { kind: 'outline', metadataKey: 'presumptive' },
+  targets: ['moments', 'durations'],
+});
 // Keep previously published declarative versions available at their original detail URLs.
 const LEGACY_PLUGINS = [MOMENT_ICONS, MOMENT_STACKS, MOMENT_COLORS, FOCUS_ON_HOVER].map(
   ({ source, ...manifest }) => validatePluginManifest({ ...manifest, version: 1 }),
@@ -1494,6 +1562,7 @@ export const BUILTIN_PLUGINS: readonly PluginManifest[] = [
   TIMELINE_THEME,
   MOMENT_HEADINGS,
   LOG_SEVERITY_COLORS,
+  PRESUMPTIVE_OUTLINE,
   RELATIONSHIP_ARROWS,
 ];
 

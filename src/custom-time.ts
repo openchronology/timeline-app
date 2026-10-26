@@ -601,6 +601,7 @@ export function compilePluginScript(source: string) {
     icon: [1],
     card: [0],
     expand: [0],
+    outline: [1],
     merge: [2],
     none: [0],
     trim: [1],

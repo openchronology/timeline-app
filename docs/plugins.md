@@ -144,10 +144,10 @@ A plugin's `theme` names the setting for each part it sets: `text`, `textFont`, 
 
 Plugins combine **JSON host component declarations** and an optional restricted script. Their source is interpreted locally, without arbitrary JavaScript execution, HTML, CSS, imports, event handlers or application API endpoints. They cannot obtain account credentials, access the DOM, call the server, or execute arbitrary code. The host is responsible for rendering, validating URLs, field input and lifecycle cleanup. API v1 supports:
 
-- Inspector fields: `text`, `multiline`, `image-url`, `stack`, `shape`, `size`, `color`, `links`, `heading`, `font` and `relationship-arrows`, each bound to one top-level moment metadata key. A `relationship-arrows` field draws arrowheads on relationship arcs ([Relationship arrows](#relationship-arrows)).
-- Marker effects: an `image`, `color`, `shape` or `heading` bound to metadata, plus hover cards and restricted scripted effects.
+- Inspector fields: `text`, `multiline`, `image-url`, `stack`, `shape`, `size`, `color`, `links`, `heading`, `font`, `toggle` and `relationship-arrows`, each bound to one top-level moment metadata key. A `relationship-arrows` field draws arrowheads on relationship arcs ([Relationship arrows](#relationship-arrows)).
+- Marker effects: an `image`, `color`, `shape`, `heading` or `outline` bound to metadata, plus hover cards and restricted scripted effects.
 - Ordering: later enabled definitions replace earlier inspector fields with the same key; later marker hooks with a valid, populated image URL take precedence. Empty or invalid URLs fall back to the preceding valid marker effect, or the normal dot.
-- Targets: an optional `targets` array of `"moments"` and/or `"durations"`. Without it, color markers, hover cards and relationship arrows apply to moments and [durations](durations.md); every other plugin applies to moments only. Durations use text, notes, color, link, image URL and relationship-arrows fields, color markers, hover cards and backgrounds (`background.kind: "image"`, which applies to durations only); stacks, shapes, sizes, icons and summary expansion are moment-only.
+- Targets: an optional `targets` array of `"moments"` and/or `"durations"`. Without it, color and outline markers, hover cards and relationship arrows apply to moments and [durations](durations.md); every other plugin applies to moments only. Durations use text, notes, color, link, image URL, toggle and relationship-arrows fields, color and outline markers, hover cards and backgrounds (`background.kind: "image"`, which applies to durations only); stacks, shapes, sizes, icons and summary expansion are moment-only.
 
 - Derived metadata: `derive` rules that work out values from the metadata an entity already has, for the other plugins to read ([derived metadata](#derived-metadata)).
 - Added shapes: an optional `shapes` array of the shapes added after the first twelve that the plugin draws, currently only `"ellipse"`. A shape field, shape marker or `api.shape(...)` of a plugin that doesn't list one treats it as unknown, as before it existed; the field's selector offers the plugin's shapes.
@@ -294,11 +294,28 @@ Install **Moment shapes** to add a shape selector to each moment and stack entry
 
 Moment shapes version 3 adds **ellipse**: a horizontal oval, wider than tall, for the conditions of an Events and Causal Factors chart. It is as wide as the moment's size and about three-fifths as tall, and an icon inside it is cropped to the oval, as in the other shapes. Version 3's manifest lists it as `"shapes": ["ellipse"]`. Versions 1 and 2 remain supported and unchanged: a timeline pinned to one of them treats a stored `ellipse` as an unknown shape, drawing a circle and leaving the stored value as it is, until Moment shapes is reinstalled from the catalogue.
 
+## Presumptive outline
+
+Install **Presumptive outline** (`presumptive-outline`, version 1) to mark moments, stack entries and durations as presumptive: not yet confirmed by evidence. Events and causal factors charts draw presumptive events and conditions with dashed outlines, and so does the timeline ([#325](https://github.com/openchronology/timeline-app/issues/325)). Its field is a checkbox, **Presumptive (unconfirmed)**, stored as `presumptive`:
+
+```json
+{ "title": "Valve left open", "presumptive": true }
+```
+
+- **Checkbox:** checking it stores `true`; unchecking it removes the key. A stored `true`, or the text `"true"`, reads as checked; any other value reads as unchecked and is kept until the box is changed.
+- **Moments and stack entries:** the marker's outline is dashed, whatever its shape, color or icon: dark dashes over its white border, so they show on light and dark backgrounds and against any marker color. Every shape of [Moment shapes](#moment-shapes) is dashed along its own outline.
+- **Durations:** the band has a dashed border, as does a collapsed duration on the axis.
+- **Summaries:** group summaries, and a band standing for several durations, stay as they are, since their members may differ. Headings stay as they are too.
+- **Reading:** the details panel shows the checkbox (read-only for viewers), the reader shows a **Presumptive (unconfirmed)** flag on the moment, duration or stack entry, and the hover card of **Focus on hover** has a dashed border.
+- **Disabling:** disabling or removing the plugin draws everything solid again; the metadata is kept.
+
+The plugin's marker is `{ "kind": "outline", "metadataKey": "presumptive" }`: dashed while that key's toggle is on. Both the `toggle` field kind and the `outline` marker are available to other plugins, and a script can return `api.outline("dashed")` (or `"solid"`). Without `targets`, an outline marker applies to moments and durations, like a color marker. Overviews carry a toggle that is on (`true`) along with text fields, so shared and read-only timelines, the desktop app and duration bands show the same outlines.
+
 ## Authoring scripts
 
 Open **Plugins → Create / import plugin**. The editor starts with a working status example. This works in the single-file offline build too. The JSON editor defines the identity and host input components; the source editor defines rendering behavior. **Install on timeline** applies it immediately, replacing the same ID in place. Definitions can also be imported/exported as `.plugin.json` files. Saved `.ochx` and `.och` timelines include the complete source and fields, so loading them never requires fetching code from the catalogue.
 
-This is the same bounded interpreter used for custom time formatters, with a separate plugin API. It accepts a JavaScript/TypeScript-like subset, rather than full JavaScript. Host components support `text`, `multiline`, `color`, `shape`, `size`, `image-url`, `links`, and `stack` fields. They automatically participate in the moment editor and stack editor; recursive stacks are excluded. Scripts return rendering effects; they cannot construct arbitrary HTML, add arbitrary DOM components, execute code, or mutate metadata/time. Expanding those host components requires an application release.
+This is the same bounded interpreter used for custom time formatters, with a separate plugin API. It accepts a JavaScript/TypeScript-like subset, rather than full JavaScript. Host components support `text`, `multiline`, `color`, `shape`, `size`, `image-url`, `links`, `toggle`, and `stack` fields. They automatically participate in the moment editor and stack editor; recursive stacks are excluded. Scripts return rendering effects; they cannot construct arbitrary HTML, add arbitrary DOM components, execute code, or mutate metadata/time. Expanding those host components requires an application release.
 
 Example manifest:
 
@@ -331,6 +348,7 @@ function render(moment: string, api: PluginAPI): string {
 | `get(key)`                                                             | Read a declared field, title, or description as bounded text. Missing/structured values become empty text. |
 | `shape(name)`                                                          | Choose a supported shape. Unrecognized/empty input contributes no effect.                                  |
 | `color(hex)`                                                           | Choose a six-digit hex color. Unrecognized/empty input contributes no effect.                              |
+| `outline(style)`                                                       | Outline the marker or band `dashed` or `solid`. Unrecognized/empty input contributes no effect.            |
 | `icon(key)`                                                            | Use the URL from a declared `image-url` field.                                                             |
 | `card()`                                                               | Enable the title/notes/image hover card.                                                                   |
 | `none()`                                                               | Contribute no marker effects.                                                                              |

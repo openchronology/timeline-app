@@ -516,9 +516,10 @@ impl Snapshot {
                 // joined to that moment by time (events_time index) to send its ID, title
                 // (cut to 512 characters) and metadata: whole when it is at most 2048 bytes,
                 // otherwise only the plugin keys in ?1 (text fields, descriptions cut to 512
-                // characters, and small arrays), or {} if even that exceeds 2048 bytes. More
+                // characters, toggles that are on and small arrays), or {} if even that exceeds
+                // 2048 bytes. More
                 // than 1025 groups fails the row budget rather than truncating the frame.
-                let rows=db.query_limited("SELECT p.time,p.last_time,p.weight,p.distinct_count,p.visited_nodes,e.id,CASE WHEN json_valid(e.metadata) THEN substr(json_extract(e.metadata,'$.title'),1,512) END,CASE WHEN length(CAST(e.metadata AS BLOB))<=2048 THEN e.metadata ELSE (SELECT CASE WHEN length(projected)<=2048 THEN projected ELSE '{}' END FROM (SELECT json_group_object(j.key,CASE WHEN j.type='text' THEN substr(j.value,1,CASE WHEN j.key='description' THEN 512 ELSE 10000 END) ELSE json(j.value) END) AS projected FROM json_each(e.metadata) j WHERE j.key IN (SELECT value FROM json_each(?)) AND (j.type='text' OR (j.type='array' AND length(j.value)<=2048)))) END FROM points p LEFT JOIN events e ON p.weight=1 AND e.time=p.time COLLATE RATIONAL_V1 WHERE p.lower=q(?) AND p.upper=q(?) AND p.include_upper=1 AND p.threshold=q(?) AND p.mode='span' ORDER BY p.time COLLATE RATIONAL_V1 LIMIT 1026",&[&metadata_keys,&q.lower,&q.upper,&threshold],1025,BUDGET)?;
+                let rows=db.query_limited("SELECT p.time,p.last_time,p.weight,p.distinct_count,p.visited_nodes,e.id,CASE WHEN json_valid(e.metadata) THEN substr(json_extract(e.metadata,'$.title'),1,512) END,CASE WHEN length(CAST(e.metadata AS BLOB))<=2048 THEN e.metadata ELSE (SELECT CASE WHEN length(projected)<=2048 THEN projected ELSE '{}' END FROM (SELECT json_group_object(j.key,CASE WHEN j.type='text' THEN substr(j.value,1,CASE WHEN j.key='description' THEN 512 ELSE 10000 END) WHEN j.type='true' THEN json('true') ELSE json(j.value) END) AS projected FROM json_each(e.metadata) j WHERE j.key IN (SELECT value FROM json_each(?)) AND (j.type IN ('text','true') OR (j.type='array' AND length(j.value)<=2048)))) END FROM points p LEFT JOIN events e ON p.weight=1 AND e.time=p.time COLLATE RATIONAL_V1 WHERE p.lower=q(?) AND p.upper=q(?) AND p.include_upper=1 AND p.threshold=q(?) AND p.mode='span' ORDER BY p.time COLLATE RATIONAL_V1 LIMIT 1026",&[&metadata_keys,&q.lower,&q.upper,&threshold],1025,BUDGET)?;
                 let mut groups = Vec::new();
                 let mut visited = 0u64;
                 for row in rows {
@@ -2887,5 +2888,42 @@ mod summary_equivalence_tests {
         }
         assert_eq!(compared, 12 * 42);
         assert!(groups > 1000, "the windows produced summaries ({groups})");
+    }
+}
+/// Toggles (#325): a `true` that a plugin draws with, such as a presumptive moment or
+/// duration, reaches the overview, from a moment's projected metadata and a duration's band.
+#[cfg(test)]
+mod toggle_tests {
+    use super::*;
+    #[test]
+    fn toggles_that_are_on_reach_moment_projections_and_bands() {
+        let snapshot = Snapshot::from_document(
+            &serde_json::from_value(json!({
+                "format":"openchronology","version":1,"title":"Toggles","description":"",
+                "events":[{"id":"big","time":"0/1","metadata":{
+                    "title":"Big","description":"x".repeat(4096),"presumptive":true,"other":true
+                }}],
+                "durations":[{"id":"d","start":"-50/1","end":"50/1","metadata":{
+                    "title":"D","presumptive":true,"off":false,"count":3
+                }}]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let frame = snapshot
+            .query(
+                &serde_json::from_value(json!({"kind":"overview","lower":"-100/1","upper":"100/1",
+                    "threshold":"1/1","metadata_keys":["presumptive"]}))
+                .unwrap(),
+            )
+            .unwrap();
+        let moment = &frame["groups"][0]["metadata"];
+        assert_eq!(moment["presumptive"], json!(true));
+        assert!(
+            moment.get("other").is_none(),
+            "Only the plugins' keys: {moment}"
+        );
+        let band = &frame["durations"][0]["metadata"];
+        assert_eq!(band, &json!({"title":"D","presumptive":true}));
     }
 }
