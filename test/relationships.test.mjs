@@ -3,7 +3,14 @@
 // sparse edits and merges.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Q, TimelineIndex, Viewport, validateDocument, filterDocument } from '../dist/core.mjs';
+import {
+  Q,
+  TimelineIndex,
+  Viewport,
+  validateDocument,
+  filterDocument,
+  arcPath,
+} from '../dist/core.mjs';
 import { RemoteWorkspace } from '../dist/remote-cache.mjs';
 import { applyPatch } from '../server/store.mjs';
 import { rebaseDocument } from '../server/merge.mjs';
@@ -132,4 +139,36 @@ test('merges treat links as a set and drop links to entities the merge removes',
     { a: { duration: 'x' }, b: { moment: 'a' } },
     { a: { moment: 'c' }, b: { moment: 'lone' } },
   ]);
+});
+
+test('an arc is drawn only over the stage, as the same parabola, wherever its ends are', () => {
+  /** A drawn arc's height at x: its path is one quadratic with its control midway in x. */
+  const at = (d, x) => {
+    const [x0, y0, , cy, x1, y1] = d.match(/-?[\d.e+]+/g).map(Number);
+    const t = (x - x0) / (x1 - x0);
+    return (1 - t) ** 2 * y0 + 2 * t * (1 - t) * cy + t ** 2 * y1;
+  };
+  const parabola = (xa, xb, x) => {
+    const t = (x - xa) / (xb - xa);
+    return 192 - 4 * 150 * t * (1 - t);
+  };
+  // Wholly in view, it is the arc as before: ends on the axis, its middle `lift` over it.
+  const whole = arcPath(100, 300, 192, 40, -64, 464);
+  assert.equal(whole, 'M 100 192 Q 200 112 300 192');
+  // Ends twenty million pixels apart, panned: only the stage's part, at the parabola's heights.
+  for (const shift of [0, 7.25, 25, 333.5]) {
+    const xa = -1e7 + shift,
+      xb = 1e7 + shift;
+    const d = arcPath(xa, xb, 192, 150, -64, 464);
+    assert(
+      d.match(/-?[\d.e+]+/g).every((v) => Math.abs(Number(v)) < 1000),
+      d,
+    );
+    for (const x of [-64, 0, 200, 464])
+      assert(Math.abs(at(d, x) - parabola(xa, xb, x)) < 1e-6, `${shift}: ${x}`);
+  }
+  // Either order of ends; nothing when the arc is entirely off screen.
+  assert.equal(arcPath(300, 100, 192, 40, -64, 464), whole);
+  assert.equal(arcPath(1000, 2000, 192, 40, -64, 464), '');
+  assert.equal(arcPath(-2000, -1000, 192, 40, -64, 464), '');
 });

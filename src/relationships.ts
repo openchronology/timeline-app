@@ -172,3 +172,36 @@ export function arcFromBand(band: DurationBand): EdgeBand {
     last: band.last,
   };
 }
+/**
+ * The SVG path of a relationship's arc between screen positions `xa` and `xb` on the axis at
+ * height `axis`, rising `lift` pixels at its middle, drawn only over `left`–`right` (the stage,
+ * plus a margin). The arc is the parabola y = axis − 4·lift·t(1 − t), with t running from 0 at
+ * `xa` to 1 at `xb`; the part in view is returned as its own quadratic curve with the same shape.
+ * An endpoint far off screen would otherwise put a coordinate millions of pixels away, and
+ * browsers draw such a curve as a few straight chords, whose height in view jumps as the view
+ * pans. Empty when no part of the arc is in view.
+ */
+export function arcPath(
+  xa: number,
+  xb: number,
+  axis: number,
+  lift: number,
+  left: number,
+  right: number,
+): string {
+  const lo = Math.min(xa, xb),
+    hi = Math.max(xa, xb);
+  const x0 = Math.max(lo, left),
+    x1 = Math.min(hi, right);
+  if (!(x0 <= x1) || hi === lo) return lo >= left && lo <= right ? `M ${lo} ${axis}` : '';
+  const y = (x: number) => {
+    const t = (x - lo) / (hi - lo);
+    return axis - 4 * lift * t * (1 - t);
+  };
+  // A quadratic curve whose control point sits midway in x passes through the parabola's middle
+  // point when its control is at twice that height less the ends' mean.
+  const xm = (x0 + x1) / 2,
+    y0 = y(x0),
+    y1 = y(x1);
+  return `M ${x0} ${y0} Q ${xm} ${2 * y(xm) - (y0 + y1) / 2} ${x1} ${y1}`;
+}

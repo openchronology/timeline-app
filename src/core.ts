@@ -38,6 +38,7 @@ export {
   edgeTree,
   edgeBand,
   arcFromBand,
+  arcPath,
 } from './relationships.js';
 export type { EdgeBand, EntityRef, Relationship } from './relationships.js';
 export { durationGroups, coalesceGroups, entityCount } from './summaries.js';

@@ -111,6 +111,7 @@ import {
   mappedEntities,
   unchangedMapping,
   durationLanes,
+  arcPath,
 } from './core.js';
 import type {
   EntityRef,
@@ -9258,7 +9259,10 @@ function renderEdgeArcs() {
       edgeArcs.set(edge.id, arc);
     }
     shown.add(edge.id);
-    const d = `M ${xa} ${axis} Q ${(xa + xb) / 2} ${axis - 2 * lift} ${xb} ${axis}`;
+    // Only the part over the stage, so an endpoint far off screen never puts a coordinate
+    // millions of pixels away (which browsers draw coarsely, flickering as the view pans).
+    const margin = 64,
+      d = arcPath(xa, xb, axis, lift, -margin, stageWidth() / uiScale + margin);
     arc.path.setAttribute('d', d);
     arc.halo.setAttribute('d', d);
     // Names change only with the timeline's content, not as the view moves.

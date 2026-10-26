@@ -104,8 +104,68 @@ export async function checkRelationships(page, restore) {
     await page.locator('#separation-rejoin').click();
     await page.locator('#separation-settings').waitFor({ state: 'hidden' });
     await page.waitForFunction(() => document.querySelectorAll('.edge-arc').length === 2);
+
+    // An arc whose endpoints are far off screen keeps its place as the view pans: only the part
+    // over the stage is drawn, so no coordinate is millions of pixels away (which browsers draw
+    // as coarse chords whose height jumps between frames).
+    await imported({
+      format: 'openchronology',
+      version: 1,
+      title: 'Relationships far off screen',
+      description: '',
+      events: [
+        { id: 'past', time: '-10000000/1', metadata: { title: 'Past' } },
+        { id: 'here', time: '1000/1', metadata: { title: 'Here' } },
+        { id: 'future', time: '10000000/1', metadata: { title: 'Future' } },
+      ],
+      relationships: [{ a: { moment: 'past' }, b: { moment: 'future' } }],
+    });
+    await page.locator('#left-bound').fill('990');
+    await page.locator('#right-bound').fill('1010');
+    await page.locator('#apply-bounds').click();
+    await page.waitForFunction(() => document.querySelector('.edge-arc')?.getAttribute('d'));
+    const stage = await page.locator('#timeline-stage').boundingBox();
+    /** The arc's numbers, and its height where it crosses the middle of the stage. */
+    const sample = () =>
+      page.evaluate(() => {
+        const svg = document.getElementById('edge-arcs'),
+          arc = svg.querySelector('.edge-arc');
+        const n = arc
+          .getAttribute('d')
+          .match(/-?[\d.e+]+/g)
+          .map(Number);
+        const [x0, y0, cx, cy, x1, y1] = n;
+        // In the arcs' own coordinates: the layer is the stage's width at the current size.
+        const middle = parseFloat(svg.style.width) / 2;
+        const t = (middle - x0) / (x1 - x0);
+        return {
+          numbers: n,
+          control: cx === (x0 + x1) / 2,
+          y: (1 - t) ** 2 * y0 + 2 * t * (1 - t) * cy + t ** 2 * y1,
+        };
+      });
+    const heights = [];
+    for (let step = 0; step < 8; step++) {
+      await page.mouse.move(stage.x + stage.width / 2, stage.y + stage.height - 40);
+      await page.mouse.down();
+      await page.mouse.move(stage.x + stage.width / 2 + 25, stage.y + stage.height - 40, {
+        steps: 3,
+      });
+      await page.mouse.up();
+      await page.evaluate(() => new Promise(requestAnimationFrame));
+      const { numbers, control, y } = await sample();
+      assert(
+        numbers.every((v) => Math.abs(v) < 5000),
+        `arc coordinates stay near the stage: ${numbers}`,
+      );
+      assert(control, 'the drawn part is the same parabola');
+      heights.push(y);
+    }
+    // Midway between endpoints twenty million apart, the arc is at its peak, 150 px over the
+    // axis, in every frame.
+    for (const y of heights) assert(Math.abs(y - (192 - 150)) < 0.5, `arc height ${heights}`);
     console.log(
-      'PASS relationships: linking by search, transitive count, arcs, navigation, unlink and undo, separation by connections.',
+      'PASS relationships: linking by search, transitive count, arcs, navigation, unlink and undo, separation by connections, arcs far off screen.',
     );
   } finally {
     if (await page.locator('#separation-settings').isVisible())
