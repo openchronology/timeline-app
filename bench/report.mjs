@@ -284,6 +284,7 @@ const SCENARIO_NAMES = {
   'fit-all': 'Fit all',
   'pinch-zoom': 'Pinch zoom (longest frame)',
   'vertical-pinch': 'Vertical pinch (longest frame)',
+  'dense-durations': 'Drag over dense durations (longest frame)',
   'open-moment': 'Open a moment',
   typing: 'Typing (per key)',
   'save-moment': 'Save a moment',

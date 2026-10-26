@@ -58,6 +58,13 @@ try {
   assert.equal(frame.durations.length, 256);
   assert(frame.durationsTruncated);
   assert(frame.durations.every((b) => b.first === '-100/1' && b.last === '100/1'));
+  // Past 256 the window counts them (#316), and keeps the same 256 the browser's index would.
+  assert.equal(frame.durationsTotal, 300);
+  assert.equal(frame.durationsTotalMore, undefined);
+  assert.deepEqual(
+    frame.durations.map((b) => b.id),
+    new TimelineIndex(doc).frame(new Viewport(Q.zero, Q.one), 1000).durations.map((b) => b.id),
+  );
   // Viewport bands carry short plugin fields but not arbitrary metadata.
   assert.deepEqual(frame.durations[0].metadata, {
     title: frame.durations[0].metadata.title,
@@ -181,6 +188,63 @@ try {
     });
   } finally {
     await pool.query('DELETE FROM oc_timelines WHERE id=$1', [old.id]);
+  }
+  // A dense window (#316): 3,000 spans of the same time and staggered spans longer than them
+  // but starting after them. The frame keeps its longest in start order and counts them all;
+  // the list pages, searches and sorts every duration touching the window.
+  const dense = await store.create(user, {
+    format: 'openchronology',
+    version: 1,
+    title: 'Dense',
+    description: '',
+    events: [],
+    durations: [
+      ...Array.from({ length: 3000 }, (_, i) => ({
+        id: 'same' + String(i).padStart(4, '0'),
+        start: '100/1',
+        end: '900/1',
+        metadata: { title: 'Same ' + i },
+      })),
+      ...Array.from({ length: 18 }, (_, i) => ({
+        id: 'stair' + String(i).padStart(2, '0'),
+        start: `${105 + i * 80}/1`,
+        end: `${1000 + i * 90}/1`,
+        metadata: { title: 'Stair ' + i },
+      })),
+    ],
+  });
+  try {
+    const window = { lower: '0/1', upper: '3000/1', threshold: '0/1' };
+    const denseFrame = await store.query(dense.id, user, { kind: 'overview', ...window });
+    assert.equal(denseFrame.durations.length, 256);
+    assert.equal(denseFrame.durationsTotal, 3018);
+    const kept = denseFrame.durations.map((b) => b.id);
+    for (let i = 0; i < 18; i++) assert(kept.includes('stair' + String(i).padStart(2, '0')));
+    assert.deepEqual(
+      denseFrame.durations.map((b) => Q.parse(b.first)),
+      denseFrame.durations.map((b) => Q.parse(b.first)).sort((a, b) => a.compare(b)),
+    );
+    const list = (extra) =>
+      store.query(dense.id, user, {
+        kind: 'durations',
+        overlapping: true,
+        ...window,
+        limit: 25,
+        ...extra,
+      });
+    const first = await list({});
+    assert.equal(first.total, 3018);
+    assert.equal(first.durations[0].id, 'stair17');
+    assert.equal(first.next, 25);
+    const third = await list({ offset: 50, sort: 'start' });
+    assert.equal(third.durations.length, 25);
+    assert(third.durations.every((b) => b.id.startsWith('same')));
+    const stairs = await list({ text: 'STAIR 1', sort: 'title' });
+    assert.equal(stairs.total, 9);
+    assert.equal(stairs.durations[0].id, 'stair01');
+    assert.equal(stairs.next, null);
+  } finally {
+    await pool.query('DELETE FROM oc_timelines WHERE id=$1', [dense.id]);
   }
   console.log(
     'PASS PostgreSQL durations: standalone definitions, anchored and fixed endpoints, bounded frames, sparse edits, pinned deletions, immutable history and legacy conversion.',

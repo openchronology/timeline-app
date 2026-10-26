@@ -328,6 +328,16 @@ export class ComparisonView {
     const frame = {
       durations: frames.flatMap((f) => f.durations ?? []),
       durationsTruncated: frames.some((f) => f.durationsTruncated),
+      // How many touch the window across the timelines, where some were left out (#316).
+      ...(frames.some((f) => f.durationsTruncated)
+        ? {
+            durationsTotal: frames.reduce(
+              (n, f) => n + (f.durationsTotal ?? f.durations?.length ?? 0),
+              0,
+            ),
+            ...(frames.some((f) => f.durationsTotalMore) ? { durationsTotalMore: true } : {}),
+          }
+        : {}),
       groups: frames.flatMap((f) => f.groups),
       visitedNodes: frames.reduce((n, f) => n + f.visitedNodes, 0),
     };

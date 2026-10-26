@@ -2564,6 +2564,47 @@ dialog button {
   left: 48px;
   font-size: 11px;
 }
+/* The bands that didn't fit their rows, and any not sent, behind one chip (#316). */
+.duration-more {
+  position: absolute;
+  pointer-events: auto;
+  min-height: 0;
+  height: 16px;
+  padding: 0 8px;
+  justify-content: flex-start;
+  border: 1px dashed var(--timeline-duration, #73958b);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--timeline-duration, #73958b) 18%, transparent);
+  color: var(--timeline-duration-text, #213d33);
+  box-shadow: none;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.duration-more:hover,
+.duration-more:focus-visible {
+  background: color-mix(in srgb, var(--timeline-duration, #73958b) 32%, transparent);
+  z-index: 3;
+}
+/* A band standing for several nearly identical spans (#316) is outlined twice. */
+.duration-band[data-grouped]:not([data-grouped='1']) {
+  box-shadow: 0 0 0 1px var(--timeline-duration, #73958b);
+}
+#duration-list .search-row select {
+  flex: 0 0 auto;
+  width: auto;
+}
+.duration-list-item {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+.duration-list-item .search-result {
+  flex: 1;
+  min-width: 0;
+}
 .duration-endpoints {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));

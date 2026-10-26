@@ -748,6 +748,10 @@ export class RemoteWorkspace extends TimelineIndex {
         groups,
         durations: bands.slice(0, 256),
         durationsTruncated: frame.durationsTruncated || bands.length > 256,
+        // Unsaved durations can push a window past 256 that the server counted under it.
+        ...(!frame.durationsTruncated && bands.length > 256
+          ? { durationsTotal: bands.length }
+          : {}),
         edges: this.overlayEdges(frame.edges ?? [], view, threshold),
       },
       threshold,

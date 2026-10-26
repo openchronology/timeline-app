@@ -11,6 +11,10 @@ import {
   durationTree,
   durationWindow,
   durationLanes,
+  arrangeDurations,
+  compareDurationRank,
+  durationCountText,
+  DURATION_COUNT_CAP,
   fixMissingAnchors,
   durationPlugins,
   momentPlugins,
@@ -351,4 +355,189 @@ test('overlapping durations never share a row; rows free up once a band ends (#2
     ]),
     [0, 0, 0],
   );
+});
+
+// A band as the window sends it, from `first` to `last`, titled.
+const band = (id, first, last, title = id, sourceKey) => ({
+  id,
+  start: String(first),
+  end: String(last),
+  first: Q.from(BigInt(first)).toString(),
+  last: Q.from(BigInt(last)).toString(),
+  startTime: Q.from(BigInt(first)).toString(),
+  endTime: Q.from(BigInt(last)).toString(),
+  metadata: { title },
+  ...(sourceKey ? { sourceKey } : {}),
+});
+test('past 256 bands, a window counts its durations up to the cap (#316)', () => {
+  const same = (n) =>
+    Array.from({ length: n }, (_, i) => ({
+      id: 'd' + i,
+      start: '0/1',
+      end: '100/1',
+      metadata: {},
+    }));
+  const few = durationWindow(
+    durationTree(same(10), () => undefined),
+    Q.zero,
+    Q.from(100n),
+  );
+  assert.equal(few.durationsTruncated, false);
+  assert.equal(few.durationsTotal, undefined);
+  const many = durationWindow(
+    durationTree(same(3000), () => undefined),
+    Q.zero,
+    Q.from(100n),
+  );
+  assert.equal(many.durations.length, 256);
+  assert.equal(many.durationsTotal, 3000);
+  assert.equal(many.durationsTotalMore, undefined);
+  const beyond = durationWindow(
+    durationTree(same(DURATION_COUNT_CAP + 5), () => undefined),
+    Q.zero,
+    Q.from(100n),
+  );
+  assert.equal(beyond.durationsTotal, DURATION_COUNT_CAP);
+  assert.equal(beyond.durationsTotalMore, true);
+  assert.equal(durationCountText(DURATION_COUNT_CAP, true), '10,000+');
+  // A dense window sends its longest, in start order: spans longer than the 3,000 same ones
+  // but starting after them are kept, though the first 256 by start would leave them out.
+  const later = Array.from({ length: 18 }, (_, i) => ({
+    id: 'later' + i,
+    start: `${105 + i * 80}/1`,
+    end: `${1000 + i * 90}/1`,
+    metadata: {},
+  }));
+  const ranked = durationWindow(
+    durationTree([...same(3000), ...later], () => undefined),
+    Q.zero,
+    Q.from(3000n),
+  );
+  const kept = ranked.durations.map((b) => b.id);
+  assert.equal(kept.length, 256);
+  assert(later.every((d) => kept.includes(d.id)));
+  assert.deepEqual(
+    ranked.durations.map((b) => Q.parse(b.first)),
+    ranked.durations.map((b) => Q.parse(b.first)).sort((a, b) => a.compare(b)),
+  );
+  assert.equal(durationCountText(1234), '1,234');
+});
+test('nearly identical spans share one band; rows go longest first and stop at the cap (#316)', () => {
+  // One pixel per unit of time; grouping within 5 pixels.
+  const pixels = (span) =>
+    Number(span.toString().split('/')[0]) / Number(span.toString().split('/')[1]);
+  const bands = [
+    band('era', 0, 1000, 'An era'),
+    ...Array.from({ length: 40 }, (_, i) =>
+      band('same' + i, 100 + (i % 3), 300 - (i % 4), 'Same ' + i),
+    ),
+    band('short', 400, 450, 'Short'),
+    // Six bands overlapping each other, apart from the rest, to fill rows past the cap.
+    ...Array.from({ length: 6 }, (_, i) =>
+      band('stack' + i, 500 + i * 30, 900 - i * 20, 'Stack ' + i),
+    ),
+  ];
+  const { shown, hidden } = arrangeDurations(bands, pixels, 5, 4);
+  // The forty near-identical spans are one band, led by the first in rank order.
+  const same = shown.find((s) => s.band.id.startsWith('same'));
+  assert.equal(same.members.length, 40);
+  assert.equal(
+    same.band.id,
+    [...bands].filter((b) => b.id.startsWith('same')).sort(compareDurationRank)[0].id,
+  );
+  // The longest takes the first row.
+  assert.equal(shown.find((s) => s.band.id === 'era').row, 0);
+  // No two bands in one row overlap (#269).
+  for (const a of shown)
+    for (const b of shown)
+      if (a !== b && a.row === b.row && (a.band.sourceKey ?? '') === (b.band.sourceKey ?? ''))
+        assert(
+          Q.parse(a.band.last).compare(Q.parse(b.band.first)) <= 0 ||
+            Q.parse(b.band.last).compare(Q.parse(a.band.first)) <= 0,
+        );
+  // At most four rows; what needed more is hidden, every band accounted for once.
+  assert(shown.every((s) => s.row < 4));
+  const hiddenIds = hidden.flatMap((h) => h.bands.map((b) => b.id));
+  assert(hiddenIds.length > 0);
+  assert.equal(shown.reduce((n, s) => n + s.members.length, 0) + hiddenIds.length, bands.length);
+  // A comparison's timelines are arranged apart, each with its own rows.
+  const two = arrangeDurations(
+    [band('a', 0, 10, 'A', 'one'), band('b', 0, 10, 'B', 'two')],
+    pixels,
+    0,
+    1,
+  );
+  assert.deepEqual(two.shown.map((s) => [s.band.sourceKey, s.row]).sort(), [
+    ['one', 0],
+    ['two', 0],
+  ]);
+});
+test('the arrangement depends on the durations, not on where the view is (#316)', () => {
+  const bands = Array.from({ length: 300 }, (_, i) =>
+    band('d' + i, (i * 37) % 500, ((i * 37) % 500) + 50 + ((i * 13) % 400), 'D' + (i % 7)),
+  );
+  const pixels = (span) =>
+    Number(span.toString().split('/')[0]) / Number(span.toString().split('/')[1]);
+  const layout = (list) =>
+    JSON.stringify(
+      arrangeDurations(list, pixels, 3, 8).shown.map((s) => [s.band.id, s.row, s.members.length]),
+    );
+  const first = layout(bands);
+  // Same bands in another order (a different window's tree walk): the same layout.
+  assert.equal(layout([...bands].reverse()), first);
+  assert.equal(layout([...bands].sort(() => 0.5 - Math.random())), first);
+  // Panning only moves the bands; grouping uses distances in time, so nothing reshuffles.
+  assert.equal(layout(bands.map((b) => ({ ...b }))), first);
+});
+test('a dense window keeps exactly the longest durations and counts them (#316, randomized)', () => {
+  let seed = 316;
+  const random = (n) => (seed = (seed * 1103515245 + 12345) % 2147483648) % n;
+  for (let round = 0; round < 40; round++) {
+    const durations = Array.from({ length: 50 + random(900) }, (_, i) => {
+      const start = random(200),
+        length = random(4) === 0 ? random(400) : random(60);
+      return {
+        id: 'd' + String(random(100000)).padStart(5, '0') + '-' + i,
+        start: `${start}/1`,
+        end: `${start + length}/${1 + random(2)}`,
+        metadata: {},
+      };
+    });
+    const tree = durationTree(durations, () => undefined);
+    const lower = Q.from(BigInt(random(150))),
+      upper = lower.add(Q.from(BigInt(1 + random(120)))),
+      threshold = random(3) ? Q.from(BigInt(random(30))) : null,
+      limit = 1 + random(80);
+    const window = durationWindow(tree, lower, upper, limit, threshold);
+    // Brute force: every duration touching the window and reaching the threshold, ranked.
+    const all = durations
+      .map((d) => {
+        const a = Q.parse(d.start),
+          b = Q.parse(d.end);
+        return { id: d.id, first: a.min(b), last: a.max(b) };
+      })
+      .filter(
+        (b) =>
+          b.first.compare(upper) <= 0 &&
+          b.last.compare(lower) >= 0 &&
+          (threshold === null || b.last.sub(b.first).compare(threshold) >= 0),
+      )
+      .sort(
+        (a, b) =>
+          b.last.sub(b.first).compare(a.last.sub(a.first)) ||
+          a.first.compare(b.first) ||
+          (a.id < b.id ? -1 : 1),
+      );
+    const expected = all
+      .slice(0, limit)
+      .sort((a, b) => a.first.compare(b.first) || (a.id < b.id ? -1 : 1))
+      .map((b) => b.id);
+    assert.deepEqual(
+      window.durations.map((b) => b.id),
+      expected,
+      `round ${round}`,
+    );
+    assert.equal(window.durationsTruncated, all.length > limit);
+    assert.equal(window.durationsTotal, all.length > limit ? all.length : undefined);
+  }
 });

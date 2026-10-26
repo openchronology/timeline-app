@@ -27,6 +27,7 @@ import {
   RESERVED_NAMES,
   SLUG_RULE,
   TIMELINE_UUID,
+  DURATION_COUNT_CAP,
 } from '../dist/core.mjs';
 import { randomUUID } from 'node:crypto';
 import { pluginCompiler } from './plugin-sandbox.mjs';
@@ -2085,12 +2086,18 @@ export class PostgresStore {
           [tree, query.lower, query.upper, threshold],
         );
         // Bands are durations at least as long as the threshold; shorter ones are summarized.
-        // LIMIT 257 reads one more than the 256 returned, to tell whether there were more.
+        // A dense window sends its 256 longest (#316): the walk's matches in start order, up
+        // to one past DURATION_COUNT_CAP (which also counts them), ranked longest first, then
+        // by start and ID, the first 256 kept and returned in start order.
         const intervals = await c.query(
-          `${walk(names.durations, names.roots, 'duration_root', pruned)} SELECT band FROM visible WHERE first_time<=$3::mpq AND last_time>=$2::mpq
-          AND ($4::mpq='0'::mpq OR last_time-first_time>=$4::mpq) LIMIT 257`,
+          `${walk(names.durations, names.roots, 'duration_root', pruned)},
+          matches AS (SELECT band,first_time,last_time FROM visible WHERE first_time<=$3::mpq AND last_time>=$2::mpq
+            AND ($4::mpq='0'::mpq OR last_time-first_time>=$4::mpq) LIMIT ${DURATION_COUNT_CAP + 1}),
+          kept AS (SELECT band,first_time FROM matches ORDER BY last_time-first_time DESC,first_time,band->>'id' COLLATE "C" LIMIT 256)
+          SELECT band,(SELECT count(*)::int FROM matches) AS total FROM kept ORDER BY first_time,band->>'id' COLLATE "C"`,
           [tree, query.lower, query.upper, threshold],
         );
+        const total = intervals.rows[0]?.total ?? 0;
         // Arcs use the same pruned interval query, over the relationship arc tree
         // (oc_edge_nodes, rooted at edge_root); separation views draw none.
         const arcs = view
@@ -2130,8 +2137,14 @@ export class PostgresStore {
           })),
         );
         return {
-          durations: intervals.rows.slice(0, 256).map((r) => r.band),
-          durationsTruncated: intervals.rows.length > 256,
+          durations: intervals.rows.map((r) => r.band),
+          durationsTruncated: total > 256,
+          ...(total > 256
+            ? {
+                durationsTotal: Math.min(total, DURATION_COUNT_CAP),
+                ...(total > DURATION_COUNT_CAP ? { durationsTotalMore: true } : {}),
+              }
+            : {}),
           edges: arcs.rows.slice(0, 256).map((r) => arcFromBand(r.band)),
           edgesTruncated: arcs.rows.length > 256,
           revision: t.revision,
@@ -2252,6 +2265,38 @@ export class PostgresStore {
           })),
           total: rows[0]?.total ?? '0',
           page: query.page,
+          revision: t.revision,
+        };
+      }
+      if (query.kind === 'durations' && query.overlapping) {
+        // The durations touching a window and at least `threshold` long, as the bands drawn
+        // there (#316): a page of `limit` from `offset`, optionally only those whose title
+        // contains `text`, longest first (or by start, or by title), with how many match,
+        // counted up to DURATION_COUNT_CAP. Offsets stop at the cap, so a page costs at most
+        // that many rows.
+        const order = {
+          extent: `last_time-first_time DESC,first_time,band->>'id' COLLATE "C"`,
+          start: `first_time,band->>'id' COLLATE "C"`,
+          title: `lower(band->'metadata'->>'title') COLLATE "C",first_time,band->>'id' COLLATE "C"`,
+        }[query.sort ?? 'extent'];
+        const where = `first_time<=$3::mpq AND last_time>=$2::mpq
+          AND ($4::mpq='0'::mpq OR last_time-first_time>=$4::mpq)
+          AND ($5='' OR strpos(lower(band->'metadata'->>'title'),lower($5))>0)`;
+        const params = [tree, query.lower, query.upper, query.threshold ?? '0', query.text ?? ''];
+        const { rows } = await c.query(
+          `SELECT band FROM ${from('durations')} x WHERE ${where} ORDER BY ${order} LIMIT $6 OFFSET $7`,
+          [...params, query.limit + 1, query.offset ?? 0],
+        );
+        const counted = await c.query(
+          `SELECT count(*)::int AS n FROM (SELECT 1 FROM ${from('durations')} x WHERE ${where} LIMIT ${DURATION_COUNT_CAP + 1}) c`,
+          params,
+        );
+        const total = counted.rows[0].n;
+        return {
+          durations: rows.slice(0, query.limit).map((r) => r.band),
+          next: rows.length > query.limit ? (query.offset ?? 0) + query.limit : null,
+          total: Math.min(total, DURATION_COUNT_CAP),
+          ...(total > DURATION_COUNT_CAP ? { totalMore: true } : {}),
           revision: t.revision,
         };
       }
