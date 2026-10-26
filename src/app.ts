@@ -765,6 +765,8 @@ reducedMotion.addEventListener('change', () => {
     for (const label of [...momentLabels.values(), ...stackLabels.values()]) finishTimeFade(label);
 });
 let menuGeneration = 0;
+/** What the open timeline menu was opened on, and where it was then (see closeMenuOnScroll). */
+let menuAnchor: { node: Element; left: number; top: number } | null = null;
 let longPressTimer: ReturnType<typeof setTimeout> | undefined;
 let longPressed = false;
 let frame: Frame = { groups: [], visitedNodes: 0 },
@@ -4588,6 +4590,7 @@ function fit() {
 
 function closeTimelineMenu() {
   menuGeneration++;
+  menuAnchor = null;
   const menu = el('timeline-menu');
   if (menu.contains(document.activeElement)) stage.focus({ preventScroll: true });
   if (menu.matches(':popover-open')) menu.hidePopover();
@@ -4677,6 +4680,12 @@ function showTimelineMenu(
   closeTimelineMenu();
   const menu = el('timeline-menu');
   const details = el<HTMLDialogElement>('inspector');
+  // Read before the menu shows, so the menu itself is not what lies under the point.
+  const node = document.elementFromPoint(x, y);
+  if (node) {
+    const rect = node.getBoundingClientRect();
+    menuAnchor = { node, left: rect.left, top: rect.top };
+  }
   (details.open ? details : document.body).append(menu);
   menu.replaceChildren();
   const add = (label: string, action: () => void) => {
@@ -4901,7 +4910,21 @@ document.addEventListener('pointerdown', (event) => {
   if (!el('timeline-menu').contains(event.target as Node)) closeTimelineMenu();
 });
 window.addEventListener('resize', closeTimelineMenu);
-window.addEventListener('scroll', closeTimelineMenu, true);
+/**
+ * Scrolling closes the menu once what it was opened on has moved, or gone. A scroll event can
+ * arrive a frame after the scroll itself, so one for a scroll that ended before the menu opened
+ * (a press or right-click straight after scrolling) would otherwise close it at once (#308).
+ */
+function closeMenuOnScroll() {
+  if (el('timeline-menu').hidden) return;
+  if (menuAnchor?.node.isConnected) {
+    const rect = menuAnchor.node.getBoundingClientRect();
+    if (Math.abs(rect.left - menuAnchor.left) < 1 && Math.abs(rect.top - menuAnchor.top) < 1)
+      return;
+  }
+  closeTimelineMenu();
+}
+window.addEventListener('scroll', closeMenuOnScroll, true);
 window.addEventListener('blur', () => {
   clearTimeout(longPressTimer);
   closeTimelineMenu();
