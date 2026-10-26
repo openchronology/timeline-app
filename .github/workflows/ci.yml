@@ -306,6 +306,8 @@ jobs:
         run: node test/sharing-postgres.mjs
       - name: Reports and moderation in a live browser
         run: node test/moderation-live-postgres.mjs
+      - name: Agreeing to the terms in a live browser
+        run: node test/terms-live-postgres.mjs
       - name: Saving while others save, in a live browser
         run: node test/save-merge-live-postgres.mjs
       - name: Sensitive-content labels in a live browser

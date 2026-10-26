@@ -19,6 +19,8 @@ export default function TermsPrompt({ version }) {
   async function agree(event) {
     event.preventDefault();
     if (busy) return;
+    // Read before awaiting: React clears event.currentTarget once the handler yields.
+    const acceptTerms = new FormData(event.currentTarget).get('acceptTerms');
     setBusy(true);
     setError('');
     try {
@@ -26,7 +28,7 @@ export default function TermsPrompt({ version }) {
       await api('auth/terms', {
         method: 'POST',
         csrf: session.csrf,
-        data: { acceptTerms: new FormData(event.currentTarget).get('acceptTerms') },
+        data: { acceptTerms },
       });
       window.location.reload();
     } catch (e) {
