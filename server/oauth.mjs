@@ -23,12 +23,24 @@ export const pkce = (verifier) => createHash('sha256').update(verifier).digest('
 export const MICROSOFT_CONSUMERS = '9188040d-6c67-4c5b-b112-36a304b66dad';
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /**
+ * Whether `OAUTH_<NAME>_ENABLED` leaves a provider on: unset or empty, 1, true, yes or on keep it;
+ * 0, false, no or off turn it off though its client ID and secret stay set (for example while a
+ * provider's app review is pending). Any other value stops the server at start-up.
+ */
+function enabled(env, prefix) {
+  const value = (env[prefix + 'ENABLED'] ?? '').trim().toLowerCase();
+  if (['', '1', 'true', 'yes', 'on'].includes(value)) return true;
+  if (['0', 'false', 'no', 'off'].includes(value)) return false;
+  throw new Error(`Set ${prefix}ENABLED to true or false.`);
+}
+/**
  * The configured identity providers from `env`: each of Google, GitHub, Facebook and Microsoft
  * whose client ID and secret are both set (Facebook also needs OAUTH_FACEBOOK_GRAPH_VERSION).
  * Microsoft's OAUTH_MICROSOFT_TENANT says whose accounts may sign in: `organizations` (the
  * default: any work or school account), `common` (those and personal Microsoft accounts),
  * `consumers` (personal accounts only), or one tenant by its ID or a domain name of it (one
- * school's accounts only). OAUTH_MICROSOFT_LABEL names its button. Throws at start-up on half a
+ * school's accounts only). OAUTH_MICROSOFT_LABEL names its button. A provider turned off with
+ * OAUTH_<NAME>_ENABLED is left out, its settings unchecked. Throws at start-up on half a
  * configuration or an invalid tenant rather than quietly disabling the provider.
  */
 export function providersFromEnv(env = process.env) {
@@ -37,6 +49,7 @@ export function providersFromEnv(env = process.env) {
     const prefix = `OAUTH_${name.toUpperCase()}_`,
       clientId = env[prefix + 'CLIENT_ID'],
       clientSecret = env[prefix + 'CLIENT_SECRET'];
+    if (!enabled(env, prefix)) continue;
     if (clientId && clientSecret) {
       const version = env.OAUTH_FACEBOOK_GRAPH_VERSION;
       if (name === 'facebook' && !/^v\d+\.\d+$/.test(version ?? ''))

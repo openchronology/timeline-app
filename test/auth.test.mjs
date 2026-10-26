@@ -23,6 +23,25 @@ test('provider configuration fails closed and PKCE follows the RFC vector', () =
     }).facebook.version,
     'v23.0',
   );
+  // A configured provider can be turned off with OAUTH_<NAME>_ENABLED, and its settings are then
+  // not checked; a value that is neither on nor off stops the server.
+  const facebook = {
+    OAUTH_FACEBOOK_CLIENT_ID: 'id',
+    OAUTH_FACEBOOK_CLIENT_SECRET: 'secret',
+    OAUTH_FACEBOOK_GRAPH_VERSION: 'v23.0',
+  };
+  for (const value of ['false', '0', 'off', 'No'])
+    assert.deepEqual(providersFromEnv({ ...facebook, OAUTH_FACEBOOK_ENABLED: value }), {});
+  assert.deepEqual(
+    providersFromEnv({ OAUTH_FACEBOOK_CLIENT_ID: 'id', OAUTH_FACEBOOK_ENABLED: 'false' }),
+    {},
+  );
+  for (const value of ['', 'true', '1', 'on'])
+    assert(providersFromEnv({ ...facebook, OAUTH_FACEBOOK_ENABLED: value }).facebook);
+  assert.throws(
+    () => providersFromEnv({ ...facebook, OAUTH_FACEBOOK_ENABLED: 'maybe' }),
+    /ENABLED/,
+  );
   // Microsoft: work and school accounts by default; a tenant by name, ID or domain; a label.
   const microsoft = (env) =>
     providersFromEnv({
