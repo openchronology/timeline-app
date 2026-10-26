@@ -42,6 +42,41 @@ export async function checkZoomHelp(page) {
   }, target.left.toString());
   assert.equal((await camera()).span.toString(), target.span.toString());
 
+  // The first frame after a zoom key already moves the view (#319). A busy page handles input
+  // at the start of a frame, after the frame's timestamp, so the animation's first tick saw no
+  // time pass and redrew the old view. Frame timestamps are shifted 50 ms back here to make that
+  // happen every time; the result is read after the frame paints (a message posted from
+  // requestAnimationFrame runs after it).
+  const view = () => page.evaluate(() => document.getElementById('markers').dataset.view);
+  await page.evaluate(() => {
+    window.__raf = window.requestAnimationFrame;
+    window.requestAnimationFrame = (callback) => window.__raf((now) => callback(now - 50));
+  });
+  for (let i = 0; i < 5; i++) {
+    await page.evaluate(() => {
+      const before = document.getElementById('markers').dataset.view;
+      window.__firstZoomFrame = null;
+      addEventListener(
+        'keydown',
+        () => {
+          const channel = new MessageChannel();
+          channel.port1.onmessage = () =>
+            (window.__firstZoomFrame = document.getElementById('markers').dataset.view !== before);
+          window.__raf(() => channel.port2.postMessage(0));
+        },
+        { capture: true, once: true },
+      );
+    });
+    const shown = await view();
+    await stage.focus();
+    await page.keyboard.press(i % 2 ? '-' : '+');
+    await page.waitForFunction(() => window.__firstZoomFrame !== null);
+    assert.equal(await page.evaluate(() => window.__firstZoomFrame), true, 'first frame moves');
+    await page.waitForFunction(() => !document.getElementById('timeline-stage').dataset.zooming);
+    assert.notEqual(await view(), shown);
+  }
+  await page.evaluate(() => (window.requestAnimationFrame = window.__raf));
+
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.waitForFunction(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
   await page.evaluate(

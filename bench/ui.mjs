@@ -288,10 +288,6 @@ const SCENARIOS = [
     name: 'keyboard-zoom',
     group: 'navigation',
     budget: 'view',
-    // CI's runners measure this at 246–262 ms on a 4× slowed CPU since late October 2026, past
-    // the gate's 1.5 × 150 ms, with no code change found to explain it. Its gate allows 2× (300 ms)
-    // until it is profiled (#319); the product budget itself stays 150 ms.
-    gateTolerance: 2,
     async run(d, t) {
       await show(d, t.fitted.left, t.fitted.right);
       await d.focus('#timeline-stage');

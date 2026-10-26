@@ -4509,7 +4509,11 @@ function animateView(destination: Viewport, automatic = false) {
       cancelZoomAnimation();
       return;
     }
-    const progress = Math.min(1, Math.max(0, (now - started) / 220));
+    // The first frame advances at least one frame interval. Input arrives at the start of a
+    // frame, after that frame's timestamp, so `now - started` is zero or less on the first tick:
+    // it would redraw the unchanged view at full cost and the zoom would show a frame late
+    // (#319).
+    const progress = Math.min(1, Math.max(1000 / 60, now - started) / 220);
     if (progress === 1) {
       cancelZoomAnimation();
       navigate(destination, false);
