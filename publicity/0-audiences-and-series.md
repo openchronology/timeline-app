@@ -45,25 +45,27 @@ The same facts are true for everyone; what changes is the order, the example and
 
 ## 2 · The series
 
-Eleven videos. Three are for everyone; the rest each answer one audience. All are 16:9. The social feeds get their own cuts rather than crops: eight vertical [shorts](shorts/0-shorts-audiences-and-series.md), each made for one community on TikTok, YouTube Shorts and Reels.
+Thirteen videos. Three are for everyone; the rest each answer one audience. All are 16:9. The social feeds get their own cuts rather than crops: ten vertical [shorts](shorts/0-shorts-audiences-and-series.md), each made for one community on TikTok, YouTube Shorts and Reels.
 
-| #   | Title                                    | For                          | Runtime | Goal                                                               | Ends on                                     |
-| --- | ---------------------------------------- | ---------------------------- | ------- | ------------------------------------------------------------------ | ------------------------------------------- |
-| 1   | **What is OpenChronology?**              | Everyone (front door)        | ~0:57   | One idea: any span of time, on one exact line you can zoom         | "Pick the video for what you do"            |
-| 2   | **How to see a timeline**                | Readers (A, B)               | ~1:58   | Read any timeline: markers, zoom, summaries, durations, the reader | "Open a public timeline"                    |
-| 3   | **Website, desktop or offline?**         | Owners of data (G), all      | ~2:17   | The editions side by side, and where each keeps your data          | "Download, or open the website"             |
-| 4   | **Exact time: rational numbers**         | Skeptics (F, E)              | ~2:52   | Why floating point fails for time, and how fractions don't         | "Every time is a fraction. Nothing rounds." |
-| 5   | **Tour: the United States, 1775–2008**   | Students, teachers (B, C)    | ~1:52   | A modern-history timeline built and read the way a class would     | "Make your class's timeline"                |
-| 6   | **Tour: a story's timeline**             | Writers, GMs (D)             | ~1:53   | An invented world: in-world calendar, character tracks, threads    | "Keep your canon straight"                  |
-| 7   | **Tour: keeping a canon (Middle-earth)** | Canon developers (D)         | ~1:45   | A vast, finished canon kept: its own calendar, sources, threads    | "Keep your canon"                           |
-| 8   | **Tour: deep time**                      | Science (E), all             | ~1:49   | 4.5 billion years and one human lifetime on the same line          | "From eons to seconds"                      |
-| 9   | **Working together**                     | Teachers, communities (C, J) | ~2:07   | Share, embed, collaborate, fork, propose, review                   | "Build it together"                         |
-| 10  | **Timelines from logs**                  | Operations (H)               | ~2:18   | Logs in, an incident's timeline out; retention; scale              | "Point your syslog at it"                   |
-| 11  | **Run your own server**                  | Administrators (I)           | ~2:11   | Packages, Docker, accounts, moderation, upgrades                   | "Install the package"                       |
+| #   | Title                                               | For                          | Runtime | Goal                                                                           | Ends on                                         |
+| --- | --------------------------------------------------- | ---------------------------- | ------- | ------------------------------------------------------------------------------ | ----------------------------------------------- |
+| 1   | **What is OpenChronology?**                         | Everyone (front door)        | ~0:57   | One idea: any span of time, on one exact line you can zoom                     | "Pick the video for what you do"                |
+| 2   | **How to see a timeline**                           | Readers (A, B)               | ~1:58   | Read any timeline: markers, zoom, summaries, durations, the reader             | "Open a public timeline"                        |
+| 3   | **Website, desktop or offline?**                    | Owners of data (G), all      | ~2:17   | The editions side by side, and where each keeps your data                      | "Download, or open the website"                 |
+| 4   | **Exact time: rational numbers**                    | Skeptics (F, E)              | ~2:52   | Why floating point fails for time, and how fractions don't                     | "Every time is a fraction. Nothing rounds."     |
+| 5   | **Tour: the United States, 1775–2008**              | Students, teachers (B, C)    | ~1:52   | A modern-history timeline built and read the way a class would                 | "Make your class's timeline"                    |
+| 6   | **Tour: a story's timeline**                        | Writers, GMs (D)             | ~1:53   | An invented world: in-world calendar, character tracks, threads                | "Keep your canon straight"                      |
+| 7   | **Tour: keeping a canon (Middle-earth)**            | Canon developers (D)         | ~1:45   | A vast, finished canon kept: its own calendar, sources, threads                | "Keep your canon"                               |
+| 8   | **Tour: deep time**                                 | Science (E), all             | ~1:49   | 4.5 billion years and one human lifetime on the same line                      | "From eons to seconds"                          |
+| 9   | **Working together**                                | Teachers, communities (C, J) | ~2:07   | Share, embed, collaborate, fork, propose, review                               | "Build it together"                             |
+| 10  | **Timelines from logs**                             | Operations (H)               | ~2:18   | Logs in, an incident's timeline out; retention; scale                          | "Point your syslog at it"                       |
+| 11  | **Run your own server**                             | Administrators (I)           | ~2:11   | Packages, Docker, accounts, moderation, upgrades                               | "Install the package"                           |
+| 12  | **Timelines from AI and automation**                | Automation (F, H), all       | ~3:05   | An assistant and any script, through an API key; how the app is built          | "Built by you, your scripts, or your assistant" |
+| 13  | **Investigations: from timeline to causal factors** | Investigators (H)            | ~3:08   | An events and causal factors chart: events, conditions, causal factors, review | "Every investigation is a timeline"             |
 
 **Why eleven rather than the four first asked for:** the four (reading, editions, rational numbers, tours) cover readers, owners and the curious. Three more audiences came out of the analysis with needs none of those meet: teachers and communities need collaboration, operators need log ingestion, administrators need the server. And the tour splits into four because makers are only convinced by their own kind of subject. Writers get two: Video 6 shows a world being written; Video 7 shows a vast, finished canon being kept (Tolkien's, from the Years of the Trees to the Fourth Age), for the people who maintain one: authors of long series, lore keepers for games and editors of fan chronologies, who need their own calendar, every date's source and certainty, and which book says what. A one-minute front door (1) lets every other video assume the basics.
 
-**Order of release (suggested):** 1, 2 and 5 together (the widest audience, and a teacher can use all three in a lesson), then 6, 7 and 8, then 3 and 4, then 9, 10 and 11 for the communities that will host and build.
+**Order of release (suggested):** 1, 2 and 5 together (the widest audience, and a teacher can use all three in a lesson), then 6, 7 and 8, then 3 and 4, then 9, 10 and 11 for the communities that will host and build, then 12 and 13 for automation and investigations.
 
 ---
 
@@ -80,7 +82,7 @@ What changes is the ground and the accent, so each video feels made for its audi
 | **Parchment** | 6          | Deep ink-blue ground with gold and ember accents; a serif title | A storyteller's tone, not a spreadsheet's                      |
 | **Lore**      | 7          | Deep forest green with gold; a serif title                      | A keeper of lore, between the storyteller's and the scholar's  |
 | **Strata**    | 8          | Night-sky ground with rock-strata bands for eons                | Deep time feels deep; the bands are the geological column      |
-| **Terminal**  | 4, 10, 11  | Dark ink ground, mono type, green and amber highlights          | Engineers and administrators trust what looks like their tools |
+| **Terminal**  | 4, 10–13   | Dark ink ground, mono type, green and amber highlights          | Engineers and administrators trust what looks like their tools |
 
 **The tours (5, 6, 7, 8) and the logs video (10) show the real app.** Their timelines are sample files (`publicity/video/samples/`) opened in the actual editor and captured zooming and panning, framed in a browser window. Everything else is drawn as an infographic, like CMR Scanner's videos, so it stays clear at any size and doesn't date when the interface changes.
 

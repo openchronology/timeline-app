@@ -1,0 +1,339 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:04,780"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 4780
+			},
+			"text": " I asked an AI assistant to build a Star Wars timeline, from the comics to the games.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.93092,
+					"t_dtw": -1
+				},
+				{
+					"text": " I",
+					"timestamps": {
+						"from": "00:00:00,030",
+						"to": "00:00:00,070"
+					},
+					"offsets": {
+						"from": 30,
+						"to": 70
+					},
+					"id": 314,
+					"p": 0.92656,
+					"t_dtw": -1
+				},
+				{
+					"text": " asked",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:00,450"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 450
+					},
+					"id": 1965,
+					"p": 0.998342,
+					"t_dtw": -1
+				},
+				{
+					"text": " an",
+					"timestamps": {
+						"from": "00:00:00,450",
+						"to": "00:00:00,570"
+					},
+					"offsets": {
+						"from": 450,
+						"to": 570
+					},
+					"id": 281,
+					"p": 0.997097,
+					"t_dtw": -1
+				},
+				{
+					"text": " AI",
+					"timestamps": {
+						"from": "00:00:00,700",
+						"to": "00:00:00,750"
+					},
+					"offsets": {
+						"from": 700,
+						"to": 750
+					},
+					"id": 9552,
+					"p": 0.931246,
+					"t_dtw": -1
+				},
+				{
+					"text": " assistant",
+					"timestamps": {
+						"from": "00:00:00,750",
+						"to": "00:00:01,440"
+					},
+					"offsets": {
+						"from": 750,
+						"to": 1440
+					},
+					"id": 8796,
+					"p": 0.970852,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:01,440",
+						"to": "00:00:01,590"
+					},
+					"offsets": {
+						"from": 1440,
+						"to": 1590
+					},
+					"id": 284,
+					"p": 0.989546,
+					"t_dtw": -1
+				},
+				{
+					"text": " build",
+					"timestamps": {
+						"from": "00:00:01,590",
+						"to": "00:00:01,970"
+					},
+					"offsets": {
+						"from": 1590,
+						"to": 1970
+					},
+					"id": 1382,
+					"p": 0.996502,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:01,970",
+						"to": "00:00:02,040"
+					},
+					"offsets": {
+						"from": 1970,
+						"to": 2040
+					},
+					"id": 257,
+					"p": 0.988859,
+					"t_dtw": -1
+				},
+				{
+					"text": " Star",
+					"timestamps": {
+						"from": "00:00:02,040",
+						"to": "00:00:02,340"
+					},
+					"offsets": {
+						"from": 2040,
+						"to": 2340
+					},
+					"id": 2907,
+					"p": 0.938044,
+					"t_dtw": -1
+				},
+				{
+					"text": " Wars",
+					"timestamps": {
+						"from": "00:00:02,340",
+						"to": "00:00:02,640"
+					},
+					"offsets": {
+						"from": 2340,
+						"to": 2640
+					},
+					"id": 6176,
+					"p": 0.998249,
+					"t_dtw": -1
+				},
+				{
+					"text": " timeline",
+					"timestamps": {
+						"from": "00:00:02,640",
+						"to": "00:00:03,160"
+					},
+					"offsets": {
+						"from": 2640,
+						"to": 3160
+					},
+					"id": 15264,
+					"p": 0.940091,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,430",
+						"to": "00:00:03,430"
+					},
+					"offsets": {
+						"from": 3430,
+						"to": 3430
+					},
+					"id": 11,
+					"p": 0.704582,
+					"t_dtw": -1
+				},
+				{
+					"text": " from",
+					"timestamps": {
+						"from": "00:00:03,540",
+						"to": "00:00:03,660"
+					},
+					"offsets": {
+						"from": 3540,
+						"to": 3660
+					},
+					"id": 422,
+					"p": 0.786862,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:03,660",
+						"to": "00:00:03,830"
+					},
+					"offsets": {
+						"from": 3660,
+						"to": 3830
+					},
+					"id": 262,
+					"p": 0.995082,
+					"t_dtw": -1
+				},
+				{
+					"text": " comics",
+					"timestamps": {
+						"from": "00:00:03,830",
+						"to": "00:00:04,160"
+					},
+					"offsets": {
+						"from": 3830,
+						"to": 4160
+					},
+					"id": 12770,
+					"p": 0.986857,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:04,180",
+						"to": "00:00:04,290"
+					},
+					"offsets": {
+						"from": 4180,
+						"to": 4290
+					},
+					"id": 284,
+					"p": 0.993295,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:04,290",
+						"to": "00:00:04,460"
+					},
+					"offsets": {
+						"from": 4290,
+						"to": 4460
+					},
+					"id": 262,
+					"p": 0.99361,
+					"t_dtw": -1
+				},
+				{
+					"text": " games",
+					"timestamps": {
+						"from": "00:00:04,460",
+						"to": "00:00:04,720"
+					},
+					"offsets": {
+						"from": 4460,
+						"to": 4720
+					},
+					"id": 1830,
+					"p": 0.983086,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,780",
+						"to": "00:00:04,780"
+					},
+					"offsets": {
+						"from": 4780,
+						"to": 4780
+					},
+					"id": 13,
+					"p": 0.937934,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_239]",
+					"timestamps": {
+						"from": "00:00:04,780",
+						"to": "00:00:04,780"
+					},
+					"offsets": {
+						"from": 4780,
+						"to": 4780
+					},
+					"id": 50602,
+					"p": 0.0750994,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,860 @@
+{
+ "format": "openchronology",
+ "version": 1,
+ "title": "Investigation: forklift collision, aisle 14",
+ "description": "A made-up investigation laid out as an Events and Causal Factors chart: a forklift reversing out of aisle 14 on the night shift of 15–16 October strikes a picker crossing the aisle end. Primary events, conditions, evidence, causal factors and the root cause. The warehouse, its people and its records are invented.",
+ "presentation": {
+  "mode": "gregorian",
+  "unit": "",
+  "scale": "1/1",
+  "origin": "0/1",
+  "version": 1,
+  "offsetMinutes": 0,
+  "significantDigits": 6
+ },
+ "tags": [
+  "investigation",
+  "causal factor analysis",
+  "made up"
+ ],
+ "plugins": [
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-stacks",
+    "version": 2,
+    "name": "Moment stacks",
+    "description": "Keep ordered entries inside a moment, sharing its time and the timeline’s other metadata plugins. Stacks cannot be nested.",
+    "fields": [
+     {
+      "kind": "stack",
+      "metadataKey": "stack",
+      "label": "Moment stack"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-shapes",
+    "version": 2,
+    "name": "Moment shapes",
+    "description": "Choose geometric and flowchart symbols for moments and stack entries: decisions, processes, documents and more.",
+    "fields": [
+     {
+      "kind": "shape",
+      "metadataKey": "shape",
+      "label": "Moment shape"
+     },
+     {
+      "kind": "size",
+      "metadataKey": "shapeSize",
+      "label": "Moment size"
+     }
+    ],
+    "marker": {
+     "kind": "shape",
+     "metadataKey": "shape"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.merge(api.shape(api.get(\"shape\")), api.size(api.get(\"shapeSize\"))); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-colors",
+    "version": 2,
+    "name": "Moment colors",
+    "description": "Choose muted semantic swatches or a custom color for moments and stack entries while preserving their white borders.",
+    "fields": [
+     {
+      "kind": "color",
+      "metadataKey": "color",
+      "label": "Moment color"
+     }
+    ],
+    "marker": {
+     "kind": "color",
+     "metadataKey": "color"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.color(api.get(\"color\")); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "rich-text-notes",
+    "version": 1,
+    "name": "Rich text notes",
+    "description": "Edit moment and stack notes visually, storing portable Markdown. Hover cards render safe headings, emphasis, lists, code and HTTPS links. HTML and images are not executed.",
+    "fields": [],
+    "notes": {
+     "kind": "markdown"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "dating-context",
+    "version": 1,
+    "name": "Dating context",
+    "description": "Explain the precision and coordinate convention of a moment. An exact stored coordinate can still represent an approximate age or a calendar-day marker.",
+    "fields": [
+     {
+      "kind": "text",
+      "metadataKey": "datePrecision",
+      "label": "Date precision"
+     },
+     {
+      "kind": "multiline",
+      "metadataKey": "coordinateConvention",
+      "label": "Coordinate convention"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  }
+ ],
+ "events": [
+  {
+   "id": "risk-review",
+   "time": "1791795600/1",
+   "metadata": {
+    "title": "No risk review of longer shifts",
+    "description": "**Root cause.** Peak-season night shifts were extended from 8 to 10 hours from 12 October. The change was approved without the risk review the site procedure requires, so nobody checked that safety roles, rest breaks and lighting checks still fitted the longer shift.\n\nEvidence: the change request (no risk assessment attached); interview with the shift manager.",
+    "tags": [
+     "condition",
+     "causal factor",
+     "root cause"
+    ],
+    "color": "#bc6663",
+    "shape": "terminator"
+   }
+  },
+  {
+   "id": "fault-report",
+   "time": "1791944100/1",
+   "metadata": {
+    "title": "Light fault: no work order",
+    "description": "A picker reported the light at the end of aisle 14 on the fault sheet. No work order was raised, so it was not repaired before the collision.\n\nEvidence: fault sheet, 14 October; the maintenance log.",
+    "tags": [
+     "condition",
+     "barrier"
+    ],
+    "color": "#d6ad4c",
+    "shape": "terminator"
+   }
+  },
+  {
+   "id": "sick-call",
+   "time": "1792091400/1",
+   "metadata": {
+    "title": "Spotter sick, not replaced",
+    "description": "The assigned spotter called in sick. The shift started without a replacement.\n\nEvidence: the attendance record; interview with the shift supervisor.",
+    "tags": [
+     "condition"
+    ],
+    "color": "#d6ad4c",
+    "shape": "terminator"
+   }
+  },
+  {
+   "id": "briefing",
+   "time": "1792094100/1",
+   "metadata": {
+    "title": "Pre-shift briefing",
+    "description": "Held as usual, but without the lighting walk the procedure lists (the written procedure assumes a 22:00 start).",
+    "tags": [
+     "secondary event"
+    ],
+    "color": "#7aadc4",
+    "shape": "process",
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "run-start",
+   "time": "1792116750/1",
+   "metadata": {
+    "title": "FL-3 starts a run",
+    "description": "The driver of forklift FL-3 starts moving pallets into aisle 14, in the seventh hour of a 10-hour shift.\n\nEvidence: FL-3 telematics; the task log.",
+    "tags": [
+     "primary event"
+    ],
+    "shape": "process",
+    "shapeSize": "large"
+   }
+  },
+  {
+   "id": "enters",
+   "time": "1792117908/1",
+   "metadata": {
+    "title": "FL-3 enters aisle 14",
+    "description": "Forward, to set a pallet down at the far end.\n\nEvidence: FL-3 telematics.",
+    "tags": [
+     "primary event"
+    ],
+    "shape": "process",
+    "shapeSize": "large"
+   }
+  },
+  {
+   "id": "picker-statement",
+   "time": "1792117800/1",
+   "metadata": {
+    "title": "Picker crosses (statement)",
+    "description": "**Unconfirmed.** The picker's statement puts this at about 02:30. Camera 7 shows 02:33:20; the camera's clock was checked against the network time afterwards, so the camera's time is used.",
+    "tags": [
+     "primary event",
+     "presumptive"
+    ],
+    "color": "#9aa49f",
+    "shape": "process",
+    "datePrecision": "About 02:30, from memory"
+   }
+  },
+  {
+   "id": "crosses",
+   "time": "1792118000/1",
+   "metadata": {
+    "title": "Picker crosses (camera 7)",
+    "description": "The picker walks along the cross-aisle towards zone C, past the end of aisle 14, which is dark.\n\nEvidence: camera 7.",
+    "tags": [
+     "primary event"
+    ],
+    "shape": "process",
+    "shapeSize": "large"
+   }
+  },
+  {
+   "id": "horn",
+   "time": "1792118036/1",
+   "metadata": {
+    "title": "Horn sounded? (driver)",
+    "description": "**Unconfirmed.** The driver says he sounded the horn before reversing. The picker heard no horn, and camera 7 has no sound. Kept as presumptive until it's confirmed or ruled out.",
+    "tags": [
+     "primary event",
+     "presumptive"
+    ],
+    "color": "#9aa49f",
+    "shape": "process"
+   }
+  },
+  {
+   "id": "reverses",
+   "time": "1792118038/1",
+   "metadata": {
+    "title": "FL-3 reverses out",
+    "description": "Reversing at about 7 km/h, with no spotter at the aisle end.\n\nEvidence: FL-3 telematics; camera 7.",
+    "tags": [
+     "primary event"
+    ],
+    "shape": "process",
+    "shapeSize": "large"
+   }
+  },
+  {
+   "id": "collision",
+   "time": "44802951234/25",
+   "metadata": {
+    "title": "Collision at aisle 14",
+    "description": "The reversing forklift strikes the picker at the end of aisle 14. The picker's leg is injured.\n\nThe time is camera 7’s frame: 02:34:09 and 9/25 of a second (frame 9 of 25 in that second).",
+    "tags": [
+     "primary event",
+     "incident"
+    ],
+    "color": "#bc6663",
+    "shape": "diamond",
+    "shapeSize": "large",
+    "stack": [
+     {
+      "id": "c-dark",
+      "metadata": {
+       "title": "Condition: aisle end dark",
+       "description": "The light at the end of aisle 14 had been out since Tuesday.",
+       "shape": "terminator",
+       "color": "#bc6663"
+      }
+     },
+     {
+      "id": "c-spotter",
+      "metadata": {
+       "title": "Condition: no spotter",
+       "description": "The procedure requires one for reversing out of narrow aisles.",
+       "shape": "terminator",
+       "color": "#bc6663"
+      }
+     },
+     {
+      "id": "c-fatigue",
+      "metadata": {
+       "title": "Presumptive: fatigue",
+       "description": "The seventh hour of a 10-hour shift, with no break after 01:00. Fatigue not confirmed.",
+       "shape": "terminator",
+       "color": "#9aa49f"
+      }
+     },
+     {
+      "id": "ev-camera",
+      "metadata": {
+       "title": "Evidence: camera 7 frame",
+       "description": "Contact at 02:34:09.36, frame 9 of 25 in that second; the clock checked against network time.",
+       "shape": "document"
+      }
+     },
+     {
+      "id": "ev-telematics",
+      "metadata": {
+       "title": "Evidence: FL-3 telematics",
+       "description": "Reversing at about 7 km/h; speed and direction logged once a second.",
+       "shape": "document"
+      }
+     },
+     {
+      "id": "ev-statements",
+      "metadata": {
+       "title": "Evidence: statements",
+       "description": "Driver, picker and supervisor, taken on 16 October; the horn is disputed.",
+       "shape": "document"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "supervisor",
+   "time": "1792118090/1",
+   "metadata": {
+    "title": "Supervisor alerted",
+    "description": "Radio log.",
+    "tags": [
+     "secondary event"
+    ],
+    "color": "#7aadc4",
+    "shape": "process",
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "ambulance-call",
+   "time": "1792118175/1",
+   "metadata": {
+    "title": "Ambulance called",
+    "description": "Phone log.",
+    "tags": [
+     "secondary event"
+    ],
+    "color": "#7aadc4",
+    "shape": "process",
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "first-aid",
+   "time": "1792118280/1",
+   "metadata": {
+    "title": "First aid given",
+    "description": "By the trained first aider on shift.",
+    "tags": [
+     "secondary event"
+    ],
+    "color": "#7aadc4",
+    "shape": "process",
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "cordon",
+   "time": "1792118760/1",
+   "metadata": {
+    "title": "Aisle 14 cordoned",
+    "description": "The scene is kept as it was for the investigation.",
+    "tags": [
+     "secondary event"
+    ],
+    "color": "#7aadc4",
+    "shape": "process",
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "ambulance",
+   "time": "1792119300/1",
+   "metadata": {
+    "title": "Ambulance arrives",
+    "description": "The picker is taken to hospital for a leg injury.",
+    "tags": [
+     "secondary event"
+    ],
+    "color": "#7aadc4",
+    "shape": "process",
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-1",
+   "time": "1792094490/1",
+   "metadata": {
+    "title": "Badge: door 5",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-2",
+   "time": "1792095123/1",
+   "metadata": {
+    "title": "Badge: door 3",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-3",
+   "time": "1792096063/1",
+   "metadata": {
+    "title": "FL-2 telematics: task 4408",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-4",
+   "time": "1792097227/1",
+   "metadata": {
+    "title": "FL-1 telematics: task 4584",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-5",
+   "time": "1792098264/1",
+   "metadata": {
+    "title": "Scanner: pick list 806",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-6",
+   "time": "1792099049/1",
+   "metadata": {
+    "title": "Badge: door 8",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-7",
+   "time": "1792100364/1",
+   "metadata": {
+    "title": "Badge: door 7",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-8",
+   "time": "1792101186/1",
+   "metadata": {
+    "title": "Badge: door 2",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-9",
+   "time": "1792102211/1",
+   "metadata": {
+    "title": "FL-1 telematics: task 4229",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-10",
+   "time": "1792103127/1",
+   "metadata": {
+    "title": "FL-1 telematics: task 4492",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-11",
+   "time": "1792104282/1",
+   "metadata": {
+    "title": "Scanner: pick list 775",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-12",
+   "time": "1792105355/1",
+   "metadata": {
+    "title": "Badge: door 8",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-13",
+   "time": "1792106704/1",
+   "metadata": {
+    "title": "FL-2 telematics: task 4878",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-14",
+   "time": "1792107607/1",
+   "metadata": {
+    "title": "Badge: door 1",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-15",
+   "time": "1792108409/1",
+   "metadata": {
+    "title": "Badge: door 2",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-16",
+   "time": "1792109855/1",
+   "metadata": {
+    "title": "Badge: door 3",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-17",
+   "time": "1792110743/1",
+   "metadata": {
+    "title": "Badge: door 4",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-18",
+   "time": "1792112153/1",
+   "metadata": {
+    "title": "Scanner: pick list 876",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-19",
+   "time": "1792113243/1",
+   "metadata": {
+    "title": "Scanner: pick list 747",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-20",
+   "time": "1792114168/1",
+   "metadata": {
+    "title": "FL-1 telematics: task 4294",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-21",
+   "time": "1792115009/1",
+   "metadata": {
+    "title": "Badge: door 1",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-22",
+   "time": "1792116116/1",
+   "metadata": {
+    "title": "Badge: door 2",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-23",
+   "time": "1792119379/1",
+   "metadata": {
+    "title": "FL-1 telematics: task 4646",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-24",
+   "time": "1792120450/1",
+   "metadata": {
+    "title": "Scanner: pick list 801",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-25",
+   "time": "1792121490/1",
+   "metadata": {
+    "title": "Badge: door 2",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  },
+  {
+   "id": "rec-26",
+   "time": "1792122712/1",
+   "metadata": {
+    "title": "FL-1 telematics: task 4106",
+    "tags": [
+     "record"
+    ],
+    "shapeSize": "small"
+   }
+  }
+ ],
+ "durations": [
+  {
+   "id": "shift",
+   "start": "1792094400/1",
+   "end": "1792130400/1",
+   "metadata": {
+    "title": "Night shift, 20:00–06:00",
+    "description": "The tenth night of the longer shifts.",
+    "tags": [
+     "shift"
+    ],
+    "color": "#7aadc4"
+   }
+  },
+  {
+   "id": "long-shifts",
+   "start": "1791835200/1",
+   "end": "1792130400/1",
+   "metadata": {
+    "title": "10-hour night shifts",
+    "description": "Night shifts 20:00–06:00 instead of 22:00–06:00, from 12 October; suspended after the collision.",
+    "tags": [
+     "condition"
+    ],
+    "color": "#d6ad4c"
+   }
+  },
+  {
+   "id": "light-out",
+   "start": "1791934800/1",
+   "end": "1792143000/1",
+   "metadata": {
+    "title": "Aisle 14 end light out",
+    "description": "**Causal factor.** The aisle end was dark: the picker could not be seen from the forklift, and the forklift’s rear could not be seen from the cross-aisle.\n\nEvidence: the fault sheet; camera 7; repaired 16 October at 09:30.",
+    "tags": [
+     "condition",
+     "causal factor",
+     "barrier"
+    ],
+    "color": "#bc6663"
+   }
+  },
+  {
+   "id": "no-spotter",
+   "start": "1792091400/1",
+   "end": "1792130400/1",
+   "metadata": {
+    "title": "No spotter on shift",
+    "description": "**Causal factor.** The procedure requires a spotter to guide forklifts reversing out of narrow aisles. None was on shift.\n\nEvidence: the rota; the attendance record.",
+    "tags": [
+     "condition",
+     "causal factor",
+     "barrier"
+    ],
+    "color": "#bc6663"
+   }
+  },
+  {
+   "id": "fatigue",
+   "start": "1792112400/1",
+   "end": "44802951234/25",
+   "metadata": {
+    "title": "Driver fatigue (unconfirmed)",
+    "description": "**Presumptive.** The driver was in the sixth and seventh hours of a 10-hour shift, with no rest break taken after 01:00. Fatigue is possible but not confirmed.",
+    "tags": [
+     "condition",
+     "presumptive"
+    ],
+    "color": "#9aa49f"
+   }
+  }
+ ],
+ "relationships": [
+  {
+   "a": {
+    "moment": "risk-review"
+   },
+   "b": {
+    "duration": "long-shifts"
+   }
+  },
+  {
+   "a": {
+    "duration": "long-shifts"
+   },
+   "b": {
+    "duration": "fatigue"
+   }
+  },
+  {
+   "a": {
+    "moment": "risk-review"
+   },
+   "b": {
+    "moment": "sick-call"
+   }
+  },
+  {
+   "a": {
+    "moment": "sick-call"
+   },
+   "b": {
+    "duration": "no-spotter"
+   }
+  },
+  {
+   "a": {
+    "moment": "fault-report"
+   },
+   "b": {
+    "duration": "light-out"
+   }
+  },
+  {
+   "a": {
+    "duration": "fatigue"
+   },
+   "b": {
+    "moment": "reverses"
+   }
+  },
+  {
+   "a": {
+    "moment": "run-start"
+   },
+   "b": {
+    "moment": "enters"
+   }
+  },
+  {
+   "a": {
+    "moment": "enters"
+   },
+   "b": {
+    "moment": "reverses"
+   }
+  },
+  {
+   "a": {
+    "moment": "reverses"
+   },
+   "b": {
+    "moment": "collision"
+   }
+  },
+  {
+   "a": {
+    "moment": "crosses"
+   },
+   "b": {
+    "moment": "collision"
+   }
+  },
+  {
+   "a": {
+    "duration": "light-out"
+   },
+   "b": {
+    "moment": "collision"
+   }
+  },
+  {
+   "a": {
+    "duration": "no-spotter"
+   },
+   "b": {
+    "moment": "collision"
+   }
+  }
+ ]
+}

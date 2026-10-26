@@ -1,0 +1,408 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:03,060"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 3060
+			},
+			"text": " A forklift strikes a worker on the night shift.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.90985,
+					"t_dtw": -1
+				},
+				{
+					"text": " A",
+					"timestamps": {
+						"from": "00:00:00,030",
+						"to": "00:00:00,070"
+					},
+					"offsets": {
+						"from": 30,
+						"to": 70
+					},
+					"id": 317,
+					"p": 0.912699,
+					"t_dtw": -1
+				},
+				{
+					"text": " fork",
+					"timestamps": {
+						"from": "00:00:00,270",
+						"to": "00:00:00,320"
+					},
+					"offsets": {
+						"from": 270,
+						"to": 320
+					},
+					"id": 15563,
+					"p": 0.994455,
+					"t_dtw": -1
+				},
+				{
+					"text": "lift",
+					"timestamps": {
+						"from": "00:00:00,420",
+						"to": "00:00:00,530"
+					},
+					"offsets": {
+						"from": 420,
+						"to": 530
+					},
+					"id": 26282,
+					"p": 0.985409,
+					"t_dtw": -1
+				},
+				{
+					"text": " strikes",
+					"timestamps": {
+						"from": "00:00:00,630",
+						"to": "00:00:01,090"
+					},
+					"offsets": {
+						"from": 630,
+						"to": 1090
+					},
+					"id": 8956,
+					"p": 0.999314,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:01,090",
+						"to": "00:00:01,090"
+					},
+					"offsets": {
+						"from": 1090,
+						"to": 1090
+					},
+					"id": 257,
+					"p": 0.997706,
+					"t_dtw": -1
+				},
+				{
+					"text": " worker",
+					"timestamps": {
+						"from": "00:00:01,170",
+						"to": "00:00:01,570"
+					},
+					"offsets": {
+						"from": 1170,
+						"to": 1570
+					},
+					"id": 8383,
+					"p": 0.99799,
+					"t_dtw": -1
+				},
+				{
+					"text": " on",
+					"timestamps": {
+						"from": "00:00:01,570",
+						"to": "00:00:01,700"
+					},
+					"offsets": {
+						"from": 1570,
+						"to": 1700
+					},
+					"id": 319,
+					"p": 0.995972,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:01,700",
+						"to": "00:00:01,890"
+					},
+					"offsets": {
+						"from": 1700,
+						"to": 1890
+					},
+					"id": 262,
+					"p": 0.994169,
+					"t_dtw": -1
+				},
+				{
+					"text": " night",
+					"timestamps": {
+						"from": "00:00:01,890",
+						"to": "00:00:02,170"
+					},
+					"offsets": {
+						"from": 1890,
+						"to": 2170
+					},
+					"id": 1755,
+					"p": 0.992297,
+					"t_dtw": -1
+				},
+				{
+					"text": " shift",
+					"timestamps": {
+						"from": "00:00:02,170",
+						"to": "00:00:02,360"
+					},
+					"offsets": {
+						"from": 2170,
+						"to": 2360
+					},
+					"id": 6482,
+					"p": 0.948748,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:02,600",
+						"to": "00:00:03,060"
+					},
+					"offsets": {
+						"from": 2600,
+						"to": 3060
+					},
+					"id": 13,
+					"p": 0.95803,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_153]",
+					"timestamps": {
+						"from": "00:00:03,060",
+						"to": "00:00:03,060"
+					},
+					"offsets": {
+						"from": 3060,
+						"to": 3060
+					},
+					"id": 50516,
+					"p": 0.019951,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:03,060",
+				"to": "00:00:06,000"
+			},
+			"offsets": {
+				"from": 3060,
+				"to": 6000
+			},
+			"text": " Everyone asks the same question, why did it happen?",
+			"tokens": [
+				{
+					"text": " Everyone",
+					"timestamps": {
+						"from": "00:00:03,330",
+						"to": "00:00:03,590"
+					},
+					"offsets": {
+						"from": 3330,
+						"to": 3590
+					},
+					"id": 11075,
+					"p": 0.991894,
+					"t_dtw": -1
+				},
+				{
+					"text": " asks",
+					"timestamps": {
+						"from": "00:00:03,590",
+						"to": "00:00:03,800"
+					},
+					"offsets": {
+						"from": 3590,
+						"to": 3800
+					},
+					"id": 7893,
+					"p": 0.995418,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:03,930",
+						"to": "00:00:04,040"
+					},
+					"offsets": {
+						"from": 3930,
+						"to": 4040
+					},
+					"id": 262,
+					"p": 0.999096,
+					"t_dtw": -1
+				},
+				{
+					"text": " same",
+					"timestamps": {
+						"from": "00:00:04,050",
+						"to": "00:00:04,310"
+					},
+					"offsets": {
+						"from": 4050,
+						"to": 4310
+					},
+					"id": 976,
+					"p": 0.999729,
+					"t_dtw": -1
+				},
+				{
+					"text": " question",
+					"timestamps": {
+						"from": "00:00:04,310",
+						"to": "00:00:04,840"
+					},
+					"offsets": {
+						"from": 4310,
+						"to": 4840
+					},
+					"id": 1808,
+					"p": 0.997919,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:04,840",
+						"to": "00:00:04,960"
+					},
+					"offsets": {
+						"from": 4840,
+						"to": 4960
+					},
+					"id": 11,
+					"p": 0.470057,
+					"t_dtw": -1
+				},
+				{
+					"text": " why",
+					"timestamps": {
+						"from": "00:00:05,020",
+						"to": "00:00:05,170"
+					},
+					"offsets": {
+						"from": 5020,
+						"to": 5170
+					},
+					"id": 1521,
+					"p": 0.46311,
+					"t_dtw": -1
+				},
+				{
+					"text": " did",
+					"timestamps": {
+						"from": "00:00:05,170",
+						"to": "00:00:05,260"
+					},
+					"offsets": {
+						"from": 5170,
+						"to": 5260
+					},
+					"id": 750,
+					"p": 0.997358,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:05,260",
+						"to": "00:00:05,420"
+					},
+					"offsets": {
+						"from": 5260,
+						"to": 5420
+					},
+					"id": 340,
+					"p": 0.998502,
+					"t_dtw": -1
+				},
+				{
+					"text": " happen",
+					"timestamps": {
+						"from": "00:00:05,450",
+						"to": "00:00:05,450"
+					},
+					"offsets": {
+						"from": 5450,
+						"to": 5450
+					},
+					"id": 1645,
+					"p": 0.995178,
+					"t_dtw": -1
+				},
+				{
+					"text": "?",
+					"timestamps": {
+						"from": "00:00:05,790",
+						"to": "00:00:05,800"
+					},
+					"offsets": {
+						"from": 5790,
+						"to": 5800
+					},
+					"id": 30,
+					"p": 0.964345,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_300]",
+					"timestamps": {
+						"from": "00:00:06,000",
+						"to": "00:00:06,000"
+					},
+					"offsets": {
+						"from": 6000,
+						"to": 6000
+					},
+					"id": 50663,
+					"p": 0.0245273,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

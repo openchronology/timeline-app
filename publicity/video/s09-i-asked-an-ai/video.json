@@ -1,0 +1,15 @@
+{
+  "script": "../../shorts/9-i-asked-an-ai.md",
+  "format": "vertical",
+  "look": "terminal",
+  "pace": 1.0,
+  "silence": 0.2,
+  "lead": 0.15,
+  "tail": 0.3,
+  "hold": 2.0,
+  "minDur": {
+    "2": 8,
+    "3": 7,
+    "4": 9
+  }
+}
