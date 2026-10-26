@@ -353,16 +353,47 @@ SCENES[1] = function (lt, q) {
   return s;
 };
 
-/* ---------- Scene 6: where the chart is approximate ---------- */
+/* ---------- Scene 6: drawn as the method draws it ---------- */
+/** An arc above the axis from x0 to x1 (core's arc), with an arrowhead at x1 once drawn. */
+function arcTo(x0, x1, y, h, color, p, w) {
+  var s = arc(x0, x1, y, p, { h: h, color: color, w: w || 0.9 });
+  if (p > 0.95) {
+    var dx = (x1 - x0) / 2,
+      dy = 2 * h,
+      l = Math.hypot(dx, dy),
+      ux = dx / l,
+      uy = dy / l,
+      k = 3;
+    s +=
+      '<path d="M' +
+      (x1 - ux * k - uy * k * 0.6) +
+      ' ' +
+      (y - uy * k + ux * k * 0.6) +
+      'L' +
+      x1 +
+      ' ' +
+      y +
+      'L' +
+      (x1 - ux * k + uy * k * 0.6) +
+      ' ' +
+      (y - uy * k - ux * k * 0.6) +
+      '" fill="none" stroke="' +
+      color +
+      '" stroke-width="' +
+      (w || 0.9) +
+      '" stroke-linejoin="round" stroke-linecap="round"/>';
+  }
+  return s;
+}
 SCENES[6] = function (lt, q) {
   var s = '';
   var L = 14,
-    M = 150,
-    Y0 = 20,
-    RH = 44;
+    M = 156,
+    Y0 = 16,
+    RH = 30;
   s += G(
     txt(L, Y0, 'ECF CONVENTION', { size: 4.6, anchor: 'start', fill: C.soft, ls: 0.6 }) +
-      txt(M, Y0, 'IN OPENCHRONOLOGY TODAY', { size: 4.6, anchor: 'start', fill: C.soft, ls: 0.6 }) +
+      txt(M, Y0, 'IN OPENCHRONOLOGY', { size: 4.6, anchor: 'start', fill: C.soft, ls: 0.6 }) +
       '<path d="M' +
       L +
       ' ' +
@@ -374,19 +405,26 @@ SCENES[6] = function (lt, q) {
   );
   var rows = [
     {
-      t: q('conditions'),
-      plan: q('ellipse'),
+      t: q(['ellipses', 'conditions']),
       ecf: function (y) {
         return (
-          oval(L + 22, y, 18, 8, '', {}) +
-          txt(L + 48, y + 1.8, 'Condition: an oval', { size: 6, anchor: 'start' })
+          oval(L + 20, y, 16, 7, '', {}) +
+          txt(L + 44, y + 1.8, 'Condition: an oval', { size: 6, anchor: 'start' })
         );
       },
       app: function (y) {
         return (
-          rect(M + 2, y - 6, 34, 12, C.card, { rx: 6, stroke: C.amber, sw: 0.8 }) +
-          txt(M + 44, y - 0.6, 'A stadium', { size: 6, anchor: 'start' }) +
-          txt(M + 44, y + 6.4, 'shape: terminator', {
+          '<ellipse cx="' +
+          (M + 18) +
+          '" cy="' +
+          y +
+          '" rx="16" ry="7" fill="' +
+          C.amber +
+          '" stroke="' +
+          C.text +
+          '" stroke-width="0.8"/>' +
+          txt(M + 42, y - 0.6, 'An ellipse · Moment shapes', { size: 5.6, anchor: 'start' }) +
+          txt(M + 42, y + 6.4, 'shape: ellipse', {
             size: 4.6,
             anchor: 'start',
             mono: true,
@@ -395,103 +433,123 @@ SCENES[6] = function (lt, q) {
           })
         );
       },
-      chip: 'ellipse · #324',
     },
     {
       t: q('presumptive'),
-      plan: q('dashed', 1),
       ecf: function (y) {
         return (
-          eventBox(L + 22, y, 36, 12, '', { stroke: C.soft, dash: '2 1.4' }) +
-          txt(L + 48, y + 1.8, 'Presumptive: dashed', { size: 6, anchor: 'start' })
+          eventBox(L + 20, y, 32, 12, '', { stroke: C.soft, dash: '2 1.4' }) +
+          txt(L + 44, y + 1.8, 'Presumptive: dashed', { size: 6, anchor: 'start' })
         );
       },
       app: function (y) {
         return (
-          eventBox(M + 19, y, 34, 12, '', { fill: '#9aa49f', stroke: '#9aa49f' }) +
-          chip(M + 44, y + 2.2, 'presumptive', C.soft, { size: 4.8 }) +
-          txt(M + 44 + chipWidth('presumptive', { size: 4.8 }) + 3, y + 2, 'muted color', {
-            size: 4.8,
+          rect(M + 2, y - 4, 32, 8, mix(C.amber, C.ground, 0.35), {
+            rx: 1.4,
+            stroke: C.text,
+            sw: 0.8,
+            dash: '2 1.4',
+          }) +
+          txt(M + 42, y - 0.6, 'A dashed outline · Presumptive outline', {
+            size: 5.6,
             anchor: 'start',
-            fill: C.soft,
-            weight: 500,
-          })
-        );
-      },
-      chip: 'dashed outline · #325',
-    },
-    {
-      t: q('relationships'),
-      plan: q('directed'),
-      ecf: function (y) {
-        return (
-          '<circle cx="' +
-          (L + 6) +
-          '" cy="' +
-          (y + 3) +
-          '" r="2" fill="' +
-          C.amber +
-          '"/>' +
-          arrow(L + 9, y + 3, L + 37, y + 3, C.text, 1) +
-          '<circle cx="' +
-          (L + 40) +
-          '" cy="' +
-          (y + 3) +
-          '" r="2" fill="' +
-          C.red +
-          '"/>' +
-          txt(L + 23, y - 2, 'caused', { size: 4.6, fill: C.soft, weight: 500, italic: true }) +
-          txt(L + 48, y + 1.8, 'Directed, labelled links', { size: 6, anchor: 'start' })
-        );
-      },
-      app: function (y) {
-        return (
-          '<circle cx="' +
-          (M + 4) +
-          '" cy="' +
-          (y + 4) +
-          '" r="2" fill="' +
-          C.amber +
-          '"/>' +
-          arc(M + 4, M + 34, y + 4, 1, { h: 6 }) +
-          '<circle cx="' +
-          (M + 34) +
-          '" cy="' +
-          (y + 4) +
-          '" r="2" fill="' +
-          C.red +
-          '"/>' +
-          txt(M + 44, y - 0.6, 'An arc, no direction or label', { size: 6, anchor: 'start' }) +
-          txt(M + 44, y + 6.4, 'time order and tags carry it', {
+          }) +
+          txt(M + 42, y + 6.4, 'presumptive: true', {
             size: 4.6,
             anchor: 'start',
+            mono: true,
             fill: C.soft,
             weight: 500,
           })
         );
       },
-      chip: 'directed, labelled · #326',
+    },
+    {
+      t: q('arrows'),
+      ecf: function (y) {
+        return (
+          '<circle cx="' +
+          (L + 4) +
+          '" cy="' +
+          (y + 3) +
+          '" r="2" fill="' +
+          C.amber +
+          '"/>' +
+          arrow(L + 7, y + 3, L + 33, y + 3, C.text, 1) +
+          '<circle cx="' +
+          (L + 36) +
+          '" cy="' +
+          (y + 3) +
+          '" r="2" fill="' +
+          C.red +
+          '"/>' +
+          txt(L + 44, y + 1.8, 'Cause → effect arrows', { size: 6, anchor: 'start' })
+        );
+      },
+      app: function (y) {
+        return (
+          '<circle cx="' +
+          (M + 3) +
+          '" cy="' +
+          (y + 4) +
+          '" r="2" fill="' +
+          C.amber +
+          '"/>' +
+          arcTo(M + 3, M + 31, y + 4, 5, C.arc, 1, 0.9) +
+          '<circle cx="' +
+          (M + 33) +
+          '" cy="' +
+          (y + 4) +
+          '" r="2" fill="' +
+          C.red +
+          '"/>' +
+          txt(M + 42, y - 0.6, 'Arrowheads · Relationship arrows', { size: 5.6, anchor: 'start' }) +
+          txt(M + 42, y + 6.4, 'arrows: "to" (cause → effect)', {
+            size: 4.6,
+            anchor: 'start',
+            mono: true,
+            fill: C.soft,
+            weight: 500,
+          })
+        );
+      },
     },
   ];
   rows.forEach(function (r, i) {
-    var y = Y0 + 24 + i * RH;
-    var p = P(lt, r.t - 0.2, 0.6);
-    s += G(r.ecf(y) + arrow(M - 14, y, M - 4, y, C.line, 1), { o: p, tx: (1 - p) * -6 });
-    s += G(r.app(y), { o: P(lt, r.t + 0.3, 0.6), tx: (1 - P(lt, r.t + 0.3, 0.6)) * 6 });
-    var cp = P(lt, r.plan + i * 0.1, 0.45);
-    var label = 'planned: ' + r.chip;
-    s += pop(
-      chip(306 - chipWidth(label, { size: 4.6 }), y + 16, label, C.accent, { size: 4.6 }),
-      cp,
-      290,
-      y + 14,
-    );
+    var y = Y0 + 18 + i * RH;
+    var p = P(lt, r.t - 0.2, 0.6),
+      pa = P(lt, r.t + 0.3, 0.6);
+    s += G(r.ecf(y) + arrow(M - 16, y, M - 6, y, C.line, 1), { o: p, tx: (1 - p) * -6 });
+    s += G(r.app(y) + check(310, y, C.green), { o: pa, tx: (1 - pa) * 6 });
     if (i < 2)
       s += G(
-        '<path d="M' + L + ' ' + (y + 24) + 'H306" stroke="' + C.faint + '" stroke-width="0.6"/>',
+        '<path d="M' + L + ' ' + (y + 15) + 'H306" stroke="' + C.faint + '" stroke-width="0.6"/>',
         { o: p },
       );
   });
+  // What stays true: the arrows are drawn, not meant.
+  var NY = Y0 + 18 + 3 * RH - 4,
+    np = P(lt, q('convention') - 0.3, 0.6);
+  var notes = [
+    ['Arrows are a drawing convention kept on the events.', q('convention')],
+    ['A link has no label, such as “caused” or “contributed to”.', q('label')],
+    ['Separate all connected doesn’t follow the arrows.', q('separate')],
+  ];
+  var nb = card(L, NY, 292, 46, { stroke: C.amber });
+  notes.forEach(function (n, k) {
+    nb += G(
+      '<circle cx="' +
+        (L + 9) +
+        '" cy="' +
+        (NY + 11.6 + k * 12) +
+        '" r="1.2" fill="' +
+        C.amber +
+        '"/>' +
+        txt(L + 14, NY + 13.4 + k * 12, n[0], { size: 5.6, anchor: 'start', weight: 600 }),
+      { o: P(lt, n[1] - 0.1, 0.45) },
+    );
+  });
+  s += rise(nb, np, 6);
   return s;
 };
 
@@ -1033,11 +1091,11 @@ SCENES[5] = function (lt, q) {
     s += callout(
       fx(900),
       fy(870),
-      'a muted color',
+      'a dashed outline',
       C.soft,
       undefined,
       undefined,
-      P(lt, q('muted') - 0.1, 0.5),
+      P(lt, q('dashed') - 0.1, 0.5),
       { anchor: 'middle', size: 5.2 },
     );
   }

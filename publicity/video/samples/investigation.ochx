@@ -40,9 +40,9 @@
    "manifest": {
     "apiVersion": 1,
     "id": "moment-shapes",
-    "version": 2,
+    "version": 3,
     "name": "Moment shapes",
-    "description": "Choose geometric and flowchart symbols for moments and stack entries: decisions, processes, documents and more.",
+    "description": "Choose geometric and flowchart symbols for moments and stack entries: decisions, processes, documents, conditions and more.",
     "fields": [
      {
       "kind": "shape",
@@ -59,6 +59,9 @@
      "kind": "shape",
      "metadataKey": "shape"
     },
+    "shapes": [
+     "ellipse"
+    ],
     "source": "function render(moment: string, api: PluginAPI): string { return api.merge(api.shape(api.get(\"shape\")), api.size(api.get(\"shapeSize\"))); }"
    },
    "enabled": true
@@ -82,6 +85,52 @@
      "metadataKey": "color"
     },
     "source": "function render(moment: string, api: PluginAPI): string { return api.color(api.get(\"color\")); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "presumptive-outline",
+    "version": 1,
+    "name": "Presumptive outline",
+    "description": "Mark moments, stack entries and durations as presumptive: not yet confirmed by evidence. They are drawn with a dashed outline, whatever their shape, color or icon, as events and causal factors charts draw presumptive events and conditions.",
+    "fields": [
+     {
+      "kind": "toggle",
+      "metadataKey": "presumptive",
+      "label": "Presumptive (unconfirmed)"
+     }
+    ],
+    "marker": {
+     "kind": "outline",
+     "metadataKey": "presumptive"
+    },
+    "targets": [
+     "moments",
+     "durations"
+    ]
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "relationship-arrows",
+    "version": 1,
+    "name": "Relationship arrows",
+    "description": "Draw arrowheads on relationship arcs, such as from causes to their effect. In an event's details, choose one of its relationships and an arrow toward the other end, toward this one, or both ways; an arc shows what either end chose. Arrows are a drawing convention kept on the events: relationships stay undirected, and separating by relationships does not follow them.",
+    "fields": [
+     {
+      "kind": "relationship-arrows",
+      "metadataKey": "arrows",
+      "label": "Relationship arrows"
+     }
+    ],
+    "targets": [
+     "moments",
+     "durations"
+    ]
    },
    "enabled": true
   },
@@ -137,7 +186,21 @@
      "root cause"
     ],
     "color": "#bc6663",
-    "shape": "terminator"
+    "shape": "ellipse",
+    "arrows": [
+     {
+      "target": {
+       "duration": "long-shifts"
+      },
+      "arrow": "to"
+     },
+     {
+      "target": {
+       "moment": "sick-call"
+      },
+      "arrow": "to"
+     }
+    ]
    }
   },
   {
@@ -151,7 +214,15 @@
      "barrier"
     ],
     "color": "#d6ad4c",
-    "shape": "terminator"
+    "shape": "ellipse",
+    "arrows": [
+     {
+      "target": {
+       "duration": "light-out"
+      },
+      "arrow": "to"
+     }
+    ]
    }
   },
   {
@@ -164,7 +235,15 @@
      "condition"
     ],
     "color": "#d6ad4c",
-    "shape": "terminator"
+    "shape": "ellipse",
+    "arrows": [
+     {
+      "target": {
+       "duration": "no-spotter"
+      },
+      "arrow": "to"
+     }
+    ]
    }
   },
   {
@@ -191,7 +270,15 @@
      "primary event"
     ],
     "shape": "process",
-    "shapeSize": "large"
+    "shapeSize": "large",
+    "arrows": [
+     {
+      "target": {
+       "moment": "enters"
+      },
+      "arrow": "to"
+     }
+    ]
    }
   },
   {
@@ -204,7 +291,15 @@
      "primary event"
     ],
     "shape": "process",
-    "shapeSize": "large"
+    "shapeSize": "large",
+    "arrows": [
+     {
+      "target": {
+       "moment": "reverses"
+      },
+      "arrow": "to"
+     }
+    ]
    }
   },
   {
@@ -217,9 +312,9 @@
      "primary event",
      "presumptive"
     ],
-    "color": "#9aa49f",
     "shape": "process",
-    "datePrecision": "About 02:30, from memory"
+    "datePrecision": "About 02:30, from memory",
+    "presumptive": true
    }
   },
   {
@@ -232,7 +327,15 @@
      "primary event"
     ],
     "shape": "process",
-    "shapeSize": "large"
+    "shapeSize": "large",
+    "arrows": [
+     {
+      "target": {
+       "moment": "collision"
+      },
+      "arrow": "to"
+     }
+    ]
    }
   },
   {
@@ -245,8 +348,8 @@
      "primary event",
      "presumptive"
     ],
-    "color": "#9aa49f",
-    "shape": "process"
+    "shape": "process",
+    "presumptive": true
    }
   },
   {
@@ -259,7 +362,15 @@
      "primary event"
     ],
     "shape": "process",
-    "shapeSize": "large"
+    "shapeSize": "large",
+    "arrows": [
+     {
+      "target": {
+       "moment": "collision"
+      },
+      "arrow": "to"
+     }
+    ]
    }
   },
   {
@@ -281,7 +392,7 @@
       "metadata": {
        "title": "Condition: aisle end dark",
        "description": "The light at the end of aisle 14 had been out since Tuesday.",
-       "shape": "terminator",
+       "shape": "ellipse",
        "color": "#bc6663"
       }
      },
@@ -290,7 +401,7 @@
       "metadata": {
        "title": "Condition: no spotter",
        "description": "The procedure requires one for reversing out of narrow aisles.",
-       "shape": "terminator",
+       "shape": "ellipse",
        "color": "#bc6663"
       }
      },
@@ -299,8 +410,9 @@
       "metadata": {
        "title": "Presumptive: fatigue",
        "description": "The seventh hour of a 10-hour shift, with no break after 01:00. Fatigue not confirmed.",
-       "shape": "terminator",
-       "color": "#9aa49f"
+       "shape": "ellipse",
+       "color": "#d6ad4c",
+       "presumptive": true
       }
      },
      {
@@ -711,7 +823,15 @@
     "tags": [
      "condition"
     ],
-    "color": "#d6ad4c"
+    "color": "#d6ad4c",
+    "arrows": [
+     {
+      "target": {
+       "duration": "fatigue"
+      },
+      "arrow": "to"
+     }
+    ]
    }
   },
   {
@@ -726,7 +846,15 @@
      "causal factor",
      "barrier"
     ],
-    "color": "#bc6663"
+    "color": "#bc6663",
+    "arrows": [
+     {
+      "target": {
+       "moment": "collision"
+      },
+      "arrow": "to"
+     }
+    ]
    }
   },
   {
@@ -741,7 +869,15 @@
      "causal factor",
      "barrier"
     ],
-    "color": "#bc6663"
+    "color": "#bc6663",
+    "arrows": [
+     {
+      "target": {
+       "moment": "collision"
+      },
+      "arrow": "to"
+     }
+    ]
    }
   },
   {
@@ -755,7 +891,16 @@
      "condition",
      "presumptive"
     ],
-    "color": "#9aa49f"
+    "color": "#d6ad4c",
+    "presumptive": true,
+    "arrows": [
+     {
+      "target": {
+       "moment": "reverses"
+      },
+      "arrow": "to"
+     }
+    ]
    }
   }
  ],

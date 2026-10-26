@@ -40,9 +40,9 @@
    "manifest": {
     "apiVersion": 1,
     "id": "moment-shapes",
-    "version": 2,
+    "version": 3,
     "name": "Moment shapes",
-    "description": "Choose geometric and flowchart symbols for moments and stack entries: decisions, processes, documents and more.",
+    "description": "Choose geometric and flowchart symbols for moments and stack entries: decisions, processes, documents, conditions and more.",
     "fields": [
      {
       "kind": "shape",
@@ -59,6 +59,9 @@
      "kind": "shape",
      "metadataKey": "shape"
     },
+    "shapes": [
+     "ellipse"
+    ],
     "source": "function render(moment: string, api: PluginAPI): string { return api.merge(api.shape(api.get(\"shape\")), api.size(api.get(\"shapeSize\"))); }"
    },
    "enabled": true

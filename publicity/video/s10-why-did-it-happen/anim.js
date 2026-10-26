@@ -46,6 +46,32 @@ function diamondAt(x, y, r, fill) {
     '" stroke-width="0.9"/>'
   );
 }
+/** An arrowhead at (x, y) pointing along (ux, uy). */
+function head(x, y, ux, uy, color, w) {
+  var l = Math.hypot(ux, uy),
+    k = 3.2;
+  ux /= l;
+  uy /= l;
+  return (
+    '<path d="M' +
+    (x - ux * k - uy * k * 0.6) +
+    ' ' +
+    (y - uy * k + ux * k * 0.6) +
+    'L' +
+    x +
+    ' ' +
+    y +
+    'L' +
+    (x - ux * k + uy * k * 0.6) +
+    ' ' +
+    (y - uy * k - ux * k * 0.6) +
+    '" fill="none" stroke="' +
+    color +
+    '" stroke-width="' +
+    w +
+    '" stroke-linejoin="round" stroke-linecap="round"/>'
+  );
+}
 /** The chart: o.events (0–1 for each), o.bands (0–1 each), o.links (0–1), o.light (0–1),
     o.root (0–1), o.cursor (0–1), o.pulse (0–1). */
 function chart(o) {
@@ -55,12 +81,12 @@ function chart(o) {
   if (o.links > 0) {
     EVENTS.forEach(function (e, i) {
       var red = i === 2 ? light : 0;
+      var h = 6 + (DX - e[0]) * 0.12,
+        col = mix(C.arc, C.red, red),
+        w = 0.9 + 0.6 * red;
       s += G(
-        arc(e[0] + 5, DX - 5, AY - 3, o.links, {
-          h: 6 + (DX - e[0]) * 0.12,
-          color: mix(C.arc, C.red, red),
-          w: 0.9 + 0.6 * red,
-        }),
+        arc(e[0] + 5, DX - 5, AY - 3, o.links, { h: h, color: col, w: w }) +
+          (o.links > 0.95 ? head(DX - 5, AY - 3, (DX - 5 - e[0] - 5) / 2, 2 * h, col, w) : ''),
         { o: lerp(1, i === 2 ? 1 : 0.35, light) },
       );
     });
@@ -68,14 +94,12 @@ function chart(o) {
       var y = bandY(i) + 4.5,
         red = b[2] ? light : 0;
       var d =
-        'M' + (DX - 30 - i * 14) + ' ' + y + 'Q' + (DX - 2) + ' ' + y + ' ' + DX + ' ' + (AY + 7);
+        'M' + (DX - 30 - i * 14) + ' ' + y + 'Q' + (DX - 2) + ' ' + y + ' ' + DX + ' ' + (AY + 9.5);
+      var bc = mix(C.arc, C.red, red),
+        bw = 0.9 + 0.6 * red;
       s += G(
-        drawPath(
-          d,
-          50,
-          o.links,
-          'stroke="' + mix(C.arc, C.red, red) + '" stroke-width="' + (0.9 + 0.6 * red) + '"',
-        ),
+        drawPath(d, 50, o.links, 'stroke="' + bc + '" stroke-width="' + bw + '"') +
+          (o.links > 0.95 ? head(DX, AY + 9.5, 2, AY + 9.5 - y, bc, bw) : ''),
         { o: lerp(1, b[2] ? 1 : 0.35, light) },
       );
     });
@@ -150,15 +174,20 @@ function chart(o) {
   if (o.root > 0) {
     var r = o.root;
     s += rise(
-      rect(10, 72, 56, 12, C.card, { rx: 6, stroke: C.red, sw: 1 }) +
+      '<ellipse cx="38" cy="78" rx="29" ry="7" fill="' +
+        C.card +
+        '" stroke="' +
+        C.red +
+        '" stroke-width="1"/>' +
         txt(38, 80.2, 'no risk review', { size: 6.2, weight: 700 }) +
-        chip(70, 80, 'root cause', C.red, { size: 6, solid: true }) +
+        chip(72, 80, 'root cause', C.red, { size: 6, solid: true }) +
         drawPath(
-          'M12 80Q6 ' + (bandY(0) + 4) + ' 12 ' + (bandY(0) + 4),
+          'M11 81Q8 ' + (bandY(0) - 10) + ' 10 ' + (bandY(0) - 0.5),
           110,
           r,
           'stroke="' + C.red + '" stroke-width="1.2"',
-        ),
+        ) +
+        (r > 0.95 ? head(10, bandY(0) - 0.5, 2, 9.5, C.red, 1.2) : ''),
       r,
       4,
     );
