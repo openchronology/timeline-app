@@ -609,9 +609,9 @@ try {
   });
   assert.notEqual(meta(await guest.request(named), 'og:image'), picture);
   assert.equal((await oembed(origin + named)).thumbnail_url, undefined);
-  const labelled = await owner.request('/' + username);
-  assert.doesNotMatch(labelled, card);
-  assert.match(labelled, /timeline-card-placeholder/);
+  const labelledProfile = await owner.request('/' + username);
+  assert.doesNotMatch(labelledProfile, card);
+  assert.match(labelledProfile, /timeline-card-placeholder/);
   await owner.request(`/api/timelines/${timelineId}/settings`, {
     method: 'PATCH',
     data: { labels: [] },
@@ -659,7 +659,7 @@ try {
   await signedIn.close();
   await context.close();
   console.log(
-    'PASS sharing: addresses, page metadata and previews, preview images, moment and duration pages and their structured data, links, the share dialog, embeds, oEmbed, robots and sitemap with entity pages; private and labelled timelines show none.',
+    'PASS sharing: addresses, page metadata and previews, preview images, its own image, moment and duration pages and their structured data, links, the share dialog, embeds, oEmbed, robots and sitemap with entity pages; private and labelled timelines show none.',
   );
 } catch (error) {
   console.error(logs);
