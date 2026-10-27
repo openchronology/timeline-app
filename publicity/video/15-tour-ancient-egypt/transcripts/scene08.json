@@ -1,0 +1,688 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:07,440"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 7440
+			},
+			"text": " The Rosetta Stone's decree is dated to the day, the 27th of March, 196 BCE.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.850267,
+					"t_dtw": -1
+				},
+				{
+					"text": " The",
+					"timestamps": {
+						"from": "00:00:00,250",
+						"to": "00:00:00,250"
+					},
+					"offsets": {
+						"from": 250,
+						"to": 250
+					},
+					"id": 383,
+					"p": 0.963475,
+					"t_dtw": -1
+				},
+				{
+					"text": " Ros",
+					"timestamps": {
+						"from": "00:00:00,350",
+						"to": "00:00:00,500"
+					},
+					"offsets": {
+						"from": 350,
+						"to": 500
+					},
+					"id": 10018,
+					"p": 0.93809,
+					"t_dtw": -1
+				},
+				{
+					"text": "etta",
+					"timestamps": {
+						"from": "00:00:00,500",
+						"to": "00:00:00,840"
+					},
+					"offsets": {
+						"from": 500,
+						"to": 840
+					},
+					"id": 15253,
+					"p": 0.997498,
+					"t_dtw": -1
+				},
+				{
+					"text": " Stone",
+					"timestamps": {
+						"from": "00:00:00,840",
+						"to": "00:00:01,260"
+					},
+					"offsets": {
+						"from": 840,
+						"to": 1260
+					},
+					"id": 8026,
+					"p": 0.482302,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:01,260",
+						"to": "00:00:01,430"
+					},
+					"offsets": {
+						"from": 1260,
+						"to": 1430
+					},
+					"id": 338,
+					"p": 0.990299,
+					"t_dtw": -1
+				},
+				{
+					"text": " decree",
+					"timestamps": {
+						"from": "00:00:01,430",
+						"to": "00:00:01,940"
+					},
+					"offsets": {
+						"from": 1430,
+						"to": 1940
+					},
+					"id": 25931,
+					"p": 0.766118,
+					"t_dtw": -1
+				},
+				{
+					"text": " is",
+					"timestamps": {
+						"from": "00:00:01,940",
+						"to": "00:00:02,110"
+					},
+					"offsets": {
+						"from": 1940,
+						"to": 2110
+					},
+					"id": 318,
+					"p": 0.990654,
+					"t_dtw": -1
+				},
+				{
+					"text": " dated",
+					"timestamps": {
+						"from": "00:00:02,110",
+						"to": "00:00:02,530"
+					},
+					"offsets": {
+						"from": 2110,
+						"to": 2530
+					},
+					"id": 14567,
+					"p": 0.997486,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:02,530",
+						"to": "00:00:02,700"
+					},
+					"offsets": {
+						"from": 2530,
+						"to": 2700
+					},
+					"id": 284,
+					"p": 0.992614,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,700",
+						"to": "00:00:02,910"
+					},
+					"offsets": {
+						"from": 2700,
+						"to": 2910
+					},
+					"id": 262,
+					"p": 0.996637,
+					"t_dtw": -1
+				},
+				{
+					"text": " day",
+					"timestamps": {
+						"from": "00:00:03,240",
+						"to": "00:00:03,240"
+					},
+					"offsets": {
+						"from": 3240,
+						"to": 3240
+					},
+					"id": 1110,
+					"p": 0.994287,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,240",
+						"to": "00:00:03,310"
+					},
+					"offsets": {
+						"from": 3240,
+						"to": 3310
+					},
+					"id": 11,
+					"p": 0.725203,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:03,530",
+						"to": "00:00:03,660"
+					},
+					"offsets": {
+						"from": 3530,
+						"to": 3660
+					},
+					"id": 262,
+					"p": 0.545434,
+					"t_dtw": -1
+				},
+				{
+					"text": " 27",
+					"timestamps": {
+						"from": "00:00:03,700",
+						"to": "00:00:04,300"
+					},
+					"offsets": {
+						"from": 3700,
+						"to": 4300
+					},
+					"id": 2681,
+					"p": 0.990219,
+					"t_dtw": -1
+				},
+				{
+					"text": "th",
+					"timestamps": {
+						"from": "00:00:04,350",
+						"to": "00:00:04,560"
+					},
+					"offsets": {
+						"from": 4350,
+						"to": 4560
+					},
+					"id": 400,
+					"p": 0.946519,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:04,560",
+						"to": "00:00:04,760"
+					},
+					"offsets": {
+						"from": 4560,
+						"to": 4760
+					},
+					"id": 286,
+					"p": 0.967146,
+					"t_dtw": -1
+				},
+				{
+					"text": " March",
+					"timestamps": {
+						"from": "00:00:05,060",
+						"to": "00:00:05,360"
+					},
+					"offsets": {
+						"from": 5060,
+						"to": 5360
+					},
+					"id": 2805,
+					"p": 0.987832,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:05,370",
+						"to": "00:00:05,580"
+					},
+					"offsets": {
+						"from": 5370,
+						"to": 5580
+					},
+					"id": 11,
+					"p": 0.873031,
+					"t_dtw": -1
+				},
+				{
+					"text": " 196",
+					"timestamps": {
+						"from": "00:00:05,580",
+						"to": "00:00:06,610"
+					},
+					"offsets": {
+						"from": 5580,
+						"to": 6610
+					},
+					"id": 28817,
+					"p": 0.973087,
+					"t_dtw": -1
+				},
+				{
+					"text": " BCE",
+					"timestamps": {
+						"from": "00:00:06,610",
+						"to": "00:00:06,790"
+					},
+					"offsets": {
+						"from": 6610,
+						"to": 6790
+					},
+					"id": 37078,
+					"p": 0.828408,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:06,790",
+						"to": "00:00:07,220"
+					},
+					"offsets": {
+						"from": 6790,
+						"to": 7220
+					},
+					"id": 13,
+					"p": 0.984987,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_372]",
+					"timestamps": {
+						"from": "00:00:07,440",
+						"to": "00:00:07,440"
+					},
+					"offsets": {
+						"from": 7440,
+						"to": 7440
+					},
+					"id": 50735,
+					"p": 0.0152167,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:07,440",
+				"to": "00:00:14,280"
+			},
+			"offsets": {
+				"from": 7440,
+				"to": 14280
+			},
+			"text": " Historical dates keep it as the sources give it, in the Julian calendar, beside the timeline's own.",
+			"tokens": [
+				{
+					"text": " Historical",
+					"timestamps": {
+						"from": "00:00:07,790",
+						"to": "00:00:08,270"
+					},
+					"offsets": {
+						"from": 7790,
+						"to": 8270
+					},
+					"id": 23121,
+					"p": 0.949832,
+					"t_dtw": -1
+				},
+				{
+					"text": " dates",
+					"timestamps": {
+						"from": "00:00:08,270",
+						"to": "00:00:08,690"
+					},
+					"offsets": {
+						"from": 8270,
+						"to": 8690
+					},
+					"id": 9667,
+					"p": 0.996708,
+					"t_dtw": -1
+				},
+				{
+					"text": " keep",
+					"timestamps": {
+						"from": "00:00:08,690",
+						"to": "00:00:08,970"
+					},
+					"offsets": {
+						"from": 8690,
+						"to": 8970
+					},
+					"id": 1394,
+					"p": 0.995934,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:09,020",
+						"to": "00:00:09,180"
+					},
+					"offsets": {
+						"from": 9020,
+						"to": 9180
+					},
+					"id": 340,
+					"p": 0.99755,
+					"t_dtw": -1
+				},
+				{
+					"text": " as",
+					"timestamps": {
+						"from": "00:00:09,180",
+						"to": "00:00:09,340"
+					},
+					"offsets": {
+						"from": 9180,
+						"to": 9340
+					},
+					"id": 355,
+					"p": 0.989408,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:09,340",
+						"to": "00:00:09,590"
+					},
+					"offsets": {
+						"from": 9340,
+						"to": 9590
+					},
+					"id": 262,
+					"p": 0.996417,
+					"t_dtw": -1
+				},
+				{
+					"text": " sources",
+					"timestamps": {
+						"from": "00:00:09,590",
+						"to": "00:00:10,170"
+					},
+					"offsets": {
+						"from": 9590,
+						"to": 10170
+					},
+					"id": 4237,
+					"p": 0.993585,
+					"t_dtw": -1
+				},
+				{
+					"text": " give",
+					"timestamps": {
+						"from": "00:00:10,170",
+						"to": "00:00:10,350"
+					},
+					"offsets": {
+						"from": 10170,
+						"to": 10350
+					},
+					"id": 1577,
+					"p": 0.993926,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:10,350",
+						"to": "00:00:10,710"
+					},
+					"offsets": {
+						"from": 10350,
+						"to": 10710
+					},
+					"id": 340,
+					"p": 0.9969,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:10,850",
+						"to": "00:00:10,850"
+					},
+					"offsets": {
+						"from": 10850,
+						"to": 10850
+					},
+					"id": 11,
+					"p": 0.63477,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:10,950",
+						"to": "00:00:10,980"
+					},
+					"offsets": {
+						"from": 10950,
+						"to": 10980
+					},
+					"id": 287,
+					"p": 0.743374,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:10,980",
+						"to": "00:00:11,180"
+					},
+					"offsets": {
+						"from": 10980,
+						"to": 11180
+					},
+					"id": 262,
+					"p": 0.99322,
+					"t_dtw": -1
+				},
+				{
+					"text": " Julian",
+					"timestamps": {
+						"from": "00:00:11,180",
+						"to": "00:00:11,590"
+					},
+					"offsets": {
+						"from": 11180,
+						"to": 11590
+					},
+					"id": 18322,
+					"p": 0.90485,
+					"t_dtw": -1
+				},
+				{
+					"text": " calendar",
+					"timestamps": {
+						"from": "00:00:11,590",
+						"to": "00:00:12,160"
+					},
+					"offsets": {
+						"from": 11590,
+						"to": 12160
+					},
+					"id": 11845,
+					"p": 0.805325,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:12,160",
+						"to": "00:00:12,210"
+					},
+					"offsets": {
+						"from": 12160,
+						"to": 12210
+					},
+					"id": 11,
+					"p": 0.825687,
+					"t_dtw": -1
+				},
+				{
+					"text": " beside",
+					"timestamps": {
+						"from": "00:00:12,500",
+						"to": "00:00:12,800"
+					},
+					"offsets": {
+						"from": 12500,
+						"to": 12800
+					},
+					"id": 13970,
+					"p": 0.876874,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:12,810",
+						"to": "00:00:12,900"
+					},
+					"offsets": {
+						"from": 12810,
+						"to": 12900
+					},
+					"id": 262,
+					"p": 0.932334,
+					"t_dtw": -1
+				},
+				{
+					"text": " timeline",
+					"timestamps": {
+						"from": "00:00:12,900",
+						"to": "00:00:13,430"
+					},
+					"offsets": {
+						"from": 12900,
+						"to": 13430
+					},
+					"id": 15264,
+					"p": 0.783765,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:13,430",
+						"to": "00:00:13,520"
+					},
+					"offsets": {
+						"from": 13430,
+						"to": 13520
+					},
+					"id": 338,
+					"p": 0.742539,
+					"t_dtw": -1
+				},
+				{
+					"text": " own",
+					"timestamps": {
+						"from": "00:00:13,520",
+						"to": "00:00:13,900"
+					},
+					"offsets": {
+						"from": 13520,
+						"to": 13900
+					},
+					"id": 898,
+					"p": 0.864694,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:13,900",
+						"to": "00:00:14,220"
+					},
+					"offsets": {
+						"from": 13900,
+						"to": 14220
+					},
+					"id": 13,
+					"p": 0.987192,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_714]",
+					"timestamps": {
+						"from": "00:00:14,280",
+						"to": "00:00:14,280"
+					},
+					"offsets": {
+						"from": 14280,
+						"to": 14280
+					},
+					"id": 51077,
+					"p": 0.0187186,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

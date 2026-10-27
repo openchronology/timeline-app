@@ -31,6 +31,7 @@ Narration recordings, trimmed audio, captured shots, rendered frames and MP4s ar
 | [`12-ai-and-automation/`](12-ai-and-automation/README.md)                         | Video 12: Timelines from AI and automation.                                                 |
 | [`13-investigations-causal-factors/`](13-investigations-causal-factors/README.md) | Video 13: Investigations, from timeline to causal factors.                                  |
 | [`17-tour-george-washington/`](17-tour-george-washington/README.md)               | Video 17: Tour, George Washington.                                                          |
+| [`15-tour-ancient-egypt/`](15-tour-ancient-egypt/README.md)                       | Video 15: Tour, Ancient Egypt.                                                              |
 | [`s01-1776-to-the-moon/`](s01-1776-to-the-moon/README.md)                         | Short 1: 1776 to one second on the Moon.                                                    |
 | [`s02-the-last-six-seconds/`](s02-the-last-six-seconds/README.md)                 | Short 2: you're the last six seconds.                                                       |
 | [`s03-point-one-plus-point-two/`](s03-point-one-plus-point-two/README.md)         | Short 3: 0.1 + 0.2 isn't 0.3.                                                               |
@@ -42,6 +43,7 @@ Narration recordings, trimmed audio, captured shots, rendered frames and MP4s ar
 | [`s09-i-asked-an-ai/`](s09-i-asked-an-ai/README.md)                               | Short 9: I asked an AI to build a timeline.                                                 |
 | [`s10-why-did-it-happen/`](s10-why-did-it-happen/README.md)                       | Short 10: why did it happen?                                                                |
 | [`s14-six-years-from-home/`](s14-six-years-from-home/README.md)                   | Short 14: six years from home.                                                              |
+| [`s12-closer-to-the-moon/`](s12-closer-to-the-moon/README.md)                     | Short 12: Cleopatra lived closer to the Moon landing than to the Great Pyramid.             |
 
 ## Making a video
 

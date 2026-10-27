@@ -1,0 +1,353 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:05,160"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 5160
+			},
+			"text": " Cleopatra lived closer in time to the moon landing than to the building of the Great Pyramid.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.931126,
+					"t_dtw": -1
+				},
+				{
+					"text": " Cle",
+					"timestamps": {
+						"from": "00:00:00,220",
+						"to": "00:00:00,220"
+					},
+					"offsets": {
+						"from": 220,
+						"to": 220
+					},
+					"id": 3779,
+					"p": 0.959817,
+					"t_dtw": -1
+				},
+				{
+					"text": "op",
+					"timestamps": {
+						"from": "00:00:00,330",
+						"to": "00:00:00,370"
+					},
+					"offsets": {
+						"from": 330,
+						"to": 370
+					},
+					"id": 404,
+					"p": 0.999432,
+					"t_dtw": -1
+				},
+				{
+					"text": "atra",
+					"timestamps": {
+						"from": "00:00:00,370",
+						"to": "00:00:00,670"
+					},
+					"offsets": {
+						"from": 370,
+						"to": 670
+					},
+					"id": 26066,
+					"p": 0.999744,
+					"t_dtw": -1
+				},
+				{
+					"text": " lived",
+					"timestamps": {
+						"from": "00:00:00,670",
+						"to": "00:00:01,050"
+					},
+					"offsets": {
+						"from": 670,
+						"to": 1050
+					},
+					"id": 5615,
+					"p": 0.999039,
+					"t_dtw": -1
+				},
+				{
+					"text": " closer",
+					"timestamps": {
+						"from": "00:00:01,050",
+						"to": "00:00:01,500"
+					},
+					"offsets": {
+						"from": 1050,
+						"to": 1500
+					},
+					"id": 5699,
+					"p": 0.997855,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:01,500",
+						"to": "00:00:01,650"
+					},
+					"offsets": {
+						"from": 1500,
+						"to": 1650
+					},
+					"id": 287,
+					"p": 0.991645,
+					"t_dtw": -1
+				},
+				{
+					"text": " time",
+					"timestamps": {
+						"from": "00:00:01,650",
+						"to": "00:00:01,930"
+					},
+					"offsets": {
+						"from": 1650,
+						"to": 1930
+					},
+					"id": 640,
+					"p": 0.994169,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:01,950",
+						"to": "00:00:02,100"
+					},
+					"offsets": {
+						"from": 1950,
+						"to": 2100
+					},
+					"id": 284,
+					"p": 0.990488,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,100",
+						"to": "00:00:02,320"
+					},
+					"offsets": {
+						"from": 2100,
+						"to": 2320
+					},
+					"id": 262,
+					"p": 0.994634,
+					"t_dtw": -1
+				},
+				{
+					"text": " moon",
+					"timestamps": {
+						"from": "00:00:02,320",
+						"to": "00:00:02,620"
+					},
+					"offsets": {
+						"from": 2320,
+						"to": 2620
+					},
+					"id": 8824,
+					"p": 0.819684,
+					"t_dtw": -1
+				},
+				{
+					"text": " landing",
+					"timestamps": {
+						"from": "00:00:02,620",
+						"to": "00:00:03,020"
+					},
+					"offsets": {
+						"from": 2620,
+						"to": 3020
+					},
+					"id": 9581,
+					"p": 0.992632,
+					"t_dtw": -1
+				},
+				{
+					"text": " than",
+					"timestamps": {
+						"from": "00:00:03,380",
+						"to": "00:00:03,420"
+					},
+					"offsets": {
+						"from": 3380,
+						"to": 3420
+					},
+					"id": 621,
+					"p": 0.67093,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:03,420",
+						"to": "00:00:03,540"
+					},
+					"offsets": {
+						"from": 3420,
+						"to": 3540
+					},
+					"id": 284,
+					"p": 0.984202,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:03,540",
+						"to": "00:00:03,630"
+					},
+					"offsets": {
+						"from": 3540,
+						"to": 3630
+					},
+					"id": 262,
+					"p": 0.987645,
+					"t_dtw": -1
+				},
+				{
+					"text": " building",
+					"timestamps": {
+						"from": "00:00:03,680",
+						"to": "00:00:04,000"
+					},
+					"offsets": {
+						"from": 3680,
+						"to": 4000
+					},
+					"id": 2615,
+					"p": 0.976432,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:04,000",
+						"to": "00:00:04,100"
+					},
+					"offsets": {
+						"from": 4000,
+						"to": 4100
+					},
+					"id": 286,
+					"p": 0.972719,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:04,180",
+						"to": "00:00:04,230"
+					},
+					"offsets": {
+						"from": 4180,
+						"to": 4230
+					},
+					"id": 262,
+					"p": 0.958309,
+					"t_dtw": -1
+				},
+				{
+					"text": " Great",
+					"timestamps": {
+						"from": "00:00:04,270",
+						"to": "00:00:04,420"
+					},
+					"offsets": {
+						"from": 4270,
+						"to": 4420
+					},
+					"id": 3878,
+					"p": 0.825333,
+					"t_dtw": -1
+				},
+				{
+					"text": " Pyramid",
+					"timestamps": {
+						"from": "00:00:04,510",
+						"to": "00:00:04,890"
+					},
+					"offsets": {
+						"from": 4510,
+						"to": 4890
+					},
+					"id": 41450,
+					"p": 0.886266,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,160",
+						"to": "00:00:05,160"
+					},
+					"offsets": {
+						"from": 5160,
+						"to": 5160
+					},
+					"id": 13,
+					"p": 0.922925,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_258]",
+					"timestamps": {
+						"from": "00:00:05,160",
+						"to": "00:00:05,160"
+					},
+					"offsets": {
+						"from": 5160,
+						"to": 5160
+					},
+					"id": 50621,
+					"p": 0.0177359,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}
