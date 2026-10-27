@@ -70,7 +70,12 @@ export async function checkViewMode(page, restore) {
         id: 'campaign',
         start: '50/1',
         end: '300/1',
-        metadata: { title: 'The campaign', description: 'Six months of **fighting**.' },
+        metadata: {
+          title: 'The campaign',
+          description: 'Six months of **fighting**.',
+          sources: ['https://sources.example/campaign'],
+          datePrecision: 'Month',
+        },
       },
     ],
     relationships: [{ a: { moment: 'landing' }, b: { duration: 'campaign' } }],
@@ -135,6 +140,9 @@ export async function checkViewMode(page, restore) {
   assert.match(shown.when, / → /);
   // Its notes are Markdown too, with the rich-text plugin on.
   assert.deepEqual(shown.bold, ['fighting']);
+  // Its sources and dating context too (#341).
+  assert.deepEqual(shown.details, ['Date precision', 'Month']);
+  assert.deepEqual(shown.links, ['https://sources.example/campaign']);
   assert.match((await read()).related.join(), /The landing/);
   // A duration's band opens it in the reader too.
   await page.locator('#reader-close').click();
