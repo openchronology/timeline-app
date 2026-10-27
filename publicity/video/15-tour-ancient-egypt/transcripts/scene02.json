@@ -1,0 +1,1230 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:04,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 4000
+			},
+			"text": " Ancient dates are estimates, and scholars' chronologies differ,",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.980664,
+					"t_dtw": -1
+				},
+				{
+					"text": " Ancient",
+					"timestamps": {
+						"from": "00:00:00,140",
+						"to": "00:00:00,530"
+					},
+					"offsets": {
+						"from": 140,
+						"to": 530
+					},
+					"id": 13406,
+					"p": 0.862553,
+					"t_dtw": -1
+				},
+				{
+					"text": " dates",
+					"timestamps": {
+						"from": "00:00:00,530",
+						"to": "00:00:00,910"
+					},
+					"offsets": {
+						"from": 530,
+						"to": 910
+					},
+					"id": 9667,
+					"p": 0.997373,
+					"t_dtw": -1
+				},
+				{
+					"text": " are",
+					"timestamps": {
+						"from": "00:00:00,910",
+						"to": "00:00:01,140"
+					},
+					"offsets": {
+						"from": 910,
+						"to": 1140
+					},
+					"id": 389,
+					"p": 0.99587,
+					"t_dtw": -1
+				},
+				{
+					"text": " estimates",
+					"timestamps": {
+						"from": "00:00:01,140",
+						"to": "00:00:01,690"
+					},
+					"offsets": {
+						"from": 1140,
+						"to": 1690
+					},
+					"id": 7746,
+					"p": 0.999483,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,750",
+						"to": "00:00:01,920"
+					},
+					"offsets": {
+						"from": 1750,
+						"to": 1920
+					},
+					"id": 11,
+					"p": 0.646053,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:02,040",
+						"to": "00:00:02,090"
+					},
+					"offsets": {
+						"from": 2040,
+						"to": 2090
+					},
+					"id": 290,
+					"p": 0.808402,
+					"t_dtw": -1
+				},
+				{
+					"text": " scholars",
+					"timestamps": {
+						"from": "00:00:02,090",
+						"to": "00:00:02,550"
+					},
+					"offsets": {
+						"from": 2090,
+						"to": 2550
+					},
+					"id": 9123,
+					"p": 0.820723,
+					"t_dtw": -1
+				},
+				{
+					"text": "'",
+					"timestamps": {
+						"from": "00:00:02,550",
+						"to": "00:00:02,600"
+					},
+					"offsets": {
+						"from": 2550,
+						"to": 2600
+					},
+					"id": 6,
+					"p": 0.945431,
+					"t_dtw": -1
+				},
+				{
+					"text": " chron",
+					"timestamps": {
+						"from": "00:00:02,600",
+						"to": "00:00:02,880"
+					},
+					"offsets": {
+						"from": 2600,
+						"to": 2880
+					},
+					"id": 16199,
+					"p": 0.993714,
+					"t_dtw": -1
+				},
+				{
+					"text": "ologies",
+					"timestamps": {
+						"from": "00:00:02,880",
+						"to": "00:00:03,230"
+					},
+					"offsets": {
+						"from": 2880,
+						"to": 3230
+					},
+					"id": 5823,
+					"p": 0.988938,
+					"t_dtw": -1
+				},
+				{
+					"text": " differ",
+					"timestamps": {
+						"from": "00:00:03,330",
+						"to": "00:00:03,650"
+					},
+					"offsets": {
+						"from": 3330,
+						"to": 3650
+					},
+					"id": 13238,
+					"p": 0.983152,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:04,000",
+						"to": "00:00:04,000"
+					},
+					"offsets": {
+						"from": 4000,
+						"to": 4000
+					},
+					"id": 11,
+					"p": 0.754925,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_200]",
+					"timestamps": {
+						"from": "00:00:04,000",
+						"to": "00:00:04,000"
+					},
+					"offsets": {
+						"from": 4000,
+						"to": 4000
+					},
+					"id": 50563,
+					"p": 0.064991,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,000",
+				"to": "00:00:07,280"
+			},
+			"offsets": {
+				"from": 4000,
+				"to": 7280
+			},
+			"text": " so this timeline follows one standard chronology—",
+			"tokens": [
+				{
+					"text": " so",
+					"timestamps": {
+						"from": "00:00:04,140",
+						"to": "00:00:04,150"
+					},
+					"offsets": {
+						"from": 4140,
+						"to": 4150
+					},
+					"id": 523,
+					"p": 0.998525,
+					"t_dtw": -1
+				},
+				{
+					"text": " this",
+					"timestamps": {
+						"from": "00:00:04,150",
+						"to": "00:00:04,450"
+					},
+					"offsets": {
+						"from": 4150,
+						"to": 4450
+					},
+					"id": 428,
+					"p": 0.999222,
+					"t_dtw": -1
+				},
+				{
+					"text": " timeline",
+					"timestamps": {
+						"from": "00:00:04,450",
+						"to": "00:00:05,040"
+					},
+					"offsets": {
+						"from": 4450,
+						"to": 5040
+					},
+					"id": 15264,
+					"p": 0.989449,
+					"t_dtw": -1
+				},
+				{
+					"text": " follows",
+					"timestamps": {
+						"from": "00:00:05,110",
+						"to": "00:00:05,530"
+					},
+					"offsets": {
+						"from": 5110,
+						"to": 5530
+					},
+					"id": 5679,
+					"p": 0.998997,
+					"t_dtw": -1
+				},
+				{
+					"text": " one",
+					"timestamps": {
+						"from": "00:00:05,610",
+						"to": "00:00:05,700"
+					},
+					"offsets": {
+						"from": 5610,
+						"to": 5700
+					},
+					"id": 530,
+					"p": 0.994002,
+					"t_dtw": -1
+				},
+				{
+					"text": " standard",
+					"timestamps": {
+						"from": "00:00:06,040",
+						"to": "00:00:06,400"
+					},
+					"offsets": {
+						"from": 6040,
+						"to": 6400
+					},
+					"id": 3210,
+					"p": 0.997168,
+					"t_dtw": -1
+				},
+				{
+					"text": " chron",
+					"timestamps": {
+						"from": "00:00:06,400",
+						"to": "00:00:06,780"
+					},
+					"offsets": {
+						"from": 6400,
+						"to": 6780
+					},
+					"id": 16199,
+					"p": 0.998843,
+					"t_dtw": -1
+				},
+				{
+					"text": "ology",
+					"timestamps": {
+						"from": "00:00:06,780",
+						"to": "00:00:07,200"
+					},
+					"offsets": {
+						"from": 6780,
+						"to": 7200
+					},
+					"id": 1435,
+					"p": 0.999685,
+					"t_dtw": -1
+				},
+				{
+					"text": "—",
+					"timestamps": {
+						"from": "00:00:07,200",
+						"to": "00:00:07,240"
+					},
+					"offsets": {
+						"from": 7200,
+						"to": 7240
+					},
+					"id": 960,
+					"p": 0.41492,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_364]",
+					"timestamps": {
+						"from": "00:00:07,280",
+						"to": "00:00:07,280"
+					},
+					"offsets": {
+						"from": 7280,
+						"to": 7280
+					},
+					"id": 50727,
+					"p": 0.0744787,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:07,280",
+				"to": "00:00:11,280"
+			},
+			"offsets": {
+				"from": 7280,
+				"to": 11280
+			},
+			"text": " the Oxford history of ancient Egypt and says so.",
+			"tokens": [
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:07,420",
+						"to": "00:00:07,560"
+					},
+					"offsets": {
+						"from": 7420,
+						"to": 7560
+					},
+					"id": 262,
+					"p": 0.947536,
+					"t_dtw": -1
+				},
+				{
+					"text": " Oxford",
+					"timestamps": {
+						"from": "00:00:07,560",
+						"to": "00:00:08,050"
+					},
+					"offsets": {
+						"from": 7560,
+						"to": 8050
+					},
+					"id": 13643,
+					"p": 0.993347,
+					"t_dtw": -1
+				},
+				{
+					"text": " history",
+					"timestamps": {
+						"from": "00:00:08,150",
+						"to": "00:00:08,790"
+					},
+					"offsets": {
+						"from": 8150,
+						"to": 8790
+					},
+					"id": 2106,
+					"p": 0.71888,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:08,790",
+						"to": "00:00:08,980"
+					},
+					"offsets": {
+						"from": 8790,
+						"to": 8980
+					},
+					"id": 286,
+					"p": 0.99971,
+					"t_dtw": -1
+				},
+				{
+					"text": " ancient",
+					"timestamps": {
+						"from": "00:00:09,320",
+						"to": "00:00:09,640"
+					},
+					"offsets": {
+						"from": 9320,
+						"to": 9640
+					},
+					"id": 6156,
+					"p": 0.80054,
+					"t_dtw": -1
+				},
+				{
+					"text": " Egypt",
+					"timestamps": {
+						"from": "00:00:09,640",
+						"to": "00:00:10,110"
+					},
+					"offsets": {
+						"from": 9640,
+						"to": 10110
+					},
+					"id": 6365,
+					"p": 0.999729,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:10,110",
+						"to": "00:00:10,390"
+					},
+					"offsets": {
+						"from": 10110,
+						"to": 10390
+					},
+					"id": 290,
+					"p": 0.731083,
+					"t_dtw": -1
+				},
+				{
+					"text": " says",
+					"timestamps": {
+						"from": "00:00:10,390",
+						"to": "00:00:10,700"
+					},
+					"offsets": {
+						"from": 10390,
+						"to": 10700
+					},
+					"id": 1139,
+					"p": 0.994079,
+					"t_dtw": -1
+				},
+				{
+					"text": " so",
+					"timestamps": {
+						"from": "00:00:10,790",
+						"to": "00:00:10,930"
+					},
+					"offsets": {
+						"from": 10790,
+						"to": 10930
+					},
+					"id": 523,
+					"p": 0.999268,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:10,960",
+						"to": "00:00:10,960"
+					},
+					"offsets": {
+						"from": 10960,
+						"to": 10960
+					},
+					"id": 13,
+					"p": 0.994588,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_564]",
+					"timestamps": {
+						"from": "00:00:11,280",
+						"to": "00:00:11,280"
+					},
+					"offsets": {
+						"from": 11280,
+						"to": 11280
+					},
+					"id": 50927,
+					"p": 0.107033,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:11,280",
+				"to": "00:00:14,320"
+			},
+			"offsets": {
+				"from": 11280,
+				"to": 14320
+			},
+			"text": " Where Egypt split, the bands show it.",
+			"tokens": [
+				{
+					"text": " Where",
+					"timestamps": {
+						"from": "00:00:11,420",
+						"to": "00:00:11,720"
+					},
+					"offsets": {
+						"from": 11420,
+						"to": 11720
+					},
+					"id": 6350,
+					"p": 0.996147,
+					"t_dtw": -1
+				},
+				{
+					"text": " Egypt",
+					"timestamps": {
+						"from": "00:00:11,720",
+						"to": "00:00:12,060"
+					},
+					"offsets": {
+						"from": 11720,
+						"to": 12060
+					},
+					"id": 6365,
+					"p": 0.998112,
+					"t_dtw": -1
+				},
+				{
+					"text": " split",
+					"timestamps": {
+						"from": "00:00:12,150",
+						"to": "00:00:12,560"
+					},
+					"offsets": {
+						"from": 12150,
+						"to": 12560
+					},
+					"id": 6626,
+					"p": 0.810132,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:12,600",
+						"to": "00:00:12,770"
+					},
+					"offsets": {
+						"from": 12600,
+						"to": 12770
+					},
+					"id": 11,
+					"p": 0.990323,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:12,770",
+						"to": "00:00:12,980"
+					},
+					"offsets": {
+						"from": 12770,
+						"to": 12980
+					},
+					"id": 262,
+					"p": 0.996685,
+					"t_dtw": -1
+				},
+				{
+					"text": " bands",
+					"timestamps": {
+						"from": "00:00:13,320",
+						"to": "00:00:13,460"
+					},
+					"offsets": {
+						"from": 13320,
+						"to": 13460
+					},
+					"id": 11760,
+					"p": 0.739471,
+					"t_dtw": -1
+				},
+				{
+					"text": " show",
+					"timestamps": {
+						"from": "00:00:13,570",
+						"to": "00:00:13,820"
+					},
+					"offsets": {
+						"from": 13570,
+						"to": 13820
+					},
+					"id": 905,
+					"p": 0.999504,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:13,820",
+						"to": "00:00:13,920"
+					},
+					"offsets": {
+						"from": 13820,
+						"to": 13920
+					},
+					"id": 340,
+					"p": 0.999752,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:14,010",
+						"to": "00:00:14,320"
+					},
+					"offsets": {
+						"from": 14010,
+						"to": 14320
+					},
+					"id": 13,
+					"p": 0.995042,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_716]",
+					"timestamps": {
+						"from": "00:00:14,320",
+						"to": "00:00:14,320"
+					},
+					"offsets": {
+						"from": 14320,
+						"to": 14320
+					},
+					"id": 51079,
+					"p": 0.143104,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:14,320",
+				"to": "00:00:19,360"
+			},
+			"offsets": {
+				"from": 14320,
+				"to": 19360
+			},
+			"text": " Around 1650 BCE, the Hyksos kings rule the north from Avaris",
+			"tokens": [
+				{
+					"text": " Around",
+					"timestamps": {
+						"from": "00:00:14,460",
+						"to": "00:00:14,920"
+					},
+					"offsets": {
+						"from": 14460,
+						"to": 14920
+					},
+					"id": 16824,
+					"p": 0.997923,
+					"t_dtw": -1
+				},
+				{
+					"text": " 16",
+					"timestamps": {
+						"from": "00:00:14,920",
+						"to": "00:00:15,520"
+					},
+					"offsets": {
+						"from": 14920,
+						"to": 15520
+					},
+					"id": 1467,
+					"p": 0.997525,
+					"t_dtw": -1
+				},
+				{
+					"text": "50",
+					"timestamps": {
+						"from": "00:00:15,520",
+						"to": "00:00:16,010"
+					},
+					"offsets": {
+						"from": 15520,
+						"to": 16010
+					},
+					"id": 1120,
+					"p": 0.996309,
+					"t_dtw": -1
+				},
+				{
+					"text": " BCE",
+					"timestamps": {
+						"from": "00:00:16,360",
+						"to": "00:00:16,420"
+					},
+					"offsets": {
+						"from": 16360,
+						"to": 16420
+					},
+					"id": 37078,
+					"p": 0.95736,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:16,420",
+						"to": "00:00:16,640"
+					},
+					"offsets": {
+						"from": 16420,
+						"to": 16640
+					},
+					"id": 11,
+					"p": 0.977664,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:16,640",
+						"to": "00:00:16,850"
+					},
+					"offsets": {
+						"from": 16640,
+						"to": 16850
+					},
+					"id": 262,
+					"p": 0.831874,
+					"t_dtw": -1
+				},
+				{
+					"text": " Hy",
+					"timestamps": {
+						"from": "00:00:16,850",
+						"to": "00:00:16,960"
+					},
+					"offsets": {
+						"from": 16850,
+						"to": 16960
+					},
+					"id": 6707,
+					"p": 0.495177,
+					"t_dtw": -1
+				},
+				{
+					"text": "ks",
+					"timestamps": {
+						"from": "00:00:17,060",
+						"to": "00:00:17,130"
+					},
+					"offsets": {
+						"from": 17060,
+						"to": 17130
+					},
+					"id": 591,
+					"p": 0.92202,
+					"t_dtw": -1
+				},
+				{
+					"text": "os",
+					"timestamps": {
+						"from": "00:00:17,130",
+						"to": "00:00:17,270"
+					},
+					"offsets": {
+						"from": 17130,
+						"to": 17270
+					},
+					"id": 418,
+					"p": 0.99208,
+					"t_dtw": -1
+				},
+				{
+					"text": " kings",
+					"timestamps": {
+						"from": "00:00:17,270",
+						"to": "00:00:17,550"
+					},
+					"offsets": {
+						"from": 17270,
+						"to": 17550
+					},
+					"id": 21557,
+					"p": 0.944834,
+					"t_dtw": -1
+				},
+				{
+					"text": " rule",
+					"timestamps": {
+						"from": "00:00:17,650",
+						"to": "00:00:17,890"
+					},
+					"offsets": {
+						"from": 17650,
+						"to": 17890
+					},
+					"id": 3896,
+					"p": 0.9866,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:17,890",
+						"to": "00:00:17,990"
+					},
+					"offsets": {
+						"from": 17890,
+						"to": 17990
+					},
+					"id": 262,
+					"p": 0.989712,
+					"t_dtw": -1
+				},
+				{
+					"text": " north",
+					"timestamps": {
+						"from": "00:00:18,410",
+						"to": "00:00:18,480"
+					},
+					"offsets": {
+						"from": 18410,
+						"to": 18480
+					},
+					"id": 5093,
+					"p": 0.926781,
+					"t_dtw": -1
+				},
+				{
+					"text": " from",
+					"timestamps": {
+						"from": "00:00:18,480",
+						"to": "00:00:18,700"
+					},
+					"offsets": {
+						"from": 18480,
+						"to": 18700
+					},
+					"id": 422,
+					"p": 0.964602,
+					"t_dtw": -1
+				},
+				{
+					"text": " Av",
+					"timestamps": {
+						"from": "00:00:18,830",
+						"to": "00:00:19,000"
+					},
+					"offsets": {
+						"from": 18830,
+						"to": 19000
+					},
+					"id": 5184,
+					"p": 0.606313,
+					"t_dtw": -1
+				},
+				{
+					"text": "aris",
+					"timestamps": {
+						"from": "00:00:19,000",
+						"to": "00:00:19,360"
+					},
+					"offsets": {
+						"from": 19000,
+						"to": 19360
+					},
+					"id": 20066,
+					"p": 0.700324,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_968]",
+					"timestamps": {
+						"from": "00:00:19,360",
+						"to": "00:00:19,360"
+					},
+					"offsets": {
+						"from": 19360,
+						"to": 19360
+					},
+					"id": 51331,
+					"p": 0.153918,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:19,360",
+				"to": "00:00:24,080"
+			},
+			"offsets": {
+				"from": 19360,
+				"to": 24080
+			},
+			"text": " while Theban kings hold the south, until Amos drives the Hyksos out.",
+			"tokens": [
+				{
+					"text": " while",
+					"timestamps": {
+						"from": "00:00:19,500",
+						"to": "00:00:19,730"
+					},
+					"offsets": {
+						"from": 19500,
+						"to": 19730
+					},
+					"id": 981,
+					"p": 0.901621,
+					"t_dtw": -1
+				},
+				{
+					"text": " The",
+					"timestamps": {
+						"from": "00:00:19,730",
+						"to": "00:00:19,950"
+					},
+					"offsets": {
+						"from": 19730,
+						"to": 19950
+					},
+					"id": 383,
+					"p": 0.956125,
+					"t_dtw": -1
+				},
+				{
+					"text": "ban",
+					"timestamps": {
+						"from": "00:00:19,950",
+						"to": "00:00:20,140"
+					},
+					"offsets": {
+						"from": 19950,
+						"to": 20140
+					},
+					"id": 3820,
+					"p": 0.94382,
+					"t_dtw": -1
+				},
+				{
+					"text": " kings",
+					"timestamps": {
+						"from": "00:00:20,230",
+						"to": "00:00:20,540"
+					},
+					"offsets": {
+						"from": 20230,
+						"to": 20540
+					},
+					"id": 21557,
+					"p": 0.977031,
+					"t_dtw": -1
+				},
+				{
+					"text": " hold",
+					"timestamps": {
+						"from": "00:00:20,540",
+						"to": "00:00:20,840"
+					},
+					"offsets": {
+						"from": 20540,
+						"to": 20840
+					},
+					"id": 1745,
+					"p": 0.993661,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:20,840",
+						"to": "00:00:21,050"
+					},
+					"offsets": {
+						"from": 20840,
+						"to": 21050
+					},
+					"id": 262,
+					"p": 0.99918,
+					"t_dtw": -1
+				},
+				{
+					"text": " south",
+					"timestamps": {
+						"from": "00:00:21,400",
+						"to": "00:00:21,480"
+					},
+					"offsets": {
+						"from": 21400,
+						"to": 21480
+					},
+					"id": 5366,
+					"p": 0.976202,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:21,480",
+						"to": "00:00:21,500"
+					},
+					"offsets": {
+						"from": 21480,
+						"to": 21500
+					},
+					"id": 11,
+					"p": 0.464323,
+					"t_dtw": -1
+				},
+				{
+					"text": " until",
+					"timestamps": {
+						"from": "00:00:21,650",
+						"to": "00:00:21,940"
+					},
+					"offsets": {
+						"from": 21650,
+						"to": 21940
+					},
+					"id": 1566,
+					"p": 0.623378,
+					"t_dtw": -1
+				},
+				{
+					"text": " Amos",
+					"timestamps": {
+						"from": "00:00:21,940",
+						"to": "00:00:22,280"
+					},
+					"offsets": {
+						"from": 21940,
+						"to": 22280
+					},
+					"id": 49104,
+					"p": 0.844796,
+					"t_dtw": -1
+				},
+				{
+					"text": " drives",
+					"timestamps": {
+						"from": "00:00:22,280",
+						"to": "00:00:22,780"
+					},
+					"offsets": {
+						"from": 22280,
+						"to": 22780
+					},
+					"id": 10182,
+					"p": 0.993787,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:22,780",
+						"to": "00:00:23,010"
+					},
+					"offsets": {
+						"from": 22780,
+						"to": 23010
+					},
+					"id": 262,
+					"p": 0.997387,
+					"t_dtw": -1
+				},
+				{
+					"text": " Hy",
+					"timestamps": {
+						"from": "00:00:23,040",
+						"to": "00:00:23,040"
+					},
+					"offsets": {
+						"from": 23040,
+						"to": 23040
+					},
+					"id": 6707,
+					"p": 0.957553,
+					"t_dtw": -1
+				},
+				{
+					"text": "ks",
+					"timestamps": {
+						"from": "00:00:23,380",
+						"to": "00:00:23,380"
+					},
+					"offsets": {
+						"from": 23380,
+						"to": 23380
+					},
+					"id": 591,
+					"p": 0.997567,
+					"t_dtw": -1
+				},
+				{
+					"text": "os",
+					"timestamps": {
+						"from": "00:00:23,490",
+						"to": "00:00:23,550"
+					},
+					"offsets": {
+						"from": 23490,
+						"to": 23550
+					},
+					"id": 418,
+					"p": 0.999796,
+					"t_dtw": -1
+				},
+				{
+					"text": " out",
+					"timestamps": {
+						"from": "00:00:23,550",
+						"to": "00:00:23,740"
+					},
+					"offsets": {
+						"from": 23550,
+						"to": 23740
+					},
+					"id": 503,
+					"p": 0.999445,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:23,870",
+						"to": "00:00:24,080"
+					},
+					"offsets": {
+						"from": 23870,
+						"to": 24080
+					},
+					"id": 13,
+					"p": 0.994877,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_1204]",
+					"timestamps": {
+						"from": "00:00:24,080",
+						"to": "00:00:24,080"
+					},
+					"offsets": {
+						"from": 24080,
+						"to": 24080
+					},
+					"id": 51567,
+					"p": 0.0156318,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

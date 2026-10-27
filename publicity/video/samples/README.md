@@ -18,6 +18,7 @@ The sample timelines the tours open in the real editor. Each `.ochx` is built by
 | [`investigation.mjs`](investigation.mjs)                       | A made-up forklift collision on a warehouse night shift, as an events and causal factors chart (Video 13, Short 10).        |
 | [`investigation-procedure.mjs`](investigation-procedure.mjs)   | The made-up written night-shift procedure for the same night, to compare with the investigation (Video 13).                 |
 | [`rome.mjs`](rome.mjs)                                         | Ancient Rome, the founding to 476 and the East to 1453, with Roman and Julian dates (Video 19, Short 16).                   |
+| [`egypt.mjs`](egypt.mjs)                                       | Ancient Egypt from Narmer to Cleopatra, in Shaw's chronology, with dating notes and Julian dates kept (Video 15, Short 12). |
 | [`usa.ochx`](usa.ochx)                                         | Built from `usa.mjs`.                                                                                                       |
 | [`saga.ochx`](saga.ochx)                                       | Built from `saga.mjs`.                                                                                                      |
 | [`deep-time.ochx`](deep-time.ochx)                             | Built from `deep-time.mjs`.                                                                                                 |
@@ -26,4 +27,5 @@ The sample timelines the tours open in the real editor. Each `.ochx` is built by
 | [`investigation.ochx`](investigation.ochx)                     | Built from `investigation.mjs`.                                                                                             |
 | [`investigation-procedure.ochx`](investigation-procedure.ochx) | Built from `investigation-procedure.mjs`.                                                                                   |
 | [`rome.ochx`](rome.ochx)                                       | Built from `rome.mjs`.                                                                                                      |
+| [`egypt.ochx`](egypt.ochx)                                     | Built from `egypt.mjs`.                                                                                                     |
 | [`star-wars.ochx`](star-wars.ochx)                             | The live Star Wars timeline, downloaded through the API (Video 12, Short 9).                                                |
