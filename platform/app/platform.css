@@ -311,6 +311,27 @@ h2 {
 .timeline-card h3 {
   margin: 0 0 8px;
 }
+/* A timeline's image (#339), or its placeholder, cropped to one shape so cards line up. */
+.timeline-card-image {
+  margin: -20px -20px 14px;
+  overflow: hidden;
+  border-radius: 11px 11px 0 0;
+  background: var(--hover);
+}
+/* Full width, 16 : 9, and a band rather than a poster on a card spanning a wide page. */
+.timeline-card-image img,
+.timeline-card-image .timeline-card-placeholder {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 220px;
+  object-fit: cover;
+}
+.timeline-card-placeholder {
+  display: block;
+  height: 100%;
+  background: linear-gradient(135deg, #e7eedf, #f6f1e3);
+}
 .muted {
   color: var(--muted);
   font-size: 13px;
@@ -1177,6 +1198,26 @@ label .field-hint {
 .address-form label input {
   flex: 1 1 12em;
   width: auto;
+}
+/* A timeline's image in its settings (#339): previewed as its card crops it. */
+.image-form {
+  display: grid;
+  gap: 10px;
+  max-width: 32rem;
+}
+.image-preview {
+  aspect-ratio: 16 / 9;
+  max-width: 20rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--hover);
+}
+.image-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 /* The HTTP API reference (#178): contents beside the operations, stacked when narrow. */
 main.api-reference {

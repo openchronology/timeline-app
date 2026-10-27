@@ -290,6 +290,7 @@ jobs:
       - run: node test/labels-postgres.mjs
       - run: node test/ages-postgres.mjs
       - run: node test/image-links-postgres.mjs
+      - run: node test/timeline-image-postgres.mjs
       - run: node test/deletion-postgres.mjs
       - run: node test/time-map-postgres.mjs
       - run: node test/openapi-postgres.mjs

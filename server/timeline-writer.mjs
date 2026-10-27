@@ -86,7 +86,15 @@ export class TimelineWriter {
     const { status, value } = await this.request('timelines/' + timeline);
     if (status !== 200) return { status, value };
     const settings = { format: 'openchronology', version: 1 };
-    for (const key of ['title', 'description', 'presentation', 'plugins', 'tags', 'assets'])
+    for (const key of [
+      'title',
+      'description',
+      'presentation',
+      'plugins',
+      'tags',
+      'image',
+      'assets',
+    ])
       if (value[key] !== null && value[key] !== undefined) settings[key] = value[key];
     return {
       status,

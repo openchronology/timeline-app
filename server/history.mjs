@@ -616,7 +616,7 @@ export async function startHistory(client) {
     SELECT t.id,t.revision,jsonb_build_object('format','openchronology','version',1,
       'title',t.title,'description',t.description)
       ||${optional('presentation')}||${optional('plugins')}||${optional('tags', 'to_jsonb(t.tags)')}
-      ||${optional('assets')}||${optional('comparison')}
+      ||${optional('image')}||${optional('assets')}||${optional('comparison')}
     FROM oc_timelines t WHERE t.history_since IS NULL AND t.keep_history ON CONFLICT DO NOTHING`,
   );
   const { rowCount } = await client.query(

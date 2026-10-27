@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// Sharing a timeline and what is in it (issues 60, 61, 95 and 97): page metadata and link
-// previews, preview images, entity pages, links into a timeline, embeds, oEmbed, robots and
-// the sitemap; private timelines show none of it.
+// Sharing a timeline and what is in it (issues 60, 61, 95, 97 and 339): page metadata and link
+// previews, preview images, a timeline's own image, entity pages, links into a timeline,
+// embeds, oEmbed, robots and the sitemap; private timelines show none of it.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -85,6 +85,16 @@ function client(ip) {
 const meta = (html, key) =>
   new RegExp(`<meta (?:property|name)="${key}" content="([^"]*)"`).exec(html)?.[1] ?? null;
 const unescape = (text) => text.replaceAll('&amp;', '&').replaceAll('&quot;', '"');
+/** A 2 × 1 PNG, standing in for a timeline's image hosted elsewhere. */
+const PIXEL = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAAD0lEQVR4nGPQCHc6kWINAAcNAilk1XzNAAAAAElFTkSuQmCC',
+  'base64',
+);
+/** A screenshot of `page` as `name`.png, when SCREENSHOT_DIR names where to keep them. */
+const shot = (page, name) =>
+  process.env.SCREENSHOT_DIR
+    ? page.screenshot({ path: `${process.env.SCREENSHOT_DIR}/${name}.png`, fullPage: true })
+    : null;
 /**
  * Every address the sitemap lists, read from its index and then each page it names (#287),
  * checking that no page holds more than SITEMAP_PAGE_SIZE timelines or profiles.
@@ -429,6 +439,79 @@ try {
   await settings.waitForURL(origin + named + '/moments/leg%3A2');
   await settings.frameLocator('iframe.editor-frame').locator('#inspector').waitFor();
   await settings.close();
+
+  // Its own image (#339), set in its settings: above its title, on its card, as its link
+  // preview and oEmbed thumbnail. Hosted elsewhere; the browser is answered for that host.
+  const picture = 'https://images.example.test/voyage-' + suffix + '.png';
+  await signedIn.route('https://images.example.test/**', (route) =>
+    route.fulfill({ contentType: 'image/png', body: PIXEL }),
+  );
+  const imaging = await signedIn.newPage();
+  await imaging.goto(origin + named + '/settings');
+  await imaging.getByRole('textbox', { name: 'Link to the image' }).fill(picture);
+  await imaging.getByRole('textbox', { name: 'Alt text' }).fill('A ship under sail');
+  // Its preview loads, so its size is sent with it.
+  await imaging.waitForFunction(() => document.querySelector('.image-preview img')?.naturalWidth);
+  await shot(imaging, 'timeline-image-settings');
+  await imaging.getByRole('button', { name: 'Set image' }).click();
+  await imaging.getByRole('button', { name: 'Replace image' }).waitFor();
+  const pictured = { url: picture, alt: 'A ship under sail', width: 2, height: 1 };
+  assert.deepEqual((await owner.request(`/api/timelines/${timelineId}`)).image, pictured);
+  const previewed = await guest.request(named);
+  assert.equal(meta(previewed, 'og:image'), picture);
+  assert.equal(meta(previewed, 'og:image:alt'), 'A ship under sail');
+  assert.equal(meta(previewed, 'og:image:width'), '2');
+  assert.equal(meta(previewed, 'twitter:image'), picture);
+  const thumbnail = await oembed(origin + named);
+  assert.deepEqual(
+    [thumbnail.thumbnail_url, thumbnail.thumbnail_width, thumbnail.thumbnail_height],
+    [picture, 2, 1],
+  );
+  // A moment's page still previews the moment.
+  assert.notEqual(meta(await guest.request(named + '/moments/leg%3A2'), 'og:image'), picture);
+  // On its card, lazily, with its alt text; and above its title in the editor.
+  const card = new RegExp(`<img src="${picture}" alt="A ship under sail" loading="lazy"`);
+  assert.match(await guest.request('/' + username), card);
+  await imaging.goto(origin + '/' + username);
+  await imaging.waitForFunction(() => document.querySelector('.timeline-card-image img')?.complete);
+  await shot(imaging, 'timeline-image-card');
+  await imaging.goto(origin + named);
+  const heading = imaging.frameLocator('iframe.editor-frame').locator('#timeline-image');
+  await heading.waitFor({ state: 'visible' });
+  assert.equal(await heading.getAttribute('src'), picture);
+  assert.equal(await heading.getAttribute('alt'), 'A ship under sail');
+  await shot(imaging, 'timeline-image-heading');
+  // Labelled, it previews and lists without it (#115).
+  await owner.request(`/api/timelines/${timelineId}/settings`, {
+    method: 'PATCH',
+    data: { labels: ['violence'] },
+  });
+  assert.notEqual(meta(await guest.request(named), 'og:image'), picture);
+  assert.equal((await oembed(origin + named)).thumbnail_url, undefined);
+  const labelled = await owner.request('/' + username);
+  assert.doesNotMatch(labelled, card);
+  assert.match(labelled, /timeline-card-placeholder/);
+  await owner.request(`/api/timelines/${timelineId}/settings`, {
+    method: 'PATCH',
+    data: { labels: [] },
+  });
+  // Without its size, oEmbed keeps the drawn thumbnail.
+  await owner.request(`/api/timelines/${timelineId}/settings`, {
+    method: 'PATCH',
+    data: { image: { url: picture, alt: 'A ship under sail' } },
+  });
+  assert.equal(
+    (await oembed(origin + named)).thumbnail_url,
+    `${origin}/timelines/${timelineId}/opengraph-image`,
+  );
+  // Removed in its settings: the drawn preview and the placeholder again.
+  await imaging.goto(origin + named + '/settings');
+  await imaging.getByRole('button', { name: 'Remove image' }).click();
+  await imaging.getByRole('button', { name: 'Set image' }).waitFor();
+  assert.equal((await owner.request(`/api/timelines/${timelineId}`)).image, null);
+  assert(meta(await guest.request(named), 'og:image').includes('/opengraph-image'));
+  assert.doesNotMatch(await guest.request('/' + username), card);
+  await imaging.close();
 
   // A timeline started in the browser is a draft, listed on the dashboard to open (#188).
   const drafting = await signedIn.newPage();

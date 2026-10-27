@@ -71,8 +71,10 @@ Timeline, moment and duration pages describe themselves for link previews (Open 
 Twitter cards) and search engines: a title, a description (the timeline's description, or how
 many moments it has, over what time and by whom; for a moment, its time and notes), the
 canonical address, and a 1200 × 630 preview image. The image shows the title and a strip of the
-timeline's moments, with the shared event marked on it. Facebook, X, LinkedIn,
-Slack, Discord, iMessage and others show these as a card with a large image.
+timeline's moments, with the shared event marked on it. A timeline with
+[an image of its own](images.md#a-timelines-own-image) previews its page with that image
+instead, linked where it is hosted. Facebook, X, LinkedIn, Slack, Discord, iMessage and others
+show these as a card with a large image.
 
 Previews are made as a guest sees the timeline: a private timeline's preview image is the
 site's own card, and its pages ask search engines not to index them, so nothing private
@@ -141,6 +143,7 @@ GET /api/oembed?url=https://timescale.info/<username>/<slug>&maxwidth=600&format
 
 It answers a `rich` embed with the iframe above (opening at the page's event, or at
 the link's fragment), its size (at most 800 × 480, within `maxwidth` and `maxheight`), the
-title and owner, and the preview image as its thumbnail. Any of a timeline's addresses will do.
+title and owner, and the preview image as its thumbnail (the timeline's own image, when it has
+one whose size its settings measured). Any of a timeline's addresses will do.
 Only `json` is available; addresses of other sites, and timelines that are not public, are not
 found.

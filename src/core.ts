@@ -93,6 +93,9 @@ export * from './suites.js';
 export * from './editions.js';
 export * from './capacity.js';
 export * from './content-labels.js';
+export * from './timeline-image.js';
+import { validateTimelineImage } from './timeline-image.js';
+import type { TimelineImage } from './timeline-image.js';
 export * from './drafts.js';
 export { stackWindow, scaleTimeline } from './stack-layout.js';
 import { parseTimestamp } from './calendar.js';
@@ -181,6 +184,8 @@ export interface TimelineDocument {
   presentation?: TimePresentation;
   plugins?: InstalledPlugin[];
   tags?: string[];
+  /** The timeline's own image (#339), above its title and on its card. */
+  image?: TimelineImage;
   assets?: Record<string, string>;
   events: PointEvent[];
   durations?: Duration[];
@@ -308,6 +313,7 @@ export function validateDocument(value: unknown, partial = false): TimelineDocum
       : { presentation: validatePresentation(doc.presentation) }),
     ...(plugins === undefined ? {} : { plugins }),
     ...(doc.tags === undefined ? {} : { tags: validateTags(doc.tags) }),
+    ...(doc.image == null ? {} : { image: validateTimelineImage(doc.image) }),
     ...(doc.assets === undefined ? {} : { assets: validateAssets(doc.assets) }),
     events: legacy.events,
     ...(durations.length ? { durations } : {}),
@@ -341,10 +347,12 @@ export class TimelineIndex {
   presentation?: TimePresentation;
   plugins?: InstalledPlugin[];
   tags?: string[];
+  image?: TimelineImage;
   assets?: Record<string, string>;
   constructor(document: TimelineDocument) {
     // Server metadata reports unset settings as null; treat them as absent.
     this.tags = document.tags == null ? undefined : validateTags(document.tags);
+    this.image = document.image == null ? undefined : validateTimelineImage(document.image);
     this.assets = document.assets == null ? undefined : validateAssets(document.assets);
     this.title = document.title;
     this.description = document.description;
@@ -549,6 +557,7 @@ export class TimelineIndex {
       ...(this.presentation ? { presentation: this.presentation } : {}),
       ...(this.plugins === undefined ? {} : { plugins: this.plugins }),
       ...(this.tags === undefined ? {} : { tags: this.tags }),
+      ...(this.image === undefined ? {} : { image: this.image }),
       ...(this.assets === undefined ? {} : { assets: this.assets }),
       events: [...this.points].flatMap(([, bucket]) => [...bucket]),
       ...(durations.length ? { durations } : {}),
