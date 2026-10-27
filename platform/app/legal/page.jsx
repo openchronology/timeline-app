@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { pageTitle } from '../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
 export function generateMetadata() {
-  return { title: pageTitle('Terms, privacy and licenses') };
+  return { title: pageTitle('Terms, privacy and licenses'), alternates: { canonical: '/legal' } };
 }
 export default async function LegalPage() {
   const files = [

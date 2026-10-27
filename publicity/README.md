@@ -24,6 +24,7 @@ The [shorts](shorts/README.md) are ten vertical cuts for TikTok, YouTube Shorts 
 | [`11-run-your-own-server.md`](11-run-your-own-server.md)                     | Video 11, for administrators: the footprint, packages, configuration, running and upgrading.                         |
 | [`12-ai-and-automation.md`](12-ai-and-automation.md)                         | Video 12, for automation: an assistant builds a timeline through an API key, and how the app is built.               |
 | [`13-investigations-causal-factors.md`](13-investigations-causal-factors.md) | Video 13, for investigators: an events and causal factors chart, built on a made-up case.                            |
+| [`15-tour-ancient-egypt.md`](15-tour-ancient-egypt.md)                       | Video 15, for students and teachers: ancient Egypt from Narmer to Cleopatra, in one named chronology.                |
 | [`16-tour-mesopotamia.md`](16-tour-mesopotamia.md)                           | Video 16, for students and teachers: a tour of ancient Mesopotamia, villages to Cyrus, with every date's chronology. |
 | [`shorts/`](shorts/README.md)                                                | The ten vertical shorts: what the feeds demand, their audiences, and a script for each.                              |
 | [`video/`](video/README.md)                                                  | The pipeline and each video's animation source, the tours' sample timelines and their captured shots.                |

@@ -2,7 +2,7 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-The sample timelines the tours open in the real editor. Each `.ochx` is built by [`build.mjs`](build.mjs) from its data file, with the editor's own plugin definitions, and checked with its validator; import any of them into OpenChronology to explore it. History and science use well-established dates, each with its source; the story, the incident and the investigation are made up; the Middle-earth chronology is an unofficial summary of the published one. `star-wars.ochx` isn't built here: it's the live timeline at timescale.info/athan/star-wars, downloaded through the API, an unofficial fan chronology not affiliated with Lucasfilm.
+The sample timelines the tours open in the real editor. Each `.ochx` is built by [`build.mjs`](build.mjs) from its data file, with the editor's own plugin definitions, and checked with its validator; import any of them into OpenChronology to explore it. History and science use well-established dates, each with its source (ancient Egypt in one named chronology, its estimates marked); the story, the incident and the investigation are made up; the Middle-earth chronology is an unofficial summary of the published one. `star-wars.ochx` isn't built here: it's the live timeline at timescale.info/athan/star-wars, downloaded through the API, an unofficial fan chronology not affiliated with Lucasfilm.
 
 ## Contents
 
@@ -18,6 +18,7 @@ The sample timelines the tours open in the real editor. Each `.ochx` is built by
 | [`investigation.mjs`](investigation.mjs)                       | A made-up forklift collision on a warehouse night shift, as an events and causal factors chart (Video 13, Short 10).                |
 | [`investigation-procedure.mjs`](investigation-procedure.mjs)   | The made-up written night-shift procedure for the same night, to compare with the investigation (Video 13).                         |
 | [`mesopotamia.mjs`](mesopotamia.mjs)                           | Ancient Mesopotamia, about 7000–323 BCE, in the middle chronology: periods, reigns, laws, writing and battles (Video 16, Short 13). |
+| [`egypt.mjs`](egypt.mjs)                                       | Ancient Egypt from Narmer to Cleopatra, in Shaw's chronology, with dating notes and Julian dates kept (Video 15, Short 12).         |
 | [`usa.ochx`](usa.ochx)                                         | Built from `usa.mjs`.                                                                                                               |
 | [`saga.ochx`](saga.ochx)                                       | Built from `saga.mjs`.                                                                                                              |
 | [`deep-time.ochx`](deep-time.ochx)                             | Built from `deep-time.mjs`.                                                                                                         |
@@ -26,4 +27,5 @@ The sample timelines the tours open in the real editor. Each `.ochx` is built by
 | [`investigation.ochx`](investigation.ochx)                     | Built from `investigation.mjs`.                                                                                                     |
 | [`investigation-procedure.ochx`](investigation-procedure.ochx) | Built from `investigation-procedure.mjs`.                                                                                           |
 | [`mesopotamia.ochx`](mesopotamia.ochx)                         | Built from `mesopotamia.mjs`.                                                                                                       |
+| [`egypt.ochx`](egypt.ochx)                                     | Built from `egypt.mjs`.                                                                                                             |
 | [`star-wars.ochx`](star-wars.ochx)                             | The live Star Wars timeline, downloaded through the API (Video 12, Short 9).                                                        |

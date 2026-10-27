@@ -20,3 +20,4 @@ The scripts and storyboards of OpenChronology's vertical shorts for TikTok, YouT
 | [`9-i-asked-an-ai.md`](9-i-asked-an-ai.md)                             | Short 9: one prompt and an API key build the Star Wars timeline.                       |
 | [`10-why-did-it-happen.md`](10-why-did-it-happen.md)                   | Short 10: events, conditions and causal factors, on a made-up case.                    |
 | [`13-the-first-archaeologist.md`](13-the-first-archaeologist.md)       | Short 13: Nabonidus dated Naram-Sin 3,200 years back; on one line it is about 1,700.   |
+| [`12-closer-to-the-moon.md`](12-closer-to-the-moon.md)                 | Short 12: Cleopatra lived closer to the Moon landing than to the Great Pyramid.        |
