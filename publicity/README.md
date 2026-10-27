@@ -25,5 +25,6 @@ The [shorts](shorts/README.md) are ten vertical cuts for TikTok, YouTube Shorts 
 | [`12-ai-and-automation.md`](12-ai-and-automation.md)                         | Video 12, for automation: an assistant builds a timeline through an API key, and how the app is built.      |
 | [`13-investigations-causal-factors.md`](13-investigations-causal-factors.md) | Video 13, for investigators: an events and causal factors chart, built on a made-up case.                   |
 | [`21-tour-the-great-depression.md`](21-tour-the-great-depression.md)         | Video 21, for students and teachers: the Great Depression, 1929–1941, in the US and the world.              |
+| [`15-tour-ancient-egypt.md`](15-tour-ancient-egypt.md)                       | Video 15, for students and teachers: ancient Egypt from Narmer to Cleopatra, in one named chronology.       |
 | [`shorts/`](shorts/README.md)                                                | The ten vertical shorts: what the feeds demand, their audiences, and a script for each.                     |
 | [`video/`](video/README.md)                                                  | The pipeline and each video's animation source, the tours' sample timelines and their captured shots.       |

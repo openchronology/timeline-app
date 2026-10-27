@@ -20,3 +20,4 @@ The scripts and storyboards of OpenChronology's vertical shorts for TikTok, YouT
 | [`9-i-asked-an-ai.md`](9-i-asked-an-ai.md)                             | Short 9: one prompt and an API key build the Star Wars timeline.                       |
 | [`10-why-did-it-happen.md`](10-why-did-it-happen.md)                   | Short 10: events, conditions and causal factors, on a made-up case.                    |
 | [`18-twenty-five-years-back.md`](18-twenty-five-years-back.md)         | Short 18: the Dow's 25 years from its 1929 peak back to it.                            |
+| [`12-closer-to-the-moon.md`](12-closer-to-the-moon.md)                 | Short 12: Cleopatra lived closer to the Moon landing than to the Great Pyramid.        |
