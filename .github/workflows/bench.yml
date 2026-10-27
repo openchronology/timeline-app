@@ -45,6 +45,7 @@ jobs:
           cache: npm
       - name: Install PostgreSQL and native build dependencies
         run: |
+          sh scripts/ubuntu-archive.sh
           sudo apt-get update
           sudo apt-get install -y postgresql-16 postgresql-server-dev-16 libgmp-dev libsqlite3-dev build-essential cmake python3
           "$PG_CONFIG" --bindir >> "$GITHUB_PATH"
@@ -63,8 +64,8 @@ jobs:
           createdb "$PGDATABASE"
           psql -X -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION pgmp;'
       - run: node scripts/npm-ci.mjs
-      # Capacity measurements run the editor in Chromium. Its system packages come from the
-      # runner's Ubuntu mirror; when it is slow, this fails on its own (#351).
+      # Capacity measurements run the editor in Chromium. Its system packages come from
+      # Ubuntu's archive; when it is slow, this fails on its own (#351).
       - run: npx playwright install --with-deps chromium
         timeout-minutes: 10
       - name: Install Rust
