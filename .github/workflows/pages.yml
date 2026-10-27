@@ -29,7 +29,9 @@ jobs:
       - run: npm run typecheck
       - run: npm run build:editor
       - run: npm run build:offline
+      # A slow Ubuntu mirror fails this step on its own (#351).
       - run: npx playwright install --with-deps chromium
+        timeout-minutes: 10
       - name: Verify the file works without a network
         run: npm run test:offline:browser
       # The organization site serves its default branch directly; a write deploy key scoped to that
