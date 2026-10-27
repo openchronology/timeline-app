@@ -1,0 +1,798 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:02,060"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 2060
+			},
+			"text": " Then Carthage.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.952151,
+					"t_dtw": -1
+				},
+				{
+					"text": " Then",
+					"timestamps": {
+						"from": "00:00:00,150",
+						"to": "00:00:00,540"
+					},
+					"offsets": {
+						"from": 150,
+						"to": 540
+					},
+					"id": 3244,
+					"p": 0.857351,
+					"t_dtw": -1
+				},
+				{
+					"text": " Carth",
+					"timestamps": {
+						"from": "00:00:00,540",
+						"to": "00:00:01,000"
+					},
+					"offsets": {
+						"from": 540,
+						"to": 1000
+					},
+					"id": 49268,
+					"p": 0.987895,
+					"t_dtw": -1
+				},
+				{
+					"text": "age",
+					"timestamps": {
+						"from": "00:00:01,000",
+						"to": "00:00:01,540"
+					},
+					"offsets": {
+						"from": 1000,
+						"to": 1540
+					},
+					"id": 496,
+					"p": 0.999399,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:01,960",
+						"to": "00:00:02,060"
+					},
+					"offsets": {
+						"from": 1960,
+						"to": 2060
+					},
+					"id": 13,
+					"p": 0.744156,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_103]",
+					"timestamps": {
+						"from": "00:00:02,060",
+						"to": "00:00:02,060"
+					},
+					"offsets": {
+						"from": 2060,
+						"to": 2060
+					},
+					"id": 50466,
+					"p": 0.0182008,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:02,060",
+				"to": "00:00:05,200"
+			},
+			"offsets": {
+				"from": 2060,
+				"to": 5200
+			},
+			"text": " Hannibal takes Saguntum, crosses the Alps,",
+			"tokens": [
+				{
+					"text": " Hannibal",
+					"timestamps": {
+						"from": "00:00:02,210",
+						"to": "00:00:02,680"
+					},
+					"offsets": {
+						"from": 2210,
+						"to": 2680
+					},
+					"id": 41949,
+					"p": 0.995024,
+					"t_dtw": -1
+				},
+				{
+					"text": " takes",
+					"timestamps": {
+						"from": "00:00:02,680",
+						"to": "00:00:03,060"
+					},
+					"offsets": {
+						"from": 2680,
+						"to": 3060
+					},
+					"id": 2753,
+					"p": 0.990255,
+					"t_dtw": -1
+				},
+				{
+					"text": " Sag",
+					"timestamps": {
+						"from": "00:00:03,060",
+						"to": "00:00:03,080"
+					},
+					"offsets": {
+						"from": 3060,
+						"to": 3080
+					},
+					"id": 25605,
+					"p": 0.871722,
+					"t_dtw": -1
+				},
+				{
+					"text": "unt",
+					"timestamps": {
+						"from": "00:00:03,080",
+						"to": "00:00:03,520"
+					},
+					"offsets": {
+						"from": 3080,
+						"to": 3520
+					},
+					"id": 2797,
+					"p": 0.79791,
+					"t_dtw": -1
+				},
+				{
+					"text": "um",
+					"timestamps": {
+						"from": "00:00:03,520",
+						"to": "00:00:03,610"
+					},
+					"offsets": {
+						"from": 3520,
+						"to": 3610
+					},
+					"id": 388,
+					"p": 0.993995,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,880",
+						"to": "00:00:03,880"
+					},
+					"offsets": {
+						"from": 3880,
+						"to": 3880
+					},
+					"id": 11,
+					"p": 0.981159,
+					"t_dtw": -1
+				},
+				{
+					"text": " crosses",
+					"timestamps": {
+						"from": "00:00:04,320",
+						"to": "00:00:04,530"
+					},
+					"offsets": {
+						"from": 4320,
+						"to": 4530
+					},
+					"id": 24234,
+					"p": 0.849973,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:04,530",
+						"to": "00:00:04,770"
+					},
+					"offsets": {
+						"from": 4530,
+						"to": 4770
+					},
+					"id": 262,
+					"p": 0.995579,
+					"t_dtw": -1
+				},
+				{
+					"text": " Alps",
+					"timestamps": {
+						"from": "00:00:04,830",
+						"to": "00:00:05,200"
+					},
+					"offsets": {
+						"from": 4830,
+						"to": 5200
+					},
+					"id": 46312,
+					"p": 0.99053,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:05,200",
+						"to": "00:00:05,200"
+					},
+					"offsets": {
+						"from": 5200,
+						"to": 5200
+					},
+					"id": 11,
+					"p": 0.837593,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_260]",
+					"timestamps": {
+						"from": "00:00:05,200",
+						"to": "00:00:05,200"
+					},
+					"offsets": {
+						"from": 5200,
+						"to": 5200
+					},
+					"id": 50623,
+					"p": 0.0993626,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:05,200",
+				"to": "00:00:09,000"
+			},
+			"offsets": {
+				"from": 5200,
+				"to": 9000
+			},
+			"text": " and destroys Roman armies at Lake Trasimene and at Cannae,",
+			"tokens": [
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:05,350",
+						"to": "00:00:05,410"
+					},
+					"offsets": {
+						"from": 5350,
+						"to": 5410
+					},
+					"id": 290,
+					"p": 0.998936,
+					"t_dtw": -1
+				},
+				{
+					"text": " destroys",
+					"timestamps": {
+						"from": "00:00:05,410",
+						"to": "00:00:05,960"
+					},
+					"offsets": {
+						"from": 5410,
+						"to": 5960
+					},
+					"id": 27838,
+					"p": 0.996974,
+					"t_dtw": -1
+				},
+				{
+					"text": " Roman",
+					"timestamps": {
+						"from": "00:00:05,960",
+						"to": "00:00:06,210"
+					},
+					"offsets": {
+						"from": 5960,
+						"to": 6210
+					},
+					"id": 7993,
+					"p": 0.997759,
+					"t_dtw": -1
+				},
+				{
+					"text": " armies",
+					"timestamps": {
+						"from": "00:00:06,740",
+						"to": "00:00:06,740"
+					},
+					"offsets": {
+						"from": 6740,
+						"to": 6740
+					},
+					"id": 18837,
+					"p": 0.999012,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:06,740",
+						"to": "00:00:06,750"
+					},
+					"offsets": {
+						"from": 6740,
+						"to": 6750
+					},
+					"id": 379,
+					"p": 0.97623,
+					"t_dtw": -1
+				},
+				{
+					"text": " Lake",
+					"timestamps": {
+						"from": "00:00:07,090",
+						"to": "00:00:07,170"
+					},
+					"offsets": {
+						"from": 7090,
+						"to": 7170
+					},
+					"id": 6233,
+					"p": 0.973598,
+					"t_dtw": -1
+				},
+				{
+					"text": " Tr",
+					"timestamps": {
+						"from": "00:00:07,310",
+						"to": "00:00:07,310"
+					},
+					"offsets": {
+						"from": 7310,
+						"to": 7310
+					},
+					"id": 833,
+					"p": 0.929945,
+					"t_dtw": -1
+				},
+				{
+					"text": "as",
+					"timestamps": {
+						"from": "00:00:07,450",
+						"to": "00:00:07,450"
+					},
+					"offsets": {
+						"from": 7450,
+						"to": 7450
+					},
+					"id": 292,
+					"p": 0.857053,
+					"t_dtw": -1
+				},
+				{
+					"text": "im",
+					"timestamps": {
+						"from": "00:00:07,480",
+						"to": "00:00:07,590"
+					},
+					"offsets": {
+						"from": 7480,
+						"to": 7590
+					},
+					"id": 320,
+					"p": 0.685517,
+					"t_dtw": -1
+				},
+				{
+					"text": "ene",
+					"timestamps": {
+						"from": "00:00:07,590",
+						"to": "00:00:07,840"
+					},
+					"offsets": {
+						"from": 7590,
+						"to": 7840
+					},
+					"id": 1734,
+					"p": 0.972801,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:07,840",
+						"to": "00:00:08,140"
+					},
+					"offsets": {
+						"from": 7840,
+						"to": 8140
+					},
+					"id": 290,
+					"p": 0.888927,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:08,150",
+						"to": "00:00:08,360"
+					},
+					"offsets": {
+						"from": 8150,
+						"to": 8360
+					},
+					"id": 379,
+					"p": 0.975856,
+					"t_dtw": -1
+				},
+				{
+					"text": " Cann",
+					"timestamps": {
+						"from": "00:00:08,360",
+						"to": "00:00:08,780"
+					},
+					"offsets": {
+						"from": 8360,
+						"to": 8780
+					},
+					"id": 12283,
+					"p": 0.495755,
+					"t_dtw": -1
+				},
+				{
+					"text": "ae",
+					"timestamps": {
+						"from": "00:00:08,780",
+						"to": "00:00:08,880"
+					},
+					"offsets": {
+						"from": 8780,
+						"to": 8880
+					},
+					"id": 3609,
+					"p": 0.909431,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:09,000",
+						"to": "00:00:09,000"
+					},
+					"offsets": {
+						"from": 9000,
+						"to": 9000
+					},
+					"id": 11,
+					"p": 0.840371,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_450]",
+					"timestamps": {
+						"from": "00:00:09,000",
+						"to": "00:00:09,000"
+					},
+					"offsets": {
+						"from": 9000,
+						"to": 9000
+					},
+					"id": 50813,
+					"p": 0.192807,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:09,000",
+				"to": "00:00:13,000"
+			},
+			"offsets": {
+				"from": 9000,
+				"to": 13000
+			},
+			"text": " each battle linked to the next, until Scipio beats him at Zama.",
+			"tokens": [
+				{
+					"text": " each",
+					"timestamps": {
+						"from": "00:00:09,150",
+						"to": "00:00:09,320"
+					},
+					"offsets": {
+						"from": 9150,
+						"to": 9320
+					},
+					"id": 1123,
+					"p": 0.997428,
+					"t_dtw": -1
+				},
+				{
+					"text": " battle",
+					"timestamps": {
+						"from": "00:00:09,320",
+						"to": "00:00:09,790"
+					},
+					"offsets": {
+						"from": 9320,
+						"to": 9790
+					},
+					"id": 3344,
+					"p": 0.995927,
+					"t_dtw": -1
+				},
+				{
+					"text": " linked",
+					"timestamps": {
+						"from": "00:00:09,790",
+						"to": "00:00:10,010"
+					},
+					"offsets": {
+						"from": 9790,
+						"to": 10010
+					},
+					"id": 6692,
+					"p": 0.958457,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:10,010",
+						"to": "00:00:10,370"
+					},
+					"offsets": {
+						"from": 10010,
+						"to": 10370
+					},
+					"id": 284,
+					"p": 0.998951,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:10,370",
+						"to": "00:00:10,540"
+					},
+					"offsets": {
+						"from": 10370,
+						"to": 10540
+					},
+					"id": 262,
+					"p": 0.99795,
+					"t_dtw": -1
+				},
+				{
+					"text": " next",
+					"timestamps": {
+						"from": "00:00:10,890",
+						"to": "00:00:11,000"
+					},
+					"offsets": {
+						"from": 10890,
+						"to": 11000
+					},
+					"id": 1306,
+					"p": 0.967382,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:11,130",
+						"to": "00:00:11,130"
+					},
+					"offsets": {
+						"from": 11130,
+						"to": 11130
+					},
+					"id": 11,
+					"p": 0.571373,
+					"t_dtw": -1
+				},
+				{
+					"text": " until",
+					"timestamps": {
+						"from": "00:00:11,280",
+						"to": "00:00:11,460"
+					},
+					"offsets": {
+						"from": 11280,
+						"to": 11460
+					},
+					"id": 1566,
+					"p": 0.587746,
+					"t_dtw": -1
+				},
+				{
+					"text": " Sc",
+					"timestamps": {
+						"from": "00:00:11,460",
+						"to": "00:00:11,590"
+					},
+					"offsets": {
+						"from": 11460,
+						"to": 11590
+					},
+					"id": 1446,
+					"p": 0.666313,
+					"t_dtw": -1
+				},
+				{
+					"text": "ip",
+					"timestamps": {
+						"from": "00:00:11,590",
+						"to": "00:00:11,710"
+					},
+					"offsets": {
+						"from": 11590,
+						"to": 11710
+					},
+					"id": 541,
+					"p": 0.982264,
+					"t_dtw": -1
+				},
+				{
+					"text": "io",
+					"timestamps": {
+						"from": "00:00:11,710",
+						"to": "00:00:11,850"
+					},
+					"offsets": {
+						"from": 11710,
+						"to": 11850
+					},
+					"id": 952,
+					"p": 0.994014,
+					"t_dtw": -1
+				},
+				{
+					"text": " beats",
+					"timestamps": {
+						"from": "00:00:11,850",
+						"to": "00:00:12,180"
+					},
+					"offsets": {
+						"from": 11850,
+						"to": 12180
+					},
+					"id": 17825,
+					"p": 0.974478,
+					"t_dtw": -1
+				},
+				{
+					"text": " him",
+					"timestamps": {
+						"from": "00:00:12,180",
+						"to": "00:00:12,380"
+					},
+					"offsets": {
+						"from": 12180,
+						"to": 12380
+					},
+					"id": 683,
+					"p": 0.997678,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:12,380",
+						"to": "00:00:12,510"
+					},
+					"offsets": {
+						"from": 12380,
+						"to": 12510
+					},
+					"id": 379,
+					"p": 0.996426,
+					"t_dtw": -1
+				},
+				{
+					"text": " Z",
+					"timestamps": {
+						"from": "00:00:12,510",
+						"to": "00:00:12,570"
+					},
+					"offsets": {
+						"from": 12510,
+						"to": 12570
+					},
+					"id": 1168,
+					"p": 0.951647,
+					"t_dtw": -1
+				},
+				{
+					"text": "ama",
+					"timestamps": {
+						"from": "00:00:12,570",
+						"to": "00:00:12,680"
+					},
+					"offsets": {
+						"from": 12570,
+						"to": 12680
+					},
+					"id": 1689,
+					"p": 0.941046,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:13,000",
+						"to": "00:00:13,000"
+					},
+					"offsets": {
+						"from": 13000,
+						"to": 13000
+					},
+					"id": 13,
+					"p": 0.993557,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_650]",
+					"timestamps": {
+						"from": "00:00:13,000",
+						"to": "00:00:13,000"
+					},
+					"offsets": {
+						"from": 13000,
+						"to": 13000
+					},
+					"id": 51013,
+					"p": 0.0348476,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

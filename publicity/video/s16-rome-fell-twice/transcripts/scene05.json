@@ -1,0 +1,353 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:05,680"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 5680
+			},
+			"text": " From Romulus to the Last Constantine, 22 Centuries of Rome, on one line you consume.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.890158,
+					"t_dtw": -1
+				},
+				{
+					"text": " From",
+					"timestamps": {
+						"from": "00:00:00,310",
+						"to": "00:00:00,320"
+					},
+					"offsets": {
+						"from": 310,
+						"to": 320
+					},
+					"id": 3574,
+					"p": 0.912531,
+					"t_dtw": -1
+				},
+				{
+					"text": " Rom",
+					"timestamps": {
+						"from": "00:00:00,320",
+						"to": "00:00:00,560"
+					},
+					"offsets": {
+						"from": 320,
+						"to": 560
+					},
+					"id": 3570,
+					"p": 0.972462,
+					"t_dtw": -1
+				},
+				{
+					"text": "ulus",
+					"timestamps": {
+						"from": "00:00:00,560",
+						"to": "00:00:00,870"
+					},
+					"offsets": {
+						"from": 560,
+						"to": 870
+					},
+					"id": 23515,
+					"p": 0.994317,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:00,870",
+						"to": "00:00:01,040"
+					},
+					"offsets": {
+						"from": 870,
+						"to": 1040
+					},
+					"id": 284,
+					"p": 0.993479,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:01,040",
+						"to": "00:00:01,280"
+					},
+					"offsets": {
+						"from": 1040,
+						"to": 1280
+					},
+					"id": 262,
+					"p": 0.985518,
+					"t_dtw": -1
+				},
+				{
+					"text": " Last",
+					"timestamps": {
+						"from": "00:00:01,280",
+						"to": "00:00:01,600"
+					},
+					"offsets": {
+						"from": 1280,
+						"to": 1600
+					},
+					"id": 4586,
+					"p": 0.423077,
+					"t_dtw": -1
+				},
+				{
+					"text": " Constantine",
+					"timestamps": {
+						"from": "00:00:01,600",
+						"to": "00:00:02,170"
+					},
+					"offsets": {
+						"from": 1600,
+						"to": 2170
+					},
+					"id": 44665,
+					"p": 0.94358,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,610",
+						"to": "00:00:02,630"
+					},
+					"offsets": {
+						"from": 2610,
+						"to": 2630
+					},
+					"id": 11,
+					"p": 0.610662,
+					"t_dtw": -1
+				},
+				{
+					"text": " 22",
+					"timestamps": {
+						"from": "00:00:02,690",
+						"to": "00:00:02,960"
+					},
+					"offsets": {
+						"from": 2690,
+						"to": 2960
+					},
+					"id": 2534,
+					"p": 0.432786,
+					"t_dtw": -1
+				},
+				{
+					"text": " Cent",
+					"timestamps": {
+						"from": "00:00:02,960",
+						"to": "00:00:03,170"
+					},
+					"offsets": {
+						"from": 2960,
+						"to": 3170
+					},
+					"id": 1979,
+					"p": 0.674558,
+					"t_dtw": -1
+				},
+				{
+					"text": "uries",
+					"timestamps": {
+						"from": "00:00:03,170",
+						"to": "00:00:03,450"
+					},
+					"offsets": {
+						"from": 3170,
+						"to": 3450
+					},
+					"id": 4740,
+					"p": 0.998473,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:03,470",
+						"to": "00:00:03,620"
+					},
+					"offsets": {
+						"from": 3470,
+						"to": 3620
+					},
+					"id": 286,
+					"p": 0.975401,
+					"t_dtw": -1
+				},
+				{
+					"text": " Rome",
+					"timestamps": {
+						"from": "00:00:03,620",
+						"to": "00:00:03,910"
+					},
+					"offsets": {
+						"from": 3620,
+						"to": 3910
+					},
+					"id": 10598,
+					"p": 0.990082,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:04,000",
+						"to": "00:00:04,000"
+					},
+					"offsets": {
+						"from": 4000,
+						"to": 4000
+					},
+					"id": 11,
+					"p": 0.800182,
+					"t_dtw": -1
+				},
+				{
+					"text": " on",
+					"timestamps": {
+						"from": "00:00:04,140",
+						"to": "00:00:04,150"
+					},
+					"offsets": {
+						"from": 4140,
+						"to": 4150
+					},
+					"id": 319,
+					"p": 0.78565,
+					"t_dtw": -1
+				},
+				{
+					"text": " one",
+					"timestamps": {
+						"from": "00:00:04,150",
+						"to": "00:00:04,370"
+					},
+					"offsets": {
+						"from": 4150,
+						"to": 4370
+					},
+					"id": 530,
+					"p": 0.976492,
+					"t_dtw": -1
+				},
+				{
+					"text": " line",
+					"timestamps": {
+						"from": "00:00:04,370",
+						"to": "00:00:04,670"
+					},
+					"offsets": {
+						"from": 4370,
+						"to": 4670
+					},
+					"id": 1627,
+					"p": 0.996741,
+					"t_dtw": -1
+				},
+				{
+					"text": " you",
+					"timestamps": {
+						"from": "00:00:04,670",
+						"to": "00:00:04,880"
+					},
+					"offsets": {
+						"from": 4670,
+						"to": 4880
+					},
+					"id": 345,
+					"p": 0.979873,
+					"t_dtw": -1
+				},
+				{
+					"text": " consume",
+					"timestamps": {
+						"from": "00:00:04,940",
+						"to": "00:00:05,370"
+					},
+					"offsets": {
+						"from": 4940,
+						"to": 5370
+					},
+					"id": 15000,
+					"p": 0.528211,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,670",
+						"to": "00:00:05,670"
+					},
+					"offsets": {
+						"from": 5670,
+						"to": 5670
+					},
+					"id": 13,
+					"p": 0.927957,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_284]",
+					"timestamps": {
+						"from": "00:00:05,680",
+						"to": "00:00:05,680"
+					},
+					"offsets": {
+						"from": 5680,
+						"to": 5680
+					},
+					"id": 50647,
+					"p": 0.0186422,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

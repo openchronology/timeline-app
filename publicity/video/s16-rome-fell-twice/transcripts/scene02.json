@@ -1,0 +1,534 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:05,300"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 5300
+			},
+			"text": " In 395, the Emperor Theodosius dies, and his sons split the empire.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.915789,
+					"t_dtw": -1
+				},
+				{
+					"text": " In",
+					"timestamps": {
+						"from": "00:00:00,230",
+						"to": "00:00:00,230"
+					},
+					"offsets": {
+						"from": 230,
+						"to": 230
+					},
+					"id": 554,
+					"p": 0.945658,
+					"t_dtw": -1
+				},
+				{
+					"text": " 395",
+					"timestamps": {
+						"from": "00:00:00,290",
+						"to": "00:00:01,190"
+					},
+					"offsets": {
+						"from": 290,
+						"to": 1190
+					},
+					"id": 42321,
+					"p": 0.973637,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,290",
+						"to": "00:00:01,540"
+					},
+					"offsets": {
+						"from": 1290,
+						"to": 1540
+					},
+					"id": 11,
+					"p": 0.851189,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:01,540",
+						"to": "00:00:01,540"
+					},
+					"offsets": {
+						"from": 1540,
+						"to": 1540
+					},
+					"id": 262,
+					"p": 0.970949,
+					"t_dtw": -1
+				},
+				{
+					"text": " Emperor",
+					"timestamps": {
+						"from": "00:00:01,820",
+						"to": "00:00:02,230"
+					},
+					"offsets": {
+						"from": 1820,
+						"to": 2230
+					},
+					"id": 10851,
+					"p": 0.530864,
+					"t_dtw": -1
+				},
+				{
+					"text": " The",
+					"timestamps": {
+						"from": "00:00:02,320",
+						"to": "00:00:02,460"
+					},
+					"offsets": {
+						"from": 2320,
+						"to": 2460
+					},
+					"id": 383,
+					"p": 0.98856,
+					"t_dtw": -1
+				},
+				{
+					"text": "od",
+					"timestamps": {
+						"from": "00:00:02,500",
+						"to": "00:00:02,630"
+					},
+					"offsets": {
+						"from": 2500,
+						"to": 2630
+					},
+					"id": 375,
+					"p": 0.993408,
+					"t_dtw": -1
+				},
+				{
+					"text": "os",
+					"timestamps": {
+						"from": "00:00:02,630",
+						"to": "00:00:02,770"
+					},
+					"offsets": {
+						"from": 2630,
+						"to": 2770
+					},
+					"id": 418,
+					"p": 0.997728,
+					"t_dtw": -1
+				},
+				{
+					"text": "ius",
+					"timestamps": {
+						"from": "00:00:02,770",
+						"to": "00:00:02,940"
+					},
+					"offsets": {
+						"from": 2770,
+						"to": 2940
+					},
+					"id": 3754,
+					"p": 0.991015,
+					"t_dtw": -1
+				},
+				{
+					"text": " dies",
+					"timestamps": {
+						"from": "00:00:02,990",
+						"to": "00:00:03,300"
+					},
+					"offsets": {
+						"from": 2990,
+						"to": 3300
+					},
+					"id": 10564,
+					"p": 0.999302,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,300",
+						"to": "00:00:03,350"
+					},
+					"offsets": {
+						"from": 3300,
+						"to": 3350
+					},
+					"id": 11,
+					"p": 0.494681,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:03,640",
+						"to": "00:00:03,640"
+					},
+					"offsets": {
+						"from": 3640,
+						"to": 3640
+					},
+					"id": 290,
+					"p": 0.773105,
+					"t_dtw": -1
+				},
+				{
+					"text": " his",
+					"timestamps": {
+						"from": "00:00:03,660",
+						"to": "00:00:03,840"
+					},
+					"offsets": {
+						"from": 3660,
+						"to": 3840
+					},
+					"id": 465,
+					"p": 0.997219,
+					"t_dtw": -1
+				},
+				{
+					"text": " sons",
+					"timestamps": {
+						"from": "00:00:03,970",
+						"to": "00:00:04,110"
+					},
+					"offsets": {
+						"from": 3970,
+						"to": 4110
+					},
+					"id": 11989,
+					"p": 0.971508,
+					"t_dtw": -1
+				},
+				{
+					"text": " split",
+					"timestamps": {
+						"from": "00:00:04,110",
+						"to": "00:00:04,350"
+					},
+					"offsets": {
+						"from": 4110,
+						"to": 4350
+					},
+					"id": 6626,
+					"p": 0.996214,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:04,450",
+						"to": "00:00:04,650"
+					},
+					"offsets": {
+						"from": 4450,
+						"to": 4650
+					},
+					"id": 262,
+					"p": 0.99823,
+					"t_dtw": -1
+				},
+				{
+					"text": " empire",
+					"timestamps": {
+						"from": "00:00:04,650",
+						"to": "00:00:05,050"
+					},
+					"offsets": {
+						"from": 4650,
+						"to": 5050
+					},
+					"id": 13735,
+					"p": 0.707149,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,050",
+						"to": "00:00:05,160"
+					},
+					"offsets": {
+						"from": 5050,
+						"to": 5160
+					},
+					"id": 13,
+					"p": 0.642439,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_265]",
+					"timestamps": {
+						"from": "00:00:05,300",
+						"to": "00:00:05,300"
+					},
+					"offsets": {
+						"from": 5300,
+						"to": 5300
+					},
+					"id": 50628,
+					"p": 0.0357872,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:05,300",
+				"to": "00:00:09,660"
+			},
+			"offsets": {
+				"from": 5300,
+				"to": 9660
+			},
+			"text": " A western half ruled from Italy, an eastern half from Constantinople.",
+			"tokens": [
+				{
+					"text": " A",
+					"timestamps": {
+						"from": "00:00:05,360",
+						"to": "00:00:05,360"
+					},
+					"offsets": {
+						"from": 5360,
+						"to": 5360
+					},
+					"id": 317,
+					"p": 0.988636,
+					"t_dtw": -1
+				},
+				{
+					"text": " western",
+					"timestamps": {
+						"from": "00:00:05,590",
+						"to": "00:00:05,940"
+					},
+					"offsets": {
+						"from": 5590,
+						"to": 5940
+					},
+					"id": 8830,
+					"p": 0.827797,
+					"t_dtw": -1
+				},
+				{
+					"text": " half",
+					"timestamps": {
+						"from": "00:00:05,940",
+						"to": "00:00:06,260"
+					},
+					"offsets": {
+						"from": 5940,
+						"to": 6260
+					},
+					"id": 2063,
+					"p": 0.997164,
+					"t_dtw": -1
+				},
+				{
+					"text": " ruled",
+					"timestamps": {
+						"from": "00:00:06,260",
+						"to": "00:00:06,650"
+					},
+					"offsets": {
+						"from": 6260,
+						"to": 6650
+					},
+					"id": 8879,
+					"p": 0.998188,
+					"t_dtw": -1
+				},
+				{
+					"text": " from",
+					"timestamps": {
+						"from": "00:00:06,650",
+						"to": "00:00:06,840"
+					},
+					"offsets": {
+						"from": 6650,
+						"to": 6840
+					},
+					"id": 422,
+					"p": 0.996584,
+					"t_dtw": -1
+				},
+				{
+					"text": " Italy",
+					"timestamps": {
+						"from": "00:00:07,120",
+						"to": "00:00:07,400"
+					},
+					"offsets": {
+						"from": 7120,
+						"to": 7400
+					},
+					"id": 8031,
+					"p": 0.999697,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:07,400",
+						"to": "00:00:07,520"
+					},
+					"offsets": {
+						"from": 7400,
+						"to": 7520
+					},
+					"id": 11,
+					"p": 0.570083,
+					"t_dtw": -1
+				},
+				{
+					"text": " an",
+					"timestamps": {
+						"from": "00:00:07,520",
+						"to": "00:00:07,640"
+					},
+					"offsets": {
+						"from": 7520,
+						"to": 7640
+					},
+					"id": 281,
+					"p": 0.604823,
+					"t_dtw": -1
+				},
+				{
+					"text": " eastern",
+					"timestamps": {
+						"from": "00:00:07,640",
+						"to": "00:00:08,070"
+					},
+					"offsets": {
+						"from": 7640,
+						"to": 8070
+					},
+					"id": 10183,
+					"p": 0.974366,
+					"t_dtw": -1
+				},
+				{
+					"text": " half",
+					"timestamps": {
+						"from": "00:00:08,070",
+						"to": "00:00:08,320"
+					},
+					"offsets": {
+						"from": 8070,
+						"to": 8320
+					},
+					"id": 2063,
+					"p": 0.998144,
+					"t_dtw": -1
+				},
+				{
+					"text": " from",
+					"timestamps": {
+						"from": "00:00:08,320",
+						"to": "00:00:08,570"
+					},
+					"offsets": {
+						"from": 8320,
+						"to": 8570
+					},
+					"id": 422,
+					"p": 0.996236,
+					"t_dtw": -1
+				},
+				{
+					"text": " Constantinople",
+					"timestamps": {
+						"from": "00:00:08,570",
+						"to": "00:00:09,440"
+					},
+					"offsets": {
+						"from": 8570,
+						"to": 9440
+					},
+					"id": 46369,
+					"p": 0.999355,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:09,440",
+						"to": "00:00:09,650"
+					},
+					"offsets": {
+						"from": 9440,
+						"to": 9650
+					},
+					"id": 13,
+					"p": 0.987592,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_483]",
+					"timestamps": {
+						"from": "00:00:09,660",
+						"to": "00:00:09,660"
+					},
+					"offsets": {
+						"from": 9660,
+						"to": 9660
+					},
+					"id": 50846,
+					"p": 0.0423726,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

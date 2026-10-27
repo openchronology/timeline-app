@@ -1,0 +1,55 @@
+1
+00:00:00,460 --> 00:00:05,430
+Rome fell in 476. Then it fell again,
+nine hundred and seventy-seven years
+
+2
+00:00:05,480 --> 00:00:06,780
+later.
+
+3
+00:00:07,060 --> 00:00:12,140
+In 395 the emperor Theodosius dies,
+and his sons split the empire:
+
+4
+00:00:12,190 --> 00:00:17,096
+a western half ruled from Italy, an
+eastern half from Constantinople.
+
+5
+00:00:17,416 --> 00:00:23,656
+The West lasts eighty-one years. In 476
+a general named Odoacer deposes its last
+
+6
+00:00:23,706 --> 00:00:29,250
+emperor, a boy called Romulus Augustulus.
+That's the date in the textbooks.
+
+7
+00:00:29,510 --> 00:00:34,250
+But the eastern half doesn't fall. It
+goes on calling itself the Roman Empire
+
+8
+00:00:34,300 --> 00:00:38,550
+for nearly a thousand years, until the
+Ottomans take Constantinople on the
+
+9
+00:00:38,600 --> 00:00:41,350
+twenty-ninth of May, 1453.
+
+10
+00:00:41,710 --> 00:00:45,490
+From Romulus to the last Constantine:
+twenty-two centuries of Rome,
+
+11
+00:00:45,540 --> 00:00:47,473
+on one line you can zoom.
+
+12
+00:00:47,763 --> 00:00:50,172
+That's OpenChronology, and it's free.

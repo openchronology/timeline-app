@@ -1,0 +1,289 @@
+{
+  "sample": "../samples/rome.ochx",
+  "size": [1280, 720],
+  "scale": 1.5,
+  "shots": [
+    {
+      "id": "sweep",
+      "dur": 0.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-99848937600, -2382048000]
+        }
+      ]
+    },
+    {
+      "id": "kings",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-99848937600, -2382048000]
+        },
+        {
+          "t": 2.4,
+          "view": [-86434473600, -77756371200]
+        }
+      ]
+    },
+    {
+      "id": "founding",
+      "dur": 4,
+      "setup": [
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-86434473600, -77756371200]
+        },
+        {
+          "t": 2.4,
+          "view": [-85992624000, -85740163200]
+        }
+      ],
+      "actions": [
+        {
+          "t": 2.9,
+          "do": "open",
+          "title": "Founding of Rome"
+        }
+      ]
+    },
+    {
+      "id": "republic",
+      "dur": 4.5,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '16'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-86434473600, -77756371200]
+        },
+        {
+          "t": 4,
+          "view": [-78545203200, -70182633600]
+        }
+      ]
+    },
+    {
+      "id": "hannibal",
+      "dur": 3.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-78545203200, -70182633600]
+        },
+        {
+          "t": 3,
+          "view": [-69141254400, -68415494400]
+        }
+      ]
+    },
+    {
+      "id": "cannae",
+      "dur": 1.5,
+      "setup": [
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-69141254400, -68415494400]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.4,
+          "do": "open",
+          "title": "Battle of Cannae"
+        }
+      ]
+    },
+    {
+      "id": "pydna",
+      "dur": 3.5,
+      "setup": [
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-69141254400, -68415494400]
+        },
+        {
+          "t": 2,
+          "view": [-67563417600, -67310956800]
+        }
+      ],
+      "actions": [
+        {
+          "t": 2.5,
+          "do": "open",
+          "title": "Battle of Pydna"
+        }
+      ]
+    },
+    {
+      "id": "gracchi",
+      "dur": 2.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-67563417600, -67310956800]
+        },
+        {
+          "t": 2.2,
+          "view": [-66553574400, -62924601600]
+        }
+      ]
+    },
+    {
+      "id": "ides",
+      "dur": 6,
+      "setup": [
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-66553574400, -62924601600]
+        },
+        {
+          "t": 3,
+          "view": [-63574243200, -63461059200]
+        }
+      ],
+      "actions": [
+        {
+          "t": 4.5,
+          "do": "open",
+          "title": "Caesar assassinated"
+        }
+      ]
+    },
+    {
+      "id": "emperors",
+      "dur": 4,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-63574243200, -63461059200]
+        },
+        {
+          "t": 3.5,
+          "view": [-63082368000, -55855785600]
+        }
+      ]
+    },
+    {
+      "id": "law",
+      "dur": 4,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '18'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-63082368000, -55855785600]
+        },
+        {
+          "t": 2,
+          "view": [-87381158400, -43233004800]
+        }
+      ],
+      "actions": [
+        {
+          "t": 2.3,
+          "do": "separate",
+          "tags": ["law"]
+        }
+      ]
+    },
+    {
+      "id": "constantine",
+      "dur": 4,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-87381158400, -43233004800]
+        },
+        {
+          "t": 3.5,
+          "view": [-54909100800, -47019830400]
+        }
+      ]
+    },
+    {
+      "id": "west",
+      "dur": 4,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-54909100800, -47019830400]
+        },
+        {
+          "t": 3.5,
+          "view": [-49859971200, -47019830400]
+        }
+      ]
+    },
+    {
+      "id": "east",
+      "dur": 3.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-49859971200, -47019830400]
+        },
+        {
+          "t": 3,
+          "view": [-50806742400, -15462921600]
+        }
+      ]
+    },
+    {
+      "id": "fall",
+      "dur": 1.5,
+      "setup": [
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-16725225600, -16094073600]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.4,
+          "do": "open",
+          "title": "Fall of Constantinople"
+        }
+      ]
+    }
+  ]
+}

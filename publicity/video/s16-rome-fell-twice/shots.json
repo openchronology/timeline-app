@@ -1,0 +1,556 @@
+{
+  "sample": "../samples/rome.ochx",
+  "size": [360, 640],
+  "scale": 3,
+  "shots": [
+    {
+      "id": "split",
+      "dur": 16.996,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "eval",
+          "js": "document.head.insertAdjacentHTML('beforeend', '<style>.edge-arc, .event-marker, .duration-band { pointer-events: none !important; }</style>')"
+        },
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-57086536320, -4449444480]
+        },
+        {
+          "t": 6.23,
+          "view": [-57086536320, -4449444480]
+        },
+        {
+          "t": 10.59,
+          "view": [-49708643400, -49694452200]
+        }
+      ]
+    },
+    {
+      "id": "west",
+      "dur": 12.654,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "eval",
+          "js": "document.head.insertAdjacentHTML('beforeend', '<style>.edge-arc, .event-marker, .duration-band { pointer-events: none !important; }</style>')"
+        },
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-49708643400, -49694452200]
+        },
+        {
+          "t": 0.2,
+          "view": [-49708643400, -49694452200]
+        },
+        {
+          "t": 2,
+          "view": [-50112475200, -46325563200]
+        },
+        {
+          "t": 3.4,
+          "view": [-47366916480, -46988277120]
+        }
+      ],
+      "actions": [
+        {
+          "t": 4.87,
+          "do": "open",
+          "title": "Romulus Augustulus deposed"
+        }
+      ]
+    },
+    {
+      "id": "east",
+      "dur": 12.6,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "eval",
+          "js": "document.head.insertAdjacentHTML('beforeend', '<style>.edge-arc, .event-marker, .duration-band { pointer-events: none !important; }</style>')"
+        },
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-47366915740, -46988277860],
+          "ease": "linear"
+        },
+        {
+          "t": 0.1,
+          "view": [-47366915740, -46988277860],
+          "ease": "linear"
+        },
+        {
+          "t": 0.2,
+          "view": [-47366915740, -46988277860],
+          "ease": "linear"
+        },
+        {
+          "t": 0.3,
+          "view": [-47366915740, -46988277860],
+          "ease": "linear"
+        },
+        {
+          "t": 0.4,
+          "view": [-47368862716, -46982511520],
+          "ease": "linear"
+        },
+        {
+          "t": 0.5,
+          "view": [-47374714258, -46965181063],
+          "ease": "linear"
+        },
+        {
+          "t": 0.6,
+          "view": [-47384792985, -46935330995],
+          "ease": "linear"
+        },
+        {
+          "t": 0.7,
+          "view": [-47399828648, -46890800020],
+          "ease": "linear"
+        },
+        {
+          "t": 0.8,
+          "view": [-47421000537, -46828095439],
+          "ease": "linear"
+        },
+        {
+          "t": 0.9,
+          "view": [-47450026587, -46742129271],
+          "ease": "linear"
+        },
+        {
+          "t": 1,
+          "view": [-47489295134, -46625827993],
+          "ease": "linear"
+        },
+        {
+          "t": 1.1,
+          "view": [-47542035561, -46469627184],
+          "ease": "linear"
+        },
+        {
+          "t": 1.2,
+          "view": [-47612519095, -46260876786],
+          "ease": "linear"
+        },
+        {
+          "t": 1.3,
+          "view": [-47706269939, -45983215819],
+          "ease": "linear"
+        },
+        {
+          "t": 1.4,
+          "view": [-47830247799, -45616031794],
+          "ease": "linear"
+        },
+        {
+          "t": 1.5,
+          "view": [-47992934754, -45134203416],
+          "ease": "linear"
+        },
+        {
+          "t": 1.6,
+          "view": [-48204223162, -44508432587],
+          "ease": "linear"
+        },
+        {
+          "t": 1.7,
+          "view": [-48474962199, -43706587407],
+          "ease": "linear"
+        },
+        {
+          "t": 1.8,
+          "view": [-48815991567, -42696564036],
+          "ease": "linear"
+        },
+        {
+          "t": 1.9,
+          "view": [-49236494202, -41451165460],
+          "ease": "linear"
+        },
+        {
+          "t": 2,
+          "view": [-49741567001, -39955296251],
+          "ease": "linear"
+        },
+        {
+          "t": 2.1,
+          "view": [-50329073142, -38215285009],
+          "ease": "linear"
+        },
+        {
+          "t": 2.2,
+          "view": [-50986120392, -36269314543],
+          "ease": "linear"
+        },
+        {
+          "t": 2.3,
+          "view": [-51673946658, -34184891337],
+          "ease": "linear"
+        },
+        {
+          "t": 2.4,
+          "view": [-52316559549, -32054354263],
+          "ease": "linear"
+        },
+        {
+          "t": 2.5,
+          "view": [-52856861030, -30046980876],
+          "ease": "linear"
+        },
+        {
+          "t": 2.6,
+          "view": [-53230213032, -28363201665],
+          "ease": "linear"
+        },
+        {
+          "t": 2.7,
+          "view": [-53371331277, -27205361002],
+          "ease": "linear"
+        },
+        {
+          "t": 2.8,
+          "view": [-53232255829, -26724493909],
+          "ease": "linear"
+        },
+        {
+          "t": 2.9,
+          "view": [-52970588147, -26462826227],
+          "ease": "linear"
+        },
+        {
+          "t": 3,
+          "view": [-52674872304, -26167110384],
+          "ease": "linear"
+        },
+        {
+          "t": 3.1,
+          "view": [-52347378178, -25839616258],
+          "ease": "linear"
+        },
+        {
+          "t": 3.2,
+          "view": [-51990375646, -25482613726],
+          "ease": "linear"
+        },
+        {
+          "t": 3.3,
+          "view": [-51606134585, -25098372665],
+          "ease": "linear"
+        },
+        {
+          "t": 3.4,
+          "view": [-51196924873, -24689162953],
+          "ease": "linear"
+        },
+        {
+          "t": 3.5,
+          "view": [-50765016388, -24257254468],
+          "ease": "linear"
+        },
+        {
+          "t": 3.6,
+          "view": [-50312679005, -23804917085],
+          "ease": "linear"
+        },
+        {
+          "t": 3.7,
+          "view": [-49842182604, -23334420684],
+          "ease": "linear"
+        },
+        {
+          "t": 3.8,
+          "view": [-49355797061, -22848035141],
+          "ease": "linear"
+        },
+        {
+          "t": 3.9,
+          "view": [-48855792253, -22348030333],
+          "ease": "linear"
+        },
+        {
+          "t": 4,
+          "view": [-48344438059, -21836676139],
+          "ease": "linear"
+        },
+        {
+          "t": 4.1,
+          "view": [-47824004355, -21316242435],
+          "ease": "linear"
+        },
+        {
+          "t": 4.2,
+          "view": [-47296761019, -20788999099],
+          "ease": "linear"
+        },
+        {
+          "t": 4.3,
+          "view": [-46764977928, -20257216008],
+          "ease": "linear"
+        },
+        {
+          "t": 4.4,
+          "view": [-46230924960, -19723163040],
+          "ease": "linear"
+        },
+        {
+          "t": 4.5,
+          "view": [-45696871992, -19189110072],
+          "ease": "linear"
+        },
+        {
+          "t": 4.6,
+          "view": [-45165088901, -18657326981],
+          "ease": "linear"
+        },
+        {
+          "t": 4.7,
+          "view": [-44637845565, -18130083645],
+          "ease": "linear"
+        },
+        {
+          "t": 4.8,
+          "view": [-44117411861, -17609649941],
+          "ease": "linear"
+        },
+        {
+          "t": 4.9,
+          "view": [-43606057667, -17098295747],
+          "ease": "linear"
+        },
+        {
+          "t": 5,
+          "view": [-43106052859, -16598290939],
+          "ease": "linear"
+        },
+        {
+          "t": 5.1,
+          "view": [-42619667316, -16111905396],
+          "ease": "linear"
+        },
+        {
+          "t": 5.2,
+          "view": [-42149170915, -15641408995],
+          "ease": "linear"
+        },
+        {
+          "t": 5.3,
+          "view": [-41696833532, -15189071612],
+          "ease": "linear"
+        },
+        {
+          "t": 5.4,
+          "view": [-41264925047, -14757163127],
+          "ease": "linear"
+        },
+        {
+          "t": 5.5,
+          "view": [-40855715335, -14347953415],
+          "ease": "linear"
+        },
+        {
+          "t": 5.6,
+          "view": [-40471474274, -13963712354],
+          "ease": "linear"
+        },
+        {
+          "t": 5.7,
+          "view": [-40114471742, -13606709822],
+          "ease": "linear"
+        },
+        {
+          "t": 5.8,
+          "view": [-39786977616, -13279215696],
+          "ease": "linear"
+        },
+        {
+          "t": 5.9,
+          "view": [-39491261773, -12983499853],
+          "ease": "linear"
+        },
+        {
+          "t": 6,
+          "view": [-39229594091, -12721832171],
+          "ease": "linear"
+        },
+        {
+          "t": 6.1,
+          "view": [-39004244447, -12496482527],
+          "ease": "linear"
+        },
+        {
+          "t": 6.2,
+          "view": [-38767472664, -12319024884],
+          "ease": "linear"
+        },
+        {
+          "t": 6.3,
+          "view": [-37780425454, -12329610853],
+          "ease": "linear"
+        },
+        {
+          "t": 6.4,
+          "view": [-35980872276, -12542510245],
+          "ease": "linear"
+        },
+        {
+          "t": 6.5,
+          "view": [-33664017178, -12905494208],
+          "ease": "linear"
+        },
+        {
+          "t": 6.6,
+          "view": [-31130317172, -13362715582],
+          "ease": "linear"
+        },
+        {
+          "t": 6.7,
+          "view": [-28601873001, -13833118183],
+          "ease": "linear"
+        },
+        {
+          "t": 6.8,
+          "view": [-26250667816, -14270546484],
+          "ease": "linear"
+        },
+        {
+          "t": 6.9,
+          "view": [-24185013428, -14654849689],
+          "ease": "linear"
+        },
+        {
+          "t": 7,
+          "view": [-22448883399, -14977846768],
+          "ease": "linear"
+        },
+        {
+          "t": 7.1,
+          "view": [-21039903122, -15239979504],
+          "ease": "linear"
+        },
+        {
+          "t": 7.2,
+          "view": [-19927599392, -15446917263],
+          "ease": "linear"
+        },
+        {
+          "t": 7.3,
+          "view": [-19068298515, -15606785284],
+          "ease": "linear"
+        },
+        {
+          "t": 7.4,
+          "view": [-18415483637, -15728237765],
+          "ease": "linear"
+        },
+        {
+          "t": 7.5,
+          "view": [-17925942389, -15819314120],
+          "ease": "linear"
+        },
+        {
+          "t": 7.6,
+          "view": [-17562710180, -15886891398],
+          "ease": "linear"
+        },
+        {
+          "t": 7.7,
+          "view": [-17295917627, -15936526629],
+          "ease": "linear"
+        },
+        {
+          "t": 7.8,
+          "view": [-17102467530, -15972516915],
+          "ease": "linear"
+        },
+        {
+          "t": 7.9,
+          "view": [-16965200226, -15998054714],
+          "ease": "linear"
+        },
+        {
+          "t": 8,
+          "view": [-16871966645, -16015400289],
+          "ease": "linear"
+        },
+        {
+          "t": 8.1,
+          "view": [-16814860338, -16026024591],
+          "ease": "linear"
+        },
+        {
+          "t": 8.2,
+          "view": [-16789772897, -16030691967],
+          "ease": "linear"
+        }
+      ],
+      "actions": [
+        {
+          "t": 9.15,
+          "do": "open",
+          "title": "Fall of Constantinople"
+        }
+      ]
+    },
+    {
+      "id": "line",
+      "dur": 10.822,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "eval",
+          "js": "document.head.insertAdjacentHTML('beforeend', '<style>.edge-arc, .event-marker, .duration-band { pointer-events: none !important; }</style>')"
+        },
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-16788340800, -16030958400]
+        },
+        {
+          "t": 0.3,
+          "view": [-16788340800, -16030958400]
+        },
+        {
+          "t": 2.6,
+          "view": [-94825434240, -5494124160]
+        }
+      ]
+    }
+  ]
+}

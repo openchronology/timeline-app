@@ -1,0 +1,283 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:06,020"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 6020
+			},
+			"text": " Rome fell in 476, then it fell again 977 years later.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.885652,
+					"t_dtw": -1
+				},
+				{
+					"text": " Rome",
+					"timestamps": {
+						"from": "00:00:00,310",
+						"to": "00:00:00,550"
+					},
+					"offsets": {
+						"from": 310,
+						"to": 550
+					},
+					"id": 10598,
+					"p": 0.990044,
+					"t_dtw": -1
+				},
+				{
+					"text": " fell",
+					"timestamps": {
+						"from": "00:00:00,670",
+						"to": "00:00:01,050"
+					},
+					"offsets": {
+						"from": 670,
+						"to": 1050
+					},
+					"id": 3214,
+					"p": 0.999291,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:01,170",
+						"to": "00:00:01,450"
+					},
+					"offsets": {
+						"from": 1170,
+						"to": 1450
+					},
+					"id": 287,
+					"p": 0.998801,
+					"t_dtw": -1
+				},
+				{
+					"text": " 4",
+					"timestamps": {
+						"from": "00:00:01,450",
+						"to": "00:00:01,850"
+					},
+					"offsets": {
+						"from": 1450,
+						"to": 1850
+					},
+					"id": 604,
+					"p": 0.984567,
+					"t_dtw": -1
+				},
+				{
+					"text": "76",
+					"timestamps": {
+						"from": "00:00:01,850",
+						"to": "00:00:02,200"
+					},
+					"offsets": {
+						"from": 1850,
+						"to": 2200
+					},
+					"id": 4304,
+					"p": 0.999444,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,960",
+						"to": "00:00:02,960"
+					},
+					"offsets": {
+						"from": 2960,
+						"to": 2960
+					},
+					"id": 11,
+					"p": 0.169919,
+					"t_dtw": -1
+				},
+				{
+					"text": " then",
+					"timestamps": {
+						"from": "00:00:03,080",
+						"to": "00:00:03,200"
+					},
+					"offsets": {
+						"from": 3080,
+						"to": 3200
+					},
+					"id": 788,
+					"p": 0.81383,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:03,320",
+						"to": "00:00:03,450"
+					},
+					"offsets": {
+						"from": 3320,
+						"to": 3450
+					},
+					"id": 340,
+					"p": 0.994738,
+					"t_dtw": -1
+				},
+				{
+					"text": " fell",
+					"timestamps": {
+						"from": "00:00:03,450",
+						"to": "00:00:03,750"
+					},
+					"offsets": {
+						"from": 3450,
+						"to": 3750
+					},
+					"id": 3214,
+					"p": 0.997687,
+					"t_dtw": -1
+				},
+				{
+					"text": " again",
+					"timestamps": {
+						"from": "00:00:04,040",
+						"to": "00:00:04,190"
+					},
+					"offsets": {
+						"from": 4040,
+						"to": 4190
+					},
+					"id": 757,
+					"p": 0.997995,
+					"t_dtw": -1
+				},
+				{
+					"text": " 9",
+					"timestamps": {
+						"from": "00:00:04,190",
+						"to": "00:00:04,430"
+					},
+					"offsets": {
+						"from": 4190,
+						"to": 4430
+					},
+					"id": 860,
+					"p": 0.512145,
+					"t_dtw": -1
+				},
+				{
+					"text": "77",
+					"timestamps": {
+						"from": "00:00:04,430",
+						"to": "00:00:04,920"
+					},
+					"offsets": {
+						"from": 4430,
+						"to": 4920
+					},
+					"id": 3324,
+					"p": 0.999355,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:04,920",
+						"to": "00:00:05,330"
+					},
+					"offsets": {
+						"from": 4920,
+						"to": 5330
+					},
+					"id": 812,
+					"p": 0.998791,
+					"t_dtw": -1
+				},
+				{
+					"text": " later",
+					"timestamps": {
+						"from": "00:00:05,330",
+						"to": "00:00:05,740"
+					},
+					"offsets": {
+						"from": 5330,
+						"to": 5740
+					},
+					"id": 1568,
+					"p": 0.999344,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,740",
+						"to": "00:00:05,930"
+					},
+					"offsets": {
+						"from": 5740,
+						"to": 5930
+					},
+					"id": 13,
+					"p": 0.959764,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_301]",
+					"timestamps": {
+						"from": "00:00:06,020",
+						"to": "00:00:06,020"
+					},
+					"offsets": {
+						"from": 6020,
+						"to": 6020
+					},
+					"id": 50664,
+					"p": 0.0149203,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

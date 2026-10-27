@@ -1,0 +1,3698 @@
+{
+ "format": "openchronology",
+ "version": 1,
+ "title": "Ancient Rome: from the founding to the fall",
+ "description": "Ancient Rome from its legendary founding in 753 BCE through the kings, the Republic and the Empire, to the deposition of the last western emperor in 476 CE, with the Eastern Empire to the fall of Constantinople in 1453 as an epilogue: its eras, dynasties and major reigns, its wars and battles, its laws, buildings, roads and aqueducts, and the writers we know it from. A sample timeline built from the sources cited on each moment.\n\n**How to read it.** Chapter headings mark the eras. Eras are navy bands, the legendary kings light grey, dynasties grey, reigns ochre, wars brick, political struggles green and the Eastern Empire purple; everything else is a moment, linked to the article it draws on. Related things (a battle and the war it ended, a law and the law it led to) are linked. The tag `legend` marks what we know only from tradition.\n\n**Dates.** The line is the Gregorian calendar extended back. Years before about 300 BCE are the traditional (Varronian) ones, and the kings' reigns are legend. Before 45 BCE, days are dates in the old Roman calendar, which had drifted from the seasons (by about two and a half months in 168 BCE); their Julian equivalent is mostly unknown, so they are placed as if they were Julian. From 45 BCE days are Julian: the Gregorian line shows them one or two days earlier before 200 CE, on the same day in the 3rd century, and one to nine days later after it (the fall of Constantinople, 29 May 1453, reads 7 June). Either way, the source's date is kept under **Historical dates**, and each moment's **Date precision** says how it is dated. A date known only to its year sits at mid-year (1 July).",
+ "presentation": {
+  "mode": "gregorian",
+  "unit": "",
+  "scale": "1/1",
+  "origin": "0/1",
+  "version": 1,
+  "offsetMinutes": 0,
+  "significantDigits": 6
+ },
+ "tags": [
+  "history",
+  "ancient rome",
+  "antiquity",
+  "education"
+ ],
+ "plugins": [
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "rich-text-notes",
+    "version": 1,
+    "name": "Rich text notes",
+    "description": "Edit moment and stack notes visually, storing portable Markdown. Hover cards render safe headings, emphasis, lists, code and HTTPS links. HTML and images are not executed.",
+    "fields": [],
+    "notes": {
+     "kind": "markdown"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-headings",
+    "version": 1,
+    "name": "Headings",
+    "description": "Let a moment act as a heading or marker: only its title shows, sized as a heading from level 1 to 6, and the title is what you click. Choose its font (Times New Roman by default). Headings still group into summaries with other moments.",
+    "fields": [
+     {
+      "kind": "heading",
+      "metadataKey": "headingLevel",
+      "label": "Heading level"
+     },
+     {
+      "kind": "font",
+      "metadataKey": "headingFont",
+      "label": "Heading font"
+     }
+    ],
+    "marker": {
+     "kind": "heading",
+     "metadataKey": "headingLevel"
+    },
+    "targets": [
+     "moments"
+    ]
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-colors",
+    "version": 2,
+    "name": "Moment colors",
+    "description": "Choose muted semantic swatches or a custom color for moments and stack entries while preserving their white borders.",
+    "fields": [
+     {
+      "kind": "color",
+      "metadataKey": "color",
+      "label": "Moment color"
+     }
+    ],
+    "marker": {
+     "kind": "color",
+     "metadataKey": "color"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.color(api.get(\"color\")); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-sources",
+    "version": 1,
+    "name": "Sources",
+    "description": "Show and edit a series of source links for moments and stack entries.",
+    "fields": [
+     {
+      "kind": "links",
+      "metadataKey": "sources",
+      "label": "Sources"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "dating-context",
+    "version": 1,
+    "name": "Dating context",
+    "description": "Explain the precision and coordinate convention of a moment. An exact stored coordinate can still represent an approximate age or a calendar-day marker.",
+    "fields": [
+     {
+      "kind": "text",
+      "metadataKey": "datePrecision",
+      "label": "Date precision"
+     },
+     {
+      "kind": "multiline",
+      "metadataKey": "coordinateConvention",
+      "label": "Coordinate convention"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "historical-dates",
+    "version": 1,
+    "name": "Historical dates",
+    "description": "Retain an original historical date and its calendar separately from the timeline coordinate and display calendar, such as a Julian date on a Gregorian timeline.",
+    "fields": [
+     {
+      "kind": "text",
+      "metadataKey": "historicalDate",
+      "label": "Original historical date"
+     },
+     {
+      "kind": "text",
+      "metadataKey": "calendar",
+      "label": "Original calendar"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "expand-on-hover",
+    "version": 1,
+    "name": "Expand on hover",
+    "description": "Hover or focus a summary of two to five moments to fan out its members radially for individual inspection. Larger summaries stay collapsed.",
+    "fields": [],
+    "summary": {
+     "kind": "radial"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.expand(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "timeline-theme",
+    "version": 2,
+    "name": "Timeline theme",
+    "description": "Choose the timeline's colors, fonts and text sizes: its labels, its measure (the axis, tick marks and their times), the halo that keeps them readable over images, the default marker and duration colors, and a background color. Set them here in the plugin list; anything left blank keeps the usual look, and colors chosen for events still win.",
+    "fields": [],
+    "settings": [
+     {
+      "kind": "color",
+      "key": "textColor",
+      "label": "Label color"
+     },
+     {
+      "kind": "font",
+      "key": "textFont",
+      "label": "Label font"
+     },
+     {
+      "kind": "text-size",
+      "key": "textSize",
+      "label": "Label size"
+     },
+     {
+      "kind": "color",
+      "key": "measureColor",
+      "label": "Measure color"
+     },
+     {
+      "kind": "font",
+      "key": "measureFont",
+      "label": "Measure font"
+     },
+     {
+      "kind": "text-size",
+      "key": "measureSize",
+      "label": "Measure size"
+     },
+     {
+      "kind": "color",
+      "key": "haloColor",
+      "label": "Halo color"
+     },
+     {
+      "kind": "color",
+      "key": "markerColor",
+      "label": "Marker color"
+     },
+     {
+      "kind": "color",
+      "key": "durationColor",
+      "label": "Duration color"
+     },
+     {
+      "kind": "color",
+      "key": "backgroundColor",
+      "label": "Background color"
+     }
+    ],
+    "theme": {
+     "text": "textColor",
+     "textFont": "textFont",
+     "textSize": "textSize",
+     "measure": "measureColor",
+     "measureFont": "measureFont",
+     "measureSize": "measureSize",
+     "halo": "haloColor",
+     "marker": "markerColor",
+     "duration": "durationColor",
+     "background": "backgroundColor"
+    }
+   },
+   "enabled": true,
+   "settings": {
+    "textColor": "#1f2a44",
+    "textFont": "Georgia, serif",
+    "measureColor": "#9c3b2a",
+    "haloColor": "#f3ead7",
+    "markerColor": "#1f3a5f",
+    "durationColor": "#9c3b2a",
+    "backgroundColor": "#f3ead7"
+   }
+  }
+ ],
+ "events": [
+  {
+   "id": "h-kings",
+   "time": "-85898016000/1",
+   "metadata": {
+    "title": "The kings",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2",
+    "datePrecision": "Chapter heading, placed at the start of 753 BCE."
+   }
+  },
+  {
+   "id": "founding",
+   "time": "-85889116800/1",
+   "metadata": {
+    "title": "Founding of Rome",
+    "description": "In legend, **Romulus** founds the city on the **Palatine Hill** after killing his twin **Remus**. The year 753 BCE is the antiquarian **Varro**'s reckoning, and 21 April, the festival of the Parilia, was celebrated as Rome's birthday.",
+    "tags": [
+     "legend",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Founding_of_Rome",
+     "https://en.wikipedia.org/wiki/Romulus_and_Remus"
+    ],
+    "datePrecision": "Legendary. 753 BCE is the Varronian date (other ancient writers gave 748 or 728 BCE); 21 April is the traditional day, placed as if it were a Julian date.",
+    "historicalDate": "21 April 753 BCE (the Parilia)",
+    "calendar": "Roman (pre-Julian Republican)"
+   }
+  },
+  {
+   "id": "palatine-huts",
+   "time": "-85785091200/1",
+   "metadata": {
+    "title": "Iron Age huts on the Palatine",
+    "description": "Archaeologists have found postholes of **Iron Age huts** on the Palatine and burials in the valley below, showing villages on Rome's hills by the 8th century BCE, whatever the truth of the legend.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Palatine_Hill",
+     "https://en.wikipedia.org/wiki/Founding_of_Rome"
+    ],
+    "datePrecision": "Archaeological: the 8th century BCE, around the traditional founding; placed at 750 BCE."
+   }
+  },
+  {
+   "id": "cloaca",
+   "time": "-81054172800/1",
+   "metadata": {
+    "title": "Cloaca Maxima",
+    "description": "The **Great Drain**, credited by tradition to **Tarquinius Priscus**, drained the valley that became the **Forum**. Rebuilt many times, part of it still carries water to the Tiber.",
+    "tags": [
+     "building",
+     "legend"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Cloaca_Maxima"
+    ],
+    "datePrecision": "About 600 BCE, by tradition; the dating is approximate."
+   }
+  },
+  {
+   "id": "lapis-niger",
+   "time": "-79791868800/1",
+   "metadata": {
+    "title": "Lapis Niger inscription",
+    "description": "A stone post under the black paving of the **Forum** carries one of the oldest known inscriptions in **Latin**, a sacred law that mentions a king (*rex*).",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lapis_Niger"
+    ],
+    "datePrecision": "About 570–550 BCE, from the letter forms; placed at 560 BCE."
+   }
+  },
+  {
+   "id": "tarquin-expelled",
+   "time": "-78182409600/1",
+   "metadata": {
+    "title": "The last king expelled",
+    "description": "After his son **Sextus Tarquinius** rapes **Lucretia**, **Lucius Junius Brutus** leads the Romans to drive out **Tarquinius Superbus**. Rome swears never again to have a king.",
+    "tags": [
+     "legend",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Overthrow_of_the_Roman_monarchy",
+     "https://www.gutenberg.org/ebooks/19725"
+    ],
+    "datePrecision": "Traditional (Varronian) date; the early chronology was reconstructed by Roman antiquarians centuries later and may be off by years. Placed at mid-year."
+   }
+  },
+  {
+   "id": "h-republic",
+   "time": "-78198134400/1",
+   "metadata": {
+    "title": "The early Republic",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2",
+    "datePrecision": "Chapter heading, placed at the start of 509 BCE."
+   }
+  },
+  {
+   "id": "first-consuls",
+   "time": "-78181977600/1",
+   "metadata": {
+    "title": "The first consuls",
+    "description": "Two magistrates elected for one year, the **consuls**, take the king's power: by tradition **Brutus** and **Collatinus**, Lucretia's husband. The yearly pair of consuls names Roman years for a thousand years.",
+    "tags": [
+     "politics",
+     "legend"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Roman_consul",
+     "https://en.wikipedia.org/wiki/Roman_Republic"
+    ],
+    "datePrecision": "Traditional (Varronian) date; the early chronology was reconstructed by Roman antiquarians centuries later and may be off by years. Placed five days after the expulsion so the two can be told apart."
+   }
+  },
+  {
+   "id": "jupiter-temple",
+   "time": "-78176534400/1",
+   "metadata": {
+    "title": "Temple of Jupiter on the Capitol",
+    "description": "The great temple of **Jupiter Optimus Maximus**, begun under the kings, is dedicated in the Republic's first year, by tradition on the Ides of September.",
+    "tags": [
+     "building",
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Temple_of_Jupiter_Optimus_Maximus"
+    ],
+    "datePrecision": "13 September 509 BCE in the pre-Julian Roman calendar, which had drifted from the seasons; its Julian equivalent is uncertain, so it is placed as if it were a Julian date. Traditional (Varronian) date; the early chronology was reconstructed by Roman antiquarians centuries later and may be off by years.",
+    "historicalDate": "13 September 509 BCE",
+    "calendar": "Roman (pre-Julian Republican)"
+   }
+  },
+  {
+   "id": "regillus",
+   "time": "-77772268800/1",
+   "metadata": {
+    "title": "Battle of Lake Regillus",
+    "description": "Rome defeats the **Latin League**, which had backed the exiled Tarquins; legend says **Castor and Pollux** fought for Rome.",
+    "tags": [
+     "war",
+     "legend"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Lake_Regillus"
+    ],
+    "datePrecision": "Known to the year (496 BCE); placed at mid-year. Traditional (Varronian) date; the early chronology was reconstructed by Roman antiquarians centuries later and may be off by years."
+   }
+  },
+  {
+   "id": "secession",
+   "time": "-77709196800/1",
+   "metadata": {
+    "title": "First secession of the plebs",
+    "description": "The **plebeians** walk out of the city to the Sacred Mount and refuse to fight until they win officers of their own, the **tribunes of the plebs**.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Secessio_plebis",
+     "https://en.wikipedia.org/wiki/Tribune_of_the_plebs"
+    ],
+    "datePrecision": "Known to the year (494 BCE); placed at mid-year. Traditional (Varronian) date; the early chronology was reconstructed by Roman antiquarians centuries later and may be off by years."
+   }
+  },
+  {
+   "id": "twelve-tables",
+   "time": "-76320662400/1",
+   "metadata": {
+    "title": "The Twelve Tables",
+    "description": "A board of ten, the **decemviri**, writes Rome's laws down for the first time and posts them in the Forum on twelve tablets: the foundation of **Roman law**, learned by heart by schoolboys for centuries.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Twelve_Tables",
+     "https://avalon.law.yale.edu/ancient/twelve_tables.asp"
+    ],
+    "datePrecision": "Drafted in 451–450 BCE (Varronian dates); placed at 450 BCE. The text survives only in later quotations."
+   }
+  },
+  {
+   "id": "canuleia",
+   "time": "-76162809600/1",
+   "metadata": {
+    "title": "Lex Canuleia",
+    "description": "A tribune's law lets **patricians and plebeians marry**, which one of the Twelve Tables had forbidden.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lex_Canuleia"
+    ],
+    "datePrecision": "Known to the year (445 BCE); placed at mid-year. Traditional (Varronian) date; the early chronology was reconstructed by Roman antiquarians centuries later and may be off by years."
+   }
+  },
+  {
+   "id": "veii",
+   "time": "-74616508800/1",
+   "metadata": {
+    "title": "Veii captured",
+    "description": "**Marcus Furius Camillus** takes the Etruscan city of **Veii**, Rome's neighbour and rival, after a long siege, doubling Rome's territory.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Veii"
+    ],
+    "datePrecision": "Known to the year (396 BCE); placed at mid-year. Traditional (Varronian) date; the early chronology was reconstructed by Roman antiquarians centuries later and may be off by years."
+   }
+  },
+  {
+   "id": "allia",
+   "time": "-74426169600/1",
+   "metadata": {
+    "title": "Gauls sack Rome",
+    "description": "Gauls under **Brennus** rout the Romans at the **Allia** and sack the city; only the Capitol holds out. The day of the defeat stayed an unlucky day in the Roman calendar.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_the_Allia",
+     "https://en.wikipedia.org/wiki/Sack_of_Rome_(390_BC)"
+    ],
+    "datePrecision": "18 July 390 BCE in the pre-Julian Roman calendar, which had drifted from the seasons; its Julian equivalent is uncertain, so it is placed as if it were a Julian date. The year is Varronian; Polybius's reckoning gives 387 or 386 BCE.",
+    "historicalDate": "18 July 390 BCE",
+    "calendar": "Roman (pre-Julian Republican)"
+   }
+  },
+  {
+   "id": "servian-wall",
+   "time": "-74048515200/1",
+   "metadata": {
+    "title": "Servian Wall",
+    "description": "After the Gallic sack Rome rings its hills with a wall of tufa blocks about 11 km long. It is named after the king **Servius Tullius**, but the surviving wall dates from the 4th century BCE.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Servian_Wall"
+    ],
+    "datePrecision": "Begun about 378 BCE (Livy); placed at mid-year."
+   }
+  },
+  {
+   "id": "licinian",
+   "time": "-73701360000/1",
+   "metadata": {
+    "title": "Licinian–Sextian laws",
+    "description": "The tribunes **Licinius** and **Sextius** carry laws opening the consulship to plebeians; **Lucius Sextius** becomes the first plebeian consul the next year.",
+    "tags": [
+     "law",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Licinio-Sextian_rogations"
+    ],
+    "datePrecision": "Known to the year (367 BCE); placed at mid-year. Traditional (Varronian) date; the early chronology was reconstructed by Roman antiquarians centuries later and may be off by years."
+   }
+  },
+  {
+   "id": "caudine",
+   "time": "-72249667200/1",
+   "metadata": {
+    "title": "Caudine Forks",
+    "description": "In the **Second Samnite War** a Roman army is trapped in a mountain pass and made to pass under a yoke of spears, a famous humiliation.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_the_Caudine_Forks"
+    ],
+    "datePrecision": "Known to the year (321 BCE); placed at mid-year. Traditional (Varronian) date; the early chronology was reconstructed by Roman antiquarians centuries later and may be off by years."
+   }
+  },
+  {
+   "id": "via-appia",
+   "time": "-71965670400/1",
+   "metadata": {
+    "title": "Via Appia begun",
+    "description": "The censor **Appius Claudius Caecus** builds the first great Roman road, south to Capua; it was later carried on to **Brundisium**. Long stretches of its paving survive.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Appian_Way"
+    ],
+    "datePrecision": "Known to the year (312 BCE); placed at mid-year. The aqueduct of the same year is placed ten days later so the two can be told apart."
+   }
+  },
+  {
+   "id": "aqua-appia",
+   "time": "-71964806400/1",
+   "metadata": {
+    "title": "Aqua Appia",
+    "description": "The same censor builds Rome's **first aqueduct**, about 16 km long and almost all underground.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Aqua_Appia"
+    ],
+    "datePrecision": "Known to the year (312 BCE); placed at mid-year. Placed ten days after the Via Appia."
+   }
+  },
+  {
+   "id": "sentinum",
+   "time": "-71429299200/1",
+   "metadata": {
+    "title": "Battle of Sentinum",
+    "description": "Rome defeats Samnites and Gauls together in the largest battle yet fought in Italy, deciding the **Third Samnite War**.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Sentinum"
+    ],
+    "datePrecision": "Known to the year (295 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "hortensia",
+   "time": "-71176838400/1",
+   "metadata": {
+    "title": "Lex Hortensia",
+    "description": "After a last secession, the dictator **Quintus Hortensius** makes resolutions of the plebeian assembly binding on all Romans: usually taken as the end of the **Conflict of the Orders**.",
+    "tags": [
+     "law",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lex_Hortensia"
+    ],
+    "datePrecision": "Known to the year (287 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "asculum",
+   "time": "-70924377600/1",
+   "metadata": {
+    "title": "Battle of Asculum",
+    "description": "King **Pyrrhus** of Epirus beats the Romans a second time, at such a cost that a victory too dear to win is still called a **Pyrrhic victory**.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Asculum"
+    ],
+    "datePrecision": "Known to the year (279 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "beneventum",
+   "time": "-70798147200/1",
+   "metadata": {
+    "title": "Battle of Beneventum",
+    "description": "Pyrrhus is checked and leaves Italy; within a few years Rome controls the peninsula south of the Po.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Beneventum_(275_BC)"
+    ],
+    "datePrecision": "Known to the year (275 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "h-carthage",
+   "time": "-70466630400/1",
+   "metadata": {
+    "title": "Rome against Carthage",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2",
+    "datePrecision": "Chapter heading, placed at the start of 264 BCE."
+   }
+  },
+  {
+   "id": "mylae",
+   "time": "-70324761600/1",
+   "metadata": {
+    "title": "Battle of Mylae",
+    "description": "Rome's new fleet, using the **corvus**, a boarding bridge, wins its first great sea battle against Carthage under **Gaius Duilius**.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Mylae"
+    ],
+    "datePrecision": "Known to the year (260 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "aegates",
+   "time": "-69735254400/1",
+   "metadata": {
+    "title": "Battle of the Aegates",
+    "description": "A Roman fleet destroys Carthage's off western Sicily and ends the **First Punic War**; Sicily becomes Rome's first overseas territory.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_the_Aegates"
+    ],
+    "datePrecision": "10 March 241 BCE in the pre-Julian Roman calendar, which had drifted from the seasons; its Julian equivalent is uncertain, so it is placed as if it were a Julian date.",
+    "historicalDate": "10 March 241 BCE",
+    "calendar": "Roman (pre-Julian Republican)"
+   }
+  },
+  {
+   "id": "andronicus",
+   "time": "-69693609600/1",
+   "metadata": {
+    "title": "The first Latin play",
+    "description": "**Livius Andronicus**, a Greek from Tarentum, stages a play translated from Greek at the Roman Games: the traditional beginning of **Latin literature**.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Livius_Andronicus",
+     "https://en.wikipedia.org/wiki/Latin_literature"
+    ],
+    "datePrecision": "Known to the year (240 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "via-flaminia",
+   "time": "-69062457600/1",
+   "metadata": {
+    "title": "Via Flaminia",
+    "description": "**Gaius Flaminius** builds the great road north across the Apennines to the Adriatic.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Via_Flaminia"
+    ],
+    "datePrecision": "Known to the year (220 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "saguntum",
+   "time": "-69030921600/1",
+   "metadata": {
+    "title": "Hannibal takes Saguntum",
+    "description": "**Hannibal** besieges and takes **Saguntum** in Spain, a city friendly to Rome: the cause of the **Second Punic War**.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Saguntum"
+    ],
+    "datePrecision": "Known to the year (219 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "alps",
+   "time": "-68990745600/1",
+   "metadata": {
+    "title": "Hannibal crosses the Alps",
+    "description": "Hannibal leads his army, with its **war elephants**, from Spain over the Alps into Italy, losing much of it to cold and the mountain tribes.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hannibal's_crossing_of_the_Alps"
+    ],
+    "datePrecision": "Autumn of 218 BCE; placed in October. The route is still debated."
+   }
+  },
+  {
+   "id": "trasimene",
+   "time": "-68968972800/1",
+   "metadata": {
+    "title": "Battle of Lake Trasimene",
+    "description": "Hannibal ambushes a Roman army in the morning mist by the lake and kills the consul **Flaminius**. Rome names **Fabius Maximus** dictator, and he avoids battle: *Cunctator*, the Delayer.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Lake_Trasimene"
+    ],
+    "datePrecision": "21 June 217 BCE in the pre-Julian Roman calendar, which had drifted from the seasons; its Julian equivalent is uncertain, so it is placed as if it were a Julian date. The day is Ovid's.",
+    "historicalDate": "21 June 217 BCE",
+    "calendar": "Roman (pre-Julian Republican)"
+   }
+  },
+  {
+   "id": "cannae",
+   "time": "-68933808000/1",
+   "metadata": {
+    "title": "Battle of Cannae",
+    "description": "Hannibal surrounds and destroys a far larger Roman army in Apulia: one of the worst defeats in Rome's history, with tens of thousands dead. Rome still refuses to make peace.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Cannae"
+    ],
+    "datePrecision": "2 August 216 BCE in the pre-Julian Roman calendar, which had drifted from the seasons; its Julian equivalent is uncertain, so it is placed as if it were a Julian date. One review of the evidence (Derow) puts it on 1 July 216 BCE (Julian); others differ.",
+    "historicalDate": "2 August 216 BCE",
+    "calendar": "Roman (pre-Julian Republican)"
+   }
+  },
+  {
+   "id": "syracuse",
+   "time": "-68809996800/1",
+   "metadata": {
+    "title": "Syracuse falls; Archimedes killed",
+    "description": "Rome takes **Syracuse** after a siege prolonged by **Archimedes**'s war machines; he is killed by a Roman soldier in the sack.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Syracuse_(213–212_BC)",
+     "https://en.wikipedia.org/wiki/Archimedes"
+    ],
+    "datePrecision": "Known to the year (212 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "metaurus",
+   "time": "-68652230400/1",
+   "metadata": {
+    "title": "Battle of the Metaurus",
+    "description": "Hannibal's brother **Hasdrubal**, bringing a second army over the Alps, is defeated and killed before the brothers can join.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_the_Metaurus"
+    ],
+    "datePrecision": "Known to the year (207 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "zama",
+   "time": "-68484960000/1",
+   "metadata": {
+    "title": "Battle of Zama",
+    "description": "**Scipio**, taking the war to Africa, defeats Hannibal near Carthage; he is called **Africanus**, and Carthage accepts Rome's terms the next year.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Zama"
+    ],
+    "datePrecision": "Autumn of 202 BCE; often given as 19 October (Roman calendar), but the day is not certain. Placed in October."
+   }
+  },
+  {
+   "id": "cynoscephalae",
+   "time": "-68336697600/1",
+   "metadata": {
+    "title": "Battle of Cynoscephalae",
+    "description": "The Roman legion beats the **Macedonian phalanx** of Philip V in Thessaly; the next year Rome declares the Greeks free, under its protection.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Cynoscephalae"
+    ],
+    "datePrecision": "Known to the year (197 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "pydna",
+   "time": "-67422585600/1",
+   "metadata": {
+    "title": "Battle of Pydna",
+    "description": "**Aemilius Paullus** destroys the army of **Perseus**, the last king of Macedon. The night before, a lunar eclipse unsettled the Macedonians; a Roman officer, **Sulpicius Gallus**, is said to have predicted it.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Pydna",
+     "https://en.wikipedia.org/wiki/Gaius_Sulpicius_Gallus"
+    ],
+    "datePrecision": "Fixed by a lunar eclipse on the night before the battle, astronomically 21 June 168 BCE (Julian). Livy dates the eclipse to the night of 3–4 September in the Roman calendar of the day, which was then about two and a half months ahead of the seasons. The timeline's Gregorian line shows it 3 days earlier.",
+    "historicalDate": "22 June 168 BCE (Julian); the eclipse before it fell on 4 September in the Roman calendar",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "carthage-destroyed",
+   "time": "-66732508800/1",
+   "metadata": {
+    "title": "Carthage destroyed",
+    "description": "After a three-year siege **Scipio Aemilianus** storms Carthage; the city is razed, its people killed or enslaved, and its land becomes the province of **Africa**.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Carthage_(Third_Punic_War)"
+    ],
+    "datePrecision": "Spring of 146 BCE; placed at the start of May, before Corinth."
+   }
+  },
+  {
+   "id": "corinth",
+   "time": "-66722140800/1",
+   "metadata": {
+    "title": "Corinth destroyed",
+    "description": "In the same year **Lucius Mummius** sacks **Corinth** after the Achaean War, and its art is shipped to Rome; Greece falls under Roman rule.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Corinth_(146_BC)"
+    ],
+    "datePrecision": "Later in 146 BCE; placed at the end of August, after Carthage."
+   }
+  },
+  {
+   "id": "aqua-marcia",
+   "time": "-66664166400/1",
+   "metadata": {
+    "title": "Aqua Marcia",
+    "description": "The praetor **Quintus Marcius Rex** begins the longest of Rome's aqueducts so far, about 91 km, carrying water on high arches for its last stretch; finished in 140 BCE.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Aqua_Marcia"
+    ],
+    "datePrecision": "Built 144–140 BCE; placed at its start."
+   }
+  },
+  {
+   "id": "h-crisis-republic",
+   "time": "-66332736000/1",
+   "metadata": {
+    "title": "The Republic in crisis",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2",
+    "datePrecision": "Chapter heading, placed at the start of 133 BCE."
+   }
+  },
+  {
+   "id": "tiberius-gracchus",
+   "time": "-66317011200/1",
+   "metadata": {
+    "title": "Tiberius Gracchus killed",
+    "description": "The tribune **Tiberius Gracchus** passes a law sharing out public land to poor citizens and is clubbed to death with hundreds of supporters by senators: the first bloodshed of its kind in Roman politics in centuries.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tiberius_Gracchus"
+    ],
+    "datePrecision": "Known to the year (133 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "gaius-gracchus",
+   "time": "-65938320000/1",
+   "metadata": {
+    "title": "Gaius Gracchus killed",
+    "description": "His brother **Gaius**, tribune twice with a wider programme, dies with thousands of followers after the Senate's first emergency decree, the *senatus consultum ultimum*.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Gaius_Gracchus"
+    ],
+    "datePrecision": "Known to the year (121 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "marius",
+   "time": "-65496556800/1",
+   "metadata": {
+    "title": "Marius consul",
+    "description": "**Gaius Marius**, a \"new man\", is elected consul and enlists the landless poor; he will hold the consulship seven times, and his soldiers look to their general for their reward.",
+    "tags": [
+     "politics",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Gaius_Marius",
+     "https://en.wikipedia.org/wiki/Marian_reforms"
+    ],
+    "datePrecision": "Known to the year (107 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "vercellae",
+   "time": "-65304921600/1",
+   "metadata": {
+    "title": "Battle of Vercellae",
+    "description": "Marius and Catulus destroy the **Cimbri**, ending the migrating tribes' threat to Italy.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Vercellae"
+    ],
+    "datePrecision": "30 July 101 BCE in the pre-Julian Roman calendar, which had drifted from the seasons; its Julian equivalent is uncertain, so it is placed as if it were a Julian date.",
+    "historicalDate": "30 July 101 BCE",
+    "calendar": "Roman (pre-Julian Republican)"
+   }
+  },
+  {
+   "id": "lex-julia",
+   "time": "-64960185600/1",
+   "metadata": {
+    "title": "Citizenship for the Italians",
+    "description": "In the middle of the **Social War**, the **Lex Julia** offers Roman citizenship to allied Italian communities that have not taken up arms; most of Italy becomes Roman.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Social_War_(91–87_BC)"
+    ],
+    "datePrecision": "Known to the year (90 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "sulla-march",
+   "time": "-64897027200/1",
+   "metadata": {
+    "title": "Sulla marches on Rome",
+    "description": "Stripped of his eastern command, the consul **Sulla** leads his legions against the city itself, the first Roman to do so.",
+    "tags": [
+     "politics",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sulla's_civil_war"
+    ],
+    "datePrecision": "Known to the year (88 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "sulla-dictator",
+   "time": "-64707724800/1",
+   "metadata": {
+    "title": "Sulla dictator",
+    "description": "Victorious in civil war, Sulla is made **dictator** to reform the constitution, and posts **proscription** lists: anyone named could be killed for a reward. He resigns and dies in 78 BCE.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sulla",
+     "https://en.wikipedia.org/wiki/Proscription"
+    ],
+    "datePrecision": "Late 82 BCE; placed at mid-year."
+   }
+  },
+  {
+   "id": "spartacus-defeated",
+   "time": "-64360569600/1",
+   "metadata": {
+    "title": "Spartacus defeated",
+    "description": "**Crassus** defeats the slave army of **Spartacus**, a gladiator; Spartacus dies in battle, and 6,000 captives are crucified along the **Via Appia**.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Third_Servile_War",
+     "https://en.wikipedia.org/wiki/Spartacus"
+    ],
+    "datePrecision": "Spring of 71 BCE; placed at mid-year."
+   }
+  },
+  {
+   "id": "pirates",
+   "time": "-64234339200/1",
+   "metadata": {
+    "title": "Pompey clears the seas of pirates",
+    "description": "The **Lex Gabinia** gives **Pompey** an unprecedented command over the whole Mediterranean; he clears it of pirates in about three months.",
+    "tags": [
+     "war",
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lex_Gabinia_de_piratis_persequendis",
+     "https://en.wikipedia.org/wiki/Pompey"
+    ],
+    "datePrecision": "Known to the year (67 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "jerusalem-63",
+   "time": "-64110700800/1",
+   "metadata": {
+    "title": "Pompey takes Jerusalem",
+    "description": "Ending his war in the East, having made Syria a province, Pompey takes **Jerusalem**; Judaea becomes a client of Rome.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Jerusalem_(63_BC)"
+    ],
+    "datePrecision": "63 BCE; placed a month before mid-year, apart from Cicero's speeches."
+   }
+  },
+  {
+   "id": "catiline",
+   "time": "-64097049600/1",
+   "metadata": {
+    "title": "Cicero against Catiline",
+    "description": "The consul **Marcus Tullius Cicero** denounces **Catiline**'s conspiracy in the Senate in the first of four speeches, the **Catilinarians**; he later has five conspirators executed without trial.",
+    "tags": [
+     "writing",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Catilinarian_orations",
+     "https://en.wikipedia.org/wiki/Cicero"
+    ],
+    "datePrecision": "8 November 63 BCE in the pre-Julian Roman calendar, which had drifted from the seasons; its Julian equivalent is uncertain, so it is placed as if it were a Julian date.",
+    "historicalDate": "8 November 63 BCE",
+    "calendar": "Roman (pre-Julian Republican)"
+   }
+  },
+  {
+   "id": "triumvirate-1",
+   "time": "-64013414400/1",
+   "metadata": {
+    "title": "The First Triumvirate",
+    "description": "**Caesar**, **Pompey** and **Crassus** make a private alliance to get what each wants from the state; Caesar is consul the next year.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_Triumvirate"
+    ],
+    "datePrecision": "Known to the year (60 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "pompey-theatre",
+   "time": "-63855648000/1",
+   "metadata": {
+    "title": "Theatre of Pompey",
+    "description": "Rome's first permanent stone theatre, on the Campus Martius. Its portico held the Senate's meeting hall where Caesar was later killed.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Theatre_of_Pompey"
+    ],
+    "datePrecision": "Known to the year (55 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "carrhae",
+   "time": "-63792489600/1",
+   "metadata": {
+    "title": "Battle of Carrhae",
+    "description": "**Crassus** invades Parthia and is destroyed by its horse archers in the desert near Carrhae; his death ends the triumvirate's balance.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Carrhae"
+    ],
+    "datePrecision": "Known to the year (53 BCE); placed at mid-year."
+   }
+  },
+  {
+   "id": "alesia",
+   "time": "-63754905600/1",
+   "metadata": {
+    "title": "Siege of Alesia",
+    "description": "Caesar encircles **Vercingetorix** in Alesia and beats off a relief army; Vercingetorix surrenders and Gaul is conquered.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Alesia",
+     "https://en.wikipedia.org/wiki/Vercingetorix"
+    ],
+    "datePrecision": "September 52 BCE in the Roman calendar; placed in September."
+   }
+  },
+  {
+   "id": "commentarii",
+   "time": "-63729417600/1",
+   "metadata": {
+    "title": "Caesar's Commentaries on the Gallic War",
+    "description": "Caesar's own account of his wars in Gaul, in seven books written of himself in the third person, plain and persuasive; an eighth was added by his officer Hirtius.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Commentarii_de_Bello_Gallico"
+    ],
+    "datePrecision": "Written about 58–49 BCE; placed at 51 BCE."
+   }
+  },
+  {
+   "id": "rubicon",
+   "time": "-63681379200/1",
+   "metadata": {
+    "title": "Caesar crosses the Rubicon",
+    "description": "Ordered to give up his army, **Caesar** leads a legion over the **Rubicon**, the border of Italy, saying, Suetonius reports, \"the die is cast\": civil war.",
+    "tags": [
+     "war",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Crossing_the_Rubicon",
+     "https://penelope.uchicago.edu/Thayer/E/Roman/Texts/Suetonius/12Caesars/Julius*.html"
+    ],
+    "datePrecision": "10 January 49 BCE in the pre-Julian Roman calendar, which had drifted from the seasons; its Julian equivalent is uncertain, so it is placed as if it were a Julian date. Usually placed on the night of 10–11 January; the precise day is uncertain.",
+    "historicalDate": "10 January 49 BCE",
+    "calendar": "Roman (pre-Julian Republican)"
+   }
+  },
+  {
+   "id": "pharsalus",
+   "time": "-63631526400/1",
+   "metadata": {
+    "title": "Battle of Pharsalus",
+    "description": "In Thessaly Caesar defeats Pompey, who has the larger army; Pompey flees to Egypt.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Pharsalus"
+    ],
+    "datePrecision": "9 August 48 BCE in the pre-Julian Roman calendar, which had drifted from the seasons; its Julian equivalent is uncertain, so it is placed as if it were a Julian date.",
+    "historicalDate": "9 August 48 BCE",
+    "calendar": "Roman (pre-Julian Republican)"
+   }
+  },
+  {
+   "id": "pompey-killed",
+   "time": "-63627206400/1",
+   "metadata": {
+    "title": "Pompey killed in Egypt",
+    "description": "Landing in Egypt, Pompey is stabbed on the orders of the boy king **Ptolemy XIII**'s advisers, the day before his birthday.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Pompey"
+    ],
+    "datePrecision": "28 September 48 BCE in the pre-Julian Roman calendar, which had drifted from the seasons; its Julian equivalent is uncertain, so it is placed as if it were a Julian date.",
+    "historicalDate": "28 September 48 BCE",
+    "calendar": "Roman (pre-Julian Republican)"
+   }
+  },
+  {
+   "id": "julian-calendar",
+   "time": "-63555926400/1",
+   "metadata": {
+    "title": "The Julian calendar",
+    "description": "Caesar's new calendar takes effect: a 365-day year with a leap day every fourth year. To bring the old calendar back in line with the seasons, the year before (46 BCE) was stretched to **445 days**.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Julian_calendar",
+     "https://en.wikipedia.org/wiki/Roman_calendar"
+    ],
+    "datePrecision": "1 January 45 BCE: the first day of the Julian calendar; days before it are dates in the old Roman calendar. The timeline's Gregorian line shows it 2 days earlier. Until 8 BCE the pontiffs misapplied the leap years, so the true day may differ from the proleptic Julian date by up to three days.",
+    "historicalDate": "1 January 45 BCE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "munda",
+   "time": "-63549360000/1",
+   "metadata": {
+    "title": "Battle of Munda",
+    "description": "In Spain Caesar defeats Pompey's sons: the last battle of his civil war.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Munda"
+    ],
+    "datePrecision": "17 March 45 BCE, Julian calendar. The timeline's Gregorian line shows it 2 days earlier. Until 8 BCE the pontiffs misapplied the leap years, so the true day may differ from the proleptic Julian date by up to three days.",
+    "historicalDate": "17 March 45 BCE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "ides",
+   "time": "-63517996800/1",
+   "metadata": {
+    "title": "Caesar assassinated",
+    "description": "A month after being named **dictator for life**, **Julius Caesar** is stabbed 23 times by senators led by **Brutus** and **Cassius**, at a meeting of the Senate in the hall by Pompey's theatre.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Assassination_of_Julius_Caesar",
+     "https://penelope.uchicago.edu/Thayer/E/Roman/Texts/Suetonius/12Caesars/Julius*.html"
+    ],
+    "datePrecision": "Ides of March (15 March) 44 BCE, Julian calendar. The timeline's Gregorian line shows it 2 days earlier. Until 8 BCE the pontiffs misapplied the leap years, so the true day may differ from the proleptic Julian date by up to three days.",
+    "historicalDate": "Ides of March (15 March) 44 BCE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "cicero-killed",
+   "time": "-63463392000/1",
+   "metadata": {
+    "title": "Cicero killed",
+    "description": "Proscribed by the **Second Triumvirate** for his **Philippics** against Antony, Cicero is killed near his villa at Formiae; his head and hands are nailed up in the Forum.",
+    "tags": [
+     "politics",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Cicero",
+     "https://en.wikipedia.org/wiki/Philippicae"
+    ],
+    "datePrecision": "7 December 43 BCE, Julian calendar. The timeline's Gregorian line shows it 2 days earlier. Until 8 BCE the pontiffs misapplied the leap years, so the true day may differ from the proleptic Julian date by up to three days.",
+    "historicalDate": "7 December 43 BCE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "philippi",
+   "time": "-63435744000/1",
+   "metadata": {
+    "title": "Battle of Philippi",
+    "description": "**Antony** and **Octavian** defeat Caesar's assassins in Macedonia; **Cassius** and then **Brutus** take their own lives.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Philippi"
+    ],
+    "datePrecision": "23 October 42 BCE, Julian calendar. The timeline's Gregorian line shows it 2 days earlier. Until 8 BCE the pontiffs misapplied the leap years, so the true day may differ from the proleptic Julian date by up to three days. The second of the two battles; the first was on 3 October.",
+    "historicalDate": "23 October 42 BCE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "actium",
+   "time": "-63092995200/1",
+   "metadata": {
+    "title": "Battle of Actium",
+    "description": "Off western Greece, **Agrippa**'s fleet, for **Octavian**, defeats **Antony** and **Cleopatra**; they escape to Egypt.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Actium"
+    ],
+    "datePrecision": "2 September 31 BCE, Julian calendar. The timeline's Gregorian line shows it 2 days earlier. Until 8 BCE the pontiffs misapplied the leap years, so the true day may differ from the proleptic Julian date by up to three days.",
+    "historicalDate": "2 September 31 BCE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "alexandria-30",
+   "time": "-63064224000/1",
+   "metadata": {
+    "title": "Egypt taken; Antony and Cleopatra die",
+    "description": "Octavian takes **Alexandria**; Antony and then Cleopatra take their own lives, and Egypt becomes Rome's, governed for the emperor himself.",
+    "tags": [
+     "war",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/War_of_Actium",
+     "https://en.wikipedia.org/wiki/Death_of_Cleopatra"
+    ],
+    "datePrecision": "1 August 30 BCE, Julian calendar. The timeline's Gregorian line shows it 2 days earlier. Until 8 BCE the pontiffs misapplied the leap years, so the true day may differ from the proleptic Julian date by up to three days. Alexandria fell on 1 August; Cleopatra died about ten days later.",
+    "historicalDate": "1 August 30 BCE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "h-principate",
+   "time": "-62987673600/1",
+   "metadata": {
+    "title": "The Principate",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2",
+    "datePrecision": "Chapter heading, placed at the start of 27 BCE."
+   }
+  },
+  {
+   "id": "augustus-named",
+   "time": "-62986550400/1",
+   "metadata": {
+    "title": "Octavian becomes Augustus",
+    "description": "Three days after he \"restores the Republic\" to the Senate, Octavian is given the name **Augustus**. He keeps the armies and the real power as *princeps*, first citizen: the start of the **Principate**.",
+    "tags": [
+     "ruler",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Augustus",
+     "https://penelope.uchicago.edu/Thayer/E/Roman/Texts/Augustus/Res_Gestae/home.html"
+    ],
+    "datePrecision": "16 January 27 BCE, Julian calendar. The timeline's Gregorian line shows it 2 days earlier. Until 8 BCE the pontiffs misapplied the leap years, so the true day may differ from the proleptic Julian date by up to three days.",
+    "historicalDate": "16 January 27 BCE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "livy",
+   "time": "-62972035200/1",
+   "metadata": {
+    "title": "Livy begins his history",
+    "description": "**Livy** begins *Ab Urbe Condita*, the history of Rome \"from the founding of the city\", in 142 books; 35 survive. Much of what we know of the kings and the early Republic is his telling.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Livy",
+     "https://en.wikipedia.org/wiki/History_of_Rome_(Livy)",
+     "https://www.gutenberg.org/ebooks/19725"
+    ],
+    "datePrecision": "Begun about 27–25 BCE; placed at mid-27 BCE."
+   }
+  },
+  {
+   "id": "virgil",
+   "time": "-62712662400/1",
+   "metadata": {
+    "title": "Virgil dies; the Aeneid",
+    "description": "**Virgil** dies at Brundisium with the **Aeneid**, his epic of Aeneas's journey from Troy to Italy, unfinished; Augustus has it published against the poet's wishes.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Virgil",
+     "https://en.wikipedia.org/wiki/Aeneid"
+    ],
+    "datePrecision": "21 September 19 BCE, Julian calendar. The timeline's Gregorian line shows it 2 days earlier. Until 8 BCE the pontiffs misapplied the leap years, so the true day may differ from the proleptic Julian date by up to three days.",
+    "historicalDate": "21 September 19 BCE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "ara-pacis",
+   "time": "-62417347200/1",
+   "metadata": {
+    "title": "Ara Pacis consecrated",
+    "description": "The **Altar of Augustan Peace**, voted by the Senate in 13 BCE, carved with a procession of the imperial family.",
+    "tags": [
+     "building",
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ara_Pacis"
+    ],
+    "datePrecision": "30 January 9 BCE, Julian calendar. The timeline's Gregorian line shows it 2 days earlier. Until 8 BCE the pontiffs misapplied the leap years, so the true day may differ from the proleptic Julian date by up to three days.",
+    "historicalDate": "30 January 9 BCE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "ovid-exiled",
+   "time": "-61899033600/1",
+   "metadata": {
+    "title": "Ovid exiled",
+    "description": "Augustus banishes **Ovid**, poet of the *Metamorphoses*, to Tomis on the Black Sea, for \"a poem and a mistake\" that he never explained.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ovid"
+    ],
+    "datePrecision": "Known to the year (8 CE); placed at mid-year."
+   }
+  },
+  {
+   "id": "teutoburg",
+   "time": "-61861449600/1",
+   "metadata": {
+    "title": "Teutoburg Forest",
+    "description": "Germans under **Arminius** destroy three legions under **Varus**; Rome gives up conquering Germany beyond the Rhine.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_the_Teutoburg_Forest"
+    ],
+    "datePrecision": "September 9 CE; the day is not known. Placed in September."
+   }
+  },
+  {
+   "id": "augustus-dies",
+   "time": "-61705670400/1",
+   "metadata": {
+    "title": "Augustus dies",
+    "description": "Augustus dies at Nola after more than forty years as sole ruler; the Senate makes him a god, and his stepson **Tiberius** succeeds. His own account, the **Res Gestae**, is set up on bronze outside his tomb.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Augustus",
+     "https://en.wikipedia.org/wiki/Res_Gestae_Divi_Augusti"
+    ],
+    "datePrecision": "19 August 14 CE, Julian calendar. The timeline's Gregorian line shows it 2 days earlier.",
+    "historicalDate": "19 August 14 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "crucifixion",
+   "time": "-61204809600/1",
+   "metadata": {
+    "title": "Jesus crucified",
+    "description": "**Jesus of Nazareth** is crucified in Jerusalem under the prefect **Pontius Pilate**, a Roman punishment; his followers spread through the empire.",
+    "tags": [
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Crucifixion_of_Jesus",
+     "https://en.wikipedia.org/wiki/Pontius_Pilate"
+    ],
+    "datePrecision": "About 30–33 CE; scholars favour 30 or 33. Placed at mid-30 CE."
+   }
+  },
+  {
+   "id": "caligula-killed",
+   "time": "-60871478400/1",
+   "metadata": {
+    "title": "Caligula assassinated",
+    "description": "Officers of the **Praetorian Guard** kill the emperor **Gaius (Caligula)**; the Guard proclaims his uncle **Claudius** emperor.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Caligula"
+    ],
+    "datePrecision": "24 January 41 CE, Julian calendar. The timeline's Gregorian line shows it 2 days earlier.",
+    "historicalDate": "24 January 41 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "britain",
+   "time": "-60794582400/1",
+   "metadata": {
+    "title": "Claudius invades Britain",
+    "description": "Four legions under **Aulus Plautius** land in Britain; it becomes a province.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Roman_conquest_of_Britain"
+    ],
+    "datePrecision": "Known to the year (43 CE); placed at mid-year."
+   }
+  },
+  {
+   "id": "aqua-claudia",
+   "time": "-60510499200/1",
+   "metadata": {
+    "title": "Aqua Claudia",
+    "description": "Claudius completes two great aqueducts begun by Caligula, the **Aqua Claudia** and **Anio Novus**, which enter Rome over the **Porta Maggiore**.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Aqua_Claudia"
+    ],
+    "datePrecision": "Known to the year (52 CE); placed at mid-year."
+   }
+  },
+  {
+   "id": "fire",
+   "time": "-60130425600/1",
+   "metadata": {
+    "title": "Great Fire of Rome",
+    "description": "Fire burns for six days; of Rome's fourteen districts three are destroyed and seven damaged. **Nero** blames the **Christians**, and Tacitus records their execution; tradition puts the deaths of **Peter** and **Paul** in these years.",
+    "tags": [
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Great_Fire_of_Rome"
+    ],
+    "datePrecision": "19 July 64 CE, Julian calendar. The timeline's Gregorian line shows it 2 days earlier. The fire began on the night of 18–19 July.",
+    "historicalDate": "19 July 64 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "nero-dies",
+   "time": "-60007651200/1",
+   "metadata": {
+    "title": "Nero dies",
+    "description": "Declared a public enemy, **Nero** takes his own life outside Rome; the Julio-Claudian line ends, and four emperors follow in a year.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Nero"
+    ],
+    "datePrecision": "9 June 68 CE, Julian calendar. The timeline's Gregorian line shows it 2 days earlier.",
+    "historicalDate": "9 June 68 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "temple",
+   "time": "-59937321600/1",
+   "metadata": {
+    "title": "Jerusalem and the Temple destroyed",
+    "description": "**Titus** takes Jerusalem after a long siege and the **Second Temple** is burned. The **Arch of Titus** in Rome shows its treasures carried in triumph.",
+    "tags": [
+     "war",
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Jerusalem_(70_CE)",
+     "https://en.wikipedia.org/wiki/Arch_of_Titus"
+    ],
+    "datePrecision": "August 70 CE; the day is debated. Placed at the end of August."
+   }
+  },
+  {
+   "id": "vesuvius",
+   "time": "-59654016000/1",
+   "metadata": {
+    "title": "Vesuvius buries Pompeii",
+    "description": "The eruption buries **Pompeii** and **Herculaneum**. **Pliny the Elder**, author of the *Natural History*, dies trying to rescue people; his nephew **Pliny the Younger** describes it in two letters to **Tacitus**.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Eruption_of_Mount_Vesuvius_in_79_AD",
+     "https://en.wikipedia.org/wiki/Pliny_the_Elder"
+    ],
+    "datePrecision": "24 August 79 CE (Julian) is the date in the manuscripts of Pliny's letter, as traditionally read; finds at Pompeii suggest an autumn date, perhaps late October, and that is now often preferred. The timeline's Gregorian line shows it 2 days earlier.",
+    "historicalDate": "24 August 79 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "colosseum",
+   "time": "-59626886400/1",
+   "metadata": {
+    "title": "The Colosseum opens",
+    "description": "Begun by **Vespasian** on the site of Nero's palace lake, the **Flavian Amphitheatre** is opened by **Titus** with a hundred days of games. It held about 50,000 people.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Colosseum"
+    ],
+    "datePrecision": "Inaugurated in 80 CE; the day is not known."
+   }
+  },
+  {
+   "id": "domitian-killed",
+   "time": "-59115312000/1",
+   "metadata": {
+    "title": "Domitian assassinated",
+    "description": "Court officials kill **Domitian**, last of the Flavians; the Senate names the elderly **Nerva** emperor the same day.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Domitian",
+     "https://en.wikipedia.org/wiki/Nerva"
+    ],
+    "datePrecision": "18 September 96 CE, Julian calendar. The timeline's Gregorian line shows it 2 days earlier.",
+    "historicalDate": "18 September 96 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "trajans-column",
+   "time": "-58585593600/1",
+   "metadata": {
+    "title": "Trajan's Column",
+    "description": "A 30 m marble column in **Trajan's Forum**, its spiral frieze telling the **Dacian Wars** in about 155 scenes. Trajan's ashes were placed in its base.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Trajan's_Column"
+    ],
+    "datePrecision": "Dedicated in May 113 CE; placed at mid-year."
+   }
+  },
+  {
+   "id": "tacitus",
+   "time": "-58493491200/1",
+   "metadata": {
+    "title": "Tacitus writes the Annals",
+    "description": "**Tacitus**, senator and historian, writes the **Annals**, the history of the emperors from Tiberius to Nero, after his **Histories** of the years 69–96.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tacitus",
+     "https://en.wikipedia.org/wiki/Annals_(Tacitus)"
+    ],
+    "datePrecision": "About 116 CE or a few years later; placed at 116 CE."
+   }
+  },
+  {
+   "id": "greatest-extent",
+   "time": "-58464547200/1",
+   "metadata": {
+    "title": "The empire's greatest extent",
+    "description": "After Trajan's conquests of **Dacia** and, briefly, **Mesopotamia**, the empire reaches its greatest size, about 5 million km²; Hadrian gives up the new eastern provinces.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Roman_Empire",
+     "https://en.wikipedia.org/wiki/Trajan"
+    ],
+    "datePrecision": "At Trajan's death in August 117 CE; placed in early May, before it."
+   }
+  },
+  {
+   "id": "suetonius",
+   "time": "-58333132800/1",
+   "metadata": {
+    "title": "Suetonius: The Twelve Caesars",
+    "description": "**Suetonius**, Hadrian's secretary, writes lives of Julius Caesar and the eleven emperors after him, full of gossip and detail.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/The_Twelve_Caesars"
+    ],
+    "datePrecision": "About 121 CE; placed at mid-year."
+   }
+  },
+  {
+   "id": "hadrians-wall",
+   "time": "-58301596800/1",
+   "metadata": {
+    "title": "Hadrian's Wall begun",
+    "description": "After visiting Britain, **Hadrian** orders a wall across the north of the province, 117 km from coast to coast, with forts and milecastles.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hadrian's_Wall"
+    ],
+    "datePrecision": "Known to the year (122 CE); placed at mid-year."
+   }
+  },
+  {
+   "id": "pantheon",
+   "time": "-58175366400/1",
+   "metadata": {
+    "title": "The Pantheon rebuilt",
+    "description": "Rebuilt under Hadrian, still with Agrippa's name on its front: its unreinforced concrete dome, 43 m across, is still the largest of its kind in the world.",
+    "tags": [
+     "building",
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Pantheon,_Rome"
+    ],
+    "datePrecision": "Built about 113–125 CE, dedicated about 126; placed at 126."
+   }
+  },
+  {
+   "id": "antonine-plague",
+   "time": "-56944598400/1",
+   "metadata": {
+    "title": "Antonine Plague",
+    "description": "Troops returning from war with **Parthia** bring an epidemic, probably **smallpox**, that kills millions across the empire over fifteen years; the doctor **Galen** describes it.",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Antonine_Plague"
+    ],
+    "datePrecision": "165 CE, when it reached the empire; placed at mid-year."
+   }
+  },
+  {
+   "id": "meditations",
+   "time": "-56629065600/1",
+   "metadata": {
+    "title": "Meditations of Marcus Aurelius",
+    "description": "On campaign on the Danube, the emperor **Marcus Aurelius** writes notes to himself in Greek on Stoic philosophy, known to us as the **Meditations**.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Meditations"
+    ],
+    "datePrecision": "Written about 170–180 CE; placed at 175."
+   }
+  },
+  {
+   "id": "commodus-killed",
+   "time": "-56076796800/1",
+   "metadata": {
+    "title": "Commodus killed",
+    "description": "**Commodus**, Marcus's son, who fought as a gladiator in the arena, is strangled by a wrestler on the last day of the year; the Year of the Five Emperors follows.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Commodus"
+    ],
+    "datePrecision": "31 December 192 CE, Julian calendar. The timeline's Gregorian line shows it 1 day earlier.",
+    "historicalDate": "31 December 192 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "antoniniana",
+   "time": "-55461456000/1",
+   "metadata": {
+    "title": "Citizenship for all free men",
+    "description": "The emperor **Caracalla**'s edict, the **Constitutio Antoniniana**, makes almost every free man in the empire a Roman citizen.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Constitutio_Antoniniana"
+    ],
+    "datePrecision": "Known to the year (212 CE); placed at mid-year."
+   }
+  },
+  {
+   "id": "caracalla-baths",
+   "time": "-55335225600/1",
+   "metadata": {
+    "title": "Baths of Caracalla",
+    "description": "The vast public baths on the Aventine are opened, with room for well over a thousand bathers.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Baths_of_Caracalla"
+    ],
+    "datePrecision": "Built about 212–216 CE; placed at 216."
+   }
+  },
+  {
+   "id": "h-crisis",
+   "time": "-54751334400/1",
+   "metadata": {
+    "title": "Crisis of the Third Century",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2",
+    "datePrecision": "Chapter heading, placed at the start of 235 CE."
+   }
+  },
+  {
+   "id": "decius",
+   "time": "-54262310400/1",
+   "metadata": {
+    "title": "Decius orders sacrifices",
+    "description": "**Decius** orders everyone in the empire to sacrifice to the gods and get a certificate saying so; Christians who refuse are killed, the first empire-wide persecution.",
+    "tags": [
+     "religion",
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Decian_persecution"
+    ],
+    "datePrecision": "Known to the year (250 CE); placed at mid-year."
+   }
+  },
+  {
+   "id": "valerian",
+   "time": "-53946691200/1",
+   "metadata": {
+    "title": "Valerian captured by Persia",
+    "description": "The emperor **Valerian** is taken prisoner by **Shapur I** of Persia near Edessa and dies in captivity; the Gallic Empire breaks away in the west the same year.",
+    "tags": [
+     "war",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Valerian_(emperor)",
+     "https://en.wikipedia.org/wiki/Battle_of_Edessa"
+    ],
+    "datePrecision": "Known to the year (260 CE); placed at mid-year."
+   }
+  },
+  {
+   "id": "aurelian-walls",
+   "time": "-53599622400/1",
+   "metadata": {
+    "title": "Aurelian Walls begun",
+    "description": "**Aurelian** walls the city of Rome itself for the first time in six centuries: 19 km of brick-faced concrete, much of it still standing.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Aurelian_Walls"
+    ],
+    "datePrecision": "Known to the year (271 CE); placed at mid-year."
+   }
+  },
+  {
+   "id": "zenobia",
+   "time": "-53568000000/1",
+   "metadata": {
+    "title": "Zenobia defeated",
+    "description": "Aurelian defeats **Zenobia**, queen of **Palmyra**, who had taken Egypt and much of the East; two years later he ends the Gallic Empire and reunites the empire.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Zenobia",
+     "https://en.wikipedia.org/wiki/Palmyrene_Empire"
+    ],
+    "datePrecision": "Known to the year (272 CE); placed at mid-year."
+   }
+  },
+  {
+   "id": "h-late",
+   "time": "-53205033600/1",
+   "metadata": {
+    "title": "The late empire",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2",
+    "datePrecision": "Chapter heading, placed at the start of 284 CE."
+   }
+  },
+  {
+   "id": "diocletian",
+   "time": "-53177040000/1",
+   "metadata": {
+    "title": "Diocletian proclaimed",
+    "description": "The army proclaims **Diocletian**, a Dalmatian officer, at Nicomedia. His reforms of the army, the provinces and taxes remake the state: what is often called the **Dominate**.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Diocletian"
+    ],
+    "datePrecision": "20 November 284 CE, Julian calendar. In this century the Julian and Gregorian calendars agree, so the line shows the same day.",
+    "historicalDate": "20 November 284 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "tetrarchy",
+   "time": "-52915852800/1",
+   "metadata": {
+    "title": "The Tetrarchy",
+    "description": "Diocletian shares rule among four: two senior emperors (**Augusti**), himself and **Maximian**, and two juniors (**Caesares**), **Galerius** and **Constantius**.",
+    "tags": [
+     "politics",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tetrarchy"
+    ],
+    "datePrecision": "1 March 293 CE, Julian calendar. In this century the Julian and Gregorian calendars agree, so the line shows the same day.",
+    "historicalDate": "1 March 293 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "prices",
+   "time": "-52652937600/1",
+   "metadata": {
+    "title": "Edict on Maximum Prices",
+    "description": "Diocletian fixes maximum prices for more than a thousand goods and services, against inflation; the edict failed, but its inscriptions are a priceless record.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Edict_on_Maximum_Prices"
+    ],
+    "datePrecision": "Late 301 CE; placed at mid-year."
+   }
+  },
+  {
+   "id": "persecution",
+   "time": "-52600838400/1",
+   "metadata": {
+    "title": "The Great Persecution",
+    "description": "Diocletian's first edict against the **Christians** orders churches destroyed and scriptures burned; the last and harshest persecution follows.",
+    "tags": [
+     "religion",
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Diocletianic_Persecution"
+    ],
+    "datePrecision": "23 February 303 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later.",
+    "historicalDate": "23 February 303 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "constantine-york",
+   "time": "-52493011200/1",
+   "metadata": {
+    "title": "Constantine acclaimed at York",
+    "description": "When his father **Constantius** dies at **Eboracum** (York), the army there proclaims **Constantine** emperor.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Constantine_the_Great"
+    ],
+    "datePrecision": "25 July 306 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later.",
+    "historicalDate": "25 July 306 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "milvian",
+   "time": "-52295414400/1",
+   "metadata": {
+    "title": "Battle of the Milvian Bridge",
+    "description": "Constantine defeats his rival **Maxentius** at a bridge over the Tiber; his soldiers, by Christian writers' accounts, bore a Christian sign after a vision.",
+    "tags": [
+     "war",
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_the_Milvian_Bridge"
+    ],
+    "datePrecision": "28 October 312 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later.",
+    "historicalDate": "28 October 312 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "milan",
+   "time": "-52275715200/1",
+   "metadata": {
+    "title": "Edict of Milan",
+    "description": "Constantine and **Licinius**, meeting at Milan, agree to grant freedom of worship to Christians and all others and return confiscated church property.",
+    "tags": [
+     "law",
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Edict_of_Milan",
+     "https://sourcebooks.fordham.edu/source/edict-milan.asp"
+    ],
+    "datePrecision": "13 June 313 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later. Agreed at Milan in February; 13 June is when Licinius's letter announcing it was posted at Nicomedia (Lactantius).",
+    "historicalDate": "13 June 313 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "arch-constantine",
+   "time": "-52211174400/1",
+   "metadata": {
+    "title": "Arch of Constantine",
+    "description": "The Senate dedicates a triumphal arch by the Colosseum for Constantine's victory, reusing sculpture from monuments of Trajan, Hadrian and Marcus Aurelius.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Arch_of_Constantine"
+    ],
+    "datePrecision": "Known to the year (315 CE); placed at mid-year."
+   }
+  },
+  {
+   "id": "nicaea",
+   "time": "-51899097600/1",
+   "metadata": {
+    "title": "Council of Nicaea",
+    "description": "Constantine calls the bishops of the empire to **Nicaea**; they condemn **Arius** and agree the first form of the **Nicene Creed**.",
+    "tags": [
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_Council_of_Nicaea"
+    ],
+    "datePrecision": "20 May 325 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later. The council is usually said to have opened on 20 May 325; sources differ.",
+    "historicalDate": "20 May 325 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "constantinople-founded",
+   "time": "-51742108800/1",
+   "metadata": {
+    "title": "Constantinople dedicated",
+    "description": "Constantine refounds the Greek city of **Byzantium** on the Bosporus as his new capital, **Constantinople**: the New Rome.",
+    "tags": [
+     "building",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Constantinople"
+    ],
+    "datePrecision": "11 May 330 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later.",
+    "historicalDate": "11 May 330 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "constantine-dies",
+   "time": "-51520233600/1",
+   "metadata": {
+    "title": "Constantine dies",
+    "description": "Constantine is baptized on his deathbed near Nicomedia; his three sons divide the empire.",
+    "tags": [
+     "ruler",
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Constantine_the_Great"
+    ],
+    "datePrecision": "22 May 337 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later.",
+    "historicalDate": "22 May 337 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "julian-dies",
+   "time": "-50696755200/1",
+   "metadata": {
+    "title": "Julian dies in Persia",
+    "description": "**Julian**, the last emperor to worship the old gods, called the Apostate by Christians, is killed on campaign against Persia.",
+    "tags": [
+     "ruler",
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Julian_(emperor)"
+    ],
+    "datePrecision": "26 June 363 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later.",
+    "historicalDate": "26 June 363 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "adrianople",
+   "time": "-50219568000/1",
+   "metadata": {
+    "title": "Battle of Adrianople",
+    "description": "**Goths**, admitted across the Danube two years before and badly treated, destroy an eastern Roman army; the emperor **Valens** is killed.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Adrianople"
+    ],
+    "datePrecision": "9 August 378 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later.",
+    "historicalDate": "9 August 378 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "thessalonica",
+   "time": "-50170579200/1",
+   "metadata": {
+    "title": "Edict of Thessalonica",
+    "description": "**Theodosius I** and his co-emperors declare **Nicene Christianity** the faith of all their peoples.",
+    "tags": [
+     "law",
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Edict_of_Thessalonica"
+    ],
+    "datePrecision": "27 February 380 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later.",
+    "historicalDate": "27 February 380 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "frigidus",
+   "time": "-49712227200/1",
+   "metadata": {
+    "title": "Battle of the Frigidus",
+    "description": "Theodosius defeats the western usurper **Eugenius**, whose regime the last pagan senators had backed; Theodosius is the last emperor to rule both halves of the empire.",
+    "tags": [
+     "war",
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_the_Frigidus"
+    ],
+    "datePrecision": "6 September 394 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later. The battle lasted two days, 5–6 September.",
+    "historicalDate": "6 September 394 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "h-fall",
+   "time": "-49702204800/1",
+   "metadata": {
+    "title": "The fall of the West",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2",
+    "datePrecision": "Chapter heading, placed at the start of 395 CE."
+   }
+  },
+  {
+   "id": "division",
+   "time": "-49700736000/1",
+   "metadata": {
+    "title": "Theodosius dies; the empire divided",
+    "description": "Theodosius dies at Milan; his sons rule the two halves, **Arcadius** in the East from Constantinople and the boy **Honorius** in the West. The empire is never again ruled by one man.",
+    "tags": [
+     "ruler",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Theodosius_I",
+     "https://en.wikipedia.org/wiki/Western_Roman_Empire"
+    ],
+    "datePrecision": "17 January 395 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later.",
+    "historicalDate": "17 January 395 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "rhine",
+   "time": "-49323513600/1",
+   "metadata": {
+    "title": "The Rhine crossed",
+    "description": "**Vandals**, **Alans** and **Suebi** cross the Rhine into Gaul and go on to Spain.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Crossing_of_the_Rhine"
+    ],
+    "datePrecision": "31 December 406 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later. The traditional date, from Prosper of Aquitaine; some argue for 405.",
+    "historicalDate": "31 December 406 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "alaric",
+   "time": "-49208428800/1",
+   "metadata": {
+    "title": "Visigoths sack Rome",
+    "description": "**Alaric**'s **Visigoths** take and plunder Rome for three days: the first time in 800 years that an enemy has taken the city.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sack_of_Rome_(410)"
+    ],
+    "datePrecision": "24 August 410 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later.",
+    "historicalDate": "24 August 410 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "city-of-god",
+   "time": "-49118486400/1",
+   "metadata": {
+    "title": "Augustine begins The City of God",
+    "description": "**Augustine**, bishop of Hippo, answers pagans who blamed the sack of Rome on the Christian god; he works on *The City of God* until 426.",
+    "tags": [
+     "writing",
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/The_City_of_God"
+    ],
+    "datePrecision": "Begun about 413 CE; placed at mid-year."
+   }
+  },
+  {
+   "id": "vandal-carthage",
+   "time": "-48288441600/1",
+   "metadata": {
+    "title": "Vandals take Carthage",
+    "description": "**Gaiseric**'s Vandals take **Carthage**, the West's richest province and Rome's grain supply.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Vandal_Kingdom"
+    ],
+    "datePrecision": "19 October 439 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later.",
+    "historicalDate": "19 October 439 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "catalaunian",
+   "time": "-47920204800/1",
+   "metadata": {
+    "title": "Battle of the Catalaunian Plains",
+    "description": "**Aetius**, with Romans and Visigoths, stops **Attila**'s Huns in Gaul.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_the_Catalaunian_Plains"
+    ],
+    "datePrecision": "20 June 451 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later. The traditional day; sources differ, and some put it in September.",
+    "historicalDate": "20 June 451 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "leo-attila",
+   "time": "-47887718400/1",
+   "metadata": {
+    "title": "Pope Leo meets Attila",
+    "description": "Attila invades Italy; **Pope Leo I** is among the envoys who meet him near Mantua, and the Huns withdraw.",
+    "tags": [
+     "religion",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Pope_Leo_I",
+     "https://en.wikipedia.org/wiki/Attila"
+    ],
+    "datePrecision": "Known to the year (452 CE); placed at mid-year."
+   }
+  },
+  {
+   "id": "vandal-sack",
+   "time": "-47795529600/1",
+   "metadata": {
+    "title": "Vandals sack Rome",
+    "description": "Gaiseric's Vandals sail from Carthage and plunder Rome for two weeks, carrying off treasures and captives, among them the empress **Eudoxia** and her daughters.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sack_of_Rome_(455)"
+    ],
+    "datePrecision": "2 June 455 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later. The sack began on 2 June and lasted about two weeks.",
+    "historicalDate": "2 June 455 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "deposed",
+   "time": "-47124633600/1",
+   "metadata": {
+    "title": "Romulus Augustulus deposed",
+    "description": "The Germanic general **Odoacer** deposes the boy emperor **Romulus Augustulus** and sends the imperial regalia to Constantinople. No new emperor is made in the West: the traditional end of the Western Roman Empire.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Romulus_Augustulus",
+     "https://en.wikipedia.org/wiki/Fall_of_the_Western_Roman_Empire"
+    ],
+    "datePrecision": "4 September 476 CE, Julian calendar. The timeline's Gregorian line shows it 1 day later.",
+    "historicalDate": "4 September 476 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "h-east",
+   "time": "-45536688000/1",
+   "metadata": {
+    "title": "Epilogue: Rome in the East",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2",
+    "datePrecision": "Chapter heading, placed at the start of 527 CE."
+   }
+  },
+  {
+   "id": "codex",
+   "time": "-45465062400/1",
+   "metadata": {
+    "title": "Justinian's Code",
+    "description": "The first edition of **Justinian**'s code of imperial law, followed by the Digest and Institutes: the **Corpus Juris Civilis**, through which Roman law reached modern Europe.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Corpus_Juris_Civilis"
+    ],
+    "datePrecision": "7 April 529 CE, Julian calendar. The timeline's Gregorian line shows it 2 days later.",
+    "historicalDate": "7 April 529 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "hagia-sophia",
+   "time": "-45189792000/1",
+   "metadata": {
+    "title": "Hagia Sophia dedicated",
+    "description": "Justinian's great church in Constantinople, with its 31 m dome, built in under six years after riots burned the old one.",
+    "tags": [
+     "building",
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hagia_Sophia"
+    ],
+    "datePrecision": "27 December 537 CE, Julian calendar. The timeline's Gregorian line shows it 2 days later.",
+    "historicalDate": "27 December 537 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "crusade-1204",
+   "time": "-24163142400/1",
+   "metadata": {
+    "title": "Crusaders sack Constantinople",
+    "description": "The army of the **Fourth Crusade** storms and plunders the city; the empire is restored only in 1261, smaller and weaker.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sack_of_Constantinople"
+    ],
+    "datePrecision": "13 April 1204 CE, Julian calendar. The timeline's Gregorian line shows it 7 days later.",
+    "historicalDate": "13 April 1204 CE",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "fall-1453",
+   "time": "-16301347200/1",
+   "metadata": {
+    "title": "Fall of Constantinople",
+    "description": "The Ottoman sultan **Mehmed II** takes the city after a 53-day siege; the last emperor, **Constantine XI**, dies in the fighting. The Roman Empire, in the East, ends.",
+    "tags": [
+     "war",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fall_of_Constantinople"
+    ],
+    "datePrecision": "29 May 1453 CE, Julian calendar. The timeline's Gregorian line shows it 9 days later.",
+    "historicalDate": "29 May 1453 CE",
+    "calendar": "Julian"
+   }
+  }
+ ],
+ "durations": [
+  {
+   "id": "regal",
+   "start": "-85889116800/1",
+   "end": "-78182409600/1",
+   "metadata": {
+    "title": "Roman Kingdom",
+    "description": "Rome under seven kings, by tradition from Romulus to Tarquin the Proud: 753–509 BCE, dates that are legend rather than record.",
+    "tags": [
+     "ruler",
+     "legend"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Roman_Kingdom"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "republic",
+   "start": "-78182409600/1",
+   "end": "-62986550400/1",
+   "metadata": {
+    "title": "Roman Republic",
+    "description": "Government by yearly magistrates, the Senate and the assemblies, from the expulsion of the kings (509 BCE, traditional) until Octavian becomes Augustus (27 BCE): 482 years.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Roman_Republic"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "principate",
+   "start": "-62986550400/1",
+   "end": "-53177040000/1",
+   "metadata": {
+    "title": "The Principate",
+    "description": "Rule by an emperor who keeps the Republic's forms and calls himself *princeps*, first citizen: from Augustus (27 BCE) to Diocletian (284 CE).",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Principate"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "dominate",
+   "start": "-53177040000/1",
+   "end": "-47124633600/1",
+   "metadata": {
+    "title": "The late empire (Dominate)",
+    "description": "From Diocletian to the last western emperor: emperors ruling openly as masters (*domini*), often several at once, with a Christian empire from Constantine.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Dominate"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "western",
+   "start": "-49700736000/1",
+   "end": "-47124633600/1",
+   "metadata": {
+    "title": "Western Roman Empire",
+    "description": "The western half after the division of 395, ruled from Milan and then Ravenna, until 476: 81 years.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Western_Roman_Empire"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "eastern",
+   "start": "-49700736000/1",
+   "end": "-16301347200/1",
+   "metadata": {
+    "title": "Eastern Roman (Byzantine) Empire",
+    "description": "The eastern half, ruled from Constantinople, which called itself Roman to the end; modern historians call it the **Byzantine Empire**. It outlived the West by almost a thousand years, from 476 to 1453.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Byzantine_Empire"
+    ],
+    "color": "#5b4a7a"
+   }
+  },
+  {
+   "id": "romulus",
+   "start": "-85889116800/1",
+   "end": "-84714681600/1",
+   "metadata": {
+    "title": "Romulus",
+    "description": "The founder; at his end, legend says, he vanished in a storm and became the god **Quirinus**. Traditional reign, 753–716 BCE: legend, not record.",
+    "tags": [
+     "ruler",
+     "legend"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Romulus"
+    ],
+    "color": "#8a96a8"
+   }
+  },
+  {
+   "id": "numa",
+   "start": "-84683145600/1",
+   "end": "-83357769600/1",
+   "metadata": {
+    "title": "Numa Pompilius",
+    "description": "A Sabine, the peaceful king: legend credits him with Rome's priesthoods and its calendar. Traditional reign, 715–673 BCE: legend, not record.",
+    "tags": [
+     "ruler",
+     "legend"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Numa_Pompilius"
+    ],
+    "color": "#8a96a8"
+   }
+  },
+  {
+   "id": "tullus",
+   "start": "-83357769600/1",
+   "end": "-82379548800/1",
+   "metadata": {
+    "title": "Tullus Hostilius",
+    "description": "A warlike king who destroys **Alba Longa**, after the legendary fight of the Horatii and Curiatii. Traditional reign, 673–642 BCE: legend, not record.",
+    "tags": [
+     "ruler",
+     "legend"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tullus_Hostilius"
+    ],
+    "color": "#8a96a8"
+   }
+  },
+  {
+   "id": "ancus",
+   "start": "-82379548800/1",
+   "end": "-81590544000/1",
+   "metadata": {
+    "title": "Ancus Marcius",
+    "description": "Credited with the first bridge over the Tiber and the port of **Ostia**. Traditional reign, 642–617 BCE: legend, not record.",
+    "tags": [
+     "ruler",
+     "legend"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ancus_Marcius"
+    ],
+    "color": "#8a96a8"
+   }
+  },
+  {
+   "id": "priscus",
+   "start": "-81559008000/1",
+   "end": "-80391484800/1",
+   "metadata": {
+    "title": "Tarquinius Priscus",
+    "description": "The first king of Etruscan origin; tradition credits him with draining the Forum and the Circus Maximus. Traditional reign, 616–579 BCE: legend, not record.",
+    "tags": [
+     "ruler",
+     "legend"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lucius_Tarquinius_Priscus"
+    ],
+    "color": "#8a96a8"
+   }
+  },
+  {
+   "id": "servius",
+   "start": "-80359948800/1",
+   "end": "-79002950400/1",
+   "metadata": {
+    "title": "Servius Tullius",
+    "description": "Credited with the first census and with dividing the people into classes by wealth. Traditional reign, 578–535 BCE: legend, not record.",
+    "tags": [
+     "ruler",
+     "legend"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Servius_Tullius"
+    ],
+    "color": "#8a96a8"
+   }
+  },
+  {
+   "id": "superbus",
+   "start": "-79002950400/1",
+   "end": "-78182409600/1",
+   "metadata": {
+    "title": "Tarquinius Superbus",
+    "description": "Tarquin the Proud, the seventh and last king, a tyrant in the tradition, expelled in 509 BCE. Traditional reign, 535–509 BCE: legend, not record.",
+    "tags": [
+     "ruler",
+     "legend"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lucius_Tarquinius_Superbus"
+    ],
+    "color": "#8a96a8"
+   }
+  },
+  {
+   "id": "orders",
+   "start": "-77709196800/1",
+   "end": "-71176838400/1",
+   "metadata": {
+    "title": "Conflict of the Orders",
+    "description": "The plebeians' two-century struggle with the patricians for political equality, from the first secession (494 BCE) to the Lex Hortensia (287 BCE).",
+    "tags": [
+     "politics",
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Conflict_of_the_Orders"
+    ],
+    "color": "#5f7a52"
+   }
+  },
+  {
+   "id": "triumvirate-2",
+   "start": "-63464256000/1",
+   "end": "-63145699200/1",
+   "metadata": {
+    "title": "Second Triumvirate",
+    "description": "**Octavian**, **Antony** and **Lepidus**, made \"three men for restoring the state\" by law in November 43 BCE; their powers lapsed at the end of 33 BCE.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Second_Triumvirate"
+    ],
+    "color": "#5f7a52"
+   }
+  },
+  {
+   "id": "four-emperors",
+   "start": "-60007651200/1",
+   "end": "-59959353600/1",
+   "metadata": {
+    "title": "Year of the Four Emperors",
+    "description": "After Nero, **Galba**, **Otho** and **Vitellius** rule in turn and die; **Vespasian**'s troops take Rome in December 69.",
+    "tags": [
+     "ruler",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Year_of_the_Four_Emperors"
+    ],
+    "color": "#6b7f99"
+   }
+  },
+  {
+   "id": "crisis-3",
+   "start": "-54744336000/1",
+   "end": "-53177040000/1",
+   "metadata": {
+    "title": "Crisis of the Third Century",
+    "description": "Half a century of civil wars, invasions, plague and debased coinage, from the murder of **Severus Alexander** (235) to Diocletian; some twenty-five emperors, most of them murdered.",
+    "tags": [
+     "politics",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Crisis_of_the_Third_Century"
+    ],
+    "color": "#5f7a52"
+   }
+  },
+  {
+   "id": "tetrarchy-band",
+   "start": "-52915852800/1",
+   "end": "-52274246400/1",
+   "metadata": {
+    "title": "Tetrarchy",
+    "description": "Rule by four emperors, from 293 until the system broke down in civil war; shown to 313.",
+    "tags": [
+     "politics",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tetrarchy"
+    ],
+    "color": "#5f7a52"
+   }
+  },
+  {
+   "id": "julio-claudian",
+   "start": "-62986550400/1",
+   "end": "-60007651200/1",
+   "metadata": {
+    "title": "Julio-Claudian dynasty",
+    "description": "Augustus, Tiberius, Caligula, Claudius and Nero: from 27 BCE to Nero's death in 68 CE.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Julio-Claudian_dynasty"
+    ],
+    "color": "#6b7f99"
+   }
+  },
+  {
+   "id": "flavian",
+   "start": "-59959353600/1",
+   "end": "-59115312000/1",
+   "metadata": {
+    "title": "Flavian dynasty",
+    "description": "**Vespasian** and his sons **Titus** and **Domitian**, builders of the Colosseum.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Flavian_dynasty"
+    ],
+    "color": "#6b7f99"
+   }
+  },
+  {
+   "id": "antonine",
+   "start": "-59115312000/1",
+   "end": "-56076796800/1",
+   "metadata": {
+    "title": "Nerva–Antonine dynasty",
+    "description": "Nerva, Trajan, Hadrian, Antoninus Pius, Marcus Aurelius (with Lucius Verus) and Commodus. Gibbon called the years from Nerva to Marcus the happiest in history.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Nerva–Antonine_dynasty"
+    ],
+    "color": "#6b7f99"
+   }
+  },
+  {
+   "id": "severan",
+   "start": "-56068243200/1",
+   "end": "-54744336000/1",
+   "metadata": {
+    "title": "Severan dynasty",
+    "description": "**Septimius Severus**, an African-born general, and his heirs, to the murder of Severus Alexander in 235.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Severan_dynasty"
+    ],
+    "color": "#6b7f99"
+   }
+  },
+  {
+   "id": "r-augustus",
+   "start": "-62986550400/1",
+   "end": "-61705670400/1",
+   "metadata": {
+    "title": "Augustus",
+    "description": "The first emperor, 27 BCE – 14 CE.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Augustus"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "r-tiberius",
+   "start": "-61703078400/1",
+   "end": "-60993302400/1",
+   "metadata": {
+    "title": "Tiberius",
+    "description": "Augustus's stepson, 14–37 CE, much of it ruled from Capri.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tiberius"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "r-caligula",
+   "start": "-60993129600/1",
+   "end": "-60871478400/1",
+   "metadata": {
+    "title": "Caligula",
+    "description": "Gaius, called Caligula, 37–41 CE.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Caligula"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "r-claudius",
+   "start": "-60871478400/1",
+   "end": "-60438614400/1",
+   "metadata": {
+    "title": "Claudius",
+    "description": "41–54 CE: the conquest of Britain, aqueducts and the harbour at Ostia.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Claudius"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "r-nero",
+   "start": "-60438614400/1",
+   "end": "-60007651200/1",
+   "metadata": {
+    "title": "Nero",
+    "description": "54–68 CE: the Great Fire and the Golden House.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Nero"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "r-trajan",
+   "start": "-59072371200/1",
+   "end": "-58456166400/1",
+   "metadata": {
+    "title": "Trajan",
+    "description": "The first emperor born in a province (Spain), 98–117 CE; under him the empire was at its largest.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Trajan"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "r-hadrian",
+   "start": "-58455907200/1",
+   "end": "-57795984000/1",
+   "metadata": {
+    "title": "Hadrian",
+    "description": "117–138 CE: he travelled the whole empire and fixed its frontiers.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hadrian"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "r-marcus",
+   "start": "-57080937600/1",
+   "end": "-56480457600/1",
+   "metadata": {
+    "title": "Marcus Aurelius",
+    "description": "The philosopher emperor, 161–180 CE, much of it at war on the Danube.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Marcus_Aurelius"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "r-diocletian",
+   "start": "-53177040000/1",
+   "end": "-52531891200/1",
+   "metadata": {
+    "title": "Diocletian",
+    "description": "284–305 CE; he is the only emperor of the age to abdicate, retiring to his palace at Split.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Diocletian"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "r-constantine",
+   "start": "-52493011200/1",
+   "end": "-51520233600/1",
+   "metadata": {
+    "title": "Constantine",
+    "description": "306–337 CE; sole emperor from 324. The first Christian emperor.",
+    "tags": [
+     "ruler",
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Constantine_the_Great"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "r-theodosius",
+   "start": "-50205484800/1",
+   "end": "-49700736000/1",
+   "metadata": {
+    "title": "Theodosius I",
+    "description": "Emperor in the East from 379 CE, and of the whole empire in his last months.",
+    "tags": [
+     "ruler",
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Theodosius_I"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "r-romulus",
+   "start": "-47151331200/1",
+   "end": "-47124633600/1",
+   "metadata": {
+    "title": "Romulus Augustulus",
+    "description": "The last emperor in the West, a boy set up by his father Orestes; he reigned less than a year.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Romulus_Augustulus"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "r-justinian",
+   "start": "-45518198400/1",
+   "end": "-44309894400/1",
+   "metadata": {
+    "title": "Justinian I",
+    "description": "Eastern emperor 527–565 CE, who won back Italy and Africa for a time and codified Roman law.",
+    "tags": [
+     "ruler",
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Justinian_I"
+    ],
+    "color": "#5b4a7a"
+   }
+  },
+  {
+   "id": "samnite",
+   "start": "-72943977600/1",
+   "end": "-71271532800/1",
+   "metadata": {
+    "title": "Samnite Wars",
+    "description": "Three wars with the **Samnites** of the southern Apennines, which made Rome master of central Italy.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Samnite_Wars"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "pyrrhic",
+   "start": "-70955913600/1",
+   "end": "-70798147200/1",
+   "metadata": {
+    "title": "Pyrrhic War",
+    "description": "King **Pyrrhus** of Epirus fights for the Greek city of Tarentum against Rome.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Pyrrhic_War"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "punic-1",
+   "start": "-70450992000/1",
+   "end": "-69735254400/1",
+   "metadata": {
+    "title": "First Punic War",
+    "description": "Rome against **Carthage** for Sicily, mostly at sea: 264–241 BCE.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_Punic_War"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "punic-2",
+   "start": "-68999385600/1",
+   "end": "-68462928000/1",
+   "metadata": {
+    "title": "Second Punic War",
+    "description": "**Hannibal**'s war, 218–201 BCE: Italy invaded, and Carthage defeated in Africa.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Second_Punic_War"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "macedonian",
+   "start": "-68873155200/1",
+   "end": "-66790396800/1",
+   "metadata": {
+    "title": "Macedonian Wars",
+    "description": "Four wars, 214–148 BCE, that ended with Macedonia a Roman province.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Macedonian_Wars"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "punic-3",
+   "start": "-66821932800/1",
+   "end": "-66732508800/1",
+   "metadata": {
+    "title": "Third Punic War",
+    "description": "Rome's three-year siege of Carthage, ending in its destruction in 146 BCE.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Third_Punic_War"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "social",
+   "start": "-64991721600/1",
+   "end": "-64865491200/1",
+   "metadata": {
+    "title": "Social War",
+    "description": "Rome's Italian allies (*socii*) rise for Roman citizenship, 91–87 BCE, and win it in the end.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Social_War_(91–87_BC)"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "servile-3",
+   "start": "-64423641600/1",
+   "end": "-64360569600/1",
+   "metadata": {
+    "title": "Spartacus's revolt",
+    "description": "The Third Servile War, 73–71 BCE: escaped gladiators and slaves defeat Roman armies across Italy.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Third_Servile_War"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "gallic",
+   "start": "-63950342400/1",
+   "end": "-63697881600/1",
+   "metadata": {
+    "title": "Gallic Wars",
+    "description": "Caesar's conquest of Gaul, 58–50 BCE.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Gallic_Wars"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "caesar-civil",
+   "start": "-63681379200/1",
+   "end": "-63549360000/1",
+   "metadata": {
+    "title": "Caesar's civil war",
+    "description": "From the Rubicon to Munda: Caesar against Pompey and the Senate's party, 49–45 BCE.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Caesar's_civil_war"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "jewish",
+   "start": "-60068736000/1",
+   "end": "-59847811200/1",
+   "metadata": {
+    "title": "First Jewish–Roman War",
+    "description": "The revolt of Judaea, 66–73 CE, ending with the fall of Masada.",
+    "tags": [
+     "war",
+     "religion"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_Jewish–Roman_War"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "dacian",
+   "start": "-58964284800/1",
+   "end": "-58806518400/1",
+   "metadata": {
+    "title": "Trajan's Dacian Wars",
+    "description": "Two wars, 101–102 and 105–106 CE, that made **Dacia** (in modern Romania) a province.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Trajan's_Dacian_Wars"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "marcomannic",
+   "start": "-56913062400/1",
+   "end": "-56480457600/1",
+   "metadata": {
+    "title": "Marcomannic Wars",
+    "description": "Marcus Aurelius's wars with Germanic and Sarmatian peoples on the Danube, 166–180 CE.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Marcomannic_Wars"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "gothic",
+   "start": "-50286096000/1",
+   "end": "-50096793600/1",
+   "metadata": {
+    "title": "Gothic War",
+    "description": "Goths admitted into the empire rise, win at Adrianople and settle by treaty in 382 CE.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Gothic_War_(376–382)"
+    ],
+    "color": "#9c3b2a"
+   }
+  }
+ ],
+ "relationships": [
+  {
+   "a": {
+    "moment": "founding"
+   },
+   "b": {
+    "duration": "romulus"
+   }
+  },
+  {
+   "a": {
+    "duration": "priscus"
+   },
+   "b": {
+    "moment": "cloaca"
+   }
+  },
+  {
+   "a": {
+    "duration": "superbus"
+   },
+   "b": {
+    "moment": "tarquin-expelled"
+   }
+  },
+  {
+   "a": {
+    "moment": "tarquin-expelled"
+   },
+   "b": {
+    "moment": "first-consuls"
+   }
+  },
+  {
+   "a": {
+    "moment": "first-consuls"
+   },
+   "b": {
+    "moment": "jupiter-temple"
+   }
+  },
+  {
+   "a": {
+    "moment": "secession"
+   },
+   "b": {
+    "duration": "orders"
+   }
+  },
+  {
+   "a": {
+    "moment": "twelve-tables"
+   },
+   "b": {
+    "moment": "canuleia"
+   }
+  },
+  {
+   "a": {
+    "moment": "licinian"
+   },
+   "b": {
+    "moment": "hortensia"
+   }
+  },
+  {
+   "a": {
+    "duration": "orders"
+   },
+   "b": {
+    "moment": "hortensia"
+   }
+  },
+  {
+   "a": {
+    "moment": "allia"
+   },
+   "b": {
+    "moment": "servian-wall"
+   }
+  },
+  {
+   "a": {
+    "moment": "via-appia"
+   },
+   "b": {
+    "moment": "aqua-appia"
+   }
+  },
+  {
+   "a": {
+    "moment": "aegates"
+   },
+   "b": {
+    "duration": "punic-1"
+   }
+  },
+  {
+   "a": {
+    "moment": "saguntum"
+   },
+   "b": {
+    "moment": "alps"
+   }
+  },
+  {
+   "a": {
+    "moment": "alps"
+   },
+   "b": {
+    "moment": "trasimene"
+   }
+  },
+  {
+   "a": {
+    "moment": "trasimene"
+   },
+   "b": {
+    "moment": "cannae"
+   }
+  },
+  {
+   "a": {
+    "moment": "cannae"
+   },
+   "b": {
+    "moment": "zama"
+   }
+  },
+  {
+   "a": {
+    "duration": "punic-2"
+   },
+   "b": {
+    "moment": "zama"
+   }
+  },
+  {
+   "a": {
+    "duration": "macedonian"
+   },
+   "b": {
+    "moment": "pydna"
+   }
+  },
+  {
+   "a": {
+    "duration": "punic-3"
+   },
+   "b": {
+    "moment": "carthage-destroyed"
+   }
+  },
+  {
+   "a": {
+    "moment": "tiberius-gracchus"
+   },
+   "b": {
+    "moment": "gaius-gracchus"
+   }
+  },
+  {
+   "a": {
+    "duration": "social"
+   },
+   "b": {
+    "moment": "lex-julia"
+   }
+  },
+  {
+   "a": {
+    "moment": "lex-julia"
+   },
+   "b": {
+    "moment": "antoniniana"
+   }
+  },
+  {
+   "a": {
+    "moment": "sulla-march"
+   },
+   "b": {
+    "moment": "sulla-dictator"
+   }
+  },
+  {
+   "a": {
+    "duration": "servile-3"
+   },
+   "b": {
+    "moment": "spartacus-defeated"
+   }
+  },
+  {
+   "a": {
+    "moment": "triumvirate-1"
+   },
+   "b": {
+    "moment": "carrhae"
+   }
+  },
+  {
+   "a": {
+    "duration": "gallic"
+   },
+   "b": {
+    "moment": "alesia"
+   }
+  },
+  {
+   "a": {
+    "duration": "gallic"
+   },
+   "b": {
+    "moment": "commentarii"
+   }
+  },
+  {
+   "a": {
+    "moment": "rubicon"
+   },
+   "b": {
+    "moment": "pharsalus"
+   }
+  },
+  {
+   "a": {
+    "moment": "pharsalus"
+   },
+   "b": {
+    "moment": "pompey-killed"
+   }
+  },
+  {
+   "a": {
+    "moment": "pompey-theatre"
+   },
+   "b": {
+    "moment": "ides"
+   }
+  },
+  {
+   "a": {
+    "moment": "ides"
+   },
+   "b": {
+    "moment": "cicero-killed"
+   }
+  },
+  {
+   "a": {
+    "moment": "ides"
+   },
+   "b": {
+    "moment": "philippi"
+   }
+  },
+  {
+   "a": {
+    "moment": "actium"
+   },
+   "b": {
+    "moment": "alexandria-30"
+   }
+  },
+  {
+   "a": {
+    "moment": "alexandria-30"
+   },
+   "b": {
+    "moment": "augustus-named"
+   }
+  },
+  {
+   "a": {
+    "duration": "r-augustus"
+   },
+   "b": {
+    "moment": "virgil"
+   }
+  },
+  {
+   "a": {
+    "duration": "r-augustus"
+   },
+   "b": {
+    "moment": "ara-pacis"
+   }
+  },
+  {
+   "a": {
+    "duration": "r-nero"
+   },
+   "b": {
+    "moment": "fire"
+   }
+  },
+  {
+   "a": {
+    "duration": "jewish"
+   },
+   "b": {
+    "moment": "temple"
+   }
+  },
+  {
+   "a": {
+    "moment": "temple"
+   },
+   "b": {
+    "moment": "colosseum"
+   }
+  },
+  {
+   "a": {
+    "moment": "vesuvius"
+   },
+   "b": {
+    "moment": "tacitus"
+   }
+  },
+  {
+   "a": {
+    "duration": "dacian"
+   },
+   "b": {
+    "moment": "trajans-column"
+   }
+  },
+  {
+   "a": {
+    "duration": "r-trajan"
+   },
+   "b": {
+    "moment": "greatest-extent"
+   }
+  },
+  {
+   "a": {
+    "duration": "r-hadrian"
+   },
+   "b": {
+    "moment": "hadrians-wall"
+   }
+  },
+  {
+   "a": {
+    "duration": "r-hadrian"
+   },
+   "b": {
+    "moment": "pantheon"
+   }
+  },
+  {
+   "a": {
+    "duration": "r-marcus"
+   },
+   "b": {
+    "moment": "meditations"
+   }
+  },
+  {
+   "a": {
+    "moment": "decius"
+   },
+   "b": {
+    "moment": "persecution"
+   }
+  },
+  {
+   "a": {
+    "duration": "r-diocletian"
+   },
+   "b": {
+    "moment": "tetrarchy"
+   }
+  },
+  {
+   "a": {
+    "moment": "persecution"
+   },
+   "b": {
+    "moment": "milan"
+   }
+  },
+  {
+   "a": {
+    "moment": "milvian"
+   },
+   "b": {
+    "moment": "milan"
+   }
+  },
+  {
+   "a": {
+    "moment": "milvian"
+   },
+   "b": {
+    "moment": "arch-constantine"
+   }
+  },
+  {
+   "a": {
+    "moment": "nicaea"
+   },
+   "b": {
+    "moment": "thessalonica"
+   }
+  },
+  {
+   "a": {
+    "duration": "r-constantine"
+   },
+   "b": {
+    "moment": "constantinople-founded"
+   }
+  },
+  {
+   "a": {
+    "moment": "adrianople"
+   },
+   "b": {
+    "duration": "gothic"
+   }
+  },
+  {
+   "a": {
+    "moment": "division"
+   },
+   "b": {
+    "duration": "eastern"
+   }
+  },
+  {
+   "a": {
+    "moment": "alaric"
+   },
+   "b": {
+    "moment": "city-of-god"
+   }
+  },
+  {
+   "a": {
+    "moment": "vandal-carthage"
+   },
+   "b": {
+    "moment": "vandal-sack"
+   }
+  },
+  {
+   "a": {
+    "moment": "deposed"
+   },
+   "b": {
+    "duration": "western"
+   }
+  },
+  {
+   "a": {
+    "moment": "twelve-tables"
+   },
+   "b": {
+    "moment": "codex"
+   }
+  },
+  {
+   "a": {
+    "duration": "r-justinian"
+   },
+   "b": {
+    "moment": "codex"
+   }
+  },
+  {
+   "a": {
+    "duration": "r-justinian"
+   },
+   "b": {
+    "moment": "hagia-sophia"
+   }
+  },
+  {
+   "a": {
+    "moment": "constantinople-founded"
+   },
+   "b": {
+    "moment": "fall-1453"
+   }
+  },
+  {
+   "a": {
+    "moment": "crusade-1204"
+   },
+   "b": {
+    "moment": "fall-1453"
+   }
+  }
+ ]
+}

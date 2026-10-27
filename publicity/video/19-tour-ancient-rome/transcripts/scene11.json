@@ -1,0 +1,880 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:03,900"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 3900
+			},
+			"text": " The third century nearly breaks the empire.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.846744,
+					"t_dtw": -1
+				},
+				{
+					"text": " The",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:00,300"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 300
+					},
+					"id": 383,
+					"p": 0.915678,
+					"t_dtw": -1
+				},
+				{
+					"text": " third",
+					"timestamps": {
+						"from": "00:00:00,340",
+						"to": "00:00:00,790"
+					},
+					"offsets": {
+						"from": 340,
+						"to": 790
+					},
+					"id": 2368,
+					"p": 0.60017,
+					"t_dtw": -1
+				},
+				{
+					"text": " century",
+					"timestamps": {
+						"from": "00:00:00,800",
+						"to": "00:00:01,230"
+					},
+					"offsets": {
+						"from": 800,
+						"to": 1230
+					},
+					"id": 4289,
+					"p": 0.998011,
+					"t_dtw": -1
+				},
+				{
+					"text": " nearly",
+					"timestamps": {
+						"from": "00:00:01,520",
+						"to": "00:00:02,080"
+					},
+					"offsets": {
+						"from": 1520,
+						"to": 2080
+					},
+					"id": 3016,
+					"p": 0.987799,
+					"t_dtw": -1
+				},
+				{
+					"text": " breaks",
+					"timestamps": {
+						"from": "00:00:02,080",
+						"to": "00:00:02,670"
+					},
+					"offsets": {
+						"from": 2080,
+						"to": 2670
+					},
+					"id": 9457,
+					"p": 0.99855,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,670",
+						"to": "00:00:02,920"
+					},
+					"offsets": {
+						"from": 2670,
+						"to": 2920
+					},
+					"id": 262,
+					"p": 0.998094,
+					"t_dtw": -1
+				},
+				{
+					"text": " empire",
+					"timestamps": {
+						"from": "00:00:02,920",
+						"to": "00:00:02,970"
+					},
+					"offsets": {
+						"from": 2920,
+						"to": 2970
+					},
+					"id": 13735,
+					"p": 0.735435,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:03,830",
+						"to": "00:00:03,900"
+					},
+					"offsets": {
+						"from": 3830,
+						"to": 3900
+					},
+					"id": 13,
+					"p": 0.974515,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_195]",
+					"timestamps": {
+						"from": "00:00:03,900",
+						"to": "00:00:03,900"
+					},
+					"offsets": {
+						"from": 3900,
+						"to": 3900
+					},
+					"id": 50558,
+					"p": 0.0226038,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:03,900",
+				"to": "00:00:07,480"
+			},
+			"offsets": {
+				"from": 3900,
+				"to": 7480
+			},
+			"text": " Diocletian shares it among four emperors.",
+			"tokens": [
+				{
+					"text": " Di",
+					"timestamps": {
+						"from": "00:00:03,950",
+						"to": "00:00:04,070"
+					},
+					"offsets": {
+						"from": 3950,
+						"to": 4070
+					},
+					"id": 6031,
+					"p": 0.981718,
+					"t_dtw": -1
+				},
+				{
+					"text": "oc",
+					"timestamps": {
+						"from": "00:00:04,240",
+						"to": "00:00:04,260"
+					},
+					"offsets": {
+						"from": 4240,
+						"to": 4260
+					},
+					"id": 420,
+					"p": 0.979587,
+					"t_dtw": -1
+				},
+				{
+					"text": "let",
+					"timestamps": {
+						"from": "00:00:04,260",
+						"to": "00:00:04,540"
+					},
+					"offsets": {
+						"from": 4260,
+						"to": 4540
+					},
+					"id": 1616,
+					"p": 0.988814,
+					"t_dtw": -1
+				},
+				{
+					"text": "ian",
+					"timestamps": {
+						"from": "00:00:04,540",
+						"to": "00:00:04,820"
+					},
+					"offsets": {
+						"from": 4540,
+						"to": 4820
+					},
+					"id": 666,
+					"p": 0.9935,
+					"t_dtw": -1
+				},
+				{
+					"text": " shares",
+					"timestamps": {
+						"from": "00:00:04,820",
+						"to": "00:00:05,130"
+					},
+					"offsets": {
+						"from": 4820,
+						"to": 5130
+					},
+					"id": 7303,
+					"p": 0.999096,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:05,420",
+						"to": "00:00:05,560"
+					},
+					"offsets": {
+						"from": 5420,
+						"to": 5560
+					},
+					"id": 340,
+					"p": 0.99875,
+					"t_dtw": -1
+				},
+				{
+					"text": " among",
+					"timestamps": {
+						"from": "00:00:05,560",
+						"to": "00:00:06,000"
+					},
+					"offsets": {
+						"from": 5560,
+						"to": 6000
+					},
+					"id": 1871,
+					"p": 0.998266,
+					"t_dtw": -1
+				},
+				{
+					"text": " four",
+					"timestamps": {
+						"from": "00:00:06,070",
+						"to": "00:00:06,400"
+					},
+					"offsets": {
+						"from": 6070,
+						"to": 6400
+					},
+					"id": 1440,
+					"p": 0.986545,
+					"t_dtw": -1
+				},
+				{
+					"text": " em",
+					"timestamps": {
+						"from": "00:00:06,400",
+						"to": "00:00:06,580"
+					},
+					"offsets": {
+						"from": 6400,
+						"to": 6580
+					},
+					"id": 795,
+					"p": 0.907199,
+					"t_dtw": -1
+				},
+				{
+					"text": "perors",
+					"timestamps": {
+						"from": "00:00:06,580",
+						"to": "00:00:06,830"
+					},
+					"offsets": {
+						"from": 6580,
+						"to": 6830
+					},
+					"id": 49406,
+					"p": 0.999186,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:06,830",
+						"to": "00:00:07,360"
+					},
+					"offsets": {
+						"from": 6830,
+						"to": 7360
+					},
+					"id": 13,
+					"p": 0.990894,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_374]",
+					"timestamps": {
+						"from": "00:00:07,480",
+						"to": "00:00:07,480"
+					},
+					"offsets": {
+						"from": 7480,
+						"to": 7480
+					},
+					"id": 50737,
+					"p": 0.0673647,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:07,480",
+				"to": "00:00:10,180"
+			},
+			"offsets": {
+				"from": 7480,
+				"to": 10180
+			},
+			"text": " Constantine wins at the Milvian Bridge,",
+			"tokens": [
+				{
+					"text": " Constantine",
+					"timestamps": {
+						"from": "00:00:07,820",
+						"to": "00:00:08,320"
+					},
+					"offsets": {
+						"from": 7820,
+						"to": 8320
+					},
+					"id": 44665,
+					"p": 0.950573,
+					"t_dtw": -1
+				},
+				{
+					"text": " wins",
+					"timestamps": {
+						"from": "00:00:08,320",
+						"to": "00:00:08,620"
+					},
+					"offsets": {
+						"from": 8320,
+						"to": 8620
+					},
+					"id": 7864,
+					"p": 0.946983,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:08,620",
+						"to": "00:00:08,710"
+					},
+					"offsets": {
+						"from": 8620,
+						"to": 8710
+					},
+					"id": 379,
+					"p": 0.99867,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:09,000",
+						"to": "00:00:09,000"
+					},
+					"offsets": {
+						"from": 9000,
+						"to": 9000
+					},
+					"id": 262,
+					"p": 0.99826,
+					"t_dtw": -1
+				},
+				{
+					"text": " Mil",
+					"timestamps": {
+						"from": "00:00:09,000",
+						"to": "00:00:09,230"
+					},
+					"offsets": {
+						"from": 9000,
+						"to": 9230
+					},
+					"id": 4460,
+					"p": 0.821665,
+					"t_dtw": -1
+				},
+				{
+					"text": "v",
+					"timestamps": {
+						"from": "00:00:09,230",
+						"to": "00:00:09,300"
+					},
+					"offsets": {
+						"from": 9230,
+						"to": 9300
+					},
+					"id": 85,
+					"p": 0.907043,
+					"t_dtw": -1
+				},
+				{
+					"text": "ian",
+					"timestamps": {
+						"from": "00:00:09,300",
+						"to": "00:00:09,530"
+					},
+					"offsets": {
+						"from": 9300,
+						"to": 9530
+					},
+					"id": 666,
+					"p": 0.998895,
+					"t_dtw": -1
+				},
+				{
+					"text": " Bridge",
+					"timestamps": {
+						"from": "00:00:09,530",
+						"to": "00:00:09,990"
+					},
+					"offsets": {
+						"from": 9530,
+						"to": 9990
+					},
+					"id": 10290,
+					"p": 0.803579,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:09,990",
+						"to": "00:00:10,170"
+					},
+					"offsets": {
+						"from": 9990,
+						"to": 10170
+					},
+					"id": 11,
+					"p": 0.983239,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_509]",
+					"timestamps": {
+						"from": "00:00:10,180",
+						"to": "00:00:10,180"
+					},
+					"offsets": {
+						"from": 10180,
+						"to": 10180
+					},
+					"id": 50872,
+					"p": 0.0706029,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:10,180",
+				"to": "00:00:12,380"
+			},
+			"offsets": {
+				"from": 10180,
+				"to": 12380
+			},
+			"text": " grants Christians freedom of worship,",
+			"tokens": [
+				{
+					"text": " grants",
+					"timestamps": {
+						"from": "00:00:10,520",
+						"to": "00:00:10,580"
+					},
+					"offsets": {
+						"from": 10520,
+						"to": 10580
+					},
+					"id": 11455,
+					"p": 0.996105,
+					"t_dtw": -1
+				},
+				{
+					"text": " Christians",
+					"timestamps": {
+						"from": "00:00:10,580",
+						"to": "00:00:11,240"
+					},
+					"offsets": {
+						"from": 10580,
+						"to": 11240
+					},
+					"id": 9316,
+					"p": 0.988048,
+					"t_dtw": -1
+				},
+				{
+					"text": " freedom",
+					"timestamps": {
+						"from": "00:00:11,240",
+						"to": "00:00:11,410"
+					},
+					"offsets": {
+						"from": 11240,
+						"to": 11410
+					},
+					"id": 4925,
+					"p": 0.988578,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:11,700",
+						"to": "00:00:11,830"
+					},
+					"offsets": {
+						"from": 11700,
+						"to": 11830
+					},
+					"id": 286,
+					"p": 0.999415,
+					"t_dtw": -1
+				},
+				{
+					"text": " worship",
+					"timestamps": {
+						"from": "00:00:11,830",
+						"to": "00:00:12,280"
+					},
+					"offsets": {
+						"from": 11830,
+						"to": 12280
+					},
+					"id": 11892,
+					"p": 0.999731,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:12,340",
+						"to": "00:00:12,370"
+					},
+					"offsets": {
+						"from": 12340,
+						"to": 12370
+					},
+					"id": 11,
+					"p": 0.83705,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_619]",
+					"timestamps": {
+						"from": "00:00:12,380",
+						"to": "00:00:12,380"
+					},
+					"offsets": {
+						"from": 12380,
+						"to": 12380
+					},
+					"id": 50982,
+					"p": 0.0664762,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:12,380",
+				"to": "00:00:15,020"
+			},
+			"offsets": {
+				"from": 12380,
+				"to": 15020
+			},
+			"text": " and founds Constantinople.",
+			"tokens": [
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:12,680",
+						"to": "00:00:12,680"
+					},
+					"offsets": {
+						"from": 12680,
+						"to": 12680
+					},
+					"id": 290,
+					"p": 0.999756,
+					"t_dtw": -1
+				},
+				{
+					"text": " found",
+					"timestamps": {
+						"from": "00:00:12,720",
+						"to": "00:00:13,170"
+					},
+					"offsets": {
+						"from": 12720,
+						"to": 13170
+					},
+					"id": 1043,
+					"p": 0.964285,
+					"t_dtw": -1
+				},
+				{
+					"text": "s",
+					"timestamps": {
+						"from": "00:00:13,180",
+						"to": "00:00:13,280"
+					},
+					"offsets": {
+						"from": 13180,
+						"to": 13280
+					},
+					"id": 82,
+					"p": 0.994972,
+					"t_dtw": -1
+				},
+				{
+					"text": " Constantinople",
+					"timestamps": {
+						"from": "00:00:13,280",
+						"to": "00:00:14,700"
+					},
+					"offsets": {
+						"from": 13280,
+						"to": 14700
+					},
+					"id": 46369,
+					"p": 0.997932,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:14,700",
+						"to": "00:00:15,020"
+					},
+					"offsets": {
+						"from": 14700,
+						"to": 15020
+					},
+					"id": 13,
+					"p": 0.997619,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_751]",
+					"timestamps": {
+						"from": "00:00:15,020",
+						"to": "00:00:15,020"
+					},
+					"offsets": {
+						"from": 15020,
+						"to": 15020
+					},
+					"id": 51114,
+					"p": 0.073937,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:15,020",
+				"to": "00:00:19,020"
+			},
+			"offsets": {
+				"from": 15020,
+				"to": 19020
+			},
+			"text": " In 395, the empire divides for good.",
+			"tokens": [
+				{
+					"text": " In",
+					"timestamps": {
+						"from": "00:00:15,300",
+						"to": "00:00:15,300"
+					},
+					"offsets": {
+						"from": 15300,
+						"to": 15300
+					},
+					"id": 554,
+					"p": 0.993779,
+					"t_dtw": -1
+				},
+				{
+					"text": " 395",
+					"timestamps": {
+						"from": "00:00:15,360",
+						"to": "00:00:16,580"
+					},
+					"offsets": {
+						"from": 15360,
+						"to": 16580
+					},
+					"id": 42321,
+					"p": 0.980159,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:16,580",
+						"to": "00:00:16,880"
+					},
+					"offsets": {
+						"from": 16580,
+						"to": 16880
+					},
+					"id": 11,
+					"p": 0.919021,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:16,880",
+						"to": "00:00:17,120"
+					},
+					"offsets": {
+						"from": 16880,
+						"to": 17120
+					},
+					"id": 262,
+					"p": 0.967634,
+					"t_dtw": -1
+				},
+				{
+					"text": " empire",
+					"timestamps": {
+						"from": "00:00:17,120",
+						"to": "00:00:17,560"
+					},
+					"offsets": {
+						"from": 17120,
+						"to": 17560
+					},
+					"id": 13735,
+					"p": 0.940304,
+					"t_dtw": -1
+				},
+				{
+					"text": " divides",
+					"timestamps": {
+						"from": "00:00:17,590",
+						"to": "00:00:17,930"
+					},
+					"offsets": {
+						"from": 17590,
+						"to": 17930
+					},
+					"id": 36319,
+					"p": 0.999664,
+					"t_dtw": -1
+				},
+				{
+					"text": " for",
+					"timestamps": {
+						"from": "00:00:17,930",
+						"to": "00:00:18,420"
+					},
+					"offsets": {
+						"from": 17930,
+						"to": 18420
+					},
+					"id": 329,
+					"p": 0.999699,
+					"t_dtw": -1
+				},
+				{
+					"text": " good",
+					"timestamps": {
+						"from": "00:00:18,420",
+						"to": "00:00:18,480"
+					},
+					"offsets": {
+						"from": 18420,
+						"to": 18480
+					},
+					"id": 922,
+					"p": 0.999592,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:18,850",
+						"to": "00:00:19,020"
+					},
+					"offsets": {
+						"from": 18850,
+						"to": 19020
+					},
+					"id": 13,
+					"p": 0.996921,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_951]",
+					"timestamps": {
+						"from": "00:00:19,020",
+						"to": "00:00:19,020"
+					},
+					"offsets": {
+						"from": 19020,
+						"to": 19020
+					},
+					"id": 51314,
+					"p": 0.0639994,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}
