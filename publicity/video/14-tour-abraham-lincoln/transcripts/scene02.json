@@ -1,0 +1,855 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:05,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 5000
+			},
+			"text": " The bands are durations, homes, offices, partnerships, the war.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.839084,
+					"t_dtw": -1
+				},
+				{
+					"text": " The",
+					"timestamps": {
+						"from": "00:00:00,240",
+						"to": "00:00:00,240"
+					},
+					"offsets": {
+						"from": 240,
+						"to": 240
+					},
+					"id": 383,
+					"p": 0.960125,
+					"t_dtw": -1
+				},
+				{
+					"text": " bands",
+					"timestamps": {
+						"from": "00:00:00,350",
+						"to": "00:00:00,650"
+					},
+					"offsets": {
+						"from": 350,
+						"to": 650
+					},
+					"id": 11760,
+					"p": 0.643602,
+					"t_dtw": -1
+				},
+				{
+					"text": " are",
+					"timestamps": {
+						"from": "00:00:00,650",
+						"to": "00:00:00,890"
+					},
+					"offsets": {
+						"from": 650,
+						"to": 890
+					},
+					"id": 389,
+					"p": 0.996725,
+					"t_dtw": -1
+				},
+				{
+					"text": " d",
+					"timestamps": {
+						"from": "00:00:00,890",
+						"to": "00:00:00,970"
+					},
+					"offsets": {
+						"from": 890,
+						"to": 970
+					},
+					"id": 288,
+					"p": 0.916881,
+					"t_dtw": -1
+				},
+				{
+					"text": "urations",
+					"timestamps": {
+						"from": "00:00:00,970",
+						"to": "00:00:01,550"
+					},
+					"offsets": {
+						"from": 970,
+						"to": 1550
+					},
+					"id": 20074,
+					"p": 0.999253,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,820",
+						"to": "00:00:01,820"
+					},
+					"offsets": {
+						"from": 1820,
+						"to": 1820
+					},
+					"id": 11,
+					"p": 0.166586,
+					"t_dtw": -1
+				},
+				{
+					"text": " homes",
+					"timestamps": {
+						"from": "00:00:02,050",
+						"to": "00:00:02,260"
+					},
+					"offsets": {
+						"from": 2050,
+						"to": 2260
+					},
+					"id": 5682,
+					"p": 0.896128,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,260",
+						"to": "00:00:02,400"
+					},
+					"offsets": {
+						"from": 2260,
+						"to": 2400
+					},
+					"id": 11,
+					"p": 0.996202,
+					"t_dtw": -1
+				},
+				{
+					"text": " offices",
+					"timestamps": {
+						"from": "00:00:02,430",
+						"to": "00:00:03,050"
+					},
+					"offsets": {
+						"from": 2430,
+						"to": 3050
+					},
+					"id": 9730,
+					"p": 0.988921,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,050",
+						"to": "00:00:03,240"
+					},
+					"offsets": {
+						"from": 3050,
+						"to": 3240
+					},
+					"id": 11,
+					"p": 0.995152,
+					"t_dtw": -1
+				},
+				{
+					"text": " partnerships",
+					"timestamps": {
+						"from": "00:00:03,240",
+						"to": "00:00:03,830"
+					},
+					"offsets": {
+						"from": 3240,
+						"to": 3830
+					},
+					"id": 22867,
+					"p": 0.870808,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,890",
+						"to": "00:00:03,940"
+					},
+					"offsets": {
+						"from": 3890,
+						"to": 3940
+					},
+					"id": 11,
+					"p": 0.513975,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:04,020",
+						"to": "00:00:04,400"
+					},
+					"offsets": {
+						"from": 4020,
+						"to": 4400
+					},
+					"id": 262,
+					"p": 0.977556,
+					"t_dtw": -1
+				},
+				{
+					"text": " war",
+					"timestamps": {
+						"from": "00:00:05,000",
+						"to": "00:00:05,000"
+					},
+					"offsets": {
+						"from": 5000,
+						"to": 5000
+					},
+					"id": 1175,
+					"p": 0.98229,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,000",
+						"to": "00:00:05,000"
+					},
+					"offsets": {
+						"from": 5000,
+						"to": 5000
+					},
+					"id": 13,
+					"p": 0.870225,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_250]",
+					"timestamps": {
+						"from": "00:00:05,000",
+						"to": "00:00:05,000"
+					},
+					"offsets": {
+						"from": 5000,
+						"to": 5000
+					},
+					"id": 50613,
+					"p": 0.0376284,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:05,000",
+				"to": "00:00:11,000"
+			},
+			"offsets": {
+				"from": 5000,
+				"to": 11000
+			},
+			"text": " Separate by tags, choose home, and the places he lived line up on their own track.",
+			"tokens": [
+				{
+					"text": " Sep",
+					"timestamps": {
+						"from": "00:00:05,340",
+						"to": "00:00:05,370"
+					},
+					"offsets": {
+						"from": 5340,
+						"to": 5370
+					},
+					"id": 8621,
+					"p": 0.972376,
+					"t_dtw": -1
+				},
+				{
+					"text": "arate",
+					"timestamps": {
+						"from": "00:00:05,370",
+						"to": "00:00:05,990"
+					},
+					"offsets": {
+						"from": 5370,
+						"to": 5990
+					},
+					"id": 30748,
+					"p": 0.995279,
+					"t_dtw": -1
+				},
+				{
+					"text": " by",
+					"timestamps": {
+						"from": "00:00:05,990",
+						"to": "00:00:06,220"
+					},
+					"offsets": {
+						"from": 5990,
+						"to": 6220
+					},
+					"id": 416,
+					"p": 0.993951,
+					"t_dtw": -1
+				},
+				{
+					"text": " tags",
+					"timestamps": {
+						"from": "00:00:06,230",
+						"to": "00:00:06,570"
+					},
+					"offsets": {
+						"from": 6230,
+						"to": 6570
+					},
+					"id": 15940,
+					"p": 0.997156,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:07,000",
+						"to": "00:00:07,000"
+					},
+					"offsets": {
+						"from": 7000,
+						"to": 7000
+					},
+					"id": 11,
+					"p": 0.928189,
+					"t_dtw": -1
+				},
+				{
+					"text": " choose",
+					"timestamps": {
+						"from": "00:00:07,050",
+						"to": "00:00:07,410"
+					},
+					"offsets": {
+						"from": 7050,
+						"to": 7410
+					},
+					"id": 3853,
+					"p": 0.755271,
+					"t_dtw": -1
+				},
+				{
+					"text": " home",
+					"timestamps": {
+						"from": "00:00:07,660",
+						"to": "00:00:07,910"
+					},
+					"offsets": {
+						"from": 7660,
+						"to": 7910
+					},
+					"id": 1363,
+					"p": 0.904426,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:08,000",
+						"to": "00:00:08,090"
+					},
+					"offsets": {
+						"from": 8000,
+						"to": 8090
+					},
+					"id": 11,
+					"p": 0.740042,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:08,090",
+						"to": "00:00:08,190"
+					},
+					"offsets": {
+						"from": 8090,
+						"to": 8190
+					},
+					"id": 290,
+					"p": 0.788853,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:08,230",
+						"to": "00:00:08,340"
+					},
+					"offsets": {
+						"from": 8230,
+						"to": 8340
+					},
+					"id": 262,
+					"p": 0.991614,
+					"t_dtw": -1
+				},
+				{
+					"text": " places",
+					"timestamps": {
+						"from": "00:00:08,420",
+						"to": "00:00:08,650"
+					},
+					"offsets": {
+						"from": 8420,
+						"to": 8650
+					},
+					"id": 4113,
+					"p": 0.995739,
+					"t_dtw": -1
+				},
+				{
+					"text": " he",
+					"timestamps": {
+						"from": "00:00:08,650",
+						"to": "00:00:08,740"
+					},
+					"offsets": {
+						"from": 8650,
+						"to": 8740
+					},
+					"id": 339,
+					"p": 0.975803,
+					"t_dtw": -1
+				},
+				{
+					"text": " lived",
+					"timestamps": {
+						"from": "00:00:08,740",
+						"to": "00:00:08,940"
+					},
+					"offsets": {
+						"from": 8740,
+						"to": 8940
+					},
+					"id": 5615,
+					"p": 0.991145,
+					"t_dtw": -1
+				},
+				{
+					"text": " line",
+					"timestamps": {
+						"from": "00:00:09,020",
+						"to": "00:00:09,240"
+					},
+					"offsets": {
+						"from": 9020,
+						"to": 9240
+					},
+					"id": 1627,
+					"p": 0.825847,
+					"t_dtw": -1
+				},
+				{
+					"text": " up",
+					"timestamps": {
+						"from": "00:00:09,240",
+						"to": "00:00:09,340"
+					},
+					"offsets": {
+						"from": 9240,
+						"to": 9340
+					},
+					"id": 510,
+					"p": 0.990951,
+					"t_dtw": -1
+				},
+				{
+					"text": " on",
+					"timestamps": {
+						"from": "00:00:09,360",
+						"to": "00:00:09,410"
+					},
+					"offsets": {
+						"from": 9360,
+						"to": 9410
+					},
+					"id": 319,
+					"p": 0.970426,
+					"t_dtw": -1
+				},
+				{
+					"text": " their",
+					"timestamps": {
+						"from": "00:00:09,790",
+						"to": "00:00:09,790"
+					},
+					"offsets": {
+						"from": 9790,
+						"to": 9790
+					},
+					"id": 511,
+					"p": 0.996506,
+					"t_dtw": -1
+				},
+				{
+					"text": " own",
+					"timestamps": {
+						"from": "00:00:09,790",
+						"to": "00:00:09,910"
+					},
+					"offsets": {
+						"from": 9790,
+						"to": 9910
+					},
+					"id": 898,
+					"p": 0.996147,
+					"t_dtw": -1
+				},
+				{
+					"text": " track",
+					"timestamps": {
+						"from": "00:00:10,600",
+						"to": "00:00:10,620"
+					},
+					"offsets": {
+						"from": 10600,
+						"to": 10620
+					},
+					"id": 2610,
+					"p": 0.983021,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:10,710",
+						"to": "00:00:10,950"
+					},
+					"offsets": {
+						"from": 10710,
+						"to": 10950
+					},
+					"id": 13,
+					"p": 0.979411,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_550]",
+					"timestamps": {
+						"from": "00:00:11,000",
+						"to": "00:00:11,000"
+					},
+					"offsets": {
+						"from": 11000,
+						"to": 11000
+					},
+					"id": 50913,
+					"p": 0.683475,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:11,000",
+				"to": "00:00:17,000"
+			},
+			"offsets": {
+				"from": 11000,
+				"to": 17000
+			},
+			"text": " Two Kentucky farms, 13 years in Indiana, New Salem, Springfield, and Washington.",
+			"tokens": [
+				{
+					"text": " Two",
+					"timestamps": {
+						"from": "00:00:11,300",
+						"to": "00:00:11,300"
+					},
+					"offsets": {
+						"from": 11300,
+						"to": 11300
+					},
+					"id": 4930,
+					"p": 0.874232,
+					"t_dtw": -1
+				},
+				{
+					"text": " Kentucky",
+					"timestamps": {
+						"from": "00:00:11,350",
+						"to": "00:00:12,090"
+					},
+					"offsets": {
+						"from": 11350,
+						"to": 12090
+					},
+					"id": 11867,
+					"p": 0.996136,
+					"t_dtw": -1
+				},
+				{
+					"text": " farms",
+					"timestamps": {
+						"from": "00:00:12,090",
+						"to": "00:00:12,550"
+					},
+					"offsets": {
+						"from": 12090,
+						"to": 12550
+					},
+					"id": 15893,
+					"p": 0.970215,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:12,550",
+						"to": "00:00:12,590"
+					},
+					"offsets": {
+						"from": 12550,
+						"to": 12590
+					},
+					"id": 11,
+					"p": 0.890758,
+					"t_dtw": -1
+				},
+				{
+					"text": " 13",
+					"timestamps": {
+						"from": "00:00:13,050",
+						"to": "00:00:13,370"
+					},
+					"offsets": {
+						"from": 13050,
+						"to": 13370
+					},
+					"id": 1511,
+					"p": 0.656881,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:13,370",
+						"to": "00:00:13,870"
+					},
+					"offsets": {
+						"from": 13370,
+						"to": 13870
+					},
+					"id": 812,
+					"p": 0.994541,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:13,870",
+						"to": "00:00:14,070"
+					},
+					"offsets": {
+						"from": 13870,
+						"to": 14070
+					},
+					"id": 287,
+					"p": 0.99915,
+					"t_dtw": -1
+				},
+				{
+					"text": " Indiana",
+					"timestamps": {
+						"from": "00:00:14,070",
+						"to": "00:00:14,750"
+					},
+					"offsets": {
+						"from": 14070,
+						"to": 14750
+					},
+					"id": 10278,
+					"p": 0.999333,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:14,770",
+						"to": "00:00:14,940"
+					},
+					"offsets": {
+						"from": 14770,
+						"to": 14940
+					},
+					"id": 11,
+					"p": 0.855355,
+					"t_dtw": -1
+				},
+				{
+					"text": " New",
+					"timestamps": {
+						"from": "00:00:15,020",
+						"to": "00:00:15,150"
+					},
+					"offsets": {
+						"from": 15020,
+						"to": 15150
+					},
+					"id": 968,
+					"p": 0.653226,
+					"t_dtw": -1
+				},
+				{
+					"text": " Salem",
+					"timestamps": {
+						"from": "00:00:15,150",
+						"to": "00:00:15,370"
+					},
+					"offsets": {
+						"from": 15150,
+						"to": 15370
+					},
+					"id": 31988,
+					"p": 0.993599,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:15,370",
+						"to": "00:00:15,420"
+					},
+					"offsets": {
+						"from": 15370,
+						"to": 15420
+					},
+					"id": 11,
+					"p": 0.995387,
+					"t_dtw": -1
+				},
+				{
+					"text": " Springfield",
+					"timestamps": {
+						"from": "00:00:16,060",
+						"to": "00:00:16,060"
+					},
+					"offsets": {
+						"from": 16060,
+						"to": 16060
+					},
+					"id": 27874,
+					"p": 0.995537,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:16,160",
+						"to": "00:00:16,160"
+					},
+					"offsets": {
+						"from": 16160,
+						"to": 16160
+					},
+					"id": 11,
+					"p": 0.663288,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:16,290",
+						"to": "00:00:16,300"
+					},
+					"offsets": {
+						"from": 16290,
+						"to": 16300
+					},
+					"id": 290,
+					"p": 0.99118,
+					"t_dtw": -1
+				},
+				{
+					"text": " Washington",
+					"timestamps": {
+						"from": "00:00:16,610",
+						"to": "00:00:16,780"
+					},
+					"offsets": {
+						"from": 16610,
+						"to": 16780
+					},
+					"id": 2669,
+					"p": 0.997168,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:16,860",
+						"to": "00:00:16,950"
+					},
+					"offsets": {
+						"from": 16860,
+						"to": 16950
+					},
+					"id": 13,
+					"p": 0.969934,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_850]",
+					"timestamps": {
+						"from": "00:00:17,000",
+						"to": "00:00:17,000"
+					},
+					"offsets": {
+						"from": 17000,
+						"to": 17000
+					},
+					"id": 51213,
+					"p": 0.228136,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}
