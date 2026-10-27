@@ -125,23 +125,40 @@ function bounds(context: PresentationContext, level: Level): Q[] {
     }
     return result;
   }
-  // Calendar levels: count months as year × 12 + (month − 1), or whole years, from year
-  // zero, so multi-month and multi-year steps stay aligned for negative years too.
+  // Calendar levels: count months as year × 12 + (month − 1) from year zero, so multi-month
+  // steps stay aligned for negative years too.
   const [year, month] = dateParts(context.left.div(Q.from(86400n)).floor().numerator);
-  // The time of the first day of month (or year) number `index`.
-  const at = (index: bigint): Q =>
-    level.months
-      ? Q.from(
-          dayNumber(floorDiv(index, 12n), index - floorDiv(index, 12n) * 12n + 1n, 1n) * 86400n,
-        )
-      : Q.from(dayNumber(index, 1n, 1n) * 86400n);
-  const step = level.months ?? level.years!;
-  let index = floorDiv(level.months ? year * 12n + month - 1n : year, step) * step;
-  if (at(index).compare(context.left) < 0) index += step;
-  for (let time = at(index); time.compare(right) <= 0; index += step, time = at(index)) {
+  const push = (time: Q) => {
     if (result.length >= MAX_TICKS) throw new Error('Ruler exceeds its visible tick budget.');
     result.push(time);
+  };
+  if (level.months) {
+    const step = level.months;
+    // The time of the first day of month number `index`.
+    const at = (index: bigint): Q =>
+      Q.from(dayNumber(floorDiv(index, 12n), index - floorDiv(index, 12n) * 12n + 1n, 1n) * 86400n);
+    let index = floorDiv(year * 12n + month - 1n, step) * step;
+    if (at(index).compare(context.left) < 0) index += step;
+    for (let time = at(index); time.compare(right) <= 0; index += step, time = at(index))
+      push(time);
+    return result;
   }
+  // Whole years step in BCE/CE numbering (#340), so labels read round in both eras: every
+  // `step` CE and every `step` BCE (astronomical 1 − n × step), with 1 CE between them,
+  // where the era turns. Aligning to astronomical zero instead would print "1001 BCE",
+  // "1 BCE". Years are numbered by era as signed counts with no zero: 1 CE is 1, 1 BCE −1.
+  const step = level.years!;
+  const toEra = (y: bigint) => (y > 0n ? y : y - 1n),
+    fromEra = (e: bigint) => (e > 0n ? e : e + 1n);
+  // The first marked year at or after era year `e`: a multiple of the step, or 1 CE.
+  const next = (e: bigint): bigint => {
+    const multiple = -floorDiv(-e, step) * step;
+    return e <= 1n && multiple >= 0n ? 1n : multiple;
+  };
+  const at = (e: bigint): Q => Q.from(dayNumber(fromEra(e), 1n, 1n) * 86400n);
+  let e = next(toEra(year));
+  if (at(e).compare(context.left) < 0) e = next(e + 1n);
+  for (let time = at(e); time.compare(right) <= 0; e = next(e + 1n), time = at(e)) push(time);
   return result;
 }
 /**
@@ -182,7 +199,7 @@ function calendarLevels(target: Q): Level[] {
   if (target.compare(Q.from(31557600n)) > 0) {
     const years = decimalLevel(target, Q.from(31557600n)).step!;
     const count = years.div(Q.from(31557600n)).numerator;
-    // Coarse years stay aligned to year zero, including negative and enormous years.
+    // Coarse years stay aligned to round BCE/CE years, including enormous ones (bounds).
     if (count > 10n)
       levels.push({
         name: `${count / 10n} years`,

@@ -750,6 +750,28 @@ test('shape sizes are bounded, opt-in and retained in exported timeline metadata
   );
 });
 
+test('Sources and Dating context 2 apply to durations, version 1 still to moments only (#341)', () => {
+  const library = createPluginLibrary();
+  for (const id of ['moment-sources', 'dating-context']) {
+    const [first, second] = BUILTIN_PLUGINS.filter((p) => p.id === id);
+    assert.deepEqual([first.version, second.version], [1, 2]);
+    assert.deepEqual(pluginTargets(first), ['moments']);
+    assert.deepEqual(pluginTargets(second), ['moments', 'durations']);
+    // The same fields, so what a timeline pinned to version 1 stored carries over.
+    assert.deepEqual(second.fields, first.fields);
+    assert(isOfficialPlugin(first) && isOfficialPlugin(second));
+    assert.equal(durationPlugins([installed(first)]).length, 0);
+    assert.deepEqual(durationPlugins([installed(second)])[0].manifest.fields, second.fields);
+    assert.equal(momentPlugins([installed(second)]).length, 1);
+    // The library offers the newest; version 1's detail URL remains.
+    assert.equal(
+      library.search({ search: second.name }).plugins.find((p) => p.id === id).version,
+      2,
+    );
+    assert.equal(library.get(id, 1)?.version, 1);
+  }
+});
+
 test('Sources plugin reads existing metadata, preserves exports and restricts outgoing links', () => {
   const plugins = [installed(MOMENT_SOURCES)];
   assert.equal(createPluginLibrary().search({ search: 'Sources' }).plugins[0].id, 'moment-sources');

@@ -920,7 +920,8 @@ export function sourceLinks(value: unknown): string[] {
     return url;
   });
 }
-export const MOMENT_SOURCES: PluginManifest = validatePluginManifest({
+/** The first Sources, for moments only; kept for its URL and the timelines pinned to it. */
+const LEGACY_MOMENT_SOURCES: PluginManifest = validatePluginManifest({
   apiVersion: 1,
   id: 'moment-sources',
   version: 1,
@@ -929,7 +930,15 @@ export const MOMENT_SOURCES: PluginManifest = validatePluginManifest({
   fields: [{ kind: 'links', metadataKey: 'sources', label: 'Sources' }],
   source: 'function render(moment: string, api: PluginAPI): string { return api.none(); }',
 });
-export const DATING_CONTEXT: PluginManifest = validatePluginManifest({
+/** Sources 2 (#341): durations, such as a reign or a war, have sources too. */
+export const MOMENT_SOURCES: PluginManifest = validatePluginManifest({
+  ...LEGACY_MOMENT_SOURCES,
+  version: 2,
+  description: 'Show and edit a series of source links for moments, stack entries and durations.',
+  targets: ['moments', 'durations'],
+});
+/** The first Dating context, for moments only; kept for its URL and the timelines pinned to it. */
+const LEGACY_DATING_CONTEXT: PluginManifest = validatePluginManifest({
   apiVersion: 1,
   id: 'dating-context',
   version: 1,
@@ -941,6 +950,14 @@ export const DATING_CONTEXT: PluginManifest = validatePluginManifest({
     { kind: 'multiline', metadataKey: 'coordinateConvention', label: 'Coordinate convention' },
   ],
   source: 'function render(moment: string, api: PluginAPI): string { return api.none(); }',
+});
+/** Dating context 2 (#341): a duration's approximate start or end is explained the same way. */
+export const DATING_CONTEXT: PluginManifest = validatePluginManifest({
+  ...LEGACY_DATING_CONTEXT,
+  version: 2,
+  description:
+    'Explain the precision and coordinate convention of a moment or a duration, such as an approximate start or end. An exact stored coordinate can still represent an approximate age or a calendar-day marker.',
+  targets: ['moments', 'durations'],
 });
 export const HISTORICAL_DATES: PluginManifest = validatePluginManifest({
   apiVersion: 1,
@@ -1550,7 +1567,9 @@ export const BUILTIN_PLUGINS: readonly PluginManifest[] = [
   MOMENT_COLORS,
   FOCUS_ON_HOVER,
   MOMENT_SHAPES,
+  LEGACY_MOMENT_SOURCES,
   MOMENT_SOURCES,
+  LEGACY_DATING_CONTEXT,
   DATING_CONTEXT,
   HISTORICAL_DATES,
   GEOLOGICAL_AGES,

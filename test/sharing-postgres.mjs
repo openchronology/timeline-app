@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// Sharing a timeline and what is in it (issues 60, 61, 95 and 97): page metadata and link
-// previews, preview images, entity pages, links into a timeline, embeds, oEmbed, robots and
-// the sitemap; private timelines show none of it.
+// Sharing a timeline and what is in it (issues 60, 61, 95, 97 and 335): page metadata and
+// link previews, preview images, entity pages and their structured data, links into a
+// timeline, embeds, oEmbed, robots and the sitemap; private timelines show none of it.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -12,6 +12,7 @@ import { createServer } from 'node:http';
 import pg from 'pg';
 import { chromium } from 'playwright';
 import { passwordHash } from '../server/auth.mjs';
+import { DATING_CONTEXT, MOMENT_SOURCES } from '../dist/core.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
@@ -28,6 +29,8 @@ const env = {
   HOSTNAME: '127.0.0.1',
   // One timeline or profile to a sitemap page, so the sitemap's paging is exercised.
   SITEMAP_PAGE_SIZE: '1',
+  // At most four moments and durations of a timeline in the entity sitemap (#335).
+  SITEMAP_TIMELINE_ENTITIES: '4',
 };
 for (const key of Object.keys(env))
   if (key.startsWith('OAUTH_') || ['PLUGIN_LIBRARY', 'FEATURED_TIMELINES'].includes(key))
@@ -85,9 +88,15 @@ function client(ip) {
 const meta = (html, key) =>
   new RegExp(`<meta (?:property|name)="${key}" content="([^"]*)"`).exec(html)?.[1] ?? null;
 const unescape = (text) => text.replaceAll('&amp;', '&').replaceAll('&quot;', '"');
+/** A page's schema.org JSON-LD, parsed; null when it has none. */
+function structuredData(html) {
+  const script = /<script type="application\/ld\+json">([^<]*)<\/script>/.exec(html);
+  return script ? JSON.parse(script[1]) : null;
+}
 /**
  * Every address the sitemap lists, read from its index and then each page it names (#287),
- * checking that no page holds more than SITEMAP_PAGE_SIZE timelines or profiles.
+ * checking that no page holds more than SITEMAP_PAGE_SIZE timelines or profiles, or more
+ * than one timeline's SITEMAP_TIMELINE_ENTITIES moments and durations (#335).
  */
 async function sitemapAddresses(visitor) {
   const index = await visitor.request('/sitemap.xml');
@@ -99,7 +108,8 @@ async function sitemapAddresses(visitor) {
     assert(page.startsWith(origin + '/sitemap/'), page);
     const xml = await visitor.request(page.slice(origin.length));
     const locs = [...xml.matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]);
-    if (page !== pages[0]) assert(locs.length <= 1, `${page} holds ${locs.length}`);
+    const most = page.includes('/sitemap/entities-') ? 4 : 1;
+    if (page !== pages[0]) assert(locs.length <= most, `${page} holds ${locs.length}`);
     addresses.push(...locs);
   }
   return addresses;
@@ -108,6 +118,7 @@ async function sitemapAddresses(visitor) {
 const owner = client('192.0.2.111'),
   guest = client('192.0.2.112');
 let userId, timelineId, otherTimelineId, browser, embedder;
+const extraTimelines = [];
 try {
   for (let i = 0; i < 100 && !exited; i++) {
     try {
@@ -133,17 +144,47 @@ try {
     method: 'POST',
     data: { username, password: 'sharing-test-password-2026' },
   });
-  // Moment IDs with characters that addresses escape (`:`).
+  // Moment IDs with characters that addresses escape (`:`), on Gregorian dates, with tags,
+  // sources, a dating note and a relationship for their pages to show (#335).
   const document = {
     format: 'openchronology',
     version: 1,
     title: 'Voyages of ' + suffix,
     description: 'Ships & the sea, from departure to return.',
+    presentation: {
+      version: 1,
+      mode: 'gregorian',
+      significantDigits: 6,
+      unit: '',
+      scale: '1/1',
+      origin: '0/1',
+      offsetMinutes: 0,
+    },
+    plugins: [
+      { manifest: MOMENT_SOURCES, enabled: true },
+      { manifest: DATING_CONTEXT, enabled: true },
+    ],
     events: [
       { id: 'leg:1', time: '0/1', metadata: { title: 'Departure', description: 'Left port.' } },
-      { id: 'leg:2', time: '86400/1', metadata: { title: 'Storm ' + suffix } },
-      { id: 'leg:3', time: '172800/1', metadata: { title: 'Return' } },
+      {
+        id: 'leg:2',
+        time: '86400/1',
+        metadata: {
+          title: 'Storm ' + suffix,
+          tags: ['weather'],
+          sources: ['https://example.com/logbook', 'javascript:alert(1)'],
+          datePrecision: 'To the day',
+        },
+      },
+      // A note that would close a script, were it not escaped (with no `>`, so it is not
+      // dropped as a tag).
+      {
+        id: 'leg:3',
+        time: '172800/1',
+        metadata: { title: 'Return', description: 'In </script x' },
+      },
     ],
+    relationships: [{ a: { moment: 'leg:2' }, b: { duration: 'crossing' } }],
     durations: [
       {
         id: 'crossing',
@@ -237,6 +278,38 @@ try {
     ),
   );
   assert(moment.includes(`#timeline/${timelineId}/moment/leg%3A2`));
+  assert.equal(meta(moment, 'robots'), null);
+  assert(moment.includes(`<link rel="canonical" href="${origin + momentPath}"/>`));
+  // As text (#335): its date, tags, sources (https only), dating note, what it is related
+  // to, and a link into the timeline at it.
+  assert.match(moment, /<time datetime="1970-01-02T00:00:00Z">/i, 'Its date, for machines.');
+  assert.match(moment, /<ul aria-label="Tags"><li>weather<\/li><\/ul>/);
+  assert(moment.includes('href="https://example.com/logbook"'));
+  assert(!moment.includes('javascript:alert'));
+  assert.match(moment, /<dt>Date precision<\/dt><dd>To the day<\/dd>/);
+  assert(moment.includes(`<a href="${durationPath}">The crossing</a>`));
+  assert(
+    moment.includes(`<a href="${base}#moment/leg%3A2">Open Storm ${suffix} in the timeline</a>`),
+  );
+  // And as structured data: an event on its date, in its timeline, by its owner.
+  assert.deepEqual(structuredData(moment), {
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name: 'Storm ' + suffix,
+    url: origin + momentPath,
+    startDate: '1970-01-02T00:00:00Z',
+    keywords: 'weather',
+    isPartOf: {
+      '@type': 'CreativeWork',
+      name: 'Voyages of ' + suffix,
+      url: origin + base,
+      author: { '@type': 'Person', name: '@' + username, url: `${origin}/${username}` },
+    },
+  });
+  // A note can't end the script early.
+  const ret = await guest.request(base + '/moments/leg%3A3');
+  assert(ret.includes('"description":"In \\u003c/script x"'));
+  assert.equal(structuredData(ret).description, 'In </script x');
   const momentImage = await guest.request(meta(moment, 'og:image').slice(origin.length), {
     raw: true,
   });
@@ -246,6 +319,13 @@ try {
   const duration = await guest.request(durationPath);
   assert.equal(meta(duration, 'og:title'), `The crossing · Voyages of ${suffix}`);
   assert(duration.includes(`#timeline/${timelineId}/duration/crossing`));
+  const during = structuredData(duration);
+  assert.equal(during['@type'], 'Event');
+  assert.deepEqual(
+    [during.startDate, during.endDate, during.description],
+    ['1970-01-01T00:00:00Z', '1970-01-03T00:00:00Z', 'Two days at sea.'],
+  );
+  assert(duration.includes(`<a href="${momentPath}">Storm ${suffix}</a>`));
   await guest.request(base + '/durations/absent', { status: 404 });
 
   // Embeds: any site may frame a public timeline; it names its canonical page.
@@ -294,6 +374,46 @@ try {
   assert(sitemap.includes(`${origin}/${username}`));
   assert(sitemap.includes(origin + '/privacy'));
   assert.equal(new Set(sitemap).size, sitemap.length, 'No address is listed twice.');
+  // Its moments' and durations' pages too (#335).
+  for (const path of [
+    momentPath,
+    durationPath,
+    base + '/moments/leg%3A1',
+    base + '/moments/leg%3A3',
+  ])
+    assert(sitemap.includes(origin + path), path);
+  // Not those of a timeline with sensitive-content labels, whose pages are not indexed, nor
+  // of one with more moments than the sitemap lists of a timeline; their own pages are.
+  const publish = async (data) => {
+    const { id } = await owner.request('/api/timelines', { method: 'POST', status: 201, data });
+    extraTimelines.push(id);
+    await owner.request(`/api/timelines/${id}/settings`, {
+      method: 'PATCH',
+      data: { visibility: 'public' },
+    });
+    return id;
+  };
+  const labelled = await publish({ ...document, title: 'Labelled ' + suffix });
+  await owner.request(`/api/timelines/${labelled}/settings`, {
+    method: 'PATCH',
+    data: { labels: ['violence'] },
+  });
+  const large = await publish({
+    format: 'openchronology',
+    version: 1,
+    title: 'Large ' + suffix,
+    description: 'More moments than the sitemap lists of one timeline.',
+    events: Array.from({ length: 5 }, (_, i) => ({ id: 'm' + i, time: `${i}/1`, metadata: {} })),
+  });
+  const labelledMoment = await guest.request(`/${username}/${labelled}/moments/leg%3A2`);
+  assert.equal(meta(labelledMoment, 'robots'), 'noindex, nofollow');
+  assert.equal(meta(labelledMoment, 'description'), 'Sensitive content: graphic violence');
+  assert.equal(structuredData(labelledMoment), null);
+  const crawled = await sitemapAddresses(guest);
+  assert(crawled.includes(`${origin}/${username}/${labelled}`));
+  assert(crawled.includes(`${origin}/${username}/${large}`));
+  for (const id of [labelled, large])
+    assert(!crawled.some((a) => a.startsWith(`${origin}/${username}/${id}/`)), id);
   // A page that isn't one of the sitemap's is not found.
   await guest.request('/sitemap/timelines-not-an-id.xml', { status: 404 });
   await guest.request('/sitemap/other.xml', { status: 404 });
@@ -455,7 +575,7 @@ try {
   await signedIn.close();
   await context.close();
   console.log(
-    'PASS sharing: addresses, page metadata and previews, preview images, moment and duration pages, links, the share dialog, embeds, oEmbed, robots and sitemap; private timelines show none.',
+    'PASS sharing: addresses, page metadata and previews, preview images, moment and duration pages and their structured data, links, the share dialog, embeds, oEmbed, robots and sitemap with entity pages; private and labelled timelines show none.',
   );
 } catch (error) {
   console.error(logs);
@@ -464,7 +584,7 @@ try {
   await browser?.close();
   embedder?.close();
   child.kill();
-  for (const id of [timelineId, otherTimelineId])
+  for (const id of [timelineId, otherTimelineId, ...extraTimelines])
     if (id) await pool.query('DELETE FROM oc_timelines WHERE id=$1', [id]);
   if (userId) await pool.query('DELETE FROM oc_users WHERE id=$1', [userId]);
   await pool.end();

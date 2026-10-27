@@ -6,6 +6,6 @@ The pages of the sitemap, which [`/sitemap.xml`](../sitemap.xml/README.md) lists
 
 ## Contents
 
-| File                          | What it is for                                                                       |
-| ----------------------------- | ------------------------------------------------------------------------------------ |
-| [`[file]/`]([file]/README.md) | One page at `/sitemap/<file>`: the site's pages, or a page of timelines or profiles. |
+| File                          | What it is for                                                                                                         |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| [`[file]/`]([file]/README.md) | One page at `/sitemap/<file>`: the site's pages, or a page of timelines, profiles or timelines' moments and durations. |

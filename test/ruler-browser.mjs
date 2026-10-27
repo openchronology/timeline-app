@@ -120,5 +120,12 @@ export async function checkRuler(page, restoreDocument) {
   assert(
     (await ticks()).some((tick) => tick.time === parseTimestamp('2024-02-29T00:00:00Z').toString()),
   );
+  // Millennia BCE read round in BCE numbering, meeting the CE years at 1 CE (#340).
+  await go('-3499-01-01T00:00:00Z', '0100-01-01T00:00:00Z');
+  const ancient = await page
+    .locator('.axis-tick .tick-label')
+    .evaluateAll((nodes) => nodes.map((node) => node.textContent));
+  for (const label of ['3000 BCE', '2000 BCE', '1000 BCE', '1 CE']) assert(ancient.includes(label));
+  assert(!ancient.some((label) => /^(1|1001|2001) BCE$/.test(label)), ancient.join(', '));
   await imported(restoreDocument);
 }

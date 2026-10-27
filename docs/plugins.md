@@ -423,8 +423,9 @@ Custom plugins can declare a `size` field and return `api.size(api.get("fieldKey
 
 ## Sources
 
-The official **Sources** plugin (`moment-sources`, version 1) reads the existing
-`sources` metadata array as a list of HTTPS URL strings. The inspector displays
+The official **Sources** plugin (`moment-sources`, version 2) reads the existing
+`sources` metadata array of a moment, stack entry or duration as a list of HTTPS URL
+strings. The inspector displays
 clickable references and, for editors, a text area with one URL per line. Valid
 edits use the existing debounced moment editing flow. Invalid links do not replace
 saved references. Links open in a separate tab with no opener or referrer; the
@@ -432,7 +433,10 @@ plugin never fetches source pages automatically or renders their HTML.
 
 This component is also available to custom plugins as a `links` field. It supports
 at most 100 links, each at most 4,096 characters, with no embedded credentials.
-Stack entries receive the same editor. Manifests and source arrays persist through
+Stack entries and durations receive the same editor, and the reader lists a
+duration's sources as it does a moment's. Version 1 applies to moments and stack
+entries only; timelines pinned to it keep working, and **Update to v2** in the
+plugin library extends it to durations in place. Manifests and source arrays persist through
 `.ochx`, `.och`, PostgreSQL and standalone HTML use. New seed timelines include the
 plugin; existing seed timelines receive it with the one-time seed enrichment on
 reseeding. Other timelines can install **Sources** through **Plugins → Add plugin**,
@@ -449,7 +453,10 @@ safe host fields as custom plugins:
 | Historical dates | `historicalDate`, `calendar`            | Keep the original source date/calendar alongside the timeline's chosen display, including Julian dates shown on a Gregorian axis. |
 | Geological ages  | `approximateAgeYears`                   | Preserve the approximate age in years before reference year 2000 CE.                                                              |
 
-These annotations are editable text and do not change or recompute moment time.
+Dating context version 2 also applies to durations, so a duration's details and the
+reader explain an approximate start or end in its **Date precision** and **Coordinate
+convention**; version 1 is for moments only and stays supported until updated in the
+plugin library. These annotations are editable text and do not change or recompute moment time.
 They make no automatic calendar-conversion or scientific-precision claims. Each
 plugin includes its restricted script and fields in saved timelines, works offline,
 and applies to stack entries. Combine them with Sources for provenance and Dating
