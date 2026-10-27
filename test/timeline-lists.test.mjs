@@ -6,6 +6,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   LISTS,
+  changeList,
+  searchBody,
   SORT_LABELS,
   listHref,
   listQuery,
@@ -120,12 +122,12 @@ test('links change one list and keep the others', () => {
   // The next page of the account's timelines keeps the public search, its page and the drafts.
   assert.equal(
     listHref('/', query, LISTS.mine, states.mine, { page: 5 }),
-    '/?owner=seed&search=rome&sort=stars&page=2&draftSearch=notes&mineTag=war&minePage=5',
+    '/?owner=seed&search=rome&sort=stars&page=2&draftSearch=notes&mineTag=war&minePage=5#mine',
   );
   // A tag filters its own list, from page one.
   assert.equal(
     listHref('/', query, LISTS.explore, states.explore, { tag: 'empire', page: 1 }),
-    '/?owner=seed&mineTag=war&minePage=4&draftSearch=notes&search=rome&tag=empire&sort=stars',
+    '/?owner=seed&mineTag=war&minePage=4&draftSearch=notes&search=rome&tag=empire&sort=stars#explore',
   );
   // The default order is left out: relevance with search text, the list's own without.
   assert.deepEqual(listQuery(LISTS.explore, { search: 'rome', sort: 'relevance', page: 1 }), {
@@ -135,7 +137,7 @@ test('links change one list and keep the others', () => {
     sort: 'relevance',
   });
   assert.deepEqual(listQuery(LISTS.favorites, { search: '', sort: 'age', page: 1 }), {});
-  assert.equal(listHref('/ada', {}, LISTS.profile, readList({}, LISTS.profile)), '/ada');
+  assert.equal(listHref('/ada', {}, LISTS.profile, readList({}, LISTS.profile)), '/ada#timelines');
 });
 
 test('search text reads as the server reads it: words, phrases and exclusions', () => {
@@ -193,4 +195,33 @@ test('a list says how many it has, or why it has none', () => {
     statusText(LISTS.mine, { ...state, visibility: 'private' }, { total: 0 }),
     'None of your timelines match this search.',
   );
+});
+
+test('changing a list starts from page one, and a search sorts by relevance (#338)', () => {
+  const browse = readList({ page: '3' }, LISTS.explore);
+  assert.deepEqual(changeList(LISTS.explore, browse, { search: 'rome' }), {
+    ...browse,
+    search: 'rome',
+    sort: 'relevance',
+    page: 1,
+  });
+  assert.equal(changeList(LISTS.explore, browse, { page: 4 }).page, 4);
+  // Another order chosen stays; clearing the text goes back to browsing's order.
+  const stars = readList({ sort: 'stars' }, LISTS.explore);
+  assert.equal(changeList(LISTS.explore, stars, { search: 'rome' }).sort, 'stars');
+  const found = readList({ search: 'rome' }, LISTS.explore);
+  assert.equal(changeList(LISTS.explore, found, { search: '' }).sort, 'featured');
+  assert.equal(changeList(LISTS.mine, readList({}, LISTS.mine), { search: 'x' }).sort, 'relevance');
+  // Every list's links open at its section, and no two sections on a page share an id.
+  for (const page of [
+    ['explore', 'mine', 'favorites', 'drafts'],
+    ['profile', 'profileFavorites'],
+  ])
+    assert.equal(new Set(page.map((name) => LISTS[name].id)).size, page.length);
+  // The search a list sends the API.
+  assert.deepEqual(
+    searchBody(LISTS.mine, readList({ mineVisibility: 'private' }, LISTS.mine), { scope: 'mine' }),
+    { scope: 'mine', search: '', tag: '', sort: 'updated', page: 1, visibility: 'private' },
+  );
+  assert.equal('visibility' in searchBody(LISTS.explore, browse, { scope: 'public' }), false);
 });

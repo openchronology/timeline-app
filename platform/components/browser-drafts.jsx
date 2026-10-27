@@ -2,24 +2,30 @@
 'use client';
 // The timelines this account started in this browser and hasn't saved to the server (#188):
 // each kept until it is saved or deleted, and opened in the editor at /editor?draft=….
-// Searched, sorted and paged in the browser (#337), in the address's `draft…` parameters.
+// Searched, sorted and paged in the browser (#337), in the address's `draft…` parameters,
+// in place (#338).
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { deleteDraft, listDrafts } from '../../src/draft-store.ts';
 import { momentsText } from '../../src/wording.ts';
-import TimelineSearch from './timeline-search.jsx';
-import { LISTS, listHref, readList, searchDrafts, statusText } from '../lib/timeline-lists.js';
+import TimelineSearch, { useLayout } from './timeline-search.jsx';
+import { EmptyList, Pager, moveBetweenCards, plainClick } from './timeline-list.jsx';
+import { cardDate, excerpt } from './timeline-card.jsx';
+import {
+  LISTS,
+  listHref,
+  navigateList,
+  readList,
+  searchDrafts,
+  statusText,
+} from '../lib/timeline-lists.js';
 const list = LISTS.drafts;
-/**
- * @param {object} props
- * @param {string} props.userId the account whose drafts to list
- * @param {Record<string, string>} props.query the dashboard's whole query, which the drafts'
- *   form and links keep
- */
-export default function BrowserDrafts({ userId, query }) {
-  const [drafts, setDrafts] = useState([]);
-  const state = readList(useSearchParams(), list),
+/** @param {{userId: string}} props the account whose drafts to list */
+export default function BrowserDrafts({ userId }) {
+  const [drafts, setDrafts] = useState([]),
+    [layout, setLayout] = useLayout();
+  const params = useSearchParams(),
+    state = readList(params, list),
     result = searchDrafts(drafts, state);
   const refresh = () =>
     listDrafts(userId)
@@ -29,63 +35,106 @@ export default function BrowserDrafts({ userId, query }) {
     void refresh();
   }, [userId]);
   if (!drafts.length) return null;
-  const href = (changes) => listHref('/', query, list, state, changes);
+  const href = (changes) =>
+    listHref(window.location.pathname, Object.fromEntries(params), list, state, changes);
+  const navigate = (changes, options) => navigateList(list, changes, options);
   return (
-    <section id="dashboard-drafts">
-      <h2>Drafts in this browser</h2>
+    <section id="drafts" aria-labelledby="drafts-heading">
+      <h2 id="drafts-heading">Drafts in this browser</h2>
       <p className="muted">
         Timelines you started here and haven’t saved to the server. Each stays in this browser until
         you save it to the server or delete it.
       </p>
-      <TimelineSearch key={JSON.stringify(state)} list={list} state={state} query={query} />
-      <div className="timeline-grid">
-        {result.timelines.map((draft) => (
-          <article className="timeline-card" key={draft.id} data-draft={draft.id}>
-            <h3>
-              <a href={'/editor?draft=' + encodeURIComponent(draft.id)}>
-                {draft.title || 'Untitled timeline'}
-              </a>
-            </h3>
-            <p className="muted">
-              {momentsText(draft.moments)}
-              {draft.updated && ` · edited ${new Date(draft.updated).toLocaleString()}`}
-            </p>
-            {draft.description && <p>{draft.description.slice(0, 220)}</p>}
-            {draft.tags?.length > 0 && (
-              <div className="tags">
-                {draft.tags.map((tag) => (
-                  <Link
-                    className="button"
-                    key={tag}
-                    href={href({ tag, page: 1 })}
-                    aria-current={tag === state.tag ? 'true' : undefined}
-                  >
-                    {tag}
-                  </Link>
-                ))}
+      <TimelineSearch
+        list={list}
+        state={state}
+        onNavigate={navigate}
+        layout={layout}
+        onLayout={setLayout}
+      />
+      <div
+        className={`timeline-grid${layout === 'list' ? ' list-layout' : ''}`}
+        role="region"
+        aria-label="Results: drafts"
+        onKeyDown={moveBetweenCards}
+      >
+        {result.timelines.map((draft) => {
+          const title = draft.title || 'Untitled timeline';
+          return (
+            <article className="timeline-card" key={draft.id} data-draft={draft.id}>
+              <h3 className="timeline-card-title">
+                <a href={'/editor?draft=' + encodeURIComponent(draft.id)}>{title}</a>
+              </h3>
+              <p className="timeline-card-byline">
+                {momentsText(draft.moments)}
+                {draft.updated && (
+                  <>
+                    {' · Edited '}
+                    <time dateTime={draft.updated}>{cardDate(draft.updated)}</time>
+                  </>
+                )}
+              </p>
+              {draft.description?.trim() && (
+                <p className="timeline-card-description">{excerpt(draft.description)}</p>
+              )}
+              {draft.tags?.length > 0 && (
+                <ul className="tags" aria-label="Tags">
+                  {draft.tags.map((tag) => (
+                    <li key={tag}>
+                      <a
+                        className="tag-chip"
+                        href={href({ tag })}
+                        aria-current={tag === state.tag ? 'true' : undefined}
+                        onClick={(event) => {
+                          if (!plainClick(event)) return;
+                          event.preventDefault();
+                          navigate({ tag });
+                        }}
+                      >
+                        {tag}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="timeline-card-footer">
+                <button
+                  type="button"
+                  aria-label={`Delete the draft “${title}”`}
+                  onClick={() => {
+                    if (!confirm(`Delete the draft “${title}” for good?`)) return;
+                    void deleteDraft(draft.id).then(refresh);
+                  }}
+                >
+                  Delete
+                </button>
               </div>
-            )}
-            <button
-              type="button"
-              aria-label={`Delete the draft “${draft.title || 'Untitled timeline'}”`}
-              onClick={() => {
-                if (!confirm(`Delete the draft “${draft.title || 'Untitled timeline'}” for good?`))
-                  return;
-                void deleteDraft(draft.id).then(refresh);
-              }}
-            >
-              Delete
-            </button>
-          </article>
-        ))}
+            </article>
+          );
+        })}
       </div>
-      <p role="status">{statusText(list, state, result)}</p>
-      {result.pages > 1 && (
-        <nav className="pager" aria-label={`Pages of ${list.noun}`}>
-          {result.page > 1 && <Link href={href({ page: result.page - 1 })}>Previous</Link>}
-          {result.page < result.pages && <Link href={href({ page: result.page + 1 })}>Next</Link>}
-        </nav>
+      <p className="list-status" role="status">
+        {statusText(list, state, result)}
+      </p>
+      {!result.total && (
+        <EmptyList
+          state={state}
+          href={href}
+          onClear={(event) => {
+            event.preventDefault();
+            navigate({ search: '', tag: '' });
+          }}
+        />
       )}
+      <Pager
+        list={list}
+        result={result}
+        href={href}
+        onPage={(event, page) => {
+          event.preventDefault();
+          navigate({ page });
+        }}
+      />
     </section>
   );
 }

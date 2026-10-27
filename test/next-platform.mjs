@@ -122,10 +122,10 @@ try {
   assert.doesNotMatch(windows, /openchronology-offline-cfam\.html/);
   const phone = await download('Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X)');
   assert.match(phone, /Use OpenChronology in your browser/);
-  assert.match(html, /id="dashboard-browser"/);
+  assert.match(html, /id="explore"/);
   assert.match(html, /Sort timelines/);
-  assert.doesNotMatch(html, /id="dashboard-favorites"/);
-  assert.doesNotMatch(html, /id="dashboard-mine"/);
+  assert.doesNotMatch(html, /id="favorites"/);
+  assert.doesNotMatch(html, /id="mine"/);
   assert.doesNotMatch(html, /id="timeline-stage"/);
   assert.match(html, /href="\/editor\?new=1"/);
   assert.match(html, /src="\/logo-mark\.svg"[^>]*\/>(<!-- -->)?timescale\.test<\/a>/);
@@ -270,7 +270,7 @@ try {
       await consent.getByRole('button', { name: 'Decline' }).click();
       await consent.waitFor({ state: 'hidden' });
       await page.reload();
-      await page.locator('#dashboard-browser').waitFor();
+      await page.locator('#explore').waitFor();
       await page.waitForTimeout(300);
       assert.equal(await consent.count(), 0);
       assert.deepEqual(tags, []);
@@ -296,9 +296,9 @@ try {
         page.waitForEvent('load'),
         consent.getByRole('button', { name: 'Decline' }).click(),
       ]);
-      await page.locator('#dashboard-browser').waitFor();
+      await page.locator('#explore').waitFor();
       await page.reload();
-      await page.locator('#dashboard-browser').waitFor();
+      await page.locator('#explore').waitFor();
       await page.waitForTimeout(300);
       assert.equal(await page.evaluate(() => window.tagLoaded), undefined);
       assert.equal(await consent.count(), 0);
@@ -307,8 +307,8 @@ try {
       await page.getByRole('button', { name: 'Analytics settings' }).click();
       await consent.getByRole('button', { name: 'Allow analytics' }).click();
       await page.waitForFunction(() => window.tagLoaded === true);
-      await page.locator('#dashboard-browser').waitFor();
-      assert.equal(await page.locator('#dashboard-mine').count(), 0);
+      await page.locator('#explore').waitFor();
+      assert.equal(await page.locator('#mine').count(), 0);
       await page.getByLabel('Search timelines').fill('history');
       await page.getByRole('button', { name: 'Search', exact: true }).click();
       await page.waitForURL((url) => url.searchParams.get('search') === 'history');

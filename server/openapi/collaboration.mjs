@@ -592,6 +592,28 @@ export const schemas = {
         description: 'Its sensitive-content labels, its owner’s and moderators’.',
       },
       rank: { type: 'number', description: 'Its text-search rank; 0 without search text.' },
+      first_time: {
+        type: ['string', 'null'],
+        description:
+          'Its first moment’s time, exact ("n/d"); null without moments, and for comparisons and forks that read through to their source.',
+      },
+      last_time: {
+        type: ['string', 'null'],
+        description: 'Its last moment’s time, exact ("n/d"); null as for `first_time`.',
+      },
+      time_span: {
+        type: ['string', 'null'],
+        description:
+          'Its first and last times as the timeline presents them (its calendar or units), such as "1 Jan 1900 – 31 Dec 1999"; null as for `first_time`.',
+      },
+      shape: {
+        type: ['array', 'null'],
+        items: { type: 'integer', minimum: 0, maximum: 100 },
+        minItems: 24,
+        maxItems: 24,
+        description:
+          'How densely 24 equal parts of its span hold moments, from 0 (none) to 100 (the densest), estimated from the top of its moment tree; null as for `first_time`.',
+      },
       created_at: timestamp,
       updated_at: timestamp,
     },

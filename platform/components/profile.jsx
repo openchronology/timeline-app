@@ -5,13 +5,12 @@ import { CompareTray } from './compare-selection.jsx';
 import { notFound } from 'next/navigation';
 import { accountCompareLimit, currentSession, userCompareLimit } from '../lib/session.js';
 import { searchTimelines } from '../../server/collaboration.mjs';
-import TimelineList from './timeline-list.jsx';
+import TimelineBrowser from './timeline-browser.jsx';
 import { siteName } from '../lib/sharing.js';
 import { minor } from '../../server/auth.mjs';
 import ReportLink from './report-link.jsx';
 import { profilePath } from '../../src/addresses.ts';
-import TimelineSearch from './timeline-search.jsx';
-import { LISTS, pageQuery, readList } from '../lib/timeline-lists.js';
+import { LISTS, readList, searchBody } from '../lib/timeline-lists.js';
 export function profileMetadata(username) {
   const title = '@' + username,
     description = `Public timelines and favorites of @${username} on ${siteName()}.`,
@@ -35,52 +34,37 @@ export default async function Profile({ username, searchParams }) {
   if (!rows[0]) notFound();
   // Its two lists search, sort and page apart (#337), each in its own query parameters
   // (lib/timeline-lists.js): `search`, `tag`, `sort` and `page` for its public timelines, and
-  // `favoriteSearch` and so on for its public favorites.
+  // `favoriteSearch` and so on for its public favorites; in place, with JavaScript (#338).
   const states = {
-      profile: readList(query, LISTS.profile),
-      profileFavorites: readList(query, LISTS.profileFavorites),
-    },
-    pageState = pageQuery(states);
-  const search = (name) => {
-    const { search, tag, sort, page } = states[name];
-    return { scope: 'public', search, tag, sort, page };
+    profile: readList(query, LISTS.profile),
+    profileFavorites: readList(query, LISTS.profileFavorites),
   };
-  const [owned, favorites] = await Promise.all([
-    searchTimelines(
-      current.services.pool,
-      current.user?.id,
-      { ...search('profile'), owner: username },
-      current.services.featured,
+  const fixed = {
+    profile: { scope: 'public', owner: username },
+    profileFavorites: { scope: 'public', starredBy: username },
+  };
+  const [owned, favorites] = await Promise.all(
+    ['profile', 'profileFavorites'].map((name) =>
+      searchTimelines(
+        current.services.pool,
+        current.user?.id,
+        searchBody(LISTS[name], states[name], fixed[name]),
+        current.services.featured,
+      ),
     ),
-    searchTimelines(
-      current.services.pool,
-      current.user?.id,
-      { ...search('profileFavorites'), starredBy: username },
-      current.services.featured,
-    ),
-  ]);
+  );
   const basePath = profilePath(username);
-  /** A list's search form, then its page of timelines. */
+  /** A list, searched in place: its controls, then its page of timelines. */
   const list = (name, result) => (
-    <>
-      {/* Keyed by the list's state, so its fields start over from the address after a search. */}
-      <TimelineSearch
-        key={JSON.stringify(states[name])}
-        list={LISTS[name]}
-        state={states[name]}
-        query={pageState}
-        basePath={basePath}
-      />
-      <TimelineList
-        compareLimit={accountCompareLimit(current)}
-        result={result}
-        list={LISTS[name]}
-        state={states[name]}
-        query={pageState}
-        basePath={basePath}
-        guest={!current.user}
-      />
-    </>
+    <TimelineBrowser
+      name={name}
+      initialState={states[name]}
+      initialResult={result}
+      fixed={fixed[name]}
+      basePath={basePath}
+      compareLimit={accountCompareLimit(current)}
+      guest={!current.user}
+    />
   );
   return (
     <main className="platform">
@@ -97,14 +81,14 @@ export default async function Profile({ username, searchParams }) {
         userLimit={userCompareLimit(current)}
         signedIn={!!current.user}
       />
-      <section id="profile-timelines">
-        <h2>Public timelines</h2>
+      <section id="timelines" aria-labelledby="timelines-heading">
+        <h2 id="timelines-heading">Public timelines</h2>
         {list('profile', owned)}
       </section>
       {/* A minor's favorites stay private (the UK Children's Code; #166). */}
       {!minor(rows[0].birth_year) && (
-        <section id="profile-favorites">
-          <h2>Public favorites</h2>
+        <section id="favorites" aria-labelledby="favorites-heading">
+          <h2 id="favorites-heading">Public favorites</h2>
           {list('profileFavorites', favorites)}
         </section>
       )}

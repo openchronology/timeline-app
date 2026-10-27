@@ -438,7 +438,7 @@ try {
   await draftEditor.locator('#timeline-title').press('Tab');
   await draftEditor.getByText('Saved in this browser').waitFor();
   await drafting.goto(origin + '/');
-  const listed = drafting.locator('#dashboard-drafts').getByRole('link', {
+  const listed = drafting.locator('#drafts').getByRole('link', {
     name: 'Browser draft ' + suffix,
   });
   await listed.waitFor();

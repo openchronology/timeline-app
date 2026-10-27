@@ -10,7 +10,7 @@
 import { rebaseDocument, mergePatch } from './merge.mjs';
 import { randomUUID } from 'node:crypto';
 import { HttpError, restrictedTimeline, withoutImageCopies } from './store.mjs';
-import { validateDocument, relationshipKey } from '../dist/core.mjs';
+import { validateDocument, relationshipKey, createPresenter, Q } from '../dist/core.mjs';
 import { commonAncestor, lockTimelines, revisionId } from './versioning.mjs';
 import { differences } from './history.mjs';
 /** Why a timeline that keeps no saved history takes no pull requests. */
@@ -205,7 +205,86 @@ export async function searchTimelines(pool, userId, value, featured = []) {
     ],
   );
   const total = Number(rows[0].total);
-  return { timelines: rows[0].timelines, total, page, limit, pages: Math.ceil(total / limit) };
+  const timelines = rows[0].timelines.length
+    ? await withShapes(pool, rows[0].timelines)
+    : rows[0].timelines;
+  return { timelines, total, page, limit, pages: Math.ceil(total / limit) };
+}
+/** How many parts of a timeline's span a result's `shape` counts its moments in. */
+export const SHAPE_BINS = 24;
+/** How deep into the moment tree a result's shape reads: at most 2^(depth+1)-1 nodes. */
+const SHAPE_DEPTH = 3;
+/**
+ * Search results with the span and shape of their moments, for the browser's cards (#338):
+ * `first_time` and `last_time` (exact "n/d" text), `time_span` (the two as the timeline
+ * presents times) and `shape` (SHAPE_BINS numbers from 0 to 100, how densely each part of
+ * the span holds moments, the densest 100).
+ *
+ * Cheap where it can be: one query for the whole page, reading by primary key the top
+ * SHAPE_DEPTH levels of each moment tree (oc_nodes; a node holds its subtree's first and
+ * last times and count), so a page of 12 reads at most 180 rows. A node at the last level
+ * stands for its subtree, spread evenly over its times; a node above it for its own moments,
+ * at its time. Forks that read through to their source's index (index_bases) and
+ * comparisons have neither, as reading them takes far more (index-versions.mjs).
+ */
+export async function withShapes(pool, timelines) {
+  const { rows } = await pool.query(
+    `WITH RECURSIVE walk AS (
+      SELECT t.id AS tid,n.id,n.left_id,n.right_id,n.time,n.first_time,n.last_time,n.event_count,n.bucket_count,0 AS depth,
+        n.first_time AS lo,n.last_time AS hi,t.presentation
+      FROM oc_timelines t JOIN oc_nodes n ON n.timeline_id=t.id AND n.id=t.root AND NOT n.hidden
+      WHERE t.id=ANY($1::uuid[]) AND cardinality(t.index_bases)=0 AND t.comparison IS NULL
+      UNION ALL
+      SELECT w.tid,c.id,c.left_id,c.right_id,c.time,c.first_time,c.last_time,c.event_count,c.bucket_count,w.depth+1,w.lo,w.hi,NULL
+      FROM walk w JOIN oc_nodes c ON c.timeline_id=w.tid AND c.id IN (w.left_id,w.right_id) AND NOT c.hidden
+      WHERE w.depth<$2
+    )
+    SELECT tid,depth,presentation,oc_qtext(lo) AS lo,oc_qtext(hi) AS hi,
+      -- Where in the span (0 to 1) this part begins and ends, and what it counts.
+      CASE WHEN hi=lo THEN 0 ELSE ((CASE WHEN depth=$2 THEN first_time ELSE time END-lo)/(hi-lo))::float8 END AS a,
+      CASE WHEN hi=lo THEN 0 ELSE ((CASE WHEN depth=$2 THEN last_time ELSE time END-lo)/(hi-lo))::float8 END AS b,
+      (CASE WHEN depth=$2 THEN event_count ELSE bucket_count END)::float8 AS count
+    FROM walk`,
+    [timelines.map((t) => t.id), SHAPE_DEPTH],
+  );
+  const shapes = new Map();
+  for (const row of rows) {
+    let shape = shapes.get(row.tid);
+    if (!shape) shapes.set(row.tid, (shape = { bins: new Array(SHAPE_BINS).fill(0) }));
+    if (row.depth === 0)
+      Object.assign(shape, { first: row.lo, last: row.hi, presentation: row.presentation });
+    // Spread the part's moments over the bins it covers, in proportion.
+    const a = row.a * SHAPE_BINS,
+      b = row.b * SHAPE_BINS;
+    if (b - a < 1e-9) shape.bins[Math.min(SHAPE_BINS - 1, Math.floor(a))] += row.count;
+    else
+      for (let i = Math.floor(a); i < Math.min(SHAPE_BINS, Math.ceil(b)); i++)
+        shape.bins[i] += (row.count * (Math.min(b, i + 1) - Math.max(a, i))) / (b - a);
+  }
+  return timelines.map((t) => {
+    const shape = shapes.get(t.id);
+    if (!shape?.first)
+      return { ...t, first_time: null, last_time: null, time_span: null, shape: null };
+    const most = Math.max(...shape.bins);
+    const print = (time) => {
+      try {
+        return createPresenter(shape.presentation ?? undefined).print(Q.parse(time));
+      } catch {
+        return time;
+      }
+    };
+    return {
+      ...t,
+      first_time: shape.first,
+      last_time: shape.last,
+      time_span:
+        shape.first === shape.last
+          ? print(shape.first)
+          : `${print(shape.first)} – ${print(shape.last)}`,
+      // A part with any moments shows at least a sliver.
+      shape: shape.bins.map((n) => (n > 0 ? Math.max(1, Math.round((100 * n) / most)) : 0)),
+    };
+  });
 }
 /** A timeline's revision counter as a string (a positive bigint); 400 otherwise. */
 const revision = (value) => {

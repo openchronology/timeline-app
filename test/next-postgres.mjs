@@ -220,15 +220,15 @@ try {
   const guestHome = await guest.request('/');
   assert.match(guestHome, /<a href="\/login" class="button">Sign in<\/a>/);
   assert.doesNotMatch(guestHome, /account-menu-button/);
-  assert.match(ownDashboard, /id="dashboard-mine"/);
+  assert.match(ownDashboard, /id="mine"/);
   assert(ownDashboard.includes(`href="${base}"`));
-  assert.doesNotMatch(await guest.request('/'), /id="dashboard-mine"/);
+  assert.doesNotMatch(await guest.request('/'), /id="mine"/);
   assert(
     !(await guest.request('/?search=' + term)).includes(`href="${base}"`),
     'private timeline leaked into public search',
   );
   await owner.request(api + '/star', { method: 'POST', data: { starred: true } });
-  assert.match(await owner.request('/'), /id="dashboard-favorites"/);
+  assert.match(await owner.request('/'), /id="favorites"/);
   const profileUrl = '/' + ownerName;
   assert(
     !(await guest.request(profileUrl)).includes(`href="${base}"`),
@@ -325,90 +325,81 @@ try {
   // The account's own timelines, private ones too: by words, tag and visibility.
   let mineList = inList(
     await owner.request('/?mineSearch=' + term + '&mineVisibility=private'),
-    'dashboard-mine',
+    'mine',
   );
   assert(mineList.includes(at(duplicate.id)), 'a private timeline found by its owner');
   assert(!mineList.includes(`href="${base}"`), 'a public timeline listed as private');
-  mineList = inList(
-    await owner.request('/?mineSearch=' + term + '&mineVisibility=public'),
-    'dashboard-mine',
-  );
+  mineList = inList(await owner.request('/?mineSearch=' + term + '&mineVisibility=public'), 'mine');
   assert(mineList.includes(`href="${base}"`));
   assert(!mineList.includes(at(duplicate.id)));
-  mineList = inList(await owner.request('/?mineSearch=%22plugin+sandbox%22'), 'dashboard-mine');
+  mineList = inList(await owner.request('/?mineSearch=%22plugin+sandbox%22'), 'mine');
   assert(mineList.includes(at(compiled.id)));
   assert(!mineList.includes(`href="${base}"`));
   assert(
-    inList(
-      await owner.request('/?mineTag=framework-ci&mineSort=alphabetical'),
-      'dashboard-mine',
-    ).includes(`href="${base}"`),
+    inList(await owner.request('/?mineTag=framework-ci&mineSort=alphabetical'), 'mine').includes(
+      `href="${base}"`,
+    ),
   );
   assert.match(
-    inList(await owner.request('/?mineSearch=nothingmatches' + suffix), 'dashboard-mine'),
+    inList(await owner.request('/?mineSearch=nothingmatches' + suffix), 'mine'),
     /None of your timelines match this search\./,
   );
   // Each list keeps the others' state: the public search, here, is untouched by the account's
   // own, and its tags and form carry the account's list's parameters.
   const both = await owner.request('/?search=' + term + '&mineTag=framework-ci&minePage=1');
-  const exploreList = inList(both, 'dashboard-browser');
+  const exploreList = inList(both, 'explore');
   assert(exploreList.includes(`href="${base}"`));
   assert(
-    exploreList.includes(`href="/?mineTag=framework-ci&amp;search=${term}&amp;tag=framework-ci"`),
+    exploreList.includes(
+      `href="/?mineTag=framework-ci&amp;minePage=1&amp;search=${term}&amp;tag=framework-ci#explore"`,
+    ),
     'a tag keeps the other lists’ state',
   );
   assert.match(exploreList, /<input type="hidden" name="mineTag" value="framework-ci"\/>/);
-  assert.match(inList(both, 'dashboard-mine'), /name="mineSearch"/);
-  assert.match(inList(both, 'dashboard-mine'), /name="mineVisibility"/);
-  assert.match(
-    inList(both, 'dashboard-mine'),
-    /<input type="hidden" name="search" value="[^"]+"\/>/,
-  );
+  assert.match(inList(both, 'mine'), /name="mineSearch"/);
+  assert.match(inList(both, 'mine'), /name="mineVisibility"/);
+  assert.match(inList(both, 'mine'), /<input type="hidden" name="search" value="[^"]+"\/>/);
   // Favorites: by words, tag and visibility.
   assert(
-    inList(await owner.request('/?favoriteSearch=' + term), 'dashboard-favorites').includes(
-      `href="${base}"`,
-    ),
+    inList(await owner.request('/?favoriteSearch=' + term), 'favorites').includes(`href="${base}"`),
   );
   assert(
     !inList(
       await owner.request('/?favoriteSearch=' + term + '&favoriteVisibility=private'),
-      'dashboard-favorites',
+      'favorites',
     ).includes(`href="${base}"`),
   );
   assert.match(
-    inList(await owner.request('/?favoriteTag=nothing-tagged'), 'dashboard-favorites'),
+    inList(await owner.request('/?favoriteTag=nothing-tagged'), 'favorites'),
     /None of your favorites match this search\./,
   );
   // A profile's public timelines and favorites, each on its own.
   const profileSearch = await guest.request(
     profileUrl + '?search=' + term + '&favoriteTag=framework-ci',
   );
-  assert(inList(profileSearch, 'profile-timelines').includes(`href="${base}"`));
-  assert(inList(profileSearch, 'profile-favorites').includes(`href="${base}"`));
+  assert(inList(profileSearch, 'timelines').includes(`href="${base}"`));
+  assert(inList(profileSearch, 'favorites').includes(`href="${base}"`));
   assert(
     !inList(
       await guest.request(profileUrl + '?search=nothingmatches' + suffix),
-      'profile-timelines',
+      'timelines',
     ).includes(`href="${base}"`),
   );
   assert(
-    !inList(
-      await guest.request(profileUrl + '?favoriteTag=nothing-tagged'),
-      'profile-favorites',
-    ).includes(`href="${base}"`),
+    !inList(await guest.request(profileUrl + '?favoriteTag=nothing-tagged'), 'favorites').includes(
+      `href="${base}"`,
+    ),
   );
   // The owner's explore list (/?owner=…) searches within that account's public timelines.
   assert(
-    inList(
-      await guest.request('/?owner=' + ownerName + '&search=' + term),
-      'dashboard-browser',
-    ).includes(`href="${base}"`),
+    inList(await guest.request('/?owner=' + ownerName + '&search=' + term), 'explore').includes(
+      `href="${base}"`,
+    ),
   );
   assert(
     !inList(
       await guest.request('/?owner=' + ownerName + '&search=nothingmatches' + suffix),
-      'dashboard-browser',
+      'explore',
     ).includes(`href="${base}"`),
   );
   const publicPage = await guest.request(base);
@@ -656,7 +647,7 @@ try {
   assert.match(await guest.request(base), /title="Timeline editor"/);
   await guest.request('/' + ownerName + '/no-such-slug', { status: 404 });
   await owner.request('/api/auth/logout', { method: 'POST', data: {} });
-  assert.doesNotMatch(await owner.request('/'), /id="dashboard-mine"/);
+  assert.doesNotMatch(await owner.request('/'), /id="mine"/);
   console.log(
     'PASS Next.js/PostgreSQL accounts, private SSR access, public full-text search, stars, private favorites, public profiles, sorting, sharing, proposal discussion, writer-only merge, optional saved history and addresses.',
   );

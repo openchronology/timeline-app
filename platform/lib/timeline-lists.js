@@ -37,6 +37,8 @@ const OWN_SORTS = [
 ];
 /**
  * The lists. Each has:
+ * - `id`: its section's id on the page, which its links end with (`#mine`), so a page loaded
+ *   without JavaScript opens at the list that was used (#338);
  * - `prefix`: what its query parameters begin with (`mineSearch`, `mineTag`, `mineSort`,
  *   `mineVisibility`, `minePage`); none for the page's main list (`search`, `tag`, …);
  * - `sorts`: the orders it offers, and `browse`: its order without search text (a search
@@ -48,6 +50,7 @@ const OWN_SORTS = [
  */
 export const LISTS = {
   explore: {
+    id: 'explore',
     prefix: '',
     sorts: PUBLIC_SORTS,
     browse: 'featured',
@@ -57,6 +60,7 @@ export const LISTS = {
     none: 'No public timelines match this search.',
   },
   mine: {
+    id: 'mine',
     prefix: 'mine',
     sorts: OWN_SORTS,
     browse: 'updated',
@@ -67,6 +71,7 @@ export const LISTS = {
     none: 'None of your timelines match this search.',
   },
   favorites: {
+    id: 'favorites',
     prefix: 'favorite',
     sorts: OWN_SORTS,
     browse: 'age',
@@ -78,6 +83,7 @@ export const LISTS = {
   },
   // Searched in the browser (searchDrafts below), by what the list of drafts records.
   drafts: {
+    id: 'drafts',
     prefix: 'draft',
     sorts: ['updated', 'alphabetical', 'moments', 'relevance'],
     browse: 'updated',
@@ -87,6 +93,7 @@ export const LISTS = {
     none: 'No drafts match this search.',
   },
   profile: {
+    id: 'timelines',
     prefix: '',
     sorts: PUBLIC_SORTS,
     browse: 'featured',
@@ -96,6 +103,7 @@ export const LISTS = {
     none: 'No public timelines match this search.',
   },
   profileFavorites: {
+    id: 'favorites',
     prefix: 'favorite',
     sorts: OWN_SORTS,
     browse: 'age',
@@ -185,15 +193,52 @@ export function otherParams(query, list) {
 /**
  * The address of a page with one list changed: `query` (the whole page's state, as
  * listQuery and any fixed parameters such as `owner` give it) with `list`'s parameters
- * replaced by its state with `changes` over it.
+ * replaced by its state with `changes` over it (changeList), ending with the list's
+ * section, so the page opens there.
  */
 export function listHref(basePath, query, list, state, changes = {}) {
   const params = new URLSearchParams({
     ...otherParams(query, list),
-    ...listQuery(list, { ...state, ...changes }),
+    ...listQuery(list, changeList(list, state, changes)),
   });
   const text = params.toString();
-  return text ? basePath + '?' + text : basePath;
+  return (text ? basePath + '?' + text : basePath) + '#' + list.id;
+}
+/**
+ * A list's state with `changes` over it, as a search, filter, sort or page asks: any change
+ * but the page's starts from page one, and typing the first word switches the default
+ * order to relevance and clearing the text switches back, unless another order was chosen.
+ */
+export function changeList(list, state, changes) {
+  const next = { ...state, ...changes };
+  if (!('page' in changes)) next.page = 1;
+  if ('search' in changes && !('sort' in changes)) {
+    const had = !!state.search.trim(),
+      has = !!next.search.trim();
+    if (!had && has && state.sort === list.browse) next.sort = 'relevance';
+    if (had && !has && state.sort === 'relevance') next.sort = list.browse;
+  }
+  return next;
+}
+/**
+ * In the browser: changes one list in the address without loading the page (#338), keeping
+ * the rest of the address as it is now, so lists changed in place keep each other's state.
+ * Next.js follows history.pushState and replaceState (useSearchParams sees the change), and
+ * neither scrolls. `replace` is for typing, so each keystroke is not a step back.
+ */
+export function navigateList(list, changes, { replace = false } = {}) {
+  const current = Object.fromEntries(new URLSearchParams(window.location.search));
+  const href = listHref(window.location.pathname, current, list, readList(current, list), changes);
+  if (href === window.location.pathname + window.location.search + window.location.hash) return;
+  window.history[replace ? 'replaceState' : 'pushState'](null, '', href);
+}
+/**
+ * A list's search as the search API (POST /api/timelines/search) and searchTimelines take
+ * it: its state, and what the page fixes (its scope, and an owner or starredBy).
+ */
+export function searchBody(list, state, fixed) {
+  const { search, tag, sort, visibility, page } = state;
+  return { ...fixed, search, tag, sort, page, ...(list.visibility ? { visibility } : {}) };
 }
 /** How many drafts a page of them shows. */
 export const DRAFT_PAGE_SIZE = 12;
