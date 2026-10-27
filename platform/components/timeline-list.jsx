@@ -6,44 +6,36 @@ import StarButton from './star-button.jsx';
 import { describeLabels } from '../../src/content-labels.ts';
 import { CompareCheckbox } from './compare-selection.jsx';
 import { profilePath, timelinePath } from '../../src/addresses.ts';
-/**
- * The address of the list with some of its query changed: the current query (search, tag,
- * owner, sort and each list's page) with `values` over it, so changing one list's page or
- * choosing a tag keeps everything else.
- */
-function link(query, values, basePath = '/') {
-  const p = new URLSearchParams({ ...query, ...values });
-  return basePath + '?' + p;
-}
+import { listHref, statusText } from '../lib/timeline-lists.js';
 /**
  * A page of timelines as cards, with the line saying how many there are and Previous and Next
  * links. A server component: it fetches nothing, and is given a search result
- * (server/collaboration.mjs's `searchTimelines`) by the dashboard or a profile.
+ * (server/collaboration.mjs's `searchTimelines`) by the dashboard or a profile. Its links
+ * change only its own list's query parameters (lib/timeline-lists.js): a tag filters this
+ * list by it, from page one, and the pager turns its pages, keeping the other lists' state.
  *
  * @param {object} props
  * @param {{timelines: object[], total: number, page: number, pages: number}} props.result
  *   one page of timelines and the counts for the pager
+ * @param {object} props.list the list (lib/timeline-lists.js LISTS)
+ * @param {{search: string, tag: string, sort: string, visibility: string, page: number}}
+ *   props.state the list's state, as readList gives it
  * @param {Record<string, string>} props.query the page's whole query, kept in every link
- * @param {boolean} [props.mine] the account's own timelines (its empty message and page key)
  * @param {boolean} [props.guest] the visitor is not signed in: stars can't be given, and each
  *   timeline offers a fork into the browser instead
- * @param {boolean} [props.favorites] the account's starred timelines
- * @param {string} [props.basePath] the page the pager links to (a profile passes its own)
- * @param {string} [props.pageKey] the query parameter of this list's page, when the defaults
- *   (`minePage`, `favoritePage` or `page`) don't fit
+ * @param {string} [props.basePath] the page the links lead to (a profile passes its own)
  * @param {number} [props.compareLimit] how many timelines the visitor may compare
  */
 export default function TimelineList({
   result,
+  list,
+  state,
   query,
-  mine,
   guest,
-  favorites = false,
   basePath = '/',
-  pageKey: customPageKey,
   compareLimit = 8,
 }) {
-  const pageKey = customPageKey ?? (mine ? 'minePage' : favorites ? 'favoritePage' : 'page');
+  const href = (changes) => listHref(basePath, query, list, state, changes);
   return (
     <>
       <div className="timeline-grid">
@@ -77,12 +69,11 @@ export default function TimelineList({
             )}
             <div className="tags">
               {(t.tags ?? []).map((tag) => (
-                // A tag searches the dashboard's public timelines (always /), from page one; a
-                // profile's own pages (its favorites page) don't carry over.
                 <Link
                   className="button"
                   key={tag}
-                  href={link(basePath === '/' ? query : {}, { tag, page: '1' })}
+                  href={href({ tag, page: 1 })}
+                  aria-current={tag === state.tag ? 'true' : undefined}
                 >
                   {tag}
                 </Link>
@@ -91,34 +82,11 @@ export default function TimelineList({
           </article>
         ))}
       </div>
-      <p role="status">
-        {result.total
-          ? `${result.total} timelines · Page ${result.page} of ${result.pages}`
-          : mine
-            ? 'You have no server timelines yet.'
-            : favorites
-              ? 'No favorites yet.'
-              : 'No public timelines match this search.'}
-      </p>
+      <p role="status">{statusText(list, state, result)}</p>
       {result.pages > 1 && (
-        <nav
-          className="pager"
-          aria-label={
-            mine
-              ? 'Your timeline pages'
-              : favorites
-                ? 'Favorite timeline pages'
-                : 'Public timeline pages'
-          }
-        >
-          {result.page > 1 && (
-            <Link href={link(query, { [pageKey]: String(result.page - 1) }, basePath)}>
-              Previous
-            </Link>
-          )}
-          {result.page < result.pages && (
-            <Link href={link(query, { [pageKey]: String(result.page + 1) }, basePath)}>Next</Link>
-          )}
+        <nav className="pager" aria-label={`Pages of ${list.noun}`}>
+          {result.page > 1 && <Link href={href({ page: result.page - 1 })}>Previous</Link>}
+          {result.page < result.pages && <Link href={href({ page: result.page + 1 })}>Next</Link>}
         </nav>
       )}
     </>

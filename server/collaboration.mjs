@@ -19,13 +19,24 @@ export const PULLS_UNAVAILABLE =
 /** Why a fork that keeps no saved history cannot propose its changes. */
 export const FORK_PULLS_UNAVAILABLE =
   'This fork does not keep saved history, so it cannot propose its changes: turn on Keep saved history in its settings first.';
+/** The orders a timeline search may ask for (searchInput's `sort`). */
+export const SEARCH_SORTS = [
+  'featured',
+  'stars',
+  'popularity',
+  'trending',
+  'alphabetical',
+  'age',
+  'updated',
+  'relevance',
+];
 /**
  * A timeline search as the dashboard and API send it, checked and normalized: `search` (web
  * search syntax, up to 300 characters), `tag`, `owner` (a username), `starredBy` (a username
  * whose public favorites to list; only with the public scope), `scope` (public, mine, visible
- * or starred), `sort` (relevance by default when there is search text, else featured),
- * `page` and `limit` (up to 50). Tags are compared lower-cased and NFC-normalized, as they are
- * stored.
+ * or starred), `visibility` (public or private only; empty for both), `sort` (relevance by
+ * default when there is search text, else featured), `page` and `limit` (up to 50). Tags are
+ * compared lower-cased and NFC-normalized, as they are stored.
  * @throws {HttpError} 400 for unknown keys or values out of range
  */
 export function searchInput(value = {}) {
@@ -34,7 +45,18 @@ export function searchInput(value = {}) {
     typeof value !== 'object' ||
     Array.isArray(value) ||
     Object.keys(value).some(
-      (k) => !['search', 'page', 'limit', 'scope', 'tag', 'owner', 'sort', 'starredBy'].includes(k),
+      (k) =>
+        ![
+          'search',
+          'page',
+          'limit',
+          'scope',
+          'tag',
+          'owner',
+          'sort',
+          'starredBy',
+          'visibility',
+        ].includes(k),
     )
   )
     throw new HttpError(400, 'Invalid timeline search.');
@@ -47,6 +69,7 @@ export function searchInput(value = {}) {
     owner = '',
     sort = typeof search === 'string' && search.trim() ? 'relevance' : 'featured',
     starredBy = '',
+    visibility = '',
   } = value;
   if (
     typeof search !== 'string' ||
@@ -62,9 +85,8 @@ export function searchInput(value = {}) {
     limit < 1 ||
     limit > 50 ||
     !['public', 'mine', 'visible', 'starred'].includes(scope) ||
-    !['featured', 'stars', 'popularity', 'trending', 'alphabetical', 'age', 'relevance'].includes(
-      sort,
-    ) ||
+    !SEARCH_SORTS.includes(sort) ||
+    !['', 'public', 'private'].includes(visibility) ||
     typeof starredBy !== 'string' ||
     starredBy.length > 64 ||
     (starredBy !== '' && scope !== 'public')
@@ -79,6 +101,7 @@ export function searchInput(value = {}) {
     sort,
     starredBy: starredBy.normalize('NFC').trim(),
     owner: owner.normalize('NFC').trim(),
+    visibility,
   };
 }
 /**
@@ -98,12 +121,14 @@ export function searchInput(value = {}) {
  *   star_count and popularity come as strings (bigint and real kept exact for JSON)
  */
 export async function searchTimelines(pool, userId, value, featured = []) {
-  const { search, tag, page, limit, scope, owner, sort, starredBy } = searchInput(value);
+  const { search, tag, page, limit, scope, owner, sort, starredBy, visibility } =
+    searchInput(value);
   if (['mine', 'starred'].includes(scope) && !userId)
     throw new HttpError(401, 'Sign in to see your timelines.');
   // One query for a page and its total. Parameters: $1 the mine scope, $2 search text, $3 and
   // $4 limit and offset, $5 featured ids, $6 the reader (null when signed out), $7 tag, $8 the
-  // visible scope, $9 owner, $10 sort, $11 the starred scope, $12 starredBy, $13 browsing.
+  // visible scope, $9 owner, $10 sort, $11 the starred scope, $12 starredBy, $13 browsing,
+  // $14 visibility.
   //
   // `matching` is every timeline the scope and filters allow, with what ranking needs: the
   // reader's star, popularity and trending (oc_timeline_popularity, standing.mjs), whether its
@@ -117,8 +142,8 @@ export async function searchTimelines(pool, userId, value, featured = []) {
   //
   // `page` orders: featured first when sorting by featured; with search text, established
   // accounts' matches before newcomers'; then the chosen sort (rank, stars, popularity,
-  // trending, title, or creation date), then the latest updated, then id so pages are
-  // stable. Each CASE gives a constant for the sorts it does not apply to, so one ORDER BY
+  // trending, title, or creation date), then the latest updated (all `updated` sorts by),
+  // then id so pages are stable. Each CASE gives a constant for the sorts it does not apply to, so one ORDER BY
   // serves every sort.
   const { rows } = await pool.query(
     `WITH matching AS (
@@ -137,6 +162,7 @@ export async function searchTimelines(pool, userId, value, featured = []) {
       AND ($2='' OR t.search_document @@ websearch_to_tsquery('english',$2))
       AND ($7='' OR t.tags @> ARRAY[$7]::text[])
       AND ($9='' OR u.username=$9)
+      AND ($14='' OR t.visibility=$14)
       AND (NOT $11::boolean OR EXISTS(SELECT 1 FROM oc_timeline_stars s WHERE s.timeline_id=t.id AND s.user_id=$6::uuid))
       -- A reader's public favorites; not those of an account that may be under 18, private by
       -- default (the UK Children's Code; #166).
@@ -175,6 +201,7 @@ export async function searchTimelines(pool, userId, value, featured = []) {
       starredBy,
       // Browsing: public timelines found by neither text, owner nor a reader's favorites.
       scope === 'public' && !search && !owner && !starredBy,
+      visibility,
     ],
   );
   const total = Number(rows[0].total);

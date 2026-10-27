@@ -533,11 +533,27 @@ export const schemas = {
         description:
           '`public`: public timelines. `mine`: the caller’s own. `visible`: public ones and those shared with the caller. `starred`: those the caller starred. All but `public` need sign-in.',
       },
+      visibility: {
+        type: 'string',
+        enum: ['', 'public', 'private'],
+        default: '',
+        description:
+          'Only public or only private timelines; empty for both. Useful with the `mine`, `visible` and `starred` scopes (the `public` scope finds no private ones).',
+      },
       sort: {
         type: 'string',
-        enum: ['featured', 'stars', 'popularity', 'trending', 'alphabetical', 'age', 'relevance'],
+        enum: [
+          'featured',
+          'stars',
+          'popularity',
+          'trending',
+          'alphabetical',
+          'age',
+          'updated',
+          'relevance',
+        ],
         description:
-          'The order: `relevance` by default when there is `search` text, otherwise `featured` (featured first, then recently updated). `popularity` and `trending` (last 30 days) weigh stars and forks by the standing of who gave them; `age` is newest first. Ties go to the most recently updated.',
+          'The order: `relevance` by default when there is `search` text, otherwise `featured` (featured first, then recently updated). `popularity` and `trending` (last 30 days) weigh stars and forks by the standing of who gave them; `age` is newest first and `updated` most recently changed first. Ties go to the most recently updated.',
       },
       page: { type: 'integer', minimum: 1, maximum: 10000, default: 1 },
       limit: { type: 'integer', minimum: 1, maximum: 50, default: 12 },

@@ -10,52 +10,43 @@ import TimelineList from '../components/timeline-list.jsx';
 import LegacyLinks from '../components/legacy-links.jsx';
 import BrowserDrafts from '../components/browser-drafts.jsx';
 import { profilePath } from '../../src/addresses.ts';
+import { LISTS, pageQuery, readList } from '../lib/timeline-lists.js';
 // Rendered for every request: it depends on who is signed in and on the query.
 export const dynamic = 'force-dynamic';
 // One address for search engines, whatever the query: searches, tags, sorts and pages are views
 // of the same dashboard.
 export const metadata = { alternates: { canonical: '/' } };
-/** A page number from the address: a whole number from 1 to 10,000, or 1 when it is not one. */
-const pageNumber = (value) =>
-  Math.max(1, Math.min(10000, Number.isSafeInteger(Number(value)) ? Number(value) : 1));
+/** The dashboard's lists, by their names in lib/timeline-lists.js LISTS. */
+const DASHBOARD_LISTS = ['explore', 'mine', 'favorites', 'drafts'];
 /**
  * The dashboard (/).
  *
  * Reads the visitor's session, then searches the database directly (server/collaboration.mjs's
  * `searchTimelines`, not the HTTP API) for three lists at once: the public timelines that
  * match the query, and, when signed in, the account's own timelines and the ones it starred.
- * Each list pages on its own (`page`, `minePage`, `favoritePage`), so the query carries all
- * three. Without a database, or when a search fails, the page still renders, with a notice,
+ * Each list searches, sorts and pages on its own, in its own query parameters
+ * (lib/timeline-lists.js): `search`, `tag`, `sort` and `page` for the public timelines;
+ * `mineSearch`, `mineTag`, `mineSort`, `mineVisibility` and `minePage` for the account's own;
+ * likewise `favorite…` for its favorites and `draft…` for its browser drafts, which are
+ * searched in the browser. So the address carries them all, and each list's links keep the
+ * others'. Without a database, or when a search fails, the page still renders, with a notice,
  * since local editing works without the server.
  *
  * @param {{searchParams: Promise<Record<string, string|string[]>>}} props the address's query:
- *   `search`, `tag`, `owner`, `sort` and the three page numbers
+ *   each list's parameters, and `owner` to show one account's public timelines
  */
 export default async function Dashboard({ searchParams }) {
   const params = await searchParams;
-  // The query, made safe: strings only (a repeated parameter is an array, and ignored), cut to
-  // a length the search accepts, and a sort it knows. A search sorts by relevance unless asked
-  // otherwise; browsing without one shows the featured timelines first.
-  const query = {
-    search: typeof params.search === 'string' ? params.search.slice(0, 300) : '',
-    tag: typeof params.tag === 'string' ? params.tag.slice(0, 64) : '',
-    owner: typeof params.owner === 'string' ? params.owner.slice(0, 64) : '',
-    page: String(pageNumber(params.page)),
-    minePage: String(pageNumber(params.minePage)),
-    favoritePage: String(pageNumber(params.favoritePage)),
-    sort: [
-      'featured',
-      'stars',
-      'popularity',
-      'trending',
-      'alphabetical',
-      'age',
-      'relevance',
-    ].includes(params.sort)
-      ? params.sort
-      : params.search
-        ? 'relevance'
-        : 'featured',
+  const owner = typeof params.owner === 'string' ? params.owner.slice(0, 64) : '';
+  // Each list's state, made safe, and the whole query as every link and form keeps it.
+  const states = Object.fromEntries(
+    DASHBOARD_LISTS.map((name) => [name, readList(params, LISTS[name])]),
+  );
+  const query = pageQuery(states, owner ? { owner } : {});
+  /** A list's search, as searchTimelines takes it. */
+  const search = (name, scope) => {
+    const { search, tag, sort, visibility, page } = states[name];
+    return { scope, search, tag, sort, page, ...(LISTS[name].visibility ? { visibility } : {}) };
   };
   // A guest's defaults, until the session says otherwise (and if reading it fails).
   let user = null,
@@ -77,33 +68,39 @@ export default async function Dashboard({ searchParams }) {
         searchTimelines(
           current.services.pool,
           user?.id,
-          {
-            scope: 'public',
-            page: Number(query.page),
-            search: query.search,
-            tag: query.tag,
-            owner: query.owner,
-            sort: query.sort,
-          },
+          { ...search('explore', 'public'), owner },
           current.services.featured,
         ),
+        user ? searchTimelines(current.services.pool, user.id, search('mine', 'mine')) : null,
         user
-          ? searchTimelines(current.services.pool, user.id, {
-              scope: 'mine',
-              page: Number(query.minePage),
-            })
-          : null,
-        user
-          ? searchTimelines(current.services.pool, user.id, {
-              scope: 'starred',
-              page: Number(query.favoritePage),
-              sort: 'age',
-            })
+          ? searchTimelines(current.services.pool, user.id, search('favorites', 'starred'))
           : null,
       ]);
   } catch {
     error = 'The timeline browser is temporarily unavailable. Local editing remains available.';
   }
+  /** A list's search form, then its page of timelines. */
+  const list = (name, result, props = {}) => (
+    <>
+      {/* Keyed by the list's state, so its fields start over from the address after a search. */}
+      <TimelineSearch
+        key={JSON.stringify(states[name])}
+        list={LISTS[name]}
+        state={states[name]}
+        query={query}
+      />
+      {result && (
+        <TimelineList
+          compareLimit={compareLimit}
+          result={result}
+          list={LISTS[name]}
+          state={states[name]}
+          query={query}
+          {...props}
+        />
+      )}
+    </>
+  );
   return (
     <main className="platform">
       <LegacyLinks />
@@ -112,20 +109,18 @@ export default async function Dashboard({ searchParams }) {
       </div>
       {/* The timelines picked to compare, from any of the lists below. */}
       <CompareTray limit={compareLimit} userLimit={userLimit} signedIn={!!user} />
-      {user && <BrowserDrafts userId={user.id} />}
+      {user && <BrowserDrafts userId={user.id} query={query} />}
       {user && (
         <section id="dashboard-mine">
           <h2>Your timelines</h2>
-          {mine && <TimelineList compareLimit={compareLimit} result={mine} query={query} mine />}
+          {mine && list('mine', mine)}
         </section>
       )}
       {user && (
         <section id="dashboard-favorites">
           <h2>Your favorites</h2>
           <Link href={profilePath(user.username)}>Your public profile</Link>
-          {favorites && (
-            <TimelineList compareLimit={compareLimit} result={favorites} query={query} favorites />
-          )}
+          {favorites && list('favorites', favorites)}
         </section>
       )}
       <section className="dashboard-introduction">
@@ -136,28 +131,18 @@ export default async function Dashboard({ searchParams }) {
         </Link>
       </section>
       <section id="dashboard-browser">
-        <h2>{query.owner ? `${query.owner}’s public timelines` : 'Explore timelines'}</h2>
-        {query.owner && <Link href="/">Browse all timelines</Link>}
+        <h2>{owner ? `${owner}’s public timelines` : 'Explore timelines'}</h2>
+        {owner && <Link href="/">Browse all timelines</Link>}
         <p className="muted">
           Search titles, notes and tags across public timelines. Popularity combines stars and
           public forks.
         </p>
         {!user && <Link href="/login">Sign in to see your timelines</Link>}
-        {/* Keyed by the query, so its fields start over from the address after a search. */}
-        <TimelineSearch key={JSON.stringify(query)} query={query} />
-        {error ? (
+        {list('explore', error ? null : publicResults, { guest: !user })}
+        {error && (
           <p className="notice" role="status">
             {error}
           </p>
-        ) : (
-          publicResults && (
-            <TimelineList
-              compareLimit={compareLimit}
-              result={publicResults}
-              query={query}
-              guest={!user}
-            />
-          )
         )}
       </section>
     </main>

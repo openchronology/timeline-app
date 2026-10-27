@@ -10,8 +10,8 @@ import { siteName } from '../lib/sharing.js';
 import { minor } from '../../server/auth.mjs';
 import ReportLink from './report-link.jsx';
 import { profilePath } from '../../src/addresses.ts';
-const pageNumber = (n) =>
-  Math.max(1, Math.min(10000, Number.isSafeInteger(Number(n)) ? Number(n) : 1));
+import TimelineSearch from './timeline-search.jsx';
+import { LISTS, pageQuery, readList } from '../lib/timeline-lists.js';
 export function profileMetadata(username) {
   const title = '@' + username,
     description = `Public timelines and favorites of @${username} on ${siteName()}.`,
@@ -33,21 +33,55 @@ export default async function Profile({ username, searchParams }) {
     [username],
   );
   if (!rows[0]) notFound();
+  // Its two lists search, sort and page apart (#337), each in its own query parameters
+  // (lib/timeline-lists.js): `search`, `tag`, `sort` and `page` for its public timelines, and
+  // `favoriteSearch` and so on for its public favorites.
+  const states = {
+      profile: readList(query, LISTS.profile),
+      profileFavorites: readList(query, LISTS.profileFavorites),
+    },
+    pageState = pageQuery(states);
+  const search = (name) => {
+    const { search, tag, sort, page } = states[name];
+    return { scope: 'public', search, tag, sort, page };
+  };
   const [owned, favorites] = await Promise.all([
-    searchTimelines(current.services.pool, current.user?.id, {
-      scope: 'public',
-      owner: username,
-      page: pageNumber(query.page),
-    }),
-    searchTimelines(current.services.pool, current.user?.id, {
-      scope: 'public',
-      starredBy: username,
-      page: pageNumber(query.favoritePage),
-      sort: 'age',
-    }),
+    searchTimelines(
+      current.services.pool,
+      current.user?.id,
+      { ...search('profile'), owner: username },
+      current.services.featured,
+    ),
+    searchTimelines(
+      current.services.pool,
+      current.user?.id,
+      { ...search('profileFavorites'), starredBy: username },
+      current.services.featured,
+    ),
   ]);
-  const basePath = profilePath(username),
-    pages = { page: String(owned.page), favoritePage: String(favorites.page) };
+  const basePath = profilePath(username);
+  /** A list's search form, then its page of timelines. */
+  const list = (name, result) => (
+    <>
+      {/* Keyed by the list's state, so its fields start over from the address after a search. */}
+      <TimelineSearch
+        key={JSON.stringify(states[name])}
+        list={LISTS[name]}
+        state={states[name]}
+        query={pageState}
+        basePath={basePath}
+      />
+      <TimelineList
+        compareLimit={accountCompareLimit(current)}
+        result={result}
+        list={LISTS[name]}
+        state={states[name]}
+        query={pageState}
+        basePath={basePath}
+        guest={!current.user}
+      />
+    </>
+  );
   return (
     <main className="platform">
       <Link href="/">All timelines</Link>
@@ -63,28 +97,15 @@ export default async function Profile({ username, searchParams }) {
         userLimit={userCompareLimit(current)}
         signedIn={!!current.user}
       />
-      <section>
+      <section id="profile-timelines">
         <h2>Public timelines</h2>
-        <TimelineList
-          compareLimit={accountCompareLimit(current)}
-          result={owned}
-          query={pages}
-          basePath={basePath}
-          guest={!current.user}
-        />
+        {list('profile', owned)}
       </section>
       {/* A minor's favorites stay private (the UK Children's Code; #166). */}
       {!minor(rows[0].birth_year) && (
-        <section>
+        <section id="profile-favorites">
           <h2>Public favorites</h2>
-          <TimelineList
-            compareLimit={accountCompareLimit(current)}
-            result={favorites}
-            query={pages}
-            basePath={basePath}
-            favorites
-            guest={!current.user}
-          />
+          {list('profileFavorites', favorites)}
         </section>
       )}
     </main>

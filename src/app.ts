@@ -2765,6 +2765,8 @@ async function storeDraft(index: TimelineIndex, id: string): Promise<number> {
       id,
       owner: session.user.id,
       title: index.title,
+      description: index.description,
+      tags: index.tags ?? [],
       moments: Number(index.points.entryCount),
       updated: new Date().toISOString(),
     });
