@@ -8,6 +8,7 @@ import {
   MOMENT_ICONS,
   MOMENT_SOURCES,
   RICH_TEXT_NOTES,
+  parseTimestamp,
 } from '../dist/core.mjs';
 /**
  * The switch shows for those who can edit. On, the editing controls go, and a moment or
@@ -70,7 +71,12 @@ export async function checkViewMode(page, restore) {
         id: 'campaign',
         start: '50/1',
         end: '300/1',
-        metadata: { title: 'The campaign', description: 'Six months of **fighting**.' },
+        metadata: {
+          title: 'The campaign',
+          description: 'Six months of **fighting**.',
+          sources: ['https://sources.example/campaign'],
+          datePrecision: 'Month',
+        },
       },
     ],
     relationships: [{ a: { moment: 'landing' }, b: { duration: 'campaign' } }],
@@ -135,6 +141,9 @@ export async function checkViewMode(page, restore) {
   assert.match(shown.when, / → /);
   // Its notes are Markdown too, with the rich-text plugin on.
   assert.deepEqual(shown.bold, ['fighting']);
+  // Its sources and dating context too (#341).
+  assert.deepEqual(shown.details, ['Date precision', 'Month']);
+  assert.deepEqual(shown.links, ['https://sources.example/campaign']);
   assert.match((await read()).related.join(), /The landing/);
   // A duration's band opens it in the reader too.
   await page.locator('#reader-close').click();
@@ -148,6 +157,51 @@ export async function checkViewMode(page, restore) {
   await page.locator('#reader-close').click();
   await page.waitForFunction(() => !document.getElementById('inspector').open);
 
+  // Separated (#345), its tracks still open in the reader, as the timeline keeps them.
+  await page.locator('#separate-button').click();
+  await page.locator('#separate-extra').fill('pacific');
+  await page.locator('#separate-submit').click();
+  await page.locator('#separation-settings').waitFor();
+  // Separation re-keys markers into tracks, which ease into place: click once they hold still.
+  const settled = async (selector) => {
+    let last = null;
+    for (let i = 0; i < 100; i++) {
+      const box = await page.locator(selector).boundingBox();
+      if (box && last && box.x === last.x && box.y === last.y) return;
+      last = box;
+      await new Promise((r) => setTimeout(r, 150));
+    }
+  };
+  await settled('.event-marker[aria-label="The landing"]');
+  await page.getByRole('button', { name: 'The landing', exact: true }).click({ force: true });
+  await page.waitForFunction(
+    () =>
+      document.getElementById('inspector').open &&
+      document.getElementById('reader-title').textContent === 'The landing',
+  );
+  assert.equal(await page.locator('#moment-panel').isVisible(), false);
+  await page.waitForFunction(() => document.querySelector('#reader-panel .related-entity'));
+  shown = await read();
+  assert.deepEqual(shown.tags, ['amphibious', 'pacific']);
+  assert.deepEqual(shown.details, ['Date precision', 'Day']);
+  assert.match(shown.related.join(), /The campaign/, 'its relationships, by its own ID');
+  await page.locator('#reader-close').click();
+  await page.waitForFunction(() => !document.getElementById('inspector').open);
+  await settled('.duration-band[data-duration-id="rest:campaign"]');
+  await page.locator('.duration-band[data-duration-id="rest:campaign"]').click({ force: true });
+  await page.waitForFunction(
+    () =>
+      document.getElementById('inspector').open &&
+      document.getElementById('reader-title').textContent === 'The campaign',
+  );
+  shown = await read();
+  assert.match(shown.when, / → /);
+  assert.match(shown.related.join(), /The landing/);
+  await page.locator('#reader-close').click();
+  await page.waitForFunction(() => !document.getElementById('inspector').open);
+  await page.locator('#separation-rejoin').click();
+  await page.locator('#separation-settings').waitFor({ state: 'hidden' });
+
   // Off again, the editor is back.
   await page.locator('#view-mode').uncheck();
   await page.waitForFunction(() => !document.getElementById('add-button').hidden);
@@ -156,6 +210,66 @@ export async function checkViewMode(page, restore) {
   assert.equal(await page.locator('#event-title').isEditable(), true);
   assert.equal(await page.locator('#reader-panel').isVisible(), false);
   await closeMomentDetails(page);
+
+  // The reader writes dates in full at their own precision, whatever the view (#344): not
+  // "09-09" from a view starting in that year, nor "0091-01-01 BCE" for a year.
+  await load({
+    format: 'openchronology',
+    version: 1,
+    title: 'Reading dates',
+    description: '',
+    presentation: {
+      version: 1,
+      mode: 'gregorian',
+      significantDigits: 6,
+      unit: '',
+      scale: '1/1',
+      origin: '0/1',
+      offsetMinutes: 0,
+    },
+    events: [
+      {
+        id: 'march',
+        time: parseTimestamp('1781-09-09T00:00:00Z').toString(),
+        metadata: { title: 'The march south' },
+      },
+      {
+        id: 'social',
+        time: parseTimestamp('-0090-01-01T00:00:00Z').toString(),
+        metadata: { title: 'The Social War' },
+      },
+    ],
+    relationships: [{ a: { moment: 'march' }, b: { moment: 'social' } }],
+  });
+  await page.locator('#view-mode').check();
+  const view = async (left, right) => {
+    await page.locator('#left-bound').fill(left);
+    await page.locator('#right-bound').fill(right);
+    await page.locator('#apply-bounds').click();
+  };
+  const readDate = async (title) => {
+    await page.getByRole('button', { name: title, exact: true }).click({ force: true });
+    await page.waitForFunction(
+      (title) =>
+        document.getElementById('inspector').open &&
+        document.getElementById('reader-title').textContent === title,
+      title,
+    );
+    await page.waitForFunction(() => document.querySelector('#reader-panel .related-entity'));
+    const shown = await read();
+    await page.locator('#reader-close').click();
+    await page.waitForFunction(() => !document.getElementById('inspector').open);
+    return shown;
+  };
+  await view('1781-03-01T00:00:00Z', '1782-06-01T00:00:00Z');
+  shown = await readDate('The march south');
+  assert.equal(shown.when, '1781-09-09 CE');
+  assert.deepEqual(shown.related, ['The Social War · 91 BCE']);
+  await view('-0091-12-31T12:00:00Z', '-0090-01-01T12:00:00Z');
+  shown = await readDate('The Social War');
+  assert.equal(shown.when, '91 BCE');
+  assert.deepEqual(shown.related, ['The march south · 1781-09-09 CE']);
+  await page.locator('#view-mode').uncheck();
   await page.unroute(images);
   await load(restore);
   console.log(

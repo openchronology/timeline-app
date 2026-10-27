@@ -201,6 +201,27 @@ export function printCalendarSpan(first: Q, last: Q, offset: number): string {
   const suffix = clock ? ' ' + zone(a) : '';
   return from === to ? from + suffix : `${from} – ${end}${suffix}`;
 }
+
+/**
+ * A time written on its own (#344), for a page about one moment rather than a view: always its
+ * full date with its era, at the time's own precision. The start of a year is that year
+ * (`91 BCE`, or an age in deep time), the start of a month its year and month (`1781-09 CE`),
+ * midnight its date (`1781-09-09 CE`); other times add their clock, to the minute, the second
+ * or exactly (`1781-09-09 CE 14:30 UTC`), with the zone.
+ */
+export function printCalendarAlone(time: Q, offset: number): string {
+  const p = parts(time, offset);
+  if (time.equals(time.floor()) && p.hour === '00' && p.minute === '00' && p.second === '00') {
+    if (p.month === '01' && p.day === '01') return deepYear(p.year);
+    const [year, era] = eraYear(p.year).split(' ');
+    return p.day === '01' ? `${year}-${p.month} ${era}` : date(p);
+  }
+  // The exact clock as the full timestamp writes it, fraction and all, without needless seconds.
+  const clock = /T(\d{2}:\d{2}):(\d{2}.*?)(Z|[+-]\d{2}:\d{2})$/.exec(printTimestamp(time, offset))!;
+  const zone = clock[3] === 'Z' ? 'UTC' : 'UTC' + clock[3];
+  return `${date(p)} ${clock[1]}${clock[2] === '00' ? '' : ':' + clock[2]} ${zone}`;
+}
+
 /**
  * The caption above the chart that supplies what adaptive labels omit: the dates the view
  * spans, the base hour or minute for short clock labels, and the zone; the Δ origin when

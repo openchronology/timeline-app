@@ -391,3 +391,42 @@ function parse(text: string, api: TimeAPI): Rational { return api.rational(text)
   assert.equal(custom.print(at, { ...axis, labelInterval: Q.from(31557600n) }), '31557600/1');
   assert.throws(() => format.print(at, { ...axis, labelInterval: Q.zero }), /label interval/);
 });
+
+test('a time written alone gives its full date at its own precision, whatever the view (#344)', () => {
+  const format = createPresenter(settings);
+  for (const [text, expected] of [
+    ['1781-09-09T00:00:00Z', '1781-09-09 CE'],
+    ['1781-09-01T00:00:00Z', '1781-09 CE'],
+    ['1781-01-01T00:00:00Z', '1781 CE'],
+    ['-0090-01-01T00:00:00Z', '91 BCE'],
+    ['-0043-03-15T00:00:00Z', '0044-03-15 BCE'],
+    ['1781-09-09T14:00:00Z', '1781-09-09 CE 14:00 UTC'],
+    ['1781-09-09T14:30:05Z', '1781-09-09 CE 14:30:05 UTC'],
+    ['2026-10-05T13:45:30{+1/3}Z', '2026-10-05 CE 13:45:30{+1/3} UTC'],
+    ['-2998000-01-01T00:00:00Z', '3 mya'],
+  ])
+    assert.equal(format.alone(parseTimestamp(text)), expected, text);
+  // The chart abbreviates the same date against a view starting in its year; alone never does.
+  const day = parseTimestamp('2026-11-09T00:00:00Z');
+  assert.equal(format.print(day, context(86400n * 400n)), '11-09');
+  assert.equal(format.alone(day), '2026-11-09 CE');
+  // In a fixed offset, local midnight is a date.
+  const zoned = createPresenter({ ...settings, offsetMinutes: -300 });
+  assert.equal(zoned.alone(parseTimestamp('1781-09-09T05:00:00Z')), '1781-09-09 CE');
+  assert.equal(
+    zoned.alone(parseTimestamp('1781-09-09T12:00:00Z')),
+    '1781-09-09 CE 07:00 UTC-05:00',
+  );
+  // Other displays write it as without a view: never Δ offsets from the view's edge.
+  const float = createPresenter({ ...DEFAULT_PRESENTATION, mode: 'float' });
+  const near = Q.parse('1000000001/1000');
+  assert.match(float.print(near, { ...context(1n), left: Q.from(1000000n) }), /^Δ/);
+  assert.equal(float.alone(near), float.print(near));
+  const custom = createPresenter({
+    ...DEFAULT_PRESENTATION,
+    mode: 'custom',
+    source: `function print(time: Rational, api: TimeAPI): string { return api.purpose(); }
+function parse(text: string, api: TimeAPI): Rational { return api.rational(text); }`,
+  });
+  assert.equal(custom.alone(Q.one), 'input');
+});

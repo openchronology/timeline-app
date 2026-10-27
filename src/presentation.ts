@@ -16,6 +16,7 @@ import {
 import {
   printCalendar,
   printCalendarSpan,
+  printCalendarAlone,
   parseCalendar,
   describeCalendar,
 } from './calendar-presentation.js';
@@ -187,10 +188,14 @@ export function printTimeSpan(settings: TimePresentation | undefined, first: Q, 
  * text; with a viewport context (purpose `axis`, `event` or `input`) labels may adapt to
  * the view, and parsing reads such labels back relative to the same view. `describe` gives
  * the line of context shown with adaptive labels (absent for custom code). `rules` plans the
- * ruler's ticks for a view, in stored coordinates. All of them throw on invalid input.
+ * ruler's ticks for a view, in stored coordinates. `alone` writes a time on its own, as the
+ * reader shows a moment (#344): independent of any view, so never abbreviated against one;
+ * Gregorian dates at the time's own precision, other displays as `print` writes them without a
+ * context. All of them throw on invalid input.
  */
 export interface TimePresenter {
   print(time: Q, context?: PresentationContext): string;
+  alone(time: Q): string;
   parse(text: string, context?: PresentationContext): Q;
   describe?(context: PresentationContext): string;
   rules(context: PresentationContext): RulerPlan;
@@ -274,9 +279,17 @@ export function createPresenter(settings?: TimePresentation): TimePresenter {
       })),
     };
   };
-  if (options.mode === 'custom') return { ...compileCustom(options.source!), rules };
-  return {
+  if (options.mode === 'custom') {
+    const custom = compileCustom(options.source!);
+    return { ...custom, rules, alone: (time) => custom.print(time) };
+  }
+  const presenter: TimePresenter = {
     rules,
+    alone(time) {
+      return options.mode === 'gregorian'
+        ? printCalendarAlone(time.sub(origin).div(scale), options.offsetMinutes)
+        : presenter.print(time);
+    },
     describe(context) {
       validateContext(context);
       return options.mode === 'gregorian' && options.adaptiveLabels !== false
@@ -358,6 +371,7 @@ export function createPresenter(settings?: TimePresentation): TimePresenter {
       return origin.add(value.mul(scale));
     },
   };
+  return presenter;
 }
 
 /**

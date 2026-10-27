@@ -68,11 +68,15 @@ Unsaved moments and edits cannot be shared until they are saved.
 ## Link previews
 
 Timeline, moment and duration pages describe themselves for link previews (Open Graph and
-Twitter cards) and search engines: a title, a description (the timeline's description, or how
-many moments it has, over what time and by whom; for a moment, its time and notes), the
-canonical address, and a 1200 × 630 preview image. The image shows the title and a strip of the
-timeline's moments, with the shared event marked on it. Facebook, X, LinkedIn,
-Slack, Discord, iMessage and others show these as a card with a large image.
+Twitter cards) and search engines. Each has:
+
+- a title;
+- a description: the timeline's description, or how many moments it has, over what time and
+  by whom; for a moment or duration, its time and notes;
+- the canonical address;
+- a 1200 × 630 preview image. The image shows the title and a strip of the
+  timeline's moments, with the shared event marked on it. Facebook, X, LinkedIn,
+  Slack, Discord, iMessage and others show these as a card with a large image.
 
 Previews are made as a guest sees the timeline: a private timeline's preview image is the
 site's own card, and its pages ask search engines not to index them, so nothing private
@@ -80,7 +84,8 @@ appears in a preview even when a member shares the link.
 
 A timeline with [sensitive-content labels](moderation.md#sensitive-content-labels) previews as
 its title and what it is labelled as containing, without its moments or description, and its
-oEmbed answer has no thumbnail: it opens behind its warning.
+oEmbed answer has no thumbnail: it opens behind its warning. Its moment and duration pages are
+described by their labels instead of their notes, and ask search engines not to index them.
 
 ## Search engines
 
@@ -90,20 +95,51 @@ oEmbed answer has no thumbnail: it opens behind its warning.
   it covers the site however many timelines it has.
   - `/sitemap/pages.xml` lists the site's own pages (the dashboard, plugins, download, the API
     reference, the help and each of its pages, the terms, privacy policy and legal notices).
-  - `/sitemap/timelines-<id>.xml` pages list every public timeline, 45,000 to a page, and
-    `/sitemap/profiles-<id>.xml` pages every profile that owns one (an account that isn't
-    suspended), each with when it last changed. The index gives each page the latest change
-    on it, so a crawler can tell which pages to read again.
+  - `/sitemap/timelines-<id>.xml` pages list every public timeline, 45,000 to a page.
+    `/sitemap/profiles-<id>.xml` pages list every profile that owns one (an account that
+    isn't suspended). Each address has when it last changed, and the index gives each page
+    the latest change on it, so a crawler can tell which pages to read again.
+  - `/sitemap/entities-<id>.xml` pages list the pages of moments and durations
+    ([#335](https://github.com/openchronology/timeline-app/issues/335)), several timelines to
+    a page and never more than 45,000 addresses, each with its timeline's last change.
+  - **Which timelines' entities are listed:** public timelines without
+    sensitive-content labels, that are not comparisons, with at most 5,000 moments.
+    For each, its first 5,000 entities by kind and ID (durations, then moments).
+    - A timeline with more moments (a log import can have millions) is left out
+      altogether. Its own page is listed, and links to its first 50 moments.
+    - On a server, `SITEMAP_TIMELINE_ENTITIES` sets the limit, from 1 to 45,000.
+    - Private timelines, and timelines restricted by moderators (which become private),
+      list nothing, as everywhere in the sitemap.
   - Each page is read from its first ID on, by an index range, and the index reads each
     public timeline's ID once; neither skips through rows, so they stay quick with millions
     of timelines.
+  - A timeline's entities are read by the primary key of its search rows (see
+    [search](search.md#storage-and-api)), as a guest sees them, so its size costs nothing beyond
+    the addresses listed.
 - To tell Google about it, open [Search Console](https://search.google.com/search-console)
   for the site's domain (verified by a DNS record or an HTML file), choose **Sitemaps**, and
   submit `sitemap.xml`. Google reads the index and then each page it names; the report shows
   how many addresses it found. `robots.txt` names the sitemap too, which other search engines
   (and Google) also follow.
 - Each timeline page includes its title, description, owner and first 50 moments as text, for
-  screen readers and crawlers; each moment links to its own page.
+  screen readers and crawlers. Each moment links to its own page.
+- **Moment and duration pages as text:** each includes, as text:
+  - its title;
+  - its time or extent as the timeline displays it (with the ISO date for machines on a
+    timeline of Gregorian dates);
+  - its tags and notes;
+  - what its timeline's plugins record, such as dating notes, and their links, such as
+    sources (https only, marked `ugc nofollow`);
+  - up to 50 of the moments and durations [related](relationships.md) to it, each linked to
+    its own page;
+  - a link into the timeline open at it.
+- **Structured data:** each moment and duration page also describes itself as
+  [schema.org](https://schema.org) JSON-LD:
+  - an `Event` with its `startDate` (and a duration's `endDate`) on a timeline of Gregorian
+    dates in years 0000–9999;
+  - otherwise a `CreativeWork` whose `temporalCoverage` is its time as displayed;
+  - either way, with its notes, tags as keywords, and the timeline and its owner (`isPartOf`).
+  - Private and labelled timelines' pages have none.
 
 ## Embedding
 
