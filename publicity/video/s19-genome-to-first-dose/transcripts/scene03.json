@@ -1,0 +1,673 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:04,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 4000
+			},
+			"text": " December 2nd, the UK authorizes the first vaccine.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.898905,
+					"t_dtw": -1
+				},
+				{
+					"text": " December",
+					"timestamps": {
+						"from": "00:00:00,280",
+						"to": "00:00:00,660"
+					},
+					"offsets": {
+						"from": 280,
+						"to": 660
+					},
+					"id": 3426,
+					"p": 0.946887,
+					"t_dtw": -1
+				},
+				{
+					"text": " 2",
+					"timestamps": {
+						"from": "00:00:00,700",
+						"to": "00:00:00,950"
+					},
+					"offsets": {
+						"from": 700,
+						"to": 950
+					},
+					"id": 362,
+					"p": 0.979699,
+					"t_dtw": -1
+				},
+				{
+					"text": "nd",
+					"timestamps": {
+						"from": "00:00:00,950",
+						"to": "00:00:00,990"
+					},
+					"offsets": {
+						"from": 950,
+						"to": 990
+					},
+					"id": 358,
+					"p": 0.689625,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,290",
+						"to": "00:00:01,290"
+					},
+					"offsets": {
+						"from": 1290,
+						"to": 1290
+					},
+					"id": 11,
+					"p": 0.626778,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:01,310",
+						"to": "00:00:01,540"
+					},
+					"offsets": {
+						"from": 1310,
+						"to": 1540
+					},
+					"id": 262,
+					"p": 0.923229,
+					"t_dtw": -1
+				},
+				{
+					"text": " UK",
+					"timestamps": {
+						"from": "00:00:01,590",
+						"to": "00:00:01,720"
+					},
+					"offsets": {
+						"from": 1590,
+						"to": 1720
+					},
+					"id": 3482,
+					"p": 0.830886,
+					"t_dtw": -1
+				},
+				{
+					"text": " author",
+					"timestamps": {
+						"from": "00:00:01,720",
+						"to": "00:00:02,240"
+					},
+					"offsets": {
+						"from": 1720,
+						"to": 2240
+					},
+					"id": 1772,
+					"p": 0.987099,
+					"t_dtw": -1
+				},
+				{
+					"text": "izes",
+					"timestamps": {
+						"from": "00:00:02,240",
+						"to": "00:00:02,580"
+					},
+					"offsets": {
+						"from": 2240,
+						"to": 2580
+					},
+					"id": 4340,
+					"p": 0.898527,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,580",
+						"to": "00:00:02,840"
+					},
+					"offsets": {
+						"from": 2580,
+						"to": 2840
+					},
+					"id": 262,
+					"p": 0.991813,
+					"t_dtw": -1
+				},
+				{
+					"text": " first",
+					"timestamps": {
+						"from": "00:00:02,840",
+						"to": "00:00:03,250"
+					},
+					"offsets": {
+						"from": 2840,
+						"to": 3250
+					},
+					"id": 717,
+					"p": 0.997921,
+					"t_dtw": -1
+				},
+				{
+					"text": " vaccine",
+					"timestamps": {
+						"from": "00:00:03,250",
+						"to": "00:00:03,280"
+					},
+					"offsets": {
+						"from": 3250,
+						"to": 3280
+					},
+					"id": 12319,
+					"p": 0.997781,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:03,950",
+						"to": "00:00:04,000"
+					},
+					"offsets": {
+						"from": 3950,
+						"to": 4000
+					},
+					"id": 13,
+					"p": 0.959304,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_200]",
+					"timestamps": {
+						"from": "00:00:04,000",
+						"to": "00:00:04,000"
+					},
+					"offsets": {
+						"from": 4000,
+						"to": 4000
+					},
+					"id": 50563,
+					"p": 0.0481387,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,000",
+				"to": "00:00:08,000"
+			},
+			"offsets": {
+				"from": 4000,
+				"to": 8000
+			},
+			"text": " December 8th, at 6, 31 in the morning, Margaret Keenan, 90,",
+			"tokens": [
+				{
+					"text": " December",
+					"timestamps": {
+						"from": "00:00:04,280",
+						"to": "00:00:04,650"
+					},
+					"offsets": {
+						"from": 4280,
+						"to": 4650
+					},
+					"id": 3426,
+					"p": 0.985633,
+					"t_dtw": -1
+				},
+				{
+					"text": " 8",
+					"timestamps": {
+						"from": "00:00:04,650",
+						"to": "00:00:04,890"
+					},
+					"offsets": {
+						"from": 4650,
+						"to": 4890
+					},
+					"id": 807,
+					"p": 0.998195,
+					"t_dtw": -1
+				},
+				{
+					"text": "th",
+					"timestamps": {
+						"from": "00:00:04,890",
+						"to": "00:00:04,990"
+					},
+					"offsets": {
+						"from": 4890,
+						"to": 4990
+					},
+					"id": 400,
+					"p": 0.996136,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:05,210",
+						"to": "00:00:05,210"
+					},
+					"offsets": {
+						"from": 5210,
+						"to": 5210
+					},
+					"id": 11,
+					"p": 0.597353,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:05,310",
+						"to": "00:00:05,370"
+					},
+					"offsets": {
+						"from": 5310,
+						"to": 5370
+					},
+					"id": 379,
+					"p": 0.994875,
+					"t_dtw": -1
+				},
+				{
+					"text": " 6",
+					"timestamps": {
+						"from": "00:00:05,370",
+						"to": "00:00:05,610"
+					},
+					"offsets": {
+						"from": 5370,
+						"to": 5610
+					},
+					"id": 718,
+					"p": 0.796175,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:05,610",
+						"to": "00:00:05,780"
+					},
+					"offsets": {
+						"from": 5610,
+						"to": 5780
+					},
+					"id": 11,
+					"p": 0.601896,
+					"t_dtw": -1
+				},
+				{
+					"text": " 31",
+					"timestamps": {
+						"from": "00:00:05,840",
+						"to": "00:00:06,180"
+					},
+					"offsets": {
+						"from": 5840,
+						"to": 6180
+					},
+					"id": 3261,
+					"p": 0.926645,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:06,180",
+						"to": "00:00:06,300"
+					},
+					"offsets": {
+						"from": 6180,
+						"to": 6300
+					},
+					"id": 287,
+					"p": 0.995338,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:06,300",
+						"to": "00:00:06,480"
+					},
+					"offsets": {
+						"from": 6300,
+						"to": 6480
+					},
+					"id": 262,
+					"p": 0.99871,
+					"t_dtw": -1
+				},
+				{
+					"text": " morning",
+					"timestamps": {
+						"from": "00:00:06,480",
+						"to": "00:00:06,960"
+					},
+					"offsets": {
+						"from": 6480,
+						"to": 6960
+					},
+					"id": 3329,
+					"p": 0.995171,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:06,960",
+						"to": "00:00:07,020"
+					},
+					"offsets": {
+						"from": 6960,
+						"to": 7020
+					},
+					"id": 11,
+					"p": 0.840719,
+					"t_dtw": -1
+				},
+				{
+					"text": " Margaret",
+					"timestamps": {
+						"from": "00:00:07,020",
+						"to": "00:00:07,260"
+					},
+					"offsets": {
+						"from": 7020,
+						"to": 7260
+					},
+					"id": 19579,
+					"p": 0.811027,
+					"t_dtw": -1
+				},
+				{
+					"text": " Keen",
+					"timestamps": {
+						"from": "00:00:07,260",
+						"to": "00:00:07,260"
+					},
+					"offsets": {
+						"from": 7260,
+						"to": 7260
+					},
+					"id": 32444,
+					"p": 0.719901,
+					"t_dtw": -1
+				},
+				{
+					"text": "an",
+					"timestamps": {
+						"from": "00:00:07,440",
+						"to": "00:00:07,440"
+					},
+					"offsets": {
+						"from": 7440,
+						"to": 7440
+					},
+					"id": 272,
+					"p": 0.996909,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:07,440",
+						"to": "00:00:07,520"
+					},
+					"offsets": {
+						"from": 7440,
+						"to": 7520
+					},
+					"id": 11,
+					"p": 0.680167,
+					"t_dtw": -1
+				},
+				{
+					"text": " 90",
+					"timestamps": {
+						"from": "00:00:07,520",
+						"to": "00:00:08,000"
+					},
+					"offsets": {
+						"from": 7520,
+						"to": 8000
+					},
+					"id": 4101,
+					"p": 0.898948,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:08,000",
+						"to": "00:00:08,000"
+					},
+					"offsets": {
+						"from": 8000,
+						"to": 8000
+					},
+					"id": 11,
+					"p": 0.943916,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_400]",
+					"timestamps": {
+						"from": "00:00:08,000",
+						"to": "00:00:08,000"
+					},
+					"offsets": {
+						"from": 8000,
+						"to": 8000
+					},
+					"id": 50763,
+					"p": 0.288797,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:08,000",
+				"to": "00:00:11,000"
+			},
+			"offsets": {
+				"from": 8000,
+				"to": 11000
+			},
+			"text": " gets the first authorized dose outside a trial.",
+			"tokens": [
+				{
+					"text": " gets",
+					"timestamps": {
+						"from": "00:00:08,280",
+						"to": "00:00:08,280"
+					},
+					"offsets": {
+						"from": 8280,
+						"to": 8280
+					},
+					"id": 3011,
+					"p": 0.99598,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:08,300",
+						"to": "00:00:08,490"
+					},
+					"offsets": {
+						"from": 8300,
+						"to": 8490
+					},
+					"id": 262,
+					"p": 0.999603,
+					"t_dtw": -1
+				},
+				{
+					"text": " first",
+					"timestamps": {
+						"from": "00:00:08,490",
+						"to": "00:00:08,780"
+					},
+					"offsets": {
+						"from": 8490,
+						"to": 8780
+					},
+					"id": 717,
+					"p": 0.999451,
+					"t_dtw": -1
+				},
+				{
+					"text": " authorized",
+					"timestamps": {
+						"from": "00:00:08,840",
+						"to": "00:00:09,540"
+					},
+					"offsets": {
+						"from": 8840,
+						"to": 9540
+					},
+					"id": 10435,
+					"p": 0.913454,
+					"t_dtw": -1
+				},
+				{
+					"text": " dose",
+					"timestamps": {
+						"from": "00:00:09,590",
+						"to": "00:00:09,780"
+					},
+					"offsets": {
+						"from": 9590,
+						"to": 9780
+					},
+					"id": 10742,
+					"p": 0.998839,
+					"t_dtw": -1
+				},
+				{
+					"text": " outside",
+					"timestamps": {
+						"from": "00:00:09,840",
+						"to": "00:00:10,320"
+					},
+					"offsets": {
+						"from": 9840,
+						"to": 10320
+					},
+					"id": 2354,
+					"p": 0.996164,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:10,320",
+						"to": "00:00:10,380"
+					},
+					"offsets": {
+						"from": 10320,
+						"to": 10380
+					},
+					"id": 257,
+					"p": 0.94899,
+					"t_dtw": -1
+				},
+				{
+					"text": " trial",
+					"timestamps": {
+						"from": "00:00:10,450",
+						"to": "00:00:10,710"
+					},
+					"offsets": {
+						"from": 10450,
+						"to": 10710
+					},
+					"id": 4473,
+					"p": 0.998045,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:10,750",
+						"to": "00:00:10,970"
+					},
+					"offsets": {
+						"from": 10750,
+						"to": 10970
+					},
+					"id": 13,
+					"p": 0.997946,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_550]",
+					"timestamps": {
+						"from": "00:00:11,000",
+						"to": "00:00:11,000"
+					},
+					"offsets": {
+						"from": 11000,
+						"to": 11000
+					},
+					"id": 50913,
+					"p": 0.396688,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

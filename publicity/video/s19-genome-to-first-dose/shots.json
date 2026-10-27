@@ -1,0 +1,91 @@
+{
+  "sample": "../samples/covid-19.ochx",
+  "size": [360, 640],
+  "scale": 3,
+  "shots": [
+    {
+      "id": "jan",
+      "dur": 0.034,
+      "keys": [
+        {
+          "t": 0,
+          "view": [1578441600, 1578960000]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "out",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [1578441600, 1578960000]
+        },
+        {
+          "t": 3,
+          "view": [1576800000, 1609804800]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "in",
+      "dur": 4,
+      "keys": [
+        {
+          "t": 0,
+          "view": [1576800000, 1609804800]
+        },
+        {
+          "t": 4,
+          "view": [1606608000, 1607817600]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "reader",
+      "dur": 1.2,
+      "keys": [
+        {
+          "t": 0,
+          "view": [1576800000, 1609804800]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ],
+      "actions": [
+        {
+          "t": 0,
+          "do": "viewMode",
+          "on": true
+        },
+        {
+          "t": 0.1,
+          "do": "open",
+          "title": "From genome to first authorised dose"
+        }
+      ]
+    }
+  ]
+}

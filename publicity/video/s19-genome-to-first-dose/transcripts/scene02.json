@@ -1,0 +1,534 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:05,240"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 5240
+			},
+			"text": " 65 days later, the first volunteer in a vaccine trial gets a dose.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.88832,
+					"t_dtw": -1
+				},
+				{
+					"text": " 65",
+					"timestamps": {
+						"from": "00:00:00,310",
+						"to": "00:00:00,560"
+					},
+					"offsets": {
+						"from": 310,
+						"to": 560
+					},
+					"id": 6135,
+					"p": 0.45945,
+					"t_dtw": -1
+				},
+				{
+					"text": " days",
+					"timestamps": {
+						"from": "00:00:00,560",
+						"to": "00:00:00,930"
+					},
+					"offsets": {
+						"from": 560,
+						"to": 930
+					},
+					"id": 1528,
+					"p": 0.981983,
+					"t_dtw": -1
+				},
+				{
+					"text": " later",
+					"timestamps": {
+						"from": "00:00:00,930",
+						"to": "00:00:01,390"
+					},
+					"offsets": {
+						"from": 930,
+						"to": 1390
+					},
+					"id": 1568,
+					"p": 0.999436,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,390",
+						"to": "00:00:01,460"
+					},
+					"offsets": {
+						"from": 1390,
+						"to": 1460
+					},
+					"id": 11,
+					"p": 0.947312,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:01,780",
+						"to": "00:00:01,780"
+					},
+					"offsets": {
+						"from": 1780,
+						"to": 1780
+					},
+					"id": 262,
+					"p": 0.943672,
+					"t_dtw": -1
+				},
+				{
+					"text": " first",
+					"timestamps": {
+						"from": "00:00:01,800",
+						"to": "00:00:02,080"
+					},
+					"offsets": {
+						"from": 1800,
+						"to": 2080
+					},
+					"id": 717,
+					"p": 0.997811,
+					"t_dtw": -1
+				},
+				{
+					"text": " volunteer",
+					"timestamps": {
+						"from": "00:00:02,080",
+						"to": "00:00:02,640"
+					},
+					"offsets": {
+						"from": 2080,
+						"to": 2640
+					},
+					"id": 13904,
+					"p": 0.987452,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:02,640",
+						"to": "00:00:02,760"
+					},
+					"offsets": {
+						"from": 2640,
+						"to": 2760
+					},
+					"id": 287,
+					"p": 0.957923,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:02,760",
+						"to": "00:00:02,820"
+					},
+					"offsets": {
+						"from": 2760,
+						"to": 2820
+					},
+					"id": 257,
+					"p": 0.995216,
+					"t_dtw": -1
+				},
+				{
+					"text": " vaccine",
+					"timestamps": {
+						"from": "00:00:02,820",
+						"to": "00:00:03,230"
+					},
+					"offsets": {
+						"from": 2820,
+						"to": 3230
+					},
+					"id": 12319,
+					"p": 0.992685,
+					"t_dtw": -1
+				},
+				{
+					"text": " trial",
+					"timestamps": {
+						"from": "00:00:03,230",
+						"to": "00:00:03,540"
+					},
+					"offsets": {
+						"from": 3230,
+						"to": 3540
+					},
+					"id": 4473,
+					"p": 0.991558,
+					"t_dtw": -1
+				},
+				{
+					"text": " gets",
+					"timestamps": {
+						"from": "00:00:03,540",
+						"to": "00:00:04,090"
+					},
+					"offsets": {
+						"from": 3540,
+						"to": 4090
+					},
+					"id": 3011,
+					"p": 0.933783,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:04,090",
+						"to": "00:00:04,240"
+					},
+					"offsets": {
+						"from": 4090,
+						"to": 4240
+					},
+					"id": 257,
+					"p": 0.997522,
+					"t_dtw": -1
+				},
+				{
+					"text": " dose",
+					"timestamps": {
+						"from": "00:00:04,240",
+						"to": "00:00:04,370"
+					},
+					"offsets": {
+						"from": 4240,
+						"to": 4370
+					},
+					"id": 10742,
+					"p": 0.997669,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,240",
+						"to": "00:00:05,240"
+					},
+					"offsets": {
+						"from": 5240,
+						"to": 5240
+					},
+					"id": 13,
+					"p": 0.992564,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_262]",
+					"timestamps": {
+						"from": "00:00:05,240",
+						"to": "00:00:05,240"
+					},
+					"offsets": {
+						"from": 5240,
+						"to": 5240
+					},
+					"id": 50625,
+					"p": 0.0250606,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:05,240",
+				"to": "00:00:09,640"
+			},
+			"offsets": {
+				"from": 5240,
+				"to": 9640
+			},
+			"text": " In July, large trials begin, each planned for about 30,000 volunteers.",
+			"tokens": [
+				{
+					"text": " In",
+					"timestamps": {
+						"from": "00:00:05,400",
+						"to": "00:00:05,400"
+					},
+					"offsets": {
+						"from": 5400,
+						"to": 5400
+					},
+					"id": 554,
+					"p": 0.997269,
+					"t_dtw": -1
+				},
+				{
+					"text": " July",
+					"timestamps": {
+						"from": "00:00:05,550",
+						"to": "00:00:05,720"
+					},
+					"offsets": {
+						"from": 5550,
+						"to": 5720
+					},
+					"id": 2901,
+					"p": 0.998241,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:05,770",
+						"to": "00:00:05,840"
+					},
+					"offsets": {
+						"from": 5770,
+						"to": 5840
+					},
+					"id": 11,
+					"p": 0.981182,
+					"t_dtw": -1
+				},
+				{
+					"text": " large",
+					"timestamps": {
+						"from": "00:00:05,920",
+						"to": "00:00:06,270"
+					},
+					"offsets": {
+						"from": 5920,
+						"to": 6270
+					},
+					"id": 1588,
+					"p": 0.994126,
+					"t_dtw": -1
+				},
+				{
+					"text": " trials",
+					"timestamps": {
+						"from": "00:00:06,270",
+						"to": "00:00:06,680"
+					},
+					"offsets": {
+						"from": 6270,
+						"to": 6680
+					},
+					"id": 9867,
+					"p": 0.998656,
+					"t_dtw": -1
+				},
+				{
+					"text": " begin",
+					"timestamps": {
+						"from": "00:00:07,030",
+						"to": "00:00:07,090"
+					},
+					"offsets": {
+						"from": 7030,
+						"to": 7090
+					},
+					"id": 2221,
+					"p": 0.994936,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:07,180",
+						"to": "00:00:07,320"
+					},
+					"offsets": {
+						"from": 7180,
+						"to": 7320
+					},
+					"id": 11,
+					"p": 0.817396,
+					"t_dtw": -1
+				},
+				{
+					"text": " each",
+					"timestamps": {
+						"from": "00:00:07,320",
+						"to": "00:00:07,500"
+					},
+					"offsets": {
+						"from": 7320,
+						"to": 7500
+					},
+					"id": 1123,
+					"p": 0.96021,
+					"t_dtw": -1
+				},
+				{
+					"text": " planned",
+					"timestamps": {
+						"from": "00:00:07,500",
+						"to": "00:00:07,830"
+					},
+					"offsets": {
+						"from": 7500,
+						"to": 7830
+					},
+					"id": 6027,
+					"p": 0.983052,
+					"t_dtw": -1
+				},
+				{
+					"text": " for",
+					"timestamps": {
+						"from": "00:00:07,830",
+						"to": "00:00:07,970"
+					},
+					"offsets": {
+						"from": 7830,
+						"to": 7970
+					},
+					"id": 329,
+					"p": 0.995139,
+					"t_dtw": -1
+				},
+				{
+					"text": " about",
+					"timestamps": {
+						"from": "00:00:07,970",
+						"to": "00:00:08,200"
+					},
+					"offsets": {
+						"from": 7970,
+						"to": 8200
+					},
+					"id": 546,
+					"p": 0.992738,
+					"t_dtw": -1
+				},
+				{
+					"text": " 30",
+					"timestamps": {
+						"from": "00:00:08,200",
+						"to": "00:00:08,480"
+					},
+					"offsets": {
+						"from": 8200,
+						"to": 8480
+					},
+					"id": 1542,
+					"p": 0.972055,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:08,480",
+						"to": "00:00:08,570"
+					},
+					"offsets": {
+						"from": 8480,
+						"to": 8570
+					},
+					"id": 11,
+					"p": 0.975394,
+					"t_dtw": -1
+				},
+				{
+					"text": "000",
+					"timestamps": {
+						"from": "00:00:08,570",
+						"to": "00:00:08,980"
+					},
+					"offsets": {
+						"from": 8570,
+						"to": 8980
+					},
+					"id": 830,
+					"p": 0.998277,
+					"t_dtw": -1
+				},
+				{
+					"text": " volunteers",
+					"timestamps": {
+						"from": "00:00:08,990",
+						"to": "00:00:09,410"
+					},
+					"offsets": {
+						"from": 8990,
+						"to": 9410
+					},
+					"id": 11661,
+					"p": 0.996712,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:09,460",
+						"to": "00:00:09,600"
+					},
+					"offsets": {
+						"from": 9460,
+						"to": 9600
+					},
+					"id": 13,
+					"p": 0.989736,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_482]",
+					"timestamps": {
+						"from": "00:00:09,640",
+						"to": "00:00:09,640"
+					},
+					"offsets": {
+						"from": 9640,
+						"to": 9640
+					},
+					"id": 50845,
+					"p": 0.136268,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

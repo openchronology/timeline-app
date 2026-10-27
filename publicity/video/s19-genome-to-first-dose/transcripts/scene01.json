@@ -1,0 +1,367 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:07,200"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 7200
+			},
+			"text": " January 11, 2020. Scientists post the new coronavirus's genome online, for anyone to use.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.798763,
+					"t_dtw": -1
+				},
+				{
+					"text": " January",
+					"timestamps": {
+						"from": "00:00:00,310",
+						"to": "00:00:00,730"
+					},
+					"offsets": {
+						"from": 310,
+						"to": 730
+					},
+					"id": 3269,
+					"p": 0.79068,
+					"t_dtw": -1
+				},
+				{
+					"text": " 11",
+					"timestamps": {
+						"from": "00:00:00,730",
+						"to": "00:00:01,170"
+					},
+					"offsets": {
+						"from": 730,
+						"to": 1170
+					},
+					"id": 1367,
+					"p": 0.999053,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,380",
+						"to": "00:00:01,570"
+					},
+					"offsets": {
+						"from": 1380,
+						"to": 1570
+					},
+					"id": 11,
+					"p": 0.846655,
+					"t_dtw": -1
+				},
+				{
+					"text": " 2020",
+					"timestamps": {
+						"from": "00:00:01,570",
+						"to": "00:00:02,040"
+					},
+					"offsets": {
+						"from": 1570,
+						"to": 2040
+					},
+					"id": 12131,
+					"p": 0.998944,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:02,970",
+						"to": "00:00:02,970"
+					},
+					"offsets": {
+						"from": 2970,
+						"to": 2970
+					},
+					"id": 13,
+					"p": 0.453787,
+					"t_dtw": -1
+				},
+				{
+					"text": " Scientists",
+					"timestamps": {
+						"from": "00:00:03,040",
+						"to": "00:00:03,410"
+					},
+					"offsets": {
+						"from": 3040,
+						"to": 3410
+					},
+					"id": 23782,
+					"p": 0.481879,
+					"t_dtw": -1
+				},
+				{
+					"text": " post",
+					"timestamps": {
+						"from": "00:00:03,410",
+						"to": "00:00:03,600"
+					},
+					"offsets": {
+						"from": 3410,
+						"to": 3600
+					},
+					"id": 1281,
+					"p": 0.990828,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:03,600",
+						"to": "00:00:03,700"
+					},
+					"offsets": {
+						"from": 3600,
+						"to": 3700
+					},
+					"id": 262,
+					"p": 0.979436,
+					"t_dtw": -1
+				},
+				{
+					"text": " new",
+					"timestamps": {
+						"from": "00:00:03,800",
+						"to": "00:00:03,980"
+					},
+					"offsets": {
+						"from": 3800,
+						"to": 3980
+					},
+					"id": 649,
+					"p": 0.994212,
+					"t_dtw": -1
+				},
+				{
+					"text": " coron",
+					"timestamps": {
+						"from": "00:00:03,980",
+						"to": "00:00:04,300"
+					},
+					"offsets": {
+						"from": 3980,
+						"to": 4300
+					},
+					"id": 26920,
+					"p": 0.91538,
+					"t_dtw": -1
+				},
+				{
+					"text": "av",
+					"timestamps": {
+						"from": "00:00:04,300",
+						"to": "00:00:04,390"
+					},
+					"offsets": {
+						"from": 4300,
+						"to": 4390
+					},
+					"id": 615,
+					"p": 0.999449,
+					"t_dtw": -1
+				},
+				{
+					"text": "irus",
+					"timestamps": {
+						"from": "00:00:04,440",
+						"to": "00:00:04,650"
+					},
+					"offsets": {
+						"from": 4440,
+						"to": 4650
+					},
+					"id": 19397,
+					"p": 0.698105,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:04,690",
+						"to": "00:00:04,840"
+					},
+					"offsets": {
+						"from": 4690,
+						"to": 4840
+					},
+					"id": 338,
+					"p": 0.860719,
+					"t_dtw": -1
+				},
+				{
+					"text": " genome",
+					"timestamps": {
+						"from": "00:00:04,940",
+						"to": "00:00:05,160"
+					},
+					"offsets": {
+						"from": 4940,
+						"to": 5160
+					},
+					"id": 19270,
+					"p": 0.94481,
+					"t_dtw": -1
+				},
+				{
+					"text": " online",
+					"timestamps": {
+						"from": "00:00:05,160",
+						"to": "00:00:05,680"
+					},
+					"offsets": {
+						"from": 5160,
+						"to": 5680
+					},
+					"id": 2691,
+					"p": 0.846918,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:05,950",
+						"to": "00:00:05,950"
+					},
+					"offsets": {
+						"from": 5950,
+						"to": 5950
+					},
+					"id": 11,
+					"p": 0.340465,
+					"t_dtw": -1
+				},
+				{
+					"text": " for",
+					"timestamps": {
+						"from": "00:00:06,050",
+						"to": "00:00:06,110"
+					},
+					"offsets": {
+						"from": 6050,
+						"to": 6110
+					},
+					"id": 329,
+					"p": 0.794101,
+					"t_dtw": -1
+				},
+				{
+					"text": " anyone",
+					"timestamps": {
+						"from": "00:00:06,150",
+						"to": "00:00:06,440"
+					},
+					"offsets": {
+						"from": 6150,
+						"to": 6440
+					},
+					"id": 2687,
+					"p": 0.978374,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:06,440",
+						"to": "00:00:06,560"
+					},
+					"offsets": {
+						"from": 6440,
+						"to": 6560
+					},
+					"id": 284,
+					"p": 0.964733,
+					"t_dtw": -1
+				},
+				{
+					"text": " use",
+					"timestamps": {
+						"from": "00:00:06,560",
+						"to": "00:00:06,970"
+					},
+					"offsets": {
+						"from": 6560,
+						"to": 6970
+					},
+					"id": 779,
+					"p": 0.862812,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:07,200",
+						"to": "00:00:07,200"
+					},
+					"offsets": {
+						"from": 7200,
+						"to": 7200
+					},
+					"id": 13,
+					"p": 0.967865,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_360]",
+					"timestamps": {
+						"from": "00:00:07,200",
+						"to": "00:00:07,200"
+					},
+					"offsets": {
+						"from": 7200,
+						"to": 7200
+					},
+					"id": 50723,
+					"p": 0.0243829,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

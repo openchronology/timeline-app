@@ -17,6 +17,7 @@ The sample timelines the tours open in the real editor. Each `.ochx` is built by
 | [`incident.mjs`](incident.mjs)                                 | A made-up outage: three hours of syslog from four hosts and the investigation on top (Video 10).                            |
 | [`investigation.mjs`](investigation.mjs)                       | A made-up forklift collision on a warehouse night shift, as an events and causal factors chart (Video 13, Short 10).        |
 | [`investigation-procedure.mjs`](investigation-procedure.mjs)   | The made-up written night-shift procedure for the same night, to compare with the investigation (Video 13).                 |
+| [`covid-19.mjs`](covid-19.mjs)                                 | The COVID-19 pandemic worldwide, Wuhan 2019 to May 2023, from WHO and other sources (Video 22, Short 19).                   |
 | [`usa.ochx`](usa.ochx)                                         | Built from `usa.mjs`.                                                                                                       |
 | [`saga.ochx`](saga.ochx)                                       | Built from `saga.mjs`.                                                                                                      |
 | [`deep-time.ochx`](deep-time.ochx)                             | Built from `deep-time.mjs`.                                                                                                 |
@@ -24,4 +25,5 @@ The sample timelines the tours open in the real editor. Each `.ochx` is built by
 | [`incident.ochx`](incident.ochx)                               | Built from `incident.mjs`.                                                                                                  |
 | [`investigation.ochx`](investigation.ochx)                     | Built from `investigation.mjs`.                                                                                             |
 | [`investigation-procedure.ochx`](investigation-procedure.ochx) | Built from `investigation-procedure.mjs`.                                                                                   |
+| [`covid-19.ochx`](covid-19.ochx)                               | Built from `covid-19.mjs`.                                                                                                  |
 | [`star-wars.ochx`](star-wars.ochx)                             | The live Star Wars timeline, downloaded through the API (Video 12, Short 9).                                                |

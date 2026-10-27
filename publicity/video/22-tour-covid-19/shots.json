@@ -1,0 +1,222 @@
+{
+  "sample": "../samples/covid-19.ochx",
+  "size": [1920, 1080],
+  "scale": 1,
+  "shots": [
+    {
+      "id": "whole",
+      "dur": 0.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [1573344000, 1687219200]
+        }
+      ]
+    },
+    {
+      "id": "january",
+      "dur": 7,
+      "keys": [
+        {
+          "t": 0,
+          "view": [1573344000, 1687219200]
+        },
+        {
+          "t": 6,
+          "view": [1578096000, 1580688000]
+        }
+      ]
+    },
+    {
+      "id": "measures",
+      "dur": 5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [1578096000, 1580688000]
+        },
+        {
+          "t": 1.6,
+          "view": [1576800000, 1609372800]
+        }
+      ],
+      "actions": [
+        {
+          "t": 2,
+          "do": "separate",
+          "tags": ["measures"]
+        }
+      ]
+    },
+    {
+      "id": "counts",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [1573344000, 1687219200]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.4,
+          "do": "separate",
+          "tags": ["milestone"]
+        }
+      ]
+    },
+    {
+      "id": "excess",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [1638316800, 1661904000]
+        }
+      ],
+      "setup": [
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.4,
+          "do": "open",
+          "title": "WHO estimates"
+        }
+      ]
+    },
+    {
+      "id": "vaccines",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [1576800000, 1615766400]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.4,
+          "do": "separate",
+          "tags": ["vaccine"]
+        }
+      ]
+    },
+    {
+      "id": "keenan",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [1576800000, 1610236800]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        },
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.4,
+          "do": "open",
+          "title": "First authorised dose"
+        }
+      ]
+    },
+    {
+      "id": "variants",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [1573344000, 1687219200]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.4,
+          "do": "separate",
+          "tags": ["variant"]
+        }
+      ]
+    },
+    {
+      "id": "omicron",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [1608422400, 1648684800]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        },
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.2,
+          "do": "open",
+          "title": "Omicron wave"
+        },
+        {
+          "t": 0.4,
+          "do": "click",
+          "selector": "#reader-related .related-entity:has-text(\"Omicron a variant\")"
+        }
+      ]
+    },
+    {
+      "id": "end",
+      "dur": 6,
+      "keys": [
+        {
+          "t": 0,
+          "view": [1573344000, 1687219200]
+        },
+        {
+          "t": 5,
+          "view": [1668470400, 1686355200]
+        }
+      ]
+    },
+    {
+      "id": "pheic-end",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [1671494400, 1685577600]
+        }
+      ],
+      "setup": [
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.4,
+          "do": "open",
+          "title": "WHO: no longer"
+        }
+      ]
+    }
+  ]
+}

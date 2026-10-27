@@ -1,0 +1,245 @@
+1
+00:00:01,140 --> 00:00:05,200
+Here's a timeline we built
+of the COVID-19 pandemic,
+
+2
+00:00:05,250 --> 00:00:10,140
+from the first reported cluster in Wuhan
+at the end of 2019 to the end of the
+
+3
+00:00:10,190 --> 00:00:15,270
+global health emergency
+in May 2023. Emergencies,
+
+4
+00:00:15,320 --> 00:00:19,110
+lockdowns and waves are
+bands; declarations,
+
+5
+00:00:19,160 --> 00:00:24,560
+discoveries and counts are moments,
+each linked to the sources it draws on:
+
+6
+00:00:24,610 --> 00:00:29,063
+WHO, health agencies, regulators
+and scientific papers.
+
+7
+00:00:30,603 --> 00:00:35,013
+On the last day of 2019, Wuhan's
+health commission reports a cluster of
+
+8
+00:00:35,063 --> 00:00:41,013
+pneumonia of unknown cause. Zoom into
+the next month and it moves fast:
+
+9
+00:00:41,063 --> 00:00:46,613
+a new coronavirus identified on January
+ninth; its genome published two days
+
+10
+00:00:46,663 --> 00:00:51,493
+later; a first case outside China;
+human-to-human spread confirmed;
+
+11
+00:00:51,543 --> 00:00:55,483
+Wuhan locked down on the
+twenty-third; and on the thirtieth,
+
+12
+00:00:55,533 --> 00:01:01,563
+WHO's highest alarm, a public health
+emergency of international concern.
+
+13
+00:01:01,613 --> 00:01:05,243
+Where the virus came from
+has not been established.
+
+14
+00:01:05,293 --> 00:01:10,193
+It remains under investigation and debated,
+and the timeline cites WHO's reports
+
+15
+00:01:10,243 --> 00:01:12,014
+on it, and leaves it there.
+
+16
+00:01:13,484 --> 00:01:18,484
+On March eleventh, WHO says the
+outbreak can be called a pandemic.
+
+17
+00:01:18,534 --> 00:01:23,424
+Separate by tags, choose measures,
+and the spring of 2020 stacks up:
+
+18
+00:01:23,474 --> 00:01:26,964
+Italy's national lockdown
+from March ninth, then Spain,
+
+19
+00:01:27,014 --> 00:01:30,744
+France, England, India,
+New Zealand, South Africa,
+
+20
+00:01:30,794 --> 00:01:35,334
+within three weeks of each other.
+Even the Tokyo Olympics moved,
+
+21
+00:01:35,384 --> 00:01:37,968
+postponed on March twenty-fourth.
+
+22
+00:01:39,668 --> 00:01:44,358
+Pull out the counts and they climb: one
+million confirmed deaths by the end of
+
+23
+00:01:44,408 --> 00:01:51,958
+September 2020, six million by March 2022.
+But a confirmed death is one that was
+
+24
+00:01:52,008 --> 00:01:59,818
+tested and reported. Open WHO's estimate
+of excess deaths in 2020 and 2021,
+
+25
+00:01:59,868 --> 00:02:05,898
+and it's about 14.9 million, nearly
+three times the count for those years.
+
+26
+00:02:05,948 --> 00:02:09,135
+The timeline labels it
+what it is: an estimate.
+
+27
+00:02:10,685 --> 00:02:16,075
+Now follow the science. Separate
+by tags, choose vaccine,
+
+28
+00:02:16,125 --> 00:02:21,235
+and the band runs from the genome's
+publication in January 2020.
+
+29
+00:02:21,285 --> 00:02:26,845
+Sixty-five days later, on March sixteenth,
+a volunteer in Seattle gets the first
+
+30
+00:02:26,895 --> 00:02:31,315
+dose in a vaccine trial.
+Large trials begin in July;
+
+31
+00:02:31,365 --> 00:02:33,502
+in November, the first results.
+
+32
+00:02:35,052 --> 00:02:41,492
+Open a moment to read it. On December
+second, the UK's regulator authorises the
+
+33
+00:02:41,542 --> 00:02:48,392
+Pfizer–BioNTech vaccine: the first
+authorisation anywhere of a COVID-19 vaccine
+
+34
+00:02:48,442 --> 00:02:54,402
+after a full phase 3 trial. Six
+days later, at 6:31 in the morning,
+
+35
+00:02:54,452 --> 00:02:59,432
+Margaret Keenan, ninety, gets the
+first dose given outside a trial.
+
+36
+00:02:59,482 --> 00:03:04,192
+The reader shows how precisely that's
+known, and where it comes from.
+
+37
+00:03:04,242 --> 00:03:08,540
+The United States authorises the
+same vaccine three days later.
+
+38
+00:03:10,090 --> 00:03:16,790
+The virus changed. Separate the variants:
+WHO designates Alpha and Beta variants
+
+39
+00:03:16,840 --> 00:03:20,740
+of concern in December
+2020, Gamma in January,
+
+40
+00:03:20,790 --> 00:03:27,160
+Delta in May 2021, and that month gives
+them Greek letters instead of the names
+
+41
+00:03:27,210 --> 00:03:32,210
+of places. On November twenty-sixth,
+two days after South Africa reports it,
+
+42
+00:03:32,260 --> 00:03:36,690
+Omicron. The waves they
+drove sit below as bands,
+
+43
+00:03:36,740 --> 00:03:41,166
+dated roughly, because waves
+have no agreed start or end.
+
+44
+00:03:42,716 --> 00:03:50,116
+And then the end. On May fifth, 2023, WHO
+declares that COVID-19 is no longer a
+
+45
+00:03:50,166 --> 00:03:56,006
+global health emergency, 1,191
+days after declaring it one,
+
+46
+00:03:56,056 --> 00:03:59,796
+with nearly seven million
+deaths reported and, WHO says,
+
+47
+00:03:59,846 --> 00:04:05,747
+many more uncounted. Six days later,
+the United States ends its own.
+
+48
+00:04:07,297 --> 00:04:11,757
+Anyone can read a public timeline
+like this, no account needed.
+
+49
+00:04:11,807 --> 00:04:15,387
+Build one with your class, for a
+year, a country or a single thread,
+
+50
+00:04:15,437 --> 00:04:17,949
+and share it with a link.

@@ -1,0 +1,42 @@
+1
+00:00:00,460 --> 00:00:06,150
+January eleventh, 2020. Scientists post
+the new coronavirus's genome online,
+
+2
+00:00:06,200 --> 00:00:07,830
+for anyone to use.
+
+3
+00:00:08,190 --> 00:00:13,230
+Sixty-five days later, the first
+volunteer in a vaccine trial gets a dose.
+
+4
+00:00:13,280 --> 00:00:18,184
+In July, large trials begin, each planned
+for about thirty thousand volunteers.
+
+5
+00:00:18,514 --> 00:00:22,464
+December second, the UK
+authorises the first vaccine.
+
+6
+00:00:22,514 --> 00:00:25,704
+December eighth, at 6:31 in
+the morning, Margaret Keenan,
+
+7
+00:00:25,754 --> 00:00:29,647
+ninety, gets the first
+authorised dose outside a trial.
+
+8
+00:00:30,027 --> 00:00:33,746
+Three hundred and thirty-two
+days, end to end, on one line.
+
+9
+00:00:36,987 --> 00:00:40,369
+That's OpenChronology. It's free.

@@ -1,0 +1,240 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:02,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 2000
+			},
+			"text": " That's open chronology.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.838166,
+					"t_dtw": -1
+				},
+				{
+					"text": " That",
+					"timestamps": {
+						"from": "00:00:00,290",
+						"to": "00:00:00,400"
+					},
+					"offsets": {
+						"from": 290,
+						"to": 400
+					},
+					"id": 1320,
+					"p": 0.929503,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:00,400",
+						"to": "00:00:00,590"
+					},
+					"offsets": {
+						"from": 400,
+						"to": 590
+					},
+					"id": 338,
+					"p": 0.998471,
+					"t_dtw": -1
+				},
+				{
+					"text": " open",
+					"timestamps": {
+						"from": "00:00:00,590",
+						"to": "00:00:00,990"
+					},
+					"offsets": {
+						"from": 590,
+						"to": 990
+					},
+					"id": 1280,
+					"p": 0.744738,
+					"t_dtw": -1
+				},
+				{
+					"text": " chron",
+					"timestamps": {
+						"from": "00:00:00,990",
+						"to": "00:00:01,410"
+					},
+					"offsets": {
+						"from": 990,
+						"to": 1410
+					},
+					"id": 16199,
+					"p": 0.962225,
+					"t_dtw": -1
+				},
+				{
+					"text": "ology",
+					"timestamps": {
+						"from": "00:00:02,000",
+						"to": "00:00:02,000"
+					},
+					"offsets": {
+						"from": 2000,
+						"to": 2000
+					},
+					"id": 1435,
+					"p": 0.999003,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:02,000",
+						"to": "00:00:02,000"
+					},
+					"offsets": {
+						"from": 2000,
+						"to": 2000
+					},
+					"id": 13,
+					"p": 0.92558,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_100]",
+					"timestamps": {
+						"from": "00:00:02,000",
+						"to": "00:00:02,000"
+					},
+					"offsets": {
+						"from": 2000,
+						"to": 2000
+					},
+					"id": 50463,
+					"p": 0.0505955,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:02,000",
+				"to": "00:00:04,000"
+			},
+			"offsets": {
+				"from": 2000,
+				"to": 4000
+			},
+			"text": " It's free.",
+			"tokens": [
+				{
+					"text": " It",
+					"timestamps": {
+						"from": "00:00:02,290",
+						"to": "00:00:02,360"
+					},
+					"offsets": {
+						"from": 2290,
+						"to": 2360
+					},
+					"id": 632,
+					"p": 0.996656,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:02,360",
+						"to": "00:00:02,660"
+					},
+					"offsets": {
+						"from": 2360,
+						"to": 2660
+					},
+					"id": 338,
+					"p": 0.999668,
+					"t_dtw": -1
+				},
+				{
+					"text": " free",
+					"timestamps": {
+						"from": "00:00:02,730",
+						"to": "00:00:03,390"
+					},
+					"offsets": {
+						"from": 2730,
+						"to": 3390
+					},
+					"id": 1479,
+					"p": 0.991999,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:03,390",
+						"to": "00:00:03,450"
+					},
+					"offsets": {
+						"from": 3390,
+						"to": 3450
+					},
+					"id": 13,
+					"p": 0.936297,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_200]",
+					"timestamps": {
+						"from": "00:00:04,000",
+						"to": "00:00:04,000"
+					},
+					"offsets": {
+						"from": 4000,
+						"to": 4000
+					},
+					"id": 50563,
+					"p": 0.171421,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

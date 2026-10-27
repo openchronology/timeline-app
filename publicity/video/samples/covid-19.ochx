@@ -1,0 +1,2556 @@
+{
+ "format": "openchronology",
+ "version": 1,
+ "title": "The COVID-19 pandemic, 2019–2023",
+ "description": "The COVID-19 pandemic worldwide, from the first reported cluster of pneumonia in Wuhan in December 2019 to the end of WHO’s public health emergency of international concern and of the US public health emergency in May 2023: WHO’s declarations, the spread, measures such as lockdowns, the science and the vaccines, the variants of concern and the waves they drove, and the counts. A sample timeline built from the sources cited on each moment: WHO statements and reports, regulators and public-health agencies, peer-reviewed papers, the Johns Hopkins CSSE and Our World in Data counts, and Wikipedia as the general reference.\n\n**How to read it.** Chapter headings mark the phases. Emergencies, lockdowns, waves and events are bands (ochre, navy, brick and grey); everything else is a moment. Green marks science and vaccines, brick the variants, grey the counts. Related things (a variant reported and its designation, an emergency declared and ended) are linked.\n\n**Dates and numbers.** Dates are UTC days unless a time is given. Counts are confirmed cases and deaths as reported, which understate the true numbers; WHO’s excess-mortality figure is an estimate and labelled so. Waves are approximate. The origin of the virus has not been established: it remains under investigation and is debated (see WHO’s SAGO reports). Measures are described with their dates, not judged.",
+ "presentation": {
+  "mode": "gregorian",
+  "unit": "",
+  "scale": "1/1",
+  "origin": "0/1",
+  "version": 1,
+  "offsetMinutes": 0,
+  "significantDigits": 6
+ },
+ "tags": [
+  "history",
+  "public health",
+  "covid-19",
+  "education"
+ ],
+ "plugins": [
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "rich-text-notes",
+    "version": 1,
+    "name": "Rich text notes",
+    "description": "Edit moment and stack notes visually, storing portable Markdown. Hover cards render safe headings, emphasis, lists, code and HTTPS links. HTML and images are not executed.",
+    "fields": [],
+    "notes": {
+     "kind": "markdown"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-headings",
+    "version": 1,
+    "name": "Headings",
+    "description": "Let a moment act as a heading or marker: only its title shows, sized as a heading from level 1 to 6, and the title is what you click. Choose its font (Times New Roman by default). Headings still group into summaries with other moments.",
+    "fields": [
+     {
+      "kind": "heading",
+      "metadataKey": "headingLevel",
+      "label": "Heading level"
+     },
+     {
+      "kind": "font",
+      "metadataKey": "headingFont",
+      "label": "Heading font"
+     }
+    ],
+    "marker": {
+     "kind": "heading",
+     "metadataKey": "headingLevel"
+    },
+    "targets": [
+     "moments"
+    ]
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-colors",
+    "version": 2,
+    "name": "Moment colors",
+    "description": "Choose muted semantic swatches or a custom color for moments and stack entries while preserving their white borders.",
+    "fields": [
+     {
+      "kind": "color",
+      "metadataKey": "color",
+      "label": "Moment color"
+     }
+    ],
+    "marker": {
+     "kind": "color",
+     "metadataKey": "color"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.color(api.get(\"color\")); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-sources",
+    "version": 1,
+    "name": "Sources",
+    "description": "Show and edit a series of source links for moments and stack entries.",
+    "fields": [
+     {
+      "kind": "links",
+      "metadataKey": "sources",
+      "label": "Sources"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "dating-context",
+    "version": 1,
+    "name": "Dating context",
+    "description": "Explain the precision and coordinate convention of a moment. An exact stored coordinate can still represent an approximate age or a calendar-day marker.",
+    "fields": [
+     {
+      "kind": "text",
+      "metadataKey": "datePrecision",
+      "label": "Date precision"
+     },
+     {
+      "kind": "multiline",
+      "metadataKey": "coordinateConvention",
+      "label": "Coordinate convention"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "expand-on-hover",
+    "version": 1,
+    "name": "Expand on hover",
+    "description": "Hover or focus a summary of two to five moments to fan out its members radially for individual inspection. Larger summaries stay collapsed.",
+    "fields": [],
+    "summary": {
+     "kind": "radial"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.expand(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "timeline-theme",
+    "version": 2,
+    "name": "Timeline theme",
+    "description": "Choose the timeline's colors, fonts and text sizes: its labels, its measure (the axis, tick marks and their times), the halo that keeps them readable over images, the default marker and duration colors, and a background color. Set them here in the plugin list; anything left blank keeps the usual look, and colors chosen for events still win.",
+    "fields": [],
+    "settings": [
+     {
+      "kind": "color",
+      "key": "textColor",
+      "label": "Label color"
+     },
+     {
+      "kind": "font",
+      "key": "textFont",
+      "label": "Label font"
+     },
+     {
+      "kind": "text-size",
+      "key": "textSize",
+      "label": "Label size"
+     },
+     {
+      "kind": "color",
+      "key": "measureColor",
+      "label": "Measure color"
+     },
+     {
+      "kind": "font",
+      "key": "measureFont",
+      "label": "Measure font"
+     },
+     {
+      "kind": "text-size",
+      "key": "measureSize",
+      "label": "Measure size"
+     },
+     {
+      "kind": "color",
+      "key": "haloColor",
+      "label": "Halo color"
+     },
+     {
+      "kind": "color",
+      "key": "markerColor",
+      "label": "Marker color"
+     },
+     {
+      "kind": "color",
+      "key": "durationColor",
+      "label": "Duration color"
+     },
+     {
+      "kind": "color",
+      "key": "backgroundColor",
+      "label": "Background color"
+     }
+    ],
+    "theme": {
+     "text": "textColor",
+     "textFont": "textFont",
+     "textSize": "textSize",
+     "measure": "measureColor",
+     "measureFont": "measureFont",
+     "measureSize": "measureSize",
+     "halo": "haloColor",
+     "marker": "markerColor",
+     "duration": "durationColor",
+     "background": "backgroundColor"
+    }
+   },
+   "enabled": true,
+   "settings": {
+    "textColor": "#1f2a44",
+    "textFont": "Georgia, serif",
+    "measureColor": "#9c3b2a",
+    "haloColor": "#f3ead7",
+    "markerColor": "#1f3a5f",
+    "durationColor": "#9c3b2a",
+    "backgroundColor": "#f3ead7"
+   }
+  }
+ ],
+ "events": [
+  {
+   "id": "h-emergence",
+   "time": "1575158400/1",
+   "metadata": {
+    "title": "Emergence",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "onsets",
+   "time": "1575763200/1",
+   "metadata": {
+    "title": "Earliest known cases fall ill",
+    "description": "The earliest symptom onsets later identified in **Wuhan**, Hubei province. The first patients had pneumonia of unknown cause; many, not all, were linked to the **Huanan Seafood Wholesale Market**.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_mainland_China",
+     "https://doi.org/10.1016/S0140-6736(20)30183-5",
+     "https://www.who.int/publications/i/item/who-convened-global-study-of-origins-of-sars-cov-2-china-part"
+    ],
+    "datePrecision": "Early December 2019; reports differ. The WHO–China joint study (2021) gives 8 December as the earliest confirmed onset; Huang et al. (Lancet, 2020) reported one patient falling ill on 1 December."
+   }
+  },
+  {
+   "id": "li-warns",
+   "time": "1577664000/1",
+   "metadata": {
+    "title": "Doctors warn colleagues",
+    "description": "Wuhan’s health commission sends hospitals an urgent internal notice about pneumonia of unknown cause. The ophthalmologist **Li Wenliang** warns colleagues in a chat group, and is later reprimanded by police.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Li_Wenliang"
+    ]
+   }
+  },
+  {
+   "id": "wuhan-cluster",
+   "time": "1577750400/1",
+   "metadata": {
+    "title": "A cluster of pneumonia reported in Wuhan",
+    "description": "The **Wuhan Municipal Health Commission** publicly reports a cluster of pneumonia cases of unknown cause, 27 of them. **WHO’s China country office** picks up its statement the same day.",
+    "tags": [
+     "who",
+     "spread"
+    ],
+    "sources": [
+     "https://www.who.int/news/item/27-04-2020-who-timeline---covid-19",
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "market-closed",
+   "time": "1577836800/1",
+   "metadata": {
+    "title": "Huanan market closed",
+    "description": "Wuhan closes the **Huanan Seafood Wholesale Market** for cleaning and disinfection.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Huanan_Seafood_Wholesale_Market"
+    ]
+   }
+  },
+  {
+   "id": "who-imst",
+   "time": "1577880000/1",
+   "metadata": {
+    "title": "WHO sets up an incident team",
+    "description": "WHO sets up an **Incident Management Support Team** across its headquarters, regional and country levels.",
+    "tags": [
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/news/item/27-04-2020-who-timeline---covid-19"
+    ],
+    "datePrecision": "1 January 2020; drawn at noon so it stands apart from the market’s closure the same day."
+   }
+  },
+  {
+   "id": "who-don",
+   "time": "1578182400/1",
+   "metadata": {
+    "title": "WHO’s first outbreak news",
+    "description": "WHO publishes its first **Disease Outbreak News** on the pneumonia of unknown cause in Wuhan, with a risk assessment and advice.",
+    "tags": [
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/news/item/27-04-2020-who-timeline---covid-19"
+    ]
+   }
+  },
+  {
+   "id": "novel-cov",
+   "time": "1578528000/1",
+   "metadata": {
+    "title": "A new coronavirus identified",
+    "description": "Chinese authorities report that the cause is a **novel coronavirus**; WHO says so in a statement the same day.",
+    "tags": [
+     "science",
+     "who"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/SARS-CoV-2"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "genome",
+   "time": "1578704700/1",
+   "metadata": {
+    "title": "The genome is published",
+    "description": "The virus’s genome sequence, from **Zhang Yongzhen**’s team at Fudan University, is posted on **Virological.org** by **Edward Holmes**, for anyone to use. Vaccine and test developers start work from it.",
+    "tags": [
+     "science"
+    ],
+    "sources": [
+     "https://virological.org/t/novel-2019-coronavirus-genome/319",
+     "https://doi.org/10.1038/s41586-020-2008-3",
+     "https://www.who.int/news/item/27-04-2020-who-timeline---covid-19"
+    ],
+    "color": "#4f6f45",
+    "datePrecision": "Posted at 01:05 UTC on 11 January 2020 (10 January in the Americas). WHO’s timeline dates China’s public sharing of the sequence to 12 January."
+   }
+  },
+  {
+   "id": "first-death",
+   "time": "1578744000/1",
+   "metadata": {
+    "title": "First reported death",
+    "description": "Chinese authorities report the first death: a 61-year-old man in Wuhan.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_mainland_China"
+    ],
+    "datePrecision": "Reported 11 January 2020 (he died on 9 January); drawn at noon, apart from the genome’s publication."
+   }
+  },
+  {
+   "id": "thailand",
+   "time": "1578873600/1",
+   "metadata": {
+    "title": "First case outside China",
+    "description": "**Thailand** confirms a case in a traveller from Wuhan: the first recorded outside China.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://www.who.int/news/item/27-04-2020-who-timeline---covid-19"
+    ]
+   }
+  },
+  {
+   "id": "h2h",
+   "time": "1579478400/1",
+   "metadata": {
+    "title": "Human-to-human spread confirmed",
+    "description": "The epidemiologist **Zhong Nanshan**, for China’s National Health Commission, says on state television that the virus spreads between people.",
+    "tags": [
+     "science"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Zhong_Nanshan"
+    ]
+   }
+  },
+  {
+   "id": "us-first",
+   "time": "1579564800/1",
+   "metadata": {
+    "title": "First US case",
+    "description": "The **CDC** confirms the first case in the United States, in Washington State.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://www.cdc.gov/media/releases/2020/p0121-novel-coronavirus-travel-case.html",
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_the_United_States"
+    ]
+   }
+  },
+  {
+   "id": "ec-first",
+   "time": "1579651200/1",
+   "metadata": {
+    "title": "Emergency Committee first meets",
+    "description": "WHO’s **Emergency Committee** under the International Health Regulations meets on 22–23 January and cannot reach consensus on declaring an emergency.",
+    "tags": [
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/news/item/27-04-2020-who-timeline---covid-19"
+    ]
+   }
+  },
+  {
+   "id": "wuhan-lockdown",
+   "time": "1579744800/1",
+   "metadata": {
+    "title": "Wuhan locked down",
+    "description": "At 10 a.m. local time, Wuhan suspends public transport and closes outbound routes; other cities in Hubei follow within days.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_lockdown_in_China"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "europe-first",
+   "time": "1579824000/1",
+   "metadata": {
+    "title": "First cases in Europe",
+    "description": "**France** confirms three cases: the first in Europe.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_France"
+    ]
+   }
+  },
+  {
+   "id": "huang",
+   "time": "1579867200/1",
+   "metadata": {
+    "title": "First clinical report",
+    "description": "**Huang et al.** describe the first 41 hospitalised patients in Wuhan in *The Lancet*: their symptoms, scans and outcomes.",
+    "tags": [
+     "science"
+    ],
+    "sources": [
+     "https://doi.org/10.1016/S0140-6736(20)30183-5"
+    ],
+    "color": "#4f6f45",
+    "datePrecision": "Published online 24 January 2020; drawn at noon, apart from France’s cases."
+   }
+  },
+  {
+   "id": "pheic",
+   "time": "1580342400/1",
+   "metadata": {
+    "title": "A public health emergency of international concern",
+    "description": "After its Emergency Committee reaches consensus, WHO’s Director-General **Tedros Adhanom Ghebreyesus** declares the outbreak a **public health emergency of international concern** (PHEIC), WHO’s highest level of alarm under the International Health Regulations.",
+    "tags": [
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/news/item/30-01-2020-statement-on-the-second-meeting-of-the-international-health-regulations-(2005)-emergency-committee-regarding-the-outbreak-of-novel-coronavirus-(2019-ncov)",
+     "https://en.wikipedia.org/wiki/Public_health_emergency_of_international_concern"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "first-death-outside",
+   "time": "1580601600/1",
+   "metadata": {
+    "title": "First death outside China",
+    "description": "The **Philippines** reports the first death outside mainland China.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_the_Philippines"
+    ]
+   }
+  },
+  {
+   "id": "bat-relative",
+   "time": "1580688000/1",
+   "metadata": {
+    "title": "A close relative in bats",
+    "description": "*Nature* publishes two papers describing the new virus. **Zhou et al.** report a bat coronavirus whose genome is 96% identical to it; **Wu et al.** describe its genome.",
+    "tags": [
+     "science"
+    ],
+    "sources": [
+     "https://doi.org/10.1038/s41586-020-2012-7",
+     "https://doi.org/10.1038/s41586-020-2008-3"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "li-dies",
+   "time": "1581033600/1",
+   "metadata": {
+    "title": "Li Wenliang dies",
+    "description": "The doctor **Li Wenliang**, who had warned colleagues in December, dies of COVID-19 in Wuhan.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Li_Wenliang"
+    ]
+   }
+  },
+  {
+   "id": "name",
+   "time": "1581379200/1",
+   "metadata": {
+    "title": "The disease is named COVID-19",
+    "description": "WHO names the disease **COVID-19**: **co**rona**vi**rus **d**isease, 20**19**, a name chosen not to refer to a place, an animal or a group of people.",
+    "tags": [
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/emergencies/diseases/novel-coronavirus-2019/technical-guidance/naming-the-coronavirus-disease-(covid-2019)-and-the-virus-that-causes-it",
+     "https://en.wikipedia.org/wiki/COVID-19"
+    ]
+   }
+  },
+  {
+   "id": "ictv",
+   "time": "1581422400/1",
+   "metadata": {
+    "title": "The virus is named SARS-CoV-2",
+    "description": "The **International Committee on Taxonomy of Viruses** names the virus **SARS-CoV-2**, a sister of the 2003 SARS coronavirus.",
+    "tags": [
+     "science"
+    ],
+    "sources": [
+     "https://doi.org/10.1038/s41564-020-0695-z",
+     "https://www.who.int/emergencies/diseases/novel-coronavirus-2019/technical-guidance/naming-the-coronavirus-disease-(covid-2019)-and-the-virus-that-causes-it"
+    ],
+    "color": "#4f6f45",
+    "datePrecision": "11 February 2020, the same day as WHO’s name for the disease; drawn at noon."
+   }
+  },
+  {
+   "id": "africa-first",
+   "time": "1581638400/1",
+   "metadata": {
+    "title": "First case in Africa",
+    "description": "**Egypt** confirms the first case on the African continent.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_Africa"
+    ]
+   }
+  },
+  {
+   "id": "codogno",
+   "time": "1582243200/1",
+   "metadata": {
+    "title": "A cluster in Lombardy",
+    "description": "A case confirmed in **Codogno**, Lombardy, reveals local spread in northern Italy; eleven towns in Lombardy and Veneto are quarantined two days later.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_Italy"
+    ]
+   }
+  },
+  {
+   "id": "brazil-first",
+   "time": "1582675200/1",
+   "metadata": {
+    "title": "First case in Latin America",
+    "description": "**Brazil** confirms a case in São Paulo, the first in Latin America.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_Brazil"
+    ]
+   }
+  },
+  {
+   "id": "mission-report",
+   "time": "1582848000/1",
+   "metadata": {
+    "title": "WHO–China joint mission reports",
+    "description": "The **WHO–China Joint Mission** publishes its report on the outbreak in China, its spread and the measures taken.",
+    "tags": [
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/publications/i/item/report-of-the-who-china-joint-mission-on-coronavirus-disease-2019-(covid-19)"
+    ]
+   }
+  },
+  {
+   "id": "h-pandemic",
+   "time": "1583020800/1",
+   "metadata": {
+    "title": "A pandemic",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "pandemic",
+   "time": "1583884800/1",
+   "metadata": {
+    "title": "WHO: a pandemic",
+    "description": "WHO assesses that COVID-19 **can be characterized as a pandemic**. The Director-General cites more than 118,000 cases in 114 countries and 4,291 deaths.",
+    "tags": [
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/news-room/speeches/item/who-director-general-s-opening-remarks-at-the-media-briefing-on-covid-19---11-march-2020",
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "us-emergency",
+   "time": "1584057600/1",
+   "metadata": {
+    "title": "US national emergency",
+    "description": "President **Donald Trump** declares a national emergency under the National Emergencies Act.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_the_United_States"
+    ]
+   }
+  },
+  {
+   "id": "europe-epicentre",
+   "time": "1584100800/1",
+   "metadata": {
+    "title": "WHO: Europe the epicentre",
+    "description": "WHO says Europe has become the epicentre of the pandemic.",
+    "tags": [
+     "who",
+     "spread"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_Europe"
+    ],
+    "datePrecision": "13 March 2020; drawn at noon, apart from the US declaration."
+   }
+  },
+  {
+   "id": "first-vaccine-trial",
+   "time": "1584316800/1",
+   "metadata": {
+    "title": "First vaccine trial dose",
+    "description": "At **Kaiser Permanente Washington** in Seattle, the first volunteer receives **mRNA-1273**, the Moderna and NIH vaccine, in a phase 1 trial: the first COVID-19 vaccine trial to dose a person.",
+    "tags": [
+     "science",
+     "vaccine"
+    ],
+    "sources": [
+     "https://www.nih.gov/news-events/news-releases/nih-clinical-trial-investigational-vaccine-covid-19-begins",
+     "https://en.wikipedia.org/wiki/Moderna_COVID-19_vaccine"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "eu-borders",
+   "time": "1584403200/1",
+   "metadata": {
+    "title": "EU closes its external borders",
+    "description": "EU leaders agree to restrict non-essential travel into the EU for 30 days; it is extended several times.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_Europe"
+    ]
+   }
+  },
+  {
+   "id": "solidarity",
+   "time": "1584489600/1",
+   "metadata": {
+    "title": "Solidarity trial launched",
+    "description": "WHO and partners launch the **Solidarity** trial, an international trial of treatments for COVID-19.",
+    "tags": [
+     "who",
+     "science"
+    ],
+    "sources": [
+     "https://www.who.int/news/item/27-04-2020-who-timeline---covid-19",
+     "https://en.wikipedia.org/wiki/Solidarity_trial"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "olympics-postponed",
+   "time": "1585008000/1",
+   "metadata": {
+    "title": "Tokyo Olympics postponed",
+    "description": "The **IOC** and Japan agree to postpone the Tokyo 2020 Olympic and Paralympic Games to 2021, keeping the name Tokyo 2020.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/2020_Summer_Olympics"
+    ]
+   }
+  },
+  {
+   "id": "cases-1m",
+   "time": "1585785600/1",
+   "metadata": {
+    "title": "1 million confirmed cases",
+    "description": "Confirmed cases worldwide pass **one million**.",
+    "tags": [
+     "milestone"
+    ],
+    "sources": [
+     "https://coronavirus.jhu.edu/",
+     "https://ourworldindata.org/covid-cases"
+    ],
+    "color": "#6b7f99",
+    "datePrecision": "The day the Johns Hopkins CSSE count passed the mark, as reported then; reported counts are lower than the true numbers, and WHO’s count crossed within days."
+   }
+  },
+  {
+   "id": "deaths-100k",
+   "time": "1586476800/1",
+   "metadata": {
+    "title": "100,000 confirmed deaths",
+    "description": "Confirmed deaths worldwide pass **100,000**.",
+    "tags": [
+     "milestone"
+    ],
+    "sources": [
+     "https://coronavirus.jhu.edu/",
+     "https://ourworldindata.org/covid-deaths"
+    ],
+    "color": "#6b7f99",
+    "datePrecision": "The day the Johns Hopkins CSSE count passed the mark, as reported then; reported counts are lower than the true numbers, and WHO’s count crossed within days."
+   }
+  },
+  {
+   "id": "oxford-trial",
+   "time": "1587600000/1",
+   "metadata": {
+    "title": "Oxford vaccine trial begins",
+    "description": "The first volunteers receive the **University of Oxford** vaccine, ChAdOx1 nCoV-19 (later Oxford–AstraZeneca), in a trial in England.",
+    "tags": [
+     "science",
+     "vaccine"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Oxford–AstraZeneca_COVID-19_vaccine"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "act-a",
+   "time": "1587686400/1",
+   "metadata": {
+    "title": "ACT Accelerator launched",
+    "description": "WHO and partners launch the **Access to COVID-19 Tools Accelerator**, whose vaccine pillar is **COVAX**, for shared access to tests, treatments and vaccines.",
+    "tags": [
+     "who",
+     "vaccine"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVAX"
+    ]
+   }
+  },
+  {
+   "id": "remdesivir",
+   "time": "1588291200/1",
+   "metadata": {
+    "title": "Remdesivir authorised in the US",
+    "description": "The **FDA** issues an emergency use authorization for the antiviral **remdesivir** in hospitalised patients.",
+    "tags": [
+     "science"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Remdesivir"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "h-waves",
+   "time": "1590969600/1",
+   "metadata": {
+    "title": "Waves and trials",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "masks",
+   "time": "1591315200/1",
+   "metadata": {
+    "title": "WHO advice on masks",
+    "description": "WHO updates its guidance to advise fabric masks for the general public where there is community spread and distancing is hard.",
+    "tags": [
+     "who",
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Face_masks_during_the_COVID-19_pandemic"
+    ]
+   }
+  },
+  {
+   "id": "dexamethasone",
+   "time": "1592265600/1",
+   "metadata": {
+    "title": "Dexamethasone reduces deaths",
+    "description": "The UK **RECOVERY** trial reports that the cheap steroid **dexamethasone** reduces deaths among hospitalised patients needing oxygen or ventilation.",
+    "tags": [
+     "science"
+    ],
+    "sources": [
+     "https://doi.org/10.1056/NEJMoa2021436",
+     "https://en.wikipedia.org/wiki/RECOVERY_Trial"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "cases-10m",
+   "time": "1593302400/1",
+   "metadata": {
+    "title": "10 million confirmed cases",
+    "description": "Confirmed cases worldwide pass **ten million**.",
+    "tags": [
+     "milestone"
+    ],
+    "sources": [
+     "https://coronavirus.jhu.edu/",
+     "https://ourworldindata.org/covid-cases"
+    ],
+    "color": "#6b7f99",
+    "datePrecision": "The day the Johns Hopkins CSSE count passed the mark, as reported then; reported counts are lower than the true numbers, and WHO’s count crossed within days."
+   }
+  },
+  {
+   "id": "deaths-500k",
+   "time": "1593345600/1",
+   "metadata": {
+    "title": "500,000 confirmed deaths",
+    "description": "Confirmed deaths worldwide pass **half a million**, the same day as ten million cases.",
+    "tags": [
+     "milestone"
+    ],
+    "sources": [
+     "https://coronavirus.jhu.edu/",
+     "https://ourworldindata.org/covid-deaths"
+    ],
+    "color": "#6b7f99",
+    "datePrecision": "The day the Johns Hopkins CSSE count passed the mark, as reported then; drawn at noon, apart from the ten million cases the same day."
+   }
+  },
+  {
+   "id": "airborne",
+   "time": "1594252800/1",
+   "metadata": {
+    "title": "WHO brief on transmission",
+    "description": "A WHO scientific brief on how the virus spreads acknowledges reports of airborne transmission in some indoor settings, alongside droplets and contact.",
+    "tags": [
+     "who",
+     "science"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Transmission_of_COVID-19"
+    ]
+   }
+  },
+  {
+   "id": "phase3",
+   "time": "1595808000/1",
+   "metadata": {
+    "title": "Phase 3 vaccine trials begin",
+    "description": "**Moderna** and **Pfizer–BioNTech** begin large phase 3 trials of their mRNA vaccines on the same day, each with about 30,000 or more volunteers.",
+    "tags": [
+     "science",
+     "vaccine"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Moderna_COVID-19_vaccine",
+     "https://en.wikipedia.org/wiki/Pfizer–BioNTech_COVID-19_vaccine"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "sputnik",
+   "time": "1597104000/1",
+   "metadata": {
+    "title": "Russia registers Sputnik V",
+    "description": "Russia registers the **Gam-COVID-Vac** (Sputnik V) vaccine for use, before its phase 3 trial.",
+    "tags": [
+     "vaccine"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sputnik_V_COVID-19_vaccine"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "deaths-1m",
+   "time": "1601251200/1",
+   "metadata": {
+    "title": "1 million confirmed deaths",
+    "description": "Confirmed deaths worldwide pass **one million**, about nine months after the first reported cluster.",
+    "tags": [
+     "milestone"
+    ],
+    "sources": [
+     "https://coronavirus.jhu.edu/",
+     "https://ourworldindata.org/covid-deaths",
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_deaths"
+    ],
+    "color": "#6b7f99",
+    "datePrecision": "The day the Johns Hopkins CSSE count passed the mark, as reported then; reported counts are lower than the true numbers, and WHO’s count crossed within days."
+   }
+  },
+  {
+   "id": "h-vaccines",
+   "time": "1604188800/1",
+   "metadata": {
+    "title": "The first vaccines",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "pfizer-interim",
+   "time": "1604880000/1",
+   "metadata": {
+    "title": "Pfizer–BioNTech: over 90% efficacy",
+    "description": "**Pfizer** and **BioNTech** announce that their vaccine, BNT162b2, was more than 90% effective at preventing symptomatic COVID-19 in an interim analysis of its phase 3 trial.",
+    "tags": [
+     "science",
+     "vaccine"
+    ],
+    "sources": [
+     "https://doi.org/10.1056/NEJMoa2034577",
+     "https://en.wikipedia.org/wiki/Pfizer–BioNTech_COVID-19_vaccine"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "moderna-interim",
+   "time": "1605484800/1",
+   "metadata": {
+    "title": "Moderna: 94.5% efficacy",
+    "description": "**Moderna** announces an efficacy of 94.5% in an interim analysis of its phase 3 trial.",
+    "tags": [
+     "science",
+     "vaccine"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Moderna_COVID-19_vaccine"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "az-interim",
+   "time": "1606089600/1",
+   "metadata": {
+    "title": "Oxford–AstraZeneca interim results",
+    "description": "**Oxford** and **AstraZeneca** announce interim efficacy results from trials in the UK and Brazil.",
+    "tags": [
+     "science",
+     "vaccine"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Oxford–AstraZeneca_COVID-19_vaccine"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "mhra",
+   "time": "1606867200/1",
+   "metadata": {
+    "title": "First vaccine authorised: UK",
+    "description": "The UK’s **Medicines and Healthcare products Regulatory Agency** (MHRA) gives the Pfizer–BioNTech vaccine a temporary authorisation: the first anywhere for a COVID-19 vaccine after a full phase 3 trial.",
+    "tags": [
+     "vaccine"
+    ],
+    "sources": [
+     "https://www.gov.uk/government/news/uk-medicines-regulator-gives-approval-for-first-uk-covid-19-vaccine",
+     "https://en.wikipedia.org/wiki/Pfizer–BioNTech_COVID-19_vaccine"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "keenan",
+   "time": "1607409060/1",
+   "metadata": {
+    "title": "First authorised dose: Margaret Keenan",
+    "description": "**Margaret Keenan**, 90, receives the Pfizer–BioNTech vaccine at University Hospital, **Coventry**, at 6:31 a.m.: the first dose given after an authorisation, outside a trial.",
+    "tags": [
+     "vaccine"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_vaccination_in_the_United_Kingdom"
+    ],
+    "color": "#4f6f45",
+    "datePrecision": "8 December 2020, 06:31 GMT (UTC), as the NHS reported it."
+   }
+  },
+  {
+   "id": "fda-eua",
+   "time": "1607644800/1",
+   "metadata": {
+    "title": "US emergency use authorization",
+    "description": "The US **FDA** issues an emergency use authorization for the Pfizer–BioNTech vaccine for people 16 and older.",
+    "tags": [
+     "vaccine"
+    ],
+    "sources": [
+     "https://www.fda.gov/media/144412/download",
+     "https://en.wikipedia.org/wiki/Pfizer–BioNTech_COVID-19_vaccine"
+    ],
+    "color": "#4f6f45",
+    "datePrecision": "Issued late on 11 December 2020, US Eastern time."
+   }
+  },
+  {
+   "id": "lindsay",
+   "time": "1607904000/1",
+   "metadata": {
+    "title": "First US vaccination",
+    "description": "The critical-care nurse **Sandra Lindsay** receives the first authorised dose in the United States, in New York.",
+    "tags": [
+     "vaccine"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_vaccination_in_the_United_States"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "uk-variant",
+   "time": "1607947200/1",
+   "metadata": {
+    "title": "UK reports a new variant",
+    "description": "The UK government tells Parliament that a new variant, later lineage **B.1.1.7**, is spreading in the south-east of England.",
+    "tags": [
+     "variant"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/SARS-CoV-2_Alpha_variant"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "14 December 2020; drawn at noon, apart from the first US vaccination."
+   }
+  },
+  {
+   "id": "alpha",
+   "time": "1608249600/1",
+   "metadata": {
+    "title": "B.1.1.7 a variant of concern (Alpha)",
+    "description": "WHO designates **B.1.1.7**, first documented in the United Kingdom in September 2020, a **variant of concern**; it is labelled **Alpha** in May 2021.",
+    "tags": [
+     "variant",
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/activities/tracking-SARS-CoV-2-variants",
+     "https://en.wikipedia.org/wiki/SARS-CoV-2_Alpha_variant"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "WHO’s designation date, 18 December 2020. Alpha and Beta share it; they are drawn six hours apart so that both can be read."
+   }
+  },
+  {
+   "id": "beta",
+   "time": "1608271200/1",
+   "metadata": {
+    "title": "B.1.351 a variant of concern (Beta)",
+    "description": "WHO designates **B.1.351**, first documented in South Africa in May 2020, a **variant of concern**; it is labelled **Beta** in May 2021.",
+    "tags": [
+     "variant",
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/activities/tracking-SARS-CoV-2-variants",
+     "https://en.wikipedia.org/wiki/SARS-CoV-2_Beta_variant"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "WHO’s designation date, 18 December 2020, shared with Alpha; drawn six hours later so that both can be read."
+   }
+  },
+  {
+   "id": "moderna-eua",
+   "time": "1608314400/1",
+   "metadata": {
+    "title": "Moderna vaccine authorised in the US",
+    "description": "The **FDA** issues an emergency use authorization for the Moderna vaccine.",
+    "tags": [
+     "vaccine"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Moderna_COVID-19_vaccine"
+    ],
+    "color": "#4f6f45",
+    "datePrecision": "18 December 2020, US Eastern time; drawn in the evening, apart from the two variants designated the same day."
+   }
+  },
+  {
+   "id": "eu-comirnaty",
+   "time": "1608508800/1",
+   "metadata": {
+    "title": "EU authorises its first vaccine",
+    "description": "After the **European Medicines Agency**’s recommendation, the European Commission grants the Pfizer–BioNTech vaccine (**Comirnaty**) a conditional marketing authorisation.",
+    "tags": [
+     "vaccine"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Pfizer–BioNTech_COVID-19_vaccine"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "mhra-az",
+   "time": "1609286400/1",
+   "metadata": {
+    "title": "Oxford–AstraZeneca authorised in the UK",
+    "description": "The **MHRA** authorises the Oxford–AstraZeneca vaccine.",
+    "tags": [
+     "vaccine"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Oxford–AstraZeneca_COVID-19_vaccine"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "who-eul",
+   "time": "1609372800/1",
+   "metadata": {
+    "title": "WHO’s first emergency use listing",
+    "description": "WHO lists the Pfizer–BioNTech vaccine for emergency use, its first COVID-19 vaccine listing, which lets countries and UNICEF procure it more quickly.",
+    "tags": [
+     "who",
+     "vaccine"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Pfizer–BioNTech_COVID-19_vaccine"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "gamma",
+   "time": "1610323200/1",
+   "metadata": {
+    "title": "P.1 a variant of concern (Gamma)",
+    "description": "WHO designates **P.1**, first documented in Brazil in November 2020 and found in travellers arriving in Japan, a **variant of concern**; it is labelled **Gamma** in May 2021.",
+    "tags": [
+     "variant",
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/activities/tracking-SARS-CoV-2-variants",
+     "https://en.wikipedia.org/wiki/SARS-CoV-2_Gamma_variant"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "deaths-2m",
+   "time": "1610668800/1",
+   "metadata": {
+    "title": "2 million confirmed deaths",
+    "description": "Confirmed deaths worldwide pass **two million**.",
+    "tags": [
+     "milestone"
+    ],
+    "sources": [
+     "https://coronavirus.jhu.edu/",
+     "https://ourworldindata.org/covid-deaths",
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_deaths"
+    ],
+    "color": "#6b7f99",
+    "datePrecision": "The day the Johns Hopkins CSSE count passed the mark, as reported then; reported counts are lower than the true numbers, and WHO’s count crossed within days."
+   }
+  },
+  {
+   "id": "cases-100m",
+   "time": "1611619200/1",
+   "metadata": {
+    "title": "100 million confirmed cases",
+    "description": "Confirmed cases worldwide pass **one hundred million**.",
+    "tags": [
+     "milestone"
+    ],
+    "sources": [
+     "https://coronavirus.jhu.edu/",
+     "https://ourworldindata.org/covid-cases"
+    ],
+    "color": "#6b7f99",
+    "datePrecision": "The day the Johns Hopkins CSSE count passed the mark, as reported then; reported counts are lower than the true numbers, and WHO’s count crossed within days."
+   }
+  },
+  {
+   "id": "covax-ghana",
+   "time": "1614124800/1",
+   "metadata": {
+    "title": "COVAX’s first delivery",
+    "description": "**Ghana** receives 600,000 doses of the Oxford–AstraZeneca vaccine, the first delivery by **COVAX**.",
+    "tags": [
+     "vaccine",
+     "who"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVAX"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "janssen",
+   "time": "1614384000/1",
+   "metadata": {
+    "title": "A one-dose vaccine authorised",
+    "description": "The **FDA** authorises the single-dose **Janssen** (Johnson & Johnson) vaccine for emergency use.",
+    "tags": [
+     "vaccine"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Janssen_COVID-19_vaccine"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "origins-report",
+   "time": "1617062400/1",
+   "metadata": {
+    "title": "WHO–China origins study published",
+    "description": "WHO publishes the report of the **WHO-convened global study of origins**, China part. The virus’s origin has not been established; it remains under investigation and is debated.",
+    "tags": [
+     "who",
+     "science"
+    ],
+    "sources": [
+     "https://www.who.int/publications/i/item/who-convened-global-study-of-origins-of-sars-cov-2-china-part",
+     "https://en.wikipedia.org/wiki/Origin_of_SARS-CoV-2"
+    ]
+   }
+  },
+  {
+   "id": "h-delta",
+   "time": "1617235200/1",
+   "metadata": {
+    "title": "Delta",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "delta-voi",
+   "time": "1617494400/1",
+   "metadata": {
+    "title": "B.1.617.2 a variant of interest (Delta)",
+    "description": "WHO designates **B.1.617.2**, first documented in India in October 2020, a **variant of interest**.",
+    "tags": [
+     "variant",
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/activities/tracking-SARS-CoV-2-variants",
+     "https://en.wikipedia.org/wiki/SARS-CoV-2_Delta_variant"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "ema-clots",
+   "time": "1617753600/1",
+   "metadata": {
+    "title": "EMA: a possible link to rare clots",
+    "description": "The **European Medicines Agency** finds a possible link between the Oxford–AstraZeneca vaccine and very rare blood clots with low platelets, to be listed as a very rare side effect.",
+    "tags": [
+     "vaccine",
+     "science"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Oxford–AstraZeneca_COVID-19_vaccine"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "deaths-3m",
+   "time": "1618617600/1",
+   "metadata": {
+    "title": "3 million confirmed deaths",
+    "description": "Confirmed deaths worldwide pass **three million**.",
+    "tags": [
+     "milestone"
+    ],
+    "sources": [
+     "https://coronavirus.jhu.edu/",
+     "https://ourworldindata.org/covid-deaths",
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_deaths"
+    ],
+    "color": "#6b7f99",
+    "datePrecision": "The day the Johns Hopkins CSSE count passed the mark, as reported then; reported counts are lower than the true numbers, and WHO’s count crossed within days."
+   }
+  },
+  {
+   "id": "delta-voc",
+   "time": "1620691200/1",
+   "metadata": {
+    "title": "Delta a variant of concern",
+    "description": "WHO designates the **B.1.617** lineage a **variant of concern**; B.1.617.2 (**Delta**) remains one, and becomes dominant worldwide in 2021.",
+    "tags": [
+     "variant",
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/docs/default-source/coronaviruse/situation-reports/20210601_weekly_epi_update_42.pdf",
+     "https://www.who.int/activities/tracking-SARS-CoV-2-variants",
+     "https://en.wikipedia.org/wiki/SARS-CoV-2_Delta_variant"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "greek",
+   "time": "1622419200/1",
+   "metadata": {
+    "title": "Greek letters for variants",
+    "description": "WHO announces simple labels for variants of interest and concern, letters of the **Greek alphabet**, so that they need not be named after the places they were first found.",
+    "tags": [
+     "variant",
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/news/item/31-05-2021-who-announces-simple-easy-to-say-labels-for-sars-cov-2-variants-of-interest-and-concern",
+     "https://en.wikipedia.org/wiki/Variants_of_SARS-CoV-2"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "deaths-4m",
+   "time": "1625616000/1",
+   "metadata": {
+    "title": "4 million confirmed deaths",
+    "description": "Confirmed deaths worldwide pass **four million**.",
+    "tags": [
+     "milestone"
+    ],
+    "sources": [
+     "https://coronavirus.jhu.edu/",
+     "https://ourworldindata.org/covid-deaths",
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_deaths"
+    ],
+    "color": "#6b7f99",
+    "datePrecision": "The day the Johns Hopkins CSSE count passed the mark, as reported then; reported counts are lower than the true numbers, and WHO’s count crossed within days."
+   }
+  },
+  {
+   "id": "olympics-open",
+   "time": "1626998400/1",
+   "metadata": {
+    "title": "Tokyo Olympics open",
+    "description": "The postponed **Tokyo 2020** Games open a year late, with spectators barred from almost all venues.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/2020_Summer_Olympics"
+    ]
+   }
+  },
+  {
+   "id": "comirnaty-approved",
+   "time": "1629676800/1",
+   "metadata": {
+    "title": "First full US approval",
+    "description": "The **FDA** fully approves the Pfizer–BioNTech vaccine, as **Comirnaty**, for people 16 and older: the first COVID-19 vaccine approved in the US.",
+    "tags": [
+     "vaccine"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Pfizer–BioNTech_COVID-19_vaccine"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "deaths-5m",
+   "time": "1635724800/1",
+   "metadata": {
+    "title": "5 million confirmed deaths",
+    "description": "Confirmed deaths worldwide pass **five million**.",
+    "tags": [
+     "milestone"
+    ],
+    "sources": [
+     "https://coronavirus.jhu.edu/",
+     "https://ourworldindata.org/covid-deaths",
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_deaths"
+    ],
+    "color": "#6b7f99",
+    "datePrecision": "The day the Johns Hopkins CSSE count passed the mark, as reported then; reported counts are lower than the true numbers, and WHO’s count crossed within days."
+   }
+  },
+  {
+   "id": "molnupiravir",
+   "time": "1635984000/1",
+   "metadata": {
+    "title": "First oral antiviral authorised",
+    "description": "The UK **MHRA** authorises **molnupiravir**, the first oral antiviral for COVID-19 to be authorised.",
+    "tags": [
+     "science"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Molnupiravir"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "h-omicron",
+   "time": "1637366400/1",
+   "metadata": {
+    "title": "Omicron",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "sa-report",
+   "time": "1637712000/1",
+   "metadata": {
+    "title": "South Africa reports B.1.1.529",
+    "description": "South Africa reports a new, heavily mutated variant, **B.1.1.529**, to WHO, found by genomic surveillance in South Africa and Botswana.",
+    "tags": [
+     "variant"
+    ],
+    "sources": [
+     "https://www.who.int/news/item/26-11-2021-classification-of-omicron-(b.1.1.529)-sars-cov-2-variant-of-concern",
+     "https://en.wikipedia.org/wiki/SARS-CoV-2_Omicron_variant"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "omicron",
+   "time": "1637884800/1",
+   "metadata": {
+    "title": "Omicron a variant of concern",
+    "description": "On the advice of its Technical Advisory Group on Virus Evolution, WHO designates B.1.1.529 a **variant of concern** and names it **Omicron**.",
+    "tags": [
+     "variant",
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/news/item/26-11-2021-classification-of-omicron-(b.1.1.529)-sars-cov-2-variant-of-concern",
+     "https://www.who.int/activities/tracking-SARS-CoV-2-variants",
+     "https://www.ecdc.europa.eu/en/covid-19/variants-concern"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "paxlovid",
+   "time": "1640131200/1",
+   "metadata": {
+    "title": "Paxlovid authorised in the US",
+    "description": "The **FDA** authorises **Paxlovid** (nirmatrelvir with ritonavir), an oral antiviral, for emergency use.",
+    "tags": [
+     "science"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Nirmatrelvir/ritonavir"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "record-week",
+   "time": "1642377600/1",
+   "metadata": {
+    "title": "The most cases reported in a week",
+    "description": "In the week from 17 January 2022, more than 21 million new cases are reported to WHO, the most in any week of the pandemic, as Omicron spreads.",
+    "tags": [
+     "milestone",
+     "spread"
+    ],
+    "sources": [
+     "https://www.who.int/publications/m/item/weekly-epidemiological-update-on-covid-19---25-january-2022",
+     "https://ourworldindata.org/covid-cases"
+    ],
+    "color": "#6b7f99",
+    "datePrecision": "The week of 17–23 January 2022, as WHO’s weekly epidemiological updates reported it; testing varied widely, so reported cases understate infections."
+   }
+  },
+  {
+   "id": "deaths-6m",
+   "time": "1646611200/1",
+   "metadata": {
+    "title": "6 million confirmed deaths",
+    "description": "Confirmed deaths worldwide pass **six million**.",
+    "tags": [
+     "milestone"
+    ],
+    "sources": [
+     "https://coronavirus.jhu.edu/",
+     "https://ourworldindata.org/covid-deaths",
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_deaths"
+    ],
+    "color": "#6b7f99",
+    "datePrecision": "The day the Johns Hopkins CSSE count passed the mark, as reported then; reported counts are lower than the true numbers, and WHO’s count crossed within days."
+   }
+  },
+  {
+   "id": "excess",
+   "time": "1651708800/1",
+   "metadata": {
+    "title": "WHO estimates 14.9 million excess deaths",
+    "description": "WHO **estimates** that about **14.9 million** excess deaths (range 13.3 to 16.6 million) were associated with the pandemic in 2020 and 2021, nearly three times the 5.4 million COVID-19 deaths reported for those years. It is an estimate, not a count.",
+    "tags": [
+     "who",
+     "milestone"
+    ],
+    "sources": [
+     "https://www.who.int/news/item/05-05-2022-14.9-million-excess-deaths-were-associated-with-the-covid-19-pandemic-in-2020-and-2021",
+     "https://doi.org/10.1038/s41586-022-05522-2"
+    ],
+    "color": "#6b7f99"
+   }
+  },
+  {
+   "id": "sago",
+   "time": "1654732800/1",
+   "metadata": {
+    "title": "SAGO’s preliminary report on origins",
+    "description": "WHO’s **Scientific Advisory Group for the Origins of Novel Pathogens** (SAGO) publishes a preliminary report and recommends further studies. Its 2025 assessment also found the origin not established; it remains under investigation and is debated.",
+    "tags": [
+     "who",
+     "science"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Scientific_Advisory_Group_for_the_Origins_of_Novel_Pathogens",
+     "https://www.who.int/publications/m/item/independent-assessment-of-the-origins-of-sars-cov-2-from-the-scientific-advisory-group-for-the-origins-of-novel-pathogens"
+    ]
+   }
+  },
+  {
+   "id": "bivalent-uk",
+   "time": "1660521600/1",
+   "metadata": {
+    "title": "First bivalent booster authorised",
+    "description": "The UK **MHRA** authorises a **bivalent** Moderna booster, targeting both the original virus and Omicron BA.1: the first such vaccine authorised.",
+    "tags": [
+     "vaccine"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Moderna_COVID-19_vaccine"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "bivalent-us",
+   "time": "1661904000/1",
+   "metadata": {
+    "title": "US authorises bivalent boosters",
+    "description": "The **FDA** authorises bivalent Moderna and Pfizer–BioNTech boosters that target the original virus and Omicron BA.4 and BA.5.",
+    "tags": [
+     "vaccine"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_vaccination_in_the_United_States"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "china-eases",
+   "time": "1670371200/1",
+   "metadata": {
+    "title": "China eases its measures",
+    "description": "China’s National Health Commission announces ten measures that end most mass testing, centralised quarantine and travel limits under its **dynamic zero-COVID** policy.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Zero-COVID"
+    ]
+   }
+  },
+  {
+   "id": "h-end",
+   "time": "1672531200/1",
+   "metadata": {
+    "title": "The end of the emergency",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "china-reopens",
+   "time": "1673136000/1",
+   "metadata": {
+    "title": "China reopens its borders",
+    "description": "China ends quarantine for arrivals and reclassifies COVID-19 as a less serious, Class B infectious disease.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Zero-COVID"
+    ]
+   }
+  },
+  {
+   "id": "ec-jan-2023",
+   "time": "1675036800/1",
+   "metadata": {
+    "title": "WHO: still an emergency",
+    "description": "After its fourteenth meeting, the Emergency Committee advises that the pandemic is still a PHEIC, and WHO’s Director-General agrees, while noting it was probably approaching an inflection point.",
+    "tags": [
+     "who"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Public_health_emergency_of_international_concern"
+    ]
+   }
+  },
+  {
+   "id": "us-plan",
+   "time": "1675080000/1",
+   "metadata": {
+    "title": "US sets an end date",
+    "description": "The US administration announces that it plans to end the public health emergency on **11 May 2023**.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_the_United_States"
+    ],
+    "datePrecision": "30 January 2023; drawn at noon, apart from WHO’s statement the same day."
+   }
+  },
+  {
+   "id": "jhu-ends",
+   "time": "1678406400/1",
+   "metadata": {
+    "title": "Johns Hopkins stops counting",
+    "description": "The **Johns Hopkins CSSE** dashboard, a reference count since January 2020, stops collecting data, at about 676 million cases and 6.88 million deaths reported worldwide.",
+    "tags": [
+     "milestone"
+    ],
+    "sources": [
+     "https://coronavirus.jhu.edu/",
+     "https://doi.org/10.1016/S1473-3099(20)30120-1"
+    ],
+    "color": "#6b7f99"
+   }
+  },
+  {
+   "id": "no-voc",
+   "time": "1678838400/1",
+   "metadata": {
+    "title": "No variant of concern circulating",
+    "description": "WHO updates its variant tracking: Alpha to Delta and the original Omicron lineage are now **previously circulating** variants of concern, and Omicron’s sublineages are tracked on their own.",
+    "tags": [
+     "variant",
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/activities/tracking-SARS-CoV-2-variants"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "pheic-end",
+   "time": "1683244800/1",
+   "metadata": {
+    "title": "WHO: no longer a global emergency",
+    "description": "Tedros, on the Emergency Committee’s advice, declares that COVID-19 is **no longer a PHEIC**, after three years and three months. Nearly **7 million** deaths had been reported to WHO; WHO said the true toll was several times higher, and that the disease remained a global health threat.",
+    "tags": [
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/news/item/05-05-2023-statement-on-the-fifteenth-meeting-of-the-international-health-regulations-(2005)-emergency-committee-regarding-the-coronavirus-disease-(covid-19)-pandemic",
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "us-phe-end",
+   "time": "1683763200/1",
+   "metadata": {
+    "title": "US public health emergency ends",
+    "description": "The US federal **public health emergency** for COVID-19, in place since January 2020, expires.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://www.hhs.gov/about/news/2023/05/09/fact-sheet-end-of-the-covid-19-public-health-emergency.html",
+     "https://www.cdc.gov/coronavirus/2019-ncov/your-health/end-of-phe.html"
+    ],
+    "color": "#b07a2a"
+   }
+  }
+ ],
+ "durations": [
+  {
+   "id": "pheic",
+   "start": "1580342400/1",
+   "end": "1683244800/1",
+   "metadata": {
+    "title": "A public health emergency of international concern",
+    "description": "From WHO’s declaration on 30 January 2020 to its end on 5 May 2023: 1,191 days.",
+    "tags": [
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/news/item/30-01-2020-statement-on-the-second-meeting-of-the-international-health-regulations-(2005)-emergency-committee-regarding-the-outbreak-of-novel-coronavirus-(2019-ncov)",
+     "https://www.who.int/news/item/05-05-2023-statement-on-the-fifteenth-meeting-of-the-international-health-regulations-(2005)-emergency-committee-regarding-the-coronavirus-disease-(covid-19)-pandemic"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "us-phe",
+   "start": "1580428800/1",
+   "end": "1683763200/1",
+   "metadata": {
+    "title": "US public health emergency",
+    "description": "Declared by the Secretary of Health and Human Services on 31 January 2020 (effective from 27 January) and renewed every 90 days until it expired on 11 May 2023.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_the_United_States"
+    ],
+    "color": "#b07a2a"
+   }
+  },
+  {
+   "id": "genome-dose",
+   "start": "1578704700/1",
+   "end": "1607409060/1",
+   "metadata": {
+    "title": "From genome to first authorised dose",
+    "description": "From the genome’s publication on 11 January 2020 to Margaret Keenan’s dose on 8 December: 332 days. By the calendar, the first trial dose came 65 days after the genome, and the first authorisation 326 days after it.",
+    "tags": [
+     "science",
+     "vaccine"
+    ],
+    "sources": [
+     "https://virological.org/t/novel-2019-coronavirus-genome/319",
+     "https://en.wikipedia.org/wiki/COVID-19_vaccine"
+    ],
+    "color": "#4f6f45"
+   }
+  },
+  {
+   "id": "joint-mission",
+   "start": "1581811200/1",
+   "end": "1582502400/1",
+   "metadata": {
+    "title": "WHO–China Joint Mission",
+    "description": "International and Chinese experts visit Beijing, Wuhan and two other cities.",
+    "tags": [
+     "who"
+    ],
+    "sources": [
+     "https://www.who.int/news/item/27-04-2020-who-timeline---covid-19"
+    ],
+    "color": "#6b7f99"
+   }
+  },
+  {
+   "id": "diamond-princess",
+   "start": "1580860800/1",
+   "end": "1583020800/1",
+   "metadata": {
+    "title": "Diamond Princess quarantine",
+    "description": "The cruise ship is quarantined at **Yokohama**; more than 700 of the 3,700 people on board are infected. The last passengers and crew leave on 1 March.",
+    "tags": [
+     "measures",
+     "spread"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_pandemic_on_Diamond_Princess"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "joint-study",
+   "start": "1610582400/1",
+   "end": "1612915200/1",
+   "metadata": {
+    "title": "WHO-convened origins study in Wuhan",
+    "description": "The international team’s visit to Wuhan, including two weeks of quarantine, for the joint study on origins.",
+    "tags": [
+     "who",
+     "science"
+    ],
+    "sources": [
+     "https://www.who.int/publications/i/item/who-convened-global-study-of-origins-of-sars-cov-2-china-part",
+     "https://en.wikipedia.org/wiki/Origin_of_SARS-CoV-2"
+    ],
+    "color": "#6b7f99"
+   }
+  },
+  {
+   "id": "olympics",
+   "start": "1626998400/1",
+   "end": "1628380800/1",
+   "metadata": {
+    "title": "Tokyo 2020 Olympics",
+    "description": "Held a year late, from 23 July to 8 August 2021, almost entirely without spectators.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/2020_Summer_Olympics"
+    ],
+    "color": "#6b7f99"
+   }
+  },
+  {
+   "id": "paralympics",
+   "start": "1629763200/1",
+   "end": "1630800000/1",
+   "metadata": {
+    "title": "Tokyo 2020 Paralympics",
+    "description": "Held from 24 August to 5 September 2021.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/2020_Summer_Paralympics"
+    ],
+    "color": "#6b7f99"
+   }
+  },
+  {
+   "id": "wuhan",
+   "start": "1579744800/1",
+   "end": "1586304000/1",
+   "metadata": {
+    "title": "Wuhan lockdown",
+    "description": "From 10 a.m. on 23 January to the lifting of the outbound travel ban on 8 April 2020: 76 days.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_lockdown_in_China"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "italy",
+   "start": "1583712000/1",
+   "end": "1589760000/1",
+   "metadata": {
+    "title": "Italy’s national lockdown",
+    "description": "Announced on 9 March 2020, the first national lockdown in Europe; eased from 4 May, with most limits on movement lifted on 18 May.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_lockdowns_in_Italy",
+     "https://en.wikipedia.org/wiki/COVID-19_lockdowns"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "spain",
+   "start": "1584144000/1",
+   "end": "1588982400/1",
+   "metadata": {
+    "title": "Spain’s lockdown",
+    "description": "Under a **state of alarm** declared on 14 March 2020; the strictest limits were eased in phases from May.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_lockdowns"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "peru",
+   "start": "1584316800/1",
+   "end": "1593475200/1",
+   "metadata": {
+    "title": "Peru’s lockdown",
+    "description": "A national lockdown from 16 March to 30 June 2020.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_lockdowns"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "france",
+   "start": "1584403200/1",
+   "end": "1589155200/1",
+   "metadata": {
+    "title": "France’s first confinement",
+    "description": "A national stay-at-home order from 17 March to 11 May 2020; France had two more, in autumn 2020 and spring 2021.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_lockdowns"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "england",
+   "start": "1584921600/1",
+   "end": "1593820800/1",
+   "metadata": {
+    "title": "England’s first lockdown",
+    "description": "Announced on 23 March 2020 and eased in steps from May; pubs and restaurants reopened on 4 July.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_lockdowns"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "new-zealand",
+   "start": "1584921600/1",
+   "end": "1589328000/1",
+   "metadata": {
+    "title": "New Zealand’s lockdown",
+    "description": "Alert levels 4 and 3, from the announcement on 23 March to the move to level 2 on 13 May 2020.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_lockdowns"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "india",
+   "start": "1585094400/1",
+   "end": "1590883200/1",
+   "metadata": {
+    "title": "India’s nationwide lockdown",
+    "description": "Announced for 21 days for 1.3 billion people, then extended in four phases to 31 May 2020; reopening began on 1 June.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_lockdown_in_India"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "south-africa",
+   "start": "1585180800/1",
+   "end": "1588204800/1",
+   "metadata": {
+    "title": "South Africa’s national lockdown",
+    "description": "The strictest level, from 26 March to 30 April 2020, then eased by alert levels.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_lockdowns"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "melbourne",
+   "start": "1594252800/1",
+   "end": "1603756800/1",
+   "metadata": {
+    "title": "Melbourne’s second lockdown",
+    "description": "From 9 July to 27 October 2020, with a night curfew from August. Across six lockdowns, Melbourne spent about 262 days in all under stay-at-home orders.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_lockdowns"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "england-2",
+   "start": "1604534400/1",
+   "end": "1606867200/1",
+   "metadata": {
+    "title": "England’s second lockdown",
+    "description": "Four weeks, from 5 November to 2 December 2020; a third followed from 6 January 2021.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/COVID-19_lockdowns"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "shanghai",
+   "start": "1648425600/1",
+   "end": "1654041600/1",
+   "metadata": {
+    "title": "Shanghai lockdown",
+    "description": "A citywide lockdown of about 25 million people, begun in two halves of the city, under China’s zero-COVID policy, until 1 June 2022.",
+    "tags": [
+     "measures"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/2022_Shanghai_COVID-19_outbreak",
+     "https://en.wikipedia.org/wiki/Zero-COVID"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "wave-1",
+   "start": "1583020800/1",
+   "end": "1590883200/1",
+   "metadata": {
+    "title": "First global wave",
+    "description": "Cases rise across Europe, Iran and the Americas after spreading from China; reported deaths peak in mid-April 2020. Approximate: dated here from the rise and fall of Our World in Data’s global (or national) daily cases; waves have no agreed start or end.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://ourworldindata.org/covid-cases",
+     "https://ourworldindata.org/covid-deaths"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "wave-winter",
+   "start": "1601510400/1",
+   "end": "1614470400/1",
+   "metadata": {
+    "title": "Northern winter wave",
+    "description": "The largest wave until then, across Europe and the Americas; reported deaths peak in late January 2021. Approximate: dated here from the rise and fall of Our World in Data’s global (or national) daily cases; waves have no agreed start or end.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://ourworldindata.org/covid-cases",
+     "https://ourworldindata.org/covid-deaths"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "wave-india",
+   "start": "1615766400/1",
+   "end": "1623715200/1",
+   "metadata": {
+    "title": "India’s second wave",
+    "description": "Driven by Delta; India reports more than 400,000 cases a day at its peak in early May 2021, with shortages of oxygen and hospital beds. Approximate: dated here from the rise and fall of Our World in Data’s global (or national) daily cases; waves have no agreed start or end.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://ourworldindata.org/covid-cases",
+     "https://ourworldindata.org/covid-deaths"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "wave-delta",
+   "start": "1623715200/1",
+   "end": "1634256000/1",
+   "metadata": {
+    "title": "Delta wave",
+    "description": "Delta spreads worldwide and becomes the dominant variant. Approximate: dated here from the rise and fall of Our World in Data’s global (or national) daily cases; waves have no agreed start or end.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://ourworldindata.org/covid-cases",
+     "https://ourworldindata.org/covid-deaths"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "wave-omicron",
+   "start": "1638316800/1",
+   "end": "1646006400/1",
+   "metadata": {
+    "title": "Omicron wave",
+    "description": "Omicron BA.1 brings the most reported cases of the pandemic, peaking in late January 2022. Approximate: dated here from the rise and fall of Our World in Data’s global (or national) daily cases; waves have no agreed start or end.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://ourworldindata.org/covid-cases",
+     "https://ourworldindata.org/covid-deaths"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "wave-ba5",
+   "start": "1654041600/1",
+   "end": "1661904000/1",
+   "metadata": {
+    "title": "BA.5 wave",
+    "description": "Omicron’s BA.4 and BA.5 sublineages bring another rise in cases in many countries. Approximate: dated here from the rise and fall of Our World in Data’s global (or national) daily cases; waves have no agreed start or end.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://ourworldindata.org/covid-cases",
+     "https://ourworldindata.org/covid-deaths"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "wave-china",
+   "start": "1669852800/1",
+   "end": "1675123200/1",
+   "metadata": {
+    "title": "China’s winter wave",
+    "description": "A large wave in China after the easing of its zero-COVID measures in December 2022. Approximate: dated here from the rise and fall of Our World in Data’s global (or national) daily cases; waves have no agreed start or end.",
+    "tags": [
+     "spread"
+    ],
+    "sources": [
+     "https://ourworldindata.org/covid-cases",
+     "https://ourworldindata.org/covid-deaths"
+    ],
+    "color": "#9c3b2a"
+   }
+  }
+ ],
+ "relationships": [
+  {
+   "a": {
+    "moment": "onsets"
+   },
+   "b": {
+    "moment": "wuhan-cluster"
+   }
+  },
+  {
+   "a": {
+    "moment": "li-warns"
+   },
+   "b": {
+    "moment": "li-dies"
+   }
+  },
+  {
+   "a": {
+    "moment": "wuhan-cluster"
+   },
+   "b": {
+    "moment": "who-don"
+   }
+  },
+  {
+   "a": {
+    "moment": "novel-cov"
+   },
+   "b": {
+    "moment": "genome"
+   }
+  },
+  {
+   "a": {
+    "moment": "genome"
+   },
+   "b": {
+    "moment": "first-vaccine-trial"
+   }
+  },
+  {
+   "a": {
+    "moment": "genome"
+   },
+   "b": {
+    "duration": "genome-dose"
+   }
+  },
+  {
+   "a": {
+    "moment": "keenan"
+   },
+   "b": {
+    "duration": "genome-dose"
+   }
+  },
+  {
+   "a": {
+    "moment": "first-vaccine-trial"
+   },
+   "b": {
+    "moment": "phase3"
+   }
+  },
+  {
+   "a": {
+    "moment": "phase3"
+   },
+   "b": {
+    "moment": "pfizer-interim"
+   }
+  },
+  {
+   "a": {
+    "moment": "pfizer-interim"
+   },
+   "b": {
+    "moment": "mhra"
+   }
+  },
+  {
+   "a": {
+    "moment": "mhra"
+   },
+   "b": {
+    "moment": "keenan"
+   }
+  },
+  {
+   "a": {
+    "moment": "pfizer-interim"
+   },
+   "b": {
+    "moment": "fda-eua"
+   }
+  },
+  {
+   "a": {
+    "moment": "fda-eua"
+   },
+   "b": {
+    "moment": "lindsay"
+   }
+  },
+  {
+   "a": {
+    "moment": "name"
+   },
+   "b": {
+    "moment": "ictv"
+   }
+  },
+  {
+   "a": {
+    "moment": "ec-first"
+   },
+   "b": {
+    "moment": "pheic"
+   }
+  },
+  {
+   "a": {
+    "moment": "pheic"
+   },
+   "b": {
+    "duration": "pheic"
+   }
+  },
+  {
+   "a": {
+    "moment": "pheic"
+   },
+   "b": {
+    "moment": "pandemic"
+   }
+  },
+  {
+   "a": {
+    "moment": "ec-jan-2023"
+   },
+   "b": {
+    "moment": "pheic-end"
+   }
+  },
+  {
+   "a": {
+    "moment": "pheic-end"
+   },
+   "b": {
+    "duration": "pheic"
+   }
+  },
+  {
+   "a": {
+    "moment": "us-plan"
+   },
+   "b": {
+    "moment": "us-phe-end"
+   }
+  },
+  {
+   "a": {
+    "moment": "us-phe-end"
+   },
+   "b": {
+    "duration": "us-phe"
+   }
+  },
+  {
+   "a": {
+    "moment": "wuhan-lockdown"
+   },
+   "b": {
+    "duration": "wuhan"
+   }
+  },
+  {
+   "a": {
+    "duration": "joint-mission"
+   },
+   "b": {
+    "moment": "mission-report"
+   }
+  },
+  {
+   "a": {
+    "duration": "joint-study"
+   },
+   "b": {
+    "moment": "origins-report"
+   }
+  },
+  {
+   "a": {
+    "moment": "origins-report"
+   },
+   "b": {
+    "moment": "sago"
+   }
+  },
+  {
+   "a": {
+    "moment": "olympics-postponed"
+   },
+   "b": {
+    "moment": "olympics-open"
+   }
+  },
+  {
+   "a": {
+    "moment": "olympics-open"
+   },
+   "b": {
+    "duration": "olympics"
+   }
+  },
+  {
+   "a": {
+    "moment": "uk-variant"
+   },
+   "b": {
+    "moment": "alpha"
+   }
+  },
+  {
+   "a": {
+    "moment": "alpha"
+   },
+   "b": {
+    "moment": "greek"
+   }
+  },
+  {
+   "a": {
+    "moment": "beta"
+   },
+   "b": {
+    "moment": "greek"
+   }
+  },
+  {
+   "a": {
+    "moment": "gamma"
+   },
+   "b": {
+    "moment": "greek"
+   }
+  },
+  {
+   "a": {
+    "moment": "delta-voi"
+   },
+   "b": {
+    "moment": "delta-voc"
+   }
+  },
+  {
+   "a": {
+    "moment": "delta-voc"
+   },
+   "b": {
+    "moment": "greek"
+   }
+  },
+  {
+   "a": {
+    "moment": "delta-voc"
+   },
+   "b": {
+    "duration": "wave-delta"
+   }
+  },
+  {
+   "a": {
+    "moment": "sa-report"
+   },
+   "b": {
+    "moment": "omicron"
+   }
+  },
+  {
+   "a": {
+    "moment": "omicron"
+   },
+   "b": {
+    "duration": "wave-omicron"
+   }
+  },
+  {
+   "a": {
+    "moment": "act-a"
+   },
+   "b": {
+    "moment": "covax-ghana"
+   }
+  },
+  {
+   "a": {
+    "moment": "who-eul"
+   },
+   "b": {
+    "moment": "covax-ghana"
+   }
+  },
+  {
+   "a": {
+    "moment": "china-eases"
+   },
+   "b": {
+    "moment": "china-reopens"
+   }
+  },
+  {
+   "a": {
+    "moment": "china-eases"
+   },
+   "b": {
+    "duration": "wave-china"
+   }
+  },
+  {
+   "a": {
+    "moment": "deaths-5m"
+   },
+   "b": {
+    "moment": "excess"
+   }
+  }
+ ]
+}
