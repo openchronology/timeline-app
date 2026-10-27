@@ -19,3 +19,4 @@ The scripts and storyboards of OpenChronology's vertical shorts for TikTok, YouT
 | [`8-paged-at-2-58.md`](8-paged-at-2-58.md)                             | Short 8: an outage at 2:58 a.m., found on a timeline of syslog.                        |
 | [`9-i-asked-an-ai.md`](9-i-asked-an-ai.md)                             | Short 9: one prompt and an API key build the Star Wars timeline.                       |
 | [`10-why-did-it-happen.md`](10-why-did-it-happen.md)                   | Short 10: events, conditions and causal factors, on a made-up case.                    |
+| [`12-closer-to-the-moon.md`](12-closer-to-the-moon.md)                 | Short 12: Cleopatra lived closer to the Moon landing than to the Great Pyramid.        |
