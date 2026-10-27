@@ -50,6 +50,23 @@ const id = randomUUID(),
   word = 'zq' + suffix;
 const cookies = new Map();
 let csrf;
+/** Waits for a list's status line to match `pattern`, failing with what it says instead. */
+async function statusMatches(page, list, pattern) {
+  await page
+    .waitForFunction(
+      ([selector, source]) =>
+        new RegExp(source).test(document.querySelector(selector)?.textContent ?? ''),
+      [`#${list} .list-status`, pattern.source],
+    )
+    .catch(async (error) => {
+      const shown = await page
+        .locator(`#${list} .list-status, #${list} [role=alert]`)
+        .allTextContents();
+      throw new Error(`${list}'s status never matched ${pattern}: ${JSON.stringify(shown)}`, {
+        cause: error,
+      });
+    });
+}
 /** Calls the API as the test's account. */
 async function call(path, data, method = data ? 'POST' : 'GET') {
   const res = await fetch(origin + path, {
@@ -259,9 +276,7 @@ try {
   await explore.getByText('No public timelines match this search.').waitFor();
   await explore.getByRole('link', { name: 'Clear the search' }).click();
   await tab.waitForURL((url) => !url.searchParams.has('search'));
-  await tab.waitForFunction(() =>
-    /^\d+ timelines? · Page/.test(document.querySelector('#explore .list-status')?.textContent),
-  );
+  await statusMatches(tab, 'explore', /^[\d,]+ timelines? · Page/);
   assert.equal(await words.inputValue(), '');
 
   // Pages, in place: the cards take focus, and the other lists keep their state.
