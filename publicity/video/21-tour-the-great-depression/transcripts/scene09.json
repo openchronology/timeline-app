@@ -1,0 +1,869 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:06,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 6000
+			},
+			"text": " Then the second New Deal, the WPA, the Wagner Act, Social Security.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.881413,
+					"t_dtw": -1
+				},
+				{
+					"text": " Then",
+					"timestamps": {
+						"from": "00:00:00,290",
+						"to": "00:00:00,290"
+					},
+					"offsets": {
+						"from": 290,
+						"to": 290
+					},
+					"id": 3244,
+					"p": 0.914857,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:00,340",
+						"to": "00:00:00,500"
+					},
+					"offsets": {
+						"from": 340,
+						"to": 500
+					},
+					"id": 262,
+					"p": 0.947514,
+					"t_dtw": -1
+				},
+				{
+					"text": " second",
+					"timestamps": {
+						"from": "00:00:00,500",
+						"to": "00:00:00,930"
+					},
+					"offsets": {
+						"from": 500,
+						"to": 930
+					},
+					"id": 1218,
+					"p": 0.903447,
+					"t_dtw": -1
+				},
+				{
+					"text": " New",
+					"timestamps": {
+						"from": "00:00:00,930",
+						"to": "00:00:01,140"
+					},
+					"offsets": {
+						"from": 930,
+						"to": 1140
+					},
+					"id": 968,
+					"p": 0.540375,
+					"t_dtw": -1
+				},
+				{
+					"text": " Deal",
+					"timestamps": {
+						"from": "00:00:01,140",
+						"to": "00:00:01,420"
+					},
+					"offsets": {
+						"from": 1140,
+						"to": 1420
+					},
+					"id": 15138,
+					"p": 0.994222,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,420",
+						"to": "00:00:01,440"
+					},
+					"offsets": {
+						"from": 1420,
+						"to": 1440
+					},
+					"id": 11,
+					"p": 0.503927,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:01,900",
+						"to": "00:00:02,060"
+					},
+					"offsets": {
+						"from": 1900,
+						"to": 2060
+					},
+					"id": 262,
+					"p": 0.910776,
+					"t_dtw": -1
+				},
+				{
+					"text": " W",
+					"timestamps": {
+						"from": "00:00:02,060",
+						"to": "00:00:02,210"
+					},
+					"offsets": {
+						"from": 2060,
+						"to": 2210
+					},
+					"id": 370,
+					"p": 0.992707,
+					"t_dtw": -1
+				},
+				{
+					"text": "PA",
+					"timestamps": {
+						"from": "00:00:02,210",
+						"to": "00:00:02,510"
+					},
+					"offsets": {
+						"from": 2210,
+						"to": 2510
+					},
+					"id": 4537,
+					"p": 0.984583,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,510",
+						"to": "00:00:02,840"
+					},
+					"offsets": {
+						"from": 2510,
+						"to": 2840
+					},
+					"id": 11,
+					"p": 0.930649,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,840",
+						"to": "00:00:03,060"
+					},
+					"offsets": {
+						"from": 2840,
+						"to": 3060
+					},
+					"id": 262,
+					"p": 0.886485,
+					"t_dtw": -1
+				},
+				{
+					"text": " Wagner",
+					"timestamps": {
+						"from": "00:00:03,060",
+						"to": "00:00:03,490"
+					},
+					"offsets": {
+						"from": 3060,
+						"to": 3490
+					},
+					"id": 26451,
+					"p": 0.980534,
+					"t_dtw": -1
+				},
+				{
+					"text": " Act",
+					"timestamps": {
+						"from": "00:00:03,500",
+						"to": "00:00:03,720"
+					},
+					"offsets": {
+						"from": 3500,
+						"to": 3720
+					},
+					"id": 2191,
+					"p": 0.973942,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,720",
+						"to": "00:00:03,880"
+					},
+					"offsets": {
+						"from": 3720,
+						"to": 3880
+					},
+					"id": 11,
+					"p": 0.895712,
+					"t_dtw": -1
+				},
+				{
+					"text": " Social",
+					"timestamps": {
+						"from": "00:00:04,000",
+						"to": "00:00:04,360"
+					},
+					"offsets": {
+						"from": 4000,
+						"to": 4360
+					},
+					"id": 5483,
+					"p": 0.865024,
+					"t_dtw": -1
+				},
+				{
+					"text": " Security",
+					"timestamps": {
+						"from": "00:00:04,360",
+						"to": "00:00:04,990"
+					},
+					"offsets": {
+						"from": 4360,
+						"to": 4990
+					},
+					"id": 4765,
+					"p": 0.996635,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,990",
+						"to": "00:00:05,040"
+					},
+					"offsets": {
+						"from": 4990,
+						"to": 5040
+					},
+					"id": 13,
+					"p": 0.95379,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_300]",
+					"timestamps": {
+						"from": "00:00:06,000",
+						"to": "00:00:06,000"
+					},
+					"offsets": {
+						"from": 6000,
+						"to": 6000
+					},
+					"id": 50663,
+					"p": 0.0390318,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:06,000",
+				"to": "00:00:11,000"
+			},
+			"offsets": {
+				"from": 6000,
+				"to": 11000
+			},
+			"text": " The court strikes down the NRA, and Roosevelt's plan to enlarge it fails.",
+			"tokens": [
+				{
+					"text": " The",
+					"timestamps": {
+						"from": "00:00:06,240",
+						"to": "00:00:06,240"
+					},
+					"offsets": {
+						"from": 6240,
+						"to": 6240
+					},
+					"id": 383,
+					"p": 0.99798,
+					"t_dtw": -1
+				},
+				{
+					"text": " court",
+					"timestamps": {
+						"from": "00:00:06,340",
+						"to": "00:00:06,570"
+					},
+					"offsets": {
+						"from": 6340,
+						"to": 6570
+					},
+					"id": 2184,
+					"p": 0.589761,
+					"t_dtw": -1
+				},
+				{
+					"text": " strikes",
+					"timestamps": {
+						"from": "00:00:06,680",
+						"to": "00:00:07,180"
+					},
+					"offsets": {
+						"from": 6680,
+						"to": 7180
+					},
+					"id": 8956,
+					"p": 0.998561,
+					"t_dtw": -1
+				},
+				{
+					"text": " down",
+					"timestamps": {
+						"from": "00:00:07,180",
+						"to": "00:00:07,430"
+					},
+					"offsets": {
+						"from": 7180,
+						"to": 7430
+					},
+					"id": 866,
+					"p": 0.9987,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:07,740",
+						"to": "00:00:07,740"
+					},
+					"offsets": {
+						"from": 7740,
+						"to": 7740
+					},
+					"id": 262,
+					"p": 0.999163,
+					"t_dtw": -1
+				},
+				{
+					"text": " NRA",
+					"timestamps": {
+						"from": "00:00:07,900",
+						"to": "00:00:07,980"
+					},
+					"offsets": {
+						"from": 7900,
+						"to": 7980
+					},
+					"id": 23962,
+					"p": 0.996371,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:08,010",
+						"to": "00:00:08,130"
+					},
+					"offsets": {
+						"from": 8010,
+						"to": 8130
+					},
+					"id": 11,
+					"p": 0.67545,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:08,170",
+						"to": "00:00:08,360"
+					},
+					"offsets": {
+						"from": 8170,
+						"to": 8360
+					},
+					"id": 290,
+					"p": 0.896073,
+					"t_dtw": -1
+				},
+				{
+					"text": " Roosevelt",
+					"timestamps": {
+						"from": "00:00:08,430",
+						"to": "00:00:09,070"
+					},
+					"offsets": {
+						"from": 8430,
+						"to": 9070
+					},
+					"id": 19297,
+					"p": 0.974491,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:09,070",
+						"to": "00:00:09,220"
+					},
+					"offsets": {
+						"from": 9070,
+						"to": 9220
+					},
+					"id": 338,
+					"p": 0.995687,
+					"t_dtw": -1
+				},
+				{
+					"text": " plan",
+					"timestamps": {
+						"from": "00:00:09,220",
+						"to": "00:00:09,510"
+					},
+					"offsets": {
+						"from": 9220,
+						"to": 9510
+					},
+					"id": 1410,
+					"p": 0.992398,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:09,530",
+						"to": "00:00:09,670"
+					},
+					"offsets": {
+						"from": 9530,
+						"to": 9670
+					},
+					"id": 284,
+					"p": 0.993989,
+					"t_dtw": -1
+				},
+				{
+					"text": " enlarge",
+					"timestamps": {
+						"from": "00:00:09,670",
+						"to": "00:00:10,200"
+					},
+					"offsets": {
+						"from": 9670,
+						"to": 10200
+					},
+					"id": 27475,
+					"p": 0.993129,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:10,200",
+						"to": "00:00:10,350"
+					},
+					"offsets": {
+						"from": 10200,
+						"to": 10350
+					},
+					"id": 340,
+					"p": 0.988565,
+					"t_dtw": -1
+				},
+				{
+					"text": " fails",
+					"timestamps": {
+						"from": "00:00:10,350",
+						"to": "00:00:10,730"
+					},
+					"offsets": {
+						"from": 10350,
+						"to": 10730
+					},
+					"id": 10143,
+					"p": 0.993154,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:10,730",
+						"to": "00:00:10,990"
+					},
+					"offsets": {
+						"from": 10730,
+						"to": 10990
+					},
+					"id": 13,
+					"p": 0.996753,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_550]",
+					"timestamps": {
+						"from": "00:00:11,000",
+						"to": "00:00:11,000"
+					},
+					"offsets": {
+						"from": 11000,
+						"to": 11000
+					},
+					"id": 50913,
+					"p": 0.236845,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:11,000",
+				"to": "00:00:19,000"
+			},
+			"offsets": {
+				"from": 11000,
+				"to": 19000
+			},
+			"text": " In 1937, the recovery breaks—unemployment, 14 percent that year, is 19 the next.",
+			"tokens": [
+				{
+					"text": " In",
+					"timestamps": {
+						"from": "00:00:11,040",
+						"to": "00:00:11,160"
+					},
+					"offsets": {
+						"from": 11040,
+						"to": 11160
+					},
+					"id": 554,
+					"p": 0.98405,
+					"t_dtw": -1
+				},
+				{
+					"text": " 1937",
+					"timestamps": {
+						"from": "00:00:11,340",
+						"to": "00:00:12,170"
+					},
+					"offsets": {
+						"from": 11340,
+						"to": 12170
+					},
+					"id": 28684,
+					"p": 0.980989,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:12,170",
+						"to": "00:00:12,320"
+					},
+					"offsets": {
+						"from": 12170,
+						"to": 12320
+					},
+					"id": 11,
+					"p": 0.826746,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:12,320",
+						"to": "00:00:12,430"
+					},
+					"offsets": {
+						"from": 12320,
+						"to": 12430
+					},
+					"id": 262,
+					"p": 0.997657,
+					"t_dtw": -1
+				},
+				{
+					"text": " recovery",
+					"timestamps": {
+						"from": "00:00:12,900",
+						"to": "00:00:13,250"
+					},
+					"offsets": {
+						"from": 12900,
+						"to": 13250
+					},
+					"id": 7628,
+					"p": 0.982514,
+					"t_dtw": -1
+				},
+				{
+					"text": " breaks",
+					"timestamps": {
+						"from": "00:00:13,250",
+						"to": "00:00:13,750"
+					},
+					"offsets": {
+						"from": 13250,
+						"to": 13750
+					},
+					"id": 9457,
+					"p": 0.995129,
+					"t_dtw": -1
+				},
+				{
+					"text": "—",
+					"timestamps": {
+						"from": "00:00:13,750",
+						"to": "00:00:13,830"
+					},
+					"offsets": {
+						"from": 13750,
+						"to": 13830
+					},
+					"id": 960,
+					"p": 0.265097,
+					"t_dtw": -1
+				},
+				{
+					"text": "un",
+					"timestamps": {
+						"from": "00:00:13,830",
+						"to": "00:00:13,880"
+					},
+					"offsets": {
+						"from": 13830,
+						"to": 13880
+					},
+					"id": 403,
+					"p": 0.895178,
+					"t_dtw": -1
+				},
+				{
+					"text": "employment",
+					"timestamps": {
+						"from": "00:00:14,020",
+						"to": "00:00:14,720"
+					},
+					"offsets": {
+						"from": 14020,
+						"to": 14720
+					},
+					"id": 28812,
+					"p": 0.988884,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:14,850",
+						"to": "00:00:14,890"
+					},
+					"offsets": {
+						"from": 14850,
+						"to": 14890
+					},
+					"id": 11,
+					"p": 0.719509,
+					"t_dtw": -1
+				},
+				{
+					"text": " 14",
+					"timestamps": {
+						"from": "00:00:15,010",
+						"to": "00:00:15,490"
+					},
+					"offsets": {
+						"from": 15010,
+						"to": 15490
+					},
+					"id": 1478,
+					"p": 0.954131,
+					"t_dtw": -1
+				},
+				{
+					"text": " percent",
+					"timestamps": {
+						"from": "00:00:15,490",
+						"to": "00:00:16,000"
+					},
+					"offsets": {
+						"from": 15490,
+						"to": 16000
+					},
+					"id": 1411,
+					"p": 0.496464,
+					"t_dtw": -1
+				},
+				{
+					"text": " that",
+					"timestamps": {
+						"from": "00:00:16,410",
+						"to": "00:00:16,410"
+					},
+					"offsets": {
+						"from": 16410,
+						"to": 16410
+					},
+					"id": 326,
+					"p": 0.994954,
+					"t_dtw": -1
+				},
+				{
+					"text": " year",
+					"timestamps": {
+						"from": "00:00:16,410",
+						"to": "00:00:16,540"
+					},
+					"offsets": {
+						"from": 16410,
+						"to": 16540
+					},
+					"id": 614,
+					"p": 0.998405,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:16,930",
+						"to": "00:00:17,000"
+					},
+					"offsets": {
+						"from": 16930,
+						"to": 17000
+					},
+					"id": 11,
+					"p": 0.668344,
+					"t_dtw": -1
+				},
+				{
+					"text": " is",
+					"timestamps": {
+						"from": "00:00:17,220",
+						"to": "00:00:17,220"
+					},
+					"offsets": {
+						"from": 17220,
+						"to": 17220
+					},
+					"id": 318,
+					"p": 0.87746,
+					"t_dtw": -1
+				},
+				{
+					"text": " 19",
+					"timestamps": {
+						"from": "00:00:17,250",
+						"to": "00:00:17,850"
+					},
+					"offsets": {
+						"from": 17250,
+						"to": 17850
+					},
+					"id": 678,
+					"p": 0.900315,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:17,890",
+						"to": "00:00:18,210"
+					},
+					"offsets": {
+						"from": 17890,
+						"to": 18210
+					},
+					"id": 262,
+					"p": 0.986399,
+					"t_dtw": -1
+				},
+				{
+					"text": " next",
+					"timestamps": {
+						"from": "00:00:18,210",
+						"to": "00:00:18,640"
+					},
+					"offsets": {
+						"from": 18210,
+						"to": 18640
+					},
+					"id": 1306,
+					"p": 0.999674,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:18,640",
+						"to": "00:00:18,800"
+					},
+					"offsets": {
+						"from": 18640,
+						"to": 18800
+					},
+					"id": 13,
+					"p": 0.987624,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_950]",
+					"timestamps": {
+						"from": "00:00:19,000",
+						"to": "00:00:19,000"
+					},
+					"offsets": {
+						"from": 19000,
+						"to": 19000
+					},
+					"id": 51313,
+					"p": 0.360568,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

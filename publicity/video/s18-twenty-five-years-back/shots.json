@@ -1,0 +1,136 @@
+{
+  "sample": "../samples/great-depression.ochx",
+  "size": [360, 1500],
+  "scale": 3,
+  "shots": [
+    {
+      "id": "fit",
+      "dur": 0.5,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ],
+      "actions": [
+        {
+          "t": 0,
+          "do": "click",
+          "selector": "#fit-button"
+        }
+      ]
+    },
+    {
+      "id": "zoom",
+      "dur": 1.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-1798138800, -256503600]
+        },
+        {
+          "t": 1.5,
+          "view": [-1280775600, -1164913200]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "sep",
+      "dur": 0.034,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-1280775600, -1164913200]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "separate",
+          "tags": ["market"]
+        }
+      ]
+    },
+    {
+      "id": "out",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-1280775600, -1164913200]
+        },
+        {
+          "t": 3,
+          "view": [-1388516400, -283978800]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "separate",
+          "tags": ["market"]
+        }
+      ]
+    },
+    {
+      "id": "reader",
+      "dur": 1.2,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-536439600, -441831600]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ],
+      "actions": [
+        {
+          "t": 0,
+          "do": "viewMode",
+          "on": true
+        },
+        {
+          "t": 0.1,
+          "do": "open",
+          "title": "The Dow regains its 1929 peak"
+        }
+      ]
+    },
+    {
+      "id": "back",
+      "dur": 2,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-536439600, -441831600]
+        },
+        {
+          "t": 2,
+          "view": [-1798138800, -256503600]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    }
+  ]
+}

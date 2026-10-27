@@ -1,0 +1,534 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:06,080"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 6080
+			},
+			"text": " The hundred days are a band of their own, the Civilian Conservation Corps, Farm Relief,",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.861203,
+					"t_dtw": -1
+				},
+				{
+					"text": " The",
+					"timestamps": {
+						"from": "00:00:00,240",
+						"to": "00:00:00,240"
+					},
+					"offsets": {
+						"from": 240,
+						"to": 240
+					},
+					"id": 383,
+					"p": 0.923393,
+					"t_dtw": -1
+				},
+				{
+					"text": " hundred",
+					"timestamps": {
+						"from": "00:00:00,350",
+						"to": "00:00:00,790"
+					},
+					"offsets": {
+						"from": 350,
+						"to": 790
+					},
+					"id": 3470,
+					"p": 0.665727,
+					"t_dtw": -1
+				},
+				{
+					"text": " days",
+					"timestamps": {
+						"from": "00:00:00,850",
+						"to": "00:00:01,130"
+					},
+					"offsets": {
+						"from": 850,
+						"to": 1130
+					},
+					"id": 1528,
+					"p": 0.997602,
+					"t_dtw": -1
+				},
+				{
+					"text": " are",
+					"timestamps": {
+						"from": "00:00:01,130",
+						"to": "00:00:01,370"
+					},
+					"offsets": {
+						"from": 1130,
+						"to": 1370
+					},
+					"id": 389,
+					"p": 0.997908,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:01,370",
+						"to": "00:00:01,420"
+					},
+					"offsets": {
+						"from": 1370,
+						"to": 1420
+					},
+					"id": 257,
+					"p": 0.997276,
+					"t_dtw": -1
+				},
+				{
+					"text": " band",
+					"timestamps": {
+						"from": "00:00:01,470",
+						"to": "00:00:01,760"
+					},
+					"offsets": {
+						"from": 1470,
+						"to": 1760
+					},
+					"id": 4097,
+					"p": 0.993275,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:01,840",
+						"to": "00:00:01,930"
+					},
+					"offsets": {
+						"from": 1840,
+						"to": 1930
+					},
+					"id": 286,
+					"p": 0.997885,
+					"t_dtw": -1
+				},
+				{
+					"text": " their",
+					"timestamps": {
+						"from": "00:00:01,930",
+						"to": "00:00:02,330"
+					},
+					"offsets": {
+						"from": 1930,
+						"to": 2330
+					},
+					"id": 511,
+					"p": 0.997813,
+					"t_dtw": -1
+				},
+				{
+					"text": " own",
+					"timestamps": {
+						"from": "00:00:02,330",
+						"to": "00:00:02,370"
+					},
+					"offsets": {
+						"from": 2330,
+						"to": 2370
+					},
+					"id": 898,
+					"p": 0.997765,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,370",
+						"to": "00:00:02,770"
+					},
+					"offsets": {
+						"from": 2370,
+						"to": 2770
+					},
+					"id": 11,
+					"p": 0.0807282,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,920",
+						"to": "00:00:02,960"
+					},
+					"offsets": {
+						"from": 2920,
+						"to": 2960
+					},
+					"id": 262,
+					"p": 0.631699,
+					"t_dtw": -1
+				},
+				{
+					"text": " Civil",
+					"timestamps": {
+						"from": "00:00:02,960",
+						"to": "00:00:03,290"
+					},
+					"offsets": {
+						"from": 2960,
+						"to": 3290
+					},
+					"id": 7511,
+					"p": 0.857195,
+					"t_dtw": -1
+				},
+				{
+					"text": "ian",
+					"timestamps": {
+						"from": "00:00:03,290",
+						"to": "00:00:03,500"
+					},
+					"offsets": {
+						"from": 3290,
+						"to": 3500
+					},
+					"id": 666,
+					"p": 0.996859,
+					"t_dtw": -1
+				},
+				{
+					"text": " Conservation",
+					"timestamps": {
+						"from": "00:00:03,500",
+						"to": "00:00:04,410"
+					},
+					"offsets": {
+						"from": 3500,
+						"to": 4410
+					},
+					"id": 23702,
+					"p": 0.966262,
+					"t_dtw": -1
+				},
+				{
+					"text": " Corps",
+					"timestamps": {
+						"from": "00:00:04,410",
+						"to": "00:00:04,600"
+					},
+					"offsets": {
+						"from": 4410,
+						"to": 4600
+					},
+					"id": 12778,
+					"p": 0.94859,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:04,980",
+						"to": "00:00:05,000"
+					},
+					"offsets": {
+						"from": 4980,
+						"to": 5000
+					},
+					"id": 11,
+					"p": 0.977074,
+					"t_dtw": -1
+				},
+				{
+					"text": " Farm",
+					"timestamps": {
+						"from": "00:00:05,000",
+						"to": "00:00:05,380"
+					},
+					"offsets": {
+						"from": 5000,
+						"to": 5380
+					},
+					"id": 11272,
+					"p": 0.422119,
+					"t_dtw": -1
+				},
+				{
+					"text": " Relief",
+					"timestamps": {
+						"from": "00:00:05,380",
+						"to": "00:00:05,590"
+					},
+					"offsets": {
+						"from": 5380,
+						"to": 5590
+					},
+					"id": 30323,
+					"p": 0.986281,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:06,040",
+						"to": "00:00:06,080"
+					},
+					"offsets": {
+						"from": 6040,
+						"to": 6080
+					},
+					"id": 11,
+					"p": 0.987153,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_304]",
+					"timestamps": {
+						"from": "00:00:06,080",
+						"to": "00:00:06,080"
+					},
+					"offsets": {
+						"from": 6080,
+						"to": 6080
+					},
+					"id": 50667,
+					"p": 0.110081,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:06,080",
+				"to": "00:00:10,040"
+			},
+			"offsets": {
+				"from": 6080,
+				"to": 10040
+			},
+			"text": " the Tennessee Valley Authority, the NRA, and Deposit Insurance.",
+			"tokens": [
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:06,170",
+						"to": "00:00:06,240"
+					},
+					"offsets": {
+						"from": 6170,
+						"to": 6240
+					},
+					"id": 262,
+					"p": 0.960276,
+					"t_dtw": -1
+				},
+				{
+					"text": " Tennessee",
+					"timestamps": {
+						"from": "00:00:06,430",
+						"to": "00:00:06,870"
+					},
+					"offsets": {
+						"from": 6430,
+						"to": 6870
+					},
+					"id": 11287,
+					"p": 0.996315,
+					"t_dtw": -1
+				},
+				{
+					"text": " Valley",
+					"timestamps": {
+						"from": "00:00:06,930",
+						"to": "00:00:07,260"
+					},
+					"offsets": {
+						"from": 6930,
+						"to": 7260
+					},
+					"id": 6916,
+					"p": 0.996238,
+					"t_dtw": -1
+				},
+				{
+					"text": " Authority",
+					"timestamps": {
+						"from": "00:00:07,290",
+						"to": "00:00:07,840"
+					},
+					"offsets": {
+						"from": 7290,
+						"to": 7840
+					},
+					"id": 11416,
+					"p": 0.996432,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:07,920",
+						"to": "00:00:08,010"
+					},
+					"offsets": {
+						"from": 7920,
+						"to": 8010
+					},
+					"id": 11,
+					"p": 0.996348,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:08,010",
+						"to": "00:00:08,210"
+					},
+					"offsets": {
+						"from": 8010,
+						"to": 8210
+					},
+					"id": 262,
+					"p": 0.996421,
+					"t_dtw": -1
+				},
+				{
+					"text": " NRA",
+					"timestamps": {
+						"from": "00:00:08,210",
+						"to": "00:00:08,400"
+					},
+					"offsets": {
+						"from": 8210,
+						"to": 8400
+					},
+					"id": 23962,
+					"p": 0.989172,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:08,400",
+						"to": "00:00:08,440"
+					},
+					"offsets": {
+						"from": 8400,
+						"to": 8440
+					},
+					"id": 11,
+					"p": 0.806243,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:08,740",
+						"to": "00:00:08,740"
+					},
+					"offsets": {
+						"from": 8740,
+						"to": 8740
+					},
+					"id": 290,
+					"p": 0.997099,
+					"t_dtw": -1
+				},
+				{
+					"text": " Deposit",
+					"timestamps": {
+						"from": "00:00:09,010",
+						"to": "00:00:09,200"
+					},
+					"offsets": {
+						"from": 9010,
+						"to": 9200
+					},
+					"id": 44158,
+					"p": 0.586827,
+					"t_dtw": -1
+				},
+				{
+					"text": " Insurance",
+					"timestamps": {
+						"from": "00:00:09,200",
+						"to": "00:00:09,800"
+					},
+					"offsets": {
+						"from": 9200,
+						"to": 9800
+					},
+					"id": 17541,
+					"p": 0.990917,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:09,800",
+						"to": "00:00:10,040"
+					},
+					"offsets": {
+						"from": 9800,
+						"to": 10040
+					},
+					"id": 13,
+					"p": 0.988329,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_502]",
+					"timestamps": {
+						"from": "00:00:10,040",
+						"to": "00:00:10,040"
+					},
+					"offsets": {
+						"from": 10040,
+						"to": 10040
+					},
+					"id": 50865,
+					"p": 0.200657,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

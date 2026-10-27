@@ -1,0 +1,534 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:03,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 3000
+			},
+			"text": " And the crash was only the start.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.899417,
+					"t_dtw": -1
+				},
+				{
+					"text": " And",
+					"timestamps": {
+						"from": "00:00:00,230",
+						"to": "00:00:00,230"
+					},
+					"offsets": {
+						"from": 230,
+						"to": 230
+					},
+					"id": 843,
+					"p": 0.50794,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:00,330",
+						"to": "00:00:00,460"
+					},
+					"offsets": {
+						"from": 330,
+						"to": 460
+					},
+					"id": 262,
+					"p": 0.990135,
+					"t_dtw": -1
+				},
+				{
+					"text": " crash",
+					"timestamps": {
+						"from": "00:00:00,460",
+						"to": "00:00:00,830"
+					},
+					"offsets": {
+						"from": 460,
+						"to": 830
+					},
+					"id": 7014,
+					"p": 0.996901,
+					"t_dtw": -1
+				},
+				{
+					"text": " was",
+					"timestamps": {
+						"from": "00:00:00,830",
+						"to": "00:00:01,060"
+					},
+					"offsets": {
+						"from": 830,
+						"to": 1060
+					},
+					"id": 373,
+					"p": 0.99894,
+					"t_dtw": -1
+				},
+				{
+					"text": " only",
+					"timestamps": {
+						"from": "00:00:01,130",
+						"to": "00:00:01,370"
+					},
+					"offsets": {
+						"from": 1130,
+						"to": 1370
+					},
+					"id": 691,
+					"p": 0.998468,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:01,370",
+						"to": "00:00:01,590"
+					},
+					"offsets": {
+						"from": 1370,
+						"to": 1590
+					},
+					"id": 262,
+					"p": 0.998652,
+					"t_dtw": -1
+				},
+				{
+					"text": " start",
+					"timestamps": {
+						"from": "00:00:01,590",
+						"to": "00:00:01,910"
+					},
+					"offsets": {
+						"from": 1590,
+						"to": 1910
+					},
+					"id": 923,
+					"p": 0.999659,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:03,000",
+						"to": "00:00:03,000"
+					},
+					"offsets": {
+						"from": 3000,
+						"to": 3000
+					},
+					"id": 13,
+					"p": 0.966047,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_150]",
+					"timestamps": {
+						"from": "00:00:03,000",
+						"to": "00:00:03,000"
+					},
+					"offsets": {
+						"from": 3000,
+						"to": 3000
+					},
+					"id": 50513,
+					"p": 0.037071,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:03,000",
+				"to": "00:00:11,000"
+			},
+			"offsets": {
+				"from": 3000,
+				"to": 11000
+			},
+			"text": " That band, the Dow from Peak to Bottom, runs two years and ten months to July 1932, down 89%.",
+			"tokens": [
+				{
+					"text": " That",
+					"timestamps": {
+						"from": "00:00:03,270",
+						"to": "00:00:03,270"
+					},
+					"offsets": {
+						"from": 3270,
+						"to": 3270
+					},
+					"id": 1320,
+					"p": 0.992774,
+					"t_dtw": -1
+				},
+				{
+					"text": " band",
+					"timestamps": {
+						"from": "00:00:03,330",
+						"to": "00:00:03,530"
+					},
+					"offsets": {
+						"from": 3330,
+						"to": 3530
+					},
+					"id": 4097,
+					"p": 0.752047,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,600",
+						"to": "00:00:03,670"
+					},
+					"offsets": {
+						"from": 3600,
+						"to": 3670
+					},
+					"id": 11,
+					"p": 0.814954,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:03,670",
+						"to": "00:00:03,870"
+					},
+					"offsets": {
+						"from": 3670,
+						"to": 3870
+					},
+					"id": 262,
+					"p": 0.835101,
+					"t_dtw": -1
+				},
+				{
+					"text": " Dow",
+					"timestamps": {
+						"from": "00:00:03,870",
+						"to": "00:00:04,060"
+					},
+					"offsets": {
+						"from": 3870,
+						"to": 4060
+					},
+					"id": 21842,
+					"p": 0.902589,
+					"t_dtw": -1
+				},
+				{
+					"text": " from",
+					"timestamps": {
+						"from": "00:00:04,130",
+						"to": "00:00:04,340"
+					},
+					"offsets": {
+						"from": 4130,
+						"to": 4340
+					},
+					"id": 422,
+					"p": 0.837277,
+					"t_dtw": -1
+				},
+				{
+					"text": " Peak",
+					"timestamps": {
+						"from": "00:00:04,340",
+						"to": "00:00:04,610"
+					},
+					"offsets": {
+						"from": 4340,
+						"to": 4610
+					},
+					"id": 23974,
+					"p": 0.678369,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:04,610",
+						"to": "00:00:04,740"
+					},
+					"offsets": {
+						"from": 4610,
+						"to": 4740
+					},
+					"id": 284,
+					"p": 0.990163,
+					"t_dtw": -1
+				},
+				{
+					"text": " Bottom",
+					"timestamps": {
+						"from": "00:00:04,740",
+						"to": "00:00:04,920"
+					},
+					"offsets": {
+						"from": 4740,
+						"to": 4920
+					},
+					"id": 24530,
+					"p": 0.982941,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:04,920",
+						"to": "00:00:05,290"
+					},
+					"offsets": {
+						"from": 4920,
+						"to": 5290
+					},
+					"id": 11,
+					"p": 0.926638,
+					"t_dtw": -1
+				},
+				{
+					"text": " runs",
+					"timestamps": {
+						"from": "00:00:05,290",
+						"to": "00:00:05,410"
+					},
+					"offsets": {
+						"from": 5290,
+						"to": 5410
+					},
+					"id": 4539,
+					"p": 0.726425,
+					"t_dtw": -1
+				},
+				{
+					"text": " two",
+					"timestamps": {
+						"from": "00:00:05,680",
+						"to": "00:00:05,680"
+					},
+					"offsets": {
+						"from": 5680,
+						"to": 5680
+					},
+					"id": 734,
+					"p": 0.678967,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:06,000",
+						"to": "00:00:06,000"
+					},
+					"offsets": {
+						"from": 6000,
+						"to": 6000
+					},
+					"id": 812,
+					"p": 0.995163,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:06,100",
+						"to": "00:00:06,280"
+					},
+					"offsets": {
+						"from": 6100,
+						"to": 6280
+					},
+					"id": 290,
+					"p": 0.607647,
+					"t_dtw": -1
+				},
+				{
+					"text": " ten",
+					"timestamps": {
+						"from": "00:00:06,400",
+						"to": "00:00:06,500"
+					},
+					"offsets": {
+						"from": 6400,
+						"to": 6500
+					},
+					"id": 3478,
+					"p": 0.69764,
+					"t_dtw": -1
+				},
+				{
+					"text": " months",
+					"timestamps": {
+						"from": "00:00:06,500",
+						"to": "00:00:07,000"
+					},
+					"offsets": {
+						"from": 6500,
+						"to": 7000
+					},
+					"id": 1933,
+					"p": 0.984851,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:07,000",
+						"to": "00:00:07,240"
+					},
+					"offsets": {
+						"from": 7000,
+						"to": 7240
+					},
+					"id": 284,
+					"p": 0.495409,
+					"t_dtw": -1
+				},
+				{
+					"text": " July",
+					"timestamps": {
+						"from": "00:00:07,240",
+						"to": "00:00:07,680"
+					},
+					"offsets": {
+						"from": 7240,
+						"to": 7680
+					},
+					"id": 2901,
+					"p": 0.953093,
+					"t_dtw": -1
+				},
+				{
+					"text": " 1932",
+					"timestamps": {
+						"from": "00:00:07,680",
+						"to": "00:00:09,000"
+					},
+					"offsets": {
+						"from": 7680,
+						"to": 9000
+					},
+					"id": 32471,
+					"p": 0.887154,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:09,000",
+						"to": "00:00:09,140"
+					},
+					"offsets": {
+						"from": 9000,
+						"to": 9140
+					},
+					"id": 11,
+					"p": 0.607873,
+					"t_dtw": -1
+				},
+				{
+					"text": " down",
+					"timestamps": {
+						"from": "00:00:09,160",
+						"to": "00:00:09,520"
+					},
+					"offsets": {
+						"from": 9160,
+						"to": 9520
+					},
+					"id": 866,
+					"p": 0.873156,
+					"t_dtw": -1
+				},
+				{
+					"text": " 89",
+					"timestamps": {
+						"from": "00:00:09,520",
+						"to": "00:00:10,400"
+					},
+					"offsets": {
+						"from": 9520,
+						"to": 10400
+					},
+					"id": 9919,
+					"p": 0.736388,
+					"t_dtw": -1
+				},
+				{
+					"text": "%.",
+					"timestamps": {
+						"from": "00:00:10,400",
+						"to": "00:00:11,000"
+					},
+					"offsets": {
+						"from": 10400,
+						"to": 11000
+					},
+					"id": 7225,
+					"p": 0.571584,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_550]",
+					"timestamps": {
+						"from": "00:00:11,000",
+						"to": "00:00:11,000"
+					},
+					"offsets": {
+						"from": 11000,
+						"to": 11000
+					},
+					"id": 50913,
+					"p": 0.184952,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

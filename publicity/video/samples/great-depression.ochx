@@ -1,0 +1,3056 @@
+{
+ "format": "openchronology",
+ "version": 1,
+ "title": "The Great Depression, 1929–1941",
+ "description": "The Great Depression in the United States and around the world: the boom of the 1920s and its cracks, the Crash of 1929 and the market's three-year fall, the banking panics, the European crisis and the end of the gold standard, the Hoover years and the Bonus Army, the Dust Bowl, Roosevelt's New Deal, the court fight and the recession of 1937–38, the culture of the decade, and the war economy that ended it.\n\n**How to read it.** Chapter headings mark the stages. Presidencies, programs, panics, droughts, recessions and the market's slide are durations; everything else is a moment, tagged by thread (market, banking, policy, politics, world, labor, farm, culture, economy). Related moments are linked: a cause and what it led to.\n\n**Dates and figures.** Local days, shown at a fixed UTC−5, New York's standard time, so the Crash's market hours read as Wall Street's. The business cycle follows the NBER's dates (to the month); unemployment rates are the Bureau of Labor Statistics' later annual estimates, placed at mid-year. Where a date or a figure is approximate, its dating note or its notes say so.\n\nA sample timeline built from the cited sources (Wikipedia, the NBER, the Bureau of Labor Statistics, the Federal Reserve's history essays, the National Archives and others); not a definitive history.",
+ "presentation": {
+  "mode": "gregorian",
+  "unit": "",
+  "scale": "1/1",
+  "origin": "0/1",
+  "version": 1,
+  "offsetMinutes": -300,
+  "significantDigits": 6
+ },
+ "tags": [
+  "history",
+  "great depression",
+  "economics",
+  "united states",
+  "new deal",
+  "education"
+ ],
+ "plugins": [
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "rich-text-notes",
+    "version": 1,
+    "name": "Rich text notes",
+    "description": "Edit moment and stack notes visually, storing portable Markdown. Hover cards render safe headings, emphasis, lists, code and HTTPS links. HTML and images are not executed.",
+    "fields": [],
+    "notes": {
+     "kind": "markdown"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-headings",
+    "version": 1,
+    "name": "Headings",
+    "description": "Let a moment act as a heading or marker: only its title shows, sized as a heading from level 1 to 6, and the title is what you click. Choose its font (Times New Roman by default). Headings still group into summaries with other moments.",
+    "fields": [
+     {
+      "kind": "heading",
+      "metadataKey": "headingLevel",
+      "label": "Heading level"
+     },
+     {
+      "kind": "font",
+      "metadataKey": "headingFont",
+      "label": "Heading font"
+     }
+    ],
+    "marker": {
+     "kind": "heading",
+     "metadataKey": "headingLevel"
+    },
+    "targets": [
+     "moments"
+    ]
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-sources",
+    "version": 1,
+    "name": "Sources",
+    "description": "Show and edit a series of source links for moments and stack entries.",
+    "fields": [
+     {
+      "kind": "links",
+      "metadataKey": "sources",
+      "label": "Sources"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-colors",
+    "version": 2,
+    "name": "Moment colors",
+    "description": "Choose muted semantic swatches or a custom color for moments and stack entries while preserving their white borders.",
+    "fields": [
+     {
+      "kind": "color",
+      "metadataKey": "color",
+      "label": "Moment color"
+     }
+    ],
+    "marker": {
+     "kind": "color",
+     "metadataKey": "color"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.color(api.get(\"color\")); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "dating-context",
+    "version": 1,
+    "name": "Dating context",
+    "description": "Explain the precision and coordinate convention of a moment. An exact stored coordinate can still represent an approximate age or a calendar-day marker.",
+    "fields": [
+     {
+      "kind": "text",
+      "metadataKey": "datePrecision",
+      "label": "Date precision"
+     },
+     {
+      "kind": "multiline",
+      "metadataKey": "coordinateConvention",
+      "label": "Coordinate convention"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "expand-on-hover",
+    "version": 1,
+    "name": "Expand on hover",
+    "description": "Hover or focus a summary of two to five moments to fan out its members radially for individual inspection. Larger summaries stay collapsed.",
+    "fields": [],
+    "summary": {
+     "kind": "radial"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.expand(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "timeline-theme",
+    "version": 2,
+    "name": "Timeline theme",
+    "description": "Choose the timeline's colors, fonts and text sizes: its labels, its measure (the axis, tick marks and their times), the halo that keeps them readable over images, the default marker and duration colors, and a background color. Set them here in the plugin list; anything left blank keeps the usual look, and colors chosen for events still win.",
+    "fields": [],
+    "settings": [
+     {
+      "kind": "color",
+      "key": "textColor",
+      "label": "Label color"
+     },
+     {
+      "kind": "font",
+      "key": "textFont",
+      "label": "Label font"
+     },
+     {
+      "kind": "text-size",
+      "key": "textSize",
+      "label": "Label size"
+     },
+     {
+      "kind": "color",
+      "key": "measureColor",
+      "label": "Measure color"
+     },
+     {
+      "kind": "font",
+      "key": "measureFont",
+      "label": "Measure font"
+     },
+     {
+      "kind": "text-size",
+      "key": "measureSize",
+      "label": "Measure size"
+     },
+     {
+      "kind": "color",
+      "key": "haloColor",
+      "label": "Halo color"
+     },
+     {
+      "kind": "color",
+      "key": "markerColor",
+      "label": "Marker color"
+     },
+     {
+      "kind": "color",
+      "key": "durationColor",
+      "label": "Duration color"
+     },
+     {
+      "kind": "color",
+      "key": "backgroundColor",
+      "label": "Background color"
+     }
+    ],
+    "theme": {
+     "text": "textColor",
+     "textFont": "textFont",
+     "textSize": "textSize",
+     "measure": "measureColor",
+     "measureFont": "measureFont",
+     "measureSize": "measureSize",
+     "halo": "haloColor",
+     "marker": "markerColor",
+     "duration": "durationColor",
+     "background": "backgroundColor"
+    }
+   },
+   "enabled": true,
+   "settings": {
+    "textColor": "#1f2a44",
+    "textFont": "Georgia, serif",
+    "measureColor": "#9c3b2a",
+    "haloColor": "#f3ead7",
+    "markerColor": "#1f3a5f",
+    "durationColor": "#9c3b2a",
+    "backgroundColor": "#f3ead7"
+   }
+  }
+ ],
+ "events": [
+  {
+   "id": "h-twenties",
+   "time": "-1577905200/1",
+   "metadata": {
+    "title": "The boom and its cracks",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "prohibition-begins",
+   "time": "-1576522800/1",
+   "metadata": {
+    "title": "Prohibition begins",
+    "description": "The **Eighteenth Amendment** takes effect: the manufacture, sale and transport of alcoholic drinks are banned nationwide.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Prohibition_in_the_United_States"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "farm-prices",
+   "time": "-1562180400/1",
+   "metadata": {
+    "title": "Farm prices collapse",
+    "description": "Crop prices, high during the war, fall sharply in the **depression of 1920–21**. Farmers who had borrowed to buy land stay in trouble for the rest of the decade, years before the Crash.",
+    "tags": [
+     "farm"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Depression_of_1920–1921",
+     "https://en.wikipedia.org/wiki/Agriculture_in_the_United_States"
+    ],
+    "color": "#b0782a",
+    "datePrecision": "Prices fell through the second half of 1920; placed at mid-year."
+   }
+  },
+  {
+   "id": "bull-begins",
+   "time": "-1525978800/1",
+   "metadata": {
+    "title": "The bull market begins",
+    "description": "The Dow Jones Industrial Average closes at **63.90**, its low after the 1920–21 slump. From here it rises six-fold in eight years.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average",
+     "https://en.wikipedia.org/wiki/Roaring_Twenties"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "coolidge",
+   "time": "-1464807600/1",
+   "metadata": {
+    "title": "Coolidge becomes president",
+    "description": "**Warren G. Harding** dies in office and **Calvin Coolidge** succeeds him: the years of \"Coolidge prosperity\", low taxes and light regulation.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Calvin_Coolidge"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "miami-hurricane",
+   "time": "-1366052400/1",
+   "metadata": {
+    "title": "The Miami hurricane",
+    "description": "A major hurricane strikes **Miami**, finishing off the Florida land boom, which had already begun to falter as buyers ran short.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1926_Miami_hurricane",
+     "https://en.wikipedia.org/wiki/Florida_land_boom_of_the_1920s"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "mcnary-haugen",
+   "time": "-1352228400/1",
+   "metadata": {
+    "title": "Coolidge vetoes farm relief",
+    "description": "Coolidge vetoes the **McNary–Haugen** bill, which would have had the government buy farm surpluses to raise prices; he vetoes it again in 1928.",
+    "tags": [
+     "farm"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/McNary–Haugen_Farm_Relief_Bill"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "hoover-inaugurated",
+   "time": "-1288465200/1",
+   "metadata": {
+    "title": "Hoover inaugurated",
+    "description": "**Herbert Hoover**, an engineer and Commerce Secretary under Coolidge, becomes president, promising that the end of poverty is in sight.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Herbert_Hoover",
+     "https://en.wikipedia.org/wiki/Presidency_of_Herbert_Hoover"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "mini-crash",
+   "time": "-1286564400/1",
+   "metadata": {
+    "title": "A warning break",
+    "description": "Prices break on fears that the **Federal Reserve** will tighten credit for speculation; **Charles E. Mitchell** of National City Bank offers loans to calm the market, and it recovers.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wall_Street_crash_of_1929",
+     "https://en.wikipedia.org/wiki/Charles_E._Mitchell"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "farm-board",
+   "time": "-1279566000/1",
+   "metadata": {
+    "title": "Agricultural Marketing Act",
+    "description": "Hoover's answer to the farm problem: a **Federal Farm Board** to lend to cooperatives and hold surpluses off the market.",
+    "tags": [
+     "farm",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Agricultural_Marketing_Act_of_1929"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "unemployment-1929",
+   "time": "-1278183600/1",
+   "metadata": {
+    "title": "Unemployment: 3.2%",
+    "description": "**3.2%** of the civilian labor force out of work, about **1.6 million** people, in the Bureau of Labor Statistics' estimates (Stanley Lebergott's, the basis of Historical Statistics' series). No one measured unemployment directly at the time: these are later estimates, and others who count relief workers as employed put the 1930s lower.",
+    "tags": [
+     "economy"
+    ],
+    "sources": [
+     "https://www.bls.gov/opub/mlr/1948/article/pdf/labor-force-employment-and-unemployment-1929-39-estimating-methods.pdf",
+     "https://en.wikipedia.org/wiki/Great_Depression_in_the_United_States"
+    ],
+    "color": "#3d3a33",
+    "datePrecision": "An annual average for the year, placed at mid-year."
+   }
+  },
+  {
+   "id": "nber-peak",
+   "time": "-1275505200/1",
+   "metadata": {
+    "title": "The business cycle peaks",
+    "description": "The **National Bureau of Economic Research** dates the peak of the expansion to August 1929: the economy was already turning down two months before the Crash.",
+    "tags": [
+     "economy"
+    ],
+    "sources": [
+     "https://www.nber.org/research/data/us-business-cycle-expansions-and-contractions",
+     "https://www.federalreservehistory.org/essays/great-depression"
+    ],
+    "color": "#3d3a33",
+    "datePrecision": "The NBER dates peaks and troughs to the month (August 1929); placed at its first day."
+   }
+  },
+  {
+   "id": "h-crash",
+   "time": "-1272740400/1",
+   "metadata": {
+    "title": "The Crash",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "dow-peak",
+   "time": "-1272654000/1",
+   "metadata": {
+    "title": "The Dow peaks at 381.17",
+    "description": "The Dow Jones Industrial Average closes at **381.17**, its high. Much of the buying is **on margin**: stock bought with money borrowed from brokers, against the stock itself.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wall_Street_crash_of_1929",
+     "https://www.federalreservehistory.org/essays/stock-market-crash-of-1929"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "babson",
+   "time": "-1272481200/1",
+   "metadata": {
+    "title": "The Babson break",
+    "description": "The investment adviser **Roger Babson** tells a business conference that \"a crash is coming\"; prices fall sharply that afternoon.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Roger_Babson",
+     "https://en.wikipedia.org/wiki/Wall_Street_crash_of_1929"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "hatry",
+   "time": "-1271185200/1",
+   "metadata": {
+    "title": "The Hatry crash in London",
+    "description": "The London Stock Exchange suspends trading in the companies of **Clarence Hatry**, whose empire is found to rest on fraud; British investors' losses unsettle markets in New York.",
+    "tags": [
+     "world",
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Clarence_Hatry",
+     "https://en.wikipedia.org/wiki/Wall_Street_crash_of_1929"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "fisher",
+   "time": "-1269025200/1",
+   "metadata": {
+    "title": "\"A permanently high plateau\"",
+    "description": "The Yale economist **Irving Fisher** says that stock prices have reached \"what looks like a permanently high plateau\". Nine days later the panic begins.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Irving_Fisher"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Said at a dinner in mid-October 1929 and reported the next day."
+   }
+  },
+  {
+   "id": "black-thursday",
+   "time": "-1268211600/1",
+   "metadata": {
+    "title": "Black Thursday",
+    "description": "Selling floods the New York Stock Exchange from the opening: a record **12.9 million shares** change hands, and the ticker runs hours behind the trading.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wall_Street_crash_of_1929",
+     "https://www.federalreservehistory.org/essays/stock-market-crash-of-1929"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "The day is exact; placed at the 10 a.m. opening bell, New York's time."
+   }
+  },
+  {
+   "id": "bankers",
+   "time": "-1268204400/1",
+   "metadata": {
+    "title": "The bankers' meeting",
+    "description": "Leaders of New York's biggest banks (**Thomas Lamont** of J.P. Morgan, **Albert Wiggin** of Chase, **Charles Mitchell** of National City) meet at the House of Morgan and agree to buy stocks to steady the market.",
+    "tags": [
+     "market",
+     "banking"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wall_Street_crash_of_1929"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Around midday, as contemporary accounts give it."
+   }
+  },
+  {
+   "id": "whitney",
+   "time": "-1268199000/1",
+   "metadata": {
+    "title": "Whitney bids 205 for Steel",
+    "description": "**Richard Whitney**, the Exchange's vice president, walks onto the floor and bids well above the market for **U.S. Steel**, then for other leading stocks. Prices rally, and the Dow closes the day down only about 2%.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Richard_Whitney_(financier)",
+     "https://en.wikipedia.org/wiki/Wall_Street_crash_of_1929"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "About 1:30 p.m., as most accounts give it."
+   }
+  },
+  {
+   "id": "black-monday",
+   "time": "-1267902000/1",
+   "metadata": {
+    "title": "Black Monday",
+    "description": "No rescue comes this time: the Dow falls **38.33 points, 12.8%**, to 260.64, its worst day of the Crash in percentage terms.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wall_Street_crash_of_1929"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "black-tuesday",
+   "time": "-1267815600/1",
+   "metadata": {
+    "title": "Black Tuesday",
+    "description": "About **16.4 million shares** trade and the Dow falls another **11.7%**, to 230.07: down 23% in two days.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wall_Street_crash_of_1929",
+     "https://www.federalreservehistory.org/essays/stock-market-crash-of-1929"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "nov-low",
+   "time": "-1266519600/1",
+   "metadata": {
+    "title": "The Crash bottoms at 198.60",
+    "description": "The Dow closes at **198.60**, nearly half its September peak. It then recovers through the winter, and many expect the worst is over.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wall_Street_crash_of_1929"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "h-slide",
+   "time": "-1262286000/1",
+   "metadata": {
+    "title": "The slide, 1930–1932",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "spring-rally",
+   "time": "-1253127600/1",
+   "metadata": {
+    "title": "The Dow recovers to 294",
+    "description": "The rally after the Crash peaks at **294.07**. From here the market falls, with pauses, for more than two years.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wall_Street_crash_of_1929",
+     "https://en.wikipedia.org/wiki/Timeline_of_the_Great_Depression"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "bruning-chancellor",
+   "time": "-1254682800/1",
+   "metadata": {
+    "title": "Brüning becomes chancellor",
+    "description": "**Heinrich Brüning** becomes Germany's chancellor and governs by presidential emergency decree, cutting spending and wages to keep the budget balanced and reparations paid.",
+    "tags": [
+     "world"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Heinrich_Brüning",
+     "https://en.wikipedia.org/wiki/Great_Depression_in_Germany"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "smoot-hawley",
+   "time": "-1247857200/1",
+   "metadata": {
+    "title": "Smoot–Hawley tariff",
+    "description": "Hoover signs the **Smoot–Hawley Tariff Act**, raising duties on thousands of imports, despite a petition from more than a thousand economists. Other countries retaliate and world trade shrinks.",
+    "tags": [
+     "policy",
+     "world"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Smoot–Hawley_Tariff_Act",
+     "https://www.federalreservehistory.org/essays/smoot-hawley-tariff"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "reichstag-1930",
+   "time": "-1240167600/1",
+   "metadata": {
+    "title": "Nazis gain in Germany",
+    "description": "In the Reichstag election the **Nazi party** grows from 12 seats to 107, the second-largest party, on the back of the slump's discontent.",
+    "tags": [
+     "world",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1930_German_federal_election"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "caldwell",
+   "time": "-1235502000/1",
+   "metadata": {
+    "title": "Caldwell and Company fails",
+    "description": "The **Bank of Tennessee**, part of the Nashville financial empire of Caldwell and Company, closes; its affiliates follow, and runs spread through the South: the first banking panic.",
+    "tags": [
+     "banking"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Rogers_Caldwell",
+     "https://www.federalreservehistory.org/essays/banking-panics-1930-31"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "bank-of-us",
+   "time": "-1232564400/1",
+   "metadata": {
+    "title": "The Bank of United States closes",
+    "description": "The **Bank of United States**, a New York commercial bank with some 400,000 depositors, many of them immigrants, closes after a run: the largest US bank failure to that time.",
+    "tags": [
+     "banking"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Bank_of_United_States",
+     "https://www.federalreservehistory.org/essays/banking-panics-1930-31"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "creditanstalt",
+   "time": "-1219518000/1",
+   "metadata": {
+    "title": "Creditanstalt fails",
+    "description": "Vienna's **Creditanstalt**, Austria's largest bank, announces it has lost most of its capital. The crisis spreads to Hungary and Germany and becomes a European financial panic.",
+    "tags": [
+     "world",
+     "banking"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Creditanstalt",
+     "https://www.federalreservehistory.org/essays/creditanstalt-failure"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "moratorium-announced",
+   "time": "-1216062000/1",
+   "metadata": {
+    "title": "The Hoover Moratorium",
+    "description": "Hoover proposes a one-year halt to payments of **war debts and German reparations**. France delays agreeing for weeks, and the panic continues.",
+    "tags": [
+     "world",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hoover_Moratorium"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "danat",
+   "time": "-1214074800/1",
+   "metadata": {
+    "title": "Danatbank fails",
+    "description": "Germany's **Darmstädter und Nationalbank** closes its doors, and the government closes the country's banks for days.",
+    "tags": [
+     "world",
+     "banking"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Danat-Bank",
+     "https://en.wikipedia.org/wiki/European_banking_crisis_of_1931"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "britain-gold",
+   "time": "-1208026800/1",
+   "metadata": {
+    "title": "Britain leaves gold",
+    "description": "After weeks of gold losses, Britain suspends the **gold standard** and the pound falls. Within weeks Scandinavia and much of the Commonwealth follow; those who left early recover sooner.",
+    "tags": [
+     "world",
+     "banking"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Gold_standard",
+     "https://en.wikipedia.org/wiki/Great_Depression_in_the_United_Kingdom"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "fed-raises",
+   "time": "-1206471600/1",
+   "metadata": {
+    "title": "The Fed raises its rate",
+    "description": "To defend the dollar against gold outflows, the **Federal Reserve Bank of New York** raises its discount rate to 2½%, and to 3½% a week later, in the middle of a banking panic: a step **Milton Friedman** and **Anna Schwartz** later blamed for deepening the depression.",
+    "tags": [
+     "banking",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Great_Depression_in_the_United_States",
+     "https://www.federalreservehistory.org/essays/great-depression"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "japan-gold",
+   "time": "-1200855600/1",
+   "metadata": {
+    "title": "Japan leaves gold",
+    "description": "On the day **Takahashi Korekiyo** becomes finance minister again, Japan reimposes its gold embargo; the yen falls and exports recover.",
+    "tags": [
+     "world"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Takahashi_Korekiyo",
+     "https://en.wikipedia.org/wiki/Economic_history_of_Japan"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "germany-six-million",
+   "time": "-1198004400/1",
+   "metadata": {
+    "title": "Six million out of work in Germany",
+    "description": "Registered unemployment in Germany passes **six million**, roughly a third of the workforce by some estimates; many more had stopped registering.",
+    "tags": [
+     "world",
+     "economy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Great_Depression_in_Germany",
+     "https://en.wikipedia.org/wiki/Weimar_Republic"
+    ],
+    "color": "#2f6b73",
+    "datePrecision": "A monthly registered figure: about 6 million in early 1932, and again in early 1933."
+   }
+  },
+  {
+   "id": "rfc",
+   "time": "-1197399600/1",
+   "metadata": {
+    "title": "The RFC",
+    "description": "Hoover signs the act creating the **Reconstruction Finance Corporation**, to lend to banks, railroads and other businesses. The New Deal keeps it and widens it.",
+    "tags": [
+     "policy",
+     "banking"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Reconstruction_Finance_Corporation",
+     "https://www.federalreservehistory.org/essays/reconstruction-finance-corporation"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "revenue-1932",
+   "time": "-1185649200/1",
+   "metadata": {
+    "title": "Revenue Act of 1932",
+    "description": "To balance the budget, Congress passes one of the largest peacetime **tax increases** in American history, in the depths of the slump.",
+    "tags": [
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Revenue_Act_of_1932"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "bonus-vote",
+   "time": "-1184698800/1",
+   "metadata": {
+    "title": "Senate rejects the bonus",
+    "description": "The Senate defeats the **Patman bill**, 62 to 18, which would have paid veterans their First World War bonus early, while thousands of them wait outside the Capitol.",
+    "tags": [
+     "politics",
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Bonus_Army"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "new-deal-speech",
+   "time": "-1183402800/1",
+   "metadata": {
+    "title": "\"A new deal for the American people\"",
+    "description": "Accepting the Democratic nomination in Chicago, **Franklin D. Roosevelt**, governor of New York, pledges \"a new deal for the American people\", the phrase that names his programs.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1932_Democratic_National_Convention",
+     "https://en.wikipedia.org/wiki/New_Deal"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "dow-bottom",
+   "time": "-1182884400/1",
+   "metadata": {
+    "title": "The Dow hits bottom: 41.22",
+    "description": "The Dow closes at **41.22**, down **89%** from its 1929 peak and lower than at any time since 1896: its low of the twentieth century.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wall_Street_crash_of_1929",
+     "https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "unemployment-1932",
+   "time": "-1183489200/1",
+   "metadata": {
+    "title": "Unemployment: 23.6%",
+    "description": "**23.6%** of the civilian labor force out of work, about **12.1 million** people, in the Bureau of Labor Statistics' estimates (Stanley Lebergott's, the basis of Historical Statistics' series). No one measured unemployment directly at the time: these are later estimates, and others who count relief workers as employed put the 1930s lower.",
+    "tags": [
+     "economy"
+    ],
+    "sources": [
+     "https://www.bls.gov/opub/mlr/1948/article/pdf/labor-force-employment-and-unemployment-1929-39-estimating-methods.pdf"
+    ],
+    "color": "#3d3a33",
+    "datePrecision": "An annual average for the year, placed at mid-year."
+   }
+  },
+  {
+   "id": "erca",
+   "time": "-1181761200/1",
+   "metadata": {
+    "title": "Emergency Relief and Construction Act",
+    "description": "The first federal relief law: the RFC may lend up to **$300 million** to the states for relief and more for public works, a break with Hoover's long refusal of federal relief.",
+    "tags": [
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emergency_Relief_and_Construction_Act"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "bonus-eviction",
+   "time": "-1181156400/1",
+   "metadata": {
+    "title": "The Bonus Army driven out",
+    "description": "After police shoot two veterans, Hoover orders the Army in: troops under **Douglas MacArthur**, with cavalry, tanks and tear gas, clear the marchers and burn their camp at Anacostia Flats.",
+    "tags": [
+     "politics",
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Bonus_Army"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "reichstag-1932",
+   "time": "-1180897200/1",
+   "metadata": {
+    "title": "The Nazis become the largest party",
+    "description": "With about **37%** of the vote, the Nazis win 230 seats and become the largest party in the Reichstag, though short of a majority.",
+    "tags": [
+     "world",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/July_1932_German_federal_election"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "brother-dime",
+   "time": "-1175194800/1",
+   "metadata": {
+    "title": "\"Brother, Can You Spare a Dime?\"",
+    "description": "**Yip Harburg** and **Jay Gorney**'s song, from the revue Americana, of a man who built the railroads and fought the war and now stands in a breadline: the Depression's anthem.",
+    "tags": [
+     "culture"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Brother,_Can_You_Spare_a_Dime%3F"
+    ],
+    "color": "#8a4f6a",
+    "datePrecision": "The revue Americana opened on Broadway in early October 1932."
+   }
+  },
+  {
+   "id": "election-1932",
+   "time": "-1172257200/1",
+   "metadata": {
+    "title": "Roosevelt elected",
+    "description": "Roosevelt defeats Hoover with **57%** of the popular vote and 472 electoral votes to 59; four months of interregnum follow before he takes office.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1932_United_States_presidential_election"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "hitler",
+   "time": "-1165086000/1",
+   "metadata": {
+    "title": "Hitler becomes chancellor",
+    "description": "President **Hindenburg** appoints **Adolf Hitler** chancellor of Germany. Within months the Nazis have made Germany a dictatorship; the slump's six million unemployed had fed their rise.",
+    "tags": [
+     "world",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Adolf_Hitler%27s_rise_to_power",
+     "https://en.wikipedia.org/wiki/Great_Depression_in_Germany"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "michigan-holiday",
+   "time": "-1163790000/1",
+   "metadata": {
+    "title": "Michigan closes its banks",
+    "description": "To stop runs on Detroit's banks, Michigan's governor declares an eight-day **bank holiday**. Panic spreads, and state after state closes its banks in the weeks that follow.",
+    "tags": [
+     "banking"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emergency_Banking_Act",
+     "https://www.federalreservehistory.org/essays/bank-holiday-of-1933"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "h-new-deal",
+   "time": "-1162839600/1",
+   "metadata": {
+    "title": "The New Deal",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "fdr-inaugurated",
+   "time": "-1162234800/1",
+   "metadata": {
+    "title": "\"The only thing we have to fear…\"",
+    "description": "Roosevelt is inaugurated, with most of the nation's banks shut or restricted: \"the only thing we have to fear is fear itself\". The last inauguration held in March.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_inauguration_of_Franklin_D._Roosevelt",
+     "https://www.presidency.ucsb.edu/documents/inaugural-address-8"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "bank-holiday",
+   "time": "-1162062000/1",
+   "metadata": {
+    "title": "The national bank holiday",
+    "description": "By proclamation, Roosevelt closes every bank in the country and halts gold exports, so that the banks' books can be examined.",
+    "tags": [
+     "banking",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emergency_Banking_Act",
+     "https://www.federalreservehistory.org/essays/bank-holiday-of-1933"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "emergency-banking",
+   "time": "-1161802800/1",
+   "metadata": {
+    "title": "Emergency Banking Act",
+    "description": "Congress passes it the day it meets, in a few hours, and Roosevelt signs it that night: sound banks are to reopen under license, with Federal Reserve currency behind them. The **Hundred Days** begin.",
+    "tags": [
+     "banking",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emergency_Banking_Act",
+     "https://www.federalreservehistory.org/essays/bank-holiday-of-1933"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "fireside-chat",
+   "time": "-1161543600/1",
+   "metadata": {
+    "title": "The first fireside chat",
+    "description": "On a Sunday evening, Roosevelt explains the banking crisis over the radio in plain words: \"it is safer to keep your money in a reopened bank than under the mattress.\"",
+    "tags": [
+     "banking",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fireside_chats",
+     "https://www.federalreservehistory.org/essays/bank-holiday-of-1933"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "banks-reopen",
+   "time": "-1161457200/1",
+   "metadata": {
+    "title": "Banks begin to reopen",
+    "description": "Banks in the Federal Reserve cities reopen first, others over the following days. Depositors bring their money back; the panic is over.",
+    "tags": [
+     "banking"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emergency_Banking_Act",
+     "https://www.federalreservehistory.org/essays/bank-holiday-of-1933"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "dow-record-day",
+   "time": "-1161284400/1",
+   "metadata": {
+    "title": "The Dow gains 15% in a day",
+    "description": "When the Stock Exchange reopens after the holiday, the Dow rises **15.34%**, its largest one-day gain in percentage terms, a record that still stands.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average",
+     "https://en.wikipedia.org/wiki/Emergency_Banking_Act"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "beer",
+   "time": "-1160679600/1",
+   "metadata": {
+    "title": "Beer is legal again",
+    "description": "The **Cullen–Harrison Act** allows beer and light wine of up to 3.2% alcohol from April 7, while repeal of Prohibition goes to the states.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Cullen–Harrison_Act"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "ccc-act",
+   "time": "-1159902000/1",
+   "metadata": {
+    "title": "The Civilian Conservation Corps",
+    "description": "Young unemployed men are put to work planting forests, fighting erosion and building parks, in camps run with the Army; most of their pay is sent home to their families.",
+    "tags": [
+     "policy",
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Civilian_Conservation_Corps"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "gold-6102",
+   "time": "-1159470000/1",
+   "metadata": {
+    "title": "Gold must be handed in",
+    "description": "**Executive Order 6102** requires Americans to deliver most of their gold coin, bullion and gold certificates to the Federal Reserve, at $20.67 an ounce.",
+    "tags": [
+     "banking",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Executive_Order_6102",
+     "https://www.federalreservehistory.org/essays/roosevelts-gold-program"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "off-gold",
+   "time": "-1158260400/1",
+   "metadata": {
+    "title": "The United States leaves gold",
+    "description": "Roosevelt bans gold exports, taking the dollar off the gold standard; it falls against foreign currencies, and prices begin to rise.",
+    "tags": [
+     "banking",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Gold_standard",
+     "https://www.federalreservehistory.org/essays/roosevelts-gold-program"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Announced on April 19, 1933; the executive order followed on the 20th."
+   }
+  },
+  {
+   "id": "aaa",
+   "time": "-1156230000/1",
+   "metadata": {
+    "title": "Agricultural Adjustment Act",
+    "description": "Farmers are paid to plant less, funded by a tax on processors, to raise crop prices. To cut that year's surplus, millions of young pigs are slaughtered and cotton plowed under.",
+    "tags": [
+     "farm",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Agricultural_Adjustment_Act"
+    ],
+    "color": "#b0782a",
+    "datePrecision": "Signed on May 12, 1933, the same day as the act creating FERA; placed at midday, an hour apart, so the two separate."
+   }
+  },
+  {
+   "id": "fera",
+   "time": "-1156226400/1",
+   "metadata": {
+    "title": "Federal Emergency Relief Administration",
+    "description": "**Harry Hopkins**'s FERA gives the states **$500 million** in grants, not loans, for relief: direct federal money for the jobless.",
+    "tags": [
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Federal_Emergency_Relief_Administration"
+    ],
+    "color": "#4f7a4a",
+    "datePrecision": "Signed on May 12, 1933, with the AAA; placed an hour after it."
+   }
+  },
+  {
+   "id": "tva",
+   "time": "-1155754800/1",
+   "metadata": {
+    "title": "The Tennessee Valley Authority",
+    "description": "A public corporation to build dams for flood control and cheap electric power across one of the poorest regions in the country.",
+    "tags": [
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tennessee_Valley_Authority",
+     "https://www.archives.gov/milestone-documents/tennessee-valley-authority-act"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "securities-act",
+   "time": "-1154977200/1",
+   "metadata": {
+    "title": "Securities Act of 1933",
+    "description": "Companies selling stocks and bonds to the public must now register them and tell the truth about them: the first federal law regulating securities.",
+    "tags": [
+     "market",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Securities_Act_of_1933"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "nira",
+   "time": "-1153206000/1",
+   "metadata": {
+    "title": "National Industrial Recovery Act",
+    "description": "Industries write **codes** of fair competition setting prices, wages and hours, under the Blue Eagle of the **National Recovery Administration**; section 7(a) protects the right to organize. It also creates the Public Works Administration.",
+    "tags": [
+     "policy",
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/National_Industrial_Recovery_Act_of_1933",
+     "https://en.wikipedia.org/wiki/National_Recovery_Administration"
+    ],
+    "color": "#4f7a4a",
+    "datePrecision": "Signed on June 16, 1933, the last day of the Hundred Days, with the Banking Act; placed at midday, an hour apart, so the two separate."
+   }
+  },
+  {
+   "id": "glass-steagall",
+   "time": "-1153202400/1",
+   "metadata": {
+    "title": "Glass–Steagall and the FDIC",
+    "description": "The **Banking Act of 1933** separates commercial from investment banking and creates the **Federal Deposit Insurance Corporation** to insure bank deposits.",
+    "tags": [
+     "banking",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1933_Banking_Act",
+     "https://www.federalreservehistory.org/essays/glass-steagall-act",
+     "https://www.fdic.gov/about/history"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Signed on June 16, 1933, with the NIRA; placed an hour after it."
+   }
+  },
+  {
+   "id": "bombshell",
+   "time": "-1151780400/1",
+   "metadata": {
+    "title": "Roosevelt's bombshell message",
+    "description": "Roosevelt tells the **London Economic Conference** that he will not tie the dollar to a currency agreement: recovery at home comes first. The conference breaks up without one.",
+    "tags": [
+     "world",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/London_Economic_Conference"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "unemployment-1933",
+   "time": "-1151953200/1",
+   "metadata": {
+    "title": "Unemployment peaks: 24.9%",
+    "description": "**24.9%** of the civilian labor force out of work, about **12.8 million** people, in the Bureau of Labor Statistics' estimates (Stanley Lebergott's, the basis of Historical Statistics' series). No one measured unemployment directly at the time: these are later estimates, and others who count relief workers as employed put the 1930s lower. The worst year: one worker in four. More than 9,000 banks had closed since 1930.",
+    "tags": [
+     "economy"
+    ],
+    "sources": [
+     "https://www.bls.gov/opub/mlr/1948/article/pdf/labor-force-employment-and-unemployment-1929-39-estimating-methods.pdf",
+     "https://en.wikipedia.org/wiki/Great_Depression_in_the_United_States"
+    ],
+    "color": "#3d3a33",
+    "datePrecision": "An annual average for the year, placed at mid-year."
+   }
+  },
+  {
+   "id": "nber-trough",
+   "time": "-1162494000/1",
+   "metadata": {
+    "title": "The business cycle bottoms",
+    "description": "The NBER dates the trough to **March 1933**: 43 months of contraction, the longest since the 1870s. By then the money supply had fallen by nearly 30% since 1930, and prices about as much.",
+    "tags": [
+     "economy"
+    ],
+    "sources": [
+     "https://www.nber.org/research/data/us-business-cycle-expansions-and-contractions",
+     "https://www.federalreservehistory.org/essays/great-depression"
+    ],
+    "color": "#3d3a33",
+    "datePrecision": "The NBER dates the trough to March 1933; placed at its first day."
+   }
+  },
+  {
+   "id": "repeal",
+   "time": "-1138388400/1",
+   "metadata": {
+    "title": "Prohibition ends",
+    "description": "Utah becomes the 36th state to ratify the **Twenty-first Amendment**, repealing the Eighteenth: alcohol is legal again, and taxed.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Twenty-first_Amendment_to_the_United_States_Constitution"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "fdic-begins",
+   "time": "-1136055600/1",
+   "metadata": {
+    "title": "Deposit insurance begins",
+    "description": "The FDIC begins insuring deposits, up to $2,500 per depositor at first. Bank runs, routine for a century, almost disappear.",
+    "tags": [
+     "banking"
+    ],
+    "sources": [
+     "https://www.fdic.gov/about/history",
+     "https://en.wikipedia.org/wiki/Federal_Deposit_Insurance_Corporation"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "gold-reserve-act",
+   "time": "-1133550000/1",
+   "metadata": {
+    "title": "Gold Reserve Act",
+    "description": "The Treasury takes title to the Federal Reserve's gold, and the next day Roosevelt fixes the price of gold at **$35 an ounce**, up from $20.67: a devaluation of the dollar by about 41%.",
+    "tags": [
+     "banking",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Gold_Reserve_Act",
+     "https://www.federalreservehistory.org/essays/gold-reserve-act"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "dust-may-1934",
+   "time": "-1124823600/1",
+   "metadata": {
+    "title": "Dust reaches the East Coast",
+    "description": "A great dust storm from the Plains darkens skies over Chicago, then New York and Washington, and drops dust on ships in the Atlantic.",
+    "tags": [
+     "farm"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Dust_Bowl"
+    ],
+    "color": "#b0782a",
+    "datePrecision": "The storm crossed the country over May 9–11, 1934."
+   }
+  },
+  {
+   "id": "sec",
+   "time": "-1122577200/1",
+   "metadata": {
+    "title": "The SEC",
+    "description": "The **Securities Exchange Act** regulates the stock exchanges and margin lending and creates the **Securities and Exchange Commission**; its first chairman is the former speculator **Joseph P. Kennedy**.",
+    "tags": [
+     "market",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Securities_Exchange_Act_of_1934",
+     "https://en.wikipedia.org/wiki/U.S._Securities_and_Exchange_Commission"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "rtaa",
+   "time": "-1122058800/1",
+   "metadata": {
+    "title": "Reciprocal Trade Agreements Act",
+    "description": "Congress lets the president cut tariffs by up to half in bilateral agreements, beginning to undo **Smoot–Hawley**.",
+    "tags": [
+     "policy",
+     "world"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Reciprocal_Tariff_Act"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "h-second",
+   "time": "-1104519600/1",
+   "metadata": {
+    "title": "The Second New Deal",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "era-1935",
+   "time": "-1096138800/1",
+   "metadata": {
+    "title": "Emergency Relief Appropriation Act",
+    "description": "Nearly **$5 billion** for work relief, then the largest single appropriation in American history: the money behind the WPA.",
+    "tags": [
+     "policy",
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emergency_Relief_Appropriation_Act_of_1935"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "black-sunday",
+   "time": "-1095620400/1",
+   "metadata": {
+    "title": "Black Sunday",
+    "description": "A wall of dust driven by a cold front sweeps across the southern Plains, turning afternoon to night. A reporter's story about it gives the region its name: the **Dust Bowl**.",
+    "tags": [
+     "farm"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Black_Sunday_(storm)",
+     "https://en.wikipedia.org/wiki/Dust_Bowl"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "soil-conservation",
+   "time": "-1094497200/1",
+   "metadata": {
+    "title": "The Soil Conservation Service",
+    "description": "The **Soil Conservation Act** sets up the Soil Conservation Service under **Hugh Hammond Bennett**, who teaches contour plowing, terracing and shelterbelts.",
+    "tags": [
+     "farm",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Natural_Resources_Conservation_Service",
+     "https://en.wikipedia.org/wiki/Dust_Bowl"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "wpa",
+   "time": "-1093719600/1",
+   "metadata": {
+    "title": "The WPA",
+    "description": "Executive Order 7034 creates the **Works Progress Administration**. At its height it employs over three million people, building roads, schools, bridges and airports, and paying artists, writers and actors.",
+    "tags": [
+     "policy",
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Works_Progress_Administration"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "rea",
+   "time": "-1093287600/1",
+   "metadata": {
+    "title": "Rural Electrification Administration",
+    "description": "Nine farms in ten have no electricity. The REA lends to cooperatives to string lines into the countryside.",
+    "tags": [
+     "farm",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Rural_Electrification_Administration"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "schechter",
+   "time": "-1091905200/1",
+   "metadata": {
+    "title": "The Schechter decision",
+    "description": "In **Schechter Poultry Corp. v. United States**, a case about a Brooklyn poultry dealer, the Supreme Court unanimously strikes down the NRA's codes: Congress cannot hand its lawmaking to the president, nor regulate purely local business.",
+    "tags": [
+     "policy",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Schechter_Poultry_Corp._v._United_States"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "wagner",
+   "time": "-1088535600/1",
+   "metadata": {
+    "title": "The Wagner Act",
+    "description": "The **National Labor Relations Act** guarantees workers the right to organize unions and bargain collectively, and sets up the National Labor Relations Board, replacing the NRA's section 7(a).",
+    "tags": [
+     "labor",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/National_Labor_Relations_Act_of_1935",
+     "https://www.archives.gov/milestone-documents/national-labor-relations-act"
+    ],
+    "color": "#7a5c2e"
+   }
+  },
+  {
+   "id": "federal-one",
+   "time": "-1086116400/1",
+   "metadata": {
+    "title": "The WPA's arts projects",
+    "description": "**Federal Project Number One** employs artists, musicians, actors and writers: the Federal Writers' Project's state guides and recorded life stories of formerly enslaved people come from it.",
+    "tags": [
+     "culture",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Federal_Project_Number_One"
+    ],
+    "color": "#8a4f6a",
+    "datePrecision": "Set up in the summer of 1935; dated here to August 2."
+   }
+  },
+  {
+   "id": "social-security",
+   "time": "-1085079600/1",
+   "metadata": {
+    "title": "The Social Security Act",
+    "description": "Old-age insurance paid for by a payroll tax, unemployment insurance run by the states, and aid to dependent children: the foundation of the American welfare state.",
+    "tags": [
+     "policy",
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Social_Security_Act",
+     "https://www.archives.gov/milestone-documents/social-security-act"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "banking-act-1935",
+   "time": "-1084302000/1",
+   "metadata": {
+    "title": "Banking Act of 1935",
+    "description": "It reorganizes the **Federal Reserve**, putting monetary policy in the hands of a Board of Governors in Washington and its Open Market Committee, and makes deposit insurance permanent.",
+    "tags": [
+     "banking",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Banking_Act_of_1935",
+     "https://www.federalreservehistory.org/essays/banking-act-of-1935"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "cio",
+   "time": "-1077562800/1",
+   "metadata": {
+    "title": "The CIO is formed",
+    "description": "**John L. Lewis** and other union leaders form the Committee for Industrial Organization to organize whole industries, such as steel and cars, rather than single crafts.",
+    "tags": [
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Congress_of_Industrial_Organizations"
+    ],
+    "color": "#7a5c2e"
+   }
+  },
+  {
+   "id": "butler",
+   "time": "-1072551600/1",
+   "metadata": {
+    "title": "The Court strikes down the AAA",
+    "description": "In **United States v. Butler**, the Supreme Court holds the AAA's processing tax unconstitutional, ending the first farm program.",
+    "tags": [
+     "farm",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/United_States_v._Butler"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "keynes",
+   "time": "-1070046000/1",
+   "metadata": {
+    "title": "Keynes's General Theory",
+    "description": "**John Maynard Keynes** publishes The General Theory of Employment, Interest and Money in London, arguing that an economy can stay stuck with mass unemployment, and that government spending can lift it out.",
+    "tags": [
+     "world",
+     "culture"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/The_General_Theory_of_Employment,_Interest_and_Money"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "takahashi-killed",
+   "time": "-1068145200/1",
+   "metadata": {
+    "title": "Takahashi assassinated",
+    "description": "Japan's finance minister, aged 81, whose deficit spending and cheap yen had brought Japan out of the slump early, is killed by army officers in the **February 26 incident**, partly for trying to cut military spending.",
+    "tags": [
+     "world"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Takahashi_Korekiyo",
+     "https://en.wikipedia.org/wiki/February_26_incident"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "allotment-act",
+   "time": "-1067886000/1",
+   "metadata": {
+    "title": "Soil Conservation and Domestic Allotment Act",
+    "description": "A replacement for the struck-down AAA: farmers are now paid to plant soil-building crops instead of soil-depleting ones such as wheat and cotton.",
+    "tags": [
+     "farm",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Soil_Conservation_and_Domestic_Allotment_Act"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "migrant-mother",
+   "time": "-1066590000/1",
+   "metadata": {
+    "title": "Migrant Mother",
+    "description": "**Dorothea Lange**, photographing for the Resettlement Administration, takes pictures of a mother and her children in a pea pickers' camp at Nipomo, California. The woman, **Florence Owens Thompson**, was identified only in 1978.",
+    "tags": [
+     "culture",
+     "farm"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Migrant_Mother",
+     "https://www.loc.gov/pictures/item/2017762891/"
+    ],
+    "color": "#8a4f6a",
+    "datePrecision": "March 1936; the day is not certain, so it is placed mid-month."
+   }
+  },
+  {
+   "id": "jarrow-start",
+   "time": "-1048964400/1",
+   "metadata": {
+    "title": "The Jarrow March",
+    "description": "Some 200 men from **Jarrow**, a shipbuilding town in northeast England where most were out of work, set out to walk to London to petition Parliament for work.",
+    "tags": [
+     "world",
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Jarrow_March"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "election-1936",
+   "time": "-1046458800/1",
+   "metadata": {
+    "title": "Roosevelt re-elected",
+    "description": "Roosevelt wins **46 of 48 states** and 523 electoral votes to Alf Landon's 8, with a coalition of workers, farmers, Black voters in the North, and the South.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1936_United_States_presidential_election"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "h-recession",
+   "time": "-1041361200/1",
+   "metadata": {
+    "title": "Court fight and recession",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "second-inaugural",
+   "time": "-1039719600/1",
+   "metadata": {
+    "title": "\"One-third of a nation\"",
+    "description": "At the first January inauguration, Roosevelt says he sees \"one-third of a nation ill-housed, ill-clad, ill-nourished\".",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Second_inauguration_of_Franklin_D._Roosevelt"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "court-plan",
+   "time": "-1038337200/1",
+   "metadata": {
+    "title": "The court-packing plan",
+    "description": "Roosevelt asks Congress for the power to appoint a new justice for every one over seventy, up to six: a way past the Court that had struck down his laws. Even many Democrats oppose it.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Judicial_Procedures_Reform_Bill_of_1937"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "west-coast-hotel",
+   "time": "-1033844400/1",
+   "metadata": {
+    "title": "West Coast Hotel v. Parrish",
+    "description": "The Court upholds Washington State's **minimum wage for women**, 5 to 4, as **Justice Owen Roberts** joins the majority: the \"switch in time\" that took the urgency out of the court plan.",
+    "tags": [
+     "politics",
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/West_Coast_Hotel_Co._v._Parrish"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "jones-laughlin",
+   "time": "-1032634800/1",
+   "metadata": {
+    "title": "The Wagner Act upheld",
+    "description": "In **NLRB v. Jones & Laughlin Steel**, the Court upholds the Wagner Act, and with it federal power over labor relations in industry.",
+    "tags": [
+     "labor",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/NLRB_v._Jones_%26_Laughlin_Steel_Corp."
+    ],
+    "color": "#7a5c2e"
+   }
+  },
+  {
+   "id": "reserves-doubled",
+   "time": "-1030993200/1",
+   "metadata": {
+    "title": "Reserve requirements doubled",
+    "description": "The last of three increases since August 1936 takes effect: banks must hold **twice** the reserves they did. With the budget tightened too, many economists count it among the causes of the recession that follows.",
+    "tags": [
+     "banking",
+     "policy"
+    ],
+    "sources": [
+     "https://www.federalreservehistory.org/essays/recession-of-1937-38",
+     "https://en.wikipedia.org/wiki/Recession_of_1937–1938"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "memorial-day",
+   "time": "-1028487600/1",
+   "metadata": {
+    "title": "The Memorial Day massacre",
+    "description": "Chicago police fire on striking steelworkers and their families marching on **Republic Steel**: ten are killed.",
+    "tags": [
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Memorial_Day_massacre_of_1937"
+    ],
+    "color": "#7a5c2e"
+   }
+  },
+  {
+   "id": "unemployment-1937",
+   "time": "-1025722800/1",
+   "metadata": {
+    "title": "Unemployment: 14.3%",
+    "description": "**14.3%** of the civilian labor force out of work, about **7.7 million** people, in the Bureau of Labor Statistics' estimates (Stanley Lebergott's, the basis of Historical Statistics' series). No one measured unemployment directly at the time: these are later estimates, and others who count relief workers as employed put the 1930s lower. The best year of the decade, and still one worker in seven.",
+    "tags": [
+     "economy"
+    ],
+    "sources": [
+     "https://www.bls.gov/opub/mlr/1948/article/pdf/labor-force-employment-and-unemployment-1929-39-estimating-methods.pdf"
+    ],
+    "color": "#3d3a33",
+    "datePrecision": "An annual average for the year, placed at mid-year."
+   }
+  },
+  {
+   "id": "court-recommitted",
+   "time": "-1023908400/1",
+   "metadata": {
+    "title": "The court plan fails",
+    "description": "The Senate votes **70 to 20** to send the bill back to committee, ending it. Retirements soon give Roosevelt his majority on the Court anyway.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Judicial_Procedures_Reform_Bill_of_1937"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "second-aaa",
+   "time": "-1005850800/1",
+   "metadata": {
+    "title": "The second AAA",
+    "description": "A new **Agricultural Adjustment Act**, on firmer constitutional ground, with crop quotas, price-support loans and an \"ever-normal granary\".",
+    "tags": [
+     "farm",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Agricultural_Adjustment_Act"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "spending-1938",
+   "time": "-1000926000/1",
+   "metadata": {
+    "title": "Roosevelt turns to spending",
+    "description": "With the recession deepening, Roosevelt asks Congress for billions in new relief and public works spending, and explains why in a fireside chat that evening.",
+    "tags": [
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Recession_of_1937–1938",
+     "https://www.federalreservehistory.org/essays/recession-of-1937-38"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "flsa",
+   "time": "-994705200/1",
+   "metadata": {
+    "title": "The Fair Labor Standards Act",
+    "description": "A national **minimum wage** of 25 cents an hour, a maximum work week of 44 hours falling to 40, with overtime pay, and a ban on most child labor. The last major New Deal law.",
+    "tags": [
+     "labor",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fair_Labor_Standards_Act_of_1938"
+    ],
+    "color": "#7a5c2e"
+   }
+  },
+  {
+   "id": "unemployment-1938",
+   "time": "-994186800/1",
+   "metadata": {
+    "title": "Unemployment: 19.0%",
+    "description": "**19.0%** of the civilian labor force out of work, about **10.4 million** people, in the Bureau of Labor Statistics' estimates (Stanley Lebergott's, the basis of Historical Statistics' series). No one measured unemployment directly at the time: these are later estimates, and others who count relief workers as employed put the 1930s lower. Up from 14.3% the year before, in the recession.",
+    "tags": [
+     "economy"
+    ],
+    "sources": [
+     "https://www.bls.gov/opub/mlr/1948/article/pdf/labor-force-employment-and-unemployment-1929-39-estimating-methods.pdf"
+    ],
+    "color": "#3d3a33",
+    "datePrecision": "An annual average for the year, placed at mid-year."
+   }
+  },
+  {
+   "id": "h-war",
+   "time": "-978289200/1",
+   "metadata": {
+    "title": "Toward war",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "grapes-book",
+   "time": "-969390000/1",
+   "metadata": {
+    "title": "The Grapes of Wrath",
+    "description": "**John Steinbeck**'s novel of the **Joads**, tenant farmers driven off their Oklahoma land who go west to California, comes out four years to the day after Black Sunday. It wins the Pulitzer Prize.",
+    "tags": [
+     "culture",
+     "farm"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/The_Grapes_of_Wrath"
+    ],
+    "color": "#8a4f6a"
+   }
+  },
+  {
+   "id": "ww2-begins",
+   "time": "-957294000/1",
+   "metadata": {
+    "title": "War in Europe",
+    "description": "Germany invades **Poland**; Britain and France declare war two days later. Orders for arms from abroad begin to reach American factories.",
+    "tags": [
+     "world"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Invasion_of_Poland",
+     "https://en.wikipedia.org/wiki/World_War_II"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "grapes-film",
+   "time": "-944766000/1",
+   "metadata": {
+    "title": "The Grapes of Wrath on screen",
+    "description": "**John Ford**'s film, with **Henry Fonda** as Tom Joad, opens in New York, less than a year after the novel.",
+    "tags": [
+     "culture"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/The_Grapes_of_Wrath_(film)"
+    ],
+    "color": "#8a4f6a"
+   }
+  },
+  {
+   "id": "first-check",
+   "time": "-944161200/1",
+   "metadata": {
+    "title": "The first monthly Social Security check",
+    "description": "A retired legal secretary in Vermont, **Ida May Fuller**, receives check number 00-000-001, for **$22.54**.",
+    "tags": [
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ida_May_Fuller",
+     "https://en.wikipedia.org/wiki/Social_Security_(United_States)"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "fifty-thousand-planes",
+   "time": "-935002800/1",
+   "metadata": {
+    "title": "50,000 planes a year",
+    "description": "As Germany overruns western Europe, Roosevelt asks Congress for a huge defense build-up and a goal of **50,000 aircraft** a year.",
+    "tags": [
+     "policy",
+     "world"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Arsenal_of_Democracy",
+     "https://en.wikipedia.org/wiki/United_States_home_front_during_World_War_II"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "draft",
+   "time": "-924375600/1",
+   "metadata": {
+    "title": "The first peacetime draft",
+    "description": "The **Selective Training and Service Act** requires men aged 21 to 35 to register for military service.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Selective_Training_and_Service_Act_of_1940"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "lend-lease",
+   "time": "-909169200/1",
+   "metadata": {
+    "title": "Lend-Lease",
+    "description": "Congress lets the president lend or lease war supplies to countries whose defense is vital to the United States, starting with **Britain**: the \"arsenal of democracy\" at work.",
+    "tags": [
+     "world",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lend-Lease"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "unemployment-1941",
+   "time": "-899492400/1",
+   "metadata": {
+    "title": "Unemployment: 9.9%",
+    "description": "**9.9%** of the civilian labor force out of work, about **5.6 million** people, in the Bureau of Labor Statistics' estimates (Stanley Lebergott's, the basis of Historical Statistics' series). No one measured unemployment directly at the time: these are later estimates, and others who count relief workers as employed put the 1930s lower. Falling fast as defense work grows.",
+    "tags": [
+     "economy"
+    ],
+    "sources": [
+     "https://www.bls.gov/opub/mlr/1948/article/pdf/labor-force-employment-and-unemployment-1929-39-estimating-methods.pdf"
+    ],
+    "color": "#3d3a33",
+    "datePrecision": "An annual average for the year, placed at mid-year."
+   }
+  },
+  {
+   "id": "pearl-harbor",
+   "time": "-885754800/1",
+   "metadata": {
+    "title": "Pearl Harbor",
+    "description": "Japan attacks the US Pacific Fleet in Hawaii, and the United States enters the Second World War. The war economy, not the New Deal, ends mass unemployment.",
+    "tags": [
+     "world",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Attack_on_Pearl_Harbor",
+     "https://en.wikipedia.org/wiki/Great_Depression_in_the_United_States"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "unemployment-1942",
+   "time": "-867956400/1",
+   "metadata": {
+    "title": "Unemployment: 4.7%",
+    "description": "**4.7%** of the civilian labor force out of work, about **2.7 million** people, in the Bureau of Labor Statistics' estimates (Stanley Lebergott's, the basis of Historical Statistics' series). No one measured unemployment directly at the time: these are later estimates, and others who count relief workers as employed put the 1930s lower. By 1944 it is under 2%.",
+    "tags": [
+     "economy"
+    ],
+    "sources": [
+     "https://www.bls.gov/opub/mlr/1948/article/pdf/labor-force-employment-and-unemployment-1929-39-estimating-methods.pdf"
+    ],
+    "color": "#3d3a33",
+    "datePrecision": "An annual average for the year, placed at mid-year."
+   }
+  },
+  {
+   "id": "h-after",
+   "time": "-504903600/1",
+   "metadata": {
+    "title": "Afterward",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "dow-regains",
+   "time": "-476737200/1",
+   "metadata": {
+    "title": "The Dow regains its 1929 peak",
+    "description": "The Dow closes above **381.17** for the first time, at 382.74, **25 years** after its September 1929 peak. That counts prices alone: with dividends reinvested and the fall in prices allowed for, an investor at the peak had broken even by about 1936.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wall_Street_crash_of_1929",
+     "https://www.historynewsnetwork.org/article/79770"
+    ],
+    "color": "#9c3b2a"
+   }
+  }
+ ],
+ "durations": [
+  {
+   "id": "great-depression",
+   "start": "-1275505200/1",
+   "end": "-885754800/1",
+   "metadata": {
+    "title": "The Great Depression",
+    "description": "Dated here from the NBER peak of August 1929 to Pearl Harbor. Its start and end are a matter of convention: many date it from the Crash, and to 1939 or 1941.",
+    "tags": [
+     "economy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Great_Depression",
+     "https://www.federalreservehistory.org/essays/great-depression"
+    ],
+    "color": "#3d3a33"
+   }
+  },
+  {
+   "id": "depression-1920",
+   "start": "-1577905200/1",
+   "end": "-1530644400/1",
+   "metadata": {
+    "title": "Depression of 1920–21",
+    "description": "Peak January 1920, trough July 1921, as the NBER dates them; short and sharp.",
+    "tags": [
+     "economy"
+    ],
+    "sources": [
+     "https://www.nber.org/research/data/us-business-cycle-expansions-and-contractions",
+     "https://en.wikipedia.org/wiki/Depression_of_1920–1921"
+    ],
+    "color": "#3d3a33"
+   }
+  },
+  {
+   "id": "contraction",
+   "start": "-1275505200/1",
+   "end": "-1162494000/1",
+   "metadata": {
+    "title": "Contraction, Aug 1929 – Mar 1933",
+    "description": "The NBER business-cycle contraction: 43 months from peak to trough, dated to the month.",
+    "tags": [
+     "economy"
+    ],
+    "sources": [
+     "https://www.nber.org/research/data/us-business-cycle-expansions-and-contractions"
+    ],
+    "color": "#3d3a33"
+   }
+  },
+  {
+   "id": "expansion",
+   "start": "-1162494000/1",
+   "end": "-1030993200/1",
+   "metadata": {
+    "title": "Recovery, Mar 1933 – May 1937",
+    "description": "The NBER expansion: 50 months of fast growth, from a very low base; unemployment stays above 14%.",
+    "tags": [
+     "economy"
+    ],
+    "sources": [
+     "https://www.nber.org/research/data/us-business-cycle-expansions-and-contractions",
+     "https://www.bls.gov/opub/mlr/1948/article/pdf/labor-force-employment-and-unemployment-1929-39-estimating-methods.pdf"
+    ],
+    "color": "#3d3a33"
+   }
+  },
+  {
+   "id": "recession-1937",
+   "start": "-1030993200/1",
+   "end": "-996778800/1",
+   "metadata": {
+    "title": "Recession, May 1937 – June 1938",
+    "description": "The NBER contraction of 1937–38: 13 months, the \"depression within the Depression\", after tighter money and a tighter budget.",
+    "tags": [
+     "economy"
+    ],
+    "sources": [
+     "https://www.nber.org/research/data/us-business-cycle-expansions-and-contractions",
+     "https://www.federalreservehistory.org/essays/recession-of-1937-38"
+    ],
+    "color": "#3d3a33"
+   }
+  },
+  {
+   "id": "bull-market",
+   "start": "-1525978800/1",
+   "end": "-1272654000/1",
+   "metadata": {
+    "title": "The bull market",
+    "description": "The Dow rises from 63.90 to 381.17 in eight years, the last two fueled by **brokers' loans** for margin buying.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Roaring_Twenties",
+     "https://en.wikipedia.org/wiki/Wall_Street_crash_of_1929"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "florida",
+   "start": "-1451674800/1",
+   "end": "-1366052400/1",
+   "metadata": {
+    "title": "The Florida land boom",
+    "description": "Speculation in Florida lots, bought on small deposits and resold before the next payment was due; it peaked in 1925 (the start is approximate) and the 1926 hurricane finished it.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Florida_land_boom_of_the_1920s"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "dow-slide",
+   "start": "-1272654000/1",
+   "end": "-1182884400/1",
+   "metadata": {
+    "title": "The Dow, peak to bottom",
+    "description": "From 381.17 to 41.22: a fall of 89% in two years and ten months.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wall_Street_crash_of_1929"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "dow-below",
+   "start": "-1272654000/1",
+   "end": "-476737200/1",
+   "metadata": {
+    "title": "The Dow below its 1929 peak",
+    "description": "Twenty-five years and two months before the index closes above 381.17 again. In prices alone; dividends and deflation shorten it to about seven years.",
+    "tags": [
+     "market"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wall_Street_crash_of_1929",
+     "https://www.historynewsnetwork.org/article/79770"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "panic-1930",
+   "start": "-1236020400/1",
+   "end": "-1228158000/1",
+   "metadata": {
+    "title": "First banking panic",
+    "description": "From the fall of Caldwell and Company in Nashville to the Bank of United States in New York: hundreds of banks suspend.",
+    "tags": [
+     "banking"
+    ],
+    "sources": [
+     "https://www.federalreservehistory.org/essays/banking-panics-1930-31",
+     "https://en.wikipedia.org/wiki/Great_Depression_in_the_United_States"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "panic-1931",
+   "start": "-1222974000/1",
+   "end": "-1209841200/1",
+   "metadata": {
+    "title": "Second banking panic",
+    "description": "Runs in the Midwest, centered on Chicago, as the European crisis builds; dates to the month.",
+    "tags": [
+     "banking"
+    ],
+    "sources": [
+     "https://www.federalreservehistory.org/essays/banking-panics-1930-31",
+     "https://en.wikipedia.org/wiki/Great_Depression_in_the_United_States"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "panic-sterling",
+   "start": "-1208026800/1",
+   "end": "-1204570800/1",
+   "metadata": {
+    "title": "Bank runs after sterling",
+    "description": "After Britain leaves gold, gold flows out of the US and depositors pull cash: by October more than 2,100 banks have suspended since the start of the slump.",
+    "tags": [
+     "banking"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Great_Depression_in_the_United_States"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "panic-1933",
+   "start": "-1163790000/1",
+   "end": "-1162062000/1",
+   "metadata": {
+    "title": "Banking panic of 1933",
+    "description": "From Michigan's bank holiday to the national one: by inauguration day, most states had closed or restricted their banks.",
+    "tags": [
+     "banking"
+    ],
+    "sources": [
+     "https://www.federalreservehistory.org/essays/bank-holiday-of-1933",
+     "https://en.wikipedia.org/wiki/Emergency_Banking_Act"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "holiday",
+   "start": "-1162062000/1",
+   "end": "-1161457200/1",
+   "metadata": {
+    "title": "The bank holiday",
+    "description": "Every bank in the country closed, until they began to reopen under license.",
+    "tags": [
+     "banking"
+    ],
+    "sources": [
+     "https://www.federalreservehistory.org/essays/bank-holiday-of-1933"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "coolidge-term",
+   "start": "-1464807600/1",
+   "end": "-1288465200/1",
+   "metadata": {
+    "title": "Coolidge presidency",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Presidency_of_Calvin_Coolidge"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "hoover-term",
+   "start": "-1288465200/1",
+   "end": "-1162234800/1",
+   "metadata": {
+    "title": "Hoover presidency",
+    "description": "One term, almost all of it in the slump.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Presidency_of_Herbert_Hoover"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "fdr-term",
+   "start": "-1162234800/1",
+   "end": "-780174000/1",
+   "metadata": {
+    "title": "Roosevelt presidency",
+    "description": "Twelve years and five weeks, to his death in April 1945: the longest presidency.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Presidency_of_Franklin_D._Roosevelt"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "prohibition",
+   "start": "-1576522800/1",
+   "end": "-1138388400/1",
+   "metadata": {
+    "title": "Prohibition",
+    "description": "Almost fourteen years, from the Eighteenth Amendment to the Twenty-first.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Prohibition_in_the_United_States"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "bonus-army",
+   "start": "-1186686000/1",
+   "end": "-1181156400/1",
+   "metadata": {
+    "title": "The Bonus Army in Washington",
+    "description": "From late May 1932, as the first veterans arrive (the day is approximate), about 17,000 veterans and their families camp in the capital until they are driven out.",
+    "tags": [
+     "politics",
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Bonus_Army"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "court-fight",
+   "start": "-1038337200/1",
+   "end": "-1023908400/1",
+   "metadata": {
+    "title": "The court fight",
+    "description": "Five and a half months, from the plan to its recommittal.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Judicial_Procedures_Reform_Bill_of_1937"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "hundred-days",
+   "start": "-1161802800/1",
+   "end": "-1153249200/1",
+   "metadata": {
+    "title": "The Hundred Days",
+    "description": "The special session of Congress, from the Emergency Banking Act to the NIRA and Glass–Steagall: fifteen major laws in about a hundred days.",
+    "tags": [
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_100_days_of_Franklin_D._Roosevelt%27s_presidency",
+     "https://en.wikipedia.org/wiki/New_Deal"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "ccc",
+   "start": "-1159902000/1",
+   "end": "-868042800/1",
+   "metadata": {
+    "title": "Civilian Conservation Corps",
+    "description": "About three million young men served in it over nine years, until Congress stopped its funding in 1942.",
+    "tags": [
+     "policy",
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Civilian_Conservation_Corps"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "aaa-first",
+   "start": "-1156273200/1",
+   "end": "-1072551600/1",
+   "metadata": {
+    "title": "The first AAA",
+    "description": "Until the Supreme Court struck it down in United States v. Butler.",
+    "tags": [
+     "farm",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Agricultural_Adjustment_Act"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "nra",
+   "start": "-1153249200/1",
+   "end": "-1091905200/1",
+   "metadata": {
+    "title": "The NRA codes",
+    "description": "Until the Schechter decision; the agency itself was wound up by the end of 1935.",
+    "tags": [
+     "policy",
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/National_Recovery_Administration"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "cwa",
+   "start": "-1140721200/1",
+   "end": "-1128366000/1",
+   "metadata": {
+    "title": "Civil Works Administration",
+    "description": "A winter jobs program that put about four million people to work within weeks, then was shut down for its cost.",
+    "tags": [
+     "policy",
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Civil_Works_Administration"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "wpa-years",
+   "start": "-1093719600/1",
+   "end": "-836506800/1",
+   "metadata": {
+    "title": "Works Progress Administration",
+    "description": "Renamed the Work Projects Administration in 1939; about 8.5 million people worked for it before it closed in 1943.",
+    "tags": [
+     "policy",
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Works_Progress_Administration"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "flint",
+   "start": "-1041534000/1",
+   "end": "-1037818800/1",
+   "metadata": {
+    "title": "Flint sit-down strike",
+    "description": "Autoworkers occupy General Motors plants in Flint, Michigan, for six weeks, until GM recognizes the **United Auto Workers**.",
+    "tags": [
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Flint_sit-down_strike"
+    ],
+    "color": "#7a5c2e"
+   }
+  },
+  {
+   "id": "dust-bowl",
+   "start": "-1246647600/1",
+   "end": "-954702000/1",
+   "metadata": {
+    "title": "The Dust Bowl",
+    "description": "Drought from the summer of 1930 to the rains of the fall of 1939 (the ends are to the season), in waves in 1934, 1936 and 1939–40, on Plains grassland plowed up for wheat. About 3.5 million people left the Plains states in the 1930s.",
+    "tags": [
+     "farm"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Dust_Bowl"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "bruning",
+   "start": "-1254682800/1",
+   "end": "-1186254000/1",
+   "metadata": {
+    "title": "Brüning chancellorship",
+    "description": "Two years of austerity by emergency decree, as German unemployment tripled.",
+    "tags": [
+     "world"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Heinrich_Brüning",
+     "https://en.wikipedia.org/wiki/Great_Depression_in_Germany"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "moratorium",
+   "start": "-1215111600/1",
+   "end": "-1183575600/1",
+   "metadata": {
+    "title": "The Hoover Moratorium",
+    "description": "A year without war-debt and reparations payments. At Lausanne in 1932 reparations were all but cancelled.",
+    "tags": [
+     "world",
+     "policy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hoover_Moratorium"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "takahashi-1",
+   "start": "-1200855600/1",
+   "end": "-1119812400/1",
+   "metadata": {
+    "title": "Takahashi at the Finance Ministry",
+    "description": "Off gold, a cheaper yen, low interest rates and deficits financed by the Bank of Japan: Japan recovers among the first.",
+    "tags": [
+     "world"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Takahashi_Korekiyo"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "takahashi-2",
+   "start": "-1107543600/1",
+   "end": "-1068145200/1",
+   "metadata": {
+    "title": "Takahashi at the Finance Ministry again",
+    "description": "His second term, ended by his assassination.",
+    "tags": [
+     "world"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Takahashi_Korekiyo"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "london-conference",
+   "start": "-1153594800/1",
+   "end": "-1149706800/1",
+   "metadata": {
+    "title": "London Economic Conference",
+    "description": "Sixty-six nations meet to stabilize currencies and revive trade, and fail, after Roosevelt rejects a currency agreement.",
+    "tags": [
+     "world"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/London_Economic_Conference"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "jarrow",
+   "start": "-1048964400/1",
+   "end": "-1046718000/1",
+   "metadata": {
+    "title": "The Jarrow March",
+    "description": "Nearly 300 miles to London, in a month.",
+    "tags": [
+     "world",
+     "labor"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Jarrow_March"
+    ],
+    "color": "#2f6b73"
+   }
+  },
+  {
+   "id": "war-before-us",
+   "start": "-957294000/1",
+   "end": "-885754800/1",
+   "metadata": {
+    "title": "War in Europe, before the US enters",
+    "description": "Two years and three months in which orders, then Lend-Lease, put American industry back to work.",
+    "tags": [
+     "world"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/World_War_II",
+     "https://en.wikipedia.org/wiki/United_States_home_front_during_World_War_II"
+    ],
+    "color": "#2f6b73"
+   }
+  }
+ ],
+ "relationships": [
+  {
+   "a": {
+    "duration": "florida"
+   },
+   "b": {
+    "moment": "miami-hurricane"
+   }
+  },
+  {
+   "a": {
+    "duration": "bull-market"
+   },
+   "b": {
+    "moment": "dow-peak"
+   }
+  },
+  {
+   "a": {
+    "moment": "fisher"
+   },
+   "b": {
+    "moment": "black-thursday"
+   }
+  },
+  {
+   "a": {
+    "moment": "black-thursday"
+   },
+   "b": {
+    "moment": "bankers"
+   }
+  },
+  {
+   "a": {
+    "moment": "bankers"
+   },
+   "b": {
+    "moment": "whitney"
+   }
+  },
+  {
+   "a": {
+    "moment": "whitney"
+   },
+   "b": {
+    "moment": "black-monday"
+   }
+  },
+  {
+   "a": {
+    "moment": "black-monday"
+   },
+   "b": {
+    "moment": "black-tuesday"
+   }
+  },
+  {
+   "a": {
+    "duration": "dow-slide"
+   },
+   "b": {
+    "moment": "dow-bottom"
+   }
+  },
+  {
+   "a": {
+    "duration": "dow-below"
+   },
+   "b": {
+    "moment": "dow-regains"
+   }
+  },
+  {
+   "a": {
+    "moment": "caldwell"
+   },
+   "b": {
+    "moment": "bank-of-us"
+   }
+  },
+  {
+   "a": {
+    "moment": "creditanstalt"
+   },
+   "b": {
+    "moment": "moratorium-announced"
+   }
+  },
+  {
+   "a": {
+    "moment": "moratorium-announced"
+   },
+   "b": {
+    "moment": "danat"
+   }
+  },
+  {
+   "a": {
+    "moment": "danat"
+   },
+   "b": {
+    "moment": "britain-gold"
+   }
+  },
+  {
+   "a": {
+    "moment": "britain-gold"
+   },
+   "b": {
+    "moment": "fed-raises"
+   }
+  },
+  {
+   "a": {
+    "moment": "smoot-hawley"
+   },
+   "b": {
+    "moment": "rtaa"
+   }
+  },
+  {
+   "a": {
+    "moment": "bonus-vote"
+   },
+   "b": {
+    "moment": "bonus-eviction"
+   }
+  },
+  {
+   "a": {
+    "moment": "new-deal-speech"
+   },
+   "b": {
+    "moment": "election-1932"
+   }
+  },
+  {
+   "a": {
+    "moment": "election-1932"
+   },
+   "b": {
+    "moment": "fdr-inaugurated"
+   }
+  },
+  {
+   "a": {
+    "moment": "reichstag-1932"
+   },
+   "b": {
+    "moment": "hitler"
+   }
+  },
+  {
+   "a": {
+    "moment": "michigan-holiday"
+   },
+   "b": {
+    "moment": "bank-holiday"
+   }
+  },
+  {
+   "a": {
+    "moment": "bank-holiday"
+   },
+   "b": {
+    "moment": "emergency-banking"
+   }
+  },
+  {
+   "a": {
+    "moment": "emergency-banking"
+   },
+   "b": {
+    "moment": "fireside-chat"
+   }
+  },
+  {
+   "a": {
+    "moment": "fireside-chat"
+   },
+   "b": {
+    "moment": "banks-reopen"
+   }
+  },
+  {
+   "a": {
+    "moment": "glass-steagall"
+   },
+   "b": {
+    "moment": "fdic-begins"
+   }
+  },
+  {
+   "a": {
+    "moment": "gold-6102"
+   },
+   "b": {
+    "moment": "off-gold"
+   }
+  },
+  {
+   "a": {
+    "moment": "off-gold"
+   },
+   "b": {
+    "moment": "bombshell"
+   }
+  },
+  {
+   "a": {
+    "moment": "securities-act"
+   },
+   "b": {
+    "moment": "sec"
+   }
+  },
+  {
+   "a": {
+    "moment": "nira"
+   },
+   "b": {
+    "moment": "schechter"
+   }
+  },
+  {
+   "a": {
+    "moment": "nira"
+   },
+   "b": {
+    "moment": "wagner"
+   }
+  },
+  {
+   "a": {
+    "moment": "aaa"
+   },
+   "b": {
+    "moment": "butler"
+   }
+  },
+  {
+   "a": {
+    "moment": "black-sunday"
+   },
+   "b": {
+    "moment": "soil-conservation"
+   }
+  },
+  {
+   "a": {
+    "moment": "court-plan"
+   },
+   "b": {
+    "moment": "west-coast-hotel"
+   }
+  },
+  {
+   "a": {
+    "moment": "reserves-doubled"
+   },
+   "b": {
+    "duration": "recession-1937"
+   }
+  },
+  {
+   "a": {
+    "duration": "recession-1937"
+   },
+   "b": {
+    "moment": "spending-1938"
+   }
+  },
+  {
+   "a": {
+    "moment": "social-security"
+   },
+   "b": {
+    "moment": "first-check"
+   }
+  },
+  {
+   "a": {
+    "moment": "migrant-mother"
+   },
+   "b": {
+    "moment": "grapes-book"
+   }
+  },
+  {
+   "a": {
+    "moment": "grapes-book"
+   },
+   "b": {
+    "moment": "grapes-film"
+   }
+  },
+  {
+   "a": {
+    "moment": "japan-gold"
+   },
+   "b": {
+    "duration": "takahashi-1"
+   }
+  },
+  {
+   "a": {
+    "moment": "lend-lease"
+   },
+   "b": {
+    "moment": "pearl-harbor"
+   }
+  },
+  {
+   "a": {
+    "moment": "beer"
+   },
+   "b": {
+    "moment": "repeal"
+   }
+  }
+ ]
+}

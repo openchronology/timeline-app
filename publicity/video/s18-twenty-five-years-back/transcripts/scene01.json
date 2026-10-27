@@ -1,0 +1,408 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:05,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 5000
+			},
+			"text": " In September 1929, the Dow closed at 381.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.911927,
+					"t_dtw": -1
+				},
+				{
+					"text": " In",
+					"timestamps": {
+						"from": "00:00:00,040",
+						"to": "00:00:00,140"
+					},
+					"offsets": {
+						"from": 40,
+						"to": 140
+					},
+					"id": 554,
+					"p": 0.936911,
+					"t_dtw": -1
+				},
+				{
+					"text": " September",
+					"timestamps": {
+						"from": "00:00:00,290",
+						"to": "00:00:00,800"
+					},
+					"offsets": {
+						"from": 290,
+						"to": 800
+					},
+					"id": 2693,
+					"p": 0.991004,
+					"t_dtw": -1
+				},
+				{
+					"text": " 1929",
+					"timestamps": {
+						"from": "00:00:00,800",
+						"to": "00:00:01,680"
+					},
+					"offsets": {
+						"from": 800,
+						"to": 1680
+					},
+					"id": 31883,
+					"p": 0.97537,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,680",
+						"to": "00:00:01,780"
+					},
+					"offsets": {
+						"from": 1680,
+						"to": 1780
+					},
+					"id": 11,
+					"p": 0.89657,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,130",
+						"to": "00:00:02,170"
+					},
+					"offsets": {
+						"from": 2130,
+						"to": 2170
+					},
+					"id": 262,
+					"p": 0.930767,
+					"t_dtw": -1
+				},
+				{
+					"text": " Dow",
+					"timestamps": {
+						"from": "00:00:02,170",
+						"to": "00:00:02,480"
+					},
+					"offsets": {
+						"from": 2170,
+						"to": 2480
+					},
+					"id": 21842,
+					"p": 0.938098,
+					"t_dtw": -1
+				},
+				{
+					"text": " closed",
+					"timestamps": {
+						"from": "00:00:02,550",
+						"to": "00:00:03,160"
+					},
+					"offsets": {
+						"from": 2550,
+						"to": 3160
+					},
+					"id": 4838,
+					"p": 0.995296,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:03,160",
+						"to": "00:00:03,380"
+					},
+					"offsets": {
+						"from": 3160,
+						"to": 3380
+					},
+					"id": 379,
+					"p": 0.991628,
+					"t_dtw": -1
+				},
+				{
+					"text": " 38",
+					"timestamps": {
+						"from": "00:00:03,380",
+						"to": "00:00:04,040"
+					},
+					"offsets": {
+						"from": 3380,
+						"to": 4040
+					},
+					"id": 4353,
+					"p": 0.971364,
+					"t_dtw": -1
+				},
+				{
+					"text": "1",
+					"timestamps": {
+						"from": "00:00:04,040",
+						"to": "00:00:04,160"
+					},
+					"offsets": {
+						"from": 4040,
+						"to": 4160
+					},
+					"id": 16,
+					"p": 0.998481,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,000",
+						"to": "00:00:05,000"
+					},
+					"offsets": {
+						"from": 5000,
+						"to": 5000
+					},
+					"id": 13,
+					"p": 0.966824,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_250]",
+					"timestamps": {
+						"from": "00:00:05,000",
+						"to": "00:00:05,000"
+					},
+					"offsets": {
+						"from": 5000,
+						"to": 5000
+					},
+					"id": 50613,
+					"p": 0.0478845,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:05,000",
+				"to": "00:00:08,000"
+			},
+			"offsets": {
+				"from": 5000,
+				"to": 8000
+			},
+			"text": " It didn't close that high again for 25 years.",
+			"tokens": [
+				{
+					"text": " It",
+					"timestamps": {
+						"from": "00:00:05,040",
+						"to": "00:00:05,130"
+					},
+					"offsets": {
+						"from": 5040,
+						"to": 5130
+					},
+					"id": 632,
+					"p": 0.996048,
+					"t_dtw": -1
+				},
+				{
+					"text": " didn",
+					"timestamps": {
+						"from": "00:00:05,280",
+						"to": "00:00:05,350"
+					},
+					"offsets": {
+						"from": 5280,
+						"to": 5350
+					},
+					"id": 1422,
+					"p": 0.997661,
+					"t_dtw": -1
+				},
+				{
+					"text": "'t",
+					"timestamps": {
+						"from": "00:00:05,420",
+						"to": "00:00:05,490"
+					},
+					"offsets": {
+						"from": 5420,
+						"to": 5490
+					},
+					"id": 470,
+					"p": 0.999275,
+					"t_dtw": -1
+				},
+				{
+					"text": " close",
+					"timestamps": {
+						"from": "00:00:05,590",
+						"to": "00:00:05,870"
+					},
+					"offsets": {
+						"from": 5590,
+						"to": 5870
+					},
+					"id": 1969,
+					"p": 0.99883,
+					"t_dtw": -1
+				},
+				{
+					"text": " that",
+					"timestamps": {
+						"from": "00:00:05,870",
+						"to": "00:00:06,140"
+					},
+					"offsets": {
+						"from": 5870,
+						"to": 6140
+					},
+					"id": 326,
+					"p": 0.997134,
+					"t_dtw": -1
+				},
+				{
+					"text": " high",
+					"timestamps": {
+						"from": "00:00:06,140",
+						"to": "00:00:06,410"
+					},
+					"offsets": {
+						"from": 6140,
+						"to": 6410
+					},
+					"id": 1029,
+					"p": 0.998934,
+					"t_dtw": -1
+				},
+				{
+					"text": " again",
+					"timestamps": {
+						"from": "00:00:06,410",
+						"to": "00:00:06,750"
+					},
+					"offsets": {
+						"from": 6410,
+						"to": 6750
+					},
+					"id": 757,
+					"p": 0.998146,
+					"t_dtw": -1
+				},
+				{
+					"text": " for",
+					"timestamps": {
+						"from": "00:00:06,750",
+						"to": "00:00:06,780"
+					},
+					"offsets": {
+						"from": 6750,
+						"to": 6780
+					},
+					"id": 329,
+					"p": 0.993352,
+					"t_dtw": -1
+				},
+				{
+					"text": " 25",
+					"timestamps": {
+						"from": "00:00:07,130",
+						"to": "00:00:07,360"
+					},
+					"offsets": {
+						"from": 7130,
+						"to": 7360
+					},
+					"id": 1679,
+					"p": 0.974007,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:07,360",
+						"to": "00:00:07,700"
+					},
+					"offsets": {
+						"from": 7360,
+						"to": 7700
+					},
+					"id": 812,
+					"p": 0.999085,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:07,700",
+						"to": "00:00:08,000"
+					},
+					"offsets": {
+						"from": 7700,
+						"to": 8000
+					},
+					"id": 13,
+					"p": 0.989946,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_400]",
+					"timestamps": {
+						"from": "00:00:08,000",
+						"to": "00:00:08,000"
+					},
+					"offsets": {
+						"from": 8000,
+						"to": 8000
+					},
+					"id": 50763,
+					"p": 0.126114,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

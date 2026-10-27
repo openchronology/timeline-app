@@ -1,0 +1,644 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:02,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 2000
+			},
+			"text": " That's the price alone.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.84051,
+					"t_dtw": -1
+				},
+				{
+					"text": " That",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:00,360"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 360
+					},
+					"id": 1320,
+					"p": 0.967196,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:00,360",
+						"to": "00:00:00,430"
+					},
+					"offsets": {
+						"from": 360,
+						"to": 430
+					},
+					"id": 338,
+					"p": 0.996246,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:00,580",
+						"to": "00:00:00,810"
+					},
+					"offsets": {
+						"from": 580,
+						"to": 810
+					},
+					"id": 262,
+					"p": 0.999325,
+					"t_dtw": -1
+				},
+				{
+					"text": " price",
+					"timestamps": {
+						"from": "00:00:00,810",
+						"to": "00:00:01,240"
+					},
+					"offsets": {
+						"from": 810,
+						"to": 1240
+					},
+					"id": 2756,
+					"p": 0.9996,
+					"t_dtw": -1
+				},
+				{
+					"text": " alone",
+					"timestamps": {
+						"from": "00:00:01,240",
+						"to": "00:00:01,310"
+					},
+					"offsets": {
+						"from": 1240,
+						"to": 1310
+					},
+					"id": 3436,
+					"p": 0.997866,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:01,700",
+						"to": "00:00:02,000"
+					},
+					"offsets": {
+						"from": 1700,
+						"to": 2000
+					},
+					"id": 13,
+					"p": 0.94562,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_100]",
+					"timestamps": {
+						"from": "00:00:02,000",
+						"to": "00:00:02,000"
+					},
+					"offsets": {
+						"from": 2000,
+						"to": 2000
+					},
+					"id": 50463,
+					"p": 0.0487589,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:02,000",
+				"to": "00:00:04,500"
+			},
+			"offsets": {
+				"from": 2000,
+				"to": 4500
+			},
+			"text": " Count the dividends and the fall in prices,",
+			"tokens": [
+				{
+					"text": " Count",
+					"timestamps": {
+						"from": "00:00:02,290",
+						"to": "00:00:02,290"
+					},
+					"offsets": {
+						"from": 2290,
+						"to": 2290
+					},
+					"id": 2764,
+					"p": 0.99313,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,300",
+						"to": "00:00:02,430"
+					},
+					"offsets": {
+						"from": 2300,
+						"to": 2430
+					},
+					"id": 262,
+					"p": 0.99926,
+					"t_dtw": -1
+				},
+				{
+					"text": " dividends",
+					"timestamps": {
+						"from": "00:00:02,580",
+						"to": "00:00:03,000"
+					},
+					"offsets": {
+						"from": 2580,
+						"to": 3000
+					},
+					"id": 26360,
+					"p": 0.998075,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:03,000",
+						"to": "00:00:03,240"
+					},
+					"offsets": {
+						"from": 3000,
+						"to": 3240
+					},
+					"id": 290,
+					"p": 0.930442,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:03,240",
+						"to": "00:00:03,310"
+					},
+					"offsets": {
+						"from": 3240,
+						"to": 3310
+					},
+					"id": 262,
+					"p": 0.996759,
+					"t_dtw": -1
+				},
+				{
+					"text": " fall",
+					"timestamps": {
+						"from": "00:00:03,310",
+						"to": "00:00:03,710"
+					},
+					"offsets": {
+						"from": 3310,
+						"to": 3710
+					},
+					"id": 2121,
+					"p": 0.313594,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:03,940",
+						"to": "00:00:03,990"
+					},
+					"offsets": {
+						"from": 3940,
+						"to": 3990
+					},
+					"id": 287,
+					"p": 0.968984,
+					"t_dtw": -1
+				},
+				{
+					"text": " prices",
+					"timestamps": {
+						"from": "00:00:04,220",
+						"to": "00:00:04,500"
+					},
+					"offsets": {
+						"from": 4220,
+						"to": 4500
+					},
+					"id": 4536,
+					"p": 0.99771,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:04,500",
+						"to": "00:00:04,500"
+					},
+					"offsets": {
+						"from": 4500,
+						"to": 4500
+					},
+					"id": 11,
+					"p": 0.702484,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_225]",
+					"timestamps": {
+						"from": "00:00:04,500",
+						"to": "00:00:04,500"
+					},
+					"offsets": {
+						"from": 4500,
+						"to": 4500
+					},
+					"id": 50588,
+					"p": 0.102254,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,500",
+				"to": "00:00:09,000"
+			},
+			"offsets": {
+				"from": 4500,
+				"to": 9000
+			},
+			"text": " and someone who bought at the top was even by about 1936.",
+			"tokens": [
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:04,540",
+						"to": "00:00:04,660"
+					},
+					"offsets": {
+						"from": 4540,
+						"to": 4660
+					},
+					"id": 290,
+					"p": 0.998856,
+					"t_dtw": -1
+				},
+				{
+					"text": " someone",
+					"timestamps": {
+						"from": "00:00:04,800",
+						"to": "00:00:05,000"
+					},
+					"offsets": {
+						"from": 4800,
+						"to": 5000
+					},
+					"id": 2130,
+					"p": 0.998852,
+					"t_dtw": -1
+				},
+				{
+					"text": " who",
+					"timestamps": {
+						"from": "00:00:05,080",
+						"to": "00:00:05,180"
+					},
+					"offsets": {
+						"from": 5080,
+						"to": 5180
+					},
+					"id": 508,
+					"p": 0.999397,
+					"t_dtw": -1
+				},
+				{
+					"text": " bought",
+					"timestamps": {
+						"from": "00:00:05,210",
+						"to": "00:00:05,530"
+					},
+					"offsets": {
+						"from": 5210,
+						"to": 5530
+					},
+					"id": 5839,
+					"p": 0.999178,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:05,530",
+						"to": "00:00:05,640"
+					},
+					"offsets": {
+						"from": 5530,
+						"to": 5640
+					},
+					"id": 379,
+					"p": 0.993339,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:05,640",
+						"to": "00:00:05,790"
+					},
+					"offsets": {
+						"from": 5640,
+						"to": 5790
+					},
+					"id": 262,
+					"p": 0.999033,
+					"t_dtw": -1
+				},
+				{
+					"text": " top",
+					"timestamps": {
+						"from": "00:00:05,790",
+						"to": "00:00:05,810"
+					},
+					"offsets": {
+						"from": 5790,
+						"to": 5810
+					},
+					"id": 1353,
+					"p": 0.999266,
+					"t_dtw": -1
+				},
+				{
+					"text": " was",
+					"timestamps": {
+						"from": "00:00:05,810",
+						"to": "00:00:06,190"
+					},
+					"offsets": {
+						"from": 5810,
+						"to": 6190
+					},
+					"id": 373,
+					"p": 0.889314,
+					"t_dtw": -1
+				},
+				{
+					"text": " even",
+					"timestamps": {
+						"from": "00:00:06,690",
+						"to": "00:00:06,720"
+					},
+					"offsets": {
+						"from": 6690,
+						"to": 6720
+					},
+					"id": 772,
+					"p": 0.993473,
+					"t_dtw": -1
+				},
+				{
+					"text": " by",
+					"timestamps": {
+						"from": "00:00:06,730",
+						"to": "00:00:06,890"
+					},
+					"offsets": {
+						"from": 6730,
+						"to": 6890
+					},
+					"id": 416,
+					"p": 0.982922,
+					"t_dtw": -1
+				},
+				{
+					"text": " about",
+					"timestamps": {
+						"from": "00:00:06,970",
+						"to": "00:00:07,430"
+					},
+					"offsets": {
+						"from": 6970,
+						"to": 7430
+					},
+					"id": 546,
+					"p": 0.998908,
+					"t_dtw": -1
+				},
+				{
+					"text": " 1936",
+					"timestamps": {
+						"from": "00:00:07,430",
+						"to": "00:00:08,650"
+					},
+					"offsets": {
+						"from": 7430,
+						"to": 8650
+					},
+					"id": 27653,
+					"p": 0.921689,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:08,650",
+						"to": "00:00:08,860"
+					},
+					"offsets": {
+						"from": 8650,
+						"to": 8860
+					},
+					"id": 13,
+					"p": 0.988255,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_450]",
+					"timestamps": {
+						"from": "00:00:09,000",
+						"to": "00:00:09,000"
+					},
+					"offsets": {
+						"from": 9000,
+						"to": 9000
+					},
+					"id": 50813,
+					"p": 0.111069,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:09,000",
+				"to": "00:00:11,000"
+			},
+			"offsets": {
+				"from": 9000,
+				"to": 11000
+			},
+			"text": " The timeline's note says so.",
+			"tokens": [
+				{
+					"text": " The",
+					"timestamps": {
+						"from": "00:00:09,230",
+						"to": "00:00:09,230"
+					},
+					"offsets": {
+						"from": 9230,
+						"to": 9230
+					},
+					"id": 383,
+					"p": 0.993023,
+					"t_dtw": -1
+				},
+				{
+					"text": " timeline",
+					"timestamps": {
+						"from": "00:00:09,310",
+						"to": "00:00:09,840"
+					},
+					"offsets": {
+						"from": 9310,
+						"to": 9840
+					},
+					"id": 15264,
+					"p": 0.547381,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:09,840",
+						"to": "00:00:09,990"
+					},
+					"offsets": {
+						"from": 9840,
+						"to": 9990
+					},
+					"id": 338,
+					"p": 0.998228,
+					"t_dtw": -1
+				},
+				{
+					"text": " note",
+					"timestamps": {
+						"from": "00:00:09,990",
+						"to": "00:00:10,290"
+					},
+					"offsets": {
+						"from": 9990,
+						"to": 10290
+					},
+					"id": 3465,
+					"p": 0.982482,
+					"t_dtw": -1
+				},
+				{
+					"text": " says",
+					"timestamps": {
+						"from": "00:00:10,290",
+						"to": "00:00:10,310"
+					},
+					"offsets": {
+						"from": 10290,
+						"to": 10310
+					},
+					"id": 1139,
+					"p": 0.999363,
+					"t_dtw": -1
+				},
+				{
+					"text": " so",
+					"timestamps": {
+						"from": "00:00:10,310",
+						"to": "00:00:10,710"
+					},
+					"offsets": {
+						"from": 10310,
+						"to": 10710
+					},
+					"id": 523,
+					"p": 0.999466,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:10,940",
+						"to": "00:00:11,000"
+					},
+					"offsets": {
+						"from": 10940,
+						"to": 11000
+					},
+					"id": 13,
+					"p": 0.991151,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_550]",
+					"timestamps": {
+						"from": "00:00:11,000",
+						"to": "00:00:11,000"
+					},
+					"offsets": {
+						"from": 11000,
+						"to": 11000
+					},
+					"id": 50913,
+					"p": 0.302661,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,464 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:05,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 5000
+			},
+			"text": " Then the climb back, 22 years through the New Deal, a world war, and into the '50s.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.92735,
+					"t_dtw": -1
+				},
+				{
+					"text": " Then",
+					"timestamps": {
+						"from": "00:00:00,290",
+						"to": "00:00:00,290"
+					},
+					"offsets": {
+						"from": 290,
+						"to": 290
+					},
+					"id": 3244,
+					"p": 0.820562,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:00,500"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 500
+					},
+					"id": 262,
+					"p": 0.942874,
+					"t_dtw": -1
+				},
+				{
+					"text": " climb",
+					"timestamps": {
+						"from": "00:00:00,550",
+						"to": "00:00:00,870"
+					},
+					"offsets": {
+						"from": 550,
+						"to": 870
+					},
+					"id": 12080,
+					"p": 0.925689,
+					"t_dtw": -1
+				},
+				{
+					"text": " back",
+					"timestamps": {
+						"from": "00:00:00,870",
+						"to": "00:00:01,050"
+					},
+					"offsets": {
+						"from": 870,
+						"to": 1050
+					},
+					"id": 736,
+					"p": 0.999161,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,320",
+						"to": "00:00:01,320"
+					},
+					"offsets": {
+						"from": 1320,
+						"to": 1320
+					},
+					"id": 11,
+					"p": 0.594512,
+					"t_dtw": -1
+				},
+				{
+					"text": " 22",
+					"timestamps": {
+						"from": "00:00:01,360",
+						"to": "00:00:01,670"
+					},
+					"offsets": {
+						"from": 1360,
+						"to": 1670
+					},
+					"id": 2534,
+					"p": 0.843082,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:01,700",
+						"to": "00:00:02,000"
+					},
+					"offsets": {
+						"from": 1700,
+						"to": 2000
+					},
+					"id": 812,
+					"p": 0.997312,
+					"t_dtw": -1
+				},
+				{
+					"text": " through",
+					"timestamps": {
+						"from": "00:00:02,000",
+						"to": "00:00:02,330"
+					},
+					"offsets": {
+						"from": 2000,
+						"to": 2330
+					},
+					"id": 832,
+					"p": 0.906231,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,330",
+						"to": "00:00:02,470"
+					},
+					"offsets": {
+						"from": 2330,
+						"to": 2470
+					},
+					"id": 262,
+					"p": 0.957172,
+					"t_dtw": -1
+				},
+				{
+					"text": " New",
+					"timestamps": {
+						"from": "00:00:02,470",
+						"to": "00:00:02,610"
+					},
+					"offsets": {
+						"from": 2470,
+						"to": 2610
+					},
+					"id": 968,
+					"p": 0.797841,
+					"t_dtw": -1
+				},
+				{
+					"text": " Deal",
+					"timestamps": {
+						"from": "00:00:02,610",
+						"to": "00:00:02,800"
+					},
+					"offsets": {
+						"from": 2610,
+						"to": 2800
+					},
+					"id": 15138,
+					"p": 0.985075,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,800",
+						"to": "00:00:02,910"
+					},
+					"offsets": {
+						"from": 2800,
+						"to": 2910
+					},
+					"id": 11,
+					"p": 0.968394,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:03,000",
+						"to": "00:00:03,000"
+					},
+					"offsets": {
+						"from": 3000,
+						"to": 3000
+					},
+					"id": 257,
+					"p": 0.773441,
+					"t_dtw": -1
+				},
+				{
+					"text": " world",
+					"timestamps": {
+						"from": "00:00:03,050",
+						"to": "00:00:03,360"
+					},
+					"offsets": {
+						"from": 3050,
+						"to": 3360
+					},
+					"id": 995,
+					"p": 0.762454,
+					"t_dtw": -1
+				},
+				{
+					"text": " war",
+					"timestamps": {
+						"from": "00:00:03,400",
+						"to": "00:00:03,640"
+					},
+					"offsets": {
+						"from": 3400,
+						"to": 3640
+					},
+					"id": 1175,
+					"p": 0.992669,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,640",
+						"to": "00:00:03,680"
+					},
+					"offsets": {
+						"from": 3640,
+						"to": 3680
+					},
+					"id": 11,
+					"p": 0.6025,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:03,680",
+						"to": "00:00:03,850"
+					},
+					"offsets": {
+						"from": 3680,
+						"to": 3850
+					},
+					"id": 290,
+					"p": 0.885131,
+					"t_dtw": -1
+				},
+				{
+					"text": " into",
+					"timestamps": {
+						"from": "00:00:03,850",
+						"to": "00:00:04,080"
+					},
+					"offsets": {
+						"from": 3850,
+						"to": 4080
+					},
+					"id": 656,
+					"p": 0.984349,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:04,080",
+						"to": "00:00:04,310"
+					},
+					"offsets": {
+						"from": 4080,
+						"to": 4310
+					},
+					"id": 262,
+					"p": 0.988193,
+					"t_dtw": -1
+				},
+				{
+					"text": " '",
+					"timestamps": {
+						"from": "00:00:04,410",
+						"to": "00:00:04,410"
+					},
+					"offsets": {
+						"from": 4410,
+						"to": 4410
+					},
+					"id": 705,
+					"p": 0.32509,
+					"t_dtw": -1
+				},
+				{
+					"text": "50",
+					"timestamps": {
+						"from": "00:00:04,420",
+						"to": "00:00:04,680"
+					},
+					"offsets": {
+						"from": 4420,
+						"to": 4680
+					},
+					"id": 1120,
+					"p": 0.999354,
+					"t_dtw": -1
+				},
+				{
+					"text": "s",
+					"timestamps": {
+						"from": "00:00:04,680",
+						"to": "00:00:05,000"
+					},
+					"offsets": {
+						"from": 4680,
+						"to": 5000
+					},
+					"id": 82,
+					"p": 0.982885,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,000",
+						"to": "00:00:05,000"
+					},
+					"offsets": {
+						"from": 5000,
+						"to": 5000
+					},
+					"id": 13,
+					"p": 0.889433,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_250]",
+					"timestamps": {
+						"from": "00:00:05,000",
+						"to": "00:00:05,000"
+					},
+					"offsets": {
+						"from": 5000,
+						"to": 5000
+					},
+					"id": 50613,
+					"p": 0.0371121,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:05,000",
+				"to": "00:00:07,000"
+			},
+			"offsets": {
+				"from": 5000,
+				"to": 7000
+			},
+			"text": " November 1954.",
+			"tokens": [
+				{
+					"text": " November",
+					"timestamps": {
+						"from": "00:00:05,300",
+						"to": "00:00:05,800"
+					},
+					"offsets": {
+						"from": 5300,
+						"to": 5800
+					},
+					"id": 3389,
+					"p": 0.894852,
+					"t_dtw": -1
+				},
+				{
+					"text": " 1954",
+					"timestamps": {
+						"from": "00:00:05,800",
+						"to": "00:00:07,000"
+					},
+					"offsets": {
+						"from": 5800,
+						"to": 7000
+					},
+					"id": 24718,
+					"p": 0.658251,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:07,000",
+						"to": "00:00:07,000"
+					},
+					"offsets": {
+						"from": 7000,
+						"to": 7000
+					},
+					"id": 13,
+					"p": 0.80695,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_350]",
+					"timestamps": {
+						"from": "00:00:07,000",
+						"to": "00:00:07,000"
+					},
+					"offsets": {
+						"from": 7000,
+						"to": 7000
+					},
+					"id": 50713,
+					"p": 0.274325,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}
