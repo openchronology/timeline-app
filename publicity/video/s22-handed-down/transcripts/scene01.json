@@ -1,0 +1,367 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:05,360"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 5360
+			},
+			"text": " Every 10th of November, the oldest marine in the room hands a piece of cake to the youngest.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.974873,
+					"t_dtw": -1
+				},
+				{
+					"text": " Every",
+					"timestamps": {
+						"from": "00:00:00,140",
+						"to": "00:00:00,330"
+					},
+					"offsets": {
+						"from": 140,
+						"to": 330
+					},
+					"id": 3887,
+					"p": 0.832739,
+					"t_dtw": -1
+				},
+				{
+					"text": " 10",
+					"timestamps": {
+						"from": "00:00:00,330",
+						"to": "00:00:00,730"
+					},
+					"offsets": {
+						"from": 330,
+						"to": 730
+					},
+					"id": 838,
+					"p": 0.773415,
+					"t_dtw": -1
+				},
+				{
+					"text": "th",
+					"timestamps": {
+						"from": "00:00:00,730",
+						"to": "00:00:00,860"
+					},
+					"offsets": {
+						"from": 730,
+						"to": 860
+					},
+					"id": 400,
+					"p": 0.983804,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:00,860",
+						"to": "00:00:00,990"
+					},
+					"offsets": {
+						"from": 860,
+						"to": 990
+					},
+					"id": 286,
+					"p": 0.967004,
+					"t_dtw": -1
+				},
+				{
+					"text": " November",
+					"timestamps": {
+						"from": "00:00:00,990",
+						"to": "00:00:01,220"
+					},
+					"offsets": {
+						"from": 990,
+						"to": 1220
+					},
+					"id": 3389,
+					"p": 0.996309,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,670",
+						"to": "00:00:01,670"
+					},
+					"offsets": {
+						"from": 1670,
+						"to": 1670
+					},
+					"id": 11,
+					"p": 0.841551,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:01,710",
+						"to": "00:00:01,780"
+					},
+					"offsets": {
+						"from": 1710,
+						"to": 1780
+					},
+					"id": 262,
+					"p": 0.885513,
+					"t_dtw": -1
+				},
+				{
+					"text": " oldest",
+					"timestamps": {
+						"from": "00:00:01,860",
+						"to": "00:00:02,160"
+					},
+					"offsets": {
+						"from": 1860,
+						"to": 2160
+					},
+					"id": 13325,
+					"p": 0.992569,
+					"t_dtw": -1
+				},
+				{
+					"text": " marine",
+					"timestamps": {
+						"from": "00:00:02,160",
+						"to": "00:00:02,500"
+					},
+					"offsets": {
+						"from": 2160,
+						"to": 2500
+					},
+					"id": 16050,
+					"p": 0.628337,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:02,500",
+						"to": "00:00:02,620"
+					},
+					"offsets": {
+						"from": 2500,
+						"to": 2620
+					},
+					"id": 287,
+					"p": 0.977868,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,620",
+						"to": "00:00:02,790"
+					},
+					"offsets": {
+						"from": 2620,
+						"to": 2790
+					},
+					"id": 262,
+					"p": 0.995327,
+					"t_dtw": -1
+				},
+				{
+					"text": " room",
+					"timestamps": {
+						"from": "00:00:02,790",
+						"to": "00:00:03,040"
+					},
+					"offsets": {
+						"from": 2790,
+						"to": 3040
+					},
+					"id": 2119,
+					"p": 0.996407,
+					"t_dtw": -1
+				},
+				{
+					"text": " hands",
+					"timestamps": {
+						"from": "00:00:03,040",
+						"to": "00:00:03,440"
+					},
+					"offsets": {
+						"from": 3040,
+						"to": 3440
+					},
+					"id": 2832,
+					"p": 0.591078,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:03,440",
+						"to": "00:00:03,490"
+					},
+					"offsets": {
+						"from": 3440,
+						"to": 3490
+					},
+					"id": 257,
+					"p": 0.979245,
+					"t_dtw": -1
+				},
+				{
+					"text": " piece",
+					"timestamps": {
+						"from": "00:00:03,490",
+						"to": "00:00:03,830"
+					},
+					"offsets": {
+						"from": 3490,
+						"to": 3830
+					},
+					"id": 3704,
+					"p": 0.989668,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:03,830",
+						"to": "00:00:03,920"
+					},
+					"offsets": {
+						"from": 3830,
+						"to": 3920
+					},
+					"id": 286,
+					"p": 0.997702,
+					"t_dtw": -1
+				},
+				{
+					"text": " cake",
+					"timestamps": {
+						"from": "00:00:04,010",
+						"to": "00:00:04,210"
+					},
+					"offsets": {
+						"from": 4010,
+						"to": 4210
+					},
+					"id": 12187,
+					"p": 0.995634,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:04,310",
+						"to": "00:00:04,400"
+					},
+					"offsets": {
+						"from": 4310,
+						"to": 4400
+					},
+					"id": 284,
+					"p": 0.985569,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:04,400",
+						"to": "00:00:04,640"
+					},
+					"offsets": {
+						"from": 4400,
+						"to": 4640
+					},
+					"id": 262,
+					"p": 0.99544,
+					"t_dtw": -1
+				},
+				{
+					"text": " youngest",
+					"timestamps": {
+						"from": "00:00:04,640",
+						"to": "00:00:04,960"
+					},
+					"offsets": {
+						"from": 4640,
+						"to": 4960
+					},
+					"id": 18887,
+					"p": 0.994352,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,270",
+						"to": "00:00:05,270"
+					},
+					"offsets": {
+						"from": 5270,
+						"to": 5270
+					},
+					"id": 13,
+					"p": 0.965391,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_268]",
+					"timestamps": {
+						"from": "00:00:05,360",
+						"to": "00:00:05,360"
+					},
+					"offsets": {
+						"from": 5360,
+						"to": 5360
+					},
+					"id": 50631,
+					"p": 0.0427352,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

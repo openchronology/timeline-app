@@ -13,7 +13,8 @@ in the python:3.12-slim image, one container per video. Words a voice would misr
 respelled for it by SAY below and by the video's own "say" map in video.json; a respelling
 can also give exact phonemes in Kokoro's own notation, as "[word](/phonemes/)". Captions keep
 the script's spelling. video.json's "pace" (1.25: higher reads slower) and "silence" (seconds
-between sentences, 0.35) set how quickly it reads; the shorts read faster.
+between sentences, 0.35) set how quickly it reads; the shorts read faster. Its "voice" picks
+another of Kokoro's voices (af_heart by default).
 """
 import json, os, re, subprocess, sys
 
@@ -62,7 +63,7 @@ def sentences(text):
 
 
 def speak(jobs):
-    """Runs in the container: reads [{out, sentences, speed, silence}] and writes each clip."""
+    """Runs in the container: reads [{out, sentences, speed, silence, voice}] and writes each clip."""
     import numpy as np, soundfile as sf, torch
     from kokoro import KPipeline
     torch.set_num_threads(int(os.environ.get("THREADS", "4")))
@@ -71,7 +72,7 @@ def speak(jobs):
         gap = np.zeros(int(24000 * job["silence"]), dtype=np.float32)
         parts = []
         for s in job["sentences"]:
-            parts += [a.numpy() for _, _, a in pipe(s, voice=VOICE, speed=job["speed"])] + [gap]
+            parts += [a.numpy() for _, _, a in pipe(s, voice=job["voice"], speed=job["speed"])] + [gap]
         sf.write(job["out"], np.concatenate(parts[:-1]), 24000)
         print("scene", job["id"], "->", "audio/" + os.path.basename(job["out"]), flush=True)
 
@@ -83,7 +84,7 @@ def main(folder, only):
     ensure_kokoro()
     os.makedirs(os.path.join(folder, "audio"), exist_ok=True)
     jobs = [{"id": sc["id"], "out": f"/o/scene{sc['id']:02d}.wav", "speed": SPEED / cfg.get("pace", 1.25),
-             "silence": cfg.get("silence", 0.35), "sentences": sentences(spoken(sc["vo"], cfg.get("say", {})))}
+             "silence": cfg.get("silence", 0.35), "voice": cfg.get("voice", VOICE), "sentences": sentences(spoken(sc["vo"], cfg.get("say", {})))}
             for sc in scenes if not only or sc["id"] in only]
     subprocess.run(["docker", "run", "--rm", "-i", "--user", UID, "-e", "HOME=/tmp", "-e", "HF_HOME=/t/hf",
                     "-e", "PYTHONPATH=/t/pip", "-e", f"THREADS={os.environ.get('THREADS', '4')}",

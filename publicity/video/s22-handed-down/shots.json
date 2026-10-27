@@ -1,0 +1,368 @@
+{
+  "sample": "../samples/usmc.ochx",
+  "size": [
+    360,
+    640
+  ],
+  "scale": 3,
+  "shots": [
+    {
+      "id": "all",
+      "dur": 0.034,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -6216652800,
+            1830297600
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "zoom75",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -6216652800,
+            1830297600
+          ]
+        },
+        {
+          "t": 3,
+          "view": [
+            -6132585600,
+            -6122131200
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "reader75",
+      "dur": 1.2,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -6153580800,
+            -6108912000
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ],
+      "actions": [
+        {
+          "t": 0,
+          "do": "viewMode",
+          "on": true
+        },
+        {
+          "t": 0.1,
+          "do": "open",
+          "title": "The Continental Congress raises"
+        }
+      ]
+    },
+    {
+      "id": "pan",
+      "dur": 8.4,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -6132585600,
+            -6122131200
+          ]
+        },
+        {
+          "t": 0.5,
+          "view": [
+            -6208320384.0,
+            -5110166016.0
+          ]
+        },
+        {
+          "t": 1.0,
+          "view": [
+            -5206896000,
+            -5185900800
+          ]
+        },
+        {
+          "t": 1.2,
+          "view": [
+            -5206896000,
+            -5185900800
+          ]
+        },
+        {
+          "t": 1.7,
+          "view": [
+            -5315331456.0,
+            -3743017344.0
+          ]
+        },
+        {
+          "t": 2.2,
+          "view": [
+            -3867264000,
+            -3851452800
+          ]
+        },
+        {
+          "t": 2.4,
+          "view": [
+            -3867264000,
+            -3851452800
+          ]
+        },
+        {
+          "t": 2.9,
+          "view": [
+            -4046810112.0,
+            -1443391488.0
+          ]
+        },
+        {
+          "t": 3.4,
+          "view": [
+            -1630800000,
+            -1622937600
+          ]
+        },
+        {
+          "t": 3.6,
+          "view": [
+            -1630800000,
+            -1622937600
+          ]
+        },
+        {
+          "t": 4.1,
+          "view": [
+            -1699021440.0,
+            -709810560.0
+          ]
+        },
+        {
+          "t": 4.6,
+          "view": [
+            -788400000,
+            -778032000
+          ]
+        },
+        {
+          "t": 4.8,
+          "view": [
+            -788400000,
+            -778032000
+          ]
+        },
+        {
+          "t": 5.3,
+          "view": [
+            -803440512.0,
+            -585353088.0
+          ]
+        },
+        {
+          "t": 5.8,
+          "view": [
+            -603504000,
+            -600393600
+          ]
+        },
+        {
+          "t": 6.0,
+          "view": [
+            -603504000,
+            -600393600
+          ]
+        },
+        {
+          "t": 6.5,
+          "view": [
+            -647457408.0,
+            -10132992.0
+          ]
+        },
+        {
+          "t": 7.0,
+          "view": [
+            -64454400,
+            -54086400
+          ]
+        },
+        {
+          "t": 7.2,
+          "view": [
+            -64454400,
+            -54086400
+          ]
+        },
+        {
+          "t": 7.7,
+          "view": [
+            -158063616.0,
+            1199270016.0
+          ]
+        },
+        {
+          "t": 8.2,
+          "view": [
+            1097884800,
+            1105660800
+          ]
+        },
+        {
+          "t": 8.4,
+          "view": [
+            1097884800,
+            1105660800
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "back21",
+      "dur": 1.6,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            1097884800,
+            1105660800
+          ]
+        },
+        {
+          "t": 0.8,
+          "view": [
+            -1830384000,
+            1262304000
+          ]
+        },
+        {
+          "t": 1.6,
+          "view": [
+            -1609459200,
+            -1451692800
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "reader21",
+      "dur": 1.2,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -1546300800,
+            -1501718400
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ],
+      "actions": [
+        {
+          "t": 0,
+          "do": "viewMode",
+          "on": true
+        },
+        {
+          "t": 0.1,
+          "do": "open",
+          "title": "Lejeune's birthday message"
+        }
+      ]
+    },
+    {
+      "id": "modern",
+      "dur": 2,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -1609459200,
+            -1451692800
+          ]
+        },
+        {
+          "t": 2,
+          "view": [
+            -788918400,
+            1893456000
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "home",
+      "dur": 1.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -788918400,
+            1893456000
+          ]
+        },
+        {
+          "t": 1.5,
+          "view": [
+            -6216652800,
+            1830297600
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    }
+  ]
+}

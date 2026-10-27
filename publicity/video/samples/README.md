@@ -29,3 +29,4 @@ The sample timelines the tours open in the real editor. Each `.ochx` is built by
 | [`egypt.ochx`](egypt.ochx)                                     | Built from `egypt.mjs`.                                                                                                                        |
 | [`lincoln.ochx`](lincoln.ochx)                                 | Built from `lincoln.mjs`.                                                                                                                      |
 | [`star-wars.ochx`](star-wars.ochx)                             | The live Star Wars timeline, downloaded through the API (Video 12, Short 9).                                                                   |
+| [`usmc.ochx`](usmc.ochx)                                       | An export of the live Marine Corps timeline at timescale.info/athan/usmc, with three moments added for Short 22.                               |

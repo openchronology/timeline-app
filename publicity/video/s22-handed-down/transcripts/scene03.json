@@ -1,0 +1,437 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:06,560"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 6560
+			},
+			"text": " Every generation since has added to the line, Tripoli, Bella Wood, Iwo Jima, chosen Hui, Fallujah.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.97461,
+					"t_dtw": -1
+				},
+				{
+					"text": " Every",
+					"timestamps": {
+						"from": "00:00:00,140",
+						"to": "00:00:00,320"
+					},
+					"offsets": {
+						"from": 140,
+						"to": 320
+					},
+					"id": 3887,
+					"p": 0.631329,
+					"t_dtw": -1
+				},
+				{
+					"text": " generation",
+					"timestamps": {
+						"from": "00:00:00,320",
+						"to": "00:00:00,960"
+					},
+					"offsets": {
+						"from": 320,
+						"to": 960
+					},
+					"id": 5270,
+					"p": 0.986481,
+					"t_dtw": -1
+				},
+				{
+					"text": " since",
+					"timestamps": {
+						"from": "00:00:00,960",
+						"to": "00:00:01,280"
+					},
+					"offsets": {
+						"from": 960,
+						"to": 1280
+					},
+					"id": 1201,
+					"p": 0.99082,
+					"t_dtw": -1
+				},
+				{
+					"text": " has",
+					"timestamps": {
+						"from": "00:00:01,280",
+						"to": "00:00:01,470"
+					},
+					"offsets": {
+						"from": 1280,
+						"to": 1470
+					},
+					"id": 468,
+					"p": 0.989102,
+					"t_dtw": -1
+				},
+				{
+					"text": " added",
+					"timestamps": {
+						"from": "00:00:01,470",
+						"to": "00:00:01,790"
+					},
+					"offsets": {
+						"from": 1470,
+						"to": 1790
+					},
+					"id": 2087,
+					"p": 0.989724,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:01,790",
+						"to": "00:00:01,920"
+					},
+					"offsets": {
+						"from": 1790,
+						"to": 1920
+					},
+					"id": 284,
+					"p": 0.995226,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:01,920",
+						"to": "00:00:02,090"
+					},
+					"offsets": {
+						"from": 1920,
+						"to": 2090
+					},
+					"id": 262,
+					"p": 0.993352,
+					"t_dtw": -1
+				},
+				{
+					"text": " line",
+					"timestamps": {
+						"from": "00:00:02,090",
+						"to": "00:00:02,140"
+					},
+					"offsets": {
+						"from": 2090,
+						"to": 2140
+					},
+					"id": 1627,
+					"p": 0.979904,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,390",
+						"to": "00:00:02,480"
+					},
+					"offsets": {
+						"from": 2390,
+						"to": 2480
+					},
+					"id": 11,
+					"p": 0.179765,
+					"t_dtw": -1
+				},
+				{
+					"text": " Tripoli",
+					"timestamps": {
+						"from": "00:00:02,700",
+						"to": "00:00:03,040"
+					},
+					"offsets": {
+						"from": 2700,
+						"to": 3040
+					},
+					"id": 47318,
+					"p": 0.405862,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,040",
+						"to": "00:00:03,130"
+					},
+					"offsets": {
+						"from": 3040,
+						"to": 3130
+					},
+					"id": 11,
+					"p": 0.925499,
+					"t_dtw": -1
+				},
+				{
+					"text": " Bella",
+					"timestamps": {
+						"from": "00:00:03,300",
+						"to": "00:00:03,520"
+					},
+					"offsets": {
+						"from": 3300,
+						"to": 3520
+					},
+					"id": 39304,
+					"p": 0.161648,
+					"t_dtw": -1
+				},
+				{
+					"text": " Wood",
+					"timestamps": {
+						"from": "00:00:03,520",
+						"to": "00:00:03,780"
+					},
+					"offsets": {
+						"from": 3520,
+						"to": 3780
+					},
+					"id": 5326,
+					"p": 0.958617,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,780",
+						"to": "00:00:03,890"
+					},
+					"offsets": {
+						"from": 3780,
+						"to": 3890
+					},
+					"id": 11,
+					"p": 0.980585,
+					"t_dtw": -1
+				},
+				{
+					"text": " I",
+					"timestamps": {
+						"from": "00:00:03,910",
+						"to": "00:00:03,940"
+					},
+					"offsets": {
+						"from": 3910,
+						"to": 3940
+					},
+					"id": 314,
+					"p": 0.86009,
+					"t_dtw": -1
+				},
+				{
+					"text": "wo",
+					"timestamps": {
+						"from": "00:00:04,070",
+						"to": "00:00:04,230"
+					},
+					"offsets": {
+						"from": 4070,
+						"to": 4230
+					},
+					"id": 21638,
+					"p": 0.993902,
+					"t_dtw": -1
+				},
+				{
+					"text": " Jim",
+					"timestamps": {
+						"from": "00:00:04,230",
+						"to": "00:00:04,550"
+					},
+					"offsets": {
+						"from": 4230,
+						"to": 4550
+					},
+					"id": 5395,
+					"p": 0.971578,
+					"t_dtw": -1
+				},
+				{
+					"text": "a",
+					"timestamps": {
+						"from": "00:00:04,550",
+						"to": "00:00:04,650"
+					},
+					"offsets": {
+						"from": 4550,
+						"to": 4650
+					},
+					"id": 64,
+					"p": 0.9599,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:04,650",
+						"to": "00:00:04,720"
+					},
+					"offsets": {
+						"from": 4650,
+						"to": 4720
+					},
+					"id": 11,
+					"p": 0.944303,
+					"t_dtw": -1
+				},
+				{
+					"text": " chosen",
+					"timestamps": {
+						"from": "00:00:04,980",
+						"to": "00:00:05,400"
+					},
+					"offsets": {
+						"from": 4980,
+						"to": 5400
+					},
+					"id": 7147,
+					"p": 0.616631,
+					"t_dtw": -1
+				},
+				{
+					"text": " H",
+					"timestamps": {
+						"from": "00:00:05,400",
+						"to": "00:00:05,440"
+					},
+					"offsets": {
+						"from": 5400,
+						"to": 5440
+					},
+					"id": 367,
+					"p": 0.638077,
+					"t_dtw": -1
+				},
+				{
+					"text": "ui",
+					"timestamps": {
+						"from": "00:00:05,550",
+						"to": "00:00:05,650"
+					},
+					"offsets": {
+						"from": 5550,
+						"to": 5650
+					},
+					"id": 9019,
+					"p": 0.257541,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:05,650",
+						"to": "00:00:05,810"
+					},
+					"offsets": {
+						"from": 5650,
+						"to": 5810
+					},
+					"id": 11,
+					"p": 0.573648,
+					"t_dtw": -1
+				},
+				{
+					"text": " Fall",
+					"timestamps": {
+						"from": "00:00:05,970",
+						"to": "00:00:06,200"
+					},
+					"offsets": {
+						"from": 5970,
+						"to": 6200
+					},
+					"id": 7218,
+					"p": 0.462835,
+					"t_dtw": -1
+				},
+				{
+					"text": "ujah",
+					"timestamps": {
+						"from": "00:00:06,200",
+						"to": "00:00:06,360"
+					},
+					"offsets": {
+						"from": 6200,
+						"to": 6360
+					},
+					"id": 46024,
+					"p": 0.79631,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:06,360",
+						"to": "00:00:06,560"
+					},
+					"offsets": {
+						"from": 6360,
+						"to": 6560
+					},
+					"id": 13,
+					"p": 0.870409,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_328]",
+					"timestamps": {
+						"from": "00:00:06,560",
+						"to": "00:00:06,560"
+					},
+					"offsets": {
+						"from": 6560,
+						"to": 6560
+					},
+					"id": 50691,
+					"p": 0.0534825,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

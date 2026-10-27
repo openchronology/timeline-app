@@ -1,0 +1,22 @@
+{
+  "script": "../../shorts/22-handed-down.md",
+  "format": "vertical",
+  "look": "archive",
+  "voice": "am_michael",
+  "pace": 1.05,
+  "silence": 0.12,
+  "lead": 0.15,
+  "tail": 0.3,
+  "hold": 2.0,
+  "say": {
+    "Huế": "[Huế](/hwˈA/)",
+    "Lejeune": "[Lejeune](/ləʒˈɜɹn/)",
+    "Chosin": "[Chosin](/ʧˈOzɪn/)",
+    "1775": "seventeen seventy-five",
+    "1921": "nineteen twenty-one",
+    "line. Tripoli. Belleau Wood. Iwo Jima. Chosin. Huế. Fallujah.": "line: Tripoli, Belleau Wood, Iwo Jima, [Chosin](/ʧˈOzɪn/), [Huế](/hwˈA/), Fallujah."
+  },
+  "minDur": {
+    "3": 9
+  }
+}

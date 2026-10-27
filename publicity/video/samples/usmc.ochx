@@ -1,0 +1,3029 @@
+{
+ "format": "openchronology",
+ "version": 1,
+ "title": "The United States Marine Corps: A History",
+ "description": "From two battalions raised by the Continental Congress in 1775 to the Corps of today: the wars and battles the Marines fought, the leaders who shaped them, and the traditions they carry.\n\n**How to read it.** Wars and campaigns are durations, with a picture behind the timeline while they last; battles, milestones and people are moments with their picture. Chapter headings mark the eras. Hover over a cluster of moments to fan it out, and open any moment for its full notes and sources. Related events (a leader and their battle, a battle and its war) are linked.\n\n**Sources and images.** Each event links the Wikipedia article it draws on. Images are linked, not copied, from Wikimedia Commons, where most are US government works in the public domain; open an image's original for its author and license. Dates are given in UTC; where only the month or year is known, the notes say so.",
+ "presentation": {
+  "mode": "gregorian",
+  "unit": "",
+  "scale": "1/1",
+  "origin": "0/1",
+  "version": 1,
+  "offsetMinutes": 0,
+  "significantDigits": 6
+ },
+ "plugins": [
+  {
+   "enabled": true,
+   "manifest": {
+    "id": "moment-icons",
+    "name": "Moment icons",
+    "fields": [
+     {
+      "kind": "image-url",
+      "label": "Moment icon URL",
+      "metadataKey": "iconUrl"
+     }
+    ],
+    "marker": {
+     "kind": "image",
+     "metadataKey": "iconUrl"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.icon(\"iconUrl\"); }",
+    "version": 2,
+    "apiVersion": 1,
+    "description": "Show a circular image on each moment, enlarge it on hover, and edit its image URL in the details panel."
+   }
+  },
+  {
+   "enabled": true,
+   "manifest": {
+    "id": "duration-backgrounds",
+    "name": "Duration backgrounds",
+    "fields": [
+     {
+      "kind": "image-url",
+      "label": "Background image URL",
+      "metadataKey": "backgroundUrl"
+     }
+    ],
+    "targets": [
+     "durations"
+    ],
+    "version": 1,
+    "apiVersion": 1,
+    "background": {
+     "kind": "image",
+     "metadataKey": "backgroundUrl"
+    },
+    "description": "Show an image behind the timeline where a duration lies, centered between its visible start and end and filling the timeline. Smaller durations show above larger ones, and edges blend into each other."
+   }
+  },
+  {
+   "enabled": true,
+   "manifest": {
+    "id": "expand-on-hover",
+    "name": "Expand on hover",
+    "fields": [],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.expand(); }",
+    "summary": {
+     "kind": "radial"
+    },
+    "version": 1,
+    "apiVersion": 1,
+    "description": "Hover or focus a summary of two to five moments to fan out its members radially for individual inspection. Larger summaries stay collapsed."
+   }
+  },
+  {
+   "enabled": true,
+   "manifest": {
+    "id": "rich-text-notes",
+    "name": "Rich text notes",
+    "notes": {
+     "kind": "markdown"
+    },
+    "fields": [],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }",
+    "version": 1,
+    "apiVersion": 1,
+    "description": "Edit moment and stack notes visually, storing portable Markdown. Hover cards render safe headings, emphasis, lists, code and HTTPS links. HTML and images are not executed."
+   }
+  },
+  {
+   "enabled": true,
+   "manifest": {
+    "id": "moment-headings",
+    "name": "Headings",
+    "fields": [
+     {
+      "kind": "heading",
+      "label": "Heading level",
+      "metadataKey": "headingLevel"
+     },
+     {
+      "kind": "font",
+      "label": "Heading font",
+      "metadataKey": "headingFont"
+     }
+    ],
+    "marker": {
+     "kind": "heading",
+     "metadataKey": "headingLevel"
+    },
+    "targets": [
+     "moments"
+    ],
+    "version": 1,
+    "apiVersion": 1,
+    "description": "Let a moment act as a heading or marker: only its title shows, sized as a heading from level 1 to 6, and the title is what you click. Choose its font (Times New Roman by default). Headings still group into summaries with other moments."
+   }
+  },
+  {
+   "enabled": true,
+   "manifest": {
+    "id": "moment-sources",
+    "name": "Sources",
+    "fields": [
+     {
+      "kind": "links",
+      "label": "Sources",
+      "metadataKey": "sources"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }",
+    "version": 1,
+    "apiVersion": 1,
+    "description": "Show and edit a series of source links for moments and stack entries."
+   }
+  },
+  {
+   "enabled": true,
+   "manifest": {
+    "id": "timeline-background",
+    "name": "Timeline background",
+    "fields": [],
+    "version": 1,
+    "backdrop": {
+     "kind": "image",
+     "setting": "imageUrl"
+    },
+    "settings": [
+     {
+      "key": "imageUrl",
+      "kind": "image-url",
+      "label": "Background image URL"
+     }
+    ],
+    "apiVersion": 1,
+    "description": "Show one image behind the whole timeline, beneath any duration backgrounds. Set its address here in the plugin list: it belongs to the whole timeline, not to any one event."
+   },
+   "settings": {
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/MARFORK_250th_Marine_Corps_Birthday_Ball_%289415007%29.jpg/1920px-MARFORK_250th_Marine_Corps_Birthday_Ball_%289415007%29.jpg"
+   }
+  },
+  {
+   "enabled": true,
+   "manifest": {
+    "id": "timeline-theme",
+    "name": "Timeline theme",
+    "theme": {
+     "halo": "haloColor",
+     "text": "textColor",
+     "marker": "markerColor",
+     "measure": "measureColor",
+     "duration": "durationColor",
+     "textFont": "textFont",
+     "background": "backgroundColor",
+     "measureFont": "measureFont"
+    },
+    "fields": [],
+    "version": 1,
+    "settings": [
+     {
+      "key": "textColor",
+      "kind": "color",
+      "label": "Label color"
+     },
+     {
+      "key": "textFont",
+      "kind": "font",
+      "label": "Label font"
+     },
+     {
+      "key": "measureColor",
+      "kind": "color",
+      "label": "Measure color"
+     },
+     {
+      "key": "measureFont",
+      "kind": "font",
+      "label": "Measure font"
+     },
+     {
+      "key": "haloColor",
+      "kind": "color",
+      "label": "Halo color"
+     },
+     {
+      "key": "markerColor",
+      "kind": "color",
+      "label": "Marker color"
+     },
+     {
+      "key": "durationColor",
+      "kind": "color",
+      "label": "Duration color"
+     },
+     {
+      "key": "backgroundColor",
+      "kind": "color",
+      "label": "Background color"
+     }
+    ],
+    "apiVersion": 1,
+    "description": "Choose the timeline's colors and fonts: its labels, its measure (the axis, tick marks and their times), the halo that keeps them readable over images, the default marker and duration colors, and a background color. Set them here in the plugin list; anything left blank keeps the usual look, and colors chosen for events still win."
+   },
+   "settings": {
+    "textFont": "Georgia, serif",
+    "haloColor": "#0b1733",
+    "textColor": "#f3d27a",
+    "markerColor": "#b3122e",
+    "measureColor": "#e8c25a",
+    "durationColor": "#c8102e",
+    "backgroundColor": "#0b1733"
+   }
+  }
+ ],
+ "tags": [
+  "history",
+  "military history",
+  "united states marine corps",
+  "education"
+ ],
+ "image": {
+  "alt": "Joe Rosenthal's \"Raising the Flag on Iwo Jima\", 23 February 1945",
+  "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b0/Raising_the_Flag_on_Iwo_Jima%2C_larger_-_edit1.jpg/1280px-Raising_the_Flag_on_Iwo_Jima%2C_larger_-_edit1.jpg"
+ },
+ "events": [
+  {
+   "id": "abbey-gate",
+   "time": "1629936000/1",
+   "metadata": {
+    "tags": [
+     "event",
+     "afghanistan",
+     "memorial"
+    ],
+    "title": "Abbey Gate bombing at Kabul airport",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/37/2021_Kabul_airport_bombing_explosion_%2802%29.png/960px-2021_Kabul_airport_bombing_explosion_%2802%29.png",
+    "sources": [
+     "https://en.wikipedia.org/wiki/2021_Kabul_airport_attack"
+    ],
+    "description": "An ISIS-K suicide bomber struck the crowds at Abbey Gate during the evacuation, killing **13 American service members** (11 of them Marines) and about 170 Afghans.\n\n**Read more:** [2021 Kabul airport attack — Wikipedia](https://en.wikipedia.org/wiki/2021_Kabul_airport_attack)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "act-1798",
+   "time": "-5411232000/1",
+   "metadata": {
+    "tags": [
+     "founding",
+     "law"
+    ],
+    "title": "President John Adams signs the act establishing the Marine Corps",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/75/John_Adams_Portrait.jpg/960px-John_Adams_Portrait.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/John_Adams"
+    ],
+    "description": "\"An Act for the establishing and organizing a Marine Corps\" created the **United States Marine Corps** as a permanent service, at first under the Navy at sea and liable for duty on land at the President's direction.\n\n**Read more:** [John Adams — Wikipedia](https://en.wikipedia.org/wiki/John_Adams)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "al-gray",
+   "time": "552096000/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "commandant",
+     "doctrine"
+    ],
+    "title": "Al Gray becomes Commandant",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7f/Official_Portrait_of_Retired_Gen._Alfred_M._Gray_%282%29_%28cropped%29.jpg/960px-Official_Portrait_of_Retired_Gen._Alfred_M._Gray_%282%29_%28cropped%29.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Alfred_M._Gray_Jr."
+    ],
+    "description": "A former enlisted Marine, the 29th Commandant made **maneuver warfare** the Corps' doctrine, published in *FMFM 1, Warfighting* (1989), and insisted that \"every Marine is a rifleman\".\n\n**Read more:** [Alfred M. Gray Jr. — Wikipedia](https://en.wikipedia.org/wiki/Alfred_M._Gray_Jr.)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "armistice",
+   "time": "-1613865600/1",
+   "metadata": {
+    "tags": [
+     "treaty",
+     "world war i"
+    ],
+    "title": "Armistice: the guns fall silent",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/2/2f/Armisticetrain_%28slight_crop%29.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Armistice_of_11_November_1918"
+    ],
+    "description": "The armistice took effect at 11 a.m. Marines were still fighting that morning, crossing the Meuse River the night before. Over 2,400 Marines were killed in the war.\n\n**Read more:** [Armistice of 11 November 1918 — Wikipedia](https://en.wikipedia.org/wiki/Armistice_of_11_November_1918)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "armistice-korea",
+   "time": "-518572800/1",
+   "metadata": {
+    "tags": [
+     "treaty",
+     "korean war"
+    ],
+    "title": "Korean Armistice Agreement",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b5/Korean_War_armistice_agreement_1953.jpg/960px-Korean_War_armistice_agreement_1953.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Korean_Armistice_Agreement"
+    ],
+    "description": "The armistice ended the fighting, though no peace treaty has ever been signed. About 4,500 Marines died in Korea.\n\n**Read more:** [Korean Armistice Agreement — Wikipedia](https://en.wikipedia.org/wiki/Korean_Armistice_Agreement)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "aviation",
+   "time": "-1818115200/1",
+   "metadata": {
+    "tags": [
+     "aviation",
+     "founding"
+    ],
+    "title": "Birth of Marine Corps aviation",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/33/USMC-19400.jpg/960px-USMC-19400.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Alfred_A._Cunningham"
+    ],
+    "description": "First Lieutenant **Alfred A. Cunningham** reported for flight training at Annapolis, becoming the first Marine aviator. The day is celebrated as the birthday of Marine aviation.\n\n**Read more:** [Alfred Austell Cunningham — Wikipedia](https://en.wikipedia.org/wiki/Alfred_A._Cunningham)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "barracks",
+   "time": "-5325436800/1",
+   "metadata": {
+    "tags": [
+     "tradition",
+     "place"
+    ],
+    "title": "Marine Barracks Washington: \"8th & I\"",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/32/U.S._Marines_pass_in_review_at_the_closing_the_retirement_ceremony_for_Gen._George_J._Flynn%2C_not_shown_at_Marine_Barracks_Washington_in_Washington%2C_D.C.%2C_May_9%2C_2013_130509-M-LU710-372.jpg/960px-thumbnail.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Marine_Barracks,_Washington,_D.C."
+    ],
+    "description": "President Thomas Jefferson and Commandant Burrows chose the site of the Marine Barracks near the Washington Navy Yard, by tradition while riding together on this day. \"8th & I\" is the **oldest post of the Corps** and the Commandant's home since 1806.\n\n**Read more:** [Marine Barracks, Washington, D.C. — Wikipedia](https://en.wikipedia.org/wiki/Marine_Barracks,_Washington,_D.C.)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "basilone",
+   "time": "-858038400/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "medal of honor",
+     "guadalcanal"
+    ],
+    "title": "John Basilone at Henderson Field",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/29/John_Basilone%2C_September_1943_%2810931006014%29.jpg/960px-John_Basilone%2C_September_1943_%2810931006014%29.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/John_Basilone"
+    ],
+    "description": "Sergeant \"Manila John\" Basilone's machine-gun section held through two nights of attacks, Basilone repairing guns and running ammunition through enemy lines. Awarded the **Medal of Honor**, he insisted on returning to combat and was killed on the first day at Iwo Jima, receiving the Navy Cross.\n\n**Read more:** [John Basilone — Wikipedia](https://en.wikipedia.org/wiki/John_Basilone)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "beirut",
+   "time": "435715200/1",
+   "metadata": {
+    "tags": [
+     "event",
+     "lebanon",
+     "memorial"
+    ],
+    "title": "Beirut barracks bombing",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cc/Beirutbarr.jpg/960px-Beirutbarr.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/1983_Beirut_barracks_bombings"
+    ],
+    "description": "A truck bomb destroyed the headquarters of the 1st Battalion, 8th Marines at Beirut airport, killing **241 American servicemen**, 220 of them Marines: the Corps' deadliest single day since Iwo Jima. A second bomb killed 58 French paratroopers.\n\n**Read more:** [1983 Beirut barracks bombings — Wikipedia](https://en.wikipedia.org/wiki/1983_Beirut_barracks_bombings)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "birthday",
+   "time": "-6126537600/1",
+   "metadata": {
+    "tags": [
+     "founding",
+     "tradition"
+    ],
+    "title": "The Continental Congress raises two battalions of Marines",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/61/Sketch_of_Tun_Tavern_in_the_Revolutionary_War.jpg/960px-Sketch_of_Tun_Tavern_in_the_Revolutionary_War.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tun_Tavern"
+    ],
+    "description": "The Second Continental Congress resolved \"that two Battalions of Marines be raised\", men \"good seamen, or so acquainted with maritime affairs as to be able to serve to advantage by sea\".\n\nTradition places the first recruiting at **Tun Tavern** in Philadelphia. Marines celebrate **10 November** as the Corps' birthday every year.\n\n**Read more:** [Tun Tavern — Wikipedia](https://en.wikipedia.org/wiki/Tun_Tavern)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "birthday-order",
+   "time": "-1520035200/1",
+   "metadata": {
+    "tags": [
+     "tradition",
+     "founding"
+    ],
+    "title": "Lejeune's birthday message (Marine Corps Order No. 47)",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/MarineCorpsBirthdayCake_CampLejeune_2008_081107-M-3189M-001.jpg/960px-MarineCorpsBirthdayCake_CampLejeune_2008_081107-M-3189M-001.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/United_States_Marine_Corps_Birthday"
+    ],
+    "description": "Lejeune ordered that a summary of the Corps' history and traditions be read to every command each **10 November**. The message is still read at every Marine Corps birthday ball.\n\n**Read more:** [United States Marine Corps birthday — Wikipedia](https://en.wikipedia.org/wiki/United_States_Marine_Corps_Birthday)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "bladensburg",
+   "time": "-4902595200/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "war of 1812"
+    ],
+    "title": "Battle of Bladensburg",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4e/Final_Stand_at_Bladensburg.png/960px-Final_Stand_at_Bladensburg.png",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Bladensburg"
+    ],
+    "description": "As American militia broke, about 100 Marines and 400 sailors under Commodore Joshua Barney held their line until overrun, earning the respect of the British. Washington was burned that night, but the Marine Barracks and Commandant's House were spared.\n\n**Read more:** [Battle of Bladensburg — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Bladensburg)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "boyington",
+   "time": "-820368000/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "aviation",
+     "medal of honor"
+    ],
+    "title": "Pappy Boyington is shot down",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/5/5f/Pappy_Boyington.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Pappy_Boyington"
+    ],
+    "description": "Commander of VMF-214, the **\"Black Sheep\" squadron**, Boyington was credited with 26 victories (28 by his own count) before being shot down over Rabaul and captured. He spent the rest of the war as a prisoner and received the **Medal of Honor**.\n\n**Read more:** [Gregory Boyington — Wikipedia](https://en.wikipedia.org/wiki/Pappy_Boyington)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "brewer",
+   "time": "263692800/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "women marines",
+     "milestone"
+    ],
+    "title": "Margaret A. Brewer: the first woman general",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fc/Brewer_MA_USMC.jpg/960px-Brewer_MA_USMC.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Margaret_A._Brewer"
+    ],
+    "description": "The last Director of Women Marines became the first woman in the Marine Corps to reach general officer rank, as brigadier general and Director of Information.\n\n**Read more:** [Margaret A. Brewer — Wikipedia](https://en.wikipedia.org/wiki/Margaret_A._Brewer)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "bull-run",
+   "time": "-3422304000/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "civil war"
+    ],
+    "title": "First Battle of Bull Run",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/Bridge_during_the_Retreat_from_Manassas%2C_First_Battle_of_Bull_Run_%28First_Manassas%29%2C_Virginia_1861.jpg/960px-Bridge_during_the_Retreat_from_Manassas%2C_First_Battle_of_Bull_Run_%28First_Manassas%29%2C_Virginia_1861.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_Battle_of_Bull_Run"
+    ],
+    "description": "A battalion of mostly raw Marine recruits fought with the Union army in the first major battle of the war and was swept up in its retreat: one of the Corps' few battles ending in defeat.\n\n**Read more:** [First Battle of Bull Run — Wikipedia](https://en.wikipedia.org/wiki/First_Battle_of_Bull_Run)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "burrows",
+   "time": "-5411145600/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "commandant"
+    ],
+    "title": "William Ward Burrows becomes Commandant",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/d/d0/William_Burrows_MET_APS6820.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/William_Ward_Burrows_II"
+    ],
+    "description": "The first Commandant of the new Marine Corps. Burrows founded the **Marine Band** in 1798 and moved the Corps' headquarters to Washington.\n\n**Read more:** [William Ward Burrows II — Wikipedia](https://en.wikipedia.org/wiki/William_Ward_Burrows_II)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "camp-rhino",
+   "time": "1006646400/1",
+   "metadata": {
+    "tags": [
+     "event",
+     "afghanistan",
+     "amphibious"
+    ],
+    "title": "Task Force 58 seizes Camp Rhino",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/13/Flag_of_the_United_States_Marine_Corps.svg/960px-Flag_of_the_United_States_Marine_Corps.svg.png",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Camp_Rhino"
+    ],
+    "description": "Marines under Brigadier General **James Mattis** flew some 400 miles inland from ships in the Arabian Sea to seize a desert airstrip near Kandahar: the first conventional US ground forces in Afghanistan and one of the deepest amphibious operations in history.\n\n**Read more:** [Camp Rhino — Wikipedia](https://en.wikipedia.org/wiki/Camp_Rhino)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "carpenter",
+   "time": "1290297600/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "medal of honor",
+     "afghanistan"
+    ],
+    "title": "Kyle Carpenter covers a grenade in Marjah",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/df/Kyle_Carpenter_140618-M-LI307-0155.jpg/960px-Kyle_Carpenter_140618-M-LI307-0155.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Kyle_Carpenter"
+    ],
+    "description": "Lance Corporal Carpenter shielded a fellow Marine from a grenade on a rooftop in Helmand, suffering grave wounds that took dozens of surgeries to repair. He is the youngest living recipient of the **Medal of Honor**.\n\n**Read more:** [Kyle Carpenter — Wikipedia](https://en.wikipedia.org/wiki/Kyle_Carpenter)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "chapultepec",
+   "time": "-3859488000/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "mexican–american war",
+     "tradition"
+    ],
+    "title": "Storming of Chapultepec: \"the Halls of Montezuma\"",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/Nebel_Mexican_War_10_Chapultepec_Pillow_%28cropped%29.jpg/960px-Nebel_Mexican_War_10_Chapultepec_Pillow_%28cropped%29.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Chapultepec"
+    ],
+    "description": "Marines joined the assault on the castle guarding Mexico City, then entered the city and guarded the National Palace.\n\nThe Marines' Hymn opens with **\"From the Halls of Montezuma\"**, and a popular tradition links the scarlet **\"blood stripe\"** on dress blue trousers to the officers and NCOs who fell here, though the stripe predates the war.\n\n**Read more:** [Battle of Chapultepec — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Chapultepec)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "chesty-puller",
+   "time": "-857952000/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "navy cross"
+    ],
+    "title": "Lewis \"Chesty\" Puller",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/1/1e/Chesty-puller.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Chesty_Puller"
+    ],
+    "description": "The most decorated Marine in history, with **five Navy Crosses**: two from Nicaragua, one for his battalion's stand at Henderson Field, one at Cape Gloucester and one at Chosin. Recruits still end the day with *\"Good night, Chesty, wherever you are!\"*\n\n**Read more:** [Chesty Puller — Wikipedia](https://en.wikipedia.org/wiki/Chesty_Puller)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "code-talkers",
+   "time": "-784684800/1",
+   "metadata": {
+    "tags": [
+     "milestone",
+     "code talkers"
+    ],
+    "title": "Navajo Code Talkers at Iwo Jima",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0b/Navajo_code_talkers_%284374070382%29.jpg/960px-Navajo_code_talkers_%284374070382%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Code_talker",
+     "https://commons.wikimedia.org/wiki/File:Navajo_code_talkers_(4374070382).jpg"
+    ],
+    "description": "Navajo Marines transmitted messages in a code built on their language that the Japanese never broke. At Iwo Jima six code talkers sent and received more than 800 messages without error in the first two days.\n\n> \"Were it not for the Navajos, the Marines would never have taken Iwo Jima.\" — Major Howard Connor, 5th Marine Division signal officer\n\n**Read more:** [Code talker — Wikipedia](https://en.wikipedia.org/wiki/Code_talker)\n\n*Image: Wikimedia Commons ([file page](https://commons.wikimedia.org/wiki/File:Navajo_code_talkers_(4374070382).jpg)).*"
+   }
+  },
+  {
+   "id": "corregidor",
+   "time": "-872812800/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war ii"
+    ],
+    "title": "The 4th Marines at Corregidor",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5e/American_and_Filipino_Prisoners%2C_Captured_at_Corregidor_-_NARA_-_6200939.jpg/960px-American_and_Filipino_Prisoners%2C_Captured_at_Corregidor_-_NARA_-_6200939.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Corregidor"
+    ],
+    "description": "The 4th Marine Regiment, withdrawn from Shanghai to the Philippines, defended the beaches of Corregidor until the island surrendered. Colonel Samuel Howard ordered the regiment's colors burned rather than surrendered; its survivors spent the rest of the war as prisoners.\n\n**Read more:** [Battle of Corregidor — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Corregidor)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "da-nang",
+   "time": "-152064000/1",
+   "metadata": {
+    "tags": [
+     "event",
+     "vietnam war",
+     "amphibious"
+    ],
+    "title": "Marines land at Da Nang",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/0/0f/Beach_activity_at_Da_Nang%2C_Vietnam_during_landing_of_United_States_Marines_of_the_9th_Marine_Expeditionary_Brigade_in_March_of_1965.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/9th_Marine_Expeditionary_Brigade"
+    ],
+    "description": "The 9th Marine Expeditionary Brigade came ashore to guard the Da Nang air base: the first American ground combat units in South Vietnam.\n\n**Read more:** [9th Marine Expeditionary Brigade — Wikipedia](https://en.wikipedia.org/wiki/9th_Marine_Expeditionary_Brigade)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "dan-daly",
+   "time": "-1627516800/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "medal of honor",
+     "world war i"
+    ],
+    "title": "Dan Daly: \"Do you want to live forever?\"",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/48/DanielDaly.jpg/960px-DanielDaly.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Daniel_Daly"
+    ],
+    "description": "One of only two Marines to receive **two Medals of Honor** for separate actions (Peking 1900 and Haiti 1915). At Belleau Wood, Gunnery Sergeant Daly is said to have led a charge with the cry *\"Come on, you sons of bitches, do you want to live forever?\"*\n\n**Read more:** [Daniel Daly — Wikipedia](https://en.wikipedia.org/wiki/Daniel_Daly)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "derna",
+   "time": "-5196873600/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "barbary"
+    ],
+    "title": "Battle of Derna: \"to the shores of Tripoli\"",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/9/95/Attack_on_Derna_by_Charles_Waterhouse_01.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Derna_(1805)"
+    ],
+    "description": "After a 500-mile march across the Libyan desert from Egypt, Lieutenant **Presley O'Bannon**, eight Marines and a force of mercenaries took the port of Derna. It was the first time the US flag was raised in victory on foreign soil.\n\n**Read more:** [Battle of Derna (1805) — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Derna_(1805))\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "douglas-mansfield",
+   "time": "-552614400/1",
+   "metadata": {
+    "tags": [
+     "law",
+     "organization"
+    ],
+    "title": "The Douglas–Mansfield Act",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8f/CAC_CC_001_18_29_0000_2899_%28cropped%29.jpg/960px-CAC_CC_001_18_29_0000_2899_%28cropped%29.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mike_Mansfield"
+    ],
+    "description": "Congress fixed the Marine Corps' strength at no fewer than **three divisions and three air wings**, and gave the Commandant a voice on the Joint Chiefs of Staff on matters concerning the Corps.\n\nBoth sponsors were former Marines: Senator **Paul Douglas** enlisted as a private at 50 and was wounded at Peleliu and Okinawa; Representative **Mike Mansfield** had served as a Marine private in the Philippines and China.\n\n**Read more:** [Mike Mansfield — Wikipedia](https://en.wikipedia.org/wiki/Mike_Mansfield)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "dunham",
+   "time": "1081900800/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "medal of honor",
+     "iraq"
+    ],
+    "title": "Jason Dunham covers a grenade at Karabilah",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/b/b4/JasonDunham.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Jason_Dunham"
+    ],
+    "description": "Corporal Dunham threw himself on a grenade with his Kevlar helmet to shield two fellow Marines near the Syrian border, and died of his wounds eight days later. He was the first Marine to receive the **Medal of Honor** for Iraq.\n\n**Read more:** [Jason Dunham — Wikipedia](https://en.wikipedia.org/wiki/Jason_Dunham)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "ega",
+   "time": "-3190924800/1",
+   "metadata": {
+    "tags": [
+     "tradition",
+     "emblem"
+    ],
+    "title": "The Eagle, Globe and Anchor is adopted",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3a/Eagle%2C_Globe_and_Anchor.svg/960px-Eagle%2C_Globe_and_Anchor.svg.png",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Eagle,_Globe,_and_Anchor"
+    ],
+    "description": "Commandant **Jacob Zeilin** approved the emblem: an eagle for the nation, a globe for worldwide service and a fouled anchor for the Corps' naval tradition. A version of it is still the Marine Corps emblem.\n\n**Read more:** [Eagle, Globe, and Anchor — Wikipedia](https://en.wikipedia.org/wiki/Eagle,_Globe,_and_Anchor)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "evans-carlson",
+   "time": "-863913600/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "raiders",
+     "tradition"
+    ],
+    "title": "Evans Carlson and \"Gung Ho\"",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f2/Colonel_Evans_F._Carlson_Trim_Edit.jpg/960px-Colonel_Evans_F._Carlson_Trim_Edit.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Evans_Carlson"
+    ],
+    "description": "Carlson had observed Mao's Eighth Route Army in China, and brought back its spirit of shared hardship and the Chinese phrase *gōng hé*, \"work together\", as his Raiders' motto. \"Gung Ho\" passed into the Corps, and into English.\n\n**Read more:** [Evans Carlson — Wikipedia](https://en.wikipedia.org/wiki/Evans_Carlson)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "firdos",
+   "time": "1049846400/1",
+   "metadata": {
+    "tags": [
+     "event",
+     "iraq",
+     "iconic"
+    ],
+    "title": "The Firdos Square statue falls",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c1/SaddamStatue.jpg/960px-SaddamStatue.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Saddam_Hussein_statue_destruction"
+    ],
+    "description": "Marines of the 3rd Battalion, 4th Marines helped Iraqis pull down a statue of Saddam Hussein in central Baghdad, televised around the world as the symbolic fall of the regime.\n\n**Read more:** [Firdos Square statue destruction — Wikipedia](https://en.wikipedia.org/wiki/Saddam_Hussein_statue_destruction)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "flag-raising",
+   "time": "-784339200/1",
+   "metadata": {
+    "tags": [
+     "event",
+     "world war ii",
+     "iconic"
+    ],
+    "title": "Raising the Flag on Iwo Jima",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b0/Raising_the_Flag_on_Iwo_Jima%2C_larger_-_edit1.jpg/960px-Raising_the_Flag_on_Iwo_Jima%2C_larger_-_edit1.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Raising_the_Flag_on_Iwo_Jima"
+    ],
+    "description": "Joe Rosenthal's photograph of six men raising the second, larger flag atop Mount Suribachi became one of the most reproduced images in history and won the Pulitzer Prize. Three of the six were killed in the battle that followed.\n\nThe photograph is the model for the **Marine Corps War Memorial** in Arlington, Virginia, dedicated in 1954.\n\n**Read more:** [Raising the Flag on Iwo Jima — Wikipedia](https://en.wikipedia.org/wiki/Raising_the_Flag_on_Iwo_Jima)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "fmf",
+   "time": "-1138233600/1",
+   "metadata": {
+    "tags": [
+     "doctrine",
+     "organization",
+     "amphibious"
+    ],
+    "title": "The Fleet Marine Force is established",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b3/Seal_of_the_United_States_Marine_Corps.svg/960px-Seal_of_the_United_States_Marine_Corps.svg.png",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fleet_Marine_Force"
+    ],
+    "description": "The Navy Department created the Fleet Marine Force as a standing amphibious assault force of the fleet. The next year Marine officers at Quantico produced the *Tentative Manual for Landing Operations*, the basis of the amphibious doctrine used in World War II.\n\n**Read more:** [Fleet Marine Force — Wikipedia](https://en.wikipedia.org/wiki/Fleet_Marine_Force)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "force-design",
+   "time": "1583020800/1",
+   "metadata": {
+    "tags": [
+     "doctrine",
+     "organization"
+    ],
+    "title": "Force Design 2030",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5c/Gen._David_H._Berger.jpg/960px-Gen._David_H._Berger.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Force_Design_2030",
+     "https://en.wikipedia.org/wiki/David_Berger_(general)"
+    ],
+    "description": "Commandant **David H. Berger** announced a sweeping redesign to fight a peer adversary in the Indo-Pacific: tanks divested, artillery cut and new **Marine Littoral Regiments** with long-range missiles. The plan was debated fiercely, including by retired generals. *(Published in March 2020; the day here marks the month.)*\n\n**Read more:** [Force Design 2030 — Wikipedia](https://en.wikipedia.org/wiki/Force_Design_2030)\n\n*Image: Wikimedia Commons ([file page](https://en.wikipedia.org/wiki/David_Berger_(general))).*"
+   }
+  },
+  {
+   "id": "fort-fisher",
+   "time": "-3312230400/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "civil war",
+     "amphibious"
+    ],
+    "title": "Second Battle of Fort Fisher",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7b/Assault_and_capture_of_Fort_Fisher_January_1865_Harper%27s_Weekly.png/960px-Assault_and_capture_of_Fort_Fisher_January_1865_Harper%27s_Weekly.png",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Second_Battle_of_Fort_Fisher"
+    ],
+    "description": "Marines and sailors assaulted the sea face of the fort guarding Wilmington, the Confederacy's last major port, while Army troops attacked from the land side. The fort fell that night. Several Marines received the Medal of Honor.\n\n**Read more:** [Second Battle of Fort Fisher — Wikipedia](https://en.wikipedia.org/wiki/Second_Battle_of_Fort_Fisher)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "fort-riviere",
+   "time": "-1708041600/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "banana wars"
+    ],
+    "title": "Battle of Fort Rivière",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/Fort_Rivi%C3%A8re%2C_Haiti%2C_after_its_capture_by_US_Marine_Corps_and_Navy_personnel%2C_1915.png/960px-Fort_Rivi%C3%A8re%2C_Haiti%2C_after_its_capture_by_US_Marine_Corps_and_Navy_personnel%2C_1915.png",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Fort_Rivi%C3%A8re"
+    ],
+    "description": "The decisive battle of the First Caco War in Haiti. A small force of Marines and sailors broke into the old French fort through a drain and took it in minutes.\n\n**Read more:** [Battle of Fort Rivière — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Fort_Rivi%C3%A8re)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "frequent-wind",
+   "time": "167961600/1",
+   "metadata": {
+    "tags": [
+     "evacuation",
+     "vietnam war"
+    ],
+    "title": "Operation Frequent Wind: the fall of Saigon",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4a/South_Vietnamese_helicopter_is_pushed_over_the_side_of_the_USS_Okinawa_during_Operation_Frequent_Wind%2C_April_1975.jpg/960px-South_Vietnamese_helicopter_is_pushed_over_the_side_of_the_USS_Okinawa_during_Operation_Frequent_Wind%2C_April_1975.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Operation_Frequent_Wind"
+    ],
+    "description": "Marine and Air Force helicopters lifted more than **7,000 Americans and Vietnamese** from Saigon to ships offshore in about 18 hours. The last Marines left the embassy roof on the morning of 30 April.\n\n**Read more:** [Operation Frequent Wind — Wikipedia](https://en.wikipedia.org/wiki/Operation_Frequent_Wind)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "grenada",
+   "time": "435888000/1",
+   "metadata": {
+    "tags": [
+     "event",
+     "grenada",
+     "amphibious"
+    ],
+    "title": "Operation Urgent Fury: Grenada",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f5/CH-53D_HMM-261_Grenada_Okt1983.jpeg/960px-CH-53D_HMM-261_Grenada_Okt1983.jpeg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/United_States_invasion_of_Grenada"
+    ],
+    "description": "Two days after the Beirut bombing, Marines of the 22nd Marine Amphibious Unit, diverted on their way to Lebanon, landed in the north of Grenada and then at Grand Mal, alongside Army Rangers and paratroopers.\n\n**Read more:** [United States invasion of Grenada — Wikipedia](https://en.wikipedia.org/wiki/United_States_invasion_of_Grenada)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "guadalcanal-end",
+   "time": "-848707200/1",
+   "metadata": {
+    "tags": [
+     "event",
+     "world war ii",
+     "guadalcanal"
+    ],
+    "title": "Guadalcanal secured",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a8/Marines_rest_in_the_field_on_Guadalcanal.jpg/960px-Marines_rest_in_the_field_on_Guadalcanal.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Guadalcanal_campaign"
+    ],
+    "description": "The last Japanese troops were evacuated from the island. The 1st Marine Division, relieved in December, received a **Presidential Unit Citation**; Vandegrift received the Medal of Honor.\n\n**Read more:** [Guadalcanal campaign — Wikipedia](https://en.wikipedia.org/wiki/Guadalcanal_campaign)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "guantanamo",
+   "time": "-2258236800/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "spanish–american war",
+     "amphibious"
+    ],
+    "title": "Marines land at Guantánamo Bay",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d5/LC-USZC4-2678_%2817522430051%29.jpg/960px-LC-USZC4-2678_%2817522430051%29.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Guant%C3%A1namo_Bay"
+    ],
+    "description": "The 1st Marine Battalion under Lieutenant Colonel Robert Huntington seized the bay as a coaling station for the fleet blockading Santiago, and defended it in several days of fighting, including at Cuzco Well on 14 June.\n\n**Read more:** [Battle of Guantánamo Bay — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Guant%C3%A1namo_Bay)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "h-banana-wars",
+   "time": "-1811721600/1",
+   "metadata": {
+    "tags": [
+     "chapter"
+    ],
+    "title": "The Banana Wars",
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "h-cold-war",
+   "time": "-767750400/1",
+   "metadata": {
+    "tags": [
+     "chapter"
+    ],
+    "title": "The Cold War: Korea to Beirut (1945–1989)",
+    "headingLevel": "h1"
+   }
+  },
+  {
+   "id": "h-expansion",
+   "time": "-2262556800/1",
+   "metadata": {
+    "tags": [
+     "chapter"
+    ],
+    "title": "Empire, Banana Wars and the Great War (1898–1939)",
+    "headingLevel": "h1"
+   }
+  },
+  {
+   "id": "h-great-war",
+   "time": "-1664323200/1",
+   "metadata": {
+    "tags": [
+     "chapter"
+    ],
+    "title": "The Great War",
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "h-guadalcanal",
+   "time": "-864777600/1",
+   "metadata": {
+    "tags": [
+     "chapter"
+    ],
+    "title": "Guadalcanal and the Solomons",
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "h-gwot",
+   "time": "1000166400/1",
+   "metadata": {
+    "tags": [
+     "chapter"
+    ],
+    "title": "The Global War on Terrorism",
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "h-island-hopping",
+   "time": "-824169600/1",
+   "metadata": {
+    "tags": [
+     "chapter"
+    ],
+    "title": "Island hopping across the Central Pacific",
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "h-korea",
+   "time": "-616032000/1",
+   "metadata": {
+    "tags": [
+     "chapter"
+    ],
+    "title": "Korea",
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "h-modern",
+   "time": "649555200/1",
+   "metadata": {
+    "tags": [
+     "chapter"
+    ],
+    "title": "The Modern Corps (1990–today)",
+    "headingLevel": "h1"
+   }
+  },
+  {
+   "id": "h-old-corps",
+   "time": "-4887216000/1",
+   "metadata": {
+    "tags": [
+     "chapter"
+    ],
+    "title": "The Old Corps (1815–1898)",
+    "headingLevel": "h1"
+   }
+  },
+  {
+   "id": "h-revolution",
+   "time": "-6144249600/1",
+   "metadata": {
+    "tags": [
+     "chapter"
+    ],
+    "title": "Birth of the Corps (1775–1815)",
+    "headingLevel": "h1"
+   }
+  },
+  {
+   "id": "h-vietnam",
+   "time": "-152064000/1",
+   "metadata": {
+    "tags": [
+     "chapter"
+    ],
+    "title": "Vietnam",
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "h-ww2",
+   "time": "-885772800/1",
+   "metadata": {
+    "tags": [
+     "chapter"
+    ],
+    "title": "World War II in the Pacific (1941–1945)",
+    "headingLevel": "h1"
+   }
+  },
+  {
+   "id": "harpers-ferry",
+   "time": "-3477772800/1",
+   "metadata": {
+    "tags": [
+     "event",
+     "civil war"
+    ],
+    "title": "Marines capture John Brown at Harpers Ferry",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/19/The_Harper%27s_Ferry_insurrection-The_U.S._Marines_storming_the_engine_house-Insurgents_firing_through_holes_in_the_doors_-_from_a_sketch_made_on_the_spot_by_our_special_artist._LCCN00652046.jpg/960px-thumbnail.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "sources": [
+     "https://en.wikipedia.org/wiki/John_Brown%27s_raid_on_Harpers_Ferry",
+     "https://commons.wikimedia.org/wiki/File:The_Harper%27s_Ferry_insurrection-The_U.S._Marines_storming_the_engine_house-Insurgents_firing_through_holes_in_the_doors_-_from_a_sketch_made_on_the_spot_by_our_special_artist._LCCN00652046.jpg"
+    ],
+    "description": "Ninety Marines from the Washington barracks, under Lieutenant Israel Greene and with Army Lieutenant Colonel **Robert E. Lee** in overall command, stormed the engine house where the abolitionist John Brown had barricaded himself. Brown's raid and execution pushed the nation toward civil war.\n\n**Read more:** [John Brown's raid on Harpers Ferry — Wikipedia](https://en.wikipedia.org/wiki/John_Brown%27s_raid_on_Harpers_Ferry)\n\n*Image: Wikimedia Commons ([file page](https://commons.wikimedia.org/wiki/File:The_Harper%27s_Ferry_insurrection-The_U.S._Marines_storming_the_engine_house-Insurgents_firing_through_holes_in_the_doors_-_from_a_sketch_made_on_the_spot_by_our_special_artist._LCCN00652046.jpg)).*"
+   }
+  },
+  {
+   "id": "hatchee-lustee",
+   "time": "-4194806400/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "seminole war"
+    ],
+    "title": "Battle of Hatchee-Lustee",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d1/Archibald_Henderson.jpg/960px-Archibald_Henderson.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Second_Seminole_War",
+     "https://en.wikipedia.org/wiki/Archibald_Henderson"
+    ],
+    "description": "A Marine-led force under Archibald Henderson attacked Seminole and Black Seminole forces in Florida. Henderson was promoted brevet brigadier general for the campaign, the first Marine general.\n\n**Read more:** [Second Seminole War — Wikipedia](https://en.wikipedia.org/wiki/Second_Seminole_War)\n\n*Image: Wikimedia Commons ([file page](https://en.wikipedia.org/wiki/Archibald_Henderson)).*"
+   }
+  },
+  {
+   "id": "hmx-1",
+   "time": "-696988800/1",
+   "metadata": {
+    "tags": [
+     "aviation",
+     "doctrine"
+    ],
+    "title": "HMX-1: the first Marine helicopter squadron",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bd/HMX-1_Insignia.svg/960px-HMX-1_Insignia.svg.png",
+    "sources": [
+     "https://en.wikipedia.org/wiki/HMX-1"
+    ],
+    "description": "Marine Helicopter Squadron One was formed at Quantico to develop **vertical envelopment**: landing troops by helicopter from ships, a concept the Corps proved in Korea. HMX-1 today also flies the President as *Marine One*.\n\n**Read more:** [HMX-1 — Wikipedia](https://en.wikipedia.org/wiki/HMX-1)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "holland-smith",
+   "time": "-806198400/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "amphibious"
+    ],
+    "title": "Holland M. \"Howlin' Mad\" Smith",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d6/Holland_Smith.jpg/960px-Holland_Smith.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Holland_Smith"
+    ],
+    "description": "Considered the father of modern US amphibious warfare. He trained Army and Marine divisions in amphibious techniques before the war, and commanded the V Amphibious Corps and then the Fleet Marine Force, Pacific, from the Gilberts to Iwo Jima.\n\n**Read more:** [Holland Smith — Wikipedia](https://en.wikipedia.org/wiki/Holland_Smith)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "khafji",
+   "time": "665107200/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "gulf war"
+    ],
+    "title": "Battle of Khafji",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c9/Battle_of_Khafji_1991.svg/960px-Battle_of_Khafji_1991.svg.png",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Khafji"
+    ],
+    "description": "Iraq's only major ground offensive of the Gulf War seized the Saudi town of Khafji. Two Marine reconnaissance teams hid in the town calling in fire, while Saudi and Qatari forces, supported by Marines and coalition aircraft, retook it.\n\n**Read more:** [Battle of Khafji — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Khafji)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "korea-1871",
+   "time": "-3110313600/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "expedition"
+    ],
+    "title": "United States expedition to Korea",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/78/Sujagi.jpg/960px-Sujagi.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/United_States_expedition_to_Korea"
+    ],
+    "description": "Marines and sailors stormed the forts on Ganghwa Island after Korean batteries fired on an American survey. Six Marines received the **Medal of Honor**, the first for actions in a foreign war.\n\n**Read more:** [United States expedition to Korea — Wikipedia](https://en.wikipedia.org/wiki/United_States_expedition_to_Korea)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "langley",
+   "time": "1659744000/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "milestone"
+    ],
+    "title": "Michael Langley: the Corps' first Black four-star general",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/aa/Gen_Michael_E._Langley.jpg/960px-Gen_Michael_E._Langley.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Michael_Langley"
+    ],
+    "description": "In 2022, 247 years after the Corps' founding, Langley was promoted to general and took command of United States Africa Command.\n\n**Read more:** [Michael Langley — Wikipedia](https://en.wikipedia.org/wiki/Michael_Langley)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "lebanon-1958",
+   "time": "-361843200/1",
+   "metadata": {
+    "tags": [
+     "event",
+     "lebanon",
+     "amphibious"
+    ],
+    "title": "Marines land in Lebanon",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c1/Foxhole_-_Lebanon_-_Beirut_-_July_1958.jpg/960px-Foxhole_-_Lebanon_-_Beirut_-_July_1958.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/1958_Lebanon_crisis"
+    ],
+    "description": "At the request of President Camille Chamoun, Marines landed at Beirut's beaches, to the surprise of sunbathers, in the first application of the Eisenhower Doctrine. Some 14,000 US troops were ashore at the peak; they left in October.\n\n**Read more:** [1958 Lebanon crisis — Wikipedia](https://en.wikipedia.org/wiki/1958_Lebanon_crisis)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "lejeune",
+   "time": "-1562198400/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "commandant"
+    ],
+    "title": "John A. Lejeune becomes Commandant",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/John_A._Lejeune_c1920.jpg/960px-John_A._Lejeune_c1920.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/John_A._Lejeune"
+    ],
+    "description": "The \"Greatest of all Leathernecks\", the first Marine to command an Army division in combat. As 13th Commandant (1920–1929), Lejeune set the Corps on its course toward **amphibious warfare** as its central mission.\n\n**Read more:** [John A. Lejeune — Wikipedia](https://en.wikipedia.org/wiki/John_A._Lejeune)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "makin",
+   "time": "-863913600/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war ii",
+     "raiders"
+    ],
+    "title": "Carlson's Raiders at Makin Island",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/e/ed/Nautilus_Makin_Raid.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Raid_on_Makin_Island"
+    ],
+    "description": "The 2nd Raider Battalion under **Evans Carlson**, with Major James Roosevelt, the President's son, came ashore from submarines to destroy the Japanese garrison on Butaritari. Nine Raiders accidentally left behind were captured and executed.\n\n**Read more:** [Makin Island raid — Wikipedia](https://en.wikipedia.org/wiki/Raid_on_Makin_Island)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "mayaguez",
+   "time": "169344000/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "cambodia"
+    ],
+    "title": "Mayaguez incident: the battle of Koh Tang",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/2/25/Two_crashed_U.S._Air_Force_CH-53_helicopters_on_Koh_Tang%2C_1975.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mayaguez_incident"
+    ],
+    "description": "After the Khmer Rouge seized the US container ship SS *Mayaguez*, Marines assaulted Koh Tang island under heavy fire. The crew was released, but 41 Americans died; three Marines left behind on the island were later killed. They are the last names on the Vietnam Veterans Memorial.\n\n**Read more:** [Mayaguez incident — Wikipedia](https://en.wikipedia.org/wiki/Mayaguez_incident)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "merritt-edson",
+   "time": "-861580800/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "medal of honor",
+     "guadalcanal"
+    ],
+    "title": "Merritt \"Red Mike\" Edson holds the ridge",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0d/EdsonMikeRed.jpg/960px-EdsonMikeRed.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Merritt_A._Edson"
+    ],
+    "description": "Commanding the 1st Raider Battalion, Edson moved among his lines through the night of 13–14 September, rallying the defenders of the ridge south of Henderson Field. He received the **Medal of Honor**.\n\n**Read more:** [Merritt A. Edson — Wikipedia](https://en.wikipedia.org/wiki/Merritt_A._Edson)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "meyer",
+   "time": "1252368000/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "medal of honor",
+     "afghanistan"
+    ],
+    "title": "Dakota Meyer at Ganjgal",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4f/Dakota_L._Meyer.JPG/960px-Dakota_L._Meyer.JPG",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Dakota_Meyer"
+    ],
+    "description": "In the Battle of Ganjgal, Corporal Meyer drove into an ambush five times against orders, rescuing wounded Afghan and American troops and recovering the bodies of four fallen Americans. He was the first living Marine to receive the **Medal of Honor** since Vietnam.\n\n**Read more:** [Dakota Meyer — Wikipedia](https://en.wikipedia.org/wiki/Dakota_Meyer)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "midway",
+   "time": "-870307200/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war ii",
+     "aviation"
+    ],
+    "title": "Battle of Midway",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bb/USS_Yorktown_%28CV-5%29_is_hit_by_a_torpedo_on_4_June_1942.jpg/960px-USS_Yorktown_%28CV-5%29_is_hit_by_a_torpedo_on_4_June_1942.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Midway"
+    ],
+    "description": "Marine squadrons on Midway Atoll attacked the Japanese carrier force in obsolete aircraft and suffered heavy losses, while Marine anti-aircraft gunners defended the island. The battle turned the tide of the Pacific War.\n\n**Read more:** [Battle of Midway — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Midway)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "montford-point",
+   "time": "-863136000/1",
+   "metadata": {
+    "tags": [
+     "milestone",
+     "montford point"
+    ],
+    "title": "The first Black recruits arrive at Montford Point",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/Montford_Point_Marines_430401-M-XX999-031.jpg/960px-Montford_Point_Marines_430401-M-XX999-031.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Montford_Point_Marine_Association",
+     "https://commons.wikimedia.org/wiki/File:Montford_Point_Marines_430401-M-XX999-031.jpg"
+    ],
+    "description": "After an executive order by President Roosevelt opened the Corps to Black Americans, about **20,000** trained at the segregated Camp Montford Point in North Carolina until 1949. In 2012 the Montford Point Marines received the **Congressional Gold Medal**.\n\n**Read more:** [Montford Point Marines — Wikipedia](https://en.wikipedia.org/wiki/Montford_Point_Marine_Association)\n\n*Image: Wikimedia Commons ([file page](https://commons.wikimedia.org/wiki/File:Montford_Point_Marines_430401-M-XX999-031.jpg)).*"
+   }
+  },
+  {
+   "id": "nasiriyah",
+   "time": "1048377600/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "iraq"
+    ],
+    "title": "Battle of Nasiriyah",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fd/AAV-Nsry.jpg/960px-AAV-Nsry.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Nasiriyah"
+    ],
+    "description": "Task Force Tarawa fought to seize the bridges over the Euphrates and the Saddam Canal, after the Army's 507th Maintenance Company was ambushed in the city. Eighteen Marines were killed on the first day.\n\n**Read more:** [Battle of Nasiriyah — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Nasiriyah)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "nassau",
+   "time": "-6116688000/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "revolution",
+     "amphibious"
+    ],
+    "title": "Battle of Nassau: the first amphibious landing",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fb/Battle_of_Nassau.jpg/960px-Battle_of_Nassau.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Raid_of_Nassau"
+    ],
+    "description": "About 250 Marines and sailors under Samuel Nicholas landed on New Providence in the Bahamas and took Fort Montagu and Fort Nassau, seizing cannon and stores for the Continental Army. It was the Marines' **first amphibious landing**.\n\n**Read more:** [Battle of Nassau — Wikipedia](https://en.wikipedia.org/wiki/Raid_of_Nassau)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "national-security-act",
+   "time": "-708048000/1",
+   "metadata": {
+    "tags": [
+     "law",
+     "organization"
+    ],
+    "title": "National Security Act of 1947",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5c/Great_Seal_of_the_United_States_%28obverse%29.svg/960px-Great_Seal_of_the_United_States_%28obverse%29.svg.png",
+    "sources": [
+     "https://en.wikipedia.org/wiki/National_Security_Act_of_1947"
+    ],
+    "description": "The act that unified the armed forces under a Secretary of Defense also wrote the Marine Corps' combat missions into law, after Vandegrift and others had resisted plans to reduce it.\n\n**Read more:** [National Security Act of 1947 — Wikipedia](https://en.wikipedia.org/wiki/National_Security_Act_of_1947)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "new-orleans",
+   "time": "-4890758400/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "war of 1812"
+    ],
+    "title": "Battle of New Orleans",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/15/Battle_of_New_Orleans%2C_Jean_Hyacinthe_de_Laclotte.jpg/960px-Battle_of_New_Orleans%2C_Jean_Hyacinthe_de_Laclotte.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_New_Orleans"
+    ],
+    "description": "Marines held part of Andrew Jackson's line behind the Rodriguez Canal. The battle was fought after the peace treaty was signed but before word reached America.\n\n**Read more:** [Battle of New Orleans — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_New_Orleans)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "obannon",
+   "time": "-5196873600/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "tradition",
+     "barbary"
+    ],
+    "title": "Presley O'Bannon and the Mameluke sword",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f6/PresleyOBannon.jpg/960px-PresleyOBannon.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Presley_O%27Bannon"
+    ],
+    "description": "The hero of Derna. Tradition holds that Prince Hamet Karamanli presented O'Bannon with a Mameluke sword, the model for the sword Marine officers have carried since 1826.\n\n**Read more:** [Presley O'Bannon — Wikipedia](https://en.wikipedia.org/wiki/Presley_O%27Bannon)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "ocotal",
+   "time": "-1340064000/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "banana wars",
+     "aviation"
+    ],
+    "title": "Battle of Ocotal: early dive bombing in support of troops",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/c/cc/Fort_Ocotal_in_Ocotal_Nicaragua.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Ocotal"
+    ],
+    "description": "When Sandino's forces besieged a small Marine and Nicaraguan National Guard garrison, five Marine DH-4 biplanes made one of the first organized **dive-bombing attacks** in support of ground troops, breaking the attack.\n\n**Read more:** [Battle of Ocotal — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Ocotal)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "oliver-smith",
+   "time": "-601862400/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "korean war"
+    ],
+    "title": "Oliver P. Smith: \"Retreat, hell!\"",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a8/Oliver_P._Smith.jpg/960px-Oliver_P._Smith.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Oliver_P._Smith"
+    ],
+    "description": "Commanding the 1st Marine Division at Chosin, Smith concentrated his regiments against orders to scatter them, saving the division. As the breakout from Hagaru-ri began, he told reporters: *\"Retreat, hell! We're not retreating, we're just advancing in a different direction.\"*\n\n**Read more:** [Oliver P. Smith — Wikipedia](https://en.wikipedia.org/wiki/Oliver_P._Smith)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "opha-may-johnson",
+   "time": "-1621641600/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "women marines"
+    ],
+    "title": "Opha May Johnson becomes the first woman Marine",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/d/d9/Opha-Mae-Johnson-face.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Opha_May_Johnson"
+    ],
+    "description": "Johnson was the first of some 300 women who enlisted in the Marine Corps Reserve in World War I, \"to free a man to fight\", working as clerks at Headquarters and elsewhere.\n\n**Read more:** [Opha May Johnson — Wikipedia](https://en.wikipedia.org/wiki/Opha_May_Johnson)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "pearl-harbor",
+   "time": "-885772800/1",
+   "metadata": {
+    "tags": [
+     "event",
+     "world war ii"
+    ],
+    "title": "Attack on Pearl Harbor",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c7/Attack_on_Pearl_Harbor_Japanese_planes_view.jpg/960px-Attack_on_Pearl_Harbor_Japanese_planes_view.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Attack_on_Pearl_Harbor"
+    ],
+    "description": "Marines at Ewa airfield, the Navy Yard and aboard the battleships fought back during the attack that brought the United States into the war.\n\n**Read more:** [Attack on Pearl Harbor — Wikipedia](https://en.wikipedia.org/wiki/Attack_on_Pearl_Harbor)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "pete-ellis",
+   "time": "-1528761600/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "doctrine",
+     "amphibious"
+    ],
+    "title": "Pete Ellis: \"Advanced Base Operations in Micronesia\"",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/26/Ellis_EarlH_USMC.jpg/960px-Ellis_EarlH_USMC.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Earl_Hancock_Ellis"
+    ],
+    "description": "Lejeune approved **Operation Plan 712**, in which Major Earl \"Pete\" Ellis predicted a war with Japan and the island-by-island amphibious campaign the Marines would need to win it: a remarkably accurate forecast of the Pacific War. Ellis died in the Japanese-held Palau Islands in 1923.\n\n**Read more:** [Earl Hancock Ellis — Wikipedia](https://en.wikipedia.org/wiki/Earl_Hancock_Ellis)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "princeton",
+   "time": "-6090249600/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "revolution"
+    ],
+    "title": "Marines fight at Princeton",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/The_Death_of_General_Mercer_at_the_Battle_of_Princeton_January_3_1777.jpeg/960px-The_Death_of_General_Mercer_at_the_Battle_of_Princeton_January_3_1777.jpeg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Princeton"
+    ],
+    "description": "A battalion of Continental Marines under Nicholas joined Washington's army for the winter campaign of Trenton and Princeton: one of the first times Marines fought alongside the Continental Army in the field.\n\n**Read more:** [Battle of Princeton — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Princeton)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "restore-hope",
+   "time": "723859200/1",
+   "metadata": {
+    "tags": [
+     "event",
+     "somalia",
+     "humanitarian"
+    ],
+    "title": "Operation Restore Hope: Marines land in Somalia",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ea/US-SoldatenMogadischu1993.jpg/960px-US-SoldatenMogadischu1993.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Unified_Task_Force"
+    ],
+    "description": "Marines came ashore at Mogadishu, met by television cameras on the beach, to secure the delivery of food aid amid famine and civil war.\n\n**Read more:** [Unified Task Force — Wikipedia](https://en.wikipedia.org/wiki/Unified_Task_Force)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "saint-mihiel",
+   "time": "-1619049600/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war i"
+    ],
+    "title": "Battle of Saint-Mihiel",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c7/A_French_World_War_I_Renault_FT-17_tank%2C_ditching.jpg/960px-A_French_World_War_I_Renault_FT-17_tank%2C_ditching.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Saint-Mihiel"
+    ],
+    "description": "The first offensive of the American Expeditionary Forces as an independent army. The 4th Marine Brigade attacked with the 2nd Division and took its objectives quickly as the German salient collapsed.\n\n**Read more:** [Battle of Saint-Mihiel — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Saint-Mihiel)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "samuel-nicholas",
+   "time": "-6124982400/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "commandant"
+    ],
+    "title": "Samuel Nicholas commissioned Captain of Marines",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/3/35/Portrait_of_First_Leader_of_Marines%2C_Maj._Samuel_Nicholas.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Samuel_Nicholas"
+    ],
+    "description": "A Philadelphia innkeeper's son, Nicholas was the first commissioned officer of the Continental Marines. As their senior officer throughout the Revolution, he is traditionally considered the **first Commandant**.\n\n**Read more:** [Samuel Nicholas — Wikipedia](https://en.wikipedia.org/wiki/Samuel_Nicholas)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "semper-fi",
+   "time": "-2745446400/1",
+   "metadata": {
+    "tags": [
+     "tradition",
+     "motto"
+    ],
+    "title": "Semper Fidelis becomes the Corps motto",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/08/Charles_G._McCawley.jpg/960px-Charles_G._McCawley.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Semper_fidelis",
+     "https://en.wikipedia.org/wiki/Charles_Grymes_McCawley"
+    ],
+    "description": "Commandant **Charles McCawley** adopted \"Semper Fidelis\", \"always faithful\", as the motto of the Corps in 1883. *(The day is not recorded; the moment marks the year.)*\n\n**Read more:** [Semper fidelis — Wikipedia](https://en.wikipedia.org/wiki/Semper_fidelis)\n\n*Image: Wikimedia Commons ([file page](https://en.wikipedia.org/wiki/Charles_Grymes_McCawley)).*"
+   }
+  },
+  {
+   "id": "smedley-butler",
+   "time": "-1708041600/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "medal of honor",
+     "banana wars"
+    ],
+    "title": "Smedley Butler at Fort Rivière",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/54/SmedleyButler.jpeg/960px-SmedleyButler.jpeg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Smedley_Butler"
+    ],
+    "description": "Major Smedley Butler led the assault on the Caco stronghold of Fort Rivière in Haiti, receiving his **second Medal of Honor** (the first was for Veracruz). Retired as a major general, he later denounced the interventions he had fought in, in *War Is a Racket* (1935).\n\n**Read more:** [Smedley Butler — Wikipedia](https://en.wikipedia.org/wiki/Smedley_Butler)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "sousa",
+   "time": "-2816467200/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "music",
+     "tradition"
+    ],
+    "title": "John Philip Sousa leads the Marine Band",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/69/John_Philip_Sousa_in_1922.jpg/960px-John_Philip_Sousa_in_1922.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/John_Philip_Sousa"
+    ],
+    "description": "Sousa led \"The President's Own\" for twelve years, making it one of the best-known bands in the country. He wrote the Corps' official march, **\"Semper Fidelis\"** (1888).\n\n**Read more:** [John Philip Sousa — Wikipedia](https://en.wikipedia.org/wiki/John_Philip_Sousa)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "starlite",
+   "time": "-137980800/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "vietnam war",
+     "amphibious"
+    ],
+    "title": "Operation Starlite",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/00/OperationStarlight.jpg/960px-OperationStarlight.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Operation_Starlite"
+    ],
+    "description": "The first major offensive by a purely American force in Vietnam: Marines attacked the 1st Viet Cong Regiment on the Van Tuong Peninsula by land, sea and helicopter.\n\n**Read more:** [Operation Starlite — Wikipedia](https://en.wikipedia.org/wiki/Operation_Starlite)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "surrender",
+   "time": "-767836800/1",
+   "metadata": {
+    "tags": [
+     "treaty",
+     "world war ii"
+    ],
+    "title": "Japan surrenders aboard USS Missouri",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/94/Mamoru_Shigemitsu_signs_the_Instrument_of_Surrender%2C_officially_ending_the_Second_World_War.jpg/960px-Mamoru_Shigemitsu_signs_the_Instrument_of_Surrender%2C_officially_ending_the_Second_World_War.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Surrender_of_Japan"
+    ],
+    "description": "The formal surrender in Tokyo Bay ended World War II. Marines went on to occupy parts of Japan and northern China.\n\n**Read more:** [Surrender of Japan — Wikipedia](https://en.wikipedia.org/wiki/Surrender_of_Japan)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "tenaru",
+   "time": "-863568000/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war ii",
+     "guadalcanal"
+    ],
+    "title": "Battle of the Tenaru",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8f/Aerial_view_of_Henderson_Field%2C_Guadalcanal%2C_in_late_August_1942.jpg/960px-Aerial_view_of_Henderson_Field%2C_Guadalcanal%2C_in_late_August_1942.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_the_Tenaru",
+     "https://commons.wikimedia.org/wiki/File:Aerial_view_of_Henderson_Field,_Guadalcanal,_in_late_August_1942.jpg"
+    ],
+    "description": "The first Japanese ground attack on Guadalcanal, by the Ichiki detachment, was destroyed at the mouth of Alligator Creek: the first major land defeat of the Japanese army in the war.\n\n**Read more:** [Battle of the Tenaru — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_the_Tenaru)\n\n*Image: Wikimedia Commons ([file page](https://commons.wikimedia.org/wiki/File:Aerial_view_of_Henderson_Field,_Guadalcanal,_in_late_August_1942.jpg)).*"
+   }
+  },
+  {
+   "id": "tet",
+   "time": "-60652800/1",
+   "metadata": {
+    "tags": [
+     "event",
+     "vietnam war",
+     "tet offensive"
+    ],
+    "title": "The Tet Offensive begins",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/96/Tet_Offensive_map.png/960px-Tet_Offensive_map.png",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tet_Offensive"
+    ],
+    "description": "Coordinated attacks on cities and bases across South Vietnam during the lunar new year truce. A military defeat for the attackers, it turned American opinion against the war.\n\n**Read more:** [Tet Offensive — Wikipedia](https://en.wikipedia.org/wiki/Tet_Offensive)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "treaty-paris",
+   "time": "-5879952000/1",
+   "metadata": {
+    "tags": [
+     "treaty",
+     "revolution"
+    ],
+    "title": "Treaty of Paris ends the Revolutionary War",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/2/25/Treaty_of_Paris_%281783%29.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Treaty_of_Paris_(1783)"
+    ],
+    "description": "With peace, the Continental Navy was sold off and the Continental Marines ceased to exist. The United States had no Marine Corps for almost fifteen years.\n\n**Read more:** [Treaty of Paris (1783) — Wikipedia](https://en.wikipedia.org/wiki/Treaty_of_Paris_(1783))\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "vandegrift",
+   "time": "-820540800/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "commandant",
+     "medal of honor"
+    ],
+    "title": "Alexander Vandegrift becomes Commandant",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/43/General_AAVandegrift_-_in_dress_uniform_-_with_medal_of_honor_ribbon.jpg/960px-General_AAVandegrift_-_in_dress_uniform_-_with_medal_of_honor_ribbon.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Alexander_Vandegrift"
+    ],
+    "description": "The victor of Guadalcanal became the 18th Commandant and the first Marine on active duty to hold four-star rank. After the war he fought to preserve the Corps against plans to absorb it into the Army: the 1946 **\"bended knee\"** speech to the Senate.\n\n**Read more:** [Alexander Vandegrift — Wikipedia](https://en.wikipedia.org/wiki/Alexander_Vandegrift)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "war-memorial",
+   "time": "-477878400/1",
+   "metadata": {
+    "tags": [
+     "memorial",
+     "tradition"
+    ],
+    "title": "Marine Corps War Memorial dedicated",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/54/2018-10-31_15_25_21_The_west_side_of_the_Marine_Corps_War_Memorial_in_Arlington_County%2C_Virginia.jpg/960px-2018-10-31_15_25_21_The_west_side_of_the_Marine_Corps_War_Memorial_in_Arlington_County%2C_Virginia.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Marine_Corps_War_Memorial"
+    ],
+    "description": "Felix de Weldon's bronze statue of the Iwo Jima flag raising was dedicated in Arlington, Virginia, on the Corps' 179th birthday. It honors all Marines who have died in the defense of the United States since 1775.\n\n**Read more:** [Marine Corps War Memorial — Wikipedia](https://en.wikipedia.org/wiki/Marine_Corps_War_Memorial)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "women-combat",
+   "time": "1449100800/1",
+   "metadata": {
+    "tags": [
+     "milestone",
+     "women marines"
+    ],
+    "title": "All combat jobs open to women",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/89/Ash_Carter_DOD_Secretary_Portrait.jpg/960px-Ash_Carter_DOD_Secretary_Portrait.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Women_in_the_United_States_Marine_Corps",
+     "https://en.wikipedia.org/wiki/Ash_Carter"
+    ],
+    "description": "Defense Secretary Ash Carter opened every military occupation, including Marine infantry, to women from 2016. The first women graduated from the Infantry Officer Course in 2017.\n\n**Read more:** [Women in the United States Marines — Wikipedia](https://en.wikipedia.org/wiki/Women_in_the_United_States_Marine_Corps)\n\n*Image: Wikimedia Commons ([file page](https://en.wikipedia.org/wiki/Ash_Carter)).*"
+   }
+  },
+  {
+   "id": "women-integration",
+   "time": "-680227200/1",
+   "metadata": {
+    "tags": [
+     "law",
+     "women marines"
+    ],
+    "title": "Women's Armed Services Integration Act",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5c/Great_Seal_of_the_United_States_%28obverse%29.svg/960px-Great_Seal_of_the_United_States_%28obverse%29.svg.png",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Women%27s_Armed_Services_Integration_Act"
+    ],
+    "description": "The act made women a permanent, regular part of the armed forces, including the Marine Corps, rather than only a wartime reserve.\n\n**Read more:** [Women's Armed Services Integration Act — Wikipedia](https://en.wikipedia.org/wiki/Women%27s_Armed_Services_Integration_Act)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "womens-reserve",
+   "time": "-848361600/1",
+   "metadata": {
+    "tags": [
+     "milestone",
+     "women marines"
+    ],
+    "title": "The Marine Corps Women's Reserve is established",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f2/%22Be_a_Marine-Free_a_Marine_to_Fight%22_-_NARA_-_513679.jpg/960px-%22Be_a_Marine-Free_a_Marine_to_Fight%22_-_NARA_-_513679.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/United_States_Marine_Corps_Women%27s_Reserve"
+    ],
+    "description": "Commandant Thomas Holcomb opened the Corps to women for the duration of the war. About **20,000 women Marines** served by 1945, in more than 200 specialties.\n\n> \"They are Marines. They don't have a nickname, and they don't need one.\" — Commandant Thomas Holcomb\n\n**Read more:** [United States Marine Corps Women's Reserve — Wikipedia](https://en.wikipedia.org/wiki/United_States_Marine_Corps_Women%27s_Reserve)\n\n*Image: Wikimedia Commons (from the article above).*"
+   }
+  },
+  {
+   "id": "first-birthday-ball",
+   "time": "-1420070400/1",
+   "metadata": {
+    "tags": [
+     "tradition",
+     "birthday"
+    ],
+    "title": "The first formal birthday ball",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Marine_Corps_birthday_ball"
+    ],
+    "description": "Four years after Lejeune's birthday order, Marines held the first formal **Marine Corps birthday ball**. No record of its proceedings survives. *(The day is not recorded; the moment marks the year.)*\n\n**Read more:** [Marine Corps birthday ball — Wikipedia](https://en.wikipedia.org/wiki/Marine_Corps_birthday_ball)"
+   }
+  },
+  {
+   "id": "cake-ceremony",
+   "time": "-568080000/1",
+   "metadata": {
+    "tags": [
+     "tradition",
+     "birthday"
+    ],
+    "title": "The cake-cutting ceremony is made standard",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/48/US_Navy_051108-N-9455G-001_The_youngest_and_oldest_Marine_stand_ready_to_celebrate_the_230th_Marine_Corps_birthday_at_Shirley_Lanham_Elementary_School.jpg/960px-US_Navy_051108-N-9455G-001_The_youngest_and_oldest_Marine_stand_ready_to_celebrate_the_230th_Marine_Corps_birthday_at_Shirley_Lanham_Elementary_School.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Marine_Corps_birthday_ball"
+    ],
+    "description": "Commandant **Lemuel C. Shepherd Jr.** standardized the birthday celebration, including the cake-cutting ceremony, which entered the Marine drill manual in 1956. The first slice goes to the guest of honor; the second to the **oldest Marine present, who passes it to the youngest**, as experience is handed to the next generation. *(The day is not recorded; the moment marks the year.)*\n\n**Read more:** [Marine Corps birthday ball — Wikipedia](https://en.wikipedia.org/wiki/Marine_Corps_birthday_ball)\n\n*Image: Wikimedia Commons (the youngest and oldest Marine at a 230th birthday ceremony, 2005; U.S. Navy photo).*"
+   }
+  },
+  {
+   "id": "birthday-250",
+   "time": "1762732800/1",
+   "metadata": {
+    "tags": [
+     "tradition",
+     "birthday",
+     "milestone"
+    ],
+    "title": "The Corps turns 250",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c5/MCIPAC_celebrates_250th_Marine_Corps_Birthday_%289398924%29.jpg/960px-MCIPAC_celebrates_250th_Marine_Corps_Birthday_%289398924%29.jpg",
+    "sources": [
+     "https://www.marines.mil/News/Messages/Messages-Display/Article/4000116/250th-anniversary-of-the-united-states-marine-corps/",
+     "https://en.wikipedia.org/wiki/United_States_Marine_Corps_Birthday"
+    ],
+    "description": "The Marine Corps' **250th birthday**, marked by Marines around the world after a year of anniversary events, with celebrations in Philadelphia, where the Corps was raised, and the Commandant's ball in Washington.\n\n**Read more:** [250th anniversary of the United States Marine Corps — marines.mil](https://www.marines.mil/News/Messages/Messages-Display/Article/4000116/250th-anniversary-of-the-united-states-marine-corps/)\n\n*Image: Wikimedia Commons (a 250th birthday cake ceremony, Marine Corps Installations Pacific; U.S. Marine Corps photo).*"
+   }
+  }
+ ],
+ "durations": [
+  {
+   "id": "war-revolution",
+   "end": "-5879952000/1",
+   "start": "-6144249600/1",
+   "metadata": {
+    "tags": [
+     "war",
+     "revolution"
+    ],
+    "title": "American Revolutionary War",
+    "sources": [
+     "https://en.wikipedia.org/wiki/American_Revolutionary_War"
+    ],
+    "description": "The war for American independence, from **Lexington and Concord** to the **Treaty of Paris**.\n\nThe Continental Marines, raised in November 1775, fought aboard Continental Navy ships, landed at **New Providence (Nassau)**, and served with Washington's army at **Trenton and Princeton**. Both the Continental Navy and its Marines were disbanded after the war.\n\n**Read more:** [American Revolutionary War — Wikipedia](https://en.wikipedia.org/wiki/American_Revolutionary_War)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b8/Surrender_of_Lord_Cornwallis.jpg/960px-Surrender_of_Lord_Cornwallis.jpg"
+   }
+  },
+  {
+   "id": "penobscot",
+   "end": "-6007910400/1",
+   "start": "-6009724800/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "revolution",
+     "amphibious"
+    ],
+    "title": "Penobscot Expedition",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Penobscot_Expedition"
+    ],
+    "description": "The largest American naval expedition of the Revolution, against a British post in present-day Maine.\n\nContinental and Massachusetts Marines **stormed the bluffs of Majabigwaduce** on 28 July 1779, but the expedition stalled and was destroyed when a British relief fleet arrived.\n\n**Read more:** [Penobscot Expedition — Wikipedia](https://en.wikipedia.org/wiki/Penobscot_Expedition)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/47/PenobscotExpeditionBySerres.jpg/960px-PenobscotExpeditionBySerres.jpg"
+   }
+  },
+  {
+   "id": "war-quasi",
+   "end": "-5341161600/1",
+   "start": "-5411577600/1",
+   "metadata": {
+    "tags": [
+     "war"
+    ],
+    "title": "Quasi-War with France",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Quasi-War"
+    ],
+    "description": "An undeclared naval war with France over attacks on American shipping. The newly re-established Marine Corps served aboard the frigates of the young US Navy, fighting in ship-to-ship actions and boarding parties in the Caribbean.\n\n**Read more:** [Quasi-War — Wikipedia](https://en.wikipedia.org/wiki/Quasi-War)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/ff/USSConstellationVsInsurgente.jpg/960px-USSConstellationVsInsurgente.jpg"
+   }
+  },
+  {
+   "id": "war-barbary",
+   "end": "-5193072000/1",
+   "start": "-5321980800/1",
+   "metadata": {
+    "tags": [
+     "war",
+     "barbary"
+    ],
+    "title": "First Barbary War",
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_Barbary_War"
+    ],
+    "description": "Fought against Tripoli over tribute and the capture of American sailors. It gave the Marines' Hymn its line **\"to the shores of Tripoli\"** and, tradition holds, the Mameluke sword carried by Marine officers.\n\n**Read more:** [First Barbary War — Wikipedia](https://en.wikipedia.org/wiki/First_Barbary_War)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/58/EnterpriseTripoli.jpg/960px-EnterpriseTripoli.jpg"
+   }
+  },
+  {
+   "id": "war-1812",
+   "end": "-4887302400/1",
+   "start": "-4971456000/1",
+   "metadata": {
+    "tags": [
+     "war"
+    ],
+    "title": "War of 1812",
+    "sources": [
+     "https://en.wikipedia.org/wiki/War_of_1812"
+    ],
+    "description": "War with Britain. Marines served at sea (including aboard USS *Constitution*), on the Great Lakes, at **Bladensburg** in defense of Washington, and at **New Orleans**.\n\n**Read more:** [War of 1812 — Wikipedia](https://en.wikipedia.org/wiki/War_of_1812)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fc/War_of_1812_Montage.jpg/960px-War_of_1812_Montage.jpg"
+   }
+  },
+  {
+   "id": "henderson-tenure",
+   "end": "-3502396800/1",
+   "start": "-4708540800/1",
+   "metadata": {
+    "tags": [
+     "leader",
+     "commandant"
+    ],
+    "title": "Archibald Henderson as Commandant",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Archibald_Henderson"
+    ],
+    "description": "The longest-serving Commandant: almost **39 years**, until his death in office. Henderson defeated a move to fold the Marines into the Army, and is remembered as the \"Grand Old Man of the Marine Corps\".\n\n**Read more:** [Archibald Henderson — Wikipedia](https://en.wikipedia.org/wiki/Archibald_Henderson)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d1/Archibald_Henderson.jpg/960px-Archibald_Henderson.jpg"
+   }
+  },
+  {
+   "id": "war-seminole",
+   "end": "-4019846400/1",
+   "start": "-4229452800/1",
+   "metadata": {
+    "tags": [
+     "war"
+    ],
+    "title": "Second Seminole War",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Second_Seminole_War"
+    ],
+    "description": "Henderson volunteered a Marine regiment for service in the Creek and Seminole campaigns in 1836, leading it in person in Florida and Georgia: half of the Corps' strength at the time.\n\n**Read more:** [Second Seminole War — Wikipedia](https://en.wikipedia.org/wiki/Second_Seminole_War)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://upload.wikimedia.org/wikipedia/commons/8/80/Pilaklikaha.jpg"
+   }
+  },
+  {
+   "id": "war-mexico",
+   "end": "-3847219200/1",
+   "start": "-3903206400/1",
+   "metadata": {
+    "tags": [
+     "war"
+    ],
+    "title": "Mexican–American War",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mexican%E2%80%93American_War"
+    ],
+    "description": "Marines fought in California, along both coasts of Mexico, and with Winfield Scott's army on the march to **Mexico City**, where they took part in the storming of **Chapultepec** and stood guard at the National Palace: \"the Halls of Montezuma\".\n\n**Read more:** [Mexican–American War — Wikipedia](https://en.wikipedia.org/wiki/Mexican%E2%80%93American_War)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7f/Nebel_Mexican_War_12_Scott_in_Mexico_City_%28cropped%29.jpg/960px-Nebel_Mexican_War_12_Scott_in_Mexico_City_%28cropped%29.jpg"
+   }
+  },
+  {
+   "id": "war-civil",
+   "end": "-3300912000/1",
+   "start": "-3430944000/1",
+   "metadata": {
+    "tags": [
+     "war",
+     "civil war"
+    ],
+    "title": "American Civil War",
+    "sources": [
+     "https://en.wikipedia.org/wiki/American_Civil_War"
+    ],
+    "description": "The Union Marine Corps, never more than about 4,000 strong, served mostly at sea and in landing parties along the Confederate coast. Many officers resigned to join the small **Confederate States Marine Corps**.\n\n**Read more:** [American Civil War — Wikipedia](https://en.wikipedia.org/wiki/American_Civil_War)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/69/Battle_of_Gettysburg%2C_by_Currier_and_Ives.png/960px-Battle_of_Gettysburg%2C_by_Currier_and_Ives.png"
+   }
+  },
+  {
+   "id": "war-spain",
+   "end": "-2252707200/1",
+   "start": "-2262556800/1",
+   "metadata": {
+    "tags": [
+     "war"
+    ],
+    "title": "Spanish–American War",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Spanish%E2%80%93American_War"
+    ],
+    "description": "A short war that made the United States a Pacific and Caribbean power. Marines seized **Guantánamo Bay** as an advanced base for the fleet: a preview of the Corps' 20th-century amphibious mission.\n\n**Read more:** [Spanish–American War — Wikipedia](https://en.wikipedia.org/wiki/Spanish%E2%80%93American_War)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/84/Collage_infobox_for_Spanish-American_War.jpg/960px-Collage_infobox_for_Spanish-American_War.jpg"
+   }
+  },
+  {
+   "id": "war-philippines",
+   "end": "-2130019200/1",
+   "start": "-2237587200/1",
+   "metadata": {
+    "tags": [
+     "war"
+    ],
+    "title": "Philippine–American War",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Philippine%E2%80%93American_War"
+    ],
+    "description": "Marines garrisoned bases such as Cavite and Olongapo and campaigned on Samar. Fighting continued in places long after the war was officially declared over in July 1902.\n\n**Read more:** [Philippine–American War — Wikipedia](https://en.wikipedia.org/wiki/Philippine%E2%80%93American_War)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/23/Manila646_1899.jpg/960px-Manila646_1899.jpg"
+   }
+  },
+  {
+   "id": "boxer-legations",
+   "end": "-2189548800/1",
+   "start": "-2194300800/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "boxer rebellion"
+    ],
+    "title": "Siege of the International Legations (Peking)",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_the_International_Legations"
+    ],
+    "description": "During the Boxer Rebellion, a small legation guard of US Marines helped hold the foreign quarter of Peking for 55 days until relief arrived.\n\nPrivate **Dan Daly** earned the first of his two Medals of Honor defending the Tartar Wall.\n\n**Read more:** [Siege of the International Legations — Wikipedia](https://en.wikipedia.org/wiki/Siege_of_the_International_Legations)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cb/Siege_of_Peking%2C_Boxer_Rebellion.jpg/960px-Siege_of_Peking%2C_Boxer_Rebellion.jpg"
+   }
+  },
+  {
+   "id": "occupation-nicaragua",
+   "end": "-1167523200/1",
+   "start": "-1811721600/1",
+   "metadata": {
+    "tags": [
+     "banana wars",
+     "occupation"
+    ],
+    "title": "US occupation of Nicaragua",
+    "sources": [
+     "https://en.wikipedia.org/wiki/United_States_occupation_of_Nicaragua"
+    ],
+    "description": "Part of the **Banana Wars**. Marines fought Augusto César Sandino's insurgency from 1927 and trained the Nicaraguan National Guard; future leaders such as **Chesty Puller** and **Merritt Edson** learned small-unit and air-ground tactics here.\n\n**Read more:** [United States occupation of Nicaragua — Wikipedia](https://en.wikipedia.org/wiki/United_States_occupation_of_Nicaragua)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7b/U.S._Marines_holding_Sandino%27s_Flag_-_Nicaragua_1932.jpg/960px-U.S._Marines_holding_Sandino%27s_Flag_-_Nicaragua_1932.jpg"
+   }
+  },
+  {
+   "id": "veracruz",
+   "end": "-1739059200/1",
+   "start": "-1757721600/1",
+   "metadata": {
+    "tags": [
+     "banana wars",
+     "occupation"
+    ],
+    "title": "Occupation of Veracruz",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Veracruz_(1914)"
+    ],
+    "description": "Sailors and Marines landed and seized the Mexican port after the Tampico Affair. Major **Smedley Butler** received his first Medal of Honor for the fighting on 21–22 April.\n\n**Read more:** [United States occupation of Veracruz — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Veracruz_(1914))\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f9/LC-DIG-GGBAIN-15834_%2817523460795%29.jpg/960px-LC-DIG-GGBAIN-15834_%2817523460795%29.jpg"
+   }
+  },
+  {
+   "id": "occupation-haiti",
+   "end": "-1117756800/1",
+   "start": "-1717718400/1",
+   "metadata": {
+    "tags": [
+     "banana wars",
+     "occupation"
+    ],
+    "title": "US occupation of Haiti",
+    "sources": [
+     "https://en.wikipedia.org/wiki/United_States_occupation_of_Haiti"
+    ],
+    "description": "A 19-year occupation. Marines fought the **Caco Wars** and organized the Haitian Gendarmerie. The occupation remains controversial for its forced labor and the suppression of Haitian resistance.\n\n**Read more:** [United States occupation of Haiti — Wikipedia](https://en.wikipedia.org/wiki/United_States_occupation_of_Haiti)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b2/American_Marines_In_1915_defending_the_entrance_gate_in_Cap-Haitian_-_34510.jpg/960px-American_Marines_In_1915_defending_the_entrance_gate_in_Cap-Haitian_-_34510.jpg"
+   }
+  },
+  {
+   "id": "occupation-dominican",
+   "end": "-1429142400/1",
+   "start": "-1692489600/1",
+   "metadata": {
+    "tags": [
+     "banana wars",
+     "occupation"
+    ],
+    "title": "US occupation of the Dominican Republic",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Military_Government_of_Santo_Domingo",
+     "https://commons.wikimedia.org/wiki/File:US_Marines_camp_in_the_Dominican_Republic.jpg"
+    ],
+    "description": "A US military government ran the country for eight years, with Marines fighting guerrillas in the east and building a constabulary that later became the base of Rafael Trujillo's power.\n\n**Read more:** [United States occupation of the Dominican Republic (1916–1924) — Wikipedia](https://en.wikipedia.org/wiki/Military_Government_of_Santo_Domingo)\n\n*Image: Wikimedia Commons ([file page](https://commons.wikimedia.org/wiki/File:US_Marines_camp_in_the_Dominican_Republic.jpg)).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/52/US_Marines_camp_in_the_Dominican_Republic.jpg/960px-US_Marines_camp_in_the_Dominican_Republic.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   }
+  },
+  {
+   "id": "war-ww1",
+   "end": "-1613865600/1",
+   "start": "-1664323200/1",
+   "metadata": {
+    "tags": [
+     "war",
+     "world war i"
+    ],
+    "title": "World War I (United States)",
+    "sources": [
+     "https://en.wikipedia.org/wiki/World_War_I",
+     "https://commons.wikimedia.org/wiki/File:Teufel_Hunden_US_Marines_recruiting_poster.jpg"
+    ],
+    "description": "The 4th Marine Brigade fought with the Army's 2nd Division in France: **Belleau Wood**, Soissons, **Saint-Mihiel**, **Blanc Mont** and the Meuse–Argonne. The Corps grew from about 13,000 to over 70,000 Marines.\n\n**Read more:** [World War I — Wikipedia](https://en.wikipedia.org/wiki/World_War_I)\n\n*Image: Wikimedia Commons ([file page](https://commons.wikimedia.org/wiki/File:Teufel_Hunden_US_Marines_recruiting_poster.jpg)).*",
+    "backgroundUrl": "https://upload.wikimedia.org/wikipedia/commons/c/c6/Teufel_Hunden_US_Marines_recruiting_poster.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled"
+   }
+  },
+  {
+   "id": "belleau-wood",
+   "end": "-1625788800/1",
+   "start": "-1627948800/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war i"
+    ],
+    "title": "Battle of Belleau Wood",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Belleau_Wood"
+    ],
+    "description": "Three weeks of fighting through a square mile of forest northwest of Château-Thierry, with more than 1,000 Marine casualties on **6 June** alone, then the bloodiest day in the Corps' history.\n\nThe French renamed the wood **\"Bois de la Brigade de Marine\"**. Marine legend holds the Germans called the Marines *Teufelshunde*, \"devil dogs\".\n\n**Read more:** [Battle of Belleau Wood — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Belleau_Wood)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7a/US_Army_Infantrymen%2C_2nd_Infantry_Division%2C_Battle_of_Belleau_Wood%2C_June_1918.jpg/960px-US_Army_Infantrymen%2C_2nd_Infantry_Division%2C_Battle_of_Belleau_Wood%2C_June_1918.jpg"
+   }
+  },
+  {
+   "id": "blanc-mont",
+   "end": "-1615161600/1",
+   "start": "-1617235200/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war i"
+    ],
+    "title": "Battle of Blanc Mont Ridge",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Blanc_Mont_Ridge"
+    ],
+    "description": "The 2nd Division, under Marine Major General **John A. Lejeune**, seized a ridge in Champagne that had held for years. Marshal Pétain called it the greatest single achievement of the 1918 campaign.\n\n**Read more:** [Battle of Blanc Mont Ridge — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Blanc_Mont_Ridge)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://upload.wikimedia.org/wikipedia/commons/9/9a/Battle_of_Blanc_Mont_Ridge.jpg"
+   }
+  },
+  {
+   "id": "war-ww2",
+   "end": "-767836800/1",
+   "start": "-885772800/1",
+   "metadata": {
+    "tags": [
+     "war",
+     "world war ii"
+    ],
+    "title": "World War II (United States)",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Pacific_War"
+    ],
+    "description": "From Pearl Harbor to the surrender in Tokyo Bay. Six Marine divisions and five aircraft wings fought across the Central and South Pacific; the Corps peaked at about **485,000 Marines**, and nearly 87,000 were killed or wounded.\n\n**Read more:** [Pacific War — Wikipedia](https://en.wikipedia.org/wiki/Pacific_War)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b0/Raising_the_Flag_on_Iwo_Jima%2C_larger_-_edit1.jpg/960px-Raising_the_Flag_on_Iwo_Jima%2C_larger_-_edit1.jpg"
+   }
+  },
+  {
+   "id": "wake-island",
+   "end": "-884390400/1",
+   "start": "-885686400/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war ii"
+    ],
+    "title": "Battle of Wake Island",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Wake_Island"
+    ],
+    "description": "The 1st Defense Battalion and VMF-211 repelled the first Japanese landing on **11 December**, sinking two destroyers: one of the few early American successes of the war. A second, larger assault took the atoll on 23 December.\n\n**Read more:** [Battle of Wake Island — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Wake_Island)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://upload.wikimedia.org/wikipedia/commons/0/0f/USMC-M-Wake-17.PNG"
+   }
+  },
+  {
+   "id": "guadalcanal",
+   "end": "-848707200/1",
+   "start": "-864777600/1",
+   "metadata": {
+    "tags": [
+     "campaign",
+     "world war ii",
+     "amphibious"
+    ],
+    "title": "Guadalcanal campaign",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Guadalcanal_campaign"
+    ],
+    "description": "The first major Allied offensive against Japan. The **1st Marine Division** under **Alexander Vandegrift** seized the airfield, named **Henderson Field**, and held it through months of counterattacks, naval battles and disease, supported by the \"Cactus Air Force\".\n\n**Read more:** [Guadalcanal campaign — Wikipedia](https://en.wikipedia.org/wiki/Guadalcanal_campaign)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a8/Marines_rest_in_the_field_on_Guadalcanal.jpg/960px-Marines_rest_in_the_field_on_Guadalcanal.jpg"
+   }
+  },
+  {
+   "id": "edsons-ridge",
+   "end": "-861494400/1",
+   "start": "-861667200/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war ii",
+     "guadalcanal"
+    ],
+    "title": "Battle of Edson's Ridge",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Edson%27s_Ridge"
+    ],
+    "description": "Raiders and paratroopers under **Merritt Edson** held a low ridge south of Henderson Field against a night assault by a Japanese brigade, saving the airfield.\n\n**Read more:** [Battle of Edson's Ridge — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Edson%27s_Ridge)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/12/EdsonsRidge.jpg/960px-EdsonsRidge.jpg"
+   }
+  },
+  {
+   "id": "henderson-field",
+   "end": "-857865600/1",
+   "start": "-858124800/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war ii",
+     "guadalcanal"
+    ],
+    "title": "Battle for Henderson Field",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_for_Henderson_Field",
+     "https://commons.wikimedia.org/wiki/File:View_of_Henderson_Field_on_Guadalcanal,_in_September_1942.jpg"
+    ],
+    "description": "The last major Japanese ground offensive on Guadalcanal. Marines under **Chesty Puller** and soldiers of the Army's 164th Infantry broke repeated night attacks; Sergeant **John Basilone** earned the Medal of Honor.\n\n**Read more:** [Battle for Henderson Field — Wikipedia](https://en.wikipedia.org/wiki/Battle_for_Henderson_Field)\n\n*Image: Wikimedia Commons ([file page](https://commons.wikimedia.org/wiki/File:View_of_Henderson_Field_on_Guadalcanal,_in_September_1942.jpg)).*",
+    "backgroundUrl": "https://upload.wikimedia.org/wikipedia/commons/8/86/View_of_Henderson_Field_on_Guadalcanal%2C_in_September_1942.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled"
+   }
+  },
+  {
+   "id": "tarawa",
+   "end": "-823910400/1",
+   "start": "-824169600/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war ii",
+     "amphibious"
+    ],
+    "title": "Battle of Tarawa",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Tarawa"
+    ],
+    "description": "The 2nd Marine Division's assault on Betio, a fortified islet of about 300 acres. Landing craft stuck on the reef, and Marines waded hundreds of yards under fire; over 1,000 were killed in 76 hours.\n\nIts lessons reshaped amphibious doctrine: more amphibian tractors, better naval gunfire and underwater demolition teams.\n\n**Read more:** [Battle of Tarawa — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Tarawa)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e7/Marines_Advance_on_Japanese_Pill_Boxes%2C_Tarawa%2C_November_1943_%2810962107133%29.jpg/960px-Marines_Advance_on_Japanese_Pill_Boxes%2C_Tarawa%2C_November_1943_%2810962107133%29.jpg"
+   }
+  },
+  {
+   "id": "kwajalein",
+   "end": "-817689600/1",
+   "start": "-817948800/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war ii",
+     "amphibious"
+    ],
+    "title": "Battle of Kwajalein",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Kwajalein"
+    ],
+    "description": "The 4th Marine Division took **Roi-Namur** in the north of the atoll while the Army took Kwajalein Island: a swift success built on the lessons of Tarawa.\n\n**Read more:** [Battle of Kwajalein — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Kwajalein)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/Men_of_the_7th_Div_HD-SN-99-02846.jpg/960px-Men_of_the_7th_Div_HD-SN-99-02846.jpg"
+   }
+  },
+  {
+   "id": "saipan",
+   "end": "-804124800/1",
+   "start": "-806198400/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war ii",
+     "amphibious"
+    ],
+    "title": "Battle of Saipan",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Saipan"
+    ],
+    "description": "The 2nd and 4th Marine Divisions and the Army's 27th Division, under **Holland \"Howlin' Mad\" Smith**, broke Japan's inner defense line. The capture put Tokyo within range of B-29 bombers, and its fall brought down Prime Minister Tojo's government.\n\n**Read more:** [Battle of Saipan — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Saipan)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d0/Marines_and_King_Kong_on_Saipan.jpg/960px-Marines_and_King_Kong_on_Saipan.jpg"
+   }
+  },
+  {
+   "id": "guam",
+   "end": "-801360000/1",
+   "start": "-803088000/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war ii",
+     "amphibious"
+    ],
+    "title": "Battle of Guam",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Guam_(1944)"
+    ],
+    "description": "The recapture of the first American territory taken by Japan, by the 3rd Marine Division, the 1st Provisional Marine Brigade and the Army's 77th Division.\n\n**Read more:** [Battle of Guam (1944) — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Guam_(1944))\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9b/First_flag_on_Guam_-_1944.jpg/960px-First_flag_on_Guam_-_1944.jpg"
+   }
+  },
+  {
+   "id": "tinian",
+   "end": "-802137600/1",
+   "start": "-802828800/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war ii",
+     "amphibious"
+    ],
+    "title": "Battle of Tinian",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Tinian"
+    ],
+    "description": "Often called the most nearly perfect amphibious operation of the war. Tinian's airfields later launched the atomic bombing missions against Hiroshima and Nagasaki.\n\n**Read more:** [Battle of Tinian — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Tinian)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9c/A_Water_Buffalo%2C_loaded_with_Marines%2C_churns_through_the_sea_bound_for_beaches_of_Tinian_Island_near_Guam._-_NARA_-_513181.tif/lossy-page1-960px-A_Water_Buffalo%2C_loaded_with_Marines%2C_churns_through_the_sea_bound_for_beaches_of_Tinian_Island_near_Guam._-_NARA_-_513181.tif.jpg"
+   }
+  },
+  {
+   "id": "peleliu",
+   "end": "-791942400/1",
+   "start": "-798249600/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war ii",
+     "amphibious"
+    ],
+    "title": "Battle of Peleliu",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Peleliu"
+    ],
+    "description": "Expected to last days, the battle lasted ten weeks. Japanese defenders fought from caves in the coral ridges of the Umurbrogol, and the 1st Marine Division suffered over 6,500 casualties.\n\n**Read more:** [Battle of Peleliu — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Peleliu)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e9/First_wave_of_LVTs_moves_toward_the_invasion_beaches_-_Peleliu.jpg"
+   }
+  },
+  {
+   "id": "iwo-jima",
+   "end": "-781660800/1",
+   "start": "-784684800/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war ii",
+     "amphibious"
+    ],
+    "title": "Battle of Iwo Jima",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Iwo_Jima"
+    ],
+    "description": "Three Marine divisions against 21,000 defenders dug into tunnels across eight square miles of volcanic ash. Over 6,800 Americans and nearly all the Japanese garrison died.\n\n> \"Among the Americans who served on Iwo Island, uncommon valor was a common virtue.\" — Admiral Chester Nimitz\n\n27 Medals of Honor were awarded for Iwo Jima, more than for any other single battle.\n\n**Read more:** [Battle of Iwo Jima — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Iwo_Jima)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b0/Raising_the_Flag_on_Iwo_Jima%2C_larger_-_edit1.jpg/960px-Raising_the_Flag_on_Iwo_Jima%2C_larger_-_edit1.jpg"
+   }
+  },
+  {
+   "id": "okinawa",
+   "end": "-774057600/1",
+   "start": "-781142400/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "world war ii",
+     "amphibious"
+    ],
+    "title": "Battle of Okinawa",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Okinawa"
+    ],
+    "description": "The largest amphibious assault of the Pacific War. The 1st and 6th Marine Divisions fought alongside the Army's Tenth Army through Shuri Castle and the island's south, while kamikazes struck the fleet offshore. More than 100,000 Okinawan civilians died.\n\n**Read more:** [Battle of Okinawa — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Okinawa)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bf/Ww2_158.jpg/960px-Ww2_158.jpg"
+   }
+  },
+  {
+   "id": "war-korea",
+   "end": "-518572800/1",
+   "start": "-616032000/1",
+   "metadata": {
+    "tags": [
+     "war",
+     "korean war"
+    ],
+    "title": "Korean War",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Korean_War"
+    ],
+    "description": "Called up at short notice after cuts that had nearly reduced it to a ceremonial force, the Corps sent the 1st Provisional Marine Brigade to the **Pusan Perimeter**, landed at **Inchon**, and fought its way out of the **Chosin Reservoir**. Marine helicopters flew the first combat medical evacuations and troop lifts.\n\n**Read more:** [Korean War — Wikipedia](https://en.wikipedia.org/wiki/Korean_War)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7b/Chosin.jpg/960px-Chosin.jpg"
+   }
+  },
+  {
+   "id": "pusan",
+   "end": "-608688000/1",
+   "start": "-612576000/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "korean war"
+    ],
+    "title": "Battle of the Pusan Perimeter",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_the_Pusan_Perimeter"
+    ],
+    "description": "The 1st Provisional Marine Brigade, a \"fire brigade\" moved wherever the line was threatened, helped hold the last United Nations foothold in Korea, notably in the battles of the Naktong Bulge.\n\n**Read more:** [Battle of Pusan Perimeter — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_the_Pusan_Perimeter)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://upload.wikimedia.org/wikipedia/commons/f/fb/27th_Infantry_Regiment_soldiers_at_the_Pusan_Perimeter%2C_September_4%2C_1950.jpg"
+   }
+  },
+  {
+   "id": "inchon",
+   "end": "-608601600/1",
+   "start": "-608947200/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "korean war",
+     "amphibious"
+    ],
+    "title": "Battle of Inchon",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Inchon"
+    ],
+    "description": "Douglas MacArthur's amphibious gamble far behind North Korean lines, against extreme tides and seawalls. The 1st Marine Division landed and drove on to recapture **Seoul**, cutting the North Korean army's supply lines.\n\n**Read more:** [Battle of Inchon — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Inchon)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/92/Battle_of_Inchon.png/960px-Battle_of_Inchon.png"
+   }
+  },
+  {
+   "id": "chosin",
+   "end": "-601257600/1",
+   "start": "-602640000/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "korean war"
+    ],
+    "title": "Battle of Chosin Reservoir",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Chosin_Reservoir"
+    ],
+    "description": "Surrounded by Chinese armies in temperatures down to −35 °F, the 1st Marine Division under **Oliver P. Smith** fought 78 miles south to the port of Hungnam, bringing out its wounded, its dead and its equipment.\n\nSurvivors are known as the **\"Chosin Few\"**.\n\n**Read more:** [Battle of Chosin Reservoir — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Chosin_Reservoir)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7b/Chosin.jpg/960px-Chosin.jpg"
+   }
+  },
+  {
+   "id": "war-vietnam",
+   "end": "102211200/1",
+   "start": "-152064000/1",
+   "metadata": {
+    "tags": [
+     "war",
+     "vietnam war"
+    ],
+    "title": "Marines in the Vietnam War",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Vietnam_War"
+    ],
+    "description": "From the landing at Da Nang to the last American troops leaving South Vietnam. Marines held the northern provinces of I Corps, from the DMZ to Da Nang, combining large battles with the **Combined Action Program** of rifle squads living in villages. About **13,000 Marines** died in Vietnam.\n\n**Read more:** [Vietnam War — Wikipedia](https://en.wikipedia.org/wiki/Vietnam_War)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/67/U.S._Army_UH-1H_Hueys_insert_ARVN_troops_at_Kh%C3%A2m_%C4%90%E1%BB%A9c%2C_Vietnam%2C_12_July_1970_%2879431435%29.jpg/960px-U.S._Army_UH-1H_Hueys_insert_ARVN_troops_at_Kh%C3%A2m_%C4%90%E1%BB%A9c%2C_Vietnam%2C_12_July_1970_%2879431435%29.jpg"
+   }
+  },
+  {
+   "id": "khe-sanh",
+   "end": "-46742400/1",
+   "start": "-61430400/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "vietnam war"
+    ],
+    "title": "Battle of Khe Sanh",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Khe_Sanh"
+    ],
+    "description": "A 77-day siege of the Marine combat base near the Laotian border by two North Vietnamese divisions, broken by massive air support (Operation Niagara) and Operation Pegasus. The base was abandoned that July.\n\n**Read more:** [Battle of Khe Sanh — Wikipedia](https://en.wikipedia.org/wiki/Siege_of_Khe_Sanh)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://upload.wikimedia.org/wikipedia/commons/3/3c/Khe_Sanh_Bunkers_and_burning_Fuel_Dump.jpg"
+   }
+  },
+  {
+   "id": "hue",
+   "end": "-57888000/1",
+   "start": "-60566400/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "vietnam war",
+     "tet offensive"
+    ],
+    "title": "Battle of Huế",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Hu%E1%BA%BF"
+    ],
+    "description": "During the Tet Offensive, Marines and South Vietnamese troops retook the ancient imperial capital house by house: the Corps' first major urban battle since Seoul in 1950. Thousands of civilians were killed, many in massacres by occupying forces.\n\n**Read more:** [Battle of Huế — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Hu%E1%BA%BF)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/96/Marines_Fire_From_a_House_Window%2C_February_1968_%2816242259837%29_%28cropped%29.jpg/960px-Marines_Fire_From_a_House_Window%2C_February_1968_%2816242259837%29_%28cropped%29.jpg"
+   }
+  },
+  {
+   "id": "lebanon-mnf",
+   "end": "446601600/1",
+   "start": "399081600/1",
+   "metadata": {
+    "tags": [
+     "peacekeeping",
+     "lebanon"
+    ],
+    "title": "Multinational Force in Lebanon",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Multinational_Force_in_Lebanon"
+    ],
+    "description": "Marines deployed to Beirut as peacekeepers with French, Italian and British contingents during the Lebanese Civil War. The mission ended months after the 1983 barracks bombing.\n\n**Read more:** [Multinational Force in Lebanon — Wikipedia](https://en.wikipedia.org/wiki/Multinational_Force_in_Lebanon)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/71/AH-1T_SeaCobra_in_the_outskirts_of_Beirut_1983.JPEG/960px-AH-1T_SeaCobra_in_the_outskirts_of_Beirut_1983.JPEG"
+   }
+  },
+  {
+   "id": "war-gulf",
+   "end": "667699200/1",
+   "start": "649555200/1",
+   "metadata": {
+    "tags": [
+     "war",
+     "gulf war"
+    ],
+    "title": "Gulf War",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Gulf_War"
+    ],
+    "description": "After Iraq invaded Kuwait, more than **90,000 Marines** deployed for Operations Desert Shield and Desert Storm, the largest Marine operation since World War II. An amphibious force afloat held Iraqi divisions on the coast while the 1st and 2nd Marine Divisions breached the defenses into Kuwait.\n\n**Read more:** [Gulf War — Wikipedia](https://en.wikipedia.org/wiki/Gulf_War)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/04/USAF_F-16A_F-15C_F-15E_Desert_Storm_edit2.jpg/960px-USAF_F-16A_F-15C_F-15E_Desert_Storm_edit2.jpg"
+   }
+  },
+  {
+   "id": "desert-storm-ground",
+   "end": "667699200/1",
+   "start": "667353600/1",
+   "metadata": {
+    "tags": [
+     "campaign",
+     "gulf war"
+    ],
+    "title": "Desert Storm ground offensive",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Liberation_of_Kuwait_campaign"
+    ],
+    "description": "The \"100-hour\" ground war. Marine divisions breached two belts of minefields and obstacles and reached Kuwait City's outskirts and Kuwait International Airport.\n\n**Read more:** [Liberation of Kuwait campaign — Wikipedia](https://en.wikipedia.org/wiki/Liberation_of_Kuwait_campaign)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2d/An_Iraqi_T-54%2C_T-55_or_Type_59_and_T-55A_on_Basra-Kuwait_Highway_near_Kuwait.JPEG/960px-An_Iraqi_T-54%2C_T-55_or_Type_59_and_T-55A_on_Basra-Kuwait_Highway_near_Kuwait.JPEG"
+   }
+  },
+  {
+   "id": "war-afghanistan",
+   "end": "1630281600/1",
+   "start": "1002412800/1",
+   "metadata": {
+    "tags": [
+     "war",
+     "afghanistan"
+    ],
+    "title": "War in Afghanistan",
+    "sources": [
+     "https://en.wikipedia.org/wiki/War_in_Afghanistan_(2001%E2%80%932021)"
+    ],
+    "description": "America's longest war. Marines seized **Camp Rhino** in 2001 and, from 2008, fought for years in **Helmand Province**, including Marjah and Sangin, before handing over to Afghan forces in 2014. They returned to secure Kabul airport for the final evacuation in 2021.\n\n**Read more:** [War in Afghanistan (2001–2021) — Wikipedia](https://en.wikipedia.org/wiki/War_in_Afghanistan_(2001%E2%80%932021))\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/94/U.S._Army_firefight_in_Kunar.jpg/960px-U.S._Army_firefight_in_Kunar.jpg"
+   }
+  },
+  {
+   "id": "war-iraq",
+   "end": "1324166400/1",
+   "start": "1048118400/1",
+   "metadata": {
+    "tags": [
+     "war",
+     "iraq"
+    ],
+    "title": "Iraq War",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Iraq_War"
+    ],
+    "description": "The I Marine Expeditionary Force drove from Kuwait to Baghdad and Tikrit in 2003. Marines then spent years in **Al Anbar Province**, where the Sunni tribes' **Anbar Awakening** of 2006–2007 turned against al-Qaeda in Iraq.\n\n**Read more:** [Iraq War — Wikipedia](https://en.wikipedia.org/wiki/Iraq_War)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/80/UStanks_baghdad_2003.JPEG/960px-UStanks_baghdad_2003.JPEG"
+   }
+  },
+  {
+   "id": "fallujah-1",
+   "end": "1083369600/1",
+   "start": "1081036800/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "iraq"
+    ],
+    "title": "First Battle of Fallujah",
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_Battle_of_Fallujah"
+    ],
+    "description": "Operation Vigilant Resolve, launched after the killing of four contractors in the city. Marines were ordered to halt before taking the city, which was handed to a short-lived local \"Fallujah Brigade\".\n\n**Read more:** [First Battle of Fallujah — Wikipedia](https://en.wikipedia.org/wiki/First_Battle_of_Fallujah)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://upload.wikimedia.org/wikipedia/commons/4/42/Npi040604a4b.jpg"
+   }
+  },
+  {
+   "id": "fallujah-2",
+   "end": "1103760000/1",
+   "start": "1099785600/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "iraq"
+    ],
+    "title": "Second Battle of Fallujah",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Second_Battle_of_Fallujah"
+    ],
+    "description": "Operation Phantom Fury: Marine and Army units cleared the insurgent stronghold block by block, the heaviest urban combat for US forces since **Huế** in 1968.\n\n**Read more:** [Second Battle of Fallujah — Wikipedia](https://en.wikipedia.org/wiki/Second_Battle_of_Fallujah)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/4-14_Marines_in_Fallujah.jpg/960px-4-14_Marines_in_Fallujah.jpg"
+   }
+  },
+  {
+   "id": "marjah",
+   "end": "1291680000/1",
+   "start": "1266019200/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "afghanistan"
+    ],
+    "title": "Battle of Marjah",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Operation_Moshtarak",
+     "https://en.wikipedia.org/wiki/Marjah"
+    ],
+    "description": "Operation Moshtarak, the largest offensive of the Afghan war at the time: Marines and Afghan troops took a Taliban stronghold in central Helmand, then fought months of insurgency in its farmland.\n\n**Read more:** [Battle of Marjah — Wikipedia](https://en.wikipedia.org/wiki/Operation_Moshtarak)\n\n*Image: Wikimedia Commons ([file page](https://en.wikipedia.org/wiki/Marjah)).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5e/Marines_in_poppy_fields.jpg/960px-Marines_in_poppy_fields.jpg"
+   }
+  },
+  {
+   "id": "kabul-airlift",
+   "end": "1630281600/1",
+   "start": "1628899200/1",
+   "metadata": {
+    "tags": [
+     "evacuation",
+     "afghanistan"
+    ],
+    "title": "Kabul airlift",
+    "sources": [
+     "https://en.wikipedia.org/wiki/2021_Kabul_airlift"
+    ],
+    "description": "Marines, soldiers and allied troops held Hamid Karzai International Airport as more than **120,000 people** were evacuated after the fall of Kabul to the Taliban.\n\n**Read more:** [2021 evacuation from Afghanistan — Wikipedia](https://en.wikipedia.org/wiki/2021_Kabul_airlift)\n\n*Image: Wikimedia Commons (from the article above).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Afghanistan_Evacuation_210821-M-GQ845-1035.jpg/960px-Afghanistan_Evacuation_210821-M-GQ845-1035.jpg"
+   }
+  }
+ ],
+ "relationships": [
+  {
+   "a": {
+    "duration": "belleau-wood"
+   },
+   "b": {
+    "moment": "dan-daly"
+   }
+  },
+  {
+   "a": {
+    "duration": "blanc-mont"
+   },
+   "b": {
+    "moment": "lejeune"
+   }
+  },
+  {
+   "a": {
+    "duration": "boxer-legations"
+   },
+   "b": {
+    "moment": "dan-daly"
+   }
+  },
+  {
+   "a": {
+    "duration": "chosin"
+   },
+   "b": {
+    "moment": "chesty-puller"
+   }
+  },
+  {
+   "a": {
+    "duration": "chosin"
+   },
+   "b": {
+    "moment": "oliver-smith"
+   }
+  },
+  {
+   "a": {
+    "duration": "edsons-ridge"
+   },
+   "b": {
+    "moment": "merritt-edson"
+   }
+  },
+  {
+   "a": {
+    "duration": "guadalcanal"
+   },
+   "b": {
+    "moment": "guadalcanal-end"
+   }
+  },
+  {
+   "a": {
+    "duration": "guadalcanal"
+   },
+   "b": {
+    "moment": "tenaru"
+   }
+  },
+  {
+   "a": {
+    "duration": "guadalcanal"
+   },
+   "b": {
+    "moment": "vandegrift"
+   }
+  },
+  {
+   "a": {
+    "duration": "henderson-field"
+   },
+   "b": {
+    "moment": "basilone"
+   }
+  },
+  {
+   "a": {
+    "duration": "henderson-field"
+   },
+   "b": {
+    "moment": "chesty-puller"
+   }
+  },
+  {
+   "a": {
+    "duration": "henderson-tenure"
+   },
+   "b": {
+    "moment": "hatchee-lustee"
+   }
+  },
+  {
+   "a": {
+    "duration": "hue"
+   },
+   "b": {
+    "moment": "tet"
+   }
+  },
+  {
+   "a": {
+    "duration": "iwo-jima"
+   },
+   "b": {
+    "moment": "basilone"
+   }
+  },
+  {
+   "a": {
+    "duration": "iwo-jima"
+   },
+   "b": {
+    "moment": "code-talkers"
+   }
+  },
+  {
+   "a": {
+    "duration": "iwo-jima"
+   },
+   "b": {
+    "moment": "flag-raising"
+   }
+  },
+  {
+   "a": {
+    "duration": "iwo-jima"
+   },
+   "b": {
+    "moment": "holland-smith"
+   }
+  },
+  {
+   "a": {
+    "duration": "kabul-airlift"
+   },
+   "b": {
+    "moment": "abbey-gate"
+   }
+  },
+  {
+   "a": {
+    "duration": "khe-sanh"
+   },
+   "b": {
+    "moment": "tet"
+   }
+  },
+  {
+   "a": {
+    "duration": "lebanon-mnf"
+   },
+   "b": {
+    "moment": "beirut"
+   }
+  },
+  {
+   "a": {
+    "duration": "marjah"
+   },
+   "b": {
+    "moment": "carpenter"
+   }
+  },
+  {
+   "a": {
+    "duration": "occupation-haiti"
+   },
+   "b": {
+    "moment": "fort-riviere"
+   }
+  },
+  {
+   "a": {
+    "duration": "occupation-nicaragua"
+   },
+   "b": {
+    "moment": "chesty-puller"
+   }
+  },
+  {
+   "a": {
+    "duration": "occupation-nicaragua"
+   },
+   "b": {
+    "moment": "ocotal"
+   }
+  },
+  {
+   "a": {
+    "duration": "saipan"
+   },
+   "b": {
+    "moment": "holland-smith"
+   }
+  },
+  {
+   "a": {
+    "duration": "veracruz"
+   },
+   "b": {
+    "moment": "smedley-butler"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-1812"
+   },
+   "b": {
+    "moment": "bladensburg"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-1812"
+   },
+   "b": {
+    "moment": "new-orleans"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-afghanistan"
+   },
+   "b": {
+    "moment": "camp-rhino"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-afghanistan"
+   },
+   "b": {
+    "moment": "meyer"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-barbary"
+   },
+   "b": {
+    "moment": "derna"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-barbary"
+   },
+   "b": {
+    "moment": "obannon"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-civil"
+   },
+   "b": {
+    "moment": "bull-run"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-civil"
+   },
+   "b": {
+    "moment": "fort-fisher"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-gulf"
+   },
+   "b": {
+    "moment": "khafji"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-iraq"
+   },
+   "b": {
+    "moment": "dunham"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-iraq"
+   },
+   "b": {
+    "moment": "firdos"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-iraq"
+   },
+   "b": {
+    "moment": "nasiriyah"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-korea"
+   },
+   "b": {
+    "moment": "armistice-korea"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-mexico"
+   },
+   "b": {
+    "moment": "chapultepec"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-spain"
+   },
+   "b": {
+    "moment": "guantanamo"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-vietnam"
+   },
+   "b": {
+    "moment": "da-nang"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-vietnam"
+   },
+   "b": {
+    "moment": "starlite"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-ww1"
+   },
+   "b": {
+    "moment": "armistice"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-ww1"
+   },
+   "b": {
+    "moment": "saint-mihiel"
+   }
+  },
+  {
+   "a": {
+    "duration": "war-ww2"
+   },
+   "b": {
+    "moment": "pete-ellis"
+   }
+  },
+  {
+   "a": {
+    "moment": "derna"
+   },
+   "b": {
+    "moment": "obannon"
+   }
+  },
+  {
+   "a": {
+    "moment": "evans-carlson"
+   },
+   "b": {
+    "moment": "makin"
+   }
+  },
+  {
+   "a": {
+    "moment": "flag-raising"
+   },
+   "b": {
+    "moment": "war-memorial"
+   }
+  },
+  {
+   "a": {
+    "moment": "fort-riviere"
+   },
+   "b": {
+    "moment": "smedley-butler"
+   }
+  },
+  {
+   "a": {
+    "moment": "nassau"
+   },
+   "b": {
+    "moment": "samuel-nicholas"
+   }
+  },
+  {
+   "a": {
+    "moment": "princeton"
+   },
+   "b": {
+    "moment": "samuel-nicholas"
+   }
+  }
+ ]
+}
