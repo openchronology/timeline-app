@@ -12,7 +12,7 @@
 /* ---------- the phone, with a camera on the captured frame ---------- */
 /* The phone's screen on the stage, and a camera on the shot (1080 × 1920 px, a 360 × 640
    window at scale 3): zoom z about the shot pixel (fx, fy), which sits at the screen's centre. */
-var SCR = { x: 12, y: 72, w: 136, h: 136 };
+var SCR = { x: 19, y: 72, w: 122, h: 136 };
 var SHOT_W = 1080;
 function pcam(z, fx, fy) {
   var k = (z * SCR.w) / SHOT_W;
@@ -61,7 +61,11 @@ function phone(c, layers, bg) {
       rx: r + b,
       op: 0.22,
     }) +
-    rect(SCR.x - b, SCR.y - b, SCR.w + 2 * b, SCR.h + 2 * b, '#15191c', { rx: r + b }) +
+    rect(SCR.x - b, SCR.y - b, SCR.w + 2 * b, SCR.h + 2 * b, '#15191c', {
+      rx: r + b,
+      stroke: C.line,
+      sw: 0.6,
+    }) +
     '<defs><clipPath id="scr-clip">' +
     rect(SCR.x, SCR.y, SCR.w, SCR.h, '#000', { rx: r }) +
     '</clipPath></defs>' +
@@ -146,8 +150,8 @@ function glow(x, y, p) {
 function panel(x, y, w, h, op) {
   return rect(x, y, w, h, C.card, {
     rx: 4,
-    stroke: C.line,
-    sw: 0.7,
+    stroke: C.accent,
+    sw: 0.6,
     op: op === undefined ? 0.94 : op,
   });
 }
@@ -327,10 +331,10 @@ SCENES[4] = function (lt, q) {
   var card = '';
   if (sh > 0.001) {
     var y0 = 69.5;
-    card += G(panel(12, y0, 136, 50), { o: sh });
+    card += G(panel(18, y0, 124, 50), { o: sh });
     QUOTE.forEach(function (l, i) {
       card += rise(
-        txt(SAFE.cx, y0 + 11 + i * 9.2, l, { size: 6.4, serif: true, weight: 600 }),
+        txt(SAFE.cx, y0 + 11 + i * 9.2, l, { size: 5.9, serif: true, weight: 600 }),
         P(lt, cues[i] - 0.15, 0.4),
         2,
       );
@@ -378,7 +382,7 @@ SCENES[5] = function (lt, q) {
     if (p <= 0.001 || mp < 1) return;
     var w = textWidth(m[1], 5.6) + 8;
     var x0 =
-      m[4] === 'start' ? Math.max(SAFE.x0 + 2, m[0] - 6) : Math.min(SAFE.x1 - 2, m[0] + 6) - w;
+      m[4] === 'start' ? Math.max(STRIPES.x0 + 4, m[0] - 6) : Math.min(SAFE.x1 - 2, m[0] + 6) - w;
     tags += rise(
       rect(x0, m[3] - 6.2, w, 9, C.card, { rx: 2.5, stroke: C.select, sw: 0.8, op: 0.95 }) +
         txt(x0 + w / 2, m[3] + 0.6, m[1], { size: 5.6, weight: 700 }),
@@ -391,7 +395,7 @@ SCENES[5] = function (lt, q) {
   var lp = P(lt, tK, 0.45);
   if (lp > 0.001) {
     var y0 = 76;
-    lesson += G(panel(16, y0, 128, 34), { o: lp });
+    lesson += G(panel(20, y0, 120, 34), { o: lp });
     [
       ['Keep faith with those', q('keep')],
       ['who came before you.', q('came')],

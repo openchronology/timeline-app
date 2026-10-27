@@ -1,6 +1,6 @@
 # Short 22: Handed Down
 
-The source for the video of [`22-handed-down.md`](../../shorts/22-handed-down.md), in the **archive** look. Build, narrate, render and encode it as [the pipeline's README](../README.md) describes. Narration, trimmed audio, captured shots, frames and the MP4 are not in git.
+The source for the video of [`22-handed-down.md`](../../shorts/22-handed-down.md), in the **dressblues** look. Build, narrate, render and encode it as [the pipeline's README](../README.md) describes. Narration, trimmed audio, captured shots, frames and the MP4 are not in git.
 
 ## Contents
 
