@@ -1,0 +1,617 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:02,120"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 2120
+			},
+			"text": " Then it happens again.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.860511,
+					"t_dtw": -1
+				},
+				{
+					"text": " Then",
+					"timestamps": {
+						"from": "00:00:00,320",
+						"to": "00:00:00,400"
+					},
+					"offsets": {
+						"from": 320,
+						"to": 400
+					},
+					"id": 3244,
+					"p": 0.924949,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:00,400",
+						"to": "00:00:00,580"
+					},
+					"offsets": {
+						"from": 400,
+						"to": 580
+					},
+					"id": 340,
+					"p": 0.932476,
+					"t_dtw": -1
+				},
+				{
+					"text": " happens",
+					"timestamps": {
+						"from": "00:00:00,580",
+						"to": "00:00:01,240"
+					},
+					"offsets": {
+						"from": 580,
+						"to": 1240
+					},
+					"id": 4325,
+					"p": 0.99886,
+					"t_dtw": -1
+				},
+				{
+					"text": " again",
+					"timestamps": {
+						"from": "00:00:01,800",
+						"to": "00:00:01,800"
+					},
+					"offsets": {
+						"from": 1800,
+						"to": 1800
+					},
+					"id": 757,
+					"p": 0.999687,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:02,120",
+						"to": "00:00:02,120"
+					},
+					"offsets": {
+						"from": 2120,
+						"to": 2120
+					},
+					"id": 13,
+					"p": 0.946182,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_106]",
+					"timestamps": {
+						"from": "00:00:02,120",
+						"to": "00:00:02,120"
+					},
+					"offsets": {
+						"from": 2120,
+						"to": 2120
+					},
+					"id": 50469,
+					"p": 0.0276323,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:02,120",
+				"to": "00:00:08,660"
+			},
+			"offsets": {
+				"from": 2120,
+				"to": 8660
+			},
+			"text": " After centuries of division, the Sui reunite China, dig the Grand Canal, and last 37 years.",
+			"tokens": [
+				{
+					"text": " After",
+					"timestamps": {
+						"from": "00:00:02,380",
+						"to": "00:00:02,380"
+					},
+					"offsets": {
+						"from": 2380,
+						"to": 2380
+					},
+					"id": 2293,
+					"p": 0.99835,
+					"t_dtw": -1
+				},
+				{
+					"text": " centuries",
+					"timestamps": {
+						"from": "00:00:02,440",
+						"to": "00:00:02,830"
+					},
+					"offsets": {
+						"from": 2440,
+						"to": 2830
+					},
+					"id": 10675,
+					"p": 0.999619,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:02,900",
+						"to": "00:00:02,950"
+					},
+					"offsets": {
+						"from": 2900,
+						"to": 2950
+					},
+					"id": 286,
+					"p": 0.999866,
+					"t_dtw": -1
+				},
+				{
+					"text": " division",
+					"timestamps": {
+						"from": "00:00:02,950",
+						"to": "00:00:03,360"
+					},
+					"offsets": {
+						"from": 2950,
+						"to": 3360
+					},
+					"id": 7297,
+					"p": 0.998367,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,360",
+						"to": "00:00:03,380"
+					},
+					"offsets": {
+						"from": 3360,
+						"to": 3380
+					},
+					"id": 11,
+					"p": 0.956366,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:03,720",
+						"to": "00:00:03,720"
+					},
+					"offsets": {
+						"from": 3720,
+						"to": 3720
+					},
+					"id": 262,
+					"p": 0.928914,
+					"t_dtw": -1
+				},
+				{
+					"text": " Su",
+					"timestamps": {
+						"from": "00:00:03,720",
+						"to": "00:00:03,790"
+					},
+					"offsets": {
+						"from": 3720,
+						"to": 3790
+					},
+					"id": 1778,
+					"p": 0.482995,
+					"t_dtw": -1
+				},
+				{
+					"text": "i",
+					"timestamps": {
+						"from": "00:00:03,960",
+						"to": "00:00:03,960"
+					},
+					"offsets": {
+						"from": 3960,
+						"to": 3960
+					},
+					"id": 72,
+					"p": 0.98473,
+					"t_dtw": -1
+				},
+				{
+					"text": " reun",
+					"timestamps": {
+						"from": "00:00:04,270",
+						"to": "00:00:04,280"
+					},
+					"offsets": {
+						"from": 4270,
+						"to": 4280
+					},
+					"id": 15398,
+					"p": 0.988433,
+					"t_dtw": -1
+				},
+				{
+					"text": "ite",
+					"timestamps": {
+						"from": "00:00:04,280",
+						"to": "00:00:04,520"
+					},
+					"offsets": {
+						"from": 4280,
+						"to": 4520
+					},
+					"id": 578,
+					"p": 0.999314,
+					"t_dtw": -1
+				},
+				{
+					"text": " China",
+					"timestamps": {
+						"from": "00:00:04,520",
+						"to": "00:00:04,930"
+					},
+					"offsets": {
+						"from": 4520,
+						"to": 4930
+					},
+					"id": 2807,
+					"p": 0.996658,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:04,930",
+						"to": "00:00:05,120"
+					},
+					"offsets": {
+						"from": 4930,
+						"to": 5120
+					},
+					"id": 11,
+					"p": 0.986806,
+					"t_dtw": -1
+				},
+				{
+					"text": " dig",
+					"timestamps": {
+						"from": "00:00:05,120",
+						"to": "00:00:05,310"
+					},
+					"offsets": {
+						"from": 5120,
+						"to": 5310
+					},
+					"id": 3100,
+					"p": 0.793099,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:05,320",
+						"to": "00:00:05,500"
+					},
+					"offsets": {
+						"from": 5320,
+						"to": 5500
+					},
+					"id": 262,
+					"p": 0.99552,
+					"t_dtw": -1
+				},
+				{
+					"text": " Grand",
+					"timestamps": {
+						"from": "00:00:05,650",
+						"to": "00:00:05,810"
+					},
+					"offsets": {
+						"from": 5650,
+						"to": 5810
+					},
+					"id": 5675,
+					"p": 0.822993,
+					"t_dtw": -1
+				},
+				{
+					"text": " Canal",
+					"timestamps": {
+						"from": "00:00:05,870",
+						"to": "00:00:06,180"
+					},
+					"offsets": {
+						"from": 5870,
+						"to": 6180
+					},
+					"id": 31314,
+					"p": 0.991423,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:06,180",
+						"to": "00:00:06,320"
+					},
+					"offsets": {
+						"from": 6180,
+						"to": 6320
+					},
+					"id": 11,
+					"p": 0.583179,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:06,320",
+						"to": "00:00:06,650"
+					},
+					"offsets": {
+						"from": 6320,
+						"to": 6650
+					},
+					"id": 290,
+					"p": 0.955248,
+					"t_dtw": -1
+				},
+				{
+					"text": " last",
+					"timestamps": {
+						"from": "00:00:06,650",
+						"to": "00:00:06,900"
+					},
+					"offsets": {
+						"from": 6650,
+						"to": 6900
+					},
+					"id": 938,
+					"p": 0.978427,
+					"t_dtw": -1
+				},
+				{
+					"text": " 37",
+					"timestamps": {
+						"from": "00:00:07,290",
+						"to": "00:00:07,750"
+					},
+					"offsets": {
+						"from": 7290,
+						"to": 7750
+					},
+					"id": 5214,
+					"p": 0.948583,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:07,750",
+						"to": "00:00:08,300"
+					},
+					"offsets": {
+						"from": 7750,
+						"to": 8300
+					},
+					"id": 812,
+					"p": 0.995368,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:08,300",
+						"to": "00:00:08,660"
+					},
+					"offsets": {
+						"from": 8300,
+						"to": 8660
+					},
+					"id": 13,
+					"p": 0.993906,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_433]",
+					"timestamps": {
+						"from": "00:00:08,660",
+						"to": "00:00:08,660"
+					},
+					"offsets": {
+						"from": 8660,
+						"to": 8660
+					},
+					"id": 50796,
+					"p": 0.137465,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:08,660",
+				"to": "00:00:10,840"
+			},
+			"offsets": {
+				"from": 8660,
+				"to": 10840
+			},
+			"text": " The Tang that follows lasts nearly 300.",
+			"tokens": [
+				{
+					"text": " The",
+					"timestamps": {
+						"from": "00:00:08,700",
+						"to": "00:00:08,810"
+					},
+					"offsets": {
+						"from": 8700,
+						"to": 8810
+					},
+					"id": 383,
+					"p": 0.99835,
+					"t_dtw": -1
+				},
+				{
+					"text": " Tang",
+					"timestamps": {
+						"from": "00:00:08,980",
+						"to": "00:00:09,020"
+					},
+					"offsets": {
+						"from": 8980,
+						"to": 9020
+					},
+					"id": 18816,
+					"p": 0.930343,
+					"t_dtw": -1
+				},
+				{
+					"text": " that",
+					"timestamps": {
+						"from": "00:00:09,020",
+						"to": "00:00:09,230"
+					},
+					"offsets": {
+						"from": 9020,
+						"to": 9230
+					},
+					"id": 326,
+					"p": 0.998612,
+					"t_dtw": -1
+				},
+				{
+					"text": " follows",
+					"timestamps": {
+						"from": "00:00:09,230",
+						"to": "00:00:09,600"
+					},
+					"offsets": {
+						"from": 9230,
+						"to": 9600
+					},
+					"id": 5679,
+					"p": 0.994761,
+					"t_dtw": -1
+				},
+				{
+					"text": " lasts",
+					"timestamps": {
+						"from": "00:00:09,600",
+						"to": "00:00:09,850"
+					},
+					"offsets": {
+						"from": 9600,
+						"to": 9850
+					},
+					"id": 20374,
+					"p": 0.830311,
+					"t_dtw": -1
+				},
+				{
+					"text": " nearly",
+					"timestamps": {
+						"from": "00:00:09,850",
+						"to": "00:00:09,920"
+					},
+					"offsets": {
+						"from": 9850,
+						"to": 9920
+					},
+					"id": 3016,
+					"p": 0.999481,
+					"t_dtw": -1
+				},
+				{
+					"text": " 300",
+					"timestamps": {
+						"from": "00:00:09,920",
+						"to": "00:00:10,640"
+					},
+					"offsets": {
+						"from": 9920,
+						"to": 10640
+					},
+					"id": 5867,
+					"p": 0.960021,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:10,810",
+						"to": "00:00:10,840"
+					},
+					"offsets": {
+						"from": 10810,
+						"to": 10840
+					},
+					"id": 13,
+					"p": 0.959013,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_542]",
+					"timestamps": {
+						"from": "00:00:10,840",
+						"to": "00:00:10,840"
+					},
+					"offsets": {
+						"from": 10840,
+						"to": 10840
+					},
+					"id": 50905,
+					"p": 0.231832,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

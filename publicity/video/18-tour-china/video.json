@@ -1,0 +1,17 @@
+{
+  "script": "../../18-tour-china.md",
+  "look": "archive",
+  "say": {
+    "Xia": "Shyah",
+    "Laozi": "Laow-dzuh",
+    "Sunzi": "Soon-dzuh",
+    "Sima Qian's": "Suh-mah Chyen's",
+    "Yongle": "Yong-luh",
+    "Cixi": "Tsuh-shee",
+    "Taiping": "Tie-ping"
+  },
+  "minDur": {
+    "2": 35,
+    "10": 13
+  }
+}

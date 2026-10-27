@@ -1,0 +1,380 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:03,200"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 3200
+			},
+			"text": " 7,000 years of China on one line.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.881765,
+					"t_dtw": -1
+				},
+				{
+					"text": " 7",
+					"timestamps": {
+						"from": "00:00:00,240",
+						"to": "00:00:00,240"
+					},
+					"offsets": {
+						"from": 240,
+						"to": 240
+					},
+					"id": 767,
+					"p": 0.560223,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:00,280",
+						"to": "00:00:00,390"
+					},
+					"offsets": {
+						"from": 280,
+						"to": 390
+					},
+					"id": 11,
+					"p": 0.985047,
+					"t_dtw": -1
+				},
+				{
+					"text": "000",
+					"timestamps": {
+						"from": "00:00:00,390",
+						"to": "00:00:01,100"
+					},
+					"offsets": {
+						"from": 390,
+						"to": 1100
+					},
+					"id": 830,
+					"p": 0.999066,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:01,100",
+						"to": "00:00:01,500"
+					},
+					"offsets": {
+						"from": 1100,
+						"to": 1500
+					},
+					"id": 812,
+					"p": 0.98995,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:01,500",
+						"to": "00:00:01,660"
+					},
+					"offsets": {
+						"from": 1500,
+						"to": 1660
+					},
+					"id": 286,
+					"p": 0.997657,
+					"t_dtw": -1
+				},
+				{
+					"text": " China",
+					"timestamps": {
+						"from": "00:00:01,660",
+						"to": "00:00:02,060"
+					},
+					"offsets": {
+						"from": 1660,
+						"to": 2060
+					},
+					"id": 2807,
+					"p": 0.997607,
+					"t_dtw": -1
+				},
+				{
+					"text": " on",
+					"timestamps": {
+						"from": "00:00:02,060",
+						"to": "00:00:02,220"
+					},
+					"offsets": {
+						"from": 2060,
+						"to": 2220
+					},
+					"id": 319,
+					"p": 0.568066,
+					"t_dtw": -1
+				},
+				{
+					"text": " one",
+					"timestamps": {
+						"from": "00:00:02,220",
+						"to": "00:00:02,410"
+					},
+					"offsets": {
+						"from": 2220,
+						"to": 2410
+					},
+					"id": 530,
+					"p": 0.997497,
+					"t_dtw": -1
+				},
+				{
+					"text": " line",
+					"timestamps": {
+						"from": "00:00:02,410",
+						"to": "00:00:02,550"
+					},
+					"offsets": {
+						"from": 2410,
+						"to": 2550
+					},
+					"id": 1627,
+					"p": 0.997885,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:02,550",
+						"to": "00:00:02,990"
+					},
+					"offsets": {
+						"from": 2550,
+						"to": 2990
+					},
+					"id": 13,
+					"p": 0.864304,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_160]",
+					"timestamps": {
+						"from": "00:00:03,200",
+						"to": "00:00:03,200"
+					},
+					"offsets": {
+						"from": 3200,
+						"to": 3200
+					},
+					"id": 50523,
+					"p": 0.0213232,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:03,200",
+				"to": "00:00:05,240"
+			},
+			"offsets": {
+				"from": 3200,
+				"to": 5240
+			},
+			"text": " It's open chronology and it's free.",
+			"tokens": [
+				{
+					"text": " It",
+					"timestamps": {
+						"from": "00:00:03,240",
+						"to": "00:00:03,320"
+					},
+					"offsets": {
+						"from": 3240,
+						"to": 3320
+					},
+					"id": 632,
+					"p": 0.985154,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:03,440",
+						"to": "00:00:03,440"
+					},
+					"offsets": {
+						"from": 3440,
+						"to": 3440
+					},
+					"id": 338,
+					"p": 0.996166,
+					"t_dtw": -1
+				},
+				{
+					"text": " open",
+					"timestamps": {
+						"from": "00:00:03,570",
+						"to": "00:00:03,690"
+					},
+					"offsets": {
+						"from": 3570,
+						"to": 3690
+					},
+					"id": 1280,
+					"p": 0.95649,
+					"t_dtw": -1
+				},
+				{
+					"text": " chron",
+					"timestamps": {
+						"from": "00:00:03,690",
+						"to": "00:00:04,000"
+					},
+					"offsets": {
+						"from": 3690,
+						"to": 4000
+					},
+					"id": 16199,
+					"p": 0.996804,
+					"t_dtw": -1
+				},
+				{
+					"text": "ology",
+					"timestamps": {
+						"from": "00:00:04,000",
+						"to": "00:00:04,310"
+					},
+					"offsets": {
+						"from": 4000,
+						"to": 4310
+					},
+					"id": 1435,
+					"p": 0.999397,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:04,310",
+						"to": "00:00:04,460"
+					},
+					"offsets": {
+						"from": 4310,
+						"to": 4460
+					},
+					"id": 290,
+					"p": 0.59462,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:04,550",
+						"to": "00:00:04,620"
+					},
+					"offsets": {
+						"from": 4550,
+						"to": 4620
+					},
+					"id": 340,
+					"p": 0.993771,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:04,620",
+						"to": "00:00:04,740"
+					},
+					"offsets": {
+						"from": 4620,
+						"to": 4740
+					},
+					"id": 338,
+					"p": 0.998837,
+					"t_dtw": -1
+				},
+				{
+					"text": " free",
+					"timestamps": {
+						"from": "00:00:04,740",
+						"to": "00:00:04,880"
+					},
+					"offsets": {
+						"from": 4740,
+						"to": 4880
+					},
+					"id": 1479,
+					"p": 0.999171,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,120",
+						"to": "00:00:05,240"
+					},
+					"offsets": {
+						"from": 5120,
+						"to": 5240
+					},
+					"id": 13,
+					"p": 0.992169,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_262]",
+					"timestamps": {
+						"from": "00:00:05,240",
+						"to": "00:00:05,240"
+					},
+					"offsets": {
+						"from": 5240,
+						"to": 5240
+					},
+					"id": 50625,
+					"p": 0.0304949,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

@@ -30,6 +30,7 @@ Narration recordings, trimmed audio, captured shots, rendered frames and MP4s ar
 | [`11-run-your-own-server/`](11-run-your-own-server/README.md)                     | Video 11: Run your own server.                                                              |
 | [`12-ai-and-automation/`](12-ai-and-automation/README.md)                         | Video 12: Timelines from AI and automation.                                                 |
 | [`13-investigations-causal-factors/`](13-investigations-causal-factors/README.md) | Video 13: Investigations, from timeline to causal factors.                                  |
+| [`18-tour-china/`](18-tour-china/README.md)                                       | Video 18: Tour, China.                                                                      |
 | [`s01-1776-to-the-moon/`](s01-1776-to-the-moon/README.md)                         | Short 1: 1776 to one second on the Moon.                                                    |
 | [`s02-the-last-six-seconds/`](s02-the-last-six-seconds/README.md)                 | Short 2: you're the last six seconds.                                                       |
 | [`s03-point-one-plus-point-two/`](s03-point-one-plus-point-two/README.md)         | Short 3: 0.1 + 0.2 isn't 0.3.                                                               |
@@ -40,6 +41,7 @@ Narration recordings, trimmed audio, captured shots, rendered frames and MP4s ar
 | [`s08-paged-at-2-58/`](s08-paged-at-2-58/README.md)                               | Short 8: 2:58 a.m., everything's down.                                                      |
 | [`s09-i-asked-an-ai/`](s09-i-asked-an-ai/README.md)                               | Short 9: I asked an AI to build a timeline.                                                 |
 | [`s10-why-did-it-happen/`](s10-why-did-it-happen/README.md)                       | Short 10: why did it happen?                                                                |
+| [`s15-the-fifteen-year-dynasty/`](s15-the-fifteen-year-dynasty/README.md)         | Short 15: the fifteen-year dynasty.                                                         |
 
 ## Making a video
 

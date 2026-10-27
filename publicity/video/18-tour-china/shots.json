@@ -1,0 +1,251 @@
+{
+  "sample": "../samples/china.ochx",
+  "size": [1280, 720],
+  "scale": 1.5,
+  "shots": [
+    {
+      "id": "sweep",
+      "dur": 0.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-238854528000, 2840140800]
+        }
+      ]
+    },
+    {
+      "id": "early",
+      "dur": 7,
+      "setup": [
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-238854528000, 2840140800]
+        },
+        {
+          "t": 5,
+          "view": [-131560934400, -84225484800]
+        }
+      ],
+      "actions": [
+        {
+          "t": 6,
+          "do": "open",
+          "title": "841 BCE"
+        }
+      ]
+    },
+    {
+      "id": "zhou",
+      "dur": 5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-131560934400, -84225484800]
+        },
+        {
+          "t": 4,
+          "view": [-96848265600, -60589296000]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(()=>{const d=document.getElementById('density');d.value=12;d.dispatchEvent(new Event('input',{bubbles:true}));d.dispatchEvent(new Event('change',{bubbles:true}));})()"
+        }
+      ]
+    },
+    {
+      "id": "thought",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-87381158400, 1262304000]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.6,
+          "do": "separate",
+          "tags": ["thought"]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(()=>{const d=document.getElementById('density');d.value=12;d.dispatchEvent(new Event('input',{bubbles:true}));d.dispatchEvent(new Event('change',{bubbles:true}));})()"
+        }
+      ]
+    },
+    {
+      "id": "shiji",
+      "dur": 3,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(()=>{const d=document.getElementById('density');d.value=12;d.dispatchEvent(new Event('input',{bubbles:true}));d.dispatchEvent(new Event('change',{bubbles:true}));})()"
+        },
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-84225484800, -46388678400]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.6,
+          "do": "open",
+          "title": "Records of the Grand Historian"
+        }
+      ]
+    },
+    {
+      "id": "division",
+      "dur": 6,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-73180540800, -35343734400]
+        },
+        {
+          "t": 5,
+          "view": [-70024867200, -32188060800],
+          "ease": "linear"
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(()=>{const d=document.getElementById('density');d.value=12;d.dispatchEvent(new Event('input',{bubbles:true}));d.dispatchEvent(new Event('change',{bubbles:true}));})()"
+        }
+      ]
+    },
+    {
+      "id": "invention",
+      "dur": 4,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-74758377600, -24298876800]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.6,
+          "do": "separate",
+          "tags": ["invention"]
+        },
+        {
+          "t": 3.6,
+          "do": "rejoin"
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(()=>{const d=document.getElementById('density');d.value=12;d.dispatchEvent(new Event('input',{bubbles:true}));d.dispatchEvent(new Event('change',{bubbles:true}));})()"
+        }
+      ]
+    },
+    {
+      "id": "sutra",
+      "dur": 6,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(()=>{const d=document.getElementById('density');d.value=12;d.dispatchEvent(new Event('input',{bubbles:true}));d.dispatchEvent(new Event('change',{bubbles:true}));})()"
+        },
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-74758377600, -24298876800]
+        },
+        {
+          "t": 4,
+          "view": [-34807276800, -34744118400]
+        }
+      ],
+      "actions": [
+        {
+          "t": 4.8,
+          "do": "open",
+          "title": "The Diamond Sutra printed"
+        }
+      ]
+    },
+    {
+      "id": "ming",
+      "dur": 6,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-23036572800, -16725225600]
+        },
+        {
+          "t": 5,
+          "view": [-22405420800, -16094073600],
+          "ease": "linear"
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(()=>{const d=document.getElementById('density');d.value=12;d.dispatchEvent(new Event('input',{bubbles:true}));d.dispatchEvent(new Event('change',{bubbles:true}));})()"
+        }
+      ]
+    },
+    {
+      "id": "qing",
+      "dur": 13,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-4891363200, -946771200]
+        },
+        {
+          "t": 5,
+          "view": [-4417977600, -473385600],
+          "ease": "linear"
+        },
+        {
+          "t": 6,
+          "view": [-4417977600, -473385600]
+        },
+        {
+          "t": 8.5,
+          "view": [-1840924800, -1822521600]
+        },
+        {
+          "t": 10,
+          "view": [-1840924800, -1822521600]
+        },
+        {
+          "t": 12.5,
+          "view": [-4417977600, -473385600]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(()=>{const d=document.getElementById('density');d.value=12;d.dispatchEvent(new Event('input',{bubbles:true}));d.dispatchEvent(new Event('change',{bubbles:true}));})()"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+1
+00:00:00,370 --> 00:00:04,054
+The dynasty that unified
+China lasted fifteen years.
+
+2
+00:00:04,384 --> 00:00:08,584
+In 221 BCE, Qin conquers
+the last of its rivals,
+
+3
+00:00:08,634 --> 00:00:11,694
+and its king becomes the
+First Emperor: one script,
+
+4
+00:00:11,744 --> 00:00:17,464
+one coinage, one set of weights and
+measures. He dies eleven years later.
+
+5
+00:00:17,514 --> 00:00:22,056
+Within a year, the revolts begin,
+and by 206 his dynasty is gone.
+
+6
+00:00:22,306 --> 00:00:27,226
+But the empire it built outlasts it. The
+Han that takes over keeps it for about
+
+7
+00:00:27,276 --> 00:00:28,385
+four hundred years.
+
+8
+00:00:28,755 --> 00:00:32,105
+Then it happens again. After
+centuries of division,
+
+9
+00:00:32,155 --> 00:00:37,085
+the Sui reunite China, dig the Grand
+Canal, and last thirty-seven years.
+
+10
+00:00:37,135 --> 00:00:39,900
+The Tang that follows lasts
+nearly three hundred.
+
+11
+00:00:40,190 --> 00:00:44,210
+Seven thousand years of China, on
+one line. It's OpenChronology,
+
+12
+00:00:44,260 --> 00:00:45,732
+and it's free.

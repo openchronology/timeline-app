@@ -1,0 +1,205 @@
+{
+  "sample": "../samples/china.ochx",
+  "size": [360, 480],
+  "scale": 3,
+  "shots": [
+    {
+      "id": "qin",
+      "dur": 21.956,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "eval",
+          "js": "document.head.insertAdjacentHTML('beforeend', '<style>.edge-arc, .event-marker, .duration-band { pointer-events: none !important; }</style>')"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-70971552000, -66869193600]
+        },
+        {
+          "t": 4.154,
+          "view": [-70971552000, -66869193600]
+        },
+        {
+          "t": 21.756,
+          "view": [-70592860800, -66490502400],
+          "ease": "linear"
+        }
+      ]
+    },
+    {
+      "id": "out",
+      "dur": 6.329,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "eval",
+          "js": "document.head.insertAdjacentHTML('beforeend', '<style>.edge-arc, .event-marker, .duration-band { pointer-events: none !important; }</style>')"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-70592860800, -66490502400]
+        },
+        {
+          "t": 0.1,
+          "view": [-70592860800, -66490502400]
+        },
+        {
+          "t": 2.6,
+          "view": [-71287171200, -59958144000]
+        }
+      ]
+    },
+    {
+      "id": "pan",
+      "dur": 19.347,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "eval",
+          "js": "document.head.insertAdjacentHTML('beforeend', '<style>.edge-arc, .event-marker, .duration-band { pointer-events: none !important; }</style>')"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-71287171200, -59958144000],
+          "ease": "linear"
+        },
+        {
+          "t": 0.1,
+          "view": [-71287171200, -59958144000],
+          "ease": "linear"
+        },
+        {
+          "t": 0.2,
+          "view": [-71248938707, -59918123344],
+          "ease": "linear"
+        },
+        {
+          "t": 0.3,
+          "view": [-70953432172, -59608785992],
+          "ease": "linear"
+        },
+        {
+          "t": 0.4,
+          "view": [-70388888688, -59017771697],
+          "ease": "linear"
+        },
+        {
+          "t": 0.5,
+          "view": [-69582944299, -58173927894],
+          "ease": "linear"
+        },
+        {
+          "t": 0.6,
+          "view": [-68563245012, -57106092050],
+          "ease": "linear"
+        },
+        {
+          "t": 0.7,
+          "view": [-67357440874, -55843097596],
+          "ease": "linear"
+        },
+        {
+          "t": 0.8,
+          "view": [-65993180722, -54413779168],
+          "ease": "linear"
+        },
+        {
+          "t": 0.9,
+          "view": [-64498107588, -52846977212],
+          "ease": "linear"
+        },
+        {
+          "t": 1,
+          "view": [-62899854730, -51171541945],
+          "ease": "linear"
+        },
+        {
+          "t": 1.1,
+          "view": [-61226042322, -49416336670],
+          "ease": "linear"
+        },
+        {
+          "t": 1.2,
+          "view": [-59504274778, -47610240448],
+          "ease": "linear"
+        },
+        {
+          "t": 1.3,
+          "view": [-57762138773, -45782150079],
+          "ease": "linear"
+        },
+        {
+          "t": 1.4,
+          "view": [-56027201961, -43960981388],
+          "ease": "linear"
+        },
+        {
+          "t": 1.5,
+          "view": [-54327012431, -42175669758],
+          "ease": "linear"
+        },
+        {
+          "t": 1.6,
+          "view": [-52689098962, -40455169888],
+          "ease": "linear"
+        },
+        {
+          "t": 1.7,
+          "view": [-51140972075, -38828454734],
+          "ease": "linear"
+        },
+        {
+          "t": 1.8,
+          "view": [-49710125957, -37324513582],
+          "ease": "linear"
+        },
+        {
+          "t": 1.9,
+          "view": [-48424041267, -35972349252],
+          "ease": "linear"
+        },
+        {
+          "t": 2,
+          "view": [-47310188848, -34800974374],
+          "ease": "linear"
+        },
+        {
+          "t": 2.1,
+          "view": [-46396034370, -33839406756],
+          "ease": "linear"
+        },
+        {
+          "t": 2.2,
+          "view": [-45709043893, -33116663813],
+          "ease": "linear"
+        },
+        {
+          "t": 2.3,
+          "view": [-45276690334, -32661756105],
+          "ease": "linear"
+        },
+        {
+          "t": 2.4,
+          "view": [-45126460800, -32503680000],
+          "ease": "linear"
+        }
+      ]
+    }
+  ]
+}

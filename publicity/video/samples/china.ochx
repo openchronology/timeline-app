@@ -1,0 +1,3484 @@
+{
+ "format": "openchronology",
+ "version": 1,
+ "title": "China, from the Neolithic to 1949",
+ "description": "Chinese history on one line: the Neolithic cultures, the Xia of tradition, the Shang and Zhou, the empire from Qin to Qing, and the Republic, to the founding of the People’s Republic on 1 October 1949, with two later milestones. Dynasties, reigns and wars are durations; people, works, inventions and battles are moments.\n\n**How it is dated.** Before 841 BCE, the first year Chinese history dates year by year, the dates are the Xia–Shang–Zhou Chronology Project’s conventional figures, and approximate. Years are proleptic Gregorian with BCE (1 BCE is year 0); dates known to the day before 1582 are converted from the Julian dates in the sources, which are kept under Historical dates. Days are UTC date markers.\n\nA sample timeline built from the cited sources, not a definitive history.",
+ "presentation": {
+  "mode": "gregorian",
+  "unit": "",
+  "scale": "1/1",
+  "origin": "0/1",
+  "version": 1,
+  "offsetMinutes": 0,
+  "significantDigits": 6
+ },
+ "tags": [
+  "history",
+  "china",
+  "education"
+ ],
+ "plugins": [
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "rich-text-notes",
+    "version": 1,
+    "name": "Rich text notes",
+    "description": "Edit moment and stack notes visually, storing portable Markdown. Hover cards render safe headings, emphasis, lists, code and HTTPS links. HTML and images are not executed.",
+    "fields": [],
+    "notes": {
+     "kind": "markdown"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-headings",
+    "version": 1,
+    "name": "Headings",
+    "description": "Let a moment act as a heading or marker: only its title shows, sized as a heading from level 1 to 6, and the title is what you click. Choose its font (Times New Roman by default). Headings still group into summaries with other moments.",
+    "fields": [
+     {
+      "kind": "heading",
+      "metadataKey": "headingLevel",
+      "label": "Heading level"
+     },
+     {
+      "kind": "font",
+      "metadataKey": "headingFont",
+      "label": "Heading font"
+     }
+    ],
+    "marker": {
+     "kind": "heading",
+     "metadataKey": "headingLevel"
+    },
+    "targets": [
+     "moments"
+    ]
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-colors",
+    "version": 2,
+    "name": "Moment colors",
+    "description": "Choose muted semantic swatches or a custom color for moments and stack entries while preserving their white borders.",
+    "fields": [
+     {
+      "kind": "color",
+      "metadataKey": "color",
+      "label": "Moment color"
+     }
+    ],
+    "marker": {
+     "kind": "color",
+     "metadataKey": "color"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.color(api.get(\"color\")); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-sources",
+    "version": 1,
+    "name": "Sources",
+    "description": "Show and edit a series of source links for moments and stack entries.",
+    "fields": [
+     {
+      "kind": "links",
+      "metadataKey": "sources",
+      "label": "Sources"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "dating-context",
+    "version": 1,
+    "name": "Dating context",
+    "description": "Explain the precision and coordinate convention of a moment. An exact stored coordinate can still represent an approximate age or a calendar-day marker.",
+    "fields": [
+     {
+      "kind": "text",
+      "metadataKey": "datePrecision",
+      "label": "Date precision"
+     },
+     {
+      "kind": "multiline",
+      "metadataKey": "coordinateConvention",
+      "label": "Coordinate convention"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "historical-dates",
+    "version": 1,
+    "name": "Historical dates",
+    "description": "Retain an original historical date and its calendar separately from the timeline coordinate and display calendar, such as a Julian date on a Gregorian timeline.",
+    "fields": [
+     {
+      "kind": "text",
+      "metadataKey": "historicalDate",
+      "label": "Original historical date"
+     },
+     {
+      "kind": "text",
+      "metadataKey": "calendar",
+      "label": "Original calendar"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "presumptive-outline",
+    "version": 1,
+    "name": "Presumptive outline",
+    "description": "Mark moments, stack entries and durations as presumptive: not yet confirmed by evidence. They are drawn with a dashed outline, whatever their shape, color or icon, as events and causal factors charts draw presumptive events and conditions.",
+    "fields": [
+     {
+      "kind": "toggle",
+      "metadataKey": "presumptive",
+      "label": "Presumptive (unconfirmed)"
+     }
+    ],
+    "marker": {
+     "kind": "outline",
+     "metadataKey": "presumptive"
+    },
+    "targets": [
+     "moments",
+     "durations"
+    ]
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "expand-on-hover",
+    "version": 1,
+    "name": "Expand on hover",
+    "description": "Hover or focus a summary of two to five moments to fan out its members radially for individual inspection. Larger summaries stay collapsed.",
+    "fields": [],
+    "summary": {
+     "kind": "radial"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.expand(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "timeline-theme",
+    "version": 2,
+    "name": "Timeline theme",
+    "description": "Choose the timeline's colors, fonts and text sizes: its labels, its measure (the axis, tick marks and their times), the halo that keeps them readable over images, the default marker and duration colors, and a background color. Set them here in the plugin list; anything left blank keeps the usual look, and colors chosen for events still win.",
+    "fields": [],
+    "settings": [
+     {
+      "kind": "color",
+      "key": "textColor",
+      "label": "Label color"
+     },
+     {
+      "kind": "font",
+      "key": "textFont",
+      "label": "Label font"
+     },
+     {
+      "kind": "text-size",
+      "key": "textSize",
+      "label": "Label size"
+     },
+     {
+      "kind": "color",
+      "key": "measureColor",
+      "label": "Measure color"
+     },
+     {
+      "kind": "font",
+      "key": "measureFont",
+      "label": "Measure font"
+     },
+     {
+      "kind": "text-size",
+      "key": "measureSize",
+      "label": "Measure size"
+     },
+     {
+      "kind": "color",
+      "key": "haloColor",
+      "label": "Halo color"
+     },
+     {
+      "kind": "color",
+      "key": "markerColor",
+      "label": "Marker color"
+     },
+     {
+      "kind": "color",
+      "key": "durationColor",
+      "label": "Duration color"
+     },
+     {
+      "kind": "color",
+      "key": "backgroundColor",
+      "label": "Background color"
+     }
+    ],
+    "theme": {
+     "text": "textColor",
+     "textFont": "textFont",
+     "textSize": "textSize",
+     "measure": "measureColor",
+     "measureFont": "measureFont",
+     "measureSize": "measureSize",
+     "halo": "haloColor",
+     "marker": "markerColor",
+     "duration": "durationColor",
+     "background": "backgroundColor"
+    }
+   },
+   "enabled": true,
+   "settings": {
+    "textColor": "#1f2a44",
+    "textFont": "Georgia, serif",
+    "measureColor": "#9c3b2a",
+    "haloColor": "#f3ead7",
+    "markerColor": "#1f3a5f",
+    "durationColor": "#9c3b2a",
+    "backgroundColor": "#f3ead7"
+   }
+  }
+ ],
+ "events": [
+  {
+   "id": "h-neolithic",
+   "time": "-219920400000/1",
+   "metadata": {
+    "title": "Neolithic cultures",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "hemudu",
+   "time": "-213608966400/1",
+   "metadata": {
+    "title": "Hemudu: rice on the Yangtze",
+    "description": "Villages of wooden houses on stilts near the Yangtze delta, with abundant cultivated **rice**, about 5000–4500 BCE: farming in China began along both the Yellow River and the Yangtze.",
+    "tags": [
+     "archaeology"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hemudu_culture"
+    ],
+    "datePrecision": "Approximate: a rounded archaeological date"
+   }
+  },
+  {
+   "id": "banpo",
+   "time": "-204141945600/1",
+   "metadata": {
+    "title": "Banpo village",
+    "description": "A **Yangshao** village near Xi’an, about 4800–4300 BCE: round houses, a ditch, kilns and painted pottery, some marked with signs.",
+    "tags": [
+     "archaeology"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Banpo"
+    ],
+    "datePrecision": "Approximate: a rounded archaeological date"
+   }
+  },
+  {
+   "id": "taosi",
+   "time": "-134716608000/1",
+   "metadata": {
+    "title": "Taosi",
+    "description": "A large walled settlement of the late **Longshan** period in southern Shanxi, about 2300–1900 BCE, with elite tombs and a structure often read as an observatory.",
+    "tags": [
+     "archaeology"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Taosi"
+    ],
+    "datePrecision": "Approximate: a rounded archaeological date"
+   }
+  },
+  {
+   "id": "h-bronze",
+   "time": "-127458576000/1",
+   "metadata": {
+    "title": "The first dynasties",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "erlitou-palaces",
+   "time": "-115782480000/1",
+   "metadata": {
+    "title": "Palaces and bronze at Erlitou",
+    "description": "The city at **Erlitou** in the Yiluo valley has palace foundations and the earliest large-scale bronze casting in China, including the first known ritual vessels. Many Chinese archaeologists identify it with the late Xia; without written records, the link is unproven.",
+    "tags": [
+     "archaeology"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Erlitou_culture"
+    ],
+    "datePrecision": "Approximate: a rounded archaeological date"
+   }
+  },
+  {
+   "id": "zhengzhou",
+   "time": "-112626720000/1",
+   "metadata": {
+    "title": "The Shang at Zhengzhou",
+    "description": "Walled cities of the **Erligang** culture at Zhengzhou and Yanshi mark the early Shang. The Chronology Project ties the dynasty’s start, about 1600 BCE, to the Yanshi city.",
+    "tags": [
+     "dynasty",
+     "archaeology"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Shang_dynasty",
+     "https://en.wikipedia.org/wiki/Xia–Shang–Zhou_Chronology_Project"
+    ],
+    "datePrecision": "Approximate: the Xia–Shang–Zhou Chronology Project's conventional date"
+   }
+  },
+  {
+   "id": "pan-geng",
+   "time": "-103159699200/1",
+   "metadata": {
+    "title": "Pan Geng moves to Yin",
+    "description": "King **Pan Geng** moves the Shang capital to Yin, near modern Anyang, where it stays until the dynasty’s fall. The Chronology Project dates the move about 1300 BCE.",
+    "tags": [
+     "dynasty",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Pan_Geng",
+     "https://en.wikipedia.org/wiki/Yinxu"
+    ],
+    "datePrecision": "Approximate: the Xia–Shang–Zhou Chronology Project's conventional date"
+   }
+  },
+  {
+   "id": "oracle-bones",
+   "time": "-101581862400/1",
+   "metadata": {
+    "title": "Oracle bones",
+    "description": "Questions to the ancestors, carved on ox shoulder blades and turtle shells at Yin from the reign of **Wu Ding** (from 1250 BCE in the Chronology Project): the earliest substantial body of Chinese writing. Recognized as writing in 1899, they confirmed the Shang kings of the later histories.",
+    "tags": [
+     "writing",
+     "archaeology"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Oracle_bone",
+     "https://en.wikipedia.org/wiki/Oracle_bone_script"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Approximate: the Xia–Shang–Zhou Chronology Project's conventional date"
+   }
+  },
+  {
+   "id": "fu-hao",
+   "time": "-100003939200/1",
+   "metadata": {
+    "title": "Tomb of Fu Hao",
+    "description": "**Fu Hao**, a consort of Wu Ding, led armies according to the oracle bones. Her tomb at Yin, found undisturbed in 1976, held well over a thousand objects of jade, bronze and bone, and thousands of cowry shells. She died about 1200 BCE.",
+    "tags": [
+     "archaeology",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fu_Hao",
+     "https://whc.unesco.org/en/list/1114/"
+    ],
+    "datePrecision": "Approximate: about this year"
+   }
+  },
+  {
+   "id": "sanxingdui",
+   "time": "-96848265600/1",
+   "metadata": {
+    "title": "Sanxingdui",
+    "description": "Pits in Sichuan with bronze masks, standing figures and gold, dated about 1200–1000 BCE (placed here mid-range): a bronze culture contemporary with the late Shang but unlike it, with no writing found.",
+    "tags": [
+     "archaeology"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sanxingdui"
+    ],
+    "datePrecision": "Approximate: a rounded archaeological date"
+   }
+  },
+  {
+   "id": "muye",
+   "time": "-95144198400/1",
+   "metadata": {
+    "title": "Battle of Muye",
+    "description": "King **Wu of Zhou** defeats Di Xin, the last Shang king, and the Zhou claim the **Mandate of Heaven**. The Chronology Project dates it to 1046 BCE (20 January); older chronologies proposed dozens of dates, from 1130 to 1018 BCE, 1122 and 1027 the best known.",
+    "tags": [
+     "war",
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Muye",
+     "https://en.wikipedia.org/wiki/Xia–Shang–Zhou_Chronology_Project"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Approximate: the Xia–Shang–Zhou Chronology Project's conventional date"
+   }
+  },
+  {
+   "id": "h-zhou",
+   "time": "-93692592000/1",
+   "metadata": {
+    "title": "Zhou",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "gonghe",
+   "time": "-88675084800/1",
+   "metadata": {
+    "title": "841 BCE: the first dated year",
+    "description": "After King Li is driven out, the **Gonghe Regency** governs until 828 BCE. Sima Qian’s year-by-year tables begin here: 841 BCE is the earliest year of Chinese history dated year by year. (The Cambridge History of Ancient China starts the regency in 842.)",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Gonghe_Regency",
+     "https://ctext.org/shiji"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "haojing",
+   "time": "-86466009600/1",
+   "metadata": {
+    "title": "Haojing falls",
+    "description": "Rebels and the Quanrong sack the western capital and kill **King You**. The court moves east to Luoyang, and the Western Zhou gives way to the Eastern.",
+    "tags": [
+     "war",
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/King_You_of_Zhou"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "chunqiu",
+   "time": "-84919708800/1",
+   "metadata": {
+    "title": "Spring and Autumn Annals begin",
+    "description": "The chronicle of the state of **Lu** records its years from 722 to 481 BCE, and gives the period its name. Tradition says Confucius edited it.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Spring_and_Autumn_Annals"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "confucius",
+   "time": "-79523510400/1",
+   "metadata": {
+    "title": "Confucius born",
+    "description": "**Kong Qiu**, known as Kongzi or **Confucius**, is born in Lu, in 551 BCE by the usual reckoning. He taught that order begins with personal virtue, ritual and right relationships.",
+    "tags": [
+     "thought"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Confucius"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Traditional date; the earliest sources disagree"
+   }
+  },
+  {
+   "id": "laozi",
+   "time": "-80154662400/1",
+   "metadata": {
+    "title": "Laozi and the Daodejing",
+    "description": "Tradition makes **Laozi** an older contemporary of Confucius, born, by one account, in 571 BCE, and the author of the **Daodejing**, the founding text of Daoism. Whether he lived is debated; the oldest manuscript, from Guodian, is from about 300 BCE.",
+    "tags": [
+     "thought",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Laozi",
+     "https://en.wikipedia.org/wiki/Tao_Te_Ching",
+     "https://ctext.org/dao-de-jing"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Traditional date; the earliest sources disagree"
+   }
+  },
+  {
+   "id": "sunzi",
+   "time": "-77914137600/1",
+   "metadata": {
+    "title": "Sunzi, The Art of War",
+    "description": "Attributed to **Sun Wu (Sunzi)**, a general of the state of Wu around 500 BCE. Most scholars think the text took its form in the Warring States period.",
+    "tags": [
+     "thought",
+     "writing",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/The_Art_of_War",
+     "https://ctext.org/art-of-war"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Traditional date; the earliest sources disagree"
+   }
+  },
+  {
+   "id": "confucius-dies",
+   "time": "-77251449600/1",
+   "metadata": {
+    "title": "Confucius dies",
+    "description": "He dies in Lu in 479 BCE, his teaching known only to his followers; it becomes state orthodoxy under the Han, three centuries later.",
+    "tags": [
+     "thought"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Confucius"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "analects",
+   "time": "-74758377600/1",
+   "metadata": {
+    "title": "The Analects",
+    "description": "The **Analects** (Lunyu), sayings of Confucius and his disciples, compiled by his followers over the generations after his death and settled in its present form under the Han.",
+    "tags": [
+     "thought",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Analects",
+     "https://ctext.org/analects"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Approximate: about this year"
+   }
+  },
+  {
+   "id": "jin-partition",
+   "time": "-74853072000/1",
+   "metadata": {
+    "title": "Partition of Jin",
+    "description": "The Zhou king recognizes **Han, Zhao and Wei**, carved out of the state of Jin, as states. Sima Guang begins his history of the Warring States here; Sima Qian uses 475 BCE.",
+    "tags": [
+     "dynasty",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Partition_of_Jin"
+    ],
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "mencius",
+   "time": "-73874764800/1",
+   "metadata": {
+    "title": "Mencius born",
+    "description": "**Mengzi (Mencius)**, about 372–289 BCE, the most influential follower of Confucius, argued that human nature is good.",
+    "tags": [
+     "thought"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mencius",
+     "https://ctext.org/mengzi"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Traditional date; the earliest sources disagree"
+   }
+  },
+  {
+   "id": "shang-yang",
+   "time": "-73369843200/1",
+   "metadata": {
+    "title": "Shang Yang’s reforms in Qin",
+    "description": "Under Duke Xiao, **Shang Yang** remakes Qin: land for farmers, ranks for soldiers, harsh and uniform laws. The **Legalist** state he built went on to conquer the others.",
+    "tags": [
+     "thought",
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Shang_Yang"
+    ],
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "dujiangyan",
+   "time": "-70198531200/1",
+   "metadata": {
+    "title": "Dujiangyan",
+    "description": "The Qin governor **Li Bing** splits the Min River in Sichuan without a dam, to irrigate the Chengdu plain and tame its floods, about 256 BCE. It still works.",
+    "tags": [
+     "invention"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Dujiangyan"
+    ],
+    "color": "#2f6b4f",
+    "datePrecision": "Approximate: about this year"
+   }
+  },
+  {
+   "id": "changping",
+   "time": "-70340400000/1",
+   "metadata": {
+    "title": "Battle of Changping",
+    "description": "Qin destroys the army of **Zhao**, its strongest rival; the histories say the surrendered soldiers were killed.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Changping"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "zhou-ends",
+   "time": "-70214169600/1",
+   "metadata": {
+    "title": "The last Zhou king",
+    "description": "Qin takes the royal domain and King Nan dies: the Zhou, the longest-lasting dynasty, ends after about 790 years.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Zhou_dynasty"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "ying-zheng",
+   "time": "-69898636800/1",
+   "metadata": {
+    "title": "Ying Zheng becomes king of Qin",
+    "description": "The future First Emperor comes to the Qin throne as a boy of about thirteen.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Qin_Shi_Huang"
+    ],
+    "color": "#b0862f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "h-empire",
+   "time": "-69393715200/1",
+   "metadata": {
+    "title": "Qin and Han: the empire",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "unification",
+   "time": "-69109718400/1",
+   "metadata": {
+    "title": "Qin unifies China",
+    "description": "With Qi, the last of the six states, conquered, Ying Zheng takes a new title: **Qin Shi Huang, the First Emperor**. Qin standardizes the script, weights and measures, coins and axle widths, and governs through commanderies instead of fiefs.",
+    "tags": [
+     "dynasty",
+     "ruler",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Qin's_wars_of_unification",
+     "https://en.wikipedia.org/wiki/Qin_Shi_Huang"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "wall-qin",
+   "time": "-68888793600/1",
+   "metadata": {
+    "title": "Qin joins the northern walls",
+    "description": "General **Meng Tian** drives back the Xiongnu and links earlier states’ walls into one northern line, of rammed earth; little of it survives.",
+    "tags": [
+     "war",
+     "invention"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Great_Wall_of_China",
+     "https://whc.unesco.org/en/list/438/"
+    ],
+    "datePrecision": "Approximate: about this year"
+   }
+  },
+  {
+   "id": "book-burning",
+   "time": "-68857257600/1",
+   "metadata": {
+    "title": "Burning of the books",
+    "description": "On the advice of **Li Si**, histories of the other states and private copies of the classics are ordered burned. The story that 460 scholars were buried alive the next year comes from later sources and is questioned.",
+    "tags": [
+     "thought",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Burning_of_books_and_burying_of_scholars"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "first-emperor-dies",
+   "time": "-68762563200/1",
+   "metadata": {
+    "title": "The First Emperor dies",
+    "description": "**Qin Shi Huang** dies on a tour of the east in 210 BCE. His son’s reign is short and the empire collapses within four years.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Qin_Shi_Huang"
+    ],
+    "color": "#b0862f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "terracotta",
+   "time": "-68746924800/1",
+   "metadata": {
+    "title": "The Terracotta Army",
+    "description": "Thousands of life-size clay soldiers, horses and chariots buried in pits east of the **First Emperor’s** tomb near Xi’an. Farmers digging a well found them in 1974.",
+    "tags": [
+     "archaeology",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Terracotta_Army",
+     "https://whc.unesco.org/en/list/441/"
+    ],
+    "datePrecision": "Approximate: about this year"
+   }
+  },
+  {
+   "id": "dazexiang",
+   "time": "-68731027200/1",
+   "metadata": {
+    "title": "Chen Sheng and Wu Guang rise",
+    "description": "Conscripts led by **Chen Sheng** and **Wu Guang**, late for duty and facing death under Qin law, rebel: the first of the uprisings that bring Qin down.",
+    "tags": [
+     "revolution",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Chen_Sheng_and_Wu_Guang_uprising"
+    ],
+    "color": "#c46a2c",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "gaixia",
+   "time": "-68510102400/1",
+   "metadata": {
+    "title": "Battle of Gaixia",
+    "description": "**Liu Bang** defeats his rival Xiang Yu and becomes **Emperor Gaozu**, founder of the Han.",
+    "tags": [
+     "war",
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Gaixia",
+     "https://en.wikipedia.org/wiki/Emperor_Gaozu_of_Han"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "zhang-qian",
+   "time": "-66490502400/1",
+   "metadata": {
+    "title": "Zhang Qian goes west",
+    "description": "Emperor Wu sends **Zhang Qian** to seek allies against the Xiongnu. Captured for ten years, he reaches Central Asia and returns about 126 BCE with reports that open the **Silk Road** to Han trade and armies.",
+    "tags": [
+     "contact"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Zhang_Qian",
+     "https://en.wikipedia.org/wiki/Silk_Road"
+    ],
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "taixue",
+   "time": "-66048652800/1",
+   "metadata": {
+    "title": "The Imperial Academy",
+    "description": "Emperor Wu founds the **Taixue** to train officials in the Confucian classics, which become the state’s learning for the next two thousand years.",
+    "tags": [
+     "thought"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Taixue",
+     "https://en.wikipedia.org/wiki/Emperor_Wu_of_Han"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "shiji",
+   "time": "-65007360000/1",
+   "metadata": {
+    "title": "Records of the Grand Historian",
+    "description": "**Sima Qian** completes the **Shiji**, about 91 BCE: a history of some two thousand years from the Yellow Emperor to his own time, in annals, tables, treatises and biographies, the model for every later dynastic history.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Shiji",
+     "https://ctext.org/shiji"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Approximate: about this year"
+   }
+  },
+  {
+   "id": "wang-mang",
+   "time": "-61883136000/1",
+   "metadata": {
+    "title": "Wang Mang’s Xin dynasty",
+    "description": "The regent **Wang Mang** takes the throne and proclaims the Xin dynasty, dividing the Han into Western and Eastern. Floods and revolts end it in 23 CE.",
+    "tags": [
+     "dynasty",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Xin_dynasty",
+     "https://en.wikipedia.org/wiki/Wang_Mang"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "eastern-han",
+   "time": "-61378214400/1",
+   "metadata": {
+    "title": "The Han restored",
+    "description": "**Liu Xiu (Emperor Guangwu)** restores the Han, with its capital at Luoyang.",
+    "tags": [
+     "dynasty",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emperor_Guangwu_of_Han"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "white-horse",
+   "time": "-60021302400/1",
+   "metadata": {
+    "title": "White Horse Temple",
+    "description": "By tradition the first Buddhist temple in China, founded at Luoyang under Emperor Ming. Buddhism had arrived along the trade routes from Central Asia.",
+    "tags": [
+     "thought",
+     "contact"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/White_Horse_Temple"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Traditional date; the earliest sources disagree"
+   }
+  },
+  {
+   "id": "paper",
+   "time": "-58853692800/1",
+   "metadata": {
+    "title": "Cai Lun’s paper",
+    "description": "The court official **Cai Lun** presents his method of making paper from bark, hemp, rags and fishing nets. Earlier paper has been found; he improved and spread a process already under way.",
+    "tags": [
+     "invention"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Cai_Lun",
+     "https://en.wikipedia.org/wiki/Paper"
+    ],
+    "color": "#2f6b4f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "seismoscope",
+   "time": "-58001702400/1",
+   "metadata": {
+    "title": "Zhang Heng’s seismoscope",
+    "description": "The astronomer **Zhang Heng** presents a bronze vessel that dropped a ball from a dragon’s mouth to show the direction of a distant earthquake.",
+    "tags": [
+     "invention"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Zhang_Heng"
+    ],
+    "color": "#2f6b4f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "yellow-turbans",
+   "time": "-56360707200/1",
+   "metadata": {
+    "title": "Yellow Turban Rebellion",
+    "description": "A Daoist movement led by **Zhang Jue** rises across the north. It is put down, but the generals who did it become the warlords who divide the Han.",
+    "tags": [
+     "revolution",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Yellow_Turban_Rebellion"
+    ],
+    "color": "#c46a2c",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "red-cliffs",
+   "time": "-55603411200/1",
+   "metadata": {
+    "title": "Battle of Red Cliffs",
+    "description": "In the winter of 208–209, **Sun Quan** and **Liu Bei** defeat **Cao Cao**’s fleet on the Yangtze, ending his hope of uniting China and setting the shape of the Three Kingdoms.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Red_Cliffs"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "h-division",
+   "time": "-55224720000/1",
+   "metadata": {
+    "title": "Three Kingdoms and division",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "han-ends",
+   "time": "-55194912000/1",
+   "metadata": {
+    "title": "The Han ends",
+    "description": "**Cao Pi**, Cao Cao’s son, makes the last Han emperor abdicate and founds **Wei**; Shu Han and Wu follow, the Three Kingdoms. Sources give 11 December 220 (Julian); on this line, 11 December 220 (proleptic Gregorian).",
+    "tags": [
+     "dynasty",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Cao_Pi",
+     "https://en.wikipedia.org/wiki/End_of_the_Han_dynasty"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Day, as the sources give it in the Julian calendar",
+    "historicalDate": "11 December 220",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "jin-unites",
+   "time": "-53331264000/1",
+   "metadata": {
+    "title": "Jin reunites China",
+    "description": "The Jin, which had replaced Wei, conquers **Wu**, the last of the three kingdoms.",
+    "tags": [
+     "dynasty",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Conquest_of_Wu_by_Jin"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "yongjia",
+   "time": "-52353043200/1",
+   "metadata": {
+    "title": "Luoyang sacked",
+    "description": "Xiongnu forces of the Han-Zhao state take the Jin capital and the emperor (the **Disaster of Yongjia**). The north splits into kingdoms; the Jin court survives in the south, at Jiankang (Nanjing).",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Disaster_of_Yongjia"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "lanting",
+   "time": "-51027580800/1",
+   "metadata": {
+    "title": "The Orchid Pavilion Preface",
+    "description": "**Wang Xizhi** writes the preface to poems from a gathering at the Orchid Pavilion: the most celebrated work of Chinese calligraphy, known now from copies.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lantingji_Xu"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "fei",
+   "time": "-50080896000/1",
+   "metadata": {
+    "title": "Battle of the Fei River",
+    "description": "The Eastern Jin defeats the much larger army of the **Former Qin**, which had united the north; the division between north and south holds for two more centuries.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Fei_River"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "faxian",
+   "time": "-49575974400/1",
+   "metadata": {
+    "title": "Faxian sets out for India",
+    "description": "The monk **Faxian** walks to India for Buddhist texts and returns by sea in 412; his account is one of the oldest travel records of South Asia.",
+    "tags": [
+     "contact",
+     "thought"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Faxian"
+    ],
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "yungang",
+   "time": "-47650982400/1",
+   "metadata": {
+    "title": "Yungang grottoes",
+    "description": "The **Northern Wei** begins carving Buddhist cave temples and colossal statues into the cliffs near its capital, Pingcheng (Datong), from about 460.",
+    "tags": [
+     "thought",
+     "archaeology"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Yungang_Grottoes"
+    ],
+    "datePrecision": "Approximate: about this year"
+   }
+  },
+  {
+   "id": "xiaowen",
+   "time": "-46577980800/1",
+   "metadata": {
+    "title": "Northern Wei moves to Luoyang",
+    "description": "**Emperor Xiaowen** moves the Xianbei court to Luoyang and has it adopt Chinese dress, language and surnames.",
+    "tags": [
+     "ruler",
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emperor_Xiaowen_of_Northern_Wei"
+    ],
+    "color": "#b0862f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "h-sui-tang",
+   "time": "-43832534400/1",
+   "metadata": {
+    "title": "Sui and Tang",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "sui",
+   "time": "-43827004800/1",
+   "metadata": {
+    "title": "Sui founded",
+    "description": "**Yang Jian (Emperor Wen)** takes the throne of the Northern Zhou as the first Sui emperor. Sources give 4 March 581 (Julian); on this line, 6 March 581 (proleptic Gregorian).",
+    "tags": [
+     "dynasty",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emperor_Wen_of_Sui"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Day, as the sources give it in the Julian calendar",
+    "historicalDate": "4 March 581",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "sui-unites",
+   "time": "-43580073600/1",
+   "metadata": {
+    "title": "Sui reunites China",
+    "description": "Sui armies take **Jiankang**, capital of the southern Chen, in the spring of 589: China is one state again after nearly three centuries.",
+    "tags": [
+     "dynasty",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sui_dynasty"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "grand-canal",
+   "time": "-43075238400/1",
+   "metadata": {
+    "title": "The Grand Canal",
+    "description": "**Emperor Yang** begins joining older canals into a waterway from the Yangtze to the Yellow River and on to the north, finished about 610, so the south’s grain could feed the capital and the armies. Extended and rebuilt, it still runs from Beijing to Hangzhou.",
+    "tags": [
+     "invention",
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Grand_Canal_(China)",
+     "https://whc.unesco.org/en/list/1443/"
+    ],
+    "color": "#2f6b4f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "exams",
+   "time": "-43059600000/1",
+   "metadata": {
+    "title": "Examinations for office",
+    "description": "The Sui recruits officials by written **examination**, the jinshi degree traditionally from 605. Under the Tang and especially the Song the exams become the road to office, until 1905.",
+    "tags": [
+     "thought"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Imperial_examination"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Traditional date; the earliest sources disagree"
+   }
+  },
+  {
+   "id": "tang",
+   "time": "-42650236800/1",
+   "metadata": {
+    "title": "Tang founded",
+    "description": "After Emperor Yang of Sui is murdered, **Li Yuan (Emperor Gaozu)** declares himself emperor of the Tang at Chang’an. Sources give 18 June 618 (Julian); on this line, 21 June 618 (proleptic Gregorian).",
+    "tags": [
+     "dynasty",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tang_dynasty",
+     "https://en.wikipedia.org/wiki/Emperor_Gaozu_of_Tang"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Day, as the sources give it in the Julian calendar",
+    "historicalDate": "18 June 618",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "xuanwu",
+   "time": "-42396566400/1",
+   "metadata": {
+    "title": "Xuanwu Gate incident",
+    "description": "**Li Shimin** kills two of his brothers at a palace gate; within weeks his father abdicates and he becomes **Emperor Taizong**. Sources give 2 July 626 (Julian); on this line, 5 July 626 (proleptic Gregorian).",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Xuanwu_Gate_Incident"
+    ],
+    "color": "#b0862f",
+    "datePrecision": "Day, as the sources give it in the Julian calendar",
+    "historicalDate": "2 July 626",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "xuanzang",
+   "time": "-41812934400/1",
+   "metadata": {
+    "title": "Xuanzang returns from India",
+    "description": "The monk **Xuanzang** comes back to Chang’an after sixteen years with hundreds of Buddhist texts to translate; his travel record is a major source for seventh-century India.",
+    "tags": [
+     "contact",
+     "thought"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Xuanzang"
+    ],
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "wu-zetian",
+   "time": "-40392864000/1",
+   "metadata": {
+    "title": "Wu Zetian takes the throne",
+    "description": "Already the real power for decades, **Wu Zetian** proclaims her own Zhou dynasty (690–705): the only woman to rule China as emperor in her own name. She is deposed in 705, at about eighty.",
+    "tags": [
+     "ruler",
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wu_Zetian"
+    ],
+    "color": "#b0862f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "li-du",
+   "time": "-38688883200/1",
+   "metadata": {
+    "title": "Li Bai meets Du Fu",
+    "description": "The two greatest Tang poets, **Li Bai** and **Du Fu**, meet in 744 and travel together; Du Fu wrote poems to Li Bai for the rest of his life.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Li_Bai",
+     "https://en.wikipedia.org/wiki/Du_Fu"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "talas",
+   "time": "-38467958400/1",
+   "metadata": {
+    "title": "Battle of Talas",
+    "description": "An Abbasid army defeats a Tang force in Central Asia, near the Talas River; Tang expansion westward stops.",
+    "tags": [
+     "war",
+     "contact"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Talas"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "an-lushan",
+   "time": "-38311228800/1",
+   "metadata": {
+    "title": "An Lushan rebels",
+    "description": "The frontier general **An Lushan** turns his armies on the court; both capitals fall. The war lasts until 763 and the Tang never recovers its central power. Sources give 16 December 755 (Julian); on this line, 20 December 755 (proleptic Gregorian).",
+    "tags": [
+     "war",
+     "revolution"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/An_Lushan_rebellion"
+    ],
+    "color": "#c46a2c",
+    "datePrecision": "Day, as the sources give it in the Julian calendar",
+    "historicalDate": "16 December 755",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "huichang",
+   "time": "-35501500800/1",
+   "metadata": {
+    "title": "Huichang persecution",
+    "description": "**Emperor Wuzong** closes thousands of Buddhist monasteries and returns hundreds of thousands of monks and nuns to lay life.",
+    "tags": [
+     "thought"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Huichang_persecution_of_Buddhism"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "diamond-sutra",
+   "time": "-34764076800/1",
+   "metadata": {
+    "title": "The Diamond Sutra printed",
+    "description": "A woodblock-printed scroll of the **Diamond Sutra**, found in a sealed cave at **Dunhuang**: the oldest printed book that carries its date, the 15th day of the 4th month of the 9th year of Xiantong. It is now in the British Library. Sources give 11 May 868 (Julian); on this line, 15 May 868 (proleptic Gregorian).",
+    "tags": [
+     "invention",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Diamond_Sutra"
+    ],
+    "color": "#2f6b4f",
+    "datePrecision": "Day, as the sources give it in the Julian calendar",
+    "historicalDate": "11 May 868",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "tang-ends",
+   "time": "-33545059200/1",
+   "metadata": {
+    "title": "The Tang ends",
+    "description": "The warlord **Zhu Wen** deposes the last Tang emperor and founds the Later Liang, the first of the Five Dynasties.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tang_dynasty"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "h-song",
+   "time": "-31872528000/1",
+   "metadata": {
+    "title": "Song",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "song",
+   "time": "-31869158400/1",
+   "metadata": {
+    "title": "Song founded",
+    "description": "The general **Zhao Kuangyin** is acclaimed emperor by his troops at Chenqiao and founds the Song as **Emperor Taizu**. Sources give 4 February 960 (Julian); on this line, 9 February 960 (proleptic Gregorian).",
+    "tags": [
+     "dynasty",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emperor_Taizu_of_Song"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Day, as the sources give it in the Julian calendar",
+    "historicalDate": "4 February 960",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "jiaozi",
+   "time": "-29884464000/1",
+   "metadata": {
+    "title": "Paper money",
+    "description": "In Sichuan, after merchant houses issuing **jiaozi** notes fail, the Song state takes over: the first paper money issued by a government.",
+    "tags": [
+     "invention"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Jiaozi_(currency)"
+    ],
+    "color": "#2f6b4f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "movable-type",
+   "time": "-29348006400/1",
+   "metadata": {
+    "title": "Bi Sheng’s movable type",
+    "description": "The artisan **Bi Sheng** prints with movable type of baked clay, between 1041 and 1048; Shen Kuo’s Dream Pool Essays describe it.",
+    "tags": [
+     "invention"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Bi_Sheng",
+     "https://en.wikipedia.org/wiki/Movable_type"
+    ],
+    "color": "#2f6b4f",
+    "datePrecision": "Approximate: about this year"
+   }
+  },
+  {
+   "id": "gunpowder",
+   "time": "-29221776000/1",
+   "metadata": {
+    "title": "Gunpowder formulas written down",
+    "description": "The military compendium **Wujing Zongyao**, finished in 1044, gives the earliest known written formulas for **gunpowder**, saltpetre, sulphur and charcoal, for bombs and incendiaries.",
+    "tags": [
+     "invention",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wujing_Zongyao",
+     "https://en.wikipedia.org/wiki/Gunpowder"
+    ],
+    "color": "#2f6b4f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "wang-anshi",
+   "time": "-28432771200/1",
+   "metadata": {
+    "title": "Wang Anshi’s New Policies",
+    "description": "The chancellor **Wang Anshi** begins reforms of farm loans, taxes, militia and the exams; they divide the court for decades.",
+    "tags": [
+     "thought",
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wang_Anshi"
+    ],
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "zizhi",
+   "time": "-27959472000/1",
+   "metadata": {
+    "title": "Comprehensive Mirror",
+    "description": "**Sima Guang** presents the **Zizhi Tongjian**, a year-by-year history of China from 403 BCE to 959 CE, to the throne.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Zizhi_Tongjian"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "compass",
+   "time": "-27833241600/1",
+   "metadata": {
+    "title": "The magnetic needle",
+    "description": "**Shen Kuo**'s **Dream Pool Essays** describe a magnetized needle that points south, and note that it points slightly east of true south: the first record of magnetic declination. By 1117 a source records ships navigating by compass.",
+    "tags": [
+     "invention",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Dream_Pool_Essays",
+     "https://en.wikipedia.org/wiki/Shen_Kuo",
+     "https://en.wikipedia.org/wiki/Compass"
+    ],
+    "color": "#2f6b4f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "jingkang",
+   "time": "-26602560000/1",
+   "metadata": {
+    "title": "Jingkang incident",
+    "description": "The **Jurchen Jin** take Kaifeng and carry off two Song emperors. A prince re-founds the court in the south, at Hangzhou: the Southern Song.",
+    "tags": [
+     "war",
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Jingkang_incident"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "zhu-xi",
+   "time": "-24614409600/1",
+   "metadata": {
+    "title": "Zhu Xi’s Four Books",
+    "description": "**Zhu Xi** publishes the Analects, Mencius, the Great Learning and the Doctrine of the Mean together with his commentaries: Neo-Confucianism’s canon, set for the exams from 1313.",
+    "tags": [
+     "thought",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Zhu_Xi",
+     "https://en.wikipedia.org/wiki/Four_Books_and_Five_Classics"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "h-yuan",
+   "time": "-24109488000/1",
+   "metadata": {
+    "title": "The Mongols: Yuan",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "zhongdu",
+   "time": "-23825491200/1",
+   "metadata": {
+    "title": "Mongols take Zhongdu",
+    "description": "**Genghis Khan**’s armies capture the Jin capital, Zhongdu, on the site of Beijing.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sieges_of_Zhongdu"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "yuan",
+   "time": "-22058265600/1",
+   "metadata": {
+    "title": "Kublai proclaims the Yuan",
+    "description": "**Kublai Khan**, grandson of Genghis, gives his realm the Chinese dynastic name **Great Yuan**, ruling from Dadu (Khanbaliq), today’s Beijing.",
+    "tags": [
+     "dynasty",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Yuan_dynasty",
+     "https://en.wikipedia.org/wiki/Kublai_Khan"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "yamen",
+   "time": "-21798547200/1",
+   "metadata": {
+    "title": "Battle of Yamen",
+    "description": "The Yuan fleet destroys the last Song forces off Guangdong; the minister **Lu Xiufu** leaps into the sea with the boy emperor. The Song ends and the Mongols rule all of China. Sources give 19 March 1279 (Julian); on this line, 26 March 1279 (proleptic Gregorian).",
+    "tags": [
+     "war",
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Yamen"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Day, as the sources give it in the Julian calendar",
+    "historicalDate": "19 March 1279",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "red-turbans",
+   "time": "-19533744000/1",
+   "metadata": {
+    "title": "Red Turban Rebellion",
+    "description": "Rebellions spread after floods and forced labour on the Yellow River; from them rises **Zhu Yuanzhang**, a former monk.",
+    "tags": [
+     "revolution",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Red_Turban_Rebellions"
+    ],
+    "color": "#c46a2c",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "poyang",
+   "time": "-19155052800/1",
+   "metadata": {
+    "title": "Battle of Lake Poyang",
+    "description": "Zhu Yuanzhang’s fleet defeats **Chen Youliang**’s on China’s largest freshwater lake, in late summer 1363, one of the largest naval battles in history.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Lake_Poyang"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Month; the day is not certain"
+   }
+  },
+  {
+   "id": "h-ming",
+   "time": "-18997286400/1",
+   "metadata": {
+    "title": "Ming",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "ming",
+   "time": "-18994694400/1",
+   "metadata": {
+    "title": "Ming founded",
+    "description": "**Zhu Yuanzhang** proclaims the Ming at Nanjing as the **Hongwu Emperor**; that September his armies take Dadu and the Yuan court flees north. Sources give 23 January 1368 (Julian); on this line, 31 January 1368 (proleptic Gregorian).",
+    "tags": [
+     "dynasty",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hongwu_Emperor"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Day, as the sources give it in the Julian calendar",
+    "historicalDate": "23 January 1368",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "yongle",
+   "time": "-17906572800/1",
+   "metadata": {
+    "title": "The Yongle Emperor",
+    "description": "**Zhu Di**, Prince of Yan, takes Nanjing from his nephew after a three-year civil war and becomes the **Yongle Emperor**. Sources give 17 July 1402 (Julian); on this line, 26 July 1402 (proleptic Gregorian).",
+    "tags": [
+     "ruler",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Yongle_Emperor"
+    ],
+    "color": "#b0862f",
+    "datePrecision": "Day, as the sources give it in the Julian calendar",
+    "historicalDate": "17 July 1402",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "zheng-he-1",
+   "time": "-17812396800/1",
+   "metadata": {
+    "title": "Zheng He’s first voyage",
+    "description": "The eunuch admiral **Zheng He** sails with some 317 ships and nearly 28,000 men, the first of seven voyages that reach Southeast Asia, India, Arabia and the coast of East Africa. Sources give 11 July 1405 (Julian); on this line, 20 July 1405 (proleptic Gregorian).",
+    "tags": [
+     "contact"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Zheng_He",
+     "https://en.wikipedia.org/wiki/Ming_treasure_voyages"
+    ],
+    "datePrecision": "Day, as the sources give it in the Julian calendar",
+    "historicalDate": "11 July 1405",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "encyclopedia",
+   "time": "-17735068800/1",
+   "metadata": {
+    "title": "Yongle Encyclopedia",
+    "description": "More than two thousand scholars finish the **Yongle Dadian**, 22,937 chapters in 11,095 volumes; only about 3.5 per cent survives.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Yongle_Encyclopedia"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "forbidden-city",
+   "time": "-17329593600/1",
+   "metadata": {
+    "title": "Beijing and the Forbidden City",
+    "description": "Yongle declares **Beijing** the principal capital; the palace he built there, the **Forbidden City**, houses the emperors until 1912. Sources give 28 October 1420 (Julian); on this line, 6 November 1420 (proleptic Gregorian).",
+    "tags": [
+     "ruler",
+     "archaeology"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Forbidden_City",
+     "https://whc.unesco.org/en/list/439/"
+    ],
+    "color": "#b0862f",
+    "datePrecision": "Day, as the sources give it in the Julian calendar",
+    "historicalDate": "28 October 1420",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "zheng-he-7",
+   "time": "-17009222400/1",
+   "metadata": {
+    "title": "Zheng He’s last voyage",
+    "description": "The seventh voyage sails in 1431 and returns in 1433; the court then ends the expeditions, and their records are later lost or destroyed.",
+    "tags": [
+     "contact"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ming_treasure_voyages"
+    ],
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "tumu",
+   "time": "-16419369600/1",
+   "metadata": {
+    "title": "Tumu crisis",
+    "description": "Oirat Mongols under **Esen** rout a Ming army and capture the **Zhengtong Emperor**. The Ming turns from campaigns on the steppe to building walls. Sources give 1 September 1449 (Julian); on this line, 10 September 1449 (proleptic Gregorian).",
+    "tags": [
+     "war",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tumu_Crisis"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Day, as the sources give it in the Julian calendar",
+    "historicalDate": "1 September 1449",
+    "calendar": "Julian"
+   }
+  },
+  {
+   "id": "ricci",
+   "time": "-11644473600/1",
+   "metadata": {
+    "title": "Matteo Ricci at the Ming court",
+    "description": "The Jesuit **Matteo Ricci** is invited to advise the Wanli court, the first Westerner admitted to the Forbidden City (he never met the emperor). In 1607 he and **Xu Guangqi** publish Euclid in Chinese.",
+    "tags": [
+     "contact",
+     "thought"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Matteo_Ricci"
+    ],
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "li-zicheng",
+   "time": "-10277625600/1",
+   "metadata": {
+    "title": "Li Zicheng takes Beijing",
+    "description": "The rebel **Li Zicheng** enters Beijing; the last Ming emperor, **Chongzhen**, hangs himself on the hill behind the palace.",
+    "tags": [
+     "revolution",
+     "war",
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Li_Zicheng",
+     "https://en.wikipedia.org/wiki/Chongzhen_Emperor"
+    ],
+    "color": "#c46a2c",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "shanhai",
+   "time": "-10274860800/1",
+   "metadata": {
+    "title": "Battle of Shanhai Pass",
+    "description": "The Ming general **Wu Sangui** opens the pass at the eastern end of the Great Wall to the Manchus, and together they defeat Li Zicheng.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Shanhai_Pass"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "h-qing",
+   "time": "-10287561600/1",
+   "metadata": {
+    "title": "Qing",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "qing-beijing",
+   "time": "-10273996800/1",
+   "metadata": {
+    "title": "The Qing enter Beijing",
+    "description": "Manchu forces under the regent **Dorgon** occupy Beijing and move the Qing court there; the conquest of the south takes decades.",
+    "tags": [
+     "dynasty",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Transition_from_Ming_to_Qing"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "nerchinsk",
+   "time": "-8846841600/1",
+   "metadata": {
+    "title": "Treaty of Nerchinsk",
+    "description": "Kangxi’s envoys and Russia’s fix the border along the Amur watershed, with Jesuits interpreting in Latin: China’s first treaty with a European state.",
+    "tags": [
+     "contact"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Treaty_of_Nerchinsk"
+    ],
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "kangxi-dictionary",
+   "time": "-8015500800/1",
+   "metadata": {
+    "title": "Kangxi Dictionary",
+    "description": "Compiled at the emperor’s order, it lists some 47,000 characters by the 214 radicals still used to order Chinese dictionaries.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Kangxi_Dictionary"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "siku",
+   "time": "-5932656000/1",
+   "metadata": {
+    "title": "The Complete Library",
+    "description": "The first copy of the **Siku Quanshu**, Qianlong’s collection of some 3,500 works in about 36,000 volumes, is finished; the project also banned and destroyed thousands of books.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siku_Quanshu"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "red-chamber",
+   "time": "-5648659200/1",
+   "metadata": {
+    "title": "Dream of the Red Chamber printed",
+    "description": "**Cao Xueqin**’s novel of a great family’s decline, circulated in manuscript, is printed in 120 chapters, the last forty completed by others.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Dream_of_the_Red_Chamber"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Year"
+   }
+  },
+  {
+   "id": "macartney",
+   "time": "-5563382400/1",
+   "metadata": {
+    "title": "Macartney meets Qianlong",
+    "description": "Britain’s first embassy, under **Lord Macartney**, is received at Chengde; the emperor refuses its requests for trade and a resident ambassador.",
+    "tags": [
+     "contact"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Macartney_Embassy"
+    ],
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "humen",
+   "time": "-4120761600/1",
+   "metadata": {
+    "title": "Lin Zexu destroys opium",
+    "description": "The commissioner **Lin Zexu** begins destroying about 1,000 tonnes of opium seized from foreign merchants at **Humen**, Canton; Britain answers with war.",
+    "tags": [
+     "contact",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Destruction_of_opium_at_Humen"
+    ],
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "nanking",
+   "time": "-4018550400/1",
+   "metadata": {
+    "title": "Treaty of Nanking",
+    "description": "The first of the **unequal treaties**: China cedes **Hong Kong Island** to Britain, opens five ports and pays an indemnity.",
+    "tags": [
+     "war",
+     "contact"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Treaty_of_Nanking"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "jintian",
+   "time": "-3754425600/1",
+   "metadata": {
+    "title": "Jintian uprising",
+    "description": "**Hong Xiuquan**, who believed himself the younger brother of Jesus, launches the **Taiping Heavenly Kingdom** at Jintian, Guangxi.",
+    "tags": [
+     "revolution",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Jintian_Uprising",
+     "https://en.wikipedia.org/wiki/Hong_Xiuquan"
+    ],
+    "color": "#c46a2c",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "tianjing",
+   "time": "-3685478400/1",
+   "metadata": {
+    "title": "Taipings take Nanjing",
+    "description": "The Taipings capture Nanjing and make it their capital, **Tianjing**, for eleven years.",
+    "tags": [
+     "revolution",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Taiping_Rebellion"
+    ],
+    "color": "#c46a2c",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "summer-palace",
+   "time": "-3446150400/1",
+   "metadata": {
+    "title": "Old Summer Palace burned",
+    "description": "British and French troops loot and then burn the **Yuanmingyuan**, the Qing emperors’ garden palace outside Beijing.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Old_Summer_Palace"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "nanjing-retaken",
+   "time": "-3327782400/1",
+   "metadata": {
+    "title": "Nanjing retaken",
+    "description": "**Zeng Guofan**’s Xiang Army takes Tianjing, a few weeks after Hong Xiuquan’s death; the Taiping war had cost some 20–30 million lives.",
+    "tags": [
+     "war",
+     "revolution"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Third_Battle_of_Nanjing"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "shimonoseki",
+   "time": "-2357596800/1",
+   "metadata": {
+    "title": "Treaty of Shimonoseki",
+    "description": "Defeated in the **First Sino-Japanese War** (1894–95), China gives up Korea as a tributary and cedes Taiwan and the Penghu islands to Japan.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Treaty_of_Shimonoseki",
+     "https://en.wikipedia.org/wiki/First_Sino-Japanese_War"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "hundred-days",
+   "time": "-2258150400/1",
+   "metadata": {
+    "title": "Hundred Days’ Reform",
+    "description": "The **Guangxu Emperor**, advised by **Kang Youwei**, decrees reforms of schools, the exams and the army. On 21 September **Cixi** ends them and confines him.",
+    "tags": [
+     "thought",
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hundred_Days'_Reform"
+    ],
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "boxer-protocol",
+   "time": "-2155939200/1",
+   "metadata": {
+    "title": "Boxer Protocol",
+    "description": "After eight foreign armies relieve the legations in Beijing, China agrees to pay an indemnity of 450 million taels.",
+    "tags": [
+     "war",
+     "contact"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Boxer_Protocol"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "exams-end",
+   "time": "-2030140800/1",
+   "metadata": {
+    "title": "Examinations abolished",
+    "description": "An edict ends the **imperial examinations**, about thirteen centuries after the Sui began them.",
+    "tags": [
+     "thought"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Imperial_examination"
+    ],
+    "color": "#6b4a7a",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "puyi",
+   "time": "-1927584000/1",
+   "metadata": {
+    "title": "Puyi enthroned",
+    "description": "Two weeks after Cixi’s death, the two-year-old **Puyi** becomes the Xuantong Emperor, the last emperor of China.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Puyi"
+    ],
+    "color": "#b0862f",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "h-republic",
+   "time": "-1861920000/1",
+   "metadata": {
+    "title": "Revolution and Republic",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "wuchang",
+   "time": "-1837555200/1",
+   "metadata": {
+    "title": "Wuchang uprising",
+    "description": "Army units in Wuchang mutiny; province after province declares against the Qing: the **1911 (Xinhai) Revolution**.",
+    "tags": [
+     "revolution"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wuchang_Uprising",
+     "https://en.wikipedia.org/wiki/1911_Revolution"
+    ],
+    "color": "#c46a2c",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "roc",
+   "time": "-1830384000/1",
+   "metadata": {
+    "title": "Republic of China proclaimed",
+    "description": "**Sun Yat-sen** takes office in Nanjing as provisional president of the Republic of China.",
+    "tags": [
+     "revolution",
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sun_Yat-sen",
+     "https://en.wikipedia.org/wiki/Republic_of_China_(1912–1949)"
+    ],
+    "color": "#c46a2c",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "abdication",
+   "time": "-1826755200/1",
+   "metadata": {
+    "title": "The last emperor abdicates",
+    "description": "An edict in **Puyi**’s name ends the Qing and more than two thousand years of imperial rule; **Yuan Shikai** becomes president.",
+    "tags": [
+     "ruler",
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Puyi",
+     "https://en.wikipedia.org/wiki/1911_Revolution"
+    ],
+    "color": "#b0862f",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "may-fourth",
+   "time": "-1598832000/1",
+   "metadata": {
+    "title": "May Fourth Movement",
+    "description": "Students in Beijing protest the Versailles decision to hand Germany’s rights in Shandong to Japan; the movement for science, democracy and writing in the vernacular grows from it.",
+    "tags": [
+     "revolution",
+     "thought"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/May_Fourth_Movement"
+    ],
+    "color": "#c46a2c",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "ccp",
+   "time": "-1528761600/1",
+   "metadata": {
+    "title": "Communist Party founded",
+    "description": "The first congress of the **Chinese Communist Party** opens in Shanghai, with about a dozen delegates, among them **Mao Zedong**.",
+    "tags": [
+     "revolution"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1st_National_Congress_of_the_Chinese_Communist_Party"
+    ],
+    "color": "#c46a2c",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "northern-expedition",
+   "time": "-1372204800/1",
+   "metadata": {
+    "title": "Northern Expedition",
+    "description": "The Nationalists under **Chiang Kai-shek** march north from Guangzhou against the warlords, uniting the country under the Nanjing government by the end of 1928.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Northern_Expedition"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "shanghai-1927",
+   "time": "-1348272000/1",
+   "metadata": {
+    "title": "Shanghai purge",
+    "description": "Chiang turns on his Communist allies in Shanghai; thousands are killed, and the alliance between the two parties ends.",
+    "tags": [
+     "war",
+     "revolution"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Shanghai_massacre"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "mukden",
+   "time": "-1208304000/1",
+   "metadata": {
+    "title": "Mukden incident",
+    "description": "Japanese officers blow up a section of railway as a pretext and the Kwantung Army seizes **Manchuria**.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mukden_incident"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "long-march",
+   "time": "-1111190400/1",
+   "metadata": {
+    "title": "Long March begins",
+    "description": "The Red Army breaks out of its base in Jiangxi; a year later, on 22 October 1935, the survivors reach Shaanxi, few of those who set out, with **Mao Zedong** now its leader.",
+    "tags": [
+     "war",
+     "revolution"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Long_March"
+    ],
+    "color": "#c46a2c",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "marco-polo",
+   "time": "-1025222400/1",
+   "metadata": {
+    "title": "Marco Polo Bridge",
+    "description": "A clash between Chinese and Japanese troops near Beijing opens full-scale war; the Nationalists and Communists form a second united front.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Marco_Polo_Bridge_incident"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "nanjing-1937",
+   "time": "-1011484800/1",
+   "metadata": {
+    "title": "Nanjing falls",
+    "description": "Japanese troops take the capital and, over the following six weeks, kill vast numbers of civilians and prisoners: the **Nanjing Massacre**.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Nanjing_Massacre"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "japan-surrenders",
+   "time": "-767836800/1",
+   "metadata": {
+    "title": "Japan surrenders",
+    "description": "Japan signs the instrument of surrender in Tokyo Bay; its armies in China surrender at Nanjing on 9 September.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Surrender_of_Japan"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "yangtze",
+   "time": "-653011200/1",
+   "metadata": {
+    "title": "Nanjing taken",
+    "description": "The **People’s Liberation Army** crosses the Yangtze and takes the Nationalist capital.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Yangtze_River_Crossing_campaign"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "prc",
+   "time": "-639100800/1",
+   "metadata": {
+    "title": "People’s Republic proclaimed",
+    "description": "**Mao Zedong** proclaims the **People’s Republic of China** from Tiananmen in Beijing.",
+    "tags": [
+     "revolution",
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Proclamation_of_the_People's_Republic_of_China"
+    ],
+    "color": "#c46a2c",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "taipei",
+   "time": "-633312000/1",
+   "metadata": {
+    "title": "ROC government to Taipei",
+    "description": "The Nationalist government of the Republic of China moves to **Taipei**; major fighting on the mainland ends.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Retreat_of_the_government_of_the_Republic_of_China_to_Taiwan"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "h-since",
+   "time": "-631152000/1",
+   "metadata": {
+    "title": "Since 1949",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "reform",
+   "time": "282787200/1",
+   "metadata": {
+    "title": "Reform and opening",
+    "description": "The Third Plenum of the Communist Party’s 11th Central Committee (18–22 December) begins the economic reforms associated with **Deng Xiaoping**.",
+    "tags": [
+     "contact"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Reform_and_opening_up"
+    ],
+    "datePrecision": "Day"
+   }
+  },
+  {
+   "id": "hong-kong",
+   "time": "867715200/1",
+   "metadata": {
+    "title": "Hong Kong handover",
+    "description": "Britain transfers sovereignty over **Hong Kong** to the People’s Republic of China, 155 years after the Treaty of Nanking.",
+    "tags": [
+     "contact"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Handover_of_Hong_Kong"
+    ],
+    "datePrecision": "Day"
+   }
+  }
+ ],
+ "durations": [
+  {
+   "id": "yangshao",
+   "start": "-219920400000/1",
+   "end": "-156806496000/1",
+   "metadata": {
+    "title": "Yangshao culture",
+    "description": "Farming villages of the middle **Yellow River**, about 5000–3000 BCE, growing millet and making painted pottery.",
+    "tags": [
+     "archaeology"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Yangshao_culture"
+    ],
+    "color": "#6f7d4a"
+   }
+  },
+  {
+   "id": "liangzhu",
+   "start": "-166273603200/1",
+   "end": "-134716608000/1",
+   "metadata": {
+    "title": "Liangzhu culture",
+    "description": "A rice-farming culture of the Yangtze delta, about 3300–2300 BCE, with a walled city, large water works and fine jade.",
+    "tags": [
+     "archaeology"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Liangzhu_culture"
+    ],
+    "color": "#6f7d4a"
+   }
+  },
+  {
+   "id": "longshan",
+   "start": "-156806496000/1",
+   "end": "-122093827200/1",
+   "metadata": {
+    "title": "Longshan culture",
+    "description": "The late Neolithic of the Yellow River, about 3000–1900 BCE: walled towns, thin black pottery and growing differences of rank.",
+    "tags": [
+     "archaeology"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Longshan_culture"
+    ],
+    "color": "#6f7d4a"
+   }
+  },
+  {
+   "id": "erlitou",
+   "start": "-122093827200/1",
+   "end": "-109471046400/1",
+   "metadata": {
+    "title": "Erlitou culture",
+    "description": "Usually dated about 1900–1500 BCE (radiocarbon studies narrow it to about 1750–1500): China’s first city with palaces and bronze casting on a large scale.",
+    "tags": [
+     "archaeology"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Erlitou_culture"
+    ],
+    "color": "#6f7d4a"
+   }
+  },
+  {
+   "id": "xia",
+   "start": "-127458576000/1",
+   "end": "-112626720000/1",
+   "metadata": {
+    "title": "Xia (traditional)",
+    "description": "The first dynasty of the traditional histories, founded by **Yu the Great**. No writing from it has been found and its historicity is debated; the dates, about 2070–1600 BCE, are the Chronology Project’s. Drawn dashed: unconfirmed.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Xia_dynasty",
+     "https://en.wikipedia.org/wiki/Xia–Shang–Zhou_Chronology_Project"
+    ],
+    "color": "#1f3a5f",
+    "presumptive": true
+   }
+  },
+  {
+   "id": "shang",
+   "start": "-112626720000/1",
+   "end": "-95144198400/1",
+   "metadata": {
+    "title": "Shang",
+    "description": "About 1600–1046 BCE (Chronology Project): bronze, chariots, royal tombs and the oracle bones, the first Chinese dynasty attested in its own writing.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Shang_dynasty"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "western-zhou",
+   "start": "-95144198400/1",
+   "end": "-86466009600/1",
+   "metadata": {
+    "title": "Western Zhou",
+    "description": "From the conquest of the Shang to the fall of Haojing, 1046–771 BCE, ruling through relatives and allies given fiefs.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Western_Zhou"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "eastern-zhou",
+   "start": "-86434473600/1",
+   "end": "-70214169600/1",
+   "metadata": {
+    "title": "Eastern Zhou",
+    "description": "From Luoyang, 770–256 BCE, the Zhou kings reign while the states rule: the age of Confucius, Laozi and the hundred schools of thought.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Eastern_Zhou"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "spring-autumn",
+   "start": "-86434473600/1",
+   "end": "-77156755200/1",
+   "metadata": {
+    "title": "Spring and Autumn period",
+    "description": "Named after the chronicle of Lu; conventionally 770–476 BCE, as more than a hundred states shrink to a few great ones.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Spring_and_Autumn_period"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "warring-states",
+   "start": "-77125219200/1",
+   "end": "-69109718400/1",
+   "metadata": {
+    "title": "Warring States",
+    "description": "Conventionally 475–221 BCE (Sima Qian’s start; others begin in 403): seven states with mass infantry, iron and written law, until Qin conquers the rest.",
+    "tags": [
+     "dynasty",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Warring_States_period"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "qin",
+   "start": "-69109718400/1",
+   "end": "-68636332800/1",
+   "metadata": {
+    "title": "Qin",
+    "description": "The first empire, 221–206 BCE: fifteen years that set the form of the Chinese state for two thousand. The name “China” probably comes from Qin.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Qin_dynasty"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "han",
+   "start": "-68510102400/1",
+   "end": "-55194912000/1",
+   "metadata": {
+    "title": "Han",
+    "description": "202 BCE–220 CE, Western Han and Eastern Han, divided by Wang Mang’s Xin (9–23). The majority of Chinese still call themselves the **Han** people.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Han_dynasty"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "three-kingdoms",
+   "start": "-55194912000/1",
+   "end": "-53331264000/1",
+   "metadata": {
+    "title": "Three Kingdoms",
+    "description": "Wei, Shu Han and Wu, 220–280: the age retold in the Ming novel **Romance of the Three Kingdoms**.",
+    "tags": [
+     "dynasty",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Three_Kingdoms"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "jin",
+   "start": "-53773027200/1",
+   "end": "-48913286400/1",
+   "metadata": {
+    "title": "Jin",
+    "description": "Founded by the Sima family in 266, it reunites China in 280, loses the north in 311–316 and rules the south as the Eastern Jin until 420.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Jin_dynasty_(266–420)"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "north-south",
+   "start": "-48913286400/1",
+   "end": "-43580073600/1",
+   "metadata": {
+    "title": "Northern and Southern dynasties",
+    "description": "Northern dynasties of Xianbei origin and southern Chinese courts at Jiankang, 420–589, while Buddhism spreads through both.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Northern_and_Southern_dynasties"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "sui-d",
+   "start": "-43827004800/1",
+   "end": "-42665011200/1",
+   "metadata": {
+    "title": "Sui",
+    "description": "581–618: reunifies China, builds the Grand Canal and exhausts itself in wars on Goguryeo; thirty-seven years that prepared the Tang.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sui_dynasty"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "tang-d",
+   "start": "-42650236800/1",
+   "end": "-33545059200/1",
+   "metadata": {
+    "title": "Tang",
+    "description": "618–907, with Wu Zetian’s Zhou (690–705) in the middle: Chang’an at the eastern end of the Silk Road, the great age of Chinese poetry.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tang_dynasty"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "five-dynasties",
+   "start": "-33545059200/1",
+   "end": "-31272912000/1",
+   "metadata": {
+    "title": "Five Dynasties and Ten Kingdoms",
+    "description": "Five short-lived dynasties in the north and ten kingdoms mostly in the south, 907–979, until the Song absorb the last of them.",
+    "tags": [
+     "dynasty",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Five_Dynasties_and_Ten_Kingdoms_period"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "song-d",
+   "start": "-31869158400/1",
+   "end": "-21798547200/1",
+   "metadata": {
+    "title": "Song",
+    "description": "The Northern Song at Kaifeng (960–1127) and the Southern Song at Hangzhou (1127–1279): printing, paper money, gunpowder and the compass; an economy of cities and canals.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Song_dynasty"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "yuan-d",
+   "start": "-22058265600/1",
+   "end": "-18974390400/1",
+   "metadata": {
+    "title": "Yuan",
+    "description": "The Mongol dynasty, from Kublai’s proclamation in 1271 to the fall of Dadu on 14 September 1368 (Julian).",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Yuan_dynasty"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "ming-d",
+   "start": "-18994694400/1",
+   "end": "-10277625600/1",
+   "metadata": {
+    "title": "Ming",
+    "description": "1368–1644: the Forbidden City, the treasure fleets, the Great Wall in brick and stone, and a population that roughly doubled.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ming_dynasty"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "qing-d",
+   "start": "-10273996800/1",
+   "end": "-1826755200/1",
+   "metadata": {
+    "title": "Qing",
+    "description": "The Manchu dynasty, ruling from Beijing from 1644 to the abdication of 1912; at its height under Kangxi and Qianlong, the largest Chinese empire.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Qing_dynasty"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "roc-d",
+   "start": "-1830384000/1",
+   "end": "-633312000/1",
+   "metadata": {
+    "title": "Republic of China (mainland)",
+    "description": "From its proclamation to the government’s move to Taipei, where the Republic of China continues.",
+    "tags": [
+     "dynasty"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Republic_of_China_(1912–1949)"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "first-emperor-reign",
+   "start": "-69109718400/1",
+   "end": "-68762563200/1",
+   "metadata": {
+    "title": "Qin Shi Huang, the First Emperor",
+    "description": "King of Qin from 246 BCE, emperor from 221 until his death in 210.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Qin_Shi_Huang"
+    ],
+    "color": "#b0862f"
+   }
+  },
+  {
+   "id": "wudi",
+   "start": "-66585196800/1",
+   "end": "-64881129600/1",
+   "metadata": {
+    "title": "Han Wudi",
+    "description": "**Emperor Wu of Han**, 141–87 BCE: wars on the Xiongnu, the road west, state monopolies of salt and iron, and Confucian learning for officials.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emperor_Wu_of_Han"
+    ],
+    "color": "#b0862f"
+   }
+  },
+  {
+   "id": "taizong",
+   "start": "-42412550400/1",
+   "end": "-41686704000/1",
+   "metadata": {
+    "title": "Tang Taizong",
+    "description": "**Li Shimin**, 626–649: held up by later historians as the model ruler, who took counsel and conquered the Eastern Turks.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emperor_Taizong_of_Tang"
+    ],
+    "color": "#b0862f"
+   }
+  },
+  {
+   "id": "kublai",
+   "start": "-22394016000/1",
+   "end": "-21327667200/1",
+   "metadata": {
+    "title": "Kublai Khan",
+    "description": "Proclaimed Great Khan on 5 May 1260 and first Yuan emperor, until his death on 18 February 1294 (dates Julian).",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Kublai_Khan"
+    ],
+    "color": "#b0862f"
+   }
+  },
+  {
+   "id": "yongle-reign",
+   "start": "-17906572800/1",
+   "end": "-17210016000/1",
+   "metadata": {
+    "title": "Yongle Emperor",
+    "description": "17 July 1402 – 12 August 1424 (Julian): Beijing, the Forbidden City, the Yongle Encyclopedia and Zheng He’s first six voyages.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Yongle_Emperor"
+    ],
+    "color": "#b0862f"
+   }
+  },
+  {
+   "id": "kangxi",
+   "start": "-9747993600/1",
+   "end": "-7795612800/1",
+   "metadata": {
+    "title": "Kangxi Emperor",
+    "description": "Sixty-one years, 1661–1722, the longest reign in Chinese history: he put down the Three Feudatories, took Taiwan and fixed the Russian border.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Kangxi_Emperor"
+    ],
+    "color": "#b0862f"
+   }
+  },
+  {
+   "id": "qianlong",
+   "start": "-7390828800/1",
+   "end": "-5487523200/1",
+   "metadata": {
+    "title": "Qianlong Emperor",
+    "description": "1735–1796, abdicating so as not to reign longer than his grandfather Kangxi, though he held power until his death in 1799. The empire reaches its greatest extent.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Qianlong_Emperor"
+    ],
+    "color": "#b0862f"
+   }
+  },
+  {
+   "id": "cixi",
+   "start": "-3412540800/1",
+   "end": "-1929052800/1",
+   "metadata": {
+    "title": "Cixi, regent",
+    "description": "**Empress Dowager Cixi** rules as regent for her son and then her nephew (1861–73, 1875–89) and holds power again from 1898 until her death in 1908.",
+    "tags": [
+     "ruler"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Empress_Dowager_Cixi"
+    ],
+    "color": "#b0862f"
+   }
+  },
+  {
+   "id": "an-lushan-d",
+   "start": "-38311228800/1",
+   "end": "-38084860800/1",
+   "metadata": {
+    "title": "An Lushan rebellion",
+    "description": "16 December 755 to 17 February 763 (Julian): one of the deadliest wars of its age; the Tang survives, weakened.",
+    "tags": [
+     "war",
+     "revolution"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/An_Lushan_rebellion"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "voyages",
+   "start": "-17812396800/1",
+   "end": "-16946064000/1",
+   "metadata": {
+    "title": "Zheng He’s voyages",
+    "description": "Seven voyages, 1405–1433, across the Indian Ocean as far as East Africa.",
+    "tags": [
+     "contact"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ming_treasure_voyages"
+    ],
+    "color": "#3d6e8a"
+   }
+  },
+  {
+   "id": "ming-wall",
+   "start": "-16419369600/1",
+   "end": "-10287561600/1",
+   "metadata": {
+    "title": "The Great Wall rebuilt",
+    "description": "After the Tumu crisis the Ming build walls along the northern frontier, in brick and stone above all in the sixteenth century: most of the Great Wall seen today.",
+    "tags": [
+     "war",
+     "invention"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Great_Wall_of_China",
+     "https://whc.unesco.org/en/list/438/"
+    ],
+    "color": "#7a6a55"
+   }
+  },
+  {
+   "id": "opium-1",
+   "start": "-4112726400/1",
+   "end": "-4018550400/1",
+   "metadata": {
+    "title": "First Opium War",
+    "description": "Britain against the Qing, 1839–1842, over the opium trade and access to China.",
+    "tags": [
+     "war",
+     "contact"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_Opium_War"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "taiping",
+   "start": "-3757968000/1",
+   "end": "-3326659200/1",
+   "metadata": {
+    "title": "Taiping Rebellion",
+    "description": "December 1850 to August 1864: a civil war between the Qing and the Taiping Heavenly Kingdom, among the deadliest wars in history, with some 20–30 million dead.",
+    "tags": [
+     "war",
+     "revolution"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Taiping_Rebellion"
+    ],
+    "color": "#c46a2c"
+   }
+  },
+  {
+   "id": "opium-2",
+   "start": "-3573244800/1",
+   "end": "-3445632000/1",
+   "metadata": {
+    "title": "Second Opium War",
+    "description": "Britain and France against the Qing, 1856–1860, ending with the Convention of Peking; Russia gains the lands north of the Amur and east of the Ussuri.",
+    "tags": [
+     "war",
+     "contact"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Second_Opium_War"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "boxers",
+   "start": "-2215468800/1",
+   "end": "-2155939200/1",
+   "metadata": {
+    "title": "Boxer Rebellion",
+    "description": "An anti-foreign, anti-Christian movement in the north, backed by the court in 1900, and the foreign intervention that crushed it.",
+    "tags": [
+     "war",
+     "revolution"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Boxer_Rebellion"
+    ],
+    "color": "#c46a2c"
+   }
+  },
+  {
+   "id": "sino-japanese",
+   "start": "-1025222400/1",
+   "end": "-767836800/1",
+   "metadata": {
+    "title": "War with Japan",
+    "description": "The **Second Sino-Japanese War**, from Marco Polo Bridge to Japan’s surrender (fighting had begun in Manchuria in 1931); estimates of Chinese deaths run from 15 to 20 million and more.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Second_Sino-Japanese_War"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "civil-war",
+   "start": "-1338681600/1",
+   "end": "-633312000/1",
+   "metadata": {
+    "title": "Civil War",
+    "description": "Nationalists against Communists, from the Nanchang uprising of 1927 to the government’s move to Taipei in 1949, paused by the united front against Japan and fought in full from 1946.",
+    "tags": [
+     "war",
+     "revolution"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Chinese_Civil_War"
+    ],
+    "color": "#9c3b2a"
+   }
+  }
+ ],
+ "relationships": [
+  {
+   "a": {
+    "duration": "erlitou"
+   },
+   "b": {
+    "duration": "xia"
+   }
+  },
+  {
+   "a": {
+    "moment": "erlitou-palaces"
+   },
+   "b": {
+    "duration": "xia"
+   }
+  },
+  {
+   "a": {
+    "moment": "pan-geng"
+   },
+   "b": {
+    "moment": "oracle-bones"
+   }
+  },
+  {
+   "a": {
+    "moment": "oracle-bones"
+   },
+   "b": {
+    "moment": "fu-hao"
+   }
+  },
+  {
+   "a": {
+    "moment": "muye"
+   },
+   "b": {
+    "duration": "western-zhou"
+   }
+  },
+  {
+   "a": {
+    "moment": "gonghe"
+   },
+   "b": {
+    "moment": "shiji"
+   }
+  },
+  {
+   "a": {
+    "moment": "haojing"
+   },
+   "b": {
+    "duration": "eastern-zhou"
+   }
+  },
+  {
+   "a": {
+    "moment": "chunqiu"
+   },
+   "b": {
+    "moment": "confucius"
+   }
+  },
+  {
+   "a": {
+    "moment": "confucius"
+   },
+   "b": {
+    "moment": "analects"
+   }
+  },
+  {
+   "a": {
+    "moment": "confucius"
+   },
+   "b": {
+    "moment": "confucius-dies"
+   }
+  },
+  {
+   "a": {
+    "moment": "analects"
+   },
+   "b": {
+    "moment": "taixue"
+   }
+  },
+  {
+   "a": {
+    "moment": "mencius"
+   },
+   "b": {
+    "moment": "zhu-xi"
+   }
+  },
+  {
+   "a": {
+    "moment": "shang-yang"
+   },
+   "b": {
+    "moment": "unification"
+   }
+  },
+  {
+   "a": {
+    "moment": "changping"
+   },
+   "b": {
+    "moment": "unification"
+   }
+  },
+  {
+   "a": {
+    "moment": "ying-zheng"
+   },
+   "b": {
+    "moment": "unification"
+   }
+  },
+  {
+   "a": {
+    "moment": "unification"
+   },
+   "b": {
+    "moment": "book-burning"
+   }
+  },
+  {
+   "a": {
+    "moment": "first-emperor-dies"
+   },
+   "b": {
+    "moment": "terracotta"
+   }
+  },
+  {
+   "a": {
+    "moment": "first-emperor-dies"
+   },
+   "b": {
+    "moment": "dazexiang"
+   }
+  },
+  {
+   "a": {
+    "moment": "dazexiang"
+   },
+   "b": {
+    "moment": "gaixia"
+   }
+  },
+  {
+   "a": {
+    "moment": "zhang-qian"
+   },
+   "b": {
+    "moment": "white-horse"
+   }
+  },
+  {
+   "a": {
+    "duration": "wudi"
+   },
+   "b": {
+    "moment": "zhang-qian"
+   }
+  },
+  {
+   "a": {
+    "duration": "wudi"
+   },
+   "b": {
+    "moment": "taixue"
+   }
+  },
+  {
+   "a": {
+    "moment": "yellow-turbans"
+   },
+   "b": {
+    "moment": "red-cliffs"
+   }
+  },
+  {
+   "a": {
+    "moment": "red-cliffs"
+   },
+   "b": {
+    "moment": "han-ends"
+   }
+  },
+  {
+   "a": {
+    "moment": "sui-unites"
+   },
+   "b": {
+    "moment": "grand-canal"
+   }
+  },
+  {
+   "a": {
+    "moment": "xuanwu"
+   },
+   "b": {
+    "duration": "taizong"
+   }
+  },
+  {
+   "a": {
+    "moment": "white-horse"
+   },
+   "b": {
+    "moment": "diamond-sutra"
+   }
+  },
+  {
+   "a": {
+    "moment": "diamond-sutra"
+   },
+   "b": {
+    "moment": "movable-type"
+   }
+  },
+  {
+   "a": {
+    "moment": "gunpowder"
+   },
+   "b": {
+    "moment": "compass"
+   }
+  },
+  {
+   "a": {
+    "moment": "jingkang"
+   },
+   "b": {
+    "moment": "yamen"
+   }
+  },
+  {
+   "a": {
+    "moment": "red-turbans"
+   },
+   "b": {
+    "moment": "ming"
+   }
+  },
+  {
+   "a": {
+    "moment": "yongle"
+   },
+   "b": {
+    "moment": "forbidden-city"
+   }
+  },
+  {
+   "a": {
+    "moment": "yongle"
+   },
+   "b": {
+    "moment": "zheng-he-1"
+   }
+  },
+  {
+   "a": {
+    "moment": "tumu"
+   },
+   "b": {
+    "duration": "ming-wall"
+   }
+  },
+  {
+   "a": {
+    "moment": "li-zicheng"
+   },
+   "b": {
+    "moment": "shanhai"
+   }
+  },
+  {
+   "a": {
+    "moment": "shanhai"
+   },
+   "b": {
+    "moment": "qing-beijing"
+   }
+  },
+  {
+   "a": {
+    "moment": "humen"
+   },
+   "b": {
+    "duration": "opium-1"
+   }
+  },
+  {
+   "a": {
+    "moment": "nanking"
+   },
+   "b": {
+    "moment": "hong-kong"
+   }
+  },
+  {
+   "a": {
+    "moment": "jintian"
+   },
+   "b": {
+    "moment": "tianjing"
+   }
+  },
+  {
+   "a": {
+    "moment": "tianjing"
+   },
+   "b": {
+    "moment": "nanjing-retaken"
+   }
+  },
+  {
+   "a": {
+    "moment": "exams"
+   },
+   "b": {
+    "moment": "exams-end"
+   }
+  },
+  {
+   "a": {
+    "moment": "wuchang"
+   },
+   "b": {
+    "moment": "roc"
+   }
+  },
+  {
+   "a": {
+    "moment": "roc"
+   },
+   "b": {
+    "moment": "abdication"
+   }
+  },
+  {
+   "a": {
+    "moment": "marco-polo"
+   },
+   "b": {
+    "moment": "nanjing-1937"
+   }
+  },
+  {
+   "a": {
+    "moment": "yangtze"
+   },
+   "b": {
+    "moment": "prc"
+   }
+  }
+ ]
+}

@@ -1,0 +1,394 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:02,560"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 2560
+			},
+			"text": " But the empire it built outlasts it.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.923395,
+					"t_dtw": -1
+				},
+				{
+					"text": " But",
+					"timestamps": {
+						"from": "00:00:00,200",
+						"to": "00:00:00,200"
+					},
+					"offsets": {
+						"from": 200,
+						"to": 200
+					},
+					"id": 887,
+					"p": 0.712365,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:00,280",
+						"to": "00:00:00,400"
+					},
+					"offsets": {
+						"from": 280,
+						"to": 400
+					},
+					"id": 262,
+					"p": 0.98304,
+					"t_dtw": -1
+				},
+				{
+					"text": " empire",
+					"timestamps": {
+						"from": "00:00:00,400",
+						"to": "00:00:00,810"
+					},
+					"offsets": {
+						"from": 400,
+						"to": 810
+					},
+					"id": 13735,
+					"p": 0.842576,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:00,810",
+						"to": "00:00:00,850"
+					},
+					"offsets": {
+						"from": 810,
+						"to": 850
+					},
+					"id": 340,
+					"p": 0.996455,
+					"t_dtw": -1
+				},
+				{
+					"text": " built",
+					"timestamps": {
+						"from": "00:00:00,950",
+						"to": "00:00:01,280"
+					},
+					"offsets": {
+						"from": 950,
+						"to": 1280
+					},
+					"id": 3170,
+					"p": 0.998167,
+					"t_dtw": -1
+				},
+				{
+					"text": " outl",
+					"timestamps": {
+						"from": "00:00:01,280",
+						"to": "00:00:01,550"
+					},
+					"offsets": {
+						"from": 1280,
+						"to": 1550
+					},
+					"id": 41528,
+					"p": 0.977033,
+					"t_dtw": -1
+				},
+				{
+					"text": "asts",
+					"timestamps": {
+						"from": "00:00:01,550",
+						"to": "00:00:01,770"
+					},
+					"offsets": {
+						"from": 1550,
+						"to": 1770
+					},
+					"id": 5773,
+					"p": 0.998793,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:01,830",
+						"to": "00:00:01,860"
+					},
+					"offsets": {
+						"from": 1830,
+						"to": 1860
+					},
+					"id": 340,
+					"p": 0.999331,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:01,860",
+						"to": "00:00:02,550"
+					},
+					"offsets": {
+						"from": 1860,
+						"to": 2550
+					},
+					"id": 13,
+					"p": 0.955463,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_128]",
+					"timestamps": {
+						"from": "00:00:02,560",
+						"to": "00:00:02,560"
+					},
+					"offsets": {
+						"from": 2560,
+						"to": 2560
+					},
+					"id": 50491,
+					"p": 0.0125902,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:02,560",
+				"to": "00:00:05,680"
+			},
+			"offsets": {
+				"from": 2560,
+				"to": 5680
+			},
+			"text": " The hand that takes over keeps it for about 400 years.",
+			"tokens": [
+				{
+					"text": " The",
+					"timestamps": {
+						"from": "00:00:02,740",
+						"to": "00:00:02,740"
+					},
+					"offsets": {
+						"from": 2740,
+						"to": 2740
+					},
+					"id": 383,
+					"p": 0.994162,
+					"t_dtw": -1
+				},
+				{
+					"text": " hand",
+					"timestamps": {
+						"from": "00:00:02,840",
+						"to": "00:00:02,980"
+					},
+					"offsets": {
+						"from": 2840,
+						"to": 2980
+					},
+					"id": 1021,
+					"p": 0.959219,
+					"t_dtw": -1
+				},
+				{
+					"text": " that",
+					"timestamps": {
+						"from": "00:00:02,980",
+						"to": "00:00:03,220"
+					},
+					"offsets": {
+						"from": 2980,
+						"to": 3220
+					},
+					"id": 326,
+					"p": 0.993184,
+					"t_dtw": -1
+				},
+				{
+					"text": " takes",
+					"timestamps": {
+						"from": "00:00:03,220",
+						"to": "00:00:03,410"
+					},
+					"offsets": {
+						"from": 3220,
+						"to": 3410
+					},
+					"id": 2753,
+					"p": 0.995562,
+					"t_dtw": -1
+				},
+				{
+					"text": " over",
+					"timestamps": {
+						"from": "00:00:03,510",
+						"to": "00:00:03,700"
+					},
+					"offsets": {
+						"from": 3510,
+						"to": 3700
+					},
+					"id": 625,
+					"p": 0.998559,
+					"t_dtw": -1
+				},
+				{
+					"text": " keeps",
+					"timestamps": {
+						"from": "00:00:03,760",
+						"to": "00:00:04,040"
+					},
+					"offsets": {
+						"from": 3760,
+						"to": 4040
+					},
+					"id": 7622,
+					"p": 0.929807,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:04,040",
+						"to": "00:00:04,110"
+					},
+					"offsets": {
+						"from": 4040,
+						"to": 4110
+					},
+					"id": 340,
+					"p": 0.997773,
+					"t_dtw": -1
+				},
+				{
+					"text": " for",
+					"timestamps": {
+						"from": "00:00:04,150",
+						"to": "00:00:04,300"
+					},
+					"offsets": {
+						"from": 4150,
+						"to": 4300
+					},
+					"id": 329,
+					"p": 0.972431,
+					"t_dtw": -1
+				},
+				{
+					"text": " about",
+					"timestamps": {
+						"from": "00:00:04,300",
+						"to": "00:00:04,410"
+					},
+					"offsets": {
+						"from": 4300,
+						"to": 4410
+					},
+					"id": 546,
+					"p": 0.984638,
+					"t_dtw": -1
+				},
+				{
+					"text": " 400",
+					"timestamps": {
+						"from": "00:00:05,170",
+						"to": "00:00:05,170"
+					},
+					"offsets": {
+						"from": 5170,
+						"to": 5170
+					},
+					"id": 7337,
+					"p": 0.874373,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:05,300",
+						"to": "00:00:05,470"
+					},
+					"offsets": {
+						"from": 5300,
+						"to": 5470
+					},
+					"id": 812,
+					"p": 0.998138,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,470",
+						"to": "00:00:05,640"
+					},
+					"offsets": {
+						"from": 5470,
+						"to": 5640
+					},
+					"id": 13,
+					"p": 0.984792,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_284]",
+					"timestamps": {
+						"from": "00:00:05,680",
+						"to": "00:00:05,680"
+					},
+					"offsets": {
+						"from": 5680,
+						"to": 5680
+					},
+					"id": 50647,
+					"p": 0.028456,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

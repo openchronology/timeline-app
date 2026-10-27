@@ -1,0 +1,199 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:03,620"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 3620
+			},
+			"text": " The dynasty that unified China lasted 15 years.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.924167,
+					"t_dtw": -1
+				},
+				{
+					"text": " The",
+					"timestamps": {
+						"from": "00:00:00,220",
+						"to": "00:00:00,220"
+					},
+					"offsets": {
+						"from": 220,
+						"to": 220
+					},
+					"id": 383,
+					"p": 0.931289,
+					"t_dtw": -1
+				},
+				{
+					"text": " dynasty",
+					"timestamps": {
+						"from": "00:00:00,290",
+						"to": "00:00:00,640"
+					},
+					"offsets": {
+						"from": 290,
+						"to": 640
+					},
+					"id": 30968,
+					"p": 0.985331,
+					"t_dtw": -1
+				},
+				{
+					"text": " that",
+					"timestamps": {
+						"from": "00:00:00,740",
+						"to": "00:00:01,040"
+					},
+					"offsets": {
+						"from": 740,
+						"to": 1040
+					},
+					"id": 326,
+					"p": 0.99968,
+					"t_dtw": -1
+				},
+				{
+					"text": " unified",
+					"timestamps": {
+						"from": "00:00:01,040",
+						"to": "00:00:01,560"
+					},
+					"offsets": {
+						"from": 1040,
+						"to": 1560
+					},
+					"id": 22706,
+					"p": 0.996109,
+					"t_dtw": -1
+				},
+				{
+					"text": " China",
+					"timestamps": {
+						"from": "00:00:01,560",
+						"to": "00:00:01,780"
+					},
+					"offsets": {
+						"from": 1560,
+						"to": 1780
+					},
+					"id": 2807,
+					"p": 0.997763,
+					"t_dtw": -1
+				},
+				{
+					"text": " lasted",
+					"timestamps": {
+						"from": "00:00:02,050",
+						"to": "00:00:02,380"
+					},
+					"offsets": {
+						"from": 2050,
+						"to": 2380
+					},
+					"id": 15436,
+					"p": 0.952262,
+					"t_dtw": -1
+				},
+				{
+					"text": " 15",
+					"timestamps": {
+						"from": "00:00:02,490",
+						"to": "00:00:02,820"
+					},
+					"offsets": {
+						"from": 2490,
+						"to": 2820
+					},
+					"id": 1315,
+					"p": 0.915323,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:02,820",
+						"to": "00:00:03,170"
+					},
+					"offsets": {
+						"from": 2820,
+						"to": 3170
+					},
+					"id": 812,
+					"p": 0.99841,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:03,170",
+						"to": "00:00:03,200"
+					},
+					"offsets": {
+						"from": 3170,
+						"to": 3200
+					},
+					"id": 13,
+					"p": 0.981061,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_181]",
+					"timestamps": {
+						"from": "00:00:03,620",
+						"to": "00:00:03,620"
+					},
+					"offsets": {
+						"from": 3620,
+						"to": 3620
+					},
+					"id": 50544,
+					"p": 0.00642219,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}
