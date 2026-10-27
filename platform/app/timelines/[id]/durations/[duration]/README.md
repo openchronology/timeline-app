@@ -2,7 +2,7 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-`/<owner>/<slug>/durations/<duration>`: the timeline open at one duration, with the duration's title, extent and description in its link previews. See [durations](../../../../../../docs/durations.md).
+`/<owner>/<slug>/durations/<duration>`: the timeline open at one duration, with the duration's title, extent and description in its link previews, and the duration as text and schema.org structured data for search engines. See [durations](../../../../../../docs/durations.md).
 
 ## Contents
 
