@@ -253,6 +253,7 @@ export function entityMetadata(timeline, entity, title, time, notes) {
     labelled
       ? `Sensitive content: ${describeLabels(timeline.labels).toLowerCase()}`
       : excerpt(`${time}. ${notes ?? ''}`) || time,
+    null,
     { index: entitiesIndexable(timeline) },
   );
 }
@@ -336,6 +337,17 @@ export function embedCode(src, title, width = '100%', height = 480) {
 }
 
 /**
+ * The image a link to the timeline previews with (#339): its own image, when it is public and
+ * unlabelled (a labelled timeline previews as its title and labels alone, #115); else null,
+ * and the drawn preview (lib/preview-image.jsx) stands in.
+ * @returns {{url: string, alt: string, width?: number, height?: number}|null}
+ */
+export function previewOf(timeline) {
+  return timeline?.image && timeline.visibility === 'public' && !timeline.labels?.length
+    ? timeline.image
+    : null;
+}
+/**
  * A page's metadata (Next.js's `generateMetadata` result): title, description, canonical
  * address, link previews (Open Graph and Twitter cards) and oEmbed discovery.
  *
@@ -347,12 +359,34 @@ export function embedCode(src, title, width = '100%', height = 480) {
  * @param {string} path the page's path, made absolute with siteOrigin()
  * @param {string} title the page's own title, before the site's name
  * @param {string} description its plain-text description
+ * @param {{url: string, alt: string, width?: number, height?: number}|null} [image] the
+ *   preview image (previewOf) in place of the page's drawn one (its opengraph-image)
  * @param {{index?: boolean}} [options] `index` false asks search engines not to index it
  */
-export function pageMetadata(timeline, path, title, description, { index = true } = {}) {
+export function pageMetadata(
+  timeline,
+  path,
+  title,
+  description,
+  image = null,
+  { index = true } = {},
+) {
   const origin = siteOrigin(),
     url = origin + path,
     shown = timeline.visibility === 'public';
+  // Linked where it is hosted, as everywhere (docs/images.md); given here, it takes the place
+  // of the drawn image Next.js would otherwise name.
+  const images = image
+    ? {
+        images: [
+          {
+            url: image.url,
+            ...(image.alt ? { alt: image.alt } : {}),
+            ...(image.width ? { width: image.width, height: image.height } : {}),
+          },
+        ],
+      }
+    : {};
   return {
     title: `${title} · ${siteName()}`,
     description,
@@ -368,7 +402,15 @@ export function pageMetadata(timeline, path, title, description, { index = true 
     },
     // Private pages are for their members: not for search engines.
     ...(shown && index ? {} : { robots: { index: false, follow: false } }),
-    openGraph: { type: 'website', siteName: siteName(), locale: 'en_US', title, description, url },
-    twitter: { card: 'summary_large_image', title, description },
+    openGraph: {
+      type: 'website',
+      siteName: siteName(),
+      locale: 'en_US',
+      title,
+      description,
+      url,
+      ...images,
+    },
+    twitter: { card: 'summary_large_image', title, description, ...images },
   };
 }

@@ -49,7 +49,15 @@ export function mergeValue(a, b, c, key, fields, conflicts) {
   return c;
 }
 /** The settings a merge reconciles field by field; others follow the timeline merged into. */
-export const SETTINGS = ['title', 'description', 'tags', 'presentation', 'plugins', 'assets'];
+export const SETTINGS = [
+  'title',
+  'description',
+  'tags',
+  'image',
+  'presentation',
+  'plugins',
+  'assets',
+];
 /** The 409 refusing a merge, naming its first ten conflicts and carrying them all. */
 function conflict(conflicts) {
   return Object.assign(

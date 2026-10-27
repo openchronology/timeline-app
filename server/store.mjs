@@ -192,6 +192,7 @@ const TIMELINE_INDEX = [
   'presentation',
   'plugins',
   'tags',
+  'image',
   'assets',
   'comparison',
   'root',
@@ -873,7 +874,7 @@ export class PostgresStore {
     // storage size (the same as set above, so its charge is unchanged), event_generation when
     // moments were added, updated_at when `touch`, and index_version 2 (current).
     await client.query(
-      'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,tags=$8,assets=$9::jsonb,event_text=$10,comparison=$11::jsonb,storage_bytes=$12,event_generation=event_generation+CASE WHEN $13 THEN 1 ELSE 0 END,updated_at=CASE WHEN $14 THEN now() ELSE updated_at END,duration_root=$15,edge_root=$16,index_version=2,event_text_stale=false WHERE id=$1',
+      'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,tags=$8,assets=$9::jsonb,event_text=$10,comparison=$11::jsonb,storage_bytes=$12,event_generation=event_generation+CASE WHEN $13 THEN 1 ELSE 0 END,updated_at=CASE WHEN $14 THEN now() ELSE updated_at END,duration_root=$15,edge_root=$16,index_version=2,event_text_stale=false,image=$17::jsonb WHERE id=$1',
       [
         id,
         document.title,
@@ -891,6 +892,7 @@ export class PostgresStore {
         touch,
         durations.root,
         edges.root,
+        document.image ? JSON.stringify(document.image) : null,
       ],
     );
   }
@@ -1752,6 +1754,7 @@ export class PostgresStore {
           ...(t.presentation ? { presentation: t.presentation } : {}),
           ...(t.plugins ? { plugins: t.plugins } : {}),
           ...(t.tags === null || t.tags === undefined ? {} : { tags: t.tags }),
+          ...(t.image ? { image: t.image } : {}),
           ...(t.assets ? { assets: t.assets } : {}),
           ...(t.comparison ? { comparison: t.comparison } : {}),
           events,
@@ -1792,6 +1795,7 @@ export class PostgresStore {
         ...(t.presentation ? { presentation: t.presentation } : {}),
         ...(t.plugins ? { plugins: t.plugins } : {}),
         ...(t.tags === null || t.tags === undefined ? {} : { tags: t.tags }),
+        ...(t.image ? { image: t.image } : {}),
         ...(t.assets ? { assets: t.assets } : {}),
         ...(t.comparison ? { comparison: t.comparison } : {}),
       },
@@ -1935,6 +1939,7 @@ export class PostgresStore {
       ...(timeline.presentation ? { presentation: timeline.presentation } : {}),
       ...(timeline.plugins ? { plugins: timeline.plugins } : {}),
       ...(timeline.tags == null ? {} : { tags: timeline.tags }),
+      ...(timeline.image ? { image: timeline.image } : {}),
       ...(timeline.assets ? { assets: timeline.assets } : {}),
       ...(timeline.comparison ? { comparison: timeline.comparison } : {}),
       events,

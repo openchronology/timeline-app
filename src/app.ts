@@ -65,6 +65,7 @@ import {
   pluginSize,
   PLUGIN_EXAMPLE,
   validateTags,
+  validateTimelineImage,
   contentLabels,
   describeLabels,
   CONTENT_LABELS_KEY,
@@ -138,6 +139,7 @@ import type {
   FrameGroup,
   PointEvent,
   TimelineDocument,
+  TimelineImage,
   TimePresentation,
   PresentationContext,
   RulerPlan,
@@ -227,6 +229,8 @@ interface RemoteTimeline {
   canWrite?: boolean;
   canPropose?: boolean;
   tags?: string[];
+  /** Its own image (#339), set in its settings (the server sends null for none). */
+  image?: TimelineImage;
   assets?: Record<string, string>;
   /** Its sensitive-content labels (#115): its owner's and moderators'. */
   labels?: string[];
@@ -2558,6 +2562,17 @@ function heading() {
       : (model?.assets ?? remote?.assets),
     offlineHtml,
   );
+  // The timeline's own image (#339) above its title, from its copy when it carries one; a
+  // comparison shows its sources and has none.
+  const image = comparison ? null : model ? model.image : remote?.image;
+  const picture = el<HTMLImageElement>('timeline-image'),
+    source = imageSource(image?.url ?? null);
+  if (picture.getAttribute('src') !== source) {
+    if (source) picture.src = source;
+    else picture.removeAttribute('src');
+  }
+  picture.alt = image?.alt ?? '';
+  picture.hidden = !source;
   input('timeline-title').value = comparison
     ? remote?.comparison
       ? remote.title
@@ -3084,6 +3099,7 @@ async function openRemote(id: string, restoreSeparation = true) {
   if (info.plugins) info.plugins = validateInstalledPlugins(info.plugins);
   if (info.assets) info.assets = validateAssets(info.assets);
   if (info.tags) info.tags = validateTags(info.tags);
+  info.image = info.image ? validateTimelineImage(info.image) : undefined;
   if (info.comparison) {
     const sources = await comparisonSources(info.comparison.sources);
     if (request !== documentRequest) return;
@@ -3105,6 +3121,7 @@ async function openRemote(id: string, restoreSeparation = true) {
       presentation: info.presentation,
       plugins: info.plugins,
       tags: info.tags,
+      image: info.image,
       assets: info.assets,
       events: [],
     });
@@ -7166,6 +7183,7 @@ async function moveToLatest(id: string) {
   if (info.plugins) info.plugins = validateInstalledPlugins(info.plugins);
   if (info.assets) info.assets = validateAssets(info.assets);
   if (info.tags) info.tags = validateTags(info.tags);
+  info.image = info.image ? validateTimelineImage(info.image) : undefined;
   // Settings not edited here are as `before` had them: they take the latest.
   adoptSettings(index, before!, info);
   if (
@@ -7191,7 +7209,15 @@ interface SaveConflict {
   id: string;
   title: string | null;
 }
-const SETTING_KEYS = ['title', 'description', 'tags', 'presentation', 'plugins', 'assets'] as const;
+const SETTING_KEYS = [
+  'title',
+  'description',
+  'tags',
+  'image',
+  'presentation',
+  'plugins',
+  'assets',
+] as const;
 /**
  * Conflicts the editor chose to keep its own version of: saved without what they were made
  * on, so they replace what was saved. For the open timeline only, until it saves.
@@ -7247,6 +7273,7 @@ function takeSetting(
   if (key === 'title') index.title = saved.title;
   if (key === 'description') index.description = saved.description;
   if (key === 'tags') index.tags = saved.tags ? validateTags(saved.tags) : undefined;
+  if (key === 'image') index.image = saved.image ? validateTimelineImage(saved.image) : undefined;
   if (key === 'presentation')
     index.presentation = saved.presentation ? validatePresentation(saved.presentation) : undefined;
   if (key === 'plugins')
@@ -7257,6 +7284,7 @@ const SETTING_NAMES: Record<string, string> = {
   title: 'The title',
   description: 'The description',
   tags: 'The tags',
+  image: 'The image',
   presentation: 'The time display',
   plugins: 'The plugins',
   assets: 'The images',

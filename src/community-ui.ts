@@ -127,7 +127,7 @@ function summarize(base: TimelineDocument, after: TimelineDocument): ProposalCha
   const count = (change: MomentChange['change']) =>
     examples.filter((e) => e.change === change).length;
   const settings = (
-    ['title', 'description', 'tags', 'presentation', 'plugins', 'assets'] as const
+    ['title', 'description', 'tags', 'image', 'presentation', 'plugins', 'assets'] as const
   ).filter((key) => JSON.stringify(base[key]) !== JSON.stringify(after[key]));
   return {
     settings,

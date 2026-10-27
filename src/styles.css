@@ -479,6 +479,19 @@ main {
 .document-heading {
   padding: 35px 0 28px;
 }
+/* The timeline's own image (#339), above its title: cropped to its cards' shape. */
+.timeline-image {
+  display: block;
+  width: min(100%, 420px);
+  aspect-ratio: 16 / 9;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #eef2ea;
+}
+.timeline-image[hidden] {
+  display: none;
+}
 .title-input {
   display: block;
   resize: none;
@@ -3109,7 +3122,8 @@ body[data-warnings][data-sensitive]:not([data-images-shown])
     .plugin-image-link img,
     .reader-panel img,
     .duration-background img,
-    .timeline-backdrop img
+    .timeline-backdrop img,
+    .timeline-image
   ),
 body[data-warnings]:not([data-images-shown])
   :is(

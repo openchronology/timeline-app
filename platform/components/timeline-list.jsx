@@ -1,8 +1,9 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// A page of timelines as cards, with their owners, tags, labels and stars, compare
+// A page of timelines as cards, with their images, owners, tags, labels and stars, compare
 // checkboxes and links to more pages.
 import Link from 'next/link';
 import StarButton from './star-button.jsx';
+import TimelineCardImage from './timeline-image.jsx';
 import { describeLabels } from '../../src/content-labels.ts';
 import { CompareCheckbox } from './compare-selection.jsx';
 import { profilePath, timelinePath } from '../../src/addresses.ts';
@@ -41,6 +42,7 @@ export default function TimelineList({
       <div className="timeline-grid">
         {result.timelines.map((t) => (
           <article className="timeline-card" key={t.id}>
+            <TimelineCardImage timeline={t} />
             <CompareCheckbox
               id={t.id}
               title={t.title || 'Untitled timeline'}
