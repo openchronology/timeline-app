@@ -170,6 +170,38 @@ export function printCalendar(time: Q, offset: number, context?: PresentationCon
 }
 
 /**
+ * A span of time from `first` to `last` as dates, as precise as its length calls for (#338):
+ * deep-time ages from 10,000 years (`66 mya – 2000 CE`), years from two years (`1809 CE –
+ * 1865 CE`), months from 60 days (`Mar 1944 CE – Aug 1945 CE`), days from two days
+ * (`6 Jun 1944 CE – 25 Aug 1944 CE`), then minutes from two hours and seconds below, with
+ * the zone. One time alone when both ends read the same.
+ */
+export function printCalendarSpan(first: Q, last: Q, offset: number): string {
+  const span = last.sub(first),
+    at = (seconds: bigint) => span.compare(Q.from(seconds)) >= 0;
+  const day = (p: ReturnType<typeof parts>) =>
+    `${Number(p.day)} ${MONTHS[Number(p.month) - 1]} ${eraYear(p.year)}`;
+  const zone = (p: ReturnType<typeof parts>) => (p.zone === 'Z' ? 'UTC' : 'UTC' + p.zone);
+  let text: (p: ReturnType<typeof parts>) => string;
+  if (at(315576000000n)) text = (p) => deepYear(p.year);
+  else if (at(2n * 31557600n)) text = (p) => eraYear(p.year);
+  else if (at(60n * 86400n)) text = (p) => `${MONTHS[Number(p.month) - 1]} ${eraYear(p.year)}`;
+  else if (at(2n * 86400n)) text = day;
+  else if (at(2n * 3600n)) text = (p) => `${day(p)} ${p.hour}:${p.minute}`;
+  else text = (p) => `${day(p)} ${p.hour}:${p.minute}:${p.second}`;
+  const a = parts(first, offset),
+    b = parts(last, offset);
+  const clock = !at(2n * 86400n);
+  const [from, to] = [text(a), text(b)];
+  // Within a day, the end needs only its clock.
+  const end =
+    clock && a.year === b.year && a.month === b.month && a.day === b.day
+      ? to.slice(day(b).length + 1)
+      : to;
+  const suffix = clock ? ' ' + zone(a) : '';
+  return from === to ? from + suffix : `${from} – ${end}${suffix}`;
+}
+/**
  * The caption above the chart that supplies what adaptive labels omit: the dates the view
  * spans, the base hour or minute for short clock labels, and the zone; the Δ origin when
  * labels are relative; or the range of ages in deep time.

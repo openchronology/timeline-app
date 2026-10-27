@@ -100,6 +100,7 @@ import { validatePresentation } from './presentation.js';
 import type { TimePresentation } from './presentation.js';
 export {
   createPresenter,
+  printTimeSpan,
   validatePresentation,
   DEFAULT_PRESENTATION,
   UNIT_PRESETS,

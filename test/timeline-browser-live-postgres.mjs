@@ -97,6 +97,21 @@ try {
       title: `${i < 3 ? 'Apollo' : 'Survey'} ${String(i).padStart(2, '0')} ${word}`,
       description: `Timeline ${i} of the browser test, about ${word}.`,
       tags: [word, i % 2 ? 'odd' : 'even'],
+      // The Apollo timelines show dates: stored times in Julian years, 161 of them before 1970
+      // (late 1808), so the sample's 0 to 24 reads 1808 to 1832; the rest show plain numbers.
+      ...(i < 3
+        ? {
+            presentation: {
+              version: 1,
+              mode: 'gregorian',
+              significantDigits: 6,
+              unit: '',
+              scale: '1/31557600',
+              origin: '161',
+              offsetMinutes: 0,
+            },
+          }
+        : {}),
     });
     if (i < 14) await call(`/api/timelines/${t.id}/settings`, { visibility: 'public' }, 'PATCH');
     made.push(t);
@@ -181,7 +196,8 @@ try {
   );
   assert.match(await card.locator('.timeline-card-facts').textContent(), /Size10 moments/);
   assert.equal((await card.locator('.timeline-shape-bars rect').count()) > 1, true);
-  assert.match(await card.locator('.timeline-shape-span').textContent(), / – /);
+  // The span in the timeline's own display: the sample's coordinates as numbers.
+  assert.equal(await card.locator('.timeline-shape-span').textContent(), '0 – 24');
 
   // Searching as you type, in place: the address follows, focus and scroll stay.
   const words = explore.getByLabel('Search timelines');
@@ -211,6 +227,11 @@ try {
   assert.deepEqual(
     await titles(explore),
     ['00', '01', '02'].map((n) => `Apollo ${n} ${word}`),
+  );
+  // A Gregorian timeline's span reads in years, as its 24 years call for.
+  assert.match(
+    await explore.locator('.timeline-shape-span').first().textContent(),
+    /^1808 CE – 1832 CE$/,
   );
   // A tag filters the list, in place.
   await explore

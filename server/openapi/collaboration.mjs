@@ -604,7 +604,7 @@ export const schemas = {
       time_span: {
         type: ['string', 'null'],
         description:
-          'Its first and last times as the timeline presents them (its calendar or units), such as "1 Jan 1900 – 31 Dec 1999"; null as for `first_time`.',
+          'Its first and last times in its own time display, as precise as the span calls for: Gregorian timelines in ages, years, months, days or clock times ("1809 CE – 1865 CE", "26 Oct 2026 CE 13:05 – 16:12 UTC"), numeric ones in their unit with enough digits ("0 – 100 years"), custom ones as their script prints them; null as for `first_time`.',
       },
       shape: {
         type: ['array', 'null'],

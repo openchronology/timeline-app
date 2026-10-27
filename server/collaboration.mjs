@@ -10,7 +10,7 @@
 import { rebaseDocument, mergePatch } from './merge.mjs';
 import { randomUUID } from 'node:crypto';
 import { HttpError, restrictedTimeline, withoutImageCopies } from './store.mjs';
-import { validateDocument, relationshipKey, createPresenter, Q } from '../dist/core.mjs';
+import { validateDocument, relationshipKey, printTimeSpan, Q } from '../dist/core.mjs';
 import { commonAncestor, lockTimelines, revisionId } from './versioning.mjs';
 import { differences } from './history.mjs';
 /** Why a timeline that keeps no saved history takes no pull requests. */
@@ -217,7 +217,7 @@ const SHAPE_DEPTH = 3;
 /**
  * Search results with the span and shape of their moments, for the browser's cards (#338):
  * `first_time` and `last_time` (exact "n/d" text), `time_span` (the two as the timeline
- * presents times) and `shape` (SHAPE_BINS numbers from 0 to 100, how densely each part of
+ * presents times, printTimeSpan) and `shape` (SHAPE_BINS numbers from 0 to 100, how densely each part of
  * the span holds moments, the densest 100).
  *
  * Cheap where it can be: one query for the whole page, reading by primary key the top
@@ -266,21 +266,23 @@ export async function withShapes(pool, timelines) {
     if (!shape?.first)
       return { ...t, first_time: null, last_time: null, time_span: null, shape: null };
     const most = Math.max(...shape.bins);
-    const print = (time) => {
-      try {
-        return createPresenter(shape.presentation ?? undefined).print(Q.parse(time));
-      } catch {
-        return time;
-      }
-    };
+    // In the timeline's own time display, as precise as the span calls for (printTimeSpan);
+    // its exact coordinates if its settings cannot be read.
+    let span;
+    try {
+      span = printTimeSpan(
+        shape.presentation ?? undefined,
+        Q.parse(shape.first),
+        Q.parse(shape.last),
+      );
+    } catch {
+      span = shape.first === shape.last ? shape.first : `${shape.first} – ${shape.last}`;
+    }
     return {
       ...t,
       first_time: shape.first,
       last_time: shape.last,
-      time_span:
-        shape.first === shape.last
-          ? print(shape.first)
-          : `${print(shape.first)} – ${print(shape.last)}`,
+      time_span: span,
       // A part with any moments shows at least a sliver.
       shape: shape.bins.map((n) => (n > 0 ? Math.max(1, Math.round((100 * n) / most)) : 0)),
     };
