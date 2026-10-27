@@ -64,7 +64,7 @@ export function printRetention(seconds, presentation) {
 export function settings(t) {
   const document = { format: 'openchronology', version: 1, title: t.title, events: [] };
   document.description = t.description ?? '';
-  for (const key of ['presentation', 'plugins', 'tags', 'assets'])
+  for (const key of ['presentation', 'plugins', 'tags', 'image', 'assets'])
     if (t[key] !== null && t[key] !== undefined) document[key] = t[key];
   return validateDocument(document);
 }

@@ -24,6 +24,7 @@ import { deleteAccount } from './account-deletion.mjs';
 import { POLICY_VERSION, agreed, requireAgreed, requireAgreement } from './policies.mjs';
 import { mapTimes } from './time-map.mjs';
 import { saveBase } from './save-merge.mjs';
+import { timelineSettings } from './incremental.mjs';
 import { authorizeKey, keyRequestRead } from './api-keys.mjs';
 import { BrowserForks } from './browser-forks.mjs';
 import { queryPlugins } from './query-plugins.mjs';
@@ -51,6 +52,7 @@ import {
   validateDocument,
   validateDuration,
   validateTags,
+  validateTimelineImage,
   validateRef,
   canonicalRelationship,
   setEntryLimit,
@@ -418,7 +420,7 @@ export function createRequestHandler({
         try {
           if (pool)
             await pool.query(
-              'SELECT t.tags,t.assets,t.search_document,t.head_revision_id,p.source_revision_id FROM oc_timelines t LEFT JOIN oc_proposals p ON false LEFT JOIN oc_plugins l ON false LEFT JOIN oc_plugin_suites ps ON false LEFT JOIN oc_revisions r ON false LEFT JOIN oc_snapshots s ON false LIMIT 0',
+              'SELECT t.tags,t.image,t.assets,t.search_document,t.head_revision_id,p.source_revision_id FROM oc_timelines t LEFT JOIN oc_proposals p ON false LEFT JOIN oc_plugins l ON false LEFT JOIN oc_plugin_suites ps ON false LEFT JOIN oc_revisions r ON false LEFT JOIN oc_snapshots s ON false LIMIT 0',
             );
           return response(res, 200, { status: 'ok', storage: pool ? 'postgresql' : 'browser' });
         } catch {
@@ -1750,9 +1752,9 @@ export function createRequestHandler({
           return response(res, 200, { ok: true });
         }
         // Sharing and settings: visibility, private forks, retention, saved history, content
-        // labels, address. Rechecked under the timeline's row lock; publishing is refused for a
-        // comparison with a private source, a copy of a private timeline, and a timeline
-        // moderators restricted.
+        // labels, address, image. Rechecked under the timeline's row lock; publishing is
+        // refused for a comparison with a private source, a copy of a private timeline, and a
+        // timeline moderators restricted.
         if (action === 'settings' && method === 'PATCH') {
           auth.require(session, req);
           const input = await body(req);
@@ -1767,6 +1769,7 @@ export function createRequestHandler({
                   'keepHistory',
                   'labels',
                   'slug',
+                  'image',
                 ].includes(k),
             ) ||
             (input.labels !== undefined &&
@@ -1783,8 +1786,16 @@ export function createRequestHandler({
           )
             throw new HttpError(
               400,
-              'Choose visibility, a private forking policy, a retention period, whether to keep saved history, content labels and/or an address.',
+              'Choose visibility, a private forking policy, a retention period, whether to keep saved history, content labels, an address and/or an image.',
             );
+          // The timeline's image (#339): a link and alt text, or null to remove it.
+          let image;
+          if (input.image != null)
+            try {
+              image = validateTimelineImage(input.image);
+            } catch (error) {
+              throw new HttpError(400, error.message);
+            }
           await store.transaction(async (c) => {
             await c.query('SELECT id FROM oc_timelines WHERE id=$1 FOR UPDATE', [id]);
             const current = await store.access(id, userId, c, { preparing: true });
@@ -1821,8 +1832,32 @@ export function createRequestHandler({
             // again from the current state.
             if (input.keepHistory === false) await store.stopHistory(c, id);
             if (input.keepHistory === true) await store.startHistory(c, id, userId);
-            // An address alone leaves the timeline's revision as it is.
-            if (Object.keys(input).every((k) => k === 'slug')) return;
+            // The image is one of the document's settings, so it is saved as a save of the
+            // settings alone would save it: a revision of its own, kept in saved history,
+            // exports and forks. A comparison is rebuilt from its sources and has none.
+            if (input.image !== undefined) {
+              if (current.comparison)
+                throw new HttpError(409, 'A comparison shows its sources and has no image.');
+              if (current.preparing_revision_id)
+                throw new HttpError(409, 'This copy is still being prepared. Try again shortly.');
+              const { image: _previous, events: _events, ...settings } = timelineSettings(current);
+              await store.applyMerge(
+                c,
+                current,
+                userId,
+                {
+                  settings: image ? { ...settings, image } : settings,
+                  changes: [],
+                  durationChanges: [],
+                  relationshipChanges: [],
+                },
+                'save',
+                [current.head_revision_id],
+              );
+            }
+            // An address or image alone leaves the timeline's revision as it is (the image's
+            // save numbered its own).
+            if (Object.keys(input).every((k) => k === 'slug' || k === 'image')) return;
             // A changed retention period clears retention_applied_at, so the next run applies
             // it at once; the revision is bumped, as a save does.
             await c.query(

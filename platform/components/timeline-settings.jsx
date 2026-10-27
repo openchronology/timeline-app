@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
-// A timeline's sharing and settings: visibility, address, collaborators, content labels,
-// saved history and deletion.
+// A timeline's sharing and settings: visibility, address, image, collaborators, content
+// labels, saved history and deletion.
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { dismissOnBackdrop } from '../../src/dialogs.ts';
@@ -10,6 +10,22 @@ import { api } from '../lib/api.js';
 import { RESERVED_NAMES, slugFromTitle, timelinePath } from '../../src/addresses.ts';
 import HelpTip from './help-tip.jsx';
 import { ADD_COLLABORATOR, ROLE_OPTIONS, VISIBILITY_OPTIONS } from '../../src/wording.ts';
+/** The longest alt text the server keeps (src/timeline-image.ts). */
+const IMAGE_ALT_LENGTH = 1000;
+/**
+ * A link as an image may be linked (the server checks it as src/plugins.ts's imageURL does):
+ * an https address without credentials, normalized; null otherwise.
+ */
+function imageURL(value) {
+  try {
+    const url = new URL(String(value ?? '').trim());
+    return url.protocol === 'https:' && url.hostname && !url.username && !url.password
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
+}
 /** A storage size, as the account page writes it. */
 const size = (bytes) =>
   bytes >= 1048576
@@ -20,7 +36,7 @@ const size = (bytes) =>
  * page is a 404 for anyone else, and the API checks every change again).
  *
  * Each change goes to the API at once: PATCH /api/timelines/<id>/settings with the one field
- * that changed (visibility, allowPrivateForks, slug, labels, retention or keepHistory), which
+ * that changed (visibility, allowPrivateForks, slug, image, labels, retention or keepHistory), which
  * answers the timeline's metadata as it is now, with its printed retention period and
  * `history_bytes`; POST and DELETE /api/timelines/<id>/members to add or remove a collaborator;
  * DELETE /api/timelines/<id> to delete it.
@@ -50,8 +66,12 @@ export default function TimelineSettings({
     [members, setMembers] = useState(initialMembers),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
-    // A refused address is shown next to its field rather than at the end of the page.
-    [addressError, setAddressError] = useState('');
+    // A refused address or image is shown next to its field rather than at the end of the page.
+    [addressError, setAddressError] = useState(''),
+    [imageError, setImageError] = useState(''),
+    // The image's link as typed, and its size once its preview loads (oEmbed needs it).
+    [imageLink, setImageLink] = useState(initial.image?.url ?? ''),
+    [imageSize, setImageSize] = useState(null);
   // A click outside either confirmation dialog closes it.
   useEffect(() => dismissOnBackdrop(dialog.current), []);
   useEffect(() => dismissOnBackdrop(historyDialog.current), []);
@@ -75,6 +95,7 @@ export default function TimelineSettings({
     setBusy(true);
     setError('');
     setAddressError('');
+    setImageError('');
     try {
       const s = await api('session');
       const value = await api(base + path, { method, csrf: s.csrf, data });
@@ -88,11 +109,27 @@ export default function TimelineSettings({
       else if (data && 'slug' in data) router.replace(timelinePath(value) + '/settings');
       else router.refresh();
     } catch (e) {
-      (data && 'slug' in data ? setAddressError : setError)(e.message);
+      (data && 'slug' in data
+        ? setAddressError
+        : data && 'image' in data
+          ? setImageError
+          : setError)(e.message);
     } finally {
       setBusy(false);
     }
   }
+  /** Sets the image from its form: its link and alt text, with its size when it loaded. */
+  function setImage(event) {
+    event.preventDefault();
+    const f = new FormData(event.currentTarget);
+    const url = imageURL(f.get('url'));
+    if (!url) return setImageError('Link an image by its https:// address.');
+    void mutate('/settings', 'PATCH', {
+      image: { url, alt: f.get('alt'), ...(imageSize?.url === url ? imageSize.size : {}) },
+    });
+  }
+  /** The preview of the link being typed: the image, if it is a usable link. */
+  const preview = imageURL(imageLink);
   /** Adds a collaborator, by username, with the role chosen. */
   function member(event) {
     event.preventDefault();
@@ -223,6 +260,83 @@ export default function TimelineSettings({
         <p className="muted">
           Without an address of its own, a timeline is at its ID. Links to its earlier addresses
           keep leading here, until another of your timelines takes one of them.
+        </p>
+      </section>
+      <section>
+        <h2>
+          Image
+          <HelpTip topic="images#a-timelines-own-image" about="the timeline’s image">
+            Shown above its title, on its card wherever timelines are listed, and when its link is
+            shared.
+          </HelpTip>
+        </h2>
+        {/* Keyed by the saved image, so the fields show it again after a change. */}
+        <form className="image-form" key={timeline.image?.url ?? ''} onSubmit={setImage}>
+          <div className="image-preview">
+            {preview ? (
+              <img
+                src={preview}
+                alt=""
+                referrerPolicy="no-referrer"
+                onLoad={(e) =>
+                  setImageSize({
+                    url: preview,
+                    size: { width: e.target.naturalWidth, height: e.target.naturalHeight },
+                  })
+                }
+              />
+            ) : (
+              <span className="timeline-card-placeholder" aria-hidden="true" />
+            )}
+          </div>
+          <label>
+            Link to the image
+            <input
+              name="url"
+              type="url"
+              defaultValue={timeline.image?.url ?? ''}
+              onChange={(e) => setImageLink(e.target.value)}
+              placeholder="https://upload.wikimedia.org/…"
+              pattern="https://.*"
+              title="An https:// address"
+              maxLength={4096}
+              required
+            />
+          </label>
+          <label>
+            Alt text
+            <input
+              name="alt"
+              defaultValue={timeline.image?.alt ?? ''}
+              placeholder="What the image shows, for those who can’t see it"
+              maxLength={IMAGE_ALT_LENGTH}
+            />
+          </label>
+          <div className="actions">
+            <button disabled={busy}>{timeline.image ? 'Replace image' : 'Set image'}</button>
+            {timeline.image && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setImageLink('');
+                  void mutate('/settings', 'PATCH', { image: null });
+                }}
+              >
+                Remove image
+              </button>
+            )}
+          </div>
+          {imageError && (
+            <p className="error" role="alert">
+              {imageError}
+            </p>
+          )}
+        </form>
+        <p className="muted">
+          Link an image where it is hosted, such as Wikimedia Commons or your own site: the server
+          keeps the link, not a copy, and exports carry a copy for offline use. Link only images you
+          may share; the same rules and reports apply as to every image.
         </p>
       </section>
       <section>

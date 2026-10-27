@@ -2,7 +2,17 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-Timelines show images by linking to them: a moment's icon, a duration's background or a stack entry's picture is an HTTPS address where its owner hosts it ([#109](https://github.com/openchronology/timeline-app/issues/109)). The server stores the link, never a copy of the image, and readers' browsers load the image from its host.
+Timelines show images by linking to them: a moment's icon, a duration's background, a stack entry's picture or the timeline's own image is an HTTPS address where its owner hosts it ([#109](https://github.com/openchronology/timeline-app/issues/109)). The server stores the link, never a copy of the image, and readers' browsers load the image from its host.
+
+## A timeline's own image
+
+A timeline can have an image of its own ([#339](https://github.com/openchronology/timeline-app/issues/339)): its owner sets, replaces or removes it under **Sharing & settings** → **Image**, with a link to the image and alt text saying what it shows. It is shown:
+
+- above the timeline's title, in the editor and as readers see it (blurred, like its other images, on a timeline with [sensitive-content labels](moderation.md#sensitive-content-labels));
+- at the top of its card wherever timelines are listed (the dashboard, profiles and search results), cropped to 16 : 9 and loaded as it scrolls into view; a card without one, or of a labelled timeline, shows a plain placeholder of the same shape;
+- as its [link preview](sharing.md#link-previews) and its oEmbed thumbnail, while it is public and unlabelled.
+
+It is one of the document's settings, like its title and tags (`image` in the `.ochx` file: `{"url": "https://…", "alt": "…", "width": 1200, "height": 800}`, its size optional), so its saved history, exports, forks and pull requests keep it, and a document saved or imported with one sets it. Through the API it is set with `PATCH /api/timelines/:id/settings` and `{"image": {"url", "alt"}}`, or removed with `{"image": null}`; that saves the settings as a revision of its own. Like every image here it is a link, not a copy: the server keeps the address, and **Export** carries a copy for offline use. Its link must be HTTPS without credentials, and the same rules and reports apply as to other images.
 
 ## Why links, not copies
 

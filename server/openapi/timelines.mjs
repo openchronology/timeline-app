@@ -214,6 +214,34 @@ export const schemas = {
       },
     },
   },
+  TimelineImage: {
+    type: 'object',
+    description:
+      'The timeline’s own image (#339): shown above its title, on its card and as its link preview. A link to where it is hosted, never a copy (docs/images.md).',
+    required: ['url'],
+    additionalProperties: false,
+    properties: {
+      url: {
+        type: 'string',
+        format: 'uri',
+        pattern: '^https://',
+        maxLength: 4096,
+        description: 'An HTTPS address without credentials.',
+      },
+      alt: {
+        type: 'string',
+        maxLength: 1000,
+        description: 'What it shows, for those who cannot see it; empty when it only decorates.',
+      },
+      width: {
+        type: 'integer',
+        minimum: 1,
+        maximum: 100000,
+        description: 'Its width in pixels, with `height`: the oEmbed thumbnail needs both.',
+      },
+      height: { type: 'integer', minimum: 1, maximum: 100000 },
+    },
+  },
   SavedComparison: {
     type: 'object',
     description:
@@ -296,6 +324,7 @@ export const schemas = {
         maxItems: 40,
         description: 'The timeline’s tags: lowercased, without commas or control characters.',
       },
+      image: ref('TimelineImage'),
       assets: {
         type: 'object',
         maxProperties: 200,
@@ -322,6 +351,7 @@ export const schemas = {
       presentation: ref('TimePresentation'),
       plugins: { type: 'array', maxItems: 32, items: { type: 'object' } },
       tags: { type: 'array', items: { type: 'string' }, maxItems: 40 },
+      image: ref('TimelineImage'),
       assets: { type: 'object' },
     },
   },
@@ -352,6 +382,7 @@ export const schemas = {
       presentation: nullable(ref('TimePresentation')),
       plugins: { type: ['array', 'null'], items: { type: 'object' } },
       tags: { type: ['array', 'null'], items: { type: 'string' } },
+      image: nullable(ref('TimelineImage')),
       assets: { type: ['object', 'null'] },
       comparison: nullable(ref('SavedComparison')),
       featured: { type: 'boolean' },
@@ -1065,7 +1096,7 @@ export const paths = {
       tags: ['Timelines'],
       summary: 'Change a timeline’s settings',
       description:
-        'For its owner (or an administrator): any of its visibility, private forking policy, retention period, whether it keeps saved history, sensitive-content labels and address. Turning saved history off deletes past revisions at once, apart from those forks and pull requests still use. A timeline goes public only if moderators have not restricted it, it is not a copy of a private timeline, and (for a comparison) all its sources are public. Changing anything but the address saves a new revision.',
+        'For its owner (or an administrator): any of its visibility, private forking policy, retention period, whether it keeps saved history, sensitive-content labels, address and image. Turning saved history off deletes past revisions at once, apart from those forks and pull requests still use. A timeline goes public only if moderators have not restricted it, it is not a copy of a private timeline, and (for a comparison) all its sources are public. Changing anything but the address saves a new revision; the image, one of the document’s settings, is saved as a revision of the settings alone, kept in saved history, exports and forks.',
       security: TIMELINE_WRITE,
       requestBody: body({
         type: 'object',
@@ -1094,6 +1125,10 @@ export const paths = {
             type: ['string', 'null'],
             description:
               'Its address, `/<owner>/<slug>`: 1–64 lowercase letters, digits, hyphens or underscores, starting with a letter or digit (trimmed and lowercased first). Null or empty removes it. Its former slug keeps leading to it until another of the owner’s timelines takes it.',
+          },
+          image: {
+            ...nullable(ref('TimelineImage')),
+            description: 'Its own image, set or replaced; null removes it. Not for a comparison.',
           },
         },
       }),

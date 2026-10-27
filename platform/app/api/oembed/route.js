@@ -10,6 +10,7 @@ import { profilePath, timelineAddress } from '../../../../src/addresses.ts';
 import {
   embedCode,
   entityParam,
+  previewOf,
   publicTimeline,
   siteOrigin,
   siteName,
@@ -26,6 +27,17 @@ const limit = (value) => {
   const n = Number(value);
   return value !== null && Number.isSafeInteger(n) && n > 0 ? n : Infinity;
 };
+/** The thumbnail fields: the timeline's own image when its size is known, else its preview. */
+function thumbnail(origin, timeline) {
+  const image = previewOf(timeline);
+  return image?.width
+    ? { thumbnail_url: image.url, thumbnail_width: image.width, thumbnail_height: image.height }
+    : {
+        thumbnail_url: `${origin}/timelines/${timeline.id}/opengraph-image`,
+        thumbnail_width: 1200,
+        thumbnail_height: 630,
+      };
+}
 export async function GET(request) {
   const query = new URL(request.url).searchParams;
   if ((query.get('format') ?? 'json') !== 'json')
@@ -67,14 +79,10 @@ export async function GET(request) {
       html: embedCode(src, title, width, height),
       width,
       height,
-      // No thumbnail of a labelled timeline (#115): it opens behind its warning.
-      ...(timeline.labels?.length
-        ? {}
-        : {
-            thumbnail_url: `${origin}/timelines/${timeline.id}/opengraph-image`,
-            thumbnail_width: 1200,
-            thumbnail_height: 630,
-          }),
+      // No thumbnail of a labelled timeline (#115): it opens behind its warning. Its own
+      // image (#339) when it has one of known size (oEmbed needs the size), else the drawn
+      // preview.
+      ...(timeline.labels?.length ? {} : thumbnail(origin, timeline)),
       cache_age: 3600,
     },
     { headers: { 'Cache-Control': 'public, max-age=3600', 'Access-Control-Allow-Origin': '*' } },

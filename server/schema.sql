@@ -391,6 +391,9 @@ CREATE INDEX IF NOT EXISTS oc_plugin_suites_owner ON oc_plugin_suites(owner_id);
 --   event_text: the catalogue's text of the timeline's duration and moment titles and notes,
 --   at most 1 MiB (eventSearchText in store.mjs, oc_event_text below).
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS tags text[];
+-- image: the timeline's own image (#339), from its document's settings: {url, alt, width?,
+-- height?}, a link to where it is hosted (docs/images.md), shown on its page and card.
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS image jsonb;
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS assets jsonb;
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS featured boolean NOT NULL DEFAULT false;
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS event_text text NOT NULL DEFAULT '';

@@ -4,6 +4,7 @@
 // tags that filter the list, and its stars, size, compare checkbox and fork.
 import Link from 'next/link';
 import StarButton from './star-button.jsx';
+import TimelineCardImage from './timeline-image.jsx';
 import { describeLabels } from '../../src/content-labels.ts';
 import { CompareCheckbox } from './compare-selection.jsx';
 import { profilePath, timelinePath } from '../../src/addresses.ts';
@@ -54,11 +55,11 @@ export function TimelineShape({ shape }) {
   );
 }
 /**
- * Where a timeline's image goes, above its title: nothing yet. The optional timeline image
- * (#339) renders here, so every list's cards show it in the same place.
+ * Where a timeline's image goes, above its title: its own image (#339) or a placeholder of the
+ * same shape, so every list's cards show it in the same place. The list layout leaves it out.
  */
-export function TimelineCardMedia() {
-  return null;
+export function TimelineCardMedia({ timeline }) {
+  return <TimelineCardImage timeline={timeline} />;
 }
 /**
  * One timeline's card.
