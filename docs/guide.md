@@ -129,7 +129,7 @@ When you can't edit a timeline, a moment or duration opens in the **reader** ins
 
 On phones the reader fills the screen. **Share** and **Report** are there too.
 
-If you can edit, turn on **View mode** at the top to read the timeline the same way. It hides the editing controls, so nothing changes by accident. Turn it off to edit again. This browser remembers the setting.
+If you can edit, turn on **View mode** at the top to read the timeline the same way. It hides the editing controls, so nothing changes by accident. Turn it off to edit again. This browser remembers the setting. The reader opens in [separated](tags.md#separating-by-tags) tracks too, in View mode or when you can't edit; otherwise they open read-only details.
 
 ### Durations
 

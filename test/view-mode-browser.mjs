@@ -148,6 +148,51 @@ export async function checkViewMode(page, restore) {
   await page.locator('#reader-close').click();
   await page.waitForFunction(() => !document.getElementById('inspector').open);
 
+  // Separated (#345), its tracks still open in the reader, as the timeline keeps them.
+  await page.locator('#separate-button').click();
+  await page.locator('#separate-extra').fill('pacific');
+  await page.locator('#separate-submit').click();
+  await page.locator('#separation-settings').waitFor();
+  // Separation re-keys markers into tracks, which ease into place: click once they hold still.
+  const settled = async (selector) => {
+    let last = null;
+    for (let i = 0; i < 100; i++) {
+      const box = await page.locator(selector).boundingBox();
+      if (box && last && box.x === last.x && box.y === last.y) return;
+      last = box;
+      await new Promise((r) => setTimeout(r, 150));
+    }
+  };
+  await settled('.event-marker[aria-label="The landing"]');
+  await page.getByRole('button', { name: 'The landing', exact: true }).click({ force: true });
+  await page.waitForFunction(
+    () =>
+      document.getElementById('inspector').open &&
+      document.getElementById('reader-title').textContent === 'The landing',
+  );
+  assert.equal(await page.locator('#moment-panel').isVisible(), false);
+  await page.waitForFunction(() => document.querySelector('#reader-panel .related-entity'));
+  shown = await read();
+  assert.deepEqual(shown.tags, ['amphibious', 'pacific']);
+  assert.deepEqual(shown.details, ['Date precision', 'Day']);
+  assert.match(shown.related.join(), /The campaign/, 'its relationships, by its own ID');
+  await page.locator('#reader-close').click();
+  await page.waitForFunction(() => !document.getElementById('inspector').open);
+  await settled('.duration-band[data-duration-id="rest:campaign"]');
+  await page.locator('.duration-band[data-duration-id="rest:campaign"]').click({ force: true });
+  await page.waitForFunction(
+    () =>
+      document.getElementById('inspector').open &&
+      document.getElementById('reader-title').textContent === 'The campaign',
+  );
+  shown = await read();
+  assert.match(shown.when, / → /);
+  assert.match(shown.related.join(), /The landing/);
+  await page.locator('#reader-close').click();
+  await page.waitForFunction(() => !document.getElementById('inspector').open);
+  await page.locator('#separation-rejoin').click();
+  await page.locator('#separation-settings').waitFor({ state: 'hidden' });
+
   // Off again, the editor is back.
   await page.locator('#view-mode').uncheck();
   await page.waitForFunction(() => !document.getElementById('add-button').hidden);
