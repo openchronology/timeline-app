@@ -2,11 +2,11 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-The source of the thirteen explainer videos and the ten vertical shorts, after CMR Scanner's leadership-brief video: every frame is drawn in SVG as a pure function of time, and each element appears on the word in the narration that introduces it. One folder per video holds only its scenes (`anim.js`) and settings; everything they share is in [`common/`](common/README.md). Each video's scenes, acts, on-screen text and narration are read straight from its script in [`publicity/`](../README.md), so the script stays the one place they're written.
+The source of the fourteen explainer videos and the eleven vertical shorts, after CMR Scanner's leadership-brief video: every frame is drawn in SVG as a pure function of time, and each element appears on the word in the narration that introduces it. One folder per video holds only its scenes (`anim.js`) and settings; everything they share is in [`common/`](common/README.md). Each video's scenes, acts, on-screen text and narration are read straight from its script in [`publicity/`](../README.md), so the script stays the one place they're written.
 
-The tours (Videos 5, 6, 7 and 8) the logs, AI and investigations videos (10, 12, 13) also show the real app: [`common/capture.mjs`](common/capture.mjs) opens a sample timeline from [`samples/`](samples/README.md) in the built editor and records each shot frame by frame, and the scenes place those frames in a browser window.
+The tours (Videos 5, 6, 7, 8 and 14), the logs, AI and investigations videos (10, 12, 13) also show the real app: [`common/capture.mjs`](common/capture.mjs) opens a sample timeline from [`samples/`](samples/README.md) in the built editor and records each shot frame by frame, and the scenes place those frames in a browser window.
 
-The shorts (`s01-…` to `s10-…`, scripts in [`publicity/shorts/`](../shorts/README.md)) use the same pipeline with `"format": "vertical"` in their `video.json`: a 1080 × 1920 stage, the narration burned in as captions a few words at a time, a headline from each scene's on-screen text, and the real app captured at phone size.
+The shorts (`s01-…` to `s11-…`, scripts in [`publicity/shorts/`](../shorts/README.md)) use the same pipeline with `"format": "vertical"` in their `video.json`: a 1080 × 1920 stage, the narration burned in as captions a few words at a time, a headline from each scene's on-screen text, and the real app captured at phone size.
 
 Narration recordings, trimmed audio, captured shots, rendered frames and MP4s are not in git (see `.gitignore`).
 
@@ -31,6 +31,7 @@ Narration recordings, trimmed audio, captured shots, rendered frames and MP4s ar
 | [`12-ai-and-automation/`](12-ai-and-automation/README.md)                         | Video 12: Timelines from AI and automation.                                                 |
 | [`13-investigations-causal-factors/`](13-investigations-causal-factors/README.md) | Video 13: Investigations, from timeline to causal factors.                                  |
 | [`15-tour-ancient-egypt/`](15-tour-ancient-egypt/README.md)                       | Video 15: Tour, Ancient Egypt.                                                              |
+| [`14-tour-abraham-lincoln/`](14-tour-abraham-lincoln/README.md)                   | Video 14: Tour, Abraham Lincoln.                                                            |
 | [`s01-1776-to-the-moon/`](s01-1776-to-the-moon/README.md)                         | Short 1: 1776 to one second on the Moon.                                                    |
 | [`s02-the-last-six-seconds/`](s02-the-last-six-seconds/README.md)                 | Short 2: you're the last six seconds.                                                       |
 | [`s03-point-one-plus-point-two/`](s03-point-one-plus-point-two/README.md)         | Short 3: 0.1 + 0.2 isn't 0.3.                                                               |
@@ -42,6 +43,7 @@ Narration recordings, trimmed audio, captured shots, rendered frames and MP4s ar
 | [`s09-i-asked-an-ai/`](s09-i-asked-an-ai/README.md)                               | Short 9: I asked an AI to build a timeline.                                                 |
 | [`s10-why-did-it-happen/`](s10-why-did-it-happen/README.md)                       | Short 10: why did it happen?                                                                |
 | [`s12-closer-to-the-moon/`](s12-closer-to-the-moon/README.md)                     | Short 12: Cleopatra lived closer to the Moon landing than to the Great Pyramid.             |
+| [`s11-1503-days/`](s11-1503-days/README.md)                                       | Short 11: Lincoln was president 1,503 days.                                                 |
 
 ## Making a video
 

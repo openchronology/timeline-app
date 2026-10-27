@@ -1,0 +1,3128 @@
+{
+ "format": "openchronology",
+ "version": 1,
+ "title": "Abraham Lincoln, 1809–1865",
+ "description": "A biography of Abraham Lincoln, from his birth in a Kentucky cabin to his funeral train: the frontier, New Salem, the law, his family, his return to politics over slavery, the debates with Douglas, the presidency and the Civil War, emancipation, and his death.\n\n**How to read it.** Chapter headings mark the stages of his life. Homes, offices, partnerships, campaigns, battles and the war are durations; everything else is a moment, tagged by thread (family, home, law, politics, office, speech, writing, slavery, war, work). Related moments are linked: a cause and what it led to.\n\n**Dates.** Local days; times of day are Washington’s, shown at a fixed UTC−5 (standard time zones came only in 1883). Where a date is approximate, its dating note says so.\n\nA sample timeline built from the cited sources (Wikipedia, The Lincoln Log, the Collected Works, the National Archives, the Library of Congress and the National Park Service); not a definitive history.",
+ "presentation": {
+  "mode": "gregorian",
+  "unit": "",
+  "scale": "1/1",
+  "origin": "0/1",
+  "version": 1,
+  "offsetMinutes": -300,
+  "significantDigits": 6
+ },
+ "tags": [
+  "history",
+  "biography",
+  "abraham lincoln",
+  "united states",
+  "civil war",
+  "education"
+ ],
+ "plugins": [
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "rich-text-notes",
+    "version": 1,
+    "name": "Rich text notes",
+    "description": "Edit moment and stack notes visually, storing portable Markdown. Hover cards render safe headings, emphasis, lists, code and HTTPS links. HTML and images are not executed.",
+    "fields": [],
+    "notes": {
+     "kind": "markdown"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-headings",
+    "version": 1,
+    "name": "Headings",
+    "description": "Let a moment act as a heading or marker: only its title shows, sized as a heading from level 1 to 6, and the title is what you click. Choose its font (Times New Roman by default). Headings still group into summaries with other moments.",
+    "fields": [
+     {
+      "kind": "heading",
+      "metadataKey": "headingLevel",
+      "label": "Heading level"
+     },
+     {
+      "kind": "font",
+      "metadataKey": "headingFont",
+      "label": "Heading font"
+     }
+    ],
+    "marker": {
+     "kind": "heading",
+     "metadataKey": "headingLevel"
+    },
+    "targets": [
+     "moments"
+    ]
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-sources",
+    "version": 1,
+    "name": "Sources",
+    "description": "Show and edit a series of source links for moments and stack entries.",
+    "fields": [
+     {
+      "kind": "links",
+      "metadataKey": "sources",
+      "label": "Sources"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-colors",
+    "version": 2,
+    "name": "Moment colors",
+    "description": "Choose muted semantic swatches or a custom color for moments and stack entries while preserving their white borders.",
+    "fields": [
+     {
+      "kind": "color",
+      "metadataKey": "color",
+      "label": "Moment color"
+     }
+    ],
+    "marker": {
+     "kind": "color",
+     "metadataKey": "color"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.color(api.get(\"color\")); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "dating-context",
+    "version": 1,
+    "name": "Dating context",
+    "description": "Explain the precision and coordinate convention of a moment. An exact stored coordinate can still represent an approximate age or a calendar-day marker.",
+    "fields": [
+     {
+      "kind": "text",
+      "metadataKey": "datePrecision",
+      "label": "Date precision"
+     },
+     {
+      "kind": "multiline",
+      "metadataKey": "coordinateConvention",
+      "label": "Coordinate convention"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "expand-on-hover",
+    "version": 1,
+    "name": "Expand on hover",
+    "description": "Hover or focus a summary of two to five moments to fan out its members radially for individual inspection. Larger summaries stay collapsed.",
+    "fields": [],
+    "summary": {
+     "kind": "radial"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.expand(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "timeline-theme",
+    "version": 2,
+    "name": "Timeline theme",
+    "description": "Choose the timeline's colors, fonts and text sizes: its labels, its measure (the axis, tick marks and their times), the halo that keeps them readable over images, the default marker and duration colors, and a background color. Set them here in the plugin list; anything left blank keeps the usual look, and colors chosen for events still win.",
+    "fields": [],
+    "settings": [
+     {
+      "kind": "color",
+      "key": "textColor",
+      "label": "Label color"
+     },
+     {
+      "kind": "font",
+      "key": "textFont",
+      "label": "Label font"
+     },
+     {
+      "kind": "text-size",
+      "key": "textSize",
+      "label": "Label size"
+     },
+     {
+      "kind": "color",
+      "key": "measureColor",
+      "label": "Measure color"
+     },
+     {
+      "kind": "font",
+      "key": "measureFont",
+      "label": "Measure font"
+     },
+     {
+      "kind": "text-size",
+      "key": "measureSize",
+      "label": "Measure size"
+     },
+     {
+      "kind": "color",
+      "key": "haloColor",
+      "label": "Halo color"
+     },
+     {
+      "kind": "color",
+      "key": "markerColor",
+      "label": "Marker color"
+     },
+     {
+      "kind": "color",
+      "key": "durationColor",
+      "label": "Duration color"
+     },
+     {
+      "kind": "color",
+      "key": "backgroundColor",
+      "label": "Background color"
+     }
+    ],
+    "theme": {
+     "text": "textColor",
+     "textFont": "textFont",
+     "textSize": "textSize",
+     "measure": "measureColor",
+     "measureFont": "measureFont",
+     "measureSize": "measureSize",
+     "halo": "haloColor",
+     "marker": "markerColor",
+     "duration": "durationColor",
+     "background": "backgroundColor"
+    }
+   },
+   "enabled": true,
+   "settings": {
+    "textColor": "#1f2a44",
+    "textFont": "Georgia, serif",
+    "measureColor": "#9c3b2a",
+    "haloColor": "#f3ead7",
+    "markerColor": "#1f3a5f",
+    "durationColor": "#9c3b2a",
+    "backgroundColor": "#f3ead7"
+   }
+  }
+ ],
+ "events": [
+  {
+   "id": "h-frontier",
+   "time": "-5080647600/1",
+   "metadata": {
+    "title": "Kentucky and Indiana",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "born",
+   "time": "-5077018800/1",
+   "metadata": {
+    "title": "Born in Kentucky",
+    "description": "Abraham Lincoln is born in a one-room log cabin on **Sinking Spring Farm**, near Hodgenville, Kentucky, to **Thomas Lincoln** and **Nancy Hanks Lincoln**. His sister **Sarah** is two years older.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln",
+     "https://www.nps.gov/abli/index.htm"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "knob-creek",
+   "time": "-5001937200/1",
+   "metadata": {
+    "title": "Move to Knob Creek",
+    "description": "The family moves about ten miles to a farm on **Knob Creek**, the earliest home Lincoln later remembered.",
+    "tags": [
+     "home"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln",
+     "https://www.nps.gov/abli/index.htm"
+    ],
+    "color": "#8a7a5c",
+    "datePrecision": "Summer 1811; the month and day are not recorded."
+   }
+  },
+  {
+   "id": "tommy",
+   "time": "-4970314800/1",
+   "metadata": {
+    "title": "A brother, Thomas, dies in infancy",
+    "description": "Lincoln's younger brother **Thomas** lives only a few days and is buried near Knob Creek.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln"
+    ],
+    "color": "#4f7a4a",
+    "datePrecision": "Born in 1812 or 1813 and lived only a few days; placed in 1812."
+   }
+  },
+  {
+   "id": "to-indiana",
+   "time": "-4830865200/1",
+   "metadata": {
+    "title": "Move to Indiana",
+    "description": "Partly over land-title disputes and partly, Lincoln later said, because of slavery, Thomas Lincoln moves the family across the Ohio River to **Little Pigeon Creek**, in what became Spencer County, Indiana.",
+    "tags": [
+     "home"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln",
+     "https://www.nps.gov/libo/index.htm"
+    ],
+    "color": "#8a7a5c",
+    "datePrecision": "December 1816; the day is not recorded."
+   }
+  },
+  {
+   "id": "nancy-dies",
+   "time": "-4772718000/1",
+   "metadata": {
+    "title": "His mother dies",
+    "description": "**Nancy Hanks Lincoln** dies of milk sickness, poisoning from the milk of cows that had grazed on white snakeroot. Abraham is nine.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Nancy_Lincoln"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "stepmother",
+   "time": "-4736170800/1",
+   "metadata": {
+    "title": "A stepmother, Sarah Bush Johnston",
+    "description": "Thomas Lincoln marries the widow **Sarah Bush Johnston** in Elizabethtown, Kentucky. She brings her three children to Indiana and encourages Abraham’s reading; he remained devoted to her.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sarah_Bush_Lincoln"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "sarah-dies",
+   "time": "-4479476400/1",
+   "metadata": {
+    "title": "His sister Sarah dies",
+    "description": "**Sarah Lincoln Grigsby** dies in childbirth, aged twenty, a year and a half after marrying Aaron Grigsby.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lincoln_family"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "flatboat-1828",
+   "time": "-4473255600/1",
+   "metadata": {
+    "title": "Flatboat to New Orleans",
+    "description": "With **Allen Gentry**, Lincoln takes a flatboat of produce down the Ohio and Mississippi to **New Orleans**, his first sight of a great city.",
+    "tags": [
+     "work"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln"
+    ],
+    "color": "#7a5c2e",
+    "datePrecision": "Spring 1828; placed in April."
+   }
+  },
+  {
+   "id": "to-illinois",
+   "time": "-4412862000/1",
+   "metadata": {
+    "title": "The family moves to Illinois",
+    "description": "The Lincolns and their relatives leave Indiana for **Macon County, Illinois**, near Decatur. Abraham, just twenty-one, helps clear and fence the new farm.",
+    "tags": [
+     "home"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln",
+     "https://www.thelincolnlog.org/"
+    ],
+    "color": "#8a7a5c",
+    "datePrecision": "They set out in early March 1830."
+   }
+  },
+  {
+   "id": "flatboat-1831",
+   "time": "-4376055600/1",
+   "metadata": {
+    "title": "Second flatboat trip",
+    "description": "Lincoln, his stepbrother **John D. Johnston** and cousin **John Hanks** take a flatboat to New Orleans for the trader **Denton Offutt**, who then hires him to clerk a store in New Salem.",
+    "tags": [
+     "work"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln"
+    ],
+    "color": "#7a5c2e",
+    "datePrecision": "Left in late April or early May 1831."
+   }
+  },
+  {
+   "id": "h-new-salem",
+   "time": "-4370785200/1",
+   "metadata": {
+    "title": "New Salem",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "new-salem",
+   "time": "-4368711600/1",
+   "metadata": {
+    "title": "Arrives in New Salem",
+    "description": "Lincoln settles in **New Salem**, a village on the Sangamon River, on his own for the first time: a clerk, a wrestler, a reader of borrowed books.",
+    "tags": [
+     "home"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln",
+     "https://www.thelincolnlog.org/"
+    ],
+    "color": "#8a7a5c",
+    "datePrecision": "Late July 1831; the day is not recorded."
+   }
+  },
+  {
+   "id": "candidacy",
+   "time": "-4349012400/1",
+   "metadata": {
+    "title": "First run for the legislature",
+    "description": "His first public letter, to the people of **Sangamon County** in the Sangamo Journal, announces his candidacy for the Illinois House and argues for river improvements and education.",
+    "tags": [
+     "politics",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "captain",
+   "time": "-4345297200/1",
+   "metadata": {
+    "title": "Elected captain of volunteers",
+    "description": "Volunteering for the **Black Hawk War**, Lincoln is elected captain by his company, an honor he later said gave him more pleasure than any since. He saw no combat.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln_in_the_Black_Hawk_War",
+     "https://www.thelincolnlog.org/"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "loses-1832",
+   "time": "-4336052400/1",
+   "metadata": {
+    "title": "Loses his first election",
+    "description": "Back from the war with little time to campaign, he finishes eighth of thirteen for four seats, though New Salem gives him 277 of its 300 votes.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "store",
+   "time": "-4322055600/1",
+   "metadata": {
+    "title": "A store with William Berry",
+    "description": "Lincoln and **William F. Berry** buy a New Salem store on credit. It fails, and after Berry’s death Lincoln spends years repaying what he called \"the national debt\".",
+    "tags": [
+     "work"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln"
+    ],
+    "color": "#7a5c2e",
+    "datePrecision": "Bought late in 1832 or early in 1833; placed in January 1833."
+   }
+  },
+  {
+   "id": "postmaster",
+   "time": "-4312378800/1",
+   "metadata": {
+    "title": "Appointed postmaster",
+    "description": "He becomes postmaster of **New Salem**, a small federal post that let him read every newspaper that came through.",
+    "tags": [
+     "office"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln",
+     "https://www.thelincolnlog.org/"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "surveyor",
+   "time": "-4294407600/1",
+   "metadata": {
+    "title": "Deputy surveyor",
+    "description": "Taught by borrowed books, he becomes a deputy to **John Calhoun**, the Sangamon County surveyor, laying out roads, farms and town lots until early 1836.",
+    "tags": [
+     "work"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln"
+    ],
+    "color": "#7a5c2e",
+    "datePrecision": "Late 1833 or the first days of 1834; placed in December 1833."
+   }
+  },
+  {
+   "id": "elected-1834",
+   "time": "-4273153200/1",
+   "metadata": {
+    "title": "Elected to the Illinois House",
+    "description": "At twenty-five, Lincoln wins a seat for **Sangamon County**, the first of four straight terms as a Whig. **John Todd Stuart** urges him to study law.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "ann-rutledge",
+   "time": "-4239802800/1",
+   "metadata": {
+    "title": "Ann Rutledge dies",
+    "description": "**Ann Rutledge**, a New Salem friend, dies of what was probably typhoid. Her death grieved him deeply; how close they were is debated by historians.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ann_Rutledge"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "reelected-1836",
+   "time": "-4210254000/1",
+   "metadata": {
+    "title": "Re-elected with the Long Nine",
+    "description": "He tops the poll in Sangamon County, one of nine unusually tall Whigs from the county, the **Long Nine**.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "license",
+   "time": "-4206884400/1",
+   "metadata": {
+    "title": "Licensed to practice law",
+    "description": "Self-taught from borrowed books, chiefly **Blackstone’s Commentaries**, Lincoln receives his license to practice law in Illinois.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln",
+     "https://www.thelincolnlog.org/"
+    ],
+    "color": "#7a5c2e"
+   }
+  },
+  {
+   "id": "capital",
+   "time": "-4192023600/1",
+   "metadata": {
+    "title": "The capital moves to Springfield",
+    "description": "The legislature votes to move the state capital from Vandalia to **Springfield**, a measure Lincoln and the Long Nine worked hard for.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "protest",
+   "time": "-4191764400/1",
+   "metadata": {
+    "title": "Lincoln–Stone protest",
+    "description": "With **Dan Stone**, Lincoln enters a protest in the House journal: slavery is \"founded on both injustice and bad policy\", though Congress has no power to interfere with it in the states. Only six members had voted against resolutions condemning abolitionists.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "h-springfield",
+   "time": "-4189258800/1",
+   "metadata": {
+    "title": "Springfield",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "to-springfield",
+   "time": "-4188049200/1",
+   "metadata": {
+    "title": "Moves to Springfield",
+    "description": "Lincoln rides into **Springfield** with everything he owns in two saddlebags, shares a room above **Joshua Speed**’s store, and becomes **John Todd Stuart**’s law partner.",
+    "tags": [
+     "home",
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Joshua_Fry_Speed",
+     "https://www.thelincolnlog.org/"
+    ],
+    "color": "#8a7a5c"
+   }
+  },
+  {
+   "id": "lyceum",
+   "time": "-4163252400/1",
+   "metadata": {
+    "title": "Lyceum Address",
+    "description": "To the Young Men’s Lyceum of Springfield, Lincoln warns that the danger to the republic is from within: mob violence and disregard for law.",
+    "tags": [
+     "speech"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln's_Lyceum_address",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "broken",
+   "time": "-4070804400/1",
+   "metadata": {
+    "title": "Engagement to Mary Todd broken",
+    "description": "Lincoln breaks off his engagement to **Mary Todd** and falls into a deep depression. They reconcile in 1842.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mary_Todd_Lincoln",
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln"
+    ],
+    "color": "#4f7a4a",
+    "datePrecision": "The \"fatal first of January\" 1841; what happened that day is not fully known."
+   }
+  },
+  {
+   "id": "shields",
+   "time": "-4016458800/1",
+   "metadata": {
+    "title": "A duel called off",
+    "description": "Satirical letters by Lincoln (and, it seems, Mary Todd) provoke the Democrat **James Shields** to challenge him. On Bloody Island, opposite Alton, friends settle it before a blow is struck.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/James_Shields",
+     "https://en.wikipedia.org/wiki/Mary_Todd_Lincoln"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "marriage",
+   "time": "-4012743600/1",
+   "metadata": {
+    "title": "Marries Mary Todd",
+    "description": "Lincoln marries **Mary Ann Todd**, of a prominent Lexington, Kentucky family, at her sister’s home in Springfield. They board at the **Globe Tavern**.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mary_Todd_Lincoln",
+     "https://www.thelincolnlog.org/"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "robert-born",
+   "time": "-3989415600/1",
+   "metadata": {
+    "title": "Robert is born",
+    "description": "**Robert Todd Lincoln**, their first son and the only one to grow to adulthood. He became Secretary of War and died in 1926.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Robert_Todd_Lincoln"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "house",
+   "time": "-3965742000/1",
+   "metadata": {
+    "title": "The house at Eighth and Jackson",
+    "description": "The Lincolns buy a one-and-a-half-storey house at **Eighth and Jackson** streets, the only home Lincoln ever owned; it is now the Lincoln Home National Historic Site.",
+    "tags": [
+     "home",
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lincoln_Home_National_Historic_Site",
+     "https://www.nps.gov/liho/index.htm"
+    ],
+    "color": "#8a7a5c",
+    "datePrecision": "They moved in during May 1844."
+   }
+  },
+  {
+   "id": "eddie-born",
+   "time": "-3907162800/1",
+   "metadata": {
+    "title": "Eddie is born",
+    "description": "**Edward Baker Lincoln**, named for Lincoln’s friend Edward D. Baker.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Edward_Baker_Lincoln"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "h-congress",
+   "time": "-3897399600/1",
+   "metadata": {
+    "title": "Congress and the law",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "elected-congress",
+   "time": "-3894548400/1",
+   "metadata": {
+    "title": "Elected to Congress",
+    "description": "Lincoln wins Illinois’s **7th district**, the state’s only Whig seat, defeating the Methodist preacher **Peter Cartwright**.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln",
+     "https://www.thelincolnlog.org/"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "spot",
+   "time": "-3850830000/1",
+   "metadata": {
+    "title": "Spot Resolutions",
+    "description": "Weeks into his term, Lincoln demands that President **Polk** name the exact \"spot\" where American blood was shed to start the **Mexican–American War**. Critics at home call him \"Spotty\".",
+    "tags": [
+     "politics",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Spot_Resolutions",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "war-speech",
+   "time": "-3849015600/1",
+   "metadata": {
+    "title": "Speech against the Mexican War",
+    "description": "In the House, Lincoln argues that Polk began the war unnecessarily and unconstitutionally. It costs him support in Illinois.",
+    "tags": [
+     "speech",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Spot_Resolutions",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "dc-bill",
+   "time": "-3817566000/1",
+   "metadata": {
+    "title": "A plan to end slavery in Washington",
+    "description": "Lincoln announces a bill for gradual, compensated emancipation in the **District of Columbia**, subject to a vote of its residents. Without support, he never formally introduces it.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "patent",
+   "time": "-3806161200/1",
+   "metadata": {
+    "title": "Patent No. 6,469",
+    "description": "A device for lifting boats over shoals with inflatable chambers: Lincoln remains the only president to hold a patent. It was never manufactured.",
+    "tags": [
+     "work"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln's_patent"
+    ],
+    "color": "#7a5c2e"
+   }
+  },
+  {
+   "id": "eddie-dies",
+   "time": "-3784129200/1",
+   "metadata": {
+    "title": "Eddie dies",
+    "description": "**Eddie** dies at three, after an illness of nearly two months, possibly tuberculosis.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Edward_Baker_Lincoln"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "willie-born",
+   "time": "-3756222000/1",
+   "metadata": {
+    "title": "Willie is born",
+    "description": "**William Wallace Lincoln**, the son most like his father, by many accounts.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/William_Wallace_Lincoln"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "father-dies",
+   "time": "-3753889200/1",
+   "metadata": {
+    "title": "His father dies",
+    "description": "**Thomas Lincoln** dies in Coles County, Illinois. His son, estranged, does not travel to his deathbed or the funeral.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Thomas_Lincoln"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "clay",
+   "time": "-3707578800/1",
+   "metadata": {
+    "title": "Eulogy on Henry Clay",
+    "description": "In Springfield, Lincoln eulogizes **Henry Clay**, his \"beau ideal of a statesman\", for a lifetime of compromise to hold the Union together.",
+    "tags": [
+     "speech"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Henry_Clay",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "tad-born",
+   "time": "-3684078000/1",
+   "metadata": {
+    "title": "Tad is born",
+    "description": "**Thomas \"Tad\" Lincoln**, the youngest; his father nicknamed him for his large head, \"like a tadpole\". He died in 1871, aged eighteen.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tad_Lincoln"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "h-return",
+   "time": "-3650209200/1",
+   "metadata": {
+    "title": "Back into politics",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "kansas-nebraska",
+   "time": "-3647703600/1",
+   "metadata": {
+    "title": "Kansas–Nebraska Act",
+    "description": "**Stephen A. Douglas**’s act lets settlers of the new territories decide on slavery, repealing the **Missouri Compromise** line. Lincoln later wrote that it roused him back into politics.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Kansas–Nebraska_Act"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "peoria",
+   "time": "-3635694000/1",
+   "metadata": {
+    "title": "Peoria speech",
+    "description": "Answering Douglas at **Peoria**, Lincoln makes his case against spreading slavery: its \"monstrous injustice\", and that no man is good enough to govern another without that other’s consent.",
+    "tags": [
+     "speech",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln's_Peoria_speech",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "senate-1855",
+   "time": "-3625758000/1",
+   "metadata": {
+    "title": "Loses the Senate race",
+    "description": "Leading on the early ballots in the legislature, Lincoln throws his votes to **Lyman Trumbull** to make sure an anti-Nebraska man wins the seat.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln",
+     "https://www.thelincolnlog.org/"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "lost-speech",
+   "time": "-3584631600/1",
+   "metadata": {
+    "title": "Joins the Republicans",
+    "description": "At the founding convention of the Illinois **Republican Party** in Bloomington he gives the \"**Lost Speech**\", so gripping, the story goes, that reporters forgot to take notes.",
+    "tags": [
+     "speech",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lincoln's_Lost_Speech"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "vp-votes",
+   "time": "-3582817200/1",
+   "metadata": {
+    "title": "110 votes for vice president",
+    "description": "At the first Republican national convention, in Philadelphia, Lincoln receives 110 votes on an informal ballot for vice president: the first sign of a national name.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1856_Republican_National_Convention"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "dred-scott",
+   "time": "-3560353200/1",
+   "metadata": {
+    "title": "Dred Scott decision",
+    "description": "The Supreme Court rules that Black Americans cannot be citizens and that Congress cannot bar slavery from the territories.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Dred_Scott_v._Sandford"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "dred-scott-speech",
+   "time": "-3550676400/1",
+   "metadata": {
+    "title": "Speech on the Dred Scott decision",
+    "description": "In Springfield, Lincoln answers Douglas: the Declaration’s \"all men are created equal\" was meant to include Black Americans, as a standard to work toward.",
+    "tags": [
+     "speech",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Dred_Scott_v._Sandford",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "effie-afton",
+   "time": "-3544887600/1",
+   "metadata": {
+    "title": "The Effie Afton case",
+    "description": "Lincoln helps defend the **Rock Island Bridge**, the first railroad bridge over the Mississippi, after a steamboat hits it. The jury deadlocks, and the railroads keep their bridge.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hurd_v._Rock_Island_Bridge_Co."
+    ],
+    "color": "#7a5c2e",
+    "datePrecision": "The trial ran through September 1857; placed at the month’s start."
+   }
+  },
+  {
+   "id": "almanac",
+   "time": "-3523460400/1",
+   "metadata": {
+    "title": "The Almanac Trial",
+    "description": "Defending **William \"Duff\" Armstrong** for murder, Lincoln uses an almanac to show the Moon was too low for the witness to have seen the killing by its light. Armstrong is acquitted.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln",
+     "https://www.thelincolnlog.org/"
+    ],
+    "color": "#7a5c2e"
+   }
+  },
+  {
+   "id": "house-divided",
+   "time": "-3520004400/1",
+   "metadata": {
+    "title": "House Divided speech",
+    "description": "Accepting the Republican nomination for the Senate, Lincoln says the nation cannot \"endure, permanently half slave and half free\": it will become all one thing or all the other.",
+    "tags": [
+     "speech",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lincoln's_House_Divided_Speech",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "ottawa",
+   "time": "-3514302000/1",
+   "metadata": {
+    "title": "Debate at Ottawa",
+    "description": "The first of seven debates with **Stephen A. Douglas**, before a crowd of perhaps ten thousand.",
+    "tags": [
+     "speech",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lincoln–Douglas_debates"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "freeport",
+   "time": "-3513783600/1",
+   "metadata": {
+    "title": "Debate at Freeport",
+    "description": "Lincoln asks whether a territory’s people can exclude slavery; Douglas’s \"Freeport Doctrine\" answer costs him with Southern Democrats.",
+    "tags": [
+     "speech",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lincoln–Douglas_debates"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "jonesboro",
+   "time": "-3512142000/1",
+   "metadata": {
+    "title": "Debate at Jonesboro",
+    "description": "The third debate, in deep southern Illinois, before the smallest crowd.",
+    "tags": [
+     "speech",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lincoln–Douglas_debates"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "charleston",
+   "time": "-3511882800/1",
+   "metadata": {
+    "title": "Debate at Charleston",
+    "description": "Near his father’s last home in Coles County, Lincoln disclaims social and political equality of the races, a passage historians still weigh against his later course.",
+    "tags": [
+     "speech",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lincoln–Douglas_debates"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "galesburg",
+   "time": "-3510241200/1",
+   "metadata": {
+    "title": "Debate at Galesburg",
+    "description": "The fifth debate, at Knox College.",
+    "tags": [
+     "speech",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lincoln–Douglas_debates"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "quincy",
+   "time": "-3509722800/1",
+   "metadata": {
+    "title": "Debate at Quincy",
+    "description": "The sixth debate, on the Mississippi.",
+    "tags": [
+     "speech",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lincoln–Douglas_debates"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "alton",
+   "time": "-3509550000/1",
+   "metadata": {
+    "title": "Debate at Alton",
+    "description": "The last debate: Lincoln frames the contest as the \"eternal struggle\" between right and wrong over slavery.",
+    "tags": [
+     "speech",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lincoln–Douglas_debates"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "loses-1858",
+   "time": "-3502465200/1",
+   "metadata": {
+    "title": "Douglas keeps his seat",
+    "description": "Republican candidates win more votes statewide in November, but the Democrats hold the legislature, which re-elects **Douglas**. The debates, published, make Lincoln known nationally.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lincoln–Douglas_debates"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "fell",
+   "time": "-3472311600/1",
+   "metadata": {
+    "title": "A short autobiography",
+    "description": "For **Jesse W. Fell**, Lincoln writes a brief account of his life for campaign use: \"There is not much of it, for the reason, I suppose, that there is not much of me.\"",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "cooper-union",
+   "time": "-3466350000/1",
+   "metadata": {
+    "title": "Cooper Union address",
+    "description": "In New York, Lincoln shows that most of the Constitution’s signers held that Congress could regulate slavery in the territories, and ends: \"let us have faith that right makes might\". **Mathew Brady** photographs him the same day.",
+    "tags": [
+     "speech",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Cooper_Union_speech",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "nominated",
+   "time": "-3459351600/1",
+   "metadata": {
+    "title": "Nominated for president",
+    "description": "At the **Republican National Convention** in Chicago’s Wigwam, Lincoln overtakes **William H. Seward** and is nominated on the third ballot.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1860_Republican_National_Convention"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "bedell",
+   "time": "-3446046000/1",
+   "metadata": {
+    "title": "Letter to Grace Bedell",
+    "description": "Answering eleven-year-old **Grace Bedell**, who suggested he grow whiskers, Lincoln asks whether people would call it \"a piece of silly affect[at]ion\". He grew a beard soon after.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Grace_Bedell",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "elected",
+   "time": "-3444490800/1",
+   "metadata": {
+    "title": "Elected president",
+    "description": "With four candidates in the field, Lincoln wins with about 40 percent of the popular vote and a majority of the electoral college, without a single Southern electoral vote.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1860_United_States_presidential_election"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "south-carolina",
+   "time": "-3440689200/1",
+   "metadata": {
+    "title": "South Carolina secedes",
+    "description": "The first state to declare itself out of the Union, six weeks after the election.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ordinance_of_Secession"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "h-presidency",
+   "time": "-3436974000/1",
+   "metadata": {
+    "title": "The presidency",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "confederacy",
+   "time": "-3436369200/1",
+   "metadata": {
+    "title": "The Confederacy is formed",
+    "description": "Seven seceded states adopt a provisional constitution at Montgomery, Alabama; **Jefferson Davis** is chosen president the next day.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Confederate_States_of_America"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "farewell",
+   "time": "-3436110000/1",
+   "metadata": {
+    "title": "Farewell to Springfield",
+    "description": "From the train, Lincoln tells his neighbors he leaves \"with a task before me greater than that which rested upon Washington\". He never returned alive.",
+    "tags": [
+     "speech",
+     "home"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln's_farewell_address",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "arrives",
+   "time": "-3435073200/1",
+   "metadata": {
+    "title": "Arrives in Washington secretly",
+    "description": "Warned of the **Baltimore Plot** against him, Lincoln passes through Baltimore at night on a changed schedule, and is mocked for it.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Baltimore_Plot"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "inaugural-1",
+   "time": "-3434295600/1",
+   "metadata": {
+    "title": "First inaugural address",
+    "description": "Sworn in by **Roger Taney**, Lincoln denies any intent to touch slavery in the states, declares the Union perpetual, and appeals to \"the better angels of our nature\".",
+    "tags": [
+     "speech",
+     "office"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln's_first_inaugural_address",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "sumter",
+   "time": "-3430926000/1",
+   "metadata": {
+    "title": "Fort Sumter",
+    "description": "Lincoln sends supplies to the fort in Charleston harbor; Confederate batteries open fire before dawn, and the garrison surrenders the next day.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Fort_Sumter"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "volunteers",
+   "time": "-3430666800/1",
+   "metadata": {
+    "title": "A call for 75,000 volunteers",
+    "description": "Lincoln calls out 75,000 militia for ninety days. Virginia, Arkansas, North Carolina and Tennessee secede rather than send troops.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Proclamation_80"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "blockade",
+   "time": "-3430321200/1",
+   "metadata": {
+    "title": "Blockade of Southern ports",
+    "description": "Lincoln proclaims a naval blockade of the seceded states’ coast.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Union_blockade"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "habeas",
+   "time": "-3429630000/1",
+   "metadata": {
+    "title": "Habeas corpus suspended",
+    "description": "Lincoln authorizes **General Scott** to suspend the writ along the line from Philadelphia to Washington. Chief Justice Taney’s ruling against it in **Ex parte Merryman** is ignored.",
+    "tags": [
+     "war",
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ex_parte_Merryman"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "bull-run",
+   "time": "-3422286000/1",
+   "metadata": {
+    "title": "First Bull Run",
+    "description": "The first major battle, in Virginia, ends in a Union rout. Lincoln calls for long-term volunteers.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_Battle_of_Bull_Run"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "mcclellan-chief",
+   "time": "-3413386800/1",
+   "metadata": {
+    "title": "McClellan made general-in-chief",
+    "description": "**George B. McClellan** succeeds Winfield Scott. He builds a superb army and is slow to use it.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_B._McClellan"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "trent",
+   "time": "-3412782000/1",
+   "metadata": {
+    "title": "The Trent affair",
+    "description": "A Union captain seizes two Confederate envoys from a British ship. Lincoln releases them to avoid war with Britain: \"one war at a time\", he reportedly said.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Trent_Affair"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "donelson",
+   "time": "-3404142000/1",
+   "metadata": {
+    "title": "Fort Donelson",
+    "description": "**Ulysses S. Grant** takes the fort in Tennessee and some twelve thousand prisoners: \"unconditional surrender\".",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Fort_Donelson"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "willie-dies",
+   "time": "-3403796400/1",
+   "metadata": {
+    "title": "Willie dies in the White House",
+    "description": "**Willie**, eleven, dies of typhoid fever. Lincoln is shattered, and Mary never fully recovers.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/William_Wallace_Lincoln"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "shiloh",
+   "time": "-3399908400/1",
+   "metadata": {
+    "title": "Shiloh",
+    "description": "Two days of fighting in Tennessee cost more than 23,000 casualties. To calls to remove Grant, Lincoln is said to have answered: \"I can’t spare this man; he fights.\"",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Shiloh"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "dc-emancipation",
+   "time": "-3399044400/1",
+   "metadata": {
+    "title": "Slavery ends in Washington",
+    "description": "Lincoln signs the **District of Columbia Compensated Emancipation Act**, freeing about three thousand people and paying their enslavers.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/District_of_Columbia_Compensated_Emancipation_Act"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "homestead",
+   "time": "-3396106800/1",
+   "metadata": {
+    "title": "Homestead Act",
+    "description": "Up to 160 acres of public land for anyone who lives on it and farms it for five years.",
+    "tags": [
+     "office"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Homestead_Acts"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "railway-act",
+   "time": "-3392478000/1",
+   "metadata": {
+    "title": "Pacific Railway Act",
+    "description": "Federal bonds and land grants for a railroad to the Pacific.",
+    "tags": [
+     "office"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Pacific_Railroad_Acts"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "morrill",
+   "time": "-3392391600/1",
+   "metadata": {
+    "title": "Morrill Land-Grant Act",
+    "description": "Public land for colleges of agriculture and the mechanic arts in every loyal state.",
+    "tags": [
+     "office"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Morrill_Land-Grant_Acts"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "cabinet-draft",
+   "time": "-3390663600/1",
+   "metadata": {
+    "title": "Reads the proclamation to his cabinet",
+    "description": "Lincoln reads a draft emancipation proclamation. **William Seward** advises waiting for a victory, so it will not look like \"our last shriek on the retreat\".",
+    "tags": [
+     "slavery",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emancipation_Proclamation"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "greeley",
+   "time": "-3387985200/1",
+   "metadata": {
+    "title": "Letter to Horace Greeley",
+    "description": "Answering the New York Tribune’s editor in public, Lincoln says his \"paramount object\" is to save the Union, whether or not that frees any slave. The proclamation was already in his desk.",
+    "tags": [
+     "writing",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emancipation_Proclamation",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "antietam",
+   "time": "-3385738800/1",
+   "metadata": {
+    "title": "Antietam",
+    "description": "The bloodiest single day in American history halts **Lee**’s invasion of Maryland: the victory Lincoln was waiting for.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Antietam"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "preliminary",
+   "time": "-3385306800/1",
+   "metadata": {
+    "title": "Preliminary Emancipation Proclamation",
+    "description": "Lincoln announces that on January 1, enslaved people in any state still in rebellion will be \"thenceforward, and forever free\".",
+    "tags": [
+     "slavery",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emancipation_Proclamation",
+     "https://www.archives.gov/exhibits/featured-documents/emancipation-proclamation"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "mcclellan-removed",
+   "time": "-3381505200/1",
+   "metadata": {
+    "title": "McClellan removed",
+    "description": "After McClellan fails to pursue Lee, Lincoln replaces him with **Ambrose Burnside** in command of the Army of the Potomac.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_B._McClellan"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "annual-1862",
+   "time": "-3379258800/1",
+   "metadata": {
+    "title": "Annual message: \"the last best hope\"",
+    "description": "His annual message to Congress proposes compensated, gradual emancipation by amendment: \"In giving freedom to the slave, we assure freedom to the free\".",
+    "tags": [
+     "speech",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "fredericksburg",
+   "time": "-3378222000/1",
+   "metadata": {
+    "title": "Fredericksburg",
+    "description": "Burnside’s assaults on Marye’s Heights fail with heavy losses.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Fredericksburg"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "emancipation",
+   "time": "-3376580400/1",
+   "metadata": {
+    "title": "Emancipation Proclamation",
+    "description": "Lincoln declares free all enslaved people in the areas in rebellion, as a war measure, and opens the army and navy to Black men; about 180,000 served in the army.",
+    "tags": [
+     "slavery",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emancipation_Proclamation",
+     "https://www.archives.gov/exhibits/featured-documents/emancipation-proclamation"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "draft",
+   "time": "-3371310000/1",
+   "metadata": {
+    "title": "Enrollment Act",
+    "description": "The first federal conscription law; a drafted man could pay $300 or hire a substitute.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Enrollment_Act"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "vicksburg",
+   "time": "-3360682800/1",
+   "metadata": {
+    "title": "Vicksburg surrenders",
+    "description": "Grant takes the last great Confederate stronghold on the Mississippi, a day after Gettysburg ends. \"The Father of Waters again goes unvexed to the sea,\" Lincoln wrote that summer.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Vicksburg"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "douglass",
+   "time": "-3357486000/1",
+   "metadata": {
+    "title": "Frederick Douglass at the White House",
+    "description": "**Frederick Douglass** meets Lincoln to press for equal pay and protection for Black soldiers. They met twice more.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Frederick_Douglass"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "thanksgiving",
+   "time": "-3352820400/1",
+   "metadata": {
+    "title": "Thanksgiving proclaimed",
+    "description": "Lincoln proclaims the last Thursday of November a national day of **Thanksgiving**, a holiday kept every year since.",
+    "tags": [
+     "office"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Thanksgiving_(United_States)"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "gettysburg-address",
+   "time": "-3348759600/1",
+   "metadata": {
+    "title": "Gettysburg Address",
+    "description": "At the dedication of the Soldiers’ National Cemetery, after **Edward Everett**’s two-hour oration, Lincoln speaks for about two minutes: \"a new birth of freedom\".",
+    "tags": [
+     "speech",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Gettysburg_Address",
+     "https://www.loc.gov/exhibits/gettysburg-address/"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "amnesty",
+   "time": "-3347118000/1",
+   "metadata": {
+    "title": "Ten percent plan",
+    "description": "The **Proclamation of Amnesty and Reconstruction** offers pardon to most Confederates who swear loyalty, and readmits a state once ten percent of its 1860 voters do.",
+    "tags": [
+     "office"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ten_percent_plan"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "grant",
+   "time": "-3339169200/1",
+   "metadata": {
+    "title": "Grant made lieutenant general",
+    "description": "Lincoln presents **Grant** his commission at the White House; three days later Grant commands all the Union armies.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ulysses_S._Grant"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "senate-13th",
+   "time": "-3336577200/1",
+   "metadata": {
+    "title": "Senate passes the Thirteenth Amendment",
+    "description": "The amendment abolishing slavery passes the Senate; it fails in the House in June.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Thirteenth_Amendment_to_the_United_States_Constitution"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "renominated",
+   "time": "-3331306800/1",
+   "metadata": {
+    "title": "Renominated",
+    "description": "The **National Union** convention in Baltimore renominates Lincoln, with **Andrew Johnson**, a Tennessee Unionist Democrat, for vice president, and endorses an amendment abolishing slavery.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1864_National_Union_National_Convention"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "wade-davis",
+   "time": "-3329060400/1",
+   "metadata": {
+    "title": "Wade–Davis Bill pocket-vetoed",
+    "description": "Lincoln declines to sign Congress’s harsher plan for Reconstruction, which required a majority, not ten percent, to swear loyalty.",
+    "tags": [
+     "office"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wade–Davis_Bill"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "fort-stevens",
+   "time": "-3328369200/1",
+   "metadata": {
+    "title": "Under fire at Fort Stevens",
+    "description": "Watching **Jubal Early**’s raid on Washington from the parapet, Lincoln comes under fire; a surgeon standing near him is hit.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Fort_Stevens"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "blind-memo",
+   "time": "-3324740400/1",
+   "metadata": {
+    "title": "The Blind Memorandum",
+    "description": "Expecting to lose, Lincoln writes that it seems \"exceedingly probable\" he will not be re-elected, has his cabinet sign it unread, and pledges to work with the winner to save the Union.",
+    "tags": [
+     "politics",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1864_United_States_presidential_election",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "atlanta",
+   "time": "-3323876400/1",
+   "metadata": {
+    "title": "Atlanta falls",
+    "description": "**William T. Sherman** takes Atlanta, turning the election.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Atlanta_campaign"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "reelected",
+   "time": "-3318087600/1",
+   "metadata": {
+    "title": "Re-elected",
+    "description": "Lincoln defeats **George McClellan**, carrying 212 of 233 electoral votes and, by most counts, about three-quarters of the soldiers’ votes.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1864_United_States_presidential_election"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "house-13th",
+   "time": "-3310830000/1",
+   "metadata": {
+    "title": "The House passes the Thirteenth Amendment",
+    "description": "After weeks of pressure from Lincoln, the House passes the amendment by 119 to 56, two votes more than two-thirds.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Thirteenth_Amendment_to_the_United_States_Constitution",
+     "https://www.archives.gov/milestone-documents/13th-amendment"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "signs-13th",
+   "time": "-3310743600/1",
+   "metadata": {
+    "title": "Lincoln signs the amendment",
+    "description": "Lincoln signs the joint resolution sending it to the states, though a president’s signature is not required. Illinois ratifies that day, the first state.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Thirteenth_Amendment_to_the_United_States_Constitution",
+     "https://www.archives.gov/milestone-documents/13th-amendment"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "hampton-roads",
+   "time": "-3310570800/1",
+   "metadata": {
+    "title": "Hampton Roads Conference",
+    "description": "Lincoln meets Confederate commissioners aboard the **River Queen**; peace fails on his terms of reunion and no retreat on slavery.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hampton_Roads_Conference"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "inaugural-2",
+   "time": "-3308065200/1",
+   "metadata": {
+    "title": "Second inaugural address",
+    "description": "Seven hundred words that call slavery the cause of the war and close: \"With malice toward none, with charity for all… to bind up the nation’s wounds\".",
+    "tags": [
+     "speech",
+     "office"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln's_second_inaugural_address",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "h-last",
+   "time": "-3305646000/1",
+   "metadata": {
+    "title": "The last days",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "richmond",
+   "time": "-3305386800/1",
+   "metadata": {
+    "title": "Walks through Richmond",
+    "description": "The day after the Confederate capital falls, Lincoln walks its streets with **Tad**, greeted by freed people.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln",
+     "https://www.thelincolnlog.org/"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "appomattox",
+   "time": "-3304954800/1",
+   "metadata": {
+    "title": "Surrender at Appomattox",
+    "description": "**Robert E. Lee** surrenders the Army of Northern Virginia to **Grant**.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Appomattox_Court_House"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "last-speech",
+   "time": "-3304782000/1",
+   "metadata": {
+    "title": "Last public address",
+    "description": "From a White House window, Lincoln speaks on Reconstruction and, for the first time in public, of the vote for some Black men. **John Wilkes Booth** is in the crowd.",
+    "tags": [
+     "speech"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Assassination_of_Abraham_Lincoln",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "shot",
+   "time": "-3304442700/1",
+   "metadata": {
+    "title": "Shot at Ford's Theatre",
+    "description": "Watching **Our American Cousin** with Mary, Lincoln is shot in the back of the head by **John Wilkes Booth**. He is carried across the street to the **Petersen House**.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Assassination_of_Abraham_Lincoln",
+     "https://www.nps.gov/foth/index.htm"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "About 10:15 p.m., Washington time."
+   }
+  },
+  {
+   "id": "dies",
+   "time": "-3304409880/1",
+   "metadata": {
+    "title": "Lincoln dies",
+    "description": "He dies at 7:22 a.m. without regaining consciousness. \"Now he belongs to the ages,\" **Edwin Stanton** is reported to have said.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Assassination_of_Abraham_Lincoln",
+     "https://www.nps.gov/foth/index.htm"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "johnson",
+   "time": "-3304400400/1",
+   "metadata": {
+    "title": "Andrew Johnson sworn in",
+    "description": "**Andrew Johnson** takes the oath at the Kirkwood House hotel.",
+    "tags": [
+     "office"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Andrew_Johnson"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "About 10 a.m.; accounts vary by up to an hour."
+   }
+  },
+  {
+   "id": "funeral",
+   "time": "-3304090800/1",
+   "metadata": {
+    "title": "Funeral in the East Room",
+    "description": "A funeral service at the White House; the body then lies in state in the **Capitol** rotunda.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Assassination_of_Abraham_Lincoln"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "booth",
+   "time": "-3303486000/1",
+   "metadata": {
+    "title": "Booth killed",
+    "description": "Cornered in a tobacco barn in Virginia, **Booth** is shot and dies.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/John_Wilkes_Booth"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "burial",
+   "time": "-3302794800/1",
+   "metadata": {
+    "title": "Buried in Springfield",
+    "description": "Lincoln is laid in the receiving vault at **Oak Ridge Cemetery**, Springfield, with Willie beside him. The Lincoln Tomb was dedicated in 1874.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lincoln_Tomb"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "ratified-13th",
+   "time": "-3284132400/1",
+   "metadata": {
+    "title": "Thirteenth Amendment ratified",
+    "description": "Georgia’s ratification completes three-quarters of the states: slavery is abolished in the United States, except as punishment for a crime.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Thirteenth_Amendment_to_the_United_States_Constitution",
+     "https://www.archives.gov/milestone-documents/13th-amendment"
+    ],
+    "color": "#b0782a"
+   }
+  }
+ ],
+ "durations": [
+  {
+   "id": "life",
+   "start": "-5077018800/1",
+   "end": "-3304409880/1",
+   "metadata": {
+    "title": "Life of Abraham Lincoln",
+    "description": "Fifty-six years, from Sinking Spring Farm to the Petersen House.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln"
+    ],
+    "color": "#3d3a33"
+   }
+  },
+  {
+   "id": "sinking-spring",
+   "start": "-5077018800/1",
+   "end": "-5001937200/1",
+   "metadata": {
+    "title": "Sinking Spring Farm, Kentucky",
+    "description": "His birthplace. The family left in the summer of 1811.",
+    "tags": [
+     "home"
+    ],
+    "sources": [
+     "https://www.nps.gov/abli/index.htm"
+    ],
+    "color": "#8a7a5c"
+   }
+  },
+  {
+   "id": "knob-creek-home",
+   "start": "-5001937200/1",
+   "end": "-4830865200/1",
+   "metadata": {
+    "title": "Knob Creek, Kentucky",
+    "description": "From the summer of 1811 to December 1816.",
+    "tags": [
+     "home"
+    ],
+    "sources": [
+     "https://www.nps.gov/abli/index.htm"
+    ],
+    "color": "#8a7a5c"
+   }
+  },
+  {
+   "id": "indiana",
+   "start": "-4830865200/1",
+   "end": "-4412862000/1",
+   "metadata": {
+    "title": "Little Pigeon Creek, Indiana",
+    "description": "From age seven to twenty-one; dates are to the month.",
+    "tags": [
+     "home"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lincoln_Boyhood_National_Memorial",
+     "https://www.nps.gov/libo/index.htm"
+    ],
+    "color": "#8a7a5c"
+   }
+  },
+  {
+   "id": "macon",
+   "start": "-4412862000/1",
+   "end": "-4368711600/1",
+   "metadata": {
+    "title": "Macon County, Illinois",
+    "description": "The family’s first Illinois farm, near Decatur, through the hard \"winter of the deep snow\"; Abraham leaves for New Salem in 1831.",
+    "tags": [
+     "home"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln"
+    ],
+    "color": "#8a7a5c"
+   }
+  },
+  {
+   "id": "new-salem-home",
+   "start": "-4368711600/1",
+   "end": "-4188049200/1",
+   "metadata": {
+    "title": "New Salem, Illinois",
+    "description": "Six years in the village; its arrival day is approximate.",
+    "tags": [
+     "home"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln"
+    ],
+    "color": "#8a7a5c"
+   }
+  },
+  {
+   "id": "springfield-rooms",
+   "start": "-4188049200/1",
+   "end": "-3965742000/1",
+   "metadata": {
+    "title": "Springfield: rented rooms",
+    "description": "Above Speed’s store, then after marrying at the **Globe Tavern** and a rented cottage.",
+    "tags": [
+     "home"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Joshua_Fry_Speed",
+     "https://www.nps.gov/liho/index.htm"
+    ],
+    "color": "#8a7a5c"
+   }
+  },
+  {
+   "id": "home",
+   "start": "-3965742000/1",
+   "end": "-3436110000/1",
+   "metadata": {
+    "title": "The Lincoln Home, Springfield",
+    "description": "From May 1844 until he left for Washington.",
+    "tags": [
+     "home",
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lincoln_Home_National_Historic_Site",
+     "https://www.nps.gov/liho/index.htm"
+    ],
+    "color": "#8a7a5c"
+   }
+  },
+  {
+   "id": "black-hawk",
+   "start": "-4345297200/1",
+   "end": "-4338385200/1",
+   "metadata": {
+    "title": "Black Hawk War service",
+    "description": "Three enlistments, first as captain, then as a private; mustered out July 10. He saw no fighting.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln_in_the_Black_Hawk_War"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "postmaster-term",
+   "start": "-4312378800/1",
+   "end": "-4215697200/1",
+   "metadata": {
+    "title": "Postmaster of New Salem",
+    "description": "Until the office moved to Petersburg.",
+    "tags": [
+     "office"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_life_and_career_of_Abraham_Lincoln",
+     "https://www.thelincolnlog.org/"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "illinois-house",
+   "start": "-4262871600/1",
+   "end": "-4010151600/1",
+   "metadata": {
+    "title": "Illinois House of Representatives",
+    "description": "Four terms for Sangamon County, as a Whig.",
+    "tags": [
+     "office",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "congress",
+   "start": "-3876145200/1",
+   "end": "-3813073200/1",
+   "metadata": {
+    "title": "U.S. House of Representatives",
+    "description": "One term, for Illinois’s 7th district; he took his seat on December 6, 1847.",
+    "tags": [
+     "office",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "away",
+   "start": "-3812986800/1",
+   "end": "-3647703600/1",
+   "metadata": {
+    "title": "Away from politics",
+    "description": "Back to the law and the circuit after Congress. Lincoln wrote in 1859 that he was \"losing interest in politics\" until the Kansas–Nebraska Act roused him again.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln",
+     "https://quod.lib.umich.edu/l/lincoln/"
+    ],
+    "color": "#7a5c2e"
+   }
+  },
+  {
+   "id": "presidency",
+   "start": "-3434252400/1",
+   "end": "-3304409880/1",
+   "metadata": {
+    "title": "President of the United States",
+    "description": "The 16th president, from noon on March 4, 1861, to his death. The family lived in the **White House**, and from 1862 spent summers at the Soldiers’ Home on the city’s edge.",
+    "tags": [
+     "office",
+     "politics",
+     "home"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Presidency_of_Abraham_Lincoln"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "stuart",
+   "start": "-4188049200/1",
+   "end": "-4061905200/1",
+   "metadata": {
+    "title": "Stuart & Lincoln",
+    "description": "His first partnership, with **John Todd Stuart**; it ended in April 1841.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/John_T._Stuart"
+    ],
+    "color": "#7a5c2e"
+   }
+  },
+  {
+   "id": "logan",
+   "start": "-4061905200/1",
+   "end": "-3947252400/1",
+   "metadata": {
+    "title": "Logan & Lincoln",
+    "description": "With **Stephen T. Logan**, a demanding lawyer who taught him care in preparation. Formed in April 1841, it ended in late 1844.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Stephen_T._Logan"
+    ],
+    "color": "#7a5c2e"
+   }
+  },
+  {
+   "id": "herndon",
+   "start": "-3947252400/1",
+   "end": "-3304409880/1",
+   "metadata": {
+    "title": "Lincoln & Herndon",
+    "description": "With **William H. Herndon**, from late 1844. Lincoln asked that the shingle stay up while he was president; Herndon later wrote a biography of him.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/William_Herndon_(lawyer)"
+    ],
+    "color": "#7a5c2e"
+   }
+  },
+  {
+   "id": "marriage-span",
+   "start": "-4012743600/1",
+   "end": "-3304409880/1",
+   "metadata": {
+    "title": "Married to Mary Todd Lincoln",
+    "description": "Twenty-two years; four sons.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mary_Todd_Lincoln"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "eddie-life",
+   "start": "-3907162800/1",
+   "end": "-3784129200/1",
+   "metadata": {
+    "title": "Eddie Lincoln",
+    "description": "Edward Baker Lincoln, not quite four.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Edward_Baker_Lincoln"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "willie-life",
+   "start": "-3756222000/1",
+   "end": "-3403796400/1",
+   "metadata": {
+    "title": "Willie Lincoln",
+    "description": "William Wallace Lincoln, eleven.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/William_Wallace_Lincoln"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "debates",
+   "start": "-3514302000/1",
+   "end": "-3509463600/1",
+   "metadata": {
+    "title": "Lincoln–Douglas debates",
+    "description": "Seven debates, one in each of seven of Illinois’s nine congressional districts; both men had already spoken in the other two, at Chicago and Springfield.",
+    "tags": [
+     "speech",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lincoln–Douglas_debates"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "campaign-1860",
+   "start": "-3459351600/1",
+   "end": "-3444490800/1",
+   "metadata": {
+    "title": "The 1860 campaign",
+    "description": "As was the custom, Lincoln did not campaign himself; he stayed in Springfield while the \"Rail Splitter\" was sold to voters.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1860_United_States_presidential_election"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "secession",
+   "start": "-3440689200/1",
+   "end": "-3426001200/1",
+   "metadata": {
+    "title": "Secession",
+    "description": "From South Carolina to Tennessee, the eleventh state to secede.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Secession_in_the_United_States"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "inaugural-journey",
+   "start": "-3436110000/1",
+   "end": "-3435073200/1",
+   "metadata": {
+    "title": "Journey to Washington",
+    "description": "Twelve days by train through the Northern states, with speeches at many stops.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Baltimore_Plot"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "campaign-1864",
+   "start": "-3331306800/1",
+   "end": "-3318087600/1",
+   "metadata": {
+    "title": "The 1864 campaign",
+    "description": "From renomination to re-election, through the summer when he expected to lose.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1864_United_States_presidential_election"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "civil-war",
+   "start": "-3430926000/1",
+   "end": "-3304954800/1",
+   "metadata": {
+    "title": "Civil War",
+    "description": "From Fort Sumter to Lee’s surrender at Appomattox. The last Confederate forces surrendered in the weeks after.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/American_Civil_War"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "mcclellan",
+   "start": "-3421854000/1",
+   "end": "-3381332400/1",
+   "metadata": {
+    "title": "McClellan commands the Army of the Potomac",
+    "description": "With a break in the late summer of 1862; relieved in November.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_B._McClellan"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "seven-days",
+   "start": "-3392996400/1",
+   "end": "-3392391600/1",
+   "metadata": {
+    "title": "Seven Days Battles",
+    "description": "Lee drives McClellan back from Richmond.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Seven_Days_Battles"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "second-bull-run",
+   "start": "-3387466800/1",
+   "end": "-3387207600/1",
+   "metadata": {
+    "title": "Second Bull Run",
+    "description": "Another Union defeat in Virginia, under John Pope.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Second_Battle_of_Bull_Run"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "chancellorsville",
+   "start": "-3366298800/1",
+   "end": "-3365694000/1",
+   "metadata": {
+    "title": "Chancellorsville",
+    "description": "Lee defeats Hooker; on hearing, Lincoln asks \"What will the country say?\"",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Chancellorsville"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "vicksburg-siege",
+   "start": "-3364743600/1",
+   "end": "-3360682800/1",
+   "metadata": {
+    "title": "Siege of Vicksburg",
+    "description": "Grant’s forty-seven-day siege.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Vicksburg"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "gettysburg",
+   "start": "-3360942000/1",
+   "end": "-3360682800/1",
+   "metadata": {
+    "title": "Gettysburg",
+    "description": "July 1–3, 1863: Lee’s second invasion of the North turned back.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Gettysburg"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "draft-riots",
+   "start": "-3359905200/1",
+   "end": "-3359559600/1",
+   "metadata": {
+    "title": "New York draft riots",
+    "description": "Four days of violence against the draft, and against Black New Yorkers.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/New_York_City_draft_riots"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "overland",
+   "start": "-3334330800/1",
+   "end": "-3329924400/1",
+   "metadata": {
+    "title": "Overland Campaign",
+    "description": "Grant against Lee from the Wilderness to Petersburg, at terrible cost.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Overland_Campaign"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "petersburg",
+   "start": "-3331220400/1",
+   "end": "-3306250800/1",
+   "metadata": {
+    "title": "Siege of Petersburg",
+    "description": "Nine months of trench warfare before Richmond fell.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Petersburg"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "march-to-sea",
+   "start": "-3317482800/1",
+   "end": "-3314372400/1",
+   "metadata": {
+    "title": "March to the Sea",
+    "description": "Sherman from Atlanta to Savannah, which he offered Lincoln as a Christmas gift.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sherman's_March_to_the_Sea"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "night",
+   "start": "-3304442700/1",
+   "end": "-3304409880/1",
+   "metadata": {
+    "title": "The night at the Petersen House",
+    "description": "Nine hours from the shot to his death.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Petersen_House"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "funeral-train",
+   "start": "-3303918000/1",
+   "end": "-3302881200/1",
+   "metadata": {
+    "title": "The funeral train",
+    "description": "About 1,650 miles from Washington to Springfield, through Baltimore, Philadelphia, New York, Albany, Cleveland, Chicago and more, retracing much of his 1861 journey. Willie’s coffin travelled with his.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/State_funeral_of_Abraham_Lincoln"
+    ],
+    "color": "#4f7a4a"
+   }
+  }
+ ],
+ "relationships": [
+  {
+   "a": {
+    "moment": "nancy-dies"
+   },
+   "b": {
+    "moment": "stepmother"
+   }
+  },
+  {
+   "a": {
+    "moment": "candidacy"
+   },
+   "b": {
+    "moment": "loses-1832"
+   }
+  },
+  {
+   "a": {
+    "moment": "loses-1832"
+   },
+   "b": {
+    "moment": "elected-1834"
+   }
+  },
+  {
+   "a": {
+    "moment": "elected-1834"
+   },
+   "b": {
+    "moment": "license"
+   }
+  },
+  {
+   "a": {
+    "moment": "license"
+   },
+   "b": {
+    "duration": "stuart"
+   }
+  },
+  {
+   "a": {
+    "moment": "capital"
+   },
+   "b": {
+    "moment": "to-springfield"
+   }
+  },
+  {
+   "a": {
+    "moment": "shields"
+   },
+   "b": {
+    "moment": "marriage"
+   }
+  },
+  {
+   "a": {
+    "moment": "marriage"
+   },
+   "b": {
+    "moment": "robert-born"
+   }
+  },
+  {
+   "a": {
+    "moment": "marriage"
+   },
+   "b": {
+    "moment": "eddie-born"
+   }
+  },
+  {
+   "a": {
+    "moment": "marriage"
+   },
+   "b": {
+    "moment": "willie-born"
+   }
+  },
+  {
+   "a": {
+    "moment": "marriage"
+   },
+   "b": {
+    "moment": "tad-born"
+   }
+  },
+  {
+   "a": {
+    "moment": "eddie-born"
+   },
+   "b": {
+    "moment": "eddie-dies"
+   }
+  },
+  {
+   "a": {
+    "moment": "willie-born"
+   },
+   "b": {
+    "moment": "willie-dies"
+   }
+  },
+  {
+   "a": {
+    "moment": "spot"
+   },
+   "b": {
+    "moment": "war-speech"
+   }
+  },
+  {
+   "a": {
+    "moment": "protest"
+   },
+   "b": {
+    "moment": "peoria"
+   }
+  },
+  {
+   "a": {
+    "moment": "kansas-nebraska"
+   },
+   "b": {
+    "moment": "peoria"
+   }
+  },
+  {
+   "a": {
+    "moment": "kansas-nebraska"
+   },
+   "b": {
+    "duration": "away"
+   }
+  },
+  {
+   "a": {
+    "moment": "peoria"
+   },
+   "b": {
+    "moment": "senate-1855"
+   }
+  },
+  {
+   "a": {
+    "moment": "dred-scott"
+   },
+   "b": {
+    "moment": "dred-scott-speech"
+   }
+  },
+  {
+   "a": {
+    "moment": "dred-scott-speech"
+   },
+   "b": {
+    "moment": "house-divided"
+   }
+  },
+  {
+   "a": {
+    "moment": "house-divided"
+   },
+   "b": {
+    "duration": "debates"
+   }
+  },
+  {
+   "a": {
+    "duration": "debates"
+   },
+   "b": {
+    "moment": "loses-1858"
+   }
+  },
+  {
+   "a": {
+    "moment": "cooper-union"
+   },
+   "b": {
+    "moment": "nominated"
+   }
+  },
+  {
+   "a": {
+    "moment": "elected"
+   },
+   "b": {
+    "moment": "south-carolina"
+   }
+  },
+  {
+   "a": {
+    "moment": "sumter"
+   },
+   "b": {
+    "moment": "volunteers"
+   }
+  },
+  {
+   "a": {
+    "moment": "cabinet-draft"
+   },
+   "b": {
+    "moment": "preliminary"
+   }
+  },
+  {
+   "a": {
+    "moment": "antietam"
+   },
+   "b": {
+    "moment": "preliminary"
+   }
+  },
+  {
+   "a": {
+    "moment": "preliminary"
+   },
+   "b": {
+    "moment": "emancipation"
+   }
+  },
+  {
+   "a": {
+    "moment": "dc-emancipation"
+   },
+   "b": {
+    "moment": "emancipation"
+   }
+  },
+  {
+   "a": {
+    "moment": "emancipation"
+   },
+   "b": {
+    "moment": "house-13th"
+   }
+  },
+  {
+   "a": {
+    "moment": "house-13th"
+   },
+   "b": {
+    "moment": "signs-13th"
+   }
+  },
+  {
+   "a": {
+    "moment": "signs-13th"
+   },
+   "b": {
+    "moment": "ratified-13th"
+   }
+  },
+  {
+   "a": {
+    "duration": "gettysburg"
+   },
+   "b": {
+    "moment": "gettysburg-address"
+   }
+  },
+  {
+   "a": {
+    "moment": "blind-memo"
+   },
+   "b": {
+    "moment": "reelected"
+   }
+  },
+  {
+   "a": {
+    "moment": "atlanta"
+   },
+   "b": {
+    "moment": "reelected"
+   }
+  },
+  {
+   "a": {
+    "moment": "last-speech"
+   },
+   "b": {
+    "moment": "shot"
+   }
+  },
+  {
+   "a": {
+    "moment": "shot"
+   },
+   "b": {
+    "moment": "dies"
+   }
+  },
+  {
+   "a": {
+    "moment": "dies"
+   },
+   "b": {
+    "moment": "johnson"
+   }
+  },
+  {
+   "a": {
+    "moment": "willie-dies"
+   },
+   "b": {
+    "duration": "funeral-train"
+   }
+  },
+  {
+   "a": {
+    "duration": "funeral-train"
+   },
+   "b": {
+    "moment": "burial"
+   }
+  }
+ ]
+}

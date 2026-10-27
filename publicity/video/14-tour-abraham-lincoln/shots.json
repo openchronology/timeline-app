@@ -1,0 +1,289 @@
+{
+  "sample": "../samples/lincoln.ochx",
+  "size": [1280, 720],
+  "scale": 1.5,
+  "shots": [
+    {
+      "id": "whole",
+      "dur": 0.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-5099137200, -3268839600]
+        }
+      ]
+    },
+    {
+      "id": "homes",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-5099137200, -3268839600]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.4,
+          "do": "separate",
+          "tags": ["home"]
+        }
+      ]
+    },
+    {
+      "id": "frontier",
+      "dur": 12,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-5099137200, -3268839600]
+        },
+        {
+          "t": 4,
+          "view": [-5122810800, -4815140400]
+        },
+        {
+          "t": 5,
+          "view": [-5122810800, -4815140400]
+        },
+        {
+          "t": 11.5,
+          "view": [-4746798000, -4460036400],
+          "ease": "linear"
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "salem",
+      "dur": 6,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-4746798000, -4460036400]
+        },
+        {
+          "t": 5,
+          "view": [-4375278000, -4200663600]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "family",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-5099137200, -3268839600]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.4,
+          "do": "separate",
+          "tags": ["family"]
+        }
+      ]
+    },
+    {
+      "id": "away",
+      "dur": 9,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-5099137200, -3268839600]
+        },
+        {
+          "t": 5,
+          "view": [-3920986800, -3621265200]
+        },
+        {
+          "t": 6,
+          "view": [-3920986800, -3621265200]
+        },
+        {
+          "t": 8.5,
+          "view": [-3692113200, -3623943600]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "reader",
+      "dur": 9,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        },
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3534346800, -3502810800]
+        },
+        {
+          "t": 5.6,
+          "view": [-3534346800, -3502810800]
+        },
+        {
+          "t": 7.6,
+          "view": [-3514906800, -3508945200]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.5,
+          "do": "open",
+          "title": "House Divided speech"
+        },
+        {
+          "t": 5,
+          "do": "click",
+          "selector": "#reader-related .related-entity:has-text(\"Lincoln–Douglas debates\")"
+        },
+        {
+          "t": 5.4,
+          "do": "click",
+          "selector": "#reader-close"
+        }
+      ]
+    },
+    {
+      "id": "war",
+      "dur": 0.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3447601200, -3297783600]
+        }
+      ]
+    },
+    {
+      "id": "slavery",
+      "dur": 5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3447601200, -3297783600]
+        },
+        {
+          "t": 2,
+          "view": [-5099137200, -3268839600]
+        }
+      ],
+      "actions": [
+        {
+          "t": 2.4,
+          "do": "separate",
+          "tags": ["slavery"]
+        }
+      ]
+    },
+    {
+      "id": "y1862",
+      "dur": 4,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3447601200, -3297783600]
+        },
+        {
+          "t": 3,
+          "view": [-3392996400, -3374506800]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "pan",
+      "dur": 12,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3392996400, -3374506800]
+        },
+        {
+          "t": 11,
+          "view": [-3326641200, -3306682800],
+          "ease": "linear"
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "night",
+      "dur": 7,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3305905200, -3304090800]
+        },
+        {
+          "t": 0.8,
+          "view": [-3305905200, -3304090800]
+        },
+        {
+          "t": 6,
+          "view": [-3304450800, -3304402200]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "train",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3304450800, -3304402200]
+        },
+        {
+          "t": 2.2,
+          "view": [-3305214000, -3302276400]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ]
+    }
+  ]
+}
