@@ -835,8 +835,10 @@ let pluginSearchRequest = 0;
 let pluginSearchTimer: ReturnType<typeof setTimeout> | undefined;
 let pluginPage = 1;
 const memoryOnly = () => !desktop && (offlineHtml || !session.user);
+/** Whether the open timeline can be edited here, view mode and comparisons aside. */
+const mayEditTimeline = () => !embedded && !!model && (!remote || remote.canEdit);
 /** Whether the open timeline can be edited here, view mode aside. */
-const mayEdit = () => !embedded && !comparison && !!model && (!remote || remote.canEdit);
+const mayEdit = () => !comparison && mayEditTimeline();
 /**
  * View mode (#233): someone who can edit reads the timeline as its viewers do, its moments and
  * durations opening in the reader. Remembered in this browser.
@@ -849,8 +851,13 @@ let viewMode = (() => {
   }
 })();
 const editable = () => !viewMode && mayEdit();
-/** Moments and durations open in the reader for anyone not editing, outside comparisons. */
-const reading = () => !comparison && !editable();
+/**
+ * Moments and durations open in the reader for anyone not editing. A comparison opens them in
+ * its read-only editor, but a separation is the open timeline itself (#345): there they open in
+ * the reader in View mode, and for anyone who could not edit the timeline anyway.
+ */
+const reading = () =>
+  !editable() && (!comparison || (!!separation && (viewMode || !mayEditTimeline())));
 /**
  * Room beside the ruler for markers at the bounds. Narrow stages, such as phones held upright,
  * keep less so the timeline itself gets the width.
@@ -3960,6 +3967,16 @@ el('inspector').addEventListener(
   },
   true,
 );
+/**
+ * A separated track's moment as the open timeline keeps it (#345): its own ID, without the
+ * track's key, and without the comparison's notes. Separated tracks keep their times.
+ */
+function separatedMoment(event: PointEvent): PointEvent {
+  const track = comparison?.tracks.find((t) => event.id.startsWith(t.source.key + ':'));
+  if (!separation || !track || !('comparisonSource' in event.metadata)) return event;
+  const { comparisonSource: _source, originalTime: _time, ...metadata } = event.metadata;
+  return { ...event, id: event.id.slice(track.source.key.length + 1), metadata };
+}
 function eventForm(event?: PointEvent, time?: Q) {
   if (comparison && !event) return;
   // Opening another entity ends the current session without keeping it.
@@ -3971,7 +3988,8 @@ function eventForm(event?: PointEvent, time?: Q) {
   if (event && reading()) {
     selected = event;
     requestRender();
-    return showReader('moment', event.id, event.metadata, presented(Q.parse(event.time), 'event'));
+    const read = separatedMoment(event);
+    return showReader('moment', read.id, read.metadata, presented(Q.parse(read.time), 'event'));
   }
   pendingEventEdit = false;
   eventEditHistory = null;
@@ -8008,7 +8026,11 @@ function createDuration(start: DurationEndpoint, end: DurationEndpoint) {
 /** Full metadata is local for complete timelines and fetched for indexed ones. */
 async function openDurationById(id: string, known?: DurationBand) {
   const band = known ?? frame.durations?.find((b) => b.id === id);
-  if (band?.sourceKey) return showDuration(band, true);
+  if (band?.sourceKey) {
+    // A separated track's duration is the open timeline's own (#345), read as it keeps it.
+    if (!separation || !reading()) return showDuration(band, true);
+    id = band.id.slice(band.sourceKey.length + 1);
+  }
   let duration = model?.durations.get(id);
   if (!duration && sparseWorkspace()) {
     const result = await timelineQuery<{ duration: Duration | null }>({
@@ -8034,8 +8056,9 @@ async function openDurationById(id: string, known?: DurationBand) {
 }
 function showDuration(duration: Duration, readOnly: boolean, isNew = false) {
   if (!isNew && reading()) {
+    // Its band on the timeline: on a separated track, under that track's key.
     const band =
-      frame.durations?.find((b) => b.id === duration.id && !b.sourceKey) ??
+      frame.durations?.find((b) => b.id === (b.sourceKey ? b.sourceKey + ':' : '') + duration.id) ??
       resolveDuration(duration, (id) => model?.momentTime(id));
     const when = band
       ? `${presented(Q.parse(band.first), 'event')} → ${presented(Q.parse(band.last), 'event')}`
