@@ -2,7 +2,7 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-Helpers the platform's pages and components share. Files that import `server-only` run only on the server (they read the session, the database or the built editor); [`api.js`](api.js), [`navigation.js`](navigation.js), [`releases.js`](releases.js) and [`api-reference.js`](api-reference.js) work anywhere. Storage and the API's logic are in [`server/`](../../server/README.md).
+Helpers the platform's pages and components share. Files that import `server-only` run only on the server (they read the session, the database or the built editor); [`api.js`](api.js), [`navigation.js`](navigation.js), [`releases.js`](releases.js), [`timeline-lists.js`](timeline-lists.js) and [`api-reference.js`](api-reference.js) work anywhere. Storage and the API's logic are in [`server/`](../../server/README.md).
 
 ## Contents
 
@@ -19,3 +19,4 @@ Helpers the platform's pages and components share. Files that import `server-onl
 | [`sharing.js`](sharing.js)               | What shared links show: titles, descriptions, preview facts, embed code and addresses, for public timelines only where a guest would see them. |
 | [`sitemap.js`](sitemap.js)               | The sitemap (`/sitemap.xml` and its pages): the site's pages, then every public timeline and every profile that owns one, 45,000 to a page.    |
 | [`timeline.js`](timeline.js)             | Loads the timeline a page names as its visitor may see it, redirecting its other addresses, and the facts pages give their components.         |
+| [`timeline-lists.js`](timeline-lists.js) | Each timeline list's own search, tag, sort, visibility and page parameters on the dashboard and profiles (#337), and searching browser drafts. |

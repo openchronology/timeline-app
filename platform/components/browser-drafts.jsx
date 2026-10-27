@@ -2,11 +2,25 @@
 'use client';
 // The timelines this account started in this browser and hasn't saved to the server (#188):
 // each kept until it is saved or deleted, and opened in the editor at /editor?draft=….
+// Searched, sorted and paged in the browser (#337), in the address's `draft…` parameters.
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { deleteDraft, listDrafts } from '../../src/draft-store.ts';
 import { momentsText } from '../../src/wording.ts';
-export default function BrowserDrafts({ userId }) {
+import TimelineSearch from './timeline-search.jsx';
+import { LISTS, listHref, readList, searchDrafts, statusText } from '../lib/timeline-lists.js';
+const list = LISTS.drafts;
+/**
+ * @param {object} props
+ * @param {string} props.userId the account whose drafts to list
+ * @param {Record<string, string>} props.query the dashboard's whole query, which the drafts'
+ *   form and links keep
+ */
+export default function BrowserDrafts({ userId, query }) {
   const [drafts, setDrafts] = useState([]);
+  const state = readList(useSearchParams(), list),
+    result = searchDrafts(drafts, state);
   const refresh = () =>
     listDrafts(userId)
       .then(setDrafts)
@@ -15,6 +29,7 @@ export default function BrowserDrafts({ userId }) {
     void refresh();
   }, [userId]);
   if (!drafts.length) return null;
+  const href = (changes) => listHref('/', query, list, state, changes);
   return (
     <section id="dashboard-drafts">
       <h2>Drafts in this browser</h2>
@@ -22,8 +37,9 @@ export default function BrowserDrafts({ userId }) {
         Timelines you started here and haven’t saved to the server. Each stays in this browser until
         you save it to the server or delete it.
       </p>
+      <TimelineSearch key={JSON.stringify(state)} list={list} state={state} query={query} />
       <div className="timeline-grid">
-        {drafts.map((draft) => (
+        {result.timelines.map((draft) => (
           <article className="timeline-card" key={draft.id} data-draft={draft.id}>
             <h3>
               <a href={'/editor?draft=' + encodeURIComponent(draft.id)}>
@@ -34,6 +50,21 @@ export default function BrowserDrafts({ userId }) {
               {momentsText(draft.moments)}
               {draft.updated && ` · edited ${new Date(draft.updated).toLocaleString()}`}
             </p>
+            {draft.description && <p>{draft.description.slice(0, 220)}</p>}
+            {draft.tags?.length > 0 && (
+              <div className="tags">
+                {draft.tags.map((tag) => (
+                  <Link
+                    className="button"
+                    key={tag}
+                    href={href({ tag, page: 1 })}
+                    aria-current={tag === state.tag ? 'true' : undefined}
+                  >
+                    {tag}
+                  </Link>
+                ))}
+              </div>
+            )}
             <button
               type="button"
               aria-label={`Delete the draft “${draft.title || 'Untitled timeline'}”`}
@@ -48,6 +79,13 @@ export default function BrowserDrafts({ userId }) {
           </article>
         ))}
       </div>
+      <p role="status">{statusText(list, state, result)}</p>
+      {result.pages > 1 && (
+        <nav className="pager" aria-label={`Pages of ${list.noun}`}>
+          {result.page > 1 && <Link href={href({ page: result.page - 1 })}>Previous</Link>}
+          {result.page < result.pages && <Link href={href({ page: result.page + 1 })}>Next</Link>}
+        </nav>
+      )}
     </section>
   );
 }

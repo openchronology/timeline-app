@@ -36,6 +36,17 @@ What a time _means_ is up to the timeline's **Time display**. A new timeline sho
 
 The home page, **Timelines**, lists **Your timelines** and **Your favorites** once you are signed in, and **Explore timelines** for everyone. Search public timelines by their titles, notes and tags, filter them by a tag, and sort them (**Featured first**, **By stars**, **By popularity** and others).
 
+Every list on the home page and on a profile has its own search, so searching one leaves the others as they are:
+
+| List                                                      | Search, filter and sort by                                                                                                                                                |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Explore timelines**                                     | Words, a tag, and **Featured first**, **By stars**, **By popularity**, **Trending this month**, **Alphabetical**, **Newest first**, **Recently changed** or **Relevance** |
+| **Your timelines**, **Your favorites**                    | The same, private timelines included, and **Visibility**: public, private or both                                                                                         |
+| **Drafts in this browser**                                | Words and a tag, searched in this browser; **Recently changed**, **Alphabetical**, **Most moments** or **Relevance**                                                      |
+| A profile's **Public timelines** and **Public favorites** | Words, a tag and the same orders as **Explore timelines**                                                                                                                 |
+
+A search sorts by **Relevance** unless you choose another order. A tag on a timeline filters its list by that tag. Each list's search, order and page are in the page's address, so a search can be shared or bookmarked.
+
 - **Start a timeline:** **＋ New timeline** in the header opens an empty timeline called "Untitled timeline" in your browser. Click the title and the description at the top to change them. **Tags (comma-separated)** under them labels the whole timeline, so others can find it.
 - **Try the sample:** **Explore 20,000 sample moments ↗** opens a sample timeline to pan and zoom through.
 - **Open a file:** **Import** reads an `.ochx` file. Signed in, **Import .och** also reads a desktop file through the server.
