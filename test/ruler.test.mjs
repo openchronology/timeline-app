@@ -139,6 +139,62 @@ test('coarse year graduations align civil years, including negative and huge yea
   }
 });
 
+test('year marks are round in BCE as in CE, with 1 CE where the eras meet (#340)', () => {
+  const format = createPresenter({ ...DEFAULT_PRESENTATION, mode: 'gregorian' });
+  // Views by BCE/CE year (astronomical 1 − n for n BCE); each is printed as the ruler does.
+  const at = (n, era) => {
+    const y = era === 'BCE' ? 1n - n : n;
+    return parseTimestamp(
+      (y < 0n ? '-' + (-y).toString().padStart(4, '0') : y.toString().padStart(4, '0')) +
+        '-01-01T00:00:00Z',
+    );
+  };
+  const labels = (left, right) => {
+    const ctx = context(left, right.sub(left), 1200),
+      plan = format.rules(ctx);
+    return {
+      graduation: plan.graduation,
+      labels: plan.ticks
+        .filter((tick) => tick.label)
+        .map((tick) =>
+          format.print(tick.time, {
+            ...ctx,
+            spacingPixels: Number(tick.interval.mul(Q.from(1200n)).div(ctx.span).floor().numerator),
+          }),
+        ),
+      ticks: plan.ticks,
+    };
+  };
+  // Ancient Egypt after Fit all: millennia, then centuries as minor marks.
+  const egypt = labels(at(3500n, 'BCE'), at(100n, 'CE'));
+  assert.equal(egypt.graduation, '1000 years');
+  assert.deepEqual(egypt.labels, ['3000 BCE', '2000 BCE', '1000 BCE', '1 CE']);
+  assert(tickAt(egypt, at(1500n, 'BCE')));
+  assert(!tickAt(egypt, at(1n, 'BCE')) && !tickAt(egypt, at(1001n, 'BCE')));
+  // Across the eras at each year graduation: 1 BCE is at most a single year's minor mark,
+  // and CE marks stay where they were.
+  for (const [n, graduation, expected] of [
+    [1200n, '1000 years', ['1000 BCE', '1 CE', '1000 CE']],
+    [300n, '100 years', ['300 BCE', '200 BCE', '100 BCE', '1 CE', '100 CE', '200 CE', '300 CE']],
+    [30n, '10 years', ['30 BCE', '20 BCE', '10 BCE', '1 CE', '10 CE', '20 CE', '30 CE']],
+  ]) {
+    const view = labels(at(n, 'BCE'), at(n, 'CE'));
+    assert.equal(view.graduation, graduation);
+    assert.deepEqual(view.labels, expected);
+    assert.notEqual(tickAt(view, at(1n, 'BCE'))?.level ?? 'minor', 'major');
+  }
+  // Single years are all marked, 1 BCE among them.
+  const years = labels(at(5n, 'BCE'), at(5n, 'CE'));
+  assert.equal(years.graduation, 'year');
+  assert(tickAt(years, at(1n, 'BCE')).label && tickAt(years, at(1n, 'CE')).label);
+  // CE-only views are unchanged.
+  assert.deepEqual(labels(at(1900n, 'CE'), at(2100n, 'CE')).labels, [
+    '1900 CE',
+    '2000 CE',
+    '2100 CE',
+  ]);
+});
+
 test('extreme rational views and wide displays stay exact with bounded visible work', () => {
   const tiny = Q.from(1n, 10n ** 1100n),
     left = Q.from(10n ** 1200n).add(tiny.mul(Q.from(13n)));
