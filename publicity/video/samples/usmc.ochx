@@ -1776,6 +1776,99 @@
     ],
     "description": "The Marine Corps' **250th birthday**, marked by Marines around the world after a year of anniversary events, with celebrations in Philadelphia, where the Corps was raised, and the Commandant's ball in Washington.\n\n**Read more:** [250th anniversary of the United States Marine Corps — marines.mil](https://www.marines.mil/News/Messages/Messages-Display/Article/4000116/250th-anniversary-of-the-united-states-marine-corps/)\n\n*Image: Wikimedia Commons (a 250th birthday cake ceremony, Marine Corps Installations Pacific; U.S. Marine Corps photo).*"
    }
+  },
+  {
+   "id": "davis-night-march",
+   "time": "-602294400/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "korean war",
+     "chosin",
+     "leader",
+     "medal of honor"
+    ],
+    "title": "Ray Davis leads 1/7 over the mountains to Fox Company",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/0/01/LTC_Ray_Davis_1952.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Raymond_G._Davis"
+    ],
+    "description": "Lt. Col. **Raymond G. Davis** led the 1st Battalion, 7th Marines, eight miles across the mountains at night in a snowstorm, over three ridges, to relieve Fox Company and hold Toktong Pass until both regiments from Yudam-ni had passed through. He brought out all his wounded, including 22 stretcher cases, and received the Medal of Honor.\n\n**Read more:** [Raymond G. Davis — Wikipedia](https://en.wikipedia.org/wiki/Raymond_G._Davis)\n\n*Image: Wikimedia Commons (Lt. Col. Ray Davis, 1952; U.S. Marine Corps photo).*"
+   }
+  },
+  {
+   "id": "hagaru-airstrip",
+   "time": "-602294400/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "korean war",
+     "chosin",
+     "aviation",
+     "evacuation"
+    ],
+    "title": "The airstrip at Hagaru-ri opens",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8c/Concentration_at_Hagaru-ri_Dec._1-4%2C_1950.jpg/960px-Concentration_at_Hagaru-ri_Dec._1-4%2C_1950.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Chosin_Reservoir",
+     "https://www.airandspaceforces.com/article/valor-the-only-way-out/"
+    ],
+    "description": "Engineers cut an airstrip out of the frozen ground at Hagaru-ri, working through the nights under fire. It opened on 1 December, and over about six days Air Force C-47s flew out **4,608 wounded** and 81 dead.\n\n**Read more:** [Battle of Chosin Reservoir — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Chosin_Reservoir); [Valor: The Only Way Out — Air & Space Forces Magazine](https://www.airandspaceforces.com/article/valor-the-only-way-out/)\n\n*Image: Wikimedia Commons (map of Hagaru-ri, 1–4 December 1950, from the Marine Corps' official history).*"
+   }
+  },
+  {
+   "id": "koto-ri-burial",
+   "time": "-601689600/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "korean war",
+     "chosin",
+     "memorial"
+    ],
+    "title": "117 dead are buried at Koto-ri",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6b/Marines_Move_Out_of_Koto-ri%2C_8_December_1950_%2815752476789%29.jpg/960px-Marines_Move_Out_of_Koto-ri%2C_8_December_1950_%2815752476789%29.jpg",
+    "sources": [
+     "https://www.pbs.org/wgbh/americanexperience/features/chosin-battle"
+    ],
+    "description": "With the ground frozen and the road south still to be fought for, **117 Marines, soldiers and Royal Marines commandos** were buried together in one grave at Koto-ri on 8 December 1950, before the division moved out.\n\n**Read more:** [The Battle of Chosin — PBS American Experience](https://www.pbs.org/wgbh/americanexperience/features/chosin-battle)\n\n*Image: Wikimedia Commons (Marines move out of Koto-ri, 8 December 1950; USMC Archives, CC BY 2.0).*"
+   }
+  },
+  {
+   "id": "funchilin-bridge",
+   "time": "-601603200/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "korean war",
+     "chosin",
+     "engineering",
+     "aviation"
+    ],
+    "title": "The air-dropped bridge at Funchilin Pass",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e9/A5408_Treadway_bridge_through_Funchilin_Pass_on_December_9%2C_1950.jpg/960px-A5408_Treadway_bridge_through_Funchilin_Pass_on_December_9%2C_1950.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Chosin_Reservoir"
+    ],
+    "description": "The Chinese blew the bridge at Funchilin Pass, below Koto-ri, the one gap no vehicle could cross. Eight Air Force C-119s parachuted in bridge sections, and engineers assembled them on **9 December**, opening the road to the sea.\n\n**Read more:** [Battle of Chosin Reservoir — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Chosin_Reservoir)\n\n*Image: Wikimedia Commons (the treadway bridge at Funchilin Pass, 9 December 1950; U.S. Army photo).*"
+   }
+  },
+  {
+   "id": "hungnam-last-ships",
+   "time": "-600307200/1",
+   "metadata": {
+    "tags": [
+     "evacuation",
+     "korean war",
+     "chosin"
+    ],
+    "title": "The last ships leave Hungnam",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e6/USS_Begor_%28APD-127%29_off_Hungnam_on_24_December_1950_%2880-G-K-11769%29.jpg/960px-USS_Begor_%28APD-127%29_off_Hungnam_on_24_December_1950_%2880-G-K-11769%29.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Chosin_Reservoir"
+    ],
+    "description": "The last UN units sailed from Hungnam on 24 December 1950, and the port was destroyed behind them. About 105,000 soldiers, 98,000 civilians, 17,500 vehicles and 350,000 tons of supplies were shipped south; one freighter, the SS *Meredith Victory*, carried 14,000 refugees.\n\n**Read more:** [Battle of Chosin Reservoir — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Chosin_Reservoir)\n\n*Image: Wikimedia Commons (USS Begor off Hungnam, 24 December 1950; U.S. Navy photo).*"
+   }
   }
  ],
  "durations": [
@@ -2605,6 +2698,44 @@
     ],
     "description": "Marines, soldiers and allied troops held Hamid Karzai International Airport as more than **120,000 people** were evacuated after the fall of Kabul to the Taliban.\n\n**Read more:** [2021 evacuation from Afghanistan — Wikipedia](https://en.wikipedia.org/wiki/2021_Kabul_airlift)\n\n*Image: Wikimedia Commons (from the article above).*",
     "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Afghanistan_Evacuation_210821-M-GQ845-1035.jpg/960px-Afghanistan_Evacuation_210821-M-GQ845-1035.jpg"
+   }
+  },
+  {
+   "id": "task-force-faith",
+   "start": "-602640000/1",
+   "end": "-602294400/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "korean war",
+     "chosin",
+     "army"
+    ],
+    "title": "Task Force Faith east of the reservoir",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0b/Lt._Col._Don_C._Faith%2C_Jr.%2C_150226-O-ZZ999-021.jpg/960px-Lt._Col._Don_C._Faith%2C_Jr.%2C_150226-O-ZZ999-021.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Chosin_Reservoir"
+    ],
+    "description": "East of the reservoir, the Army's **Regimental Combat Team 31** of the 7th Infantry Division, later called Task Force Faith after Lt. Col. Don C. Faith Jr., was cut off on 27 November and overrun in its attempt to break out to Hagaru-ri on 1 December. It lost more than a thousand men; survivors crossed the frozen reservoir to the Marine lines. Faith was killed and received the Medal of Honor. Chosin was not the Marines' fight alone.\n\n**Read more:** [Battle of Chosin Reservoir — Wikipedia](https://en.wikipedia.org/wiki/Battle_of_Chosin_Reservoir)\n\n*Image: Wikimedia Commons (Lt. Col. Don C. Faith Jr.; U.S. Army photo).*"
+   }
+  },
+  {
+   "id": "fox-company-toktong",
+   "start": "-602553600/1",
+   "end": "-602208000/1",
+   "metadata": {
+    "tags": [
+     "battle",
+     "korean war",
+     "chosin"
+    ],
+    "title": "Fox Company holds Toktong Pass",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/33/WilliamBarberUSMC.jpg/960px-WilliamBarberUSMC.jpg",
+    "sources": [
+     "https://en.wikipedia.org/wiki/William_E._Barber",
+     "https://en.wikipedia.org/wiki/Battle_of_Chosin_Reservoir"
+    ],
+    "description": "**Fox Company, 2nd Battalion, 7th Marines**, under Capt. **William E. Barber**, held the hill over Toktong Pass, the only road between Yudam-ni and Hagaru-ri, for five nights against repeated attacks. Barber, wounded, led from a stretcher and refused to withdraw. Of his 220 men, only 82 were able to walk away. He received the Medal of Honor.\n\n**Read more:** [William E. Barber — Wikipedia](https://en.wikipedia.org/wiki/William_E._Barber)\n\n*Image: Wikimedia Commons (Capt. William E. Barber; U.S. Marine Corps photo).*"
    }
   }
  ],

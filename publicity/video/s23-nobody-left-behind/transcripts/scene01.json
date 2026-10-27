@@ -1,0 +1,381 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:07,120"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 7120
+			},
+			"text": " November 1950. At the Chassen Reservoir, the 1st Marine Division is surrounded at 30 below.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.95094,
+					"t_dtw": -1
+				},
+				{
+					"text": " November",
+					"timestamps": {
+						"from": "00:00:00,150",
+						"to": "00:00:00,860"
+					},
+					"offsets": {
+						"from": 150,
+						"to": 860
+					},
+					"id": 3389,
+					"p": 0.862092,
+					"t_dtw": -1
+				},
+				{
+					"text": " 1950",
+					"timestamps": {
+						"from": "00:00:00,860",
+						"to": "00:00:01,430"
+					},
+					"offsets": {
+						"from": 860,
+						"to": 1430
+					},
+					"id": 11445,
+					"p": 0.873429,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:02,200",
+						"to": "00:00:02,200"
+					},
+					"offsets": {
+						"from": 2200,
+						"to": 2200
+					},
+					"id": 13,
+					"p": 0.420576,
+					"t_dtw": -1
+				},
+				{
+					"text": " At",
+					"timestamps": {
+						"from": "00:00:02,340",
+						"to": "00:00:02,340"
+					},
+					"offsets": {
+						"from": 2340,
+						"to": 2340
+					},
+					"id": 1629,
+					"p": 0.708936,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,350",
+						"to": "00:00:02,550"
+					},
+					"offsets": {
+						"from": 2350,
+						"to": 2550
+					},
+					"id": 262,
+					"p": 0.994607,
+					"t_dtw": -1
+				},
+				{
+					"text": " Ch",
+					"timestamps": {
+						"from": "00:00:02,550",
+						"to": "00:00:02,690"
+					},
+					"offsets": {
+						"from": 2550,
+						"to": 2690
+					},
+					"id": 609,
+					"p": 0.571968,
+					"t_dtw": -1
+				},
+				{
+					"text": "ass",
+					"timestamps": {
+						"from": "00:00:02,690",
+						"to": "00:00:02,900"
+					},
+					"offsets": {
+						"from": 2690,
+						"to": 2900
+					},
+					"id": 562,
+					"p": 0.359592,
+					"t_dtw": -1
+				},
+				{
+					"text": "en",
+					"timestamps": {
+						"from": "00:00:02,900",
+						"to": "00:00:03,040"
+					},
+					"offsets": {
+						"from": 2900,
+						"to": 3040
+					},
+					"id": 268,
+					"p": 0.885293,
+					"t_dtw": -1
+				},
+				{
+					"text": " Reserv",
+					"timestamps": {
+						"from": "00:00:03,040",
+						"to": "00:00:03,460"
+					},
+					"offsets": {
+						"from": 3040,
+						"to": 3460
+					},
+					"id": 40425,
+					"p": 0.487268,
+					"t_dtw": -1
+				},
+				{
+					"text": "oir",
+					"timestamps": {
+						"from": "00:00:03,460",
+						"to": "00:00:03,550"
+					},
+					"offsets": {
+						"from": 3460,
+						"to": 3550
+					},
+					"id": 10840,
+					"p": 0.999931,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,780",
+						"to": "00:00:03,780"
+					},
+					"offsets": {
+						"from": 3780,
+						"to": 3780
+					},
+					"id": 11,
+					"p": 0.76115,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:03,850",
+						"to": "00:00:03,940"
+					},
+					"offsets": {
+						"from": 3850,
+						"to": 3940
+					},
+					"id": 262,
+					"p": 0.776714,
+					"t_dtw": -1
+				},
+				{
+					"text": " 1",
+					"timestamps": {
+						"from": "00:00:04,020",
+						"to": "00:00:04,100"
+					},
+					"offsets": {
+						"from": 4020,
+						"to": 4100
+					},
+					"id": 352,
+					"p": 0.715195,
+					"t_dtw": -1
+				},
+				{
+					"text": "st",
+					"timestamps": {
+						"from": "00:00:04,100",
+						"to": "00:00:04,200"
+					},
+					"offsets": {
+						"from": 4100,
+						"to": 4200
+					},
+					"id": 301,
+					"p": 0.999032,
+					"t_dtw": -1
+				},
+				{
+					"text": " Marine",
+					"timestamps": {
+						"from": "00:00:04,200",
+						"to": "00:00:04,560"
+					},
+					"offsets": {
+						"from": 4200,
+						"to": 4560
+					},
+					"id": 11000,
+					"p": 0.982856,
+					"t_dtw": -1
+				},
+				{
+					"text": " Division",
+					"timestamps": {
+						"from": "00:00:04,560",
+						"to": "00:00:04,980"
+					},
+					"offsets": {
+						"from": 4560,
+						"to": 4980
+					},
+					"id": 7458,
+					"p": 0.925308,
+					"t_dtw": -1
+				},
+				{
+					"text": " is",
+					"timestamps": {
+						"from": "00:00:04,980",
+						"to": "00:00:05,130"
+					},
+					"offsets": {
+						"from": 4980,
+						"to": 5130
+					},
+					"id": 318,
+					"p": 0.986265,
+					"t_dtw": -1
+				},
+				{
+					"text": " surrounded",
+					"timestamps": {
+						"from": "00:00:05,130",
+						"to": "00:00:05,640"
+					},
+					"offsets": {
+						"from": 5130,
+						"to": 5640
+					},
+					"id": 11191,
+					"p": 0.976368,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:06,030",
+						"to": "00:00:06,070"
+					},
+					"offsets": {
+						"from": 6030,
+						"to": 6070
+					},
+					"id": 379,
+					"p": 0.542369,
+					"t_dtw": -1
+				},
+				{
+					"text": " 30",
+					"timestamps": {
+						"from": "00:00:06,070",
+						"to": "00:00:06,510"
+					},
+					"offsets": {
+						"from": 6070,
+						"to": 6510
+					},
+					"id": 1542,
+					"p": 0.974001,
+					"t_dtw": -1
+				},
+				{
+					"text": " below",
+					"timestamps": {
+						"from": "00:00:06,510",
+						"to": "00:00:06,840"
+					},
+					"offsets": {
+						"from": 6510,
+						"to": 6840
+					},
+					"id": 2174,
+					"p": 0.928935,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:06,870",
+						"to": "00:00:06,880"
+					},
+					"offsets": {
+						"from": 6870,
+						"to": 6880
+					},
+					"id": 13,
+					"p": 0.979035,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_356]",
+					"timestamps": {
+						"from": "00:00:07,120",
+						"to": "00:00:07,120"
+					},
+					"offsets": {
+						"from": 7120,
+						"to": 7120
+					},
+					"id": 50719,
+					"p": 0.0433613,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,422 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:03,980"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 3980
+			},
+			"text": " At Hagaruri, engineers cut an airstrip under fire.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.98151,
+					"t_dtw": -1
+				},
+				{
+					"text": " At",
+					"timestamps": {
+						"from": "00:00:00,130",
+						"to": "00:00:00,130"
+					},
+					"offsets": {
+						"from": 130,
+						"to": 130
+					},
+					"id": 1629,
+					"p": 0.933943,
+					"t_dtw": -1
+				},
+				{
+					"text": " Hag",
+					"timestamps": {
+						"from": "00:00:00,150",
+						"to": "00:00:00,330"
+					},
+					"offsets": {
+						"from": 150,
+						"to": 330
+					},
+					"id": 21375,
+					"p": 0.667433,
+					"t_dtw": -1
+				},
+				{
+					"text": "ar",
+					"timestamps": {
+						"from": "00:00:00,330",
+						"to": "00:00:00,440"
+					},
+					"offsets": {
+						"from": 330,
+						"to": 440
+					},
+					"id": 283,
+					"p": 0.328802,
+					"t_dtw": -1
+				},
+				{
+					"text": "uri",
+					"timestamps": {
+						"from": "00:00:00,470",
+						"to": "00:00:00,660"
+					},
+					"offsets": {
+						"from": 470,
+						"to": 660
+					},
+					"id": 9900,
+					"p": 0.418338,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:00,660",
+						"to": "00:00:00,790"
+					},
+					"offsets": {
+						"from": 660,
+						"to": 790
+					},
+					"id": 11,
+					"p": 0.96581,
+					"t_dtw": -1
+				},
+				{
+					"text": " engineers",
+					"timestamps": {
+						"from": "00:00:00,790",
+						"to": "00:00:01,410"
+					},
+					"offsets": {
+						"from": 790,
+						"to": 1410
+					},
+					"id": 12037,
+					"p": 0.964284,
+					"t_dtw": -1
+				},
+				{
+					"text": " cut",
+					"timestamps": {
+						"from": "00:00:01,410",
+						"to": "00:00:01,610"
+					},
+					"offsets": {
+						"from": 1410,
+						"to": 1610
+					},
+					"id": 2005,
+					"p": 0.996913,
+					"t_dtw": -1
+				},
+				{
+					"text": " an",
+					"timestamps": {
+						"from": "00:00:01,610",
+						"to": "00:00:01,720"
+					},
+					"offsets": {
+						"from": 1610,
+						"to": 1720
+					},
+					"id": 281,
+					"p": 0.993889,
+					"t_dtw": -1
+				},
+				{
+					"text": " airst",
+					"timestamps": {
+						"from": "00:00:01,780",
+						"to": "00:00:02,020"
+					},
+					"offsets": {
+						"from": 1780,
+						"to": 2020
+					},
+					"id": 20253,
+					"p": 0.96732,
+					"t_dtw": -1
+				},
+				{
+					"text": "rip",
+					"timestamps": {
+						"from": "00:00:02,100",
+						"to": "00:00:02,280"
+					},
+					"offsets": {
+						"from": 2100,
+						"to": 2280
+					},
+					"id": 5528,
+					"p": 0.995559,
+					"t_dtw": -1
+				},
+				{
+					"text": " under",
+					"timestamps": {
+						"from": "00:00:02,280",
+						"to": "00:00:02,620"
+					},
+					"offsets": {
+						"from": 2280,
+						"to": 2620
+					},
+					"id": 739,
+					"p": 0.889786,
+					"t_dtw": -1
+				},
+				{
+					"text": " fire",
+					"timestamps": {
+						"from": "00:00:02,620",
+						"to": "00:00:02,940"
+					},
+					"offsets": {
+						"from": 2620,
+						"to": 2940
+					},
+					"id": 2046,
+					"p": 0.994262,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:02,980",
+						"to": "00:00:03,050"
+					},
+					"offsets": {
+						"from": 2980,
+						"to": 3050
+					},
+					"id": 13,
+					"p": 0.952336,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_199]",
+					"timestamps": {
+						"from": "00:00:03,980",
+						"to": "00:00:03,980"
+					},
+					"offsets": {
+						"from": 3980,
+						"to": 3980
+					},
+					"id": 50562,
+					"p": 0.0166708,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:03,980",
+				"to": "00:00:06,040"
+			},
+			"offsets": {
+				"from": 3980,
+				"to": 6040
+			},
+			"text": " More than 4,000 wounded are flown out.",
+			"tokens": [
+				{
+					"text": " More",
+					"timestamps": {
+						"from": "00:00:04,130",
+						"to": "00:00:04,170"
+					},
+					"offsets": {
+						"from": 4130,
+						"to": 4170
+					},
+					"id": 3125,
+					"p": 0.997567,
+					"t_dtw": -1
+				},
+				{
+					"text": " than",
+					"timestamps": {
+						"from": "00:00:04,170",
+						"to": "00:00:04,360"
+					},
+					"offsets": {
+						"from": 4170,
+						"to": 4360
+					},
+					"id": 621,
+					"p": 0.995456,
+					"t_dtw": -1
+				},
+				{
+					"text": " 4",
+					"timestamps": {
+						"from": "00:00:04,360",
+						"to": "00:00:04,500"
+					},
+					"offsets": {
+						"from": 4360,
+						"to": 4500
+					},
+					"id": 604,
+					"p": 0.812396,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:04,500",
+						"to": "00:00:04,590"
+					},
+					"offsets": {
+						"from": 4500,
+						"to": 4590
+					},
+					"id": 11,
+					"p": 0.990437,
+					"t_dtw": -1
+				},
+				{
+					"text": "000",
+					"timestamps": {
+						"from": "00:00:04,590",
+						"to": "00:00:04,820"
+					},
+					"offsets": {
+						"from": 4590,
+						"to": 4820
+					},
+					"id": 830,
+					"p": 0.999085,
+					"t_dtw": -1
+				},
+				{
+					"text": " wounded",
+					"timestamps": {
+						"from": "00:00:05,140",
+						"to": "00:00:05,350"
+					},
+					"offsets": {
+						"from": 5140,
+						"to": 5350
+					},
+					"id": 10657,
+					"p": 0.997754,
+					"t_dtw": -1
+				},
+				{
+					"text": " are",
+					"timestamps": {
+						"from": "00:00:05,350",
+						"to": "00:00:05,490"
+					},
+					"offsets": {
+						"from": 5350,
+						"to": 5490
+					},
+					"id": 389,
+					"p": 0.994548,
+					"t_dtw": -1
+				},
+				{
+					"text": " flown",
+					"timestamps": {
+						"from": "00:00:05,490",
+						"to": "00:00:05,700"
+					},
+					"offsets": {
+						"from": 5490,
+						"to": 5700
+					},
+					"id": 22371,
+					"p": 0.999464,
+					"t_dtw": -1
+				},
+				{
+					"text": " out",
+					"timestamps": {
+						"from": "00:00:05,760",
+						"to": "00:00:05,860"
+					},
+					"offsets": {
+						"from": 5760,
+						"to": 5860
+					},
+					"id": 503,
+					"p": 0.998647,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,860",
+						"to": "00:00:06,010"
+					},
+					"offsets": {
+						"from": 5860,
+						"to": 6010
+					},
+					"id": 13,
+					"p": 0.989034,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_302]",
+					"timestamps": {
+						"from": "00:00:06,040",
+						"to": "00:00:06,040"
+					},
+					"offsets": {
+						"from": 6040,
+						"to": 6040
+					},
+					"id": 50665,
+					"p": 0.0203501,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

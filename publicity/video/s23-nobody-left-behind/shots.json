@@ -1,0 +1,252 @@
+{
+  "sample": "../samples/usmc.ochx",
+  "size": [
+    360,
+    640
+  ],
+  "scale": 3,
+  "shots": [
+    {
+      "id": "cover",
+      "dur": 0.034,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -603244800,
+            -599702400
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "zoomfox",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -603244800,
+            -599702400
+          ]
+        },
+        {
+          "t": 3,
+          "view": [
+            -602726400,
+            -602035200
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "rfox",
+      "dur": 1.2,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -602726400,
+            -602035200
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ],
+      "actions": [
+        {
+          "t": 0,
+          "do": "viewMode",
+          "on": true
+        },
+        {
+          "t": 0.1,
+          "do": "open",
+          "title": "Fox Company holds"
+        }
+      ]
+    },
+    {
+      "id": "davis",
+      "dur": 1.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -602726400,
+            -602035200
+          ]
+        },
+        {
+          "t": 1.5,
+          "view": [
+            -602380800,
+            -602121600
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "rdavis",
+      "dur": 1.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -631152000,
+            -599616000
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ],
+      "actions": [
+        {
+          "t": 0,
+          "do": "viewMode",
+          "on": true
+        },
+        {
+          "t": 0.05,
+          "do": "hover",
+          "title": "5 moments"
+        },
+        {
+          "t": 0.35,
+          "do": "click",
+          "selector": "button[aria-label^=\"Ray Davis\"]"
+        }
+      ]
+    },
+    {
+      "id": "air",
+      "dur": 1.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -602380800,
+            -602121600
+          ]
+        },
+        {
+          "t": 1.5,
+          "view": [
+            -602467200,
+            -601689600
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "road",
+      "dur": 2,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -602467200,
+            -601689600
+          ]
+        },
+        {
+          "t": 2,
+          "view": [
+            -602812800,
+            -599961600
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "cover6",
+      "dur": 1.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -602812800,
+            -599961600
+          ]
+        },
+        {
+          "t": 1.5,
+          "view": [
+            -603244800,
+            -599702400
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "home",
+      "dur": 1.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -603244800,
+            -599702400
+          ]
+        },
+        {
+          "t": 1.5,
+          "view": [
+            -6216652800,
+            1830297600
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    }
+  ]
+}
