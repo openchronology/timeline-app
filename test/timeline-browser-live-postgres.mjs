@@ -276,7 +276,8 @@ try {
   await explore.getByText('No public timelines match this search.').waitFor();
   await explore.getByRole('link', { name: 'Clear the search' }).click();
   await tab.waitForURL((url) => !url.searchParams.has('search'));
-  await statusMatches(tab, 'explore', /^[\d,]+ timelines? · Page/);
+  // Unsearched, explore lists established accounts' timelines (#103): there may be none.
+  await statusMatches(tab, 'explore', /^[\d,]+ timelines? · Page|^No public timelines yet\.$/);
   assert.equal(await words.inputValue(), '');
 
   // Pages, in place: the cards take focus, and the other lists keep their state.
