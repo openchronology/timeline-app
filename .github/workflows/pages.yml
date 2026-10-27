@@ -29,7 +29,12 @@ jobs:
       - run: npm run typecheck
       - run: npm run build:editor
       - run: npm run build:offline
-      - run: npx playwright install --with-deps chromium
+      # Chromium's system packages, from Ubuntu's archive; a slow one fails this step on its
+      # own (#351).
+      - run: |
+          sh scripts/ubuntu-archive.sh
+          npx playwright install --with-deps chromium
+        timeout-minutes: 10
       - name: Verify the file works without a network
         run: npm run test:offline:browser
       # The organization site serves its default branch directly; a write deploy key scoped to that
