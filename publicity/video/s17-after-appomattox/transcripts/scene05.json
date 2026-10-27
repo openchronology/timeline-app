@@ -1,0 +1,311 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:05,600"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 5600
+			},
+			"text": " 211 days after Appomattox, every date with its source on one line.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.905023,
+					"t_dtw": -1
+				},
+				{
+					"text": " 211",
+					"timestamps": {
+						"from": "00:00:00,270",
+						"to": "00:00:00,780"
+					},
+					"offsets": {
+						"from": 270,
+						"to": 780
+					},
+					"id": 28714,
+					"p": 0.962103,
+					"t_dtw": -1
+				},
+				{
+					"text": " days",
+					"timestamps": {
+						"from": "00:00:01,040",
+						"to": "00:00:01,460"
+					},
+					"offsets": {
+						"from": 1040,
+						"to": 1460
+					},
+					"id": 1528,
+					"p": 0.980393,
+					"t_dtw": -1
+				},
+				{
+					"text": " after",
+					"timestamps": {
+						"from": "00:00:01,460",
+						"to": "00:00:01,990"
+					},
+					"offsets": {
+						"from": 1460,
+						"to": 1990
+					},
+					"id": 706,
+					"p": 0.997109,
+					"t_dtw": -1
+				},
+				{
+					"text": " App",
+					"timestamps": {
+						"from": "00:00:02,060",
+						"to": "00:00:02,350"
+					},
+					"offsets": {
+						"from": 2060,
+						"to": 2350
+					},
+					"id": 2034,
+					"p": 0.893242,
+					"t_dtw": -1
+				},
+				{
+					"text": "om",
+					"timestamps": {
+						"from": "00:00:02,350",
+						"to": "00:00:02,540"
+					},
+					"offsets": {
+						"from": 2350,
+						"to": 2540
+					},
+					"id": 296,
+					"p": 0.926652,
+					"t_dtw": -1
+				},
+				{
+					"text": "att",
+					"timestamps": {
+						"from": "00:00:02,570",
+						"to": "00:00:02,830"
+					},
+					"offsets": {
+						"from": 2570,
+						"to": 2830
+					},
+					"id": 1078,
+					"p": 0.976583,
+					"t_dtw": -1
+				},
+				{
+					"text": "ox",
+					"timestamps": {
+						"from": "00:00:03,160",
+						"to": "00:00:03,160"
+					},
+					"offsets": {
+						"from": 3160,
+						"to": 3160
+					},
+					"id": 1140,
+					"p": 0.997867,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,160",
+						"to": "00:00:03,190"
+					},
+					"offsets": {
+						"from": 3160,
+						"to": 3190
+					},
+					"id": 11,
+					"p": 0.286184,
+					"t_dtw": -1
+				},
+				{
+					"text": " every",
+					"timestamps": {
+						"from": "00:00:03,680",
+						"to": "00:00:03,770"
+					},
+					"offsets": {
+						"from": 3680,
+						"to": 3770
+					},
+					"id": 790,
+					"p": 0.640135,
+					"t_dtw": -1
+				},
+				{
+					"text": " date",
+					"timestamps": {
+						"from": "00:00:03,800",
+						"to": "00:00:04,130"
+					},
+					"offsets": {
+						"from": 3800,
+						"to": 4130
+					},
+					"id": 3128,
+					"p": 0.973272,
+					"t_dtw": -1
+				},
+				{
+					"text": " with",
+					"timestamps": {
+						"from": "00:00:04,140",
+						"to": "00:00:04,330"
+					},
+					"offsets": {
+						"from": 4140,
+						"to": 4330
+					},
+					"id": 351,
+					"p": 0.958599,
+					"t_dtw": -1
+				},
+				{
+					"text": " its",
+					"timestamps": {
+						"from": "00:00:04,400",
+						"to": "00:00:04,530"
+					},
+					"offsets": {
+						"from": 4400,
+						"to": 4530
+					},
+					"id": 663,
+					"p": 0.98506,
+					"t_dtw": -1
+				},
+				{
+					"text": " source",
+					"timestamps": {
+						"from": "00:00:04,530",
+						"to": "00:00:04,800"
+					},
+					"offsets": {
+						"from": 4530,
+						"to": 4800
+					},
+					"id": 2723,
+					"p": 0.982839,
+					"t_dtw": -1
+				},
+				{
+					"text": " on",
+					"timestamps": {
+						"from": "00:00:04,930",
+						"to": "00:00:05,010"
+					},
+					"offsets": {
+						"from": 4930,
+						"to": 5010
+					},
+					"id": 319,
+					"p": 0.820974,
+					"t_dtw": -1
+				},
+				{
+					"text": " one",
+					"timestamps": {
+						"from": "00:00:05,010",
+						"to": "00:00:05,200"
+					},
+					"offsets": {
+						"from": 5010,
+						"to": 5200
+					},
+					"id": 530,
+					"p": 0.790161,
+					"t_dtw": -1
+				},
+				{
+					"text": " line",
+					"timestamps": {
+						"from": "00:00:05,200",
+						"to": "00:00:05,460"
+					},
+					"offsets": {
+						"from": 5200,
+						"to": 5460
+					},
+					"id": 1627,
+					"p": 0.979029,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,480",
+						"to": "00:00:05,550"
+					},
+					"offsets": {
+						"from": 5480,
+						"to": 5550
+					},
+					"id": 13,
+					"p": 0.975103,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_280]",
+					"timestamps": {
+						"from": "00:00:05,600",
+						"to": "00:00:05,600"
+					},
+					"offsets": {
+						"from": 5600,
+						"to": 5600
+					},
+					"id": 50643,
+					"p": 0.0628689,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

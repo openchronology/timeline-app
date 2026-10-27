@@ -1,0 +1,701 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:05,260"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 5260
+			},
+			"text": " June 19th, at Galveston, an order tells Texas that all slaves are free.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.903712,
+					"t_dtw": -1
+				},
+				{
+					"text": " June",
+					"timestamps": {
+						"from": "00:00:00,290",
+						"to": "00:00:00,290"
+					},
+					"offsets": {
+						"from": 290,
+						"to": 290
+					},
+					"id": 2795,
+					"p": 0.952426,
+					"t_dtw": -1
+				},
+				{
+					"text": " 19",
+					"timestamps": {
+						"from": "00:00:00,310",
+						"to": "00:00:00,700"
+					},
+					"offsets": {
+						"from": 310,
+						"to": 700
+					},
+					"id": 678,
+					"p": 0.998163,
+					"t_dtw": -1
+				},
+				{
+					"text": "th",
+					"timestamps": {
+						"from": "00:00:00,750",
+						"to": "00:00:00,870"
+					},
+					"offsets": {
+						"from": 750,
+						"to": 870
+					},
+					"id": 400,
+					"p": 0.408473,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:00,870",
+						"to": "00:00:00,890"
+					},
+					"offsets": {
+						"from": 870,
+						"to": 890
+					},
+					"id": 11,
+					"p": 0.523637,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:00,980",
+						"to": "00:00:01,020"
+					},
+					"offsets": {
+						"from": 980,
+						"to": 1020
+					},
+					"id": 379,
+					"p": 0.933903,
+					"t_dtw": -1
+				},
+				{
+					"text": " Gal",
+					"timestamps": {
+						"from": "00:00:01,360",
+						"to": "00:00:01,370"
+					},
+					"offsets": {
+						"from": 1360,
+						"to": 1370
+					},
+					"id": 5027,
+					"p": 0.997141,
+					"t_dtw": -1
+				},
+				{
+					"text": "vest",
+					"timestamps": {
+						"from": "00:00:01,370",
+						"to": "00:00:01,660"
+					},
+					"offsets": {
+						"from": 1370,
+						"to": 1660
+					},
+					"id": 4223,
+					"p": 0.998553,
+					"t_dtw": -1
+				},
+				{
+					"text": "on",
+					"timestamps": {
+						"from": "00:00:01,660",
+						"to": "00:00:01,780"
+					},
+					"offsets": {
+						"from": 1660,
+						"to": 1780
+					},
+					"id": 261,
+					"p": 0.999792,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,800",
+						"to": "00:00:02,000"
+					},
+					"offsets": {
+						"from": 1800,
+						"to": 2000
+					},
+					"id": 11,
+					"p": 0.735514,
+					"t_dtw": -1
+				},
+				{
+					"text": " an",
+					"timestamps": {
+						"from": "00:00:02,000",
+						"to": "00:00:02,100"
+					},
+					"offsets": {
+						"from": 2000,
+						"to": 2100
+					},
+					"id": 281,
+					"p": 0.913927,
+					"t_dtw": -1
+				},
+				{
+					"text": " order",
+					"timestamps": {
+						"from": "00:00:02,190",
+						"to": "00:00:02,450"
+					},
+					"offsets": {
+						"from": 2190,
+						"to": 2450
+					},
+					"id": 1502,
+					"p": 0.99021,
+					"t_dtw": -1
+				},
+				{
+					"text": " tells",
+					"timestamps": {
+						"from": "00:00:02,450",
+						"to": "00:00:02,770"
+					},
+					"offsets": {
+						"from": 2450,
+						"to": 2770
+					},
+					"id": 4952,
+					"p": 0.986621,
+					"t_dtw": -1
+				},
+				{
+					"text": " Texas",
+					"timestamps": {
+						"from": "00:00:02,770",
+						"to": "00:00:03,110"
+					},
+					"offsets": {
+						"from": 2770,
+						"to": 3110
+					},
+					"id": 3936,
+					"p": 0.983502,
+					"t_dtw": -1
+				},
+				{
+					"text": " that",
+					"timestamps": {
+						"from": "00:00:03,140",
+						"to": "00:00:03,460"
+					},
+					"offsets": {
+						"from": 3140,
+						"to": 3460
+					},
+					"id": 326,
+					"p": 0.895027,
+					"t_dtw": -1
+				},
+				{
+					"text": " all",
+					"timestamps": {
+						"from": "00:00:03,480",
+						"to": "00:00:03,750"
+					},
+					"offsets": {
+						"from": 3480,
+						"to": 3750
+					},
+					"id": 477,
+					"p": 0.966713,
+					"t_dtw": -1
+				},
+				{
+					"text": " slaves",
+					"timestamps": {
+						"from": "00:00:03,760",
+						"to": "00:00:04,210"
+					},
+					"offsets": {
+						"from": 3760,
+						"to": 4210
+					},
+					"id": 13384,
+					"p": 0.998274,
+					"t_dtw": -1
+				},
+				{
+					"text": " are",
+					"timestamps": {
+						"from": "00:00:04,310",
+						"to": "00:00:04,540"
+					},
+					"offsets": {
+						"from": 4310,
+						"to": 4540
+					},
+					"id": 389,
+					"p": 0.996367,
+					"t_dtw": -1
+				},
+				{
+					"text": " free",
+					"timestamps": {
+						"from": "00:00:04,970",
+						"to": "00:00:04,970"
+					},
+					"offsets": {
+						"from": 4970,
+						"to": 4970
+					},
+					"id": 1479,
+					"p": 0.996579,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,200",
+						"to": "00:00:05,260"
+					},
+					"offsets": {
+						"from": 5200,
+						"to": 5260
+					},
+					"id": 13,
+					"p": 0.99198,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_263]",
+					"timestamps": {
+						"from": "00:00:05,260",
+						"to": "00:00:05,260"
+					},
+					"offsets": {
+						"from": 5260,
+						"to": 5260
+					},
+					"id": 50626,
+					"p": 0.0293277,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:05,260",
+				"to": "00:00:07,220"
+			},
+			"offsets": {
+				"from": 5260,
+				"to": 7220
+			},
+			"text": " That's Juneteenth.",
+			"tokens": [
+				{
+					"text": " That",
+					"timestamps": {
+						"from": "00:00:05,560",
+						"to": "00:00:05,670"
+					},
+					"offsets": {
+						"from": 5560,
+						"to": 5670
+					},
+					"id": 1320,
+					"p": 0.992765,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:05,670",
+						"to": "00:00:05,870"
+					},
+					"offsets": {
+						"from": 5670,
+						"to": 5870
+					},
+					"id": 338,
+					"p": 0.996168,
+					"t_dtw": -1
+				},
+				{
+					"text": " Jun",
+					"timestamps": {
+						"from": "00:00:05,870",
+						"to": "00:00:06,150"
+					},
+					"offsets": {
+						"from": 5870,
+						"to": 6150
+					},
+					"id": 7653,
+					"p": 0.979467,
+					"t_dtw": -1
+				},
+				{
+					"text": "eteenth",
+					"timestamps": {
+						"from": "00:00:06,630",
+						"to": "00:00:06,900"
+					},
+					"offsets": {
+						"from": 6630,
+						"to": 6900
+					},
+					"id": 26425,
+					"p": 0.999633,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:06,900",
+						"to": "00:00:07,220"
+					},
+					"offsets": {
+						"from": 6900,
+						"to": 7220
+					},
+					"id": 13,
+					"p": 0.892731,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_361]",
+					"timestamps": {
+						"from": "00:00:07,220",
+						"to": "00:00:07,220"
+					},
+					"offsets": {
+						"from": 7220,
+						"to": 7220
+					},
+					"id": 50724,
+					"p": 0.0393181,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:07,220",
+				"to": "00:00:10,920"
+			},
+			"offsets": {
+				"from": 7220,
+				"to": 10920
+			},
+			"text": " Four days later, Stan Wady, a Cherokee general, gives up his command.",
+			"tokens": [
+				{
+					"text": " Four",
+					"timestamps": {
+						"from": "00:00:07,460",
+						"to": "00:00:07,460"
+					},
+					"offsets": {
+						"from": 7460,
+						"to": 7460
+					},
+					"id": 6675,
+					"p": 0.983522,
+					"t_dtw": -1
+				},
+				{
+					"text": " days",
+					"timestamps": {
+						"from": "00:00:07,530",
+						"to": "00:00:07,700"
+					},
+					"offsets": {
+						"from": 7530,
+						"to": 7700
+					},
+					"id": 1528,
+					"p": 0.998256,
+					"t_dtw": -1
+				},
+				{
+					"text": " later",
+					"timestamps": {
+						"from": "00:00:07,700",
+						"to": "00:00:08,000"
+					},
+					"offsets": {
+						"from": 7700,
+						"to": 8000
+					},
+					"id": 1568,
+					"p": 0.999645,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:08,000",
+						"to": "00:00:08,110"
+					},
+					"offsets": {
+						"from": 8000,
+						"to": 8110
+					},
+					"id": 11,
+					"p": 0.995159,
+					"t_dtw": -1
+				},
+				{
+					"text": " Stan",
+					"timestamps": {
+						"from": "00:00:08,430",
+						"to": "00:00:08,430"
+					},
+					"offsets": {
+						"from": 8430,
+						"to": 8430
+					},
+					"id": 7299,
+					"p": 0.875719,
+					"t_dtw": -1
+				},
+				{
+					"text": " W",
+					"timestamps": {
+						"from": "00:00:08,500",
+						"to": "00:00:08,500"
+					},
+					"offsets": {
+						"from": 8500,
+						"to": 8500
+					},
+					"id": 370,
+					"p": 0.243907,
+					"t_dtw": -1
+				},
+				{
+					"text": "ady",
+					"timestamps": {
+						"from": "00:00:08,590",
+						"to": "00:00:08,670"
+					},
+					"offsets": {
+						"from": 8590,
+						"to": 8670
+					},
+					"id": 4597,
+					"p": 0.620756,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:08,730",
+						"to": "00:00:08,880"
+					},
+					"offsets": {
+						"from": 8730,
+						"to": 8880
+					},
+					"id": 11,
+					"p": 0.986824,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:08,880",
+						"to": "00:00:08,920"
+					},
+					"offsets": {
+						"from": 8880,
+						"to": 8920
+					},
+					"id": 257,
+					"p": 0.978399,
+					"t_dtw": -1
+				},
+				{
+					"text": " Cherokee",
+					"timestamps": {
+						"from": "00:00:08,920",
+						"to": "00:00:09,430"
+					},
+					"offsets": {
+						"from": 8920,
+						"to": 9430
+					},
+					"id": 39476,
+					"p": 0.999177,
+					"t_dtw": -1
+				},
+				{
+					"text": " general",
+					"timestamps": {
+						"from": "00:00:09,430",
+						"to": "00:00:09,850"
+					},
+					"offsets": {
+						"from": 9430,
+						"to": 9850
+					},
+					"id": 2276,
+					"p": 0.974091,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:09,850",
+						"to": "00:00:10,000"
+					},
+					"offsets": {
+						"from": 9850,
+						"to": 10000
+					},
+					"id": 11,
+					"p": 0.975969,
+					"t_dtw": -1
+				},
+				{
+					"text": " gives",
+					"timestamps": {
+						"from": "00:00:10,000",
+						"to": "00:00:10,230"
+					},
+					"offsets": {
+						"from": 10000,
+						"to": 10230
+					},
+					"id": 3607,
+					"p": 0.934052,
+					"t_dtw": -1
+				},
+				{
+					"text": " up",
+					"timestamps": {
+						"from": "00:00:10,230",
+						"to": "00:00:10,320"
+					},
+					"offsets": {
+						"from": 10230,
+						"to": 10320
+					},
+					"id": 510,
+					"p": 0.999626,
+					"t_dtw": -1
+				},
+				{
+					"text": " his",
+					"timestamps": {
+						"from": "00:00:10,320",
+						"to": "00:00:10,450"
+					},
+					"offsets": {
+						"from": 10320,
+						"to": 10450
+					},
+					"id": 465,
+					"p": 0.999361,
+					"t_dtw": -1
+				},
+				{
+					"text": " command",
+					"timestamps": {
+						"from": "00:00:10,450",
+						"to": "00:00:10,770"
+					},
+					"offsets": {
+						"from": 10450,
+						"to": 10770
+					},
+					"id": 3141,
+					"p": 0.998788,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:10,770",
+						"to": "00:00:10,920"
+					},
+					"offsets": {
+						"from": 10770,
+						"to": 10920
+					},
+					"id": 13,
+					"p": 0.994401,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_546]",
+					"timestamps": {
+						"from": "00:00:10,920",
+						"to": "00:00:10,920"
+					},
+					"offsets": {
+						"from": 10920,
+						"to": 10920
+					},
+					"id": 50909,
+					"p": 0.0791809,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

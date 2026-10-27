@@ -1,0 +1,313 @@
+{
+  "sample": "../samples/civil-war.ochx",
+  "size": [1280, 720],
+  "scale": 1.5,
+  "shots": [
+    {
+      "id": "fit",
+      "dur": 0.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-4752068400, -2903194800]
+        }
+      ]
+    },
+    {
+      "id": "slavery",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-4752068400, -2903194800]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.4,
+          "do": "separate",
+          "tags": ["slavery"]
+        }
+      ]
+    },
+    {
+      "id": "fifties",
+      "dur": 6,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-4752068400, -2903194800]
+        },
+        {
+          "t": 5,
+          "view": [-3818343600, -3426606000]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "secession",
+      "dur": 16,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3818343600, -3426606000]
+        },
+        {
+          "t": 4,
+          "view": [-3447601200, -3432913200]
+        },
+        {
+          "t": 5,
+          "view": [-3447601200, -3432913200]
+        },
+        {
+          "t": 15,
+          "view": [-3441985200, -3424964400],
+          "ease": "linear"
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "cornerstone",
+      "dur": 2,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3440257200, -3431098800]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0,
+          "do": "viewMode",
+          "on": true
+        },
+        {
+          "t": 0.4,
+          "do": "open",
+          "title": "Cornerstone Speech"
+        }
+      ]
+    },
+    {
+      "id": "commands",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3436974000, -3174145200]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.4,
+          "do": "separate",
+          "tags": ["command"]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "west",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3436974000, -3295105200]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.4,
+          "do": "separate",
+          "tags": ["west"]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "y1862",
+      "dur": 5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3436974000, -3295105200]
+        },
+        {
+          "t": 4,
+          "view": [-3392478000, -3374938800]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "july1863",
+      "dur": 7,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3365434800, -3358350000]
+        },
+        {
+          "t": 6,
+          "view": [-3361546800, -3358954800]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "black",
+      "dur": 10,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3395070000, -3300375600]
+        },
+        {
+          "t": 3,
+          "view": [-3395070000, -3300375600]
+        },
+        {
+          "t": 5.5,
+          "view": [-3367162800, -3360164400]
+        },
+        {
+          "t": 7,
+          "view": [-3367162800, -3360164400]
+        },
+        {
+          "t": 9.5,
+          "view": [-3395070000, -3300375600]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.4,
+          "do": "separate",
+          "tags": ["black soldiers"]
+        }
+      ]
+    },
+    {
+      "id": "april1865",
+      "dur": 4,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3310743600, -3299166000]
+        },
+        {
+          "t": 3,
+          "view": [-3306250800, -3303054000]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "tail",
+      "dur": 5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3306250800, -3303054000]
+        },
+        {
+          "t": 2.5,
+          "view": [-3307114800, -3282922800]
+        }
+      ],
+      "actions": [
+        {
+          "t": 3,
+          "do": "separate",
+          "tags": ["surrender"]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "reader-war",
+      "dur": 2,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3442330800, -3281886000]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0,
+          "do": "viewMode",
+          "on": true
+        },
+        {
+          "t": 0.4,
+          "do": "open",
+          "title": "The Civil War"
+        }
+      ]
+    },
+    {
+      "id": "after",
+      "dur": 4,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3442330800, -3281886000]
+        },
+        {
+          "t": 3,
+          "view": [-3300375600, -2903281200]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ]
+    }
+  ]
+}

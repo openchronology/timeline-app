@@ -1,0 +1,3114 @@
+{
+ "format": "openchronology",
+ "version": 1,
+ "title": "The U.S. Civil War, 1861–1865",
+ "description": "The American Civil War with its causes and aftermath: the forty years of compromises and crises over slavery, secession and the founding of the Confederacy, the war in the East, the West and at sea, emancipation and the Black soldiers who fought for it, the surrenders that followed Appomattox, and Reconstruction to 1877.\n\n**How to read it.** Chapter headings mark the eras and the war’s years. Campaigns, sieges, commands, presidencies and the war itself are durations; everything else is a moment, tagged by thread (slavery, politics, east, west, navy, black soldiers, command, surrender, reconstruction). Related moments are linked: a cause and what it led to.\n\n**Slavery** was the central cause of the war, as the seceding states’ own declarations say and as historians agree. **The cost:** about 620,000 soldiers dead by the traditional count, about 750,000 by J. David Hacker’s 2011 census-based estimate; both are estimates.\n\n**Dates.** Local days, shown at a fixed UTC−5 (standard time zones came only in 1883). Where a date is approximate, its dating note says so.\n\nA sample timeline built from the cited sources (Wikipedia, the National Archives, the Library of Congress, the National Park Service, the Avalon Project and Hacker’s article); not a definitive history.",
+ "presentation": {
+  "mode": "gregorian",
+  "unit": "",
+  "scale": "1/1",
+  "origin": "0/1",
+  "version": 1,
+  "offsetMinutes": -300,
+  "significantDigits": 6
+ },
+ "tags": [
+  "history",
+  "civil war",
+  "united states",
+  "slavery",
+  "reconstruction",
+  "education"
+ ],
+ "plugins": [
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "rich-text-notes",
+    "version": 1,
+    "name": "Rich text notes",
+    "description": "Edit moment and stack notes visually, storing portable Markdown. Hover cards render safe headings, emphasis, lists, code and HTTPS links. HTML and images are not executed.",
+    "fields": [],
+    "notes": {
+     "kind": "markdown"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-headings",
+    "version": 1,
+    "name": "Headings",
+    "description": "Let a moment act as a heading or marker: only its title shows, sized as a heading from level 1 to 6, and the title is what you click. Choose its font (Times New Roman by default). Headings still group into summaries with other moments.",
+    "fields": [
+     {
+      "kind": "heading",
+      "metadataKey": "headingLevel",
+      "label": "Heading level"
+     },
+     {
+      "kind": "font",
+      "metadataKey": "headingFont",
+      "label": "Heading font"
+     }
+    ],
+    "marker": {
+     "kind": "heading",
+     "metadataKey": "headingLevel"
+    },
+    "targets": [
+     "moments"
+    ]
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-sources",
+    "version": 1,
+    "name": "Sources",
+    "description": "Show and edit a series of source links for moments and stack entries.",
+    "fields": [
+     {
+      "kind": "links",
+      "metadataKey": "sources",
+      "label": "Sources"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-colors",
+    "version": 2,
+    "name": "Moment colors",
+    "description": "Choose muted semantic swatches or a custom color for moments and stack entries while preserving their white borders.",
+    "fields": [
+     {
+      "kind": "color",
+      "metadataKey": "color",
+      "label": "Moment color"
+     }
+    ],
+    "marker": {
+     "kind": "color",
+     "metadataKey": "color"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.color(api.get(\"color\")); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "dating-context",
+    "version": 1,
+    "name": "Dating context",
+    "description": "Explain the precision and coordinate convention of a moment. An exact stored coordinate can still represent an approximate age or a calendar-day marker.",
+    "fields": [
+     {
+      "kind": "text",
+      "metadataKey": "datePrecision",
+      "label": "Date precision"
+     },
+     {
+      "kind": "multiline",
+      "metadataKey": "coordinateConvention",
+      "label": "Coordinate convention"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "expand-on-hover",
+    "version": 1,
+    "name": "Expand on hover",
+    "description": "Hover or focus a summary of two to five moments to fan out its members radially for individual inspection. Larger summaries stay collapsed.",
+    "fields": [],
+    "summary": {
+     "kind": "radial"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.expand(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "timeline-theme",
+    "version": 2,
+    "name": "Timeline theme",
+    "description": "Choose the timeline's colors, fonts and text sizes: its labels, its measure (the axis, tick marks and their times), the halo that keeps them readable over images, the default marker and duration colors, and a background color. Set them here in the plugin list; anything left blank keeps the usual look, and colors chosen for events still win.",
+    "fields": [],
+    "settings": [
+     {
+      "kind": "color",
+      "key": "textColor",
+      "label": "Label color"
+     },
+     {
+      "kind": "font",
+      "key": "textFont",
+      "label": "Label font"
+     },
+     {
+      "kind": "text-size",
+      "key": "textSize",
+      "label": "Label size"
+     },
+     {
+      "kind": "color",
+      "key": "measureColor",
+      "label": "Measure color"
+     },
+     {
+      "kind": "font",
+      "key": "measureFont",
+      "label": "Measure font"
+     },
+     {
+      "kind": "text-size",
+      "key": "measureSize",
+      "label": "Measure size"
+     },
+     {
+      "kind": "color",
+      "key": "haloColor",
+      "label": "Halo color"
+     },
+     {
+      "kind": "color",
+      "key": "markerColor",
+      "label": "Marker color"
+     },
+     {
+      "kind": "color",
+      "key": "durationColor",
+      "label": "Duration color"
+     },
+     {
+      "kind": "color",
+      "key": "backgroundColor",
+      "label": "Background color"
+     }
+    ],
+    "theme": {
+     "text": "textColor",
+     "textFont": "textFont",
+     "textSize": "textSize",
+     "measure": "measureColor",
+     "measureFont": "measureFont",
+     "measureSize": "measureSize",
+     "halo": "haloColor",
+     "marker": "markerColor",
+     "duration": "durationColor",
+     "background": "backgroundColor"
+    }
+   },
+   "enabled": true,
+   "settings": {
+    "textColor": "#1f2a44",
+    "textFont": "Georgia, serif",
+    "measureColor": "#9c3b2a",
+    "haloColor": "#f3ead7",
+    "markerColor": "#1f3a5f",
+    "durationColor": "#9c3b2a",
+    "backgroundColor": "#f3ead7"
+   }
+  }
+ ],
+ "events": [
+  {
+   "id": "h-roots",
+   "time": "-4733578800/1",
+   "metadata": {
+    "title": "Roots of the war, 1820–1860",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "missouri",
+   "time": "-4727962800/1",
+   "metadata": {
+    "title": "Missouri Compromise",
+    "description": "President **James Monroe** signs the act that admits Missouri as a slave state (with Maine as a free one) and bars slavery from the rest of the Louisiana Purchase north of 36°30′.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Missouri_Compromise",
+     "https://www.archives.gov/milestone-documents/missouri-compromise"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "liberator",
+   "time": "-4386423600/1",
+   "metadata": {
+    "title": "The Liberator",
+    "description": "**William Lloyd Garrison**'s weekly first appears in Boston, demanding the immediate abolition of slavery. It runs until the Thirteenth Amendment is ratified.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/The_Liberator_(newspaper)"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "nat-turner",
+   "time": "-4366378800/1",
+   "metadata": {
+    "title": "Nat Turner's rebellion",
+    "description": "Enslaved preacher **Nat Turner** leads a revolt in Southampton County, Virginia, killing about 55 to 65 white people. Militias and mobs kill many Black people in reprisal; Turner is hanged, and Southern states tighten their slave codes.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Nat_Turner's_Rebellion"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "douglass-narrative",
+   "time": "-3934206000/1",
+   "metadata": {
+    "title": "Narrative of the Life of Frederick Douglass",
+    "description": "**Frederick Douglass**, who escaped slavery in Maryland in 1838, publishes his autobiography in Boston. It becomes the best-known account of slavery by someone who lived it.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Narrative_of_the_Life_of_Frederick_Douglass"
+    ],
+    "color": "#b0782a",
+    "datePrecision": "Published in May 1845; placed on May 1."
+   }
+  },
+  {
+   "id": "tubman-escapes",
+   "time": "-3794756400/1",
+   "metadata": {
+    "title": "Harriet Tubman escapes",
+    "description": "**Harriet Tubman** escapes slavery on Maryland’s Eastern Shore to Philadelphia. She returns again and again over the next decade to lead family members and others to freedom.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Harriet_Tubman"
+    ],
+    "color": "#b0782a",
+    "datePrecision": "Autumn 1849; the day is not recorded."
+   }
+  },
+  {
+   "id": "fugitive-slave-act",
+   "time": "-3764343600/1",
+   "metadata": {
+    "title": "Fugitive Slave Act",
+    "description": "Part of the **Compromise of 1850**: federal commissioners return people who escaped slavery, without a jury trial, and anyone who helps them faces fines and prison. It turns many Northerners against slavery.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fugitive_Slave_Act_of_1850"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "uncle-toms-cabin",
+   "time": "-3716910000/1",
+   "metadata": {
+    "title": "Uncle Tom's Cabin",
+    "description": "**Harriet Beecher Stowe**'s novel, serialized in *The National Era* from June 1851, is published as a book. It sells about 300,000 copies in the United States in its first year.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Uncle_Tom's_Cabin"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "kansas-nebraska",
+   "time": "-3647703600/1",
+   "metadata": {
+    "title": "Kansas–Nebraska Act",
+    "description": "**Stephen Douglas**'s act organizes the Kansas and Nebraska territories and lets their settlers decide on slavery (\"popular sovereignty\"), repealing the Missouri Compromise line. Its opponents soon form the **Republican Party**.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Kansas–Nebraska_Act",
+     "https://www.archives.gov/milestone-documents/kansas-nebraska-act"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "sack-of-lawrence",
+   "time": "-3585322800/1",
+   "metadata": {
+    "title": "Sack of Lawrence",
+    "description": "A proslavery posse ransacks **Lawrence**, Kansas, the free-state settlers’ town: presses destroyed, the Free State Hotel burned.",
+    "tags": [
+     "slavery",
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sacking_of_Lawrence"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "sumner-caning",
+   "time": "-3585236400/1",
+   "metadata": {
+    "title": "Sumner caned in the Senate",
+    "description": "Representative **Preston Brooks** of South Carolina beats Senator **Charles Sumner** unconscious at his desk, two days after Sumner’s \"Crime against Kansas\" speech.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Caning_of_Charles_Sumner"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "pottawatomie",
+   "time": "-3585063600/1",
+   "metadata": {
+    "title": "Pottawatomie massacre",
+    "description": "**John Brown** and his followers kill five proslavery settlers along Pottawatomie Creek, Kansas, in reply to the sack of Lawrence.",
+    "tags": [
+     "slavery",
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Pottawatomie_massacre"
+    ],
+    "color": "#b0782a",
+    "datePrecision": "The night of May 24–25, 1856."
+   }
+  },
+  {
+   "id": "dred-scott",
+   "time": "-3560353200/1",
+   "metadata": {
+    "title": "Dred Scott v. Sandford",
+    "description": "Chief Justice **Roger Taney**’s Supreme Court rules that Black Americans cannot be citizens and that Congress cannot bar slavery from the territories, so the Missouri Compromise was unconstitutional.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Dred_Scott_v._Sandford",
+     "https://www.archives.gov/milestone-documents/dred-scott-v-sandford"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "brown-hanged",
+   "time": "-3473866800/1",
+   "metadata": {
+    "title": "John Brown hanged",
+    "description": "Convicted of treason against Virginia, murder and inciting slave insurrection, **John Brown** is hanged at Charles Town. Many in the North mourn him as a martyr; many in the South see Northern plots behind him.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/John_Brown_(abolitionist)"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "h-secession",
+   "time": "-3444922800/1",
+   "metadata": {
+    "title": "Election and secession",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "lincoln-elected",
+   "time": "-3444490800/1",
+   "metadata": {
+    "title": "Lincoln elected president",
+    "description": "**Abraham Lincoln**, the Republican who would keep slavery out of the territories, wins the presidency with no electoral votes from the South. Secession conventions follow within weeks.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1860_United_States_presidential_election"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "crittenden",
+   "time": "-3440862000/1",
+   "metadata": {
+    "title": "Crittenden Compromise proposed",
+    "description": "Senator **John J. Crittenden** of Kentucky proposes amendments to protect slavery south of 36°30′ forever. Lincoln and most Republicans refuse to extend slavery, and it fails.",
+    "tags": [
+     "politics",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Crittenden_Compromise"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "sc-secedes",
+   "time": "-3440689200/1",
+   "metadata": {
+    "title": "South Carolina secedes",
+    "description": "A convention in Charleston votes unanimously to leave the Union, the first state to do so.",
+    "tags": [
+     "politics",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/South_Carolina_in_the_American_Civil_War"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "sc-declaration",
+   "time": "-3440343600/1",
+   "metadata": {
+    "title": "South Carolina's Declaration of Causes",
+    "description": "The convention’s **Declaration of the Immediate Causes** justifies secession by the \"increasing hostility on the part of the non-slaveholding States to the institution of slavery\", citing the free states’ refusal to return fugitives and Lincoln’s election.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/South_Carolina_Declaration_of_Secession",
+     "https://avalon.law.yale.edu/19th_century/csa_scarsec.asp"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "mississippi-secedes",
+   "time": "-3438961200/1",
+   "metadata": {
+    "title": "Mississippi secedes",
+    "description": "Its convention’s declaration of causes begins: \"Our position is thoroughly identified with the institution of slavery—the greatest material interest of the world.\"",
+    "tags": [
+     "politics",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mississippi_in_the_American_Civil_War",
+     "https://avalon.law.yale.edu/19th_century/csa_missec.asp"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "florida-secedes",
+   "time": "-3438874800/1",
+   "metadata": {
+    "title": "Florida secedes",
+    "description": "The third state to leave the Union.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Florida_in_the_American_Civil_War"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "alabama-secedes",
+   "time": "-3438788400/1",
+   "metadata": {
+    "title": "Alabama secedes",
+    "description": "The fourth state to leave the Union.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Alabama_in_the_American_Civil_War"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "georgia-secedes",
+   "time": "-3438097200/1",
+   "metadata": {
+    "title": "Georgia secedes",
+    "description": "Georgia’s declaration of causes, adopted ten days later, names the North’s hostility to slavery as the reason.",
+    "tags": [
+     "politics",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Georgia_in_the_American_Civil_War",
+     "https://avalon.law.yale.edu/19th_century/csa_geosec.asp"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "louisiana-secedes",
+   "time": "-3437492400/1",
+   "metadata": {
+    "title": "Louisiana secedes",
+    "description": "The sixth state to leave the Union.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Louisiana_in_the_American_Civil_War"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "kansas-admitted",
+   "time": "-3437233200/1",
+   "metadata": {
+    "title": "Kansas admitted as a free state",
+    "description": "With Southern senators gone, Congress admits Kansas under its antislavery Wyandotte Constitution.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Kansas",
+     "https://en.wikipedia.org/wiki/Bleeding_Kansas"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "texas-secedes",
+   "time": "-3436974000/1",
+   "metadata": {
+    "title": "Texas secedes",
+    "description": "Its convention votes to leave, over Governor **Sam Houston**’s opposition; voters ratify it on February 23. Its declaration of causes defends slavery as the foundation of the state’s prosperity.",
+    "tags": [
+     "politics",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Texas_in_the_American_Civil_War",
+     "https://avalon.law.yale.edu/19th_century/csa_texsec.asp"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "csa-formed",
+   "time": "-3436369200/1",
+   "metadata": {
+    "title": "The Confederate States formed",
+    "description": "Delegates of six seceded states, meeting in **Montgomery**, Alabama, since February 4, adopt a provisional constitution; Texas’s delegates join them later. The next day they choose **Jefferson Davis** as provisional president.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Confederate_States_of_America",
+     "https://en.wikipedia.org/wiki/Provisional_Congress_of_the_Confederate_States"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "corwin",
+   "time": "-3434468400/1",
+   "metadata": {
+    "title": "Corwin Amendment passes Congress",
+    "description": "A last attempt at compromise: an amendment forbidding Congress ever to abolish slavery in the states. Lincoln does not oppose it; only a few states ratify it, and the war overtakes it.",
+    "tags": [
+     "politics",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Corwin_Amendment"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "csa-constitution",
+   "time": "-3433690800/1",
+   "metadata": {
+    "title": "Confederate Constitution",
+    "description": "The permanent constitution copies much of the U.S. one, but forbids any law \"denying or impairing the right of property in negro slaves\" and protects slavery in any new territory.",
+    "tags": [
+     "politics",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Constitution_of_the_Confederate_States",
+     "https://avalon.law.yale.edu/19th_century/csa_csa.asp"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "cornerstone",
+   "time": "-3432826800/1",
+   "metadata": {
+    "title": "Cornerstone Speech",
+    "description": "Confederate vice president **Alexander Stephens**, at Savannah, says the new government’s \"cornerstone rests upon the great truth that the negro is not equal to the white man; that slavery … is his natural and normal condition.\"",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Cornerstone_Speech",
+     "https://www.battlefields.org/learn/primary-sources/cornerstone-speech"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "h-1861",
+   "time": "-3431876400/1",
+   "metadata": {
+    "title": "1861: The war begins",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "sumter",
+   "time": "-3430909800/1",
+   "metadata": {
+    "title": "Fort Sumter",
+    "description": "Confederate batteries open fire on the federal fort in Charleston Harbor at 4:30 in the morning. Major **Robert Anderson** surrenders it the next day: the war begins.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Fort_Sumter",
+     "https://www.nps.gov/fosu/index.htm"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "call-75000",
+   "time": "-3430666800/1",
+   "metadata": {
+    "title": "Lincoln calls for 75,000 volunteers",
+    "description": "Lincoln calls up 75,000 militia for ninety days to put down the rebellion. Four states of the upper South secede rather than send troops.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Proclamation_80"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "virginia-secedes",
+   "time": "-3430494000/1",
+   "metadata": {
+    "title": "Virginia secedes",
+    "description": "Virginia’s convention votes to secede; voters ratify it in May. Richmond becomes the Confederate capital.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Virginia_in_the_American_Civil_War"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "anaconda",
+   "time": "-3429111600/1",
+   "metadata": {
+    "title": "The Anaconda Plan",
+    "description": "General-in-chief **Winfield Scott** proposes to strangle the Confederacy: blockade its coast and take the Mississippi. Mocked at first, its outline is how the war was won.",
+    "tags": [
+     "navy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Anaconda_Plan"
+    ],
+    "color": "#2f6f7a",
+    "datePrecision": "General Scott set out the plan in letters of May 3 and May 21, 1861."
+   }
+  },
+  {
+   "id": "arkansas-secedes",
+   "time": "-3428852400/1",
+   "metadata": {
+    "title": "Arkansas secedes",
+    "description": "The ninth state to leave the Union.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Arkansas_in_the_American_Civil_War"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "nc-secedes",
+   "time": "-3427642800/1",
+   "metadata": {
+    "title": "North Carolina secedes",
+    "description": "The tenth state to leave the Union.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/North_Carolina_in_the_American_Civil_War"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "contraband",
+   "time": "-3427297200/1",
+   "metadata": {
+    "title": "\"Contraband of war\"",
+    "description": "**Shepard Mallory**, **Frank Baker** and **James Townsend**, enslaved men who escaped to Fort Monroe, Virginia, are refused to their owner by General **Benjamin Butler** as \"contraband of war\". Thousands follow them to Union lines.",
+    "tags": [
+     "slavery",
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Contraband_(American_Civil_War)"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "tennessee-secedes",
+   "time": "-3426001200/1",
+   "metadata": {
+    "title": "Tennessee secedes",
+    "description": "Voters approve secession, the last of the eleven states to leave.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tennessee_in_the_American_Civil_War"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "first-bull-run",
+   "time": "-3422286000/1",
+   "metadata": {
+    "title": "First Bull Run",
+    "description": "The first major battle, near Manassas, Virginia: a Union army under **Irvin McDowell** is routed back to Washington. **Thomas Jackson** earns the name \"Stonewall\". Neither side expects a short war after it.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_Battle_of_Bull_Run"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "confiscation-1861",
+   "time": "-3420903600/1",
+   "metadata": {
+    "title": "First Confiscation Act",
+    "description": "Congress allows the seizure of property, including enslaved people, used to support the rebellion.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Confiscation_Act_of_1861"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "h-1862",
+   "time": "-3408116400/1",
+   "metadata": {
+    "title": "1862: From Donelson to Antietam",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "fort-henry",
+   "time": "-3405006000/1",
+   "metadata": {
+    "title": "Fort Henry",
+    "description": "Union gunboats under **Andrew Foote** force the surrender of Fort Henry on the Tennessee River, opening it to Union boats.",
+    "tags": [
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Fort_Henry"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "donelson-surrender",
+   "time": "-3404142000/1",
+   "metadata": {
+    "title": "Fort Donelson: \"unconditional surrender\"",
+    "description": "**Ulysses S. Grant** demands \"no terms except an unconditional and immediate surrender\", and about 12,000 Confederates give up the fort on the Cumberland River. Kentucky and much of Tennessee fall to the Union.",
+    "tags": [
+     "west",
+     "surrender"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Fort_Donelson"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "hampton-roads",
+   "time": "-3402327600/1",
+   "metadata": {
+    "title": "Monitor and Virginia",
+    "description": "The first battle between ironclads, at **Hampton Roads**, Virginia: USS *Monitor* and CSS *Virginia* fight to a draw, a day after *Virginia* sank two wooden warships.",
+    "tags": [
+     "navy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Hampton_Roads"
+    ],
+    "color": "#2f6f7a"
+   }
+  },
+  {
+   "id": "dc-emancipation",
+   "time": "-3399044400/1",
+   "metadata": {
+    "title": "Slavery abolished in Washington, D.C.",
+    "description": "The **District of Columbia Compensated Emancipation Act** frees about 3,100 people, paying their owners. Washington still marks April 16 as Emancipation Day.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/District_of_Columbia_Compensated_Emancipation_Act"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "new-orleans",
+   "time": "-3398266800/1",
+   "metadata": {
+    "title": "Farragut takes New Orleans",
+    "description": "Flag Officer **David Farragut**’s fleet runs past the forts below the city and takes the Confederacy’s largest city and port.",
+    "tags": [
+     "navy",
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Capture_of_New_Orleans"
+    ],
+    "color": "#2f6f7a",
+    "datePrecision": "The fleet passed the forts on April 24 and reached the city on April 25; it formally surrendered on April 29, and troops occupied it on May 1."
+   }
+  },
+  {
+   "id": "smalls",
+   "time": "-3396711600/1",
+   "metadata": {
+    "title": "Robert Smalls takes the Planter",
+    "description": "**Robert Smalls**, an enslaved pilot, steers the Confederate steamer *Planter* out of Charleston Harbor before dawn with his family and crew aboard, and hands it to the Union blockade. He later serves five terms in Congress.",
+    "tags": [
+     "slavery",
+     "navy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Robert_Smalls"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "militia-act",
+   "time": "-3391095600/1",
+   "metadata": {
+    "title": "Second Confiscation Act and Militia Act",
+    "description": "Congress declares free the enslaved people of rebel owners who reach Union lines, and lets the president enlist Black men in the service of the army.",
+    "tags": [
+     "slavery",
+     "black soldiers"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Confiscation_Act_of_1862",
+     "https://en.wikipedia.org/wiki/Militia_Act_of_1862"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "cabinet-reading",
+   "time": "-3390663600/1",
+   "metadata": {
+    "title": "Emancipation read to the cabinet",
+    "description": "Lincoln reads his cabinet a draft proclamation of emancipation. **William Seward** advises waiting for a victory, so it doesn’t look like an act of desperation.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emancipation_Proclamation"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "antietam",
+   "time": "-3385738800/1",
+   "metadata": {
+    "title": "Antietam",
+    "description": "At Sharpsburg, Maryland, **McClellan** stops **Lee**’s first invasion of the North. About 23,000 men are killed, wounded or missing: the bloodiest single day in American history.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Antietam",
+     "https://www.nps.gov/anti/index.htm"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "preliminary",
+   "time": "-3385306800/1",
+   "metadata": {
+    "title": "Preliminary Emancipation Proclamation",
+    "description": "Five days after Antietam, Lincoln announces that on January 1, 1863, enslaved people in any state still in rebellion \"shall be then, thenceforward, and forever free.\"",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emancipation_Proclamation",
+     "https://www.archives.gov/exhibits/featured-documents/emancipation-proclamation"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "perryville",
+   "time": "-3383924400/1",
+   "metadata": {
+    "title": "Perryville",
+    "description": "The largest battle in Kentucky ends **Braxton Bragg**’s invasion of the state; he withdraws to Tennessee.",
+    "tags": [
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Perryville"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "island-mound",
+   "time": "-3382110000/1",
+   "metadata": {
+    "title": "Island Mound",
+    "description": "The **1st Kansas Colored Infantry**, made up largely of men who had escaped slavery in Missouri, fights a Confederate force in Bates County, Missouri: among the first Black soldiers in combat in the war.",
+    "tags": [
+     "black soldiers",
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Skirmish_at_Island_Mound"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "h-1863",
+   "time": "-3376580400/1",
+   "metadata": {
+    "title": "1863: Emancipation and turning points",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "emancipation",
+   "time": "-3376537200/1",
+   "metadata": {
+    "title": "Emancipation Proclamation",
+    "description": "Lincoln declares free all enslaved people in the areas still in rebellion, about 3.5 million people, and opens the army and navy to Black men. It frees no one in the loyal border states; its reach grows with the Union armies.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Emancipation_Proclamation",
+     "https://www.archives.gov/exhibits/featured-documents/emancipation-proclamation"
+    ],
+    "color": "#b0782a",
+    "datePrecision": "Signed on the afternoon of January 1, 1863; placed at noon to stand apart from the chapter heading at midnight."
+   }
+  },
+  {
+   "id": "men-of-color",
+   "time": "-3371396400/1",
+   "metadata": {
+    "title": "\"Men of Color, To Arms!\"",
+    "description": "**Frederick Douglass** calls on Black men to enlist in the new **54th Massachusetts**: \"Better even die free, than to live slaves.\" Two of his sons join it.",
+    "tags": [
+     "black soldiers",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Frederick_Douglass",
+     "https://en.wikipedia.org/wiki/54th_Massachusetts_Infantry_Regiment"
+    ],
+    "color": "#5b4a8a",
+    "datePrecision": "Dated March 2, 1863 in Douglass’ Monthly; the Rochester broadside is often dated March 21."
+   }
+  },
+  {
+   "id": "enrollment-act",
+   "time": "-3371310000/1",
+   "metadata": {
+    "title": "Enrollment Act: the draft",
+    "description": "The Union’s first federal draft. A drafted man can hire a substitute or pay $300 to be excused, which many workers resent as a rich man’s exemption.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Enrollment_Act"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "jackson-wounded",
+   "time": "-3366126000/1",
+   "metadata": {
+    "title": "Stonewall Jackson wounded",
+    "description": "After his flank attack at Chancellorsville, **Thomas \"Stonewall\" Jackson** is shot by his own men in the dark. He dies of pneumonia on May 10.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Stonewall_Jackson"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "bct",
+   "time": "-3364398000/1",
+   "metadata": {
+    "title": "Bureau of Colored Troops",
+    "description": "The War Department’s **General Order No. 143** creates a bureau to recruit Black regiments: the **United States Colored Troops**. About 179,000 Black men serve in the army by the war’s end, about a tenth of it, and some 19,000 in the navy.",
+    "tags": [
+     "black soldiers"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/United_States_Colored_Troops",
+     "https://www.archives.gov/education/lessons/blacks-civil-war"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "port-hudson-assault",
+   "time": "-3363966000/1",
+   "metadata": {
+    "title": "Port Hudson: the Native Guards attack",
+    "description": "The **1st and 3rd Louisiana Native Guards** charge the Confederate works at Port Hudson, Louisiana: Black regiments in a major assault, praised in Northern papers.",
+    "tags": [
+     "black soldiers",
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Port_Hudson",
+     "https://en.wikipedia.org/wiki/Louisiana_Native_Guard"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "combahee",
+   "time": "-3363447600/1",
+   "metadata": {
+    "title": "Combahee River Raid",
+    "description": "**Harriet Tubman** guides Colonel **James Montgomery**’s **2nd South Carolina Volunteers**, a Black regiment, up the Combahee River in gunboats. They free more than 750 enslaved people.",
+    "tags": [
+     "black soldiers",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Raid_on_Combahee_Ferry",
+     "https://en.wikipedia.org/wiki/Harriet_Tubman"
+    ],
+    "color": "#5b4a8a",
+    "datePrecision": "The night of June 1–2, 1863."
+   }
+  },
+  {
+   "id": "millikens-bend",
+   "time": "-3363015600/1",
+   "metadata": {
+    "title": "Milliken's Bend",
+    "description": "Newly raised Black regiments, with white troops and gunboats, hold off a Confederate attack on a Union post on the Mississippi above Vicksburg.",
+    "tags": [
+     "black soldiers",
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Milliken's_Bend"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "picketts-charge",
+   "time": "-3360769200/1",
+   "metadata": {
+    "title": "Pickett's Charge",
+    "description": "On Gettysburg’s third afternoon, about 12,500 Confederates cross open fields against the Union centre on Cemetery Ridge. More than half are killed, wounded or captured.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Pickett's_Charge"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "vicksburg-surrender",
+   "time": "-3360682800/1",
+   "metadata": {
+    "title": "Vicksburg surrenders",
+    "description": "After a 47-day siege, **John Pemberton** surrenders the city and about 29,000 men to **Grant**, the day after Pickett’s Charge.",
+    "tags": [
+     "west",
+     "surrender"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Vicksburg",
+     "https://www.nps.gov/vick/index.htm"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "port-hudson-surrender",
+   "time": "-3360250800/1",
+   "metadata": {
+    "title": "Port Hudson surrenders",
+    "description": "The last Confederate stronghold on the Mississippi falls. \"The Father of Waters again goes unvexed to the sea,\" Lincoln writes.",
+    "tags": [
+     "west",
+     "surrender"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Port_Hudson"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "orphan-asylum",
+   "time": "-3359905200/1",
+   "metadata": {
+    "title": "Colored Orphan Asylum burned",
+    "description": "On the draft riots’ first day a mob burns the **Colored Orphan Asylum** on Fifth Avenue; the more than 200 children escape. Rioters hunt and kill Black New Yorkers over the next days.",
+    "tags": [
+     "politics",
+     "black soldiers"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/New_York_City_draft_riots"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "fort-wagner",
+   "time": "-3359473200/1",
+   "metadata": {
+    "title": "The 54th Massachusetts at Fort Wagner",
+    "description": "The **54th Massachusetts** leads the night assault on Fort Wagner, near Charleston. Colonel **Robert Gould Shaw** is killed with many of his men; Sergeant **William Carney**, wounded, saves the flag and later receives the Medal of Honor.",
+    "tags": [
+     "black soldiers",
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Second_Battle_of_Fort_Wagner",
+     "https://en.wikipedia.org/wiki/54th_Massachusetts_Infantry_Regiment"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "douglass-lincoln",
+   "time": "-3357486000/1",
+   "metadata": {
+    "title": "Douglass meets Lincoln",
+    "description": "**Frederick Douglass** presses Lincoln at the White House for equal pay for Black soldiers, their protection as prisoners, and promotion for merit.",
+    "tags": [
+     "black soldiers",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Frederick_Douglass"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "gettysburg-address",
+   "time": "-3348759600/1",
+   "metadata": {
+    "title": "Gettysburg Address",
+    "description": "At the dedication of the Soldiers’ National Cemetery, Lincoln speaks for about two minutes: \"a new birth of freedom\" and government \"of the people, by the people, for the people\".",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Gettysburg_Address",
+     "https://www.loc.gov/exhibits/gettysburg-address/"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "ten-percent",
+   "time": "-3347118000/1",
+   "metadata": {
+    "title": "The Ten Percent Plan",
+    "description": "Lincoln offers pardons and readmission to a Confederate state once a tenth of its 1860 voters swear loyalty and accept emancipation: his first plan for reconstruction.",
+    "tags": [
+     "reconstruction",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ten_percent_plan"
+    ],
+    "color": "#3f6e8c"
+   }
+  },
+  {
+   "id": "h-1864",
+   "time": "-3345044400/1",
+   "metadata": {
+    "title": "1864: Grant and Sherman",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "grant-lieutenant-general",
+   "time": "-3339169200/1",
+   "metadata": {
+    "title": "Grant made lieutenant general",
+    "description": "Lincoln hands **Grant** his commission as lieutenant general, a rank Congress had revived for him. Three days later Grant is general-in-chief of all the Union armies.",
+    "tags": [
+     "command"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ulysses_S._Grant"
+    ],
+    "color": "#7a5c2e"
+   }
+  },
+  {
+   "id": "senate-13th",
+   "time": "-3336577200/1",
+   "metadata": {
+    "title": "The Senate passes the Thirteenth Amendment",
+    "description": "The Senate passes the amendment abolishing slavery, 38 to 6. It falls short of two-thirds in the House that June.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Thirteenth_Amendment_to_the_United_States_Constitution"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "fort-pillow",
+   "time": "-3336231600/1",
+   "metadata": {
+    "title": "Fort Pillow",
+    "description": "Confederates under **Nathan Bedford Forrest** take Fort Pillow, Tennessee, and kill many Black soldiers trying to surrender. \"Remember Fort Pillow\" becomes a rallying cry.",
+    "tags": [
+     "black soldiers",
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Fort_Pillow"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "equal-pay",
+   "time": "-3330702000/1",
+   "metadata": {
+    "title": "Equal pay for Black soldiers",
+    "description": "After a year of protest, including the 54th Massachusetts refusing any pay at all rather than less, Congress grants Black soldiers the same pay as white ones.",
+    "tags": [
+     "black soldiers",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/United_States_Colored_Troops",
+     "https://www.archives.gov/education/lessons/blacks-civil-war"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "kearsarge",
+   "time": "-3330356400/1",
+   "metadata": {
+    "title": "Kearsarge sinks the Alabama",
+    "description": "Off Cherbourg, France, USS *Kearsarge* sinks the raider CSS *Alabama*, which had taken more than sixty Union merchant ships.",
+    "tags": [
+     "navy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Cherbourg_(1864)"
+    ],
+    "color": "#2f6f7a"
+   }
+  },
+  {
+   "id": "crater",
+   "time": "-3326814000/1",
+   "metadata": {
+    "title": "The Crater",
+    "description": "Union miners blow a gap in the Petersburg lines at 4:44 a.m., but the attack into the crater fails. The USCT division sent in late suffers heavily, and some of its men are killed after surrendering.",
+    "tags": [
+     "east",
+     "black soldiers"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_the_Crater"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "mobile-bay",
+   "time": "-3326295600/1",
+   "metadata": {
+    "title": "Mobile Bay",
+    "description": "**Farragut** takes his fleet through the mines (\"torpedoes\") into Mobile Bay, closing one of the last Confederate ports on the Gulf.",
+    "tags": [
+     "navy",
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Mobile_Bay"
+    ],
+    "color": "#2f6f7a"
+   }
+  },
+  {
+   "id": "atlanta-falls",
+   "time": "-3323876400/1",
+   "metadata": {
+    "title": "Atlanta falls",
+    "description": "Union troops enter the city. \"Atlanta is ours, and fairly won,\" **Sherman** wires Washington, and Lincoln’s chances of re-election turn.",
+    "tags": [
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Atlanta_campaign",
+     "https://en.wikipedia.org/wiki/Battle_of_Atlanta"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "new-market-heights",
+   "time": "-3321543600/1",
+   "metadata": {
+    "title": "New Market Heights",
+    "description": "USCT regiments storm the Confederate works below Richmond. Fourteen Black soldiers receive the Medal of Honor for that morning.",
+    "tags": [
+     "black soldiers",
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Chaffin%27s_Farm"
+    ],
+    "color": "#5b4a8a"
+   }
+  },
+  {
+   "id": "maryland-abolishes",
+   "time": "-3318692400/1",
+   "metadata": {
+    "title": "Maryland abolishes slavery",
+    "description": "A new state constitution frees the enslaved people of a loyal border state, whom the Emancipation Proclamation had not reached.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Maryland_in_the_American_Civil_War"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "lincoln-reelected",
+   "time": "-3318087600/1",
+   "metadata": {
+    "title": "Lincoln re-elected",
+    "description": "Lincoln defeats **George McClellan**, winning 212 of 233 electoral votes and most of the soldiers’ vote.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1864_United_States_presidential_election"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "franklin",
+   "time": "-3316186800/1",
+   "metadata": {
+    "title": "Franklin",
+    "description": "**John Bell Hood** throws the Army of Tennessee against Union entrenchments at Franklin, Tennessee: about 6,000 Confederate casualties in five hours, six generals killed.",
+    "tags": [
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Franklin"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "savannah",
+   "time": "-3314372400/1",
+   "metadata": {
+    "title": "Sherman takes Savannah",
+    "description": "The March to the Sea ends at the coast. Sherman offers the city to Lincoln \"as a Christmas gift\".",
+    "tags": [
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sherman's_March_to_the_Sea"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "h-1865",
+   "time": "-3313422000/1",
+   "metadata": {
+    "title": "1865: The end of the Confederacy",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "fort-fisher",
+   "time": "-3312212400/1",
+   "metadata": {
+    "title": "Fort Fisher",
+    "description": "A joint army and navy assault takes the fort guarding **Wilmington**, North Carolina, the Confederacy’s last major open port.",
+    "tags": [
+     "navy",
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Second_Battle_of_Fort_Fisher"
+    ],
+    "color": "#2f6f7a"
+   }
+  },
+  {
+   "id": "field-order-15",
+   "time": "-3312126000/1",
+   "metadata": {
+    "title": "Special Field Order No. 15",
+    "description": "After meeting Black ministers in Savannah, **Sherman** sets aside the coastal lands of South Carolina, Georgia and Florida for freed families in plots of up to 40 acres. President Johnson reverses it that autumn.",
+    "tags": [
+     "reconstruction",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Forty_acres_and_a_mule"
+    ],
+    "color": "#3f6e8c"
+   }
+  },
+  {
+   "id": "house-13th",
+   "time": "-3310830000/1",
+   "metadata": {
+    "title": "The House passes the Thirteenth Amendment",
+    "description": "The House passes the amendment, 119 to 56, just over two-thirds, and it goes to the states. The galleries, where Black spectators were newly admitted, erupt.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Thirteenth_Amendment_to_the_United_States_Constitution",
+     "https://www.archives.gov/milestone-documents/13th-amendment"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "hampton-roads-conference",
+   "time": "-3310570800/1",
+   "metadata": {
+    "title": "Hampton Roads Conference",
+    "description": "Lincoln and Seward meet three Confederate commissioners aboard a steamer off Fort Monroe. Lincoln will accept nothing short of reunion and emancipation, and the talks fail.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hampton_Roads_Conference"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "freedmens-bureau",
+   "time": "-3308151600/1",
+   "metadata": {
+    "title": "Freedmen's Bureau",
+    "description": "Congress creates the Bureau of Refugees, Freedmen, and Abandoned Lands, to give food, schooling, labour contracts and legal help to freed people and refugees.",
+    "tags": [
+     "reconstruction"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Freedmen's_Bureau"
+    ],
+    "color": "#3f6e8c"
+   }
+  },
+  {
+   "id": "second-inaugural",
+   "time": "-3308065200/1",
+   "metadata": {
+    "title": "Second inaugural address",
+    "description": "Lincoln says that slavery, \"a peculiar and powerful interest\", was \"somehow the cause of the war\", and closes \"With malice toward none, with charity for all\".",
+    "tags": [
+     "politics",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Abraham_Lincoln's_second_inaugural_address"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "csa-black-enlistment",
+   "time": "-3307287600/1",
+   "metadata": {
+    "title": "The Confederacy arms enslaved men",
+    "description": "Desperate for soldiers, the Confederate Congress authorizes enlisting enslaved men, without promising them freedom. Few are enlisted before the end.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Military_history_of_African_Americans_in_the_American_Civil_War"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "five-forks",
+   "time": "-3305646000/1",
+   "metadata": {
+    "title": "Five Forks",
+    "description": "**Philip Sheridan** breaks Lee’s right flank southwest of Petersburg. Grant attacks along the whole line the next morning.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Five_Forks"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "richmond-falls",
+   "time": "-3305473200/1",
+   "metadata": {
+    "title": "Richmond falls",
+    "description": "The Confederate government flees on the night of April 2. Union troops, Black regiments among the first, enter the burning capital the next morning; Lincoln walks its streets on April 4.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Richmond,_Virginia,_in_the_American_Civil_War"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "appomattox",
+   "time": "-3304954800/1",
+   "metadata": {
+    "title": "Lee surrenders at Appomattox",
+    "description": "At the **McLean House**, Appomattox Court House, **Robert E. Lee** surrenders the Army of Northern Virginia to **Grant**, who lets the men go home on parole with their horses. Other Confederate armies are still in the field.",
+    "tags": [
+     "surrender",
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Appomattox_Court_House",
+     "https://www.nps.gov/apco/index.htm"
+    ],
+    "color": "#6b5a4a"
+   }
+  },
+  {
+   "id": "stacking-arms",
+   "time": "-3304695600/1",
+   "metadata": {
+    "title": "The stacking of arms",
+    "description": "Four years to the day after Fort Sumter, Lee’s infantry marches past Union troops under **Joshua Chamberlain** and lays down its arms and flags.",
+    "tags": [
+     "surrender",
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Appomattox_Court_House",
+     "https://www.nps.gov/apco/index.htm"
+    ],
+    "color": "#6b5a4a"
+   }
+  },
+  {
+   "id": "lincoln-shot",
+   "time": "-3304442700/1",
+   "metadata": {
+    "title": "Lincoln shot at Ford's Theatre",
+    "description": "**John Wilkes Booth**, a Confederate sympathizer, shoots the president at about 10:15 p.m. during a play in Washington.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Assassination_of_Abraham_Lincoln"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "lincoln-dies",
+   "time": "-3304409880/1",
+   "metadata": {
+    "title": "Lincoln dies",
+    "description": "Lincoln dies at 7:22 a.m. in the Petersen House across the street. **Andrew Johnson** is sworn in that morning.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Assassination_of_Abraham_Lincoln"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "bennett-place",
+   "time": "-3303486000/1",
+   "metadata": {
+    "title": "Johnston surrenders at Bennett Place",
+    "description": "At a farmhouse near Durham, North Carolina, **Joseph E. Johnston** surrenders to **Sherman** the armies in the Carolinas, Georgia and Florida, about 90,000 soldiers: the largest surrender of the war. Washington had rejected their broader first terms of April 18.",
+    "tags": [
+     "surrender",
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Bennett_Place",
+     "https://en.wikipedia.org/wiki/Conclusion_of_the_American_Civil_War"
+    ],
+    "color": "#6b5a4a"
+   }
+  },
+  {
+   "id": "taylor-surrenders",
+   "time": "-3302794800/1",
+   "metadata": {
+    "title": "Taylor surrenders at Citronelle",
+    "description": "**Richard Taylor** surrenders the Confederate forces in Alabama, Mississippi and eastern Louisiana to **Edward Canby**.",
+    "tags": [
+     "surrender",
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Richard_Taylor_(Confederate_general)",
+     "https://en.wikipedia.org/wiki/Conclusion_of_the_American_Civil_War"
+    ],
+    "color": "#6b5a4a"
+   }
+  },
+  {
+   "id": "davis-captured",
+   "time": "-3302276400/1",
+   "metadata": {
+    "title": "Jefferson Davis captured",
+    "description": "Union cavalry capture the Confederate president near Irwinville, Georgia. He is held for two years at Fort Monroe and never tried.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Jefferson_Davis"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "amnesty",
+   "time": "-3300634800/1",
+   "metadata": {
+    "title": "Johnson's amnesty proclamation",
+    "description": "President **Johnson** pardons most former Confederates who take an oath of loyalty and begins restoring Southern state governments with no part for Black voters: \"Presidential Reconstruction\".",
+    "tags": [
+     "reconstruction",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Reconstruction_era",
+     "https://en.wikipedia.org/wiki/Andrew_Johnson"
+    ],
+    "color": "#3f6e8c"
+   }
+  },
+  {
+   "id": "kirby-smith",
+   "time": "-3300289200/1",
+   "metadata": {
+    "title": "Kirby Smith surrenders at Galveston",
+    "description": "**Edmund Kirby Smith** surrenders the Trans-Mississippi Department, the last large Confederate army, about 43,000 men on paper.",
+    "tags": [
+     "surrender",
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Edmund_Kirby_Smith",
+     "https://en.wikipedia.org/wiki/Conclusion_of_the_American_Civil_War"
+    ],
+    "color": "#6b5a4a",
+    "datePrecision": "His representatives agreed terms with General Canby on May 26; Smith signed them aboard USS Fort Jackson off Galveston on June 2."
+   }
+  },
+  {
+   "id": "juneteenth",
+   "time": "-3298820400/1",
+   "metadata": {
+    "title": "Juneteenth",
+    "description": "At Galveston, Major General **Gordon Granger**’s **General Order No. 3** tells the people of Texas that \"all slaves are free\", two and a half years after the Emancipation Proclamation. The day is celebrated as Juneteenth, a federal holiday since 2021.",
+    "tags": [
+     "slavery",
+     "surrender"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Juneteenth",
+     "https://www.archives.gov/news/articles/juneteenth-original-document"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "stand-watie",
+   "time": "-3298474800/1",
+   "metadata": {
+    "title": "Stand Watie surrenders",
+    "description": "At Doaksville in the Choctaw Nation, Cherokee brigadier general **Stand Watie** surrenders his First Indian Brigade: the last Confederate general to surrender on land.",
+    "tags": [
+     "surrender",
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Stand_Watie",
+     "https://en.wikipedia.org/wiki/Conclusion_of_the_American_Civil_War"
+    ],
+    "color": "#6b5a4a"
+   }
+  },
+  {
+   "id": "black-codes",
+   "time": "-3285169200/1",
+   "metadata": {
+    "title": "Mississippi’s Black Codes",
+    "description": "The restored Southern legislatures, starting with Mississippi, pass **Black Codes** that restrict freed people’s right to work, move, own land and testify, and force them into labour contracts.",
+    "tags": [
+     "reconstruction",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Black_Codes_(United_States)"
+    ],
+    "color": "#3f6e8c",
+    "datePrecision": "Mississippi’s legislature passed its first codes in late November 1865."
+   }
+  },
+  {
+   "id": "shenandoah",
+   "time": "-3286724400/1",
+   "metadata": {
+    "title": "CSS Shenandoah surrenders at Liverpool",
+    "description": "Captain **James Waddell**, who had been raiding Union whalers in the Pacific and learned of the war’s end only in August, sails the raider to Liverpool and surrenders it to the Royal Navy: the last Confederate surrender, seven months after Appomattox.",
+    "tags": [
+     "surrender",
+     "navy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/CSS_Shenandoah",
+     "https://en.wikipedia.org/wiki/Conclusion_of_the_American_Civil_War"
+    ],
+    "color": "#6b5a4a"
+   }
+  },
+  {
+   "id": "ratified-13th",
+   "time": "-3284132400/1",
+   "metadata": {
+    "title": "Thirteenth Amendment ratified",
+    "description": "Georgia’s ratification completes three-quarters of the states: slavery and involuntary servitude are abolished \"except as a punishment for crime\". Secretary Seward proclaims it on December 18.",
+    "tags": [
+     "slavery",
+     "reconstruction"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Thirteenth_Amendment_to_the_United_States_Constitution",
+     "https://www.archives.gov/milestone-documents/13th-amendment"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "h-reconstruction",
+   "time": "-3281886000/1",
+   "metadata": {
+    "title": "Reconstruction, 1865–1877",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "civil-rights-1866",
+   "time": "-3273418800/1",
+   "metadata": {
+    "title": "Civil Rights Act of 1866",
+    "description": "Congress passes, over Johnson’s veto, the first federal law defining citizenship and the equal rights of all born in the United States.",
+    "tags": [
+     "reconstruction"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Civil_Rights_Act_of_1866"
+    ],
+    "color": "#3f6e8c"
+   }
+  },
+  {
+   "id": "insurrection-over",
+   "time": "-3261927600/1",
+   "metadata": {
+    "title": "The insurrection declared at an end",
+    "description": "Johnson proclaims the insurrection over in Texas and so in the whole country, after a proclamation of April 2 covering the other states. Courts and Congress took this as the war’s legal end.",
+    "tags": [
+     "politics",
+     "surrender"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Conclusion_of_the_American_Civil_War"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "reconstruction-acts",
+   "time": "-3245166000/1",
+   "metadata": {
+    "title": "Reconstruction Acts",
+    "description": "Over Johnson’s veto, Congress divides ten Southern states into five military districts and requires new constitutions with Black men’s suffrage before readmission: \"Radical Reconstruction\".",
+    "tags": [
+     "reconstruction"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Reconstruction_Acts"
+    ],
+    "color": "#3f6e8c"
+   }
+  },
+  {
+   "id": "ratified-14th",
+   "time": "-3202398000/1",
+   "metadata": {
+    "title": "Fourteenth Amendment ratified",
+    "description": "Birthright citizenship, due process and the equal protection of the laws, overturning Dred Scott.",
+    "tags": [
+     "reconstruction"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fourteenth_Amendment_to_the_United_States_Constitution",
+     "https://www.archives.gov/milestone-documents/14th-amendment"
+    ],
+    "color": "#3f6e8c"
+   }
+  },
+  {
+   "id": "ratified-15th",
+   "time": "-3152804400/1",
+   "metadata": {
+    "title": "Fifteenth Amendment ratified",
+    "description": "The right to vote may not be denied \"on account of race, color, or previous condition of servitude.\"",
+    "tags": [
+     "reconstruction"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fifteenth_Amendment_to_the_United_States_Constitution",
+     "https://www.archives.gov/milestone-documents/15th-amendment"
+    ],
+    "color": "#3f6e8c"
+   }
+  },
+  {
+   "id": "revels",
+   "time": "-3150903600/1",
+   "metadata": {
+    "title": "Hiram Revels takes his seat",
+    "description": "**Hiram Revels** of Mississippi becomes the first Black U.S. senator, in the seat Jefferson Davis had left in 1861.",
+    "tags": [
+     "reconstruction",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hiram_R._Revels"
+    ],
+    "color": "#3f6e8c"
+   }
+  },
+  {
+   "id": "kkk-act",
+   "time": "-3114702000/1",
+   "metadata": {
+    "title": "Ku Klux Klan Act",
+    "description": "Congress lets the president use troops and suspend habeas corpus against the Klan’s terror campaign; Grant does so in nine South Carolina counties that October.",
+    "tags": [
+     "reconstruction"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ku_Klux_Klan_Act"
+    ],
+    "color": "#3f6e8c"
+   }
+  },
+  {
+   "id": "colfax",
+   "time": "-3052148400/1",
+   "metadata": {
+    "title": "Colfax massacre",
+    "description": "A white militia kills scores of Black men, many after they surrendered, at the courthouse in Colfax, Louisiana. The Supreme Court’s 1876 ruling in the resulting case weakens federal protection.",
+    "tags": [
+     "reconstruction"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Colfax_massacre"
+    ],
+    "color": "#3f6e8c"
+   }
+  },
+  {
+   "id": "electoral-commission",
+   "time": "-2932311600/1",
+   "metadata": {
+    "title": "Electoral Commission created",
+    "description": "With the 1876 election’s returns from Florida, Louisiana and South Carolina disputed, Congress creates a fifteen-member commission to decide them.",
+    "tags": [
+     "politics",
+     "reconstruction"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Electoral_Commission_(United_States)",
+     "https://en.wikipedia.org/wiki/1876_United_States_presidential_election"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "hayes-declared",
+   "time": "-2929546800/1",
+   "metadata": {
+    "title": "Hayes declared the winner",
+    "description": "Congress declares **Rutherford B. Hayes** elected, by one electoral vote, after an informal bargain with Southern Democrats: the **Compromise of 1877**.",
+    "tags": [
+     "politics",
+     "reconstruction"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Compromise_of_1877"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "troops-withdrawn",
+   "time": "-2924967600/1",
+   "metadata": {
+    "title": "Troops leave the Louisiana statehouse",
+    "description": "Federal troops withdraw from the statehouses of South Carolina (April 10) and Louisiana (April 24), and the last Republican state governments in the South fall: the conventional end of Reconstruction.",
+    "tags": [
+     "reconstruction",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Compromise_of_1877",
+     "https://en.wikipedia.org/wiki/Reconstruction_era"
+    ],
+    "color": "#3f6e8c"
+   }
+  }
+ ],
+ "durations": [
+  {
+   "id": "compromise-1850",
+   "start": "-3765121200/1",
+   "end": "-3764084400/1",
+   "metadata": {
+    "title": "Compromise of 1850",
+    "description": "Five laws signed September 9–20, 1850: California admitted free, New Mexico and Utah organized without a ban on slavery, the slave trade ended in Washington, D.C., and a new Fugitive Slave Act.",
+    "tags": [
+     "slavery",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Compromise_of_1850",
+     "https://www.archives.gov/milestone-documents/compromise-of-1850"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "bleeding-kansas",
+   "start": "-3647703600/1",
+   "end": "-3437233200/1",
+   "metadata": {
+    "title": "Bleeding Kansas",
+    "description": "Proslavery and free-state settlers fight over the territory’s future, with rival governments, fraudulent elections and raids; dated here from the Kansas–Nebraska Act to statehood.",
+    "tags": [
+     "slavery",
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Bleeding_Kansas"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "lincoln-douglas",
+   "start": "-3514302000/1",
+   "end": "-3509463600/1",
+   "metadata": {
+    "title": "Lincoln–Douglas debates",
+    "description": "Seven debates across Illinois, Ottawa to Alton, on slavery in the territories. Douglas keeps his Senate seat; Lincoln becomes known nationally.",
+    "tags": [
+     "politics",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lincoln–Douglas_debates"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "harpers-ferry",
+   "start": "-3477927600/1",
+   "end": "-3477668400/1",
+   "metadata": {
+    "title": "John Brown's raid on Harpers Ferry",
+    "description": "**John Brown** and 21 men, five of them Black, seize the federal armory at Harpers Ferry, Virginia, hoping to arm an uprising of the enslaved. Marines under **Robert E. Lee** retake it on October 18.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/John_Brown's_raid_on_Harpers_Ferry",
+     "https://www.nps.gov/hafe/index.htm"
+    ],
+    "color": "#b0782a"
+   }
+  },
+  {
+   "id": "deep-south-secession",
+   "start": "-3440689200/1",
+   "end": "-3436974000/1",
+   "metadata": {
+    "title": "The Deep South secedes",
+    "description": "Seven states, from South Carolina to Texas, the states with the highest share of enslaved people, leave the Union before Lincoln takes office.",
+    "tags": [
+     "politics",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Secession_in_the_United_States",
+     "https://en.wikipedia.org/wiki/Origins_of_the_American_Civil_War"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "davis",
+   "start": "-3435505200/1",
+   "end": "-3302276400/1",
+   "metadata": {
+    "title": "Jefferson Davis, Confederate president",
+    "description": "Inaugurated provisional president at Montgomery; elected to a six-year term and inaugurated again at Richmond on February 22, 1862. Dated here to his capture.",
+    "tags": [
+     "politics",
+     "command"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Jefferson_Davis"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "lincoln-presidency",
+   "start": "-3434295600/1",
+   "end": "-3304409880/1",
+   "metadata": {
+    "title": "Lincoln’s presidency",
+    "description": "From his first inauguration to his death, the morning after he was shot.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Presidency_of_Abraham_Lincoln"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "civil-war",
+   "start": "-3430909800/1",
+   "end": "-3304954800/1",
+   "metadata": {
+    "title": "The Civil War",
+    "description": "Dated, as usual, from Fort Sumter to Lee’s surrender at Appomattox; the last forces surrendered months later, and the war’s legal end came on August 20, 1866. **The cost:** the traditional count is about 620,000 soldiers dead, two-thirds of them from disease; J. David Hacker’s census-based estimate (*Civil War History*, 2011) is about 750,000, within a range of about 650,000 to 850,000. Both are estimates.",
+    "tags": [
+     "east",
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/American_Civil_War",
+     "https://muse.jhu.edu/article/465917"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "upper-south-secession",
+   "start": "-3430494000/1",
+   "end": "-3426001200/1",
+   "metadata": {
+    "title": "The upper South secedes",
+    "description": "After Lincoln’s call for troops, Virginia, Arkansas, North Carolina and Tennessee leave the Union. The border slave states of Delaware, Maryland, Kentucky and Missouri stay.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Secession_in_the_United_States"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "blockade",
+   "start": "-3430321200/1",
+   "end": "-3298474800/1",
+   "metadata": {
+    "title": "The Union blockade",
+    "description": "Proclaimed by Lincoln on April 19 and 27, 1861, along 3,500 miles of coast; rescinded by Johnson on June 23, 1865. Blockade runners got through, but the South’s cotton exports collapsed.",
+    "tags": [
+     "navy"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Union_blockade"
+    ],
+    "color": "#2f6f7a"
+   }
+  },
+  {
+   "id": "mcclellan",
+   "start": "-3421854000/1",
+   "end": "-3381332400/1",
+   "metadata": {
+    "title": "McClellan commands in the East",
+    "description": "**George B. McClellan** takes over the troops around Washington after Bull Run and builds the **Army of the Potomac**; general-in-chief from November 1861 to March 1862. Lincoln removes him after he fails to pursue Lee from Antietam.",
+    "tags": [
+     "command",
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_B._McClellan"
+    ],
+    "color": "#7a5c2e"
+   }
+  },
+  {
+   "id": "donelson",
+   "start": "-3404574000/1",
+   "end": "-3404055600/1",
+   "metadata": {
+    "title": "Battle of Fort Donelson",
+    "description": "Grant’s siege and capture of the fort on the Cumberland River, February 11–16.",
+    "tags": [
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Fort_Donelson"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "peninsula",
+   "start": "-3401636400/1",
+   "end": "-3392391600/1",
+   "metadata": {
+    "title": "Peninsula campaign",
+    "description": "McClellan ships his army to the peninsula southeast of Richmond and comes within sight of the city, until Lee drives him back in the Seven Days.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Peninsula_campaign"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "shiloh",
+   "start": "-3399908400/1",
+   "end": "-3399735600/1",
+   "metadata": {
+    "title": "Shiloh",
+    "description": "Surprised in Tennessee by **Albert Sidney Johnston**, who is killed, Grant’s army holds and drives the Confederates off on the second day. About 23,700 casualties: a shock to both sides.",
+    "tags": [
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Shiloh"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "lee",
+   "start": "-3395070000/1",
+   "end": "-3304954800/1",
+   "metadata": {
+    "title": "Lee commands the Army of Northern Virginia",
+    "description": "**Robert E. Lee** takes command after **Joseph E. Johnston** is wounded at Seven Pines, and keeps it to Appomattox; he is also general-in-chief of the Confederate armies from February 1865.",
+    "tags": [
+     "command",
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Robert_E._Lee",
+     "https://en.wikipedia.org/wiki/Army_of_Northern_Virginia"
+    ],
+    "color": "#7a5c2e"
+   }
+  },
+  {
+   "id": "seven-days",
+   "start": "-3392996400/1",
+   "end": "-3392391600/1",
+   "metadata": {
+    "title": "Seven Days Battles",
+    "description": "Lee’s attacks, June 25 – July 1, drive McClellan from the gates of Richmond.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Seven_Days_Battles"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "second-bull-run",
+   "start": "-3387466800/1",
+   "end": "-3387207600/1",
+   "metadata": {
+    "title": "Second Bull Run",
+    "description": "Lee, Jackson and **Longstreet** defeat **John Pope** on the old battlefield near Manassas, August 28–30, and Lee turns north into Maryland.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Second_Battle_of_Bull_Run"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "fredericksburg",
+   "start": "-3378394800/1",
+   "end": "-3377962800/1",
+   "metadata": {
+    "title": "Fredericksburg",
+    "description": "**Ambrose Burnside**’s army crosses the Rappahannock and attacks Lee’s men on Marye’s Heights again and again on December 13; it withdraws two nights later.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Fredericksburg"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "stones-river",
+   "start": "-3376666800/1",
+   "end": "-3376407600/1",
+   "metadata": {
+    "title": "Stones River",
+    "description": "**William Rosecrans** holds against Bragg at Murfreesboro, Tennessee, December 31 – January 2, and Bragg retreats.",
+    "tags": [
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Stones_River"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "chancellorsville",
+   "start": "-3366298800/1",
+   "end": "-3365694000/1",
+   "metadata": {
+    "title": "Chancellorsville",
+    "description": "Outnumbered more than two to one, Lee divides his army and routs **Joseph Hooker**’s, April 30 – May 6, at the cost of Jackson.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Chancellorsville"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "vicksburg",
+   "start": "-3364743600/1",
+   "end": "-3360682800/1",
+   "metadata": {
+    "title": "Siege of Vicksburg",
+    "description": "After a campaign of marches and five battles in Mississippi, Grant besieges the river fortress; its soldiers and townspeople are starving by the end.",
+    "tags": [
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Vicksburg",
+     "https://www.nps.gov/vick/index.htm"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "gettysburg",
+   "start": "-3360942000/1",
+   "end": "-3360682800/1",
+   "metadata": {
+    "title": "Gettysburg",
+    "description": "**George Meade**’s Army of the Potomac, three days in command, defeats Lee’s second invasion of the North in Pennsylvania, July 1–3: the war’s largest battle, with more than 50,000 casualties.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Gettysburg",
+     "https://www.nps.gov/gett/index.htm"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "draft-riots",
+   "start": "-3359905200/1",
+   "end": "-3359559600/1",
+   "metadata": {
+    "title": "New York City draft riots",
+    "description": "Four days of rioting against the draft, July 13–16, turn into attacks on Black New Yorkers. At least 119 people are killed before troops from Gettysburg restore order.",
+    "tags": [
+     "politics",
+     "black soldiers"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/New_York_City_draft_riots"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "chickamauga",
+   "start": "-3354116400/1",
+   "end": "-3353857200/1",
+   "metadata": {
+    "title": "Chickamauga",
+    "description": "Bragg, reinforced by Longstreet, routs Rosecrans in northern Georgia, September 18–20; **George Thomas** holds long enough to save the army, which falls back to Chattanooga.",
+    "tags": [
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Chickamauga"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "chattanooga",
+   "start": "-3348414000/1",
+   "end": "-3348154800/1",
+   "metadata": {
+    "title": "Chattanooga",
+    "description": "Grant breaks the siege of the city: Lookout Mountain on November 24 and Missionary Ridge on the 25th. The way into Georgia is open.",
+    "tags": [
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Chattanooga_campaign"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "grant",
+   "start": "-3338910000/1",
+   "end": "-3181834800/1",
+   "metadata": {
+    "title": "Grant, general-in-chief",
+    "description": "**Ulysses S. Grant** directs all the Union armies, travelling with Meade’s Army of the Potomac, until he becomes president in 1869.",
+    "tags": [
+     "command"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ulysses_S._Grant"
+    ],
+    "color": "#7a5c2e"
+   }
+  },
+  {
+   "id": "overland",
+   "start": "-3334330800/1",
+   "end": "-3329838000/1",
+   "metadata": {
+    "title": "Overland Campaign",
+    "description": "Grant crosses the Rapidan and keeps moving south around Lee’s right, through the Wilderness, Spotsylvania and Cold Harbor to the James: about 55,000 Union casualties in seven weeks.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Overland_Campaign"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "wilderness",
+   "start": "-3334244400/1",
+   "end": "-3333985200/1",
+   "metadata": {
+    "title": "The Wilderness",
+    "description": "Two days of fighting in dense woods, May 5–7; afterwards Grant turns south, not back.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_the_Wilderness"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "atlanta-campaign",
+   "start": "-3334071600/1",
+   "end": "-3323876400/1",
+   "metadata": {
+    "title": "Atlanta campaign",
+    "description": "**William T. Sherman** advances a hundred miles from Chattanooga against **Joseph E. Johnston** and then Hood, to the fall of Atlanta.",
+    "tags": [
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Atlanta_campaign"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "spotsylvania",
+   "start": "-3333985200/1",
+   "end": "-3332775600/1",
+   "metadata": {
+    "title": "Spotsylvania Court House",
+    "description": "Two weeks of fighting, May 8–21, including the twenty hours at the \"Bloody Angle\".",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Spotsylvania_Court_House"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "cold-harbor",
+   "start": "-3331998000/1",
+   "end": "-3330874800/1",
+   "metadata": {
+    "title": "Cold Harbor",
+    "description": "The failed frontal assault of June 3 costs thousands of Union casualties in under an hour. Grant later regretted ordering it.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Cold_Harbor"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "petersburg",
+   "start": "-3331220400/1",
+   "end": "-3306250800/1",
+   "metadata": {
+    "title": "Siege of Petersburg",
+    "description": "Nine and a half months of trenches and battles for the railroads into Richmond, dated as Wikipedia does from June 9, 1864 to Lee’s last attack on March 25, 1865. The final assault broke the lines on April 2.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Petersburg",
+     "https://www.nps.gov/pete/index.htm"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "march-to-the-sea",
+   "start": "-3317482800/1",
+   "end": "-3314372400/1",
+   "metadata": {
+    "title": "Sherman's March to the Sea",
+    "description": "Sherman’s 62,000 men cut loose from their supply lines and march 285 miles from Atlanta to Savannah, destroying railroads, farms and stores. Thousands of enslaved people follow the army to freedom.",
+    "tags": [
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sherman's_March_to_the_Sea"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "nashville",
+   "start": "-3314890800/1",
+   "end": "-3314718000/1",
+   "metadata": {
+    "title": "Nashville",
+    "description": "George Thomas’s army, including USCT regiments, destroys Hood’s Army of Tennessee as a fighting force, December 15–16.",
+    "tags": [
+     "west",
+     "black soldiers"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Nashville"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "carolinas",
+   "start": "-3310743600/1",
+   "end": "-3303486000/1",
+   "metadata": {
+    "title": "Carolinas campaign",
+    "description": "Sherman marches north from Savannah through the Carolinas, to Johnston’s surrender.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Carolinas_campaign"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "appomattox-campaign",
+   "start": "-3305905200/1",
+   "end": "-3304954800/1",
+   "metadata": {
+    "title": "Appomattox campaign",
+    "description": "From Five Forks and the fall of Petersburg to Lee’s surrender: Lee’s army flees west and is cut off at Appomattox Court House.",
+    "tags": [
+     "east"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Appomattox_campaign"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "last-surrenders",
+   "start": "-3304954800/1",
+   "end": "-3286724400/1",
+   "metadata": {
+    "title": "After Appomattox: the last surrenders",
+    "description": "Lee’s surrender was not the end: Johnston, Taylor, Kirby Smith and Stand Watie surrendered over the next eleven weeks, and the CSS Shenandoah only on November 6, 1865, 211 days after Appomattox.",
+    "tags": [
+     "surrender"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Conclusion_of_the_American_Civil_War"
+    ],
+    "color": "#6b5a4a"
+   }
+  },
+  {
+   "id": "johnson",
+   "start": "-3304409880/1",
+   "end": "-3181834800/1",
+   "metadata": {
+    "title": "Andrew Johnson’s presidency",
+    "description": "Lincoln’s vice president, a Tennessee Unionist, who fights Congress over Reconstruction and is impeached in 1868, surviving conviction by one vote.",
+    "tags": [
+     "politics",
+     "reconstruction"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Presidency_of_Andrew_Johnson"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "palmito-ranch",
+   "start": "-3302103600/1",
+   "end": "-3301930800/1",
+   "metadata": {
+    "title": "Palmito Ranch",
+    "description": "The last battle of the war, May 12–13, near Brownsville, Texas: a Confederate victory, a month after Appomattox.",
+    "tags": [
+     "west"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Palmito_Ranch"
+    ],
+    "color": "#4f7a4a"
+   }
+  },
+  {
+   "id": "reconstruction",
+   "start": "-3300634800/1",
+   "end": "-2924967600/1",
+   "metadata": {
+    "title": "Reconstruction",
+    "description": "Conventionally 1865–1877; dated here from Johnson’s amnesty proclamation to the withdrawal of federal troops from the Louisiana statehouse.",
+    "tags": [
+     "reconstruction"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Reconstruction_era"
+    ],
+    "color": "#3f6e8c"
+   }
+  }
+ ],
+ "relationships": [
+  {
+   "a": {
+    "moment": "missouri"
+   },
+   "b": {
+    "moment": "kansas-nebraska"
+   }
+  },
+  {
+   "a": {
+    "moment": "missouri"
+   },
+   "b": {
+    "moment": "dred-scott"
+   }
+  },
+  {
+   "a": {
+    "duration": "compromise-1850"
+   },
+   "b": {
+    "moment": "fugitive-slave-act"
+   }
+  },
+  {
+   "a": {
+    "moment": "kansas-nebraska"
+   },
+   "b": {
+    "duration": "bleeding-kansas"
+   }
+  },
+  {
+   "a": {
+    "duration": "harpers-ferry"
+   },
+   "b": {
+    "moment": "brown-hanged"
+   }
+  },
+  {
+   "a": {
+    "moment": "lincoln-elected"
+   },
+   "b": {
+    "moment": "sc-secedes"
+   }
+  },
+  {
+   "a": {
+    "moment": "sc-secedes"
+   },
+   "b": {
+    "moment": "sc-declaration"
+   }
+  },
+  {
+   "a": {
+    "moment": "csa-formed"
+   },
+   "b": {
+    "moment": "csa-constitution"
+   }
+  },
+  {
+   "a": {
+    "moment": "csa-constitution"
+   },
+   "b": {
+    "moment": "cornerstone"
+   }
+  },
+  {
+   "a": {
+    "moment": "sumter"
+   },
+   "b": {
+    "duration": "civil-war"
+   }
+  },
+  {
+   "a": {
+    "duration": "civil-war"
+   },
+   "b": {
+    "moment": "appomattox"
+   }
+  },
+  {
+   "a": {
+    "moment": "sumter"
+   },
+   "b": {
+    "moment": "call-75000"
+   }
+  },
+  {
+   "a": {
+    "moment": "call-75000"
+   },
+   "b": {
+    "duration": "upper-south-secession"
+   }
+  },
+  {
+   "a": {
+    "moment": "anaconda"
+   },
+   "b": {
+    "duration": "blockade"
+   }
+  },
+  {
+   "a": {
+    "moment": "contraband"
+   },
+   "b": {
+    "moment": "confiscation-1861"
+   }
+  },
+  {
+   "a": {
+    "duration": "mcclellan"
+   },
+   "b": {
+    "duration": "peninsula"
+   }
+  },
+  {
+   "a": {
+    "moment": "antietam"
+   },
+   "b": {
+    "moment": "preliminary"
+   }
+  },
+  {
+   "a": {
+    "moment": "preliminary"
+   },
+   "b": {
+    "moment": "emancipation"
+   }
+  },
+  {
+   "a": {
+    "moment": "emancipation"
+   },
+   "b": {
+    "moment": "bct"
+   }
+  },
+  {
+   "a": {
+    "moment": "men-of-color"
+   },
+   "b": {
+    "moment": "fort-wagner"
+   }
+  },
+  {
+   "a": {
+    "moment": "tubman-escapes"
+   },
+   "b": {
+    "moment": "combahee"
+   }
+  },
+  {
+   "a": {
+    "duration": "gettysburg"
+   },
+   "b": {
+    "moment": "gettysburg-address"
+   }
+  },
+  {
+   "a": {
+    "duration": "vicksburg"
+   },
+   "b": {
+    "moment": "vicksburg-surrender"
+   }
+  },
+  {
+   "a": {
+    "moment": "vicksburg-surrender"
+   },
+   "b": {
+    "moment": "port-hudson-surrender"
+   }
+  },
+  {
+   "a": {
+    "moment": "enrollment-act"
+   },
+   "b": {
+    "duration": "draft-riots"
+   }
+  },
+  {
+   "a": {
+    "moment": "douglass-lincoln"
+   },
+   "b": {
+    "moment": "equal-pay"
+   }
+  },
+  {
+   "a": {
+    "moment": "grant-lieutenant-general"
+   },
+   "b": {
+    "duration": "overland"
+   }
+  },
+  {
+   "a": {
+    "duration": "overland"
+   },
+   "b": {
+    "duration": "petersburg"
+   }
+  },
+  {
+   "a": {
+    "moment": "atlanta-falls"
+   },
+   "b": {
+    "moment": "lincoln-reelected"
+   }
+  },
+  {
+   "a": {
+    "duration": "march-to-the-sea"
+   },
+   "b": {
+    "moment": "field-order-15"
+   }
+  },
+  {
+   "a": {
+    "moment": "senate-13th"
+   },
+   "b": {
+    "moment": "house-13th"
+   }
+  },
+  {
+   "a": {
+    "moment": "house-13th"
+   },
+   "b": {
+    "moment": "ratified-13th"
+   }
+  },
+  {
+   "a": {
+    "moment": "emancipation"
+   },
+   "b": {
+    "moment": "juneteenth"
+   }
+  },
+  {
+   "a": {
+    "moment": "richmond-falls"
+   },
+   "b": {
+    "moment": "appomattox"
+   }
+  },
+  {
+   "a": {
+    "moment": "appomattox"
+   },
+   "b": {
+    "moment": "bennett-place"
+   }
+  },
+  {
+   "a": {
+    "moment": "appomattox"
+   },
+   "b": {
+    "moment": "shenandoah"
+   }
+  },
+  {
+   "a": {
+    "moment": "ratified-13th"
+   },
+   "b": {
+    "moment": "ratified-14th"
+   }
+  },
+  {
+   "a": {
+    "moment": "ratified-14th"
+   },
+   "b": {
+    "moment": "ratified-15th"
+   }
+  },
+  {
+   "a": {
+    "moment": "dred-scott"
+   },
+   "b": {
+    "moment": "ratified-14th"
+   }
+  },
+  {
+   "a": {
+    "moment": "hayes-declared"
+   },
+   "b": {
+    "moment": "troops-withdrawn"
+   }
+  }
+ ]
+}

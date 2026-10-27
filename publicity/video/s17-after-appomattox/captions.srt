@@ -1,0 +1,68 @@
+1
+00:00:00,420 --> 00:00:06,100
+Lee surrendered at Appomattox in April
+1865. The Civil War's last surrender came
+
+2
+00:00:06,150 --> 00:00:07,838
+seven months later.
+
+3
+00:00:08,078 --> 00:00:12,178
+Separate the surrenders on a
+timeline and they keep coming.
+
+4
+00:00:12,228 --> 00:00:16,108
+Johnston, in North Carolina,
+in April. Taylor in May.
+
+5
+00:00:16,158 --> 00:00:19,122
+Kirby Smith, in Texas, in June.
+
+6
+00:00:19,462 --> 00:00:24,682
+June nineteenth: at Galveston, an order
+tells Texas that all slaves are free.
+
+7
+00:00:24,732 --> 00:00:29,122
+That's Juneteenth. Four days later,
+Stand Watie, a Cherokee general,
+
+8
+00:00:29,172 --> 00:00:30,762
+gives up his command.
+
+9
+00:00:31,102 --> 00:00:34,442
+Then nothing, until November
+sixth, in Liverpool,
+
+10
+00:00:34,492 --> 00:00:37,992
+England. The raider Shenandoah had
+been hunting whalers in the Pacific.
+
+11
+00:00:38,042 --> 00:00:40,942
+Its captain learned the
+war was over in August,
+
+12
+00:00:40,992 --> 00:00:43,538
+and sailed for England to surrender.
+
+13
+00:00:43,858 --> 00:00:47,218
+Two hundred and eleven
+days after Appomattox.
+
+14
+00:00:47,268 --> 00:00:49,838
+Every date with its source, on one line.
+
+15
+00:00:50,128 --> 00:00:52,537
+That's OpenChronology, and it's free.

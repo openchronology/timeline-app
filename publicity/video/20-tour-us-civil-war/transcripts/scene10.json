@@ -1,0 +1,1090 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:03,400"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 3400
+			},
+			"text": " Pull out another thread, black soldiers.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.900802,
+					"t_dtw": -1
+				},
+				{
+					"text": " Pull",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:00,300"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 300
+					},
+					"id": 21429,
+					"p": 0.902736,
+					"t_dtw": -1
+				},
+				{
+					"text": " out",
+					"timestamps": {
+						"from": "00:00:00,330",
+						"to": "00:00:00,530"
+					},
+					"offsets": {
+						"from": 330,
+						"to": 530
+					},
+					"id": 503,
+					"p": 0.98283,
+					"t_dtw": -1
+				},
+				{
+					"text": " another",
+					"timestamps": {
+						"from": "00:00:00,530",
+						"to": "00:00:01,070"
+					},
+					"offsets": {
+						"from": 530,
+						"to": 1070
+					},
+					"id": 1194,
+					"p": 0.997615,
+					"t_dtw": -1
+				},
+				{
+					"text": " thread",
+					"timestamps": {
+						"from": "00:00:01,070",
+						"to": "00:00:01,470"
+					},
+					"offsets": {
+						"from": 1070,
+						"to": 1470
+					},
+					"id": 4704,
+					"p": 0.982169,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,700",
+						"to": "00:00:01,700"
+					},
+					"offsets": {
+						"from": 1700,
+						"to": 1700
+					},
+					"id": 11,
+					"p": 0.629591,
+					"t_dtw": -1
+				},
+				{
+					"text": " black",
+					"timestamps": {
+						"from": "00:00:01,760",
+						"to": "00:00:02,230"
+					},
+					"offsets": {
+						"from": 1760,
+						"to": 2230
+					},
+					"id": 2042,
+					"p": 0.534093,
+					"t_dtw": -1
+				},
+				{
+					"text": " soldiers",
+					"timestamps": {
+						"from": "00:00:02,230",
+						"to": "00:00:02,620"
+					},
+					"offsets": {
+						"from": 2230,
+						"to": 2620
+					},
+					"id": 5795,
+					"p": 0.991671,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:03,080",
+						"to": "00:00:03,090"
+					},
+					"offsets": {
+						"from": 3080,
+						"to": 3090
+					},
+					"id": 13,
+					"p": 0.937974,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_170]",
+					"timestamps": {
+						"from": "00:00:03,400",
+						"to": "00:00:03,400"
+					},
+					"offsets": {
+						"from": 3400,
+						"to": 3400
+					},
+					"id": 50533,
+					"p": 0.0229514,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:03,400",
+				"to": "00:00:06,640"
+			},
+			"offsets": {
+				"from": 3400,
+				"to": 6640
+			},
+			"text": " Frederick Douglass calls men to arms.",
+			"tokens": [
+				{
+					"text": " Frederick",
+					"timestamps": {
+						"from": "00:00:03,730",
+						"to": "00:00:04,250"
+					},
+					"offsets": {
+						"from": 3730,
+						"to": 4250
+					},
+					"id": 26113,
+					"p": 0.985478,
+					"t_dtw": -1
+				},
+				{
+					"text": " Dou",
+					"timestamps": {
+						"from": "00:00:04,250",
+						"to": "00:00:04,480"
+					},
+					"offsets": {
+						"from": 4250,
+						"to": 4480
+					},
+					"id": 5728,
+					"p": 0.74461,
+					"t_dtw": -1
+				},
+				{
+					"text": "glass",
+					"timestamps": {
+						"from": "00:00:04,560",
+						"to": "00:00:04,870"
+					},
+					"offsets": {
+						"from": 4560,
+						"to": 4870
+					},
+					"id": 20721,
+					"p": 0.998327,
+					"t_dtw": -1
+				},
+				{
+					"text": " calls",
+					"timestamps": {
+						"from": "00:00:05,160",
+						"to": "00:00:05,440"
+					},
+					"offsets": {
+						"from": 5160,
+						"to": 5440
+					},
+					"id": 3848,
+					"p": 0.998346,
+					"t_dtw": -1
+				},
+				{
+					"text": " men",
+					"timestamps": {
+						"from": "00:00:05,470",
+						"to": "00:00:05,750"
+					},
+					"offsets": {
+						"from": 5470,
+						"to": 5750
+					},
+					"id": 1450,
+					"p": 0.995577,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:05,750",
+						"to": "00:00:05,940"
+					},
+					"offsets": {
+						"from": 5750,
+						"to": 5940
+					},
+					"id": 284,
+					"p": 0.984844,
+					"t_dtw": -1
+				},
+				{
+					"text": " arms",
+					"timestamps": {
+						"from": "00:00:05,940",
+						"to": "00:00:06,030"
+					},
+					"offsets": {
+						"from": 5940,
+						"to": 6030
+					},
+					"id": 5101,
+					"p": 0.99799,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:06,030",
+						"to": "00:00:06,490"
+					},
+					"offsets": {
+						"from": 6030,
+						"to": 6490
+					},
+					"id": 13,
+					"p": 0.992534,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_332]",
+					"timestamps": {
+						"from": "00:00:06,640",
+						"to": "00:00:06,640"
+					},
+					"offsets": {
+						"from": 6640,
+						"to": 6640
+					},
+					"id": 50695,
+					"p": 0.0778828,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:06,640",
+				"to": "00:00:10,360"
+			},
+			"offsets": {
+				"from": 6640,
+				"to": 10360
+			},
+			"text": " Harriet Tubman guides a black regiment up the Combahee River",
+			"tokens": [
+				{
+					"text": " Harriet",
+					"timestamps": {
+						"from": "00:00:06,970",
+						"to": "00:00:07,140"
+					},
+					"offsets": {
+						"from": 6970,
+						"to": 7140
+					},
+					"id": 48805,
+					"p": 0.975246,
+					"t_dtw": -1
+				},
+				{
+					"text": " Tub",
+					"timestamps": {
+						"from": "00:00:07,140",
+						"to": "00:00:07,340"
+					},
+					"offsets": {
+						"from": 7140,
+						"to": 7340
+					},
+					"id": 42850,
+					"p": 0.995209,
+					"t_dtw": -1
+				},
+				{
+					"text": "man",
+					"timestamps": {
+						"from": "00:00:07,370",
+						"to": "00:00:07,560"
+					},
+					"offsets": {
+						"from": 7370,
+						"to": 7560
+					},
+					"id": 805,
+					"p": 0.99679,
+					"t_dtw": -1
+				},
+				{
+					"text": " guides",
+					"timestamps": {
+						"from": "00:00:07,560",
+						"to": "00:00:07,980"
+					},
+					"offsets": {
+						"from": 7560,
+						"to": 7980
+					},
+					"id": 17555,
+					"p": 0.99743,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:07,980",
+						"to": "00:00:08,050"
+					},
+					"offsets": {
+						"from": 7980,
+						"to": 8050
+					},
+					"id": 257,
+					"p": 0.993523,
+					"t_dtw": -1
+				},
+				{
+					"text": " black",
+					"timestamps": {
+						"from": "00:00:08,050",
+						"to": "00:00:08,400"
+					},
+					"offsets": {
+						"from": 8050,
+						"to": 8400
+					},
+					"id": 2042,
+					"p": 0.963694,
+					"t_dtw": -1
+				},
+				{
+					"text": " regiment",
+					"timestamps": {
+						"from": "00:00:08,400",
+						"to": "00:00:09,000"
+					},
+					"offsets": {
+						"from": 8400,
+						"to": 9000
+					},
+					"id": 34792,
+					"p": 0.996195,
+					"t_dtw": -1
+				},
+				{
+					"text": " up",
+					"timestamps": {
+						"from": "00:00:09,000",
+						"to": "00:00:09,150"
+					},
+					"offsets": {
+						"from": 9000,
+						"to": 9150
+					},
+					"id": 510,
+					"p": 0.831237,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:09,150",
+						"to": "00:00:09,270"
+					},
+					"offsets": {
+						"from": 9150,
+						"to": 9270
+					},
+					"id": 262,
+					"p": 0.987261,
+					"t_dtw": -1
+				},
+				{
+					"text": " Com",
+					"timestamps": {
+						"from": "00:00:09,590",
+						"to": "00:00:09,590"
+					},
+					"offsets": {
+						"from": 9590,
+						"to": 9590
+					},
+					"id": 955,
+					"p": 0.858362,
+					"t_dtw": -1
+				},
+				{
+					"text": "ba",
+					"timestamps": {
+						"from": "00:00:09,590",
+						"to": "00:00:09,730"
+					},
+					"offsets": {
+						"from": 9590,
+						"to": 9730
+					},
+					"id": 7012,
+					"p": 0.68146,
+					"t_dtw": -1
+				},
+				{
+					"text": "hee",
+					"timestamps": {
+						"from": "00:00:09,730",
+						"to": "00:00:09,740"
+					},
+					"offsets": {
+						"from": 9730,
+						"to": 9740
+					},
+					"id": 21067,
+					"p": 0.963311,
+					"t_dtw": -1
+				},
+				{
+					"text": " River",
+					"timestamps": {
+						"from": "00:00:10,360",
+						"to": "00:00:10,360"
+					},
+					"offsets": {
+						"from": 10360,
+						"to": 10360
+					},
+					"id": 5866,
+					"p": 0.967421,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_518]",
+					"timestamps": {
+						"from": "00:00:10,360",
+						"to": "00:00:10,360"
+					},
+					"offsets": {
+						"from": 10360,
+						"to": 10360
+					},
+					"id": 50881,
+					"p": 0.0664267,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:10,360",
+				"to": "00:00:14,080"
+			},
+			"offsets": {
+				"from": 10360,
+				"to": 14080
+			},
+			"text": " and frees more than 750 people.",
+			"tokens": [
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:10,680",
+						"to": "00:00:10,680"
+					},
+					"offsets": {
+						"from": 10680,
+						"to": 10680
+					},
+					"id": 290,
+					"p": 0.999573,
+					"t_dtw": -1
+				},
+				{
+					"text": " fre",
+					"timestamps": {
+						"from": "00:00:10,690",
+						"to": "00:00:11,000"
+					},
+					"offsets": {
+						"from": 10690,
+						"to": 11000
+					},
+					"id": 2030,
+					"p": 0.992925,
+					"t_dtw": -1
+				},
+				{
+					"text": "es",
+					"timestamps": {
+						"from": "00:00:11,000",
+						"to": "00:00:11,210"
+					},
+					"offsets": {
+						"from": 11000,
+						"to": 11210
+					},
+					"id": 274,
+					"p": 0.999051,
+					"t_dtw": -1
+				},
+				{
+					"text": " more",
+					"timestamps": {
+						"from": "00:00:11,210",
+						"to": "00:00:11,640"
+					},
+					"offsets": {
+						"from": 11210,
+						"to": 11640
+					},
+					"id": 517,
+					"p": 0.999363,
+					"t_dtw": -1
+				},
+				{
+					"text": " than",
+					"timestamps": {
+						"from": "00:00:11,640",
+						"to": "00:00:11,830"
+					},
+					"offsets": {
+						"from": 11640,
+						"to": 11830
+					},
+					"id": 621,
+					"p": 0.99931,
+					"t_dtw": -1
+				},
+				{
+					"text": " 750",
+					"timestamps": {
+						"from": "00:00:12,110",
+						"to": "00:00:12,970"
+					},
+					"offsets": {
+						"from": 12110,
+						"to": 12970
+					},
+					"id": 19683,
+					"p": 0.986929,
+					"t_dtw": -1
+				},
+				{
+					"text": " people",
+					"timestamps": {
+						"from": "00:00:13,700",
+						"to": "00:00:13,700"
+					},
+					"offsets": {
+						"from": 13700,
+						"to": 13700
+					},
+					"id": 661,
+					"p": 0.999706,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:14,080",
+						"to": "00:00:14,080"
+					},
+					"offsets": {
+						"from": 14080,
+						"to": 14080
+					},
+					"id": 13,
+					"p": 0.997777,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_704]",
+					"timestamps": {
+						"from": "00:00:14,080",
+						"to": "00:00:14,080"
+					},
+					"offsets": {
+						"from": 14080,
+						"to": 14080
+					},
+					"id": 51067,
+					"p": 0.119399,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:14,080",
+				"to": "00:00:17,600"
+			},
+			"offsets": {
+				"from": 14080,
+				"to": 17600
+			},
+			"text": " Fort Pillow, the crater, New Market Heights.",
+			"tokens": [
+				{
+					"text": " Fort",
+					"timestamps": {
+						"from": "00:00:14,410",
+						"to": "00:00:14,410"
+					},
+					"offsets": {
+						"from": 14410,
+						"to": 14410
+					},
+					"id": 6401,
+					"p": 0.985424,
+					"t_dtw": -1
+				},
+				{
+					"text": " Pill",
+					"timestamps": {
+						"from": "00:00:14,480",
+						"to": "00:00:14,780"
+					},
+					"offsets": {
+						"from": 14480,
+						"to": 14780
+					},
+					"id": 19770,
+					"p": 0.800674,
+					"t_dtw": -1
+				},
+				{
+					"text": "ow",
+					"timestamps": {
+						"from": "00:00:14,810",
+						"to": "00:00:14,980"
+					},
+					"offsets": {
+						"from": 14810,
+						"to": 14980
+					},
+					"id": 322,
+					"p": 0.99342,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:14,980",
+						"to": "00:00:15,160"
+					},
+					"offsets": {
+						"from": 14980,
+						"to": 15160
+					},
+					"id": 11,
+					"p": 0.911153,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:15,160",
+						"to": "00:00:15,420"
+					},
+					"offsets": {
+						"from": 15160,
+						"to": 15420
+					},
+					"id": 262,
+					"p": 0.90049,
+					"t_dtw": -1
+				},
+				{
+					"text": " crater",
+					"timestamps": {
+						"from": "00:00:15,420",
+						"to": "00:00:15,970"
+					},
+					"offsets": {
+						"from": 15420,
+						"to": 15970
+					},
+					"id": 32593,
+					"p": 0.956996,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:15,970",
+						"to": "00:00:16,110"
+					},
+					"offsets": {
+						"from": 15970,
+						"to": 16110
+					},
+					"id": 11,
+					"p": 0.901751,
+					"t_dtw": -1
+				},
+				{
+					"text": " New",
+					"timestamps": {
+						"from": "00:00:16,150",
+						"to": "00:00:16,420"
+					},
+					"offsets": {
+						"from": 16150,
+						"to": 16420
+					},
+					"id": 968,
+					"p": 0.825412,
+					"t_dtw": -1
+				},
+				{
+					"text": " Market",
+					"timestamps": {
+						"from": "00:00:16,420",
+						"to": "00:00:16,700"
+					},
+					"offsets": {
+						"from": 16420,
+						"to": 16700
+					},
+					"id": 5991,
+					"p": 0.993454,
+					"t_dtw": -1
+				},
+				{
+					"text": " Heights",
+					"timestamps": {
+						"from": "00:00:16,700",
+						"to": "00:00:17,600"
+					},
+					"offsets": {
+						"from": 16700,
+						"to": 17600
+					},
+					"id": 20365,
+					"p": 0.988713,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:17,600",
+						"to": "00:00:17,600"
+					},
+					"offsets": {
+						"from": 17600,
+						"to": 17600
+					},
+					"id": 13,
+					"p": 0.883293,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_880]",
+					"timestamps": {
+						"from": "00:00:17,600",
+						"to": "00:00:17,600"
+					},
+					"offsets": {
+						"from": 17600,
+						"to": 17600
+					},
+					"id": 51243,
+					"p": 0.17701,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:17,600",
+				"to": "00:00:23,080"
+			},
+			"offsets": {
+				"from": 17600,
+				"to": 23080
+			},
+			"text": " About a hundred and 79,000 black men serve in the Union Army.",
+			"tokens": [
+				{
+					"text": " About",
+					"timestamps": {
+						"from": "00:00:17,930",
+						"to": "00:00:17,970"
+					},
+					"offsets": {
+						"from": 17930,
+						"to": 17970
+					},
+					"id": 7994,
+					"p": 0.94373,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:18,000",
+						"to": "00:00:18,080"
+					},
+					"offsets": {
+						"from": 18000,
+						"to": 18080
+					},
+					"id": 257,
+					"p": 0.582328,
+					"t_dtw": -1
+				},
+				{
+					"text": " hundred",
+					"timestamps": {
+						"from": "00:00:18,080",
+						"to": "00:00:18,640"
+					},
+					"offsets": {
+						"from": 18080,
+						"to": 18640
+					},
+					"id": 3470,
+					"p": 0.991091,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:18,640",
+						"to": "00:00:18,880"
+					},
+					"offsets": {
+						"from": 18640,
+						"to": 18880
+					},
+					"id": 290,
+					"p": 0.970255,
+					"t_dtw": -1
+				},
+				{
+					"text": " 79",
+					"timestamps": {
+						"from": "00:00:18,880",
+						"to": "00:00:19,360"
+					},
+					"offsets": {
+						"from": 18880,
+						"to": 19360
+					},
+					"id": 9225,
+					"p": 0.396056,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:19,360",
+						"to": "00:00:19,520"
+					},
+					"offsets": {
+						"from": 19360,
+						"to": 19520
+					},
+					"id": 11,
+					"p": 0.964339,
+					"t_dtw": -1
+				},
+				{
+					"text": "000",
+					"timestamps": {
+						"from": "00:00:19,520",
+						"to": "00:00:20,200"
+					},
+					"offsets": {
+						"from": 19520,
+						"to": 20200
+					},
+					"id": 830,
+					"p": 0.99771,
+					"t_dtw": -1
+				},
+				{
+					"text": " black",
+					"timestamps": {
+						"from": "00:00:20,200",
+						"to": "00:00:20,240"
+					},
+					"offsets": {
+						"from": 20200,
+						"to": 20240
+					},
+					"id": 2042,
+					"p": 0.983601,
+					"t_dtw": -1
+				},
+				{
+					"text": " men",
+					"timestamps": {
+						"from": "00:00:20,240",
+						"to": "00:00:20,690"
+					},
+					"offsets": {
+						"from": 20240,
+						"to": 20690
+					},
+					"id": 1450,
+					"p": 0.999388,
+					"t_dtw": -1
+				},
+				{
+					"text": " serve",
+					"timestamps": {
+						"from": "00:00:21,410",
+						"to": "00:00:21,410"
+					},
+					"offsets": {
+						"from": 21410,
+						"to": 21410
+					},
+					"id": 4691,
+					"p": 0.79879,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:21,460",
+						"to": "00:00:21,600"
+					},
+					"offsets": {
+						"from": 21460,
+						"to": 21600
+					},
+					"id": 287,
+					"p": 0.994991,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:21,610",
+						"to": "00:00:21,890"
+					},
+					"offsets": {
+						"from": 21610,
+						"to": 21890
+					},
+					"id": 262,
+					"p": 0.997883,
+					"t_dtw": -1
+				},
+				{
+					"text": " Union",
+					"timestamps": {
+						"from": "00:00:21,890",
+						"to": "00:00:22,380"
+					},
+					"offsets": {
+						"from": 21890,
+						"to": 22380
+					},
+					"id": 4479,
+					"p": 0.972047,
+					"t_dtw": -1
+				},
+				{
+					"text": " Army",
+					"timestamps": {
+						"from": "00:00:22,380",
+						"to": "00:00:22,750"
+					},
+					"offsets": {
+						"from": 22380,
+						"to": 22750
+					},
+					"id": 5407,
+					"p": 0.846875,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:22,770",
+						"to": "00:00:23,080"
+					},
+					"offsets": {
+						"from": 22770,
+						"to": 23080
+					},
+					"id": 13,
+					"p": 0.994289,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_1154]",
+					"timestamps": {
+						"from": "00:00:23,080",
+						"to": "00:00:23,080"
+					},
+					"offsets": {
+						"from": 23080,
+						"to": 23080
+					},
+					"id": 51517,
+					"p": 0.0184009,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

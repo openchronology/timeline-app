@@ -1,0 +1,159 @@
+{
+  "sample": "../samples/civil-war.ochx",
+  "size": [360, 1500],
+  "scale": 3,
+  "shots": [
+    {
+      "id": "april",
+      "dur": 0.034,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3306250800, -3302708400]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "widen",
+      "dur": 2.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3306250800, -3302708400]
+        },
+        {
+          "t": 2.5,
+          "view": [-3306250800, -3297783600]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "sep",
+      "dur": 0.034,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3306250800, -3297783600]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "separate",
+          "tags": ["surrender"]
+        }
+      ]
+    },
+    {
+      "id": "june",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3306250800, -3297783600]
+        },
+        {
+          "t": 3,
+          "view": [-3300980400, -3297438000]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "separate",
+          "tags": ["surrender"]
+        }
+      ]
+    },
+    {
+      "id": "pan",
+      "dur": 4,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3300980400, -3297438000]
+        },
+        {
+          "t": 4,
+          "view": [-3288452400, -3284910000]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "separate",
+          "tags": ["surrender"]
+        }
+      ]
+    },
+    {
+      "id": "wide",
+      "dur": 0.034,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3307114800, -3282922800]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "separate",
+          "tags": ["surrender"]
+        }
+      ]
+    },
+    {
+      "id": "reader",
+      "dur": 1.2,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-3314458800, -3282922800]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ],
+      "actions": [
+        {
+          "t": 0,
+          "do": "viewMode",
+          "on": true
+        },
+        {
+          "t": 0.1,
+          "do": "open",
+          "title": "CSS Shenandoah"
+        }
+      ]
+    }
+  ]
+}

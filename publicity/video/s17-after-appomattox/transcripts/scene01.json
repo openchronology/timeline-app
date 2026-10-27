@@ -1,0 +1,408 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:04,420"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 4420
+			},
+			"text": " Lee surrendered at Appomattox in April 1865.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.907157,
+					"t_dtw": -1
+				},
+				{
+					"text": " Lee",
+					"timestamps": {
+						"from": "00:00:00,270",
+						"to": "00:00:00,270"
+					},
+					"offsets": {
+						"from": 270,
+						"to": 270
+					},
+					"id": 5741,
+					"p": 0.874496,
+					"t_dtw": -1
+				},
+				{
+					"text": " surrendered",
+					"timestamps": {
+						"from": "00:00:00,320",
+						"to": "00:00:01,210"
+					},
+					"offsets": {
+						"from": 320,
+						"to": 1210
+					},
+					"id": 29209,
+					"p": 0.994501,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:01,280",
+						"to": "00:00:01,460"
+					},
+					"offsets": {
+						"from": 1280,
+						"to": 1460
+					},
+					"id": 379,
+					"p": 0.994763,
+					"t_dtw": -1
+				},
+				{
+					"text": " App",
+					"timestamps": {
+						"from": "00:00:01,460",
+						"to": "00:00:01,710"
+					},
+					"offsets": {
+						"from": 1460,
+						"to": 1710
+					},
+					"id": 2034,
+					"p": 0.950083,
+					"t_dtw": -1
+				},
+				{
+					"text": "om",
+					"timestamps": {
+						"from": "00:00:01,740",
+						"to": "00:00:01,740"
+					},
+					"offsets": {
+						"from": 1740,
+						"to": 1740
+					},
+					"id": 296,
+					"p": 0.968601,
+					"t_dtw": -1
+				},
+				{
+					"text": "att",
+					"timestamps": {
+						"from": "00:00:01,980",
+						"to": "00:00:02,180"
+					},
+					"offsets": {
+						"from": 1980,
+						"to": 2180
+					},
+					"id": 1078,
+					"p": 0.976909,
+					"t_dtw": -1
+				},
+				{
+					"text": "ox",
+					"timestamps": {
+						"from": "00:00:02,180",
+						"to": "00:00:02,360"
+					},
+					"offsets": {
+						"from": 2180,
+						"to": 2360
+					},
+					"id": 1140,
+					"p": 0.998449,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:02,360",
+						"to": "00:00:02,530"
+					},
+					"offsets": {
+						"from": 2360,
+						"to": 2530
+					},
+					"id": 287,
+					"p": 0.928509,
+					"t_dtw": -1
+				},
+				{
+					"text": " April",
+					"timestamps": {
+						"from": "00:00:02,570",
+						"to": "00:00:02,980"
+					},
+					"offsets": {
+						"from": 2570,
+						"to": 2980
+					},
+					"id": 3035,
+					"p": 0.999317,
+					"t_dtw": -1
+				},
+				{
+					"text": " 1865",
+					"timestamps": {
+						"from": "00:00:03,020",
+						"to": "00:00:03,420"
+					},
+					"offsets": {
+						"from": 3020,
+						"to": 3420
+					},
+					"id": 47801,
+					"p": 0.963822,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,390",
+						"to": "00:00:04,420"
+					},
+					"offsets": {
+						"from": 4390,
+						"to": 4420
+					},
+					"id": 13,
+					"p": 0.977844,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_221]",
+					"timestamps": {
+						"from": "00:00:04,420",
+						"to": "00:00:04,420"
+					},
+					"offsets": {
+						"from": 4420,
+						"to": 4420
+					},
+					"id": 50584,
+					"p": 0.0060004,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,420",
+				"to": "00:00:07,040"
+			},
+			"offsets": {
+				"from": 4420,
+				"to": 7040
+			},
+			"text": " The Civil War's last surrender came seven months later.",
+			"tokens": [
+				{
+					"text": " The",
+					"timestamps": {
+						"from": "00:00:04,460",
+						"to": "00:00:04,580"
+					},
+					"offsets": {
+						"from": 4460,
+						"to": 4580
+					},
+					"id": 383,
+					"p": 0.997392,
+					"t_dtw": -1
+				},
+				{
+					"text": " Civil",
+					"timestamps": {
+						"from": "00:00:04,740",
+						"to": "00:00:04,840"
+					},
+					"offsets": {
+						"from": 4740,
+						"to": 4840
+					},
+					"id": 7511,
+					"p": 0.846137,
+					"t_dtw": -1
+				},
+				{
+					"text": " War",
+					"timestamps": {
+						"from": "00:00:04,840",
+						"to": "00:00:04,940"
+					},
+					"offsets": {
+						"from": 4840,
+						"to": 4940
+					},
+					"id": 1810,
+					"p": 0.954915,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:05,000",
+						"to": "00:00:05,100"
+					},
+					"offsets": {
+						"from": 5000,
+						"to": 5100
+					},
+					"id": 338,
+					"p": 0.997611,
+					"t_dtw": -1
+				},
+				{
+					"text": " last",
+					"timestamps": {
+						"from": "00:00:05,100",
+						"to": "00:00:05,310"
+					},
+					"offsets": {
+						"from": 5100,
+						"to": 5310
+					},
+					"id": 938,
+					"p": 0.988218,
+					"t_dtw": -1
+				},
+				{
+					"text": " surrender",
+					"timestamps": {
+						"from": "00:00:05,310",
+						"to": "00:00:05,790"
+					},
+					"offsets": {
+						"from": 5310,
+						"to": 5790
+					},
+					"id": 16908,
+					"p": 0.998923,
+					"t_dtw": -1
+				},
+				{
+					"text": " came",
+					"timestamps": {
+						"from": "00:00:05,790",
+						"to": "00:00:06,000"
+					},
+					"offsets": {
+						"from": 5790,
+						"to": 6000
+					},
+					"id": 1625,
+					"p": 0.993191,
+					"t_dtw": -1
+				},
+				{
+					"text": " seven",
+					"timestamps": {
+						"from": "00:00:06,000",
+						"to": "00:00:06,170"
+					},
+					"offsets": {
+						"from": 6000,
+						"to": 6170
+					},
+					"id": 3598,
+					"p": 0.929188,
+					"t_dtw": -1
+				},
+				{
+					"text": " months",
+					"timestamps": {
+						"from": "00:00:06,400",
+						"to": "00:00:06,580"
+					},
+					"offsets": {
+						"from": 6400,
+						"to": 6580
+					},
+					"id": 1933,
+					"p": 0.998251,
+					"t_dtw": -1
+				},
+				{
+					"text": " later",
+					"timestamps": {
+						"from": "00:00:06,580",
+						"to": "00:00:06,800"
+					},
+					"offsets": {
+						"from": 6580,
+						"to": 6800
+					},
+					"id": 1568,
+					"p": 0.998492,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:06,850",
+						"to": "00:00:07,010"
+					},
+					"offsets": {
+						"from": 6850,
+						"to": 7010
+					},
+					"id": 13,
+					"p": 0.985703,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_352]",
+					"timestamps": {
+						"from": "00:00:07,040",
+						"to": "00:00:07,040"
+					},
+					"offsets": {
+						"from": 7040,
+						"to": 7040
+					},
+					"id": 50715,
+					"p": 0.0961299,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}
