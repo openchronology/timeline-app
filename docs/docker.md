@@ -36,6 +36,8 @@ Set `TRUST_PROXY=1` only when the proxy overwrites `X-Forwarded-For` with a sing
 
 Public timelines can be [embedded](sharing.md#embedding) in any site. Set `EMBED_FRAME_ANCESTORS` to a space-separated list of origins (`https://example.org https://*.example.net`) to allow only those, or `'none'` to allow none.
 
+The [sitemap](sharing.md#search-engines) lists the moments and durations of public timelines with at most 5,000 moments. Set `SITEMAP_TIMELINE_ENTITIES` (1 to 45,000) to change that limit.
+
 To supply an additional plugin catalogue, bind-mount its JSON file into `app` read-only and set `PLUGIN_LIBRARY` to its container path. See [plugins.md](plugins.md). Setting a host path without mounting it is insufficient.
 
 The [export cache](administration.md#cached-downloads) is off in Compose unless configured. To keep downloads on disk, mount a volume the app container can write into `app` and set `EXPORT_CACHE_DIR` to its path, or set `EXPORT_CACHE=s3` and the `EXPORT_CACHE_S3_*` settings for a bucket.

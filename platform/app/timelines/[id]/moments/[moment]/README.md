@@ -2,7 +2,7 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-`/<owner>/<slug>/moments/<moment>`: the timeline open at one moment, with the moment's title, time and description in its link previews.
+`/<owner>/<slug>/moments/<moment>`: the timeline open at one moment, with the moment's title, time and description in its link previews, and the moment as text and schema.org structured data for search engines.
 
 ## Contents
 
