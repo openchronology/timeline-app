@@ -9,6 +9,7 @@ import {
   validateDocument,
   validatePresentation,
   createPresenter,
+  printTimeSpan,
   DEFAULT_PRESENTATION,
   CUSTOM_EXAMPLE,
   compileCustom,
@@ -413,5 +414,59 @@ function parseDifference(text: string, api: TimeAPI): Rational {
         CUSTOM_EXAMPLE + 'function offset(d: Rational, api: TimeAPI): string { return "x"; }',
       ),
     /optionally printDifference and parseDifference/,
+  );
+});
+
+test('a timeline’s span reads in its own time display, as precise as its length (#338)', () => {
+  const gregorian = { ...DEFAULT_PRESENTATION, mode: 'gregorian' },
+    at = (text) => createPresenter(gregorian).parse(text),
+    span = (settings, a, b) => printTimeSpan(settings, a, b);
+  // Gregorian: years for a life, months, days, then clock times with the zone.
+  assert.equal(
+    span(gregorian, at('1809-02-12T00:00:00Z'), at('1865-04-15T07:22:00Z')),
+    '1809 CE – 1865 CE',
+  );
+  assert.equal(
+    span(gregorian, at('1944-03-06T00:00:00Z'), at('1945-08-25T00:00:00Z')),
+    'Mar 1944 CE – Aug 1945 CE',
+  );
+  assert.equal(
+    span(gregorian, at('1944-06-06T00:00:00Z'), at('1944-06-25T00:00:00Z')),
+    '6 Jun 1944 CE – 25 Jun 1944 CE',
+  );
+  assert.equal(
+    span(gregorian, at('2026-10-26T13:05:00Z'), at('2026-10-26T16:12:30Z')),
+    '26 Oct 2026 CE 13:05 – 16:12 UTC',
+  );
+  assert.equal(
+    span(
+      { ...gregorian, offsetMinutes: 60 },
+      at('2026-10-26T13:05:00Z'),
+      at('2026-10-26T13:07:30Z'),
+    ),
+    '26 Oct 2026 CE 14:05:00 – 14:07:30 UTC+01:00',
+  );
+  assert.equal(span(gregorian, at('3000 BCE'), at('30 BCE')), '3000 BCE – 30 BCE');
+  // Deep time: ages.
+  assert.equal(span(gregorian, at('66 mya'), at('2000 CE')), '66 mya – 2000 CE');
+  assert.equal(span(gregorian, at('4.5 bya'), at('66 mya')), '4.5 bya – 66 mya');
+  // Numbers: the unit once, with digits enough for the span; coordinates as decimals.
+  const years = { ...DEFAULT_PRESENTATION, mode: 'float', unit: 'years', scale: '31557600' };
+  assert.equal(span(years, Q.parse('0'), Q.parse('3155760000')), '0 – 100 years');
+  assert.equal(span(years, Q.parse('31557600000'), Q.parse('31873176000')), '1000 – 1010 years');
+  assert.equal(span(undefined, Q.parse('0'), Q.parse('24')), '0 – 24');
+  assert.equal(span(undefined, Q.parse('1/3'), Q.parse('1/3')), '0.333');
+  assert.equal(
+    span({ ...DEFAULT_PRESENTATION, mode: 'si', unit: 'm' }, Q.parse('1/1000'), Q.parse('1/4')),
+    '1 mm – 250 mm',
+  );
+  // A custom script prints each end as it does for inputs.
+  assert.equal(
+    span(
+      { ...DEFAULT_PRESENTATION, mode: 'custom', source: CUSTOM_EXAMPLE },
+      Q.parse('60'),
+      Q.parse('600'),
+    ),
+    '1.000000 minutes – 10.000000 minutes',
   );
 });

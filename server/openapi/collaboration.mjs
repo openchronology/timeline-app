@@ -592,6 +592,28 @@ export const schemas = {
         description: 'Its sensitive-content labels, its owner’s and moderators’.',
       },
       rank: { type: 'number', description: 'Its text-search rank; 0 without search text.' },
+      first_time: {
+        type: ['string', 'null'],
+        description:
+          'Its first moment’s time, exact ("n/d"); null without moments, and for comparisons and forks that read through to their source.',
+      },
+      last_time: {
+        type: ['string', 'null'],
+        description: 'Its last moment’s time, exact ("n/d"); null as for `first_time`.',
+      },
+      time_span: {
+        type: ['string', 'null'],
+        description:
+          'Its first and last times in its own time display, as precise as the span calls for: Gregorian timelines in ages, years, months, days or clock times ("1809 CE – 1865 CE", "26 Oct 2026 CE 13:05 – 16:12 UTC"), numeric ones in their unit with enough digits ("0 – 100 years"), custom ones as their script prints them; null as for `first_time`.',
+      },
+      shape: {
+        type: ['array', 'null'],
+        items: { type: 'integer', minimum: 0, maximum: 100 },
+        minItems: 24,
+        maxItems: 24,
+        description:
+          'How densely 24 equal parts of its span hold moments, from 0 (none) to 100 (the densest), estimated from the top of its moment tree; null as for `first_time`.',
+      },
       created_at: timestamp,
       updated_at: timestamp,
     },

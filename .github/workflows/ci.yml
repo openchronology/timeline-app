@@ -331,6 +331,8 @@ jobs:
         run: node test/moderation-live-postgres.mjs
       - name: Agreeing to the terms in a live browser
         run: node test/terms-live-postgres.mjs
+      - name: Searching and browsing timelines in a live browser
+        run: node test/timeline-browser-live-postgres.mjs
       - name: Saving while others save, in a live browser
         run: node test/save-merge-live-postgres.mjs
       - name: Sensitive-content labels in a live browser

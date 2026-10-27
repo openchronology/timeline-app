@@ -47,6 +47,16 @@ Every list on the home page and on a profile has its own search, so searching on
 
 A search sorts by **Relevance** unless you choose another order. A tag on a timeline filters its list by that tag. Each list's search, order and page are in the page's address, so a search can be shared or bookmarked.
 
+Lists update in place, without loading the page again, so you stay where you were:
+
+- **Search as you type:** results follow the words and tag as you type them; **Search** or Enter applies them at once. **Sort** and **Visibility** apply as soon as you choose.
+- **Back** returns to the list as it was before your last search, tag or page.
+- **Grid** or **List** shows the cards side by side or one per row; the browser remembers your choice.
+- **Arrow keys** move between the cards' titles once one has focus (**Home** and **End** go to the first and last).
+- Each card shows the timeline's title, owner and last change, an excerpt of its description, its size, the span of its moments with a small chart of where they fall, and its tags.
+
+Without JavaScript the lists still work: searching and paging load the page, which opens at the list you used.
+
 - **Start a timeline:** **＋ New timeline** in the header opens an empty timeline called "Untitled timeline" in your browser. Click the title and the description at the top to change them. **Tags (comma-separated)** under them labels the whole timeline, so others can find it.
 - **Try the sample:** **Explore 20,000 sample moments ↗** opens a sample timeline to pan and zoom through.
 - **Open a file:** **Import** reads an `.ochx` file. Signed in, **Import .och** also reads a desktop file through the server.

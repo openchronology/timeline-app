@@ -311,9 +311,10 @@ h2 {
 .timeline-card h3 {
   margin: 0 0 8px;
 }
-/* A timeline's image (#339), or its placeholder, cropped to one shape so cards line up. */
-.timeline-card-image {
-  margin: -20px -20px 14px;
+/* A timeline's image (#339), or its placeholder, cropped to one shape so cards line up; to the
+   card's edges, past its padding. */
+.timeline-card > .timeline-card-image {
+  margin: -20px -20px 6px;
   overflow: hidden;
   border-radius: 11px 11px 0 0;
   background: var(--hover);
@@ -369,6 +370,318 @@ section {
   gap: 12px;
   align-items: center;
   margin: 18px 0;
+}
+
+/* The dashboard's and profiles' timeline lists (#338): a grid on wide screens (a column on
+   phones), or a list; cards with a clear hierarchy; loading without moving anything. */
+.timeline-grid {
+  position: relative;
+  scroll-margin-top: 16px;
+}
+.timeline-grid:focus {
+  outline: none;
+}
+.timeline-grid:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 6px;
+  border-radius: 12px;
+}
+.timeline-grid.list-layout {
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+.timeline-grid > .timeline-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    opacity 0.15s;
+}
+.timeline-grid > .timeline-card:hover,
+.timeline-grid > .timeline-card:focus-within {
+  border-color: var(--line-strong);
+  box-shadow: 0 4px 14px #1d382314;
+}
+.timeline-card > * {
+  margin: 0;
+}
+.timeline-card .timeline-card-title {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.3;
+}
+.timeline-card-title a {
+  color: var(--ink);
+  text-decoration: none;
+}
+.timeline-card-title a:hover,
+.timeline-card-title a:focus-visible {
+  color: var(--green);
+  text-decoration: underline;
+}
+.timeline-card-byline {
+  color: var(--muted);
+  font-size: 13px;
+}
+.timeline-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.timeline-card-badges .sensitive-badge {
+  margin: 0;
+}
+.badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: #44584b;
+  font-size: 12px;
+}
+.badge-featured {
+  border-color: #c9dcc5;
+  background: #edf5ea;
+  color: var(--green);
+}
+.timeline-card-description {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  color: #2f4538;
+  font-size: 14px;
+}
+.timeline-card-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.timeline-card-facts > div {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.timeline-card-facts dt {
+  font-weight: 600;
+}
+.timeline-card-facts dd {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  min-width: 0;
+}
+.timeline-shape {
+  flex: 1 1 220px;
+}
+.timeline-shape-bars {
+  flex: 0 0 72px;
+  width: 72px;
+  height: 18px;
+  fill: var(--green);
+  opacity: 0.75;
+}
+.timeline-shape-axis {
+  fill: var(--line-strong);
+}
+.timeline-shape-span {
+  overflow-wrap: anywhere;
+}
+ul.tags {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  align-items: center;
+}
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid #dbe4d4;
+  border-radius: 999px;
+  background: #edf2e8;
+  color: var(--ink);
+  font-size: 12px;
+  text-decoration: none;
+}
+.tag-chip:hover {
+  background: #e2eadb;
+  color: var(--ink);
+}
+.tag-chip[aria-current='true'] {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}
+.timeline-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+.timeline-card-footer .compare-checkbox {
+  margin: 0;
+  font-weight: 500;
+}
+/* A list: one row per timeline, its actions at the side on wide screens. */
+.list-layout > .timeline-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 24px;
+  row-gap: 6px;
+  padding: 14px 18px;
+}
+.list-layout > .timeline-card > * {
+  grid-column: 1;
+}
+/* A list is for scanning: its rows leave out the cards' images. */
+.list-layout .timeline-card-image {
+  display: none;
+}
+.list-layout > .timeline-card > .timeline-card-footer {
+  grid-column: 2;
+  grid-row: 1 / span 6;
+  align-self: center;
+  margin: 0;
+  padding: 0;
+}
+@media (max-width: 650px) {
+  .list-layout > .timeline-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .list-layout > .timeline-card > .timeline-card-footer {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+.list-status {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.empty-state {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  margin: 12px 0;
+  padding: 18px 20px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+}
+.empty-state > p {
+  margin: 0;
+}
+.layout-toggle {
+  display: flex;
+}
+.layout-toggle button {
+  border-radius: 0;
+}
+.layout-toggle button:first-child {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+.layout-toggle button:last-child {
+  margin-left: -1px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.layout-toggle button[aria-pressed='true'] {
+  background: var(--hover);
+  border-color: #bccab6;
+  font-weight: 600;
+}
+/* Loading: a thin bar above the cards, which dim and shimmer where they are. */
+.list-progress {
+  position: absolute;
+  top: -8px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 3px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.list-progress::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 30%;
+  background: var(--focus);
+  animation: list-progress 1.1s ease-in-out infinite;
+}
+.timeline-grid[aria-busy='true'] .list-progress {
+  opacity: 1;
+}
+.timeline-grid[aria-busy='true'] > .timeline-card {
+  opacity: 0.55;
+}
+.timeline-grid[aria-busy='true'] > .timeline-card::after,
+.timeline-card.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(100deg, #fff0 30%, #ffffff99 50%, #fff0 70%) -150% 0 / 200% 100%;
+  animation: shimmer 1.3s linear infinite;
+  pointer-events: none;
+}
+.timeline-card.skeleton {
+  position: relative;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.skeleton-line {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--hover);
+}
+.skeleton-title {
+  width: 60%;
+  height: 18px;
+}
+.skeleton-short {
+  width: 40%;
+}
+@keyframes list-progress {
+  from {
+    left: -30%;
+  }
+  to {
+    left: 100%;
+  }
+}
+@keyframes shimmer {
+  to {
+    background-position: 250% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .list-progress::before,
+  .timeline-grid[aria-busy='true'] > .timeline-card::after,
+  .timeline-card.skeleton::after {
+    animation: none;
+  }
+  .list-progress::before {
+    width: 100%;
+    left: 0;
+  }
 }
 .error {
   color: #9b3636;

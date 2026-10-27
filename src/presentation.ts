@@ -15,6 +15,7 @@ import {
 } from './numeric.js';
 import {
   printCalendar,
+  printCalendarSpan,
   printCalendarAlone,
   parseCalendar,
   describeCalendar,
@@ -137,6 +138,51 @@ export function validatePresentation(value: unknown): TimePresentation {
   };
 }
 
+/**
+ * A timeline's span, from its first moment to its last, as its own time display writes
+ * times, as precise as the span's length calls for (#338: the browser's cards). Gregorian
+ * dates read in ages, years, months, days or clock times (printCalendarSpan); numbers in
+ * the timeline's unit with enough digits to tell the ends apart at about a hundredth of the
+ * span (rational coordinates as decimals); a custom script prints each end as it does for
+ * inputs, and if it fails, the ends read as SI seconds, which stored times are.
+ */
+export function printTimeSpan(settings: TimePresentation | undefined, first: Q, last: Q): string {
+  const options = settings ? validatePresentation(settings) : DEFAULT_PRESENTATION;
+  const both = (print: (time: Q) => string) => {
+    const [a, b] = [print(first), print(last)];
+    return a === b ? a : `${a} – ${b}`;
+  };
+  if (options.mode === 'custom') {
+    const span = last.compare(first) > 0 ? last.sub(first) : Q.one;
+    try {
+      const presenter = compileCustom(options.source!);
+      return both((time) =>
+        presenter.print(time, { left: first, span, widthPixels: 240, purpose: 'input' }),
+      );
+    } catch {
+      return both((time) => printSI(time, 4, 's'));
+    }
+  }
+  const scale = Q.parse(options.scale),
+    origin = Q.parse(options.origin);
+  const value = (time: Q) => time.sub(origin).div(scale);
+  if (options.mode === 'gregorian')
+    return printCalendarSpan(value(first), value(last), options.offsetMinutes);
+  const unit = options.unit.trim(),
+    span = value(last).sub(value(first)),
+    largest = Math.max(decimalExponent(value(first)), decimalExponent(value(last)));
+  // Digits from the ends' size down to a hundredth of the span (3 for a span alone).
+  const digits = Math.max(
+    3,
+    Math.min(15, span.numerator === 0n ? 3 : largest - decimalExponent(span) + 3),
+  );
+  if (options.mode === 'si') return both((time) => printSI(value(time), digits, unit));
+  // The unit once, after both numbers: "1809 – 1865 years".
+  return (
+    both((time) => printNumber(value(time), digits, options.mode === 'scientific')) +
+    (unit ? ' ' + unit : '')
+  );
+}
 /**
  * A presentation ready to use. `print` and `parse` convert between stored rationals and
  * text; with a viewport context (purpose `axis`, `event` or `input`) labels may adapt to
