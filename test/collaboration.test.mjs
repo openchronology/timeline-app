@@ -280,9 +280,25 @@ test('proposal mutations and comments enforce login and origin before accepting 
 test('timeline sorting defaults and bookmark queries are validated', async () => {
   assert.equal(searchInput({}).sort, 'featured');
   assert.equal(searchInput({ search: 'galaxy' }).sort, 'relevance');
-  for (const sort of ['stars', 'popularity', 'alphabetical', 'age', 'relevance'])
+  for (const sort of ['stars', 'popularity', 'alphabetical', 'age', 'updated', 'relevance'])
     assert.equal(searchInput({ sort }).sort, sort);
   assert.throws(() => searchInput({ sort: 'sql' }));
+  // The account's own lists filter by visibility (#337).
+  assert.equal(searchInput({}).visibility, '');
+  for (const visibility of ['public', 'private'])
+    assert.equal(searchInput({ scope: 'mine', visibility }).visibility, visibility);
+  for (const visibility of ['unlisted', 'PUBLIC', 1])
+    assert.throws(() => searchInput({ visibility }));
+  let parameters, sql;
+  const pool = {
+    query: async (query, args) => {
+      [sql, parameters] = [query, args];
+      return { rows: [{ total: '0', timelines: [] }] };
+    },
+  };
+  await searchTimelines(pool, 'reader', { scope: 'mine', visibility: 'private', tag: 'x' });
+  assert.equal(parameters[13], 'private');
+  assert(sql.includes("($14='' OR t.visibility=$14)"));
   assert.throws(() => searchInput({ starredBy: 'someone', scope: 'visible' }));
   await assert.rejects(searchTimelines({}, null, { scope: 'starred' }), (e) => e.status === 401);
 });

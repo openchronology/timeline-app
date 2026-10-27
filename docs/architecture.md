@@ -292,6 +292,8 @@ private timelines. `/<username>` ([addresses](sharing.md#addresses)) shows
 public timelines and public favorites only. Losing access removes a private timeline from search results;
 its bookmark does not grant access. Timeline browsing supports featured-first,
 star count, popularity (stars plus public forks), alphabetical title, newest
-creation date, and full-text relevance. Private forks do not contribute to
+creation date, most recently changed, and full-text relevance; each list on the
+dashboard and on profiles searches, sorts and pages on its own, the account's own
+filtering by visibility too ([browsing](browsing.md#searching-the-lists)). Private forks do not contribute to
 public popularity. Historical timelines created before this migration use
 their previous update timestamp as the best available creation date.

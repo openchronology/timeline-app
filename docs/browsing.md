@@ -50,6 +50,21 @@ An established account's standing runs from 0.4 to 1, the sum of:
 
 The total is capped at 1. An account that isn't established has standing 0. Administrators and accounts marked trusted have 1.
 
+## Searching the lists
+
+Every timeline list on the dashboard and on profiles searches, sorts and pages on its own, with its own query parameters, so a search in one keeps the others' state ([#337](https://github.com/openchronology/timeline-app/issues/337)):
+
+| List                   | Parameters                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------- |
+| Explore timelines      | `search`, `tag`, `sort`, `page` (and `owner`, for one account's)                      |
+| Your timelines         | `mineSearch`, `mineTag`, `mineSort`, `mineVisibility`, `minePage`                     |
+| Your favorites         | `favoriteSearch`, `favoriteTag`, `favoriteSort`, `favoriteVisibility`, `favoritePage` |
+| Drafts in this browser | `draftSearch`, `draftTag`, `draftSort`, `draftPage`                                   |
+| A profile's timelines  | `search`, `tag`, `sort`, `page`                                                       |
+| A profile's favorites  | `favoriteSearch`, `favoriteTag`, `favoriteSort`, `favoritePage`                       |
+
+Your own lists include private timelines and filter by visibility (`public` or `private`). Drafts are searched in the browser, by their titles, descriptions and tags, with the same syntax: words, `"quoted phrases"` and `-exclusions`. The API's search takes the same `visibility` filter and the `updated` sort ([API](api.md)).
+
 ## Popularity and trending
 
 | Sort                    | Ranks by                                                                        |

@@ -1994,6 +1994,26 @@ export class PostgresStore {
     });
   }
   /**
+   * The first `limit` moments and durations of timeline `id` as a guest may see them, for
+   * its entity sitemap (#335): `{kind, id}` in key order (kind, then ID in "C" order), read
+   * from its entity search rows (a fork's read through), which hold one row per moment and
+   * duration. HttpError 404 unless a guest may open it; a comparison has none.
+   */
+  async entityKeys(id, limit) {
+    return this.transaction(async (c) => {
+      await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+      const t = await this.access(id, null, c);
+      if (t.comparison) return [];
+      const index = await indexReader(c, t);
+      const { rows } = await c.query(
+        `SELECT s.kind,s.entity_id FROM ${index('oc_entity_search', '$1', { scan: true })} s
+        ORDER BY s.kind,s.entity_id COLLATE "C" LIMIT $2`,
+        [id, limit],
+      );
+      return rows.map((r) => ({ kind: r.kind, id: r.entity_id }));
+    });
+  }
+  /**
    * Answers one read of timeline `id` for `userId` (a validated `query`, by `query.kind`):
    * - 'overview': the window [lower, upper] summarized at a grouping threshold (at least
    *   the span / 1,024): moment groups, bands (durations at least the threshold long) and

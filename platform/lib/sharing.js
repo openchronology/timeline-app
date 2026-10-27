@@ -5,9 +5,18 @@
  * never reveal a private timeline to whoever (or whatever crawler) fetches them.
  */
 import 'server-only';
-import { createPresenter, Q } from '../../dist/core.mjs';
+import {
+  createPresenter,
+  describeLabels,
+  entityTags,
+  imageURL,
+  printTimestamp,
+  Q,
+  validateInstalledPlugins,
+  validatePresentation,
+} from '../../dist/core.mjs';
 import { siteName } from '../../server/site.mjs';
-import { timelinePath } from '../../src/addresses.ts';
+import { profilePath, timelinePath } from '../../src/addresses.ts';
 
 /** The platform's name in titles and link previews (PLATFORM_NAME, or OpenChronology). */
 export { siteName };
@@ -85,6 +94,21 @@ export async function durationOf(services, timeline, id, userId = null) {
   return duration && band ? { duration, band } : null;
 }
 /**
+ * Up to `limit` of the moments and durations linked to an entity (#335), each `{kind, id,
+ * first, last, title}`, in (kind, ID) order, read as `userId` (a guest when null). The empty
+ * cursor comes before every link; given one, the store skips counting everything reachable,
+ * which costs as much as the entity's whole connected group.
+ */
+export async function relatedOf(services, timeline, entity, userId = null, limit = 50) {
+  const { related } = await services.store.query(timeline.id, userId, {
+    kind: 'related',
+    entity,
+    limit,
+    after: { kind: '', id: '' },
+  });
+  return related;
+}
+/**
  * The first moments of a timeline in time order, at most `limit` of them (for previews):
  * an unbounded range from the start, read as `userId` (a guest when null).
  */
@@ -109,6 +133,24 @@ export function presentTime(timeline, time) {
     return createPresenter(timeline.presentation ?? undefined).print(Q.parse(time));
   } catch {
     return time;
+  }
+}
+/**
+ * A time as an ISO 8601 timestamp (`1861-03-04T12:00:00-05:00`), for structured data: only
+ * on a timeline displayed as Gregorian dates, and only years 0000 to 9999 that end on a
+ * finite decimal, which is what schema.org's dates allow; null otherwise.
+ */
+export function isoTime(timeline, time) {
+  try {
+    const presentation = validatePresentation(timeline.presentation);
+    if (presentation.mode !== 'gregorian') return null;
+    const text = printTimestamp(
+      Q.parse(time).sub(Q.parse(presentation.origin)).div(Q.parse(presentation.scale)),
+      presentation.offsetMinutes,
+    );
+    return /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/.test(text) ? text : null;
+  } catch {
+    return null;
   }
 }
 /**
@@ -156,6 +198,118 @@ export function durationTitle(duration) {
   return excerpt(duration.metadata?.title, 120) || 'Untitled duration';
 }
 /**
+ * What an entity's page says of it besides its title, time and notes (#335), as its reader
+ * does: its tags, the text its timeline's enabled plugins record (`details`, each `{label,
+ * text}`) and their links, such as sources (`links`, each `{label, urls}`, https only).
+ * Fields the plugins only draw with are left out.
+ */
+export function entityFacts(timeline, metadata = {}) {
+  const tags = entityTags(metadata);
+  const details = [],
+    links = [],
+    seen = new Set();
+  let plugins = [];
+  try {
+    plugins = validateInstalledPlugins(timeline.plugins ?? []);
+  } catch {}
+  for (const plugin of plugins.filter((p) => p.enabled))
+    for (const field of plugin.manifest.fields) {
+      if (seen.has(field.metadataKey)) continue;
+      seen.add(field.metadataKey);
+      const value = metadata[field.metadataKey];
+      if (field.kind === 'text' || field.kind === 'multiline') {
+        const text = typeof value === 'string' ? value.trim() : '';
+        if (text) details.push({ label: field.label, text: text.slice(0, 4000) });
+      } else if (field.kind === 'links' && Array.isArray(value)) {
+        const urls = value.slice(0, 100).filter((url) => imageURL(url));
+        if (urls.length) links.push({ label: field.label, urls });
+      }
+    }
+  return { tags, details, links };
+}
+/**
+ * Whether search engines may index a timeline's moment and duration pages: it is public and
+ * has no sensitive-content labels, whose previews show nothing of what is in it.
+ */
+export function entitiesIndexable(timeline) {
+  return timeline.visibility === 'public' && !timeline.labels?.length;
+}
+/**
+ * A moment's or duration's page metadata (see pageMetadata): its title and the timeline's,
+ * and its time and notes; for a timeline with sensitive-content labels, the labels instead
+ * of its notes, and not for search engines.
+ * @param {object} timeline its timeline
+ * @param {{kind: 'moment'|'duration', id: string}} entity which entity
+ * @param {string} title its title
+ * @param {string} time its time (or extent) as the timeline displays it
+ * @param {string} [notes] its notes
+ */
+export function entityMetadata(timeline, entity, title, time, notes) {
+  const labelled = timeline.labels?.length > 0;
+  return pageMetadata(
+    timeline,
+    sharedPath(timeline, entity),
+    `${title} · ${timelineTitle(timeline)}`,
+    labelled
+      ? `Sensitive content: ${describeLabels(timeline.labels).toLowerCase()}`
+      : excerpt(`${time}. ${notes ?? ''}`) || time,
+    null,
+    { index: entitiesIndexable(timeline) },
+  );
+}
+/**
+ * A moment's or duration's schema.org description (#335), for a JSON-LD script: an `Event`
+ * with its start (and a duration's end) on a timeline of Gregorian dates, otherwise a
+ * `CreativeWork` covering its time as the timeline displays it; either part of the
+ * timeline, by its owner. Null where its page is not for search engines.
+ * @param {object} timeline its timeline
+ * @param {{kind: 'moment'|'duration', id: string, title: string, notes?: string,
+ *   first: string, last: string, tags?: string[]}} entity it, with its exact times
+ */
+export function entityStructuredData(timeline, entity) {
+  if (!entitiesIndexable(timeline)) return null;
+  const origin = siteOrigin(),
+    duration = entity.kind === 'duration';
+  const start = isoTime(timeline, entity.first),
+    end = duration ? isoTime(timeline, entity.last) : start;
+  const shown = duration
+    ? `${presentTime(timeline, entity.first)} – ${presentTime(timeline, entity.last)}`
+    : presentTime(timeline, entity.first);
+  const description = excerpt(entity.notes, 500);
+  return {
+    '@context': 'https://schema.org',
+    '@type': start && end ? 'Event' : 'CreativeWork',
+    name: entity.title,
+    url: origin + sharedPath(timeline, entity),
+    ...(description ? { description } : {}),
+    ...(start && end
+      ? { startDate: start, ...(duration ? { endDate: end } : {}) }
+      : { temporalCoverage: shown }),
+    ...(entity.tags?.length ? { keywords: entity.tags.join(', ') } : {}),
+    isPartOf: {
+      '@type': 'CreativeWork',
+      name: timelineTitle(timeline),
+      url: origin + timelinePath(timeline),
+      ...(timeline.owner
+        ? {
+            author: {
+              '@type': 'Person',
+              name: '@' + timeline.owner,
+              url: origin + profilePath(timeline.owner),
+            },
+          }
+        : {}),
+    },
+  };
+}
+/**
+ * Structured data as the text of a `<script type="application/ld+json">`: JSON with every
+ * `<` escaped, so no title or note can close the script.
+ */
+export function jsonLd(data) {
+  return JSON.stringify(data).replace(/</g, '\\u003c');
+}
+/**
  * The page to share for a timeline (#148), or one of its moments or durations: the
  * timeline's own address (`/<owner>/<slug>`) followed by `/moments/<id>` or `/durations/<id>`.
  * @param {object} timeline the timeline
@@ -198,7 +352,8 @@ export function previewOf(timeline) {
  * address, link previews (Open Graph and Twitter cards) and oEmbed discovery.
  *
  * Only a public timeline's pages advertise oEmbed, since /api/oembed answers for public
- * timelines only; the others are marked noindex.
+ * timelines only; the others are marked noindex, as is a page `index` false keeps from
+ * search engines.
  *
  * @param {object} timeline the timeline the page is about (its `visibility` decides)
  * @param {string} path the page's path, made absolute with siteOrigin()
@@ -206,8 +361,16 @@ export function previewOf(timeline) {
  * @param {string} description its plain-text description
  * @param {{url: string, alt: string, width?: number, height?: number}|null} [image] the
  *   preview image (previewOf) in place of the page's drawn one (its opengraph-image)
+ * @param {{index?: boolean}} [options] `index` false asks search engines not to index it
  */
-export function pageMetadata(timeline, path, title, description, image = null) {
+export function pageMetadata(
+  timeline,
+  path,
+  title,
+  description,
+  image = null,
+  { index = true } = {},
+) {
   const origin = siteOrigin(),
     url = origin + path,
     shown = timeline.visibility === 'public';
@@ -238,7 +401,7 @@ export function pageMetadata(timeline, path, title, description, image = null) {
         : {}),
     },
     // Private pages are for their members: not for search engines.
-    ...(shown ? {} : { robots: { index: false, follow: false } }),
+    ...(shown && index ? {} : { robots: { index: false, follow: false } }),
     openGraph: {
       type: 'website',
       siteName: siteName(),

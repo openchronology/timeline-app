@@ -839,8 +839,10 @@ let pluginSearchRequest = 0;
 let pluginSearchTimer: ReturnType<typeof setTimeout> | undefined;
 let pluginPage = 1;
 const memoryOnly = () => !desktop && (offlineHtml || !session.user);
+/** Whether the open timeline can be edited here, view mode and comparisons aside. */
+const mayEditTimeline = () => !embedded && !!model && (!remote || remote.canEdit);
 /** Whether the open timeline can be edited here, view mode aside. */
-const mayEdit = () => !embedded && !comparison && !!model && (!remote || remote.canEdit);
+const mayEdit = () => !comparison && mayEditTimeline();
 /**
  * View mode (#233): someone who can edit reads the timeline as its viewers do, its moments and
  * durations opening in the reader. Remembered in this browser.
@@ -853,8 +855,13 @@ let viewMode = (() => {
   }
 })();
 const editable = () => !viewMode && mayEdit();
-/** Moments and durations open in the reader for anyone not editing, outside comparisons. */
-const reading = () => !comparison && !editable();
+/**
+ * Moments and durations open in the reader for anyone not editing. A comparison opens them in
+ * its read-only editor, but a separation is the open timeline itself (#345): there they open in
+ * the reader in View mode, and for anyone who could not edit the timeline anyway.
+ */
+const reading = () =>
+  !editable() && (!comparison || (!!separation && (viewMode || !mayEditTimeline())));
 /**
  * Room beside the ruler for markers at the bounds. Narrow stages, such as phones held upright,
  * keep less so the timeline itself gets the width.
@@ -1224,6 +1231,22 @@ function presented(
     return timelinePresenter().print(q, viewContext(purpose, spacingPixels, labelInterval));
   } catch (error) {
     // A failed custom label cannot prevent timeline access or mutate an event.
+    return (
+      q.toString() +
+      ' [display error: ' +
+      (error instanceof Error ? error.message : String(error)) +
+      ']'
+    );
+  }
+}
+/**
+ * A time written on its own, independent of the view (#344): what the reader and its related
+ * entries show, read as a page about one entity rather than against the timeline's edge.
+ */
+function presentedAlone(q: Q): string {
+  try {
+    return timelinePresenter().alone(q);
+  } catch (error) {
     return (
       q.toString() +
       ' [display error: ' +
@@ -2757,6 +2780,8 @@ async function storeDraft(index: TimelineIndex, id: string): Promise<number> {
       id,
       owner: session.user.id,
       title: index.title,
+      description: index.description,
+      tags: index.tags ?? [],
       moments: Number(index.points.entryCount),
       updated: new Date().toISOString(),
     });
@@ -3977,6 +4002,16 @@ el('inspector').addEventListener(
   },
   true,
 );
+/**
+ * A separated track's moment as the open timeline keeps it (#345): its own ID, without the
+ * track's key, and without the comparison's notes. Separated tracks keep their times.
+ */
+function separatedMoment(event: PointEvent): PointEvent {
+  const track = comparison?.tracks.find((t) => event.id.startsWith(t.source.key + ':'));
+  if (!separation || !track || !('comparisonSource' in event.metadata)) return event;
+  const { comparisonSource: _source, originalTime: _time, ...metadata } = event.metadata;
+  return { ...event, id: event.id.slice(track.source.key.length + 1), metadata };
+}
 function eventForm(event?: PointEvent, time?: Q) {
   if (comparison && !event) return;
   // Opening another entity ends the current session without keeping it.
@@ -3988,7 +4023,8 @@ function eventForm(event?: PointEvent, time?: Q) {
   if (event && reading()) {
     selected = event;
     requestRender();
-    return showReader('moment', event.id, event.metadata, presented(Q.parse(event.time), 'event'));
+    const read = separatedMoment(event);
+    return showReader('moment', read.id, read.metadata, presentedAlone(Q.parse(read.time)));
   }
   pendingEventEdit = false;
   eventEditHistory = null;
@@ -8036,7 +8072,11 @@ function createDuration(start: DurationEndpoint, end: DurationEndpoint) {
 /** Full metadata is local for complete timelines and fetched for indexed ones. */
 async function openDurationById(id: string, known?: DurationBand) {
   const band = known ?? frame.durations?.find((b) => b.id === id);
-  if (band?.sourceKey) return showDuration(band, true);
+  if (band?.sourceKey) {
+    // A separated track's duration is the open timeline's own (#345), read as it keeps it.
+    if (!separation || !reading()) return showDuration(band, true);
+    id = band.id.slice(band.sourceKey.length + 1);
+  }
   let duration = model?.durations.get(id);
   if (!duration && sparseWorkspace()) {
     const result = await timelineQuery<{ duration: Duration | null }>({
@@ -8062,11 +8102,12 @@ async function openDurationById(id: string, known?: DurationBand) {
 }
 function showDuration(duration: Duration, readOnly: boolean, isNew = false) {
   if (!isNew && reading()) {
+    // Its band on the timeline: on a separated track, under that track's key.
     const band =
-      frame.durations?.find((b) => b.id === duration.id && !b.sourceKey) ??
+      frame.durations?.find((b) => b.id === (b.sourceKey ? b.sourceKey + ':' : '') + duration.id) ??
       resolveDuration(duration, (id) => model?.momentTime(id));
     const when = band
-      ? `${presented(Q.parse(band.first), 'event')} → ${presented(Q.parse(band.last), 'event')}`
+      ? `${presentedAlone(Q.parse(band.first))} → ${presentedAlone(Q.parse(band.last))}`
       : '';
     return showReader('duration', duration.id, duration.metadata, when);
   }
@@ -8660,15 +8701,25 @@ function startSeparation(by: string[] | Separation) {
   startComparison(sources, presentation);
   // Separating keeps the current view rather than fitting both tracks.
   viewport = before;
+  // The bar names what was separated: the tags, or the entity whose relationships were
+  // followed (#342).
   text(
     'separation-heading',
     'tags' in choice
       ? 'Separated by tags'
       : choice.depth === 'direct'
-        ? 'Separated by relationships'
-        : 'Separated by all connected relationships',
+        ? 'Separated: related to'
+        : 'Separated: connected to',
   );
   text('separation-tags', label);
+  text(
+    'separation-note',
+    'tags' in choice
+      ? 'Read-only. Events with any of these tags are shown above; everything else stays below.'
+      : choice.depth === 'direct'
+        ? `Read-only. Shown above: ${label} and the events related to it; everything else stays below.`
+        : `Read-only. Shown above: ${label} and everything connected to it through relationships; everything else stays below.`,
+  );
   el('separation-map').hidden = !bulkEditable();
   heading();
   requestRender();
@@ -9250,8 +9301,8 @@ function renderRelated(host: HTMLElement, ref: EntityRef | null, readOnly = fals
         (entry.title || (entry.kind === 'moment' ? 'Untitled moment' : 'Untitled duration')) +
         ' · ' +
         (entry.kind === 'moment'
-          ? presented(Q.parse(entry.first), 'event')
-          : `${presented(Q.parse(entry.first), 'event')} → ${presented(Q.parse(entry.last), 'event')}`);
+          ? presentedAlone(Q.parse(entry.first))
+          : `${presentedAlone(Q.parse(entry.first))} → ${presentedAlone(Q.parse(entry.last))}`);
       open.onclick = () => openEntry(entry);
       row.append(open);
       if (canEdit) {

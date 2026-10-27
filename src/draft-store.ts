@@ -24,6 +24,10 @@ export interface DraftEntry {
   /** The account that made it; drafts from before the list have none. */
   owner?: string;
   title: string;
+  /** Its description and tags, for searching the website's list of drafts (#337); absent for
+   * a draft last stored before the list kept them. */
+  description?: string;
+  tags?: string[];
   moments: number;
   /** When it was last stored, as an ISO date; empty for a draft from before the list. */
   updated: string;
