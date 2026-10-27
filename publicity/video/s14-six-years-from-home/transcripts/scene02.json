@@ -1,0 +1,464 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:05,720"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 5720
+			},
+			"text": " In May 1775, he rode out of Mount Vernon for Congress in Philadelphia.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.875322,
+					"t_dtw": -1
+				},
+				{
+					"text": " In",
+					"timestamps": {
+						"from": "00:00:00,210",
+						"to": "00:00:00,210"
+					},
+					"offsets": {
+						"from": 210,
+						"to": 210
+					},
+					"id": 554,
+					"p": 0.975679,
+					"t_dtw": -1
+				},
+				{
+					"text": " May",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:00,520"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 520
+					},
+					"id": 1737,
+					"p": 0.992854,
+					"t_dtw": -1
+				},
+				{
+					"text": " 17",
+					"timestamps": {
+						"from": "00:00:00,520",
+						"to": "00:00:01,050"
+					},
+					"offsets": {
+						"from": 520,
+						"to": 1050
+					},
+					"id": 1596,
+					"p": 0.964052,
+					"t_dtw": -1
+				},
+				{
+					"text": "75",
+					"timestamps": {
+						"from": "00:00:01,150",
+						"to": "00:00:01,720"
+					},
+					"offsets": {
+						"from": 1150,
+						"to": 1720
+					},
+					"id": 2425,
+					"p": 0.999363,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,720",
+						"to": "00:00:01,790"
+					},
+					"offsets": {
+						"from": 1720,
+						"to": 1790
+					},
+					"id": 11,
+					"p": 0.924318,
+					"t_dtw": -1
+				},
+				{
+					"text": " he",
+					"timestamps": {
+						"from": "00:00:02,110",
+						"to": "00:00:02,110"
+					},
+					"offsets": {
+						"from": 2110,
+						"to": 2110
+					},
+					"id": 339,
+					"p": 0.925586,
+					"t_dtw": -1
+				},
+				{
+					"text": " rode",
+					"timestamps": {
+						"from": "00:00:02,180",
+						"to": "00:00:02,330"
+					},
+					"offsets": {
+						"from": 2180,
+						"to": 2330
+					},
+					"id": 22075,
+					"p": 0.946773,
+					"t_dtw": -1
+				},
+				{
+					"text": " out",
+					"timestamps": {
+						"from": "00:00:02,330",
+						"to": "00:00:02,490"
+					},
+					"offsets": {
+						"from": 2330,
+						"to": 2490
+					},
+					"id": 503,
+					"p": 0.995961,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:02,490",
+						"to": "00:00:02,580"
+					},
+					"offsets": {
+						"from": 2490,
+						"to": 2580
+					},
+					"id": 286,
+					"p": 0.990652,
+					"t_dtw": -1
+				},
+				{
+					"text": " Mount",
+					"timestamps": {
+						"from": "00:00:02,600",
+						"to": "00:00:02,850"
+					},
+					"offsets": {
+						"from": 2600,
+						"to": 2850
+					},
+					"id": 5628,
+					"p": 0.857422,
+					"t_dtw": -1
+				},
+				{
+					"text": " Vernon",
+					"timestamps": {
+						"from": "00:00:02,960",
+						"to": "00:00:03,230"
+					},
+					"offsets": {
+						"from": 2960,
+						"to": 3230
+					},
+					"id": 27820,
+					"p": 0.999859,
+					"t_dtw": -1
+				},
+				{
+					"text": " for",
+					"timestamps": {
+						"from": "00:00:03,310",
+						"to": "00:00:03,350"
+					},
+					"offsets": {
+						"from": 3310,
+						"to": 3350
+					},
+					"id": 329,
+					"p": 0.887608,
+					"t_dtw": -1
+				},
+				{
+					"text": " Congress",
+					"timestamps": {
+						"from": "00:00:03,400",
+						"to": "00:00:03,680"
+					},
+					"offsets": {
+						"from": 3400,
+						"to": 3680
+					},
+					"id": 3162,
+					"p": 0.956621,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:03,680",
+						"to": "00:00:03,860"
+					},
+					"offsets": {
+						"from": 3680,
+						"to": 3860
+					},
+					"id": 287,
+					"p": 0.943412,
+					"t_dtw": -1
+				},
+				{
+					"text": " Philadelphia",
+					"timestamps": {
+						"from": "00:00:03,930",
+						"to": "00:00:04,690"
+					},
+					"offsets": {
+						"from": 3930,
+						"to": 4690
+					},
+					"id": 8857,
+					"p": 0.992034,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,630",
+						"to": "00:00:05,720"
+					},
+					"offsets": {
+						"from": 5630,
+						"to": 5720
+					},
+					"id": 13,
+					"p": 0.991132,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_286]",
+					"timestamps": {
+						"from": "00:00:05,720",
+						"to": "00:00:05,720"
+					},
+					"offsets": {
+						"from": 5720,
+						"to": 5720
+					},
+					"id": 50649,
+					"p": 0.010573,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:05,720",
+				"to": "00:00:07,880"
+			},
+			"offsets": {
+				"from": 5720,
+				"to": 7880
+			},
+			"text": " Six weeks later, he was commanding an army.",
+			"tokens": [
+				{
+					"text": " Six",
+					"timestamps": {
+						"from": "00:00:05,760",
+						"to": "00:00:05,880"
+					},
+					"offsets": {
+						"from": 5760,
+						"to": 5880
+					},
+					"id": 9699,
+					"p": 0.996746,
+					"t_dtw": -1
+				},
+				{
+					"text": " weeks",
+					"timestamps": {
+						"from": "00:00:06,020",
+						"to": "00:00:06,150"
+					},
+					"offsets": {
+						"from": 6020,
+						"to": 6150
+					},
+					"id": 2745,
+					"p": 0.999577,
+					"t_dtw": -1
+				},
+				{
+					"text": " later",
+					"timestamps": {
+						"from": "00:00:06,150",
+						"to": "00:00:06,420"
+					},
+					"offsets": {
+						"from": 6150,
+						"to": 6420
+					},
+					"id": 1568,
+					"p": 0.999405,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:06,420",
+						"to": "00:00:06,530"
+					},
+					"offsets": {
+						"from": 6420,
+						"to": 6530
+					},
+					"id": 11,
+					"p": 0.93753,
+					"t_dtw": -1
+				},
+				{
+					"text": " he",
+					"timestamps": {
+						"from": "00:00:06,530",
+						"to": "00:00:06,620"
+					},
+					"offsets": {
+						"from": 6530,
+						"to": 6620
+					},
+					"id": 339,
+					"p": 0.998826,
+					"t_dtw": -1
+				},
+				{
+					"text": " was",
+					"timestamps": {
+						"from": "00:00:06,650",
+						"to": "00:00:06,770"
+					},
+					"offsets": {
+						"from": 6650,
+						"to": 6770
+					},
+					"id": 373,
+					"p": 0.99987,
+					"t_dtw": -1
+				},
+				{
+					"text": " commanding",
+					"timestamps": {
+						"from": "00:00:06,850",
+						"to": "00:00:07,350"
+					},
+					"offsets": {
+						"from": 6850,
+						"to": 7350
+					},
+					"id": 25771,
+					"p": 0.998422,
+					"t_dtw": -1
+				},
+				{
+					"text": " an",
+					"timestamps": {
+						"from": "00:00:07,350",
+						"to": "00:00:07,440"
+					},
+					"offsets": {
+						"from": 7350,
+						"to": 7440
+					},
+					"id": 281,
+					"p": 0.999531,
+					"t_dtw": -1
+				},
+				{
+					"text": " army",
+					"timestamps": {
+						"from": "00:00:07,440",
+						"to": "00:00:07,510"
+					},
+					"offsets": {
+						"from": 7440,
+						"to": 7510
+					},
+					"id": 5428,
+					"p": 0.921892,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:07,880",
+						"to": "00:00:07,880"
+					},
+					"offsets": {
+						"from": 7880,
+						"to": 7880
+					},
+					"id": 13,
+					"p": 0.991584,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_394]",
+					"timestamps": {
+						"from": "00:00:07,880",
+						"to": "00:00:07,880"
+					},
+					"offsets": {
+						"from": 7880,
+						"to": 7880
+					},
+					"id": 50757,
+					"p": 0.0932957,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

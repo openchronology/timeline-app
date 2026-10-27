@@ -1,0 +1,1190 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:06,860"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 6860
+			},
+			"text": " Then the longest band of his career, eight and a half years in command of the Continental Army.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.902064,
+					"t_dtw": -1
+				},
+				{
+					"text": " Then",
+					"timestamps": {
+						"from": "00:00:00,320",
+						"to": "00:00:00,320"
+					},
+					"offsets": {
+						"from": 320,
+						"to": 320
+					},
+					"id": 3244,
+					"p": 0.677747,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:00,330",
+						"to": "00:00:00,560"
+					},
+					"offsets": {
+						"from": 330,
+						"to": 560
+					},
+					"id": 262,
+					"p": 0.876876,
+					"t_dtw": -1
+				},
+				{
+					"text": " longest",
+					"timestamps": {
+						"from": "00:00:00,560",
+						"to": "00:00:01,060"
+					},
+					"offsets": {
+						"from": 560,
+						"to": 1060
+					},
+					"id": 14069,
+					"p": 0.999338,
+					"t_dtw": -1
+				},
+				{
+					"text": " band",
+					"timestamps": {
+						"from": "00:00:01,230",
+						"to": "00:00:01,440"
+					},
+					"offsets": {
+						"from": 1230,
+						"to": 1440
+					},
+					"id": 4097,
+					"p": 0.988915,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:01,440",
+						"to": "00:00:01,600"
+					},
+					"offsets": {
+						"from": 1440,
+						"to": 1600
+					},
+					"id": 286,
+					"p": 0.997324,
+					"t_dtw": -1
+				},
+				{
+					"text": " his",
+					"timestamps": {
+						"from": "00:00:01,600",
+						"to": "00:00:01,840"
+					},
+					"offsets": {
+						"from": 1600,
+						"to": 1840
+					},
+					"id": 465,
+					"p": 0.998715,
+					"t_dtw": -1
+				},
+				{
+					"text": " career",
+					"timestamps": {
+						"from": "00:00:01,840",
+						"to": "00:00:02,150"
+					},
+					"offsets": {
+						"from": 1840,
+						"to": 2150
+					},
+					"id": 3451,
+					"p": 0.998915,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,150",
+						"to": "00:00:02,480"
+					},
+					"offsets": {
+						"from": 2150,
+						"to": 2480
+					},
+					"id": 11,
+					"p": 0.580269,
+					"t_dtw": -1
+				},
+				{
+					"text": " eight",
+					"timestamps": {
+						"from": "00:00:02,750",
+						"to": "00:00:02,790"
+					},
+					"offsets": {
+						"from": 2750,
+						"to": 2790
+					},
+					"id": 3624,
+					"p": 0.527926,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:02,790",
+						"to": "00:00:02,920"
+					},
+					"offsets": {
+						"from": 2790,
+						"to": 2920
+					},
+					"id": 290,
+					"p": 0.858149,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:02,980",
+						"to": "00:00:03,040"
+					},
+					"offsets": {
+						"from": 2980,
+						"to": 3040
+					},
+					"id": 257,
+					"p": 0.946642,
+					"t_dtw": -1
+				},
+				{
+					"text": " half",
+					"timestamps": {
+						"from": "00:00:03,040",
+						"to": "00:00:03,290"
+					},
+					"offsets": {
+						"from": 3040,
+						"to": 3290
+					},
+					"id": 2063,
+					"p": 0.997611,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:03,290",
+						"to": "00:00:03,640"
+					},
+					"offsets": {
+						"from": 3290,
+						"to": 3640
+					},
+					"id": 812,
+					"p": 0.993477,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:03,640",
+						"to": "00:00:03,770"
+					},
+					"offsets": {
+						"from": 3640,
+						"to": 3770
+					},
+					"id": 287,
+					"p": 0.797392,
+					"t_dtw": -1
+				},
+				{
+					"text": " command",
+					"timestamps": {
+						"from": "00:00:04,020",
+						"to": "00:00:04,440"
+					},
+					"offsets": {
+						"from": 4020,
+						"to": 4440
+					},
+					"id": 3141,
+					"p": 0.973199,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:04,440",
+						"to": "00:00:04,710"
+					},
+					"offsets": {
+						"from": 4440,
+						"to": 4710
+					},
+					"id": 286,
+					"p": 0.828523,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:04,710",
+						"to": "00:00:04,820"
+					},
+					"offsets": {
+						"from": 4710,
+						"to": 4820
+					},
+					"id": 262,
+					"p": 0.926652,
+					"t_dtw": -1
+				},
+				{
+					"text": " Continental",
+					"timestamps": {
+						"from": "00:00:04,820",
+						"to": "00:00:05,510"
+					},
+					"offsets": {
+						"from": 4820,
+						"to": 5510
+					},
+					"id": 30462,
+					"p": 0.914416,
+					"t_dtw": -1
+				},
+				{
+					"text": " Army",
+					"timestamps": {
+						"from": "00:00:05,530",
+						"to": "00:00:05,770"
+					},
+					"offsets": {
+						"from": 5530,
+						"to": 5770
+					},
+					"id": 5407,
+					"p": 0.940479,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,770",
+						"to": "00:00:05,900"
+					},
+					"offsets": {
+						"from": 5770,
+						"to": 5900
+					},
+					"id": 13,
+					"p": 0.936651,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_343]",
+					"timestamps": {
+						"from": "00:00:06,860",
+						"to": "00:00:06,860"
+					},
+					"offsets": {
+						"from": 6860,
+						"to": 6860
+					},
+					"id": 50706,
+					"p": 0.0169685,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:06,860",
+				"to": "00:00:12,640"
+			},
+			"offsets": {
+				"from": 6860,
+				"to": 12640
+			},
+			"text": " Inside it, the siege of Boston, the loss of New York, and the ten crucial days.",
+			"tokens": [
+				{
+					"text": " Inside",
+					"timestamps": {
+						"from": "00:00:07,190",
+						"to": "00:00:07,340"
+					},
+					"offsets": {
+						"from": 7190,
+						"to": 7340
+					},
+					"id": 14384,
+					"p": 0.998365,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:07,340",
+						"to": "00:00:07,500"
+					},
+					"offsets": {
+						"from": 7340,
+						"to": 7500
+					},
+					"id": 340,
+					"p": 0.995968,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:07,500",
+						"to": "00:00:07,660"
+					},
+					"offsets": {
+						"from": 7500,
+						"to": 7660
+					},
+					"id": 11,
+					"p": 0.610263,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:07,660",
+						"to": "00:00:07,900"
+					},
+					"offsets": {
+						"from": 7660,
+						"to": 7900
+					},
+					"id": 262,
+					"p": 0.961795,
+					"t_dtw": -1
+				},
+				{
+					"text": " siege",
+					"timestamps": {
+						"from": "00:00:07,900",
+						"to": "00:00:08,300"
+					},
+					"offsets": {
+						"from": 7900,
+						"to": 8300
+					},
+					"id": 20690,
+					"p": 0.821549,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:08,300",
+						"to": "00:00:08,460"
+					},
+					"offsets": {
+						"from": 8300,
+						"to": 8460
+					},
+					"id": 286,
+					"p": 0.999344,
+					"t_dtw": -1
+				},
+				{
+					"text": " Boston",
+					"timestamps": {
+						"from": "00:00:08,460",
+						"to": "00:00:08,930"
+					},
+					"offsets": {
+						"from": 8460,
+						"to": 8930
+					},
+					"id": 6182,
+					"p": 0.999596,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:08,940",
+						"to": "00:00:09,020"
+					},
+					"offsets": {
+						"from": 8940,
+						"to": 9020
+					},
+					"id": 11,
+					"p": 0.992316,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:09,360",
+						"to": "00:00:09,360"
+					},
+					"offsets": {
+						"from": 9360,
+						"to": 9360
+					},
+					"id": 262,
+					"p": 0.955955,
+					"t_dtw": -1
+				},
+				{
+					"text": " loss",
+					"timestamps": {
+						"from": "00:00:09,610",
+						"to": "00:00:09,670"
+					},
+					"offsets": {
+						"from": 9610,
+						"to": 9670
+					},
+					"id": 2994,
+					"p": 0.996508,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:09,670",
+						"to": "00:00:09,780"
+					},
+					"offsets": {
+						"from": 9670,
+						"to": 9780
+					},
+					"id": 286,
+					"p": 0.999112,
+					"t_dtw": -1
+				},
+				{
+					"text": " New",
+					"timestamps": {
+						"from": "00:00:09,840",
+						"to": "00:00:10,070"
+					},
+					"offsets": {
+						"from": 9840,
+						"to": 10070
+					},
+					"id": 968,
+					"p": 0.999306,
+					"t_dtw": -1
+				},
+				{
+					"text": " York",
+					"timestamps": {
+						"from": "00:00:10,070",
+						"to": "00:00:10,380"
+					},
+					"offsets": {
+						"from": 10070,
+						"to": 10380
+					},
+					"id": 1971,
+					"p": 0.999287,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:10,380",
+						"to": "00:00:10,560"
+					},
+					"offsets": {
+						"from": 10380,
+						"to": 10560
+					},
+					"id": 11,
+					"p": 0.847447,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:10,560",
+						"to": "00:00:10,630"
+					},
+					"offsets": {
+						"from": 10560,
+						"to": 10630
+					},
+					"id": 290,
+					"p": 0.926418,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:10,880",
+						"to": "00:00:11,100"
+					},
+					"offsets": {
+						"from": 10880,
+						"to": 11100
+					},
+					"id": 262,
+					"p": 0.995537,
+					"t_dtw": -1
+				},
+				{
+					"text": " ten",
+					"timestamps": {
+						"from": "00:00:11,100",
+						"to": "00:00:11,370"
+					},
+					"offsets": {
+						"from": 11100,
+						"to": 11370
+					},
+					"id": 3478,
+					"p": 0.62731,
+					"t_dtw": -1
+				},
+				{
+					"text": " crucial",
+					"timestamps": {
+						"from": "00:00:11,370",
+						"to": "00:00:12,000"
+					},
+					"offsets": {
+						"from": 11370,
+						"to": 12000
+					},
+					"id": 8780,
+					"p": 0.995747,
+					"t_dtw": -1
+				},
+				{
+					"text": " days",
+					"timestamps": {
+						"from": "00:00:12,000",
+						"to": "00:00:12,350"
+					},
+					"offsets": {
+						"from": 12000,
+						"to": 12350
+					},
+					"id": 1528,
+					"p": 0.998298,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:12,350",
+						"to": "00:00:12,630"
+					},
+					"offsets": {
+						"from": 12350,
+						"to": 12630
+					},
+					"id": 13,
+					"p": 0.750524,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_632]",
+					"timestamps": {
+						"from": "00:00:12,640",
+						"to": "00:00:12,640"
+					},
+					"offsets": {
+						"from": 12640,
+						"to": 12640
+					},
+					"id": 50995,
+					"p": 0.0703259,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:12,640",
+				"to": "00:00:19,320"
+			},
+			"offsets": {
+				"from": 12640,
+				"to": 19320
+			},
+			"text": " The crossing of the Delaware on Christmas night, Trenton the next morning, Princeton eight days later.",
+			"tokens": [
+				{
+					"text": " The",
+					"timestamps": {
+						"from": "00:00:12,700",
+						"to": "00:00:12,820"
+					},
+					"offsets": {
+						"from": 12700,
+						"to": 12820
+					},
+					"id": 383,
+					"p": 0.994196,
+					"t_dtw": -1
+				},
+				{
+					"text": " crossing",
+					"timestamps": {
+						"from": "00:00:12,970",
+						"to": "00:00:13,330"
+					},
+					"offsets": {
+						"from": 12970,
+						"to": 13330
+					},
+					"id": 12538,
+					"p": 0.924758,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:13,330",
+						"to": "00:00:13,450"
+					},
+					"offsets": {
+						"from": 13330,
+						"to": 13450
+					},
+					"id": 286,
+					"p": 0.999073,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:13,450",
+						"to": "00:00:13,630"
+					},
+					"offsets": {
+						"from": 13450,
+						"to": 13630
+					},
+					"id": 262,
+					"p": 0.945419,
+					"t_dtw": -1
+				},
+				{
+					"text": " Delaware",
+					"timestamps": {
+						"from": "00:00:13,630",
+						"to": "00:00:14,140"
+					},
+					"offsets": {
+						"from": 13630,
+						"to": 14140
+					},
+					"id": 19603,
+					"p": 0.996438,
+					"t_dtw": -1
+				},
+				{
+					"text": " on",
+					"timestamps": {
+						"from": "00:00:14,140",
+						"to": "00:00:14,260"
+					},
+					"offsets": {
+						"from": 14140,
+						"to": 14260
+					},
+					"id": 319,
+					"p": 0.996789,
+					"t_dtw": -1
+				},
+				{
+					"text": " Christmas",
+					"timestamps": {
+						"from": "00:00:14,260",
+						"to": "00:00:14,780"
+					},
+					"offsets": {
+						"from": 14260,
+						"to": 14780
+					},
+					"id": 6786,
+					"p": 0.993165,
+					"t_dtw": -1
+				},
+				{
+					"text": " night",
+					"timestamps": {
+						"from": "00:00:14,780",
+						"to": "00:00:14,820"
+					},
+					"offsets": {
+						"from": 14780,
+						"to": 14820
+					},
+					"id": 1755,
+					"p": 0.958159,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:15,300",
+						"to": "00:00:15,300"
+					},
+					"offsets": {
+						"from": 15300,
+						"to": 15300
+					},
+					"id": 11,
+					"p": 0.97303,
+					"t_dtw": -1
+				},
+				{
+					"text": " Trent",
+					"timestamps": {
+						"from": "00:00:15,390",
+						"to": "00:00:15,560"
+					},
+					"offsets": {
+						"from": 15390,
+						"to": 15560
+					},
+					"id": 24269,
+					"p": 0.928131,
+					"t_dtw": -1
+				},
+				{
+					"text": "on",
+					"timestamps": {
+						"from": "00:00:15,620",
+						"to": "00:00:15,700"
+					},
+					"offsets": {
+						"from": 15620,
+						"to": 15700
+					},
+					"id": 261,
+					"p": 0.999607,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:15,700",
+						"to": "00:00:15,870"
+					},
+					"offsets": {
+						"from": 15700,
+						"to": 15870
+					},
+					"id": 262,
+					"p": 0.994302,
+					"t_dtw": -1
+				},
+				{
+					"text": " next",
+					"timestamps": {
+						"from": "00:00:15,870",
+						"to": "00:00:16,100"
+					},
+					"offsets": {
+						"from": 15870,
+						"to": 16100
+					},
+					"id": 1306,
+					"p": 0.993293,
+					"t_dtw": -1
+				},
+				{
+					"text": " morning",
+					"timestamps": {
+						"from": "00:00:16,100",
+						"to": "00:00:16,420"
+					},
+					"offsets": {
+						"from": 16100,
+						"to": 16420
+					},
+					"id": 3329,
+					"p": 0.99855,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:16,640",
+						"to": "00:00:16,640"
+					},
+					"offsets": {
+						"from": 16640,
+						"to": 16640
+					},
+					"id": 11,
+					"p": 0.991677,
+					"t_dtw": -1
+				},
+				{
+					"text": " Princeton",
+					"timestamps": {
+						"from": "00:00:16,660",
+						"to": "00:00:17,260"
+					},
+					"offsets": {
+						"from": 16660,
+						"to": 17260
+					},
+					"id": 23173,
+					"p": 0.925085,
+					"t_dtw": -1
+				},
+				{
+					"text": " eight",
+					"timestamps": {
+						"from": "00:00:17,260",
+						"to": "00:00:17,860"
+					},
+					"offsets": {
+						"from": 17260,
+						"to": 17860
+					},
+					"id": 3624,
+					"p": 0.88856,
+					"t_dtw": -1
+				},
+				{
+					"text": " days",
+					"timestamps": {
+						"from": "00:00:17,860",
+						"to": "00:00:18,340"
+					},
+					"offsets": {
+						"from": 17860,
+						"to": 18340
+					},
+					"id": 1528,
+					"p": 0.997834,
+					"t_dtw": -1
+				},
+				{
+					"text": " later",
+					"timestamps": {
+						"from": "00:00:18,340",
+						"to": "00:00:18,530"
+					},
+					"offsets": {
+						"from": 18340,
+						"to": 18530
+					},
+					"id": 1568,
+					"p": 0.998597,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:18,950",
+						"to": "00:00:19,050"
+					},
+					"offsets": {
+						"from": 18950,
+						"to": 19050
+					},
+					"id": 13,
+					"p": 0.982182,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_966]",
+					"timestamps": {
+						"from": "00:00:19,320",
+						"to": "00:00:19,320"
+					},
+					"offsets": {
+						"from": 19320,
+						"to": 19320
+					},
+					"id": 51329,
+					"p": 0.0652984,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:19,320",
+				"to": "00:00:23,320"
+			},
+			"offsets": {
+				"from": 19320,
+				"to": 23320
+			},
+			"text": " Then Valley Forge, Monmouth, and the surrender at Yorktown.",
+			"tokens": [
+				{
+					"text": " Then",
+					"timestamps": {
+						"from": "00:00:19,610",
+						"to": "00:00:19,610"
+					},
+					"offsets": {
+						"from": 19610,
+						"to": 19610
+					},
+					"id": 3244,
+					"p": 0.937966,
+					"t_dtw": -1
+				},
+				{
+					"text": " Valley",
+					"timestamps": {
+						"from": "00:00:19,650",
+						"to": "00:00:20,040"
+					},
+					"offsets": {
+						"from": 19650,
+						"to": 20040
+					},
+					"id": 6916,
+					"p": 0.933209,
+					"t_dtw": -1
+				},
+				{
+					"text": " Forge",
+					"timestamps": {
+						"from": "00:00:20,040",
+						"to": "00:00:20,380"
+					},
+					"offsets": {
+						"from": 20040,
+						"to": 20380
+					},
+					"id": 24855,
+					"p": 0.993734,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:20,400",
+						"to": "00:00:20,430"
+					},
+					"offsets": {
+						"from": 20400,
+						"to": 20430
+					},
+					"id": 11,
+					"p": 0.936888,
+					"t_dtw": -1
+				},
+				{
+					"text": " Mon",
+					"timestamps": {
+						"from": "00:00:20,550",
+						"to": "00:00:20,750"
+					},
+					"offsets": {
+						"from": 20550,
+						"to": 20750
+					},
+					"id": 2892,
+					"p": 0.993132,
+					"t_dtw": -1
+				},
+				{
+					"text": "mouth",
+					"timestamps": {
+						"from": "00:00:20,750",
+						"to": "00:00:21,050"
+					},
+					"offsets": {
+						"from": 20750,
+						"to": 21050
+					},
+					"id": 14775,
+					"p": 0.997004,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:21,110",
+						"to": "00:00:21,250"
+					},
+					"offsets": {
+						"from": 21110,
+						"to": 21250
+					},
+					"id": 11,
+					"p": 0.896459,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:21,250",
+						"to": "00:00:21,460"
+					},
+					"offsets": {
+						"from": 21250,
+						"to": 21460
+					},
+					"id": 290,
+					"p": 0.997263,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:21,460",
+						"to": "00:00:21,500"
+					},
+					"offsets": {
+						"from": 21460,
+						"to": 21500
+					},
+					"id": 262,
+					"p": 0.947384,
+					"t_dtw": -1
+				},
+				{
+					"text": " surrender",
+					"timestamps": {
+						"from": "00:00:22,070",
+						"to": "00:00:22,320"
+					},
+					"offsets": {
+						"from": 22070,
+						"to": 22320
+					},
+					"id": 16908,
+					"p": 0.982396,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:22,320",
+						"to": "00:00:22,460"
+					},
+					"offsets": {
+						"from": 22320,
+						"to": 22460
+					},
+					"id": 379,
+					"p": 0.997817,
+					"t_dtw": -1
+				},
+				{
+					"text": " York",
+					"timestamps": {
+						"from": "00:00:22,460",
+						"to": "00:00:22,750"
+					},
+					"offsets": {
+						"from": 22460,
+						"to": 22750
+					},
+					"id": 1971,
+					"p": 0.996115,
+					"t_dtw": -1
+				},
+				{
+					"text": "town",
+					"timestamps": {
+						"from": "00:00:22,750",
+						"to": "00:00:23,040"
+					},
+					"offsets": {
+						"from": 22750,
+						"to": 23040
+					},
+					"id": 12735,
+					"p": 0.992809,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:23,040",
+						"to": "00:00:23,090"
+					},
+					"offsets": {
+						"from": 23040,
+						"to": 23090
+					},
+					"id": 13,
+					"p": 0.975511,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_1166]",
+					"timestamps": {
+						"from": "00:00:23,320",
+						"to": "00:00:23,320"
+					},
+					"offsets": {
+						"from": 23320,
+						"to": 23320
+					},
+					"id": 51529,
+					"p": 0.0150855,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

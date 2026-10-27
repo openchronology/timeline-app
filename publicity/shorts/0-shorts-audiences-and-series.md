@@ -67,6 +67,7 @@ Ten shorts. Three storyboard shapes, so the feed doesn't see the same video twic
 | 8   | **2 a.m. Everything's down.**           | Zoom   | Developers, operations | Terminal  | ~0:35   | "2 a.m. Everything's down. What broke first?"     | 10 · Logs            |
 | 9   | **I asked an AI to build a timeline**   | Zoom   | AI, developers         | Terminal  | ~0:41   | "I asked an AI to build a timeline"               | 12 · AI, automation  |
 | 10  | **Why did it happen?**                  | Stat   | Investigators, safety  | Terminal  | ~0:43   | "Why did it happen?"                              | 13 · Investigations  |
+| 14  | **Six years without going home**        | Zoom   | History, everyone      | Archive   | ~0:40   | "Washington didn't go home for 6 years"           | 17 · Washington tour |
 
 **Order of release (suggested):** 1 and 2 first (the widest feeds, and both end on the same line from eons to seconds), then 4 and 3 (the strongest single facts), then 5, 8, 6 and 7, then 9 and 10. Two or three a week; post each on all three platforms the same day.
 

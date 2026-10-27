@@ -1,0 +1,1064 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:06,400"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 6400
+			},
+			"text": " Zoom into his youth, the move to Ferry Farm, his father's death when he was 11, his first",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.964165,
+					"t_dtw": -1
+				},
+				{
+					"text": " Zoom",
+					"timestamps": {
+						"from": "00:00:00,150",
+						"to": "00:00:00,380"
+					},
+					"offsets": {
+						"from": 150,
+						"to": 380
+					},
+					"id": 40305,
+					"p": 0.915495,
+					"t_dtw": -1
+				},
+				{
+					"text": " into",
+					"timestamps": {
+						"from": "00:00:00,380",
+						"to": "00:00:00,760"
+					},
+					"offsets": {
+						"from": 380,
+						"to": 760
+					},
+					"id": 656,
+					"p": 0.989244,
+					"t_dtw": -1
+				},
+				{
+					"text": " his",
+					"timestamps": {
+						"from": "00:00:00,760",
+						"to": "00:00:01,040"
+					},
+					"offsets": {
+						"from": 760,
+						"to": 1040
+					},
+					"id": 465,
+					"p": 0.99552,
+					"t_dtw": -1
+				},
+				{
+					"text": " youth",
+					"timestamps": {
+						"from": "00:00:01,040",
+						"to": "00:00:01,190"
+					},
+					"offsets": {
+						"from": 1040,
+						"to": 1190
+					},
+					"id": 6205,
+					"p": 0.998096,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,190",
+						"to": "00:00:01,720"
+					},
+					"offsets": {
+						"from": 1190,
+						"to": 1720
+					},
+					"id": 11,
+					"p": 0.295112,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:01,880",
+						"to": "00:00:01,970"
+					},
+					"offsets": {
+						"from": 1880,
+						"to": 1970
+					},
+					"id": 262,
+					"p": 0.889675,
+					"t_dtw": -1
+				},
+				{
+					"text": " move",
+					"timestamps": {
+						"from": "00:00:01,970",
+						"to": "00:00:02,260"
+					},
+					"offsets": {
+						"from": 1970,
+						"to": 2260
+					},
+					"id": 1445,
+					"p": 0.9962,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:02,310",
+						"to": "00:00:02,440"
+					},
+					"offsets": {
+						"from": 2310,
+						"to": 2440
+					},
+					"id": 284,
+					"p": 0.99449,
+					"t_dtw": -1
+				},
+				{
+					"text": " Ferry",
+					"timestamps": {
+						"from": "00:00:02,560",
+						"to": "00:00:02,830"
+					},
+					"offsets": {
+						"from": 2560,
+						"to": 2830
+					},
+					"id": 42609,
+					"p": 0.868528,
+					"t_dtw": -1
+				},
+				{
+					"text": " Farm",
+					"timestamps": {
+						"from": "00:00:02,960",
+						"to": "00:00:03,240"
+					},
+					"offsets": {
+						"from": 2960,
+						"to": 3240
+					},
+					"id": 11272,
+					"p": 0.973258,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,240",
+						"to": "00:00:03,310"
+					},
+					"offsets": {
+						"from": 3240,
+						"to": 3310
+					},
+					"id": 11,
+					"p": 0.927957,
+					"t_dtw": -1
+				},
+				{
+					"text": " his",
+					"timestamps": {
+						"from": "00:00:03,590",
+						"to": "00:00:03,620"
+					},
+					"offsets": {
+						"from": 3590,
+						"to": 3620
+					},
+					"id": 465,
+					"p": 0.638041,
+					"t_dtw": -1
+				},
+				{
+					"text": " father",
+					"timestamps": {
+						"from": "00:00:03,620",
+						"to": "00:00:03,990"
+					},
+					"offsets": {
+						"from": 3620,
+						"to": 3990
+					},
+					"id": 2988,
+					"p": 0.996136,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:03,990",
+						"to": "00:00:04,120"
+					},
+					"offsets": {
+						"from": 3990,
+						"to": 4120
+					},
+					"id": 338,
+					"p": 0.998687,
+					"t_dtw": -1
+				},
+				{
+					"text": " death",
+					"timestamps": {
+						"from": "00:00:04,120",
+						"to": "00:00:04,400"
+					},
+					"offsets": {
+						"from": 4120,
+						"to": 4400
+					},
+					"id": 1918,
+					"p": 0.949233,
+					"t_dtw": -1
+				},
+				{
+					"text": " when",
+					"timestamps": {
+						"from": "00:00:04,400",
+						"to": "00:00:04,640"
+					},
+					"offsets": {
+						"from": 4400,
+						"to": 4640
+					},
+					"id": 618,
+					"p": 0.907064,
+					"t_dtw": -1
+				},
+				{
+					"text": " he",
+					"timestamps": {
+						"from": "00:00:04,640",
+						"to": "00:00:04,760"
+					},
+					"offsets": {
+						"from": 4640,
+						"to": 4760
+					},
+					"id": 339,
+					"p": 0.989659,
+					"t_dtw": -1
+				},
+				{
+					"text": " was",
+					"timestamps": {
+						"from": "00:00:04,760",
+						"to": "00:00:04,960"
+					},
+					"offsets": {
+						"from": 4760,
+						"to": 4960
+					},
+					"id": 373,
+					"p": 0.992154,
+					"t_dtw": -1
+				},
+				{
+					"text": " 11",
+					"timestamps": {
+						"from": "00:00:04,960",
+						"to": "00:00:05,410"
+					},
+					"offsets": {
+						"from": 4960,
+						"to": 5410
+					},
+					"id": 1367,
+					"p": 0.934718,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:05,680",
+						"to": "00:00:05,680"
+					},
+					"offsets": {
+						"from": 5680,
+						"to": 5680
+					},
+					"id": 11,
+					"p": 0.938929,
+					"t_dtw": -1
+				},
+				{
+					"text": " his",
+					"timestamps": {
+						"from": "00:00:05,890",
+						"to": "00:00:06,000"
+					},
+					"offsets": {
+						"from": 5890,
+						"to": 6000
+					},
+					"id": 465,
+					"p": 0.628069,
+					"t_dtw": -1
+				},
+				{
+					"text": " first",
+					"timestamps": {
+						"from": "00:00:06,000",
+						"to": "00:00:06,380"
+					},
+					"offsets": {
+						"from": 6000,
+						"to": 6380
+					},
+					"id": 717,
+					"p": 0.871982,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_320]",
+					"timestamps": {
+						"from": "00:00:06,400",
+						"to": "00:00:06,400"
+					},
+					"offsets": {
+						"from": 6400,
+						"to": 6400
+					},
+					"id": 50683,
+					"p": 0.191715,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:06,400",
+				"to": "00:00:12,480"
+			},
+			"offsets": {
+				"from": 6400,
+				"to": 12480
+			},
+			"text": " surveying trip over the Blue Ridge at 16, the voyage to Barbados with his brother Lawrence,",
+			"tokens": [
+				{
+					"text": " surve",
+					"timestamps": {
+						"from": "00:00:06,550",
+						"to": "00:00:06,770"
+					},
+					"offsets": {
+						"from": 6550,
+						"to": 6770
+					},
+					"id": 6549,
+					"p": 0.99786,
+					"t_dtw": -1
+				},
+				{
+					"text": "ying",
+					"timestamps": {
+						"from": "00:00:06,770",
+						"to": "00:00:07,040"
+					},
+					"offsets": {
+						"from": 6770,
+						"to": 7040
+					},
+					"id": 1112,
+					"p": 0.999706,
+					"t_dtw": -1
+				},
+				{
+					"text": " trip",
+					"timestamps": {
+						"from": "00:00:07,070",
+						"to": "00:00:07,350"
+					},
+					"offsets": {
+						"from": 7070,
+						"to": 7350
+					},
+					"id": 5296,
+					"p": 0.999491,
+					"t_dtw": -1
+				},
+				{
+					"text": " over",
+					"timestamps": {
+						"from": "00:00:07,350",
+						"to": "00:00:07,540"
+					},
+					"offsets": {
+						"from": 7350,
+						"to": 7540
+					},
+					"id": 625,
+					"p": 0.998121,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:07,540",
+						"to": "00:00:07,730"
+					},
+					"offsets": {
+						"from": 7540,
+						"to": 7730
+					},
+					"id": 262,
+					"p": 0.988859,
+					"t_dtw": -1
+				},
+				{
+					"text": " Blue",
+					"timestamps": {
+						"from": "00:00:08,030",
+						"to": "00:00:08,030"
+					},
+					"offsets": {
+						"from": 8030,
+						"to": 8030
+					},
+					"id": 4518,
+					"p": 0.967453,
+					"t_dtw": -1
+				},
+				{
+					"text": " Ridge",
+					"timestamps": {
+						"from": "00:00:08,300",
+						"to": "00:00:08,520"
+					},
+					"offsets": {
+						"from": 8300,
+						"to": 8520
+					},
+					"id": 20614,
+					"p": 0.994898,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:08,520",
+						"to": "00:00:08,660"
+					},
+					"offsets": {
+						"from": 8520,
+						"to": 8660
+					},
+					"id": 379,
+					"p": 0.996326,
+					"t_dtw": -1
+				},
+				{
+					"text": " 16",
+					"timestamps": {
+						"from": "00:00:08,660",
+						"to": "00:00:09,100"
+					},
+					"offsets": {
+						"from": 8660,
+						"to": 9100
+					},
+					"id": 1467,
+					"p": 0.987323,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:09,100",
+						"to": "00:00:09,230"
+					},
+					"offsets": {
+						"from": 9100,
+						"to": 9230
+					},
+					"id": 11,
+					"p": 0.98015,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:09,360",
+						"to": "00:00:09,460"
+					},
+					"offsets": {
+						"from": 9360,
+						"to": 9460
+					},
+					"id": 262,
+					"p": 0.971182,
+					"t_dtw": -1
+				},
+				{
+					"text": " voyage",
+					"timestamps": {
+						"from": "00:00:09,460",
+						"to": "00:00:09,710"
+					},
+					"offsets": {
+						"from": 9460,
+						"to": 9710
+					},
+					"id": 31505,
+					"p": 0.994594,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:09,990",
+						"to": "00:00:10,040"
+					},
+					"offsets": {
+						"from": 9990,
+						"to": 10040
+					},
+					"id": 284,
+					"p": 0.997463,
+					"t_dtw": -1
+				},
+				{
+					"text": " Barb",
+					"timestamps": {
+						"from": "00:00:10,040",
+						"to": "00:00:10,320"
+					},
+					"offsets": {
+						"from": 10040,
+						"to": 10320
+					},
+					"id": 10593,
+					"p": 0.991684,
+					"t_dtw": -1
+				},
+				{
+					"text": "ados",
+					"timestamps": {
+						"from": "00:00:10,360",
+						"to": "00:00:10,500"
+					},
+					"offsets": {
+						"from": 10360,
+						"to": 10500
+					},
+					"id": 22484,
+					"p": 0.825488,
+					"t_dtw": -1
+				},
+				{
+					"text": " with",
+					"timestamps": {
+						"from": "00:00:10,620",
+						"to": "00:00:10,820"
+					},
+					"offsets": {
+						"from": 10620,
+						"to": 10820
+					},
+					"id": 351,
+					"p": 0.992839,
+					"t_dtw": -1
+				},
+				{
+					"text": " his",
+					"timestamps": {
+						"from": "00:00:10,950",
+						"to": "00:00:11,130"
+					},
+					"offsets": {
+						"from": 10950,
+						"to": 11130
+					},
+					"id": 465,
+					"p": 0.997366,
+					"t_dtw": -1
+				},
+				{
+					"text": " brother",
+					"timestamps": {
+						"from": "00:00:11,130",
+						"to": "00:00:11,650"
+					},
+					"offsets": {
+						"from": 11130,
+						"to": 11650
+					},
+					"id": 3956,
+					"p": 0.995963,
+					"t_dtw": -1
+				},
+				{
+					"text": " Lawrence",
+					"timestamps": {
+						"from": "00:00:11,650",
+						"to": "00:00:12,360"
+					},
+					"offsets": {
+						"from": 11650,
+						"to": 12360
+					},
+					"id": 13914,
+					"p": 0.583548,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:12,360",
+						"to": "00:00:12,460"
+					},
+					"offsets": {
+						"from": 12360,
+						"to": 12460
+					},
+					"id": 11,
+					"p": 0.840138,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_624]",
+					"timestamps": {
+						"from": "00:00:12,480",
+						"to": "00:00:12,480"
+					},
+					"offsets": {
+						"from": 12480,
+						"to": 12480
+					},
+					"id": 50987,
+					"p": 0.0806239,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:12,480",
+				"to": "00:00:18,360"
+			},
+			"offsets": {
+				"from": 12480,
+				"to": 18360
+			},
+			"text": " where George caught smallpox, and Lawrence's death in 1752, which in the end brought him",
+			"tokens": [
+				{
+					"text": " where",
+					"timestamps": {
+						"from": "00:00:12,630",
+						"to": "00:00:12,830"
+					},
+					"offsets": {
+						"from": 12630,
+						"to": 12830
+					},
+					"id": 810,
+					"p": 0.99878,
+					"t_dtw": -1
+				},
+				{
+					"text": " George",
+					"timestamps": {
+						"from": "00:00:12,830",
+						"to": "00:00:13,240"
+					},
+					"offsets": {
+						"from": 12830,
+						"to": 13240
+					},
+					"id": 4502,
+					"p": 0.999275,
+					"t_dtw": -1
+				},
+				{
+					"text": " caught",
+					"timestamps": {
+						"from": "00:00:13,240",
+						"to": "00:00:13,610"
+					},
+					"offsets": {
+						"from": 13240,
+						"to": 13610
+					},
+					"id": 4978,
+					"p": 0.998201,
+					"t_dtw": -1
+				},
+				{
+					"text": " small",
+					"timestamps": {
+						"from": "00:00:13,630",
+						"to": "00:00:13,680"
+					},
+					"offsets": {
+						"from": 13630,
+						"to": 13680
+					},
+					"id": 1402,
+					"p": 0.953828,
+					"t_dtw": -1
+				},
+				{
+					"text": "pox",
+					"timestamps": {
+						"from": "00:00:13,680",
+						"to": "00:00:14,200"
+					},
+					"offsets": {
+						"from": 13680,
+						"to": 14200
+					},
+					"id": 42557,
+					"p": 0.950609,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:14,330",
+						"to": "00:00:14,330"
+					},
+					"offsets": {
+						"from": 14330,
+						"to": 14330
+					},
+					"id": 11,
+					"p": 0.823017,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:14,390",
+						"to": "00:00:14,540"
+					},
+					"offsets": {
+						"from": 14390,
+						"to": 14540
+					},
+					"id": 290,
+					"p": 0.997651,
+					"t_dtw": -1
+				},
+				{
+					"text": " Lawrence",
+					"timestamps": {
+						"from": "00:00:14,540",
+						"to": "00:00:15,090"
+					},
+					"offsets": {
+						"from": 14540,
+						"to": 15090
+					},
+					"id": 13914,
+					"p": 0.990681,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:15,090",
+						"to": "00:00:15,220"
+					},
+					"offsets": {
+						"from": 15090,
+						"to": 15220
+					},
+					"id": 338,
+					"p": 0.992941,
+					"t_dtw": -1
+				},
+				{
+					"text": " death",
+					"timestamps": {
+						"from": "00:00:15,220",
+						"to": "00:00:15,570"
+					},
+					"offsets": {
+						"from": 15220,
+						"to": 15570
+					},
+					"id": 1918,
+					"p": 0.997014,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:15,570",
+						"to": "00:00:15,710"
+					},
+					"offsets": {
+						"from": 15570,
+						"to": 15710
+					},
+					"id": 287,
+					"p": 0.997107,
+					"t_dtw": -1
+				},
+				{
+					"text": " 17",
+					"timestamps": {
+						"from": "00:00:15,710",
+						"to": "00:00:16,120"
+					},
+					"offsets": {
+						"from": 15710,
+						"to": 16120
+					},
+					"id": 1596,
+					"p": 0.999409,
+					"t_dtw": -1
+				},
+				{
+					"text": "52",
+					"timestamps": {
+						"from": "00:00:16,120",
+						"to": "00:00:16,530"
+					},
+					"offsets": {
+						"from": 16120,
+						"to": 16530
+					},
+					"id": 4309,
+					"p": 0.998811,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:16,530",
+						"to": "00:00:16,600"
+					},
+					"offsets": {
+						"from": 16530,
+						"to": 16600
+					},
+					"id": 11,
+					"p": 0.918925,
+					"t_dtw": -1
+				},
+				{
+					"text": " which",
+					"timestamps": {
+						"from": "00:00:16,700",
+						"to": "00:00:16,900"
+					},
+					"offsets": {
+						"from": 16700,
+						"to": 16900
+					},
+					"id": 543,
+					"p": 0.992333,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:17,030",
+						"to": "00:00:17,150"
+					},
+					"offsets": {
+						"from": 17030,
+						"to": 17150
+					},
+					"id": 287,
+					"p": 0.949204,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:17,150",
+						"to": "00:00:17,360"
+					},
+					"offsets": {
+						"from": 17150,
+						"to": 17360
+					},
+					"id": 262,
+					"p": 0.999157,
+					"t_dtw": -1
+				},
+				{
+					"text": " end",
+					"timestamps": {
+						"from": "00:00:17,360",
+						"to": "00:00:17,570"
+					},
+					"offsets": {
+						"from": 17360,
+						"to": 17570
+					},
+					"id": 886,
+					"p": 0.999615,
+					"t_dtw": -1
+				},
+				{
+					"text": " brought",
+					"timestamps": {
+						"from": "00:00:17,570",
+						"to": "00:00:17,890"
+					},
+					"offsets": {
+						"from": 17570,
+						"to": 17890
+					},
+					"id": 3181,
+					"p": 0.97955,
+					"t_dtw": -1
+				},
+				{
+					"text": " him",
+					"timestamps": {
+						"from": "00:00:18,360",
+						"to": "00:00:18,360"
+					},
+					"offsets": {
+						"from": 18360,
+						"to": 18360
+					},
+					"id": 683,
+					"p": 0.995851,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_918]",
+					"timestamps": {
+						"from": "00:00:18,360",
+						"to": "00:00:18,360"
+					},
+					"offsets": {
+						"from": 18360,
+						"to": 18360
+					},
+					"id": 51281,
+					"p": 0.340438,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:18,360",
+				"to": "00:00:19,080"
+			},
+			"offsets": {
+				"from": 18360,
+				"to": 19080
+			},
+			"text": " Mount Vernon.",
+			"tokens": [
+				{
+					"text": " Mount",
+					"timestamps": {
+						"from": "00:00:18,510",
+						"to": "00:00:18,610"
+					},
+					"offsets": {
+						"from": 18510,
+						"to": 18610
+					},
+					"id": 5628,
+					"p": 0.947538,
+					"t_dtw": -1
+				},
+				{
+					"text": " Vernon",
+					"timestamps": {
+						"from": "00:00:18,610",
+						"to": "00:00:18,910"
+					},
+					"offsets": {
+						"from": 18610,
+						"to": 18910
+					},
+					"id": 27820,
+					"p": 0.999781,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:18,910",
+						"to": "00:00:19,080"
+					},
+					"offsets": {
+						"from": 18910,
+						"to": 19080
+					},
+					"id": 13,
+					"p": 0.992012,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_954]",
+					"timestamps": {
+						"from": "00:00:19,080",
+						"to": "00:00:19,080"
+					},
+					"offsets": {
+						"from": 19080,
+						"to": 19080
+					},
+					"id": 51317,
+					"p": 0.173872,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

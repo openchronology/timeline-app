@@ -1,0 +1,3028 @@
+{
+ "format": "openchronology",
+ "version": 1,
+ "title": "George Washington, 1732–1799",
+ "description": "A biography of George Washington on one line: his Virginia boyhood and surveying, the Virginia Regiment and the French and Indian War, Mount Vernon and the people enslaved there, the House of Burgesses, eight and a half years in command of the Continental Army, the Constitutional Convention, two terms as the first president, and his last years and will. A sample built from the cited sources, chiefly Wikipedia, the Papers of George Washington (Founders Online) and Mount Vernon’s research library.\n\n**How to read it.** Chapter headings mark the stages of his life. His life’s stages, homes, commands, offices, campaigns and family are durations; everything else is a moment with its sources. Related events (a battle and the one it led to) are linked. Colours follow the first tag: family, land, slavery, war, politics and the presidency, writing, and the wider world.\n\n**Dates.** Days in Virginia time, approximated as a fixed UTC−5. Britain and its colonies used the Julian calendar (Old Style) until September 1752; dates before then are converted to the Gregorian calendar, and the date as written at the time is kept as each moment’s original historical date. He was born on 11 February 1731/32, Old Style: 22 February 1732.",
+ "presentation": {
+  "mode": "gregorian",
+  "unit": "",
+  "scale": "1/1",
+  "origin": "0/1",
+  "version": 1,
+  "offsetMinutes": -300,
+  "significantDigits": 6
+ },
+ "tags": [
+  "history",
+  "biography",
+  "united states",
+  "george washington",
+  "education"
+ ],
+ "plugins": [
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "rich-text-notes",
+    "version": 1,
+    "name": "Rich text notes",
+    "description": "Edit moment and stack notes visually, storing portable Markdown. Hover cards render safe headings, emphasis, lists, code and HTTPS links. HTML and images are not executed.",
+    "fields": [],
+    "notes": {
+     "kind": "markdown"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-headings",
+    "version": 1,
+    "name": "Headings",
+    "description": "Let a moment act as a heading or marker: only its title shows, sized as a heading from level 1 to 6, and the title is what you click. Choose its font (Times New Roman by default). Headings still group into summaries with other moments.",
+    "fields": [
+     {
+      "kind": "heading",
+      "metadataKey": "headingLevel",
+      "label": "Heading level"
+     },
+     {
+      "kind": "font",
+      "metadataKey": "headingFont",
+      "label": "Heading font"
+     }
+    ],
+    "marker": {
+     "kind": "heading",
+     "metadataKey": "headingLevel"
+    },
+    "targets": [
+     "moments"
+    ]
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-colors",
+    "version": 2,
+    "name": "Moment colors",
+    "description": "Choose muted semantic swatches or a custom color for moments and stack entries while preserving their white borders.",
+    "fields": [
+     {
+      "kind": "color",
+      "metadataKey": "color",
+      "label": "Moment color"
+     }
+    ],
+    "marker": {
+     "kind": "color",
+     "metadataKey": "color"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.color(api.get(\"color\")); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-sources",
+    "version": 1,
+    "name": "Sources",
+    "description": "Show and edit a series of source links for moments and stack entries.",
+    "fields": [
+     {
+      "kind": "links",
+      "metadataKey": "sources",
+      "label": "Sources"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "dating-context",
+    "version": 1,
+    "name": "Dating context",
+    "description": "Explain the precision and coordinate convention of a moment. An exact stored coordinate can still represent an approximate age or a calendar-day marker.",
+    "fields": [
+     {
+      "kind": "text",
+      "metadataKey": "datePrecision",
+      "label": "Date precision"
+     },
+     {
+      "kind": "multiline",
+      "metadataKey": "coordinateConvention",
+      "label": "Coordinate convention"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "historical-dates",
+    "version": 1,
+    "name": "Historical dates",
+    "description": "Retain an original historical date and its calendar separately from the timeline coordinate and display calendar, such as a Julian date on a Gregorian timeline.",
+    "fields": [
+     {
+      "kind": "text",
+      "metadataKey": "historicalDate",
+      "label": "Original historical date"
+     },
+     {
+      "kind": "text",
+      "metadataKey": "calendar",
+      "label": "Original calendar"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "expand-on-hover",
+    "version": 1,
+    "name": "Expand on hover",
+    "description": "Hover or focus a summary of two to five moments to fan out its members radially for individual inspection. Larger summaries stay collapsed.",
+    "fields": [],
+    "summary": {
+     "kind": "radial"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.expand(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "timeline-theme",
+    "version": 2,
+    "name": "Timeline theme",
+    "description": "Choose the timeline's colors, fonts and text sizes: its labels, its measure (the axis, tick marks and their times), the halo that keeps them readable over images, the default marker and duration colors, and a background color. Set them here in the plugin list; anything left blank keeps the usual look, and colors chosen for events still win.",
+    "fields": [],
+    "settings": [
+     {
+      "kind": "color",
+      "key": "textColor",
+      "label": "Label color"
+     },
+     {
+      "kind": "font",
+      "key": "textFont",
+      "label": "Label font"
+     },
+     {
+      "kind": "text-size",
+      "key": "textSize",
+      "label": "Label size"
+     },
+     {
+      "kind": "color",
+      "key": "measureColor",
+      "label": "Measure color"
+     },
+     {
+      "kind": "font",
+      "key": "measureFont",
+      "label": "Measure font"
+     },
+     {
+      "kind": "text-size",
+      "key": "measureSize",
+      "label": "Measure size"
+     },
+     {
+      "kind": "color",
+      "key": "haloColor",
+      "label": "Halo color"
+     },
+     {
+      "kind": "color",
+      "key": "markerColor",
+      "label": "Marker color"
+     },
+     {
+      "kind": "color",
+      "key": "durationColor",
+      "label": "Duration color"
+     },
+     {
+      "kind": "color",
+      "key": "backgroundColor",
+      "label": "Background color"
+     }
+    ],
+    "theme": {
+     "text": "textColor",
+     "textFont": "textFont",
+     "textSize": "textSize",
+     "measure": "measureColor",
+     "measureFont": "measureFont",
+     "measureSize": "measureSize",
+     "halo": "haloColor",
+     "marker": "markerColor",
+     "duration": "durationColor",
+     "background": "backgroundColor"
+    }
+   },
+   "enabled": true,
+   "settings": {
+    "textColor": "#1f2a44",
+    "textFont": "Georgia, serif",
+    "measureColor": "#9c3b2a",
+    "haloColor": "#f3ead7",
+    "markerColor": "#1f3a5f",
+    "durationColor": "#9c3b2a",
+    "backgroundColor": "#f3ead7"
+   }
+  }
+ ],
+ "events": [
+  {
+   "id": "h-youth",
+   "time": "-7510561200/1",
+   "metadata": {
+    "title": "Youth in Virginia",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "birth",
+   "time": "-7506068400/1",
+   "metadata": {
+    "title": "Born at Popes Creek",
+    "description": "**George Washington** is born at Popes Creek, Westmoreland County, Virginia, the first child of **Augustine Washington** and his second wife, **Mary Ball Washington**. The date was written at the time as 11 February 1731/32, in the Old Style; on the Gregorian calendar it is 22 February 1732, the birthday he kept after 1752.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington",
+     "https://en.wikipedia.org/wiki/George_Washington_Birthplace_National_Monument"
+    ],
+    "color": "#a8742a",
+    "datePrecision": "Gregorian date; Old Style 11 February 1731/32 (the year began on 25 March)",
+    "historicalDate": "11 February 1731/32",
+    "calendar": "Julian (Old Style)"
+   }
+  },
+  {
+   "id": "hunting-creek",
+   "time": "-7415866800/1",
+   "metadata": {
+    "title": "Move to Little Hunting Creek",
+    "description": "The family moves up the Potomac to Augustine’s plantation on **Little Hunting Creek**, the land that later became Mount Vernon.",
+    "tags": [
+     "family",
+     "land"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mount_Vernon"
+    ],
+    "color": "#a8742a",
+    "datePrecision": "Year only",
+    "historicalDate": "1735",
+    "calendar": "Julian (Old Style)"
+   }
+  },
+  {
+   "id": "ferry-farm",
+   "time": "-7292314800/1",
+   "metadata": {
+    "title": "Move to Ferry Farm",
+    "description": "The family moves to **Ferry Farm**, on the Rappahannock across from Fredericksburg, where George spends most of his boyhood.",
+    "tags": [
+     "family",
+     "land"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ferry_Farm"
+    ],
+    "color": "#a8742a",
+    "datePrecision": "Late 1738; the day is not known",
+    "historicalDate": "1738",
+    "calendar": "Julian (Old Style)"
+   }
+  },
+  {
+   "id": "father-dies",
+   "time": "-7153729200/1",
+   "metadata": {
+    "title": "His father dies",
+    "description": "**Augustine Washington** dies at Ferry Farm when George is eleven. George inherits Ferry Farm and ten enslaved people; his elder half-brother **Lawrence** inherits Little Hunting Creek.",
+    "tags": [
+     "family",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Augustine_Washington"
+    ],
+    "color": "#a8742a",
+    "historicalDate": "12 April 1743",
+    "calendar": "Julian (Old Style)"
+   }
+  },
+  {
+   "id": "mount-vernon-named",
+   "time": "-7147767600/1",
+   "metadata": {
+    "title": "Lawrence names Mount Vernon",
+    "description": "**Lawrence Washington** marries **Anne Fairfax** and names the Little Hunting Creek estate **Mount Vernon**, after Admiral Edward Vernon, under whom he had served. The Fairfax connection opens doors for George.",
+    "tags": [
+     "family",
+     "land"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lawrence_Washington_(1718–1752)",
+     "https://en.wikipedia.org/wiki/Mount_Vernon"
+    ],
+    "color": "#a8742a",
+    "datePrecision": "Year only (1743)",
+    "historicalDate": "1743",
+    "calendar": "Julian (Old Style)"
+   }
+  },
+  {
+   "id": "culpeper",
+   "time": "-6955786800/1",
+   "metadata": {
+    "title": "Surveyor of Culpeper County",
+    "description": "Licensed by the College of William & Mary, Washington takes the oath as surveyor of the new **Culpeper County**, at seventeen. He gave up the post in 1750 but went on surveying, and buying land, in the Shenandoah Valley.",
+    "tags": [
+     "land"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#4f6b3a",
+    "historicalDate": "20 July 1749",
+    "calendar": "Julian (Old Style)"
+   }
+  },
+  {
+   "id": "barbados-sail",
+   "time": "-6886666800/1",
+   "metadata": {
+    "title": "Sails for Barbados",
+    "description": "Washington sails with **Lawrence**, who is ill with tuberculosis, hoping the climate will help him. It is the only time George ever leaves mainland North America.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://founders.archives.gov/documents/Washington/01-01-02-0002-0002",
+     "https://en.wikipedia.org/wiki/George_Washington_House_(Barbados)"
+    ],
+    "color": "#a8742a",
+    "historicalDate": "28 September 1751",
+    "calendar": "Julian (Old Style)"
+   }
+  },
+  {
+   "id": "smallpox",
+   "time": "-6882346800/1",
+   "metadata": {
+    "title": "Smallpox in Barbados",
+    "description": "Two weeks after landing at Bridgetown, George falls ill with **smallpox**. He recovers, lightly scarred, and immune: a protection that mattered when the disease swept the Continental Army.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington_House_(Barbados)",
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#a8742a",
+    "historicalDate": "17 November 1751",
+    "calendar": "Julian (Old Style)"
+   }
+  },
+  {
+   "id": "lawrence-dies",
+   "time": "-6860574000/1",
+   "metadata": {
+    "title": "Lawrence dies",
+    "description": "**Lawrence Washington** dies of tuberculosis at Mount Vernon. The estate passes to his widow **Anne** and their daughter, with George to inherit if the daughter died without heirs.",
+    "tags": [
+     "family",
+     "land"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lawrence_Washington_(1718–1752)"
+    ],
+    "color": "#a8742a",
+    "historicalDate": "26 July 1752",
+    "calendar": "Julian (Old Style)"
+   }
+  },
+  {
+   "id": "new-style",
+   "time": "-6857204400/1",
+   "metadata": {
+    "title": "Britain switches calendars",
+    "description": "Under the **Calendar Act** of 1750, Britain and its colonies adopt the Gregorian calendar: Wednesday 2 September 1752 is followed by Thursday 14 September. The year had already been made to begin on 1 January. Washington’s birthday moves from 11 to 22 February.",
+    "tags": [
+     "world"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Calendar_(New_Style)_Act_1750",
+     "https://en.wikipedia.org/wiki/Old_Style_and_New_Style_dates"
+    ],
+    "color": "#6b5a43"
+   }
+  },
+  {
+   "id": "freemason",
+   "time": "-6852798000/1",
+   "metadata": {
+    "title": "Becomes a Freemason",
+    "description": "Washington is initiated into the **Masonic lodge** at Fredericksburg, at twenty.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#a8742a"
+   }
+  },
+  {
+   "id": "adjutant",
+   "time": "-6849428400/1",
+   "metadata": {
+    "title": "Adjutant, with the rank of major",
+    "description": "Governor **Robert Dinwiddie** commissions him adjutant of Virginia’s southern militia district, with the rank of major: the post Lawrence had held for the whole colony.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://founders.archives.gov/documents/Washington/02-01-02-0024"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "h-regiment",
+   "time": "-6832148400/1",
+   "metadata": {
+    "title": "The Virginia Regiment",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "le-boeuf-set-out",
+   "time": "-6821607600/1",
+   "metadata": {
+    "title": "Sent to warn the French",
+    "description": "Dinwiddie sends him from Williamsburg to the French commander in the Ohio Country, with a letter demanding that France withdraw from land Virginia claimed.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fort_Le_Boeuf",
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "le-boeuf",
+   "time": "-6818065200/1",
+   "metadata": {
+    "title": "At Fort Le Boeuf",
+    "description": "Washington reaches **Fort Le Boeuf**, near Lake Erie, and delivers the letter. The French commander, **Jacques Legardeur de Saint-Pierre**, politely refuses to leave.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fort_Le_Boeuf"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "journal",
+   "time": "-6814954800/1",
+   "metadata": {
+    "title": "Back in Williamsburg: his journal",
+    "description": "After a winter journey (he nearly drowned crossing the Allegheny), he reports to Dinwiddie, who has his account printed as **The Journal of Major George Washington**; it is reprinted in London and makes his name.",
+    "tags": [
+     "writing",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington",
+     "https://founders.archives.gov/documents/Washington/01-01-02-0003-0002"
+    ],
+    "color": "#3d6f73"
+   }
+  },
+  {
+   "id": "lt-colonel",
+   "time": "-6809943600/1",
+   "metadata": {
+    "title": "Lieutenant colonel",
+    "description": "Commissioned lieutenant colonel and second in command of the new **Virginia Regiment**, he leads its advance party toward the Forks of the Ohio.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Virginia_Regiment",
+     "https://en.wikipedia.org/wiki/Battle_of_Fort_Necessity"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "March 1754; the day is approximate"
+   }
+  },
+  {
+   "id": "jumonville",
+   "time": "-6803550000/1",
+   "metadata": {
+    "title": "Jumonville Glen",
+    "description": "Washington’s men and **Tanacharison**’s Mingo warriors surprise a French party in a glen; its commander, **Joseph Coulon de Jumonville**, is among the dead. The skirmish helps set off the **French and Indian War**.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Jumonville_Glen"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "fort-necessity",
+   "time": "-6800439600/1",
+   "metadata": {
+    "title": "Surrender at Fort Necessity",
+    "description": "Colonel since Joshua Fry’s death, Washington is besieged at **Fort Necessity** by a larger French and Indian force and surrenders. The terms he signed, in French, called Jumonville’s death an assassination, a phrase he later said had been mistranslated to him.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Fort_Necessity"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "resigns-1754",
+   "time": "-6789985200/1",
+   "metadata": {
+    "title": "Resigns his commission",
+    "description": "When the regiment is broken into independent companies, where he would rank as a captain, he resigns rather than accept the demotion.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Late 1754; the day is approximate"
+   }
+  },
+  {
+   "id": "lease",
+   "time": "-6786010800/1",
+   "metadata": {
+    "title": "Leases Mount Vernon",
+    "description": "Lawrence’s widow **Anne**, now married to George Lee, leases Mount Vernon to George, with the enslaved people who belonged to it, for a yearly rent of tobacco or cash.",
+    "tags": [
+     "land",
+     "slavery"
+    ],
+    "sources": [
+     "https://founders.archives.gov/documents/Washington/02-01-02-0116",
+     "https://en.wikipedia.org/wiki/Mount_Vernon"
+    ],
+    "color": "#4f6b3a"
+   }
+  },
+  {
+   "id": "braddock-aide",
+   "time": "-6773569200/1",
+   "metadata": {
+    "title": "Aide to General Braddock",
+    "description": "Washington joins Major General **Edward Braddock**’s expedition against Fort Duquesne as a volunteer aide-de-camp, without rank.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Braddock_Expedition"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "monongahela",
+   "time": "-6768385200/1",
+   "metadata": {
+    "title": "Braddock’s defeat",
+    "description": "At the **Battle of the Monongahela**, French troops and their Native allies rout Braddock’s army; Braddock is mortally wounded. Washington, with two horses shot under him and bullet holes in his coat, helps organize the retreat.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_the_Monongahela"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "colonel-1755",
+   "time": "-6765274800/1",
+   "metadata": {
+    "title": "Colonel of the Virginia Regiment",
+    "description": "Dinwiddie appoints him colonel of the re-formed **Virginia Regiment** and commander of all Virginia’s forces, at twenty-three, to defend a long frontier.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://founders.archives.gov/documents/Washington/02-02-02-0001-0002",
+     "https://en.wikipedia.org/wiki/Virginia_Regiment"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "elected-burgess",
+   "time": "-6672394800/1",
+   "metadata": {
+    "title": "Elected a burgess",
+    "description": "While still on campaign, he is elected to the **House of Burgesses** for Frederick County, where he had lost in 1755.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington",
+     "https://en.wikipedia.org/wiki/House_of_Burgesses"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "loyalhanna",
+   "time": "-6662804400/1",
+   "metadata": {
+    "title": "Friendly fire near Loyalhanna",
+    "description": "In the dusk, two parties of Virginians fire on each other near Fort Ligonier; fourteen are killed. Washington rides between the lines to stop it.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Forbes_Expedition",
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "duquesne",
+   "time": "-6661681200/1",
+   "metadata": {
+    "title": "Fort Duquesne taken",
+    "description": "The French blow up and abandon **Fort Duquesne** as General **John Forbes**’s army arrives; the British build Fort Pitt on the site, today’s Pittsburgh.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Forbes_Expedition",
+     "https://en.wikipedia.org/wiki/Fort_Duquesne"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "resigns-1758",
+   "time": "-6659953200/1",
+   "metadata": {
+    "title": "Leaves the army",
+    "description": "Denied the regular British commission he had sought, and with the Ohio frontier secured, he resigns his commission at the end of 1758.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Virginia_Regiment",
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "December 1758; the day is approximate"
+   }
+  },
+  {
+   "id": "h-planter",
+   "time": "-6658570800/1",
+   "metadata": {
+    "title": "Planter and burgess",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "marriage",
+   "time": "-6658052400/1",
+   "metadata": {
+    "title": "Marries Martha Custis",
+    "description": "He marries **Martha Dandridge Custis**, a wealthy widow, at her home in New Kent County. She brings her two children, **John Parke (Jacky)** and **Martha Parke (Patsy) Custis**, and the use of the Custis estate’s \"dower\" enslaved people, who could not be freed by either of them.",
+    "tags": [
+     "family",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Martha_Washington",
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#a8742a"
+   }
+  },
+  {
+   "id": "inherits",
+   "time": "-6589105200/1",
+   "metadata": {
+    "title": "Owner of Mount Vernon",
+    "description": "Anne Fairfax Lee dies, and Mount Vernon passes to George outright. Over the next decades he enlarges the house and doubles the estate to about 6,500 acres.",
+    "tags": [
+     "land"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mount_Vernon"
+    ],
+    "color": "#4f6b3a",
+    "datePrecision": "March 1761"
+   }
+  },
+  {
+   "id": "wheat",
+   "time": "-6437559600/1",
+   "metadata": {
+    "title": "From tobacco to wheat",
+    "description": "Tired of debt to London merchants and of worn-out soil, he stops growing tobacco as Mount Vernon’s cash crop and turns to wheat, a mill and later a fishery.",
+    "tags": [
+     "land"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mount_Vernon"
+    ],
+    "color": "#4f6b3a",
+    "datePrecision": "About 1766"
+   }
+  },
+  {
+   "id": "william-lee",
+   "time": "-6374487600/1",
+   "metadata": {
+    "title": "Buys William Lee",
+    "description": "Washington buys **William Lee**, a young enslaved man, and his brother Frank from the estate of Mary Lee. William became his valet and rode beside him through the whole Revolutionary War.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/William_Lee_(valet)"
+    ],
+    "color": "#5b3f6b",
+    "datePrecision": "Year only (1768)"
+   }
+  },
+  {
+   "id": "nonimportation",
+   "time": "-6331028400/1",
+   "metadata": {
+    "title": "The Virginia Association",
+    "description": "After the governor dissolves the House of Burgesses, its members meet at Raleigh Tavern and adopt a boycott of British goods drafted by **George Mason** and presented by Washington.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Virginia_Association"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "patsy-dies",
+   "time": "-6202033200/1",
+   "metadata": {
+    "title": "Patsy Custis dies",
+    "description": "His stepdaughter **Patsy**, who had suffered from epilepsy since childhood, dies at Mount Vernon after a seizure, at seventeen.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/John_Parke_Custis",
+     "https://en.wikipedia.org/wiki/Martha_Washington"
+    ],
+    "color": "#a8742a"
+   }
+  },
+  {
+   "id": "jacky-marries",
+   "time": "-6182247600/1",
+   "metadata": {
+    "title": "Jacky Custis marries",
+    "description": "**John Parke Custis** marries **Eleanor Calvert** of Maryland.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/John_Parke_Custis"
+    ],
+    "color": "#a8742a"
+   }
+  },
+  {
+   "id": "fairfax-resolves",
+   "time": "-6167991600/1",
+   "metadata": {
+    "title": "The Fairfax Resolves",
+    "description": "A Fairfax County meeting chaired by Washington adopts resolutions, written chiefly by **George Mason**, against Parliament’s Coercive Acts and calling for a boycott and a congress of the colonies.",
+    "tags": [
+     "politics",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fairfax_Resolves"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "delegate",
+   "time": "-6166436400/1",
+   "metadata": {
+    "title": "Chosen for Congress",
+    "description": "The first **Virginia Convention** chooses him as one of seven delegates to a Continental Congress in Philadelphia.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_Continental_Congress"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "h-revolution",
+   "time": "-6153562800/1",
+   "metadata": {
+    "title": "Revolution",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "lexington",
+   "time": "-6144231600/1",
+   "metadata": {
+    "title": "Lexington and Concord",
+    "description": "The first battles of the **American Revolutionary War**, in Massachusetts. Washington is at Mount Vernon.",
+    "tags": [
+     "world",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battles_of_Lexington_and_Concord"
+    ],
+    "color": "#6b5a43"
+   }
+  },
+  {
+   "id": "leaves-home",
+   "time": "-6142935600/1",
+   "metadata": {
+    "title": "Leaves Mount Vernon for Congress",
+    "description": "Washington sets out for the Second Continental Congress in Philadelphia. He would not see Mount Vernon again for more than six years.",
+    "tags": [
+     "politics",
+     "land"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "second-congress",
+   "time": "-6142417200/1",
+   "metadata": {
+    "title": "The Second Continental Congress",
+    "description": "The **Second Continental Congress** meets in Philadelphia. Washington, the delegate with the most military experience, attends in his old uniform.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Second_Continental_Congress"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "chosen",
+   "time": "-6139306800/1",
+   "metadata": {
+    "title": "Chosen commander-in-chief",
+    "description": "Congress votes unanimously for Washington, nominated by **John Adams**, to command the new **Continental Army**. He accepts the next day, refusing a salary and asking only for his expenses.",
+    "tags": [
+     "war",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington",
+     "https://en.wikipedia.org/wiki/Continental_Army"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "cambridge",
+   "time": "-6137751600/1",
+   "metadata": {
+    "title": "Takes command at Cambridge",
+    "description": "Washington takes command of the New England troops besieging Boston, an army short of gunpowder, discipline and enlistments.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Boston"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "black-enlistment",
+   "time": "-6122199600/1",
+   "metadata": {
+    "title": "Free Black soldiers may re-enlist",
+    "description": "Reversing his earlier order, Washington allows free Black soldiers already serving to re-enlist; Congress agrees. Later in the war, Black soldiers served in many regiments, among them the **1st Rhode Island**.",
+    "tags": [
+     "war",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/African_Americans_in_the_Revolutionary_War"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "dorchester",
+   "time": "-6116583600/1",
+   "metadata": {
+    "title": "Guns on Dorchester Heights",
+    "description": "In one night his men fortify **Dorchester Heights** with the cannon **Henry Knox** had hauled from Fort Ticonderoga, putting the British fleet in Boston Harbor in range.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fortification_of_Dorchester_Heights"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "boston-evacuated",
+   "time": "-6115460400/1",
+   "metadata": {
+    "title": "The British leave Boston",
+    "description": "General **William Howe** evacuates Boston by sea: the siege ends.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Boston"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "declaration-read",
+   "time": "-6105610800/1",
+   "metadata": {
+    "title": "The Declaration read to the army",
+    "description": "In New York, Washington has the **Declaration of Independence**, adopted in Philadelphia on July 4, read aloud to his troops.",
+    "tags": [
+     "war",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/United_States_Declaration_of_Independence"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "long-island",
+   "time": "-6101377200/1",
+   "metadata": {
+    "title": "Battle of Long Island",
+    "description": "Howe outflanks the Americans in Brooklyn. Two nights later Washington ferries the whole army across the East River to Manhattan, unseen.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Long_Island"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "harlem-heights",
+   "time": "-6099649200/1",
+   "metadata": {
+    "title": "Harlem Heights",
+    "description": "After the rout at Kip’s Bay the day before, his troops hold their ground on upper Manhattan.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Harlem_Heights"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "fort-washington",
+   "time": "-6094378800/1",
+   "metadata": {
+    "title": "Fort Washington falls",
+    "description": "The fort on upper Manhattan surrenders with nearly 3,000 men. The army retreats across New Jersey into Pennsylvania.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Fort_Washington"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "crossing",
+   "time": "-6091009200/1",
+   "metadata": {
+    "title": "Crossing the Delaware",
+    "description": "On the night of December 25–26, in sleet and ice, Washington crosses the **Delaware River** at McConkey’s Ferry with about 2,400 men.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington's_crossing_of_the_Delaware_River"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "trenton",
+   "time": "-6090922800/1",
+   "metadata": {
+    "title": "Trenton",
+    "description": "At dawn the army surprises the **Hessian** garrison at Trenton and takes about 900 prisoners: a small victory that revives the cause.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Trenton"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "princeton",
+   "time": "-6090231600/1",
+   "metadata": {
+    "title": "Princeton",
+    "description": "Slipping away from Cornwallis at the Assunpink Creek overnight, Washington defeats a British force at **Princeton**, then winters at Morristown.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Princeton"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "inoculation",
+   "time": "-6087380400/1",
+   "metadata": {
+    "title": "The army is inoculated",
+    "description": "Washington orders the secret **inoculation** of new recruits against smallpox, one of the first mass inoculations of an army.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington",
+     "https://en.wikipedia.org/wiki/Smallpox"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "February 1777"
+   }
+  },
+  {
+   "id": "brandywine",
+   "time": "-6068545200/1",
+   "metadata": {
+    "title": "Brandywine",
+    "description": "Howe outflanks Washington at **Brandywine Creek**; Philadelphia, the capital, falls two weeks later.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Brandywine"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "germantown",
+   "time": "-6066558000/1",
+   "metadata": {
+    "title": "Germantown",
+    "description": "A dawn attack on the British camp at **Germantown** fails in fog and confusion, but impresses European observers.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Germantown"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "saratoga",
+   "time": "-6065434800/1",
+   "metadata": {
+    "title": "Burgoyne surrenders at Saratoga",
+    "description": "General **Horatio Gates**’s Northern Army forces the surrender of **John Burgoyne**’s army in New York: the victory that brought France into the war.",
+    "tags": [
+     "world",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battles_of_Saratoga"
+    ],
+    "color": "#6b5a43"
+   }
+  },
+  {
+   "id": "french-alliance",
+   "time": "-6055758000/1",
+   "metadata": {
+    "title": "Alliance with France",
+    "description": "France and the United States sign the **Treaty of Alliance** in Paris.",
+    "tags": [
+     "world",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Treaty_of_Alliance_(1778)"
+    ],
+    "color": "#6b5a43"
+   }
+  },
+  {
+   "id": "steuben",
+   "time": "-6054289200/1",
+   "metadata": {
+    "title": "Steuben arrives at Valley Forge",
+    "description": "**Baron von Steuben**, a former Prussian officer, begins drilling the army; Washington makes him inspector general.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Friedrich_Wilhelm_von_Steuben"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "monmouth",
+   "time": "-6043489200/1",
+   "metadata": {
+    "title": "Monmouth",
+    "description": "Catching the British army leaving Philadelphia, Washington rallies the retreating troops of **Charles Lee** in the heat at **Monmouth**: a drawn battle that showed the drilled army could stand.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Monmouth"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "arnold",
+   "time": "-5972641200/1",
+   "metadata": {
+    "title": "Arnold’s treason",
+    "description": "Washington discovers that **Benedict Arnold**, commanding West Point, had plotted to surrender it to the British. Arnold escapes to a British ship.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Benedict_Arnold"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "savage",
+   "time": "-5955274800/1",
+   "metadata": {
+    "title": "Seventeen leave on HMS Savage",
+    "description": "When the British sloop **HMS Savage** anchors off Mount Vernon, seventeen enslaved people (among them **Deborah Squash** and, by his own account, **Harry Washington**, who had left earlier) are listed as gone to the British. Seven were later returned.",
+    "tags": [
+     "slavery",
+     "war"
+    ],
+    "sources": [
+     "https://www.mountvernon.org/library/digitalhistory/digital-encyclopedia/article/h-m-s-savage/",
+     "https://en.wikipedia.org/wiki/Deborah_Squash"
+    ],
+    "color": "#5b3f6b",
+    "datePrecision": "April 1781; Lund Washington wrote of it on April 18"
+   }
+  },
+  {
+   "id": "home-1781",
+   "time": "-5942487600/1",
+   "metadata": {
+    "title": "Home for the first time since 1775",
+    "description": "On the march south to Yorktown, Washington rides ahead and reaches **Mount Vernon**, his first visit home since May 1775. **Rochambeau** joins him the next evening; they leave on September 12.",
+    "tags": [
+     "war",
+     "land"
+    ],
+    "sources": [
+     "https://www.nps.gov/waro/learn/historyculture/george-washington-and-the-trail.htm",
+     "https://en.wikipedia.org/wiki/Siege_of_Yorktown"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "cornwallis-surrenders",
+   "time": "-5939031600/1",
+   "metadata": {
+    "title": "Surrender at Yorktown",
+    "description": "**Cornwallis** surrenders his army to the American and French forces of Washington and **Rochambeau**, with a French fleet holding the Chesapeake.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Yorktown"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "jacky-dies",
+   "time": "-5937562800/1",
+   "metadata": {
+    "title": "Jacky Custis dies",
+    "description": "**John Parke Custis**, serving as a civilian aide at Yorktown, dies of camp fever. George and Martha take in his two youngest children, **Nelly** and **George Washington Parke Custis**, and raise them at Mount Vernon.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/John_Parke_Custis"
+    ],
+    "color": "#a8742a"
+   }
+  },
+  {
+   "id": "nicola",
+   "time": "-5920455600/1",
+   "metadata": {
+    "title": "He rejects a crown",
+    "description": "Colonel **Lewis Nicola** writes suggesting that the army make Washington a king. Washington replies at once that he has read it \"with abhorrence\".",
+    "tags": [
+     "politics",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lewis_Nicola"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "newburgh",
+   "time": "-5894794800/1",
+   "metadata": {
+    "title": "The Newburgh address",
+    "description": "Unpaid officers at Newburgh are urged, in anonymous letters, to defy Congress. Washington meets them and, putting on spectacles to read a letter, says he has grown gray and almost blind in their service. The **Newburgh conspiracy** collapses.",
+    "tags": [
+     "war",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Newburgh_Conspiracy"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "paris",
+   "time": "-5879934000/1",
+   "metadata": {
+    "title": "Treaty of Paris",
+    "description": "Britain recognizes the independence of the United States.",
+    "tags": [
+     "world"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Treaty_of_Paris_(1783)"
+    ],
+    "color": "#6b5a43"
+   }
+  },
+  {
+   "id": "evacuation-day",
+   "time": "-5872762800/1",
+   "metadata": {
+    "title": "Into New York",
+    "description": "The last British troops leave New York City, and Washington rides in.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Evacuation_Day_(New_York)"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "fraunces",
+   "time": "-5871985200/1",
+   "metadata": {
+    "title": "Farewell at Fraunces Tavern",
+    "description": "Washington takes leave of his officers at **Fraunces Tavern** in New York.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fraunces_Tavern"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "annapolis",
+   "time": "-5870343600/1",
+   "metadata": {
+    "title": "Resigns his commission",
+    "description": "At **Annapolis**, where Congress is sitting, Washington returns his commission and retires to private life, home at Mount Vernon by Christmas Eve. King **George III** is reported to have said that a man who gave up power so would be the greatest in the world.",
+    "tags": [
+     "war",
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington's_resignation_as_commander-in-chief"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "h-constitution",
+   "time": "-5864382000/1",
+   "metadata": {
+    "title": "A new constitution",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "mv-conference",
+   "time": "-5830513200/1",
+   "metadata": {
+    "title": "The Mount Vernon Conference",
+    "description": "Delegates of **Virginia and Maryland**, meeting at Mount Vernon with Washington as host, agree on the use of the Potomac and the Chesapeake. Their success led to the Annapolis Convention.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mount_Vernon_Conference"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "potomac-company",
+   "time": "-5826193200/1",
+   "metadata": {
+    "title": "President of the Potomac Company",
+    "description": "Washington becomes president of the **Potomac Company**, formed to make the river navigable to the West with canals around its falls.",
+    "tags": [
+     "land"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Potomac_Company"
+    ],
+    "color": "#4f6b3a"
+   }
+  },
+  {
+   "id": "census-1786",
+   "time": "-5802260400/1",
+   "metadata": {
+    "title": "Counting Mount Vernon’s enslaved community",
+    "description": "Washington lists the enslaved people at Mount Vernon by name, farm and work: 216 people.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://www.mountvernon.org/library/digitalhistory/digital-encyclopedia/article/census-of-the-enslaved-population-at-mount-vernon-1786-and-1799"
+    ],
+    "color": "#5b3f6b",
+    "datePrecision": "February 1786"
+   }
+  },
+  {
+   "id": "annapolis-convention",
+   "time": "-5784289200/1",
+   "metadata": {
+    "title": "Annapolis Convention",
+    "description": "Delegates from five states, meeting on trade, call for a convention in Philadelphia to revise the Articles of Confederation.",
+    "tags": [
+     "politics",
+     "world"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Annapolis_Convention_(1786)"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "convention-president",
+   "time": "-5762430000/1",
+   "metadata": {
+    "title": "President of the Convention",
+    "description": "As the **Constitutional Convention** reaches a quorum in Philadelphia, the delegates elect Washington its president, unanimously. He seldom speaks in debate.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Constitutional_Convention_(United_States)"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "constitution",
+   "time": "-5752494000/1",
+   "metadata": {
+    "title": "The Constitution signed",
+    "description": "Washington signs first, as president of the Convention, then as a delegate of Virginia.",
+    "tags": [
+     "politics",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Constitution_of_the_United_States"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "ninth-state",
+   "time": "-5728474800/1",
+   "metadata": {
+    "title": "The Constitution ratified",
+    "description": "**New Hampshire** is the ninth state to ratify, enough to put the Constitution in effect.",
+    "tags": [
+     "politics",
+     "world"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/History_of_the_United_States_Constitution"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "h-presidency",
+   "time": "-5711713200/1",
+   "metadata": {
+    "title": "The presidency",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "elected",
+   "time": "-5703505200/1",
+   "metadata": {
+    "title": "Elected president",
+    "description": "Congress counts the electoral votes: every elector has voted for Washington; **John Adams** is vice president. Charles Thomson brings him the news at Mount Vernon on April 14.",
+    "tags": [
+     "presidency"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/1788–89_United_States_presidential_election"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "inaugurated",
+   "time": "-5701431600/1",
+   "metadata": {
+    "title": "First inauguration",
+    "description": "On the balcony of **Federal Hall** in New York he takes the oath as the first president, then gives his inaugural address to Congress inside.",
+    "tags": [
+     "presidency",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_inauguration_of_George_Washington"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "mother-dies",
+   "time": "-5691322800/1",
+   "metadata": {
+    "title": "His mother dies",
+    "description": "**Mary Ball Washington** dies in Fredericksburg, aged about eighty.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mary_Ball_Washington"
+    ],
+    "color": "#a8742a"
+   }
+  },
+  {
+   "id": "cabinet",
+   "time": "-5689854000/1",
+   "metadata": {
+    "title": "The first cabinet",
+    "description": "**Alexander Hamilton** is confirmed as Secretary of the Treasury, **Henry Knox** (War) the next day and **Edmund Randolph** (Attorney General) later that month. **Thomas Jefferson** takes up the State Department in March 1790. Washington meets them together: the first cabinet.",
+    "tags": [
+     "presidency"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Presidency_of_George_Washington"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "thanksgiving",
+   "time": "-5687953200/1",
+   "metadata": {
+    "title": "Thanksgiving proclamation",
+    "description": "At Congress’s request he proclaims Thursday, November 26, a national day of thanksgiving.",
+    "tags": [
+     "presidency",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Thanksgiving_(United_States)"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "residence-act",
+   "time": "-5663242800/1",
+   "metadata": {
+    "title": "The Residence Act",
+    "description": "Washington signs the law placing a permanent capital on the **Potomac**, its exact site his to choose, with Philadelphia the capital meanwhile.",
+    "tags": [
+     "presidency"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Residence_Act"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "touro",
+   "time": "-5660391600/1",
+   "metadata": {
+    "title": "Letter to the Newport congregation",
+    "description": "To the Hebrew Congregation of **Newport**, he writes that the government \"gives to bigotry no sanction, to persecution no assistance\".",
+    "tags": [
+     "writing",
+     "presidency"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Letter_to_the_Hebrew_Congregation_in_Newport"
+    ],
+    "color": "#3d6f73"
+   }
+  },
+  {
+   "id": "bank",
+   "time": "-5643889200/1",
+   "metadata": {
+    "title": "The first Bank",
+    "description": "After asking his cabinet whether it is constitutional (Hamilton yes, Jefferson and Randolph no), he signs the bill chartering the **First Bank of the United States**.",
+    "tags": [
+     "presidency"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_Bank_of_the_United_States"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "rotation",
+   "time": "-5639914800/1",
+   "metadata": {
+    "title": "Rotating the enslaved out of Pennsylvania",
+    "description": "Pennsylvania’s 1780 gradual abolition law freed enslaved people brought into the state after six months there. Washington’s secretary is told to send the President’s House’s enslaved workers back to Virginia before their time ran out.",
+    "tags": [
+     "slavery",
+     "presidency"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/President's_House_(Philadelphia)"
+    ],
+    "color": "#5b3f6b",
+    "datePrecision": "April 1791 (his letter to Tobias Lear)"
+   }
+  },
+  {
+   "id": "first-veto",
+   "time": "-5608897200/1",
+   "metadata": {
+    "title": "First veto",
+    "description": "Washington vetoes a bill apportioning seats in the House, the first presidential veto, finding it unconstitutional.",
+    "tags": [
+     "presidency"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Presidency_of_George_Washington"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "fugitive-slave-act",
+   "time": "-5581854000/1",
+   "metadata": {
+    "title": "The Fugitive Slave Act",
+    "description": "Washington signs the **Fugitive Slave Act**, which let enslavers seize people who had escaped to other states.",
+    "tags": [
+     "slavery",
+     "presidency"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fugitive_Slave_Act_of_1793"
+    ],
+    "color": "#5b3f6b"
+   }
+  },
+  {
+   "id": "second-inauguration",
+   "time": "-5580126000/1",
+   "metadata": {
+    "title": "Second inauguration",
+    "description": "Unanimously re-elected, he takes the oath in **Congress Hall**, Philadelphia, and gives the shortest inaugural address, 135 words.",
+    "tags": [
+     "presidency",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Second_inauguration_of_George_Washington"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "neutrality",
+   "time": "-5575892400/1",
+   "metadata": {
+    "title": "Neutrality Proclamation",
+    "description": "With Britain and revolutionary France at war, he declares the United States \"friendly and impartial\" toward both.",
+    "tags": [
+     "presidency",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Proclamation_of_Neutrality"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "capitol",
+   "time": "-5563018800/1",
+   "metadata": {
+    "title": "The Capitol’s cornerstone",
+    "description": "In a Masonic ceremony, Washington lays the cornerstone of the **Capitol** in the new federal city.",
+    "tags": [
+     "presidency"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/United_States_Capitol"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "bower-hill",
+   "time": "-5537012400/1",
+   "metadata": {
+    "title": "Attack on Bower Hill",
+    "description": "In western Pennsylvania, armed men opposed to the federal **whiskey tax** attack the home of the tax inspector **John Neville**.",
+    "tags": [
+     "presidency"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Whiskey_Rebellion"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "whiskey-proclamation",
+   "time": "-5535111600/1",
+   "metadata": {
+    "title": "He calls out the militia",
+    "description": "Washington proclaims the rebels must disperse and calls up nearly 13,000 militia from four states.",
+    "tags": [
+     "presidency",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Whiskey_Rebellion"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "whiskey-carlisle",
+   "time": "-5530100400/1",
+   "metadata": {
+    "title": "In the field again",
+    "description": "Washington joins the militia army at **Carlisle**, Pennsylvania, the only sitting president to lead troops in the field. The rebellion collapses as the army marches west.",
+    "tags": [
+     "presidency",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Whiskey_Rebellion"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Early October 1794"
+   }
+  },
+  {
+   "id": "jay-treaty",
+   "time": "-5526126000/1",
+   "metadata": {
+    "title": "The Jay Treaty signed",
+    "description": "**John Jay** signs a treaty with Britain in London: the British leave their western forts, but much else is left unsettled. Published in 1795, it divides the country.",
+    "tags": [
+     "presidency"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Jay_Treaty"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "jay-ratified",
+   "time": "-5507377200/1",
+   "metadata": {
+    "title": "The Senate approves the Jay Treaty",
+    "description": "The Senate consents by 20 to 10, exactly two thirds. Washington signs it that summer despite protests; it takes effect in 1796.",
+    "tags": [
+     "presidency"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Jay_Treaty"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "ona-judge",
+   "time": "-5478692400/1",
+   "metadata": {
+    "title": "Ona Judge escapes",
+    "description": "**Ona Judge**, Martha’s enslaved maid, slips out of the President’s House in Philadelphia and reaches Portsmouth, New Hampshire. Washington’s efforts to have her returned fail; she lived free until her death in 1848.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ona_Judge"
+    ],
+    "color": "#5b3f6b"
+   }
+  },
+  {
+   "id": "farewell",
+   "time": "-5468238000/1",
+   "metadata": {
+    "title": "The Farewell Address",
+    "description": "Declining a third term, he publishes his **Farewell Address** in a Philadelphia newspaper, warning against faction and permanent foreign alliances.",
+    "tags": [
+     "presidency",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington's_Farewell_Address"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "hercules",
+   "time": "-5454759600/1",
+   "metadata": {
+    "title": "Hercules escapes",
+    "description": "**Hercules Posey**, the celebrated cook of the President’s House, escapes from Mount Vernon on Washington’s 65th birthday; he was never recaptured.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hercules_Posey"
+    ],
+    "color": "#5b3f6b"
+   }
+  },
+  {
+   "id": "adams-inaugurated",
+   "time": "-5453895600/1",
+   "metadata": {
+    "title": "Adams succeeds him",
+    "description": "**John Adams** is inaugurated in Congress Hall; Washington attends as a private citizen. The first peaceful handover of the presidency.",
+    "tags": [
+     "presidency"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Inauguration_of_John_Adams"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "h-last",
+   "time": "-5453722800/1",
+   "metadata": {
+    "title": "Last years",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "provisional-army",
+   "time": "-5411818800/1",
+   "metadata": {
+    "title": "Commander once more",
+    "description": "Facing war with France, President Adams commissions Washington lieutenant general and commander of a new **Provisional Army**. He accepts on condition he not take the field unless an invasion comes; **Hamilton** does the work.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Quasi-War",
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "census-1799",
+   "time": "-5383134000/1",
+   "metadata": {
+    "title": "The 1799 list",
+    "description": "Washington lists 317 enslaved people at Mount Vernon: 123 his own, 153 \"dower\" people of the Custis estate, and 40 rented from a neighbour, many of them married across those lines.",
+    "tags": [
+     "slavery"
+    ],
+    "sources": [
+     "https://www.mountvernon.org/library/digitalhistory/digital-encyclopedia/article/census-of-the-enslaved-population-at-mount-vernon-1786-and-1799"
+    ],
+    "color": "#5b3f6b",
+    "datePrecision": "Summer 1799"
+   }
+  },
+  {
+   "id": "will",
+   "time": "-5379850800/1",
+   "metadata": {
+    "title": "He signs his will",
+    "description": "In his will, written in his own hand, Washington provides that the people he owned are to be freed on **Martha**’s death, with the old and sick supported and the young taught to read and a trade. **William Lee** is freed at once, with an annuity. The dower people were not his to free.",
+    "tags": [
+     "slavery",
+     "writing",
+     "family"
+    ],
+    "sources": [
+     "https://www.mountvernon.org/george-washington/slavery/washingtons-1799-will/",
+     "https://en.wikipedia.org/wiki/George_Washington_and_slavery"
+    ],
+    "color": "#5b3f6b"
+   }
+  },
+  {
+   "id": "last-ride",
+   "time": "-5366372400/1",
+   "metadata": {
+    "title": "A ride in the snow",
+    "description": "He rides his farms for about five hours in snow, sleet and rain, and sits down to dinner without changing his wet clothes. The next day he has a sore throat.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington#Death"
+    ],
+    "color": "#a8742a"
+   }
+  },
+  {
+   "id": "death",
+   "time": "-5366118600/1",
+   "metadata": {
+    "title": "Dies at Mount Vernon",
+    "description": "After a day of struggling to breathe, bled heavily by his doctors, Washington dies in his bedroom at Mount Vernon, aged 67, with Martha, **Tobias Lear** and several enslaved household servants present. The illness was most likely acute epiglottitis.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington#Death"
+    ],
+    "color": "#a8742a",
+    "datePrecision": "Between 10 and 11 p.m. (Tobias Lear’s account); placed at 10:30"
+   }
+  },
+  {
+   "id": "funeral",
+   "time": "-5365854000/1",
+   "metadata": {
+    "title": "Funeral and burial",
+    "description": "He is buried in the family vault at Mount Vernon.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington#Funeral_and_burial"
+    ],
+    "color": "#a8742a"
+   }
+  },
+  {
+   "id": "eulogy",
+   "time": "-5365162800/1",
+   "metadata": {
+    "title": "\"First in war, first in peace\"",
+    "description": "In Congress’s memorial in Philadelphia, **Henry \"Light-Horse Harry\" Lee** calls him \"first in war, first in peace, and first in the hearts of his countrymen\".",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Henry_Lee_III"
+    ],
+    "color": "#3d6f73"
+   }
+  },
+  {
+   "id": "freed",
+   "time": "-5333108400/1",
+   "metadata": {
+    "title": "Martha frees them",
+    "description": "Rather than wait for her own death, **Martha Washington** signs a deed in December 1800 freeing the people her husband had owned, and they become free on New Year’s Day 1801. The dower people stay enslaved and pass to the Custis grandchildren.",
+    "tags": [
+     "slavery",
+     "family"
+    ],
+    "sources": [
+     "https://www.mountvernon.org/george-washington/slavery/washingtons-1799-will/",
+     "https://en.wikipedia.org/wiki/Martha_Washington"
+    ],
+    "color": "#5b3f6b"
+   }
+  },
+  {
+   "id": "martha-dies",
+   "time": "-5289390000/1",
+   "metadata": {
+    "title": "Martha Washington dies",
+    "description": "Martha dies at Mount Vernon and is buried beside him.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Martha_Washington"
+    ],
+    "color": "#a8742a"
+   }
+  }
+ ],
+ "durations": [
+  {
+   "id": "life",
+   "start": "-7506068400/1",
+   "end": "-5366118600/1",
+   "metadata": {
+    "title": "George Washington, 1732–1799",
+    "description": "His life, from his birth at Popes Creek to his death at Mount Vernon, aged 67.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#6b5a43"
+   }
+  },
+  {
+   "id": "boyhood",
+   "start": "-7506068400/1",
+   "end": "-6998641200/1",
+   "metadata": {
+    "title": "Boyhood",
+    "description": "To his first surveying expedition, at sixteen. His schooling was short and practical; he never went to college.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#6b5a43"
+   }
+  },
+  {
+   "id": "surveying",
+   "start": "-6998641200/1",
+   "end": "-6853057200/1",
+   "metadata": {
+    "title": "Surveying years",
+    "description": "Dated here from the Fairfax survey to his first militia commission; his surveys and land purchases continued through his life.",
+    "tags": [
+     "family",
+     "land"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#6b5a43"
+   }
+  },
+  {
+   "id": "planter",
+   "start": "-6658052400/1",
+   "end": "-6139306800/1",
+   "metadata": {
+    "title": "Planter and burgess",
+    "description": "From his marriage to his appointment as commander-in-chief: Mount Vernon’s years of growth.",
+    "tags": [
+     "family",
+     "land"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#6b5a43"
+   }
+  },
+  {
+   "id": "private",
+   "start": "-5870257200/1",
+   "end": "-5702641200/1",
+   "metadata": {
+    "title": "Private citizen at Mount Vernon",
+    "description": "From his return home after resigning his commission to his departure for New York to be inaugurated.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#6b5a43"
+   }
+  },
+  {
+   "id": "retirement",
+   "start": "-5452945200/1",
+   "end": "-5366118600/1",
+   "metadata": {
+    "title": "Retirement",
+    "description": "From his return to Mount Vernon, about mid-March 1797, to his death.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#6b5a43"
+   }
+  },
+  {
+   "id": "popes-creek",
+   "start": "-7506068400/1",
+   "end": "-7415866800/1",
+   "metadata": {
+    "title": "Popes Creek",
+    "description": "His birthplace in Westmoreland County; the house burned in 1779.",
+    "tags": [
+     "land"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington_Birthplace_National_Monument"
+    ],
+    "color": "#4f6b3a"
+   }
+  },
+  {
+   "id": "little-hunting-creek",
+   "start": "-7415866800/1",
+   "end": "-7292314800/1",
+   "metadata": {
+    "title": "Little Hunting Creek",
+    "description": "The plantation later named Mount Vernon.",
+    "tags": [
+     "land"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mount_Vernon"
+    ],
+    "color": "#4f6b3a"
+   }
+  },
+  {
+   "id": "ferry-farm-home",
+   "start": "-7292314800/1",
+   "end": "-6786010800/1",
+   "metadata": {
+    "title": "Ferry Farm",
+    "description": "His boyhood home and his mother’s, dated here to his lease of Mount Vernon; from his teens he spent long stretches at Mount Vernon and on surveys. His mother lived there until 1772.",
+    "tags": [
+     "land"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ferry_Farm"
+    ],
+    "color": "#4f6b3a"
+   }
+  },
+  {
+   "id": "mount-vernon",
+   "start": "-6786010800/1",
+   "end": "-5366118600/1",
+   "metadata": {
+    "title": "Mount Vernon",
+    "description": "Leased from 1754 and his own from 1761: his home for the rest of his life, though the war and the presidency kept him away for most of sixteen years. Its fields, mill and house were worked by enslaved people, 317 of them by 1799.",
+    "tags": [
+     "land",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mount_Vernon"
+    ],
+    "color": "#4f6b3a"
+   }
+  },
+  {
+   "id": "newburgh-hq",
+   "start": "-5924862000/1",
+   "end": "-5881316400/1",
+   "metadata": {
+    "title": "Headquarters at Newburgh",
+    "description": "The **Hasbrouck House**, on the Hudson, his longest-held wartime headquarters.",
+    "tags": [
+     "land",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Washington's_Headquarters_State_Historic_Site"
+    ],
+    "color": "#4f6b3a"
+   }
+  },
+  {
+   "id": "osgood",
+   "start": "-5702036400/1",
+   "end": "-5675598000/1",
+   "metadata": {
+    "title": "Samuel Osgood House, New York",
+    "description": "The first presidential mansion, rented by Congress, where he lived with his family, household staff and enslaved people.",
+    "tags": [
+     "land",
+     "presidency"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Samuel_Osgood_House"
+    ],
+    "color": "#4f6b3a"
+   }
+  },
+  {
+   "id": "macomb",
+   "start": "-5675598000/1",
+   "end": "-5659354800/1",
+   "metadata": {
+    "title": "Macomb House, New York",
+    "description": "The second presidential mansion, on Broadway.",
+    "tags": [
+     "land",
+     "presidency"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Alexander_Macomb_House"
+    ],
+    "color": "#4f6b3a"
+   }
+  },
+  {
+   "id": "presidents-house",
+   "start": "-5651665200/1",
+   "end": "-5453377200/1",
+   "metadata": {
+    "title": "President’s House, Philadelphia",
+    "description": "The presidential mansion while Philadelphia was the capital; nine enslaved people from Mount Vernon worked there, and two of them, **Ona Judge** and **Hercules**, later escaped.",
+    "tags": [
+     "land",
+     "presidency",
+     "slavery"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/President's_House_(Philadelphia)"
+    ],
+    "color": "#4f6b3a"
+   }
+  },
+  {
+   "id": "fairfax-survey",
+   "start": "-6998641200/1",
+   "end": "-6995790000/1",
+   "metadata": {
+    "title": "Surveying for Lord Fairfax",
+    "description": "His first expedition over the Blue Ridge, surveying Lord Fairfax’s lands in the Shenandoah Valley, kept in his first diary. Old Style 11 March to 13 April 1747/48.",
+    "tags": [
+     "land"
+    ],
+    "sources": [
+     "https://founders.archives.gov/documents/Washington/01-01-02-0001-0002"
+    ],
+    "color": "#4f6b3a"
+   }
+  },
+  {
+   "id": "barbados",
+   "start": "-6883642800/1",
+   "end": "-6879322800/1",
+   "metadata": {
+    "title": "In Barbados",
+    "description": "From landing at Bridgetown to sailing home (Old Style 2 November to 22 December 1751); Lawrence stayed on, then went to Bermuda.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington_House_(Barbados)"
+    ],
+    "color": "#a8742a"
+   }
+  },
+  {
+   "id": "le-boeuf-mission",
+   "start": "-6821607600/1",
+   "end": "-6814954800/1",
+   "metadata": {
+    "title": "Mission to the French",
+    "description": "Williamsburg to Fort Le Boeuf and back in winter, with the frontiersman **Christopher Gist**.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fort_Le_Boeuf",
+     "https://founders.archives.gov/documents/Washington/01-01-02-0003-0002"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "regiment-1754",
+   "start": "-6809943600/1",
+   "end": "-6789985200/1",
+   "metadata": {
+    "title": "Virginia Regiment, 1754",
+    "description": "Lieutenant colonel, then colonel after Joshua Fry’s death in May, until his resignation.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Virginia_Regiment"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "regiment-command",
+   "start": "-6765274800/1",
+   "end": "-6659953200/1",
+   "metadata": {
+    "title": "Commanding the Virginia Regiment",
+    "description": "Colonel and commander of Virginia’s forces, defending some 300 miles of frontier with too few men, then in the Forbes campaign.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Virginia_Regiment"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "burgess",
+   "start": "-6672394800/1",
+   "end": "-6139306800/1",
+   "metadata": {
+    "title": "House of Burgesses",
+    "description": "For Frederick County from 1758, for Fairfax County from 1765; dated here to his appointment as commander-in-chief.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/House_of_Burgesses",
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "congress",
+   "start": "-6163758000/1",
+   "end": "-6139306800/1",
+   "metadata": {
+    "title": "Delegate to the Continental Congress",
+    "description": "At the First Congress (September–October 1774) and the Second, until he became commander-in-chief.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_Continental_Congress",
+     "https://en.wikipedia.org/wiki/Second_Continental_Congress"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "commander",
+   "start": "-6139306800/1",
+   "end": "-5870343600/1",
+   "metadata": {
+    "title": "Commander-in-chief of the Continental Army",
+    "description": "Eight and a half years, from his election by Congress to his resignation at Annapolis.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Continental_Army",
+     "https://en.wikipedia.org/wiki/George_Washington"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "convention",
+   "start": "-5762430000/1",
+   "end": "-5752494000/1",
+   "metadata": {
+    "title": "President of the Constitutional Convention",
+    "description": "From the first day with a quorum to the signing.",
+    "tags": [
+     "politics"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Constitutional_Convention_(United_States)"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "first-term",
+   "start": "-5701431600/1",
+   "end": "-5580126000/1",
+   "metadata": {
+    "title": "First term as president",
+    "description": "In New York until 1790, then Philadelphia.",
+    "tags": [
+     "presidency"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Presidency_of_George_Washington"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "second-term",
+   "start": "-5580126000/1",
+   "end": "-5453895600/1",
+   "metadata": {
+    "title": "Second term as president",
+    "description": "The years of the Neutrality Proclamation, the Whiskey Rebellion and the Jay Treaty.",
+    "tags": [
+     "presidency"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Presidency_of_George_Washington"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "provisional-command",
+   "start": "-5411818800/1",
+   "end": "-5366118600/1",
+   "metadata": {
+    "title": "Commanding the Provisional Army",
+    "description": "A commission he held until his death; the army was disbanded in 1800.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Quasi-War"
+    ],
+    "color": "#1f3a5f"
+   }
+  },
+  {
+   "id": "french-indian-war",
+   "start": "-6803550000/1",
+   "end": "-6528798000/1",
+   "metadata": {
+    "title": "French and Indian War",
+    "description": "From Jumonville Glen to the Treaty of Paris of 1763; Washington’s part ended in 1758.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/French_and_Indian_War"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "revolutionary-war",
+   "start": "-6144231600/1",
+   "end": "-5879934000/1",
+   "metadata": {
+    "title": "Revolutionary War",
+    "description": "From Lexington and Concord to the Treaty of Paris.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/American_Revolutionary_War"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "away",
+   "start": "-6142935600/1",
+   "end": "-5942487600/1",
+   "metadata": {
+    "title": "Six years away from Mount Vernon",
+    "description": "From leaving for Congress in May 1775 to his first visit home, on the way to Yorktown: six years and four months. His cousin **Lund Washington** managed the estate.",
+    "tags": [
+     "family",
+     "war",
+     "land"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/George_Washington",
+     "https://www.nps.gov/waro/learn/historyculture/george-washington-and-the-trail.htm"
+    ],
+    "color": "#6b5a43"
+   }
+  },
+  {
+   "id": "boston",
+   "start": "-6144231600/1",
+   "end": "-6115460400/1",
+   "metadata": {
+    "title": "Siege of Boston",
+    "description": "Washington commanded from July 3, 1775.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Boston"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "new-york",
+   "start": "-6101809200/1",
+   "end": "-6094378800/1",
+   "metadata": {
+    "title": "Losing New York",
+    "description": "From Howe’s landing on Long Island to the fall of Fort Washington.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/New_York_and_New_Jersey_campaign"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "ten-days",
+   "start": "-6091009200/1",
+   "end": "-6090145200/1",
+   "metadata": {
+    "title": "The Ten Crucial Days",
+    "description": "From the crossing of the Delaware to the victory at Princeton.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/New_York_and_New_Jersey_campaign",
+     "https://en.wikipedia.org/wiki/Battle_of_Princeton"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "philadelphia-campaign",
+   "start": "-6070014000/1",
+   "end": "-6059991600/1",
+   "metadata": {
+    "title": "Philadelphia campaign",
+    "description": "From Howe’s landing at Head of Elk to the march into Valley Forge.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Philadelphia_campaign"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "valley-forge",
+   "start": "-6059991600/1",
+   "end": "-6044266800/1",
+   "metadata": {
+    "title": "Valley Forge",
+    "description": "Six months of winter quarters: about 2,000 soldiers died of disease, and Steuben’s drill remade the army.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Valley_Forge"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "morristown",
+   "start": "-5998474800/1",
+   "end": "-5980762800/1",
+   "metadata": {
+    "title": "The hard winter at Morristown",
+    "description": "December 1779 to June 1780 (the days are approximate): the coldest winter of the war, with the army near starving.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Morristown_National_Historical_Park"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "yorktown",
+   "start": "-5940846000/1",
+   "end": "-5939031600/1",
+   "metadata": {
+    "title": "Siege of Yorktown",
+    "description": "American and French armies besiege Cornwallis until he surrenders.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Yorktown"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "quasi-war",
+   "start": "-5411559600/1",
+   "end": "-5341143600/1",
+   "metadata": {
+    "title": "Quasi-War",
+    "description": "An undeclared naval war with France, ended by the Convention of 1800.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Quasi-War"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "marriage-span",
+   "start": "-6658052400/1",
+   "end": "-5366118600/1",
+   "metadata": {
+    "title": "Married to Martha",
+    "description": "Forty years. They had no children together.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Martha_Washington"
+    ],
+    "color": "#a8742a"
+   }
+  },
+  {
+   "id": "jacky",
+   "start": "-6787738800/1",
+   "end": "-5937562800/1",
+   "metadata": {
+    "title": "John Parke \"Jacky\" Custis",
+    "description": "His stepson, from his birth to his death after Yorktown.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/John_Parke_Custis"
+    ],
+    "color": "#a8742a"
+   }
+  },
+  {
+   "id": "patsy",
+   "start": "-6753178800/1",
+   "end": "-6202033200/1",
+   "metadata": {
+    "title": "Martha Parke \"Patsy\" Custis",
+    "description": "His stepdaughter; she was born in 1756.",
+    "tags": [
+     "family"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/John_Parke_Custis",
+     "https://en.wikipedia.org/wiki/Martha_Washington"
+    ],
+    "color": "#a8742a"
+   }
+  }
+ ],
+ "relationships": [
+  {
+   "a": {
+    "moment": "father-dies"
+   },
+   "b": {
+    "moment": "ferry-farm"
+   }
+  },
+  {
+   "a": {
+    "moment": "mount-vernon-named"
+   },
+   "b": {
+    "moment": "lawrence-dies"
+   }
+  },
+  {
+   "a": {
+    "moment": "barbados-sail"
+   },
+   "b": {
+    "moment": "smallpox"
+   }
+  },
+  {
+   "a": {
+    "moment": "smallpox"
+   },
+   "b": {
+    "moment": "inoculation"
+   }
+  },
+  {
+   "a": {
+    "moment": "lawrence-dies"
+   },
+   "b": {
+    "moment": "lease"
+   }
+  },
+  {
+   "a": {
+    "moment": "lease"
+   },
+   "b": {
+    "moment": "inherits"
+   }
+  },
+  {
+   "a": {
+    "moment": "new-style"
+   },
+   "b": {
+    "moment": "birth"
+   }
+  },
+  {
+   "a": {
+    "duration": "le-boeuf-mission"
+   },
+   "b": {
+    "moment": "journal"
+   }
+  },
+  {
+   "a": {
+    "moment": "le-boeuf"
+   },
+   "b": {
+    "moment": "jumonville"
+   }
+  },
+  {
+   "a": {
+    "moment": "jumonville"
+   },
+   "b": {
+    "moment": "fort-necessity"
+   }
+  },
+  {
+   "a": {
+    "moment": "fort-necessity"
+   },
+   "b": {
+    "moment": "resigns-1754"
+   }
+  },
+  {
+   "a": {
+    "moment": "monongahela"
+   },
+   "b": {
+    "moment": "colonel-1755"
+   }
+  },
+  {
+   "a": {
+    "moment": "loyalhanna"
+   },
+   "b": {
+    "moment": "duquesne"
+   }
+  },
+  {
+   "a": {
+    "moment": "duquesne"
+   },
+   "b": {
+    "moment": "resigns-1758"
+   }
+  },
+  {
+   "a": {
+    "moment": "marriage"
+   },
+   "b": {
+    "duration": "jacky"
+   }
+  },
+  {
+   "a": {
+    "moment": "marriage"
+   },
+   "b": {
+    "duration": "patsy"
+   }
+  },
+  {
+   "a": {
+    "moment": "fairfax-resolves"
+   },
+   "b": {
+    "moment": "delegate"
+   }
+  },
+  {
+   "a": {
+    "moment": "second-congress"
+   },
+   "b": {
+    "moment": "chosen"
+   }
+  },
+  {
+   "a": {
+    "moment": "leaves-home"
+   },
+   "b": {
+    "moment": "home-1781"
+   }
+  },
+  {
+   "a": {
+    "moment": "dorchester"
+   },
+   "b": {
+    "moment": "boston-evacuated"
+   }
+  },
+  {
+   "a": {
+    "moment": "crossing"
+   },
+   "b": {
+    "moment": "trenton"
+   }
+  },
+  {
+   "a": {
+    "moment": "trenton"
+   },
+   "b": {
+    "moment": "princeton"
+   }
+  },
+  {
+   "a": {
+    "moment": "brandywine"
+   },
+   "b": {
+    "moment": "germantown"
+   }
+  },
+  {
+   "a": {
+    "moment": "saratoga"
+   },
+   "b": {
+    "moment": "french-alliance"
+   }
+  },
+  {
+   "a": {
+    "moment": "steuben"
+   },
+   "b": {
+    "moment": "monmouth"
+   }
+  },
+  {
+   "a": {
+    "moment": "french-alliance"
+   },
+   "b": {
+    "moment": "cornwallis-surrenders"
+   }
+  },
+  {
+   "a": {
+    "moment": "cornwallis-surrenders"
+   },
+   "b": {
+    "moment": "jacky-dies"
+   }
+  },
+  {
+   "a": {
+    "moment": "newburgh"
+   },
+   "b": {
+    "moment": "annapolis"
+   }
+  },
+  {
+   "a": {
+    "moment": "mv-conference"
+   },
+   "b": {
+    "moment": "annapolis-convention"
+   }
+  },
+  {
+   "a": {
+    "moment": "annapolis-convention"
+   },
+   "b": {
+    "moment": "convention-president"
+   }
+  },
+  {
+   "a": {
+    "moment": "constitution"
+   },
+   "b": {
+    "moment": "elected"
+   }
+  },
+  {
+   "a": {
+    "moment": "neutrality"
+   },
+   "b": {
+    "moment": "jay-treaty"
+   }
+  },
+  {
+   "a": {
+    "moment": "jay-treaty"
+   },
+   "b": {
+    "moment": "jay-ratified"
+   }
+  },
+  {
+   "a": {
+    "moment": "bower-hill"
+   },
+   "b": {
+    "moment": "whiskey-proclamation"
+   }
+  },
+  {
+   "a": {
+    "moment": "whiskey-proclamation"
+   },
+   "b": {
+    "moment": "whiskey-carlisle"
+   }
+  },
+  {
+   "a": {
+    "moment": "william-lee"
+   },
+   "b": {
+    "moment": "will"
+   }
+  },
+  {
+   "a": {
+    "moment": "rotation"
+   },
+   "b": {
+    "moment": "ona-judge"
+   }
+  },
+  {
+   "a": {
+    "moment": "will"
+   },
+   "b": {
+    "moment": "freed"
+   }
+  },
+  {
+   "a": {
+    "moment": "last-ride"
+   },
+   "b": {
+    "moment": "death"
+   }
+  },
+  {
+   "a": {
+    "moment": "death"
+   },
+   "b": {
+    "moment": "funeral"
+   }
+  }
+ ]
+}

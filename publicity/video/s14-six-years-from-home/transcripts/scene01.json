@@ -1,0 +1,241 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:03,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 3000
+			},
+			"text": " George Washington didn't go home for more than six years.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.905977,
+					"t_dtw": -1
+				},
+				{
+					"text": " George",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:00,410"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 410
+					},
+					"id": 4502,
+					"p": 0.978918,
+					"t_dtw": -1
+				},
+				{
+					"text": " Washington",
+					"timestamps": {
+						"from": "00:00:00,410",
+						"to": "00:00:01,090"
+					},
+					"offsets": {
+						"from": 410,
+						"to": 1090
+					},
+					"id": 2669,
+					"p": 0.999218,
+					"t_dtw": -1
+				},
+				{
+					"text": " didn",
+					"timestamps": {
+						"from": "00:00:01,090",
+						"to": "00:00:01,360"
+					},
+					"offsets": {
+						"from": 1090,
+						"to": 1360
+					},
+					"id": 1422,
+					"p": 0.983492,
+					"t_dtw": -1
+				},
+				{
+					"text": "'t",
+					"timestamps": {
+						"from": "00:00:01,360",
+						"to": "00:00:01,490"
+					},
+					"offsets": {
+						"from": 1360,
+						"to": 1490
+					},
+					"id": 470,
+					"p": 0.999561,
+					"t_dtw": -1
+				},
+				{
+					"text": " go",
+					"timestamps": {
+						"from": "00:00:01,490",
+						"to": "00:00:01,620"
+					},
+					"offsets": {
+						"from": 1490,
+						"to": 1620
+					},
+					"id": 467,
+					"p": 0.996253,
+					"t_dtw": -1
+				},
+				{
+					"text": " home",
+					"timestamps": {
+						"from": "00:00:01,620",
+						"to": "00:00:01,920"
+					},
+					"offsets": {
+						"from": 1620,
+						"to": 1920
+					},
+					"id": 1363,
+					"p": 0.997849,
+					"t_dtw": -1
+				},
+				{
+					"text": " for",
+					"timestamps": {
+						"from": "00:00:01,920",
+						"to": "00:00:02,090"
+					},
+					"offsets": {
+						"from": 1920,
+						"to": 2090
+					},
+					"id": 329,
+					"p": 0.932561,
+					"t_dtw": -1
+				},
+				{
+					"text": " more",
+					"timestamps": {
+						"from": "00:00:02,090",
+						"to": "00:00:02,290"
+					},
+					"offsets": {
+						"from": 2090,
+						"to": 2290
+					},
+					"id": 517,
+					"p": 0.989508,
+					"t_dtw": -1
+				},
+				{
+					"text": " than",
+					"timestamps": {
+						"from": "00:00:02,310",
+						"to": "00:00:02,530"
+					},
+					"offsets": {
+						"from": 2310,
+						"to": 2530
+					},
+					"id": 621,
+					"p": 0.995809,
+					"t_dtw": -1
+				},
+				{
+					"text": " six",
+					"timestamps": {
+						"from": "00:00:02,530",
+						"to": "00:00:02,700"
+					},
+					"offsets": {
+						"from": 2530,
+						"to": 2700
+					},
+					"id": 2237,
+					"p": 0.901521,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:02,700",
+						"to": "00:00:03,000"
+					},
+					"offsets": {
+						"from": 2700,
+						"to": 3000
+					},
+					"id": 812,
+					"p": 0.999018,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:03,000",
+						"to": "00:00:03,000"
+					},
+					"offsets": {
+						"from": 3000,
+						"to": 3000
+					},
+					"id": 13,
+					"p": 0.965265,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_150]",
+					"timestamps": {
+						"from": "00:00:03,000",
+						"to": "00:00:03,000"
+					},
+					"offsets": {
+						"from": 3000,
+						"to": 3000
+					},
+					"id": 50513,
+					"p": 0.0387858,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

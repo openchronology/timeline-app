@@ -1,0 +1,74 @@
+{
+  "sample": "../samples/washington.ochx",
+  "size": [360, 1500],
+  "scale": 3,
+  "shots": [
+    {
+      "id": "zoom",
+      "dur": 3.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-7636791600, -5175342000]
+        },
+        {
+          "t": 3.5,
+          "view": [-6185098800, -5919591600]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "sep",
+      "dur": 0.034,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-6185098800, -5919591600]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "separate",
+          "tags": ["land"]
+        }
+      ]
+    },
+    {
+      "id": "reader",
+      "dur": 1.2,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-5966852400, -5935316400]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.1,
+          "do": "open",
+          "title": "Home for the first time since 1775"
+        }
+      ]
+    }
+  ]
+}

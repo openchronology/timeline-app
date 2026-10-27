@@ -1,0 +1,1273 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:06,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 6000
+			},
+			"text": " Within four years, he was back, presiding over the convention that wrote the Constitution,",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.840421,
+					"t_dtw": -1
+				},
+				{
+					"text": " Within",
+					"timestamps": {
+						"from": "00:00:00,330",
+						"to": "00:00:00,430"
+					},
+					"offsets": {
+						"from": 330,
+						"to": 430
+					},
+					"id": 12511,
+					"p": 0.959878,
+					"t_dtw": -1
+				},
+				{
+					"text": " four",
+					"timestamps": {
+						"from": "00:00:00,500",
+						"to": "00:00:00,830"
+					},
+					"offsets": {
+						"from": 500,
+						"to": 830
+					},
+					"id": 1440,
+					"p": 0.943662,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:00,830",
+						"to": "00:00:01,240"
+					},
+					"offsets": {
+						"from": 830,
+						"to": 1240
+					},
+					"id": 812,
+					"p": 0.999699,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,240",
+						"to": "00:00:01,370"
+					},
+					"offsets": {
+						"from": 1240,
+						"to": 1370
+					},
+					"id": 11,
+					"p": 0.496399,
+					"t_dtw": -1
+				},
+				{
+					"text": " he",
+					"timestamps": {
+						"from": "00:00:01,450",
+						"to": "00:00:01,630"
+					},
+					"offsets": {
+						"from": 1450,
+						"to": 1630
+					},
+					"id": 339,
+					"p": 0.978291,
+					"t_dtw": -1
+				},
+				{
+					"text": " was",
+					"timestamps": {
+						"from": "00:00:01,640",
+						"to": "00:00:01,950"
+					},
+					"offsets": {
+						"from": 1640,
+						"to": 1950
+					},
+					"id": 373,
+					"p": 0.999641,
+					"t_dtw": -1
+				},
+				{
+					"text": " back",
+					"timestamps": {
+						"from": "00:00:01,950",
+						"to": "00:00:02,080"
+					},
+					"offsets": {
+						"from": 1950,
+						"to": 2080
+					},
+					"id": 736,
+					"p": 0.999255,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,500",
+						"to": "00:00:02,500"
+					},
+					"offsets": {
+						"from": 2500,
+						"to": 2500
+					},
+					"id": 11,
+					"p": 0.895763,
+					"t_dtw": -1
+				},
+				{
+					"text": " presiding",
+					"timestamps": {
+						"from": "00:00:02,540",
+						"to": "00:00:02,800"
+					},
+					"offsets": {
+						"from": 2540,
+						"to": 2800
+					},
+					"id": 44851,
+					"p": 0.700479,
+					"t_dtw": -1
+				},
+				{
+					"text": " over",
+					"timestamps": {
+						"from": "00:00:02,800",
+						"to": "00:00:03,230"
+					},
+					"offsets": {
+						"from": 2800,
+						"to": 3230
+					},
+					"id": 625,
+					"p": 0.959981,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:03,230",
+						"to": "00:00:03,310"
+					},
+					"offsets": {
+						"from": 3230,
+						"to": 3310
+					},
+					"id": 262,
+					"p": 0.972433,
+					"t_dtw": -1
+				},
+				{
+					"text": " convention",
+					"timestamps": {
+						"from": "00:00:03,360",
+						"to": "00:00:04,000"
+					},
+					"offsets": {
+						"from": 3360,
+						"to": 4000
+					},
+					"id": 9831,
+					"p": 0.893295,
+					"t_dtw": -1
+				},
+				{
+					"text": " that",
+					"timestamps": {
+						"from": "00:00:04,000",
+						"to": "00:00:04,100"
+					},
+					"offsets": {
+						"from": 4000,
+						"to": 4100
+					},
+					"id": 326,
+					"p": 0.797033,
+					"t_dtw": -1
+				},
+				{
+					"text": " wrote",
+					"timestamps": {
+						"from": "00:00:04,100",
+						"to": "00:00:04,390"
+					},
+					"offsets": {
+						"from": 4100,
+						"to": 4390
+					},
+					"id": 2630,
+					"p": 0.906629,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:04,470",
+						"to": "00:00:04,480"
+					},
+					"offsets": {
+						"from": 4470,
+						"to": 4480
+					},
+					"id": 262,
+					"p": 0.813687,
+					"t_dtw": -1
+				},
+				{
+					"text": " Constitution",
+					"timestamps": {
+						"from": "00:00:04,480",
+						"to": "00:00:05,410"
+					},
+					"offsets": {
+						"from": 4480,
+						"to": 5410
+					},
+					"id": 7965,
+					"p": 0.714593,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:05,940",
+						"to": "00:00:06,000"
+					},
+					"offsets": {
+						"from": 5940,
+						"to": 6000
+					},
+					"id": 11,
+					"p": 0.712843,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_300]",
+					"timestamps": {
+						"from": "00:00:06,000",
+						"to": "00:00:06,000"
+					},
+					"offsets": {
+						"from": 6000,
+						"to": 6000
+					},
+					"id": 50663,
+					"p": 0.0464286,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:06,000",
+				"to": "00:00:10,620"
+			},
+			"offsets": {
+				"from": 6000,
+				"to": 10620
+			},
+			"text": " and in 1789, he became the first president.",
+			"tokens": [
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:06,290",
+						"to": "00:00:06,290"
+					},
+					"offsets": {
+						"from": 6290,
+						"to": 6290
+					},
+					"id": 290,
+					"p": 0.998605,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:06,330",
+						"to": "00:00:06,430"
+					},
+					"offsets": {
+						"from": 6330,
+						"to": 6430
+					},
+					"id": 287,
+					"p": 0.993566,
+					"t_dtw": -1
+				},
+				{
+					"text": " 17",
+					"timestamps": {
+						"from": "00:00:06,500",
+						"to": "00:00:07,060"
+					},
+					"offsets": {
+						"from": 6500,
+						"to": 7060
+					},
+					"id": 1596,
+					"p": 0.998586,
+					"t_dtw": -1
+				},
+				{
+					"text": "89",
+					"timestamps": {
+						"from": "00:00:07,060",
+						"to": "00:00:07,630"
+					},
+					"offsets": {
+						"from": 7060,
+						"to": 7630
+					},
+					"id": 4531,
+					"p": 0.999748,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:07,660",
+						"to": "00:00:07,830"
+					},
+					"offsets": {
+						"from": 7660,
+						"to": 7830
+					},
+					"id": 11,
+					"p": 0.557532,
+					"t_dtw": -1
+				},
+				{
+					"text": " he",
+					"timestamps": {
+						"from": "00:00:07,830",
+						"to": "00:00:07,950"
+					},
+					"offsets": {
+						"from": 7830,
+						"to": 7950
+					},
+					"id": 339,
+					"p": 0.994941,
+					"t_dtw": -1
+				},
+				{
+					"text": " became",
+					"timestamps": {
+						"from": "00:00:08,060",
+						"to": "00:00:08,600"
+					},
+					"offsets": {
+						"from": 8060,
+						"to": 8600
+					},
+					"id": 2627,
+					"p": 0.998136,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:08,600",
+						"to": "00:00:08,890"
+					},
+					"offsets": {
+						"from": 8600,
+						"to": 8890
+					},
+					"id": 262,
+					"p": 0.999211,
+					"t_dtw": -1
+				},
+				{
+					"text": " first",
+					"timestamps": {
+						"from": "00:00:08,890",
+						"to": "00:00:09,360"
+					},
+					"offsets": {
+						"from": 8890,
+						"to": 9360
+					},
+					"id": 717,
+					"p": 0.973019,
+					"t_dtw": -1
+				},
+				{
+					"text": " president",
+					"timestamps": {
+						"from": "00:00:09,400",
+						"to": "00:00:10,250"
+					},
+					"offsets": {
+						"from": 9400,
+						"to": 10250
+					},
+					"id": 1893,
+					"p": 0.68324,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:10,250",
+						"to": "00:00:10,600"
+					},
+					"offsets": {
+						"from": 10250,
+						"to": 10600
+					},
+					"id": 13,
+					"p": 0.988861,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_531]",
+					"timestamps": {
+						"from": "00:00:10,620",
+						"to": "00:00:10,620"
+					},
+					"offsets": {
+						"from": 10620,
+						"to": 10620
+					},
+					"id": 50894,
+					"p": 0.0434132,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:10,620",
+				"to": "00:00:16,320"
+			},
+			"offsets": {
+				"from": 10620,
+				"to": 16320
+			},
+			"text": " Two inaugurations, the first cabinet, Hamilton's Bank, neutrality in the war between Britain",
+			"tokens": [
+				{
+					"text": " Two",
+					"timestamps": {
+						"from": "00:00:10,850",
+						"to": "00:00:10,850"
+					},
+					"offsets": {
+						"from": 10850,
+						"to": 10850
+					},
+					"id": 4930,
+					"p": 0.994875,
+					"t_dtw": -1
+				},
+				{
+					"text": " inaug",
+					"timestamps": {
+						"from": "00:00:10,950",
+						"to": "00:00:11,230"
+					},
+					"offsets": {
+						"from": 10950,
+						"to": 11230
+					},
+					"id": 14243,
+					"p": 0.893799,
+					"t_dtw": -1
+				},
+				{
+					"text": "urations",
+					"timestamps": {
+						"from": "00:00:11,230",
+						"to": "00:00:11,840"
+					},
+					"offsets": {
+						"from": 11230,
+						"to": 11840
+					},
+					"id": 20074,
+					"p": 0.989725,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:11,840",
+						"to": "00:00:11,990"
+					},
+					"offsets": {
+						"from": 11840,
+						"to": 11990
+					},
+					"id": 11,
+					"p": 0.394051,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:11,990",
+						"to": "00:00:12,220"
+					},
+					"offsets": {
+						"from": 11990,
+						"to": 12220
+					},
+					"id": 262,
+					"p": 0.987112,
+					"t_dtw": -1
+				},
+				{
+					"text": " first",
+					"timestamps": {
+						"from": "00:00:12,220",
+						"to": "00:00:12,570"
+					},
+					"offsets": {
+						"from": 12220,
+						"to": 12570
+					},
+					"id": 717,
+					"p": 0.884084,
+					"t_dtw": -1
+				},
+				{
+					"text": " cabinet",
+					"timestamps": {
+						"from": "00:00:12,680",
+						"to": "00:00:13,140"
+					},
+					"offsets": {
+						"from": 12680,
+						"to": 13140
+					},
+					"id": 13447,
+					"p": 0.609912,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:13,160",
+						"to": "00:00:13,290"
+					},
+					"offsets": {
+						"from": 13160,
+						"to": 13290
+					},
+					"id": 11,
+					"p": 0.986941,
+					"t_dtw": -1
+				},
+				{
+					"text": " Hamilton",
+					"timestamps": {
+						"from": "00:00:13,290",
+						"to": "00:00:13,900"
+					},
+					"offsets": {
+						"from": 13290,
+						"to": 13900
+					},
+					"id": 11582,
+					"p": 0.825416,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:13,900",
+						"to": "00:00:14,050"
+					},
+					"offsets": {
+						"from": 13900,
+						"to": 14050
+					},
+					"id": 338,
+					"p": 0.99803,
+					"t_dtw": -1
+				},
+				{
+					"text": " Bank",
+					"timestamps": {
+						"from": "00:00:14,050",
+						"to": "00:00:14,350"
+					},
+					"offsets": {
+						"from": 14050,
+						"to": 14350
+					},
+					"id": 5018,
+					"p": 0.514813,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:14,350",
+						"to": "00:00:14,560"
+					},
+					"offsets": {
+						"from": 14350,
+						"to": 14560
+					},
+					"id": 11,
+					"p": 0.991656,
+					"t_dtw": -1
+				},
+				{
+					"text": " neutrality",
+					"timestamps": {
+						"from": "00:00:14,560",
+						"to": "00:00:15,180"
+					},
+					"offsets": {
+						"from": 14560,
+						"to": 15180
+					},
+					"id": 20723,
+					"p": 0.939099,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:15,180",
+						"to": "00:00:15,300"
+					},
+					"offsets": {
+						"from": 15180,
+						"to": 15300
+					},
+					"id": 287,
+					"p": 0.918608,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:15,300",
+						"to": "00:00:15,480"
+					},
+					"offsets": {
+						"from": 15300,
+						"to": 15480
+					},
+					"id": 262,
+					"p": 0.998016,
+					"t_dtw": -1
+				},
+				{
+					"text": " war",
+					"timestamps": {
+						"from": "00:00:15,480",
+						"to": "00:00:15,680"
+					},
+					"offsets": {
+						"from": 15480,
+						"to": 15680
+					},
+					"id": 1175,
+					"p": 0.95034,
+					"t_dtw": -1
+				},
+				{
+					"text": " between",
+					"timestamps": {
+						"from": "00:00:15,680",
+						"to": "00:00:15,990"
+					},
+					"offsets": {
+						"from": 15680,
+						"to": 15990
+					},
+					"id": 1022,
+					"p": 0.98822,
+					"t_dtw": -1
+				},
+				{
+					"text": " Britain",
+					"timestamps": {
+						"from": "00:00:15,990",
+						"to": "00:00:16,050"
+					},
+					"offsets": {
+						"from": 15990,
+						"to": 16050
+					},
+					"id": 5491,
+					"p": 0.991459,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_816]",
+					"timestamps": {
+						"from": "00:00:16,320",
+						"to": "00:00:16,320"
+					},
+					"offsets": {
+						"from": 16320,
+						"to": 16320
+					},
+					"id": 51179,
+					"p": 0.285937,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:16,320",
+				"to": "00:00:21,360"
+			},
+			"offsets": {
+				"from": 16320,
+				"to": 21360
+			},
+			"text": " and France, the Whiskey Rebellion, when he rode out with the militia himself, the Jay",
+			"tokens": [
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:16,400",
+						"to": "00:00:16,490"
+					},
+					"offsets": {
+						"from": 16400,
+						"to": 16490
+					},
+					"id": 290,
+					"p": 0.999779,
+					"t_dtw": -1
+				},
+				{
+					"text": " France",
+					"timestamps": {
+						"from": "00:00:16,650",
+						"to": "00:00:16,920"
+					},
+					"offsets": {
+						"from": 16650,
+						"to": 16920
+					},
+					"id": 4881,
+					"p": 0.999882,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:16,920",
+						"to": "00:00:16,990"
+					},
+					"offsets": {
+						"from": 16920,
+						"to": 16990
+					},
+					"id": 11,
+					"p": 0.985665,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:17,110",
+						"to": "00:00:17,250"
+					},
+					"offsets": {
+						"from": 17110,
+						"to": 17250
+					},
+					"id": 262,
+					"p": 0.994222,
+					"t_dtw": -1
+				},
+				{
+					"text": " Whis",
+					"timestamps": {
+						"from": "00:00:17,250",
+						"to": "00:00:17,520"
+					},
+					"offsets": {
+						"from": 17250,
+						"to": 17520
+					},
+					"id": 28424,
+					"p": 0.417754,
+					"t_dtw": -1
+				},
+				{
+					"text": "key",
+					"timestamps": {
+						"from": "00:00:17,520",
+						"to": "00:00:17,690"
+					},
+					"offsets": {
+						"from": 17520,
+						"to": 17690
+					},
+					"id": 2539,
+					"p": 0.996318,
+					"t_dtw": -1
+				},
+				{
+					"text": " Rebellion",
+					"timestamps": {
+						"from": "00:00:17,710",
+						"to": "00:00:18,270"
+					},
+					"offsets": {
+						"from": 17710,
+						"to": 18270
+					},
+					"id": 34848,
+					"p": 0.956835,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:18,380",
+						"to": "00:00:18,420"
+					},
+					"offsets": {
+						"from": 18380,
+						"to": 18420
+					},
+					"id": 11,
+					"p": 0.759454,
+					"t_dtw": -1
+				},
+				{
+					"text": " when",
+					"timestamps": {
+						"from": "00:00:18,730",
+						"to": "00:00:18,730"
+					},
+					"offsets": {
+						"from": 18730,
+						"to": 18730
+					},
+					"id": 618,
+					"p": 0.991297,
+					"t_dtw": -1
+				},
+				{
+					"text": " he",
+					"timestamps": {
+						"from": "00:00:18,820",
+						"to": "00:00:18,860"
+					},
+					"offsets": {
+						"from": 18820,
+						"to": 18860
+					},
+					"id": 339,
+					"p": 0.999451,
+					"t_dtw": -1
+				},
+				{
+					"text": " rode",
+					"timestamps": {
+						"from": "00:00:18,860",
+						"to": "00:00:19,130"
+					},
+					"offsets": {
+						"from": 18860,
+						"to": 19130
+					},
+					"id": 22075,
+					"p": 0.950365,
+					"t_dtw": -1
+				},
+				{
+					"text": " out",
+					"timestamps": {
+						"from": "00:00:19,130",
+						"to": "00:00:19,320"
+					},
+					"offsets": {
+						"from": 19130,
+						"to": 19320
+					},
+					"id": 503,
+					"p": 0.997478,
+					"t_dtw": -1
+				},
+				{
+					"text": " with",
+					"timestamps": {
+						"from": "00:00:19,320",
+						"to": "00:00:19,600"
+					},
+					"offsets": {
+						"from": 19320,
+						"to": 19600
+					},
+					"id": 351,
+					"p": 0.997193,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:19,600",
+						"to": "00:00:19,800"
+					},
+					"offsets": {
+						"from": 19600,
+						"to": 19800
+					},
+					"id": 262,
+					"p": 0.981967,
+					"t_dtw": -1
+				},
+				{
+					"text": " militia",
+					"timestamps": {
+						"from": "00:00:19,800",
+						"to": "00:00:20,260"
+					},
+					"offsets": {
+						"from": 19800,
+						"to": 20260
+					},
+					"id": 21085,
+					"p": 0.989984,
+					"t_dtw": -1
+				},
+				{
+					"text": " himself",
+					"timestamps": {
+						"from": "00:00:20,270",
+						"to": "00:00:20,710"
+					},
+					"offsets": {
+						"from": 20270,
+						"to": 20710
+					},
+					"id": 2241,
+					"p": 0.996481,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:20,790",
+						"to": "00:00:20,830"
+					},
+					"offsets": {
+						"from": 20790,
+						"to": 20830
+					},
+					"id": 11,
+					"p": 0.998414,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:20,870",
+						"to": "00:00:21,050"
+					},
+					"offsets": {
+						"from": 20870,
+						"to": 21050
+					},
+					"id": 262,
+					"p": 0.990849,
+					"t_dtw": -1
+				},
+				{
+					"text": " Jay",
+					"timestamps": {
+						"from": "00:00:21,090",
+						"to": "00:00:21,360"
+					},
+					"offsets": {
+						"from": 21090,
+						"to": 21360
+					},
+					"id": 9180,
+					"p": 0.779909,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_1068]",
+					"timestamps": {
+						"from": "00:00:21,360",
+						"to": "00:00:21,360"
+					},
+					"offsets": {
+						"from": 21360,
+						"to": 21360
+					},
+					"id": 51431,
+					"p": 0.077589,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:21,360",
+				"to": "00:00:25,080"
+			},
+			"offsets": {
+				"from": 21360,
+				"to": 25080
+			},
+			"text": " Treaty, and a farewell address that turned down a third term.",
+			"tokens": [
+				{
+					"text": " Treaty",
+					"timestamps": {
+						"from": "00:00:21,690",
+						"to": "00:00:21,770"
+					},
+					"offsets": {
+						"from": 21690,
+						"to": 21770
+					},
+					"id": 21345,
+					"p": 0.717709,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:21,770",
+						"to": "00:00:21,900"
+					},
+					"offsets": {
+						"from": 21770,
+						"to": 21900
+					},
+					"id": 11,
+					"p": 0.8718,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:21,900",
+						"to": "00:00:22,030"
+					},
+					"offsets": {
+						"from": 21900,
+						"to": 22030
+					},
+					"id": 290,
+					"p": 0.998098,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:22,150",
+						"to": "00:00:22,160"
+					},
+					"offsets": {
+						"from": 22150,
+						"to": 22160
+					},
+					"id": 257,
+					"p": 0.998639,
+					"t_dtw": -1
+				},
+				{
+					"text": " farewell",
+					"timestamps": {
+						"from": "00:00:22,160",
+						"to": "00:00:22,680"
+					},
+					"offsets": {
+						"from": 22160,
+						"to": 22680
+					},
+					"id": 33458,
+					"p": 0.997765,
+					"t_dtw": -1
+				},
+				{
+					"text": " address",
+					"timestamps": {
+						"from": "00:00:22,720",
+						"to": "00:00:23,190"
+					},
+					"offsets": {
+						"from": 22720,
+						"to": 23190
+					},
+					"id": 2209,
+					"p": 0.999825,
+					"t_dtw": -1
+				},
+				{
+					"text": " that",
+					"timestamps": {
+						"from": "00:00:23,190",
+						"to": "00:00:23,420"
+					},
+					"offsets": {
+						"from": 23190,
+						"to": 23420
+					},
+					"id": 326,
+					"p": 0.999077,
+					"t_dtw": -1
+				},
+				{
+					"text": " turned",
+					"timestamps": {
+						"from": "00:00:23,860",
+						"to": "00:00:23,870"
+					},
+					"offsets": {
+						"from": 23860,
+						"to": 23870
+					},
+					"id": 2900,
+					"p": 0.998757,
+					"t_dtw": -1
+				},
+				{
+					"text": " down",
+					"timestamps": {
+						"from": "00:00:23,900",
+						"to": "00:00:24,140"
+					},
+					"offsets": {
+						"from": 23900,
+						"to": 24140
+					},
+					"id": 866,
+					"p": 0.997916,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:24,140",
+						"to": "00:00:24,200"
+					},
+					"offsets": {
+						"from": 24140,
+						"to": 24200
+					},
+					"id": 257,
+					"p": 0.997756,
+					"t_dtw": -1
+				},
+				{
+					"text": " third",
+					"timestamps": {
+						"from": "00:00:24,200",
+						"to": "00:00:24,500"
+					},
+					"offsets": {
+						"from": 24200,
+						"to": 24500
+					},
+					"id": 2368,
+					"p": 0.996597,
+					"t_dtw": -1
+				},
+				{
+					"text": " term",
+					"timestamps": {
+						"from": "00:00:24,540",
+						"to": "00:00:24,810"
+					},
+					"offsets": {
+						"from": 24540,
+						"to": 24810
+					},
+					"id": 3381,
+					"p": 0.998881,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:24,810",
+						"to": "00:00:25,080"
+					},
+					"offsets": {
+						"from": 24810,
+						"to": 25080
+					},
+					"id": 13,
+					"p": 0.985391,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_1254]",
+					"timestamps": {
+						"from": "00:00:25,080",
+						"to": "00:00:25,080"
+					},
+					"offsets": {
+						"from": 25080,
+						"to": 25080
+					},
+					"id": 51617,
+					"p": 0.129779,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

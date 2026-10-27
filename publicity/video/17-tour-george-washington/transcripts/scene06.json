@@ -1,0 +1,728 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:02,720"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 2720
+			},
+			"text": " And the band ends by choice.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.978319,
+					"t_dtw": -1
+				},
+				{
+					"text": " And",
+					"timestamps": {
+						"from": "00:00:00,150",
+						"to": "00:00:00,320"
+					},
+					"offsets": {
+						"from": 150,
+						"to": 320
+					},
+					"id": 843,
+					"p": 0.453344,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:00,320",
+						"to": "00:00:00,630"
+					},
+					"offsets": {
+						"from": 320,
+						"to": 630
+					},
+					"id": 262,
+					"p": 0.995668,
+					"t_dtw": -1
+				},
+				{
+					"text": " band",
+					"timestamps": {
+						"from": "00:00:00,630",
+						"to": "00:00:01,070"
+					},
+					"offsets": {
+						"from": 630,
+						"to": 1070
+					},
+					"id": 4097,
+					"p": 0.849533,
+					"t_dtw": -1
+				},
+				{
+					"text": " ends",
+					"timestamps": {
+						"from": "00:00:01,070",
+						"to": "00:00:01,490"
+					},
+					"offsets": {
+						"from": 1070,
+						"to": 1490
+					},
+					"id": 5645,
+					"p": 0.998711,
+					"t_dtw": -1
+				},
+				{
+					"text": " by",
+					"timestamps": {
+						"from": "00:00:01,490",
+						"to": "00:00:01,660"
+					},
+					"offsets": {
+						"from": 1490,
+						"to": 1660
+					},
+					"id": 416,
+					"p": 0.998993,
+					"t_dtw": -1
+				},
+				{
+					"text": " choice",
+					"timestamps": {
+						"from": "00:00:02,360",
+						"to": "00:00:02,360"
+					},
+					"offsets": {
+						"from": 2360,
+						"to": 2360
+					},
+					"id": 3572,
+					"p": 0.999298,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:02,720",
+						"to": "00:00:02,720"
+					},
+					"offsets": {
+						"from": 2720,
+						"to": 2720
+					},
+					"id": 13,
+					"p": 0.979972,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_136]",
+					"timestamps": {
+						"from": "00:00:02,720",
+						"to": "00:00:02,720"
+					},
+					"offsets": {
+						"from": 2720,
+						"to": 2720
+					},
+					"id": 50499,
+					"p": 0.0600897,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:02,720",
+				"to": "00:00:06,500"
+			},
+			"offsets": {
+				"from": 2720,
+				"to": 6500
+			},
+			"text": " At Newberg, he talked down officers ready to defy Congress.",
+			"tokens": [
+				{
+					"text": " At",
+					"timestamps": {
+						"from": "00:00:02,850",
+						"to": "00:00:02,850"
+					},
+					"offsets": {
+						"from": 2850,
+						"to": 2850
+					},
+					"id": 1629,
+					"p": 0.997421,
+					"t_dtw": -1
+				},
+				{
+					"text": " New",
+					"timestamps": {
+						"from": "00:00:02,870",
+						"to": "00:00:03,040"
+					},
+					"offsets": {
+						"from": 2870,
+						"to": 3040
+					},
+					"id": 968,
+					"p": 0.92222,
+					"t_dtw": -1
+				},
+				{
+					"text": "berg",
+					"timestamps": {
+						"from": "00:00:03,040",
+						"to": "00:00:03,300"
+					},
+					"offsets": {
+						"from": 3040,
+						"to": 3300
+					},
+					"id": 3900,
+					"p": 0.494401,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,300",
+						"to": "00:00:03,390"
+					},
+					"offsets": {
+						"from": 3300,
+						"to": 3390
+					},
+					"id": 11,
+					"p": 0.736932,
+					"t_dtw": -1
+				},
+				{
+					"text": " he",
+					"timestamps": {
+						"from": "00:00:03,460",
+						"to": "00:00:03,560"
+					},
+					"offsets": {
+						"from": 3460,
+						"to": 3560
+					},
+					"id": 339,
+					"p": 0.994344,
+					"t_dtw": -1
+				},
+				{
+					"text": " talked",
+					"timestamps": {
+						"from": "00:00:03,560",
+						"to": "00:00:03,950"
+					},
+					"offsets": {
+						"from": 3560,
+						"to": 3950
+					},
+					"id": 6619,
+					"p": 0.982527,
+					"t_dtw": -1
+				},
+				{
+					"text": " down",
+					"timestamps": {
+						"from": "00:00:03,950",
+						"to": "00:00:04,210"
+					},
+					"offsets": {
+						"from": 3950,
+						"to": 4210
+					},
+					"id": 866,
+					"p": 0.991333,
+					"t_dtw": -1
+				},
+				{
+					"text": " officers",
+					"timestamps": {
+						"from": "00:00:04,210",
+						"to": "00:00:04,390"
+					},
+					"offsets": {
+						"from": 4210,
+						"to": 4390
+					},
+					"id": 3790,
+					"p": 0.985993,
+					"t_dtw": -1
+				},
+				{
+					"text": " ready",
+					"timestamps": {
+						"from": "00:00:04,390",
+						"to": "00:00:04,850"
+					},
+					"offsets": {
+						"from": 4390,
+						"to": 4850
+					},
+					"id": 3492,
+					"p": 0.81254,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:05,200",
+						"to": "00:00:05,200"
+					},
+					"offsets": {
+						"from": 5200,
+						"to": 5200
+					},
+					"id": 284,
+					"p": 0.974035,
+					"t_dtw": -1
+				},
+				{
+					"text": " defy",
+					"timestamps": {
+						"from": "00:00:05,520",
+						"to": "00:00:05,520"
+					},
+					"offsets": {
+						"from": 5520,
+						"to": 5520
+					},
+					"id": 37462,
+					"p": 0.992853,
+					"t_dtw": -1
+				},
+				{
+					"text": " Congress",
+					"timestamps": {
+						"from": "00:00:05,540",
+						"to": "00:00:06,230"
+					},
+					"offsets": {
+						"from": 5540,
+						"to": 6230
+					},
+					"id": 3162,
+					"p": 0.947937,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:06,230",
+						"to": "00:00:06,500"
+					},
+					"offsets": {
+						"from": 6230,
+						"to": 6500
+					},
+					"id": 13,
+					"p": 0.614736,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_325]",
+					"timestamps": {
+						"from": "00:00:06,500",
+						"to": "00:00:06,500"
+					},
+					"offsets": {
+						"from": 6500,
+						"to": 6500
+					},
+					"id": 50688,
+					"p": 0.123395,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:06,500",
+				"to": "00:00:10,740"
+			},
+			"offsets": {
+				"from": 6500,
+				"to": 10740
+			},
+			"text": " And at Annapolis, two days before Christmas 1783,",
+			"tokens": [
+				{
+					"text": " And",
+					"timestamps": {
+						"from": "00:00:06,650",
+						"to": "00:00:06,740"
+					},
+					"offsets": {
+						"from": 6650,
+						"to": 6740
+					},
+					"id": 843,
+					"p": 0.99739,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:06,740",
+						"to": "00:00:06,900"
+					},
+					"offsets": {
+						"from": 6740,
+						"to": 6900
+					},
+					"id": 379,
+					"p": 0.982765,
+					"t_dtw": -1
+				},
+				{
+					"text": " Ann",
+					"timestamps": {
+						"from": "00:00:06,900",
+						"to": "00:00:07,130"
+					},
+					"offsets": {
+						"from": 6900,
+						"to": 7130
+					},
+					"id": 5506,
+					"p": 0.986757,
+					"t_dtw": -1
+				},
+				{
+					"text": "apolis",
+					"timestamps": {
+						"from": "00:00:07,130",
+						"to": "00:00:07,620"
+					},
+					"offsets": {
+						"from": 7130,
+						"to": 7620
+					},
+					"id": 11174,
+					"p": 0.998817,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:07,620",
+						"to": "00:00:07,780"
+					},
+					"offsets": {
+						"from": 7620,
+						"to": 7780
+					},
+					"id": 11,
+					"p": 0.934762,
+					"t_dtw": -1
+				},
+				{
+					"text": " two",
+					"timestamps": {
+						"from": "00:00:07,780",
+						"to": "00:00:08,020"
+					},
+					"offsets": {
+						"from": 7780,
+						"to": 8020
+					},
+					"id": 734,
+					"p": 0.966532,
+					"t_dtw": -1
+				},
+				{
+					"text": " days",
+					"timestamps": {
+						"from": "00:00:08,020",
+						"to": "00:00:08,170"
+					},
+					"offsets": {
+						"from": 8020,
+						"to": 8170
+					},
+					"id": 1528,
+					"p": 0.999603,
+					"t_dtw": -1
+				},
+				{
+					"text": " before",
+					"timestamps": {
+						"from": "00:00:08,170",
+						"to": "00:00:08,630"
+					},
+					"offsets": {
+						"from": 8170,
+						"to": 8630
+					},
+					"id": 878,
+					"p": 0.998719,
+					"t_dtw": -1
+				},
+				{
+					"text": " Christmas",
+					"timestamps": {
+						"from": "00:00:09,320",
+						"to": "00:00:09,550"
+					},
+					"offsets": {
+						"from": 9320,
+						"to": 9550
+					},
+					"id": 6786,
+					"p": 0.994689,
+					"t_dtw": -1
+				},
+				{
+					"text": " 17",
+					"timestamps": {
+						"from": "00:00:09,550",
+						"to": "00:00:10,030"
+					},
+					"offsets": {
+						"from": 9550,
+						"to": 10030
+					},
+					"id": 1596,
+					"p": 0.919939,
+					"t_dtw": -1
+				},
+				{
+					"text": "83",
+					"timestamps": {
+						"from": "00:00:10,030",
+						"to": "00:00:10,510"
+					},
+					"offsets": {
+						"from": 10030,
+						"to": 10510
+					},
+					"id": 5999,
+					"p": 0.999746,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:10,510",
+						"to": "00:00:10,740"
+					},
+					"offsets": {
+						"from": 10510,
+						"to": 10740
+					},
+					"id": 11,
+					"p": 0.995279,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_537]",
+					"timestamps": {
+						"from": "00:00:10,740",
+						"to": "00:00:10,740"
+					},
+					"offsets": {
+						"from": 10740,
+						"to": 10740
+					},
+					"id": 50900,
+					"p": 0.140995,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:10,740",
+				"to": "00:00:14,080"
+			},
+			"offsets": {
+				"from": 10740,
+				"to": 14080
+			},
+			"text": " he handed back his commission and went home.",
+			"tokens": [
+				{
+					"text": " he",
+					"timestamps": {
+						"from": "00:00:10,890",
+						"to": "00:00:10,910"
+					},
+					"offsets": {
+						"from": 10890,
+						"to": 10910
+					},
+					"id": 339,
+					"p": 0.999432,
+					"t_dtw": -1
+				},
+				{
+					"text": " handed",
+					"timestamps": {
+						"from": "00:00:10,910",
+						"to": "00:00:11,410"
+					},
+					"offsets": {
+						"from": 10910,
+						"to": 11410
+					},
+					"id": 10158,
+					"p": 0.999518,
+					"t_dtw": -1
+				},
+				{
+					"text": " back",
+					"timestamps": {
+						"from": "00:00:11,480",
+						"to": "00:00:11,730"
+					},
+					"offsets": {
+						"from": 11480,
+						"to": 11730
+					},
+					"id": 736,
+					"p": 0.999367,
+					"t_dtw": -1
+				},
+				{
+					"text": " his",
+					"timestamps": {
+						"from": "00:00:11,800",
+						"to": "00:00:12,010"
+					},
+					"offsets": {
+						"from": 11800,
+						"to": 12010
+					},
+					"id": 465,
+					"p": 0.999706,
+					"t_dtw": -1
+				},
+				{
+					"text": " commission",
+					"timestamps": {
+						"from": "00:00:12,010",
+						"to": "00:00:12,400"
+					},
+					"offsets": {
+						"from": 12010,
+						"to": 12400
+					},
+					"id": 5810,
+					"p": 0.984266,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:12,860",
+						"to": "00:00:12,880"
+					},
+					"offsets": {
+						"from": 12860,
+						"to": 12880
+					},
+					"id": 290,
+					"p": 0.988106,
+					"t_dtw": -1
+				},
+				{
+					"text": " went",
+					"timestamps": {
+						"from": "00:00:13,450",
+						"to": "00:00:13,450"
+					},
+					"offsets": {
+						"from": 13450,
+						"to": 13450
+					},
+					"id": 1816,
+					"p": 0.999788,
+					"t_dtw": -1
+				},
+				{
+					"text": " home",
+					"timestamps": {
+						"from": "00:00:13,560",
+						"to": "00:00:13,790"
+					},
+					"offsets": {
+						"from": 13560,
+						"to": 13790
+					},
+					"id": 1363,
+					"p": 0.99959,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:13,790",
+						"to": "00:00:14,070"
+					},
+					"offsets": {
+						"from": 13790,
+						"to": 14070
+					},
+					"id": 13,
+					"p": 0.9983,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_704]",
+					"timestamps": {
+						"from": "00:00:14,080",
+						"to": "00:00:14,080"
+					},
+					"offsets": {
+						"from": 14080,
+						"to": 14080
+					},
+					"id": 51067,
+					"p": 0.0385391,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,952 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:05,700"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 5700
+			},
+			"text": " He died at Mount Vernon in December 1799, two days after a ride in the snow,",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.895622,
+					"t_dtw": -1
+				},
+				{
+					"text": " He",
+					"timestamps": {
+						"from": "00:00:00,060",
+						"to": "00:00:00,170"
+					},
+					"offsets": {
+						"from": 60,
+						"to": 170
+					},
+					"id": 679,
+					"p": 0.956734,
+					"t_dtw": -1
+				},
+				{
+					"text": " died",
+					"timestamps": {
+						"from": "00:00:00,360",
+						"to": "00:00:00,510"
+					},
+					"offsets": {
+						"from": 360,
+						"to": 510
+					},
+					"id": 3724,
+					"p": 0.997343,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:00,510",
+						"to": "00:00:00,680"
+					},
+					"offsets": {
+						"from": 510,
+						"to": 680
+					},
+					"id": 379,
+					"p": 0.994814,
+					"t_dtw": -1
+				},
+				{
+					"text": " Mount",
+					"timestamps": {
+						"from": "00:00:00,680",
+						"to": "00:00:01,110"
+					},
+					"offsets": {
+						"from": 680,
+						"to": 1110
+					},
+					"id": 5628,
+					"p": 0.948932,
+					"t_dtw": -1
+				},
+				{
+					"text": " Vernon",
+					"timestamps": {
+						"from": "00:00:01,110",
+						"to": "00:00:01,610"
+					},
+					"offsets": {
+						"from": 1110,
+						"to": 1610
+					},
+					"id": 27820,
+					"p": 0.999859,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:01,630",
+						"to": "00:00:01,800"
+					},
+					"offsets": {
+						"from": 1630,
+						"to": 1800
+					},
+					"id": 287,
+					"p": 0.99106,
+					"t_dtw": -1
+				},
+				{
+					"text": " December",
+					"timestamps": {
+						"from": "00:00:01,800",
+						"to": "00:00:02,470"
+					},
+					"offsets": {
+						"from": 1800,
+						"to": 2470
+					},
+					"id": 3426,
+					"p": 0.995749,
+					"t_dtw": -1
+				},
+				{
+					"text": " 17",
+					"timestamps": {
+						"from": "00:00:02,490",
+						"to": "00:00:03,010"
+					},
+					"offsets": {
+						"from": 2490,
+						"to": 3010
+					},
+					"id": 1596,
+					"p": 0.928402,
+					"t_dtw": -1
+				},
+				{
+					"text": "99",
+					"timestamps": {
+						"from": "00:00:03,010",
+						"to": "00:00:03,300"
+					},
+					"offsets": {
+						"from": 3010,
+						"to": 3300
+					},
+					"id": 2079,
+					"p": 0.998645,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,550",
+						"to": "00:00:03,600"
+					},
+					"offsets": {
+						"from": 3550,
+						"to": 3600
+					},
+					"id": 11,
+					"p": 0.806035,
+					"t_dtw": -1
+				},
+				{
+					"text": " two",
+					"timestamps": {
+						"from": "00:00:03,770",
+						"to": "00:00:03,790"
+					},
+					"offsets": {
+						"from": 3770,
+						"to": 3790
+					},
+					"id": 734,
+					"p": 0.653291,
+					"t_dtw": -1
+				},
+				{
+					"text": " days",
+					"timestamps": {
+						"from": "00:00:03,790",
+						"to": "00:00:04,000"
+					},
+					"offsets": {
+						"from": 3790,
+						"to": 4000
+					},
+					"id": 1528,
+					"p": 0.998268,
+					"t_dtw": -1
+				},
+				{
+					"text": " after",
+					"timestamps": {
+						"from": "00:00:04,000",
+						"to": "00:00:04,640"
+					},
+					"offsets": {
+						"from": 4000,
+						"to": 4640
+					},
+					"id": 706,
+					"p": 0.980797,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:04,640",
+						"to": "00:00:04,670"
+					},
+					"offsets": {
+						"from": 4640,
+						"to": 4670
+					},
+					"id": 257,
+					"p": 0.979082,
+					"t_dtw": -1
+				},
+				{
+					"text": " ride",
+					"timestamps": {
+						"from": "00:00:04,710",
+						"to": "00:00:04,980"
+					},
+					"offsets": {
+						"from": 4710,
+						"to": 4980
+					},
+					"id": 6594,
+					"p": 0.978346,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:05,000",
+						"to": "00:00:05,120"
+					},
+					"offsets": {
+						"from": 5000,
+						"to": 5120
+					},
+					"id": 287,
+					"p": 0.985359,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:05,120",
+						"to": "00:00:05,310"
+					},
+					"offsets": {
+						"from": 5120,
+						"to": 5310
+					},
+					"id": 262,
+					"p": 0.990127,
+					"t_dtw": -1
+				},
+				{
+					"text": " snow",
+					"timestamps": {
+						"from": "00:00:05,310",
+						"to": "00:00:05,560"
+					},
+					"offsets": {
+						"from": 5310,
+						"to": 5560
+					},
+					"id": 6729,
+					"p": 0.99306,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:05,560",
+						"to": "00:00:05,630"
+					},
+					"offsets": {
+						"from": 5560,
+						"to": 5630
+					},
+					"id": 11,
+					"p": 0.847993,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_285]",
+					"timestamps": {
+						"from": "00:00:05,700",
+						"to": "00:00:05,700"
+					},
+					"offsets": {
+						"from": 5700,
+						"to": 5700
+					},
+					"id": 50648,
+					"p": 0.0159065,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:05,700",
+				"to": "00:00:09,000"
+			},
+			"offsets": {
+				"from": 5700,
+				"to": 9000
+			},
+			"text": " and every band of his life ends there.",
+			"tokens": [
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:06,000",
+						"to": "00:00:06,000"
+					},
+					"offsets": {
+						"from": 6000,
+						"to": 6000
+					},
+					"id": 290,
+					"p": 0.997706,
+					"t_dtw": -1
+				},
+				{
+					"text": " every",
+					"timestamps": {
+						"from": "00:00:06,060",
+						"to": "00:00:06,490"
+					},
+					"offsets": {
+						"from": 6060,
+						"to": 6490
+					},
+					"id": 790,
+					"p": 0.999119,
+					"t_dtw": -1
+				},
+				{
+					"text": " band",
+					"timestamps": {
+						"from": "00:00:06,490",
+						"to": "00:00:06,840"
+					},
+					"offsets": {
+						"from": 6490,
+						"to": 6840
+					},
+					"id": 4097,
+					"p": 0.993002,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:06,970",
+						"to": "00:00:07,090"
+					},
+					"offsets": {
+						"from": 6970,
+						"to": 7090
+					},
+					"id": 286,
+					"p": 0.998822,
+					"t_dtw": -1
+				},
+				{
+					"text": " his",
+					"timestamps": {
+						"from": "00:00:07,090",
+						"to": "00:00:07,390"
+					},
+					"offsets": {
+						"from": 7090,
+						"to": 7390
+					},
+					"id": 465,
+					"p": 0.999577,
+					"t_dtw": -1
+				},
+				{
+					"text": " life",
+					"timestamps": {
+						"from": "00:00:07,390",
+						"to": "00:00:07,790"
+					},
+					"offsets": {
+						"from": 7390,
+						"to": 7790
+					},
+					"id": 1204,
+					"p": 0.99958,
+					"t_dtw": -1
+				},
+				{
+					"text": " ends",
+					"timestamps": {
+						"from": "00:00:07,790",
+						"to": "00:00:08,170"
+					},
+					"offsets": {
+						"from": 7790,
+						"to": 8170
+					},
+					"id": 5645,
+					"p": 0.998001,
+					"t_dtw": -1
+				},
+				{
+					"text": " there",
+					"timestamps": {
+						"from": "00:00:08,190",
+						"to": "00:00:08,680"
+					},
+					"offsets": {
+						"from": 8190,
+						"to": 8680
+					},
+					"id": 612,
+					"p": 0.99899,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:08,680",
+						"to": "00:00:08,990"
+					},
+					"offsets": {
+						"from": 8680,
+						"to": 8990
+					},
+					"id": 13,
+					"p": 0.994057,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_450]",
+					"timestamps": {
+						"from": "00:00:09,000",
+						"to": "00:00:09,000"
+					},
+					"offsets": {
+						"from": 9000,
+						"to": 9000
+					},
+					"id": 50813,
+					"p": 0.0565455,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:09,000",
+				"to": "00:00:14,000"
+			},
+			"offsets": {
+				"from": 9000,
+				"to": 14000
+			},
+			"text": " It's a timeline we built from Wikipedia, his papers and Mount Vernon's own research.",
+			"tokens": [
+				{
+					"text": " It",
+					"timestamps": {
+						"from": "00:00:09,060",
+						"to": "00:00:09,140"
+					},
+					"offsets": {
+						"from": 9060,
+						"to": 9140
+					},
+					"id": 632,
+					"p": 0.994879,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:09,280",
+						"to": "00:00:09,280"
+					},
+					"offsets": {
+						"from": 9280,
+						"to": 9280
+					},
+					"id": 338,
+					"p": 0.990577,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:09,350",
+						"to": "00:00:09,350"
+					},
+					"offsets": {
+						"from": 9350,
+						"to": 9350
+					},
+					"id": 257,
+					"p": 0.99902,
+					"t_dtw": -1
+				},
+				{
+					"text": " timeline",
+					"timestamps": {
+						"from": "00:00:09,360",
+						"to": "00:00:09,900"
+					},
+					"offsets": {
+						"from": 9360,
+						"to": 9900
+					},
+					"id": 15264,
+					"p": 0.96108,
+					"t_dtw": -1
+				},
+				{
+					"text": " we",
+					"timestamps": {
+						"from": "00:00:09,950",
+						"to": "00:00:10,060"
+					},
+					"offsets": {
+						"from": 9950,
+						"to": 10060
+					},
+					"id": 356,
+					"p": 0.997212,
+					"t_dtw": -1
+				},
+				{
+					"text": " built",
+					"timestamps": {
+						"from": "00:00:10,060",
+						"to": "00:00:10,410"
+					},
+					"offsets": {
+						"from": 10060,
+						"to": 10410
+					},
+					"id": 3170,
+					"p": 0.986363,
+					"t_dtw": -1
+				},
+				{
+					"text": " from",
+					"timestamps": {
+						"from": "00:00:10,410",
+						"to": "00:00:10,690"
+					},
+					"offsets": {
+						"from": 10410,
+						"to": 10690
+					},
+					"id": 422,
+					"p": 0.99747,
+					"t_dtw": -1
+				},
+				{
+					"text": " Wikipedia",
+					"timestamps": {
+						"from": "00:00:10,690",
+						"to": "00:00:11,330"
+					},
+					"offsets": {
+						"from": 10690,
+						"to": 11330
+					},
+					"id": 15312,
+					"p": 0.990425,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:11,330",
+						"to": "00:00:11,500"
+					},
+					"offsets": {
+						"from": 11330,
+						"to": 11500
+					},
+					"id": 11,
+					"p": 0.864705,
+					"t_dtw": -1
+				},
+				{
+					"text": " his",
+					"timestamps": {
+						"from": "00:00:11,500",
+						"to": "00:00:11,740"
+					},
+					"offsets": {
+						"from": 11500,
+						"to": 11740
+					},
+					"id": 465,
+					"p": 0.874343,
+					"t_dtw": -1
+				},
+				{
+					"text": " papers",
+					"timestamps": {
+						"from": "00:00:11,740",
+						"to": "00:00:12,220"
+					},
+					"offsets": {
+						"from": 11740,
+						"to": 12220
+					},
+					"id": 9473,
+					"p": 0.997444,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:12,220",
+						"to": "00:00:12,300"
+					},
+					"offsets": {
+						"from": 12220,
+						"to": 12300
+					},
+					"id": 290,
+					"p": 0.594906,
+					"t_dtw": -1
+				},
+				{
+					"text": " Mount",
+					"timestamps": {
+						"from": "00:00:12,760",
+						"to": "00:00:12,760"
+					},
+					"offsets": {
+						"from": 12760,
+						"to": 12760
+					},
+					"id": 5628,
+					"p": 0.970668,
+					"t_dtw": -1
+				},
+				{
+					"text": " Vernon",
+					"timestamps": {
+						"from": "00:00:12,770",
+						"to": "00:00:13,100"
+					},
+					"offsets": {
+						"from": 12770,
+						"to": 13100
+					},
+					"id": 27820,
+					"p": 0.994869,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:13,100",
+						"to": "00:00:13,210"
+					},
+					"offsets": {
+						"from": 13100,
+						"to": 13210
+					},
+					"id": 338,
+					"p": 0.998525,
+					"t_dtw": -1
+				},
+				{
+					"text": " own",
+					"timestamps": {
+						"from": "00:00:13,210",
+						"to": "00:00:13,400"
+					},
+					"offsets": {
+						"from": 13210,
+						"to": 13400
+					},
+					"id": 898,
+					"p": 0.989421,
+					"t_dtw": -1
+				},
+				{
+					"text": " research",
+					"timestamps": {
+						"from": "00:00:13,400",
+						"to": "00:00:13,830"
+					},
+					"offsets": {
+						"from": 13400,
+						"to": 13830
+					},
+					"id": 2267,
+					"p": 0.975793,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:13,830",
+						"to": "00:00:13,970"
+					},
+					"offsets": {
+						"from": 13830,
+						"to": 13970
+					},
+					"id": 13,
+					"p": 0.96225,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_700]",
+					"timestamps": {
+						"from": "00:00:14,000",
+						"to": "00:00:14,000"
+					},
+					"offsets": {
+						"from": 14000,
+						"to": 14000
+					},
+					"id": 51063,
+					"p": 0.0481941,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:14,000",
+				"to": "00:00:18,000"
+			},
+			"offsets": {
+				"from": 14000,
+				"to": 18000
+			},
+			"text": " Open it, follow the sources, and keep going.",
+			"tokens": [
+				{
+					"text": " Open",
+					"timestamps": {
+						"from": "00:00:14,330",
+						"to": "00:00:14,390"
+					},
+					"offsets": {
+						"from": 14330,
+						"to": 14390
+					},
+					"id": 4946,
+					"p": 0.991883,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:14,390",
+						"to": "00:00:14,580"
+					},
+					"offsets": {
+						"from": 14390,
+						"to": 14580
+					},
+					"id": 340,
+					"p": 0.99415,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:14,580",
+						"to": "00:00:14,770"
+					},
+					"offsets": {
+						"from": 14580,
+						"to": 14770
+					},
+					"id": 11,
+					"p": 0.905276,
+					"t_dtw": -1
+				},
+				{
+					"text": " follow",
+					"timestamps": {
+						"from": "00:00:14,770",
+						"to": "00:00:15,350"
+					},
+					"offsets": {
+						"from": 14770,
+						"to": 15350
+					},
+					"id": 1061,
+					"p": 0.993284,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:15,350",
+						"to": "00:00:15,640"
+					},
+					"offsets": {
+						"from": 15350,
+						"to": 15640
+					},
+					"id": 262,
+					"p": 0.997916,
+					"t_dtw": -1
+				},
+				{
+					"text": " sources",
+					"timestamps": {
+						"from": "00:00:15,640",
+						"to": "00:00:16,320"
+					},
+					"offsets": {
+						"from": 15640,
+						"to": 16320
+					},
+					"id": 4237,
+					"p": 0.996928,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:16,320",
+						"to": "00:00:16,510"
+					},
+					"offsets": {
+						"from": 16320,
+						"to": 16510
+					},
+					"id": 11,
+					"p": 0.67215,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:16,510",
+						"to": "00:00:16,800"
+					},
+					"offsets": {
+						"from": 16510,
+						"to": 16800
+					},
+					"id": 290,
+					"p": 0.996232,
+					"t_dtw": -1
+				},
+				{
+					"text": " keep",
+					"timestamps": {
+						"from": "00:00:16,800",
+						"to": "00:00:17,180"
+					},
+					"offsets": {
+						"from": 16800,
+						"to": 17180
+					},
+					"id": 1394,
+					"p": 0.997318,
+					"t_dtw": -1
+				},
+				{
+					"text": " going",
+					"timestamps": {
+						"from": "00:00:17,180",
+						"to": "00:00:17,300"
+					},
+					"offsets": {
+						"from": 17180,
+						"to": 17300
+					},
+					"id": 1016,
+					"p": 0.999508,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:17,770",
+						"to": "00:00:18,000"
+					},
+					"offsets": {
+						"from": 17770,
+						"to": 18000
+					},
+					"id": 13,
+					"p": 0.963793,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_900]",
+					"timestamps": {
+						"from": "00:00:18,000",
+						"to": "00:00:18,000"
+					},
+					"offsets": {
+						"from": 18000,
+						"to": 18000
+					},
+					"id": 51263,
+					"p": 0.233856,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

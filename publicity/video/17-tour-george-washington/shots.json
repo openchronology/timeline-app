@@ -1,0 +1,271 @@
+{
+  "sample": "../samples/washington.ochx",
+  "size": [1280, 720],
+  "scale": 1.5,
+  "shots": [
+    {
+      "id": "whole",
+      "dur": 0.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-7605169200, -5238500400]
+        }
+      ]
+    },
+    {
+      "id": "birth",
+      "dur": 6,
+      "setup": [
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-7605169200, -5238500400]
+        },
+        {
+          "t": 2.5,
+          "view": [-7542097200, -7463300400]
+        }
+      ],
+      "actions": [
+        {
+          "t": 3.2,
+          "do": "open",
+          "title": "Born at Popes Creek"
+        }
+      ]
+    },
+    {
+      "id": "youth",
+      "dur": 15,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-7542097200, -6771668400]
+        },
+        {
+          "t": 1.5,
+          "view": [-7542097200, -6771668400]
+        },
+        {
+          "t": 5,
+          "view": [-7478938800, -7100247600]
+        },
+        {
+          "t": 14,
+          "view": [-7055665200, -6784714800],
+          "ease": "linear"
+        }
+      ]
+    },
+    {
+      "id": "regiment",
+      "dur": 13,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-7055665200, -6784714800]
+        },
+        {
+          "t": 2,
+          "view": [-6858327600, -6653386800]
+        },
+        {
+          "t": 3.5,
+          "view": [-6858327600, -6653386800]
+        },
+        {
+          "t": 5.5,
+          "view": [-6807265200, -6796724400]
+        },
+        {
+          "t": 7.5,
+          "view": [-6807265200, -6796724400]
+        },
+        {
+          "t": 10,
+          "view": [-6792663600, -6650708400]
+        },
+        {
+          "t": 12.5,
+          "view": [-6747994800, -6653386800],
+          "ease": "linear"
+        }
+      ]
+    },
+    {
+      "id": "revolution",
+      "dur": 16,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-6747994800, -6653386800]
+        },
+        {
+          "t": 2,
+          "view": [-6180001200, -5848484400]
+        },
+        {
+          "t": 4,
+          "view": [-6180001200, -5848484400]
+        },
+        {
+          "t": 10,
+          "view": [-6091614000, -6089626800]
+        },
+        {
+          "t": 11.5,
+          "view": [-6091614000, -6089626800]
+        },
+        {
+          "t": 15,
+          "view": [-6077358000, -5919591600]
+        }
+      ]
+    },
+    {
+      "id": "newburgh",
+      "dur": 10,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-5924862000, -5877514800]
+        },
+        {
+          "t": 9,
+          "view": [-5903780400, -5856433200],
+          "ease": "linear"
+        }
+      ]
+    },
+    {
+      "id": "presidency",
+      "dur": 15,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-5856433200, -5648641200]
+        },
+        {
+          "t": 1,
+          "view": [-5856433200, -5648641200]
+        },
+        {
+          "t": 14,
+          "view": [-5659182000, -5451476400],
+          "ease": "linear"
+        }
+      ]
+    },
+    {
+      "id": "slavery",
+      "dur": 3,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-7605169200, -5238500400]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.4,
+          "do": "separate",
+          "tags": ["slavery"]
+        }
+      ]
+    },
+    {
+      "id": "will",
+      "dur": 8,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        },
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-5522410800, -5288526000]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.5,
+          "do": "open",
+          "title": "He signs his will"
+        },
+        {
+          "t": 5,
+          "do": "click",
+          "selector": "#reader-related .related-entity:has-text(\"Martha frees them\")"
+        }
+      ]
+    },
+    {
+      "id": "death",
+      "dur": 7,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); })()"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-5522410800, -5288526000]
+        },
+        {
+          "t": 5.5,
+          "view": [-5366718000, -5364644400]
+        }
+      ]
+    }
+  ]
+}
