@@ -85,11 +85,17 @@ export async function checkRelationships(page, restore) {
     await page.getByRole('button', { name: 'Alpha', exact: true }).click({ force: true });
     await related.getByRole('button', { name: 'Separate all connected' }).click();
     await page.locator('#separation-settings').waitFor({ state: 'visible' });
+    // The bar describes the separation made, not tags (#342).
+    const bar = async () =>
+      [
+        await page.locator('#separation-heading').textContent(),
+        await page.locator('#separation-tags').textContent(),
+        (await page.locator('#separation-note').textContent()).trim(),
+      ].join(' | ');
     assert.equal(
-      await page.locator('#separation-heading').textContent(),
-      'Separated by all connected relationships',
+      await bar(),
+      'Separated: connected to | Alpha | Read-only. Shown above: Alpha and everything connected to it through relationships; everything else stays below.',
     );
-    assert.equal(await page.locator('#separation-tags').textContent(), 'Alpha');
     // Separation re-keys markers into tracks, which ease into place; wait for the settled
     // layout with the connected moments above Delta.
     await page.waitForFunction(() => {
@@ -101,6 +107,27 @@ export async function checkRelationships(page, restore) {
       return ['Alpha', 'Bravo', 'Charlie'].every((name) => y(name) < delta);
     });
     assert.equal(await page.locator('.edge-arc').count(), 0, 'Separated tracks draw no arcs.');
+    await page.locator('#separation-rejoin').click();
+    await page.locator('#separation-settings').waitFor({ state: 'hidden' });
+    await page.waitForFunction(() => document.querySelectorAll('.edge-arc').length === 2);
+    // Separate related says so; separating by tags afterwards returns to the tag wording.
+    await page.getByRole('button', { name: 'Alpha', exact: true }).click({ force: true });
+    await related.getByRole('button', { name: 'Separate related' }).click();
+    await page.locator('#separation-settings').waitFor({ state: 'visible' });
+    assert.equal(
+      await bar(),
+      'Separated: related to | Alpha | Read-only. Shown above: Alpha and the events related to it; everything else stays below.',
+    );
+    await page.locator('#separation-rejoin').click();
+    await page.locator('#separation-settings').waitFor({ state: 'hidden' });
+    await page.locator('#separate-button').click();
+    await page.locator('#separate-extra').fill('anything');
+    await page.locator('#separate-submit').click();
+    await page.locator('#separation-settings').waitFor({ state: 'visible' });
+    assert.equal(
+      await bar(),
+      'Separated by tags | anything | Read-only. Events with any of these tags are shown above; everything else stays below.',
+    );
     await page.locator('#separation-rejoin').click();
     await page.locator('#separation-settings').waitFor({ state: 'hidden' });
     await page.waitForFunction(() => document.querySelectorAll('.edge-arc').length === 2);

@@ -8632,15 +8632,25 @@ function startSeparation(by: string[] | Separation) {
   startComparison(sources, presentation);
   // Separating keeps the current view rather than fitting both tracks.
   viewport = before;
+  // The bar names what was separated: the tags, or the entity whose relationships were
+  // followed (#342).
   text(
     'separation-heading',
     'tags' in choice
       ? 'Separated by tags'
       : choice.depth === 'direct'
-        ? 'Separated by relationships'
-        : 'Separated by all connected relationships',
+        ? 'Separated: related to'
+        : 'Separated: connected to',
   );
   text('separation-tags', label);
+  text(
+    'separation-note',
+    'tags' in choice
+      ? 'Read-only. Events with any of these tags are shown above; everything else stays below.'
+      : choice.depth === 'direct'
+        ? `Read-only. Shown above: ${label} and the events related to it; everything else stays below.`
+        : `Read-only. Shown above: ${label} and everything connected to it through relationships; everything else stays below.`,
+  );
   el('separation-map').hidden = !bulkEditable();
   heading();
   requestRender();
