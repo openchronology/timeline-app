@@ -1,0 +1,10 @@
+{
+  "script": "../../shorts/13-the-first-archaeologist.md",
+  "format": "vertical",
+  "look": "archive",
+  "pace": 1.0,
+  "silence": 0.2,
+  "lead": 0.15,
+  "tail": 0.3,
+  "hold": 2.0
+}

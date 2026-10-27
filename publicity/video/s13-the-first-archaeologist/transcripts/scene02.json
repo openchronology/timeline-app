@@ -1,0 +1,673 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:03,160"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 3160
+			},
+			"text": " He was Nabinidus, Babylon's last king.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.893293,
+					"t_dtw": -1
+				},
+				{
+					"text": " He",
+					"timestamps": {
+						"from": "00:00:00,170",
+						"to": "00:00:00,170"
+					},
+					"offsets": {
+						"from": 170,
+						"to": 170
+					},
+					"id": 679,
+					"p": 0.922071,
+					"t_dtw": -1
+				},
+				{
+					"text": " was",
+					"timestamps": {
+						"from": "00:00:00,310",
+						"to": "00:00:00,430"
+					},
+					"offsets": {
+						"from": 310,
+						"to": 430
+					},
+					"id": 373,
+					"p": 0.999458,
+					"t_dtw": -1
+				},
+				{
+					"text": " N",
+					"timestamps": {
+						"from": "00:00:00,430",
+						"to": "00:00:00,450"
+					},
+					"offsets": {
+						"from": 430,
+						"to": 450
+					},
+					"id": 399,
+					"p": 0.302239,
+					"t_dtw": -1
+				},
+				{
+					"text": "abin",
+					"timestamps": {
+						"from": "00:00:00,510",
+						"to": "00:00:00,860"
+					},
+					"offsets": {
+						"from": 510,
+						"to": 860
+					},
+					"id": 6014,
+					"p": 0.696203,
+					"t_dtw": -1
+				},
+				{
+					"text": "id",
+					"timestamps": {
+						"from": "00:00:00,860",
+						"to": "00:00:01,030"
+					},
+					"offsets": {
+						"from": 860,
+						"to": 1030
+					},
+					"id": 312,
+					"p": 0.518049,
+					"t_dtw": -1
+				},
+				{
+					"text": "us",
+					"timestamps": {
+						"from": "00:00:01,030",
+						"to": "00:00:01,180"
+					},
+					"offsets": {
+						"from": 1030,
+						"to": 1180
+					},
+					"id": 385,
+					"p": 0.889565,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,360",
+						"to": "00:00:01,370"
+					},
+					"offsets": {
+						"from": 1360,
+						"to": 1370
+					},
+					"id": 11,
+					"p": 0.969065,
+					"t_dtw": -1
+				},
+				{
+					"text": " Babylon",
+					"timestamps": {
+						"from": "00:00:01,370",
+						"to": "00:00:01,980"
+					},
+					"offsets": {
+						"from": 1370,
+						"to": 1980
+					},
+					"id": 28028,
+					"p": 0.982432,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:01,980",
+						"to": "00:00:02,090"
+					},
+					"offsets": {
+						"from": 1980,
+						"to": 2090
+					},
+					"id": 338,
+					"p": 0.998494,
+					"t_dtw": -1
+				},
+				{
+					"text": " last",
+					"timestamps": {
+						"from": "00:00:02,140",
+						"to": "00:00:02,460"
+					},
+					"offsets": {
+						"from": 2140,
+						"to": 2460
+					},
+					"id": 938,
+					"p": 0.991041,
+					"t_dtw": -1
+				},
+				{
+					"text": " king",
+					"timestamps": {
+						"from": "00:00:02,500",
+						"to": "00:00:02,500"
+					},
+					"offsets": {
+						"from": 2500,
+						"to": 2500
+					},
+					"id": 5822,
+					"p": 0.960752,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:02,500",
+						"to": "00:00:03,160"
+					},
+					"offsets": {
+						"from": 2500,
+						"to": 3160
+					},
+					"id": 13,
+					"p": 0.97813,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_158]",
+					"timestamps": {
+						"from": "00:00:03,160",
+						"to": "00:00:03,160"
+					},
+					"offsets": {
+						"from": 3160,
+						"to": 3160
+					},
+					"id": 50521,
+					"p": 0.0529473,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:03,160",
+				"to": "00:00:04,840"
+			},
+			"offsets": {
+				"from": 3160,
+				"to": 4840
+			},
+			"text": " Rebuilding a temple at Zippar,",
+			"tokens": [
+				{
+					"text": " Reb",
+					"timestamps": {
+						"from": "00:00:03,340",
+						"to": "00:00:03,340"
+					},
+					"offsets": {
+						"from": 3340,
+						"to": 3340
+					},
+					"id": 15652,
+					"p": 0.924236,
+					"t_dtw": -1
+				},
+				{
+					"text": "uilding",
+					"timestamps": {
+						"from": "00:00:03,470",
+						"to": "00:00:03,770"
+					},
+					"offsets": {
+						"from": 3470,
+						"to": 3770
+					},
+					"id": 6963,
+					"p": 0.986619,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:03,770",
+						"to": "00:00:03,830"
+					},
+					"offsets": {
+						"from": 3770,
+						"to": 3830
+					},
+					"id": 257,
+					"p": 0.999451,
+					"t_dtw": -1
+				},
+				{
+					"text": " temple",
+					"timestamps": {
+						"from": "00:00:03,830",
+						"to": "00:00:04,150"
+					},
+					"offsets": {
+						"from": 3830,
+						"to": 4150
+					},
+					"id": 12505,
+					"p": 0.992407,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:04,150",
+						"to": "00:00:04,320"
+					},
+					"offsets": {
+						"from": 4150,
+						"to": 4320
+					},
+					"id": 379,
+					"p": 0.996428,
+					"t_dtw": -1
+				},
+				{
+					"text": " Z",
+					"timestamps": {
+						"from": "00:00:04,320",
+						"to": "00:00:04,340"
+					},
+					"offsets": {
+						"from": 4320,
+						"to": 4340
+					},
+					"id": 1168,
+					"p": 0.248725,
+					"t_dtw": -1
+				},
+				{
+					"text": "ipp",
+					"timestamps": {
+						"from": "00:00:04,520",
+						"to": "00:00:04,560"
+					},
+					"offsets": {
+						"from": 4520,
+						"to": 4560
+					},
+					"id": 3974,
+					"p": 0.934548,
+					"t_dtw": -1
+				},
+				{
+					"text": "ar",
+					"timestamps": {
+						"from": "00:00:04,560",
+						"to": "00:00:04,660"
+					},
+					"offsets": {
+						"from": 4560,
+						"to": 4660
+					},
+					"id": 283,
+					"p": 0.970701,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:04,700",
+						"to": "00:00:04,840"
+					},
+					"offsets": {
+						"from": 4700,
+						"to": 4840
+					},
+					"id": 11,
+					"p": 0.967314,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_242]",
+					"timestamps": {
+						"from": "00:00:04,840",
+						"to": "00:00:04,840"
+					},
+					"offsets": {
+						"from": 4840,
+						"to": 4840
+					},
+					"id": 50605,
+					"p": 0.0401268,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,840",
+				"to": "00:00:08,520"
+			},
+			"offsets": {
+				"from": 4840,
+				"to": 8520
+			},
+			"text": " he dug down to an inscription of Narimson, a king of Akkad.",
+			"tokens": [
+				{
+					"text": " he",
+					"timestamps": {
+						"from": "00:00:04,880",
+						"to": "00:00:04,950"
+					},
+					"offsets": {
+						"from": 4880,
+						"to": 4950
+					},
+					"id": 339,
+					"p": 0.979697,
+					"t_dtw": -1
+				},
+				{
+					"text": " dug",
+					"timestamps": {
+						"from": "00:00:05,120",
+						"to": "00:00:05,120"
+					},
+					"offsets": {
+						"from": 5120,
+						"to": 5120
+					},
+					"id": 18735,
+					"p": 0.990531,
+					"t_dtw": -1
+				},
+				{
+					"text": " down",
+					"timestamps": {
+						"from": "00:00:05,150",
+						"to": "00:00:05,300"
+					},
+					"offsets": {
+						"from": 5150,
+						"to": 5300
+					},
+					"id": 866,
+					"p": 0.99899,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:05,350",
+						"to": "00:00:05,460"
+					},
+					"offsets": {
+						"from": 5350,
+						"to": 5460
+					},
+					"id": 284,
+					"p": 0.995251,
+					"t_dtw": -1
+				},
+				{
+					"text": " an",
+					"timestamps": {
+						"from": "00:00:05,460",
+						"to": "00:00:05,550"
+					},
+					"offsets": {
+						"from": 5460,
+						"to": 5550
+					},
+					"id": 281,
+					"p": 0.996915,
+					"t_dtw": -1
+				},
+				{
+					"text": " inscription",
+					"timestamps": {
+						"from": "00:00:05,550",
+						"to": "00:00:06,240"
+					},
+					"offsets": {
+						"from": 5550,
+						"to": 6240
+					},
+					"id": 40189,
+					"p": 0.996966,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:06,240",
+						"to": "00:00:06,400"
+					},
+					"offsets": {
+						"from": 6240,
+						"to": 6400
+					},
+					"id": 286,
+					"p": 0.946832,
+					"t_dtw": -1
+				},
+				{
+					"text": " Nar",
+					"timestamps": {
+						"from": "00:00:06,400",
+						"to": "00:00:06,640"
+					},
+					"offsets": {
+						"from": 6400,
+						"to": 6640
+					},
+					"id": 13596,
+					"p": 0.318441,
+					"t_dtw": -1
+				},
+				{
+					"text": "im",
+					"timestamps": {
+						"from": "00:00:06,640",
+						"to": "00:00:06,790"
+					},
+					"offsets": {
+						"from": 6640,
+						"to": 6790
+					},
+					"id": 320,
+					"p": 0.812274,
+					"t_dtw": -1
+				},
+				{
+					"text": "son",
+					"timestamps": {
+						"from": "00:00:06,790",
+						"to": "00:00:07,000"
+					},
+					"offsets": {
+						"from": 6790,
+						"to": 7000
+					},
+					"id": 1559,
+					"p": 0.64285,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:07,040",
+						"to": "00:00:07,190"
+					},
+					"offsets": {
+						"from": 7040,
+						"to": 7190
+					},
+					"id": 11,
+					"p": 0.969255,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:07,200",
+						"to": "00:00:07,260"
+					},
+					"offsets": {
+						"from": 7200,
+						"to": 7260
+					},
+					"id": 257,
+					"p": 0.520022,
+					"t_dtw": -1
+				},
+				{
+					"text": " king",
+					"timestamps": {
+						"from": "00:00:07,270",
+						"to": "00:00:07,320"
+					},
+					"offsets": {
+						"from": 7270,
+						"to": 7320
+					},
+					"id": 5822,
+					"p": 0.912621,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:07,320",
+						"to": "00:00:07,730"
+					},
+					"offsets": {
+						"from": 7320,
+						"to": 7730
+					},
+					"id": 286,
+					"p": 0.999098,
+					"t_dtw": -1
+				},
+				{
+					"text": " Ak",
+					"timestamps": {
+						"from": "00:00:07,950",
+						"to": "00:00:07,970"
+					},
+					"offsets": {
+						"from": 7950,
+						"to": 7970
+					},
+					"id": 9084,
+					"p": 0.838689,
+					"t_dtw": -1
+				},
+				{
+					"text": "k",
+					"timestamps": {
+						"from": "00:00:07,970",
+						"to": "00:00:08,050"
+					},
+					"offsets": {
+						"from": 7970,
+						"to": 8050
+					},
+					"id": 74,
+					"p": 0.891372,
+					"t_dtw": -1
+				},
+				{
+					"text": "ad",
+					"timestamps": {
+						"from": "00:00:08,220",
+						"to": "00:00:08,220"
+					},
+					"offsets": {
+						"from": 8220,
+						"to": 8220
+					},
+					"id": 324,
+					"p": 0.989146,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:08,230",
+						"to": "00:00:08,490"
+					},
+					"offsets": {
+						"from": 8230,
+						"to": 8490
+					},
+					"id": 13,
+					"p": 0.990029,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_426]",
+					"timestamps": {
+						"from": "00:00:08,520",
+						"to": "00:00:08,520"
+					},
+					"offsets": {
+						"from": 8520,
+						"to": 8520
+					},
+					"id": 50789,
+					"p": 0.0214782,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

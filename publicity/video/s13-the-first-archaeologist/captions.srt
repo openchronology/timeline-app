@@ -1,0 +1,52 @@
+1
+00:00:00,450 --> 00:00:04,910
+Around 540 BCE, a Babylonian
+king dug up a ruin,
+
+2
+00:00:04,960 --> 00:00:07,580
+and said it was thirty-two
+hundred years old.
+
+3
+00:00:07,800 --> 00:00:12,460
+He was Nabonidus, Babylon's last
+king. Rebuilding a temple at Sippar,
+
+4
+00:00:12,510 --> 00:00:16,519
+he dug down to an inscription
+of Naram-Sin, a king of Akkad.
+
+5
+00:00:16,819 --> 00:00:21,809
+Put them on one line. Separate related,
+and the two kings rise into a track of
+
+6
+00:00:21,859 --> 00:00:27,809
+their own. Naram-Sin ruled about 2250
+BCE. The gap isn't thirty-two hundred
+
+7
+00:00:27,859 --> 00:00:30,563
+years. It's about seventeen hundred.
+
+8
+00:00:30,823 --> 00:00:36,463
+His number would put it before 3700 BCE,
+earlier than any writing we know of.
+
+9
+00:00:36,513 --> 00:00:41,117
+He was out by fifteen centuries, and he's
+still called the first archaeologist.
+
+10
+00:00:41,437 --> 00:00:44,337
+Every date on one line,
+with where it comes from.
+
+11
+00:00:44,387 --> 00:00:46,916
+That's OpenChronology, and it's free.

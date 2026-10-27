@@ -1,0 +1,298 @@
+{
+  "sample": "../samples/mesopotamia.ochx",
+  "size": [1280, 720],
+  "scale": 1.5,
+  "shots": [
+    {
+      "id": "sweep",
+      "dur": 0.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-325178236800, -30171139200]
+        }
+      ]
+    },
+    {
+      "id": "uruk",
+      "dur": 7.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-325178236800, -30171139200]
+        },
+        {
+          "t": 6.5,
+          "view": [-191519164800, -150495062400]
+        }
+      ]
+    },
+    {
+      "id": "sumer",
+      "dur": 18,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const r = document.getElementById('density'); r.value = '12'; r.dispatchEvent(new Event('input', { bubbles: true })); r.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-191519164800, -150495062400]
+        },
+        {
+          "t": 3,
+          "view": [-140081356800, -130298630400]
+        },
+        {
+          "t": 16,
+          "view": [-133769923200, -123671664000]
+        }
+      ]
+    },
+    {
+      "id": "law",
+      "dur": 3,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-141028041600, -95270428800]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.4,
+          "do": "separate",
+          "tags": ["law"]
+        }
+      ]
+    },
+    {
+      "id": "reader",
+      "dur": 6,
+      "setup": [
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-120515990400, -115782480000]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.5,
+          "do": "open",
+          "title": "The Code of Hammurabi"
+        },
+        {
+          "t": 4,
+          "do": "click",
+          "selector": "#reader-related .related-entity:has-text(\"stele carried to Susa\")"
+        }
+      ]
+    },
+    {
+      "id": "venus",
+      "dur": 2,
+      "setup": [
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-115782480000, -111048883200]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.3,
+          "do": "open",
+          "title": "The Venus tablet"
+        }
+      ]
+    },
+    {
+      "id": "sack",
+      "dur": 2,
+      "setup": [
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-115782480000, -111048883200]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.1,
+          "do": "open",
+          "title": "The Venus tablet"
+        },
+        {
+          "t": 0.3,
+          "do": "click",
+          "selector": "#reader-related .related-entity:has-text(\"The Hittites sack\")"
+        }
+      ]
+    },
+    {
+      "id": "eclipse",
+      "dur": 2,
+      "setup": [
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-87381158400, -84856550400]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.3,
+          "do": "open",
+          "title": "The eclipse of Bur-Sagale"
+        }
+      ]
+    },
+    {
+      "id": "assyria",
+      "dur": 4,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const r = document.getElementById('density'); r.value = '12'; r.dispatchEvent(new Event('input', { bubbles: true })); r.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-103159699200, -71602704000]
+        },
+        {
+          "t": 3,
+          "view": [-90095155200, -81069811200]
+        }
+      ]
+    },
+    {
+      "id": "babylon",
+      "dur": 4,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const r = document.getElementById('density'); r.value = '12'; r.dispatchEvent(new Event('input', { bubbles: true })); r.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-90095155200, -81069811200]
+        },
+        {
+          "t": 3,
+          "view": [-81385344000, -78860822400]
+        }
+      ]
+    },
+    {
+      "id": "nabonidus",
+      "dur": 2,
+      "setup": [
+        {
+          "do": "viewMode",
+          "on": true
+        },
+        {
+          "do": "eval",
+          "js": "(() => { const r = document.getElementById('density'); r.value = '12'; r.dispatchEvent(new Event('input', { bubbles: true })); r.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-81385344000, -78860822400]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.3,
+          "do": "open",
+          "title": "Nabonidus digs up"
+        }
+      ]
+    },
+    {
+      "id": "fall",
+      "dur": 7,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-81385344000, -78860822400]
+        },
+        {
+          "t": 6,
+          "view": [-79122182400, -79118208000]
+        }
+      ]
+    },
+    {
+      "id": "fall-reader",
+      "dur": 2,
+      "setup": [
+        {
+          "do": "viewMode",
+          "on": true
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-79134451200, -79102915200]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0.1,
+          "do": "eval",
+          "js": "(async () => { for (const b of document.querySelectorAll('#markers .event-marker.group')) { b.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse', bubbles: false })); await new Promise((r) => setTimeout(r, 700)); const m = document.querySelector('.summary-member[aria-label=\"Babylon falls to Cyrus\"]'); if (m) { m.click(); return; } b.dispatchEvent(new PointerEvent('pointerleave', { pointerType: 'mouse' })); await new Promise((r) => setTimeout(r, 300)); } })()"
+        }
+      ]
+    },
+    {
+      "id": "epilogue",
+      "dur": 4,
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const r = document.getElementById('density'); r.value = '12'; r.dispatchEvent(new Event('input', { bubbles: true })); r.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ],
+      "keys": [
+        {
+          "t": 0,
+          "view": [-79122182400, -79118208000]
+        },
+        {
+          "t": 3,
+          "view": [-79807507200, -71602704000]
+        }
+      ]
+    }
+  ]
+}

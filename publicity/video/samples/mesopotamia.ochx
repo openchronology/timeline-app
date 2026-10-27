@@ -1,0 +1,2638 @@
+{
+ "format": "openchronology",
+ "version": 1,
+ "title": "Ancient Mesopotamia",
+ "description": "From the first farming villages, about 7000 BCE, through Uruk's first cities and writing, Sumer, Akkad, Ur, Hammurabi's Babylon, the Kassites and the Assyrian empires, to Nebuchadnezzar's Babylon and its fall to Cyrus in 539 BCE, with Alexander's death in Babylon in 323 BCE as an epilogue. A sample timeline built from the sources cited on each moment, mostly their Wikipedia articles; not a definitive history.\n\n**How to read it.** Chapter headings mark the eras. Periods, empires and reigns are durations; inventions, writings, laws, cities, buildings and battles are moments, coloured by tag.\n\n**Dates.** Before about 1500 BCE they depend on the chronology: this timeline uses the conventional **middle chronology** (Hammurabi 1792–1750 BCE, the Hittite sack of Babylon 1595 BCE); the high and low chronologies put the same events decades earlier or later. Prehistoric dates are approximate, and each moment's **Date precision** says how its date is known. A moment known only to the year sits at the start of that year. The display is proleptic Gregorian; days known from Babylonian records keep the Julian date historians give beside them (**Original historical date**), about six days later in the sixth century BCE.",
+ "presentation": {
+  "mode": "gregorian",
+  "unit": "",
+  "scale": "1/1",
+  "origin": "0/1",
+  "version": 1,
+  "offsetMinutes": 0,
+  "significantDigits": 6
+ },
+ "tags": [
+  "history",
+  "mesopotamia",
+  "ancient near east",
+  "education"
+ ],
+ "plugins": [
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "rich-text-notes",
+    "version": 1,
+    "name": "Rich text notes",
+    "description": "Edit moment and stack notes visually, storing portable Markdown. Hover cards render safe headings, emphasis, lists, code and HTTPS links. HTML and images are not executed.",
+    "fields": [],
+    "notes": {
+     "kind": "markdown"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-headings",
+    "version": 1,
+    "name": "Headings",
+    "description": "Let a moment act as a heading or marker: only its title shows, sized as a heading from level 1 to 6, and the title is what you click. Choose its font (Times New Roman by default). Headings still group into summaries with other moments.",
+    "fields": [
+     {
+      "kind": "heading",
+      "metadataKey": "headingLevel",
+      "label": "Heading level"
+     },
+     {
+      "kind": "font",
+      "metadataKey": "headingFont",
+      "label": "Heading font"
+     }
+    ],
+    "marker": {
+     "kind": "heading",
+     "metadataKey": "headingLevel"
+    },
+    "targets": [
+     "moments"
+    ]
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-colors",
+    "version": 2,
+    "name": "Moment colors",
+    "description": "Choose muted semantic swatches or a custom color for moments and stack entries while preserving their white borders.",
+    "fields": [
+     {
+      "kind": "color",
+      "metadataKey": "color",
+      "label": "Moment color"
+     }
+    ],
+    "marker": {
+     "kind": "color",
+     "metadataKey": "color"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.color(api.get(\"color\")); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "moment-sources",
+    "version": 1,
+    "name": "Sources",
+    "description": "Show and edit a series of source links for moments and stack entries.",
+    "fields": [
+     {
+      "kind": "links",
+      "metadataKey": "sources",
+      "label": "Sources"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "dating-context",
+    "version": 1,
+    "name": "Dating context",
+    "description": "Explain the precision and coordinate convention of a moment. An exact stored coordinate can still represent an approximate age or a calendar-day marker.",
+    "fields": [
+     {
+      "kind": "text",
+      "metadataKey": "datePrecision",
+      "label": "Date precision"
+     },
+     {
+      "kind": "multiline",
+      "metadataKey": "coordinateConvention",
+      "label": "Coordinate convention"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "historical-dates",
+    "version": 1,
+    "name": "Historical dates",
+    "description": "Retain an original historical date and its calendar separately from the timeline coordinate and display calendar, such as a Julian date on a Gregorian timeline.",
+    "fields": [
+     {
+      "kind": "text",
+      "metadataKey": "historicalDate",
+      "label": "Original historical date"
+     },
+     {
+      "kind": "text",
+      "metadataKey": "calendar",
+      "label": "Original calendar"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "expand-on-hover",
+    "version": 1,
+    "name": "Expand on hover",
+    "description": "Hover or focus a summary of two to five moments to fan out its members radially for individual inspection. Larger summaries stay collapsed.",
+    "fields": [],
+    "summary": {
+     "kind": "radial"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.expand(); }"
+   },
+   "enabled": true
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "timeline-theme",
+    "version": 2,
+    "name": "Timeline theme",
+    "description": "Choose the timeline's colors, fonts and text sizes: its labels, its measure (the axis, tick marks and their times), the halo that keeps them readable over images, the default marker and duration colors, and a background color. Set them here in the plugin list; anything left blank keeps the usual look, and colors chosen for events still win.",
+    "fields": [],
+    "settings": [
+     {
+      "kind": "color",
+      "key": "textColor",
+      "label": "Label color"
+     },
+     {
+      "kind": "font",
+      "key": "textFont",
+      "label": "Label font"
+     },
+     {
+      "kind": "text-size",
+      "key": "textSize",
+      "label": "Label size"
+     },
+     {
+      "kind": "color",
+      "key": "measureColor",
+      "label": "Measure color"
+     },
+     {
+      "kind": "font",
+      "key": "measureFont",
+      "label": "Measure font"
+     },
+     {
+      "kind": "text-size",
+      "key": "measureSize",
+      "label": "Measure size"
+     },
+     {
+      "kind": "color",
+      "key": "haloColor",
+      "label": "Halo color"
+     },
+     {
+      "kind": "color",
+      "key": "markerColor",
+      "label": "Marker color"
+     },
+     {
+      "kind": "color",
+      "key": "durationColor",
+      "label": "Duration color"
+     },
+     {
+      "kind": "color",
+      "key": "backgroundColor",
+      "label": "Background color"
+     }
+    ],
+    "theme": {
+     "text": "textColor",
+     "textFont": "textFont",
+     "textSize": "textSize",
+     "measure": "measureColor",
+     "measureFont": "measureFont",
+     "measureSize": "measureSize",
+     "halo": "haloColor",
+     "marker": "markerColor",
+     "duration": "durationColor",
+     "background": "backgroundColor"
+    }
+   },
+   "enabled": true,
+   "settings": {
+    "textColor": "#1f2a44",
+    "textFont": "Georgia, serif",
+    "measureColor": "#9c3b2a",
+    "haloColor": "#f3ead7",
+    "markerColor": "#1f3a5f",
+    "durationColor": "#9c3b2a",
+    "backgroundColor": "#f3ead7"
+   }
+  }
+ ],
+ "events": [
+  {
+   "id": "h-villages",
+   "time": "-283034304000/1",
+   "metadata": {
+    "title": "The first farming villages",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "jarmo",
+   "time": "-283034304000/1",
+   "metadata": {
+    "title": "Jarmo",
+    "description": "A farming village in the Zagros foothills of northern Iraq, about 7000 BCE: mud houses, domesticated wheat, barley, goats and sheep. One of the earliest excavated villages near Mesopotamia.",
+    "tags": [
+     "city"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Jarmo"
+    ],
+    "color": "#a8742a",
+    "datePrecision": "Approximate (archaeological dating); placed at the conventional round date."
+   }
+  },
+  {
+   "id": "oueili",
+   "time": "-267255849600/1",
+   "metadata": {
+    "title": "Tell el-'Oueili",
+    "description": "The oldest known settlement on the southern plain, near Larsa, with the earliest phase of the **Ubaid** culture (Ubaid 0), about 6500 BCE.",
+    "tags": [
+     "city"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tell_el-'Oueili",
+     "https://en.wikipedia.org/wiki/Ubaid_period"
+    ],
+    "color": "#a8742a",
+    "datePrecision": "Approximate (archaeological dating); placed at the conventional round date."
+   }
+  },
+  {
+   "id": "hassuna",
+   "time": "-251477308800/1",
+   "metadata": {
+    "title": "Hassuna villages",
+    "description": "The **Hassuna** culture of the early sixth millennium BCE: farming villages of northern Mesopotamia with painted pottery and storage bins.",
+    "tags": [
+     "city"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hassuna_culture"
+    ],
+    "color": "#a8742a",
+    "datePrecision": "Approximate (archaeological dating); placed at the conventional round date."
+   }
+  },
+  {
+   "id": "choga-mami",
+   "time": "-235698854400/1",
+   "metadata": {
+    "title": "Irrigation canals",
+    "description": "The **Samarra** culture, about 5500 BCE, left some of the earliest evidence of irrigation farming, such as the canals at Choga Mami.",
+    "tags": [
+     "science"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Samarra_culture",
+     "https://en.wikipedia.org/wiki/Choga_Mami"
+    ],
+    "color": "#2b7a8c",
+    "datePrecision": "Approximate (archaeological dating); placed at the conventional round date."
+   }
+  },
+  {
+   "id": "eridu",
+   "time": "-232543180800/1",
+   "metadata": {
+    "title": "Eridu founded",
+    "description": "Settled about 5400 BCE, **Eridu** kept a temple rebuilt on the same spot for thousands of years. Sumerian tradition called it the first city, where kingship first came down from heaven.",
+    "tags": [
+     "city"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Eridu"
+    ],
+    "color": "#a8742a",
+    "datePrecision": "Approximate (archaeological dating); placed at the conventional round date."
+   }
+  },
+  {
+   "id": "h-uruk",
+   "time": "-188363404800/1",
+   "metadata": {
+    "title": "Uruk: the first cities and writing",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "seals",
+   "time": "-172584950400/1",
+   "metadata": {
+    "title": "Cylinder seals",
+    "description": "Small carved stone cylinders, rolled across wet clay to sign or seal goods and documents. They appear in the Uruk period and were used in Mesopotamia for three thousand years.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Cylinder_seal"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Uruk period, about 3500 BCE."
+   }
+  },
+  {
+   "id": "white-temple",
+   "time": "-171007113600/1",
+   "metadata": {
+    "title": "The White Temple at Uruk",
+    "description": "A whitewashed temple on a high platform, the **Anu Ziggurat**: a forerunner of the ziggurats.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Anu_ziggurat"
+    ],
+    "color": "#7a5a2a",
+    "datePrecision": "Built about 3500–3000 BCE; placed at 3450."
+   }
+  },
+  {
+   "id": "wheel",
+   "time": "-169429276800/1",
+   "metadata": {
+    "title": "Wheeled wagons",
+    "description": "Pictographs from the Eanna district of **Uruk** show wagons on wheels. Wheeled vehicles appear at about the same time in the Caucasus and Europe, so where the wheel was first made is unknown.",
+    "tags": [
+     "science"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Wheel"
+    ],
+    "color": "#2b7a8c",
+    "datePrecision": "The Uruk pictographs are dated about 3500–3350 BCE; placed at 3400."
+   }
+  },
+  {
+   "id": "writing",
+   "time": "-166273603200/1",
+   "metadata": {
+    "title": "Writing: proto-cuneiform",
+    "description": "Clay tablets from **Uruk** record rations, animals and land in signs pressed with a reed. Writing began as bookkeeping; over centuries it became **cuneiform**, used for more than three thousand years.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Cuneiform",
+     "https://en.wikipedia.org/wiki/Proto-cuneiform"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Uruk IV, about 3300 BCE (the earliest unequivocal written documents)."
+   }
+  },
+  {
+   "id": "sixty",
+   "time": "-163117843200/1",
+   "metadata": {
+    "title": "Counting in sixties",
+    "description": "The earliest accounts already count some goods in a **sexagesimal** (base-60) system, which Babylonian mathematics later wrote with place value. Sixty minutes in an hour and 360 degrees in a circle descend from it.",
+    "tags": [
+     "science"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sexagesimal",
+     "https://en.wikipedia.org/wiki/Babylonian_cuneiform_numerals"
+    ],
+    "color": "#2b7a8c",
+    "datePrecision": "Proto-cuneiform accounts of the late fourth millennium BCE; placed at 3200."
+   }
+  },
+  {
+   "id": "uruk-vase",
+   "time": "-159962169600/1",
+   "metadata": {
+    "title": "The Warka Vase",
+    "description": "An alabaster vase from the Eanna temple at **Uruk**, carved in registers: water, crops, animals, and a procession bringing offerings to the goddess **Inanna**.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Warka_Vase"
+    ],
+    "color": "#7a5a2a",
+    "datePrecision": "About 3200–3000 BCE; placed at 3100."
+   }
+  },
+  {
+   "id": "uruk-city",
+   "time": "-153650822400/1",
+   "metadata": {
+    "title": "Uruk at its height",
+    "description": "**Uruk** covered about 6 square kilometres inside its walls and may have held 50,000 people or more, among the largest cities in the world at the time.",
+    "tags": [
+     "city"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Uruk"
+    ],
+    "color": "#a8742a",
+    "datePrecision": "About 2900 BCE; population estimates vary."
+   }
+  },
+  {
+   "id": "h-sumer",
+   "time": "-153650822400/1",
+   "metadata": {
+    "title": "The Sumerian city-states",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "gilgamesh-king",
+   "time": "-147339388800/1",
+   "metadata": {
+    "title": "Gilgamesh, king of Uruk",
+    "description": "The **Sumerian King List** names **Gilgamesh** as a king of Uruk. Kings of his time, such as Enmebaragesi of Kish, are attested, so many scholars think he was a real ruler later made a legend.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Gilgamesh"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "If he was historical, about 2700 BCE (Early Dynastic II); no inscription of his own survives."
+   }
+  },
+  {
+   "id": "enmebaragesi",
+   "time": "-144183715200/1",
+   "metadata": {
+    "title": "Enmebaragesi of Kish",
+    "description": "The earliest Sumerian king whose name appears in inscriptions of his own time. **Kish** gave its name to a title, \"king of Kish\", claimed by later rulers of all Sumer.",
+    "tags": [
+     "city"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Enmebaragesi"
+    ],
+    "color": "#a8742a",
+    "datePrecision": "About 2600 BCE (middle chronology)."
+   }
+  },
+  {
+   "id": "royal-cemetery",
+   "time": "-142605878400/1",
+   "metadata": {
+    "title": "The Royal Cemetery of Ur",
+    "description": "Tombs at **Ur** full of gold, lapis lazuli and the bodies of attendants buried with their rulers, among them Queen **Puabi**. Excavated by Leonard Woolley in the 1920s.",
+    "tags": [
+     "city"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Royal_Cemetery_at_Ur",
+     "https://en.wikipedia.org/wiki/Puabi"
+    ],
+    "color": "#a8742a",
+    "datePrecision": "About 2600–2450 BCE; placed at 2550."
+   }
+  },
+  {
+   "id": "standard-of-ur",
+   "time": "-141028041600/1",
+   "metadata": {
+    "title": "The Standard of Ur",
+    "description": "An inlaid box from the Royal Cemetery: one side shows war, with wheeled carts drawn by onagers; the other, a banquet and a procession of tribute.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Standard_of_Ur"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "About 2500 BCE."
+   }
+  },
+  {
+   "id": "vultures",
+   "time": "-139450204800/1",
+   "metadata": {
+    "title": "The Stele of the Vultures",
+    "description": "**Eannatum** of Lagash celebrates his victory over neighbouring **Umma** in a long border war over fields and water: one of the oldest known war monuments.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Stele_of_the_Vultures"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "About 2450 BCE."
+   }
+  },
+  {
+   "id": "urukagina",
+   "time": "-136925596800/1",
+   "metadata": {
+    "title": "Urukagina's reforms",
+    "description": "**Urukagina** of Lagash recorded measures against abuses by officials and the temple, such as cutting the fees charged at burials. Often called the first legal reform, though no code survives.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Urukagina"
+    ],
+    "color": "#2f6b4f",
+    "datePrecision": "Urukagina ruled about 2378–2368 BCE; placed at 2370."
+   }
+  },
+  {
+   "id": "lugalzagesi",
+   "time": "-136294444800/1",
+   "metadata": {
+    "title": "Lugalzagesi unites Sumer",
+    "description": "**Lugalzagesi** of Umma sacks Lagash and rules the Sumerian cities from Uruk, until **Sargon of Akkad** defeats him.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lugalzagesi"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "About 2350 BCE (middle chronology)."
+   }
+  },
+  {
+   "id": "h-akkad",
+   "time": "-135789523200/1",
+   "metadata": {
+    "title": "The Akkadian Empire",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "akkad",
+   "time": "-135663292800/1",
+   "metadata": {
+    "title": "Akkad, the lost capital",
+    "description": "**Sargon**'s capital, **Akkad** (Agade), gave its name to the empire and to the Akkadian language. Its site has never been found.",
+    "tags": [
+     "city"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Akkad_(city)"
+    ],
+    "color": "#a8742a",
+    "datePrecision": "Sargon's reign began about 2334 BCE (middle chronology); placed at 2330."
+   }
+  },
+  {
+   "id": "enheduanna",
+   "time": "-134243308800/1",
+   "metadata": {
+    "title": "Enheduanna, high priestess at Ur",
+    "description": "Sargon's daughter **Enheduanna**, high priestess of the moon god Nanna at Ur. Hymns to Inanna are attributed to her, which would make her the earliest author known by name; the attribution is debated.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Enheduanna"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Active about 2300 BCE; placed at 2285."
+   }
+  },
+  {
+   "id": "naram-sin-stele",
+   "time": "-133138771200/1",
+   "metadata": {
+    "title": "The Victory Stele of Naram-Sin",
+    "description": "**Naram-Sin**, horned like a god, climbs a mountain over the defeated Lullubi. Elamites carried it off to **Susa** a thousand years later, where it was found.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Victory_Stele_of_Naram-Sin"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "About 2250 BCE (middle chronology)."
+   }
+  },
+  {
+   "id": "akkad-falls",
+   "time": "-130109328000/1",
+   "metadata": {
+    "title": "Akkad falls",
+    "description": "The empire breaks up amid revolts and the arrival of the **Gutians** from the Zagros; later Mesopotamians told it as a curse on Naram-Sin.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Akkadian_Empire",
+     "https://en.wikipedia.org/wiki/Gutian_dynasty"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "About 2154 BCE (middle chronology)."
+   }
+  },
+  {
+   "id": "gudea",
+   "time": "-129194179200/1",
+   "metadata": {
+    "title": "The cylinders of Gudea",
+    "description": "**Gudea** of Lagash records, on two great clay cylinders, how he rebuilt the temple of Ningirsu: the longest known text in Sumerian. Many of his diorite statues survive.",
+    "tags": [
+     "writing",
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Gudea",
+     "https://en.wikipedia.org/wiki/Gudea_cylinders"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Gudea ruled about 2144–2124 BCE; placed at 2125."
+   }
+  },
+  {
+   "id": "h-ur",
+   "time": "-128783865600/1",
+   "metadata": {
+    "title": "The Third Dynasty of Ur",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "ziggurat-ur",
+   "time": "-128563027200/1",
+   "metadata": {
+    "title": "The Great Ziggurat of Ur",
+    "description": "A stepped temple platform for the moon god **Nanna**, built of mud brick faced with baked brick and bitumen. Its lower stage survives, restored in the 1980s.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ziggurat_of_Ur"
+    ],
+    "color": "#7a5a2a",
+    "datePrecision": "Begun under Ur-Nammu (2112–2095 BCE), finished under Shulgi; placed at 2105."
+   }
+  },
+  {
+   "id": "ur-nammu-code",
+   "time": "-128405260800/1",
+   "metadata": {
+    "title": "The Code of Ur-Nammu",
+    "description": "The oldest law code that survives: **Ur-Nammu** (or his son Shulgi) sets fines in silver for injuries, three centuries before Hammurabi.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Code_of_Ur-Nammu"
+    ],
+    "color": "#2f6b4f",
+    "datePrecision": "About 2100 BCE (middle chronology)."
+   }
+  },
+  {
+   "id": "gilgamesh-sumerian",
+   "time": "-127774108800/1",
+   "metadata": {
+    "title": "Sumerian poems of Gilgamesh",
+    "description": "Separate Sumerian poems about **Gilgamesh**, likely written for the kings of Ur, who claimed him as kin. They are the epic's sources.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Epic_of_Gilgamesh"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Probably composed under the Third Dynasty of Ur, about 2100 BCE; placed at 2080."
+   }
+  },
+  {
+   "id": "fall-of-ur",
+   "time": "-125375731200/1",
+   "metadata": {
+    "title": "Ur falls to Elam",
+    "description": "Elamites sack **Ur** and carry its last king, **Ibbi-Sin**, away. Mourned in the **Lament for Ur**.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Third_Dynasty_of_Ur",
+     "https://en.wikipedia.org/wiki/Lament_for_Ur"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "2004 BCE (middle chronology)."
+   }
+  },
+  {
+   "id": "h-babylon",
+   "time": "-125375731200/1",
+   "metadata": {
+    "title": "Amorite kingdoms and Hammurabi",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "assur",
+   "time": "-123671664000/1",
+   "metadata": {
+    "title": "Assyrian merchants at Kanesh",
+    "description": "Merchants from the city-state of **Assur** trade tin and textiles in Anatolia. Their letters and contracts, over 20,000 tablets found at Kültepe, are the archive of the **Old Assyrian** period.",
+    "tags": [
+     "writing",
+     "city"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Kültepe",
+     "https://en.wikipedia.org/wiki/Old_Assyrian_period"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Twentieth to eighteenth centuries BCE (middle chronology); placed at 1950."
+   }
+  },
+  {
+   "id": "lipit-ishtar",
+   "time": "-123040512000/1",
+   "metadata": {
+    "title": "The Code of Lipit-Ishtar",
+    "description": "Laws of **Lipit-Ishtar**, king of Isin, in Sumerian, with a prologue and epilogue like those of later codes.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Code_of_Lipit-Ishtar"
+    ],
+    "color": "#2f6b4f",
+    "datePrecision": "Lipit-Ishtar of Isin ruled about 1934–1924 BCE (middle chronology)."
+   }
+  },
+  {
+   "id": "eshnunna",
+   "time": "-122724892800/1",
+   "metadata": {
+    "title": "The Laws of Eshnunna",
+    "description": "Laws of the kingdom of **Eshnunna**, in Akkadian: prices, wages, and rules on an ox that gores, which Hammurabi’s code also takes up. Found near Baghdad in 1945 and 1947.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Laws_of_Eshnunna"
+    ],
+    "color": "#2f6b4f",
+    "datePrecision": "Dated about 1930 BCE; placed at 1920 to read apart from Lipit-Ishtar."
+   }
+  },
+  {
+   "id": "babylon-dynasty",
+   "time": "-121904524800/1",
+   "metadata": {
+    "title": "The First Dynasty of Babylon",
+    "description": "The Amorite chief **Sumu-abum** founds a dynasty in **Babylon**, then a small town. Its sixth king will be Hammurabi.",
+    "tags": [
+     "city"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_Babylonian_dynasty"
+    ],
+    "color": "#a8742a",
+    "datePrecision": "1894 BCE (middle chronology)."
+   }
+  },
+  {
+   "id": "gilgamesh-ob",
+   "time": "-118938153600/1",
+   "metadata": {
+    "title": "The Old Babylonian Gilgamesh",
+    "description": "The Sumerian tales are woven into one epic in Akkadian: Gilgamesh, his friend Enkidu, and his search for life without death.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Epic_of_Gilgamesh"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Eighteenth century BCE; the tablets are dated about 1800."
+   }
+  },
+  {
+   "id": "plimpton",
+   "time": "-118307001600/1",
+   "metadata": {
+    "title": "Plimpton 322",
+    "description": "A clay tablet with a table of numbers in base 60 that form right triangles (Pythagorean triples), more than a thousand years before Pythagoras.",
+    "tags": [
+     "science"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Plimpton_322"
+    ],
+    "color": "#2b7a8c",
+    "datePrecision": "Probably written about 1800 BCE, at Larsa; placed at 1780."
+   }
+  },
+  {
+   "id": "larsa",
+   "time": "-117770544000/1",
+   "metadata": {
+    "title": "Hammurabi conquers Larsa",
+    "description": "**Hammurabi** defeats **Rim-Sin** of Larsa and takes the south. Babylon's rise turns from city to kingdom.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hammurabi",
+     "https://en.wikipedia.org/wiki/Rim-Sin_I"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "1763 BCE (middle chronology)."
+   }
+  },
+  {
+   "id": "mari",
+   "time": "-117707472000/1",
+   "metadata": {
+    "title": "Hammurabi destroys Mari",
+    "description": "Once his ally, **Zimri-Lim** of Mari loses his city to Hammurabi. Its palace archive, some 25,000 tablets, survived in the ruins.",
+    "tags": [
+     "war",
+     "city"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mari,_Syria",
+     "https://en.wikipedia.org/wiki/Zimri-Lim"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "1761 BCE (middle chronology)."
+   }
+  },
+  {
+   "id": "hammurabi-code",
+   "time": "-117486547200/1",
+   "metadata": {
+    "title": "The Code of Hammurabi",
+    "description": "**Hammurabi** has 282 laws carved on a basalt stele under a relief of the sun god Shamash: punishments scaled to the victim's rank, and \"an eye for an eye\". Now in the Louvre.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Code_of_Hammurabi"
+    ],
+    "color": "#2f6b4f",
+    "datePrecision": "About 1755–1750 BCE (middle chronology); placed at 1754."
+   }
+  },
+  {
+   "id": "atrahasis",
+   "time": "-113889024000/1",
+   "metadata": {
+    "title": "The Epic of Atrahasis",
+    "description": "The gods send a flood to destroy humanity; **Atrahasis** survives in a boat. The same story is told in the later Gilgamesh epic.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Atra-Hasis"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "The oldest copy is from the reign of Ammi-Saduqa (1646–1626 BCE); placed at 1640."
+   }
+  },
+  {
+   "id": "venus-tablet",
+   "time": "-113573491200/1",
+   "metadata": {
+    "title": "The Venus tablet of Ammi-Saduqa",
+    "description": "Records of Venus's risings and settings over 21 years. Matching them to the sky gives several possible dates, eight years or more apart: the source of the high, middle and low chronologies.",
+    "tags": [
+     "science"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Venus_tablet_of_Ammisaduqa",
+     "https://en.wikipedia.org/wiki/Chronology_of_the_ancient_Near_East"
+    ],
+    "color": "#2b7a8c",
+    "datePrecision": "Observations of the reign of Ammi-Saduqa (1646–1626 BCE in the middle chronology)."
+   }
+  },
+  {
+   "id": "hittite-sack",
+   "time": "-112468953600/1",
+   "metadata": {
+    "title": "The Hittites sack Babylon",
+    "description": "The Hittite king **Mursili I** raids down the Euphrates and sacks **Babylon**, ending Hammurabi's dynasty; the statue of Marduk is carried off.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sack_of_Babylon",
+     "https://en.wikipedia.org/wiki/Mursili_I"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "1595 BCE in the middle chronology (1651 high, 1531 low): the date the chronologies are named by."
+   }
+  },
+  {
+   "id": "h-kassite",
+   "time": "-112468953600/1",
+   "metadata": {
+    "title": "Kassite Babylon and Middle Assyria",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "amarna",
+   "time": "-104737536000/1",
+   "metadata": {
+    "title": "Letters to Egypt",
+    "description": "Among the **Amarna letters**, the Kassite king **Burna-Buriash II** writes to the pharaoh in Babylonian, the language of diplomacy, about gold, gifts and marriages; so does Ashur-uballit I of Assyria.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Amarna_letters",
+     "https://en.wikipedia.org/wiki/Burna-Buriash_II"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "About 1360–1332 BCE; placed at 1350."
+   }
+  },
+  {
+   "id": "tukulti-ninurta-babylon",
+   "time": "-100792944000/1",
+   "metadata": {
+    "title": "Tukulti-Ninurta I takes Babylon",
+    "description": "**Tukulti-Ninurta I** of Assyria defeats the Kassite king Kashtiliash IV and rules Babylon for a time, an event celebrated in the **Tukulti-Ninurta Epic**.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tukulti-Ninurta_I"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "About 1225 BCE."
+   }
+  },
+  {
+   "id": "gilgamesh-standard",
+   "time": "-100003939200/1",
+   "metadata": {
+    "title": "The Standard Babylonian Gilgamesh",
+    "description": "The scholar-scribe **Sîn-lēqi-unninni** is credited with the version in twelve tablets, opening \"He who saw the deep\", with the flood story told to Gilgamesh by Utnapishtim.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Epic_of_Gilgamesh",
+     "https://en.wikipedia.org/wiki/Sîn-lēqi-unninni"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Compiled between about 1300 and 1000 BCE; placed at 1200."
+   }
+  },
+  {
+   "id": "stele-to-susa",
+   "time": "-98678563200/1",
+   "metadata": {
+    "title": "Hammurabi's stele carried to Susa",
+    "description": "The Elamite king **Shutruk-Nakhunte** raids Babylonia and takes monuments home to **Susa** as trophies, among them the Code of Hammurabi and the stele of Naram-Sin, where French excavators found them in 1898–1902.",
+    "tags": [
+     "law",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Shutruk-Nakhunte",
+     "https://en.wikipedia.org/wiki/Code_of_Hammurabi"
+    ],
+    "color": "#2f6b4f",
+    "datePrecision": "About 1158 BCE."
+   }
+  },
+  {
+   "id": "kassite-end",
+   "time": "-98583868800/1",
+   "metadata": {
+    "title": "The Kassite dynasty ends",
+    "description": "Elam deposes the last Kassite king, **Enlil-nadin-ahi**, after more than four centuries of Kassite rule in Babylon.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Kassites"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "1155 BCE."
+   }
+  },
+  {
+   "id": "nebuchadnezzar-i",
+   "time": "-97163798400/1",
+   "metadata": {
+    "title": "Marduk comes home",
+    "description": "**Nebuchadnezzar I** of Babylon defeats Elam and brings the statue of **Marduk** back from Susa. Marduk becomes the head of the Babylonian gods.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Nebuchadnezzar_I"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Nebuchadnezzar I ruled about 1121–1100 BCE; placed at 1110."
+   }
+  },
+  {
+   "id": "mal",
+   "time": "-96090883200/1",
+   "metadata": {
+    "title": "The Middle Assyrian Laws",
+    "description": "Tablets from **Assur** with laws on marriage, property and punishment, harsher than Babylonian law, including rules on the veiling of women.",
+    "tags": [
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Middle_Assyrian_Laws"
+    ],
+    "color": "#2f6b4f",
+    "datePrecision": "The surviving tablets are copies of about the reign of Tiglath-Pileser I (1114–1076 BCE)."
+   }
+  },
+  {
+   "id": "h-assyria",
+   "time": "-90883987200/1",
+   "metadata": {
+    "title": "The Neo-Assyrian Empire",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "kalhu",
+   "time": "-89874230400/1",
+   "metadata": {
+    "title": "The banquet at Kalhu",
+    "description": "**Ashurnasirpal II** moves his capital to **Kalhu** (Nimrud) and opens his new palace with a feast for 69,574 guests, recorded on the Banquet Stele. Its gateways were guarded by winged bulls, the **lamassu**.",
+    "tags": [
+     "city",
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Nimrud",
+     "https://en.wikipedia.org/wiki/Ashurnasirpal_II"
+    ],
+    "color": "#a8742a",
+    "datePrecision": "879 BCE."
+   }
+  },
+  {
+   "id": "qarqar",
+   "time": "-89053776000/1",
+   "metadata": {
+    "title": "The Battle of Qarqar",
+    "description": "**Shalmaneser III** fights a coalition of twelve kings in Syria, among them **Ahab** of Israel: the first mention of an Israelite king outside the Bible, and of Arabs.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Qarqar"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "853 BCE."
+   }
+  },
+  {
+   "id": "black-obelisk",
+   "time": "-88170163200/1",
+   "metadata": {
+    "title": "The Black Obelisk",
+    "description": "A stone monument of **Shalmaneser III**'s campaigns, showing kings bringing tribute; one is named as **Jehu** of Israel.",
+    "tags": [
+     "writing",
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Black_Obelisk_of_Shalmaneser_III"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "About 825 BCE."
+   }
+  },
+  {
+   "id": "eclipse",
+   "time": "-86199984000/1",
+   "metadata": {
+    "title": "The eclipse of Bur-Sagale",
+    "description": "The Assyrian list of yearly officials records a solar eclipse in the year of **Bur-Sagale**. Astronomers date it to 15 June 763 BCE, which anchors the list, and with it the dates of the Assyrian kings, to the year.",
+    "tags": [
+     "science"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Assyrian_eclipse"
+    ],
+    "color": "#2b7a8c",
+    "datePrecision": "15 June 763 BCE (Julian), fixed by astronomy.",
+    "historicalDate": "15 June 763 BCE",
+    "calendar": "Julian (proleptic)"
+   }
+  },
+  {
+   "id": "tp3-babylon",
+   "time": "-85140633600/1",
+   "metadata": {
+    "title": "Tiglath-Pileser III king of Babylon",
+    "description": "**Tiglath-Pileser III**, who rebuilt the Assyrian army and moved whole populations, takes the throne of Babylon himself.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tiglath-Pileser_III"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "729 BCE."
+   }
+  },
+  {
+   "id": "samaria",
+   "time": "-84919708800/1",
+   "metadata": {
+    "title": "Samaria falls",
+    "description": "Assyria takes **Samaria** and ends the Kingdom of Israel; Sargon II claims to have deported 27,290 people.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sargon_II",
+     "https://en.wikipedia.org/wiki/Shalmaneser_V"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "722 BCE (some date it to 720)."
+   }
+  },
+  {
+   "id": "dur-sharrukin",
+   "time": "-84761942400/1",
+   "metadata": {
+    "title": "Dur-Sharrukin founded",
+    "description": "**Sargon II** builds a new capital from nothing, **Dur-Sharrukin** (Khorsabad). Abandoned soon after his death in battle in 705.",
+    "tags": [
+     "city",
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Dur-Sharrukin",
+     "https://en.wikipedia.org/wiki/Sargon_II"
+    ],
+    "color": "#a8742a",
+    "datePrecision": "Begun 717 BCE."
+   }
+  },
+  {
+   "id": "nineveh-capital",
+   "time": "-84320092800/1",
+   "metadata": {
+    "title": "Nineveh, the Palace Without a Rival",
+    "description": "**Sennacherib** makes **Nineveh** his capital and builds the Southwest Palace, its walls lined with carved reliefs of his campaigns, and canals and aqueducts to water the city.",
+    "tags": [
+     "city",
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Nineveh",
+     "https://en.wikipedia.org/wiki/Sennacherib"
+    ],
+    "color": "#a8742a",
+    "datePrecision": "Built from about 703 BCE."
+   }
+  },
+  {
+   "id": "lachish",
+   "time": "-84257020800/1",
+   "metadata": {
+    "title": "The siege of Lachish",
+    "description": "Sennacherib's army takes the Judahite city of **Lachish** and besieges Jerusalem, which Hezekiah keeps by paying tribute. The siege is carved on the walls of his palace at Nineveh.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Lachish",
+     "https://en.wikipedia.org/wiki/Lachish_reliefs"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "701 BCE."
+   }
+  },
+  {
+   "id": "babylon-destroyed",
+   "time": "-83878416000/1",
+   "metadata": {
+    "title": "Sennacherib destroys Babylon",
+    "description": "After years of revolt, and the death of his son held captive by the Elamites, **Sennacherib** sacks Babylon and floods it. His son **Esarhaddon** rebuilds it.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sennacherib"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "689 BCE."
+   }
+  },
+  {
+   "id": "sennacherib-murdered",
+   "time": "-83625955200/1",
+   "metadata": {
+    "title": "Sennacherib murdered",
+    "description": "Killed by one or more of his sons; **Esarhaddon** wins the war for the throne.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sennacherib"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "681 BCE."
+   }
+  },
+  {
+   "id": "memphis",
+   "time": "-83310336000/1",
+   "metadata": {
+    "title": "Assyria takes Memphis",
+    "description": "**Esarhaddon** invades Egypt and takes **Memphis**, driving out the Kushite pharaoh Taharqa: Assyria at its greatest extent.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Esarhaddon",
+     "https://en.wikipedia.org/wiki/Assyrian_conquest_of_Egypt"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "671 BCE."
+   }
+  },
+  {
+   "id": "diaries",
+   "time": "-82710720000/1",
+   "metadata": {
+    "title": "The astronomical diaries begin",
+    "description": "Babylon's astronomers begin nightly records of the Moon, planets and weather, with prices and events, kept for six centuries, to 61 BCE. One records Alexander's death.",
+    "tags": [
+     "science",
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Babylonian_astronomical_diaries"
+    ],
+    "color": "#2b7a8c",
+    "datePrecision": "The oldest dated diary is from 652 BCE."
+   }
+  },
+  {
+   "id": "library",
+   "time": "-82647648000/1",
+   "metadata": {
+    "title": "The Library of Ashurbanipal",
+    "description": "**Ashurbanipal**, who claimed he could read and write, has scribes collect and copy texts from across Mesopotamia at **Nineveh**: omens, hymns, medicine, dictionaries and the best copies of Gilgamesh. More than 30,000 tablets survive.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Library_of_Ashurbanipal",
+     "https://en.wikipedia.org/wiki/Ashurbanipal"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Gathered during his reign, 669–631 BCE; placed at 650."
+   }
+  },
+  {
+   "id": "susa",
+   "time": "-82521417600/1",
+   "metadata": {
+    "title": "Ashurbanipal sacks Susa",
+    "description": "Assyria ends the long wars with **Elam** by plundering its capital, **Susa**, and its royal tombs.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ashurbanipal",
+     "https://en.wikipedia.org/wiki/Sack_of_Susa"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "About 646 BCE."
+   }
+  },
+  {
+   "id": "nabopolassar",
+   "time": "-81890265600/1",
+   "metadata": {
+    "title": "Nabopolassar seizes Babylon",
+    "description": "In the confusion after Ashurbanipal, **Nabopolassar** makes himself king of Babylon and begins a war against Assyria.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Nabopolassar"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "626 BCE."
+   }
+  },
+  {
+   "id": "nineveh-falls",
+   "time": "-81448416000/1",
+   "metadata": {
+    "title": "The fall of Nineveh",
+    "description": "Babylonians and **Medes** under Cyaxares take and burn **Nineveh**. The fire that brought down the palaces baked many of the clay tablets of its libraries hard.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Nineveh_(612_BC)",
+     "https://www.livius.org/sources/content/mesopotamian-chronicles-content/abc-3-fall-of-nineveh-chronicle/"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "612 BCE, after a siege of about three months (in the month Abu, July–August)."
+   }
+  },
+  {
+   "id": "harran",
+   "time": "-81353808000/1",
+   "metadata": {
+    "title": "The end of Assyria",
+    "description": "The last Assyrian king, **Ashur-uballit II**, fails to retake **Harran** with Egyptian help, and Assyria disappears from the record.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fall_of_Harran",
+     "https://en.wikipedia.org/wiki/Ashur-uballit_II"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Harran fell in 610 BCE; the attempt to retake it failed in 609."
+   }
+  },
+  {
+   "id": "h-neo-babylon",
+   "time": "-81227577600/1",
+   "metadata": {
+    "title": "The Neo-Babylonian Empire",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "carchemish",
+   "time": "-81227577600/1",
+   "metadata": {
+    "title": "The Battle of Carchemish",
+    "description": "Crown prince **Nebuchadnezzar** defeats the Egyptian army of **Necho II** in Syria; Babylon inherits the Assyrian empire in the west.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Carchemish"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "605 BCE, in the summer."
+   }
+  },
+  {
+   "id": "etemenanki",
+   "time": "-81069811200/1",
+   "metadata": {
+    "title": "Etemenanki, the ziggurat of Babylon",
+    "description": "The ziggurat of **Marduk**'s temple, \"temple of the foundation of heaven and earth\", about 90 metres square at its base; often taken as the model for the **Tower of Babel**.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Etemenanki"
+    ],
+    "color": "#7a5a2a",
+    "datePrecision": "Rebuilt under Nabopolassar and Nebuchadnezzar II; placed at 600."
+   }
+  },
+  {
+   "id": "jerusalem-597",
+   "time": "-80969241600/1",
+   "metadata": {
+    "title": "Nebuchadnezzar takes Jerusalem",
+    "description": "A Babylonian chronicle dates it to the day: **Nebuchadnezzar II** takes Jerusalem, deports King **Jehoiachin** to Babylon and sets up Zedekiah.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Jerusalem_(597_BC)",
+     "https://www.livius.org/sources/content/mesopotamian-chronicles-content/abc-5-jerusalem-chronicle/"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "2 Adar of his seventh year: 16 March 597 BCE (Julian).",
+    "historicalDate": "16 March 597 BCE",
+    "calendar": "Julian (proleptic)"
+   }
+  },
+  {
+   "id": "jerusalem-587",
+   "time": "-80659584000/1",
+   "metadata": {
+    "title": "Jerusalem destroyed",
+    "description": "After Zedekiah's revolt, the Babylonians destroy **Jerusalem** and Solomon's Temple and deport much of Judah's elite: the **Babylonian exile**.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siege_of_Jerusalem_(587_BC)",
+     "https://en.wikipedia.org/wiki/Babylonian_captivity"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "587 BCE (some date it to 586)."
+   }
+  },
+  {
+   "id": "ishtar-gate",
+   "time": "-80280892800/1",
+   "metadata": {
+    "title": "The Ishtar Gate",
+    "description": "The north gate of **Babylon**, faced with blue glazed brick and rows of dragons and bulls, at the head of the Processional Way. Rebuilt from its bricks in Berlin's Pergamon Museum.",
+    "tags": [
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ishtar_Gate"
+    ],
+    "color": "#7a5a2a",
+    "datePrecision": "About 575 BCE."
+   }
+  },
+  {
+   "id": "naram-sin-found",
+   "time": "-79239513600/1",
+   "metadata": {
+    "title": "Nabonidus digs up Naram-Sin's foundation",
+    "description": "Rebuilding the temple of Shamash at **Sippar**, **Nabonidus** digs down to an inscription of **Naram-Sin**, which, he wrote, no king before him had seen for 3,200 years. The real gap was about 1,700 years; he was out by some 1,500.",
+    "tags": [
+     "writing",
+     "building"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Nabonidus",
+     "https://www.livius.org/sources/content/nabonidus-cylinder-from-sippar/"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "Written after Nabonidus returned from Tayma (543 BCE) and before the war with Cyrus; placed at 542."
+   }
+  },
+  {
+   "id": "opis",
+   "time": "-79121750400/1",
+   "metadata": {
+    "title": "The Battle of Opis",
+    "description": "**Cyrus the Great** of Persia defeats the Babylonian army at Opis on the Tigris.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Opis",
+     "https://www.livius.org/sources/content/mesopotamian-chronicles-content/abc-7-nabonidus-chronicle/"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "In the month Tashritu of 539 BCE, before Sippar fell on 10 October (Julian); the day is not known, placed at 1 October."
+   }
+  },
+  {
+   "id": "sippar",
+   "time": "-79120972800/1",
+   "metadata": {
+    "title": "Sippar surrenders",
+    "description": "Sippar is taken without a battle; Nabonidus flees.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fall_of_Babylon",
+     "https://www.livius.org/sources/content/mesopotamian-chronicles-content/abc-7-nabonidus-chronicle/"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "14 Tashritu: 10 October 539 BCE (Julian).",
+    "historicalDate": "10 October 539 BCE",
+    "calendar": "Julian (proleptic)"
+   }
+  },
+  {
+   "id": "babylon-falls",
+   "time": "-79120800000/1",
+   "metadata": {
+    "title": "Babylon falls to Cyrus",
+    "description": "Cyrus's general **Ugbaru** (Gobryas) and the Persian army enter **Babylon** without a battle. The Nabonidus Chronicle gives the day.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fall_of_Babylon",
+     "https://www.livius.org/sources/content/mesopotamian-chronicles-content/abc-7-nabonidus-chronicle/"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "16 Tashritu: 12 October 539 BCE (Julian), from the Nabonidus Chronicle.",
+    "historicalDate": "12 October 539 BCE",
+    "calendar": "Julian (proleptic)"
+   }
+  },
+  {
+   "id": "cyrus-enters",
+   "time": "-79119331200/1",
+   "metadata": {
+    "title": "Cyrus enters Babylon",
+    "description": "Cyrus himself arrives; the chronicle says green branches were spread before him and peace was proclaimed to the city.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fall_of_Babylon",
+     "https://www.livius.org/sources/content/mesopotamian-chronicles-content/abc-7-nabonidus-chronicle/"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "3 Arahsamnu: 29 October 539 BCE (Julian).",
+    "historicalDate": "29 October 539 BCE",
+    "calendar": "Julian (proleptic)"
+   }
+  },
+  {
+   "id": "h-persia",
+   "time": "-79113283200/1",
+   "metadata": {
+    "title": "Epilogue: Persian Babylon and Alexander",
+    "tags": [
+     "chapter"
+    ],
+    "headingLevel": "h2"
+   }
+  },
+  {
+   "id": "cyrus-cylinder",
+   "time": "-79113283200/1",
+   "metadata": {
+    "title": "The Cyrus Cylinder",
+    "description": "A clay cylinder in Babylonian in which **Cyrus** presents himself as chosen by Marduk, condemns Nabonidus, and tells of returning gods and peoples to their homes.",
+    "tags": [
+     "writing",
+     "law"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Cyrus_Cylinder"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "539 or 538 BCE; placed at 538."
+   }
+  },
+  {
+   "id": "behistun",
+   "time": "-78545203200/1",
+   "metadata": {
+    "title": "The Behistun Inscription",
+    "description": "**Darius I** carves his victories on a cliff in Iran in Old Persian, Elamite and Babylonian. Copied in the 1830s–40s, it became the key to reading cuneiform again.",
+    "tags": [
+     "writing"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Behistun_Inscription"
+    ],
+    "color": "#1f3a5f",
+    "datePrecision": "About 520 BCE."
+   }
+  },
+  {
+   "id": "gaugamela",
+   "time": "-72557769600/1",
+   "metadata": {
+    "title": "The Battle of Gaugamela",
+    "description": "**Alexander the Great** defeats **Darius III** near Arbela in northern Mesopotamia. A Babylonian astronomical diary records the battle.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Battle_of_Gaugamela"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "1 October 331 BCE (Julian), eleven days after a lunar eclipse.",
+    "historicalDate": "1 October 331 BCE",
+    "calendar": "Julian (proleptic)"
+   }
+  },
+  {
+   "id": "alexander-babylon",
+   "time": "-72555696000/1",
+   "metadata": {
+    "title": "Alexander enters Babylon",
+    "description": "Babylon's governor **Mazaeus** surrenders the city to Alexander without a fight.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Alexander_the_Great",
+     "https://en.wikipedia.org/wiki/Mazaeus"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "Late October 331 BCE; the day is not certain, placed at 25 October (Julian)."
+   }
+  },
+  {
+   "id": "alexander-dies",
+   "time": "-72314985600/1",
+   "metadata": {
+    "title": "Alexander dies in Babylon",
+    "description": "**Alexander** dies at 32 in **Nebuchadnezzar**'s palace in Babylon, which he meant as his capital. His generals divide the empire.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Death_of_Alexander_the_Great"
+    ],
+    "color": "#9c3b2a",
+    "datePrecision": "A Babylonian astronomical diary: between the evenings of 10 and 11 June 323 BCE (Julian), as Babylon's days began at sunset.",
+    "historicalDate": "11 June 323 BCE",
+    "calendar": "Julian (proleptic)"
+   }
+  }
+ ],
+ "durations": [
+  {
+   "id": "halaf",
+   "start": "-254633068800/1",
+   "end": "-223076073600/1",
+   "metadata": {
+    "title": "Halaf culture",
+    "description": "About 6100–5100 BCE. Farming villages of northern Mesopotamia and Syria known for fine painted pottery and round houses (tholoi).",
+    "tags": [
+     "period"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Halaf_culture"
+    ],
+    "color": "#c9b48a"
+   }
+  },
+  {
+   "id": "ubaid",
+   "start": "-267255849600/1",
+   "end": "-182052057600/1",
+   "metadata": {
+    "title": "Ubaid period",
+    "description": "About 6500–3800 BCE. The first settlements of the southern plain, with irrigation, temples and towns such as Eridu; its culture spread north after about 5300.",
+    "tags": [
+     "period"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ubaid_period"
+    ],
+    "color": "#c9b48a"
+   }
+  },
+  {
+   "id": "samarra",
+   "start": "-235698854400/1",
+   "end": "-213608966400/1",
+   "metadata": {
+    "title": "Samarra culture",
+    "description": "About 5500–4800 BCE. Villages of central Mesopotamia that farmed with irrigation.",
+    "tags": [
+     "period"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Samarra_culture"
+    ],
+    "color": "#c9b48a"
+   }
+  },
+  {
+   "id": "uruk",
+   "start": "-188363404800/1",
+   "end": "-159962169600/1",
+   "metadata": {
+    "title": "Uruk period",
+    "description": "About 4000–3100 BCE. The first cities, monumental temples, the cylinder seal, and at its end, writing. Named after the city of **Uruk**.",
+    "tags": [
+     "period"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Uruk_period"
+    ],
+    "color": "#c9b48a"
+   }
+  },
+  {
+   "id": "jemdet-nasr",
+   "start": "-159962169600/1",
+   "end": "-153650822400/1",
+   "metadata": {
+    "title": "Jemdet Nasr period",
+    "description": "About 3100–2900 BCE. Proto-cuneiform writing spreads beyond Uruk.",
+    "tags": [
+     "period"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Jemdet_Nasr_period"
+    ],
+    "color": "#c9b48a"
+   }
+  },
+  {
+   "id": "early-dynastic",
+   "start": "-153650822400/1",
+   "end": "-136294444800/1",
+   "metadata": {
+    "title": "Early Dynastic period",
+    "description": "About 2900–2350 BCE (middle chronology). Rival Sumerian city-states such as Uruk, Ur, Kish, Lagash and Umma, each with its own god and ruler.",
+    "tags": [
+     "period"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Early_Dynastic_Period_(Mesopotamia)"
+    ],
+    "color": "#c9b48a"
+   }
+  },
+  {
+   "id": "akkadian-empire",
+   "start": "-135789523200/1",
+   "end": "-130109328000/1",
+   "metadata": {
+    "title": "Akkadian Empire",
+    "description": "About 2334–2154 BCE (middle chronology). The first empire to rule Sumer and the north together, founded by Sargon of Akkad; Akkadian becomes the language of government.",
+    "tags": [
+     "period"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Akkadian_Empire"
+    ],
+    "color": "#c9b48a"
+   }
+  },
+  {
+   "id": "gutian",
+   "start": "-130109328000/1",
+   "end": "-128783865600/1",
+   "metadata": {
+    "title": "Gutian period",
+    "description": "About 2154–2112 BCE (middle chronology). After Akkad, Gutian kings hold parts of the south while cities such as Lagash and Uruk rule themselves.",
+    "tags": [
+     "period"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Gutian_dynasty"
+    ],
+    "color": "#c9b48a"
+   }
+  },
+  {
+   "id": "ur-iii",
+   "start": "-128783865600/1",
+   "end": "-125375731200/1",
+   "metadata": {
+    "title": "Third Dynasty of Ur",
+    "description": "2112–2004 BCE (middle chronology). A Sumerian state run from Ur with standard weights, a calendar and tens of thousands of administrative tablets.",
+    "tags": [
+     "period"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Third_Dynasty_of_Ur"
+    ],
+    "color": "#c9b48a"
+   }
+  },
+  {
+   "id": "isin-larsa",
+   "start": "-126038505600/1",
+   "end": "-117770544000/1",
+   "metadata": {
+    "title": "Isin-Larsa period",
+    "description": "About 2025–1763 BCE (middle chronology). Amorite dynasties at Isin and Larsa compete for the south, until Hammurabi takes Larsa.",
+    "tags": [
+     "period"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Isin-Larsa_period"
+    ],
+    "color": "#c9b48a"
+   }
+  },
+  {
+   "id": "old-babylonian",
+   "start": "-121904524800/1",
+   "end": "-112468953600/1",
+   "metadata": {
+    "title": "First Dynasty of Babylon",
+    "description": "1894–1595 BCE (middle chronology). Hammurabi's dynasty, the Old Babylonian period, ended by the Hittite sack.",
+    "tags": [
+     "period"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/First_Babylonian_dynasty",
+     "https://en.wikipedia.org/wiki/Old_Babylonian_period"
+    ],
+    "color": "#c9b48a"
+   }
+  },
+  {
+   "id": "kassite",
+   "start": "-112468953600/1",
+   "end": "-98583868800/1",
+   "metadata": {
+    "title": "Kassite Babylonia",
+    "description": "About 1595–1155 BCE. Kassite kings rule Babylonia for over four centuries, the longest dynasty in its history; the start is uncertain, the end fixed by the Elamite conquest.",
+    "tags": [
+     "period"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Kassites"
+    ],
+    "color": "#c9b48a"
+   }
+  },
+  {
+   "id": "middle-assyrian",
+   "start": "-105147763200/1",
+   "end": "-90915523200/1",
+   "metadata": {
+    "title": "Middle Assyrian Empire",
+    "description": "About 1363–912 BCE, from the accession of **Ashur-uballit I** to the death of Ashur-dan II: Assyria becomes a kingdom and a power.",
+    "tags": [
+     "period"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Middle_Assyrian_Empire"
+    ],
+    "color": "#c9b48a"
+   }
+  },
+  {
+   "id": "neo-assyrian",
+   "start": "-90883987200/1",
+   "end": "-81353808000/1",
+   "metadata": {
+    "title": "Neo-Assyrian Empire",
+    "description": "911–609 BCE. From **Adad-nirari II** to the last stand at Harran: the largest empire the world had yet seen, ruling from Egypt to western Iran.",
+    "tags": [
+     "period"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Neo-Assyrian_Empire"
+    ],
+    "color": "#c9b48a"
+   }
+  },
+  {
+   "id": "neo-babylonian",
+   "start": "-81890265600/1",
+   "end": "-79144819200/1",
+   "metadata": {
+    "title": "Neo-Babylonian Empire",
+    "description": "626–539 BCE. Nabopolassar's dynasty (often called Chaldean) takes Assyria's place, until Cyrus.",
+    "tags": [
+     "period"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Neo-Babylonian_Empire"
+    ],
+    "color": "#c9b48a"
+   }
+  },
+  {
+   "id": "achaemenid",
+   "start": "-79144819200/1",
+   "end": "-72580924800/1",
+   "metadata": {
+    "title": "Persian (Achaemenid) Babylon",
+    "description": "539–331 BCE. Babylon is a capital of the Persian Empire, from Cyrus to Gaugamela.",
+    "tags": [
+     "period"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Achaemenid_Empire",
+     "https://en.wikipedia.org/wiki/Babylon"
+    ],
+    "color": "#c9b48a"
+   }
+  },
+  {
+   "id": "sargon",
+   "start": "-135789523200/1",
+   "end": "-134053920000/1",
+   "metadata": {
+    "title": "Sargon of Akkad",
+    "description": "About 2334–2279 BCE (middle chronology). Rose, as legend has it, from cupbearer of the king of Kish to conqueror of all Sumer.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sargon_of_Akkad"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "naram-sin",
+   "start": "-133265001600/1",
+   "end": "-132128928000/1",
+   "metadata": {
+    "title": "Naram-Sin",
+    "description": "About 2254–2218 BCE (middle chronology). Sargon's grandson, the first Mesopotamian king to call himself a god and \"king of the four quarters\".",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Naram-Sin_of_Akkad"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "ur-nammu",
+   "start": "-128783865600/1",
+   "end": "-128247494400/1",
+   "metadata": {
+    "title": "Ur-Nammu",
+    "description": "2112–2095 BCE (middle chronology). Founder of the Third Dynasty of Ur.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ur-Nammu"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "shulgi",
+   "start": "-128215958400/1",
+   "end": "-126732729600/1",
+   "metadata": {
+    "title": "Shulgi",
+    "description": "2094–2047 BCE (middle chronology). Ur-Nammu's son, who organised the state, its roads and scribal schools, and was praised in hymns as a god.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Shulgi"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "shamshi-adad",
+   "start": "-119190528000/1",
+   "end": "-118180771200/1",
+   "metadata": {
+    "title": "Shamshi-Adad I",
+    "description": "About 1808–1776 BCE (middle chronology). An Amorite who built a kingdom across northern Mesopotamia, including Assur.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Shamshi-Adad_I"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "hammurabi",
+   "start": "-118685692800/1",
+   "end": "-117360316800/1",
+   "metadata": {
+    "title": "Hammurabi",
+    "description": "1792–1750 BCE (middle chronology). Sixth king of Babylon's First Dynasty, who united Mesopotamia under Babylon and issued his code.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hammurabi"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "tukulti-ninurta",
+   "start": "-101360937600/1",
+   "end": "-100224864000/1",
+   "metadata": {
+    "title": "Tukulti-Ninurta I",
+    "description": "About 1243–1207 BCE. Assyrian king who conquered Babylonia; murdered by his own nobles.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tukulti-Ninurta_I"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "tiglath-pileser-i",
+   "start": "-97290028800/1",
+   "end": "-96090883200/1",
+   "metadata": {
+    "title": "Tiglath-Pileser I",
+    "description": "1114–1076 BCE. Campaigned to the Mediterranean; the Middle Assyrian high point.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tiglath-Pileser_I"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "ashurnasirpal",
+   "start": "-90000460800/1",
+   "end": "-89243078400/1",
+   "metadata": {
+    "title": "Ashurnasirpal II",
+    "description": "883–859 BCE. Campaigned yearly to the west, boasted of his cruelty, and built Kalhu.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ashurnasirpal_II"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "shalmaneser-iii",
+   "start": "-89243078400/1",
+   "end": "-88138540800/1",
+   "metadata": {
+    "title": "Shalmaneser III",
+    "description": "859–824 BCE. Thirty-five years of campaigns, from Qarqar to the Black Obelisk.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Shalmaneser_III"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "tiglath-pileser-iii",
+   "start": "-85645555200/1",
+   "end": "-85077475200/1",
+   "metadata": {
+    "title": "Tiglath-Pileser III",
+    "description": "745–727 BCE. Remade Assyria into a centralised empire with provinces, a standing army and mass deportations.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Tiglath-Pileser_III"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "sargon-ii",
+   "start": "-84919708800/1",
+   "end": "-84383251200/1",
+   "metadata": {
+    "title": "Sargon II",
+    "description": "722–705 BCE. Builder of Dur-Sharrukin; killed in battle in Anatolia.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sargon_II"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "sennacherib",
+   "start": "-84383251200/1",
+   "end": "-83625955200/1",
+   "metadata": {
+    "title": "Sennacherib",
+    "description": "705–681 BCE. Moved the capital to Nineveh; destroyed Babylon.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Sennacherib"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "esarhaddon",
+   "start": "-83625955200/1",
+   "end": "-83247264000/1",
+   "metadata": {
+    "title": "Esarhaddon",
+    "description": "681–669 BCE. Rebuilt Babylon and conquered Egypt.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Esarhaddon"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "ashurbanipal",
+   "start": "-83247264000/1",
+   "end": "-82048032000/1",
+   "metadata": {
+    "title": "Ashurbanipal",
+    "description": "669–631 BCE (his death is usually put in 631; some scholars argue later). The last great king of Assyria, and a scholar king.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ashurbanipal"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "brothers-war",
+   "start": "-82710720000/1",
+   "end": "-82584489600/1",
+   "metadata": {
+    "title": "Shamash-shum-ukin's revolt",
+    "description": "652–648 BCE. Ashurbanipal's brother, king of Babylon, rebels; Babylon falls after a two-year siege and he dies, traditionally in a fire.",
+    "tags": [
+     "war"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Shamash-shum-ukin"
+    ],
+    "color": "#9c3b2a"
+   }
+  },
+  {
+   "id": "nabopolassar",
+   "start": "-81890265600/1",
+   "end": "-81227577600/1",
+   "metadata": {
+    "title": "Nabopolassar",
+    "description": "626–605 BCE. Founder of the Neo-Babylonian Empire; with the Medes, destroyed Assyria.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Nabopolassar"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "nebuchadnezzar",
+   "start": "-81227577600/1",
+   "end": "-79870665600/1",
+   "metadata": {
+    "title": "Nebuchadnezzar II",
+    "description": "605–562 BCE. The empire's greatest king: conquered Judah and rebuilt Babylon with its walls, gates and temples.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Nebuchadnezzar_II"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "nabonidus",
+   "start": "-79681276800/1",
+   "end": "-79144819200/1",
+   "metadata": {
+    "title": "Nabonidus",
+    "description": "556–539 BCE. The last king of Babylon, devoted to the moon god Sin and to the past; dug in old temple foundations for the inscriptions of earlier kings.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Nabonidus"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "tayma",
+   "start": "-79555046400/1",
+   "end": "-79271049600/1",
+   "metadata": {
+    "title": "Nabonidus at Tayma",
+    "description": "552–543 BCE. Nabonidus lives for about ten years at the oasis of Tayma in Arabia, leaving his son **Belshazzar** in Babylon, and the New Year festival lapses.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Nabonidus",
+     "https://en.wikipedia.org/wiki/Belshazzar"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "cyrus",
+   "start": "-79144819200/1",
+   "end": "-78860822400/1",
+   "metadata": {
+    "title": "Cyrus king of Babylon",
+    "description": "539–530 BCE. Cyrus the Great rules Babylon until his death in battle in Central Asia.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Cyrus_the_Great"
+    ],
+    "color": "#5a7397"
+   }
+  },
+  {
+   "id": "alexander",
+   "start": "-72557769600/1",
+   "end": "-72314985600/1",
+   "metadata": {
+    "title": "Alexander in Mesopotamia",
+    "description": "From Gaugamela to his death in Babylon: Alexander rules Mesopotamia as king of Asia.",
+    "tags": [
+     "reign"
+    ],
+    "sources": [
+     "https://en.wikipedia.org/wiki/Alexander_the_Great"
+    ],
+    "color": "#5a7397"
+   }
+  }
+ ],
+ "relationships": [
+  {
+   "a": {
+    "moment": "writing"
+   },
+   "b": {
+    "moment": "sixty"
+   }
+  },
+  {
+   "a": {
+    "moment": "lugalzagesi"
+   },
+   "b": {
+    "duration": "sargon"
+   }
+  },
+  {
+   "a": {
+    "duration": "sargon"
+   },
+   "b": {
+    "moment": "enheduanna"
+   }
+  },
+  {
+   "a": {
+    "duration": "naram-sin"
+   },
+   "b": {
+    "moment": "naram-sin-stele"
+   }
+  },
+  {
+   "a": {
+    "duration": "naram-sin"
+   },
+   "b": {
+    "moment": "naram-sin-found"
+   }
+  },
+  {
+   "a": {
+    "moment": "naram-sin-stele"
+   },
+   "b": {
+    "moment": "stele-to-susa"
+   }
+  },
+  {
+   "a": {
+    "duration": "ur-nammu"
+   },
+   "b": {
+    "moment": "ur-nammu-code"
+   }
+  },
+  {
+   "a": {
+    "duration": "ur-nammu"
+   },
+   "b": {
+    "moment": "ziggurat-ur"
+   }
+  },
+  {
+   "a": {
+    "moment": "urukagina"
+   },
+   "b": {
+    "moment": "ur-nammu-code"
+   }
+  },
+  {
+   "a": {
+    "moment": "ur-nammu-code"
+   },
+   "b": {
+    "moment": "lipit-ishtar"
+   }
+  },
+  {
+   "a": {
+    "moment": "lipit-ishtar"
+   },
+   "b": {
+    "moment": "eshnunna"
+   }
+  },
+  {
+   "a": {
+    "moment": "eshnunna"
+   },
+   "b": {
+    "moment": "hammurabi-code"
+   }
+  },
+  {
+   "a": {
+    "duration": "hammurabi"
+   },
+   "b": {
+    "moment": "hammurabi-code"
+   }
+  },
+  {
+   "a": {
+    "duration": "hammurabi"
+   },
+   "b": {
+    "moment": "mari"
+   }
+  },
+  {
+   "a": {
+    "moment": "hammurabi-code"
+   },
+   "b": {
+    "moment": "stele-to-susa"
+   }
+  },
+  {
+   "a": {
+    "moment": "gilgamesh-king"
+   },
+   "b": {
+    "moment": "gilgamesh-sumerian"
+   }
+  },
+  {
+   "a": {
+    "moment": "gilgamesh-sumerian"
+   },
+   "b": {
+    "moment": "gilgamesh-ob"
+   }
+  },
+  {
+   "a": {
+    "moment": "gilgamesh-ob"
+   },
+   "b": {
+    "moment": "gilgamesh-standard"
+   }
+  },
+  {
+   "a": {
+    "moment": "atrahasis"
+   },
+   "b": {
+    "moment": "gilgamesh-standard"
+   }
+  },
+  {
+   "a": {
+    "moment": "gilgamesh-standard"
+   },
+   "b": {
+    "moment": "library"
+   }
+  },
+  {
+   "a": {
+    "moment": "venus-tablet"
+   },
+   "b": {
+    "moment": "hittite-sack"
+   }
+  },
+  {
+   "a": {
+    "moment": "hittite-sack"
+   },
+   "b": {
+    "duration": "kassite"
+   }
+  },
+  {
+   "a": {
+    "duration": "ashurnasirpal"
+   },
+   "b": {
+    "moment": "kalhu"
+   }
+  },
+  {
+   "a": {
+    "duration": "sennacherib"
+   },
+   "b": {
+    "moment": "lachish"
+   }
+  },
+  {
+   "a": {
+    "duration": "sennacherib"
+   },
+   "b": {
+    "moment": "babylon-destroyed"
+   }
+  },
+  {
+   "a": {
+    "duration": "ashurbanipal"
+   },
+   "b": {
+    "moment": "library"
+   }
+  },
+  {
+   "a": {
+    "moment": "library"
+   },
+   "b": {
+    "moment": "nineveh-falls"
+   }
+  },
+  {
+   "a": {
+    "moment": "nineveh-falls"
+   },
+   "b": {
+    "moment": "harran"
+   }
+  },
+  {
+   "a": {
+    "moment": "carchemish"
+   },
+   "b": {
+    "duration": "nebuchadnezzar"
+   }
+  },
+  {
+   "a": {
+    "duration": "nebuchadnezzar"
+   },
+   "b": {
+    "moment": "jerusalem-597"
+   }
+  },
+  {
+   "a": {
+    "moment": "jerusalem-597"
+   },
+   "b": {
+    "moment": "jerusalem-587"
+   }
+  },
+  {
+   "a": {
+    "duration": "nebuchadnezzar"
+   },
+   "b": {
+    "moment": "ishtar-gate"
+   }
+  },
+  {
+   "a": {
+    "duration": "nabonidus"
+   },
+   "b": {
+    "moment": "naram-sin-found"
+   }
+  },
+  {
+   "a": {
+    "moment": "opis"
+   },
+   "b": {
+    "moment": "sippar"
+   }
+  },
+  {
+   "a": {
+    "moment": "sippar"
+   },
+   "b": {
+    "moment": "babylon-falls"
+   }
+  },
+  {
+   "a": {
+    "moment": "babylon-falls"
+   },
+   "b": {
+    "moment": "cyrus-enters"
+   }
+  },
+  {
+   "a": {
+    "moment": "cyrus-enters"
+   },
+   "b": {
+    "moment": "cyrus-cylinder"
+   }
+  },
+  {
+   "a": {
+    "moment": "gaugamela"
+   },
+   "b": {
+    "moment": "alexander-babylon"
+   }
+  },
+  {
+   "a": {
+    "moment": "alexander-babylon"
+   },
+   "b": {
+    "moment": "alexander-dies"
+   }
+  },
+  {
+   "a": {
+    "moment": "diaries"
+   },
+   "b": {
+    "moment": "alexander-dies"
+   }
+  }
+ ]
+}

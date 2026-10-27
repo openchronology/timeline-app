@@ -1,0 +1,100 @@
+{
+  "sample": "../samples/mesopotamia.ochx",
+  "size": [360, 950],
+  "scale": 3,
+  "shots": [
+    {
+      "id": "neo",
+      "dur": 0.03333333333333333,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-79807507200, -78860822400]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    },
+    {
+      "id": "reader",
+      "dur": 0.03333333333333333,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-79807507200, -78860822400]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ],
+      "actions": [
+        {
+          "t": 0,
+          "do": "viewMode",
+          "on": true
+        },
+        {
+          "t": 0,
+          "do": "open",
+          "title": "Nabonidus digs up"
+        }
+      ]
+    },
+    {
+      "id": "zoom",
+      "dur": 7.1,
+      "keys": [
+        {
+          "t": 0,
+          "view": [-79807507200, -78860822400]
+        },
+        {
+          "t": 0.4,
+          "view": [-79807507200, -78860822400]
+        },
+        {
+          "t": 4.4,
+          "view": [-135347673600, -77282985600]
+        },
+        {
+          "t": 4.6,
+          "view": [-135347673600, -77282985600]
+        },
+        {
+          "t": 7,
+          "view": [-185207731200, -74758377600]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ],
+      "actions": [
+        {
+          "t": 0,
+          "do": "viewMode",
+          "on": true
+        },
+        {
+          "t": 0,
+          "do": "open",
+          "title": "Nabonidus digs up"
+        },
+        {
+          "t": 0.05,
+          "do": "eval",
+          "js": "[...document.querySelectorAll('button')].find((x) => x.textContent === 'Separate related').click()"
+        }
+      ]
+    }
+  ]
+}

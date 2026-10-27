@@ -1,0 +1,1289 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:07,740"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 7740
+			},
+			"text": " Here's a sample timeline we built of ancient Mesopotamia, the land between the Tigris and the Euphrates.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.866612,
+					"t_dtw": -1
+				},
+				{
+					"text": " Here",
+					"timestamps": {
+						"from": "00:00:00,330",
+						"to": "00:00:00,330"
+					},
+					"offsets": {
+						"from": 330,
+						"to": 330
+					},
+					"id": 3423,
+					"p": 0.96444,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:00,390",
+						"to": "00:00:00,490"
+					},
+					"offsets": {
+						"from": 390,
+						"to": 490
+					},
+					"id": 338,
+					"p": 0.972285,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:00,490",
+						"to": "00:00:00,570"
+					},
+					"offsets": {
+						"from": 490,
+						"to": 570
+					},
+					"id": 257,
+					"p": 0.998593,
+					"t_dtw": -1
+				},
+				{
+					"text": " sample",
+					"timestamps": {
+						"from": "00:00:00,570",
+						"to": "00:00:01,030"
+					},
+					"offsets": {
+						"from": 570,
+						"to": 1030
+					},
+					"id": 6291,
+					"p": 0.994759,
+					"t_dtw": -1
+				},
+				{
+					"text": " timeline",
+					"timestamps": {
+						"from": "00:00:01,100",
+						"to": "00:00:01,730"
+					},
+					"offsets": {
+						"from": 1100,
+						"to": 1730
+					},
+					"id": 15264,
+					"p": 0.987767,
+					"t_dtw": -1
+				},
+				{
+					"text": " we",
+					"timestamps": {
+						"from": "00:00:01,730",
+						"to": "00:00:01,890"
+					},
+					"offsets": {
+						"from": 1730,
+						"to": 1890
+					},
+					"id": 356,
+					"p": 0.986816,
+					"t_dtw": -1
+				},
+				{
+					"text": " built",
+					"timestamps": {
+						"from": "00:00:01,890",
+						"to": "00:00:02,320"
+					},
+					"offsets": {
+						"from": 1890,
+						"to": 2320
+					},
+					"id": 3170,
+					"p": 0.980295,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:02,330",
+						"to": "00:00:02,480"
+					},
+					"offsets": {
+						"from": 2330,
+						"to": 2480
+					},
+					"id": 286,
+					"p": 0.974269,
+					"t_dtw": -1
+				},
+				{
+					"text": " ancient",
+					"timestamps": {
+						"from": "00:00:02,590",
+						"to": "00:00:03,100"
+					},
+					"offsets": {
+						"from": 2590,
+						"to": 3100
+					},
+					"id": 6156,
+					"p": 0.966679,
+					"t_dtw": -1
+				},
+				{
+					"text": " Mes",
+					"timestamps": {
+						"from": "00:00:03,110",
+						"to": "00:00:03,320"
+					},
+					"offsets": {
+						"from": 3110,
+						"to": 3320
+					},
+					"id": 14937,
+					"p": 0.991743,
+					"t_dtw": -1
+				},
+				{
+					"text": "opot",
+					"timestamps": {
+						"from": "00:00:03,360",
+						"to": "00:00:03,700"
+					},
+					"offsets": {
+						"from": 3360,
+						"to": 3700
+					},
+					"id": 43372,
+					"p": 0.999346,
+					"t_dtw": -1
+				},
+				{
+					"text": "amia",
+					"timestamps": {
+						"from": "00:00:03,700",
+						"to": "00:00:03,840"
+					},
+					"offsets": {
+						"from": 3700,
+						"to": 3840
+					},
+					"id": 49442,
+					"p": 0.997691,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:04,240",
+						"to": "00:00:04,240"
+					},
+					"offsets": {
+						"from": 4240,
+						"to": 4240
+					},
+					"id": 11,
+					"p": 0.73396,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:04,350",
+						"to": "00:00:04,510"
+					},
+					"offsets": {
+						"from": 4350,
+						"to": 4510
+					},
+					"id": 262,
+					"p": 0.497974,
+					"t_dtw": -1
+				},
+				{
+					"text": " land",
+					"timestamps": {
+						"from": "00:00:04,510",
+						"to": "00:00:04,800"
+					},
+					"offsets": {
+						"from": 4510,
+						"to": 4800
+					},
+					"id": 1956,
+					"p": 0.994581,
+					"t_dtw": -1
+				},
+				{
+					"text": " between",
+					"timestamps": {
+						"from": "00:00:04,900",
+						"to": "00:00:05,200"
+					},
+					"offsets": {
+						"from": 4900,
+						"to": 5200
+					},
+					"id": 1022,
+					"p": 0.956931,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:05,200",
+						"to": "00:00:05,440"
+					},
+					"offsets": {
+						"from": 5200,
+						"to": 5440
+					},
+					"id": 262,
+					"p": 0.880457,
+					"t_dtw": -1
+				},
+				{
+					"text": " Tig",
+					"timestamps": {
+						"from": "00:00:05,440",
+						"to": "00:00:05,660"
+					},
+					"offsets": {
+						"from": 5440,
+						"to": 5660
+					},
+					"id": 14189,
+					"p": 0.907806,
+					"t_dtw": -1
+				},
+				{
+					"text": "ris",
+					"timestamps": {
+						"from": "00:00:05,660",
+						"to": "00:00:05,760"
+					},
+					"offsets": {
+						"from": 5660,
+						"to": 5760
+					},
+					"id": 2442,
+					"p": 0.968616,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:05,920",
+						"to": "00:00:06,000"
+					},
+					"offsets": {
+						"from": 5920,
+						"to": 6000
+					},
+					"id": 290,
+					"p": 0.911105,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:06,000",
+						"to": "00:00:06,340"
+					},
+					"offsets": {
+						"from": 6000,
+						"to": 6340
+					},
+					"id": 262,
+					"p": 0.785857,
+					"t_dtw": -1
+				},
+				{
+					"text": " Euph",
+					"timestamps": {
+						"from": "00:00:06,340",
+						"to": "00:00:06,770"
+					},
+					"offsets": {
+						"from": 6340,
+						"to": 6770
+					},
+					"id": 47441,
+					"p": 0.985979,
+					"t_dtw": -1
+				},
+				{
+					"text": "rates",
+					"timestamps": {
+						"from": "00:00:06,770",
+						"to": "00:00:06,800"
+					},
+					"offsets": {
+						"from": 6770,
+						"to": 6800
+					},
+					"id": 9700,
+					"p": 0.998508,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:07,640",
+						"to": "00:00:07,740"
+					},
+					"offsets": {
+						"from": 7640,
+						"to": 7740
+					},
+					"id": 13,
+					"p": 0.987641,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_387]",
+					"timestamps": {
+						"from": "00:00:07,740",
+						"to": "00:00:07,740"
+					},
+					"offsets": {
+						"from": 7740,
+						"to": 7740
+					},
+					"id": 50750,
+					"p": 0.0273898,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:07,740",
+				"to": "00:00:20,080"
+			},
+			"offsets": {
+				"from": 7740,
+				"to": 20080
+			},
+			"text": " It runs from the first farming villages, about 7000 BCE, to the fall of Babylon to Cyrus in 539 and Alexander's death there two centuries later.",
+			"tokens": [
+				{
+					"text": " It",
+					"timestamps": {
+						"from": "00:00:07,790",
+						"to": "00:00:07,880"
+					},
+					"offsets": {
+						"from": 7790,
+						"to": 7880
+					},
+					"id": 632,
+					"p": 0.99704,
+					"t_dtw": -1
+				},
+				{
+					"text": " runs",
+					"timestamps": {
+						"from": "00:00:08,130",
+						"to": "00:00:08,170"
+					},
+					"offsets": {
+						"from": 8130,
+						"to": 8170
+					},
+					"id": 4539,
+					"p": 0.99907,
+					"t_dtw": -1
+				},
+				{
+					"text": " from",
+					"timestamps": {
+						"from": "00:00:08,170",
+						"to": "00:00:08,450"
+					},
+					"offsets": {
+						"from": 8170,
+						"to": 8450
+					},
+					"id": 422,
+					"p": 0.99902,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:08,450",
+						"to": "00:00:08,680"
+					},
+					"offsets": {
+						"from": 8450,
+						"to": 8680
+					},
+					"id": 262,
+					"p": 0.99851,
+					"t_dtw": -1
+				},
+				{
+					"text": " first",
+					"timestamps": {
+						"from": "00:00:08,680",
+						"to": "00:00:09,040"
+					},
+					"offsets": {
+						"from": 8680,
+						"to": 9040
+					},
+					"id": 717,
+					"p": 0.967914,
+					"t_dtw": -1
+				},
+				{
+					"text": " farming",
+					"timestamps": {
+						"from": "00:00:09,050",
+						"to": "00:00:09,560"
+					},
+					"offsets": {
+						"from": 9050,
+						"to": 9560
+					},
+					"id": 16035,
+					"p": 0.995811,
+					"t_dtw": -1
+				},
+				{
+					"text": " villages",
+					"timestamps": {
+						"from": "00:00:09,560",
+						"to": "00:00:10,150"
+					},
+					"offsets": {
+						"from": 9560,
+						"to": 10150
+					},
+					"id": 15425,
+					"p": 0.997364,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:10,150",
+						"to": "00:00:10,340"
+					},
+					"offsets": {
+						"from": 10150,
+						"to": 10340
+					},
+					"id": 11,
+					"p": 0.77235,
+					"t_dtw": -1
+				},
+				{
+					"text": " about",
+					"timestamps": {
+						"from": "00:00:10,340",
+						"to": "00:00:10,840"
+					},
+					"offsets": {
+						"from": 10340,
+						"to": 10840
+					},
+					"id": 546,
+					"p": 0.961128,
+					"t_dtw": -1
+				},
+				{
+					"text": " 7000",
+					"timestamps": {
+						"from": "00:00:10,900",
+						"to": "00:00:12,110"
+					},
+					"offsets": {
+						"from": 10900,
+						"to": 12110
+					},
+					"id": 50205,
+					"p": 0.799958,
+					"t_dtw": -1
+				},
+				{
+					"text": " BCE",
+					"timestamps": {
+						"from": "00:00:12,110",
+						"to": "00:00:12,420"
+					},
+					"offsets": {
+						"from": 12110,
+						"to": 12420
+					},
+					"id": 37078,
+					"p": 0.934761,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:12,420",
+						"to": "00:00:12,550"
+					},
+					"offsets": {
+						"from": 12420,
+						"to": 12550
+					},
+					"id": 11,
+					"p": 0.956162,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:12,640",
+						"to": "00:00:12,850"
+					},
+					"offsets": {
+						"from": 12640,
+						"to": 12850
+					},
+					"id": 284,
+					"p": 0.874097,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:12,850",
+						"to": "00:00:13,160"
+					},
+					"offsets": {
+						"from": 12850,
+						"to": 13160
+					},
+					"id": 262,
+					"p": 0.997889,
+					"t_dtw": -1
+				},
+				{
+					"text": " fall",
+					"timestamps": {
+						"from": "00:00:13,160",
+						"to": "00:00:13,490"
+					},
+					"offsets": {
+						"from": 13160,
+						"to": 13490
+					},
+					"id": 2121,
+					"p": 0.887366,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:13,660",
+						"to": "00:00:13,790"
+					},
+					"offsets": {
+						"from": 13660,
+						"to": 13790
+					},
+					"id": 286,
+					"p": 0.997681,
+					"t_dtw": -1
+				},
+				{
+					"text": " Babylon",
+					"timestamps": {
+						"from": "00:00:13,790",
+						"to": "00:00:14,430"
+					},
+					"offsets": {
+						"from": 13790,
+						"to": 14430
+					},
+					"id": 28028,
+					"p": 0.996694,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:14,430",
+						"to": "00:00:14,530"
+					},
+					"offsets": {
+						"from": 14430,
+						"to": 14530
+					},
+					"id": 284,
+					"p": 0.921436,
+					"t_dtw": -1
+				},
+				{
+					"text": " Cyrus",
+					"timestamps": {
+						"from": "00:00:14,530",
+						"to": "00:00:14,980"
+					},
+					"offsets": {
+						"from": 14530,
+						"to": 14980
+					},
+					"id": 34305,
+					"p": 0.956915,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:15,380",
+						"to": "00:00:15,450"
+					},
+					"offsets": {
+						"from": 15380,
+						"to": 15450
+					},
+					"id": 287,
+					"p": 0.99062,
+					"t_dtw": -1
+				},
+				{
+					"text": " 5",
+					"timestamps": {
+						"from": "00:00:15,720",
+						"to": "00:00:15,770"
+					},
+					"offsets": {
+						"from": 15720,
+						"to": 15770
+					},
+					"id": 642,
+					"p": 0.979337,
+					"t_dtw": -1
+				},
+				{
+					"text": "39",
+					"timestamps": {
+						"from": "00:00:15,770",
+						"to": "00:00:16,420"
+					},
+					"offsets": {
+						"from": 15770,
+						"to": 16420
+					},
+					"id": 2670,
+					"p": 0.998891,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:16,420",
+						"to": "00:00:16,660"
+					},
+					"offsets": {
+						"from": 16420,
+						"to": 16660
+					},
+					"id": 290,
+					"p": 0.120197,
+					"t_dtw": -1
+				},
+				{
+					"text": " Alexander",
+					"timestamps": {
+						"from": "00:00:16,660",
+						"to": "00:00:17,400"
+					},
+					"offsets": {
+						"from": 16660,
+						"to": 17400
+					},
+					"id": 10009,
+					"p": 0.950763,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:17,400",
+						"to": "00:00:17,550"
+					},
+					"offsets": {
+						"from": 17400,
+						"to": 17550
+					},
+					"id": 338,
+					"p": 0.998298,
+					"t_dtw": -1
+				},
+				{
+					"text": " death",
+					"timestamps": {
+						"from": "00:00:17,550",
+						"to": "00:00:17,900"
+					},
+					"offsets": {
+						"from": 17550,
+						"to": 17900
+					},
+					"id": 1918,
+					"p": 0.992562,
+					"t_dtw": -1
+				},
+				{
+					"text": " there",
+					"timestamps": {
+						"from": "00:00:18,300",
+						"to": "00:00:18,370"
+					},
+					"offsets": {
+						"from": 18300,
+						"to": 18370
+					},
+					"id": 612,
+					"p": 0.984408,
+					"t_dtw": -1
+				},
+				{
+					"text": " two",
+					"timestamps": {
+						"from": "00:00:18,390",
+						"to": "00:00:18,530"
+					},
+					"offsets": {
+						"from": 18390,
+						"to": 18530
+					},
+					"id": 734,
+					"p": 0.93991,
+					"t_dtw": -1
+				},
+				{
+					"text": " centuries",
+					"timestamps": {
+						"from": "00:00:18,740",
+						"to": "00:00:19,360"
+					},
+					"offsets": {
+						"from": 18740,
+						"to": 19360
+					},
+					"id": 10675,
+					"p": 0.99934,
+					"t_dtw": -1
+				},
+				{
+					"text": " later",
+					"timestamps": {
+						"from": "00:00:19,360",
+						"to": "00:00:19,770"
+					},
+					"offsets": {
+						"from": 19360,
+						"to": 19770
+					},
+					"id": 1568,
+					"p": 0.998826,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:19,770",
+						"to": "00:00:20,080"
+					},
+					"offsets": {
+						"from": 19770,
+						"to": 20080
+					},
+					"id": 13,
+					"p": 0.990333,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_1004]",
+					"timestamps": {
+						"from": "00:00:20,080",
+						"to": "00:00:20,080"
+					},
+					"offsets": {
+						"from": 20080,
+						"to": 20080
+					},
+					"id": 51367,
+					"p": 0.0392884,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:20,080",
+				"to": "00:00:31,080"
+			},
+			"offsets": {
+				"from": 20080,
+				"to": 31080
+			},
+			"text": " Periods, empires and reigns are bands. Inventions, writings, laws and battles are moments, each linked to its sources.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:20,080",
+						"to": "00:00:20,080"
+					},
+					"offsets": {
+						"from": 20080,
+						"to": 20080
+					},
+					"id": 50363,
+					"p": 0.99999,
+					"t_dtw": -1
+				},
+				{
+					"text": " Period",
+					"timestamps": {
+						"from": "00:00:20,470",
+						"to": "00:00:20,680"
+					},
+					"offsets": {
+						"from": 20470,
+						"to": 20680
+					},
+					"id": 18581,
+					"p": 0.964693,
+					"t_dtw": -1
+				},
+				{
+					"text": "s",
+					"timestamps": {
+						"from": "00:00:20,680",
+						"to": "00:00:20,780"
+					},
+					"offsets": {
+						"from": 20680,
+						"to": 20780
+					},
+					"id": 82,
+					"p": 0.999075,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:20,780",
+						"to": "00:00:20,980"
+					},
+					"offsets": {
+						"from": 20780,
+						"to": 20980
+					},
+					"id": 11,
+					"p": 0.988759,
+					"t_dtw": -1
+				},
+				{
+					"text": " empires",
+					"timestamps": {
+						"from": "00:00:20,980",
+						"to": "00:00:21,680"
+					},
+					"offsets": {
+						"from": 20980,
+						"to": 21680
+					},
+					"id": 44982,
+					"p": 0.958415,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:21,680",
+						"to": "00:00:21,980"
+					},
+					"offsets": {
+						"from": 21680,
+						"to": 21980
+					},
+					"id": 290,
+					"p": 0.503734,
+					"t_dtw": -1
+				},
+				{
+					"text": " reign",
+					"timestamps": {
+						"from": "00:00:21,980",
+						"to": "00:00:22,480"
+					},
+					"offsets": {
+						"from": 21980,
+						"to": 22480
+					},
+					"id": 13580,
+					"p": 0.432727,
+					"t_dtw": -1
+				},
+				{
+					"text": "s",
+					"timestamps": {
+						"from": "00:00:22,480",
+						"to": "00:00:22,560"
+					},
+					"offsets": {
+						"from": 22480,
+						"to": 22560
+					},
+					"id": 82,
+					"p": 0.997775,
+					"t_dtw": -1
+				},
+				{
+					"text": " are",
+					"timestamps": {
+						"from": "00:00:22,670",
+						"to": "00:00:22,880"
+					},
+					"offsets": {
+						"from": 22670,
+						"to": 22880
+					},
+					"id": 389,
+					"p": 0.981332,
+					"t_dtw": -1
+				},
+				{
+					"text": " bands",
+					"timestamps": {
+						"from": "00:00:22,880",
+						"to": "00:00:23,380"
+					},
+					"offsets": {
+						"from": 22880,
+						"to": 23380
+					},
+					"id": 11760,
+					"p": 0.946345,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:23,380",
+						"to": "00:00:23,680"
+					},
+					"offsets": {
+						"from": 23380,
+						"to": 23680
+					},
+					"id": 13,
+					"p": 0.873201,
+					"t_dtw": -1
+				},
+				{
+					"text": " In",
+					"timestamps": {
+						"from": "00:00:23,680",
+						"to": "00:00:23,870"
+					},
+					"offsets": {
+						"from": 23680,
+						"to": 23870
+					},
+					"id": 554,
+					"p": 0.972177,
+					"t_dtw": -1
+				},
+				{
+					"text": "ventions",
+					"timestamps": {
+						"from": "00:00:23,900",
+						"to": "00:00:24,680"
+					},
+					"offsets": {
+						"from": 23900,
+						"to": 24680
+					},
+					"id": 16593,
+					"p": 0.998648,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:24,680",
+						"to": "00:00:24,870"
+					},
+					"offsets": {
+						"from": 24680,
+						"to": 24870
+					},
+					"id": 11,
+					"p": 0.997605,
+					"t_dtw": -1
+				},
+				{
+					"text": " writings",
+					"timestamps": {
+						"from": "00:00:24,870",
+						"to": "00:00:25,680"
+					},
+					"offsets": {
+						"from": 24870,
+						"to": 25680
+					},
+					"id": 19336,
+					"p": 0.996798,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:25,680",
+						"to": "00:00:25,840"
+					},
+					"offsets": {
+						"from": 25680,
+						"to": 25840
+					},
+					"id": 11,
+					"p": 0.989391,
+					"t_dtw": -1
+				},
+				{
+					"text": " laws",
+					"timestamps": {
+						"from": "00:00:26,000",
+						"to": "00:00:26,280"
+					},
+					"offsets": {
+						"from": 26000,
+						"to": 26280
+					},
+					"id": 3657,
+					"p": 0.997497,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:26,280",
+						"to": "00:00:26,580"
+					},
+					"offsets": {
+						"from": 26280,
+						"to": 26580
+					},
+					"id": 290,
+					"p": 0.919625,
+					"t_dtw": -1
+				},
+				{
+					"text": " battles",
+					"timestamps": {
+						"from": "00:00:26,580",
+						"to": "00:00:26,860"
+					},
+					"offsets": {
+						"from": 26580,
+						"to": 26860
+					},
+					"id": 10181,
+					"p": 0.999032,
+					"t_dtw": -1
+				},
+				{
+					"text": " are",
+					"timestamps": {
+						"from": "00:00:27,250",
+						"to": "00:00:27,380"
+					},
+					"offsets": {
+						"from": 27250,
+						"to": 27380
+					},
+					"id": 389,
+					"p": 0.996854,
+					"t_dtw": -1
+				},
+				{
+					"text": " moments",
+					"timestamps": {
+						"from": "00:00:28,060",
+						"to": "00:00:28,280"
+					},
+					"offsets": {
+						"from": 28060,
+						"to": 28280
+					},
+					"id": 7188,
+					"p": 0.999016,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:28,280",
+						"to": "00:00:28,480"
+					},
+					"offsets": {
+						"from": 28280,
+						"to": 28480
+					},
+					"id": 11,
+					"p": 0.8042,
+					"t_dtw": -1
+				},
+				{
+					"text": " each",
+					"timestamps": {
+						"from": "00:00:28,480",
+						"to": "00:00:28,830"
+					},
+					"offsets": {
+						"from": 28480,
+						"to": 28830
+					},
+					"id": 1123,
+					"p": 0.999397,
+					"t_dtw": -1
+				},
+				{
+					"text": " linked",
+					"timestamps": {
+						"from": "00:00:28,980",
+						"to": "00:00:29,480"
+					},
+					"offsets": {
+						"from": 28980,
+						"to": 29480
+					},
+					"id": 6692,
+					"p": 0.965862,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:29,480",
+						"to": "00:00:29,660"
+					},
+					"offsets": {
+						"from": 29480,
+						"to": 29660
+					},
+					"id": 284,
+					"p": 0.999485,
+					"t_dtw": -1
+				},
+				{
+					"text": " its",
+					"timestamps": {
+						"from": "00:00:29,700",
+						"to": "00:00:29,980"
+					},
+					"offsets": {
+						"from": 29700,
+						"to": 29980
+					},
+					"id": 663,
+					"p": 0.988105,
+					"t_dtw": -1
+				},
+				{
+					"text": " sources",
+					"timestamps": {
+						"from": "00:00:29,980",
+						"to": "00:00:30,680"
+					},
+					"offsets": {
+						"from": 29980,
+						"to": 30680
+					},
+					"id": 4237,
+					"p": 0.998428,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:30,680",
+						"to": "00:00:30,870"
+					},
+					"offsets": {
+						"from": 30680,
+						"to": 30870
+					},
+					"id": 13,
+					"p": 0.992816,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_550]",
+					"timestamps": {
+						"from": "00:00:31,080",
+						"to": "00:00:31,080"
+					},
+					"offsets": {
+						"from": 31080,
+						"to": 31080
+					},
+					"id": 50913,
+					"p": 0.00655591,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

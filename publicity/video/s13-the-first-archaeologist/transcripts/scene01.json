@@ -1,0 +1,381 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:07,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 7000
+			},
+			"text": " Around 540 BCE, a Babylonian king dug up a ruin and said it was 3,200 years old.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.91587,
+					"t_dtw": -1
+				},
+				{
+					"text": " Around",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:00,590"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 590
+					},
+					"id": 16824,
+					"p": 0.974171,
+					"t_dtw": -1
+				},
+				{
+					"text": " 540",
+					"timestamps": {
+						"from": "00:00:00,700",
+						"to": "00:00:01,670"
+					},
+					"offsets": {
+						"from": 700,
+						"to": 1670
+					},
+					"id": 38190,
+					"p": 0.990542,
+					"t_dtw": -1
+				},
+				{
+					"text": " BCE",
+					"timestamps": {
+						"from": "00:00:01,670",
+						"to": "00:00:02,000"
+					},
+					"offsets": {
+						"from": 1670,
+						"to": 2000
+					},
+					"id": 37078,
+					"p": 0.831493,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,000",
+						"to": "00:00:02,140"
+					},
+					"offsets": {
+						"from": 2000,
+						"to": 2140
+					},
+					"id": 11,
+					"p": 0.870537,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:02,330",
+						"to": "00:00:02,330"
+					},
+					"offsets": {
+						"from": 2330,
+						"to": 2330
+					},
+					"id": 257,
+					"p": 0.917795,
+					"t_dtw": -1
+				},
+				{
+					"text": " Babylon",
+					"timestamps": {
+						"from": "00:00:02,530",
+						"to": "00:00:02,960"
+					},
+					"offsets": {
+						"from": 2530,
+						"to": 2960
+					},
+					"id": 28028,
+					"p": 0.993182,
+					"t_dtw": -1
+				},
+				{
+					"text": "ian",
+					"timestamps": {
+						"from": "00:00:02,960",
+						"to": "00:00:03,230"
+					},
+					"offsets": {
+						"from": 2960,
+						"to": 3230
+					},
+					"id": 666,
+					"p": 0.999762,
+					"t_dtw": -1
+				},
+				{
+					"text": " king",
+					"timestamps": {
+						"from": "00:00:03,230",
+						"to": "00:00:03,600"
+					},
+					"offsets": {
+						"from": 3230,
+						"to": 3600
+					},
+					"id": 5822,
+					"p": 0.939205,
+					"t_dtw": -1
+				},
+				{
+					"text": " dug",
+					"timestamps": {
+						"from": "00:00:03,600",
+						"to": "00:00:03,900"
+					},
+					"offsets": {
+						"from": 3600,
+						"to": 3900
+					},
+					"id": 18735,
+					"p": 0.976381,
+					"t_dtw": -1
+				},
+				{
+					"text": " up",
+					"timestamps": {
+						"from": "00:00:03,910",
+						"to": "00:00:04,100"
+					},
+					"offsets": {
+						"from": 3910,
+						"to": 4100
+					},
+					"id": 510,
+					"p": 0.996288,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:04,110",
+						"to": "00:00:04,210"
+					},
+					"offsets": {
+						"from": 4110,
+						"to": 4210
+					},
+					"id": 257,
+					"p": 0.991982,
+					"t_dtw": -1
+				},
+				{
+					"text": " ruin",
+					"timestamps": {
+						"from": "00:00:04,210",
+						"to": "00:00:04,520"
+					},
+					"offsets": {
+						"from": 4210,
+						"to": 4520
+					},
+					"id": 16866,
+					"p": 0.975547,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:04,810",
+						"to": "00:00:04,810"
+					},
+					"offsets": {
+						"from": 4810,
+						"to": 4810
+					},
+					"id": 290,
+					"p": 0.745627,
+					"t_dtw": -1
+				},
+				{
+					"text": " said",
+					"timestamps": {
+						"from": "00:00:04,880",
+						"to": "00:00:05,020"
+					},
+					"offsets": {
+						"from": 4880,
+						"to": 5020
+					},
+					"id": 531,
+					"p": 0.988118,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:05,040",
+						"to": "00:00:05,150"
+					},
+					"offsets": {
+						"from": 5040,
+						"to": 5150
+					},
+					"id": 340,
+					"p": 0.987436,
+					"t_dtw": -1
+				},
+				{
+					"text": " was",
+					"timestamps": {
+						"from": "00:00:05,150",
+						"to": "00:00:05,300"
+					},
+					"offsets": {
+						"from": 5150,
+						"to": 5300
+					},
+					"id": 373,
+					"p": 0.994,
+					"t_dtw": -1
+				},
+				{
+					"text": " 3",
+					"timestamps": {
+						"from": "00:00:05,410",
+						"to": "00:00:05,490"
+					},
+					"offsets": {
+						"from": 5410,
+						"to": 5490
+					},
+					"id": 513,
+					"p": 0.980625,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:05,490",
+						"to": "00:00:05,600"
+					},
+					"offsets": {
+						"from": 5490,
+						"to": 5600
+					},
+					"id": 11,
+					"p": 0.624969,
+					"t_dtw": -1
+				},
+				{
+					"text": "200",
+					"timestamps": {
+						"from": "00:00:05,600",
+						"to": "00:00:06,110"
+					},
+					"offsets": {
+						"from": 5600,
+						"to": 6110
+					},
+					"id": 2167,
+					"p": 0.999521,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:06,110",
+						"to": "00:00:06,390"
+					},
+					"offsets": {
+						"from": 6110,
+						"to": 6390
+					},
+					"id": 812,
+					"p": 0.994245,
+					"t_dtw": -1
+				},
+				{
+					"text": " old",
+					"timestamps": {
+						"from": "00:00:06,390",
+						"to": "00:00:06,590"
+					},
+					"offsets": {
+						"from": 6390,
+						"to": 6590
+					},
+					"id": 1468,
+					"p": 0.998464,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:06,590",
+						"to": "00:00:06,730"
+					},
+					"offsets": {
+						"from": 6590,
+						"to": 6730
+					},
+					"id": 13,
+					"p": 0.964933,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_350]",
+					"timestamps": {
+						"from": "00:00:07,000",
+						"to": "00:00:07,000"
+					},
+					"offsets": {
+						"from": 7000,
+						"to": 7000
+					},
+					"id": 50713,
+					"p": 0.0404592,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

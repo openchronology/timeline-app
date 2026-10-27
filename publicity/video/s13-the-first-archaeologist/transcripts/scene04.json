@@ -1,0 +1,658 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:03,220"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 3220
+			},
+			"text": " His number would put it before 3,700 BCE,",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.930433,
+					"t_dtw": -1
+				},
+				{
+					"text": " His",
+					"timestamps": {
+						"from": "00:00:00,210",
+						"to": "00:00:00,210"
+					},
+					"offsets": {
+						"from": 210,
+						"to": 210
+					},
+					"id": 2399,
+					"p": 0.8754,
+					"t_dtw": -1
+				},
+				{
+					"text": " number",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:00,620"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 620
+					},
+					"id": 1271,
+					"p": 0.997425,
+					"t_dtw": -1
+				},
+				{
+					"text": " would",
+					"timestamps": {
+						"from": "00:00:00,640",
+						"to": "00:00:00,840"
+					},
+					"offsets": {
+						"from": 640,
+						"to": 840
+					},
+					"id": 561,
+					"p": 0.997904,
+					"t_dtw": -1
+				},
+				{
+					"text": " put",
+					"timestamps": {
+						"from": "00:00:00,980",
+						"to": "00:00:01,140"
+					},
+					"offsets": {
+						"from": 980,
+						"to": 1140
+					},
+					"id": 1234,
+					"p": 0.99744,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:01,230",
+						"to": "00:00:01,290"
+					},
+					"offsets": {
+						"from": 1230,
+						"to": 1290
+					},
+					"id": 340,
+					"p": 0.998483,
+					"t_dtw": -1
+				},
+				{
+					"text": " before",
+					"timestamps": {
+						"from": "00:00:01,380",
+						"to": "00:00:01,780"
+					},
+					"offsets": {
+						"from": 1380,
+						"to": 1780
+					},
+					"id": 878,
+					"p": 0.990747,
+					"t_dtw": -1
+				},
+				{
+					"text": " 3",
+					"timestamps": {
+						"from": "00:00:01,780",
+						"to": "00:00:01,920"
+					},
+					"offsets": {
+						"from": 1780,
+						"to": 1920
+					},
+					"id": 513,
+					"p": 0.489071,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,010",
+						"to": "00:00:02,100"
+					},
+					"offsets": {
+						"from": 2010,
+						"to": 2100
+					},
+					"id": 11,
+					"p": 0.989848,
+					"t_dtw": -1
+				},
+				{
+					"text": "700",
+					"timestamps": {
+						"from": "00:00:02,130",
+						"to": "00:00:02,770"
+					},
+					"offsets": {
+						"from": 2130,
+						"to": 2770
+					},
+					"id": 9879,
+					"p": 0.99724,
+					"t_dtw": -1
+				},
+				{
+					"text": " BCE",
+					"timestamps": {
+						"from": "00:00:02,770",
+						"to": "00:00:02,980"
+					},
+					"offsets": {
+						"from": 2770,
+						"to": 2980
+					},
+					"id": 37078,
+					"p": 0.883647,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,980",
+						"to": "00:00:03,080"
+					},
+					"offsets": {
+						"from": 2980,
+						"to": 3080
+					},
+					"id": 11,
+					"p": 0.809368,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_161]",
+					"timestamps": {
+						"from": "00:00:03,220",
+						"to": "00:00:03,220"
+					},
+					"offsets": {
+						"from": 3220,
+						"to": 3220
+					},
+					"id": 50524,
+					"p": 0.034579,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:03,220",
+				"to": "00:00:05,840"
+			},
+			"offsets": {
+				"from": 3220,
+				"to": 5840
+			},
+			"text": " earlier than any writing we know of.",
+			"tokens": [
+				{
+					"text": " earlier",
+					"timestamps": {
+						"from": "00:00:03,520",
+						"to": "00:00:03,790"
+					},
+					"offsets": {
+						"from": 3520,
+						"to": 3790
+					},
+					"id": 2961,
+					"p": 0.997813,
+					"t_dtw": -1
+				},
+				{
+					"text": " than",
+					"timestamps": {
+						"from": "00:00:03,790",
+						"to": "00:00:04,050"
+					},
+					"offsets": {
+						"from": 3790,
+						"to": 4050
+					},
+					"id": 621,
+					"p": 0.999176,
+					"t_dtw": -1
+				},
+				{
+					"text": " any",
+					"timestamps": {
+						"from": "00:00:04,150",
+						"to": "00:00:04,350"
+					},
+					"offsets": {
+						"from": 4150,
+						"to": 4350
+					},
+					"id": 597,
+					"p": 0.998917,
+					"t_dtw": -1
+				},
+				{
+					"text": " writing",
+					"timestamps": {
+						"from": "00:00:04,350",
+						"to": "00:00:04,920"
+					},
+					"offsets": {
+						"from": 4350,
+						"to": 4920
+					},
+					"id": 3597,
+					"p": 0.994181,
+					"t_dtw": -1
+				},
+				{
+					"text": " we",
+					"timestamps": {
+						"from": "00:00:04,920",
+						"to": "00:00:05,080"
+					},
+					"offsets": {
+						"from": 4920,
+						"to": 5080
+					},
+					"id": 356,
+					"p": 0.997383,
+					"t_dtw": -1
+				},
+				{
+					"text": " know",
+					"timestamps": {
+						"from": "00:00:05,080",
+						"to": "00:00:05,400"
+					},
+					"offsets": {
+						"from": 5080,
+						"to": 5400
+					},
+					"id": 760,
+					"p": 0.998281,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:05,400",
+						"to": "00:00:05,560"
+					},
+					"offsets": {
+						"from": 5400,
+						"to": 5560
+					},
+					"id": 286,
+					"p": 0.998872,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,560",
+						"to": "00:00:05,840"
+					},
+					"offsets": {
+						"from": 5560,
+						"to": 5840
+					},
+					"id": 13,
+					"p": 0.997328,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_292]",
+					"timestamps": {
+						"from": "00:00:05,840",
+						"to": "00:00:05,840"
+					},
+					"offsets": {
+						"from": 5840,
+						"to": 5840
+					},
+					"id": 50655,
+					"p": 0.0864146,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:05,840",
+				"to": "00:00:07,660"
+			},
+			"offsets": {
+				"from": 5840,
+				"to": 7660
+			},
+			"text": " He was out by 15 centuries,",
+			"tokens": [
+				{
+					"text": " He",
+					"timestamps": {
+						"from": "00:00:05,900",
+						"to": "00:00:05,980"
+					},
+					"offsets": {
+						"from": 5900,
+						"to": 5980
+					},
+					"id": 679,
+					"p": 0.997695,
+					"t_dtw": -1
+				},
+				{
+					"text": " was",
+					"timestamps": {
+						"from": "00:00:06,140",
+						"to": "00:00:06,190"
+					},
+					"offsets": {
+						"from": 6140,
+						"to": 6190
+					},
+					"id": 373,
+					"p": 0.999805,
+					"t_dtw": -1
+				},
+				{
+					"text": " out",
+					"timestamps": {
+						"from": "00:00:06,190",
+						"to": "00:00:06,400"
+					},
+					"offsets": {
+						"from": 6190,
+						"to": 6400
+					},
+					"id": 503,
+					"p": 0.999268,
+					"t_dtw": -1
+				},
+				{
+					"text": " by",
+					"timestamps": {
+						"from": "00:00:06,400",
+						"to": "00:00:06,540"
+					},
+					"offsets": {
+						"from": 6400,
+						"to": 6540
+					},
+					"id": 416,
+					"p": 0.999508,
+					"t_dtw": -1
+				},
+				{
+					"text": " 15",
+					"timestamps": {
+						"from": "00:00:06,540",
+						"to": "00:00:06,970"
+					},
+					"offsets": {
+						"from": 6540,
+						"to": 6970
+					},
+					"id": 1315,
+					"p": 0.851319,
+					"t_dtw": -1
+				},
+				{
+					"text": " centuries",
+					"timestamps": {
+						"from": "00:00:06,970",
+						"to": "00:00:07,640"
+					},
+					"offsets": {
+						"from": 6970,
+						"to": 7640
+					},
+					"id": 10675,
+					"p": 0.998049,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:07,640",
+						"to": "00:00:07,660"
+					},
+					"offsets": {
+						"from": 7640,
+						"to": 7660
+					},
+					"id": 11,
+					"p": 0.74135,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_383]",
+					"timestamps": {
+						"from": "00:00:07,660",
+						"to": "00:00:07,660"
+					},
+					"offsets": {
+						"from": 7660,
+						"to": 7660
+					},
+					"id": 50746,
+					"p": 0.080095,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:07,660",
+				"to": "00:00:10,260"
+			},
+			"offsets": {
+				"from": 7660,
+				"to": 10260
+			},
+			"text": " and he's still called the first archaeologist.",
+			"tokens": [
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:07,840",
+						"to": "00:00:07,840"
+					},
+					"offsets": {
+						"from": 7840,
+						"to": 7840
+					},
+					"id": 290,
+					"p": 0.997253,
+					"t_dtw": -1
+				},
+				{
+					"text": " he",
+					"timestamps": {
+						"from": "00:00:07,960",
+						"to": "00:00:07,960"
+					},
+					"offsets": {
+						"from": 7960,
+						"to": 7960
+					},
+					"id": 339,
+					"p": 0.99725,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:07,960",
+						"to": "00:00:08,080"
+					},
+					"offsets": {
+						"from": 7960,
+						"to": 8080
+					},
+					"id": 338,
+					"p": 0.608851,
+					"t_dtw": -1
+				},
+				{
+					"text": " still",
+					"timestamps": {
+						"from": "00:00:08,080",
+						"to": "00:00:08,380"
+					},
+					"offsets": {
+						"from": 8080,
+						"to": 8380
+					},
+					"id": 991,
+					"p": 0.999756,
+					"t_dtw": -1
+				},
+				{
+					"text": " called",
+					"timestamps": {
+						"from": "00:00:08,380",
+						"to": "00:00:08,750"
+					},
+					"offsets": {
+						"from": 8380,
+						"to": 8750
+					},
+					"id": 1444,
+					"p": 0.999272,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:08,750",
+						"to": "00:00:08,930"
+					},
+					"offsets": {
+						"from": 8750,
+						"to": 8930
+					},
+					"id": 262,
+					"p": 0.977262,
+					"t_dtw": -1
+				},
+				{
+					"text": " first",
+					"timestamps": {
+						"from": "00:00:08,930",
+						"to": "00:00:09,170"
+					},
+					"offsets": {
+						"from": 8930,
+						"to": 9170
+					},
+					"id": 717,
+					"p": 0.968464,
+					"t_dtw": -1
+				},
+				{
+					"text": " archae",
+					"timestamps": {
+						"from": "00:00:09,300",
+						"to": "00:00:09,590"
+					},
+					"offsets": {
+						"from": 9300,
+						"to": 9590
+					},
+					"id": 16713,
+					"p": 0.764776,
+					"t_dtw": -1
+				},
+				{
+					"text": "ologist",
+					"timestamps": {
+						"from": "00:00:09,670",
+						"to": "00:00:10,030"
+					},
+					"offsets": {
+						"from": 9670,
+						"to": 10030
+					},
+					"id": 7451,
+					"p": 0.999811,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:10,030",
+						"to": "00:00:10,260"
+					},
+					"offsets": {
+						"from": 10030,
+						"to": 10260
+					},
+					"id": 13,
+					"p": 0.992108,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_513]",
+					"timestamps": {
+						"from": "00:00:10,260",
+						"to": "00:00:10,260"
+					},
+					"offsets": {
+						"from": 10260,
+						"to": 10260
+					},
+					"id": 50876,
+					"p": 0.0224422,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}
