@@ -248,6 +248,8 @@ export async function checkViewMode(page, restore) {
     await page.locator('#apply-bounds').click();
   };
   const readDate = async (title) => {
+    // Going to bounds animates: click once the marker holds still.
+    await settled(`.event-marker[aria-label="${title}"]`);
     await page.getByRole('button', { name: title, exact: true }).click({ force: true });
     await page.waitForFunction(
       (title) =>
