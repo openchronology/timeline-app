@@ -8,6 +8,7 @@ import {
   MOMENT_ICONS,
   MOMENT_SOURCES,
   RICH_TEXT_NOTES,
+  parseTimestamp,
 } from '../dist/core.mjs';
 /**
  * The switch shows for those who can edit. On, the editing controls go, and a moment or
@@ -209,6 +210,66 @@ export async function checkViewMode(page, restore) {
   assert.equal(await page.locator('#event-title').isEditable(), true);
   assert.equal(await page.locator('#reader-panel').isVisible(), false);
   await closeMomentDetails(page);
+
+  // The reader writes dates in full at their own precision, whatever the view (#344): not
+  // "09-09" from a view starting in that year, nor "0091-01-01 BCE" for a year.
+  await load({
+    format: 'openchronology',
+    version: 1,
+    title: 'Reading dates',
+    description: '',
+    presentation: {
+      version: 1,
+      mode: 'gregorian',
+      significantDigits: 6,
+      unit: '',
+      scale: '1/1',
+      origin: '0/1',
+      offsetMinutes: 0,
+    },
+    events: [
+      {
+        id: 'march',
+        time: parseTimestamp('1781-09-09T00:00:00Z').toString(),
+        metadata: { title: 'The march south' },
+      },
+      {
+        id: 'social',
+        time: parseTimestamp('-0090-01-01T00:00:00Z').toString(),
+        metadata: { title: 'The Social War' },
+      },
+    ],
+    relationships: [{ a: { moment: 'march' }, b: { moment: 'social' } }],
+  });
+  await page.locator('#view-mode').check();
+  const view = async (left, right) => {
+    await page.locator('#left-bound').fill(left);
+    await page.locator('#right-bound').fill(right);
+    await page.locator('#apply-bounds').click();
+  };
+  const readDate = async (title) => {
+    await page.getByRole('button', { name: title, exact: true }).click({ force: true });
+    await page.waitForFunction(
+      (title) =>
+        document.getElementById('inspector').open &&
+        document.getElementById('reader-title').textContent === title,
+      title,
+    );
+    await page.waitForFunction(() => document.querySelector('#reader-panel .related-entity'));
+    const shown = await read();
+    await page.locator('#reader-close').click();
+    await page.waitForFunction(() => !document.getElementById('inspector').open);
+    return shown;
+  };
+  await view('1781-03-01T00:00:00Z', '1782-06-01T00:00:00Z');
+  shown = await readDate('The march south');
+  assert.equal(shown.when, '1781-09-09 CE');
+  assert.deepEqual(shown.related, ['The Social War · 91 BCE']);
+  await view('-0091-12-31T12:00:00Z', '-0090-01-01T12:00:00Z');
+  shown = await readDate('The Social War');
+  assert.equal(shown.when, '91 BCE');
+  assert.deepEqual(shown.related, ['The march south · 1781-09-09 CE']);
+  await page.locator('#view-mode').uncheck();
   await page.unroute(images);
   await load(restore);
   console.log(

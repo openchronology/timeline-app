@@ -1235,6 +1235,22 @@ function presented(
     );
   }
 }
+/**
+ * A time written on its own, independent of the view (#344): what the reader and its related
+ * entries show, read as a page about one entity rather than against the timeline's edge.
+ */
+function presentedAlone(q: Q): string {
+  try {
+    return timelinePresenter().alone(q);
+  } catch (error) {
+    return (
+      q.toString() +
+      ' [display error: ' +
+      (error instanceof Error ? error.message : String(error)) +
+      ']'
+    );
+  }
+}
 function axisLabel(
   q: Q,
   purpose: PresentationContext['purpose'] = 'axis',
@@ -3989,7 +4005,7 @@ function eventForm(event?: PointEvent, time?: Q) {
     selected = event;
     requestRender();
     const read = separatedMoment(event);
-    return showReader('moment', read.id, read.metadata, presented(Q.parse(read.time), 'event'));
+    return showReader('moment', read.id, read.metadata, presentedAlone(Q.parse(read.time)));
   }
   pendingEventEdit = false;
   eventEditHistory = null;
@@ -8061,7 +8077,7 @@ function showDuration(duration: Duration, readOnly: boolean, isNew = false) {
       frame.durations?.find((b) => b.id === (b.sourceKey ? b.sourceKey + ':' : '') + duration.id) ??
       resolveDuration(duration, (id) => model?.momentTime(id));
     const when = band
-      ? `${presented(Q.parse(band.first), 'event')} → ${presented(Q.parse(band.last), 'event')}`
+      ? `${presentedAlone(Q.parse(band.first))} → ${presentedAlone(Q.parse(band.last))}`
       : '';
     return showReader('duration', duration.id, duration.metadata, when);
   }
@@ -9255,8 +9271,8 @@ function renderRelated(host: HTMLElement, ref: EntityRef | null, readOnly = fals
         (entry.title || (entry.kind === 'moment' ? 'Untitled moment' : 'Untitled duration')) +
         ' · ' +
         (entry.kind === 'moment'
-          ? presented(Q.parse(entry.first), 'event')
-          : `${presented(Q.parse(entry.first), 'event')} → ${presented(Q.parse(entry.last), 'event')}`);
+          ? presentedAlone(Q.parse(entry.first))
+          : `${presentedAlone(Q.parse(entry.first))} → ${presentedAlone(Q.parse(entry.last))}`);
       open.onclick = () => openEntry(entry);
       row.append(open);
       if (canEdit) {

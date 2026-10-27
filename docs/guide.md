@@ -120,7 +120,7 @@ On the website, **Share** in the panel links to the moment, and **Report** tells
 When you can't edit a timeline, a moment or duration opens in the **reader** instead of the details panel. The reader is a full-size version of its hover card. It shows:
 
 - its pictures, credited to where they're hosted;
-- its time, or a duration's span;
+- its time, or a duration's span, written in full whatever the view (a year-dated moment reads `91 BCE`, a dated one `1781-09-09 CE`);
 - its tags;
 - its notes (formatted with **Rich text notes**);
 - what its plugins record, such as sources or dating notes;
