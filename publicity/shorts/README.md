@@ -20,3 +20,4 @@ The scripts and storyboards of OpenChronology's vertical shorts for TikTok, YouT
 | [`9-i-asked-an-ai.md`](9-i-asked-an-ai.md)                             | Short 9: one prompt and an API key build the Star Wars timeline.                       |
 | [`10-why-did-it-happen.md`](10-why-did-it-happen.md)                   | Short 10: events, conditions and causal factors, on a made-up case.                    |
 | [`15-the-fifteen-year-dynasty.md`](15-the-fifteen-year-dynasty.md)     | Short 15: the Qin united China in 15 years; the Han kept it 400.                       |
+| [`12-closer-to-the-moon.md`](12-closer-to-the-moon.md)                 | Short 12: Cleopatra lived closer to the Moon landing than to the Great Pyramid.        |

@@ -63,6 +63,7 @@ Thirteen videos. Three are for everyone; the rest each answer one audience. All 
 | 12  | **Timelines from AI and automation**                | Automation (F, H), all       | ~3:05   | An assistant and any script, through an API key; how the app is built          | "Built by you, your scripts, or your assistant" |
 | 13  | **Investigations: from timeline to causal factors** | Investigators (H)            | ~3:08   | An events and causal factors chart: events, conditions, causal factors, review | "Every investigation is a timeline"             |
 | 18  | **Tour: China, from the Neolithic to 1949**         | Students, teachers (B, C)    | ~3:55   | Dynasties as bands, where the dates begin, threads of ideas and inventions     | "Seven thousand years, one line"                |
+| 15  | **Tour: ancient Egypt, Narmer to Cleopatra**        | Students, teachers (B, C)    | ~3:40   | Antiquity on one line: one named chronology, dated estimates, its writings     | "Make your class's timeline"                    |
 
 **Why eleven rather than the four first asked for:** the four (reading, editions, rational numbers, tours) cover readers, owners and the curious. Three more audiences came out of the analysis with needs none of those meet: teachers and communities need collaboration, operators need log ingestion, administrators need the server. And the tour splits into four because makers are only convinced by their own kind of subject. Writers get two: Video 6 shows a world being written; Video 7 shows a vast, finished canon being kept (Tolkien's, from the Years of the Trees to the Fourth Age), for the people who maintain one: authors of long series, lore keepers for games and editors of fan chronologies, who need their own calendar, every date's source and certainty, and which book says what. A one-minute front door (1) lets every other video assume the basics.
 
@@ -79,7 +80,7 @@ What changes is the ground and the accent, so each video feels made for its audi
 | Look          | Videos     | Ground and accent                                               | Why                                                            |
 | ------------- | ---------- | --------------------------------------------------------------- | -------------------------------------------------------------- |
 | **Paper**     | 1, 2, 3, 9 | The app's own light paper (`#f5f6f1`) and green (`#285742`)     | Friendly, recognisably the product; most viewers start here    |
-| **Archive**   | 5          | Warm cream with navy and brick accents; a serif for dates       | Reads as history class, documents and maps                     |
+| **Archive**   | 5, 15      | Warm cream with navy and brick accents; a serif for dates       | Reads as history class, documents and maps                     |
 | **Parchment** | 6          | Deep ink-blue ground with gold and ember accents; a serif title | A storyteller's tone, not a spreadsheet's                      |
 | **Lore**      | 7          | Deep forest green with gold; a serif title                      | A keeper of lore, between the storyteller's and the scholar's  |
 | **Strata**    | 8          | Night-sky ground with rock-strata bands for eons                | Deep time feels deep; the bands are the geological column      |

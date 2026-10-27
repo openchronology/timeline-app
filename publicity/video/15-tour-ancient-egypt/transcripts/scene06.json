@@ -1,0 +1,895 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:04,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 4000
+			},
+			"text": " Raimus' II reigns 66 years.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.852394,
+					"t_dtw": -1
+				},
+				{
+					"text": " R",
+					"timestamps": {
+						"from": "00:00:00,030",
+						"to": "00:00:00,130"
+					},
+					"offsets": {
+						"from": 30,
+						"to": 130
+					},
+					"id": 371,
+					"p": 0.310638,
+					"t_dtw": -1
+				},
+				{
+					"text": "aim",
+					"timestamps": {
+						"from": "00:00:00,340",
+						"to": "00:00:00,540"
+					},
+					"offsets": {
+						"from": 340,
+						"to": 540
+					},
+					"id": 1385,
+					"p": 0.45325,
+					"t_dtw": -1
+				},
+				{
+					"text": "us",
+					"timestamps": {
+						"from": "00:00:00,540",
+						"to": "00:00:00,810"
+					},
+					"offsets": {
+						"from": 540,
+						"to": 810
+					},
+					"id": 385,
+					"p": 0.615067,
+					"t_dtw": -1
+				},
+				{
+					"text": "'",
+					"timestamps": {
+						"from": "00:00:00,810",
+						"to": "00:00:00,880"
+					},
+					"offsets": {
+						"from": 810,
+						"to": 880
+					},
+					"id": 6,
+					"p": 0.5263,
+					"t_dtw": -1
+				},
+				{
+					"text": " II",
+					"timestamps": {
+						"from": "00:00:00,970",
+						"to": "00:00:01,210"
+					},
+					"offsets": {
+						"from": 970,
+						"to": 1210
+					},
+					"id": 2873,
+					"p": 0.462882,
+					"t_dtw": -1
+				},
+				{
+					"text": " reign",
+					"timestamps": {
+						"from": "00:00:01,210",
+						"to": "00:00:01,890"
+					},
+					"offsets": {
+						"from": 1210,
+						"to": 1890
+					},
+					"id": 13580,
+					"p": 0.837516,
+					"t_dtw": -1
+				},
+				{
+					"text": "s",
+					"timestamps": {
+						"from": "00:00:01,890",
+						"to": "00:00:01,990"
+					},
+					"offsets": {
+						"from": 1890,
+						"to": 1990
+					},
+					"id": 82,
+					"p": 0.987487,
+					"t_dtw": -1
+				},
+				{
+					"text": " 66",
+					"timestamps": {
+						"from": "00:00:02,110",
+						"to": "00:00:02,840"
+					},
+					"offsets": {
+						"from": 2110,
+						"to": 2840
+					},
+					"id": 7930,
+					"p": 0.935711,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:02,840",
+						"to": "00:00:03,070"
+					},
+					"offsets": {
+						"from": 2840,
+						"to": 3070
+					},
+					"id": 812,
+					"p": 0.999382,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:03,450",
+						"to": "00:00:03,590"
+					},
+					"offsets": {
+						"from": 3450,
+						"to": 3590
+					},
+					"id": 13,
+					"p": 0.974132,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_200]",
+					"timestamps": {
+						"from": "00:00:04,000",
+						"to": "00:00:04,000"
+					},
+					"offsets": {
+						"from": 4000,
+						"to": 4000
+					},
+					"id": 50563,
+					"p": 0.0557632,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,000",
+				"to": "00:00:07,000"
+			},
+			"offsets": {
+				"from": 4000,
+				"to": 7000
+			},
+			"text": " Open the Battle of Kadesh against the Hittites.",
+			"tokens": [
+				{
+					"text": " Open",
+					"timestamps": {
+						"from": "00:00:04,310",
+						"to": "00:00:04,310"
+					},
+					"offsets": {
+						"from": 4310,
+						"to": 4310
+					},
+					"id": 4946,
+					"p": 0.989957,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:04,340",
+						"to": "00:00:04,540"
+					},
+					"offsets": {
+						"from": 4340,
+						"to": 4540
+					},
+					"id": 262,
+					"p": 0.994105,
+					"t_dtw": -1
+				},
+				{
+					"text": " Battle",
+					"timestamps": {
+						"from": "00:00:04,540",
+						"to": "00:00:05,010"
+					},
+					"offsets": {
+						"from": 4540,
+						"to": 5010
+					},
+					"id": 5838,
+					"p": 0.71306,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:05,010",
+						"to": "00:00:05,160"
+					},
+					"offsets": {
+						"from": 5010,
+						"to": 5160
+					},
+					"id": 286,
+					"p": 0.998222,
+					"t_dtw": -1
+				},
+				{
+					"text": " K",
+					"timestamps": {
+						"from": "00:00:05,160",
+						"to": "00:00:05,230"
+					},
+					"offsets": {
+						"from": 5160,
+						"to": 5230
+					},
+					"id": 509,
+					"p": 0.513508,
+					"t_dtw": -1
+				},
+				{
+					"text": "adesh",
+					"timestamps": {
+						"from": "00:00:05,230",
+						"to": "00:00:05,440"
+					},
+					"offsets": {
+						"from": 5230,
+						"to": 5440
+					},
+					"id": 13410,
+					"p": 0.417183,
+					"t_dtw": -1
+				},
+				{
+					"text": " against",
+					"timestamps": {
+						"from": "00:00:05,700",
+						"to": "00:00:05,990"
+					},
+					"offsets": {
+						"from": 5700,
+						"to": 5990
+					},
+					"id": 1028,
+					"p": 0.949229,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:06,110",
+						"to": "00:00:06,270"
+					},
+					"offsets": {
+						"from": 6110,
+						"to": 6270
+					},
+					"id": 262,
+					"p": 0.99674,
+					"t_dtw": -1
+				},
+				{
+					"text": " H",
+					"timestamps": {
+						"from": "00:00:06,320",
+						"to": "00:00:06,350"
+					},
+					"offsets": {
+						"from": 6320,
+						"to": 6350
+					},
+					"id": 367,
+					"p": 0.989619,
+					"t_dtw": -1
+				},
+				{
+					"text": "itt",
+					"timestamps": {
+						"from": "00:00:06,350",
+						"to": "00:00:06,530"
+					},
+					"offsets": {
+						"from": 6350,
+						"to": 6530
+					},
+					"id": 715,
+					"p": 0.987971,
+					"t_dtw": -1
+				},
+				{
+					"text": "ites",
+					"timestamps": {
+						"from": "00:00:06,540",
+						"to": "00:00:06,790"
+					},
+					"offsets": {
+						"from": 6540,
+						"to": 6790
+					},
+					"id": 2737,
+					"p": 0.998386,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:06,790",
+						"to": "00:00:07,000"
+					},
+					"offsets": {
+						"from": 6790,
+						"to": 7000
+					},
+					"id": 13,
+					"p": 0.934035,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_350]",
+					"timestamps": {
+						"from": "00:00:07,000",
+						"to": "00:00:07,000"
+					},
+					"offsets": {
+						"from": 7000,
+						"to": 7000
+					},
+					"id": 50713,
+					"p": 0.390193,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:07,000",
+				"to": "00:00:11,000"
+			},
+			"offsets": {
+				"from": 7000,
+				"to": 11000
+			},
+			"text": " It's linked to his reign and to the peace treaty 15 years later,",
+			"tokens": [
+				{
+					"text": " It",
+					"timestamps": {
+						"from": "00:00:07,040",
+						"to": "00:00:07,190"
+					},
+					"offsets": {
+						"from": 7040,
+						"to": 7190
+					},
+					"id": 632,
+					"p": 0.981452,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:07,340",
+						"to": "00:00:07,390"
+					},
+					"offsets": {
+						"from": 7340,
+						"to": 7390
+					},
+					"id": 338,
+					"p": 0.960239,
+					"t_dtw": -1
+				},
+				{
+					"text": " linked",
+					"timestamps": {
+						"from": "00:00:07,390",
+						"to": "00:00:07,980"
+					},
+					"offsets": {
+						"from": 7390,
+						"to": 7980
+					},
+					"id": 6692,
+					"p": 0.99625,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:07,980",
+						"to": "00:00:08,180"
+					},
+					"offsets": {
+						"from": 7980,
+						"to": 8180
+					},
+					"id": 284,
+					"p": 0.999699,
+					"t_dtw": -1
+				},
+				{
+					"text": " his",
+					"timestamps": {
+						"from": "00:00:08,180",
+						"to": "00:00:08,470"
+					},
+					"offsets": {
+						"from": 8180,
+						"to": 8470
+					},
+					"id": 465,
+					"p": 0.988691,
+					"t_dtw": -1
+				},
+				{
+					"text": " reign",
+					"timestamps": {
+						"from": "00:00:08,700",
+						"to": "00:00:08,990"
+					},
+					"offsets": {
+						"from": 8700,
+						"to": 8990
+					},
+					"id": 13580,
+					"p": 0.998935,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:09,130",
+						"to": "00:00:09,150"
+					},
+					"offsets": {
+						"from": 9130,
+						"to": 9150
+					},
+					"id": 290,
+					"p": 0.7893,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:09,150",
+						"to": "00:00:09,250"
+					},
+					"offsets": {
+						"from": 9150,
+						"to": 9250
+					},
+					"id": 284,
+					"p": 0.981875,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:09,250",
+						"to": "00:00:09,400"
+					},
+					"offsets": {
+						"from": 9250,
+						"to": 9400
+					},
+					"id": 262,
+					"p": 0.993079,
+					"t_dtw": -1
+				},
+				{
+					"text": " peace",
+					"timestamps": {
+						"from": "00:00:09,400",
+						"to": "00:00:09,650"
+					},
+					"offsets": {
+						"from": 9400,
+						"to": 9650
+					},
+					"id": 4167,
+					"p": 0.890896,
+					"t_dtw": -1
+				},
+				{
+					"text": " treaty",
+					"timestamps": {
+						"from": "00:00:09,680",
+						"to": "00:00:10,000"
+					},
+					"offsets": {
+						"from": 9680,
+						"to": 10000
+					},
+					"id": 15775,
+					"p": 0.997361,
+					"t_dtw": -1
+				},
+				{
+					"text": " 15",
+					"timestamps": {
+						"from": "00:00:10,000",
+						"to": "00:00:10,090"
+					},
+					"offsets": {
+						"from": 10000,
+						"to": 10090
+					},
+					"id": 1315,
+					"p": 0.898551,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:10,090",
+						"to": "00:00:10,560"
+					},
+					"offsets": {
+						"from": 10090,
+						"to": 10560
+					},
+					"id": 812,
+					"p": 0.998713,
+					"t_dtw": -1
+				},
+				{
+					"text": " later",
+					"timestamps": {
+						"from": "00:00:10,940",
+						"to": "00:00:10,970"
+					},
+					"offsets": {
+						"from": 10940,
+						"to": 10970
+					},
+					"id": 1568,
+					"p": 0.995552,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:11,000",
+						"to": "00:00:11,000"
+					},
+					"offsets": {
+						"from": 11000,
+						"to": 11000
+					},
+					"id": 11,
+					"p": 0.740852,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_550]",
+					"timestamps": {
+						"from": "00:00:11,000",
+						"to": "00:00:11,000"
+					},
+					"offsets": {
+						"from": 11000,
+						"to": 11000
+					},
+					"id": 50913,
+					"p": 0.903594,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:11,000",
+				"to": "00:00:14,000"
+			},
+			"offsets": {
+				"from": 11000,
+				"to": 14000
+			},
+			"text": " whose text survives from both sides.",
+			"tokens": [
+				{
+					"text": " whose",
+					"timestamps": {
+						"from": "00:00:11,340",
+						"to": "00:00:11,450"
+					},
+					"offsets": {
+						"from": 11340,
+						"to": 11450
+					},
+					"id": 3025,
+					"p": 0.991836,
+					"t_dtw": -1
+				},
+				{
+					"text": " text",
+					"timestamps": {
+						"from": "00:00:11,450",
+						"to": "00:00:11,810"
+					},
+					"offsets": {
+						"from": 11450,
+						"to": 11810
+					},
+					"id": 2420,
+					"p": 0.962996,
+					"t_dtw": -1
+				},
+				{
+					"text": " survives",
+					"timestamps": {
+						"from": "00:00:11,810",
+						"to": "00:00:12,470"
+					},
+					"offsets": {
+						"from": 11810,
+						"to": 12470
+					},
+					"id": 36417,
+					"p": 0.999577,
+					"t_dtw": -1
+				},
+				{
+					"text": " from",
+					"timestamps": {
+						"from": "00:00:12,700",
+						"to": "00:00:12,890"
+					},
+					"offsets": {
+						"from": 12700,
+						"to": 12890
+					},
+					"id": 422,
+					"p": 0.999165,
+					"t_dtw": -1
+				},
+				{
+					"text": " both",
+					"timestamps": {
+						"from": "00:00:12,890",
+						"to": "00:00:13,250"
+					},
+					"offsets": {
+						"from": 12890,
+						"to": 13250
+					},
+					"id": 1111,
+					"p": 0.999687,
+					"t_dtw": -1
+				},
+				{
+					"text": " sides",
+					"timestamps": {
+						"from": "00:00:13,250",
+						"to": "00:00:13,700"
+					},
+					"offsets": {
+						"from": 13250,
+						"to": 13700
+					},
+					"id": 5389,
+					"p": 0.99956,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:13,700",
+						"to": "00:00:14,000"
+					},
+					"offsets": {
+						"from": 13700,
+						"to": 14000
+					},
+					"id": 13,
+					"p": 0.99867,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_700]",
+					"timestamps": {
+						"from": "00:00:14,000",
+						"to": "00:00:14,000"
+					},
+					"offsets": {
+						"from": 14000,
+						"to": 14000
+					},
+					"id": 51063,
+					"p": 0.729617,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:14,000",
+				"to": "00:00:17,000"
+			},
+			"offsets": {
+				"from": 14000,
+				"to": 17000
+			},
+			"text": " Follow the link and keep reading.",
+			"tokens": [
+				{
+					"text": " Follow",
+					"timestamps": {
+						"from": "00:00:14,340",
+						"to": "00:00:14,590"
+					},
+					"offsets": {
+						"from": 14340,
+						"to": 14590
+					},
+					"id": 7281,
+					"p": 0.990817,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:14,590",
+						"to": "00:00:14,880"
+					},
+					"offsets": {
+						"from": 14590,
+						"to": 14880
+					},
+					"id": 262,
+					"p": 0.999519,
+					"t_dtw": -1
+				},
+				{
+					"text": " link",
+					"timestamps": {
+						"from": "00:00:14,970",
+						"to": "00:00:15,230"
+					},
+					"offsets": {
+						"from": 14970,
+						"to": 15230
+					},
+					"id": 2792,
+					"p": 0.999828,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:15,290",
+						"to": "00:00:15,470"
+					},
+					"offsets": {
+						"from": 15290,
+						"to": 15470
+					},
+					"id": 290,
+					"p": 0.911922,
+					"t_dtw": -1
+				},
+				{
+					"text": " keep",
+					"timestamps": {
+						"from": "00:00:15,700",
+						"to": "00:00:15,990"
+					},
+					"offsets": {
+						"from": 15700,
+						"to": 15990
+					},
+					"id": 1394,
+					"p": 0.998913,
+					"t_dtw": -1
+				},
+				{
+					"text": " reading",
+					"timestamps": {
+						"from": "00:00:15,990",
+						"to": "00:00:16,580"
+					},
+					"offsets": {
+						"from": 15990,
+						"to": 16580
+					},
+					"id": 3555,
+					"p": 0.999691,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:16,680",
+						"to": "00:00:17,000"
+					},
+					"offsets": {
+						"from": 16680,
+						"to": 17000
+					},
+					"id": 13,
+					"p": 0.97026,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_850]",
+					"timestamps": {
+						"from": "00:00:17,000",
+						"to": "00:00:17,000"
+					},
+					"offsets": {
+						"from": 17000,
+						"to": 17000
+					},
+					"id": 51213,
+					"p": 0.453064,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}
