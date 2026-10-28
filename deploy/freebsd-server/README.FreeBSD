@@ -75,9 +75,11 @@ and leaves the database and configuration as they are. It then lists:
          diff -u /usr/local/etc/openchronology/openchronology.env \
                  /usr/local/share/openchronology/openchronology.env.example
   2. A backup:  su -l postgres -c 'pg_dump openchronology' > openchronology.sql
-  3. openchronology-migrate, which migrates the database and starts the server.
+  3. openchronology-migrate, which migrates the database and starts the server, and the mail
+     worker (openchronology_mail) if it is enabled. A disabled worker stays stopped.
 
-openchronology-migrate is safe to run more than once. `--no-restart` migrates only.
+openchronology-migrate is safe to run more than once. `--no-restart` migrates only and starts
+nothing.
 
 Remove
 ------

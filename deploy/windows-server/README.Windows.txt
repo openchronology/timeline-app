@@ -78,7 +78,10 @@ Upgrade
 -------
 
 Run the newer installer. It stops the services, replaces the program, keeps the configuration
-and the database, migrates the database to the new version and starts the services again.
+and the database, migrates the database to the new version and starts the services again
+(OpenChronologyMail and OpenChronologySyslog only if they start with Windows). Running
+openchronology-migrate by hand restarts the server, and OpenChronologyMail if it starts with
+Windows.
 Back up first:
 
   "C:\Program Files\OpenChronology Server\pgsql\bin\pg_dump.exe" -h 127.0.0.1 -p 5442 ^

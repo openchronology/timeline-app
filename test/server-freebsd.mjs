@@ -134,6 +134,8 @@ assert.equal(await psql("SELECT count(*) FROM oc_users WHERE username='kept'"), 
 const migrated = await sh('openchronology-migrate 2>&1');
 assert.match(migrated, /OpenChronology schema installed\./);
 assert.match(migrated, /OpenChronology restarted\./);
+// The mail worker is not enabled, so it stays stopped (#371).
+assert.doesNotMatch(migrated, /mail worker restarted/);
 assert.deepEqual(await healthy(), { status: 'ok', storage: 'postgresql' });
 
 // Removing it stops the service and keeps the configuration and the database.

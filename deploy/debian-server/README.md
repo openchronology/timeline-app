@@ -14,7 +14,7 @@ The `openchronology-server` .deb for Debian and Ubuntu (#116). The [Dockerfile](
 | [`och-import-logs`](och-import-logs)                                         | The `och-import-logs` command: imports log files into timelines with the syslog configuration's API key.                    |
 | [`openchronology-journald.service`](openchronology-journald.service)         | The systemd service that follows the journal into timelines.                                                                |
 | [`openchronology-mail.service`](openchronology-mail.service)                 | The systemd service that delivers account email through Resend.                                                             |
-| [`openchronology-migrate`](openchronology-migrate)                           | Brings the database up to the installed version's schema and restarts the server; run after each upgrade.                   |
+| [`openchronology-migrate`](openchronology-migrate)                           | Migrates the database and restarts the server and an enabled mail worker; run after each upgrade.                           |
 | [`openchronology-reset-admin-password`](openchronology-reset-admin-password) | Resets the administrator's password to `ADMIN_INITIAL_PASSWORD` from the configuration (#118).                              |
 | [`openchronology-server.mjs`](openchronology-server.mjs)                     | Starts the platform from an installed package, reading the configuration file as systemd does when started another way.     |
 | [`openchronology-syslog.service`](openchronology-syslog.service)             | The systemd service that receives syslog messages into timelines.                                                           |

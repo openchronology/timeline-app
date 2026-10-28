@@ -131,6 +131,8 @@ await sh(
 const migrated = await sh('openchronology-migrate 2>&1');
 assert.match(migrated, /OpenChronology schema installed\./);
 assert.match(migrated, /OpenChronology restarted\./);
+// The mail worker is not enabled, so it stays stopped (#371).
+assert.doesNotMatch(migrated, /mail worker restarted/);
 const { passwordMatches } = await import(
   `${prefix}/opt/openchronology-server/libexec/server/auth.mjs`
 );

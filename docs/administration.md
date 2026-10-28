@@ -66,6 +66,10 @@ of the change. Mutations are recorded in
 API keys, and pending desktop login requests. Access checks query live account
 state instead of trusting a browser-supplied role.
 
+### Upgrading
+
+An upgrade of the Linux and FreeBSD packages stops the server and the mail worker until the database is migrated. `openchronology-migrate` then starts the server, and the mail worker if it is enabled (on macOS, if its launchd agent was started; on Windows, the installer does, for an OpenChronologyMail service that starts with Windows). A worker left disabled, because email is not configured, stays stopped. `openchronology-migrate --no-restart` migrates only and starts nothing. Releases up to 0.12.1 started only the server, so account email (confirmations, password resets, security notices) waited in `oc_mail_outbox` until someone started the worker (#371); after upgrading such an installation, check it with `systemctl is-active openchronology-mail`. With Docker Compose, see [upgrades](docker.md#upgrades-and-backups).
+
 ## Data quotas
 
 The default quota per user comes from the environment file or from `/admin`:

@@ -148,6 +148,8 @@ await writeFile(
 const migrated = await ps(`& '${dir}\\openchronology-migrate.cmd'`);
 assert.match(migrated, /OpenChronology schema installed\./);
 assert.match(migrated, /OpenChronology restarted\./);
+// The mail worker is not enabled, so it stays stopped (#371).
+assert.doesNotMatch(migrated, /mail worker restarted/);
 const { passwordMatches } = await import(pathToFileURL(`${dir}\\app\\server\\auth.mjs`).href);
 const adminMatches = async () =>
   passwordMatches(
