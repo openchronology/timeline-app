@@ -83,7 +83,7 @@ Each moment's ID comes from the entry's journal cursor. journalctl prints an ent
 Entries gather for `JOURNALD_FLUSH_MS` and are saved together, retried and backed off as the [syslog receiver's](syslog.md#delivery) are.
 
 - **The cursor:** once everything read so far has been sent, it keeps the cursor of the last entry.
-- **Restarting:** a restart (an upgrade, a reboot, a crash) runs journalctl again with `--after-cursor`. Nothing written meanwhile is missed, and nothing sent is sent again.
+- **Restarting:** a restart (an upgrade, after which `openchronology-migrate` starts the enabled service again; a reboot; a crash) runs journalctl again with `--after-cursor`. Nothing written meanwhile is missed, and nothing sent is sent again.
 - **After a crash:** at worst, the entries since the last kept cursor are read twice. They have the same IDs, so they only overwrite.
 - **If journalctl stops** (the journal was vacuumed, or an SSH connection dropped), it is started again after the last entry read. Repeated quick failures, such as journalctl missing, no permission or SSH refused, back off up to a minute and are logged.
 

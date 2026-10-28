@@ -148,8 +148,12 @@ await writeFile(
 const migrated = await ps(`& '${dir}\\openchronology-migrate.cmd'`);
 assert.match(migrated, /OpenChronology schema installed\./);
 assert.match(migrated, /OpenChronology restarted\./);
-// The mail worker is not enabled, so it stays stopped (#371).
+// The mail worker is not enabled, so it stays stopped (#371); the syslog receiver, stopped but
+// set to start with Windows above, runs again (#374).
 assert.doesNotMatch(migrated, /mail worker restarted/);
+assert.match(migrated, /OpenChronology syslog receiver restarted\./);
+assert.equal(await status('OpenChronologySyslog'), 'Running');
+assert.equal(await status('OpenChronologyMail'), 'Stopped');
 const { passwordMatches } = await import(pathToFileURL(`${dir}\\app\\server\\auth.mjs`).href);
 const adminMatches = async () =>
   passwordMatches(
