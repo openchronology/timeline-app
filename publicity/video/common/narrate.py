@@ -62,7 +62,7 @@ def spoken(text, extra):
 
 # IPA to misaki's notation (Kokoro's): diphthongs and affricates as one letter, no length marks,
 # and each stress mark just before its syllable's vowel.
-IPA = [("oʊ", "O"), ("əʊ", "O"), ("eɪ", "A"), ("aɪ", "I"), ("aʊ", "W"), ("ɔɪ", "Y"), ("tʃ", "ʧ"), ("dʒ", "ʤ"),
+IPA = [("ɝ", "ɜɹ"), ("ɚ", "əɹ"), ("oʊ", "O"), ("əʊ", "O"), ("eɪ", "A"), ("aɪ", "I"), ("aʊ", "W"), ("ɔɪ", "Y"), ("tʃ", "ʧ"), ("dʒ", "ʤ"),
        ("r", "ɹ"), ("g", "ɡ"), ("ː", ""), (".", "")]
 VOWELS = set("aeiouæɑɒɔəɛɜɪʊʌAIOWYᵻ")
 
