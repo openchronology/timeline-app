@@ -10,10 +10,15 @@ clicks and all, or the scratch voice from narrate.py), and writes:
   trim/sceneNN.wav          the speech alone, 48 kHz, with 40 ms fades (used in the mix)
   transcripts/sceneNN.json  whisper.cpp's word timings for the trimmed clip (used for cues)
 
+video.json's "segmentWords" (a list of scenes, off by default) fills in words whisper.cpp missed
+in a scratch clip: a sentence of audio/sceneNN.segments.json (from narrate.py) with no word in
+the transcript gets its words spread over the sentence's own time, so a list of one-word
+sentences can't lose its cues.
+
 Everything runs in Docker: linuxserver/ffmpeg for audio, and whisper.cpp built once from
 source in debian:13 into common/whisper/ (not in git).
 """
-import json, os, subprocess, sys, wave
+import json, os, re, subprocess, sys, wave
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build import parse_script
@@ -65,6 +70,33 @@ def ensure_whisper():
              f"cmake --build build -j --target whisper-cli >/dev/null && chown -R {UID} /b"])
 
 
+def fill_segments(path, segs, cut):
+    """Adds to whisper.cpp's transcript at path each narration sentence it has no word in, its
+    words spread over the sentence's time by length (times in the clip trimmed from cut)."""
+    tr = json.load(open(path))
+    said = [t["offsets"]["from"] / 1000 for seg in tr["transcription"] for t in seg["tokens"]
+            if re.search(r"[A-Za-z0-9]", t["text"]) and not t["text"].startswith("[")]
+    added = 0
+    for g in segs:
+        s, e = g["start"] - cut, g["end"] - cut
+        if e <= 0 or any(s - 0.1 <= x <= e + 0.1 for x in said):
+            continue
+        words = g["text"].split()
+        total = sum(len(w) + 1 for w in words)
+        tokens, at = [], max(0.0, s)
+        for w in words:
+            ms = round(at * 1000)
+            tokens.append({"text": " " + w, "offsets": {"from": ms, "to": ms}, "t_dtw": -1})
+            at += (e - s) * (len(w) + 1) / total
+        tr["transcription"].append({"offsets": {"from": round(max(0.0, s) * 1000), "to": round(e * 1000)},
+                                    "text": " " + g["text"], "tokens": tokens})
+        added += 1
+    tr["transcription"].sort(key=lambda seg: seg["offsets"]["from"])
+    json.dump(tr, open(path, "w"), indent=2, ensure_ascii=False)
+    if added:
+        print(f"  {added} sentence(s) whisper.cpp missed, timed from the narration's own sentences")
+
+
 def main(folder, only):
     folder = os.path.abspath(folder)
     cfg = json.load(open(os.path.join(folder, "video.json")))
@@ -92,6 +124,8 @@ def main(folder, only):
              "apt-get update -qq >/dev/null && apt-get install -y -qq libgomp1 >/dev/null 2>&1; "
              f"/w/whisper.cpp/build/bin/whisper-cli -m /w/ggml-small.en.bin -f /v/wav/scene{n}-trim.wav -ojf "
              f"-of /v/transcripts/scene{n} -np -dtw small.en >/dev/null 2>&1 && chown {UID} /v/transcripts/scene{n}.json"])
+        if i in cfg.get("segmentWords", []) and os.path.exists(f"audio/scene{n}.segments.json"):
+            fill_segments(f"transcripts/scene{n}.json", json.load(open(f"audio/scene{n}.segments.json")), a)
         print(f"scene {i}: speech {a:.2f}-{b:.2f} s ({b - a:.1f} s)")
     json.dump(cuts, open("cuts.json", "w"), indent=1)
     names = sorted(n for n in os.listdir("transcripts") if n.endswith(".json"))

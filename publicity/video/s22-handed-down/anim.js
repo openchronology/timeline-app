@@ -222,7 +222,7 @@ var STOPS = [
   { place: 'Belleau Wood', year: 1918, n: 143, w: ['belleau', 'bella', 'bello'] },
   { place: 'Iwo Jima', year: 1945, n: 170, w: 'iwo' },
   { place: 'Chosin Reservoir', year: 1950, n: 175, w: ['chosin', 'chosen'] },
-  { place: 'Huế City', year: 1968, n: 193, w: ['hue', 'hui', 'hway', 'whey', 'way'] },
+  { place: 'Huế City', year: 1968, n: 193, w: ['hu', 'hw', 'way'] },
   { place: 'Fallujah', year: 2004, n: 229, w: ['fallujah', 'fall'] },
 ];
 /** When the run arrives at each stop and leaves it, in scene time: at each name as it's said,
@@ -241,11 +241,14 @@ function schedule(q) {
     t[i] = lerp(t[i - 1], tj, 1 / (j - i + 1));
   }
   var out = t.map(function (x) {
-    return { a: x - 0.05, d: x + 0.15 };
+    return { a: x - 0.05, d: x + 0.5 };
   });
   out[0].a = t[0] - 0.5;
   for (var k = 0; k + 1 < out.length; k++)
-    out[k].d = Math.max(out[k].a, Math.min(Math.max(out[k].d, out[k + 1].a - 0.35), out[k + 1].a - 0.2));
+    out[k].d = Math.max(
+      out[k].a,
+      Math.min(Math.max(out[k].d, out[k + 1].a - 0.35), out[k + 1].a - 0.2),
+    );
   out[1].a = lerp(out[0].d, out[2].a, 0.55);
   out[1].d = out[1].a + 0.02;
   out[out.length - 1].d = 1e9;
