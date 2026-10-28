@@ -57,7 +57,7 @@
 **OST:** "Every generation added to it"
 
 **VO:**
-"Every generation since has added to the line. Tripoli. Belleau Wood. Iwo Jima. Chosin. Huế. Fallujah."
+"Every generation since has added to the line. Tripoli. Belleau Wood. Iwo Jima. Chosin Reservoir. Huế City. Fallujah."
 
 ### Scene 4 · 0:21 – 0:32 · The order
 
@@ -68,7 +68,7 @@
 **OST:** "Read every 10 November since 1921"
 
 **VO:**
-"In 1921, Commandant Lejeune ordered a message read on every birthday. It still is: 'This high name we have received from those who preceded us.'"
+"In 1921, General John A. Lejeune, 13th Commandant, ordered a message read on every birthday. It still is: 'This high name we have received from those who preceded us.'"
 
 ---
 
@@ -106,9 +106,9 @@
 >
 > It started here, in 1775: two battalions of Marines.
 >
-> Every generation since has added to the line. Tripoli. Belleau Wood. Iwo Jima. Chosin. Huế. Fallujah.
+> Every generation since has added to the line. Tripoli. Belleau Wood. Iwo Jima. Chosin Reservoir. Huế City. Fallujah.
 >
-> In 1921, Commandant Lejeune ordered a message read on every birthday. It still is: "This high name we have received from those who preceded us."
+> In 1921, General John A. Lejeune, 13th Commandant, ordered a message read on every birthday. It still is: "This high name we have received from those who preceded us."
 >
 > That's what the cake is. Nobody earns the title alone. Keep faith with the Marines who came before you, and hand it on.
 >

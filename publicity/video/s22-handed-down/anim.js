@@ -221,8 +221,8 @@ var STOPS = [
   { place: 'Chapultepec', year: 1847, n: 72 },
   { place: 'Belleau Wood', year: 1918, n: 143, w: ['belleau', 'bella', 'bello'] },
   { place: 'Iwo Jima', year: 1945, n: 170, w: 'iwo' },
-  { place: 'Chosin', year: 1950, n: 175, w: ['chosin', 'chosen'] },
-  { place: 'Huế', year: 1968, n: 193, w: ['hue', 'hui', 'hway', 'whey', 'way'] },
+  { place: 'Chosin Reservoir', year: 1950, n: 175, w: ['chosin', 'chosen'] },
+  { place: 'Huế City', year: 1968, n: 193, w: ['hue', 'hui', 'hway', 'whey', 'way'] },
   { place: 'Fallujah', year: 2004, n: 229, w: ['fallujah', 'fall'] },
 ];
 /** When the run arrives at each stop and leaves it, in scene time: at each name as it's said,
@@ -245,7 +245,7 @@ function schedule(q) {
   });
   out[0].a = t[0] - 0.5;
   for (var k = 0; k + 1 < out.length; k++)
-    out[k].d = Math.max(out[k].a, Math.min(out[k].d, out[k + 1].a - 0.2));
+    out[k].d = Math.max(out[k].a, Math.min(Math.max(out[k].d, out[k + 1].a - 0.35), out[k + 1].a - 0.2));
   out[1].a = lerp(out[0].d, out[2].a, 0.55);
   out[1].d = out[1].a + 0.02;
   out[out.length - 1].d = 1e9;
@@ -281,7 +281,7 @@ function readout(lt, sch) {
     { o: i === 0 ? 1 : k, ty: (1 - k) * 2.5 },
   );
   return G(
-    panel(SAFE.cx - 30, y, 60, 28) +
+    panel(SAFE.cx - 36, y, 72, 28) +
       face +
       txt(SAFE.cx, y + 25.4, 'years since 1775', { size: 4.6, weight: 600, fill: C.soft }),
     { o: P(lt, sch[0].a, 0.25) },
@@ -318,12 +318,22 @@ SCENES[4] = function (lt, q) {
     { id: 'back21', st: 1.6 * smoothstep(bp) },
     { id: 'reader21', st: 1.1, c: rc, ty: dy, op: up > 0 ? 1 : 0 },
   ]);
-  // The order lit once the run comes to rest on 1921, until the reader covers it.
+  // Lejeune lit as he's named, then his order, until the reader covers them.
   var marks = '';
   if (bp >= 1 && up < 1)
-    marks += G(ring(c.x(pxAt(V_1921, '1921-11-01')), c.y(Y_LINE), P(lt, 1.7, 0.35)), {
-      o: 1 - P(lt, tUp, 0.15),
-    });
+    marks += G(
+      ring(
+        c.x(pxAt(V_1921, '1920-07-01')),
+        c.y(Y_LINE),
+        P(lt, Math.max(1.7, q('lejeune') - 0.1), 0.35),
+      ) +
+        ring(
+          c.x(pxAt(V_1921, '1921-11-01')),
+          c.y(Y_LINE),
+          P(lt, Math.max(1.9, q('ordered') - 0.1), 0.35),
+        ),
+      { o: 1 - P(lt, tUp, 0.15) },
+    );
   var s = lerp(1, 0.6, sh);
   var keep = G(ph + clipScr(marks), { s: s, cx: SAFE.cx, cy: SCR.y + SCR.h });
   // The quotation over the space the phone leaves above it, line by line with the narration.
