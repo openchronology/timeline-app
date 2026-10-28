@@ -8,15 +8,19 @@
 // Usage: node scripts/server-package.mjs [platform|debian13|ubuntu24.04|rocky10|fedora44|
 //   freebsd14|freebsd15|macos ...]
 //   RELEASE_TAG=v1.2.3 builds a release version (the checkout must be that tag).
+//   OCH_NODE_TARBALL=<dir>/node-v<version>-linux-x64.tar.xz gives the .deb and .rpm builds the
+//   Node.js tarball they bundle (scripts/node-tarball.mjs downloads it), instead of their
+//   downloading it from nodejs.org; either way they check its pinned SHA-256 (#369).
 import { execFile, spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { releaseVersion } from './build-info.mjs';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import {
   PLATFORM,
   freebsdVersion,
+  nodeRuntime,
   serverPackage,
   serverTargets,
   upstreamVersion,
@@ -43,6 +47,17 @@ if (tag) {
 const { version } = JSON.parse(await readFile('package.json', 'utf8'));
 const stamp = (await git('show', '-s', '--format=%cd', '--date=format:%Y%m%d%H%M', 'HEAD')).trim();
 const upstream = tag ? upstreamVersion(tag) : `${version}~dev.${stamp}.${commit.slice(0, 7)}`;
+
+// A Node.js tarball given to the .deb and .rpm builds (#369): its folder becomes the
+// node-tarball stage their Dockerfiles take the tarball from, else that stage is empty.
+const nodeTarball = process.env.OCH_NODE_TARBALL ? resolve(process.env.OCH_NODE_TARBALL) : '';
+if (nodeTarball) {
+  const { tarball } = nodeRuntime();
+  if (basename(nodeTarball) !== tarball)
+    throw new Error(`OCH_NODE_TARBALL must be the pinned ${tarball}, not ${nodeTarball}`);
+  if (!existsSync(nodeTarball)) throw new Error(`${nodeTarball} does not exist`);
+}
+const nodeArgs = nodeTarball ? ['--build-context', `node-tarball=${dirname(nodeTarball)}`] : [];
 
 await mkdir('server-artifacts', { recursive: true });
 for (const name of chosen.length ? chosen : Object.keys(serverTargets)) {
@@ -83,6 +98,7 @@ for (const name of chosen.length ? chosen : Object.keys(serverTargets)) {
           `DEB_VERSION=${upstream}-1~${target.suffix}`,
         ];
   console.log(`Building openchronology-server ${upstream} for ${name} (${target.base})`);
+  if (nodeTarball) console.log(`With Node.js from ${nodeTarball}`);
   await new Promise((done, fail) => {
     const build = spawn(
       'docker',
@@ -92,6 +108,7 @@ for (const name of chosen.length ? chosen : Object.keys(serverTargets)) {
         // Every step's output as it runs, so a log shows where a stalled build is (#367).
         '--progress=plain',
         ...formatArgs,
+        ...nodeArgs,
         '--target',
         'export',
         '--output',

@@ -79,22 +79,37 @@ RUN --mount=type=bind,target=/build-context \
     && node scripts/source.mjs --rust-vendor /app/rust-dependencies \
     && cp dist/openchronology-web-source.tar.gz platform/public/
 
+# A Node.js tarball given to the build (#369): scripts/server-package.mjs replaces this empty
+# stage with the folder of OCH_NODE_TARBALL (--build-context node-tarball=<dir>), as CI does
+# with the tarball it caches. Without one, the package stage downloads it from nodejs.org.
+FROM scratch AS node-tarball
+
 # The package.
 FROM base AS package
 ARG RPM_VERSION
 ARG RPM_RELEASE=1
-# Node.js runtime, pinned and checked (https://nodejs.org/dist/v24.21.0/SHASUMS256.txt).
+# Node.js runtime, pinned and checked (https://nodejs.org/dist/v24.21.0/SHASUMS256.txt). The
+# Debian Dockerfile's are the source (nodeRuntime, scripts/server-targets.mjs); this one matches.
 ARG NODE_VERSION=24.21.0
 ARG NODE_SHA256=fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6
 RUN dnf -y install rpm-build curl-minimal xz && dnf clean all
 WORKDIR /root
 ENV ROOT=/root/package APP=/root/package/usr/lib/openchronology
-RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" -o node.tar.xz \
-    && echo "${NODE_SHA256}  node.tar.xz" | sha256sum -c - \
-    && mkdir -p "$APP/node" \
-    && tar -xJf node.tar.xz -C "$APP/node" --strip-components=1 \
-       "node-v${NODE_VERSION}-linux-x64/bin/node" "node-v${NODE_VERSION}-linux-x64/LICENSE" \
-    && rm node.tar.xz
+# The given tarball, else nodejs.org's; either is checked against the pinned SHA-256.
+RUN --mount=type=bind,from=node-tarball,target=/node-tarball \
+    set -eu; \
+    tarball="node-v${NODE_VERSION}-linux-x64.tar.xz"; \
+    if [ -f "/node-tarball/$tarball" ]; then \
+      echo "Using the given $tarball"; \
+      cp "/node-tarball/$tarball" node.tar.xz; \
+    else \
+      curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/$tarball" -o node.tar.xz; \
+    fi; \
+    echo "${NODE_SHA256}  node.tar.xz" | sha256sum -c -; \
+    mkdir -p "$APP/node"; \
+    tar -xJf node.tar.xz -C "$APP/node" --strip-components=1 \
+      "node-v${NODE_VERSION}-linux-x64/bin/node" "node-v${NODE_VERSION}-linux-x64/LICENSE"; \
+    rm node.tar.xz
 # The application, laid out as in the Debian package.
 COPY --from=app /app/platform/.next/standalone ${APP}/
 COPY --from=app /app/platform/.next/static ${APP}/platform/.next/static

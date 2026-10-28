@@ -122,3 +122,84 @@ test('the server packages build and install with their own time limits', async (
     'docker build prints its progress',
   );
 });
+
+// The Node.js tarball the .deb and .rpm packages bundle (#369): downloaded once per job outside
+// Docker, cached by version, and given to the build, which still checks it.
+const workflowSteps = async (file) => {
+  const text = await readFile(file, 'utf8');
+  return text.split(/\n(?=\s*- (?:name|uses|run):)/);
+};
+
+test('the server packages cache the Node.js tarball and give it to the build', async () => {
+  const steps = await workflowSteps('.github/workflows/server-packages.yml');
+  const at = (pattern) => steps.findIndex((s) => pattern.test(s));
+  const version = at(/run: node scripts\/node-tarball\.mjs --print >> "\$GITHUB_OUTPUT"/);
+  const cache = at(/uses: actions\/cache@[0-9a-f]{40} # v\d/);
+  const download = at(/run: node scripts\/node-tarball\.mjs "\$RUNNER_TEMP\/node-tarball"/);
+  const build = at(/- name: Build the package\n/);
+  assert(version >= 0, 'a step reads the Node.js version');
+  assert(cache > version, 'the cache follows the version');
+  assert(download > cache, 'the download follows the cache');
+  assert(build > download, 'the build follows the download');
+  // Keyed on the version and architecture the Dockerfiles pin, not a version of its own.
+  assert.match(
+    steps[cache],
+    /key: node-tarball-v\$\{\{ steps\.node-runtime\.outputs\.version \}\}-\$\{\{ steps\.node-runtime\.outputs\.arch \}\}/,
+  );
+  assert.match(steps[cache], /path: \$\{\{ runner\.temp \}\}\/node-tarball\n/);
+  assert.match(steps[download], /if: steps\.node-cache\.outputs\.cache-hit != 'true'/);
+  const minutes = Number(steps[download].match(/^\s+timeout-minutes: (\d+)$/m)?.[1]);
+  assert(minutes > 0 && minutes <= 5, `the download's timeout-minutes ${minutes}`);
+  assert.match(
+    steps[build],
+    /OCH_NODE_TARBALL: \$\{\{ runner\.temp \}\}\/node-tarball\/\$\{\{ steps\.node-runtime\.outputs\.tarball \}\}/,
+  );
+  assert.match(
+    await readFile('scripts/server-package.mjs', 'utf8'),
+    /'--build-context', `node-tarball=\$\{dirname\(nodeTarball\)\}`/,
+  );
+  const { nodeRuntime } = await import('../scripts/server-targets.mjs');
+  const workflow = await readFile('.github/workflows/server-packages.yml', 'utf8');
+  for (const own of ['nodejs.org/dist', nodeRuntime().version])
+    assert(!workflow.includes(own), `the workflow names no Node.js ${own} of its own`);
+});
+
+test('the Node.js version comes from the Dockerfiles, which agree', async () => {
+  const { nodeRuntime } = await import('../scripts/server-targets.mjs');
+  const runtime = nodeRuntime();
+  assert.match(runtime.version, /^\d+\.\d+\.\d+$/);
+  assert.match(runtime.sha256, /^[0-9a-f]{64}$/);
+  assert.equal(runtime.tarball, `node-v${runtime.version}-linux-x64.tar.xz`);
+  for (const file of ['deploy/debian-server/Dockerfile', 'deploy/rpm-server/Dockerfile'])
+    assert.deepEqual(nodeRuntime(await readFile(file, 'utf8')), runtime, file);
+  // The Windows installer bundles the same release (its zip has its own checksum).
+  assert.match(
+    await readFile('deploy/windows-server/build.ps1', 'utf8'),
+    new RegExp(`nodejs\\.org/dist/v${runtime.version}/node-v${runtime.version}-win-x64\\.zip`),
+  );
+});
+
+test('the package Dockerfiles check the Node.js tarball, given or downloaded', async () => {
+  for (const file of ['deploy/debian-server/Dockerfile', 'deploy/rpm-server/Dockerfile']) {
+    const all = stages(await readFile(file, 'utf8'));
+    const given = all.find((s) => s.name === 'node-tarball');
+    assert.equal(given?.parent, 'scratch', `${file}: an empty node-tarball stage by default`);
+    const install = all
+      .find((s) => s.name === 'package')
+      .body.split(/\n(?=RUN )/)
+      .find((run) => /node\.tar\.xz/.test(run));
+    assert(install, `${file}: the package stage installs Node.js`);
+    assert.match(install, /--mount=type=bind,from=node-tarball,target=\/node-tarball/, file);
+    assert.match(install, /set -eu;/, `${file}: a failed step fails the build`);
+    // Both branches write node.tar.xz, and the one check after them covers either.
+    const branches = install.match(
+      /if \[ -f "\/node-tarball\/\$tarball" \]; then([\s\S]*?)else([\s\S]*?)fi;([\s\S]*)/,
+    );
+    assert(branches, `${file}: the given tarball, else a download`);
+    const [, ifGiven, ifNot, after] = branches;
+    assert.match(ifGiven, /cp "\/node-tarball\/\$tarball" node\.tar\.xz/, file);
+    assert.match(ifNot, /curl -fsSL "https:\/\/nodejs\.org\/dist\/[^"]+" -o node\.tar\.xz/, file);
+    assert.match(after, /^[\s\\]*echo "\$\{NODE_SHA256\}  node\.tar\.xz" \| sha256sum -c -;/, file);
+    assert(after.indexOf('sha256sum -c') < after.indexOf('tar -xJf'), `${file}: checked first`);
+  }
+});
