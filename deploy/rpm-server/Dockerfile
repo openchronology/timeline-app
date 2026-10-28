@@ -10,9 +10,9 @@ ARG BASE=fedora:44
 FROM ${BASE} AS base
 # dnf retries a failed download and gives up on a stalled mirror after 30 s (#367).
 RUN sed -i '/^\[main\]/a retries=3\ntimeout=30' /etc/dnf/dnf.conf && grep -qx 'retries=3' /etc/dnf/dnf.conf
-# curl (the Rust installer, pgmp, Node.js) retries too, and gives up on a download that stalls
-# below 1 kB/s for 30 s (#367).
-RUN printf 'retry = 3\nretry-all-errors\nconnect-timeout = 30\nspeed-limit = 1024\nspeed-time = 30\n' > /root/.curlrc
+# curl (the Rust installer, pgmp, Node.js) retries too, giving up on an attempt that stalls below
+# 1 kB/s for 30 s or takes over 3 minutes (#367).
+RUN printf 'retry = 3\nretry-all-errors\nconnect-timeout = 30\nspeed-limit = 1024\nspeed-time = 30\nmax-time = 180\n' > /root/.curlrc
 
 # och-convert and pgmp, built on the target distribution against its own libraries and the
 # PostgreSQL it ships.

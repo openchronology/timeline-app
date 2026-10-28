@@ -88,8 +88,14 @@ test('every download with curl in a Dockerfile retries and gives up on a stall',
     for (const stage of all) {
       for (const [call] of stage.body.matchAll(/\bcurl -[^\n]*/g)) {
         checked++;
-        const flags = /--retry 3/.test(call) && /--speed-limit/.test(call);
-        const curlrc = configures(all, stage, /speed-limit = 1024/, /\bcurl -/);
+        const flags =
+          /--retry 3/.test(call) && /--speed-limit/.test(call) && /--max-time/.test(call);
+        const curlrc = configures(
+          all,
+          stage,
+          /speed-limit = 1024\\nspeed-time = 30\\nmax-time = 180/,
+          /\bcurl -/,
+        );
         assert(flags || curlrc, `${file}: ${call}`);
       }
     }

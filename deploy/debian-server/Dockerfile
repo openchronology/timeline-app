@@ -9,9 +9,9 @@ ARG BASE=debian:trixie
 FROM ${BASE} AS base
 # apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
 RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
-# curl (the Rust installer, pgmp, Node.js) retries too, and gives up on a download that stalls
-# below 1 kB/s for 30 s (#367).
-RUN printf 'retry = 3\nretry-all-errors\nconnect-timeout = 30\nspeed-limit = 1024\nspeed-time = 30\n' > /root/.curlrc
+# curl (the Rust installer, pgmp, Node.js) retries too, giving up on an attempt that stalls below
+# 1 kB/s for 30 s or takes over 3 minutes (#367).
+RUN printf 'retry = 3\nretry-all-errors\nconnect-timeout = 30\nspeed-limit = 1024\nspeed-time = 30\nmax-time = 180\n' > /root/.curlrc
 
 # och-convert and pgmp, built on the target distribution against its own libraries.
 FROM base AS native
