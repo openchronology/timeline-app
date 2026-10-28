@@ -1,0 +1,19 @@
+{
+  "script": "../../shorts/23-nobody-left-behind.md",
+  "format": "vertical",
+  "look": "dressblues",
+  "voice": "am_michael",
+  "pace": 0.95,
+  "silence": 0.08,
+  "lead": 0.12,
+  "tail": 0.22,
+  "hold": 1.8,
+  "say": {
+    "1950": "nineteen fifty",
+    "1st": "First",
+    "Hagaru-ri": "Hagaroo-ree",
+    "Koto-ri": "Koto-ree",
+    "Toktong": "Tok-tong",
+    "Chosin": "Chosen"
+  }
+}

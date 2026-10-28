@@ -1,0 +1,255 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:05,280"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 5280
+			},
+			"text": " It started here in 1775, two battalions of Marines.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.971204,
+					"t_dtw": -1
+				},
+				{
+					"text": " It",
+					"timestamps": {
+						"from": "00:00:00,150",
+						"to": "00:00:00,200"
+					},
+					"offsets": {
+						"from": 150,
+						"to": 200
+					},
+					"id": 632,
+					"p": 0.938578,
+					"t_dtw": -1
+				},
+				{
+					"text": " started",
+					"timestamps": {
+						"from": "00:00:00,230",
+						"to": "00:00:00,900"
+					},
+					"offsets": {
+						"from": 230,
+						"to": 900
+					},
+					"id": 2067,
+					"p": 0.997531,
+					"t_dtw": -1
+				},
+				{
+					"text": " here",
+					"timestamps": {
+						"from": "00:00:00,910",
+						"to": "00:00:01,310"
+					},
+					"offsets": {
+						"from": 910,
+						"to": 1310
+					},
+					"id": 994,
+					"p": 0.996964,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:01,310",
+						"to": "00:00:01,500"
+					},
+					"offsets": {
+						"from": 1310,
+						"to": 1500
+					},
+					"id": 287,
+					"p": 0.925045,
+					"t_dtw": -1
+				},
+				{
+					"text": " 17",
+					"timestamps": {
+						"from": "00:00:01,510",
+						"to": "00:00:02,120"
+					},
+					"offsets": {
+						"from": 1510,
+						"to": 2120
+					},
+					"id": 1596,
+					"p": 0.995981,
+					"t_dtw": -1
+				},
+				{
+					"text": "75",
+					"timestamps": {
+						"from": "00:00:02,120",
+						"to": "00:00:02,520"
+					},
+					"offsets": {
+						"from": 2120,
+						"to": 2520
+					},
+					"id": 2425,
+					"p": 0.999037,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:02,770",
+						"to": "00:00:02,940"
+					},
+					"offsets": {
+						"from": 2770,
+						"to": 2940
+					},
+					"id": 11,
+					"p": 0.555711,
+					"t_dtw": -1
+				},
+				{
+					"text": " two",
+					"timestamps": {
+						"from": "00:00:03,070",
+						"to": "00:00:03,210"
+					},
+					"offsets": {
+						"from": 3070,
+						"to": 3210
+					},
+					"id": 734,
+					"p": 0.912404,
+					"t_dtw": -1
+				},
+				{
+					"text": " batt",
+					"timestamps": {
+						"from": "00:00:03,210",
+						"to": "00:00:03,540"
+					},
+					"offsets": {
+						"from": 3210,
+						"to": 3540
+					},
+					"id": 6274,
+					"p": 0.970175,
+					"t_dtw": -1
+				},
+				{
+					"text": "alions",
+					"timestamps": {
+						"from": "00:00:03,540",
+						"to": "00:00:04,040"
+					},
+					"offsets": {
+						"from": 3540,
+						"to": 4040
+					},
+					"id": 50022,
+					"p": 0.999363,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:04,040",
+						"to": "00:00:04,200"
+					},
+					"offsets": {
+						"from": 4040,
+						"to": 4200
+					},
+					"id": 286,
+					"p": 0.997537,
+					"t_dtw": -1
+				},
+				{
+					"text": " Marines",
+					"timestamps": {
+						"from": "00:00:04,200",
+						"to": "00:00:04,590"
+					},
+					"offsets": {
+						"from": 4200,
+						"to": 4590
+					},
+					"id": 19586,
+					"p": 0.657337,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,590",
+						"to": "00:00:04,870"
+					},
+					"offsets": {
+						"from": 4590,
+						"to": 4870
+					},
+					"id": 13,
+					"p": 0.94245,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_264]",
+					"timestamps": {
+						"from": "00:00:05,280",
+						"to": "00:00:05,280"
+					},
+					"offsets": {
+						"from": 5280,
+						"to": 5280
+					},
+					"id": 50627,
+					"p": 0.0138454,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

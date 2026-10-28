@@ -45,6 +45,8 @@ Narration recordings, trimmed audio, captured shots, rendered frames and MP4s ar
 | [`s10-why-did-it-happen/`](s10-why-did-it-happen/README.md)                       | Short 10: why did it happen?                                                                |
 | [`s12-closer-to-the-moon/`](s12-closer-to-the-moon/README.md)                     | Short 12: Cleopatra lived closer to the Moon landing than to the Great Pyramid.             |
 | [`s11-1503-days/`](s11-1503-days/README.md)                                       | Short 11: Lincoln was president 1,503 days.                                                 |
+| [`s22-handed-down/`](s22-handed-down/README.md)                                   | Short 22: handed down, the Marine Corps birthday.                                           |
+| [`s23-nobody-left-behind/`](s23-nobody-left-behind/README.md)                     | Short 23: nobody left behind, Chosin 1950.                                                  |
 | [`s28-54-years/`](s28-54-years/README.md)                                         | Short 28: neural networks waited 54 years.                                                  |
 
 ## Making a video
