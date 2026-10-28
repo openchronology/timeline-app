@@ -81,6 +81,22 @@ test('every Dockerfile stage that runs dnf gives it retries and a timeout', asyn
   assert(checked >= 2, `dnf runs in ${checked} stages`);
 });
 
+test('every download with curl in a Dockerfile retries and gives up on a stall', async () => {
+  let checked = 0;
+  for (const file of await dockerfiles()) {
+    const all = stages(await readFile(file, 'utf8'));
+    for (const stage of all) {
+      for (const [call] of stage.body.matchAll(/\bcurl -[^\n]*/g)) {
+        checked++;
+        const flags = /--retry 3/.test(call) && /--speed-limit/.test(call);
+        const curlrc = configures(all, stage, /speed-limit = 1024/, /\bcurl -/);
+        assert(flags || curlrc, `${file}: ${call}`);
+      }
+    }
+  }
+  assert(checked >= 7, `curl runs ${checked} times`);
+});
+
 test('the server packages build and install with their own time limits', async () => {
   const text = await readFile('.github/workflows/server-packages.yml', 'utf8');
   // A step runs from its "- " to the next step or job.
