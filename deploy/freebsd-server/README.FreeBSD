@@ -76,10 +76,12 @@ and leaves the database and configuration as they are. It then lists:
                  /usr/local/share/openchronology/openchronology.env.example
   2. A backup:  su -l postgres -c 'pg_dump openchronology' > openchronology.sql
   3. openchronology-migrate, which migrates the database and starts the server, and the mail
-     worker (openchronology_mail) if it is enabled. A disabled worker stays stopped.
+     worker (openchronology_mail) and the syslog receiver (openchronology_syslog), each if it
+     is enabled. Disabled ones stay stopped.
 
 openchronology-migrate is safe to run more than once. `--no-restart` migrates only and starts
-nothing.
+nothing. Releases up to 0.12.1 started only the server; after upgrading from one, start an
+enabled receiver with `service openchronology_syslog start` (#374).
 
 Remove
 ------

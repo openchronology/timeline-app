@@ -1,9 +1,10 @@
 #!/bin/sh
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 # Brings the OpenChronology database up to this version's schema, then restarts the
-# openchronology-server service when it runs, and the mail worker's launchd agent when it is
-# started (openchronology-agent), so that it runs this version too (#371). Safe to run more than
-# once. Usage: openchronology-migrate [--no-restart]   (--no-restart restarts nothing)
+# openchronology-server service when it runs, and the mail worker's and the syslog receiver's
+# launchd agents, each when it is started (openchronology-agent), so that they run this version
+# too (#371, #374). Safe to run more than once.
+# Usage: openchronology-migrate [--no-restart]   (--no-restart restarts nothing)
 set -eu
 PREFIX=@HOMEBREW_PREFIX@
 CONFIG=$PREFIX/etc/openchronology/openchronology.env
@@ -18,8 +19,10 @@ if [ "${1:-}" != "--no-restart" ] &&
   "$PREFIX/bin/brew" services restart openchronology-server >/dev/null
   echo "OpenChronology restarted."
 fi
-if [ "${1:-}" != "--no-restart" ] &&
-  launchctl print "gui/$(id -u)/org.openchronology.mail" >/dev/null 2>&1; then
-  "$PREFIX/bin/openchronology-agent" restart mail >/dev/null
-  echo "OpenChronology mail worker restarted."
-fi
+[ "${1:-}" = "--no-restart" ] && exit 0
+for worker in "mail:mail worker" "syslog:syslog receiver"; do
+  if launchctl print "gui/$(id -u)/org.openchronology.${worker%%:*}" >/dev/null 2>&1; then
+    "$PREFIX/bin/openchronology-agent" restart "${worker%%:*}" >/dev/null
+    echo "OpenChronology ${worker#*:} restarted."
+  fi
+done

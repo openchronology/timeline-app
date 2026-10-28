@@ -130,9 +130,12 @@ openchronology-migrate --no-restart
 if [ -n "$systemd" ]; then
   systemctl enable --quiet openchronology.service
   systemctl restart openchronology.service
-  if systemctl is-enabled --quiet openchronology-mail.service 2>/dev/null; then
-    systemctl restart openchronology-mail.service
-  fi
+  # The mail worker and the log importers, each if it is enabled (#371, #374).
+  for unit in mail syslog journald; do
+    if systemctl is-enabled --quiet "openchronology-$unit.service" 2>/dev/null; then
+      systemctl restart "openchronology-$unit.service"
+    fi
+  done
 fi
 origin=$(sed -n 's/^APP_ORIGIN=//p' "$CONFIG")
 state="ready (start it with the openchronology service)"

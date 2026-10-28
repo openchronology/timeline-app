@@ -1,8 +1,9 @@
 #!/bin/sh
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-# Brings the OpenChronology database up to this package's schema, then (re)starts the server
-# and the mail worker, each when it is enabled (an upgrade stopped both, #371). Safe to run more
-# than once. Usage, as root: openchronology-migrate [--no-restart]   (restarts nothing)
+# Brings the OpenChronology database up to this package's schema, then (re)starts the server,
+# the mail worker and the syslog receiver, each when it is enabled (an upgrade stopped them all,
+# #371, #374). Safe to run more than once.
+# Usage, as root: openchronology-migrate [--no-restart]   (restarts nothing)
 set -eu
 APP=/usr/local/lib/openchronology
 CONFIG=/usr/local/etc/openchronology/openchronology.env
@@ -22,7 +23,11 @@ if [ "${1:-}" != "--no-restart" ] && service openchronology enabled; then
   service openchronology restart >/dev/null 2>&1 || service openchronology start >/dev/null
   echo "OpenChronology restarted."
 fi
-if [ "${1:-}" != "--no-restart" ] && service openchronology_mail enabled; then
-  service openchronology_mail restart >/dev/null 2>&1 || service openchronology_mail start >/dev/null
-  echo "OpenChronology mail worker restarted."
-fi
+[ "${1:-}" = "--no-restart" ] && exit 0
+for worker in "mail:mail worker" "syslog:syslog receiver"; do
+  name="openchronology_${worker%%:*}"
+  if service "$name" enabled; then
+    service "$name" restart >/dev/null 2>&1 || service "$name" start >/dev/null
+    echo "OpenChronology ${worker#*:} restarted."
+  fi
+done

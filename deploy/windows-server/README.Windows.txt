@@ -64,7 +64,7 @@ no TLS or sender authentication.
 
 The commands are in C:\Program Files\OpenChronology Server; run them as an administrator:
 
-  openchronology-migrate                 migrates the database and restarts the server
+  openchronology-migrate                 migrates the database and restarts the services
   openchronology-reset-admin-password    the administrator's password, from the configuration
   och-import-logs                        imports log files (log-import.md)
 
@@ -80,8 +80,8 @@ Upgrade
 Run the newer installer. It stops the services, replaces the program, keeps the configuration
 and the database, migrates the database to the new version and starts the services again
 (OpenChronologyMail and OpenChronologySyslog only if they start with Windows). Running
-openchronology-migrate by hand restarts the server, and OpenChronologyMail if it starts with
-Windows.
+openchronology-migrate by hand restarts the server, and OpenChronologyMail and
+OpenChronologySyslog, each if it starts with Windows.
 Back up first:
 
   "C:\Program Files\OpenChronology Server\pgsql\bin\pg_dump.exe" -h 127.0.0.1 -p 5442 ^

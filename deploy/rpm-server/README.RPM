@@ -77,12 +77,15 @@ stops the server and leaves the database and configuration as they are. It then 
                  /usr/share/openchronology/openchronology.env.example
   2. A backup:  sudo -u postgres pg_dump openchronology > openchronology.sql
   3. sudo openchronology-migrate, which migrates the database and starts the server, and
-     the mail worker (openchronology-mail) if it is enabled. A disabled worker stays stopped.
+     each of the mail worker (openchronology-mail) and the log importers
+     (openchronology-syslog, openchronology-journald) that is enabled. Disabled ones stay
+     stopped.
 
 openchronology-migrate is safe to run more than once. `--no-restart` migrates only and starts
 nothing. Releases up to 0.12.1 started only the server, so an upgrade left an enabled mail
-worker stopped and account email waiting (#371); start it with
-`sudo systemctl start openchronology-mail`.
+worker stopped and account email waiting (#371), and enabled log importers stopped and logs
+not imported (#374); start them with, for example,
+`sudo systemctl start openchronology-mail openchronology-syslog`.
 
 Remove
 ------

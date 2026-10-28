@@ -9,7 +9,7 @@ import { basename, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { serverPackage, serverTargets } from '../scripts/server-targets.mjs';
 import { checkSystemdServices } from './server-syslog.mjs';
-import { checkMailWorkerUpgrade } from './server-mail-upgrade.mjs';
+import { checkServicesUpgrade } from './server-upgrade-services.mjs';
 
 const run = promisify(execFile);
 const rpm = resolve(process.argv[2] ?? '');
@@ -139,9 +139,9 @@ try {
     "INSERT INTO oc_users(id,username,email_verified_at,terms_version) VALUES(gen_random_uuid(),'kept',now(),oc_policy_version())",
   );
   const key = /^AUTH_ENCRYPTION_KEY=.*$/m.exec(config)[0];
-  // The mail worker, enabled and running, is stopped by the upgrade and started again by
-  // openchronology-migrate (#371).
-  const { upgrade, migrate } = await checkMailWorkerUpgrade({
+  // The mail worker and the log importers, enabled and running, are stopped by the upgrade
+  // and started again by openchronology-migrate (#371, #374).
+  const { upgrade, migrate } = await checkServicesUpgrade({
     sh,
     upgrade: () => sh(`rpm -Uvh --replacepkgs ${file} 2>&1`),
   });
