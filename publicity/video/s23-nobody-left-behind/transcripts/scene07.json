@@ -1,0 +1,171 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:02,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 2000
+			},
+			"text": " Semper Fadellis.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.99999,
+					"t_dtw": -1
+				},
+				{
+					"text": " Sem",
+					"timestamps": {
+						"from": "00:00:00,340",
+						"to": "00:00:00,350"
+					},
+					"offsets": {
+						"from": 340,
+						"to": 350
+					},
+					"id": 12449,
+					"p": 1,
+					"t_dtw": -1
+				},
+				{
+					"text": "per",
+					"timestamps": {
+						"from": "00:00:00,360",
+						"to": "00:00:00,680"
+					},
+					"offsets": {
+						"from": 360,
+						"to": 680
+					},
+					"id": 525,
+					"p": 1,
+					"t_dtw": -1
+				},
+				{
+					"text": " F",
+					"timestamps": {
+						"from": "00:00:00,770",
+						"to": "00:00:00,810"
+					},
+					"offsets": {
+						"from": 770,
+						"to": 810
+					},
+					"id": 376,
+					"p": 0.692019,
+					"t_dtw": -1
+				},
+				{
+					"text": "ade",
+					"timestamps": {
+						"from": "00:00:00,810",
+						"to": "00:00:01,110"
+					},
+					"offsets": {
+						"from": 810,
+						"to": 1110
+					},
+					"id": 671,
+					"p": 0.327151,
+					"t_dtw": -1
+				},
+				{
+					"text": "ll",
+					"timestamps": {
+						"from": "00:00:01,150",
+						"to": "00:00:01,280"
+					},
+					"offsets": {
+						"from": 1150,
+						"to": 1280
+					},
+					"id": 297,
+					"p": 0.998894,
+					"t_dtw": -1
+				},
+				{
+					"text": "is",
+					"timestamps": {
+						"from": "00:00:01,580",
+						"to": "00:00:01,580"
+					},
+					"offsets": {
+						"from": 1580,
+						"to": 1580
+					},
+					"id": 271,
+					"p": 1,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:01,580",
+						"to": "00:00:01,580"
+					},
+					"offsets": {
+						"from": 1580,
+						"to": 1580
+					},
+					"id": 13,
+					"p": 0.999974,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_100]",
+					"timestamps": {
+						"from": "00:00:02,000",
+						"to": "00:00:02,000"
+					},
+					"offsets": {
+						"from": 2000,
+						"to": 2000
+					},
+					"id": 50463,
+					"p": 0.931658,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,450 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:03,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 3000
+			},
+			"text": " The dead they can't carry, they bury a coterie.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.864736,
+					"t_dtw": -1
+				},
+				{
+					"text": " The",
+					"timestamps": {
+						"from": "00:00:00,040",
+						"to": "00:00:00,180"
+					},
+					"offsets": {
+						"from": 40,
+						"to": 180
+					},
+					"id": 383,
+					"p": 0.806747,
+					"t_dtw": -1
+				},
+				{
+					"text": " dead",
+					"timestamps": {
+						"from": "00:00:00,340",
+						"to": "00:00:00,430"
+					},
+					"offsets": {
+						"from": 340,
+						"to": 430
+					},
+					"id": 2636,
+					"p": 0.993758,
+					"t_dtw": -1
+				},
+				{
+					"text": " they",
+					"timestamps": {
+						"from": "00:00:00,430",
+						"to": "00:00:00,660"
+					},
+					"offsets": {
+						"from": 430,
+						"to": 660
+					},
+					"id": 484,
+					"p": 0.970702,
+					"t_dtw": -1
+				},
+				{
+					"text": " can",
+					"timestamps": {
+						"from": "00:00:00,720",
+						"to": "00:00:00,860"
+					},
+					"offsets": {
+						"from": 720,
+						"to": 860
+					},
+					"id": 460,
+					"p": 0.976064,
+					"t_dtw": -1
+				},
+				{
+					"text": "'t",
+					"timestamps": {
+						"from": "00:00:00,860",
+						"to": "00:00:00,980"
+					},
+					"offsets": {
+						"from": 860,
+						"to": 980
+					},
+					"id": 470,
+					"p": 0.993299,
+					"t_dtw": -1
+				},
+				{
+					"text": " carry",
+					"timestamps": {
+						"from": "00:00:00,980",
+						"to": "00:00:01,270"
+					},
+					"offsets": {
+						"from": 980,
+						"to": 1270
+					},
+					"id": 3283,
+					"p": 0.999226,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,290",
+						"to": "00:00:01,290"
+					},
+					"offsets": {
+						"from": 1290,
+						"to": 1290
+					},
+					"id": 11,
+					"p": 0.721969,
+					"t_dtw": -1
+				},
+				{
+					"text": " they",
+					"timestamps": {
+						"from": "00:00:01,530",
+						"to": "00:00:01,830"
+					},
+					"offsets": {
+						"from": 1530,
+						"to": 1830
+					},
+					"id": 484,
+					"p": 0.963396,
+					"t_dtw": -1
+				},
+				{
+					"text": " bury",
+					"timestamps": {
+						"from": "00:00:01,830",
+						"to": "00:00:02,220"
+					},
+					"offsets": {
+						"from": 1830,
+						"to": 2220
+					},
+					"id": 30033,
+					"p": 0.993417,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:02,220",
+						"to": "00:00:02,310"
+					},
+					"offsets": {
+						"from": 2220,
+						"to": 2310
+					},
+					"id": 257,
+					"p": 0.997076,
+					"t_dtw": -1
+				},
+				{
+					"text": " c",
+					"timestamps": {
+						"from": "00:00:02,310",
+						"to": "00:00:02,400"
+					},
+					"offsets": {
+						"from": 2310,
+						"to": 2400
+					},
+					"id": 269,
+					"p": 0.700318,
+					"t_dtw": -1
+				},
+				{
+					"text": "ot",
+					"timestamps": {
+						"from": "00:00:02,400",
+						"to": "00:00:02,500"
+					},
+					"offsets": {
+						"from": 2400,
+						"to": 2500
+					},
+					"id": 313,
+					"p": 0.646508,
+					"t_dtw": -1
+				},
+				{
+					"text": "erie",
+					"timestamps": {
+						"from": "00:00:03,000",
+						"to": "00:00:03,000"
+					},
+					"offsets": {
+						"from": 3000,
+						"to": 3000
+					},
+					"id": 18287,
+					"p": 0.974159,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:03,000",
+						"to": "00:00:03,000"
+					},
+					"offsets": {
+						"from": 3000,
+						"to": 3000
+					},
+					"id": 13,
+					"p": 0.627757,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_150]",
+					"timestamps": {
+						"from": "00:00:03,000",
+						"to": "00:00:03,000"
+					},
+					"offsets": {
+						"from": 3000,
+						"to": 3000
+					},
+					"id": 50513,
+					"p": 0.0625068,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:03,000",
+				"to": "00:00:07,000"
+			},
+			"offsets": {
+				"from": 3000,
+				"to": 7000
+			},
+			"text": " And the division fights 78 miles to the sea together.",
+			"tokens": [
+				{
+					"text": " And",
+					"timestamps": {
+						"from": "00:00:03,240",
+						"to": "00:00:03,240"
+					},
+					"offsets": {
+						"from": 3240,
+						"to": 3240
+					},
+					"id": 843,
+					"p": 0.847621,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:03,340",
+						"to": "00:00:03,480"
+					},
+					"offsets": {
+						"from": 3340,
+						"to": 3480
+					},
+					"id": 262,
+					"p": 0.981395,
+					"t_dtw": -1
+				},
+				{
+					"text": " division",
+					"timestamps": {
+						"from": "00:00:03,480",
+						"to": "00:00:04,110"
+					},
+					"offsets": {
+						"from": 3480,
+						"to": 4110
+					},
+					"id": 7297,
+					"p": 0.571285,
+					"t_dtw": -1
+				},
+				{
+					"text": " fights",
+					"timestamps": {
+						"from": "00:00:04,110",
+						"to": "00:00:04,580"
+					},
+					"offsets": {
+						"from": 4110,
+						"to": 4580
+					},
+					"id": 11418,
+					"p": 0.993318,
+					"t_dtw": -1
+				},
+				{
+					"text": " 78",
+					"timestamps": {
+						"from": "00:00:04,580",
+						"to": "00:00:05,050"
+					},
+					"offsets": {
+						"from": 4580,
+						"to": 5050
+					},
+					"id": 8699,
+					"p": 0.923136,
+					"t_dtw": -1
+				},
+				{
+					"text": " miles",
+					"timestamps": {
+						"from": "00:00:05,050",
+						"to": "00:00:05,420"
+					},
+					"offsets": {
+						"from": 5050,
+						"to": 5420
+					},
+					"id": 4608,
+					"p": 0.990714,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:05,420",
+						"to": "00:00:05,530"
+					},
+					"offsets": {
+						"from": 5420,
+						"to": 5530
+					},
+					"id": 284,
+					"p": 0.992048,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:05,850",
+						"to": "00:00:05,850"
+					},
+					"offsets": {
+						"from": 5850,
+						"to": 5850
+					},
+					"id": 262,
+					"p": 0.997881,
+					"t_dtw": -1
+				},
+				{
+					"text": " sea",
+					"timestamps": {
+						"from": "00:00:05,850",
+						"to": "00:00:06,010"
+					},
+					"offsets": {
+						"from": 5850,
+						"to": 6010
+					},
+					"id": 5417,
+					"p": 0.996811,
+					"t_dtw": -1
+				},
+				{
+					"text": " together",
+					"timestamps": {
+						"from": "00:00:06,500",
+						"to": "00:00:06,720"
+					},
+					"offsets": {
+						"from": 6500,
+						"to": 6720
+					},
+					"id": 1978,
+					"p": 0.870776,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:06,720",
+						"to": "00:00:07,000"
+					},
+					"offsets": {
+						"from": 6720,
+						"to": 7000
+					},
+					"id": 13,
+					"p": 0.981636,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_350]",
+					"timestamps": {
+						"from": "00:00:07,000",
+						"to": "00:00:07,000"
+					},
+					"offsets": {
+						"from": 7000,
+						"to": 7000
+					},
+					"id": 50713,
+					"p": 0.228429,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

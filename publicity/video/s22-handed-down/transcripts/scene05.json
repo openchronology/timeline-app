@@ -1,0 +1,505 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:02,080"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 2080
+			},
+			"text": " That's what the cake is.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.940783,
+					"t_dtw": -1
+				},
+				{
+					"text": " That",
+					"timestamps": {
+						"from": "00:00:00,170",
+						"to": "00:00:00,420"
+					},
+					"offsets": {
+						"from": 170,
+						"to": 420
+					},
+					"id": 1320,
+					"p": 0.902939,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:00,420",
+						"to": "00:00:00,620"
+					},
+					"offsets": {
+						"from": 420,
+						"to": 620
+					},
+					"id": 338,
+					"p": 0.985496,
+					"t_dtw": -1
+				},
+				{
+					"text": " what",
+					"timestamps": {
+						"from": "00:00:00,620",
+						"to": "00:00:01,040"
+					},
+					"offsets": {
+						"from": 620,
+						"to": 1040
+					},
+					"id": 644,
+					"p": 0.99752,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:01,040",
+						"to": "00:00:01,240"
+					},
+					"offsets": {
+						"from": 1040,
+						"to": 1240
+					},
+					"id": 262,
+					"p": 0.991197,
+					"t_dtw": -1
+				},
+				{
+					"text": " cake",
+					"timestamps": {
+						"from": "00:00:01,340",
+						"to": "00:00:01,410"
+					},
+					"offsets": {
+						"from": 1340,
+						"to": 1410
+					},
+					"id": 12187,
+					"p": 0.977721,
+					"t_dtw": -1
+				},
+				{
+					"text": " is",
+					"timestamps": {
+						"from": "00:00:01,840",
+						"to": "00:00:02,000"
+					},
+					"offsets": {
+						"from": 1840,
+						"to": 2000
+					},
+					"id": 318,
+					"p": 0.998997,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:02,000",
+						"to": "00:00:02,080"
+					},
+					"offsets": {
+						"from": 2000,
+						"to": 2080
+					},
+					"id": 13,
+					"p": 0.8823,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_104]",
+					"timestamps": {
+						"from": "00:00:02,080",
+						"to": "00:00:02,080"
+					},
+					"offsets": {
+						"from": 2080,
+						"to": 2080
+					},
+					"id": 50467,
+					"p": 0.0137411,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:02,080",
+				"to": "00:00:04,720"
+			},
+			"offsets": {
+				"from": 2080,
+				"to": 4720
+			},
+			"text": " Nobody earns the title alone.",
+			"tokens": [
+				{
+					"text": " Nobody",
+					"timestamps": {
+						"from": "00:00:02,240",
+						"to": "00:00:02,640"
+					},
+					"offsets": {
+						"from": 2240,
+						"to": 2640
+					},
+					"id": 15658,
+					"p": 0.994435,
+					"t_dtw": -1
+				},
+				{
+					"text": " earns",
+					"timestamps": {
+						"from": "00:00:02,670",
+						"to": "00:00:03,130"
+					},
+					"offsets": {
+						"from": 2670,
+						"to": 3130
+					},
+					"id": 29339,
+					"p": 0.998237,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:03,130",
+						"to": "00:00:03,320"
+					},
+					"offsets": {
+						"from": 3130,
+						"to": 3320
+					},
+					"id": 262,
+					"p": 0.996607,
+					"t_dtw": -1
+				},
+				{
+					"text": " title",
+					"timestamps": {
+						"from": "00:00:03,420",
+						"to": "00:00:03,490"
+					},
+					"offsets": {
+						"from": 3420,
+						"to": 3490
+					},
+					"id": 3670,
+					"p": 0.998254,
+					"t_dtw": -1
+				},
+				{
+					"text": " alone",
+					"timestamps": {
+						"from": "00:00:04,310",
+						"to": "00:00:04,390"
+					},
+					"offsets": {
+						"from": 4310,
+						"to": 4390
+					},
+					"id": 3436,
+					"p": 0.996537,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,390",
+						"to": "00:00:04,710"
+					},
+					"offsets": {
+						"from": 4390,
+						"to": 4710
+					},
+					"id": 13,
+					"p": 0.97946,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_236]",
+					"timestamps": {
+						"from": "00:00:04,720",
+						"to": "00:00:04,720"
+					},
+					"offsets": {
+						"from": 4720,
+						"to": 4720
+					},
+					"id": 50599,
+					"p": 0.134157,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,720",
+				"to": "00:00:08,400"
+			},
+			"offsets": {
+				"from": 4720,
+				"to": 8400
+			},
+			"text": " Keep faith with the Marines who came before you and hand it on.",
+			"tokens": [
+				{
+					"text": " Keep",
+					"timestamps": {
+						"from": "00:00:04,890",
+						"to": "00:00:04,920"
+					},
+					"offsets": {
+						"from": 4890,
+						"to": 4920
+					},
+					"id": 9175,
+					"p": 0.996812,
+					"t_dtw": -1
+				},
+				{
+					"text": " faith",
+					"timestamps": {
+						"from": "00:00:04,920",
+						"to": "00:00:05,150"
+					},
+					"offsets": {
+						"from": 4920,
+						"to": 5150
+					},
+					"id": 4562,
+					"p": 0.995372,
+					"t_dtw": -1
+				},
+				{
+					"text": " with",
+					"timestamps": {
+						"from": "00:00:05,190",
+						"to": "00:00:05,380"
+					},
+					"offsets": {
+						"from": 5190,
+						"to": 5380
+					},
+					"id": 351,
+					"p": 0.994112,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:05,380",
+						"to": "00:00:05,530"
+					},
+					"offsets": {
+						"from": 5380,
+						"to": 5530
+					},
+					"id": 262,
+					"p": 0.996719,
+					"t_dtw": -1
+				},
+				{
+					"text": " Marines",
+					"timestamps": {
+						"from": "00:00:05,530",
+						"to": "00:00:05,920"
+					},
+					"offsets": {
+						"from": 5530,
+						"to": 5920
+					},
+					"id": 19586,
+					"p": 0.897844,
+					"t_dtw": -1
+				},
+				{
+					"text": " who",
+					"timestamps": {
+						"from": "00:00:05,920",
+						"to": "00:00:05,980"
+					},
+					"offsets": {
+						"from": 5920,
+						"to": 5980
+					},
+					"id": 508,
+					"p": 0.950833,
+					"t_dtw": -1
+				},
+				{
+					"text": " came",
+					"timestamps": {
+						"from": "00:00:06,090",
+						"to": "00:00:06,230"
+					},
+					"offsets": {
+						"from": 6090,
+						"to": 6230
+					},
+					"id": 1625,
+					"p": 0.988704,
+					"t_dtw": -1
+				},
+				{
+					"text": " before",
+					"timestamps": {
+						"from": "00:00:06,900",
+						"to": "00:00:06,900"
+					},
+					"offsets": {
+						"from": 6900,
+						"to": 6900
+					},
+					"id": 878,
+					"p": 0.981288,
+					"t_dtw": -1
+				},
+				{
+					"text": " you",
+					"timestamps": {
+						"from": "00:00:06,960",
+						"to": "00:00:07,200"
+					},
+					"offsets": {
+						"from": 6960,
+						"to": 7200
+					},
+					"id": 345,
+					"p": 0.993906,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:07,200",
+						"to": "00:00:07,450"
+					},
+					"offsets": {
+						"from": 7200,
+						"to": 7450
+					},
+					"id": 290,
+					"p": 0.521659,
+					"t_dtw": -1
+				},
+				{
+					"text": " hand",
+					"timestamps": {
+						"from": "00:00:07,450",
+						"to": "00:00:07,760"
+					},
+					"offsets": {
+						"from": 7450,
+						"to": 7760
+					},
+					"id": 1021,
+					"p": 0.979383,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:07,810",
+						"to": "00:00:07,960"
+					},
+					"offsets": {
+						"from": 7810,
+						"to": 7960
+					},
+					"id": 340,
+					"p": 0.998887,
+					"t_dtw": -1
+				},
+				{
+					"text": " on",
+					"timestamps": {
+						"from": "00:00:07,960",
+						"to": "00:00:08,130"
+					},
+					"offsets": {
+						"from": 7960,
+						"to": 8130
+					},
+					"id": 319,
+					"p": 0.996732,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:08,130",
+						"to": "00:00:08,400"
+					},
+					"offsets": {
+						"from": 8130,
+						"to": 8400
+					},
+					"id": 13,
+					"p": 0.959649,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_420]",
+					"timestamps": {
+						"from": "00:00:08,400",
+						"to": "00:00:08,400"
+					},
+					"offsets": {
+						"from": 8400,
+						"to": 8400
+					},
+					"id": 50783,
+					"p": 0.0176879,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

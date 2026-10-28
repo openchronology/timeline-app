@@ -97,6 +97,31 @@ var LOOKS = {
     acts: ['#d9a441', '#e0603a', '#7f9bd6', '#7fb88a', '#c08ae0'],
     serif: true,
   },
+  // The Marine Corps dress blues: the coat's midnight blue, Marine gold and scarlet, and (in a
+  // short) a blood stripe down each side, as on the trousers' outer seams. Colours only: no
+  // emblem or insignia.
+  dressblues: {
+    ground: '#0d1530',
+    card: '#16213f',
+    text: '#f3efe4',
+    soft: '#a3aec8',
+    line: '#2c3a63',
+    faint: '#121c3a',
+    accent: '#e8b631',
+    moment: '#e8b631',
+    strong: '#ffc72c',
+    duration: '#2c3a63',
+    durationText: '#f3efe4',
+    arc: '#c8102e',
+    select: '#ffc72c',
+    amber: '#e8b631',
+    red: '#c8102e',
+    blue: '#7f9fd8',
+    green: '#7fb88a',
+    acts: ['#e8b631', '#c8102e', '#7f9fd8', '#7fb88a', '#a3aec8'],
+    serif: true,
+    stripes: true,
+  },
   // A canon's keeper: deep forest green and gold.
   lore: {
     ground: '#10201a',
@@ -1090,11 +1115,24 @@ function shortCaption(t) {
     })
     .join('');
   var p = ease(clamp01((t - cue[0]) / 0.12));
+  // Between the stripes, a long cue is set a little smaller.
+  var fit = 1;
+  if (C.stripes) {
+    var w = textWidth(
+      cue[2]
+        .map(function (w) {
+          return w[0];
+        })
+        .join(' '),
+      14,
+    );
+    fit = Math.min(1, (2 * (SAFE.cx - STRIPES.x0) - 4) / w);
+  }
   return (
     '<g transform="translate(' +
     SAFE.cx +
     ' 226) scale(' +
-    (0.9 + 0.1 * p).toFixed(3) +
+    ((0.9 + 0.1 * p) * fit).toFixed(3) +
     ')"><text x="0" y="0" font-family="' +
     FONT +
     '" font-size="14" font-weight="700" text-anchor="middle" stroke="' +
@@ -1108,7 +1146,7 @@ function shortCaption(t) {
     equal width. */
 function shortHeadline(s) {
   if (!s) return '';
-  var room = SAFE.x1 - SAFE.x0,
+  var room = C.stripes ? 2 * (SAFE.cx - STRIPES.x0) : SAFE.x1 - SAFE.x0,
     words = s.split(' '),
     lines = [s];
   if (textWidth(s, 11.5) > room) {
@@ -1131,6 +1169,21 @@ function shortHeadline(s) {
     })
     .join('');
 }
+/** A look's blood stripes (C.stripes): a scarlet stripe down each side of a short's frame,
+    28 px wide and 40 px in from each edge at 1080 px, with a gold hairline inside it. Words stay
+    inside STRIPES.x0 – STRIPES.x1. */
+var STRIPES = { x0: 13, x1: 167 };
+function shortStripes() {
+  if (!C.stripes) return '';
+  var w = 28 / 6,
+    inset = 40 / 6,
+    s = '';
+  [inset, 180 - inset - w].forEach(function (x, i) {
+    s += rect(x, 0, w, 320, C.red);
+    s += rect(i === 0 ? x + w + 0.7 : x - 1.05, 0, 0.35, 320, C.accent, { op: 0.6 });
+  });
+  return s;
+}
 /** Draws a short's frame at t: the headline, the scene and the caption. The first frame is
     already whole (it's the one the feed shows before playing), scenes cut quickly, and a
     headline the next scene repeats stays put across the cut. */
@@ -1145,7 +1198,7 @@ function renderShort(sc, lt, t, body) {
     prev && prev.ost === sc.ost ? 1 : fadeIn,
     next && next.ost === sc.ost ? 1 : fadeOut,
   );
-  var out = '<rect width="180" height="320" fill="' + C.ground + '"/>';
+  var out = '<rect width="180" height="320" fill="' + C.ground + '"/>' + shortStripes();
   if (body && typeof body === 'object') {
     var kIn = body.keepIn ? 1 : fadeIn,
       kOut = body.keepOut ? 1 : fadeOut;
