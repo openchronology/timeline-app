@@ -135,9 +135,12 @@ async function open() {
     (title) => document.getElementById('timeline-title').value === title,
     doc.title,
   );
-  // Hide the import toast and give the timeline the window, as Full screen does.
+  // Hide the import toast and give the timeline the window, as Full screen does. Backgrounds
+  // show at once when loaded, not fading in, so a frame never catches one half-faded.
   await page.addStyleTag({
-    content: '.toast{display:none!important} .focus-card{transition:none!important}',
+    content:
+      '.toast{display:none!important} .focus-card{transition:none!important}' +
+      ' :is(.duration-background,.timeline-backdrop) img{transition:none!important}',
   });
   await page.keyboard.press('Escape');
   await page.locator('#fullscreen-button').click();
@@ -153,10 +156,23 @@ async function go([l, r]) {
     [boundText(l), boundText(r)],
   );
 }
-const frame = () =>
-  page.evaluate(
+/** Waits for the next painted frame, after every background image in view has loaded (or
+    failed), so no frame shows the timeline's backdrop where a duration's picture belongs. */
+const frame = async () => {
+  await page
+    .waitForFunction(
+      () =>
+        [...document.querySelectorAll('.duration-background img, .timeline-backdrop img')].every(
+          (img) => img.complete,
+        ),
+      null,
+      { timeout: 15000 },
+    )
+    .catch(() => console.warn('background images still loading after 15 s'));
+  await page.evaluate(
     () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
   );
+};
 /** Finds a marker (moment, duration band, heading) whose title starts with `title`, matching
     case: markers name themselves in their accessible name, headings in their text. */
 async function marker(title) {
