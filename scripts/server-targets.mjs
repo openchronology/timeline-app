@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+import { readFileSync } from 'node:fs';
+
 /**
  * Server package targets (#116): each system's package format and base image. Debian and
  * FreeBSD packages name their PostgreSQL major version; RPM packages take the one the
@@ -39,3 +41,18 @@ export const upstreamVersion = (tag) => tag.replace(/^v/, '').replace(/^([0-9.]+
  * suffix becomes one more part (1.2.0.rc.1, 0.1.0.dev.202610121205.abcdef1).
  */
 export const freebsdVersion = (upstream) => upstream.replace(/[~-]/g, '.');
+/**
+ * The Node.js runtime the .deb and .rpm packages bundle (#369): its version and pinned SHA-256,
+ * read from the Debian Dockerfile's NODE_VERSION and NODE_SHA256 arguments (the RPM
+ * Dockerfile's match them; test/ci-workflows.test.mjs checks), and its Linux tarball's name.
+ */
+export const nodeRuntime = (
+  dockerfile = readFileSync(new URL('../deploy/debian-server/Dockerfile', import.meta.url), 'utf8'),
+) => {
+  const arg = (name) => dockerfile.match(new RegExp(`^ARG ${name}=(\\S+)$`, 'm'))?.[1];
+  const version = arg('NODE_VERSION');
+  const sha256 = arg('NODE_SHA256');
+  if (!version || !sha256) throw new Error('The Dockerfile pins no Node.js version and checksum');
+  const arch = 'linux-x64';
+  return { version, sha256, arch, tarball: `node-v${version}-${arch}.tar.xz` };
+};

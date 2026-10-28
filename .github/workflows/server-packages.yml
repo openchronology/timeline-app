@@ -37,8 +37,26 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
+      # The Node.js tarball the package bundles, downloaded once and cached by version, so the
+      # Docker build doesn't download it from nodejs.org, which stalls from GitHub's runners
+      # (#369). The version is the Dockerfiles' (scripts/node-tarball.mjs).
+      - name: Node.js runtime version
+        id: node-runtime
+        run: node scripts/node-tarball.mjs --print >> "$GITHUB_OUTPUT"
+      - name: Cache the Node.js tarball
+        id: node-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/node-tarball
+          key: node-tarball-v${{ steps.node-runtime.outputs.version }}-${{ steps.node-runtime.outputs.arch }}
+      - name: Download and check the Node.js tarball
+        if: steps.node-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 5
+        run: node scripts/node-tarball.mjs "$RUNNER_TEMP/node-tarball"
       - name: Build the package
         timeout-minutes: 15
+        env:
+          OCH_NODE_TARBALL: ${{ runner.temp }}/node-tarball/${{ steps.node-runtime.outputs.tarball }}
         run: node scripts/server-package.mjs "${{ matrix.target }}"
       - name: Install, run, upgrade and remove it in a fresh container
         timeout-minutes: 10

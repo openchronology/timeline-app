@@ -73,6 +73,11 @@ RUN --mount=type=bind,target=/build-context \
     && node scripts/source.mjs --rust-vendor /app/rust-dependencies \
     && cp dist/openchronology-web-source.tar.gz platform/public/
 
+# A Node.js tarball given to the build (#369): scripts/server-package.mjs replaces this empty
+# stage with the folder of OCH_NODE_TARBALL (--build-context node-tarball=<dir>), as CI does
+# with the tarball it caches. Without one, the package stage downloads it from nodejs.org.
+FROM scratch AS node-tarball
+
 # The package.
 FROM base AS package
 ARG PG_MAJOR=17
@@ -85,12 +90,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /root
 ENV ROOT=/root/package APP=/root/package/usr/lib/openchronology
-RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" -o node.tar.xz \
-    && echo "${NODE_SHA256}  node.tar.xz" | sha256sum -c - \
-    && mkdir -p "$APP/node" \
-    && tar -xJf node.tar.xz -C "$APP/node" --strip-components=1 \
-       "node-v${NODE_VERSION}-linux-x64/bin/node" "node-v${NODE_VERSION}-linux-x64/LICENSE" \
-    && rm node.tar.xz
+# The given tarball, else nodejs.org's; either is checked against the pinned SHA-256.
+RUN --mount=type=bind,from=node-tarball,target=/node-tarball \
+    set -eu; \
+    tarball="node-v${NODE_VERSION}-linux-x64.tar.xz"; \
+    if [ -f "/node-tarball/$tarball" ]; then \
+      echo "Using the given $tarball"; \
+      cp "/node-tarball/$tarball" node.tar.xz; \
+    else \
+      curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/$tarball" -o node.tar.xz; \
+    fi; \
+    echo "${NODE_SHA256}  node.tar.xz" | sha256sum -c -; \
+    mkdir -p "$APP/node"; \
+    tar -xJf node.tar.xz -C "$APP/node" --strip-components=1 \
+      "node-v${NODE_VERSION}-linux-x64/bin/node" "node-v${NODE_VERSION}-linux-x64/LICENSE"; \
+    rm node.tar.xz
 # The application, laid out as in deploy/Dockerfile.app.
 COPY --from=app /app/platform/.next/standalone ${APP}/
 COPY --from=app /app/platform/.next/static ${APP}/platform/.next/static
