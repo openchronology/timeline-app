@@ -11,8 +11,11 @@
     "AlphaFold": "Alpha Fold",
     "ChatGPT": "Chat G P T",
     "OpenAI": "Open A I",
-    "Sedol": "Seh-dol",
-    "AI's": "A I's",
-    "AI": "A I"
+    "Sedol": "Seh-dol"
+  },
+  "phonemes": {
+    "AI": "/ˌeɪˈaɪ/",
+    "AI's": "/ˌeɪˈaɪz/",
+    "Separate": "/ˈsɛpəˌreɪt/"
   }
 }

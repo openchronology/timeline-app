@@ -13,7 +13,11 @@ in the python:3.12-slim image, one container per video. Words a voice would misr
 respelled for it by SAY below and by the video's own "say" map in video.json; a respelling
 can also give exact phonemes in Kokoro's own notation, as "[word](/phonemes/)". Captions keep
 the script's spelling. video.json's "pace" (1.25: higher reads slower) and "silence" (seconds
-between sentences, 0.35) set how quickly it reads; the shorts read faster.
+between sentences, 0.35) set how quickly it reads; the shorts read faster. Its "voice" picks
+another of Kokoro's voices (af_heart by default), "pauses" gives a scene its own silence between
+sentences ({"3": 0.6}), and "phonemes" says words exactly, in IPA ({"Fallujah": "/fəˈluːʃə/"}),
+turned into Kokoro's notation. Each clip's sentences, their times and the phonemes Kokoro read
+are written beside it as audio/sceneNN.segments.json (prepare.py's "segmentWords" can use them).
 """
 import json, os, re, subprocess, sys
 
@@ -56,24 +60,75 @@ def spoken(text, extra):
     return text
 
 
+# IPA to misaki's notation (Kokoro's): diphthongs and affricates as one letter, no length marks,
+# and each stress mark just before its syllable's vowel.
+IPA = [("ɝ", "ɜɹ"), ("ɚ", "əɹ"), ("oʊ", "O"), ("əʊ", "O"), ("eɪ", "A"), ("aɪ", "I"), ("aʊ", "W"), ("ɔɪ", "Y"), ("tʃ", "ʧ"), ("dʒ", "ʤ"),
+       ("r", "ɹ"), ("g", "ɡ"), ("ː", ""), (".", "")]
+VOWELS = set("aeiouæɑɒɔəɛɜɪʊʌAIOWYᵻ")
+
+
+def misaki(ipa):
+    p = ipa.strip().strip("/")
+    for a, b in IPA:
+        p = p.replace(a, b)
+    out, mark = "", ""
+    for ch in p:
+        if ch in "ˈˌ":
+            mark = ch
+        elif ch in VOWELS and mark:
+            out, mark = out + mark + ch, ""
+        else:
+            out += ch
+    return out
+
+
+def with_phonemes(text, phonemes):
+    """Each word in phonemes ({"word": "/ipa/"}) as [word](/misaki/), outside existing overrides."""
+    if not phonemes:
+        return text
+    keys = sorted(phonemes, key=len, reverse=True)
+    pat = re.compile(r"(?<![\w\[])(" + "|".join(map(re.escape, keys)) + r")(?![\w\]])")
+    parts = re.split(r"(\[[^\]]*\]\(/[^)]*/\))", text)
+    return "".join(p if i % 2 else pat.sub(lambda m: f"[{m.group(1)}](/{misaki(phonemes[m.group(1)])}/)", p)
+                   for i, p in enumerate(parts))
+
+
+def plain(text):
+    """The voice text with its overrides read as their words."""
+    return re.sub(r"\[([^\]]*)\]\(/[^)]*/\)", r"\1", text)
+
+
 def sentences(text):
     """The text split after each sentence's full stop, question or exclamation mark."""
     return [s for s in re.split(r"(?<=[.?!])\s+(?=[A-Z\"'\[])", text.strip()) if s]
 
 
 def speak(jobs):
-    """Runs in the container: reads [{out, sentences, speed, silence}] and writes each clip."""
+    """Runs in the container: reads [{out, sentences, speed, silence, voice}] and writes each clip,
+    and its sentences' times and phonemes beside it."""
     import numpy as np, soundfile as sf, torch
     from kokoro import KPipeline
     torch.set_num_threads(int(os.environ.get("THREADS", "4")))
     pipe = KPipeline(lang_code="a", repo_id="hexgrad/Kokoro-82M")
     for job in jobs:
         gap = np.zeros(int(24000 * job["silence"]), dtype=np.float32)
-        parts = []
+        parts, segs, n = [], [], 0
         for s in job["sentences"]:
-            parts += [a.numpy() for _, _, a in pipe(s, voice=VOICE, speed=job["speed"])] + [gap]
+            got = list(pipe(s, voice=job["voice"], speed=job["speed"]))
+            audio = [a.numpy() for _, _, a in got]
+            size = sum(len(a) for a in audio)
+            # Where the sentence's speech starts and ends, inside the silence the voice leaves around it.
+            loud = np.flatnonzero(np.abs(np.concatenate(audio)) > 0.03) if size else np.array([])
+            on, off = (loud[0], loud[-1]) if len(loud) else (0, size)
+            segs.append({"text": plain(s), "start": round((n + on) / 24000, 3), "end": round((n + off) / 24000, 3),
+                         "phonemes": " ".join(ps for _, ps, _ in got)})
+            parts += audio + [gap]
+            n += size + len(gap)
         sf.write(job["out"], np.concatenate(parts[:-1]), 24000)
+        json.dump(segs, open(job["out"][:-4] + ".segments.json", "w"), ensure_ascii=False, indent=1)
         print("scene", job["id"], "->", "audio/" + os.path.basename(job["out"]), flush=True)
+        for g in segs:
+            print("   ", g["text"], "=>", g["phonemes"], flush=True)
 
 
 def main(folder, only):
@@ -83,7 +138,9 @@ def main(folder, only):
     ensure_kokoro()
     os.makedirs(os.path.join(folder, "audio"), exist_ok=True)
     jobs = [{"id": sc["id"], "out": f"/o/scene{sc['id']:02d}.wav", "speed": SPEED / cfg.get("pace", 1.25),
-             "silence": cfg.get("silence", 0.35), "sentences": sentences(spoken(sc["vo"], cfg.get("say", {})))}
+             "silence": cfg.get("pauses", {}).get(str(sc["id"]), cfg.get("silence", 0.35)),
+             "voice": cfg.get("voice", VOICE),
+             "sentences": sentences(with_phonemes(spoken(sc["vo"], cfg.get("say", {})), cfg.get("phonemes", {})))}
             for sc in scenes if not only or sc["id"] in only]
     subprocess.run(["docker", "run", "--rm", "-i", "--user", UID, "-e", "HOME=/tmp", "-e", "HF_HOME=/t/hf",
                     "-e", "PYTHONPATH=/t/pip", "-e", f"THREADS={os.environ.get('THREADS', '4')}",

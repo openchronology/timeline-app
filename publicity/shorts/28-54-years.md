@@ -8,7 +8,7 @@
 **Production notes:**
 
 - About 90 words (about 100 with the years spelled out), read briskly at about 170 wpm in the default scratch voice (Kokoro `af_heart`). The voice is a science teacher who has just done the sum: wry, not breathless.
-- **The timeline is the sample `publicity/video/samples/ai.ochx`**, captured at phone size as Short 11's is and shown in `phoneShot`, with **Separate by tags** on `neural networks`: the thread's moments lift into the upper track, everything else stays in the lower one, on the same time axis. Its era bands keep their pictures behind both tracks.
+- **The timeline is the sample `publicity/video/samples/ai.ochx`**, captured narrow as Short 23's is (360 × 640, here at scale 6 so the close crop stays sharp, Group within lowered) and shown on a phone whose camera crops to the line, so the app's own labels read at phone size. In Scenes 1–4 it is separated by tags on `neural networks` and the camera holds the thread's upper track; each view holds only the few moments being talked about, and the phone pans from one to the next. Scene 5 is the whole timeline, joined.
 - The counters, chips and the error-rate bars around the phone are drawn by the infographic layer; the moments and bands are the app's.
 - **Accuracy guardrails:** "54 years" counts calendar years from the perceptron (1958) to AlexNet's ImageNet win (2012); "won" means that result, from which most histories date the deep-learning era. The narration doesn't say neural networks had no successes in between (LeCun's digit readers worked in the 1990s); it says simpler methods were usually preferred, as the sources do. The error rates are top-5 error on the ILSVRC 2012 test set, rounded to whole percents in the narration.
 
@@ -18,9 +18,9 @@
 
 ### Scene 1 · 0:00 – 0:06 · Fifty-four years
 
-**FRAME:** The phone, large in the frame, on the view 1950-01-01 → 2020-01-01, the era bands across it. Above the phone, the headline already there at frame 0; under it, "1958 → 2012".
+**FRAME:** The phone, large in the frame, close on the thread (separated by tags on `neural networks`) around 1954–1962: Rosenblatt's perceptron (1958) alone on the line, the golden years' picture behind it. Above the phone, the headline already there at frame 0; under it, "1958 → 2012".
 
-**MOTION:** None to start: the frame is the cover. The 1958 marker brightens on "learned".
+**MOTION:** None: the frame is the cover.
 
 **OST:** "Neural networks waited 54 years to win."
 
@@ -29,9 +29,9 @@
 
 ### Scene 2 · 0:06 – 0:14 · The thread
 
-**FRAME:** The phone zooms to 1940-01-01 → 1992-01-01, then **Separate by tags** on `neural networks`: the upper track holds the 1943 neuron, Hebbian learning, Rosenblatt's perceptron (1958), Minsky and Papert's Perceptrons (1969), then an empty stretch to the neocognitron (1980). Under the phone, two chips: "1958 · perceptron" and "1969 → 1980 · 11 quiet years".
+**FRAME:** The phone holds on the perceptron, then pans to 1966–1984: Minsky and Papert's Perceptrons (1969), then an empty stretch of the line to the neocognitron (1980) and Hopfield networks (1982). Under the phone, two chips: "1958 · perceptron" and "1969 → 1980 · 11 quiet years".
 
-**MOTION:** The thread lifts into its track; the second chip rises on "moved on".
+**MOTION:** A hold on the perceptron, then a pan along the thread; the second chip rises on "moved on".
 
 **OST:** "Neural networks waited 54 years to win."
 
@@ -44,9 +44,9 @@
 
 ### Scene 3 · 0:14 – 0:23 · The revival
 
-**FRAME:** The phone pans and zooms to 1980-01-01 → 2013-01-01: in the upper track the neocognitron, Hopfield networks, backpropagation (1986), convolutional networks (1989), long short-term memory (1997), deep belief networks (2006); in the lower one, the bands of the second winter and Statistical machine learning, with support vector machines (1995) and Deep Blue (1997). A counter above the phone runs up the years: "28 years since 1958" … "54 years since 1958".
+**FRAME:** The phone pans on to 1979–1991: the neocognitron, Hopfield networks, backpropagation popularized (1986) and convolutional networks (1989); then to 1993–2009: long short-term memory (1997) and deep belief networks (2006), the statistical era's server behind them. A counter above the phone runs up the years, "28 years since 1958" to "54 years since 1958"; under it, "1986 · backpropagation" and "1990s–2000s · SVMs preferred".
 
-**MOTION:** A continuous pan and zoom; the counter ticks with it.
+**MOTION:** Two pans along the thread; the counter ticks with them.
 
 **OST:** "Still waiting"
 
@@ -55,9 +55,9 @@
 
 ### Scene 4 · 0:23 – 0:34 · 2012
 
-**FRAME:** The phone zooms to 2011-06-01 → 2013-06-01: AlexNet wins ImageNet (2012-09-30) in the upper track, where the Deep learning band begins behind both tracks. Under the phone, two bars to the same scale: "AlexNet · 15.3%" and, longer, "Runner-up · 26.2%", labelled "top-5 error, ImageNet 2012"; the counter above stops at "54 years since 1958".
+**FRAME:** The phone pans and closes on 2012–2013: AlexNet wins ImageNet (2012-09-30) beside word2vec, where the Deep learning era's graphics card takes over the background. Under the phone, two bars to the same scale: "AlexNet · 15.3%" and, longer, "Runner-up · 26.2%", labelled "top-5 error, ImageNet 2012"; the counter above stops at "54 years since 1958".
 
-**MOTION:** The zoom settles on AlexNet; the bars grow on "fifteen" and "twenty-six".
+**MOTION:** The pan settles on AlexNet; the bars grow on "fifteen" and "twenty-six".
 
 **OST:** "2012: it wins"
 
@@ -70,9 +70,9 @@
 
 ### Scene 5 · 0:34 – 0:42 · And then
 
-**FRAME:** **Rejoin**; the phone eases out to 2010-01-01 → 2025-06-01, where ChatGPT (2022-11-30) sits ten years to the right of AlexNet, with a chip above the phone: "2012 → 2022 · 10 years". Then the phone shrinks and lifts; `shortEnd` with "timescale.info/athan/artificial-intelligence" as its line, above "Free and open source" and `github.com/openchronology/timeline-app`.
+**FRAME:** **Rejoin**: the whole timeline, close on the line at 2012–2013 (AlexNet wins ImageNet), panning ten years on to 2022–2023: Stable Diffusion, ChatGPT (2022-11-30) and LLaMA, with a chip above the phone: "2012 → 2022 · 10 years". Then the phone shrinks and lifts; `shortEnd` with "timescale.info/athan/artificial-intelligence" as its line, above "Free and open source" and `github.com/openchronology/timeline-app`.
 
-**MOTION:** The zoom out; the chip rises on "ten"; the end card rises and holds.
+**MOTION:** A pan along the joined line; the chip rises on "ten"; the phone lifts away and the end card rises and holds.
 
 **OST:** ""
 

@@ -30,9 +30,11 @@ function pcam(z, fx, fy) {
 function camMix(a, b, p) {
   return pcam(lerp(a.z, b.z, p), lerp(a.fx, b.fx, p), lerp(a.fy, b.fy, p));
 }
-/* The whole timeline (its line at shot y 1140), and the two separated tracks (y 1030–1730). */
-var CAM_U = pcam(1.0, 540, 1150);
-var CAM_S = pcam(1.12, 540, 1378);
+/* Close on the line, so the app's labels read on a phone: the joined timeline (its line at shot
+   y 1150), and the separated thread's upper track (its line at y 1210, labels from 1090 to 1365);
+   the shots' views are 2.6 times as wide as what the camera shows. */
+var CAM_U = pcam(1.3, 540, 1150);
+var CAM_S = pcam(2.6, 540, 1228);
 /** One shot layer's image through camera c. */
 function shotImage(id, st, c, op) {
   var sh = (typeof SHOTS !== 'undefined' && SHOTS[id]) || { width: 360, height: 640 };
@@ -106,16 +108,14 @@ function counter(n, p) {
 
 /* ---------- Scene 1: the cover ---------- */
 SCENES[1] = function (lt, q) {
-  var ph = phone(CAM_U, 'cover', 0);
+  var ph = phone(CAM_S, 'cover', 0);
   var sub = txt(SAFE.cx, ROW + 1, '1958 → 2012', { size: 8, weight: 700, fill: C.accent });
   return held(ph, sub, lt, q, true);
 };
 
 /* ---------- Scene 2: the thread separated (the shot zooms to 1940–1992, then separates) ---------- */
 SCENES[2] = function (lt, q) {
-  var st = Math.min(4, lt * 1.1);
-  var c = camMix(CAM_U, CAM_S, smooth((st - 1.6) / 0.6));
-  var ph = phone(c, 'sep', st);
+  var ph = phone(CAM_S, 'sep', Math.min(8.6, lt));
   var over =
     chip2(SCR.x + 2, ROW + 1, '1958 · perceptron', P(lt, q('perceptron'), 0.4), {
       anchor: 'start',
@@ -131,8 +131,7 @@ SCENES[2] = function (lt, q) {
 
 /* ---------- Scene 3: the revival, and the years running up ---------- */
 SCENES[3] = function (lt, q) {
-  var span = Math.max(1, q.dur - 0.6);
-  var st = 4 * smooth(lt / span);
+  var st = Math.min(9.1, lt);
   var ph = phone(CAM_S, 'revival', st);
   var t86 = q(['1986', 'nineteen']);
   var n = Math.round(lerp(28, 54, clamp01((lt - t86) / (q.end - t86))));
@@ -169,8 +168,7 @@ function errBar(y, label, pct, col, p) {
   );
 }
 SCENES[4] = function (lt, q) {
-  var tZ = Math.max(1.5, q('imagenet'));
-  var st = 3.5 * smooth(lt / tZ);
+  var st = Math.min(8.7, lt);
   var ph = phone(CAM_S, 'alex', st);
   var over =
     counter(54, 1) +
@@ -201,9 +199,9 @@ function endCard(p) {
   );
 }
 SCENES[5] = function (lt, q) {
-  var st = 3 * smooth(lt / 1.8);
+  var st = Math.min(4, lt);
   var c = camMix(CAM_S, CAM_U, smooth(lt / 0.4));
-  var tAway = q('whole') - 0.2;
+  var tAway = q('whole') + 0.5;
   var away = smooth((lt - tAway) / 0.6);
   var ph = G(phone(c, 'chat', st), {
     o: 1 - away,
