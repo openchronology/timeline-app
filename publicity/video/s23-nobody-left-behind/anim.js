@@ -1,8 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 /* Short 23, Nobody Left Behind (publicity/shorts/23-nobody-left-behind.md): the second Marine
    Corps lesson, bring your people home. The Marine Corps timeline (samples/usmc.ochx) in the
-   real editor on a phone, captured narrow in shots.json: the Chosin Reservoir campaign, 20
-   November – 31 December 1950, with the Army's Task Force Faith marked; a zoom into Fox
+   real editor on a phone, captured narrow in shots.json: the Chosin Reservoir campaign, 26
+   November – 14 December 1950, with the Army's Task Force Faith marked; a zoom into Fox
    Company's five nights at Toktong Pass, then its reader; Ray Davis's night march, opened from
    its group; the Hagaru-ri airstrip and a counter of the wounded flown out; Koto-ri and the
    seventy-eight miles to the sea; the lesson over the campaign; and the end card. Overlays sit
@@ -98,10 +98,10 @@ function pxAt(view, s) {
   return 58 + (961 * (day(s) - l)) / (r - l);
 }
 var Y_LINE = 1143;
-var V_COVER = ['1950-11-20', '1950-12-31'],
+var V_COVER = ['1950-11-26', '1950-12-14'],
   V_FOX = ['1950-11-26', '1950-12-04'],
   V_AIR = ['1950-11-29', '1950-12-08'],
-  V_ROAD = ['1950-11-25', '1950-12-28'];
+  V_ROAD = ['1950-11-26', '1950-12-14'];
 
 /* The cameras: the timeline (the line a little below the middle, the empty picture above it),
    drifting in a little; the reader's top and its notes. */
@@ -225,7 +225,7 @@ function cover(c, tp) {
       1,
       'stroke="' + C.select + '" stroke-width="0.8"',
     ) +
-    chip2(STRIPES.x0 + 5, y - 4, 'Task Force Faith (Army) · 11-27 → 12-01', 1, {
+    chip2(SCR.x + 3, y - 4, 'Task Force Faith (Army) · 11-27 → 12-01', 1, {
       anchor: 'start',
       size: 5.2,
     });
@@ -383,7 +383,7 @@ SCENES[5] = function (lt, q) {
   }
   // The Koto-ri moment named over the picture as it brightens.
   marks += chip2(
-    STRIPES.x0 + 5,
+    SCR.x + 3,
     c.y(690),
     '12-08 · 117 dead buried at Koto-ri',
     P(lt, q('bury'), 0.35) * (1 - P(lt, q('78') - 0.5, 0.3)),
@@ -397,10 +397,9 @@ SCENES[5] = function (lt, q) {
 
 /* ---------- Scene 6: bring them home (the campaign again, under the lesson) ---------- */
 SCENES[6] = function (lt, q) {
-  var pp = clamp01((lt - 0.05) / 1.4);
-  var c = camMix(CAM_LINE, CAM_DRIFT, smooth((lt - 1.2) / 4));
+  var c = camMix(CAM_LINE, CAM_DRIFT, smooth((lt - 0.2) / 4));
   var sh = smooth((lt - 0.6) / 0.6);
-  var ph = shrunk(phone(c, [{ id: 'cover6', st: 1.5 * smoothstep(pp) }]), lerp(1, 0.72, sh));
+  var ph = shrunk(phone(c, [{ id: 'cover', st: 0 }]), lerp(1, 0.72, sh));
   var card = '';
   if (sh > 0.001) {
     var y0 = 66;
