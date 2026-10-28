@@ -22,3 +22,12 @@ export const SAVE_TO_SERVER = 'Save to server';
 export function momentsText(count: number | bigint): string {
   return `${count.toLocaleString()} ${BigInt(count) === 1n ? 'moment' : 'moments'}`;
 }
+
+/**
+ * What a save, an import or the duration editor says of background image addresses too long
+ * for a band to carry (BACKGROUND_URL_LIMIT, #365): `count` durations have one.
+ */
+export function longBackgroundsText(count: number, limit: number): string {
+  const which = count === 1 ? '1 duration has' : `${count.toLocaleString('en')} durations have`;
+  return `${which} a background image address longer than ${limit.toLocaleString('en')} characters, which is not shown. Use a shorter address.`;
+}

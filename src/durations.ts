@@ -585,11 +585,18 @@ export function durationSummaries(
   return out;
 }
 
+/** The longest web address (http or https) a band keeps, such as a background image's (#365). */
+export const OVERVIEW_URL_LIMIT = 1024;
+/** Whether a band keeps this string: at most 256 characters, or a web address of at most 1,024. */
+function overviewString(value: string): boolean {
+  return value.length <= 256 || (value.length <= OVERVIEW_URL_LIMIT && /^https?:\/\//i.test(value));
+}
 /**
  * Viewport bands carry a bounded projection: title, a notes preview, short text fields and
- * toggles that are on, which plugins such as colors and outlines read (#325), small arrays (at
- * most 1,024 characters as JSON) such as relationship arrows (#326), and tags. Full metadata
- * is fetched when a duration is opened.
+ * toggles that are on, which plugins such as colors and outlines read (#325), web addresses
+ * of at most 1,024 characters such as background images (#365), small arrays (at most 1,024
+ * characters as JSON) such as relationship arrows (#326), and tags, within 4,096 characters.
+ * Full metadata is fetched when a duration is opened.
  */
 export function durationOverview(metadata: Metadata): Metadata {
   const result: Metadata = {};
@@ -599,7 +606,7 @@ export function durationOverview(metadata: Metadata): Metadata {
   let size = JSON.stringify(result).length;
   for (const [key, value] of Object.entries(metadata))
     if (['title', 'description', 'tags', CONTENT_LABELS_KEY].includes(key)) continue;
-    else if ((typeof value === 'string' && value.length <= 256) || value === true) {
+    else if ((typeof value === 'string' && overviewString(value)) || value === true) {
       // `true` is a toggle that is on, such as a presumptive duration (#325).
       size += key.length + (value === true ? 4 : value.length) + 6;
       if (size > 4096) break;

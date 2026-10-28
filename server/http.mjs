@@ -59,6 +59,9 @@ import {
   contentLabels,
   timeMapping,
   DURATION_COUNT_CAP,
+  BACKGROUND_URL_LIMIT,
+  longBackgrounds,
+  longBackgroundsText,
 } from '../dist/core.mjs';
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 /**
@@ -134,6 +137,21 @@ function document(value, partial = false, copies = false) {
   } catch (error) {
     throw new HttpError(400, error.message);
   }
+}
+/**
+ * What a save or import that succeeded warns of (#365), as `{ warnings }` to add to its
+ * answer, or nothing: durations whose background image addresses are longer than
+ * BACKGROUND_URL_LIMIT, so their bands show no picture. Names at most 100 of them.
+ */
+function saveWarnings(plugins, durations) {
+  const ids = longBackgrounds(plugins, durations);
+  if (!ids.length) return {};
+  const message = longBackgroundsText(ids.length, BACKGROUND_URL_LIMIT);
+  return {
+    warnings: [
+      { code: 'long-background', message, count: ids.length, durations: ids.slice(0, 100) },
+    ],
+  };
 }
 /**
  * A separation filter from a request: by tags (one to forty, entities with any of them or
@@ -1001,9 +1019,14 @@ export function createRequestHandler({
         if (pathname === '/api/files/import' && method === 'POST') {
           auth.require(session, req);
           await auth.rateLimit('files:' + userId);
-          return response(res, 200, {
-            document: await converter.convert('read', await fileBody(req, converter.limit)),
-          });
+          const converted = await converter.convert('read', await fileBody(req, converter.limit));
+          let warnings = {};
+          try {
+            warnings = saveWarnings(converted.plugins, converted.durations);
+          } catch {
+            // A document that is not valid has nothing to warn of: its reader refuses it.
+          }
+          return response(res, 200, { document: converted, ...warnings });
         }
         if (pathname === '/api/files/export' && method === 'POST') {
           auth.require(session, req);
@@ -1174,7 +1197,11 @@ export function createRequestHandler({
         // Creating a timeline: signed in (or an API key with write scope), with the CSRF token.
         if (pathname === '/api/timelines' && method === 'POST') {
           auth.require(session, req);
-          return response(res, 201, await store.create(userId, document(await body(req))));
+          const created = document(await body(req));
+          return response(res, 201, {
+            ...(await store.create(userId, created)),
+            ...saveWarnings(created.plugins, created.durations),
+          });
         }
         // Saved history (versioning.mjs): a page of revisions, or one revision streamed (as an
         // .ochx file with ?download=1); for anyone who may see the timeline.
@@ -1485,18 +1512,20 @@ export function createRequestHandler({
               throw new HttpError(400, 'Changed duration ID mismatch.');
             return { id: change.id, duration };
           });
-          return response(
-            res,
-            200,
-            await store.save(id, userId, input.revision, null, {
+          return response(res, 200, {
+            ...(await store.save(id, userId, input.revision, null, {
               settings,
               changes,
               durationChanges,
               relationshipChanges,
               // What the editor saw, to merge onto a newer revision (#165; save-merge.mjs).
               base: saveBase(input.base),
-            }),
-          );
+            })),
+            ...saveWarnings(
+              settings.plugins,
+              durationChanges.flatMap((change) => (change.duration ? [change.duration] : [])),
+            ),
+          });
         }
         // A save of the whole document at `revision`.
         if (!action && method === 'PUT') {
@@ -1504,11 +1533,11 @@ export function createRequestHandler({
           const input = await body(req);
           if (typeof input.revision !== 'string' || !/^\d+$/.test(input.revision))
             throw new HttpError(400, 'Expected a revision string.');
-          return response(
-            res,
-            200,
-            await store.save(id, userId, input.revision, document(input.document)),
-          );
+          const saved = document(input.document);
+          return response(res, 200, {
+            ...(await store.save(id, userId, input.revision, saved)),
+            ...saveWarnings(saved.plugins, saved.durations),
+          });
         }
         // Queries (store.query), for anyone who may see the timeline: tags, related entities,
         // an overview of a range, text search, duration and moment pages, single lookups.

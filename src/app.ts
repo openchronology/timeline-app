@@ -98,6 +98,8 @@ import {
   HEADING_FONTS,
   derivationKeys,
   BACKGROUND_URL_LIMIT,
+  longBackgrounds,
+  longBackgroundsText,
   momentPlugins,
   refKey,
   refFromKey,
@@ -927,6 +929,11 @@ function toast(message: string) {
   toastTimer = setTimeout(() => {
     el('toast').hidden = true;
   }, 7000);
+}
+/** An import's message, and a warning of background addresses too long to show (#365). */
+function withBackgroundWarning(message: string, doc: TimelineDocument): string {
+  const long = longBackgrounds(doc.plugins, doc.durations).length;
+  return long ? `${message} ${longBackgroundsText(long, BACKGROUND_URL_LIMIT)}` : message;
 }
 function fail(error: unknown) {
   toast(error instanceof Error ? error.message : String(error));
@@ -6580,7 +6587,7 @@ input('json-file').onchange = () => {
       pendingOpenStart = started;
       // An imported file is a draft of its own at once (#188).
       loadDocument(doc, memoryOnly() || desktop ? null : newDraftId());
-      toast('JSON timeline imported.');
+      toast(withBackgroundWarning('JSON timeline imported.', doc));
     })
     .catch(fail);
 };
@@ -6673,7 +6680,7 @@ input('och-file').onchange = () => {
       if (workspace !== documentRequest) return;
       historyReplace();
       loadDocument(doc);
-      toast('.och timeline imported through the server.');
+      toast(withBackgroundWarning('.och timeline imported through the server.', doc));
     })
     .catch(fail);
 };
@@ -8342,16 +8349,12 @@ function renderDurationPluginFields() {
     false,
     current.isNew ? undefined : relationshipContext({ duration: current.duration.id }),
   );
-  // Bands carry short metadata only: a longer background address would show nothing.
-  for (const { manifest, enabled } of durationPlugins(installedPlugins())) {
-    const value = manifest.background && current.duration.metadata[manifest.background.metadataKey];
-    if (enabled && typeof value === 'string' && value.length > BACKGROUND_URL_LIMIT) {
-      const note = document.createElement('p');
-      note.className = 'form-error';
-      note.textContent = `Background image addresses longer than ${BACKGROUND_URL_LIMIT} characters are not shown. Use a shorter address.`;
-      el('plugin-duration-fields').append(note);
-      break;
-    }
+  // Bands carry bounded metadata only: a longer background address would show nothing.
+  if (longBackgrounds(installedPlugins(), [current.duration]).length) {
+    const note = document.createElement('p');
+    note.className = 'form-error';
+    note.textContent = `Background image addresses longer than ${BACKGROUND_URL_LIMIT.toLocaleString('en')} characters are not shown. Use a shorter address.`;
+    el('plugin-duration-fields').append(note);
   }
 }
 /** Time an endpoint resolves to, from loaded moments or the saved band. */

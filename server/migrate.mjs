@@ -6,6 +6,7 @@ import {
   convertLegacyDurations,
   backfillEntitySearch,
   rebuildIndexes,
+  rebuildLongBackgrounds,
   releaseIndexes,
   releaseImageCopies,
 } from './store.mjs';
@@ -28,6 +29,10 @@ try {
   if (indexed) console.log(`Built text search for ${indexed} timeline(s).`);
   const rebuilt = await rebuildIndexes(client);
   if (rebuilt) console.log(`Rebuilt incremental indexes for ${rebuilt} timeline(s).`);
+  // Bands saved before they kept web addresses longer than 256 characters (#365).
+  const backgrounds = await rebuildLongBackgrounds(client);
+  if (backgrounds)
+    console.log(`Rebuilt bands with long background addresses for ${backgrounds} timeline(s).`);
   // Versions forks no longer read, which earlier versions kept after a fork was deleted.
   await releaseIndexes(client);
   // Copies of linked images earlier releases kept with timelines (#109).

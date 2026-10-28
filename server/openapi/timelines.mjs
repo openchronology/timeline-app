@@ -486,6 +486,34 @@ export const schemas = {
     description: 'A timeline’s metadata and its whole document.',
     properties: { timeline: ref('TimelineMetadata'), document: ref('TimelineDocument') },
   },
+  Warning: {
+    type: 'object',
+    description:
+      'Something a request that succeeded has to say (docs/api.md, “Warnings”). `long-background`: durations whose background image addresses are longer than 1,024 characters, which no band carries, so they show no picture (#365).',
+    required: ['code', 'message'],
+    properties: {
+      code: { enum: ['long-background'] },
+      message: { type: 'string', description: 'What to tell the person, in English.' },
+      count: { type: 'integer', description: 'How many durations have such an address.' },
+      durations: {
+        type: 'array',
+        maxItems: 100,
+        items: { type: 'string' },
+        description: 'The IDs of up to 100 of them.',
+      },
+    },
+  },
+  SavedTimeline: {
+    description:
+      'The timeline as saved, with `warnings` when there is something to warn of (such as background addresses too long to show).',
+    allOf: [
+      ref('TimelineMetadata'),
+      {
+        type: 'object',
+        properties: { warnings: { type: 'array', items: ref('Warning') } },
+      },
+    ],
+  },
   TimelineSettingsResult: {
     description: 'The timeline after a settings change.',
     allOf: [
@@ -962,6 +990,7 @@ const sqliteFile = (description) => ({
 });
 
 const metadataOk = (description) => json(ref('TimelineMetadata'), description);
+const savedOk = (description) => json(ref('SavedTimeline'), description);
 
 export const paths = {
   '/api/timelines': {
@@ -992,7 +1021,7 @@ export const paths = {
       security: TIMELINE_WRITE,
       requestBody: body(ref('TimelineDocument')),
       responses: {
-        201: metadataOk('The new timeline.'),
+        201: savedOk('The new timeline, with any warnings.'),
         ...errors(400, 401, 403, 413, 429, 503),
         ...NOT_JSON,
       },
@@ -1051,7 +1080,7 @@ export const paths = {
         properties: { revision: REVISION_BODY, document: ref('TimelineDocument') },
       }),
       responses: {
-        200: metadataOk('The timeline as saved.'),
+        200: savedOk('The timeline as saved, with any warnings.'),
         ...errors(400, 401, 403, 404, 409, 413, 429, 503),
         ...NOT_JSON,
       },
@@ -1342,7 +1371,7 @@ export const paths = {
       security: TIMELINE_WRITE,
       requestBody: body(ref('TimelineChanges')),
       responses: {
-        200: metadataOk('The timeline as saved.'),
+        200: savedOk('The timeline as saved, with any warnings.'),
         ...errors(400, 401, 403, 404, 409, 413, 429, 503),
         ...NOT_JSON,
       },
@@ -1458,8 +1487,14 @@ export const paths = {
       },
       responses: {
         200: json(
-          { type: 'object', properties: { document: ref('TimelineDocument') } },
-          'The file’s document.',
+          {
+            type: 'object',
+            properties: {
+              document: ref('TimelineDocument'),
+              warnings: { type: 'array', items: ref('Warning') },
+            },
+          },
+          'The file’s document, with any warnings.',
         ),
         ...errors(400, 401, 403, 413, 429, 503),
         415: error('The body is not a SQLite timeline file.'),

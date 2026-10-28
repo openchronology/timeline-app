@@ -86,7 +86,7 @@ Install **Duration backgrounds** to show an image behind the timeline wherever a
 - **Narrow durations:** like the ruler's finest marks, a background fades out as its duration narrows on screen: it shows in full while the duration is at least 192 pixels wide, fades as it narrows, and is gone below 96 pixels, while its band still shows.
 - **Stacking:** smaller durations show above larger ones, and all of them lie behind the timeline's axis, links and moments. An edge inside the view fades to transparency over 48 pixels, however wide the duration, so backgrounds blend into each other; an edge where the duration continues past the view does not fade.
 - **Readability:** while any background shows, moment labels sit on frosted white, and the axis, links and markers carry a white halo, so they stand out from any image.
-- **Address length:** duration bands carry string metadata of at most 256 characters, so a longer image address shows nothing, and the duration dialog says so.
+- **Address length:** duration bands carry web addresses of at most 1,024 characters ([#365](https://github.com/openchronology/timeline-app/issues/365)), so a longer image address shows nothing. The duration dialog says so, importing a file says how many durations have one, and the API's answer to a save or import carries a warning naming them (see [images](images.md#image-addresses)).
 - **Offline:** exports embed copies of background images, as for icons, so the offline edition can show them.
 
 ## Timeline background
