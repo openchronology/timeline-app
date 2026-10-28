@@ -79,7 +79,9 @@ Upgrade
          diff -u $(brew --prefix)/etc/openchronology/openchronology.env \
                  $(brew --prefix)/share/openchronology/openchronology.env.example
   2. Back up:  $(brew --prefix postgresql@17)/bin/pg_dump -h /tmp openchronology > openchronology.sql
-  3. openchronology-migrate, which migrates the database and restarts the server.
+  3. openchronology-migrate, which migrates the database and restarts the server, and the
+     mail worker's launchd agent if you started it (openchronology-agent start mail), so that
+     it runs the new version too.
 
 Remove
 ------

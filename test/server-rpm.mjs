@@ -9,6 +9,7 @@ import { basename, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { serverPackage, serverTargets } from '../scripts/server-targets.mjs';
 import { checkSystemdServices } from './server-syslog.mjs';
+import { checkMailWorkerUpgrade } from './server-mail-upgrade.mjs';
 
 const run = promisify(execFile);
 const rpm = resolve(process.argv[2] ?? '');
@@ -138,7 +139,12 @@ try {
     "INSERT INTO oc_users(id,username,email_verified_at,terms_version) VALUES(gen_random_uuid(),'kept',now(),oc_policy_version())",
   );
   const key = /^AUTH_ENCRYPTION_KEY=.*$/m.exec(config)[0];
-  const upgrade = await sh(`rpm -Uvh --replacepkgs ${file} 2>&1`);
+  // The mail worker, enabled and running, is stopped by the upgrade and started again by
+  // openchronology-migrate (#371).
+  const { upgrade, migrate } = await checkMailWorkerUpgrade({
+    sh,
+    upgrade: () => sh(`rpm -Uvh --replacepkgs ${file} 2>&1`),
+  });
   assert.match(upgrade, /is installed over an earlier version/, upgrade);
   assert.match(upgrade, /sudo openchronology-migrate/);
   assert.match(upgrade, /diff -u \/etc\/openchronology\/openchronology\.env/);
@@ -147,7 +153,7 @@ try {
     new RegExp('^' + key + '$', 'm'),
   );
   assert.equal(await psql("SELECT count(*) FROM oc_users WHERE username='kept'"), '1');
-  assert.match(await sh('openchronology-migrate 2>&1'), /OpenChronology schema installed\./);
+  assert.match(migrate, /OpenChronology schema installed\./);
   // Setup is safe to run again by hand.
   assert.match(await sh('openchronology-setup 2>&1'), /OpenChronology is installed and ready/);
 

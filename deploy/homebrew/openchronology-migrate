@@ -1,8 +1,9 @@
 #!/bin/sh
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 # Brings the OpenChronology database up to this version's schema, then restarts the
-# openchronology-server service when it runs. Safe to run more than once.
-# Usage: openchronology-migrate [--no-restart]
+# openchronology-server service when it runs, and the mail worker's launchd agent when it is
+# started (openchronology-agent), so that it runs this version too (#371). Safe to run more than
+# once. Usage: openchronology-migrate [--no-restart]   (--no-restart restarts nothing)
 set -eu
 PREFIX=@HOMEBREW_PREFIX@
 CONFIG=$PREFIX/etc/openchronology/openchronology.env
@@ -16,4 +17,9 @@ if [ "${1:-}" != "--no-restart" ] &&
   "$PREFIX/bin/brew" services list 2>/dev/null | grep -q '^openchronology-server .*started'; then
   "$PREFIX/bin/brew" services restart openchronology-server >/dev/null
   echo "OpenChronology restarted."
+fi
+if [ "${1:-}" != "--no-restart" ] &&
+  launchctl print "gui/$(id -u)/org.openchronology.mail" >/dev/null 2>&1; then
+  "$PREFIX/bin/openchronology-agent" restart mail >/dev/null
+  echo "OpenChronology mail worker restarted."
 fi

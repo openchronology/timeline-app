@@ -12,7 +12,7 @@ The OpenChronology server for macOS, as a Homebrew formula (#116). [`scripts/hom
 | [`och-import-logs`](och-import-logs)                                         | The `och-import-logs` command: imports log files into timelines with the syslog configuration's API key.              |
 | [`openchronology-agent`](openchronology-agent)                               | Runs the syslog receiver or email delivery as your launchd agent (#125): start, stop, restart and status.             |
 | [`openchronology-mail`](openchronology-mail)                                 | Delivers account email through Resend until stopped: in a terminal, or as a launchd agent (`openchronology-agent`).   |
-| [`openchronology-migrate`](openchronology-migrate)                           | Brings the database up to the installed version's schema and restarts the service when it runs.                       |
+| [`openchronology-migrate`](openchronology-migrate)                           | Brings the database up to the installed version's schema and restarts the service and the mail agent when they run.   |
 | [`openchronology-reset-admin-password`](openchronology-reset-admin-password) | Resets the administrator's password to `ADMIN_INITIAL_PASSWORD` from the configuration (#118).                        |
 | [`openchronology-server.rb.in`](openchronology-server.rb.in)                 | The formula template: builds och-convert and pgmp on the Mac and installs the server, its commands and its service.   |
 | [`openchronology-setup`](openchronology-setup)                               | Finishes an installation: the configuration, PostgreSQL, the database with pgmp, the migration and the service.       |

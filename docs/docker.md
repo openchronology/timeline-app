@@ -59,6 +59,8 @@ docker compose run --rm migrate
 docker compose up --wait --force-recreate app
 ```
 
+With the mail worker (`--profile mail`), recreate it as well, so that it runs the new image: `docker compose --profile mail up --wait --force-recreate mail-worker`.
+
 If migration fails, leave the web server stopped and inspect its output before continuing. PostgreSQL major upgrades require a separate data migration; do not simply change the image major version against an existing volume. This setup uses one database account for both migrations and runtime; deployments needing separate database privileges can supply their own service configuration.
 
 GitHub CI builds the images, boots an isolated stack, verifies exact pgmp arithmetic and bound queries, checks the HTTP session and static frontend, and round-trips SQLite files using the converter inside the actual web image.
