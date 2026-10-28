@@ -64,6 +64,10 @@ import {
   derivedMetadata,
   derivationKeys,
   durationOverview,
+  OVERVIEW_URL_LIMIT,
+  BACKGROUND_URL_LIMIT,
+  longBackgrounds,
+  longBackgroundsText,
   PRESUMPTIVE_OUTLINE,
   pluginOutline,
   toggleValue,
@@ -904,6 +908,48 @@ test('duration backgrounds: an image behind durations only, the last valid one w
   );
   // An invalid later one falls back to the earlier.
   assert.equal(pluginBackground(both, { backgroundUrl: image, otherUrl: 'nope' }), image);
+});
+test('bands keep background addresses up to 1,024 characters, and saves warn past it (#365)', () => {
+  const url = (n) => 'https://images.example/' + 'a'.repeat(n - 23);
+  assert.equal(url(300).length, 300);
+  assert.equal(BACKGROUND_URL_LIMIT, OVERVIEW_URL_LIMIT);
+  // A 300-character address is kept, as is one of exactly 1,024; past that, and for longer
+  // text that is not a web address, the band leaves it out.
+  assert.deepEqual(durationOverview({ title: 'Span', backgroundUrl: url(300) }), {
+    title: 'Span',
+    backgroundUrl: url(300),
+  });
+  assert.equal(
+    durationOverview({ link: 'http://x.example/' + 'b'.repeat(1007) }).link.length,
+    1024,
+  );
+  assert.deepEqual(durationOverview({ backgroundUrl: url(1100) }), {});
+  assert.deepEqual(durationOverview({ note: 'n'.repeat(300) }), {});
+  assert.deepEqual(durationOverview({ note: 'ftp://x.example/' + 'n'.repeat(300) }), {});
+  // Within the 4,096-character budget: addresses past it are left out, and so is what follows.
+  const many = Object.fromEntries(Array.from({ length: 6 }, (_, i) => ['u' + i, url(1000)]));
+  const kept = durationOverview({ ...many, color: '#aa0000' });
+  assert.deepEqual(Object.keys(kept), ['u0', 'u1', 'u2', 'u3']);
+  assert(JSON.stringify(kept).length <= 4096);
+  const big = durationOverview({ title: 't'.repeat(512), description: 'd'.repeat(2000), ...many });
+  assert.deepEqual(Object.keys(big), ['title', 'description', 'u0']);
+  assert(JSON.stringify(big).length <= 4096);
+
+  // Saves and imports name the durations whose background no band can carry.
+  const installed = [{ manifest: DURATION_BACKGROUNDS, enabled: true }];
+  const durations = [
+    { id: 'short', metadata: { backgroundUrl: url(300) } },
+    { id: 'long', metadata: { backgroundUrl: url(1100) } },
+    { id: 'other', metadata: { notes: url(1100) } },
+  ];
+  assert.deepEqual(longBackgrounds(installed, durations), ['long']);
+  assert.deepEqual(longBackgrounds([{ ...installed[0], enabled: false }], durations), []);
+  assert.deepEqual(longBackgrounds(undefined, durations), []);
+  assert.equal(
+    longBackgroundsText(1, BACKGROUND_URL_LIMIT),
+    '1 duration has a background image address longer than 1,024 characters, which is not shown. Use a shorter address.',
+  );
+  assert.match(longBackgroundsText(2000, BACKGROUND_URL_LIMIT), /^2,000 durations have /);
 });
 test('timeline background: one image for the whole timeline, set on the plugin (#223)', () => {
   assert(isOfficialPlugin(TIMELINE_BACKGROUND));

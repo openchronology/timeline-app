@@ -8,6 +8,7 @@ import {
   pluginMetadata,
   validateDocument,
   durationTree,
+  OVERVIEW_URL_LIMIT,
   fixMissingAnchors,
   coalesceGroups,
   durationGroups,
@@ -2684,6 +2685,40 @@ export async function rebuildIndexes(client) {
       touch: false,
     });
   await client.query('UPDATE oc_timelines SET index_version=2 WHERE comparison IS NOT NULL');
+  return rows.length;
+}
+/**
+ * Rebuilds, once, the indexes of timelines saved when bands kept only strings of at most 256
+ * characters (#365), so their longer background image addresses show without a new save: those
+ * with a duration whose metadata has a web address of 257 to OVERVIEW_URL_LIMIT characters, and
+ * forks reading through to one, each rebuilt from its document read whole without touching
+ * `updated_at`, as rebuildIndexes does. Comparisons draw their sources' bands. Records
+ * 'long-backgrounds' in oc_migrations, so later runs look at nothing. Run by migrate.mjs in its
+ * transaction `client`, after rebuildIndexes. Returns how many timelines it rebuilt.
+ */
+export async function rebuildLongBackgrounds(client) {
+  const done = await client.query(
+    "INSERT INTO oc_migrations(name) VALUES('long-backgrounds') ON CONFLICT DO NOTHING",
+  );
+  if (!done.rowCount) return 0;
+  const store = new PostgresStore(null);
+  // Web addresses the old rule dropped, in each duration's saved definition: live rows of the
+  // timeline itself, and live or retired rows of the timelines a fork reads through to.
+  const long = (table) => `SELECT DISTINCT d.timeline_id FROM ${table} d
+    CROSS JOIN LATERAL jsonb_each(CASE WHEN jsonb_typeof(d.definition->'metadata')='object'
+      THEN d.definition->'metadata' ELSE '{}' END) m
+    WHERE jsonb_typeof(m.value)='string' AND length(m.value#>>'{}') BETWEEN 257 AND $1
+    AND (m.value#>>'{}') ~* '^https?://'`;
+  const { rows } = await client.query(
+    `WITH live AS (${long('oc_duration_nodes')}), retired AS (${long('oc_duration_nodes_retired')})
+    SELECT t.* FROM oc_timelines t WHERE t.comparison IS NULL AND (t.id IN (SELECT timeline_id FROM live)
+      OR t.index_bases && ARRAY(SELECT timeline_id FROM live UNION SELECT timeline_id FROM retired))`,
+    [OVERVIEW_URL_LIMIT],
+  );
+  for (const timeline of rows)
+    await store.replace(client, timeline.id, await store.branchDocument(client, timeline), {
+      touch: false,
+    });
   return rows.length;
 }
 /**

@@ -1468,6 +1468,28 @@ mod relationship_tests {
         assert_eq!(frame["edges"].as_array().unwrap().len(), 1);
     }
     #[test]
+    fn bands_carry_web_addresses_of_at_most_1024_characters() {
+        // Background addresses longer than 256 characters still show (#365); longer text that
+        // is not a web address, and addresses past 1024 characters, stay out of bands.
+        let url = |n: usize| format!("https://example.org/{}", "a".repeat(n - 20));
+        let doc: Document = serde_json::from_value(json!({
+            "format":"openchronology","version":1,"title":"Backgrounds","description":"",
+            "events":[{"id":"a","time":"0/1","metadata":{"title":"A"}}],
+            "durations":[{"id":"x","start":"50/1","end":"60/1","metadata":{
+                "title":"X","backgroundUrl":url(300),"huge":url(1100),"text":"t".repeat(300)}}]
+        }))
+        .unwrap();
+        let snapshot = Snapshot::from_document(&doc).unwrap();
+        let frame = query(
+            &snapshot,
+            json!({"kind":"overview","lower":"-10/1","upper":"400/1","threshold":"1/1"}),
+        );
+        assert_eq!(
+            frame["durations"][0]["metadata"],
+            json!({"title":"X","backgroundUrl":url(300)})
+        );
+    }
+    #[test]
     fn relationships_round_trip_draw_arcs_page_and_follow_edits() {
         let snapshot = Snapshot::from_document(&doc()).unwrap();
         assert_eq!(snapshot.document().unwrap().relationships.len(), 3);

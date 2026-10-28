@@ -4,6 +4,16 @@ Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
 Timelines show images by linking to them: a moment's icon, a duration's background, a stack entry's picture or the timeline's own image is an HTTPS address where its owner hosts it ([#109](https://github.com/openchronology/timeline-app/issues/109)). The server stores the link, never a copy of the image, and readers' browsers load the image from its host.
 
+## Image addresses
+
+An image address is at most 4,096 characters. A duration's background is drawn from the band the timeline loads for each duration in view, which keeps web addresses of at most **1,024 characters** ([#365](https://github.com/openchronology/timeline-app/issues/365)); a background with a longer address shows nothing. Wikimedia Commons thumbnail addresses repeat the file's name, so a long name can pass that: link the original file's shorter address instead. Wherever such an address is set, you're told:
+
+- the duration's details in the editor say so;
+- importing a file in the editor says how many durations have one;
+- the API's answer to creating or saving a timeline (`POST /api/timelines`, `PUT /api/timelines/:id` and `PUT /api/timelines/:id/changes`), and to reading a file (`POST /api/files/import`), succeeds with a `warnings` list naming them: `{"code": "long-background", "message": "…", "count": 1, "durations": ["…"]}` (at most 100 IDs).
+
+Releases before this one kept addresses of at most 256 characters in bands. `openchronology-migrate` rebuilds, once, the timelines with a duration whose address is between 257 and 1,024 characters long, and the forks reading through to them, so their backgrounds show without saving them again.
+
 ## A timeline's own image
 
 A timeline can have an image of its own ([#339](https://github.com/openchronology/timeline-app/issues/339)): its owner sets, replaces or removes it under **Sharing & settings** → **Image**, with a link to the image and alt text saying what it shows. It is shown:

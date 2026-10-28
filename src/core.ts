@@ -46,6 +46,7 @@ export { durationGroups, coalesceGroups, entityCount } from './summaries.js';
 export {
   anchorOf,
   durationOverview,
+  OVERVIEW_URL_LIMIT,
   validateDurations,
   validateDuration,
   convertLegacyDurations,

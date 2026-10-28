@@ -22,6 +22,10 @@ curl -H "Authorization: Bearer $OCH_KEY" https://timescale.info/api/timelines
 
 - **Try it** in the reference sends requests as the account signed in to the page, or with an API key typed into it. The key stays in the page while it is open and is sent to this server only.
 
+## Warnings
+
+A request that succeeds may still have something to say: its answer then carries `warnings`, a list of `{"code", "message", …}`, which clients may show and otherwise ignore. Today the only one is `long-background`, given when creating or saving a timeline, or reading a file, whose durations have background image addresses too long to show ([images](images.md#image-addresses)); it adds `count` and `durations`, the IDs of up to 100 of them. Without anything to warn of, there is no `warnings`.
+
 ## Keeping it right
 
 The description is code: `server/openapi/`, one module for each area of the API (`timelines.mjs`, `collaboration.mjs`, `accounts.mjs`, `community.mjs`) sharing `common.mjs`. A route added to the server without a description fails the tests:

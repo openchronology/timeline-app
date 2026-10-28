@@ -147,6 +147,12 @@ Upgrading copies each timeline's current state into its saved history once, duri
 `openchronology-migrate`: about 14 s for 200,000 moments and 45 s for a million. Earlier
 revisions keep the form they were saved in.
 
+Upgrading to a release that keeps background addresses of up to 1,024 characters
+([#365](https://github.com/openchronology/timeline-app/issues/365)) rebuilds, once, the
+indexes of timelines with a duration whose web address is 257 to 1,024 characters long, and
+of the forks reading through to them, so those backgrounds show. Finding them reads every
+duration's definition once; `oc_migrations` records that it ran, so later upgrades skip it.
+
 **The large tables are maintained more often than PostgreSQL's defaults.** By default,
 autovacuum waits until a fifth of a table has changed, or grown by a fifth, and refreshes
 the planner's statistics after a tenth. With hundreds of millions of rows, that's far too

@@ -1038,10 +1038,6 @@ export function durationPlugins(plugins: readonly InstalledPlugin[] = []): Insta
     });
 }
 /**
- * A duration's background image: the last enabled background plugin's valid image URL. Bands
- * carry string metadata of at most 256 characters, so a longer URL shows no background.
- */
-/**
  * The timeline's theme (#230): for each role, the last enabled theme plugin's value that is
  * set. Roles none sets keep the default look.
  */
@@ -1067,6 +1063,11 @@ export function pluginBackdrop(plugins: readonly InstalledPlugin[] = []): string
     }
   return image;
 }
+/**
+ * A duration's background image: the last enabled background plugin's valid image URL. Bands
+ * carry web addresses of at most BACKGROUND_URL_LIMIT characters, so a longer URL shows no
+ * background.
+ */
 export function pluginBackground(
   plugins: readonly InstalledPlugin[] = [],
   stored: Record<string, unknown> = {},
@@ -1080,8 +1081,30 @@ export function pluginBackground(
     }
   return image;
 }
-/** The longest background URL a duration band carries (see durationOverview). */
-export const BACKGROUND_URL_LIMIT = 256;
+/** The longest background URL a duration band carries (OVERVIEW_URL_LIMIT in durations.ts). */
+export const BACKGROUND_URL_LIMIT = 1024;
+/**
+ * The IDs of the durations whose background image address, for an enabled background plugin,
+ * is longer than BACKGROUND_URL_LIMIT, so their bands show no picture (#365). Saves and imports
+ * warn of them.
+ */
+export function longBackgrounds(
+  plugins: readonly InstalledPlugin[] = [],
+  durations: readonly { id: string; metadata: Record<string, unknown> }[] = [],
+): string[] {
+  const keys = durationPlugins(plugins)
+    .filter((p) => p.enabled && p.manifest.background)
+    .map((p) => p.manifest.background!.metadataKey);
+  if (!keys.length) return [];
+  return durations
+    .filter((d) =>
+      keys.some((key) => {
+        const value = d.metadata[key];
+        return typeof value === 'string' && value.length > BACKGROUND_URL_LIMIT;
+      }),
+    )
+    .map((d) => d.id);
+}
 /** Moment rendering ignores plugins that explicitly target only durations. */
 export function momentPlugins(plugins: readonly InstalledPlugin[] = []): InstalledPlugin[] {
   return plugins.filter((p) => pluginTargets(p.manifest).includes('moments'));

@@ -204,6 +204,9 @@ UPDATE oc_nodes SET moment_ids=ARRAY(SELECT x.e->>'id' FROM jsonb_array_elements
 -- index_version: existing timelines take 0 and are rebuilt by rebuildIndexes (store.mjs);
 -- saving in place (incremental.mjs) requires version 2.
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS index_version integer NOT NULL DEFAULT 0;
+-- One-time data migrations migrate.mjs has run, by name, so one that must look at every
+-- timeline does it once: 'long-backgrounds' (rebuildLongBackgrounds in store.mjs, #365).
+CREATE TABLE IF NOT EXISTS oc_migrations (name text PRIMARY KEY, done_at timestamptz NOT NULL DEFAULT now());
 -- An mpq as "num/den" text ("/1" for integers): how the walks and queries hand exact times
 -- to JavaScript, which never sees them as floats.
 CREATE OR REPLACE FUNCTION oc_qtext(q mpq) RETURNS text LANGUAGE sql IMMUTABLE STRICT
