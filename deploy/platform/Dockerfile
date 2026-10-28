@@ -15,6 +15,8 @@ RUN cargo vendor --locked --manifest-path native-store/Cargo.toml /build/rust-de
 
 # The editor and the Next.js platform: plain JavaScript, the same for every distribution.
 FROM node:24-bookworm-slim AS app
+# apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
+RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 ARG OCH_BUILD_COMMIT
 ARG OCH_BUILD_VERSION

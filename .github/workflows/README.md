@@ -2,7 +2,7 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-The GitHub Actions workflows: continuous integration, releases, benchmarks and the published offline editor. Most steps run the repository's own scripts ([`scripts/`](../../scripts/README.md), `test/`, [`bench/`](../../bench/README.md)), so a workflow failure can usually be reproduced locally with the same command. Third-party actions are pinned to full commit hashes, and installs go through `scripts/npm-ci.mjs`. `desktop.yml` and `server-packages.yml` are reusable workflows that `ci.yml` and `release.yml` call.
+The GitHub Actions workflows: continuous integration, releases, benchmarks and the published offline editor. Most steps run the repository's own scripts ([`scripts/`](../../scripts/README.md), `test/`, [`bench/`](../../bench/README.md)), so a workflow failure can usually be reproduced locally with the same command. Third-party actions are pinned to full commit hashes, and installs go through `scripts/npm-ci.mjs`. `desktop.yml` and `server-packages.yml` are reusable workflows that `ci.yml` and `release.yml` call. The server packages' long steps (building, and installing in a fresh container or virtual machine) each have their own `timeout-minutes`, a few times their usual length, so a stalled mirror fails the step in minutes and a rerun can follow, instead of holding the runner for the whole job's limit (#367).
 
 ## Contents
 

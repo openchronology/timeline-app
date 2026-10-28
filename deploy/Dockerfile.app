@@ -2,6 +2,8 @@
 # Next.js platform built from this checkout with its web source archive, run as a standalone
 # Node.js server on port 5173.
 FROM rust:1-bookworm AS converter
+# apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
+RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
 RUN apt-get update && apt-get install -y --no-install-recommends cmake libsqlite3-dev libgmp-dev && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY native-store native-store
@@ -10,6 +12,8 @@ RUN cargo build --manifest-path native-store/Cargo.toml --release --locked --bin
 RUN cargo vendor --locked --manifest-path native-store/Cargo.toml /app/rust-dependencies
 
 FROM node:24-bookworm-slim AS build
+# apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
+RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 ARG OCH_BUILD_COMMIT
 ARG OCH_BUILD_VERSION
@@ -35,6 +39,8 @@ COPY --from=converter /app/rust-dependencies /app/rust-dependencies
 RUN --mount=type=bind,target=/build-context export OCH_BUILD_CONTEXT=/build-context OCH_BUILD_COMMIT="$OCH_BUILD_COMMIT" OCH_BUILD_VERSION="$OCH_BUILD_VERSION" && npm run build && node scripts/source.mjs --rust-vendor /app/rust-dependencies && cp dist/openchronology-web-source.tar.gz platform/public/
 
 FROM node:24-bookworm-slim
+# apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
+RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
 RUN apt-get update && apt-get install -y --no-install-recommends libsqlite3-0 libgmp10 && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production HOSTNAME=0.0.0.0 PORT=5173 OCH_APP_ROOT=/app NEXT_TELEMETRY_DISABLED=1 OCH_CONVERTER=/usr/local/bin/och-convert
 WORKDIR /app

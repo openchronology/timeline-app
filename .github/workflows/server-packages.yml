@@ -38,8 +38,10 @@ jobs:
         with:
           node-version: 24
       - name: Build the package
+        timeout-minutes: 15
         run: node scripts/server-package.mjs "${{ matrix.target }}"
       - name: Install, run, upgrade and remove it in a fresh container
+        timeout-minutes: 10
         run: node "test/server-${{ matrix.format }}.mjs" "server-artifacts/openchronology-server-${{ matrix.target }}-amd64.${{ matrix.format }}"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -64,6 +66,7 @@ jobs:
         with:
           node-version: 24
       - name: Build the platform
+        timeout-minutes: 10
         run: node scripts/server-package.mjs platform
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -101,6 +104,7 @@ jobs:
       - name: Prepare the FreeBSD build
         run: node scripts/server-package.mjs "${{ matrix.target }}"
       - name: Build the package on FreeBSD ${{ matrix.release }}
+        timeout-minutes: 15
         uses: vmactions/freebsd-vm@4469451fe39bee80be4066836c5170362e9349f3 # v1.5.7
         with:
           release: ${{ matrix.release }}
@@ -137,6 +141,7 @@ jobs:
           name: server-${{ matrix.target }}
           path: server-artifacts/
       - name: Install, run, upgrade and remove it on FreeBSD ${{ matrix.release }}
+        timeout-minutes: 15
         uses: vmactions/freebsd-vm@4469451fe39bee80be4066836c5170362e9349f3 # v1.5.7
         with:
           release: ${{ matrix.release }}
@@ -184,9 +189,11 @@ jobs:
       - name: Stop other PostgreSQL servers
         run: brew services list | awk '/^postgresql/ {print $1}' | xargs -n1 brew services stop || true
       - name: Install it as users do
+        timeout-minutes: 10
         run: brew install --build-from-source openchronology/local/openchronology-server
       - run: brew test openchronology/local/openchronology-server
       - name: Set it up, run it and remove it
+        timeout-minutes: 5
         run: node test/server-homebrew.mjs
   # Windows (#116): the self-contained installer, with its own PostgreSQL 17 and pgmp built for
   # it with MSVC, built from the platform and installed, run, upgraded and removed unattended.
@@ -233,11 +240,13 @@ jobs:
           rustup default stable
           ./deploy/windows-server/nsis.ps1 -Destination "${{ runner.temp }}/nsis"
       - name: Build the installer
+        timeout-minutes: 15
         shell: pwsh
         run: |
           $version = if ($env:RELEASE_TAG) { $env:RELEASE_TAG.TrimStart('v') } else { 'dev-' + (git rev-parse --short=7 HEAD) }
           ./deploy/windows-server/build.ps1 -Version $version
       - name: Install, run, upgrade and remove it
+        timeout-minutes: 10
         run: node test/server-windows.mjs server-artifacts/openchronology-server-windows-amd64-setup.exe
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

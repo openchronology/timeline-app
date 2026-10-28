@@ -6,9 +6,17 @@
 # The services, configuration and commands are the Debian package's (deploy/debian-server).
 ARG BASE=fedora:44
 
+# The target distribution, as the native build and the package start from it.
+FROM ${BASE} AS base
+# dnf retries a failed download and gives up on a stalled mirror after 30 s (#367).
+RUN sed -i '/^\[main\]/a retries=3\ntimeout=30' /etc/dnf/dnf.conf && grep -qx 'retries=3' /etc/dnf/dnf.conf
+# curl (the Rust installer, pgmp, Node.js) retries too, giving up on an attempt that stalls below
+# 1 kB/s for 30 s or takes over 3 minutes (#367).
+RUN printf 'retry = 3\nretry-all-errors\nconnect-timeout = 30\nspeed-limit = 1024\nspeed-time = 30\nmax-time = 180\n' > /root/.curlrc
+
 # och-convert and pgmp, built on the target distribution against its own libraries and the
 # PostgreSQL it ships.
-FROM ${BASE} AS native
+FROM base AS native
 # PostgreSQL's development files are in CodeReady Builder (CRB) on Rocky and RHEL. PGXS
 # builds with the distribution's compiler settings, from redhat-rpm-config.
 RUN set -eu; \
@@ -38,6 +46,8 @@ RUN curl -fsSL --retry 3 "https://codeload.github.com/dvarrazzo/pgmp/tar.gz/$PGM
 
 # The editor and the Next.js platform: plain JavaScript, the same for every distribution.
 FROM node:24-bookworm-slim AS app
+# apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
+RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 ARG OCH_BUILD_COMMIT
 ARG OCH_BUILD_VERSION
@@ -70,7 +80,7 @@ RUN --mount=type=bind,target=/build-context \
     && cp dist/openchronology-web-source.tar.gz platform/public/
 
 # The package.
-FROM ${BASE} AS package
+FROM base AS package
 ARG RPM_VERSION
 ARG RPM_RELEASE=1
 # Node.js runtime, pinned and checked (https://nodejs.org/dist/v24.21.0/SHASUMS256.txt).
