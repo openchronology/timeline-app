@@ -1,0 +1,381 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:08,180"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 8180
+			},
+			"text": " Here's what the line makes visible the artificial neuron is older than the transistor and it took 69 years to win",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.869082,
+					"t_dtw": -1
+				},
+				{
+					"text": " Here",
+					"timestamps": {
+						"from": "00:00:00,270",
+						"to": "00:00:00,270"
+					},
+					"offsets": {
+						"from": 270,
+						"to": 270
+					},
+					"id": 3423,
+					"p": 0.956162,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:00,390",
+						"to": "00:00:00,400"
+					},
+					"offsets": {
+						"from": 390,
+						"to": 400
+					},
+					"id": 338,
+					"p": 0.970336,
+					"t_dtw": -1
+				},
+				{
+					"text": " what",
+					"timestamps": {
+						"from": "00:00:00,400",
+						"to": "00:00:00,630"
+					},
+					"offsets": {
+						"from": 400,
+						"to": 630
+					},
+					"id": 644,
+					"p": 0.997634,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:00,680",
+						"to": "00:00:00,870"
+					},
+					"offsets": {
+						"from": 680,
+						"to": 870
+					},
+					"id": 262,
+					"p": 0.995414,
+					"t_dtw": -1
+				},
+				{
+					"text": " line",
+					"timestamps": {
+						"from": "00:00:00,870",
+						"to": "00:00:01,140"
+					},
+					"offsets": {
+						"from": 870,
+						"to": 1140
+					},
+					"id": 1627,
+					"p": 0.995116,
+					"t_dtw": -1
+				},
+				{
+					"text": " makes",
+					"timestamps": {
+						"from": "00:00:01,140",
+						"to": "00:00:01,450"
+					},
+					"offsets": {
+						"from": 1140,
+						"to": 1450
+					},
+					"id": 1838,
+					"p": 0.99549,
+					"t_dtw": -1
+				},
+				{
+					"text": " visible",
+					"timestamps": {
+						"from": "00:00:01,480",
+						"to": "00:00:01,940"
+					},
+					"offsets": {
+						"from": 1480,
+						"to": 1940
+					},
+					"id": 7424,
+					"p": 0.998405,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,060",
+						"to": "00:00:02,060"
+					},
+					"offsets": {
+						"from": 2060,
+						"to": 2060
+					},
+					"id": 262,
+					"p": 0.0123796,
+					"t_dtw": -1
+				},
+				{
+					"text": " artificial",
+					"timestamps": {
+						"from": "00:00:03,110",
+						"to": "00:00:03,110"
+					},
+					"offsets": {
+						"from": 3110,
+						"to": 3110
+					},
+					"id": 11666,
+					"p": 0.974458,
+					"t_dtw": -1
+				},
+				{
+					"text": " neuron",
+					"timestamps": {
+						"from": "00:00:03,170",
+						"to": "00:00:03,740"
+					},
+					"offsets": {
+						"from": 3170,
+						"to": 3740
+					},
+					"id": 43164,
+					"p": 0.986435,
+					"t_dtw": -1
+				},
+				{
+					"text": " is",
+					"timestamps": {
+						"from": "00:00:03,760",
+						"to": "00:00:03,950"
+					},
+					"offsets": {
+						"from": 3760,
+						"to": 3950
+					},
+					"id": 318,
+					"p": 0.986416,
+					"t_dtw": -1
+				},
+				{
+					"text": " older",
+					"timestamps": {
+						"from": "00:00:03,950",
+						"to": "00:00:04,480"
+					},
+					"offsets": {
+						"from": 3950,
+						"to": 4480
+					},
+					"id": 4697,
+					"p": 0.99423,
+					"t_dtw": -1
+				},
+				{
+					"text": " than",
+					"timestamps": {
+						"from": "00:00:04,480",
+						"to": "00:00:04,900"
+					},
+					"offsets": {
+						"from": 4480,
+						"to": 4900
+					},
+					"id": 621,
+					"p": 0.987926,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:04,900",
+						"to": "00:00:05,210"
+					},
+					"offsets": {
+						"from": 4900,
+						"to": 5210
+					},
+					"id": 262,
+					"p": 0.989999,
+					"t_dtw": -1
+				},
+				{
+					"text": " transistor",
+					"timestamps": {
+						"from": "00:00:05,250",
+						"to": "00:00:05,820"
+					},
+					"offsets": {
+						"from": 5250,
+						"to": 5820
+					},
+					"id": 49176,
+					"p": 0.962304,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:05,820",
+						"to": "00:00:05,940"
+					},
+					"offsets": {
+						"from": 5820,
+						"to": 5940
+					},
+					"id": 290,
+					"p": 0.791196,
+					"t_dtw": -1
+				},
+				{
+					"text": " it",
+					"timestamps": {
+						"from": "00:00:06,450",
+						"to": "00:00:06,590"
+					},
+					"offsets": {
+						"from": 6450,
+						"to": 6590
+					},
+					"id": 340,
+					"p": 0.9935,
+					"t_dtw": -1
+				},
+				{
+					"text": " took",
+					"timestamps": {
+						"from": "00:00:06,650",
+						"to": "00:00:06,820"
+					},
+					"offsets": {
+						"from": 6650,
+						"to": 6820
+					},
+					"id": 1718,
+					"p": 0.97663,
+					"t_dtw": -1
+				},
+				{
+					"text": " 69",
+					"timestamps": {
+						"from": "00:00:06,820",
+						"to": "00:00:07,320"
+					},
+					"offsets": {
+						"from": 6820,
+						"to": 7320
+					},
+					"id": 8644,
+					"p": 0.906239,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:07,320",
+						"to": "00:00:07,740"
+					},
+					"offsets": {
+						"from": 7320,
+						"to": 7740
+					},
+					"id": 812,
+					"p": 0.989559,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:07,740",
+						"to": "00:00:07,880"
+					},
+					"offsets": {
+						"from": 7740,
+						"to": 7880
+					},
+					"id": 284,
+					"p": 0.994266,
+					"t_dtw": -1
+				},
+				{
+					"text": " win",
+					"timestamps": {
+						"from": "00:00:07,920",
+						"to": "00:00:08,180"
+					},
+					"offsets": {
+						"from": 7920,
+						"to": 8180
+					},
+					"id": 1592,
+					"p": 0.996957,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_409]",
+					"timestamps": {
+						"from": "00:00:08,180",
+						"to": "00:00:08,180"
+					},
+					"offsets": {
+						"from": 8180,
+						"to": 8180
+					},
+					"id": 50772,
+					"p": 0.268835,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

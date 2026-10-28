@@ -1,0 +1,478 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:04,280"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 4280
+			},
+			"text": " In 1986, backpropagation trained deeper networks.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.890952,
+					"t_dtw": -1
+				},
+				{
+					"text": " In",
+					"timestamps": {
+						"from": "00:00:00,190",
+						"to": "00:00:00,190"
+					},
+					"offsets": {
+						"from": 190,
+						"to": 190
+					},
+					"id": 554,
+					"p": 0.968823,
+					"t_dtw": -1
+				},
+				{
+					"text": " 1986",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:01,290"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 1290
+					},
+					"id": 12113,
+					"p": 0.998622,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,290",
+						"to": "00:00:01,360"
+					},
+					"offsets": {
+						"from": 1290,
+						"to": 1360
+					},
+					"id": 11,
+					"p": 0.93734,
+					"t_dtw": -1
+				},
+				{
+					"text": " back",
+					"timestamps": {
+						"from": "00:00:01,630",
+						"to": "00:00:01,750"
+					},
+					"offsets": {
+						"from": 1630,
+						"to": 1750
+					},
+					"id": 736,
+					"p": 0.699507,
+					"t_dtw": -1
+				},
+				{
+					"text": "prop",
+					"timestamps": {
+						"from": "00:00:01,850",
+						"to": "00:00:02,080"
+					},
+					"offsets": {
+						"from": 1850,
+						"to": 2080
+					},
+					"id": 22930,
+					"p": 0.836576,
+					"t_dtw": -1
+				},
+				{
+					"text": "ag",
+					"timestamps": {
+						"from": "00:00:02,080",
+						"to": "00:00:02,200"
+					},
+					"offsets": {
+						"from": 2080,
+						"to": 2200
+					},
+					"id": 363,
+					"p": 0.989384,
+					"t_dtw": -1
+				},
+				{
+					"text": "ation",
+					"timestamps": {
+						"from": "00:00:02,210",
+						"to": "00:00:02,550"
+					},
+					"offsets": {
+						"from": 2210,
+						"to": 2550
+					},
+					"id": 341,
+					"p": 0.999925,
+					"t_dtw": -1
+				},
+				{
+					"text": " trained",
+					"timestamps": {
+						"from": "00:00:02,550",
+						"to": "00:00:03,010"
+					},
+					"offsets": {
+						"from": 2550,
+						"to": 3010
+					},
+					"id": 8776,
+					"p": 0.976474,
+					"t_dtw": -1
+				},
+				{
+					"text": " deeper",
+					"timestamps": {
+						"from": "00:00:03,010",
+						"to": "00:00:03,390"
+					},
+					"offsets": {
+						"from": 3010,
+						"to": 3390
+					},
+					"id": 9211,
+					"p": 0.978834,
+					"t_dtw": -1
+				},
+				{
+					"text": " networks",
+					"timestamps": {
+						"from": "00:00:03,460",
+						"to": "00:00:03,580"
+					},
+					"offsets": {
+						"from": 3460,
+						"to": 3580
+					},
+					"id": 7686,
+					"p": 0.989843,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,180",
+						"to": "00:00:04,280"
+					},
+					"offsets": {
+						"from": 4180,
+						"to": 4280
+					},
+					"id": 13,
+					"p": 0.648025,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_214]",
+					"timestamps": {
+						"from": "00:00:04,280",
+						"to": "00:00:04,280"
+					},
+					"offsets": {
+						"from": 4280,
+						"to": 4280
+					},
+					"id": 50577,
+					"p": 0.0191365,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,280",
+				"to": "00:00:08,280"
+			},
+			"offsets": {
+				"from": 4280,
+				"to": 8280
+			},
+			"text": " But through the '90s and 2000s, simpler methods were usually preferred.",
+			"tokens": [
+				{
+					"text": " But",
+					"timestamps": {
+						"from": "00:00:04,320",
+						"to": "00:00:04,440"
+					},
+					"offsets": {
+						"from": 4320,
+						"to": 4440
+					},
+					"id": 887,
+					"p": 0.986331,
+					"t_dtw": -1
+				},
+				{
+					"text": " through",
+					"timestamps": {
+						"from": "00:00:04,580",
+						"to": "00:00:04,810"
+					},
+					"offsets": {
+						"from": 4580,
+						"to": 4810
+					},
+					"id": 832,
+					"p": 0.986199,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:04,810",
+						"to": "00:00:04,970"
+					},
+					"offsets": {
+						"from": 4810,
+						"to": 4970
+					},
+					"id": 262,
+					"p": 0.999394,
+					"t_dtw": -1
+				},
+				{
+					"text": " '",
+					"timestamps": {
+						"from": "00:00:04,970",
+						"to": "00:00:05,020"
+					},
+					"offsets": {
+						"from": 4970,
+						"to": 5020
+					},
+					"id": 705,
+					"p": 0.577081,
+					"t_dtw": -1
+				},
+				{
+					"text": "90",
+					"timestamps": {
+						"from": "00:00:05,020",
+						"to": "00:00:05,260"
+					},
+					"offsets": {
+						"from": 5020,
+						"to": 5260
+					},
+					"id": 3829,
+					"p": 0.999632,
+					"t_dtw": -1
+				},
+				{
+					"text": "s",
+					"timestamps": {
+						"from": "00:00:05,380",
+						"to": "00:00:05,380"
+					},
+					"offsets": {
+						"from": 5380,
+						"to": 5380
+					},
+					"id": 82,
+					"p": 0.984549,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:05,380",
+						"to": "00:00:05,490"
+					},
+					"offsets": {
+						"from": 5380,
+						"to": 5490
+					},
+					"id": 290,
+					"p": 0.997961,
+					"t_dtw": -1
+				},
+				{
+					"text": " 2000",
+					"timestamps": {
+						"from": "00:00:05,540",
+						"to": "00:00:06,170"
+					},
+					"offsets": {
+						"from": 5540,
+						"to": 6170
+					},
+					"id": 4751,
+					"p": 0.957892,
+					"t_dtw": -1
+				},
+				{
+					"text": "s",
+					"timestamps": {
+						"from": "00:00:06,170",
+						"to": "00:00:06,190"
+					},
+					"offsets": {
+						"from": 6170,
+						"to": 6190
+					},
+					"id": 82,
+					"p": 0.984091,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:06,240",
+						"to": "00:00:06,360"
+					},
+					"offsets": {
+						"from": 6240,
+						"to": 6360
+					},
+					"id": 11,
+					"p": 0.96871,
+					"t_dtw": -1
+				},
+				{
+					"text": " simpler",
+					"timestamps": {
+						"from": "00:00:06,360",
+						"to": "00:00:06,700"
+					},
+					"offsets": {
+						"from": 6360,
+						"to": 6700
+					},
+					"id": 18599,
+					"p": 0.86517,
+					"t_dtw": -1
+				},
+				{
+					"text": " methods",
+					"timestamps": {
+						"from": "00:00:06,700",
+						"to": "00:00:07,020"
+					},
+					"offsets": {
+						"from": 6700,
+						"to": 7020
+					},
+					"id": 5050,
+					"p": 0.991805,
+					"t_dtw": -1
+				},
+				{
+					"text": " were",
+					"timestamps": {
+						"from": "00:00:07,120",
+						"to": "00:00:07,230"
+					},
+					"offsets": {
+						"from": 7120,
+						"to": 7230
+					},
+					"id": 547,
+					"p": 0.915105,
+					"t_dtw": -1
+				},
+				{
+					"text": " usually",
+					"timestamps": {
+						"from": "00:00:07,290",
+						"to": "00:00:07,670"
+					},
+					"offsets": {
+						"from": 7290,
+						"to": 7670
+					},
+					"id": 3221,
+					"p": 0.963218,
+					"t_dtw": -1
+				},
+				{
+					"text": " preferred",
+					"timestamps": {
+						"from": "00:00:07,670",
+						"to": "00:00:07,850"
+					},
+					"offsets": {
+						"from": 7670,
+						"to": 7850
+					},
+					"id": 9871,
+					"p": 0.971293,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:08,110",
+						"to": "00:00:08,220"
+					},
+					"offsets": {
+						"from": 8110,
+						"to": 8220
+					},
+					"id": 13,
+					"p": 0.993144,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_414]",
+					"timestamps": {
+						"from": "00:00:08,280",
+						"to": "00:00:08,280"
+					},
+					"offsets": {
+						"from": 8280,
+						"to": 8280
+					},
+					"id": 50777,
+					"p": 0.02542,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

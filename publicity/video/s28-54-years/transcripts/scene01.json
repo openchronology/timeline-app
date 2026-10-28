@@ -1,0 +1,338 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:03,800"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 3800
+			},
+			"text": " In 1958, a machine learned from examples.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.881262,
+					"t_dtw": -1
+				},
+				{
+					"text": " In",
+					"timestamps": {
+						"from": "00:00:00,040",
+						"to": "00:00:00,160"
+					},
+					"offsets": {
+						"from": 40,
+						"to": 160
+					},
+					"id": 554,
+					"p": 0.910618,
+					"t_dtw": -1
+				},
+				{
+					"text": " 1958",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:01,150"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 1150
+					},
+					"id": 24648,
+					"p": 0.997463,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,150",
+						"to": "00:00:01,270"
+					},
+					"offsets": {
+						"from": 1150,
+						"to": 1270
+					},
+					"id": 11,
+					"p": 0.874933,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:01,390",
+						"to": "00:00:01,390"
+					},
+					"offsets": {
+						"from": 1390,
+						"to": 1390
+					},
+					"id": 257,
+					"p": 0.991463,
+					"t_dtw": -1
+				},
+				{
+					"text": " machine",
+					"timestamps": {
+						"from": "00:00:01,600",
+						"to": "00:00:01,960"
+					},
+					"offsets": {
+						"from": 1600,
+						"to": 1960
+					},
+					"id": 4572,
+					"p": 0.999373,
+					"t_dtw": -1
+				},
+				{
+					"text": " learned",
+					"timestamps": {
+						"from": "00:00:01,960",
+						"to": "00:00:02,530"
+					},
+					"offsets": {
+						"from": 1960,
+						"to": 2530
+					},
+					"id": 4499,
+					"p": 0.988612,
+					"t_dtw": -1
+				},
+				{
+					"text": " from",
+					"timestamps": {
+						"from": "00:00:02,530",
+						"to": "00:00:02,810"
+					},
+					"offsets": {
+						"from": 2530,
+						"to": 2810
+					},
+					"id": 422,
+					"p": 0.996981,
+					"t_dtw": -1
+				},
+				{
+					"text": " examples",
+					"timestamps": {
+						"from": "00:00:02,860",
+						"to": "00:00:03,130"
+					},
+					"offsets": {
+						"from": 2860,
+						"to": 3130
+					},
+					"id": 6096,
+					"p": 0.99713,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:03,730",
+						"to": "00:00:03,800"
+					},
+					"offsets": {
+						"from": 3730,
+						"to": 3800
+					},
+					"id": 13,
+					"p": 0.975176,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_190]",
+					"timestamps": {
+						"from": "00:00:03,800",
+						"to": "00:00:03,800"
+					},
+					"offsets": {
+						"from": 3800,
+						"to": 3800
+					},
+					"id": 50553,
+					"p": 0.0159961,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:03,800",
+				"to": "00:00:05,880"
+			},
+			"offsets": {
+				"from": 3800,
+				"to": 5880
+			},
+			"text": " It took 50 for years to win.",
+			"tokens": [
+				{
+					"text": " It",
+					"timestamps": {
+						"from": "00:00:03,840",
+						"to": "00:00:03,940"
+					},
+					"offsets": {
+						"from": 3840,
+						"to": 3940
+					},
+					"id": 632,
+					"p": 0.997976,
+					"t_dtw": -1
+				},
+				{
+					"text": " took",
+					"timestamps": {
+						"from": "00:00:04,100",
+						"to": "00:00:04,230"
+					},
+					"offsets": {
+						"from": 4100,
+						"to": 4230
+					},
+					"id": 1718,
+					"p": 0.999832,
+					"t_dtw": -1
+				},
+				{
+					"text": " 50",
+					"timestamps": {
+						"from": "00:00:04,230",
+						"to": "00:00:04,670"
+					},
+					"offsets": {
+						"from": 4230,
+						"to": 4670
+					},
+					"id": 2026,
+					"p": 0.411865,
+					"t_dtw": -1
+				},
+				{
+					"text": " for",
+					"timestamps": {
+						"from": "00:00:04,670",
+						"to": "00:00:04,890"
+					},
+					"offsets": {
+						"from": 4670,
+						"to": 4890
+					},
+					"id": 329,
+					"p": 0.917604,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:04,890",
+						"to": "00:00:05,070"
+					},
+					"offsets": {
+						"from": 4890,
+						"to": 5070
+					},
+					"id": 812,
+					"p": 0.999146,
+					"t_dtw": -1
+				},
+				{
+					"text": " to",
+					"timestamps": {
+						"from": "00:00:05,400",
+						"to": "00:00:05,400"
+					},
+					"offsets": {
+						"from": 5400,
+						"to": 5400
+					},
+					"id": 284,
+					"p": 0.999611,
+					"t_dtw": -1
+				},
+				{
+					"text": " win",
+					"timestamps": {
+						"from": "00:00:05,400",
+						"to": "00:00:05,620"
+					},
+					"offsets": {
+						"from": 5400,
+						"to": 5620
+					},
+					"id": 1592,
+					"p": 0.999523,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,620",
+						"to": "00:00:05,880"
+					},
+					"offsets": {
+						"from": 5620,
+						"to": 5880
+					},
+					"id": 13,
+					"p": 0.986718,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_294]",
+					"timestamps": {
+						"from": "00:00:05,880",
+						"to": "00:00:05,880"
+					},
+					"offsets": {
+						"from": 5880,
+						"to": 5880
+					},
+					"id": 50657,
+					"p": 0.0150977,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

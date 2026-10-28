@@ -1,0 +1,48 @@
+1
+00:00:00,190 --> 00:00:06,315
+In 1958, a machine learned from examples.
+It took fifty-four years to win.
+
+2
+00:00:06,675 --> 00:00:10,975
+Rosenblatt's perceptron made
+headlines. Then, in 1969,
+
+3
+00:00:11,025 --> 00:00:14,864
+a book proved its limits, and
+most of the field moved on.
+
+4
+00:00:15,104 --> 00:00:19,184
+In 1986, backpropagation
+trained deeper networks.
+
+5
+00:00:19,234 --> 00:00:21,224
+But through the nineties
+and two thousands,
+
+6
+00:00:21,274 --> 00:00:23,824
+simpler methods were usually preferred.
+
+7
+00:00:24,154 --> 00:00:28,814
+Then, in 2012, a network called
+AlexNet won the ImageNet challenge:
+
+8
+00:00:28,864 --> 00:00:32,406
+fifteen percent error, against
+twenty-six for the runner-up.
+
+9
+00:00:32,726 --> 00:00:37,156
+Ten years later came ChatGPT. The
+whole story is on one timeline,
+
+10
+00:00:37,206 --> 00:00:41,695
+every date with its source.
+It's free, on OpenChronology.

@@ -1,0 +1,701 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:06,440"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 6440
+			},
+			"text": " In 2012, a network trained on graphics cards won the ImageNet Challenge by a wide margin,",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.855536,
+					"t_dtw": -1
+				},
+				{
+					"text": " In",
+					"timestamps": {
+						"from": "00:00:00,060",
+						"to": "00:00:00,130"
+					},
+					"offsets": {
+						"from": 60,
+						"to": 130
+					},
+					"id": 554,
+					"p": 0.965642,
+					"t_dtw": -1
+				},
+				{
+					"text": " 2012",
+					"timestamps": {
+						"from": "00:00:00,350",
+						"to": "00:00:00,950"
+					},
+					"offsets": {
+						"from": 350,
+						"to": 950
+					},
+					"id": 2321,
+					"p": 0.998441,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:00,950",
+						"to": "00:00:01,080"
+					},
+					"offsets": {
+						"from": 950,
+						"to": 1080
+					},
+					"id": 11,
+					"p": 0.924295,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:01,080",
+						"to": "00:00:01,140"
+					},
+					"offsets": {
+						"from": 1080,
+						"to": 1140
+					},
+					"id": 257,
+					"p": 0.988303,
+					"t_dtw": -1
+				},
+				{
+					"text": " network",
+					"timestamps": {
+						"from": "00:00:01,140",
+						"to": "00:00:01,620"
+					},
+					"offsets": {
+						"from": 1140,
+						"to": 1620
+					},
+					"id": 3127,
+					"p": 0.998887,
+					"t_dtw": -1
+				},
+				{
+					"text": " trained",
+					"timestamps": {
+						"from": "00:00:01,620",
+						"to": "00:00:02,040"
+					},
+					"offsets": {
+						"from": 1620,
+						"to": 2040
+					},
+					"id": 8776,
+					"p": 0.995666,
+					"t_dtw": -1
+				},
+				{
+					"text": " on",
+					"timestamps": {
+						"from": "00:00:02,100",
+						"to": "00:00:02,230"
+					},
+					"offsets": {
+						"from": 2100,
+						"to": 2230
+					},
+					"id": 319,
+					"p": 0.994071,
+					"t_dtw": -1
+				},
+				{
+					"text": " graphics",
+					"timestamps": {
+						"from": "00:00:02,230",
+						"to": "00:00:02,760"
+					},
+					"offsets": {
+						"from": 2230,
+						"to": 2760
+					},
+					"id": 9382,
+					"p": 0.975302,
+					"t_dtw": -1
+				},
+				{
+					"text": " cards",
+					"timestamps": {
+						"from": "00:00:02,770",
+						"to": "00:00:03,160"
+					},
+					"offsets": {
+						"from": 2770,
+						"to": 3160
+					},
+					"id": 4116,
+					"p": 0.985745,
+					"t_dtw": -1
+				},
+				{
+					"text": " won",
+					"timestamps": {
+						"from": "00:00:03,160",
+						"to": "00:00:03,500"
+					},
+					"offsets": {
+						"from": 3160,
+						"to": 3500
+					},
+					"id": 1839,
+					"p": 0.823419,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:03,500",
+						"to": "00:00:03,630"
+					},
+					"offsets": {
+						"from": 3500,
+						"to": 3630
+					},
+					"id": 262,
+					"p": 0.963747,
+					"t_dtw": -1
+				},
+				{
+					"text": " Image",
+					"timestamps": {
+						"from": "00:00:03,690",
+						"to": "00:00:03,990"
+					},
+					"offsets": {
+						"from": 3690,
+						"to": 3990
+					},
+					"id": 7412,
+					"p": 0.600748,
+					"t_dtw": -1
+				},
+				{
+					"text": "Net",
+					"timestamps": {
+						"from": "00:00:03,990",
+						"to": "00:00:04,170"
+					},
+					"offsets": {
+						"from": 3990,
+						"to": 4170
+					},
+					"id": 7934,
+					"p": 0.891463,
+					"t_dtw": -1
+				},
+				{
+					"text": " Challenge",
+					"timestamps": {
+						"from": "00:00:04,170",
+						"to": "00:00:04,730"
+					},
+					"offsets": {
+						"from": 4170,
+						"to": 4730
+					},
+					"id": 13879,
+					"p": 0.572115,
+					"t_dtw": -1
+				},
+				{
+					"text": " by",
+					"timestamps": {
+						"from": "00:00:04,800",
+						"to": "00:00:04,880"
+					},
+					"offsets": {
+						"from": 4800,
+						"to": 4880
+					},
+					"id": 416,
+					"p": 0.841982,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:04,880",
+						"to": "00:00:04,960"
+					},
+					"offsets": {
+						"from": 4880,
+						"to": 4960
+					},
+					"id": 257,
+					"p": 0.976843,
+					"t_dtw": -1
+				},
+				{
+					"text": " wide",
+					"timestamps": {
+						"from": "00:00:04,960",
+						"to": "00:00:05,280"
+					},
+					"offsets": {
+						"from": 4960,
+						"to": 5280
+					},
+					"id": 3094,
+					"p": 0.883243,
+					"t_dtw": -1
+				},
+				{
+					"text": " margin",
+					"timestamps": {
+						"from": "00:00:05,280",
+						"to": "00:00:05,870"
+					},
+					"offsets": {
+						"from": 5280,
+						"to": 5870
+					},
+					"id": 10330,
+					"p": 0.980953,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:06,380",
+						"to": "00:00:06,440"
+					},
+					"offsets": {
+						"from": 6380,
+						"to": 6440
+					},
+					"id": 11,
+					"p": 0.576459,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_322]",
+					"timestamps": {
+						"from": "00:00:06,440",
+						"to": "00:00:06,440"
+					},
+					"offsets": {
+						"from": 6440,
+						"to": 6440
+					},
+					"id": 50685,
+					"p": 0.0956048,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:06,440",
+				"to": "00:00:09,920"
+			},
+			"offsets": {
+				"from": 6440,
+				"to": 9920
+			},
+			"text": " and the bands change, deep learning.",
+			"tokens": [
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:06,740",
+						"to": "00:00:06,740"
+					},
+					"offsets": {
+						"from": 6740,
+						"to": 6740
+					},
+					"id": 290,
+					"p": 0.997919,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:06,790",
+						"to": "00:00:07,040"
+					},
+					"offsets": {
+						"from": 6790,
+						"to": 7040
+					},
+					"id": 262,
+					"p": 0.99886,
+					"t_dtw": -1
+				},
+				{
+					"text": " bands",
+					"timestamps": {
+						"from": "00:00:07,040",
+						"to": "00:00:07,550"
+					},
+					"offsets": {
+						"from": 7040,
+						"to": 7550
+					},
+					"id": 11760,
+					"p": 0.58837,
+					"t_dtw": -1
+				},
+				{
+					"text": " change",
+					"timestamps": {
+						"from": "00:00:07,550",
+						"to": "00:00:08,160"
+					},
+					"offsets": {
+						"from": 7550,
+						"to": 8160
+					},
+					"id": 1487,
+					"p": 0.749533,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:08,160",
+						"to": "00:00:08,350"
+					},
+					"offsets": {
+						"from": 8160,
+						"to": 8350
+					},
+					"id": 11,
+					"p": 0.329794,
+					"t_dtw": -1
+				},
+				{
+					"text": " deep",
+					"timestamps": {
+						"from": "00:00:08,470",
+						"to": "00:00:08,760"
+					},
+					"offsets": {
+						"from": 8470,
+						"to": 8760
+					},
+					"id": 2769,
+					"p": 0.818249,
+					"t_dtw": -1
+				},
+				{
+					"text": " learning",
+					"timestamps": {
+						"from": "00:00:08,760",
+						"to": "00:00:09,570"
+					},
+					"offsets": {
+						"from": 8760,
+						"to": 9570
+					},
+					"id": 4673,
+					"p": 0.985191,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:09,570",
+						"to": "00:00:09,920"
+					},
+					"offsets": {
+						"from": 9570,
+						"to": 9920
+					},
+					"id": 13,
+					"p": 0.992918,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_496]",
+					"timestamps": {
+						"from": "00:00:09,920",
+						"to": "00:00:09,920"
+					},
+					"offsets": {
+						"from": 9920,
+						"to": 9920
+					},
+					"id": 50859,
+					"p": 0.131269,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:09,920",
+				"to": "00:00:12,720"
+			},
+			"offsets": {
+				"from": 9920,
+				"to": 12720
+			},
+			"text": " Four years later, AlphaGo beat Lee Seydal at Go.",
+			"tokens": [
+				{
+					"text": " Four",
+					"timestamps": {
+						"from": "00:00:10,180",
+						"to": "00:00:10,180"
+					},
+					"offsets": {
+						"from": 10180,
+						"to": 10180
+					},
+					"id": 6675,
+					"p": 0.988789,
+					"t_dtw": -1
+				},
+				{
+					"text": " years",
+					"timestamps": {
+						"from": "00:00:10,270",
+						"to": "00:00:10,500"
+					},
+					"offsets": {
+						"from": 10270,
+						"to": 10500
+					},
+					"id": 812,
+					"p": 0.998942,
+					"t_dtw": -1
+				},
+				{
+					"text": " later",
+					"timestamps": {
+						"from": "00:00:10,500",
+						"to": "00:00:10,820"
+					},
+					"offsets": {
+						"from": 10500,
+						"to": 10820
+					},
+					"id": 1568,
+					"p": 0.999237,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:10,820",
+						"to": "00:00:10,940"
+					},
+					"offsets": {
+						"from": 10820,
+						"to": 10940
+					},
+					"id": 11,
+					"p": 0.981894,
+					"t_dtw": -1
+				},
+				{
+					"text": " Alpha",
+					"timestamps": {
+						"from": "00:00:10,940",
+						"to": "00:00:11,070"
+					},
+					"offsets": {
+						"from": 10940,
+						"to": 11070
+					},
+					"id": 12995,
+					"p": 0.66724,
+					"t_dtw": -1
+				},
+				{
+					"text": "Go",
+					"timestamps": {
+						"from": "00:00:11,380",
+						"to": "00:00:11,380"
+					},
+					"offsets": {
+						"from": 11380,
+						"to": 11380
+					},
+					"id": 5247,
+					"p": 0.737057,
+					"t_dtw": -1
+				},
+				{
+					"text": " beat",
+					"timestamps": {
+						"from": "00:00:11,430",
+						"to": "00:00:11,640"
+					},
+					"offsets": {
+						"from": 11430,
+						"to": 11640
+					},
+					"id": 4405,
+					"p": 0.997062,
+					"t_dtw": -1
+				},
+				{
+					"text": " Lee",
+					"timestamps": {
+						"from": "00:00:11,640",
+						"to": "00:00:11,830"
+					},
+					"offsets": {
+						"from": 11640,
+						"to": 11830
+					},
+					"id": 5741,
+					"p": 0.819735,
+					"t_dtw": -1
+				},
+				{
+					"text": " Se",
+					"timestamps": {
+						"from": "00:00:11,830",
+						"to": "00:00:11,960"
+					},
+					"offsets": {
+						"from": 11830,
+						"to": 11960
+					},
+					"id": 1001,
+					"p": 0.718991,
+					"t_dtw": -1
+				},
+				{
+					"text": "yd",
+					"timestamps": {
+						"from": "00:00:11,960",
+						"to": "00:00:12,080"
+					},
+					"offsets": {
+						"from": 11960,
+						"to": 12080
+					},
+					"id": 5173,
+					"p": 0.671804,
+					"t_dtw": -1
+				},
+				{
+					"text": "al",
+					"timestamps": {
+						"from": "00:00:12,080",
+						"to": "00:00:12,200"
+					},
+					"offsets": {
+						"from": 12080,
+						"to": 12200
+					},
+					"id": 282,
+					"p": 0.805957,
+					"t_dtw": -1
+				},
+				{
+					"text": " at",
+					"timestamps": {
+						"from": "00:00:12,200",
+						"to": "00:00:12,330"
+					},
+					"offsets": {
+						"from": 12200,
+						"to": 12330
+					},
+					"id": 379,
+					"p": 0.99482,
+					"t_dtw": -1
+				},
+				{
+					"text": " Go",
+					"timestamps": {
+						"from": "00:00:12,330",
+						"to": "00:00:12,460"
+					},
+					"offsets": {
+						"from": 12330,
+						"to": 12460
+					},
+					"id": 1514,
+					"p": 0.835747,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:12,460",
+						"to": "00:00:12,680"
+					},
+					"offsets": {
+						"from": 12460,
+						"to": 12680
+					},
+					"id": 13,
+					"p": 0.953477,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_636]",
+					"timestamps": {
+						"from": "00:00:12,720",
+						"to": "00:00:12,720"
+					},
+					"offsets": {
+						"from": 12720,
+						"to": 12720
+					},
+					"id": 50999,
+					"p": 0.228345,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

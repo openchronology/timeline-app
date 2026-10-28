@@ -1,0 +1,16 @@
+{
+  "script": "../../shorts/28-54-years.md",
+  "format": "vertical",
+  "look": "neural",
+  "pace": 1.0,
+  "silence": 0.2,
+  "lead": 0.15,
+  "tail": 0.3,
+  "hold": 2.0,
+  "say": {
+    "AlexNet": "Alex Net",
+    "ImageNet": "Image Net",
+    "ChatGPT": "Chat G P T",
+    "OpenChronology": "Open Chronology"
+  }
+}
