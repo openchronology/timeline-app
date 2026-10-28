@@ -95,6 +95,8 @@ jobs:
     steps:
       - name: Rocky baseline dependencies
         run: |
+          # dnf retries a failed download and gives up on a stalled mirror after 30 s (#367).
+          sed -i '/^\[main\]/a retries=3\ntimeout=30' /etc/dnf/dnf.conf
           dnf install -y dnf-plugins-core
           dnf config-manager --set-enabled crb
           dnf install -y epel-release

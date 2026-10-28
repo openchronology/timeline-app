@@ -89,6 +89,8 @@ for (const name of chosen.length ? chosen : Object.keys(serverTargets)) {
       [
         'buildx',
         'build',
+        // Every step's output as it runs, so a log shows where a stalled build is (#367).
+        '--progress=plain',
         ...formatArgs,
         '--target',
         'export',
@@ -132,6 +134,7 @@ async function platformTarball() {
       [
         'buildx',
         'build',
+        '--progress=plain',
         '--file',
         'deploy/platform/Dockerfile',
         '--target',

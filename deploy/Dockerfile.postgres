@@ -1,6 +1,8 @@
 # PostgreSQL 16 with the pgmp extension built in (compose.yml's database service): pgmp stores
 # times as exact rationals.
 FROM postgres:16-bookworm AS postgres-base
+# apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
+RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
 
 FROM postgres-base AS build
 RUN apt-get update \

@@ -32,6 +32,10 @@ const psql = (sql, db = 'openchronology') =>
 await run('docker', ['run', '-d', '--rm', '--name', name, base, 'sleep', 'infinity']);
 try {
   await run('docker', ['cp', deb, `${name}:/tmp/${basename(deb)}`]);
+  // apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
+  await sh(
+    `printf 'Acquire::Retries "3";\\nAcquire::http::Timeout "30";\\nAcquire::https::Timeout "30";\\n' > /etc/apt/apt.conf.d/80-retries`,
+  );
   // A server without systemd, like a container: the package starts PostgreSQL itself.
   const install = await sh(
     `export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y -qq /tmp/${basename(deb)} curl 2>&1`,

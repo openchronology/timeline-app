@@ -34,6 +34,8 @@ const file = '/tmp/' + basename(rpm);
 await run('docker', ['run', '-d', '--rm', '--name', name, base, 'sleep', 'infinity']);
 try {
   await run('docker', ['cp', rpm, `${name}:${file}`]);
+  // dnf retries a failed download and gives up on a stalled mirror after 30 s (#367).
+  await sh("sed -i '/^\\[main\\]/a retries=3\\ntimeout=30' /etc/dnf/dnf.conf");
   // A server without systemd, like a container: the package initializes and starts
   // PostgreSQL itself.
   // dnf 5 (Fedora) prints the package scripts' output; dnf 4 (Rocky, RHEL) logs it.

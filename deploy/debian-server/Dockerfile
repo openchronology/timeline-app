@@ -5,8 +5,13 @@
 #   DEB_VERSION, OCH_BUILD_COMMIT, OCH_BUILD_VERSION
 ARG BASE=debian:trixie
 
+# The target distribution, as the native build and the package start from it.
+FROM ${BASE} AS base
+# apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
+RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
+
 # och-convert and pgmp, built on the target distribution against its own libraries.
-FROM ${BASE} AS native
+FROM base AS native
 ARG PG_MAJOR=17
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -32,6 +37,8 @@ RUN curl -fsSL --retry 3 "https://codeload.github.com/dvarrazzo/pgmp/tar.gz/$PGM
 
 # The editor and the Next.js platform: plain JavaScript, the same for every distribution.
 FROM node:24-bookworm-slim AS app
+# apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
+RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 ARG OCH_BUILD_COMMIT
 ARG OCH_BUILD_VERSION
@@ -64,7 +71,7 @@ RUN --mount=type=bind,target=/build-context \
     && cp dist/openchronology-web-source.tar.gz platform/public/
 
 # The package.
-FROM ${BASE} AS package
+FROM base AS package
 ARG PG_MAJOR=17
 ARG DEB_VERSION
 # Node.js runtime, pinned and checked (https://nodejs.org/dist/v24.21.0/SHASUMS256.txt).
