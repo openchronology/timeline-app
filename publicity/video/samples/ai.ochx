@@ -1,0 +1,1985 @@
+{
+ "format": "openchronology",
+ "version": 1,
+ "title": "The history of artificial intelligence",
+ "description": "From Llull's combinatorial wheels and Leibniz's calculus of reasoning to today's large language models: ideas, programs, machines, games, people, companies and the policy around them. Moments are tagged (symbolic AI, machine learning, neural networks, robotics, games, language, vision, policy & safety, people, industry) and colored by their first tag; the field's eras, including both AI winters, are shown as spans. Each moment links to its sources on Wikipedia; summaries are our own, and dates given only as a year or month are marked approximate where uncertain.\n\nCompiled by an AI assistant (Claude) through the OpenChronology API and reviewed by the account owner. Coverage of the most recent years stops at the assistant's knowledge.",
+ "presentation": {
+  "mode": "gregorian",
+  "unit": "",
+  "scale": "1/1",
+  "origin": "0/1",
+  "version": 1,
+  "offsetMinutes": 0,
+  "significantDigits": 6
+ },
+ "plugins": [
+  {
+   "enabled": true,
+   "manifest": {
+    "id": "rich-text-notes",
+    "name": "Rich text notes",
+    "notes": {
+     "kind": "markdown"
+    },
+    "fields": [],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }",
+    "version": 1,
+    "apiVersion": 1,
+    "description": "Edit moment and stack notes visually, storing portable Markdown. Hover cards render safe headings, emphasis, lists, code and HTTPS links. HTML and images are not executed."
+   }
+  },
+  {
+   "enabled": true,
+   "manifest": {
+    "id": "moment-headings",
+    "name": "Headings",
+    "fields": [
+     {
+      "kind": "heading",
+      "label": "Heading level",
+      "metadataKey": "headingLevel"
+     },
+     {
+      "kind": "font",
+      "label": "Heading font",
+      "metadataKey": "headingFont"
+     }
+    ],
+    "marker": {
+     "kind": "heading",
+     "metadataKey": "headingLevel"
+    },
+    "targets": [
+     "moments"
+    ],
+    "version": 1,
+    "apiVersion": 1,
+    "description": "Let a moment act as a heading or marker: only its title shows, sized as a heading from level 1 to 6, and the title is what you click. Choose its font (Times New Roman by default). Headings still group into summaries with other moments."
+   }
+  },
+  {
+   "enabled": true,
+   "manifest": {
+    "id": "moment-colors",
+    "name": "Moment colors",
+    "fields": [
+     {
+      "kind": "color",
+      "label": "Moment color",
+      "metadataKey": "color"
+     }
+    ],
+    "marker": {
+     "kind": "color",
+     "metadataKey": "color"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.color(api.get(\"color\")); }",
+    "version": 2,
+    "apiVersion": 1,
+    "description": "Choose muted semantic swatches or a custom color for moments and stack entries while preserving their white borders."
+   }
+  },
+  {
+   "enabled": true,
+   "manifest": {
+    "id": "moment-icons",
+    "name": "Moment icons",
+    "fields": [
+     {
+      "kind": "image-url",
+      "label": "Moment icon URL",
+      "metadataKey": "iconUrl"
+     }
+    ],
+    "marker": {
+     "kind": "image",
+     "metadataKey": "iconUrl"
+    },
+    "source": "function render(moment: string, api: PluginAPI): string { return api.icon(\"iconUrl\"); }",
+    "version": 2,
+    "apiVersion": 1,
+    "description": "Show a circular image on each moment, enlarge it on hover, and edit its image URL in the details panel."
+   }
+  },
+  {
+   "enabled": true,
+   "manifest": {
+    "id": "moment-sources",
+    "name": "Sources",
+    "fields": [
+     {
+      "kind": "links",
+      "label": "Sources",
+      "metadataKey": "sources"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }",
+    "version": 1,
+    "apiVersion": 1,
+    "description": "Show and edit a series of source links for moments and stack entries."
+   }
+  },
+  {
+   "manifest": {
+    "apiVersion": 1,
+    "id": "dating-context",
+    "version": 1,
+    "name": "Dating context",
+    "description": "Explain the precision and coordinate convention of a moment. An exact stored coordinate can still represent an approximate age or a calendar-day marker.",
+    "fields": [
+     {
+      "kind": "text",
+      "metadataKey": "datePrecision",
+      "label": "Date precision"
+     },
+     {
+      "kind": "multiline",
+      "metadataKey": "coordinateConvention",
+      "label": "Coordinate convention"
+     }
+    ],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.none(); }"
+   },
+   "enabled": true
+  },
+  {
+   "enabled": true,
+   "manifest": {
+    "id": "duration-backgrounds",
+    "name": "Duration backgrounds",
+    "fields": [
+     {
+      "kind": "image-url",
+      "label": "Background image URL",
+      "metadataKey": "backgroundUrl"
+     }
+    ],
+    "targets": [
+     "durations"
+    ],
+    "version": 1,
+    "apiVersion": 1,
+    "background": {
+     "kind": "image",
+     "metadataKey": "backgroundUrl"
+    },
+    "description": "Show an image behind the timeline where a duration lies, centered between its visible start and end and filling the timeline. Smaller durations show above larger ones, and edges blend into each other."
+   }
+  },
+  {
+   "enabled": true,
+   "manifest": {
+    "id": "expand-on-hover",
+    "name": "Expand on hover",
+    "fields": [],
+    "source": "function render(moment: string, api: PluginAPI): string { return api.expand(); }",
+    "summary": {
+     "kind": "radial"
+    },
+    "version": 1,
+    "apiVersion": 1,
+    "description": "Hover or focus a summary of two to five moments to fan out its members radially for individual inspection. Larger summaries stay collapsed."
+   }
+  },
+  {
+   "enabled": true,
+   "manifest": {
+    "id": "timeline-theme",
+    "name": "Timeline theme",
+    "theme": {
+     "halo": "haloColor",
+     "text": "textColor",
+     "marker": "markerColor",
+     "measure": "measureColor",
+     "duration": "durationColor",
+     "textFont": "textFont",
+     "background": "backgroundColor",
+     "measureFont": "measureFont"
+    },
+    "fields": [],
+    "version": 1,
+    "settings": [
+     {
+      "key": "textColor",
+      "kind": "color",
+      "label": "Label color"
+     },
+     {
+      "key": "textFont",
+      "kind": "font",
+      "label": "Label font"
+     },
+     {
+      "key": "measureColor",
+      "kind": "color",
+      "label": "Measure color"
+     },
+     {
+      "key": "measureFont",
+      "kind": "font",
+      "label": "Measure font"
+     },
+     {
+      "key": "haloColor",
+      "kind": "color",
+      "label": "Halo color"
+     },
+     {
+      "key": "markerColor",
+      "kind": "color",
+      "label": "Marker color"
+     },
+     {
+      "key": "durationColor",
+      "kind": "color",
+      "label": "Duration color"
+     },
+     {
+      "key": "backgroundColor",
+      "kind": "color",
+      "label": "Background color"
+     }
+    ],
+    "apiVersion": 1,
+    "description": "Choose the timeline's colors and fonts: its labels, its measure (the axis, tick marks and their times), the halo that keeps them readable over images, the default marker and duration colors, and a background color. Set them here in the plugin list; anything left blank keeps the usual look, and colors chosen for events still win."
+   },
+   "settings": {
+    "textFont": "'Trebuchet MS', 'Helvetica Neue', sans-serif",
+    "haloColor": "#080a1c",
+    "textColor": "#e9ecff",
+    "markerColor": "#38e1ff",
+    "measureColor": "#8c9bff",
+    "durationColor": "#3d3285",
+    "backgroundColor": "#0b0e24"
+   }
+  }
+ ],
+ "tags": [
+  "history",
+  "artificial intelligence",
+  "computing",
+  "chronology"
+ ],
+ "image": {
+  "alt": "IBM's Deep Blue, the chess computer that defeated Garry Kasparov in 1997, on display at the Computer History Museum",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/b/be/Deep_Blue.jpg"
+ },
+ "events": [
+  {
+   "id": "alexnet",
+   "time": "1348963200/1",
+   "metadata": {
+    "tags": [
+     "neural networks",
+     "vision"
+    ],
+    "color": "#4fc3c8",
+    "title": "AlexNet wins ImageNet",
+    "sources": [
+     "https://en.wikipedia.org/wiki/AlexNet"
+    ],
+    "description": "Krizhevsky, Sutskever and Hinton's GPU-trained convolutional network cuts the error rate dramatically, starting the deep learning boom.\n\n*Image: Wikimedia Commons (AlexNet's architecture, from Zhang, Lipton, Li and Smola, Dive into Deep Learning; CC BY-SA 4.0).*",
+    "datePrecision": "Approximate day: the 2012 results.",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ad/AlexNet_block_diagram.svg/960px-AlexNet_block_diagram.svg.png"
+   }
+  },
+  {
+   "id": "alphafold",
+   "time": "1606694400/1",
+   "metadata": {
+    "tags": [
+     "machine learning"
+    ],
+    "color": "#6fb0e0",
+    "title": "AlphaFold 2 solves protein structure prediction",
+    "sources": [
+     "https://en.wikipedia.org/wiki/AlphaFold"
+    ],
+    "description": "DeepMind's system predicts protein structures with near-experimental accuracy at CASP14.\n\n*Image: Wikimedia Commons (Demis Hassabis in Stockholm, 2024; photo by John Sears; CC BY-SA 4.0).*",
+    "datePrecision": "The date CASP14's results were announced.",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2b/Demis_Hassabis%2C_2024_Nobel_Prize_Laureate_in_Chemistry_7_%28cropped%29.jpg/960px-Demis_Hassabis%2C_2024_Nobel_Prize_Laureate_in_Chemistry_7_%28cropped%29.jpg"
+   }
+  },
+  {
+   "id": "alphago",
+   "time": "1458000000/1",
+   "metadata": {
+    "tags": [
+     "games",
+     "machine learning"
+    ],
+    "color": "#8fd14f",
+    "title": "AlphaGo beats Lee Sedol",
+    "sources": [
+     "https://en.wikipedia.org/wiki/AlphaGo_versus_Lee_Sedol",
+     "https://en.wikipedia.org/wiki/AlphaGo"
+    ],
+    "description": "DeepMind's program wins the five-game Go match 4–1, a decade earlier than many expected.\n\n*Image: Wikimedia Commons (Lee Sedol in 2016; LG Electronics; CC BY 2.0).*",
+    "datePrecision": "The date the match ended (9–15 March 2016).",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/2/25/Lee_Se-Dol_-_2016_%28cropped%29.jpg"
+   }
+  },
+  {
+   "id": "alphazero",
+   "time": "1512086400/1",
+   "metadata": {
+    "tags": [
+     "games",
+     "machine learning"
+    ],
+    "color": "#8fd14f",
+    "title": "AlphaZero",
+    "sources": [
+     "https://en.wikipedia.org/wiki/AlphaZero"
+    ],
+    "description": "One algorithm teaches itself chess, shogi and Go from the rules alone and beats the strongest programs."
+   }
+  },
+  {
+   "id": "anthropic-founded",
+   "time": "1609459200/1",
+   "metadata": {
+    "tags": [
+     "industry",
+     "policy & safety"
+    ],
+    "color": "#9aa8ff",
+    "title": "Anthropic is founded",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Anthropic"
+    ],
+    "description": "Former OpenAI researchers found an AI safety and research company."
+   }
+  },
+  {
+   "id": "asilomar",
+   "time": "1483228800/1",
+   "metadata": {
+    "tags": [
+     "policy & safety"
+    ],
+    "color": "#ff7a6b",
+    "title": "The Asilomar AI Principles",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Asilomar_Conference_on_Beneficial_AI"
+    ],
+    "description": "Researchers gathered by the Future of Life Institute agree 23 principles for beneficial AI."
+   }
+  },
+  {
+   "id": "backprop",
+   "time": "504921600/1",
+   "metadata": {
+    "tags": [
+     "neural networks",
+     "machine learning"
+    ],
+    "color": "#4fc3c8",
+    "title": "Backpropagation popularized",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Backpropagation"
+    ],
+    "description": "Rumelhart, Hinton and Williams show backpropagation trains multi-layer networks to learn useful internal representations."
+   }
+  },
+  {
+   "id": "bert",
+   "time": "1538352000/1",
+   "metadata": {
+    "tags": [
+     "language",
+     "neural networks"
+    ],
+    "color": "#e8c547",
+    "title": "BERT",
+    "sources": [
+     "https://en.wikipedia.org/wiki/BERT_(language_model)"
+    ],
+    "description": "Google's bidirectional Transformer, pre-trained on masked words, sweeps language benchmarks."
+   }
+  },
+  {
+   "id": "bletchley",
+   "time": "1698796800/1",
+   "metadata": {
+    "tags": [
+     "policy & safety"
+    ],
+    "color": "#ff7a6b",
+    "title": "The AI Safety Summit at Bletchley Park",
+    "sources": [
+     "https://en.wikipedia.org/wiki/AI_Safety_Summit"
+    ],
+    "description": "Governments sign the Bletchley Declaration on the risks of frontier AI.\n\n*Image: Wikimedia Commons (the mansion at Bletchley Park; photo by DeFacto; CC BY-SA 4.0).*",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/43/Bletchley_Park_Mansion.jpg/960px-Bletchley_Park_Mansion.jpg"
+   }
+  },
+  {
+   "id": "boole",
+   "time": "-3660595200/1",
+   "metadata": {
+    "tags": [
+     "symbolic ai",
+     "people"
+    ],
+    "color": "#c58be0",
+    "title": "Boole's Laws of Thought",
+    "sources": [
+     "https://en.wikipedia.org/wiki/The_Laws_of_Thought",
+     "https://en.wikipedia.org/wiki/George_Boole"
+    ],
+    "description": "George Boole reduces logic to algebra, the foundation of digital circuits and of logical AI.\n\n*Image: Wikimedia Commons (portrait of George Boole; public domain).*",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c7/Portrait_of_George_Boole.png/960px-Portrait_of_George_Boole.png"
+   }
+  },
+  {
+   "id": "chatgpt",
+   "time": "1669766400/1",
+   "metadata": {
+    "tags": [
+     "language",
+     "industry"
+    ],
+    "color": "#e8c547",
+    "title": "ChatGPT",
+    "sources": [
+     "https://en.wikipedia.org/wiki/ChatGPT"
+    ],
+    "description": "OpenAI's chatbot reaches a hundred million users in about two months, bringing language models to the public."
+   }
+  },
+  {
+   "id": "claude",
+   "time": "1678752000/1",
+   "metadata": {
+    "tags": [
+     "language",
+     "industry"
+    ],
+    "color": "#e8c547",
+    "title": "Claude",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Claude_(language_model)"
+    ],
+    "description": "Anthropic releases its assistant Claude, trained with constitutional AI."
+   }
+  },
+  {
+   "id": "copilot",
+   "time": "1624924800/1",
+   "metadata": {
+    "tags": [
+     "language",
+     "industry"
+    ],
+    "color": "#e8c547",
+    "title": "GitHub Copilot",
+    "sources": [
+     "https://en.wikipedia.org/wiki/GitHub_Copilot"
+    ],
+    "description": "An AI pair programmer suggests code inside the editor."
+   }
+  },
+  {
+   "id": "cybernetics",
+   "time": "-694310400/1",
+   "metadata": {
+    "tags": [
+     "robotics",
+     "people"
+    ],
+    "color": "#e8835f",
+    "title": "Wiener's Cybernetics",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Cybernetics",
+     "https://en.wikipedia.org/wiki/Norbert_Wiener"
+    ],
+    "description": "Norbert Wiener's book on control and communication in animals and machines launches cybernetics.\n\n*Image: Wikimedia Commons (Norbert Wiener; CC0).*",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/5/56/Norbert_Wiener.png"
+   }
+  },
+  {
+   "id": "dalle",
+   "time": "1609804800/1",
+   "metadata": {
+    "tags": [
+     "vision",
+     "language"
+    ],
+    "color": "#f08fb4",
+    "title": "DALL·E",
+    "sources": [
+     "https://en.wikipedia.org/wiki/DALL-E"
+    ],
+    "description": "OpenAI generates images from text descriptions."
+   }
+  },
+  {
+   "id": "darpa-grand",
+   "time": "1128729600/1",
+   "metadata": {
+    "tags": [
+     "robotics",
+     "vision"
+    ],
+    "color": "#e8835f",
+    "title": "Stanley wins the DARPA Grand Challenge",
+    "sources": [
+     "https://en.wikipedia.org/wiki/DARPA_Grand_Challenge_(2005)"
+    ],
+    "description": "Stanford's self-driving car completes a 212 km desert course, a year after no entrant finished.\n\n*Image: Wikimedia Commons (Stanley; public domain).*",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3e/Stanley2.JPG/960px-Stanley2.JPG"
+   }
+  },
+  {
+   "id": "dartmouth",
+   "time": "-427248000/1",
+   "metadata": {
+    "tags": [
+     "symbolic ai",
+     "people"
+    ],
+    "color": "#c58be0",
+    "title": "The Dartmouth workshop",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Dartmouth_workshop"
+    ],
+    "description": "McCarthy, Minsky, Rochester and Shannon's summer project names the field \"artificial intelligence\".\n\n*Image: Wikimedia Commons (Dartmouth Hall; photo by Kenneth C. Zirkel; CC BY 4.0).*",
+    "datePrecision": "Approximate day: the workshop ran through the summer of 1956.",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9d/Dartmouth_Hall_at_Dartmouth_College.jpg/960px-Dartmouth_Hall_at_Dartmouth_College.jpg"
+   }
+  },
+  {
+   "id": "deep-belief",
+   "time": "1136073600/1",
+   "metadata": {
+    "tags": [
+     "neural networks"
+    ],
+    "color": "#4fc3c8",
+    "title": "Deep belief networks",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Deep_belief_network"
+    ],
+    "description": "Hinton and colleagues show deep networks can be trained layer by layer; \"deep learning\" catches on."
+   }
+  },
+  {
+   "id": "deep-blue",
+   "time": "863308800/1",
+   "metadata": {
+    "tags": [
+     "games",
+     "industry"
+    ],
+    "color": "#8fd14f",
+    "title": "Deep Blue beats Kasparov",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Deep_Blue_versus_Garry_Kasparov"
+    ],
+    "description": "IBM's chess computer wins a six-game match against the world champion.\n\n*Image: Wikimedia Commons (Deep Blue at the Computer History Museum; photo by James the photographer; CC BY 2.0).*",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/b/be/Deep_Blue.jpg"
+   }
+  },
+  {
+   "id": "deepseek-r1",
+   "time": "1737331200/1",
+   "metadata": {
+    "tags": [
+     "language",
+     "industry"
+    ],
+    "color": "#e8c547",
+    "title": "DeepSeek-R1",
+    "sources": [
+     "https://en.wikipedia.org/wiki/DeepSeek"
+    ],
+    "description": "A Chinese lab releases an openly licensed reasoning model trained at a fraction of the usual cost; AI stocks fall sharply days later."
+   }
+  },
+  {
+   "id": "dqn",
+   "time": "1356998400/1",
+   "metadata": {
+    "tags": [
+     "games",
+     "machine learning"
+    ],
+    "color": "#8fd14f",
+    "title": "Deep Q-networks play Atari",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Google_DeepMind"
+    ],
+    "description": "DeepMind's agent learns to play Atari games from the pixels alone."
+   }
+  },
+  {
+   "id": "eliza",
+   "time": "-126230400/1",
+   "metadata": {
+    "tags": [
+     "language"
+    ],
+    "color": "#e8c547",
+    "title": "ELIZA",
+    "sources": [
+     "https://en.wikipedia.org/wiki/ELIZA",
+     "https://en.wikipedia.org/wiki/Joseph_Weizenbaum"
+    ],
+    "description": "Joseph Weizenbaum's chatbot imitates a psychotherapist with simple patterns; people confide in it anyway.\n\n*Image: Wikimedia Commons (a conversation with ELIZA; public domain).*",
+    "datePrecision": "Approximate: published 1966.",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/7/79/ELIZA_conversation.png"
+   }
+  },
+  {
+   "id": "eu-ai-act",
+   "time": "1722470400/1",
+   "metadata": {
+    "tags": [
+     "policy & safety"
+    ],
+    "color": "#ff7a6b",
+    "title": "The EU AI Act enters into force",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Artificial_Intelligence_Act"
+    ],
+    "description": "The first comprehensive AI law regulates systems by risk, with obligations phased in over the following years.\n\n*Image: Wikimedia Commons (the flag of Europe; public domain).*",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b7/Flag_of_Europe.svg/960px-Flag_of_Europe.svg.png"
+   }
+  },
+  {
+   "id": "extinction-statement",
+   "time": "1685404800/1",
+   "metadata": {
+    "tags": [
+     "policy & safety"
+    ],
+    "color": "#ff7a6b",
+    "title": "The statement on AI risk",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Statement_on_AI_risk_of_extinction"
+    ],
+    "description": "Hundreds of researchers and executives sign a one-sentence statement that mitigating the risk of extinction from AI should be a global priority."
+   }
+  },
+  {
+   "id": "fifth-generation",
+   "time": "378691200/1",
+   "metadata": {
+    "tags": [
+     "symbolic ai",
+     "industry"
+    ],
+    "color": "#c58be0",
+    "title": "Japan's Fifth Generation project",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Fifth_Generation_Computer_Systems"
+    ],
+    "description": "A national programme to build logic-programming supercomputers prompts rival programmes in the US and UK."
+   }
+  },
+  {
+   "id": "gan",
+   "time": "1388534400/1",
+   "metadata": {
+    "tags": [
+     "neural networks",
+     "vision"
+    ],
+    "color": "#4fc3c8",
+    "title": "Generative adversarial networks",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Generative_adversarial_network"
+    ],
+    "description": "Ian Goodfellow and colleagues train a generator against a discriminator to produce realistic images."
+   }
+  },
+  {
+   "id": "gemini",
+   "time": "1701820800/1",
+   "metadata": {
+    "tags": [
+     "language",
+     "vision"
+    ],
+    "color": "#e8c547",
+    "title": "Gemini",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Gemini_(language_model)"
+    ],
+    "description": "Google DeepMind's natively multimodal model family."
+   }
+  },
+  {
+   "id": "gps",
+   "time": "-347155200/1",
+   "metadata": {
+    "tags": [
+     "symbolic ai"
+    ],
+    "color": "#c58be0",
+    "title": "The General Problem Solver",
+    "sources": [
+     "https://en.wikipedia.org/wiki/General_Problem_Solver"
+    ],
+    "description": "Newell and Simon's program applies means–ends analysis to any problem that can be stated formally."
+   }
+  },
+  {
+   "id": "gpt1",
+   "time": "1527811200/1",
+   "metadata": {
+    "tags": [
+     "language",
+     "industry"
+    ],
+    "color": "#e8c547",
+    "title": "GPT",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Generative_pre-trained_transformer"
+    ],
+    "description": "OpenAI pre-trains a Transformer on unlabelled text, then fine-tunes it for tasks."
+   }
+  },
+  {
+   "id": "gpt2",
+   "time": "1550102400/1",
+   "metadata": {
+    "tags": [
+     "language",
+     "policy & safety"
+    ],
+    "color": "#e8c547",
+    "title": "GPT-2",
+    "sources": [
+     "https://en.wikipedia.org/wiki/GPT-2"
+    ],
+    "description": "OpenAI's larger model writes fluent paragraphs; it is released in stages over concerns about misuse."
+   }
+  },
+  {
+   "id": "gpt3",
+   "time": "1590624000/1",
+   "metadata": {
+    "tags": [
+     "language"
+    ],
+    "color": "#e8c547",
+    "title": "GPT-3",
+    "sources": [
+     "https://en.wikipedia.org/wiki/GPT-3"
+    ],
+    "description": "A 175-billion-parameter model learns tasks from a few examples in its prompt.",
+    "datePrecision": "The paper's date."
+   }
+  },
+  {
+   "id": "gpt4",
+   "time": "1678752000/1",
+   "metadata": {
+    "tags": [
+     "language",
+     "vision"
+    ],
+    "color": "#e8c547",
+    "title": "GPT-4",
+    "sources": [
+     "https://en.wikipedia.org/wiki/GPT-4"
+    ],
+    "description": "OpenAI's multimodal model accepts images as well as text."
+   }
+  },
+  {
+   "id": "hebb",
+   "time": "-662688000/1",
+   "metadata": {
+    "tags": [
+     "neural networks",
+     "people"
+    ],
+    "color": "#4fc3c8",
+    "title": "Hebbian learning",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hebbian_theory",
+     "https://en.wikipedia.org/wiki/Donald_O._Hebb"
+    ],
+    "description": "Donald Hebb proposes that connections between neurons strengthen when they fire together, a model of learning."
+   }
+  },
+  {
+   "id": "hopfield",
+   "time": "378691200/1",
+   "metadata": {
+    "tags": [
+     "neural networks"
+    ],
+    "color": "#4fc3c8",
+    "title": "Hopfield networks",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Hopfield_network",
+     "https://en.wikipedia.org/wiki/John_Hopfield"
+    ],
+    "description": "John Hopfield shows recurrent networks can store memories as stable states, reviving interest in neural networks."
+   }
+  },
+  {
+   "id": "imagenet",
+   "time": "1230768000/1",
+   "metadata": {
+    "tags": [
+     "vision",
+     "machine learning"
+    ],
+    "color": "#f08fb4",
+    "title": "ImageNet",
+    "sources": [
+     "https://en.wikipedia.org/wiki/ImageNet",
+     "https://en.wikipedia.org/wiki/Fei-Fei_Li"
+    ],
+    "description": "Fei-Fei Li's team releases a dataset of millions of labelled images; its yearly challenge starts in 2010.\n\n*Image: Wikimedia Commons (Fei-Fei Li at AI for Good 2017; ITU Pictures; CC BY 2.0).*",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/c/c7/Fei-Fei_Li_at_AI_for_Good_2017.jpg"
+   }
+  },
+  {
+   "id": "lecun-cnn",
+   "time": "599616000/1",
+   "metadata": {
+    "tags": [
+     "neural networks",
+     "vision"
+    ],
+    "color": "#4fc3c8",
+    "title": "Convolutional networks read zip codes",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Convolutional_neural_network",
+     "https://en.wikipedia.org/wiki/Yann_LeCun"
+    ],
+    "description": "Yann LeCun's team trains a convolutional network with backpropagation to read handwritten digits."
+   }
+  },
+  {
+   "id": "leibniz",
+   "time": "-9593251200/1",
+   "metadata": {
+    "tags": [
+     "symbolic ai",
+     "people"
+    ],
+    "color": "#c58be0",
+    "title": "Leibniz imagines a calculus of reasoning",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Characteristica_universalis",
+     "https://en.wikipedia.org/wiki/Gottfried_Wilhelm_Leibniz"
+    ],
+    "description": "Gottfried Wilhelm Leibniz proposes a universal symbolic language in which disputes could be settled by calculation.\n\n*Image: Wikimedia Commons (Christoph Bernhard Francke's portrait of Leibniz, about 1695; public domain).*",
+    "datePrecision": "Approximate: from his Dissertatio de arte combinatoria (1666) on.",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8d/Christoph_Bernhard_Francke_-_Bildnis_des_Philosophen_Leibniz_%28ca._1695%29.jpg/960px-Christoph_Bernhard_Francke_-_Bildnis_des_Philosophen_Leibniz_%28ca._1695%29.jpg"
+   }
+  },
+  {
+   "id": "lighthill",
+   "time": "94694400/1",
+   "metadata": {
+    "tags": [
+     "policy & safety"
+    ],
+    "color": "#ff7a6b",
+    "title": "The Lighthill report",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lighthill_report"
+    ],
+    "description": "A report to the UK Science Research Council finds AI has failed its grand promises; funding is cut."
+   }
+  },
+  {
+   "id": "lisp",
+   "time": "-378691200/1",
+   "metadata": {
+    "tags": [
+     "symbolic ai"
+    ],
+    "color": "#c58be0",
+    "title": "LISP",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lisp_(programming_language)",
+     "https://en.wikipedia.org/wiki/John_McCarthy_(computer_scientist)"
+    ],
+    "description": "John McCarthy designs LISP, which becomes the language of AI research for decades.\n\n*Image: Wikimedia Commons (John McCarthy at Stanford; photo by \"null0\"; CC BY-SA 2.0).*",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/49/John_McCarthy_Stanford.jpg/960px-John_McCarthy_Stanford.jpg"
+   }
+  },
+  {
+   "id": "lisp-machines-collapse",
+   "time": "536457600/1",
+   "metadata": {
+    "tags": [
+     "industry"
+    ],
+    "color": "#9aa8ff",
+    "title": "The Lisp machine market collapses",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Lisp_machine",
+     "https://en.wikipedia.org/wiki/AI_winter"
+    ],
+    "description": "Cheaper workstations undercut specialized AI hardware, and the second AI winter begins.\n\n*Image: Wikimedia Commons (a Lisp machine at the MIT Museum; photo by Jszigetvari; CC BY-SA 3.0).*",
+    "datePrecision": "Approximate.",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/16/LISP_machine.jpg/960px-LISP_machine.jpg"
+   }
+  },
+  {
+   "id": "llama",
+   "time": "1677196800/1",
+   "metadata": {
+    "tags": [
+     "language",
+     "industry"
+    ],
+    "color": "#e8c547",
+    "title": "LLaMA",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Llama_(language_model)"
+    ],
+    "description": "Meta releases a family of language models to researchers; its weights spread, and open models flourish."
+   }
+  },
+  {
+   "id": "llull",
+   "time": "-20985350400/1",
+   "metadata": {
+    "tags": [
+     "symbolic ai",
+     "people"
+    ],
+    "color": "#c58be0",
+    "title": "Ramon Llull's Ars Magna",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ramon_Llull"
+    ],
+    "description": "A Majorcan philosopher designs paper wheels that combine basic concepts mechanically, an early dream of reasoning by procedure.\n\n*Image: Wikimedia Commons (Francisco Ribalta's portrait of Llull; public domain).*",
+    "datePrecision": "Approximate.",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/16/Francisco_Ribalta_-_Ramon_Llull_-_Google_Art_Project.jpg/960px-Francisco_Ribalta_-_Ramon_Llull_-_Google_Art_Project.jpg"
+   }
+  },
+  {
+   "id": "logic-theorist",
+   "time": "-441849600/1",
+   "metadata": {
+    "tags": [
+     "symbolic ai"
+    ],
+    "color": "#c58be0",
+    "title": "The Logic Theorist",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Logic_Theorist"
+    ],
+    "description": "Newell, Shaw and Simon's program proves theorems from Principia Mathematica, often called the first AI program."
+   }
+  },
+  {
+   "id": "lovelace",
+   "time": "-4007750400/1",
+   "metadata": {
+    "tags": [
+     "people"
+    ],
+    "color": "#b8c4bb",
+    "title": "Ada Lovelace's notes on the Analytical Engine",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Ada_Lovelace",
+     "https://en.wikipedia.org/wiki/Analytical_Engine"
+    ],
+    "description": "Lovelace sees that Babbage's engine could manipulate symbols, not just numbers, and argues it cannot originate anything: \"Lady Lovelace's objection\".\n\n*Image: Wikimedia Commons (daguerreotype by Antoine Claudet, 1843; public domain).*",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/4/4c/Ada_Lovelace_daguerreotype_by_Antoine_Claudet_1843_-_cropped.png"
+   }
+  },
+  {
+   "id": "lstm",
+   "time": "852076800/1",
+   "metadata": {
+    "tags": [
+     "neural networks"
+    ],
+    "color": "#4fc3c8",
+    "title": "Long short-term memory",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Long_short-term_memory"
+    ],
+    "description": "Hochreiter and Schmidhuber's recurrent network keeps information over long sequences."
+   }
+  },
+  {
+   "id": "mcculloch-pitts",
+   "time": "-852076800/1",
+   "metadata": {
+    "tags": [
+     "neural networks",
+     "people"
+    ],
+    "color": "#4fc3c8",
+    "title": "McCulloch and Pitts' artificial neuron",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Artificial_neuron",
+     "https://en.wikipedia.org/wiki/Warren_Sturgis_McCulloch"
+    ],
+    "description": "A logical model of the neuron shows networks of simple threshold units can compute logical functions."
+   }
+  },
+  {
+   "id": "mechanical-turk",
+   "time": "-6311347200/1",
+   "metadata": {
+    "tags": [
+     "games",
+     "robotics"
+    ],
+    "color": "#8fd14f",
+    "title": "The Mechanical Turk",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mechanical_Turk"
+    ],
+    "description": "A chess-playing \"automaton\" tours Europe; it is a hoax with a human hidden inside, but it fixes the idea of a thinking machine in the public mind.\n\n*Image: Wikimedia Commons (Joseph Racknitz's engraving of the Turk; public domain).*",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6e/Racknitz_-_The_Turk_3.jpg/960px-Racknitz_-_The_Turk_3.jpg"
+   }
+  },
+  {
+   "id": "mycin",
+   "time": "157766400/1",
+   "metadata": {
+    "tags": [
+     "symbolic ai"
+    ],
+    "color": "#c58be0",
+    "title": "MYCIN",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Mycin"
+    ],
+    "description": "A Stanford expert system diagnoses blood infections with rules and certainty factors, matching specialists in trials.",
+    "datePrecision": "Approximate: developed in the early-to-mid 1970s."
+   }
+  },
+  {
+   "id": "neocognitron",
+   "time": "315532800/1",
+   "metadata": {
+    "tags": [
+     "neural networks",
+     "vision"
+    ],
+    "color": "#4fc3c8",
+    "title": "The neocognitron",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Neocognitron"
+    ],
+    "description": "Kunihiko Fukushima's layered network for pattern recognition prefigures convolutional networks."
+   }
+  },
+  {
+   "id": "nobel-2024",
+   "time": "1728345600/1",
+   "metadata": {
+    "tags": [
+     "people",
+     "neural networks"
+    ],
+    "color": "#b8c4bb",
+    "title": "Nobel prizes for neural networks and protein structure",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Nobel_Prize_in_Physics",
+     "https://en.wikipedia.org/wiki/John_Hopfield"
+    ],
+    "description": "Hopfield and Hinton win the Nobel Prize in Physics for neural networks; the next day Hassabis and Jumper share the Chemistry prize for AlphaFold.\n\n*Image: Wikimedia Commons (John Hopfield's Nobel lecture, 2024; photo by Jay Dixit; CC BY-SA 4.0).*",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9b/John_J._Hopfield_delivering_his_lecture_at_the_2024_Nobel_Prize_Lectures_in_Stockholm.jpg/960px-John_J._Hopfield_delivering_his_lecture_at_the_2024_Nobel_Prize_Lectures_in_Stockholm.jpg"
+   }
+  },
+  {
+   "id": "o1",
+   "time": "1726099200/1",
+   "metadata": {
+    "tags": [
+     "language"
+    ],
+    "color": "#e8c547",
+    "title": "Reasoning models",
+    "sources": [
+     "https://en.wikipedia.org/wiki/OpenAI_o1"
+    ],
+    "description": "OpenAI's o1 is trained to work through problems step by step before answering."
+   }
+  },
+  {
+   "id": "openai-founded",
+   "time": "1449792000/1",
+   "metadata": {
+    "tags": [
+     "industry"
+    ],
+    "color": "#9aa8ff",
+    "title": "OpenAI is founded",
+    "sources": [
+     "https://en.wikipedia.org/wiki/OpenAI"
+    ],
+    "description": "A non-profit AI research lab launches in San Francisco."
+   }
+  },
+  {
+   "id": "paris-summit",
+   "time": "1739145600/1",
+   "metadata": {
+    "tags": [
+     "policy & safety"
+    ],
+    "color": "#ff7a6b",
+    "title": "The AI Action Summit in Paris",
+    "description": "France and India co-chair the third summit in the series begun at Bletchley Park, at the Grand Palais, with over a thousand participants from more than a hundred countries.",
+    "datePrecision": "The summit's first day (10–11 February 2025).",
+    "sources": [
+     "https://en.wikipedia.org/wiki/AI_Action_Summit_2025"
+    ]
+   }
+  },
+  {
+   "id": "pause-letter",
+   "time": "1679443200/1",
+   "metadata": {
+    "tags": [
+     "policy & safety"
+    ],
+    "color": "#ff7a6b",
+    "title": "The pause letter",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Pause_Giant_AI_Experiments:_An_Open_Letter"
+    ],
+    "description": "An open letter from the Future of Life Institute calls for a six-month pause on training systems more powerful than GPT-4."
+   }
+  },
+  {
+   "id": "pearl",
+   "time": "567993600/1",
+   "metadata": {
+    "tags": [
+     "machine learning",
+     "people"
+    ],
+    "color": "#6fb0e0",
+    "title": "Probabilistic reasoning",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Bayesian_network",
+     "https://en.wikipedia.org/wiki/Judea_Pearl"
+    ],
+    "description": "Judea Pearl's book on Bayesian networks brings probability to the centre of AI.\n\n*Image: Wikimedia Commons (Judea Pearl at NIPS 2013; photo by Better Than Bacon; CC BY 2.0).*",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e1/Judea_Pearl_at_NIPS_2013_%2811781981594%29.jpg/960px-Judea_Pearl_at_NIPS_2013_%2811781981594%29.jpg"
+   }
+  },
+  {
+   "id": "perceptron",
+   "time": "-378691200/1",
+   "metadata": {
+    "tags": [
+     "neural networks",
+     "machine learning"
+    ],
+    "color": "#4fc3c8",
+    "title": "Rosenblatt's perceptron",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Perceptron",
+     "https://en.wikipedia.org/wiki/Frank_Rosenblatt"
+    ],
+    "description": "Frank Rosenblatt builds a learning machine that adjusts its weights from examples, to great publicity.\n\n*Image: Wikimedia Commons (the Mark I Perceptron, from its 1960 operators' manual; public domain).*",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/13/Mark_I_Perceptron%2C_Figure_2_of_operator%27s_manual.png/960px-Mark_I_Perceptron%2C_Figure_2_of_operator%27s_manual.png"
+   }
+  },
+  {
+   "id": "perceptrons-book",
+   "time": "-31536000/1",
+   "metadata": {
+    "tags": [
+     "neural networks",
+     "people"
+    ],
+    "color": "#4fc3c8",
+    "title": "Minsky and Papert's Perceptrons",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Perceptrons_(book)"
+    ],
+    "description": "A book proving the limits of single-layer perceptrons dampens neural network research for a decade."
+   }
+  },
+  {
+   "id": "prolog",
+   "time": "63072000/1",
+   "metadata": {
+    "tags": [
+     "symbolic ai"
+    ],
+    "color": "#c58be0",
+    "title": "Prolog",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Prolog"
+    ],
+    "description": "Alain Colmerauer and Robert Kowalski's logic programming language."
+   }
+  },
+  {
+   "id": "resnet",
+   "time": "1448928000/1",
+   "metadata": {
+    "tags": [
+     "neural networks",
+     "vision"
+    ],
+    "color": "#4fc3c8",
+    "title": "Residual networks",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Residual_neural_network"
+    ],
+    "description": "Microsoft Research's ResNet trains networks over a hundred layers deep and wins ImageNet."
+   }
+  },
+  {
+   "id": "roomba",
+   "time": "1009843200/1",
+   "metadata": {
+    "tags": [
+     "robotics",
+     "industry"
+    ],
+    "color": "#e8835f",
+    "title": "Roomba",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Roomba"
+    ],
+    "description": "iRobot's vacuum becomes the first robot in millions of homes.\n\n*Image: Wikimedia Commons (the original Roomba; photo by Larry D. Moore; CC BY 4.0).*",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/f/f5/Roomba_original.jpg"
+   }
+  },
+  {
+   "id": "rur",
+   "time": "-1546300800/1",
+   "metadata": {
+    "tags": [
+     "robotics"
+    ],
+    "color": "#e8835f",
+    "title": "R.U.R. gives us the word \"robot\"",
+    "sources": [
+     "https://en.wikipedia.org/wiki/R.U.R."
+    ],
+    "description": "Karel Čapek's play about artificial workers who revolt introduces the word robot.\n\n*Image: Wikimedia Commons (the play's 1920 first edition; public domain).*",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/a/ad/Rosumovi_Univerz%C3%A1ln%C3%AD_Roboti_1920.jpg"
+   }
+  },
+  {
+   "id": "safety-report",
+   "time": "1738108800/1",
+   "metadata": {
+    "tags": [
+     "policy & safety"
+    ],
+    "color": "#ff7a6b",
+    "title": "The International AI Safety Report",
+    "description": "Ninety-six experts led by Yoshua Bengio assess the risks of general-purpose AI and how to mitigate them, in a report commissioned by the nations at the Bletchley Park summit.",
+    "sources": [
+     "https://en.wikipedia.org/wiki/International_AI_Safety_Report"
+    ]
+   }
+  },
+  {
+   "id": "samuel-checkers",
+   "time": "-568080000/1",
+   "metadata": {
+    "tags": [
+     "games",
+     "machine learning"
+    ],
+    "color": "#8fd14f",
+    "title": "Samuel's checkers program",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Arthur_Samuel_(computer_scientist)"
+    ],
+    "description": "Arthur Samuel's checkers player improves by playing itself; in 1959 he coins the term \"machine learning\".",
+    "datePrecision": "Approximate: developed from 1952; the term dates from 1959."
+   }
+  },
+  {
+   "id": "seq2seq",
+   "time": "1388534400/1",
+   "metadata": {
+    "tags": [
+     "language",
+     "neural networks"
+    ],
+    "color": "#e8c547",
+    "title": "Sequence-to-sequence learning and attention",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Seq2seq",
+     "https://en.wikipedia.org/wiki/Attention_(machine_learning)"
+    ],
+    "description": "Encoder–decoder networks translate between languages; Bahdanau, Cho and Bengio add attention."
+   }
+  },
+  {
+   "id": "shakey",
+   "time": "-126230400/1",
+   "metadata": {
+    "tags": [
+     "robotics",
+     "vision"
+    ],
+    "color": "#e8835f",
+    "title": "Shakey the robot",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Shakey_the_robot"
+    ],
+    "description": "SRI's mobile robot reasons about its own actions; it gives us A* search and the STRIPS planner.\n\n*Image: Wikimedia Commons (Shakey at the Computer History Museum; photo by The wub; CC BY-SA 4.0).*",
+    "datePrecision": "Approximate: built 1966–1972.",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c3/SRI_Shakey_robot%2C_1969%2C_Computer_History_Museum.jpg/960px-SRI_Shakey_robot%2C_1969%2C_Computer_History_Museum.jpg"
+   }
+  },
+  {
+   "id": "shannon-chess",
+   "time": "-631152000/1",
+   "metadata": {
+    "tags": [
+     "games",
+     "people"
+    ],
+    "color": "#8fd14f",
+    "title": "Shannon on programming a computer for chess",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Claude_Shannon",
+     "https://en.wikipedia.org/wiki/Computer_chess"
+    ],
+    "description": "Claude Shannon's paper lays out minimax game-tree search for computer chess.\n\n*Image: Wikimedia Commons (Claude Shannon; Tekniska museet; CC BY 2.0).*",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c1/C.E._Shannon._Tekniska_museet_43069_%282x3_crop%29.jpg/960px-C.E._Shannon._Tekniska_museet_43069_%282x3_crop%29.jpg"
+   }
+  },
+  {
+   "id": "shrdlu",
+   "time": "0/1",
+   "metadata": {
+    "tags": [
+     "language",
+     "symbolic ai"
+    ],
+    "color": "#e8c547",
+    "title": "SHRDLU",
+    "sources": [
+     "https://en.wikipedia.org/wiki/SHRDLU"
+    ],
+    "description": "Terry Winograd's program converses in English about a simulated world of blocks.",
+    "datePrecision": "Approximate."
+   }
+  },
+  {
+   "id": "siri",
+   "time": "1317686400/1",
+   "metadata": {
+    "tags": [
+     "language",
+     "industry"
+    ],
+    "color": "#e8c547",
+    "title": "Siri",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Siri"
+    ],
+    "description": "Apple announces a voice assistant built into the iPhone 4S."
+   }
+  },
+  {
+   "id": "stable-diffusion",
+   "time": "1661126400/1",
+   "metadata": {
+    "tags": [
+     "vision",
+     "industry"
+    ],
+    "color": "#f08fb4",
+    "title": "Stable Diffusion",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Stable_Diffusion"
+    ],
+    "description": "An openly released text-to-image diffusion model runs on consumer graphics cards."
+   }
+  },
+  {
+   "id": "stargate",
+   "time": "1737417600/1",
+   "metadata": {
+    "tags": [
+     "industry"
+    ],
+    "color": "#9aa8ff",
+    "title": "The Stargate project is announced",
+    "description": "OpenAI, SoftBank, Oracle and the investment firm MGX announce a joint venture planning to spend up to $500 billion on AI infrastructure in the United States by 2029.",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Stargate_LLC"
+    ]
+   }
+  },
+  {
+   "id": "svm",
+   "time": "788918400/1",
+   "metadata": {
+    "tags": [
+     "machine learning"
+    ],
+    "color": "#6fb0e0",
+    "title": "Support vector machines",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Support_vector_machine"
+    ],
+    "description": "Cortes and Vapnik's soft-margin SVM becomes a workhorse of statistical machine learning."
+   }
+  },
+  {
+   "id": "td-gammon",
+   "time": "694224000/1",
+   "metadata": {
+    "tags": [
+     "games",
+     "machine learning"
+    ],
+    "color": "#8fd14f",
+    "title": "TD-Gammon",
+    "sources": [
+     "https://en.wikipedia.org/wiki/TD-Gammon"
+    ],
+    "description": "Gerald Tesauro's backgammon program learns by temporal-difference reinforcement learning to play near the level of the best humans."
+   }
+  },
+  {
+   "id": "transformer",
+   "time": "1497225600/1",
+   "metadata": {
+    "tags": [
+     "language",
+     "neural networks"
+    ],
+    "color": "#e8c547",
+    "title": "Attention Is All You Need",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Attention_Is_All_You_Need",
+     "https://en.wikipedia.org/wiki/Transformer_(deep_learning_architecture)"
+    ],
+    "description": "Researchers at Google introduce the Transformer, built entirely on attention; it becomes the basis of modern language models.\n\n*Image: Wikimedia Commons (the Transformer's architecture; diagram by Yuening Jia; CC BY-SA 3.0).*",
+    "datePrecision": "The arXiv date.",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/8/8f/The-Transformer-model-architecture.png"
+   }
+  },
+  {
+   "id": "turing-award-2018",
+   "time": "1553644800/1",
+   "metadata": {
+    "tags": [
+     "people",
+     "neural networks"
+    ],
+    "color": "#b8c4bb",
+    "title": "Turing Award for deep learning",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Turing_Award"
+    ],
+    "description": "Yoshua Bengio, Geoffrey Hinton and Yann LeCun share computing's highest prize for deep learning.\n\n*Image: Wikimedia Commons (Geoffrey Hinton; photo by Cmichel67; CC BY-SA 4.0).*",
+    "datePrecision": "The 2018 award, announced in 2019.",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/82/Geoffrey_Hinton_in_2026.jpg/960px-Geoffrey_Hinton_in_2026.jpg"
+   }
+  },
+  {
+   "id": "turing-machine",
+   "time": "-1073001600/1",
+   "metadata": {
+    "tags": [
+     "symbolic ai",
+     "people"
+    ],
+    "color": "#c58be0",
+    "title": "Turing's universal machine",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Turing_machine",
+     "https://en.wikipedia.org/wiki/Alan_Turing"
+    ],
+    "description": "Alan Turing defines computation with an abstract machine and shows a single universal machine can carry out any computation.\n\n*Image: Wikimedia Commons (Mike Davey's model of a Turing machine; photo by Rocky Acosta; CC BY 3.0).*",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/03/Turing_Machine_Model_Davey_2012.jpg/960px-Turing_Machine_Model_Davey_2012.jpg"
+   }
+  },
+  {
+   "id": "turing-test",
+   "time": "-607564800/1",
+   "metadata": {
+    "tags": [
+     "symbolic ai",
+     "people"
+    ],
+    "color": "#c58be0",
+    "title": "Computing Machinery and Intelligence",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Computing_Machinery_and_Intelligence",
+     "https://en.wikipedia.org/wiki/Turing_test"
+    ],
+    "description": "Turing asks \"Can machines think?\" and replaces it with the imitation game, later called the Turing test.\n\n*Image: Wikimedia Commons (Alan Turing, photographed by Elliott & Fry; public domain).*",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/c/ce/Alan_turing_header.jpg"
+   }
+  },
+  {
+   "id": "unimate",
+   "time": "-283996800/1",
+   "metadata": {
+    "tags": [
+     "robotics",
+     "industry"
+    ],
+    "color": "#e8835f",
+    "title": "Unimate, the first industrial robot",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Unimate"
+    ],
+    "description": "A robot arm goes to work on a General Motors assembly line.\n\n*Image: Wikimedia Commons (a Unimate pouring coffee, 1967; Frank Q. Brown, Los Angeles Times; CC BY 4.0).*",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cc/Unimate_pouring_coffee_for_a_woman_at_Biltmore_Hotel%2C_1967.jpg/960px-Unimate_pouring_coffee_for_a_woman_at_Biltmore_Hotel%2C_1967.jpg"
+   }
+  },
+  {
+   "id": "us-executive-order",
+   "time": "1698624000/1",
+   "metadata": {
+    "tags": [
+     "policy & safety"
+    ],
+    "color": "#ff7a6b",
+    "title": "US executive order on AI",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Executive_Order_14110"
+    ],
+    "description": "The White House orders safety testing and reporting for powerful AI models."
+   }
+  },
+  {
+   "id": "us-order-revoked",
+   "time": "1737331200/1",
+   "metadata": {
+    "tags": [
+     "policy & safety"
+    ],
+    "color": "#ff7a6b",
+    "title": "US executive order on AI revoked",
+    "description": "Within hours of taking office, President Trump rescinds Executive Order 14110; an order of 23 January sets a new policy aimed at removing barriers to American AI leadership.",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Executive_Order_14110",
+     "https://en.wikipedia.org/wiki/Executive_Order_14179"
+    ]
+   }
+  },
+  {
+   "id": "watson",
+   "time": "1297814400/1",
+   "metadata": {
+    "tags": [
+     "language",
+     "industry"
+    ],
+    "color": "#e8c547",
+    "title": "Watson wins Jeopardy!",
+    "sources": [
+     "https://en.wikipedia.org/wiki/IBM_Watson"
+    ],
+    "description": "IBM's question-answering system beats Ken Jennings and Brad Rutter on the quiz show.\n\n*Image: Wikimedia Commons (an early Watson prototype at Yorktown Heights; photo by Clockready; CC BY-SA 3.0).*",
+    "iconUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/22/IBM_Watson.PNG/960px-IBM_Watson.PNG"
+   }
+  },
+  {
+   "id": "word2vec",
+   "time": "1356998400/1",
+   "metadata": {
+    "tags": [
+     "language",
+     "neural networks"
+    ],
+    "color": "#e8c547",
+    "title": "word2vec",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Word2vec"
+    ],
+    "description": "Mikolov and colleagues at Google learn word vectors in which meaning becomes geometry."
+   }
+  },
+  {
+   "id": "xcon",
+   "time": "315532800/1",
+   "metadata": {
+    "tags": [
+     "symbolic ai",
+     "industry"
+    ],
+    "color": "#c58be0",
+    "title": "XCON earns its keep",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Xcon"
+    ],
+    "description": "Digital Equipment Corporation's expert system configures computer orders, saving millions a year, and starts the expert systems boom.",
+    "datePrecision": "Approximate."
+   }
+  }
+ ],
+ "durations": [
+  {
+   "id": "precursors",
+   "end": "-852076800/1",
+   "start": "-21143116800/1",
+   "metadata": {
+    "tags": [
+     "era"
+    ],
+    "color": "#3d3285",
+    "title": "Precursors",
+    "description": "Mechanical reasoning, logic and automata, before electronic computers.\n\n*Image: Wikimedia Commons (the trial model of Babbage's Analytical Engine, Science Museum, London; uploaded by Mrjohncummings; CC BY-SA 2.0).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cc/Babbages_Analytical_Engine%2C_1834-1871._%289660574685%29.jpg/960px-Babbages_Analytical_Engine%2C_1834-1871._%289660574685%29.jpg"
+   }
+  },
+  {
+   "id": "founding",
+   "end": "-428716800/1",
+   "start": "-852076800/1",
+   "metadata": {
+    "tags": [
+     "era"
+    ],
+    "color": "#3d3285",
+    "title": "Founding ideas",
+    "description": "Neurons as logic, cybernetics, and Turing's question.\n\n*Image: Wikimedia Commons (Glen Beck and Betty Snyder programming ENIAC; US Army; public domain).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d3/Glen_Beck_and_Betty_Snyder_program_the_ENIAC_in_building_328_at_the_Ballistic_Research_Laboratory.jpg/960px-Glen_Beck_and_Betty_Snyder_program_the_ENIAC_in_building_328_at_the_Ballistic_Research_Laboratory.jpg"
+   }
+  },
+  {
+   "id": "golden-years",
+   "end": "126230400/1",
+   "start": "-428716800/1",
+   "metadata": {
+    "tags": [
+     "era"
+    ],
+    "color": "#3d3285",
+    "title": "The golden years",
+    "description": "Search, reasoning and early optimism after Dartmouth.\n\n*Image: Wikimedia Commons (an IBM 704 at NASA; public domain).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/20/IBM_Electronic_Data_Processing_Machine_-_GPN-2000-001881.jpg/960px-IBM_Electronic_Data_Processing_Machine_-_GPN-2000-001881.jpg"
+   }
+  },
+  {
+   "id": "first-winter",
+   "end": "315532800/1",
+   "start": "126230400/1",
+   "metadata": {
+    "tags": [
+     "era"
+    ],
+    "color": "#3d3285",
+    "title": "The first AI winter",
+    "description": "Funding cut after promises went unmet.\n\n*Image: Wikimedia Commons (the Freddy II robot; University of Edinburgh, School of Informatics; CC BY 4.0).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7a/Freddy-II-Robot.jpg/960px-Freddy-II-Robot.jpg"
+   }
+  },
+  {
+   "id": "expert-systems",
+   "end": "536457600/1",
+   "start": "315532800/1",
+   "metadata": {
+    "tags": [
+     "era"
+    ],
+    "color": "#3d3285",
+    "title": "The expert systems boom",
+    "description": "Rule-based systems in business, and national programmes.\n\n*Image: Wikimedia Commons (a DEC VAX-11/780, the machine XCON configured; photo by Joe Mabel; CC BY-SA 3.0).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/71/LCM_-_DEC_VAX_11-780-5_-_01.jpg/960px-LCM_-_DEC_VAX_11-780-5_-_01.jpg"
+   }
+  },
+  {
+   "id": "second-winter",
+   "end": "725846400/1",
+   "start": "536457600/1",
+   "metadata": {
+    "tags": [
+     "era"
+    ],
+    "color": "#3d3285",
+    "title": "The second AI winter",
+    "description": "The collapse of AI hardware and expert systems.\n\n*Image: Wikimedia Commons (a Sun-3 workstation; photo by Robert Harker; CC BY-SA 2.5).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/90/Sun3_60_Disk_Tape.jpg/960px-Sun3_60_Disk_Tape.jpg"
+   }
+  },
+  {
+   "id": "statistical-ml",
+   "end": "1346457600/1",
+   "start": "725846400/1",
+   "metadata": {
+    "tags": [
+     "era"
+    ],
+    "color": "#3d3285",
+    "title": "Statistical machine learning",
+    "description": "Probability, kernels and data take over.\n\n*Image: Wikimedia Commons (Google's first production server; photo by Steve Jurvetson; CC BY 2.0).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e0/Google%E2%80%99s_First_Production_Server.jpg/960px-Google%E2%80%99s_First_Production_Server.jpg"
+   }
+  },
+  {
+   "id": "deep-learning",
+   "end": "1748736000/1",
+   "start": "1346457600/1",
+   "metadata": {
+    "tags": [
+     "era"
+    ],
+    "color": "#3d3285",
+    "title": "Deep learning",
+    "description": "Neural networks trained on GPUs and large datasets.\n\n*Image: Wikimedia Commons (a GeForce GTX 590 graphics card; Intel Free Press; CC BY 2.0).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/45/EVGA_GeForce_GTX_590.jpg/960px-EVGA_GeForce_GTX_590.jpg"
+   }
+  },
+  {
+   "id": "llms",
+   "end": "1748736000/1",
+   "start": "1496275200/1",
+   "metadata": {
+    "tags": [
+     "era"
+    ],
+    "color": "#3d3285",
+    "title": "Large language models",
+    "description": "Transformers trained on text at scale.\n\n*Image: Wikimedia Commons (a Tensor Processing Unit 3.0; photo by Zinskauf; CC BY-SA 4.0).*",
+    "backgroundUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/be/Tensor_Processing_Unit_3.0.jpg/960px-Tensor_Processing_Unit_3.0.jpg"
+   }
+  }
+ ],
+ "relationships": [
+  {
+   "a": {
+    "moment": "alexnet"
+   },
+   "b": {
+    "moment": "backprop"
+   }
+  },
+  {
+   "a": {
+    "moment": "alexnet"
+   },
+   "b": {
+    "moment": "imagenet"
+   }
+  },
+  {
+   "a": {
+    "moment": "alexnet"
+   },
+   "b": {
+    "moment": "lecun-cnn"
+   }
+  },
+  {
+   "a": {
+    "moment": "alphafold"
+   },
+   "b": {
+    "moment": "alphago"
+   }
+  },
+  {
+   "a": {
+    "moment": "alphafold"
+   },
+   "b": {
+    "moment": "nobel-2024"
+   }
+  },
+  {
+   "a": {
+    "moment": "alphago"
+   },
+   "b": {
+    "moment": "alphazero"
+   }
+  },
+  {
+   "a": {
+    "moment": "alphago"
+   },
+   "b": {
+    "moment": "dqn"
+   }
+  },
+  {
+   "a": {
+    "moment": "alphago"
+   },
+   "b": {
+    "moment": "td-gammon"
+   }
+  },
+  {
+   "a": {
+    "moment": "asilomar"
+   },
+   "b": {
+    "moment": "bletchley"
+   }
+  },
+  {
+   "a": {
+    "moment": "backprop"
+   },
+   "b": {
+    "moment": "perceptrons-book"
+   }
+  },
+  {
+   "a": {
+    "moment": "bert"
+   },
+   "b": {
+    "moment": "transformer"
+   }
+  },
+  {
+   "a": {
+    "moment": "bletchley"
+   },
+   "b": {
+    "moment": "eu-ai-act"
+   }
+  },
+  {
+   "a": {
+    "moment": "bletchley"
+   },
+   "b": {
+    "moment": "paris-summit"
+   }
+  },
+  {
+   "a": {
+    "moment": "bletchley"
+   },
+   "b": {
+    "moment": "safety-report"
+   }
+  },
+  {
+   "a": {
+    "moment": "chatgpt"
+   },
+   "b": {
+    "moment": "gpt3"
+   }
+  },
+  {
+   "a": {
+    "moment": "chatgpt"
+   },
+   "b": {
+    "moment": "gpt4"
+   }
+  },
+  {
+   "a": {
+    "moment": "dartmouth"
+   },
+   "b": {
+    "moment": "logic-theorist"
+   }
+  },
+  {
+   "a": {
+    "moment": "deep-blue"
+   },
+   "b": {
+    "moment": "shannon-chess"
+   }
+  },
+  {
+   "a": {
+    "moment": "gpt1"
+   },
+   "b": {
+    "moment": "gpt2"
+   }
+  },
+  {
+   "a": {
+    "moment": "gpt1"
+   },
+   "b": {
+    "moment": "transformer"
+   }
+  },
+  {
+   "a": {
+    "moment": "gpt2"
+   },
+   "b": {
+    "moment": "gpt3"
+   }
+  },
+  {
+   "a": {
+    "moment": "hopfield"
+   },
+   "b": {
+    "moment": "nobel-2024"
+   }
+  },
+  {
+   "a": {
+    "moment": "lecun-cnn"
+   },
+   "b": {
+    "moment": "neocognitron"
+   }
+  },
+  {
+   "a": {
+    "moment": "mcculloch-pitts"
+   },
+   "b": {
+    "moment": "perceptron"
+   }
+  },
+  {
+   "a": {
+    "moment": "paris-summit"
+   },
+   "b": {
+    "moment": "safety-report"
+   }
+  },
+  {
+   "a": {
+    "moment": "perceptron"
+   },
+   "b": {
+    "moment": "perceptrons-book"
+   }
+  },
+  {
+   "a": {
+    "moment": "seq2seq"
+   },
+   "b": {
+    "moment": "transformer"
+   }
+  },
+  {
+   "a": {
+    "moment": "turing-machine"
+   },
+   "b": {
+    "moment": "turing-test"
+   }
+  },
+  {
+   "a": {
+    "moment": "us-executive-order"
+   },
+   "b": {
+    "moment": "us-order-revoked"
+   }
+  }
+ ]
+}

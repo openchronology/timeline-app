@@ -21,3 +21,4 @@ The scripts and storyboards of OpenChronology's vertical shorts for TikTok, YouT
 | [`10-why-did-it-happen.md`](10-why-did-it-happen.md)                   | Short 10: events, conditions and causal factors, on a made-up case.                    |
 | [`11-1503-days.md`](11-1503-days.md)                                   | Short 11: Lincoln's 1,503 days as president, 1,458 of them at war.                     |
 | [`12-closer-to-the-moon.md`](12-closer-to-the-moon.md)                 | Short 12: Cleopatra lived closer to the Moon landing than to the Great Pyramid.        |
+| [`28-54-years.md`](28-54-years.md)                                     | Short 28: neural networks waited 54 years, from the perceptron to AlexNet.             |
