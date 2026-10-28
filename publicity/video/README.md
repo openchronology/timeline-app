@@ -32,6 +32,7 @@ Narration recordings, trimmed audio, captured shots, rendered frames and MP4s ar
 | [`13-investigations-causal-factors/`](13-investigations-causal-factors/README.md) | Video 13: Investigations, from timeline to causal factors.                                  |
 | [`15-tour-ancient-egypt/`](15-tour-ancient-egypt/README.md)                       | Video 15: Tour, Ancient Egypt.                                                              |
 | [`14-tour-abraham-lincoln/`](14-tour-abraham-lincoln/README.md)                   | Video 14: Tour, Abraham Lincoln.                                                            |
+| [`25-tour-artificial-intelligence/`](25-tour-artificial-intelligence/README.md)   | Video 25: Tour, artificial intelligence.                                                    |
 | [`s01-1776-to-the-moon/`](s01-1776-to-the-moon/README.md)                         | Short 1: 1776 to one second on the Moon.                                                    |
 | [`s02-the-last-six-seconds/`](s02-the-last-six-seconds/README.md)                 | Short 2: you're the last six seconds.                                                       |
 | [`s03-point-one-plus-point-two/`](s03-point-one-plus-point-two/README.md)         | Short 3: 0.1 + 0.2 isn't 0.3.                                                               |
@@ -46,6 +47,7 @@ Narration recordings, trimmed audio, captured shots, rendered frames and MP4s ar
 | [`s11-1503-days/`](s11-1503-days/README.md)                                       | Short 11: Lincoln was president 1,503 days.                                                 |
 | [`s22-handed-down/`](s22-handed-down/README.md)                                   | Short 22: handed down, the Marine Corps birthday.                                           |
 | [`s23-nobody-left-behind/`](s23-nobody-left-behind/README.md)                     | Short 23: nobody left behind, Chosin 1950.                                                  |
+| [`s28-54-years/`](s28-54-years/README.md)                                         | Short 28: neural networks waited 54 years.                                                  |
 
 ## Making a video
 

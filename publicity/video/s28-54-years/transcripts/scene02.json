@@ -1,0 +1,506 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:02,760"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 2760
+			},
+			"text": " Rosenblatt's Perceptron made headlines.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.888104,
+					"t_dtw": -1
+				},
+				{
+					"text": " Rosen",
+					"timestamps": {
+						"from": "00:00:00,310",
+						"to": "00:00:00,360"
+					},
+					"offsets": {
+						"from": 310,
+						"to": 360
+					},
+					"id": 15564,
+					"p": 0.994231,
+					"t_dtw": -1
+				},
+				{
+					"text": "bl",
+					"timestamps": {
+						"from": "00:00:00,360",
+						"to": "00:00:00,480"
+					},
+					"offsets": {
+						"from": 360,
+						"to": 480
+					},
+					"id": 2436,
+					"p": 0.999041,
+					"t_dtw": -1
+				},
+				{
+					"text": "att",
+					"timestamps": {
+						"from": "00:00:00,530",
+						"to": "00:00:00,710"
+					},
+					"offsets": {
+						"from": 530,
+						"to": 710
+					},
+					"id": 1078,
+					"p": 0.951618,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:00,710",
+						"to": "00:00:00,790"
+					},
+					"offsets": {
+						"from": 710,
+						"to": 790
+					},
+					"id": 338,
+					"p": 0.99666,
+					"t_dtw": -1
+				},
+				{
+					"text": " Per",
+					"timestamps": {
+						"from": "00:00:00,850",
+						"to": "00:00:01,060"
+					},
+					"offsets": {
+						"from": 850,
+						"to": 1060
+					},
+					"id": 2448,
+					"p": 0.76983,
+					"t_dtw": -1
+				},
+				{
+					"text": "cept",
+					"timestamps": {
+						"from": "00:00:01,060",
+						"to": "00:00:01,350"
+					},
+					"offsets": {
+						"from": 1060,
+						"to": 1350
+					},
+					"id": 984,
+					"p": 0.989462,
+					"t_dtw": -1
+				},
+				{
+					"text": "ron",
+					"timestamps": {
+						"from": "00:00:01,350",
+						"to": "00:00:01,560"
+					},
+					"offsets": {
+						"from": 1350,
+						"to": 1560
+					},
+					"id": 1313,
+					"p": 0.999424,
+					"t_dtw": -1
+				},
+				{
+					"text": " made",
+					"timestamps": {
+						"from": "00:00:01,560",
+						"to": "00:00:01,850"
+					},
+					"offsets": {
+						"from": 1560,
+						"to": 1850
+					},
+					"id": 925,
+					"p": 0.99303,
+					"t_dtw": -1
+				},
+				{
+					"text": " headlines",
+					"timestamps": {
+						"from": "00:00:01,850",
+						"to": "00:00:02,240"
+					},
+					"offsets": {
+						"from": 1850,
+						"to": 2240
+					},
+					"id": 14408,
+					"p": 0.996611,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:02,240",
+						"to": "00:00:02,640"
+					},
+					"offsets": {
+						"from": 2240,
+						"to": 2640
+					},
+					"id": 13,
+					"p": 0.980467,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_138]",
+					"timestamps": {
+						"from": "00:00:02,760",
+						"to": "00:00:02,760"
+					},
+					"offsets": {
+						"from": 2760,
+						"to": 2760
+					},
+					"id": 50501,
+					"p": 0.0280166,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:02,760",
+				"to": "00:00:07,840"
+			},
+			"offsets": {
+				"from": 2760,
+				"to": 7840
+			},
+			"text": " Then, in 1969, a book proved its limits, and most of the field moved on.",
+			"tokens": [
+				{
+					"text": " Then",
+					"timestamps": {
+						"from": "00:00:03,070",
+						"to": "00:00:03,100"
+					},
+					"offsets": {
+						"from": 3070,
+						"to": 3100
+					},
+					"id": 3244,
+					"p": 0.996044,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:03,100",
+						"to": "00:00:03,240"
+					},
+					"offsets": {
+						"from": 3100,
+						"to": 3240
+					},
+					"id": 11,
+					"p": 0.810715,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:03,290",
+						"to": "00:00:03,440"
+					},
+					"offsets": {
+						"from": 3290,
+						"to": 3440
+					},
+					"id": 287,
+					"p": 0.997645,
+					"t_dtw": -1
+				},
+				{
+					"text": " 1969",
+					"timestamps": {
+						"from": "00:00:03,440",
+						"to": "00:00:04,420"
+					},
+					"offsets": {
+						"from": 3440,
+						"to": 4420
+					},
+					"id": 16450,
+					"p": 0.998713,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:04,460",
+						"to": "00:00:04,610"
+					},
+					"offsets": {
+						"from": 4460,
+						"to": 4610
+					},
+					"id": 11,
+					"p": 0.988342,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:04,660",
+						"to": "00:00:04,700"
+					},
+					"offsets": {
+						"from": 4660,
+						"to": 4700
+					},
+					"id": 257,
+					"p": 0.960048,
+					"t_dtw": -1
+				},
+				{
+					"text": " book",
+					"timestamps": {
+						"from": "00:00:04,700",
+						"to": "00:00:05,010"
+					},
+					"offsets": {
+						"from": 4700,
+						"to": 5010
+					},
+					"id": 1492,
+					"p": 0.999712,
+					"t_dtw": -1
+				},
+				{
+					"text": " proved",
+					"timestamps": {
+						"from": "00:00:05,010",
+						"to": "00:00:05,030"
+					},
+					"offsets": {
+						"from": 5010,
+						"to": 5030
+					},
+					"id": 8302,
+					"p": 0.976865,
+					"t_dtw": -1
+				},
+				{
+					"text": " its",
+					"timestamps": {
+						"from": "00:00:05,620",
+						"to": "00:00:05,710"
+					},
+					"offsets": {
+						"from": 5620,
+						"to": 5710
+					},
+					"id": 663,
+					"p": 0.995283,
+					"t_dtw": -1
+				},
+				{
+					"text": " limits",
+					"timestamps": {
+						"from": "00:00:05,930",
+						"to": "00:00:06,200"
+					},
+					"offsets": {
+						"from": 5930,
+						"to": 6200
+					},
+					"id": 7095,
+					"p": 0.998833,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:06,200",
+						"to": "00:00:06,310"
+					},
+					"offsets": {
+						"from": 6200,
+						"to": 6310
+					},
+					"id": 11,
+					"p": 0.653596,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:06,310",
+						"to": "00:00:06,460"
+					},
+					"offsets": {
+						"from": 6310,
+						"to": 6460
+					},
+					"id": 290,
+					"p": 0.589632,
+					"t_dtw": -1
+				},
+				{
+					"text": " most",
+					"timestamps": {
+						"from": "00:00:06,500",
+						"to": "00:00:06,690"
+					},
+					"offsets": {
+						"from": 6500,
+						"to": 6690
+					},
+					"id": 749,
+					"p": 0.996109,
+					"t_dtw": -1
+				},
+				{
+					"text": " of",
+					"timestamps": {
+						"from": "00:00:06,690",
+						"to": "00:00:06,800"
+					},
+					"offsets": {
+						"from": 6690,
+						"to": 6800
+					},
+					"id": 286,
+					"p": 0.995697,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:06,800",
+						"to": "00:00:06,920"
+					},
+					"offsets": {
+						"from": 6800,
+						"to": 6920
+					},
+					"id": 262,
+					"p": 0.996358,
+					"t_dtw": -1
+				},
+				{
+					"text": " field",
+					"timestamps": {
+						"from": "00:00:06,960",
+						"to": "00:00:07,240"
+					},
+					"offsets": {
+						"from": 6960,
+						"to": 7240
+					},
+					"id": 2214,
+					"p": 0.994141,
+					"t_dtw": -1
+				},
+				{
+					"text": " moved",
+					"timestamps": {
+						"from": "00:00:07,240",
+						"to": "00:00:07,400"
+					},
+					"offsets": {
+						"from": 7240,
+						"to": 7400
+					},
+					"id": 3888,
+					"p": 0.994469,
+					"t_dtw": -1
+				},
+				{
+					"text": " on",
+					"timestamps": {
+						"from": "00:00:07,630",
+						"to": "00:00:07,630"
+					},
+					"offsets": {
+						"from": 7630,
+						"to": 7630
+					},
+					"id": 319,
+					"p": 0.999281,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:07,660",
+						"to": "00:00:07,840"
+					},
+					"offsets": {
+						"from": 7660,
+						"to": 7840
+					},
+					"id": 13,
+					"p": 0.994053,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_392]",
+					"timestamps": {
+						"from": "00:00:07,840",
+						"to": "00:00:07,840"
+					},
+					"offsets": {
+						"from": 7840,
+						"to": 7840
+					},
+					"id": 50755,
+					"p": 0.133468,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

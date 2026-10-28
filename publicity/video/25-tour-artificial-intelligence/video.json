@@ -1,0 +1,21 @@
+{
+  "script": "../../25-tour-artificial-intelligence.md",
+  "look": "neural",
+  "say": {
+    "Llull's": "Lull's",
+    "LISP": "lisp",
+    "ELIZA's": "Eliza's",
+    "AlexNet": "Alex Net",
+    "ImageNet": "Image Net",
+    "AlphaGo": "Alpha Go",
+    "AlphaFold": "Alpha Fold",
+    "ChatGPT": "Chat G P T",
+    "OpenAI": "Open A I",
+    "Sedol": "Seh-dol"
+  },
+  "phonemes": {
+    "AI": "/ˌeɪˈaɪ/",
+    "AI's": "/ˌeɪˈaɪz/",
+    "Separate": "/ˈsɛpəˌreɪt/"
+  }
+}

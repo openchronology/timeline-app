@@ -1,0 +1,359 @@
+{
+  "sample": "../samples/ai.ochx",
+  "size": [
+    1280,
+    720
+  ],
+  "scale": 1.5,
+  "shots": [
+    {
+      "id": "sweep",
+      "dur": 0.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -21774268800,
+            2366841600
+          ]
+        }
+      ]
+    },
+    {
+      "id": "precursors",
+      "dur": 5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -21774268800,
+            2366841600
+          ]
+        },
+        {
+          "t": 4.5,
+          "view": [
+            -10413792000,
+            -315619200
+          ]
+        }
+      ]
+    },
+    {
+      "id": "founding",
+      "dur": 5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -10413792000,
+            -315619200
+          ]
+        },
+        {
+          "t": 4.5,
+          "view": [
+            -788918400,
+            157766400
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dartmouth",
+      "dur": 10,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -788918400,
+            157766400
+          ]
+        },
+        {
+          "t": 3,
+          "view": [
+            -460339200,
+            -397180800
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "t": 0,
+          "do": "viewMode",
+          "on": true
+        },
+        {
+          "t": 3.4,
+          "do": "open",
+          "title": "The Dartmouth workshop"
+        },
+        {
+          "t": 5.5,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 30; })()"
+        },
+        {
+          "t": 5.6,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 60; })()"
+        },
+        {
+          "t": 5.7,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 90; })()"
+        },
+        {
+          "t": 5.8,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 120; })()"
+        },
+        {
+          "t": 5.9,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 150; })()"
+        },
+        {
+          "t": 6.0,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 180; })()"
+        },
+        {
+          "t": 6.1,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 210; })()"
+        },
+        {
+          "t": 6.2,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 240; })()"
+        },
+        {
+          "t": 6.3,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 270; })()"
+        },
+        {
+          "t": 6.4,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 300; })()"
+        },
+        {
+          "t": 6.5,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 330; })()"
+        },
+        {
+          "t": 6.6,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 360; })()"
+        },
+        {
+          "t": 6.7,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 390; })()"
+        },
+        {
+          "t": 6.8,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 420; })()"
+        },
+        {
+          "t": 6.9,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 450; })()"
+        },
+        {
+          "t": 7.0,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 480; })()"
+        },
+        {
+          "t": 7.1,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 510; })()"
+        },
+        {
+          "t": 7.2,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 540; })()"
+        },
+        {
+          "t": 7.3,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 570; })()"
+        },
+        {
+          "t": 7.4,
+          "do": "eval",
+          "js": "(() => { const d = document.querySelector('dialog[open]'); if (!d) return; for (const e of [d, ...d.querySelectorAll('*')]) if (e.scrollHeight > e.clientHeight + 2 && getComputedStyle(e).overflowY !== 'visible') e.scrollTop = 600; })()"
+        }
+      ]
+    },
+    {
+      "id": "winters",
+      "dur": 5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -788918400,
+            157766400
+          ]
+        },
+        {
+          "t": 4.5,
+          "view": [
+            -126230400,
+            820454400
+          ]
+        }
+      ]
+    },
+    {
+      "id": "thread",
+      "dur": 6,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -126230400,
+            820454400
+          ]
+        },
+        {
+          "t": 2.5,
+          "view": [
+            -1104537600,
+            1893456000
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "t": 3,
+          "do": "separate",
+          "tags": [
+            "neural networks"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "older",
+      "dur": 0.5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -1104537600,
+            1893456000
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "separate",
+          "tags": [
+            "neural networks"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "alexnet",
+      "dur": 6,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -1104537600,
+            1893456000
+          ]
+        },
+        {
+          "t": 4,
+          "view": [
+            1072915200,
+            1514764800
+          ]
+        }
+      ]
+    },
+    {
+      "id": "transformer",
+      "dur": 5,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            1072915200,
+            1514764800
+          ]
+        },
+        {
+          "t": 4.5,
+          "view": [
+            1464739200,
+            1672531200
+          ]
+        }
+      ]
+    },
+    {
+      "id": "days",
+      "dur": 9,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            1464739200,
+            1672531200
+          ]
+        },
+        {
+          "t": 4,
+          "view": [
+            1668470400,
+            1704067200
+          ]
+        },
+        {
+          "t": 5,
+          "view": [
+            1668470400,
+            1704067200
+          ]
+        },
+        {
+          "t": 9,
+          "view": [
+            1678233600,
+            1679788800
+          ]
+        }
+      ]
+    },
+    {
+      "id": "end",
+      "dur": 4,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            1678233600,
+            1679788800
+          ]
+        },
+        {
+          "t": 3.5,
+          "view": [
+            1685577600,
+            1767225600
+          ]
+        }
+      ]
+    }
+  ]
+}

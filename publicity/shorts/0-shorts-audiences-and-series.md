@@ -55,20 +55,21 @@ Eleven shorts. Three storyboard shapes, so the feed doesn't see the same video t
 - **The stat** (2, 3, 10, 11): one surprising number, built up in animation, then the app as the proof.
 - **The how-to** (6, 7): a problem their community has, and the two or three steps that solve it, as interface cards.
 
-| #   | Title                                   | Shape  | For                    | Look      | Runtime | The hook (frame 0 and the first sentence)         | Points to explainer  |
-| --- | --------------------------------------- | ------ | ---------------------- | --------- | ------- | ------------------------------------------------- | -------------------- |
-| 1   | **1776 to one second on the Moon**      | Zoom   | History, everyone      | Archive   | ~0:27   | "230 years of history → one second on the Moon"   | 5 · The US tour      |
-| 2   | **You're the last six seconds**         | Stat   | Science, space         | Strata    | ~0:36   | "If Earth's history were one day…"                | 8 · Deep time        |
-| 3   | **0.1 + 0.2 isn't 0.3**                 | Stat   | Developers             | Terminal  | ~0:33   | "0.1 + 0.2 = 0.30000000000000004"                 | 4 · Exact time       |
-| 4   | **The Ring sat in a river 2,460 years** | Zoom   | Fandom, canon keepers  | Lore      | ~0:36   | "The One Ring spent ~2,460 years in a river"      | 7 · Middle-earth     |
-| 5   | **Check one character's thread**        | Zoom   | Writers, worldbuilders | Parchment | ~0:32   | "Does each character's story hold up on its own?" | 6 · A story          |
-| 6   | **A class timeline nobody can wreck**   | How-to | Teachers               | Paper     | ~0:33   | "30 students. 1 timeline. Nobody can wreck it."   | 9 · Working together |
-| 7   | **A whole app in one HTML file**        | How-to | Privacy, open source   | Paper     | ~0:27   | "This entire app is one HTML file"                | 3 · Editions         |
-| 8   | **2 a.m. Everything's down.**           | Zoom   | Developers, operations | Terminal  | ~0:35   | "2 a.m. Everything's down. What broke first?"     | 10 · Logs            |
-| 9   | **I asked an AI to build a timeline**   | Zoom   | AI, developers         | Terminal  | ~0:41   | "I asked an AI to build a timeline"               | 12 · AI, automation  |
-| 10  | **Why did it happen?**                  | Stat   | Investigators, safety  | Terminal  | ~0:43   | "Why did it happen?"                              | 13 · Investigations  |
-| 12  | **Closer to the Moon than the pyramid** | Zoom   | History, everyone      | Archive   | ~0:42   | "Cleopatra lived closer to the Moon landing…"     | 15 · Ancient Egypt   |
-| 11  | **Lincoln was president 1,503 days**    | Stat   | History, everyone      | Archive   | ~0:42   | "President for 1,503 days. At war for 1,458."     | 14 · Abraham Lincoln |
+| #   | Title                                   | Shape  | For                    | Look      | Runtime | The hook (frame 0 and the first sentence)         | Points to explainer          |
+| --- | --------------------------------------- | ------ | ---------------------- | --------- | ------- | ------------------------------------------------- | ---------------------------- |
+| 1   | **1776 to one second on the Moon**      | Zoom   | History, everyone      | Archive   | ~0:27   | "230 years of history → one second on the Moon"   | 5 · The US tour              |
+| 2   | **You're the last six seconds**         | Stat   | Science, space         | Strata    | ~0:36   | "If Earth's history were one day…"                | 8 · Deep time                |
+| 3   | **0.1 + 0.2 isn't 0.3**                 | Stat   | Developers             | Terminal  | ~0:33   | "0.1 + 0.2 = 0.30000000000000004"                 | 4 · Exact time               |
+| 4   | **The Ring sat in a river 2,460 years** | Zoom   | Fandom, canon keepers  | Lore      | ~0:36   | "The One Ring spent ~2,460 years in a river"      | 7 · Middle-earth             |
+| 5   | **Check one character's thread**        | Zoom   | Writers, worldbuilders | Parchment | ~0:32   | "Does each character's story hold up on its own?" | 6 · A story                  |
+| 6   | **A class timeline nobody can wreck**   | How-to | Teachers               | Paper     | ~0:33   | "30 students. 1 timeline. Nobody can wreck it."   | 9 · Working together         |
+| 7   | **A whole app in one HTML file**        | How-to | Privacy, open source   | Paper     | ~0:27   | "This entire app is one HTML file"                | 3 · Editions                 |
+| 8   | **2 a.m. Everything's down.**           | Zoom   | Developers, operations | Terminal  | ~0:35   | "2 a.m. Everything's down. What broke first?"     | 10 · Logs                    |
+| 9   | **I asked an AI to build a timeline**   | Zoom   | AI, developers         | Terminal  | ~0:41   | "I asked an AI to build a timeline"               | 12 · AI, automation          |
+| 10  | **Why did it happen?**                  | Stat   | Investigators, safety  | Terminal  | ~0:43   | "Why did it happen?"                              | 13 · Investigations          |
+| 12  | **Closer to the Moon than the pyramid** | Zoom   | History, everyone      | Archive   | ~0:42   | "Cleopatra lived closer to the Moon landing…"     | 15 · Ancient Egypt           |
+| 11  | **Lincoln was president 1,503 days**    | Stat   | History, everyone      | Archive   | ~0:42   | "President for 1,503 days. At war for 1,458."     | 14 · Abraham Lincoln         |
+| 28  | **Neural networks waited 54 years**     | Stat   | AI, tech, history      | Neural    | ~0:42   | "Neural networks waited 54 years to win."         | 25 · Artificial intelligence |
 
 **Order of release (suggested):** 1 and 2 first (the widest feeds, and both end on the same line from eons to seconds), then 4 and 3 (the strongest single facts), then 5, 8, 6 and 7, then 9 and 10, then 11 with Video 14. Two or three a week; post each on all three platforms the same day.
 

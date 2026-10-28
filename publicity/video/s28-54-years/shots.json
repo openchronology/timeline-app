@@ -1,0 +1,185 @@
+{
+  "sample": "../samples/ai.ochx",
+  "size": [
+    360,
+    640
+  ],
+  "scale": 6,
+  "shots": [
+    {
+      "id": "cover",
+      "dur": 0.034,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -706924800,
+            -50509440
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "separate",
+          "tags": [
+            "neural networks"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sep",
+      "dur": 8.6,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -706924800,
+            -50509440
+          ]
+        },
+        {
+          "t": 1.8,
+          "view": [
+            -706924800,
+            -50509440
+          ]
+        },
+        {
+          "t": 4.2,
+          "view": [
+            -580694400,
+            896227200
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "separate",
+          "tags": [
+            "neural networks"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "revival",
+      "dur": 9.1,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            -580694400,
+            896227200
+          ]
+        },
+        {
+          "t": 1.8,
+          "view": [
+            -18921600,
+            965658240
+          ]
+        },
+        {
+          "t": 4.6,
+          "view": [
+            -18921600,
+            965658240
+          ]
+        },
+        {
+          "t": 7.4,
+          "view": [
+            321857280,
+            1634688000
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "separate",
+          "tags": [
+            "neural networks"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "alex",
+      "dur": 8.7,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            321857280,
+            1634688000
+          ]
+        },
+        {
+          "t": 3.2,
+          "view": [
+            1283433120,
+            1414709280
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "do": "separate",
+          "tags": [
+            "neural networks"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chat",
+      "dur": 4,
+      "keys": [
+        {
+          "t": 0,
+          "view": [
+            1322222400,
+            1369612800
+          ]
+        },
+        {
+          "t": 0.3,
+          "view": [
+            1322222400,
+            1369612800
+          ]
+        },
+        {
+          "t": 1.5,
+          "view": [
+            1637841600,
+            1685145600
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "do": "eval",
+          "js": "(() => { const d = document.getElementById('density'); d.value = '12'; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        }
+      ]
+    }
+  ]
+}

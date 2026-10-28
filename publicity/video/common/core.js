@@ -166,6 +166,31 @@ var LOOKS = {
     acts: ['#ae027e', '#f73563', '#9ad9dd', '#67c5ca', '#f2f91d'],
     serif: false,
   },
+  // Artificial intelligence: a near-black blue-violet ground, electric cyan and magenta, and
+  // (C.network) a faint drifting field of nodes and edges behind the frame, with signals
+  // pulsing along a few of them. See networkField below.
+  neural: {
+    ground: '#080a1c',
+    card: '#11152f',
+    text: '#e9ecff',
+    soft: '#9ba1c9',
+    line: '#2a3060',
+    faint: '#151a3b',
+    accent: '#38e1ff',
+    moment: '#38e1ff',
+    strong: '#b5f4ff',
+    duration: '#3d3285',
+    durationText: '#e9ecff',
+    arc: '#ff4fd8',
+    select: '#ff6ade',
+    amber: '#ffc44d',
+    red: '#ff5c7a',
+    blue: '#6f8dff',
+    green: '#5cf2a8',
+    acts: ['#38e1ff', '#ff4fd8', '#8c7bff', '#5cf2a8', '#ffc44d'],
+    serif: false,
+    network: { seed: 1956, colors: ['#38e1ff', '#38e1ff', '#8c7bff', '#ff4fd8'], glow: '#24145a' },
+  },
 };
 var C = LOOKS[typeof LOOK === 'string' ? LOOK : 'paper'];
 var FONT = "'Saira Condensed','Arial Narrow',sans-serif";
@@ -1198,7 +1223,12 @@ function renderShort(sc, lt, t, body) {
     prev && prev.ost === sc.ost ? 1 : fadeIn,
     next && next.ost === sc.ost ? 1 : fadeOut,
   );
-  var out = '<rect width="180" height="320" fill="' + C.ground + '"/>' + shortStripes();
+  var out =
+    '<rect width="180" height="320" fill="' +
+    C.ground +
+    '"/>' +
+    networkField(180, 320, t) +
+    shortStripes();
   if (body && typeof body === 'object') {
     var kIn = body.keepIn ? 1 : fadeIn,
       kOut = body.keepOut ? 1 : fadeOut;
@@ -1206,6 +1236,186 @@ function renderShort(sc, lt, t, body) {
     if (!body.noHeadline) out += G(shortHeadline(sc.ost), { o: head });
   } else out += G(body, { o: fade }) + G(shortHeadline(sc.ost), { o: head });
   return out + shortCaption(t);
+}
+
+/* ---------- a look's background network (C.network) ---------- */
+/** A seeded generator (mulberry32): the same numbers on every frame and every render. */
+function seeded(seed) {
+  var s = seed >>> 0;
+  return function () {
+    s = (s + 0x6d2b79f5) >>> 0;
+    var r = Math.imul(s ^ (s >>> 15), s | 1);
+    r ^= r + Math.imul(r ^ (r >>> 7), r | 61);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+var NETWORKS = {};
+/** The field's layout for a w × h stage, made once from the look's seed: nodes on a jittered
+    grid, each drifting on its own slow loop; edges to each node's nearest neighbours; and, on
+    about a third of the edges, a signal that crosses it once every period seconds. */
+function networkLayout(w, h) {
+  var key = w + 'x' + h;
+  if (NETWORKS[key]) return NETWORKS[key];
+  var N = C.network,
+    rnd = seeded(N.seed || 1),
+    cell = N.cell || 26,
+    cols = Math.round(w / cell),
+    rows = Math.round(h / cell),
+    nodes = [],
+    edges = [],
+    seen = {};
+  for (var i = 0; i <= cols; i++)
+    for (var j = 0; j <= rows; j++) {
+      if (rnd() < 0.18) continue;
+      nodes.push({
+        x: ((i + rnd() * 0.9 - 0.45) * w) / cols,
+        y: ((j + rnd() * 0.9 - 0.45) * h) / rows,
+        ax: 2 + rnd() * 4,
+        ay: 2 + rnd() * 4,
+        per: 24 + rnd() * 30,
+        ph: rnd() * 6.283,
+        r: 0.35 + rnd() * 0.55,
+        col: N.colors[Math.floor(rnd() * N.colors.length)],
+      });
+    }
+  nodes.forEach(function (a, ia) {
+    nodes
+      .map(function (b, ib) {
+        return { ib: ib, d: Math.hypot(a.x - b.x, a.y - b.y) };
+      })
+      .filter(function (o) {
+        return o.ib !== ia && o.d < cell * 1.6;
+      })
+      .sort(function (p, q) {
+        return p.d - q.d;
+      })
+      .slice(0, rnd() < 0.5 ? 2 : 3)
+      .forEach(function (o) {
+        var k = Math.min(ia, o.ib) + '-' + Math.max(ia, o.ib);
+        if (seen[k]) return;
+        seen[k] = 1;
+        edges.push({
+          a: ia,
+          b: o.ib,
+          len: o.d,
+          pulse: rnd() < 0.33 ? { per: 7 + rnd() * 11, ph: rnd(), back: rnd() < 0.5 } : null,
+        });
+      });
+  });
+  return (NETWORKS[key] = { nodes: nodes, edges: edges, cell: cell });
+}
+/** A look's background field at time t on a w × h stage, drawn under everything else: faint
+    nodes and edges that drift, a slow glow, and signals that run along a few edges and light
+    the node they reach. Nothing unless the look sets `network`. */
+function networkField(w, h, t) {
+  if (!C.network) return '';
+  var L = networkLayout(w, h),
+    N = C.network,
+    TAU = 2 * Math.PI,
+    f2 = function (v) {
+      return v.toFixed(2);
+    };
+  var pos = L.nodes.map(function (n) {
+    var a = (TAU * t) / n.per + n.ph;
+    return [n.x + n.ax * Math.sin(a), n.y + n.ay * Math.cos(a * 0.8 + 1.3)];
+  });
+  var lit = L.nodes.map(function () {
+    return 0;
+  });
+  var lines = '',
+    sparks = '';
+  L.edges.forEach(function (e) {
+    var p = pos[e.a],
+      q = pos[e.b],
+      fade = 1 - e.len / (L.cell * 1.7);
+    lines +=
+      '<line x1="' +
+      f2(p[0]) +
+      '" y1="' +
+      f2(p[1]) +
+      '" x2="' +
+      f2(q[0]) +
+      '" y2="' +
+      f2(q[1]) +
+      '" stroke="' +
+      L.nodes[e.a].col +
+      '" stroke-opacity="' +
+      (0.06 + 0.15 * fade).toFixed(3) +
+      '"/>';
+    if (!e.pulse) return;
+    // The signal crosses in the first 1.8 s of its period and waits out the rest.
+    var u = ((t / e.pulse.per + e.pulse.ph) % 1) * e.pulse.per;
+    if (u > 1.8) return;
+    var from = e.pulse.back ? e.b : e.a,
+      to = e.pulse.back ? e.a : e.b,
+      s = smooth(u / 1.8),
+      s0 = smooth(Math.max(0, u - 0.35) / 1.8),
+      op = Math.sin(Math.PI * clamp01(u / 1.8)),
+      col = L.nodes[from].col,
+      A = pos[from],
+      B = pos[to];
+    sparks +=
+      '<line x1="' +
+      f2(lerp(A[0], B[0], s0)) +
+      '" y1="' +
+      f2(lerp(A[1], B[1], s0)) +
+      '" x2="' +
+      f2(lerp(A[0], B[0], s)) +
+      '" y2="' +
+      f2(lerp(A[1], B[1], s)) +
+      '" stroke="' +
+      col +
+      '" stroke-width="0.55" stroke-linecap="round" stroke-opacity="' +
+      (0.7 * op).toFixed(3) +
+      '"/><circle cx="' +
+      f2(lerp(A[0], B[0], s)) +
+      '" cy="' +
+      f2(lerp(A[1], B[1], s)) +
+      '" r="0.75" fill="' +
+      col +
+      '" opacity="' +
+      (0.9 * op).toFixed(3) +
+      '"/>';
+    lit[to] = Math.max(lit[to], clamp01((u - 1.4) / 0.4) * op + (u > 1.6 ? 0.3 : 0));
+  });
+  var dots = L.nodes
+    .map(function (n, i) {
+      var g = Math.min(1, lit[i]),
+        c = '<circle cx="' + f2(pos[i][0]) + '" cy="' + f2(pos[i][1]) + '" fill="' + n.col + '" ';
+      return (
+        (g > 0.01 ? c + 'r="' + f2(n.r * 4) + '" opacity="' + (0.18 * g).toFixed(3) + '"/>' : '') +
+        c +
+        'r="' +
+        f2(n.r) +
+        '" opacity="' +
+        (0.3 + 0.5 * g).toFixed(3) +
+        '"/>'
+      );
+    })
+    .join('');
+  // A slow violet glow drifting across the ground, under the field.
+  var gx = w * (0.5 + 0.25 * Math.sin((TAU * t) / 60)),
+    gy = h * (0.45 + 0.2 * Math.cos((TAU * t) / 75)),
+    R = Math.max(w, h);
+  return (
+    '<defs><radialGradient id="net-glow"><stop offset="0" stop-color="' +
+    N.glow +
+    '" stop-opacity="0.9"/><stop offset="1" stop-color="' +
+    N.glow +
+    '" stop-opacity="0"/></radialGradient></defs><ellipse cx="' +
+    gx.toFixed(1) +
+    '" cy="' +
+    gy.toFixed(1) +
+    '" rx="' +
+    (R * 0.6).toFixed(1) +
+    '" ry="' +
+    (R * 0.45).toFixed(1) +
+    '" fill="url(#net-glow)"/><g stroke-width="0.2">' +
+    lines +
+    '</g>' +
+    sparks +
+    dots
+  );
 }
 
 /* ---------- the frame ---------- */
@@ -1228,7 +1438,7 @@ function renderAt(t) {
     return q.missing;
   }
   var fade = Math.min(P(lt, 0, 0.4), sc.last ? 1 : 1 - clamp01((lt - (sc.dur - 0.3)) / 0.3));
-  var out = '<rect width="320" height="180" fill="' + C.ground + '"/>';
+  var out = '<rect width="320" height="180" fill="' + C.ground + '"/>' + networkField(320, 180, t);
   if (!sc.bare)
     out += G(
       txt(12, 8.2, sc.act.toUpperCase(), {

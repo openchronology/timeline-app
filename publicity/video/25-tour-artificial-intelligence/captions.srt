@@ -1,0 +1,224 @@
+1
+00:00:01,130 --> 00:00:04,940
+Here's a timeline we built
+of artificial intelligence,
+
+2
+00:00:04,990 --> 00:00:11,320
+from a philosopher's paper wheels around
+1300 to the language models of today.
+
+3
+00:00:11,370 --> 00:00:15,050
+Programs, machines, papers
+and policy are moments,
+
+4
+00:00:15,100 --> 00:00:19,010
+each linked to its sources, and the
+field's eras are bands behind them,
+
+5
+00:00:19,060 --> 00:00:20,989
+two of them winters.
+
+6
+00:00:22,539 --> 00:00:27,769
+Long before computers, people
+imagined reasoning as calculation.
+
+7
+00:00:27,819 --> 00:00:31,909
+Leibniz hoped arguments could
+be settled by computing.
+
+8
+00:00:31,959 --> 00:00:35,779
+Ada Lovelace saw that Babbage's
+engine could work with symbols,
+
+9
+00:00:35,829 --> 00:00:40,269
+not just numbers. Boole
+turned logic into algebra,
+
+10
+00:00:40,319 --> 00:00:45,119
+and in 1936 Alan Turing described
+a machine that could carry out any
+
+11
+00:00:45,169 --> 00:00:46,770
+computation.
+
+12
+00:00:48,210 --> 00:00:52,940
+In 1950, Turing asked
+whether machines can think.
+
+13
+00:00:52,990 --> 00:00:57,040
+Six years later, a summer workshop at
+Dartmouth gave the field its name,
+
+14
+00:00:57,090 --> 00:01:00,850
+and the golden years began:
+programs that proved theorems,
+
+15
+00:01:00,900 --> 00:01:04,480
+the language LISP, ELIZA's
+conversations, and Shakey,
+
+16
+00:01:04,530 --> 00:01:07,477
+a robot that planned its own moves.
+
+17
+00:01:09,017 --> 00:01:12,967
+Open a moment to read it: what
+happened, how sure its date is,
+
+18
+00:01:13,017 --> 00:01:16,967
+its picture's credit, and
+the article it comes from.
+
+19
+00:01:17,017 --> 00:01:19,381
+Every moment here has its sources.
+
+20
+00:01:21,111 --> 00:01:26,181
+Then the bands turn cold.
+Promises outran results;
+
+21
+00:01:26,231 --> 00:01:30,701
+after Britain's Lighthill report
+in 1973, funding was cut,
+
+22
+00:01:30,751 --> 00:01:37,061
+and the first AI winter set in. Expert
+systems brought a boom in the 1980s,
+
+23
+00:01:37,111 --> 00:01:42,301
+with rules written by hand, until cheaper
+workstations undercut AI's special
+
+24
+00:01:42,351 --> 00:01:45,048
+machines and a second winter followed.
+
+25
+00:01:46,598 --> 00:01:51,498
+Now pull one thread. Separate by
+tags, choose neural networks,
+
+26
+00:01:51,548 --> 00:01:58,288
+and one idea rises into its own track.
+1943: a model of the neuron as logic.
+
+27
+00:01:58,338 --> 00:02:02,788
+1958: Rosenblatt's perceptron
+learns from examples.
+
+28
+00:02:02,838 --> 00:02:08,748
+1969: a book proves its limits, and the
+track goes quiet for over a decade.
+
+29
+00:02:08,798 --> 00:02:15,298
+1986: backpropagation trains deeper
+networks. And still they wait.
+
+30
+00:02:16,968 --> 00:02:21,898
+Here's what the line makes visible. The
+artificial neuron is older than the
+
+31
+00:02:21,948 --> 00:02:25,733
+transistor, and it took
+sixty-nine years to win.
+
+32
+00:02:27,193 --> 00:02:32,043
+In 2012, a network trained on graphics
+cards won the ImageNet challenge by a
+
+33
+00:02:32,093 --> 00:02:37,263
+wide margin, and the bands
+change: deep learning.
+
+34
+00:02:37,313 --> 00:02:40,498
+Four years later, AlphaGo
+beat Lee Sedol at Go.
+
+35
+00:02:41,958 --> 00:02:46,468
+In 2017, researchers at Google
+published the Transformer,
+
+36
+00:02:46,518 --> 00:02:50,478
+built on attention. Language
+models grew from it,
+
+37
+00:02:50,528 --> 00:02:57,223
+larger each year, and in November 2022,
+ChatGPT put one in front of the public.
+
+38
+00:02:58,773 --> 00:03:04,113
+Zoom in to the days. By the end of
+2023 there were models from Meta,
+
+39
+00:03:04,163 --> 00:03:09,793
+OpenAI, Anthropic and Google; an
+open letter asking for a pause;
+
+40
+00:03:09,843 --> 00:03:14,003
+a statement on extinction risk;
+an American executive order;
+
+41
+00:03:14,053 --> 00:03:19,263
+and a summit at Bletchley Park. Researchers
+disagree about how fast this is
+
+42
+00:03:19,313 --> 00:03:24,318
+moving and what it means; the timeline
+keeps each step with its source.
+
+43
+00:03:25,798 --> 00:03:31,408
+In 2024, Nobel prizes went to work on
+neural networks and to the makers of
+
+44
+00:03:31,458 --> 00:03:36,598
+AlphaFold, and Europe's
+AI Act came into force.
+
+45
+00:03:36,648 --> 00:03:40,368
+The line is still being
+written. Anyone can read it,
+
+46
+00:03:40,418 --> 00:03:43,525
+no account needed, and
+anyone can build one.

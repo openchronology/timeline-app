@@ -23,3 +23,4 @@ The scripts and storyboards of OpenChronology's vertical shorts for TikTok, YouT
 | [`12-closer-to-the-moon.md`](12-closer-to-the-moon.md)                 | Short 12: Cleopatra lived closer to the Moon landing than to the Great Pyramid.                |
 | [`22-handed-down.md`](22-handed-down.md)                               | Short 22: why the oldest Marine hands the cake to the youngest, for the Corps' 251st birthday. |
 | [`23-nobody-left-behind.md`](23-nobody-left-behind.md)                 | Short 23: Chosin, 1950, and bringing your people home.                                         |
+| [`28-54-years.md`](28-54-years.md)                                     | Short 28: neural networks waited 54 years, from the perceptron to AlexNet.                     |

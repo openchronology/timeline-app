@@ -1,0 +1,1091 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:05,280"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 5280
+			},
+			"text": " Long before computers, people imagined reasoning as calculation.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.956649,
+					"t_dtw": -1
+				},
+				{
+					"text": " Long",
+					"timestamps": {
+						"from": "00:00:00,150",
+						"to": "00:00:00,310"
+					},
+					"offsets": {
+						"from": 150,
+						"to": 310
+					},
+					"id": 5882,
+					"p": 0.92753,
+					"t_dtw": -1
+				},
+				{
+					"text": " before",
+					"timestamps": {
+						"from": "00:00:00,310",
+						"to": "00:00:00,720"
+					},
+					"offsets": {
+						"from": 310,
+						"to": 720
+					},
+					"id": 878,
+					"p": 0.999542,
+					"t_dtw": -1
+				},
+				{
+					"text": " computers",
+					"timestamps": {
+						"from": "00:00:00,780",
+						"to": "00:00:01,390"
+					},
+					"offsets": {
+						"from": 780,
+						"to": 1390
+					},
+					"id": 9061,
+					"p": 0.998704,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,640",
+						"to": "00:00:01,640"
+					},
+					"offsets": {
+						"from": 1640,
+						"to": 1640
+					},
+					"id": 11,
+					"p": 0.972199,
+					"t_dtw": -1
+				},
+				{
+					"text": " people",
+					"timestamps": {
+						"from": "00:00:01,770",
+						"to": "00:00:02,000"
+					},
+					"offsets": {
+						"from": 1770,
+						"to": 2000
+					},
+					"id": 661,
+					"p": 0.86988,
+					"t_dtw": -1
+				},
+				{
+					"text": " imagined",
+					"timestamps": {
+						"from": "00:00:02,000",
+						"to": "00:00:02,480"
+					},
+					"offsets": {
+						"from": 2000,
+						"to": 2480
+					},
+					"id": 15758,
+					"p": 0.997383,
+					"t_dtw": -1
+				},
+				{
+					"text": " reasoning",
+					"timestamps": {
+						"from": "00:00:02,480",
+						"to": "00:00:03,040"
+					},
+					"offsets": {
+						"from": 2480,
+						"to": 3040
+					},
+					"id": 14607,
+					"p": 0.988271,
+					"t_dtw": -1
+				},
+				{
+					"text": " as",
+					"timestamps": {
+						"from": "00:00:03,040",
+						"to": "00:00:03,270"
+					},
+					"offsets": {
+						"from": 3040,
+						"to": 3270
+					},
+					"id": 355,
+					"p": 0.986956,
+					"t_dtw": -1
+				},
+				{
+					"text": " calculation",
+					"timestamps": {
+						"from": "00:00:03,320",
+						"to": "00:00:04,150"
+					},
+					"offsets": {
+						"from": 3320,
+						"to": 4150
+					},
+					"id": 17952,
+					"p": 0.990544,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:05,280",
+						"to": "00:00:05,280"
+					},
+					"offsets": {
+						"from": 5280,
+						"to": 5280
+					},
+					"id": 13,
+					"p": 0.98731,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_264]",
+					"timestamps": {
+						"from": "00:00:05,280",
+						"to": "00:00:05,280"
+					},
+					"offsets": {
+						"from": 5280,
+						"to": 5280
+					},
+					"id": 50627,
+					"p": 0.066416,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:05,280",
+				"to": "00:00:09,420"
+			},
+			"offsets": {
+				"from": 5280,
+				"to": 9420
+			},
+			"text": " Leibniz hoped arguments could be settled by computing.",
+			"tokens": [
+				{
+					"text": " Le",
+					"timestamps": {
+						"from": "00:00:05,430",
+						"to": "00:00:05,440"
+					},
+					"offsets": {
+						"from": 5430,
+						"to": 5440
+					},
+					"id": 1004,
+					"p": 0.701751,
+					"t_dtw": -1
+				},
+				{
+					"text": "ib",
+					"timestamps": {
+						"from": "00:00:05,440",
+						"to": "00:00:05,600"
+					},
+					"offsets": {
+						"from": 5440,
+						"to": 5600
+					},
+					"id": 571,
+					"p": 0.949233,
+					"t_dtw": -1
+				},
+				{
+					"text": "n",
+					"timestamps": {
+						"from": "00:00:05,600",
+						"to": "00:00:05,680"
+					},
+					"offsets": {
+						"from": 5600,
+						"to": 5680
+					},
+					"id": 77,
+					"p": 0.984259,
+					"t_dtw": -1
+				},
+				{
+					"text": "iz",
+					"timestamps": {
+						"from": "00:00:05,680",
+						"to": "00:00:05,830"
+					},
+					"offsets": {
+						"from": 5680,
+						"to": 5830
+					},
+					"id": 528,
+					"p": 0.992458,
+					"t_dtw": -1
+				},
+				{
+					"text": " hoped",
+					"timestamps": {
+						"from": "00:00:05,930",
+						"to": "00:00:06,170"
+					},
+					"offsets": {
+						"from": 5930,
+						"to": 6170
+					},
+					"id": 10719,
+					"p": 0.99049,
+					"t_dtw": -1
+				},
+				{
+					"text": " arguments",
+					"timestamps": {
+						"from": "00:00:06,260",
+						"to": "00:00:06,670"
+					},
+					"offsets": {
+						"from": 6260,
+						"to": 6670
+					},
+					"id": 7159,
+					"p": 0.998125,
+					"t_dtw": -1
+				},
+				{
+					"text": " could",
+					"timestamps": {
+						"from": "00:00:07,100",
+						"to": "00:00:07,440"
+					},
+					"offsets": {
+						"from": 7100,
+						"to": 7440
+					},
+					"id": 714,
+					"p": 0.996875,
+					"t_dtw": -1
+				},
+				{
+					"text": " be",
+					"timestamps": {
+						"from": "00:00:07,440",
+						"to": "00:00:07,590"
+					},
+					"offsets": {
+						"from": 7440,
+						"to": 7590
+					},
+					"id": 307,
+					"p": 0.997959,
+					"t_dtw": -1
+				},
+				{
+					"text": " settled",
+					"timestamps": {
+						"from": "00:00:07,600",
+						"to": "00:00:08,190"
+					},
+					"offsets": {
+						"from": 7600,
+						"to": 8190
+					},
+					"id": 10282,
+					"p": 0.998154,
+					"t_dtw": -1
+				},
+				{
+					"text": " by",
+					"timestamps": {
+						"from": "00:00:08,190",
+						"to": "00:00:08,350"
+					},
+					"offsets": {
+						"from": 8190,
+						"to": 8350
+					},
+					"id": 416,
+					"p": 0.997832,
+					"t_dtw": -1
+				},
+				{
+					"text": " computing",
+					"timestamps": {
+						"from": "00:00:08,350",
+						"to": "00:00:09,110"
+					},
+					"offsets": {
+						"from": 8350,
+						"to": 9110
+					},
+					"id": 14492,
+					"p": 0.999251,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:09,110",
+						"to": "00:00:09,390"
+					},
+					"offsets": {
+						"from": 9110,
+						"to": 9390
+					},
+					"id": 13,
+					"p": 0.995442,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_471]",
+					"timestamps": {
+						"from": "00:00:09,420",
+						"to": "00:00:09,420"
+					},
+					"offsets": {
+						"from": 9420,
+						"to": 9420
+					},
+					"id": 50834,
+					"p": 0.144208,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:09,420",
+				"to": "00:00:15,360"
+			},
+			"offsets": {
+				"from": 9420,
+				"to": 15360
+			},
+			"text": " Ada Lovelace saw that Babbage's engine could work with symbols, not just numbers.",
+			"tokens": [
+				{
+					"text": " Ada",
+					"timestamps": {
+						"from": "00:00:09,570",
+						"to": "00:00:09,620"
+					},
+					"offsets": {
+						"from": 9570,
+						"to": 9620
+					},
+					"id": 47395,
+					"p": 0.943162,
+					"t_dtw": -1
+				},
+				{
+					"text": " Lo",
+					"timestamps": {
+						"from": "00:00:09,620",
+						"to": "00:00:09,750"
+					},
+					"offsets": {
+						"from": 9620,
+						"to": 9750
+					},
+					"id": 6706,
+					"p": 0.986733,
+					"t_dtw": -1
+				},
+				{
+					"text": "vel",
+					"timestamps": {
+						"from": "00:00:09,750",
+						"to": "00:00:09,950"
+					},
+					"offsets": {
+						"from": 9750,
+						"to": 9950
+					},
+					"id": 626,
+					"p": 0.99789,
+					"t_dtw": -1
+				},
+				{
+					"text": "ace",
+					"timestamps": {
+						"from": "00:00:09,950",
+						"to": "00:00:10,150"
+					},
+					"offsets": {
+						"from": 9950,
+						"to": 10150
+					},
+					"id": 558,
+					"p": 0.999853,
+					"t_dtw": -1
+				},
+				{
+					"text": " saw",
+					"timestamps": {
+						"from": "00:00:10,150",
+						"to": "00:00:10,310"
+					},
+					"offsets": {
+						"from": 10150,
+						"to": 10310
+					},
+					"id": 2497,
+					"p": 0.998593,
+					"t_dtw": -1
+				},
+				{
+					"text": " that",
+					"timestamps": {
+						"from": "00:00:10,400",
+						"to": "00:00:10,610"
+					},
+					"offsets": {
+						"from": 10400,
+						"to": 10610
+					},
+					"id": 326,
+					"p": 0.999026,
+					"t_dtw": -1
+				},
+				{
+					"text": " B",
+					"timestamps": {
+						"from": "00:00:10,620",
+						"to": "00:00:10,690"
+					},
+					"offsets": {
+						"from": 10620,
+						"to": 10690
+					},
+					"id": 347,
+					"p": 0.980839,
+					"t_dtw": -1
+				},
+				{
+					"text": "abbage",
+					"timestamps": {
+						"from": "00:00:10,690",
+						"to": "00:00:10,820"
+					},
+					"offsets": {
+						"from": 10690,
+						"to": 10820
+					},
+					"id": 32061,
+					"p": 0.990061,
+					"t_dtw": -1
+				},
+				{
+					"text": "'s",
+					"timestamps": {
+						"from": "00:00:11,190",
+						"to": "00:00:11,230"
+					},
+					"offsets": {
+						"from": 11190,
+						"to": 11230
+					},
+					"id": 338,
+					"p": 0.998948,
+					"t_dtw": -1
+				},
+				{
+					"text": " engine",
+					"timestamps": {
+						"from": "00:00:11,240",
+						"to": "00:00:11,720"
+					},
+					"offsets": {
+						"from": 11240,
+						"to": 11720
+					},
+					"id": 3113,
+					"p": 0.967488,
+					"t_dtw": -1
+				},
+				{
+					"text": " could",
+					"timestamps": {
+						"from": "00:00:11,720",
+						"to": "00:00:11,920"
+					},
+					"offsets": {
+						"from": 11720,
+						"to": 11920
+					},
+					"id": 714,
+					"p": 0.934188,
+					"t_dtw": -1
+				},
+				{
+					"text": " work",
+					"timestamps": {
+						"from": "00:00:11,920",
+						"to": "00:00:12,120"
+					},
+					"offsets": {
+						"from": 11920,
+						"to": 12120
+					},
+					"id": 670,
+					"p": 0.980973,
+					"t_dtw": -1
+				},
+				{
+					"text": " with",
+					"timestamps": {
+						"from": "00:00:12,120",
+						"to": "00:00:12,520"
+					},
+					"offsets": {
+						"from": 12120,
+						"to": 12520
+					},
+					"id": 351,
+					"p": 0.978668,
+					"t_dtw": -1
+				},
+				{
+					"text": " symbols",
+					"timestamps": {
+						"from": "00:00:12,520",
+						"to": "00:00:13,220"
+					},
+					"offsets": {
+						"from": 12520,
+						"to": 13220
+					},
+					"id": 14354,
+					"p": 0.995898,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:13,220",
+						"to": "00:00:13,440"
+					},
+					"offsets": {
+						"from": 13220,
+						"to": 13440
+					},
+					"id": 11,
+					"p": 0.778988,
+					"t_dtw": -1
+				},
+				{
+					"text": " not",
+					"timestamps": {
+						"from": "00:00:13,440",
+						"to": "00:00:13,570"
+					},
+					"offsets": {
+						"from": 13440,
+						"to": 13570
+					},
+					"id": 407,
+					"p": 0.667138,
+					"t_dtw": -1
+				},
+				{
+					"text": " just",
+					"timestamps": {
+						"from": "00:00:13,570",
+						"to": "00:00:14,080"
+					},
+					"offsets": {
+						"from": 13570,
+						"to": 14080
+					},
+					"id": 655,
+					"p": 0.998205,
+					"t_dtw": -1
+				},
+				{
+					"text": " numbers",
+					"timestamps": {
+						"from": "00:00:14,820",
+						"to": "00:00:15,000"
+					},
+					"offsets": {
+						"from": 14820,
+						"to": 15000
+					},
+					"id": 3146,
+					"p": 0.995516,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:15,000",
+						"to": "00:00:15,270"
+					},
+					"offsets": {
+						"from": 15000,
+						"to": 15270
+					},
+					"id": 13,
+					"p": 0.996099,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_768]",
+					"timestamps": {
+						"from": "00:00:15,360",
+						"to": "00:00:15,360"
+					},
+					"offsets": {
+						"from": 15360,
+						"to": 15360
+					},
+					"id": 51131,
+					"p": 0.180867,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:15,360",
+				"to": "00:00:19,600"
+			},
+			"offsets": {
+				"from": 15360,
+				"to": 19600
+			},
+			"text": " Buhl turned logic into algebra, and in 1936,",
+			"tokens": [
+				{
+					"text": " B",
+					"timestamps": {
+						"from": "00:00:15,450",
+						"to": "00:00:15,450"
+					},
+					"offsets": {
+						"from": 15450,
+						"to": 15450
+					},
+					"id": 347,
+					"p": 0.683243,
+					"t_dtw": -1
+				},
+				{
+					"text": "uh",
+					"timestamps": {
+						"from": "00:00:15,510",
+						"to": "00:00:15,640"
+					},
+					"offsets": {
+						"from": 15510,
+						"to": 15640
+					},
+					"id": 7456,
+					"p": 0.369532,
+					"t_dtw": -1
+				},
+				{
+					"text": "l",
+					"timestamps": {
+						"from": "00:00:15,640",
+						"to": "00:00:15,730"
+					},
+					"offsets": {
+						"from": 15640,
+						"to": 15730
+					},
+					"id": 75,
+					"p": 0.987785,
+					"t_dtw": -1
+				},
+				{
+					"text": " turned",
+					"timestamps": {
+						"from": "00:00:15,730",
+						"to": "00:00:16,240"
+					},
+					"offsets": {
+						"from": 15730,
+						"to": 16240
+					},
+					"id": 2900,
+					"p": 0.996711,
+					"t_dtw": -1
+				},
+				{
+					"text": " logic",
+					"timestamps": {
+						"from": "00:00:16,310",
+						"to": "00:00:16,750"
+					},
+					"offsets": {
+						"from": 16310,
+						"to": 16750
+					},
+					"id": 9156,
+					"p": 0.998849,
+					"t_dtw": -1
+				},
+				{
+					"text": " into",
+					"timestamps": {
+						"from": "00:00:17,130",
+						"to": "00:00:17,170"
+					},
+					"offsets": {
+						"from": 17130,
+						"to": 17170
+					},
+					"id": 656,
+					"p": 0.99878,
+					"t_dtw": -1
+				},
+				{
+					"text": " algebra",
+					"timestamps": {
+						"from": "00:00:17,180",
+						"to": "00:00:17,900"
+					},
+					"offsets": {
+						"from": 17180,
+						"to": 17900
+					},
+					"id": 37139,
+					"p": 0.989615,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:17,900",
+						"to": "00:00:17,910"
+					},
+					"offsets": {
+						"from": 17900,
+						"to": 17910
+					},
+					"id": 11,
+					"p": 0.69474,
+					"t_dtw": -1
+				},
+				{
+					"text": " and",
+					"timestamps": {
+						"from": "00:00:17,930",
+						"to": "00:00:18,080"
+					},
+					"offsets": {
+						"from": 17930,
+						"to": 18080
+					},
+					"id": 290,
+					"p": 0.724674,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:18,080",
+						"to": "00:00:18,270"
+					},
+					"offsets": {
+						"from": 18080,
+						"to": 18270
+					},
+					"id": 287,
+					"p": 0.968901,
+					"t_dtw": -1
+				},
+				{
+					"text": " 1936",
+					"timestamps": {
+						"from": "00:00:18,270",
+						"to": "00:00:19,400"
+					},
+					"offsets": {
+						"from": 18270,
+						"to": 19400
+					},
+					"id": 27653,
+					"p": 0.99655,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:19,400",
+						"to": "00:00:19,510"
+					},
+					"offsets": {
+						"from": 19400,
+						"to": 19510
+					},
+					"id": 11,
+					"p": 0.744743,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_980]",
+					"timestamps": {
+						"from": "00:00:19,600",
+						"to": "00:00:19,600"
+					},
+					"offsets": {
+						"from": 19600,
+						"to": 19600
+					},
+					"id": 51343,
+					"p": 0.0723267,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:19,600",
+				"to": "00:00:23,800"
+			},
+			"offsets": {
+				"from": 19600,
+				"to": 23800
+			},
+			"text": " Alan Turing described a machine that could carry out any computation.",
+			"tokens": [
+				{
+					"text": " Alan",
+					"timestamps": {
+						"from": "00:00:19,750",
+						"to": "00:00:19,870"
+					},
+					"offsets": {
+						"from": 19750,
+						"to": 19870
+					},
+					"id": 12246,
+					"p": 0.588126,
+					"t_dtw": -1
+				},
+				{
+					"text": " Turing",
+					"timestamps": {
+						"from": "00:00:19,870",
+						"to": "00:00:20,280"
+					},
+					"offsets": {
+						"from": 19870,
+						"to": 20280
+					},
+					"id": 39141,
+					"p": 0.991145,
+					"t_dtw": -1
+				},
+				{
+					"text": " described",
+					"timestamps": {
+						"from": "00:00:20,280",
+						"to": "00:00:20,890"
+					},
+					"offsets": {
+						"from": 20280,
+						"to": 20890
+					},
+					"id": 3417,
+					"p": 0.998346,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:20,890",
+						"to": "00:00:20,950"
+					},
+					"offsets": {
+						"from": 20890,
+						"to": 20950
+					},
+					"id": 257,
+					"p": 0.998548,
+					"t_dtw": -1
+				},
+				{
+					"text": " machine",
+					"timestamps": {
+						"from": "00:00:20,950",
+						"to": "00:00:21,430"
+					},
+					"offsets": {
+						"from": 20950,
+						"to": 21430
+					},
+					"id": 4572,
+					"p": 0.998963,
+					"t_dtw": -1
+				},
+				{
+					"text": " that",
+					"timestamps": {
+						"from": "00:00:21,430",
+						"to": "00:00:21,700"
+					},
+					"offsets": {
+						"from": 21430,
+						"to": 21700
+					},
+					"id": 326,
+					"p": 0.996061,
+					"t_dtw": -1
+				},
+				{
+					"text": " could",
+					"timestamps": {
+						"from": "00:00:21,700",
+						"to": "00:00:22,040"
+					},
+					"offsets": {
+						"from": 21700,
+						"to": 22040
+					},
+					"id": 714,
+					"p": 0.994981,
+					"t_dtw": -1
+				},
+				{
+					"text": " carry",
+					"timestamps": {
+						"from": "00:00:22,040",
+						"to": "00:00:22,380"
+					},
+					"offsets": {
+						"from": 22040,
+						"to": 22380
+					},
+					"id": 3283,
+					"p": 0.991138,
+					"t_dtw": -1
+				},
+				{
+					"text": " out",
+					"timestamps": {
+						"from": "00:00:22,380",
+						"to": "00:00:22,580"
+					},
+					"offsets": {
+						"from": 22380,
+						"to": 22580
+					},
+					"id": 503,
+					"p": 0.997246,
+					"t_dtw": -1
+				},
+				{
+					"text": " any",
+					"timestamps": {
+						"from": "00:00:22,580",
+						"to": "00:00:22,760"
+					},
+					"offsets": {
+						"from": 22580,
+						"to": 22760
+					},
+					"id": 597,
+					"p": 0.990777,
+					"t_dtw": -1
+				},
+				{
+					"text": " computation",
+					"timestamps": {
+						"from": "00:00:22,780",
+						"to": "00:00:23,530"
+					},
+					"offsets": {
+						"from": 22780,
+						"to": 23530
+					},
+					"id": 29964,
+					"p": 0.998784,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:23,530",
+						"to": "00:00:23,750"
+					},
+					"offsets": {
+						"from": 23530,
+						"to": 23750
+					},
+					"id": 13,
+					"p": 0.991945,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_1190]",
+					"timestamps": {
+						"from": "00:00:23,800",
+						"to": "00:00:23,800"
+					},
+					"offsets": {
+						"from": 23800,
+						"to": 23800
+					},
+					"id": 51553,
+					"p": 0.0210764,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

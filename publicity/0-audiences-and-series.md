@@ -77,14 +77,15 @@ Every video shares a frame: a header with the act name and the scene's on-screen
 
 What changes is the ground and the accent, so each video feels made for its audience:
 
-| Look          | Videos     | Ground and accent                                               | Why                                                            |
-| ------------- | ---------- | --------------------------------------------------------------- | -------------------------------------------------------------- |
-| **Paper**     | 1, 2, 3, 9 | The app's own light paper (`#f5f6f1`) and green (`#285742`)     | Friendly, recognisably the product; most viewers start here    |
-| **Archive**   | 5, 14, 15  | Warm cream with navy and brick accents; a serif for dates       | Reads as history class, documents and maps                     |
-| **Parchment** | 6          | Deep ink-blue ground with gold and ember accents; a serif title | A storyteller's tone, not a spreadsheet's                      |
-| **Lore**      | 7          | Deep forest green with gold; a serif title                      | A keeper of lore, between the storyteller's and the scholar's  |
-| **Strata**    | 8          | Night-sky ground with rock-strata bands for eons                | Deep time feels deep; the bands are the geological column      |
-| **Terminal**  | 4, 10–13   | Dark ink ground, mono type, green and amber highlights          | Engineers and administrators trust what looks like their tools |
+| Look          | Videos     | Ground and accent                                                                                                             | Why                                                                                                     |
+| ------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **Paper**     | 1, 2, 3, 9 | The app's own light paper (`#f5f6f1`) and green (`#285742`)                                                                   | Friendly, recognisably the product; most viewers start here                                             |
+| **Archive**   | 5, 14, 15  | Warm cream with navy and brick accents; a serif for dates                                                                     | Reads as history class, documents and maps                                                              |
+| **Parchment** | 6          | Deep ink-blue ground with gold and ember accents; a serif title                                                               | A storyteller's tone, not a spreadsheet's                                                               |
+| **Lore**      | 7          | Deep forest green with gold; a serif title                                                                                    | A keeper of lore, between the storyteller's and the scholar's                                           |
+| **Strata**    | 8          | Night-sky ground with rock-strata bands for eons                                                                              | Deep time feels deep; the bands are the geological column                                               |
+| **Terminal**  | 4, 10–13   | Dark ink ground, mono type, green and amber highlights                                                                        | Engineers and administrators trust what looks like their tools                                          |
+| **Neural**    | 25         | Near-black blue-violet with electric cyan and magenta, and a faint field of drifting nodes and pulsing edges behind the frame | A history of AI without robots or glowing brains: the network is the motif, kept quiet so the app reads |
 
 **The tours (5, 6, 7, 8, 14) and the logs video (10) show the real app.** Their timelines are sample files (`publicity/video/samples/`) opened in the actual editor and captured zooming and panning, framed in a browser window. Everything else is drawn as an infographic, like CMR Scanner's videos, so it stays clear at any size and doesn't date when the interface changes.
 

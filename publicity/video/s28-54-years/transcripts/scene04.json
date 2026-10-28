@@ -1,0 +1,506 @@
+{
+	"systeminfo": "WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "small",
+		"multilingual": false,
+		"vocab": 51864,
+		"audio": {
+			"ctx": 1500,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"text": {
+			"ctx": 448,
+			"state": 768,
+			"head": 12,
+			"layer": 12
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/w/ggml-small.en.bin",
+		"language": "en",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:06,560"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 6560
+			},
+			"text": " Then, in 2012, a network called AlexNet won the ImageNet Challenge, 15% error, against",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50363,
+					"p": 0.873653,
+					"t_dtw": -1
+				},
+				{
+					"text": " Then",
+					"timestamps": {
+						"from": "00:00:00,280",
+						"to": "00:00:00,280"
+					},
+					"offsets": {
+						"from": 280,
+						"to": 280
+					},
+					"id": 3244,
+					"p": 0.938392,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:00,310",
+						"to": "00:00:00,410"
+					},
+					"offsets": {
+						"from": 310,
+						"to": 410
+					},
+					"id": 11,
+					"p": 0.685234,
+					"t_dtw": -1
+				},
+				{
+					"text": " in",
+					"timestamps": {
+						"from": "00:00:00,410",
+						"to": "00:00:00,550"
+					},
+					"offsets": {
+						"from": 410,
+						"to": 550
+					},
+					"id": 287,
+					"p": 0.996265,
+					"t_dtw": -1
+				},
+				{
+					"text": " 2012",
+					"timestamps": {
+						"from": "00:00:00,550",
+						"to": "00:00:01,350"
+					},
+					"offsets": {
+						"from": 550,
+						"to": 1350
+					},
+					"id": 2321,
+					"p": 0.997605,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,370",
+						"to": "00:00:01,420"
+					},
+					"offsets": {
+						"from": 1370,
+						"to": 1420
+					},
+					"id": 11,
+					"p": 0.957751,
+					"t_dtw": -1
+				},
+				{
+					"text": " a",
+					"timestamps": {
+						"from": "00:00:01,490",
+						"to": "00:00:01,560"
+					},
+					"offsets": {
+						"from": 1490,
+						"to": 1560
+					},
+					"id": 257,
+					"p": 0.978492,
+					"t_dtw": -1
+				},
+				{
+					"text": " network",
+					"timestamps": {
+						"from": "00:00:01,730",
+						"to": "00:00:01,730"
+					},
+					"offsets": {
+						"from": 1730,
+						"to": 1730
+					},
+					"id": 3127,
+					"p": 0.996198,
+					"t_dtw": -1
+				},
+				{
+					"text": " called",
+					"timestamps": {
+						"from": "00:00:01,730",
+						"to": "00:00:01,900"
+					},
+					"offsets": {
+						"from": 1730,
+						"to": 1900
+					},
+					"id": 1444,
+					"p": 0.995628,
+					"t_dtw": -1
+				},
+				{
+					"text": " Alex",
+					"timestamps": {
+						"from": "00:00:01,900",
+						"to": "00:00:02,110"
+					},
+					"offsets": {
+						"from": 1900,
+						"to": 2110
+					},
+					"id": 4422,
+					"p": 0.567995,
+					"t_dtw": -1
+				},
+				{
+					"text": "Net",
+					"timestamps": {
+						"from": "00:00:02,210",
+						"to": "00:00:02,460"
+					},
+					"offsets": {
+						"from": 2210,
+						"to": 2460
+					},
+					"id": 7934,
+					"p": 0.874322,
+					"t_dtw": -1
+				},
+				{
+					"text": " won",
+					"timestamps": {
+						"from": "00:00:02,460",
+						"to": "00:00:02,700"
+					},
+					"offsets": {
+						"from": 2460,
+						"to": 2700
+					},
+					"id": 1839,
+					"p": 0.976711,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:02,700",
+						"to": "00:00:02,940"
+					},
+					"offsets": {
+						"from": 2700,
+						"to": 2940
+					},
+					"id": 262,
+					"p": 0.983462,
+					"t_dtw": -1
+				},
+				{
+					"text": " Image",
+					"timestamps": {
+						"from": "00:00:02,940",
+						"to": "00:00:03,350"
+					},
+					"offsets": {
+						"from": 2940,
+						"to": 3350
+					},
+					"id": 7412,
+					"p": 0.802158,
+					"t_dtw": -1
+				},
+				{
+					"text": "Net",
+					"timestamps": {
+						"from": "00:00:03,350",
+						"to": "00:00:03,590"
+					},
+					"offsets": {
+						"from": 3350,
+						"to": 3590
+					},
+					"id": 7934,
+					"p": 0.992096,
+					"t_dtw": -1
+				},
+				{
+					"text": " Challenge",
+					"timestamps": {
+						"from": "00:00:03,590",
+						"to": "00:00:04,350"
+					},
+					"offsets": {
+						"from": 3590,
+						"to": 4350
+					},
+					"id": 13879,
+					"p": 0.552376,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:04,350",
+						"to": "00:00:04,440"
+					},
+					"offsets": {
+						"from": 4350,
+						"to": 4440
+					},
+					"id": 11,
+					"p": 0.334521,
+					"t_dtw": -1
+				},
+				{
+					"text": " 15",
+					"timestamps": {
+						"from": "00:00:04,990",
+						"to": "00:00:05,340"
+					},
+					"offsets": {
+						"from": 4990,
+						"to": 5340
+					},
+					"id": 1315,
+					"p": 0.854675,
+					"t_dtw": -1
+				},
+				{
+					"text": "%",
+					"timestamps": {
+						"from": "00:00:05,340",
+						"to": "00:00:05,430"
+					},
+					"offsets": {
+						"from": 5340,
+						"to": 5430
+					},
+					"id": 4,
+					"p": 0.743446,
+					"t_dtw": -1
+				},
+				{
+					"text": " error",
+					"timestamps": {
+						"from": "00:00:05,430",
+						"to": "00:00:05,880"
+					},
+					"offsets": {
+						"from": 5430,
+						"to": 5880
+					},
+					"id": 4049,
+					"p": 0.973692,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:05,880",
+						"to": "00:00:06,020"
+					},
+					"offsets": {
+						"from": 5880,
+						"to": 6020
+					},
+					"id": 11,
+					"p": 0.797262,
+					"t_dtw": -1
+				},
+				{
+					"text": " against",
+					"timestamps": {
+						"from": "00:00:06,280",
+						"to": "00:00:06,550"
+					},
+					"offsets": {
+						"from": 6280,
+						"to": 6550
+					},
+					"id": 1028,
+					"p": 0.95936,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_328]",
+					"timestamps": {
+						"from": "00:00:06,560",
+						"to": "00:00:06,560"
+					},
+					"offsets": {
+						"from": 6560,
+						"to": 6560
+					},
+					"id": 50691,
+					"p": 0.0765348,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:06,560",
+				"to": "00:00:07,860"
+			},
+			"offsets": {
+				"from": 6560,
+				"to": 7860
+			},
+			"text": " 26% for the runner-up.",
+			"tokens": [
+				{
+					"text": " 26",
+					"timestamps": {
+						"from": "00:00:06,870",
+						"to": "00:00:06,870"
+					},
+					"offsets": {
+						"from": 6870,
+						"to": 6870
+					},
+					"id": 2608,
+					"p": 0.911517,
+					"t_dtw": -1
+				},
+				{
+					"text": "%",
+					"timestamps": {
+						"from": "00:00:06,870",
+						"to": "00:00:06,920"
+					},
+					"offsets": {
+						"from": 6870,
+						"to": 6920
+					},
+					"id": 4,
+					"p": 0.824043,
+					"t_dtw": -1
+				},
+				{
+					"text": " for",
+					"timestamps": {
+						"from": "00:00:06,920",
+						"to": "00:00:07,070"
+					},
+					"offsets": {
+						"from": 6920,
+						"to": 7070
+					},
+					"id": 329,
+					"p": 0.995938,
+					"t_dtw": -1
+				},
+				{
+					"text": " the",
+					"timestamps": {
+						"from": "00:00:07,070",
+						"to": "00:00:07,220"
+					},
+					"offsets": {
+						"from": 7070,
+						"to": 7220
+					},
+					"id": 262,
+					"p": 0.996392,
+					"t_dtw": -1
+				},
+				{
+					"text": " runner",
+					"timestamps": {
+						"from": "00:00:07,220",
+						"to": "00:00:07,530"
+					},
+					"offsets": {
+						"from": 7220,
+						"to": 7530
+					},
+					"id": 17490,
+					"p": 0.986387,
+					"t_dtw": -1
+				},
+				{
+					"text": "-",
+					"timestamps": {
+						"from": "00:00:07,530",
+						"to": "00:00:07,570"
+					},
+					"offsets": {
+						"from": 7530,
+						"to": 7570
+					},
+					"id": 12,
+					"p": 0.726662,
+					"t_dtw": -1
+				},
+				{
+					"text": "up",
+					"timestamps": {
+						"from": "00:00:07,600",
+						"to": "00:00:07,630"
+					},
+					"offsets": {
+						"from": 7600,
+						"to": 7630
+					},
+					"id": 929,
+					"p": 0.998696,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:07,690",
+						"to": "00:00:07,860"
+					},
+					"offsets": {
+						"from": 7690,
+						"to": 7860
+					},
+					"id": 13,
+					"p": 0.987961,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_393]",
+					"timestamps": {
+						"from": "00:00:07,860",
+						"to": "00:00:07,860"
+					},
+					"offsets": {
+						"from": 7860,
+						"to": 7860
+					},
+					"id": 50756,
+					"p": 0.0744313,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}
