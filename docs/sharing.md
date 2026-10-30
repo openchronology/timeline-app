@@ -167,6 +167,12 @@ website** code is an iframe:
 ></iframe>
 ```
 
+An embed is light or dark as the visitor's system is set (the page it sits in can't tell it
+more), whatever they chose on this site. To fix it to one, add `?theme=light` or `?theme=dark`
+to its address, before any fragment: `/embed/<id>?theme=dark#moment/<moment>`. The oEmbed
+answer below leaves it to the system; add the parameter to its iframe's address to fix it. A
+timeline's own [theme](plugins.md#timeline-theme) keeps its colors either way.
+
 Any site may frame embeds unless the operator sets `EMBED_FRAME_ANCESTORS` to a list of
 origins (see [deployment](docker.md#public-hosting)). Other pages of the platform cannot be
 framed by other sites.

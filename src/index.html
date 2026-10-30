@@ -14,6 +14,9 @@
       href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDMyIDMyIj48bWFzayBpZD0ib2NoLWN1dHMiPjxyZWN0IHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik0xNiAxNiAzMCAyTTE2IDE2IDMwIDMwIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMiIvPjwvbWFzaz48cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHJ4PSI2IiBmaWxsPSIjMTkyZDI1Ii8+PGcgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSI0IiBtYXNrPSJ1cmwoI29jaC1jdXRzKSI+PHBhdGggZD0iTTIzLjQgOC42QTEwLjUgMTAuNSAwIDEgMCAyMy40IDIzLjQiIHN0cm9rZT0iI2M0ZGI5OCIvPjxwYXRoIGQ9Ik0yMy40IDguNkExMC41IDEwLjUgMCAwIDEgMjMuNCAyMy40IiBzdHJva2U9IiNmMmM4NzkiLz48L2c+PHBhdGggZD0iTTE2IDkuNVYxNkgyMSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjJjODc5IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg=="
     />
     <title>OpenChronology — a place for moments</title>
+    <!-- The color scheme chosen (#382, src/theme-choice.ts), set before the first paint. -->
+    <!-- prettier-ignore -->
+    <script>(function(){var d=document.documentElement,m=/[?&]theme=(light|dark)(&|$)/.exec(location.search),t=m&&m[1];if(!t&&!/^\/embed\//.test(location.pathname))try{t=localStorage.getItem('openchronology-theme')}catch(e){}if(t==='light'||t==='dark')d.setAttribute('data-theme',t)})()</script>
     <link rel="stylesheet" href="./app.css" />
     <script type="module" src="./app.js"></script>
   </head>
@@ -105,6 +108,15 @@
             >
           </div>
         </details>
+        <!-- The color scheme (#382): the website offers it in its own header and footer. -->
+        <label class="theme-select"
+          ><span>Theme</span
+          ><select id="theme-choice">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select></label
+        >
         <button id="new-button">＋ New timeline</button
         ><span id="storage-badge" class="badge">Browser draft</span
         ><button id="server-button" hidden>Server connection</button

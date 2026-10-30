@@ -152,9 +152,8 @@ export async function checkPresumptive(page, restore) {
             outline: node
               .querySelector('.marker-outline path:not(.marker-dashes)')
               .getAttribute('d'),
-            under: node
-              .querySelector('.marker-outline path:not(.marker-dashes)')
-              .getAttribute('stroke'),
+            under: getComputedStyle(node.querySelector('.marker-outline path:not(.marker-dashes)'))
+              .stroke,
           },
         };
       };
@@ -200,7 +199,7 @@ export async function checkPresumptive(page, restore) {
       assert.notEqual(m.dashes.array, 'none', `${key} (${name})`);
       assert.equal(m.dashes.path, m.dashes.outline, `${key}: dashed along its own outline`);
       assert(contrast(m.dashes.stroke, 'rgb(255, 255, 255)') >= 4.5, `${key} (${name})`);
-      assert.equal(m.dashes.under, 'white');
+      assert.equal(m.dashes.under, 'rgb(255, 255, 255)');
     }
     for (const key of ['plain', 'odd', 'sure', 'known']) {
       assert.equal(shown[key].outline, null, `${key} is solid (${name})`);

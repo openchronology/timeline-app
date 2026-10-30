@@ -1,14 +1,17 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Every page's frame: the site's header with its navigation and the visitor's account (sign in
 // and sign up, or the account's menu) and, for an account that has not agreed to the terms in
-// force, a request to (#277), its footer with the build, a Support link and analytics
-// when enabled; also the site's default metadata for link previews.
+// force, a request to (#277), its footer with the build, a Support link, the color scheme's
+// choice (#382) and analytics when enabled; also the site's default metadata for link previews.
+// The head's inline script sets the chosen scheme before the first paint.
 import './platform.css';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import Analytics, { AnalyticsSettings } from '../components/analytics.jsx';
 import AccountMenu from '../components/account-menu.jsx';
 import TermsPrompt from '../components/terms-prompt.jsx';
+import ThemeChoice from '../components/theme-choice.jsx';
+import { THEME_BOOT } from '../../src/theme-choice.ts';
 import { POLICY_VERSION } from '../../server/policies.mjs';
 import { currentSession } from '../lib/session.js';
 import { headers } from 'next/headers';
@@ -46,7 +49,8 @@ export default async function RootLayout({ children }) {
   const landing = landingEnabled();
   // Read for every page, so each renders per request: its header shows who is visiting.
   const request = await headers();
-  const nonce = analytics ? request.get('x-nonce') : null;
+  // The nonce the content security policy lets scripts run by (proxy.js), when it set one.
+  const nonce = request.get('x-nonce');
   // Who is visiting, for the header's end: a guest is offered to sign in, and to sign up when
   // the site takes registrations; an account gets its menu. Without accounts, neither.
   let user = null,
@@ -61,7 +65,15 @@ export default async function RootLayout({ children }) {
     console.error(error);
   }
   return (
-    <html lang="en">
+    // The inline script sets data-theme on <html> before React hydrates it.
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          nonce={nonce ?? undefined}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: THEME_BOOT }}
+        />
+      </head>
       <body>
         <header className="platform-header">
           <a href="/" className="brand">
@@ -118,6 +130,7 @@ export default async function RootLayout({ children }) {
           · <a href="https://github.com/openchronology/timeline-app">GitHub</a>
           {' · '}
           <span className="build-identity">Build: {build.label}</span>
+          <ThemeChoice />
           {name ? ' · Powered by OpenChronology' : ''}
           {analytics ? (
             <>

@@ -94,7 +94,8 @@ export async function checkTimelineTheme(page, restore) {
     'rgb(95, 139, 103)',
   );
 
-  // "Use default" brings a color back to the usual look.
+  // "Use default" brings a color back to the usual look: over the theme's dark background, the
+  // stage's dark one (#382).
   await page.locator('#plugins-button').click();
   assert.equal(await setting('textFont').inputValue(), '', 'the bad font was not saved');
   await page
@@ -103,7 +104,7 @@ export async function checkTimelineTheme(page, restore) {
     .click();
   await page.locator('[data-close="plugins-dialog"]').click();
   await page.waitForFunction(
-    () => getComputedStyle(document.querySelector('.event-label')).color === 'rgb(76, 101, 76)',
+    () => getComputedStyle(document.querySelector('.event-label')).color === 'rgb(195, 211, 196)',
   );
   await checkThemeSizes(page);
   await page.locator('#json-file').setInputFiles({

@@ -23,6 +23,12 @@ async function editions() {
   );
   return EDITIONS.map((e) => e.id);
 }
+/** The sha256 hashes (base64) of the inline scripts in `html`, for a content security policy. */
+export function inlineScriptHashes(html) {
+  return [...html.matchAll(/<script>([^<]*)<\/script>/g)].map((m) =>
+    createHash('sha256').update(m[1]).digest('base64'),
+  );
+}
 /** The general offline file, then one per edition. */
 export async function buildOffline() {
   await buildEdition(null);
@@ -72,8 +78,12 @@ async function buildEdition(edition) {
     .find((file) => file.path.endsWith('.css'))
     .text.replace(/<\/style/gi, '<\\/style');
   const hash = createHash('sha256').update(script).digest('base64');
-  const policy = `default-src 'none'; script-src 'sha256-${hash}'; script-src-attr 'none'; style-src 'unsafe-inline'; connect-src 'none'; img-src data:; font-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'`;
   let html = await withLegal(await readFile('src/index.html', 'utf8'), false);
+  // The page's own inline script, which sets the chosen color scheme first (#382), by its hash.
+  const boot = inlineScriptHashes(html)
+    .map((h) => ` 'sha256-${h}'`)
+    .join('');
+  const policy = `default-src 'none'; script-src 'sha256-${hash}'${boot}; script-src-attr 'none'; style-src 'unsafe-inline'; connect-src 'none'; img-src data:; font-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'`;
   html = html
     .replace(
       '<meta charset="utf-8" />',

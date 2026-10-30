@@ -138,6 +138,8 @@ Colors are picked with the browser's color picker; **Use default** clears one. F
 
 Larger labels keep their room: rows of labels move apart and away from the axis, their stems lengthen to reach them, moments group into summaries sooner so labels sharing a row don't run into each other, and rows that reach past the timeline can be panned into view. Larger tick labels space the ticks further apart. Timelines that installed the first version of the theme (without sizes) keep working. **Update to v2** beside it in the **Plugin library** adds the sizes in place, keeping its colors and fonts; the library offers this for any plugin it has a newer version of.
 
+**Light and dark.** The site, the editor and the desktop app follow the system's light or dark setting, or the **Theme** chosen in the site's footer or account menu, or the editor's header ([FAQ](faq.md#can-i-use-a-dark-theme)). A timeline without a theme takes the usual look of either: light labels, markers and bands on a dark stage in dark. A theme keeps its colors in both. With a **Background color**, the parts it leaves blank take the light or dark look that suits that color; with other colors and no background, the timeline keeps its light stage in dark too, since its colors were chosen on it. Printing is always light.
+
 A plugin's `theme` names the setting for each part it sets: `text`, `textFont`, `textSize`, `measure`, `measureFont`, `measureSize`, `halo`, `marker`, `duration` and `background`. Font parts read `font` settings, size parts read `text-size` settings, and the rest read `color` settings. When several enabled plugins set the same part, the last one wins.
 
 ## UI capability API v1

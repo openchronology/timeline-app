@@ -1,10 +1,11 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
 // The signed-in account's menu at the end of the site's header: its name, opening links to the
-// account page, its profile and administration, and signing out.
+// account page, its profile and administration, the color scheme (#382), and signing out.
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { profilePath } from '../../src/addresses.ts';
+import { ThemeMenuItems } from './theme-choice.jsx';
 /**
  * A button with the account's picture (or initial) and name. It opens a menu, which closes on
  * a choice, a click elsewhere, or Escape (returning the focus to the button). Signing out
@@ -88,6 +89,8 @@ export default function AccountMenu({ username, avatarUrl, isAdmin, timelinesHre
               Site administration
             </a>
           )}
+          <hr />
+          <ThemeMenuItems />
           <hr />
           <button role="menuitem" disabled={busy} onClick={signOut}>
             Sign out

@@ -16,7 +16,8 @@ import { createCommunityUI } from './community-ui.js';
 import { createSuiteUI } from './suite-ui.js';
 import type { Proposal } from './community-ui.js';
 import { configureImages, imageSource, embedImages } from './image-assets.js';
-import { themeProperties, themeScales } from './timeline-theme.js';
+import { stageScheme, themeProperties, themeScales } from './timeline-theme.js';
+import { chooseTheme, followChoice, parseChoice, storedChoice } from './theme-choice.js';
 import './styles.css';
 import {
   renderPluginMarker,
@@ -306,6 +307,15 @@ const embedded =
 if (embedded) {
   document.body.dataset.embed = 'true';
   anonymousRequests();
+}
+// The color scheme chosen (#382), offered in the header where the editor has its own (the offline
+// file, the desktop app and the plain editor), and followed as it changes in another tab or on
+// the website around the editor's frame. An embed takes only its page's setting.
+{
+  const select = el<HTMLSelectElement>('theme-choice');
+  select.value = embedded ? 'system' : storedChoice();
+  select.addEventListener('change', () => chooseTheme(parseChoice(select.value)));
+  if (!embedded) followChoice((choice) => (select.value = choice));
 }
 // Which edition this is, beside the brand: the offline file or the desktop app.
 if (offlineHtml || desktop) {
@@ -1343,15 +1353,14 @@ function renderAxis() {
     notch.style.height = `${height}px`;
     notch.style.opacity = rule.opacity.toString();
     notch.style.borderLeftWidth = `${1 + rule.boundaryOpacity}px`;
-    const strength = Math.max(rule.opacity, Number.EPSILON);
-    const color = [203, 213, 197].map((minor, channel) =>
-      Math.round(
-        minor +
-          (([181, 194, 173][channel] - minor) * rule.majorOpacity) / strength +
-          (([113, 136, 107][channel] - [181, 194, 173][channel]) * rule.boundaryOpacity) / strength,
-      ),
-    );
-    notch.style.borderColor = `rgb(${color.join(',')})`;
+    // From the minor ticks' color through the major's to the boundaries', by how much of the
+    // tick's strength each is: the theme's tick colors (#382), light or dark.
+    const strength = Math.max(rule.opacity, Number.EPSILON),
+      clamp = (x: number) => Math.min(1, Math.max(0, x));
+    const boundary = clamp(rule.boundaryOpacity / strength),
+      major = clamp(rule.majorOpacity / strength - boundary) / Math.max(1 - boundary, 1e-9);
+    const percent = (x: number) => (100 * clamp(x)).toFixed(1) + '%';
+    notch.style.borderColor = `color-mix(in srgb, var(--stage-tick-boundary) ${percent(boundary)}, color-mix(in srgb, var(--stage-tick-major) ${percent(major)}, var(--stage-tick-minor)))`;
     tick.append(notch);
     // One label per tick: crossfading versions that print differently would overlap (#241).
     const label = tickLabel(
@@ -9616,6 +9625,10 @@ function renderTimelineTheme(stage: HTMLElement) {
     const names = Array.from({ length: stage.style.length }, (_, i) => stage.style.item(i));
     for (const name of names) if (name.startsWith('--timeline-')) stage.style.removeProperty(name);
     for (const [name, value] of Object.entries(properties)) stage.style.setProperty(name, value);
+    // A scheme of its own (#382) comes with its own ground, the theme's or the scheme's.
+    const scheme = stageScheme(theme);
+    stage.style.colorScheme = scheme;
+    stage.classList.toggle('own-scheme', !!scheme);
   }
   return !!theme.background;
 }

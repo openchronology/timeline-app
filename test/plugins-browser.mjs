@@ -815,7 +815,12 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     await page.waitForFunction(
       () => document.querySelector('.event-marker[data-first="0/1"]').dataset.shape === 'diamond',
     );
-    assert.equal(await parentDot.locator('.marker-outline path').getAttribute('stroke'), 'white');
+    assert.equal(
+      await parentDot
+        .locator('.marker-outline path')
+        .evaluate((path) => getComputedStyle(path).stroke),
+      'rgb(255, 255, 255)',
+    );
     await input('plugin-event-fields')
       .locator(':scope > [data-metadata-key="shapeSize"]')
       .getByLabel('Moment size', { exact: true })
@@ -824,7 +829,12 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
       () => document.querySelector('.event-marker[data-first="0/1"]').dataset.size === 'large',
     );
     assert.equal(await parentDot.evaluate((node) => getComputedStyle(node).width), '32px');
-    assert.equal(await parentDot.locator('.marker-outline path').getAttribute('fill'), 'none');
+    assert.equal(
+      await parentDot
+        .locator('.marker-outline path')
+        .evaluate((path) => getComputedStyle(path).fill),
+      'none',
+    );
     await cards.nth(0).getByLabel('Moment size', { exact: true }).selectOption('small');
     await page.waitForFunction(
       () => document.querySelector('.stack-marker').dataset.size === 'small',

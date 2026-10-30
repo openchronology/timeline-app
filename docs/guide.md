@@ -208,6 +208,8 @@ Tags are short labels on events, such as `war` or `trade`. Each can carry up to 
 
 Preview your choice, then select **Save display settings**. On a server timeline you can write to, that saves the display at once, without saving your other edits. See [time presentation](time-presentation.md).
 
+**Light or dark** is yours, not the timeline's: everything follows your system's setting, or the **Theme** you pick (**System**, **Light** or **Dark**) in the footer or your account's menu on the website, or in the header of the offline file and the desktop app. It is kept in this browser. See the [FAQ](faq.md#can-i-use-a-dark-theme).
+
 ## Saving
 
 The status under the title says where your work stands: **Unsaved changes**, **Saved in this browser**, **Saved on the server**, **Saved to file** and so on.

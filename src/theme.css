@@ -1,0 +1,210 @@
+/* Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only */
+/* The colors of the editor and the website, light and dark (#382): one set of tokens, each
+   `light-dark(light, dark)`, imported by src/styles.css and platform/app/platform.css. The page
+   follows the system's setting unless <html data-theme> names one (src/theme-choice.ts); print
+   is always light. The first block is every token's light value, and all a browser without
+   light-dark() gets; the second pairs each with its dark one (a token left out of it is the same
+   in both).
+   test/theme-contrast.test.mjs checks the pairs used together against WCAG AA. */
+:root {
+  color-scheme: light dark;
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+@media print {
+  :root,
+  :root * {
+    color-scheme: light !important;
+  }
+}
+:root {
+  /* The page, its text and its links. */
+  --bg: #f5f6f1;
+  --ink: #20372c;
+  --label: #44584b;
+  --muted: #637166;
+  --faint: #646f61;
+  --green: #285742;
+  --green-hover: #1d4735;
+  --link: #315d80;
+  /* Surfaces: cards and fields (paper), dialogs and menus (raised), tinted panels and chips. */
+  --paper: #fff;
+  --raised: #f9fbf5;
+  --workspace: #f0f3eb;
+  --tint: #eef2ea;
+  --tint-strong: #e2eadb;
+  --hover: #f0f4ec;
+  --knob: #fff;
+  --line: #dfe5db;
+  --line-strong: #cdd6c8;
+  --line-hover: #bccab6;
+  --focus: #4f9466;
+  --focus-glow: #61a37833;
+  /* The main action, and its text. */
+  --primary: #285742;
+  --primary-hover: #1d4735;
+  --on-primary: #fff;
+  /* The header, dark in both: its text, lines and the lime accent of its buttons. */
+  --header: #192d25;
+  --header-ink: #eef4eb;
+  --header-muted: #adc09f;
+  --header-line: #284033;
+  --header-control: #46614e;
+  --header-hover: #294333;
+  --header-hover-line: #5a7862;
+  --accent: #c4db98;
+  --accent-hover: #d6e8b0;
+  --on-accent: #192d25;
+  --gold: #f2c879;
+  /* States: danger, warning (notices), caution (sensitive content), success, information. */
+  --danger: #9b3636;
+  --danger-tint: #fbf0ee;
+  --danger-line: #e7c9c4;
+  --danger-solid: #9b2f2f;
+  --warning: #614c20;
+  --warning-tint: #fff5d8;
+  --warning-line: #e7d49a;
+  --notice: #834823;
+  --notice-tint: #fff5e9;
+  --caution: #6b5326;
+  --caution-tint: #fbf6ea;
+  --caution-line: #d9c9a8;
+  --success: #2f6b45;
+  --success-tint: #e1efe2;
+  --success-solid: #2f6d4f;
+  --info: #2d5f8a;
+  --info-solid: #2d5f8a;
+  --amber-solid: #8a5a14;
+  --neutral-solid: #57655a;
+  --highlight: #f6e7a7;
+  --on-solid: #fff;
+  /* Code, tooltips and toasts. */
+  --code: #ebefe7;
+  --code-block: #1f2b25;
+  --code-block-ink: #e9efe6;
+  --tooltip: #1f2b25;
+  --tooltip-ink: #f2f6ef;
+  --toast: #20382b;
+  --toast-ink: #eef6e5;
+  --toast-line: #4d6a44;
+  /* Overlays and shadows. */
+  --backdrop: #17271d73;
+  --spotlight: #121c1773;
+  --shadow-color: #1d382314;
+  --shadow-strong: #152b3540;
+  --shimmer: #ffffff99;
+  /* A timeline's picture before it has one, and the landing video's poster (#379). */
+  --placeholder-from: #e7eedf;
+  --placeholder-to: #f6f1e3;
+  --poster: #285742;
+  /* The timeline's stage: the defaults a timeline's theme (#230) replaces. */
+  --stage-text: #4c654c;
+  --stage-text-strong: #1d3528;
+  --stage-text-soft: #6b7863;
+  --stage-measure: #687562;
+  --stage-measure-soft: #aebda7;
+  --stage-measure-faint: #e7ece2;
+  --stage-stem: #d4dfcc;
+  --stage-marker: #547d5b;
+  --stage-marker-group: #3b654a;
+  --stage-marker-strong: #214f38;
+  --stage-marker-selected: #173c28;
+  --stage-marker-edge: #cedcc7;
+  --stage-marker-ring: #e3eccb;
+  --stage-ground: #fff;
+  --stage-halo: #fff;
+  --stage-halo-backing: #ffffffb8;
+  --stage-heading-backing: #fbfcf9e6;
+  --stage-duration: #73958b;
+  --stage-duration-text: #102a20;
+  --stage-arc: #6f8c80;
+  --stage-cursor: #b0891d;
+  --stage-tick-minor: #cbd5c5;
+  --stage-tick-major: #b5c2ad;
+  --stage-tick-boundary: #71886b;
+  --stage-fan: #b9c7ad;
+}
+@supports (color: light-dark(#000, #fff)) {
+  :root {
+    --bg: light-dark(#f5f6f1, #121c17);
+    --ink: light-dark(#20372c, #e3ebe0);
+    --label: light-dark(#44584b, #c3d0c5);
+    --muted: light-dark(#637166, #a5b3a8);
+    --faint: light-dark(#646f61, #8a9a8e);
+    --green: light-dark(#285742, #9fd0a8);
+    --green-hover: light-dark(#1d4735, #bfe3c4);
+    --link: light-dark(#315d80, #9cc3e6);
+    --paper: light-dark(#fff, #1a2720);
+    --raised: light-dark(#f9fbf5, #1d2c24);
+    --workspace: light-dark(#f0f3eb, #16221c);
+    --tint: light-dark(#eef2ea, #223329);
+    --tint-strong: light-dark(#e2eadb, #2b4034);
+    --hover: light-dark(#f0f4ec, #223329);
+    --knob: light-dark(#fff, #a5b3a8);
+    --line: light-dark(#dfe5db, #2c3d33);
+    --line-strong: light-dark(#cdd6c8, #3d5145);
+    --line-hover: light-dark(#bccab6, #557062);
+    --focus: light-dark(#4f9466, #8fd19e);
+    --focus-glow: light-dark(#61a37833, #8fd19e40);
+    --primary: light-dark(#285742, #c4db98);
+    --primary-hover: light-dark(#1d4735, #d6e8b0);
+    --on-primary: light-dark(#fff, #192d25);
+    --danger: light-dark(#9b3636, #f2a39b);
+    --danger-tint: light-dark(#fbf0ee, #3a2321);
+    --danger-line: light-dark(#e7c9c4, #6e3b36);
+    --warning: light-dark(#614c20, #ecd49a);
+    --warning-tint: light-dark(#fff5d8, #302b17);
+    --warning-line: light-dark(#e7d49a, #5e5228);
+    --notice: light-dark(#834823, #f0bf94);
+    --notice-tint: light-dark(#fff5e9, #33251a);
+    --caution: light-dark(#6b5326, #e6cf9c);
+    --caution-tint: light-dark(#fbf6ea, #2c271b);
+    --caution-line: light-dark(#d9c9a8, #5a4c30);
+    --success: light-dark(#2f6b45, #9fd0a8);
+    --success-tint: light-dark(#e1efe2, #1f3a29);
+    --info: light-dark(#2d5f8a, #9cc3e6);
+    --highlight: light-dark(#f6e7a7, #5c5122);
+    --code: light-dark(#ebefe7, #24352b);
+    --code-block: light-dark(#1f2b25, #0d1611);
+    --code-block-ink: light-dark(#e9efe6, #e3ebe0);
+    --tooltip: light-dark(#1f2b25, #34493d);
+    --toast: light-dark(#20382b, #2a4535);
+    --toast-line: light-dark(#4d6a44, #5a7862);
+    --backdrop: light-dark(#17271d73, #050a07b3);
+    --spotlight: light-dark(#121c1773, #000000a6);
+    --shadow-color: light-dark(#1d382314, #00000066);
+    --shadow-strong: light-dark(#152b3540, #000000a6);
+    --shimmer: light-dark(#ffffff99, #ffffff14);
+    --placeholder-from: light-dark(#e7eedf, #22352a);
+    --placeholder-to: light-dark(#f6f1e3, #2e3326);
+    --stage-text: light-dark(#4c654c, #c3d3c4);
+    --stage-text-strong: light-dark(#1d3528, #e3ebe0);
+    --stage-text-soft: light-dark(#6b7863, #8d9d90);
+    --stage-measure: light-dark(#687562, #93a497);
+    --stage-measure-soft: light-dark(#aebda7, #4d6356);
+    --stage-measure-faint: light-dark(#e7ece2, #223128);
+    --stage-stem: light-dark(#d4dfcc, #34483c);
+    --stage-marker: light-dark(#547d5b, #7fae88);
+    --stage-marker-group: light-dark(#3b654a, #6c9c77);
+    --stage-marker-strong: light-dark(#214f38, #a9d3b0);
+    --stage-marker-selected: light-dark(#173c28, #c4e4c9);
+    --stage-marker-edge: light-dark(#cedcc7, #3d5145);
+    --stage-marker-ring: light-dark(#e3eccb, #3d5a45);
+    --stage-ground: light-dark(#fff, #1a2720);
+    --stage-halo: light-dark(#fff, #1a2720);
+    --stage-halo-backing: light-dark(#ffffffb8, #1a2720c2);
+    --stage-heading-backing: light-dark(#fbfcf9e6, #1a2720e6);
+    --stage-duration: light-dark(#73958b, #587b70);
+    --stage-duration-text: light-dark(#102a20, #fff);
+    --stage-arc: light-dark(#6f8c80, #7c978b);
+    --stage-cursor: light-dark(#b0891d, #e0b84a);
+    --stage-tick-minor: light-dark(#cbd5c5, #34463b);
+    --stage-tick-major: light-dark(#b5c2ad, #4a5f52);
+    --stage-tick-boundary: light-dark(#71886b, #8aa58f);
+    --stage-fan: light-dark(#b9c7ad, #4d6356);
+  }
+}
