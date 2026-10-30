@@ -345,6 +345,9 @@ try {
   for (const server of servers) server.child.kill();
   await pool.query('DELETE FROM oc_timelines WHERE owner_id=$1', [id]);
   await pool.query('DELETE FROM oc_users WHERE id=$1', [id]);
+  // Sign-in attempts are counted per address across servers, a minute at a time: this test's
+  // are not left to count against the live tests that follow it in CI.
+  await pool.query('DELETE FROM oc_auth_attempts');
   await pool.end();
   await rm(content, { recursive: true, force: true });
 }
