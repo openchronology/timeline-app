@@ -1,9 +1,13 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // The editor's built page (dist/index.html) as the platform serves it, and its content
-// security policy.
+// security policy, which lets its inline color-scheme script (#382) run by its hash.
 import 'server-only';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { THEME_BOOT } from '../../src/theme-choice.ts';
+/** The editor page's one inline script, which sets the chosen color scheme first (#382). */
+const BOOT = `'sha256-${createHash('sha256').update(THEME_BOOT).digest('base64')}'`;
 /** The editor's page, with its assets addressed from the site's root. */
 export async function editorHtml() {
   return (
@@ -19,5 +23,5 @@ export function editorPolicy(ancestors) {
   // Cloudflare Turnstile, when it is the human-verification provider, loads a script and frame.
   const turnstile =
     process.env.CHALLENGE_PROVIDER === 'turnstile' ? ' https://challenges.cloudflare.com' : '';
-  return `default-src 'self'; script-src 'self'${turnstile}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-src 'self'${turnstile}; frame-ancestors ${ancestors}; base-uri 'none'; form-action 'self'`;
+  return `default-src 'self'; script-src 'self' ${BOOT}${turnstile}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-src 'self'${turnstile}; frame-ancestors ${ancestors}; base-uri 'none'; form-action 'self'`;
 }

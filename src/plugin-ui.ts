@@ -925,12 +925,13 @@ export function renderPluginShape(button: HTMLButtonElement, shape: string) {
   svg.setAttribute('aria-hidden', 'true');
   const path = document.createElementNS(ns, 'path');
   path.setAttribute('d', SHAPE_PATHS[shape]);
-  path.setAttribute('fill', button.style.backgroundColor || '#547d5b');
-  path.setAttribute('stroke', 'white');
+  // The marker's color, or the stage's (#382), ringed in the stage's ground as circles are.
+  path.style.fill = button.style.backgroundColor || 'var(--timeline-marker, var(--stage-marker))';
+  path.style.stroke = 'var(--stage-ground)';
   path.setAttribute('stroke-linejoin', 'round');
   path.setAttribute('stroke-width', '5');
   const border = path.cloneNode(true) as SVGPathElement;
-  border.setAttribute('fill', 'none');
+  border.style.fill = 'none';
   // A shallow clone keeps the `marker-shape` class, so the removal above clears it too.
   const outline = svg.cloneNode(false) as SVGSVGElement;
   outline.classList.add('marker-outline');
@@ -941,8 +942,9 @@ export function renderPluginShape(button: HTMLButtonElement, shape: string) {
   button.append(outline);
 }
 /**
- * Outlines a marker (#325), after renderPluginShape has drawn it: dashed adds dark dashes over
- * its white border, so the dashes show on light and dark backgrounds and against any color.
+ * Outlines a marker (#325), after renderPluginShape has drawn it: dashed adds dashes in the
+ * text's color over its ring in the stage's ground (dark over white, or light over dark, #382),
+ * so the dashes show on light and dark backgrounds and against any color.
  * A circle (or an icon) dashes its CSS border (the `data-outline` attribute); any other shape
  * gets a dashed copy of its SVG outline's path, so every shape, present or future, is dashed
  * the same way. Solid removes them.
@@ -958,7 +960,7 @@ export function renderPluginOutline(button: HTMLElement, outline: OutlineStyle) 
   if (!border) return;
   const dashes = border.cloneNode(false) as SVGPathElement;
   dashes.classList.add('marker-dashes');
-  dashes.removeAttribute('stroke');
+  dashes.style.removeProperty('stroke');
   dashes.removeAttribute('stroke-width');
   border.after(dashes);
 }

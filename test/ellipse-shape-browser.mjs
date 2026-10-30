@@ -58,9 +58,9 @@ export async function checkEllipseShape(page, restore) {
         size: button.dataset.size,
         width: parseFloat(getComputedStyle(button).width),
         clip: button.style.getPropertyValue('--marker-clip'),
-        fill: path?.getAttribute('fill'),
-        stroke: border?.getAttribute('stroke'),
-        borderFill: border?.getAttribute('fill'),
+        fill: path && getComputedStyle(path).fill,
+        stroke: border && getComputedStyle(border).stroke,
+        borderFill: border && getComputedStyle(border).fill,
         box: box && { width: box.width, height: box.height },
         img: img && {
           clip: getComputedStyle(img).clipPath,
@@ -111,7 +111,7 @@ export async function checkEllipseShape(page, restore) {
   assert.equal(oval.clip, 'ellipse(50% 30% at 50% 50%)');
   assert(oval.box.width > oval.box.height * 1.5, JSON.stringify(oval.box));
   assert.equal(oval.fill, 'rgb(122, 173, 196)');
-  assert.deepEqual([oval.stroke, oval.borderFill], ['white', 'none']);
+  assert.deepEqual([oval.stroke, oval.borderFill], ['rgb(255, 255, 255)', 'none']);
   assert.equal(oval.width, 22);
 
   // An icon inside the large ellipse fills the marker inside its border, centred, and is
@@ -129,7 +129,7 @@ export async function checkEllipseShape(page, restore) {
     withIcon.img.offset.every((d) => Math.abs(d) <= 0.5),
     JSON.stringify(withIcon),
   );
-  assert.equal(withIcon.stroke, 'white');
+  assert.equal(withIcon.stroke, 'rgb(255, 255, 255)');
 
   // A stack entry takes the ellipse too.
   const entry = page.locator('.stack-marker[data-stack-entry="entry"]');

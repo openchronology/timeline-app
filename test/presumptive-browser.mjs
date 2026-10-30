@@ -140,11 +140,11 @@ export async function checkPresumptive(page, restore) {
         return {
           outline: node.dataset.outline ?? null,
           shaped: node.classList.contains('shaped'),
-          // A circle or icon: its CSS outline over its white border.
+          // A circle or icon: its CSS outline over its ring.
           css: style.outlineStyle,
           cssColor: style.outlineColor,
           border: style.borderTopColor,
-          // Any other shape: a dashed copy of its SVG outline, over the white stroke.
+          // Any other shape: a dashed copy of its SVG outline, over its ring.
           dashes: dash && {
             array: dash.strokeDasharray,
             stroke: dash.stroke,
@@ -152,9 +152,8 @@ export async function checkPresumptive(page, restore) {
             outline: node
               .querySelector('.marker-outline path:not(.marker-dashes)')
               .getAttribute('d'),
-            under: node
-              .querySelector('.marker-outline path:not(.marker-dashes)')
-              .getAttribute('stroke'),
+            under: getComputedStyle(node.querySelector('.marker-outline path:not(.marker-dashes)'))
+              .stroke,
           },
         };
       };
@@ -179,15 +178,18 @@ export async function checkPresumptive(page, restore) {
         document.querySelector('.duration-band[data-duration-id="condition"]') &&
         document.querySelector('#markers .event-marker[data-first="400/1"].icon'),
     );
-  /** Checks the dashes show against the white they alternate with and the background. */
-  const visible = (shown, name) => {
+  /**
+   * Checks the dashes show against the ring they alternate with (the stage's ground: white, or
+   * dark on a dark theme background, #382) and the background.
+   */
+  const visible = (shown, name, ground = 'rgb(255, 255, 255)') => {
     const { background } = shown;
     for (const key of ['circle', 'icon', 'condition']) {
       const m = shown[key];
       assert.equal(m.outline, 'dashed', `${key} (${name})`);
       assert.equal(m.css, 'dashed', `${key} (${name})`);
-      assert.equal(m.border, 'rgb(255, 255, 255)', `${key} keeps its white border (${name})`);
-      assert(contrast(m.cssColor, m.border) >= 4.5, `${key}: dashes on white (${name})`);
+      assert.equal(m.border, ground, `${key} keeps its ring (${name})`);
+      assert(contrast(m.cssColor, m.border) >= 4.5, `${key}: dashes on the ring (${name})`);
       assert(
         Math.max(contrast(m.cssColor, background), contrast(m.border, background)) >= 3,
         `${key}: the dashes or the white between them stand out (${name})`,
@@ -199,8 +201,8 @@ export async function checkPresumptive(page, restore) {
       assert(m.shaped, key);
       assert.notEqual(m.dashes.array, 'none', `${key} (${name})`);
       assert.equal(m.dashes.path, m.dashes.outline, `${key}: dashed along its own outline`);
-      assert(contrast(m.dashes.stroke, 'rgb(255, 255, 255)') >= 4.5, `${key} (${name})`);
-      assert.equal(m.dashes.under, 'white');
+      assert(contrast(m.dashes.stroke, ground) >= 4.5, `${key} (${name})`);
+      assert.equal(m.dashes.under, ground);
     }
     for (const key of ['plain', 'odd', 'sure', 'known']) {
       assert.equal(shown[key].outline, null, `${key} is solid (${name})`);
@@ -213,12 +215,24 @@ export async function checkPresumptive(page, restore) {
   await load(timeline('Presumptive', plugins()));
   await waitForMarkers();
   visible(await look(), 'light');
-  // Dark: a dark background color from the timeline theme.
+  // Dark: a dark background color from the timeline theme, which gives the stage the dark
+  // scheme: dark rings, light dashes.
   await load(timeline('Presumptive dark', plugins(true, '#1b2229')));
   await waitForMarkers();
+  // Rings ease from the light stage's ground into the dark one's.
+  await page.waitForFunction(() =>
+    [
+      '#markers .event-marker[data-first="0/1"]',
+      '#markers .event-marker[data-first="400/1"]',
+      '.duration-band[data-duration-id="condition"]',
+    ].every(
+      (selector) =>
+        getComputedStyle(document.querySelector(selector)).borderTopColor === 'rgb(26, 39, 32)',
+    ),
+  );
   const dark = await look();
   assert.equal(dark.background, 'rgb(27, 34, 41)');
-  visible(dark, 'dark');
+  visible(dark, 'dark', 'rgb(26, 39, 32)');
 
   // Summaries stay solid: zoomed out, everything groups.
   await page.locator('#left-bound').fill('-100000');

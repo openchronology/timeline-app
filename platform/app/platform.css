@@ -1,8 +1,9 @@
 /* Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only */
+@import '../../src/theme.css';
 @import '../../src/dialog-motion.css';
 :root {
-  color-scheme: light;
-  /* Shares the editor's type, color and control tokens so both surfaces read as one product. */
+  /* Shares the editor's type, color (src/theme.css, light or dark, #382) and control tokens so
+     both surfaces read as one product. */
   font-family:
     Inter,
     ui-sans-serif,
@@ -14,17 +15,8 @@
   line-height: 1.6;
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
-  color: #20372c;
-  background: #f5f6f1;
-  --green: #285742;
-  --green-hover: #1d4735;
-  --ink: #20372c;
-  --muted: #6f7c71;
-  --line: #dfe5db;
-  --line-strong: #cdd6c8;
-  --paper: #fff;
-  --hover: #f0f4ec;
-  --focus: #61a378;
+  color: var(--ink);
+  background: var(--bg);
   --radius: 8px;
   --control-height: 32px;
 }
@@ -64,7 +56,7 @@ button,
   line-height: 1.2;
   cursor: pointer;
   text-decoration: none;
-  box-shadow: 0 1px 1px #20372c0a;
+  box-shadow: 0 1px 1px var(--shadow-color);
   transition:
     background 0.15s,
     border-color 0.15s;
@@ -72,7 +64,7 @@ button,
 button:hover,
 .button:hover {
   background: var(--hover);
-  border-color: #bccab6;
+  border-color: var(--line-hover);
   color: var(--ink);
 }
 button:disabled {
@@ -86,14 +78,14 @@ summary:focus-visible {
   outline-offset: 2px;
 }
 .primary {
-  background: var(--green);
-  border-color: var(--green);
-  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
 }
 .primary:hover {
-  background: var(--green-hover);
-  border-color: var(--green-hover);
-  color: #fff;
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+  color: var(--on-primary);
 }
 input,
 textarea,
@@ -120,13 +112,13 @@ textarea:focus-visible,
 select:focus-visible {
   outline: none;
   border-color: var(--focus);
-  box-shadow: 0 0 0 3px #61a37833;
+  box-shadow: 0 0 0 3px var(--focus-glow);
 }
 label {
   display: block;
   font-size: 13px;
   font-weight: 600;
-  color: #44584b;
+  color: var(--label);
 }
 input[type='checkbox'],
 input[type='radio'] {
@@ -141,29 +133,29 @@ input[type='radio'] {
   justify-content: space-between;
   gap: 20px;
   padding: 16px 28px;
-  background: #192d25;
-  color: #eef4eb;
-  border-bottom: 1px solid #284033;
+  background: var(--header);
+  color: var(--header-ink);
+  border-bottom: 1px solid var(--header-line);
 }
 .platform-header button,
 .platform-header .button {
   background: transparent;
-  border-color: #46614e;
-  color: #e3eddf;
+  border-color: var(--header-control);
+  color: var(--header-ink);
   box-shadow: none;
 }
 .platform-header button:hover,
 .platform-header .button:hover {
-  background: #294333;
-  border-color: #5a7862;
-  color: #fff;
+  background: var(--header-hover);
+  border-color: var(--header-hover-line);
+  color: var(--on-solid);
 }
 .platform-header a {
-  color: #fff;
+  color: var(--on-solid);
   text-decoration: none;
 }
 .platform-header a.support-link {
-  color: #f2c879;
+  color: var(--gold);
 }
 /* The header's end: the visitor's account, after the navigation. A guest's Sign in and Sign
    up, or the account's menu, which drops down as a light panel. */
@@ -175,14 +167,14 @@ input[type='radio'] {
   gap: 8px;
 }
 .platform-header .button.primary {
-  background: #c4db98;
-  border-color: #c4db98;
-  color: #192d25;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
 }
 .platform-header .button.primary:hover {
-  background: #d6e8b0;
-  border-color: #d6e8b0;
-  color: #192d25;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--on-accent);
 }
 .account-menu {
   position: relative;
@@ -201,8 +193,8 @@ input[type='radio'] {
   height: 28px;
   border-radius: 50%;
   object-fit: cover;
-  background: #c4db98;
-  color: #192d25;
+  background: var(--accent);
+  color: var(--on-accent);
   font-weight: 700;
 }
 .account-menu-list {
@@ -218,7 +210,7 @@ input[type='radio'] {
   border-radius: 10px;
   background: var(--paper);
   color: var(--ink);
-  box-shadow: 0 10px 30px #10201a33;
+  box-shadow: 0 10px 30px var(--shadow-strong);
 }
 .account-menu-heading {
   margin: 4px 10px 8px;
@@ -246,6 +238,26 @@ input[type='radio'] {
 .platform-header .account-menu-list :is(a, button):focus-visible {
   background: var(--hover);
   color: var(--ink);
+}
+/* The account menu's color scheme (#382): its choices in a row, the current one marked. */
+.theme-menu {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px 2px 10px;
+}
+.theme-menu-label {
+  margin-right: auto;
+  font-size: 13px;
+  color: var(--muted);
+}
+.platform-header .theme-menu button {
+  padding: 4px 8px;
+  font-size: 13px;
+}
+.platform-header .theme-menu button[aria-checked='true'] {
+  background: var(--tint-strong);
+  font-weight: 600;
 }
 .account-menu-list hr {
   width: 100%;
@@ -305,7 +317,7 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--paper);
-  box-shadow: 0 1px 2px #1d38230a;
+  box-shadow: 0 1px 2px var(--shadow-color);
   overflow-wrap: anywhere;
 }
 .timeline-card h3 {
@@ -331,7 +343,7 @@ h2 {
 .timeline-card-placeholder {
   display: block;
   height: 100%;
-  background: linear-gradient(135deg, #e7eedf, #f6f1e3);
+  background: linear-gradient(135deg, var(--placeholder-from), var(--placeholder-to));
 }
 .muted {
   color: var(--muted);
@@ -357,8 +369,8 @@ h2 {
   min-height: 26px;
   padding: 0 10px;
   border-radius: 999px;
-  background: #edf2e8;
-  border-color: #dbe4d4;
+  background: var(--tint);
+  border-color: var(--line);
   box-shadow: none;
   font-size: 12px;
 }
@@ -403,7 +415,7 @@ section {
 .timeline-grid > .timeline-card:hover,
 .timeline-grid > .timeline-card:focus-within {
   border-color: var(--line-strong);
-  box-shadow: 0 4px 14px #1d382314;
+  box-shadow: 0 4px 14px var(--shadow-color);
 }
 .timeline-card > * {
   margin: 0;
@@ -439,12 +451,12 @@ section {
   padding: 1px 8px;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
-  color: #44584b;
+  color: var(--label);
   font-size: 12px;
 }
 .badge-featured {
-  border-color: #c9dcc5;
-  background: #edf5ea;
+  border-color: var(--line-strong);
+  background: var(--tint);
   color: var(--green);
 }
 .timeline-card-description {
@@ -453,7 +465,7 @@ section {
   -webkit-line-clamp: 3;
   line-clamp: 3;
   overflow: hidden;
-  color: #2f4538;
+  color: var(--ink);
   font-size: 14px;
 }
 .timeline-card-facts {
@@ -506,21 +518,21 @@ ul.tags {
   align-items: center;
   min-height: 26px;
   padding: 0 10px;
-  border: 1px solid #dbe4d4;
+  border: 1px solid var(--line-strong);
   border-radius: 999px;
-  background: #edf2e8;
+  background: var(--tint);
   color: var(--ink);
   font-size: 12px;
   text-decoration: none;
 }
 .tag-chip:hover {
-  background: #e2eadb;
+  background: var(--tint-strong);
   color: var(--ink);
 }
 .tag-chip[aria-current='true'] {
   border-color: var(--green);
-  background: var(--green);
-  color: #fff;
+  background: var(--primary);
+  color: var(--on-primary);
 }
 .timeline-card-footer {
   display: flex;
@@ -598,7 +610,7 @@ ul.tags {
 }
 .layout-toggle button[aria-pressed='true'] {
   background: var(--hover);
-  border-color: #bccab6;
+  border-color: var(--line-hover);
   font-weight: 600;
 }
 /* Loading: a thin bar above the cards, which dim and shimmer where they are. */
@@ -635,7 +647,8 @@ ul.tags {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(100deg, #fff0 30%, #ffffff99 50%, #fff0 70%) -150% 0 / 200% 100%;
+  background: linear-gradient(100deg, transparent 30%, var(--shimmer) 50%, transparent 70%) -150%
+    0 / 200% 100%;
   animation: shimmer 1.3s linear infinite;
   pointer-events: none;
 }
@@ -684,7 +697,7 @@ ul.tags {
   }
 }
 .error {
-  color: #9b3636;
+  color: var(--danger);
 }
 .notice {
   padding: 14px 16px;
@@ -815,6 +828,20 @@ ul.tags {
   color: var(--muted);
   text-align: center;
 }
+/* The color scheme's choice (#382), a small select among the footer's links. */
+.platform-footer .theme-choice label {
+  display: inline;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+}
+.platform-footer .theme-choice select {
+  display: inline-block;
+  width: auto;
+  min-height: 0;
+  padding: 1px 6px;
+  font-size: 12px;
+}
 .legal-document pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -851,7 +878,7 @@ body:has(.editor-page) > .platform-footer {
   min-height: 0;
   height: 0;
   border: 0;
-  background: #f5f6ef;
+  background: var(--bg);
 }
 .editor-page h1 {
   font-size: 24px;
@@ -859,7 +886,7 @@ body:has(.editor-page) > .platform-footer {
   padding: 12px 24px;
 }
 .danger {
-  color: #9b3636;
+  color: var(--danger);
 }
 @media (max-width: 650px) {
   .platform-header {
@@ -944,12 +971,12 @@ dialog {
   padding: 28px;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: #f9fbf5;
+  background: var(--raised);
   color: var(--ink);
-  box-shadow: 0 20px 100px #152b3540;
+  box-shadow: 0 20px 100px var(--shadow-strong);
 }
 dialog::backdrop {
-  background: #17271d73;
+  background: var(--backdrop);
 }
 .dialog-heading h2 {
   font-family: Georgia, serif;
@@ -980,7 +1007,7 @@ dialog::backdrop {
   height: 96px;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid white;
+  border: 3px solid var(--paper);
 }
 /* The account page: a summary across the top, then its settings as cards, two columns wide
    on a wide screen and one on a narrow one. */
@@ -1000,7 +1027,7 @@ dialog::backdrop {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--paper);
-  box-shadow: 0 1px 2px #1d38230a;
+  box-shadow: 0 1px 2px var(--shadow-color);
 }
 .account-summary .account-avatar {
   grid-area: avatar;
@@ -1056,7 +1083,7 @@ dialog::backdrop {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--paper);
-  box-shadow: 0 1px 2px #1d38230a;
+  box-shadow: 0 1px 2px var(--shadow-color);
   overflow-wrap: anywhere;
 }
 .settings-card.wide {
@@ -1071,7 +1098,7 @@ dialog::backdrop {
   font-size: 15px;
 }
 .settings-card.danger-zone {
-  border-color: #e7c9c4;
+  border-color: var(--danger-line);
 }
 /* Rows of a setting: its name, its state, and what can be done with it, at the end. */
 .settings-list {
@@ -1099,14 +1126,14 @@ dialog::backdrop {
 .status-badge {
   padding: 1px 9px;
   border-radius: 999px;
-  background: #eef1ea;
+  background: var(--tint);
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
 }
 .status-badge.on {
-  background: #e1efe2;
-  color: #2f6b45;
+  background: var(--success-tint);
+  color: var(--success);
 }
 /* A change kept closed until chosen: its button, then its form beneath, the row's width. */
 .account-disclosure > summary {
@@ -1130,7 +1157,7 @@ dialog::backdrop {
   padding: 4px 14px 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #fafbf8;
+  background: var(--raised);
 }
 .settings-form label {
   margin: 12px 0;
@@ -1150,8 +1177,8 @@ dialog::backdrop {
   align-items: center;
   justify-content: center;
   border: 0;
-  background: var(--green);
-  color: #fff;
+  background: var(--primary);
+  color: var(--on-primary);
   font-size: 30px;
   font-weight: 600;
 }
@@ -1299,7 +1326,7 @@ dialog::backdrop {
   color: var(--ink);
   font-size: 13px;
   line-height: 1.5;
-  box-shadow: 0 8px 28px #20372c26;
+  box-shadow: 0 8px 28px var(--shadow-strong);
 }
 .analytics-consent p {
   margin: 0 0 10px;
@@ -1336,7 +1363,7 @@ dialog::backdrop {
   padding: 24px;
   border: 1px solid var(--line-strong);
   border-radius: 12px;
-  background: linear-gradient(135deg, #f4f8ef, #ffffff);
+  background: linear-gradient(135deg, var(--hover), var(--paper));
 }
 .download-recommended h2 {
   margin: 0 0 6px;
@@ -1393,7 +1420,7 @@ dialog::backdrop {
   font-weight: 500;
   padding: 2px 8px;
   border-radius: 999px;
-  background: #e6efdf;
+  background: var(--tint-strong);
   color: var(--green);
 }
 .download-file {
@@ -1419,8 +1446,8 @@ dialog::backdrop {
   padding: 8px 10px;
   overflow-x: auto;
   border-radius: 6px;
-  background: #1d3528;
-  color: #eef4eb;
+  background: var(--code-block);
+  color: var(--code-block-ink);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -1438,7 +1465,7 @@ dialog::backdrop {
   text-underline-offset: 2px;
 }
 .download-primary .download-size {
-  color: #ffffffcc;
+  color: color-mix(in srgb, var(--on-primary) 80%, transparent);
 }
 /* Reports and moderation (#115). */
 .report-categories {
@@ -1477,7 +1504,7 @@ dialog::backdrop {
   border-left: 3px solid var(--line);
 }
 .badge.danger {
-  color: #9b3636;
+  color: var(--danger);
   font-size: 13px;
 }
 .moderation-notice {
@@ -1488,10 +1515,10 @@ dialog::backdrop {
   display: inline-block;
   margin: 0 0 6px;
   padding: 2px 8px;
-  border: 1px solid #d9c9a8;
+  border: 1px solid var(--caution-line);
   border-radius: 999px;
-  background: #fbf6ea;
-  color: #6b5326;
+  background: var(--caution-tint);
+  color: var(--caution);
   font-size: 12px;
 }
 label .field-hint {
@@ -1604,21 +1631,21 @@ main.api-reference {
     Menlo,
     monospace;
   text-align: center;
-  color: #fff;
-  background: #57655a;
+  color: var(--on-solid);
+  background: var(--neutral-solid);
 }
 .api-get {
-  background: #2f6d4f;
+  background: var(--success-solid);
 }
 .api-post {
-  background: #2d5f8a;
+  background: var(--info-solid);
 }
 .api-put,
 .api-patch {
-  background: #8a5a14;
+  background: var(--amber-solid);
 }
 .api-delete {
-  background: #9b2f2f;
+  background: var(--danger-solid);
 }
 .api-fields {
   margin: 0.25rem 0;
@@ -1632,11 +1659,11 @@ main.api-reference {
   color: var(--muted);
 }
 .api-type {
-  color: #2d5f8a;
+  color: var(--info);
   font-size: 13px;
 }
 .api-required {
-  color: #9b2f2f;
+  color: var(--danger);
   font-size: 12px;
 }
 .api-responses > div {
@@ -1651,10 +1678,10 @@ main.api-reference {
   margin: 0.15rem 0;
 }
 .api-ok {
-  color: #2f6d4f;
+  color: var(--success);
 }
 .api-failed {
-  color: #9b2f2f;
+  color: var(--danger);
 }
 .api-try {
   margin-top: 0.75rem;
@@ -1677,7 +1704,7 @@ main.api-reference {
   max-height: 24rem;
   padding: 0.75rem;
   border-radius: var(--radius);
-  background: #f3f5f0;
+  background: var(--code);
   font-size: 12px;
 }
 @media (max-width: 900px) {
@@ -1787,14 +1814,14 @@ main.help {
 .help-article code {
   padding: 0.1em 0.3em;
   border-radius: 4px;
-  background: #ebefe7;
+  background: var(--code);
   font-size: 0.9em;
 }
 .help-article pre {
   padding: 0.9rem 1rem;
   border-radius: var(--radius);
-  background: #1f2b25;
-  color: #e9efe6;
+  background: var(--code-block);
+  color: var(--code-block-ink);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -1820,7 +1847,7 @@ main.help {
   text-align: left;
 }
 .help-article th {
-  background: #eef2ea;
+  background: var(--tint);
 }
 .help-on-page {
   float: right;
@@ -1853,7 +1880,7 @@ main.help {
 }
 .help-results mark,
 .help-article mark {
-  background: #f6e7a7;
+  background: var(--highlight);
   color: inherit;
 }
 @media (max-width: 1100px) {
@@ -1898,9 +1925,9 @@ main.help {
 }
 .help-tip > a:hover,
 .help-tip > a:focus-visible {
-  border-color: var(--green);
-  background: var(--green);
-  color: #fff;
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--on-primary);
 }
 .help-tip [role='tooltip'] {
   position: absolute;
@@ -1911,14 +1938,14 @@ main.help {
   max-width: min(18rem, 80vw);
   padding: 8px 10px;
   border-radius: 6px;
-  background: #1f2b25;
-  color: #f2f6ef;
+  background: var(--tooltip);
+  color: var(--tooltip-ink);
   font-size: 13px;
   font-weight: 400;
   line-height: 1.45;
   letter-spacing: normal;
   text-transform: none;
-  box-shadow: 0 6px 20px rgb(0 0 0 / 0.2);
+  box-shadow: 0 6px 20px var(--shadow-strong);
   transform: translateX(-50%);
   visibility: hidden;
   opacity: 0;
@@ -2026,7 +2053,7 @@ main.landing section {
 .audience-card:hover,
 .audience-card:focus-within {
   border-color: var(--line-strong);
-  box-shadow: 0 4px 14px #1d382314;
+  box-shadow: 0 4px 14px var(--shadow-color);
 }
 .audience-card h3 {
   margin: 0 0 4px;
@@ -2077,13 +2104,13 @@ main.landing section {
   justify-content: center;
   gap: 12px;
   padding: 16px;
-  background: linear-gradient(135deg, #192d25, #285742);
-  color: #fff;
+  background: linear-gradient(135deg, var(--header), var(--poster));
+  color: var(--on-solid);
   text-align: center;
   text-decoration: none;
 }
 .landing-video-poster:hover {
-  color: #fff;
+  color: var(--on-solid);
 }
 .landing-video-play {
   display: inline-flex;
@@ -2092,12 +2119,12 @@ main.landing section {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: #c4db98;
-  color: #192d25;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 24px;
 }
 .landing-video-poster:hover .landing-video-play {
-  background: #d6e8b0;
+  background: var(--accent-hover);
 }
 .landing-video-title {
   font-size: 17px;
@@ -2139,53 +2166,5 @@ main.landing section {
   }
   .landing-actions .button {
     flex: 1 1 100%;
-  }
-}
-/* Dark, for visitors who prefer it: the page, its footer and the cards on it. */
-@media (prefers-color-scheme: dark) {
-  :root:has(main.landing) {
-    color-scheme: dark;
-    color: #e3ebe0;
-    background: #121c17;
-    --green: #9fd0a8;
-    --green-hover: #bfe3c4;
-    --ink: #e3ebe0;
-    --muted: #a5b3a8;
-    --line: #2c3d33;
-    --line-strong: #3d5145;
-    --paper: #1a2720;
-    --hover: #223329;
-    --focus: #8fd19e;
-  }
-  main.landing .primary {
-    background: #c4db98;
-    border-color: #c4db98;
-    color: #192d25;
-  }
-  main.landing .primary:hover {
-    background: #d6e8b0;
-    border-color: #d6e8b0;
-    color: #192d25;
-  }
-  main.landing :is(.badge, .timeline-card-description) {
-    color: var(--ink);
-  }
-  main.landing .badge-featured {
-    border-color: #3d5145;
-    background: #223329;
-    color: var(--green);
-  }
-  main.landing .tag-chip {
-    border-color: var(--line-strong);
-    background: var(--hover);
-  }
-  main.landing .tag-chip:hover {
-    background: #2b4034;
-  }
-  main.landing .timeline-card-placeholder {
-    background: linear-gradient(135deg, #22352a, #2e3326);
-  }
-  main.landing :is(.timeline-grid > .timeline-card, .audience-card):is(:hover, :focus-within) {
-    box-shadow: 0 4px 14px #0006;
   }
 }

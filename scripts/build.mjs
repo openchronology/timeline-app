@@ -44,6 +44,7 @@ await build({
     'src/image-assets.ts',
     'src/dialogs.ts',
     'src/timeline-theme.ts',
+    'src/theme-choice.ts',
     // The server's sandbox for compiling plugin scripts (server/plugin-sandbox.mjs).
     'src/plugin-compile-worker.mjs',
   ],

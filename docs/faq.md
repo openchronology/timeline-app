@@ -82,6 +82,10 @@ Open the moment and choose **Share** in its details. The address bar also follow
 
 Yes, if it is public. Choose **Share**, then **Embed on a website**, pick a size, and copy the code. The embedded timeline is read-only. See [embedding](sharing.md#embedding).
 
+## Can I use a dark theme?
+
+Yes. The site, the editor, the offline file and the desktop app follow your system's light or dark setting. To choose, pick **Theme**: **System**, **Light** or **Dark** in the footer of any page, or in your account's menu; the offline file and the desktop app have it in their header. The choice is kept in this browser (or app), so it holds across visits, signed in or not. Without JavaScript the system's setting applies. Embeds follow the visitor's system unless their address says `?theme=light` or `?theme=dark` (see [embedding](sharing.md#embedding)), and a timeline's own [theme](plugins.md#timeline-theme) keeps its colors. Pages print light.
+
 ## Can other people edit my timeline?
 
 Add them under **Sharing & settings → Collaborators**. A **Viewer** reads, a **Contributor** proposes changes as pull requests, and a **Writer** saves changes and merges pull requests. Only the owner changes visibility, collaborators, or deletes the timeline. See [members and roles](guide.md#members-and-roles).

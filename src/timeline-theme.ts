@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // A timeline's theme (#230): the colors, fonts and text sizes (#267) a theme plugin sets, as the
 // `--timeline-*` properties the stylesheet reads on the timeline's stage, with the shades worked
-// out from them.
+// out from them, and the light or dark scheme its background gives the stage's defaults (#382).
 import type { PluginTheme } from './plugins.js';
 
 const mix = (color: string, percent: number, other = 'transparent') =>
@@ -14,6 +14,18 @@ export function textOn(color: string) {
     return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
   });
   return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.18 ? '#1b1f1c' : '#ffffff';
+}
+
+/**
+ * The scheme the stage takes under a theme (#382), whatever the page's: a theme's background
+ * color decides it, light or dark; a theme of other colors and no background was made on the
+ * usual light stage, so keeps it, its colors readable in both. Without theme colors ('') the
+ * stage follows the page.
+ */
+export function stageScheme(theme: PluginTheme): 'light' | 'dark' | '' {
+  if (theme.background) return textOn(theme.background) === '#ffffff' ? 'dark' : 'light';
+  const colored = [theme.text, theme.measure, theme.halo, theme.marker, theme.duration];
+  return colored.some(Boolean) ? 'light' : '';
 }
 
 /**

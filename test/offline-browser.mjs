@@ -86,6 +86,13 @@ try {
   // The offline file says so beside the brand (#101).
   assert.equal(await page.locator('#edition-chip').textContent(), 'Offline');
   assert(await page.locator('#edition-chip').isVisible());
+  // Its own Theme choice (#382): the inline script that applies it passes the file's policy.
+  await page.locator('#theme-choice').selectOption('dark');
+  await page.reload();
+  await poll(() => input('memory-notice').isVisible());
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
+  await page.locator('#theme-choice').selectOption('system');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), undefined);
   // The chip says it is offline, so no badge repeats it.
   await poll(() => input('memory-notice').isVisible());
   assert(await input('storage-badge').isHidden());

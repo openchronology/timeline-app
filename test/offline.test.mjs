@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// The offline HTML build: assets embedded, a valid script hash, and no external resources.
+// The offline HTML build: assets embedded, valid script hashes, and no external resources.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -10,9 +10,13 @@ test('offline HTML has embedded assets, a valid script hash, and denies external
   const html = await readFile('dist/openchronology-offline.html', 'utf8');
   assert(html.slice(0, 1024).includes('<meta charset="utf-8" />'));
   const scripts = [...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/gi)];
-  assert.equal(scripts.length, 1);
-  assert.equal(scripts[0][1], ''); // Classic script works directly from file:// without module imports.
-  const code = scripts[0][2];
+  // The color scheme's inline script (#382) in the head, then the app's.
+  assert.equal(scripts.length, 2);
+  const boot = createHash('sha256').update(scripts[0][2]).digest('base64');
+  assert(scripts[0][2].includes('data-theme'));
+  assert(html.includes(`'sha256-${boot}'`));
+  assert.equal(scripts[1][1], ''); // Classic script works directly from file:// without module imports.
+  const code = scripts[1][2];
   new Script(code); // The final embedded code must remain valid after HTML escaping and substitution.
   assert(!/\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\s*\(/.test(code));
   assert(!/\beval\s*\(|\bnew\s+Function\s*\(/.test(code));
