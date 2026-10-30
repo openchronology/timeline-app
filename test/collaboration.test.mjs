@@ -14,6 +14,11 @@ import {
   isOfficialPlugin,
   MOMENT_SHAPES,
   TimelineIndex,
+  CUSTOM_EXAMPLE,
+  changeText,
+  exactTimeText,
+  createPresenter,
+  Q,
 } from '../dist/core.mjs';
 import {
   searchInput,
@@ -301,4 +306,127 @@ test('timeline sorting defaults and bookmark queries are validated', async () =>
   assert(sql.includes("($14='' OR t.visibility=$14)"));
   assert.throws(() => searchInput({ starredBy: 'someone', scope: 'visible' }));
   await assert.rejects(searchTimelines({}, null, { scope: 'starred' }), (e) => e.status === 401);
+});
+
+test('pull request changes list times as the timeline displays them, old → new when changed (#384)', async () => {
+  // Revisions read whole (no history rows): what a summary compares when they are not kept as rows.
+  const display = (mode, more = {}) => ({
+    version: 1,
+    mode,
+    significantDigits: 6,
+    unit: '',
+    scale: '1',
+    origin: '0',
+    offsetMinutes: 0,
+    ...more,
+  });
+  const moment = (id, time, title = id) => ({ id, time, metadata: { title } });
+  const doc = (events, durations = [], presentation) =>
+    validateDocument({
+      format: 'openchronology',
+      version: 1,
+      title: 'T',
+      description: '',
+      events,
+      durations,
+      ...(presentation ? { presentation } : {}),
+    });
+  const summary = (base, proposed, presentation) =>
+    new Collaboration({
+      pool: { query: async () => ({ rows: [] }) },
+      revisionDocument: async (_client, id) => ({ base, proposed })[id],
+    }).changes('base', 'proposed', presentation);
+  const lines = (changes) =>
+    [
+      ...changes.examples.map((e) => changeText(e, 'moment')),
+      ...changes.durationExamples.map((e) => changeText(e, 'duration')),
+    ].sort();
+  const base = doc(
+    [moment('kept', '0/1'), moment('gone', '86400/1', 'Gone'), moment('moved', '0/1', 'Moved')],
+    [{ id: 'span', start: '0/1', end: '86400/1', metadata: { title: 'Span' } }],
+  );
+  const proposed = doc(
+    [
+      moment('kept', '0/1'),
+      moment('moved', '-1393545600/1', 'Moved'),
+      moment('new', '-1393545600/1', 'Trick or treat'),
+    ],
+    [
+      { id: 'span', start: '0/1', end: '172800/1', metadata: { title: 'Span' } },
+      { id: 'anchored', start: { moment: 'new' }, end: '0/1', metadata: { title: 'Since' } },
+    ],
+  );
+
+  // Gregorian dates, as the reader writes them (each at its own precision); durations from
+  // start to end.
+  const gregorian = await summary(base, proposed, display('gregorian'));
+  assert.deepEqual(lines(gregorian), [
+    'Added duration: Since · the time of moment new – 1970 CE',
+    'Added: Trick or treat · 1925-11-04 CE',
+    'Changed duration: Span · 1970 CE – 1970-01-02 CE → 1970 CE – 1970-01-03 CE',
+    'Changed: Moved · 1970 CE → 1925-11-04 CE',
+    'Removed: Gone · 1970-01-02 CE',
+  ]);
+  // The exact times stay at hand, old → new when they changed.
+  const moved = gregorian.examples.find((e) => e.after?.id === 'moved');
+  assert.deepEqual(moved.times, { before: '1970 CE', after: '1925-11-04 CE' });
+  assert.equal(exactTimeText(moved), '0/1 → -1393545600/1');
+  // An unchanged time reads once, though the moment changed.
+  const retitled = await summary(
+    base,
+    doc([...base.events.slice(0, 2), moment('moved', '0/1', 'Renamed')]),
+    display('gregorian'),
+  );
+  assert.equal(changeText(retitled.examples[0], 'moment'), 'Changed: Renamed · 1970 CE');
+
+  // Years and millions of years in their units.
+  const years = await summary(
+    base,
+    proposed,
+    display('float', { unit: 'years', scale: '31557600' }),
+  );
+  assert.equal(years.examples.find((e) => e.after?.id === 'new').times.after, '-44.1588 years');
+  const ages = await summary(
+    doc([]),
+    doc([moment('dinosaurs', '-2093545600000000/1')]),
+    display('float', { unit: 'million years', scale: '31557600000000' }),
+  );
+  assert.equal(changeText(ages.examples[0], 'moment'), 'Added: dinosaurs · -66.3405 million years');
+
+  // No presentation: the default display, exact coordinates; a custom script prints its own.
+  assert.equal(
+    (await summary(base, proposed, null)).examples.find((e) => e.after?.id === 'new').times.after,
+    '-1393545600/1',
+  );
+  const custom = await summary(base, proposed, display('custom', { source: CUSTOM_EXAMPLE }));
+  assert.equal(
+    custom.examples.find((e) => e.after?.id === 'new').times.after,
+    createPresenter(display('custom', { source: CUSTOM_EXAMPLE })).alone(Q.parse('-1393545600/1')),
+  );
+  // Unreadable settings: exact times rather than none.
+  assert.equal(
+    (await summary(base, proposed, { mode: 'nonsense' })).examples.find(
+      (e) => e.after?.id === 'new',
+    ).times.after,
+    '-1393545600/1',
+  );
+
+  // A pull request that changes the display writes old times in the base's, new in its own.
+  const redisplayed = await summary(
+    doc([moment('moved', '0/1')]),
+    doc(
+      [moment('moved', '31557600/1')],
+      [],
+      display('float', { unit: 'years', scale: '31557600' }),
+    ),
+    null,
+  );
+  assert.deepEqual(redisplayed.settings, ['presentation']);
+  assert.deepEqual(redisplayed.examples[0].times, { before: '0/1', after: '1 years' });
+
+  // Older servers sent no times: their exact ones.
+  assert.equal(
+    changeText({ change: 'changed', before: moved.before, after: moved.after }, 'moment'),
+    'Changed: Moved · 0/1 → -1393545600/1',
+  );
 });

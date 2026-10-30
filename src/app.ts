@@ -6971,6 +6971,7 @@ const community = createCommunityUI({
   link: (id, origin) => timelineHash(id, origin ?? serverOrigin),
   user: () => session.user,
   server: () => session.server,
+  presenter: () => timelinePresenter(),
   compareLimit: () => compareLimit(),
   guestCopies: () => !desktop && !offlineHtml,
   timeline: () => remote,

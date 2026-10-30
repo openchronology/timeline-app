@@ -10,7 +10,14 @@
 import { rebaseDocument, mergePatch } from './merge.mjs';
 import { randomUUID } from 'node:crypto';
 import { HttpError, restrictedTimeline, withoutImageCopies } from './store.mjs';
-import { validateDocument, relationshipKey, printTimeSpan, Q } from '../dist/core.mjs';
+import {
+  createPresenter,
+  printEntityTime,
+  printTimeSpan,
+  relationshipKey,
+  validateDocument,
+  Q,
+} from '../dist/core.mjs';
 import { commonAncestor, lockTimelines, revisionId } from './versioning.mjs';
 import { differences } from './history.mjs';
 /** Why a timeline that keeps no saved history takes no pull requests. */
@@ -361,8 +368,16 @@ function proposalInput(value) {
 const PROPOSAL = `p.id,p.timeline_id,p.author_id,p.title,p.body,p.status,p.base_revision,p.revision,
 p.created_at,p.updated_at,p.resolved_by,p.merged_revision,p.base_revision_id,p.source_revision_id,
 p.source_timeline_id,p.merged_revision_id,p.from_fork`;
-/** How many changed moments of each kind a pull request's summary shows. */
+/** How many changed moments (and durations) of each kind a pull request's summary shows. */
 const EXAMPLES = 30;
+/** The presenter for a timeline's time display; null (exact times) if it cannot be read. */
+function presenterOf(presentation) {
+  try {
+    return createPresenter(presentation ?? undefined);
+  } catch {
+    return null;
+  }
+}
 /**
  * What differs between two whole documents, in the pages `differences` (history.mjs) gives:
  * for revisions saved before history was kept as rows.
@@ -451,7 +466,7 @@ export class Collaboration {
     }
     return {
       ...p,
-      changes: await this.changes(p.base_revision_id, p.source_revision_id),
+      changes: await this.changes(p.base_revision_id, p.source_revision_id, t.presentation),
       canMerge: t.canWrite && p.status === 'open',
       canUpdate: !!t.canEdit && p.author_id === userId && p.status === 'open',
       canClose: p.status === 'open' && (t.canWrite || p.author_id === userId),
@@ -484,18 +499,22 @@ export class Collaboration {
   }
   /**
    * What a pull request changes from its base: the settings that differ, how many moments,
-   * durations and relationships it adds, removes and changes, and the first moments of each.
-   * Computed from saved history, so it costs what changed, not the timeline's size. When
-   * either revision is no longer kept (its timeline stopped keeping saved history), nothing is
-   * counted and `unavailable` says why.
+   * durations and relationships it adds, removes and changes, and the first moments
+   * (`examples`) and durations (`durationExamples`) of each. Each example's `times` has its
+   * `before` and `after` time as the timeline displays it (printEntityTime; #384): in the
+   * `presentation` given, the timeline's, or in the base's and the proposal's when the pull
+   * request changes it. Computed from saved history, so it costs what changed, not the
+   * timeline's size. When either revision is no longer kept (its timeline stopped keeping
+   * saved history), nothing is counted and `unavailable` says why.
    */
-  async changes(baseId, sourceId) {
+  async changes(baseId, sourceId, presentation) {
     const summary = {
       settings: [],
       moments: { added: 0, removed: 0, changed: 0 },
       durations: { added: 0, removed: 0, changed: 0 },
       relationships: { added: 0, removed: 0 },
       examples: [],
+      durationExamples: [],
     };
     let pages = await differences(this.pool, baseId, sourceId);
     if (!pages)
@@ -508,19 +527,39 @@ export class Collaboration {
         if (error.status !== 409) throw error;
         return { ...summary, unavailable: error.message };
       }
-    const shown = { added: 0, removed: 0, changed: 0 };
+    const presenters = { before: presenterOf(presentation), after: presenterOf(presentation) };
+    const time = (presenter, entity) => (entity ? printEntityTime(presenter, entity) : null);
+    const shown = {
+      moments: { added: 0, removed: 0, changed: 0 },
+      durations: { added: 0, removed: 0, changed: 0 },
+    };
+    const lists = { moments: summary.examples, durations: summary.durationExamples };
+    // The settings come first, so the presentations are known before any example.
     for await (const page of pages)
       for (const { kind, before, after } of page) {
         if (kind === 'settings') {
           for (const key of new Set([...Object.keys(before), ...Object.keys(after)]))
             if (JSON.stringify(before[key]) !== JSON.stringify(after[key]))
               summary.settings.push(key);
+          if (summary.settings.includes('presentation'))
+            Object.assign(presenters, {
+              before: presenterOf(before.presentation),
+              after: presenterOf(after.presentation),
+            });
           continue;
         }
         const change = before === null ? 'added' : after === null ? 'removed' : 'changed';
         summary[kind][change]++;
-        if (kind === 'moments' && shown[change]++ < EXAMPLES)
-          summary.examples.push({ change, before, after });
+        if (lists[kind] && shown[kind][change]++ < EXAMPLES)
+          lists[kind].push({
+            change,
+            before,
+            after,
+            times: {
+              before: time(presenters.before, before),
+              after: time(presenters.after, after),
+            },
+          });
       }
     return summary;
   }

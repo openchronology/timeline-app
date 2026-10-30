@@ -494,6 +494,24 @@ const counts = (kinds) => ({
   type: 'object',
   properties: Object.fromEntries(kinds.map((k) => [k, { type: 'integer', minimum: 0 }])),
 });
+/** A moment or duration a pull request changes: its versions, and their times as text. */
+const changeExample = (entity) => ({
+  type: 'object',
+  properties: {
+    change: { type: 'string', enum: ['added', 'removed', 'changed'] },
+    before: { oneOf: [entity, { type: 'null' }] },
+    after: { oneOf: [entity, { type: 'null' }] },
+    times: {
+      type: 'object',
+      description:
+        'Each version’s time (a duration’s start – end) as the timeline displays it, as its reader shows it; null for a version that does not exist.',
+      properties: {
+        before: { type: ['string', 'null'] },
+        after: { type: ['string', 'null'] },
+      },
+    },
+  },
+});
 
 export const schemas = {
   TimelineSearchRequest: {
@@ -743,14 +761,12 @@ export const schemas = {
       examples: {
         type: 'array',
         description: 'The first thirty moments of each kind of change.',
-        items: {
-          type: 'object',
-          properties: {
-            change: { type: 'string', enum: ['added', 'removed', 'changed'] },
-            before: { oneOf: [ref('Moment'), { type: 'null' }] },
-            after: { oneOf: [ref('Moment'), { type: 'null' }] },
-          },
-        },
+        items: changeExample(ref('Moment')),
+      },
+      durationExamples: {
+        type: 'array',
+        description: 'The first thirty durations of each kind of change.',
+        items: changeExample(ref('Duration')),
       },
       unavailable: { type: 'string', description: 'Why nothing could be counted.' },
     },
