@@ -96,7 +96,8 @@ to respond and investigate. If the operator turns on Cloudflare Turnstile for
 human-verification challenges (instead of the built-in proof of work), your browser
 loads Cloudflare's challenge when one is asked for, and Cloudflare receives network
 and device information to tell people from automated traffic, under its own privacy
-policy. The service includes no advertising, and analytics only as described below.
+policy. The service includes no advertising, analytics only as described below, and
+embedded video only as described under "Embedded videos".
 
 ## Local storage, cookies, and offline editions
 
@@ -105,7 +106,8 @@ authorization-flow values secure login. Server sessions have a 14-day absolute
 expiry and become invalid after one day of inactivity. Users can revoke sessions.
 The browser keeps editing drafts and authentication-return state in local storage
 facilities. Clearing site storage removes local drafts and can sign you out.
-The application does not include advertising cookies or cross-site tracking code.
+The application does not include advertising cookies or cross-site tracking code; a
+YouTube video you choose to play on the landing pages is covered under "Embedded videos".
 The site uses Google Analytics, but first asks whether you allow
 analytics cookies. Only if you accept does your browser load Google's script, which
 sets Google Analytics cookies and sends Google the pages you visit, with network and
@@ -143,6 +145,26 @@ host allows it. Plugin scripts run
 through a restricted interpreter without direct network, DOM, or import access;
 host-rendered image fields can still cause these image requests. Published plugin
 definitions are public independently of private timelines using them.
+
+## Embedded videos
+
+Some pages that describe the service (the landing page at https://timescale.info and the
+pages under /for/) can show a video hosted on YouTube. Opening such a page loads nothing
+from YouTube or Google: the page shows a still image, a play button and a link to the
+video on youtube.com.
+
+Only if you choose to play the video does your browser load YouTube's player, from
+youtube-nocookie.com (YouTube's "privacy-enhanced mode"), inside the page. From then on
+Google receives your IP address, your browser and device information, the address of
+this site (as the referring page, without the path of the page you are on) and how you
+use the player, and once the video plays YouTube may store cookies or similar data in
+your browser, all under [Google's Privacy Policy](https://policies.google.com/privacy).
+If you prefer, the link under the video opens it on youtube.com instead, under the same
+policy.
+
+The service sends YouTube nothing about your account or your timelines. Playing a video
+is separate from the analytics choice described above: declining analytics does not stop
+a video you choose to play from loading, and playing one does not turn analytics on.
 
 ## Retention and choices
 
