@@ -435,3 +435,27 @@ function relativeContext(
       .compare(power(decimalExponent(value) - options.significantDigits + 1)) < 0
   );
 }
+
+/**
+ * A moment's time, or a duration's start – end, as its reader writes it (`alone`): for lists
+ * of changes, such as a pull request's (#384). A duration's end anchored to a moment reads as
+ * that moment's, as the revision's own times are not at hand; a time the display cannot write
+ * reads as its exact coordinate. With no presenter (invalid settings), every time is exact.
+ */
+export function printEntityTime(
+  presenter: TimePresenter | null,
+  entity:
+    { time: string } | { start: string | { moment: string }; end: string | { moment: string } },
+): string {
+  const one = (time: string | { moment: string }) => {
+    if (typeof time !== 'string') return `the time of moment ${time.moment}`;
+    try {
+      return presenter ? presenter.alone(Q.parse(time)) : time;
+    } catch {
+      return time;
+    }
+  };
+  if ('time' in entity) return one(entity.time);
+  const [start, end] = [one(entity.start), one(entity.end)];
+  return start === end ? start : `${start} – ${end}`;
+}

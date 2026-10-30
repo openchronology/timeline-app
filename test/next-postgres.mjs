@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import pg from 'pg';
 import { randomUUID } from 'node:crypto';
 import { passwordHash } from '../server/auth.mjs';
-import { demo, PLUGIN_EXAMPLE } from '../dist/core.mjs';
+import { createPresenter, demo, PLUGIN_EXAMPLE, Q } from '../dist/core.mjs';
 import { POLICY_VERSION } from '../server/policies.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -430,6 +430,45 @@ try {
   const review = await owner.request(base + '/pulls/' + proposal.id);
   assert.match(review, /Next route proposal/);
   assert.match(review, /Comment through the Next.js API/);
+  // Its changes list times as the timeline displays them, the exact ones on hover (#384): here
+  // Gregorian dates, which the pull request proposes.
+  const gregorian = {
+    version: 1,
+    mode: 'gregorian',
+    significantDigits: 6,
+    unit: '',
+    scale: '1',
+    origin: '0',
+    offsetMinutes: 0,
+  };
+  const dated = await contributor.request(api + '/proposals', {
+    method: 'POST',
+    status: 201,
+    data: {
+      title: 'Dated proposal',
+      body: '',
+      baseRevision: timeline.revision,
+      document: {
+        ...document,
+        presentation: gregorian,
+        events: [
+          ...document.events,
+          { id: 'dated', time: '-1393545600/1', metadata: { title: 'Trick or treat' } },
+        ],
+      },
+    },
+  });
+  const datedReview = await owner.request(base + '/pulls/' + dated.id);
+  const date = createPresenter(gregorian).alone(Q.parse('-1393545600/1'));
+  assert.equal(date, '1925-11-04 CE');
+  assert(
+    datedReview.includes(`title="-1393545600/1">Added: Trick or treat · ${date}</summary>`),
+    'the added moment with its date',
+  );
+  await contributor.request(api + '/proposals/' + dated.id + '/resolve', {
+    method: 'POST',
+    data: { action: 'close', revision: dated.revision },
+  });
   await contributor.request(api + '/proposals/' + proposal.id + '/resolve', {
     method: 'POST',
     status: 403,

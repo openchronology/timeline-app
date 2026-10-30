@@ -210,6 +210,74 @@ try {
     normal((await pulls.document(legacy.id, legacyPull, owner)).document),
     normal(proposed),
   );
+  // Reviews list times as the timeline displays them (#384): exact coordinates by default,
+  // Gregorian dates and years when the timeline shows them, a changed time old → new, and
+  // durations from start to end.
+  assert.deepEqual(old.changes.examples.map((e) => [e.change, e.times]).sort(), [
+    ['added', { before: null, after: '400/1' }],
+    ['changed', { before: '4/1', after: '4/1' }],
+    ['removed', { before: '9/1', after: null }],
+  ]);
+  const display = (mode, more = {}) => ({
+    version: 1,
+    mode,
+    significantDigits: 6,
+    unit: '',
+    scale: '1',
+    origin: '0',
+    offsetMinutes: 0,
+    ...more,
+  });
+  const review = async (presentation, proposedPresentation = presentation) => {
+    const dated = validateDocument({
+      ...original,
+      presentation,
+      events: [moment(0), { ...moment(1), time: '-1393545600/1' }],
+      durations: [],
+      relationships: [],
+    });
+    const d = await store.create(owner, dated);
+    timelines.push(d.id);
+    await pool.query(
+      "INSERT INTO oc_members(timeline_id,user_id,role) VALUES($1,$2,'contributor')",
+      [d.id, author],
+    );
+    const pull = await pulls.create(d.id, author, {
+      title: 'Dates',
+      body: '',
+      baseRevision: d.revision,
+      document: validateDocument({
+        ...dated,
+        presentation: proposedPresentation,
+        events: [{ ...moment(1), time: '-1393500000/1' }, moment(2)],
+        durations: [{ id: 'd', start: '-1393545600/1', end: '0/1', metadata: { title: 'Span' } }],
+      }),
+    });
+    const times = (list) =>
+      Object.fromEntries(list.map((e) => [(e.after ?? e.before).id, e.times]));
+    return {
+      moments: times(pull.changes.examples),
+      durations: times(pull.changes.durationExamples),
+    };
+  };
+  const gregorian = await review(display('gregorian'));
+  assert.deepEqual(gregorian.moments, {
+    m0: { before: '1970 CE', after: null },
+    m1: { before: '1925-11-04 CE', after: '1925-11-04 CE 12:40 UTC' },
+    m2: { before: null, after: '1970-01-01 CE 00:00:02 UTC' },
+  });
+  assert.deepEqual(gregorian.durations.d, { before: null, after: '1925-11-04 CE – 1970 CE' });
+  const years = await review(display('float', { unit: 'years', scale: '31557600' }));
+  assert.deepEqual(years.moments.m1, { before: '-44.1588 years', after: '-44.1574 years' });
+  // A pull request changing the display: old times in the base's, new in its own.
+  const redisplayed = await review(
+    display('float', { unit: 'million years', scale: '31557600000000' }),
+    display('gregorian'),
+  );
+  assert.deepEqual(redisplayed.moments.m1, {
+    before: '-0.0000441588 million years',
+    after: '1925-11-04 CE 12:40 UTC',
+  });
   console.log(
     'PASS pull requests keep no documents: submitted timelines are kept as rows charged their changes, reviewed from history, updated, rebased and merged, and removed with their timeline.',
   );

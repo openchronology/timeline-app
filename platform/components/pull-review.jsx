@@ -1,12 +1,12 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
 // Reviewing a pull request: its changes and discussion, and merging, closing or rebasing it.
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '../lib/api.js';
 import ReportDialog from './report-dialog.jsx';
-import { REBASE_PULL_REQUEST } from '../../src/wording.ts';
+import { changeText, exactTimeText, REBASE_PULL_REQUEST } from '../../src/wording.ts';
 /**
  * A pull request's page (/<owner>/<timeline>/pulls/<id>): what it changes, the buttons the
  * reader may use on it, and its discussion.
@@ -122,11 +122,15 @@ export default function PullReview({ timelineId, initial, initialComments, signe
       form.reset();
     });
   }
-  // The server summarizes what the pull request changes, with the first moments of each kind.
+  // The server summarizes what the pull request changes, with the first entities of each kind.
   // Counts of added, removed and changed moments and durations, added and removed
-  // relationships, the names of changed timeline settings, and example moments with their
-  // `before` and `after` versions.
+  // relationships, the names of changed timeline settings, and example moments and durations
+  // with their `before` and `after` versions and times as the timeline displays them.
   const { moments, durations, relationships, settings, examples } = p.changes;
+  const kinds = [
+    ['moment', examples, moments],
+    ['duration', p.changes.durationExamples ?? [], durations],
+  ];
   return (
     <>
       <h1>{p.title}</h1>
@@ -160,35 +164,38 @@ export default function PullReview({ timelineId, initial, initialComments, signe
         {settings.map((k) => (
           <p key={k}>Changed timeline {k}.</p>
         ))}
-        {[
-          ['Added', 'added'],
-          ['Removed', 'removed'],
-          ['Changed', 'changed'],
-        ].map(([label, change]) => {
-          const shown = examples.filter((e) => e.change === change);
-          return (
-            <div key={label}>
-              {shown.map(({ before, after }) => {
-                const e = after ?? before;
-                return (
-                  <details key={e.id}>
-                    <summary>
-                      {label}: {e.metadata.title || 'Untitled moment'} · {e.time}
-                    </summary>
-                    {/* A changed moment shows its old version, then its new one. */}
-                    {before && after && <pre>{JSON.stringify(before, null, 2)}</pre>}
-                    <pre>{JSON.stringify(e, null, 2)}</pre>
-                  </details>
-                );
-              })}
-              {moments[change] > shown.length && (
-                <p>
-                  {moments[change] - shown.length} more {change} moments in the proposed timeline.
-                </p>
-              )}
-            </div>
-          );
-        })}
+        {['added', 'removed', 'changed'].map((change) => (
+          <div key={change}>
+            {kinds.map(([kind, list, counts]) => {
+              const shown = list.filter((e) => e.change === change);
+              return (
+                <Fragment key={kind}>
+                  {shown.map((example) => {
+                    const { before, after } = example;
+                    const e = after ?? before;
+                    return (
+                      <details key={e.id}>
+                        {/* Its time as the timeline displays it; the exact one on hover. */}
+                        <summary title={exactTimeText(example)}>
+                          {changeText(example, kind)}
+                        </summary>
+                        {/* A changed one shows its old version, then its new one. */}
+                        {before && after && <pre>{JSON.stringify(before, null, 2)}</pre>}
+                        <pre>{JSON.stringify(e, null, 2)}</pre>
+                      </details>
+                    );
+                  })}
+                  {counts[change] > shown.length && (
+                    <p>
+                      {counts[change] - shown.length} more {change} {kind}s in the proposed
+                      timeline.
+                    </p>
+                  )}
+                </Fragment>
+              );
+            })}
+          </div>
+        ))}
       </section>
       <div className="actions">
         {/* Offered when the fork was saved since the pull request was pinned to it. */}

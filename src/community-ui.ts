@@ -1,14 +1,25 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // The dashboard and pull requests in the editor: lists of timelines (yours, starred and public),
 // stars, forks and comparisons, and reviewing, discussing and merging pull requests.
-import { validateDocument } from './core.js';
+import { printEntityTime, validateDocument } from './core.js';
 import { describeLabels } from './content-labels.js';
+import { changeText, exactTimeText } from './wording.js';
+import type { ChangeExample } from './wording.js';
 import type { TimelineDocument, PointEvent } from './core.js';
-/** A moment a pull request adds, removes or changes, with its versions. */
-interface MomentChange {
-  change: 'added' | 'removed' | 'changed';
+import type { Duration } from './durations.js';
+import type { TimePresenter } from './presentation.js';
+/**
+ * A moment a pull request adds, removes or changes, with its versions and, from current
+ * servers, their times as the timeline displays them (#384).
+ */
+interface MomentChange extends ChangeExample {
   before: PointEvent | null;
   after: PointEvent | null;
+}
+/** A duration a pull request adds, removes or changes, likewise. */
+interface DurationChange extends ChangeExample {
+  before: Duration | null;
+  after: Duration | null;
 }
 /** What a pull request changes from its base (computed by the server). */
 interface ProposalChanges {
@@ -18,6 +29,8 @@ interface ProposalChanges {
   relationships: { added: number; removed: number };
   /** The first changed moments of each kind. */
   examples: MomentChange[];
+  /** The first changed durations of each kind (current servers). */
+  durationExamples?: DurationChange[];
   /** Why nothing could be counted: a revision it compares is no longer kept. */
   unavailable?: string;
 }
@@ -68,6 +81,8 @@ interface Host {
   user(): { id: string; username: string } | null;
   /** Whether the server in use is reachable. */
   server(): boolean;
+  /** The open timeline's time display, for changes an older server sends without times. */
+  presenter?(): TimePresenter;
   /** How many timelines this account may compare at once (default 8). */
   compareLimit?(): number;
   /** Whether guests may fork public timelines into the browser (default true). */
@@ -489,7 +504,7 @@ export function createCommunityUI(host: Host) {
   }
   /**
    * Opens (or refreshes) the details dialog for a pull request: its description, status,
-   * a summary of its changes with up to 30 examples of each kind (changed moments shown as
+   * a summary of its changes with up to 30 examples of each kind (changed ones shown as
    * truncated before/after JSON), the actions this account may take, and its comments.
    */
   async function detail(id: string) {
@@ -534,26 +549,40 @@ export function createCommunityUI(host: Host) {
       );
     for (const key of changes.settings)
       el('pull-diff').append(paragraph('Changed timeline ' + key + '.'));
-    for (const [label, change] of [
-      ['Added', 'added'],
-      ['Removed', 'removed'],
-      ['Changed', 'changed'],
-    ] as const)
-      for (const { before, after } of changes.examples
-        .filter((e) => e.change === change)
-        .slice(0, 30)) {
-        const e = (after ?? before)!;
-        el('pull-diff').append(
-          paragraph(
-            label + ': ' + (e.metadata.title || 'Untitled moment') + ' (' + e.id + ') at ' + e.time,
-          ),
-        );
-        if (label === 'Changed')
-          el('pull-diff').append(
-            paragraph('Before: ' + JSON.stringify(before).slice(0, 1800)),
-            paragraph('After: ' + JSON.stringify(after).slice(0, 1800)),
-          );
+    // Each as the timeline displays its time (the exact time and ID on hover), and a changed
+    // one with its versions as truncated JSON. Older servers send no times: the open
+    // timeline's display writes them.
+    const withTimes = <T extends ChangeExample>(example: T): T => {
+      if (example.times) return example;
+      let presenter: TimePresenter | null = null;
+      try {
+        presenter = host.presenter?.() ?? null;
+      } catch {
+        // Unreadable settings: exact times.
       }
+      const time = (e: ChangeExample['before']) =>
+        e && printEntityTime(presenter, e as PointEvent | Duration);
+      return { ...example, times: { before: time(example.before), after: time(example.after) } };
+    };
+    for (const change of ['added', 'removed', 'changed'] as const)
+      for (const [kind, list] of [
+        ['moment', changes.examples],
+        ['duration', changes.durationExamples ?? []],
+      ] as const)
+        for (const example of (list as ChangeExample[])
+          .filter((e) => e.change === change)
+          .slice(0, 30)
+          .map(withTimes)) {
+          const { before, after } = example;
+          const line = paragraph(changeText(example, kind));
+          line.title = `ID ${(after ?? before)!.id}\nExact: ${exactTimeText(example)}`;
+          el('pull-diff').append(line);
+          if (change === 'changed')
+            el('pull-diff').append(
+              paragraph('Before: ' + JSON.stringify(before).slice(0, 1800)),
+              paragraph('After: ' + JSON.stringify(after).slice(0, 1800)),
+            );
+        }
     // A pull request from a fork is updated in the fork, not here.
     el('pull-edit').hidden = !p.canUpdate || !!p.from_fork;
     el('pull-merge').hidden = !p.canMerge;

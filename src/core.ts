@@ -105,6 +105,7 @@ import type { TimePresentation } from './presentation.js';
 export {
   createPresenter,
   printTimeSpan,
+  printEntityTime,
   validatePresentation,
   DEFAULT_PRESENTATION,
   UNIT_PRESETS,
