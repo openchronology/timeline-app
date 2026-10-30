@@ -219,6 +219,17 @@ export async function checkPresumptive(page, restore) {
   // scheme: dark rings, light dashes.
   await load(timeline('Presumptive dark', plugins(true, '#1b2229')));
   await waitForMarkers();
+  // Rings ease from the light stage's ground into the dark one's.
+  await page.waitForFunction(() =>
+    [
+      '#markers .event-marker[data-first="0/1"]',
+      '#markers .event-marker[data-first="400/1"]',
+      '.duration-band[data-duration-id="condition"]',
+    ].every(
+      (selector) =>
+        getComputedStyle(document.querySelector(selector)).borderTopColor === 'rgb(26, 39, 32)',
+    ),
+  );
   const dark = await look();
   assert.equal(dark.background, 'rgb(27, 34, 41)');
   visible(dark, 'dark', 'rgb(26, 39, 32)');
