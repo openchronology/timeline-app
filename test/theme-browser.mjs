@@ -29,6 +29,8 @@ export async function checkTheme(page) {
   assert(dark(shown.page) && dark(shown.card), JSON.stringify(shown));
   assert(!dark(shown.label), 'labels read on the dark stage');
   await mkdir('artifacts', { recursive: true });
+  // Controls ease into their new colors.
+  await page.waitForTimeout(400);
   await page.screenshot({ path: 'artifacts/editor-dark.png' });
   await page.emulateMedia({ colorScheme: 'light' });
   assert(!dark((await look(page)).card));

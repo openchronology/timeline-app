@@ -942,8 +942,9 @@ export function renderPluginShape(button: HTMLButtonElement, shape: string) {
   button.append(outline);
 }
 /**
- * Outlines a marker (#325), after renderPluginShape has drawn it: dashed adds dark dashes over
- * its white border, so the dashes show on light and dark backgrounds and against any color.
+ * Outlines a marker (#325), after renderPluginShape has drawn it: dashed adds dashes in the
+ * text's color over its ring in the stage's ground (dark over white, or light over dark, #382),
+ * so the dashes show on light and dark backgrounds and against any color.
  * A circle (or an icon) dashes its CSS border (the `data-outline` attribute); any other shape
  * gets a dashed copy of its SVG outline's path, so every shape, present or future, is dashed
  * the same way. Solid removes them.
