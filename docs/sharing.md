@@ -98,7 +98,9 @@ described by their labels instead of their notes, and ask search engines not to 
 - `/sitemap.xml` is a sitemap index: it names the pages of the sitemap under `/sitemap/`, so
   it covers the site however many timelines it has.
   - `/sitemap/pages.xml` lists the site's own pages (the dashboard, plugins, download, the API
-    reference, the help and each of its pages, the terms, privacy policy and legal notices).
+    reference, the help and each of its pages, the terms, privacy policy and legal notices);
+    with the [landing page](administration.md#landing-page) on, also `/explore`, `/for` and
+    each audience's page.
   - `/sitemap/timelines-<id>.xml` pages list every public timeline, 45,000 to a page.
     `/sitemap/profiles-<id>.xml` pages list every profile that owns one (an account that
     isn't suspended). Each address has when it last changed, and the index gives each page

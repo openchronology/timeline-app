@@ -25,6 +25,7 @@ import {
   timelineFileBytes,
 } from './limits.mjs';
 import { analyticsId, platformName, SiteError, supportUrl } from './site.mjs';
+import { landingSettings } from './landing.mjs';
 import { applyEnvironmentQuota } from './administration.mjs';
 import { ExportCacheError, exportCacheSettings } from './export-cache.mjs';
 /**
@@ -127,6 +128,7 @@ async function initialize() {
     platformName();
     supportUrl();
     analyticsId();
+    landingSettings();
     exportCacheSettings();
   } catch (error) {
     if (

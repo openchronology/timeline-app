@@ -4,6 +4,7 @@
 import Account from '../../components/account.jsx';
 import { safeReturnTo } from '../../lib/navigation.js';
 import { pageTitle } from '../../lib/sharing.js';
+import { browserPath } from '../../../server/landing.mjs';
 export const dynamic = 'force-dynamic';
 export function generateMetadata() {
   return { title: pageTitle('Sign in') };
@@ -12,7 +13,8 @@ export default async function Login({ searchParams }) {
   const params = await searchParams;
   return (
     <main className="platform">
-      <Account login returnTo={safeReturnTo(params.returnTo)} />
+      {/* Without a page to return to, the dashboard: /explore with the landing page on (#379). */}
+      <Account login returnTo={safeReturnTo(params.returnTo, browserPath())} />
     </main>
   );
 }

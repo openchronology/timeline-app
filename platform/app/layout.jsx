@@ -14,6 +14,7 @@ import { currentSession } from '../lib/session.js';
 import { headers } from 'next/headers';
 import { siteOrigin } from '../lib/sharing.js';
 import { analyticsId, platformName, siteName, supportUrl } from '../../server/site.mjs';
+import { landingEnabled } from '../../server/landing.mjs';
 export function generateMetadata() {
   const description = 'Exact timelines, shared on your terms.';
   return {
@@ -41,6 +42,8 @@ export default async function RootLayout({ children }) {
   // Where visitors can support the platform (SUPPORT_URL): a link in the header and footer.
   const support = supportUrl();
   const analytics = analyticsId();
+  // With the landing page at / (#379), the timeline browser is a link of its own.
+  const landing = landingEnabled();
   // Read for every page, so each renders per request: its header shows who is visiting.
   const request = await headers();
   const nonce = analytics ? request.get('x-nonce') : null;
@@ -66,6 +69,7 @@ export default async function RootLayout({ children }) {
             {name ?? 'openchronology'}
           </a>
           <nav aria-label="Platform navigation">
+            {landing ? <a href="/explore">Explore</a> : null}
             <a href="/editor?new=1">＋ New timeline</a>
             <a href="/plugins">Plugin library</a>
             <a href="/download">Download</a>
@@ -81,6 +85,7 @@ export default async function RootLayout({ children }) {
               username={user.username}
               avatarUrl={user.avatarUrl}
               isAdmin={user.isAdmin}
+              timelinesHref={landing ? '/explore#mine' : null}
             />
           ) : accounts ? (
             <div className="header-account">

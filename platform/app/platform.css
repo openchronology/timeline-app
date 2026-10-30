@@ -1957,3 +1957,235 @@ main.help {
 .terms-prompt .error:empty {
   display: none;
 }
+
+/* The landing page and the audience pages (#379): an opening with the promise and what to do
+   next, audience cards, example timelines, the video and the copy; one column on a phone.
+   They follow the visitor's light or dark preference, which the rest of the site does not
+   yet. */
+main.landing {
+  max-width: 1080px;
+}
+.landing-hero {
+  margin: 12px 0 36px;
+}
+.landing-hero h1 {
+  max-width: 18em;
+  margin: 0 0 14px;
+  font-size: clamp(32px, 6vw, 52px);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.landing-eyebrow,
+.landing-breadcrumb {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.landing-promise {
+  max-width: 40em;
+  margin: 0 0 22px;
+  font-size: 18px;
+  line-height: 1.55;
+}
+.landing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.landing-actions .button {
+  min-height: 40px;
+  padding: 0 18px;
+  font-size: 15px;
+}
+main.landing h2 {
+  margin: 0 0 14px;
+  font-size: 24px;
+  line-height: 1.25;
+}
+main.landing section {
+  margin: 0 0 40px;
+}
+.audience-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 14px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+.audience-card {
+  position: relative;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.audience-card:hover,
+.audience-card:focus-within {
+  border-color: var(--line-strong);
+  box-shadow: 0 4px 14px #1d382314;
+}
+.audience-card h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+.audience-card h3 a {
+  color: var(--ink);
+  text-decoration: none;
+}
+/* The whole card follows its link. */
+.audience-card h3 a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+}
+.audience-card h3 a:focus-visible {
+  outline: none;
+}
+.audience-card:has(a:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.audience-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.landing-examples .timeline-grid {
+  /* A card or two keep a card's width rather than stretching across the page. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  margin-bottom: 12px;
+}
+.landing-video-poster,
+.landing-video-frame {
+  display: block;
+  position: relative;
+  width: 100%;
+  max-width: 820px;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.landing-video-poster {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  background: linear-gradient(135deg, #192d25, #285742);
+  color: #fff;
+  text-align: center;
+  text-decoration: none;
+}
+.landing-video-poster:hover {
+  color: #fff;
+}
+.landing-video-play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #c4db98;
+  color: #192d25;
+  font-size: 24px;
+}
+.landing-video-poster:hover .landing-video-play {
+  background: #d6e8b0;
+}
+.landing-video-title {
+  font-size: 17px;
+  font-weight: 600;
+}
+.landing-video-frame iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.landing-video .muted {
+  max-width: 820px;
+}
+.landing-copy {
+  max-width: 46em;
+  margin: 0 0 40px;
+  font-size: 16px;
+}
+.landing-copy ul {
+  padding-left: 20px;
+}
+.landing-copy li {
+  margin: 0 0 10px;
+}
+.landing-copy code {
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+.landing-copy h2:not(:first-child) {
+  margin-top: 32px;
+}
+@media (max-width: 520px) {
+  main.landing {
+    padding: 22px 16px;
+  }
+  .landing-promise {
+    font-size: 16px;
+  }
+  .landing-actions .button {
+    flex: 1 1 100%;
+  }
+}
+/* Dark, for visitors who prefer it: the page, its footer and the cards on it. */
+@media (prefers-color-scheme: dark) {
+  :root:has(main.landing) {
+    color-scheme: dark;
+    color: #e3ebe0;
+    background: #121c17;
+    --green: #9fd0a8;
+    --green-hover: #bfe3c4;
+    --ink: #e3ebe0;
+    --muted: #a5b3a8;
+    --line: #2c3d33;
+    --line-strong: #3d5145;
+    --paper: #1a2720;
+    --hover: #223329;
+    --focus: #8fd19e;
+  }
+  main.landing .primary {
+    background: #c4db98;
+    border-color: #c4db98;
+    color: #192d25;
+  }
+  main.landing .primary:hover {
+    background: #d6e8b0;
+    border-color: #d6e8b0;
+    color: #192d25;
+  }
+  main.landing :is(.badge, .timeline-card-description) {
+    color: var(--ink);
+  }
+  main.landing .badge-featured {
+    border-color: #3d5145;
+    background: #223329;
+    color: var(--green);
+  }
+  main.landing .tag-chip {
+    border-color: var(--line-strong);
+    background: var(--hover);
+  }
+  main.landing .tag-chip:hover {
+    background: #2b4034;
+  }
+  main.landing .timeline-card-placeholder {
+    background: linear-gradient(135deg, #22352a, #2e3326);
+  }
+  main.landing :is(.timeline-grid > .timeline-card, .audience-card):is(:hover, :focus-within) {
+    box-shadow: 0 4px 14px #0006;
+  }
+}

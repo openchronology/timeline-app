@@ -44,6 +44,7 @@ export const RESERVED_NAMES: ReadonlySet<string> = new Set([
   'favicon',
   'favorites',
   'featured',
+  'for',
   'healthz',
   'help',
   'home',

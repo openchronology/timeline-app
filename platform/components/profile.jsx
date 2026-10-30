@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { CompareTray } from './compare-selection.jsx';
 import { notFound } from 'next/navigation';
+import { browserPath } from '../../server/landing.mjs';
 import { accountCompareLimit, currentSession, userCompareLimit } from '../lib/session.js';
 import { searchTimelines } from '../../server/collaboration.mjs';
 import TimelineBrowser from './timeline-browser.jsx';
@@ -68,7 +69,7 @@ export default async function Profile({ username, searchParams }) {
   );
   return (
     <main className="platform">
-      <Link href="/">All timelines</Link>
+      <Link href={browserPath()}>All timelines</Link>
       {rows[0].avatar_url && (
         <img className="account-avatar" src={rows[0].avatar_url} alt="" width={64} height={64} />
       )}
