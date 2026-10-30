@@ -71,6 +71,8 @@ export function TimelineCardMedia({ timeline }) {
  * @param {string} [props.activeTag] the tag the list is filtered by
  * @param {boolean} [props.guest] the visitor is not signed in
  * @param {number} [props.compareLimit]
+ * @param {boolean} [props.compare] whether it has a Compare checkbox: not where the page has
+ *   no tray to compare from (the landing pages, #379)
  */
 export default function TimelineCard({
   timeline: t,
@@ -79,6 +81,7 @@ export default function TimelineCard({
   activeTag,
   guest,
   compareLimit = 8,
+  compare = true,
 }) {
   const title = t.title?.trim() || 'Untitled timeline',
     tags = t.tags ?? [],
@@ -152,7 +155,7 @@ export default function TimelineCard({
       )}
       <div className="timeline-card-footer">
         <StarButton id={t.id} count={t.star_count} starred={t.starred} signedIn={!guest} />
-        <CompareCheckbox id={t.id} title={title} limit={compareLimit} />
+        {compare && <CompareCheckbox id={t.id} title={title} limit={compareLimit} />}
         {/* A comparison is a read-only view of its sources: it can't be forked. */}
         {guest && !t.comparison && (
           <a className="button" href={'/editor?fork=' + t.id}>

@@ -414,3 +414,41 @@ export function pageMetadata(
     twitter: { card: 'summary_large_image', title, description, ...images },
   };
 }
+/**
+ * A page of the site's own (not a timeline's) metadata: its title before the site's name, its
+ * description, its canonical address and link previews, as pageMetadata gives a timeline's
+ * pages, without oEmbed.
+ * @param {string} path the page's path, made absolute with siteOrigin()
+ * @param {string} title the page's own title
+ * @param {string} description its plain-text description
+ */
+export function sitePageMetadata(path, title, description) {
+  const url = siteOrigin() + path;
+  return {
+    title: pageTitle(title),
+    description,
+    alternates: { canonical: url },
+    openGraph: { type: 'website', siteName: siteName(), locale: 'en_US', title, description, url },
+    twitter: { card: 'summary_large_image', title, description },
+  };
+}
+/**
+ * A page of the site's own as schema.org JSON-LD (#379): a `WebPage` of the site's
+ * `WebSite`, with what else describes it (`about`, `audience`) over it.
+ * @param {string} path the page's path
+ * @param {string} title its title
+ * @param {string} description its description
+ * @param {object} [more] further properties
+ */
+export function webPageData(path, title, description, more = {}) {
+  const origin = siteOrigin();
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: title,
+    description,
+    url: origin + path,
+    isPartOf: { '@type': 'WebSite', name: siteName(), url: origin + '/' },
+    ...more,
+  };
+}

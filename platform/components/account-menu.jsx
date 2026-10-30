@@ -13,8 +13,10 @@ import { profilePath } from '../../src/addresses.ts';
  * @param {string} props.username the signed-in account's name
  * @param {string} [props.avatarUrl] its picture, if it has one
  * @param {boolean} [props.isAdmin] it administers the site
+ * @param {string|null} [props.timelinesHref] where its own timelines are listed, when the home
+ *   page is not the dashboard (the landing page, #379)
  */
-export default function AccountMenu({ username, avatarUrl, isAdmin }) {
+export default function AccountMenu({ username, avatarUrl, isAdmin, timelinesHref = null }) {
   const [open, setOpen] = useState(false),
     [busy, setBusy] = useState(false);
   const root = useRef(null),
@@ -70,6 +72,11 @@ export default function AccountMenu({ username, avatarUrl, isAdmin }) {
           <p className="account-menu-heading">
             Signed in as <strong>@{username}</strong>
           </p>
+          {timelinesHref && (
+            <a role="menuitem" href={timelinesHref}>
+              Your timelines
+            </a>
+          )}
           <a role="menuitem" href="/account">
             Account
           </a>

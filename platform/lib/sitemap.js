@@ -5,6 +5,7 @@
 // a time.
 import { platformServices } from '../../server/platform.mjs';
 import { helpPages } from '../../server/help.mjs';
+import { AUDIENCES, landingEnabled } from '../../server/landing.mjs';
 import { sharedPath, siteOrigin } from './sharing.js';
 import { profilePath, timelinePath } from '../../src/addresses.ts';
 
@@ -128,7 +129,8 @@ function urlset(origin, entries) {
 }
 
 /**
- * /sitemap/<file>: `pages.xml` (the site's own pages and the help), `timelines-<id>.xml`,
+ * /sitemap/<file>: `pages.xml` (the site's own pages, with the landing page on its audience
+ * pages and /explore too, and the help), `timelines-<id>.xml`,
  * `profiles-<id>.xml` (a page of them, from that ID on) or `entities-<id>.xml` (the moments
  * and durations of a page of timelines, from that timeline's ID on). Anything else is not
  * found.
@@ -146,6 +148,15 @@ export async function sitemapPage(file) {
       ['/privacy', 'monthly'],
       ['/legal', 'monthly'],
     ].map(([path, frequency]) => ({ path, frequency }));
+    // With the landing page at / (#379): the timeline browser and the audiences' pages.
+    if (landingEnabled())
+      pages.splice(
+        1,
+        0,
+        { path: '/explore', frequency: 'daily' },
+        { path: '/for', frequency: 'weekly' },
+        ...AUDIENCES.map((key) => ({ path: '/for/' + key, frequency: 'weekly' })),
+      );
     // The help's pages (#172).
     for (const slug of (await helpPages().catch(() => new Map())).keys())
       pages.push({ path: '/help/' + slug, frequency: 'weekly' });

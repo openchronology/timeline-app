@@ -4,16 +4,17 @@
 // to /timelines/<id>/… (#148).
 import { NextResponse } from 'next/server';
 import { analyticsPolicy } from '../server/site.mjs';
+import { landingFramePolicy } from '../server/landing.mjs';
 import { platformServices } from '../server/platform.mjs';
 import { RESERVED_NAMES, USERNAME, timelineAddress } from '../src/addresses.ts';
 /**
  * The site's own pages, which get the content security policy: the home page (the empty
- * alternative), the account, administration, plugin, download, legal and editor pages, and
- * the docs, help, timeline, user and connect sections. Profiles and timelines' addresses are
+ * alternative), the account, administration, plugin, download, legal, editor and explore
+ * pages, and the docs, help, timeline, user, connect and audience (`for`, #379) sections. Profiles and timelines' addresses are
  * matched separately in `proxy`.
  */
 const PAGES =
-  /^\/(?:login|account|admin|plugins|download|legal|editor|docs(?:\/.*)?|help(?:\/.*)?|timelines(?:\/.*)?|users(?:\/.*)?|connect(?:\/.*)?)?$/;
+  /^\/(?:login|account|admin|plugins|download|legal|editor|explore|for(?:\/.*)?|docs(?:\/.*)?|help(?:\/.*)?|timelines(?:\/.*)?|users(?:\/.*)?|connect(?:\/.*)?)?$/;
 /**
  * Marks what this proxy told a page, so a client cannot claim it. A fresh random value for
  * each server process: a client never sees it (the header is set on the request, not the
@@ -90,12 +91,16 @@ export async function proxy(request) {
     process.env.CHALLENGE_PROVIDER === 'turnstile' ? ' https://challenges.cloudflare.com' : '';
   // Google Analytics, when enabled, loads its script and sends measurements (after consent).
   const analytics = analyticsPolicy();
+  // The landing and audience pages' video player (#379), when one is set: loaded only once a
+  // visitor asks to play it.
+  const video = landingFramePolicy(pathname);
   // The content security policy: scripts only by nonce (plus Next's dev server's eval and its
   // hot-reload socket in development); inline styles allowed; images from the site, data:
-  // addresses and any https host; no plugins (object-src); no framing of these pages at all
+  // addresses and any https host; frames from the site, Turnstile and the landing pages' video
+  // player only; no plugins (object-src); no framing of these pages at all
   // (frame-ancestors, against clickjacking; embeds have their own route); no <base> that would
   // redirect relative addresses; forms post only to the site itself.
-  const policy = `default-src 'self'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${turnstile}${analytics.script}${development ? " 'unsafe-eval'" : ''}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'${analytics.connect}${development ? ' ws: wss:' : ''}; frame-src 'self'${turnstile}; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'self'`;
+  const policy = `default-src 'self'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${turnstile}${analytics.script}${development ? " 'unsafe-eval'" : ''}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'${analytics.connect}${development ? ' ws: wss:' : ''}; frame-src 'self'${turnstile}${video}; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'self'`;
   // The page renders with the nonce and policy on its request; Next reads the request's
   // Content-Security-Policy to put the nonce on the scripts it writes.
   headers.set('x-nonce', nonce);

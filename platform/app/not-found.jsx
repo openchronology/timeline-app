@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { currentSession } from '../lib/session.js';
+import { browserPath } from '../../server/landing.mjs';
 /**
  * Answered with 404 whether nothing is there or the visitor may not open it, so a private
  * timeline's address doesn't tell anyone that it exists (as 401 or 403 would). A guest is
@@ -37,7 +38,7 @@ export default async function NotFound() {
           </p>
         )}
         <p>
-          <Link href="/">Back to the dashboard</Link>
+          <Link href={browserPath()}>Back to the dashboard</Link>
         </p>
       </div>
     </main>

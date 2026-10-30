@@ -321,6 +321,32 @@ for it and is then sent from the cache.
 
 An ID that is not a measurement ID is refused at startup. Mention analytics in your privacy notice; `legal/PRIVACY.md` describes the default.
 
+## Landing page
+
+A server opens on the timeline browser at `/`. To pitch it to particular audiences instead, turn on the landing page ([#379](https://github.com/openchronology/timeline-app/issues/379)):
+
+```sh
+LANDING_PAGE=1
+LANDING_EXAMPLES=athan/deep-time,athan/ancient-egypt,athan/computer-science
+LANDING_EXAMPLES_EDUCATORS=athan/abraham-lincoln,athan/ancient-egypt,athan/deep-time
+LANDING_VIDEO_EDUCATORS=https://www.youtube.com/watch?v=…
+```
+
+`LANDING_PAGE` is on when it is `1`, `true` or `yes`, and off otherwise, which is the default. When it is on:
+
+- **`/`** is the landing page: "Any span of time, on one exact line", with **Explore timelines**, **Sign up** (when the site takes registrations; **Your timelines** when signed in) and **Start a timeline**, the video, a card for each audience, a few public timelines, and the page's copy.
+- **`/for`** lists the audiences, and **`/for/<audience>`** is each one's page: `educators`, `researchers`, `investigators`, `operations`, `writers` and `developers`. Each has a one-line promise, its example timelines, its video, what that audience can do, and what it can count on. Any other audience is not found.
+- **`/explore`** is the timeline browser, with everything `/` had: your timelines, favorites and drafts, and the public timelines, with each list's search, tag, sort and page in the address. The header gains an **Explore** link, the account menu **Your timelines**, and signing in without a page to return to goes there.
+- The sitemap's `pages.xml` lists `/explore`, `/for` and each audience's page. Each page has its own title, description, canonical address, link preview and schema.org `WebPage` description, and all of them work without JavaScript, at phone width, and in light or dark mode.
+
+When it is off, `/` is the timeline browser as before, `/explore` shows the same browser (its canonical address is `/`), and `/for` is not found. The username `for` is reserved for these pages; an account that already has it keeps its profile at `/users/for`.
+
+**Example timelines.** `LANDING_EXAMPLES` names the landing page's, and `LANDING_EXAMPLES_EDUCATORS`, `_RESEARCHERS`, `_INVESTIGATORS`, `_OPERATIONS`, `_WRITERS` and `_DEVELOPERS` each audience's: `owner/slug` addresses separated by commas, shown in that order as the browser's cards, with their images. Two or three suit a page; it shows at most six. A timeline that is missing, private, labelled as sensitive, still being copied, or whose owner is suspended is left out without a word. When a page names none, it shows the first three public timelines the browser lists, featured first ([featuring](collaboration.md)).
+
+**Videos.** `LANDING_VIDEO` and `LANDING_VIDEO_<AUDIENCE>` take a YouTube address (`youtube.com/watch?v=…`, `youtu.be/…`, `/embed/…` or `/shorts/…`). The page shows a poster that links to the video on YouTube; nothing is loaded from YouTube until a visitor clicks it, when YouTube's privacy-enhanced player (`youtube-nocookie.com`) plays it in place, and the page says so beside it. The player is sent the site's origin as its referrer, which YouTube needs; the site sends none elsewhere. When any video is set, the content security policy of `/` and `/for/…` allows frames from `https://www.youtube-nocookie.com`, and nothing else changes. An address that names no YouTube video stops the server starting, with the setting's name. Mention the videos in your privacy notice if you set them.
+
+**The copy** is Markdown in [`platform/content/landing/`](../platform/content/landing/README.md): `home.md`, `audiences.md` and one file for each audience. Each begins with front matter: `title`, `promise`, `description` (for search engines and link previews), and for an audience its `label` and the `card` line on the landing page. To write your own, copy the files you want to change into a directory, edit them, and set `LANDING_CONTENT_DIR` to it; a file it lacks is read from the built-in copy. Pages read the files as they are asked for, so changes show without a restart. The Markdown can have headings, lists, emphasis, code and links to the site's pages or to `https:` and `mailto:` addresses; HTML shows as text. A directory that does not exist stops the server starting. In Docker, mount it into the `app` service, for example `- ./landing:/landing:ro` under `volumes` with `LANDING_CONTENT_DIR=/landing`.
+
 ## Terms and privacy policy
 
 Every account agrees to the terms of service and privacy policy in force: at registration, at a social account's email step, or, for an account made earlier (including the first administrator), when asked on its next visit. Until then it can read and manage its account but not save or share. Each account records the version (`oc_users.terms_version`, the policies' effective date) and when (`terms_accepted_at`); `SELECT username,terms_version,terms_accepted_at FROM oc_users` lists them. Changing the policies materially means changing `POLICY_VERSION` in `server/policies.mjs` and `oc_policy_version()` in `schema.sql`; see [authentication](authentication.md#agreeing-to-the-terms).

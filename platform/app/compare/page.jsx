@@ -4,6 +4,7 @@
 import Editor from '../../components/editor.jsx';
 import { accountCompareLimit, currentSession } from '../../lib/session.js';
 import { pageTitle, siteName } from '../../lib/sharing.js';
+import { browserPath } from '../../../server/landing.mjs';
 export const dynamic = 'force-dynamic';
 export function generateMetadata() {
   return { title: pageTitle('Compare timelines') };
@@ -22,7 +23,7 @@ export default async function ComparePage({ searchParams }) {
       <main className="platform">
         <h1>Compare timelines</h1>
         <p>
-          Select two to {limit} timelines in the <a href="/">timeline browser</a>
+          Select two to {limit} timelines in the <a href={browserPath()}>timeline browser</a>
           {!current.user && limit < 8 ? '; signed in, you can compare up to 8' : ''}.
         </p>
       </main>

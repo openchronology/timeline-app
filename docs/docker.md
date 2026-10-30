@@ -65,7 +65,7 @@ If migration fails, leave the web server stopped and inspect its output before c
 
 GitHub CI builds the images, boots an isolated stack, verifies exact pgmp arithmetic and bound queries, checks the HTTP session and static frontend, and round-trips SQLite files using the converter inside the actual web image.
 
-Set `FEATURED_TIMELINES` in `.env` to comma-separated public timeline UUIDs for dashboard curation. The migration service installs full-text search and collaboration tables before starting the app.
+Set `FEATURED_TIMELINES` in `.env` to comma-separated public timeline UUIDs for dashboard curation. To open the site on a landing page with pages for each audience, set `LANDING_PAGE=1` and the `LANDING_EXAMPLES…`, `LANDING_VIDEO…` and `LANDING_CONTENT_DIR` settings ([landing page](administration.md#landing-page)); a content directory must be mounted into the `app` service. The migration service installs full-text search and collaboration tables before starting the app.
 
 ## Transactional mail and account security
 
