@@ -61,7 +61,7 @@ export const paths = {
       tags: ['Account security'],
       summary: 'Add a passkey',
       description:
-        'The browser’s new credential, answering this session’s challenge from `POST /api/auth/passkeys/register/options` (else 400), checked for this site’s address and RP ID and for user verification (else 401). The account’s first second factor turns two-factor authentication on and gives ten recovery codes, shown only once. Signs out the account’s other sessions and notifies it by email.',
+        'The browser’s new credential, answering this session’s challenge from `POST /api/auth/passkeys/register/options` (else 400), checked for this site’s address and RP ID and for user verification (else 401). The account’s first second factor turns two-factor authentication on and gives ten recovery codes, shown only once. Signs out the account’s other sessions, revokes its API keys and notifies it by email.',
       security: BROWSER,
       requestBody: body({
         type: 'object',
@@ -114,7 +114,7 @@ export const paths = {
       tags: ['Account security'],
       summary: 'Remove a passkey',
       description:
-        'Without passkeys or an authenticator app left, two-factor authentication goes off and the recovery codes with it. Signs out the account’s other sessions and notifies it by email. ' +
+        'Without passkeys or an authenticator app left, two-factor authentication goes off and the recovery codes with it. Signs out the account’s other sessions, revokes its API keys and notifies it by email. ' +
         CONFIRM,
       security: BROWSER,
       parameters: [passkeyId],

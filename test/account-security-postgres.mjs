@@ -167,6 +167,12 @@ try {
   await flushMail(pool, mailer, key);
   assert(!messages.some((m) => m.to === takenEmail));
   assert(messages.some((m) => m.to === freeEmail && m.text.includes('#verify=')));
+  // A security change revokes the account's API keys as well as its other sessions.
+  const earlierKey = await owner.request(
+    'auth/api-keys',
+    { name: 'Before two-factor', days: 1, scopes: ['timelines:read'], password },
+    201,
+  );
   const setup = await owner.request('auth/mfa/setup', { password });
   const stored = (await pool.query('SELECT secret FROM oc_mfa_setups WHERE user_id=$1', [uid]))
     .rows[0].secret;
@@ -178,6 +184,10 @@ try {
   });
   assert.equal(enabled.recoveryCodes.length, 10);
   assert.equal((await second.request('session')).user, null);
+  assert(
+    (await pool.query('SELECT revoked_at FROM oc_api_keys WHERE id=$1', [earlierKey.id])).rows[0]
+      .revoked_at,
+  );
   let account = await owner.request('auth/account');
   assert(account.security.mfa_enabled);
   assert.equal(account.security.recovery_remaining, 10);

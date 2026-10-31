@@ -137,10 +137,16 @@ export class AccountSecurity {
   /**
    * Ends what could still act for account `userId` after a security change, inside the
    * caller's transaction `c`: its sessions (all of them, or all but `keep`, the token hash of
-   * the session making the change), unclaimed desktop sign-ins (so an earlier approval cannot
-   * restore access), sign-in challenges, and passkey challenges.
+   * the session making the change), every active API key (revoked, kept for the list; a key
+   * made by someone who held the account must not outlast the cleanup), unclaimed desktop
+   * sign-ins (so an earlier approval cannot restore access), sign-in challenges, and passkey
+   * challenges.
    */
   async endAccess(c, userId, keep = null) {
+    await c.query(
+      'UPDATE oc_api_keys SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL',
+      [userId],
+    );
     if (keep)
       await c.query('DELETE FROM oc_sessions WHERE user_id=$1 AND token_hash!=$2', [userId, keep]);
     else await c.query('DELETE FROM oc_sessions WHERE user_id=$1', [userId]);
@@ -581,8 +587,8 @@ export class AccountSecurity {
         throw new HttpError(400, 'Email changed since this link was requested.');
       // Sets the confirmed address (the unique index refuses one another account took
       // meanwhile, 23505), then ends everything issued before: all email links (this one
-      // included, so it works once), sign-in challenges, sessions and unclaimed desktop
-      // sign-ins.
+      // included, so it works once), sign-in challenges, sessions, API keys and unclaimed
+      // desktop sign-ins.
       await c.query('UPDATE oc_users SET email=$2,email_verified_at=now() WHERE id=$1', [
         row.user_id,
         row.email,
@@ -688,18 +694,13 @@ export class AccountSecurity {
       // lowercased, and an account (such as the bootstrap administrator's) may keep capitals.
       if (user.email?.toLowerCase() !== row.email || !user.email_verified_at)
         throw new HttpError(400, 'This reset link is no longer valid.');
-      // The new password, then the sign-out of everything: other reset links, every session,
-      // every active API key (revoked, kept for the list), unclaimed desktop sign-ins (so an
-      // earlier approval cannot restore access) and sign-in challenges.
+      // The new password, then the sign-out of everything: other reset links, then endAccess
+      // (every session and API key, unclaimed desktop sign-ins and challenges).
       await c.query('UPDATE oc_users SET password_hash=$2 WHERE id=$1', [user.id, hash]);
       await c.query("DELETE FROM oc_email_tokens WHERE user_id=$1 AND purpose='reset'", [user.id]);
       // Every passkey goes, mfa_enabled untouched: the account keeps its recovery codes.
       const passkeys = (await c.query('DELETE FROM oc_passkeys WHERE user_id=$1', [user.id]))
         .rowCount;
-      await c.query(
-        'UPDATE oc_api_keys SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL',
-        [user.id],
-      );
       await this.endAccess(c, user.id);
       await this.notify(
         c,
@@ -812,8 +813,8 @@ export class AccountSecurity {
   /**
    * Turns two-factor authentication on: `body.code` must be a code from the secret setup made in
    * this same session (and the password, through fresh). The secret moves to the account,
-   * re-sealed for `mfa:<id>`; ten new recovery codes replace any old ones; other sessions and
-   * pending desktop sign-ins end, and this session is marked as having completed two-factor
+   * re-sealed for `mfa:<id>`; ten new recovery codes replace any old ones; other sessions, API
+   * keys and pending desktop sign-ins end, and this session is marked as having completed two-factor
    * authentication. The account is notified. Result: the recovery codes, shown this once.
    *
    * An account that already has two-factor authentication through passkeys adds the app as a
@@ -848,7 +849,7 @@ export class AccountSecurity {
       );
       if (codes) await this.setRecoveryCodes(c, user.id, codes);
       // The setup is used up; every other session, which never completed two-factor
-      // authentication, ends, as do unclaimed desktop sign-ins; this one is marked as verified
+      // authentication, ends, as do API keys and unclaimed desktop sign-ins; this one is marked as verified
       // so it keeps working under the new rule (Auth.session requires it).
       await c.query('DELETE FROM oc_mfa_setups WHERE user_id=$1', [user.id]);
       await this.endAccess(c, user.id, session.token_hash);
@@ -859,8 +860,8 @@ export class AccountSecurity {
         c,
         user,
         codes
-          ? 'Two-factor authentication was enabled. Other sessions were revoked. Keep your recovery codes offline.'
-          : 'An authenticator app was added for two-factor authentication. Other sessions were revoked.',
+          ? 'Two-factor authentication was enabled. Other sessions and API keys were revoked. Keep your recovery codes offline.'
+          : 'An authenticator app was added for two-factor authentication. Other sessions and API keys were revoked.',
       );
     });
     this.deliver();
@@ -879,7 +880,7 @@ export class AccountSecurity {
    * this browser, and tell the old one; the address changes only when confirmed, in verify),
    * `disable` (remove the authenticator app, which turns two-factor authentication off unless
    * the account has passkeys) or `recovery` (replace the recovery codes).
-   * The last two end other sessions, challenges and desktop sign-ins. Each is notified. The
+   * The last two end other sessions, API keys, challenges and desktop sign-ins. Each is notified. The
    * slow work (breach check, password hashing) happens before the transaction so the account
    * row is not locked during it. Result: a message, plus new recovery codes or the proof cookie.
    */
@@ -900,10 +901,6 @@ export class AccountSecurity {
         // As for a reset: the new hash, then every session (this one too), API key, desktop
         // sign-in, challenge and outstanding reset link ends.
         await c.query('UPDATE oc_users SET password_hash=$2 WHERE id=$1', [user.id, newHash]);
-        await c.query(
-          'UPDATE oc_api_keys SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL',
-          [user.id],
-        );
         await this.endAccess(c, user.id);
         await c.query("DELETE FROM oc_email_tokens WHERE user_id=$1 AND purpose='reset'", [
           user.id,
@@ -970,9 +967,9 @@ export class AccountSecurity {
           user,
           action === 'disable'
             ? passkeysLeft
-              ? 'The authenticator app was removed from two-factor authentication; your passkeys still answer it. Other sessions were revoked.'
-              : 'Two-factor authentication was disabled. Other sessions were revoked.'
-            : 'Recovery codes were replaced. Previous codes no longer work. Other sessions were revoked.',
+              ? 'The authenticator app was removed from two-factor authentication; your passkeys still answer it. Other sessions and API keys were revoked.'
+              : 'Two-factor authentication was disabled. Other sessions and API keys were revoked.'
+            : 'Recovery codes were replaced. Previous codes no longer work. Other sessions and API keys were revoked.',
         );
       }
     });

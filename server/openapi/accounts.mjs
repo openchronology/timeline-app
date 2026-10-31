@@ -333,7 +333,7 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Confirm an email address',
       description: [
-        'Accepts the token from an emailed confirmation link (`/login#verify=…`): it completes a registration (making the account), confirms an email address given at sign-in, or completes an email change. It works only in the browser that asked for it (its `oc_verify` cookie), within 24 hours.',
+        'Accepts the token from an emailed confirmation link (`/login#verify=…`): it completes a registration (making the account), confirms an email address given at sign-in, or completes an email change, which signs the account out everywhere and revokes its API keys. It works only in the browser that asked for it (its `oc_verify` cookie), within 24 hours.',
         'Confirming signs the account out everywhere; sign in afterwards.',
         SIGN_IN_TOKEN,
       ].join('\n\n'),
@@ -588,7 +588,7 @@ export const paths = {
       tags: ['Account security'],
       summary: 'Turn on two-factor authentication',
       description:
-        'Confirms the key from `POST /api/auth/mfa/setup` with a code from the authenticator, and gives ten recovery codes, shown only once (an account that already has passkeys keeps its codes, and the answer is `{enabled: true, message}` instead). Signs out the account’s other sessions. ' +
+        'Confirms the key from `POST /api/auth/mfa/setup` with a code from the authenticator, and gives ten recovery codes, shown only once (an account that already has passkeys keeps its codes, and the answer is `{enabled: true, message}` instead). Signs out the account’s other sessions and revokes its API keys. ' +
         FRESH,
       security: SIGNED_IN,
       requestBody: body({
@@ -627,7 +627,7 @@ export const paths = {
       tags: ['Account security'],
       summary: 'Remove the authenticator app',
       description:
-        'Removes the authenticator app. Without passkeys, that turns two-factor authentication off and removes the recovery codes; with them, it stays on and the codes stay. Signs out the account’s other sessions. ' +
+        'Removes the authenticator app. Without passkeys, that turns two-factor authentication off and removes the recovery codes; with them, it stays on and the codes stay. Signs out the account’s other sessions and revokes its API keys. ' +
         FRESH,
       security: SIGNED_IN,
       requestBody: body(ref('SecurityConfirmation')),
@@ -643,7 +643,7 @@ export const paths = {
       tags: ['Account security'],
       summary: 'Replace the recovery codes',
       description:
-        'Gives ten new recovery codes, shown only once; the old ones stop working. Signs out the account’s other sessions. ' +
+        'Gives ten new recovery codes, shown only once; the old ones stop working. Signs out the account’s other sessions and revokes its API keys. ' +
         FRESH,
       security: SIGNED_IN,
       requestBody: body(ref('SecurityConfirmation')),
