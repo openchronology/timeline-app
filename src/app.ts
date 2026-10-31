@@ -108,6 +108,7 @@ import {
   entityCount,
   entityTags,
   filterDocument,
+  separationArcs,
   tagCounts,
   searchIndex,
   searchTerms,
@@ -127,6 +128,8 @@ import {
   DURATION_COUNT_CAP,
   arcPath,
   arrowheadPath,
+  crossArcPath,
+  crossArrowheadPath,
 } from './core.js';
 import type {
   EntityRef,
@@ -8701,8 +8704,12 @@ function startSeparation(by: string[] | Separation) {
     { key: 'rest', mode: 'none' as const, title: 'Everything else' },
   ];
   let sources: ComparisonSource[];
+  // Arcs (#415) are the whole timeline's: the upper track's answers carry them all, each end
+  // marked with whether it is on that track (the lower track is the rest), so the lower
+  // track's ask for none.
   if (!sparseWorkspace() && model) {
     const document = model.document();
+    const arcs = separationArcs(document, filterFor('any'));
     sources = modes.map(({ key, mode, title }) => {
       const index = new TimelineIndex(filterDocument(document, filterFor(mode)));
       return {
@@ -8711,6 +8718,7 @@ function startSeparation(by: string[] | Separation) {
         presentation,
         plugins,
         index,
+        arcs: mode === 'any' ? arcs : () => ({ edges: [], edgesTruncated: false }),
         first: index.points.minKey()?.toString(),
         last: index.points.maxKey()?.toString(),
       };
@@ -8729,7 +8737,12 @@ function startSeparation(by: string[] | Separation) {
       last: info.last,
       query: (query, signal) =>
         timelineQuery<Frame | EventPage>(
-          { ...query, filter: filterFor(mode), revision: (local ?? remote)!.revision },
+          {
+            ...query,
+            filter: filterFor(mode),
+            revision: (local ?? remote)!.revision,
+            ...(query.kind === 'overview' && mode === 'none' ? { arcs: false } : {}),
+          },
           signal,
         ),
     }));
@@ -9460,58 +9473,98 @@ const edgeArcs = new Map<
   }
 >();
 /**
+ * The entities the frame shows by reference key, with their metadata and titles: single
+ * moments, collapsed durations and bands. On a separation's tracks (#415) their IDs carry the
+ * track's key, which is taken off, since arcs name the timeline's own entities.
+ */
+function frameEntities(): Map<string, { metadata?: Record<string, unknown>; title?: string }> {
+  const shown = new Map<string, { metadata?: Record<string, unknown>; title?: string }>();
+  const own = (id: string, sourceKey?: string) =>
+    sourceKey && id.startsWith(sourceKey + ':') ? id.slice(sourceKey.length + 1) : id;
+  for (const group of frame.groups) {
+    const sourceKey = (group as ComparisonGroup).sourceKey;
+    if (group.id)
+      shown.set('m:' + own(group.id, sourceKey), { metadata: group.metadata, title: group.title });
+    if (group.duration)
+      shown.set('d:' + own(group.duration.id, group.duration.sourceKey ?? sourceKey), {
+        metadata: group.duration.metadata,
+        title: group.duration.metadata.title,
+      });
+  }
+  for (const band of frame.durations ?? [])
+    shown.set('d:' + own(band.id, band.sourceKey), {
+      metadata: band.metadata,
+      title: band.metadata.title,
+    });
+  return shown;
+}
+/**
  * The ends of an arc that draw an arrowhead (#326): the union of what its two entities'
  * relationship-arrows fields say, read from the metadata the view already has (the timeline
  * in memory, or the frame's moments and bands), or null when no enabled plugin draws arrows.
  * An entity whose metadata isn't at hand, such as one off screen or inside a summary of a
- * server timeline, says nothing.
+ * server timeline, says nothing. A separation (#415) reads the saved version, so there the
+ * frame's metadata comes before a server or desktop timeline's unsaved edits.
  */
-function arrowheadLookup(): ((a: EntityRef, b: EntityRef) => { a: boolean; b: boolean }) | null {
+function arrowheadLookup(
+  shown: () => Map<string, { metadata?: Record<string, unknown> }>,
+): ((a: EntityRef, b: EntityRef) => { a: boolean; b: boolean }) | null {
   const installed = installedPlugins();
-  if (comparison || !pluginDrawsArrows(installed)) return null;
+  if ((comparison && !separation) || !pluginDrawsArrows(installed)) return null;
   const moments = activePlugins(),
     durations = durationPlugins(installed);
-  let shown: Map<string, Record<string, unknown>> | null = null;
-  const fromFrame = (key: string) => {
-    if (!shown) {
-      shown = new Map();
-      for (const group of frame.groups) {
-        if (group.id && group.metadata) shown.set('m:' + group.id, group.metadata);
-        if (group.duration) shown.set('d:' + group.duration.id, group.duration.metadata);
-      }
-      for (const band of frame.durations ?? []) shown.set('d:' + band.id, band.metadata);
-    }
-    return shown.get(key);
-  };
+  const edited = separation && sparseWorkspace() ? null : model;
   const end = (ref: EntityRef) => {
     const key = refKey(ref);
     return 'moment' in ref
       ? {
           key,
           plugins: moments,
-          metadata: model?.byId.get(ref.moment)?.metadata ?? fromFrame(key) ?? null,
+          metadata: edited?.byId.get(ref.moment)?.metadata ?? shown().get(key)?.metadata ?? null,
         }
       : {
           key,
           plugins: durations,
-          metadata: model?.durations.get(ref.duration)?.metadata ?? fromFrame(key) ?? null,
+          metadata:
+            edited?.durations.get(ref.duration)?.metadata ?? shown().get(key)?.metadata ?? null,
         };
   };
   return (a, b) => arcArrowheads(end(a), end(b));
 }
+/**
+ * The axes arcs are drawn on: the timeline's, or on a separation (#415) the upper track's for
+ * ends on it (`aIn`/`bIn`) and the lower track's for the rest. Other comparisons draw no arcs.
+ */
+function arcAxes(): { upper: number; lower: number } | null {
+  if (!comparison) return { upper: 192, lower: 192 };
+  if (!separation || comparison.combined || comparison.tracks.length !== 2) return null;
+  const rows = comparisonRows().rows;
+  return {
+    upper: 192 + (rows.get(comparison.tracks[0].source.key)?.offset ?? 0),
+    lower: 192 + (rows.get(comparison.tracks[1].source.key)?.offset ?? 0),
+  };
+}
 function renderEdgeArcs() {
   const svg = el('edge-arcs');
   svg.querySelector('.edge-limit')?.remove();
-  const axis = 192,
-    generation = contentGeneration(),
+  const generation = contentGeneration(),
     shown = new Set<string>(),
-    arrowhead = arrowheadLookup(),
-    right = stageWidth() / uiScale;
+    right = stageWidth() / uiScale,
+    axes = arcAxes();
+  let entities: ReturnType<typeof frameEntities> | null = null;
+  const onScreen = () => (entities ??= frameEntities());
+  const arrowhead = arrowheadLookup(onScreen);
   const name = (ref: EntityRef) =>
-    describe(refKey(ref))?.title || ('moment' in ref ? 'Moment' : 'Duration');
-  for (const edge of comparison ? [] : (frame.edges ?? [])) {
+    describe(refKey(ref))?.title ||
+    onScreen().get(refKey(ref))?.title ||
+    ('moment' in ref ? 'Moment' : 'Duration');
+  for (const edge of axes ? (frame.edges ?? []) : []) {
     const xa = (inset() + viewport.x(parsedTime(edge.aTime), width())) / uiScale,
       xb = (inset() + viewport.x(parsedTime(edge.bTime), width())) / uiScale;
+    // Each end on its track's axis: an arc within a track rises above it; one between the
+    // tracks crosses the gap from one end to the other.
+    const ya = edge.aIn === false ? axes!.lower : axes!.upper,
+      yb = edge.bIn === false ? axes!.lower : axes!.upper;
     const distance = Math.abs(xb - xa);
     const lift = Math.min(150, 18 + distance * 0.3);
     let arc = edgeArcs.get(edge.id);
@@ -9529,10 +9582,14 @@ function renderEdgeArcs() {
       edgeArcs.set(edge.id, arc);
     }
     shown.add(edge.id);
+    arc.path.classList.toggle('edge-arc-between', ya !== yb);
     // Only the part over the stage, so an endpoint far off screen never puts a coordinate
     // millions of pixels away (which browsers draw coarsely, flickering as the view pans).
     const margin = 64,
-      d = arcPath(xa, xb, axis, lift, -margin, right + margin);
+      d =
+        ya === yb
+          ? arcPath(xa, xb, ya, lift, -margin, right + margin)
+          : crossArcPath(xa, ya, xb, yb, -margin, right + margin);
     arc.path.setAttribute('d', d);
     arc.halo.setAttribute('d', d);
     // Arrowheads (#326) at the ends either entity's arrows point to, drawn in the arcs' own
@@ -9540,10 +9597,13 @@ function renderEdgeArcs() {
     const ends = arrowhead?.(edge.a, edge.b),
       toA = !!ends?.a,
       toB = !!ends?.b;
-    const heads = [
-      toA && xa >= 0 && xa <= right ? arrowheadPath(xa, xb, axis, lift) : '',
-      toB && xb >= 0 && xb <= right ? arrowheadPath(xb, xa, axis, lift) : '',
-    ]
+    const head = (x: number, y: number, otherX: number, otherY: number) =>
+      x < 0 || x > right
+        ? ''
+        : y === otherY
+          ? arrowheadPath(x, otherX, y, lift)
+          : crossArrowheadPath(x, y, otherX, otherY);
+    const heads = [toA ? head(xa, ya, xb, yb) : '', toB ? head(xb, yb, xa, ya) : '']
       .filter(Boolean)
       .join(' ');
     if (heads && d) {
@@ -9578,7 +9638,7 @@ function renderEdgeArcs() {
       arc.arrows?.remove();
       edgeArcs.delete(id);
     }
-  if (frame.edgesTruncated) {
+  if (axes && frame.edgesTruncated) {
     const note = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     note.setAttribute('x', String(inset()));
     note.setAttribute('y', '14');

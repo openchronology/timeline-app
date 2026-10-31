@@ -11,6 +11,7 @@ import {
   TimelineIndex,
   searchIndex,
   filterDocument,
+  separationArcs,
   tagCounts,
 } from '../dist/core.mjs';
 export async function checkDesktopCache(browser) {
@@ -48,6 +49,7 @@ export async function checkDesktopCache(browser) {
         metadata: { title: 'Cached period', notes: { detail: 'not in viewport payloads' } },
       },
     ],
+    relationships: [{ a: { moment: 'far' }, b: { moment: 'near' } }],
   };
   let index = new TimelineIndex(document),
     slowViews = false,
@@ -64,7 +66,7 @@ export async function checkDesktopCache(browser) {
     // Server requests: with no server connected, there should be none.
     requests = [];
   const header = () => ({
-    document: { ...document, events: [], durations: [] },
+    document: { ...document, events: [], durations: [], relationships: undefined },
     generation,
     path: '/tmp/cached.och',
     event_count: String(document.events.length),
@@ -113,6 +115,20 @@ export async function checkDesktopCache(browser) {
         Q.parse(q.threshold).div(view.span).toApproximateNumber() * 1000,
       );
       assert(frame.groups.length <= 1025);
+      // A separation's arcs are the whole file's, each end marked by side (#415), as
+      // native-store does; the lower track asks for none.
+      if (q.filter) {
+        const threshold = Q.parse(q.threshold);
+        frame.edges =
+          q.arcs === false
+            ? []
+            : separationArcs(document, q.filter)(
+                Q.parse(q.lower),
+                Q.parse(q.upper),
+                threshold.compare(Q.zero) > 0 ? threshold : null,
+              ).edges;
+        frame.edgesTruncated = false;
+      }
       return frame;
     }
     if (command === 'desktop_save') {
@@ -134,6 +150,7 @@ export async function checkDesktopCache(browser) {
         ...args.patch.settings,
         events: [...events.values()],
         durations: [...durations.values()],
+        relationships: document.relationships,
       };
       index = new TimelineIndex(document);
       generation++;
@@ -291,6 +308,11 @@ export async function checkDesktopCache(browser) {
     for (let i = 0; i < 200 && !(queried('any') && queried('none')); i++)
       await page.waitForTimeout(50);
     assert(queried('any') && queried('none'));
+    // Arcs (#415): only the upper track's overviews ask for them; the link from the tagged
+    // moment to one below is drawn between the tracks.
+    const views = filtered.filter((q) => q.kind === 'overview');
+    assert(views.every((q) => (q.filter.mode === 'none') === (q.arcs === false)));
+    await page.locator('.edge-arc.edge-arc-between').waitFor({ state: 'attached' });
     await page.getByRole('button', { name: 'Edited SQLite moment', exact: true }).waitFor();
     assert.equal(reads, 0, 'Separation never loads the whole file into the webview.');
     await page.locator('#separation-rejoin').click();

@@ -8,7 +8,7 @@ Moment details and the duration dialog have a **Related to** section. It lists d
 
 To link an entity, open **Add a relationship** and search titles and notes. Choose a result to link it. **×** removes a link. Undo and Redo cover adding and removing links. Deleting an event removes its links; undoing the deletion restores them.
 
-**Separate related** moves the entity and its directly related entities into a track above everything else, like [separating by tags](tags.md). **Separate all connected** also follows relationships transitively: everything reachable through any chain of links moves up. The bar above the tracks says which entity was separated and how, such as "Separated: related to Alpha". Separated tracks are read-only and draw no arcs; **Rejoin** returns to the whole timeline.
+**Separate related** moves the entity and its directly related entities into a track above everything else, like [separating by tags](tags.md). **Separate all connected** also follows relationships transitively: everything reachable through any chain of links moves up. The bar above the tracks says which entity was separated and how, such as "Separated: related to Alpha". Separated tracks are read-only and still draw arcs (see [Arcs between tracks](#arcs-between-tracks)); **Rejoin** returns to the whole timeline.
 
 ## Arcs
 
@@ -17,6 +17,20 @@ Each relationship is drawn as an arc above the axis between its two entities: at
 The [Relationship arrows](plugins.md#relationship-arrows) plugin draws arrowheads on arcs. Each entity keeps, in its own metadata, an arrow for any of its relationships (toward the other end, toward itself, or both), and an arc shows what either end asks for. This is a drawing convention stored on the entities, not part of the relationship: relationships stay undirected and unlabeled, and Separate related and Separate all connected don't follow the arrows.
 
 Arcs never require the whole timeline. Each relationship is indexed as a fixed interval between its endpoints' times, in the same augmented interval tree used for [duration bands](durations.md#storage-and-queries). A viewport query visits only subtrees that touch the window and skips subtrees made entirely of arcs shorter than the threshold.
+
+### Arcs between tracks
+
+While a timeline is separated, by tags or by relationships, its relationships are still drawn. A link between two events on the same track arcs above that track's axis, as on the whole timeline. A link between an event above and one below crosses the gap between the tracks: an S-shaped curve that leaves one event's marker straight down (or up), runs across, and arrives straight into the other's. Across a long time span it crosses the view almost level, halfway between the tracks, and runs off the edge toward its ends. Arrowheads, hover text, the 256-arc limit with its notice, and hiding arcs shorter than the grouping distance work as on the whole timeline.
+
+The arcs are the whole timeline's, not each track's: the upper track's overview answers carry every arc touching the window, each end marked with whether it is on that track (`aIn`, `bIn`; an end that isn't is on the lower track, which is everything else). The lower track asks for none (`arcs: false`). How each timeline knows which track an end is on, for at most 512 ends a window and never by reading the whole timeline:
+
+| Timeline            | Arcs                                                     | Which track an end is on                                                                                                                  |
+| ------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Server (PostgreSQL) | The timeline's `oc_edge_nodes` (forks read through)      | Primary-key lookups in the upper view's `oc_view_moments`, and in its `oc_view_duration_nodes` by duration ID (an index on `band->>'id'`) |
+| Desktop `.och` file | The open file's own `edge_intervals`                     | One query of primary-key lookups in the upper view's derived copy (`events`, `durations`)                                                 |
+| In-memory           | An arc tree of the whole document, built when separating | The separation's membership test (the chosen tags, or the related set found by breadth-first search)                                      |
+
+Views already hold exactly the entities on their side, so looking an end up in the upper view answers the question for both tracks, whatever the separation.
 
 ## Exchange format
 
@@ -41,4 +55,4 @@ Moment and duration IDs are separate namespaces, so each endpoint names its kind
 | Desktop `.och` file | `relationships` table, indexed from both ends | `edge_intervals` and `edge_nodes` | Recursive CTE        |
 | In-memory           | Adjacency map                                 | In-memory interval tree           | Breadth-first search |
 
-Desktop and browser saves rebuild link and arc indexes; PostgreSQL sparse saves add and remove only the changed links and re-place arcs of moved entities. Arcs come with overview queries (`edges`, `edgesTruncated`). `{"kind": "related", "entity": {"moment": "launch"}, "after": null, "limit": 25}` returns direct relations with titles and times, paged by kind and ID; its first page also returns `direct` and `reachable` counts. Separation views accept `filter: {"related": {...}, "depth": "direct" | "all", "mode": "any" | "none"}`. Sparse saves send `relationshipChanges` (`{a, b, related}`), which add or remove links idempotently.
+Desktop and browser saves rebuild link and arc indexes; PostgreSQL sparse saves add and remove only the changed links and re-place arcs of moved entities. Arcs come with overview queries (`edges`, `edgesTruncated`), including a separation's, whose arcs are the whole timeline's with each end marked by side (`aIn`, `bIn`) unless the query sets `arcs: false`. `{"kind": "related", "entity": {"moment": "launch"}, "after": null, "limit": 25}` returns direct relations with titles and times, paged by kind and ID; its first page also returns `direct` and `reachable` counts. Separation views accept `filter: {"related": {...}, "depth": "direct" | "all", "mode": "any" | "none"}`. Sparse saves send `relationshipChanges` (`{a, b, related}`), which add or remove links idempotently.

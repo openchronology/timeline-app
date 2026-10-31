@@ -9,6 +9,7 @@ import {
   validateDocument,
   validatePluginManifest,
   filterDocument,
+  separationArcs,
   tagCounts,
   viewFilterKey,
 } from '../dist/core.mjs';
@@ -81,4 +82,46 @@ test('separations split entities by tag and pin durations that follow the other 
     { tag: 'art', count: 1 },
     { tag: 'trade', count: 1 },
   ]);
+});
+
+test("a separation keeps the whole timeline's arcs, each end marked by its side (#415)", () => {
+  const d = validateDocument({
+    ...doc(),
+    events: [...doc().events, { id: 'far', time: '1000/1', metadata: { tags: ['war'] } }],
+    relationships: [
+      { a: { moment: 'a' }, b: { moment: 'c' } },
+      { a: { moment: 'a' }, b: { duration: 'x' } },
+      { a: { moment: 'b' }, b: { moment: 'c' } },
+      { a: { moment: 'b' }, b: { moment: 'far' } },
+    ],
+  });
+  const marks = (filter, lower, upper, threshold = null) =>
+    separationArcs(d, filter)(Q.parse(lower), Q.parse(upper), threshold && Q.parse(threshold))
+      .edges.map((e) => `${e.id} ${e.aIn} ${e.bIn}`)
+      .sort();
+  // a and x carry "war"; b and c don't; far does, a long way off.
+  assert.deepEqual(marks({ tags: ['war'], mode: 'any' }, '0/1', '10/1'), [
+    'd:x~m:a true true',
+    'm:a~m:c true false',
+    'm:b~m:c false false',
+    'm:b~m:far false true',
+  ]);
+  // Arcs touching the window only, at least the threshold long, as for the whole timeline.
+  assert.deepEqual(marks({ tags: ['war'], mode: 'any' }, '500/1', '600/1'), [
+    'm:b~m:far false true',
+  ]);
+  assert.deepEqual(marks({ tags: ['war'], mode: 'any' }, '0/1', '10/1', '3/2'), [
+    'm:a~m:c true false',
+    'm:b~m:far false true',
+  ]);
+  // By relationship: a and what it links to directly.
+  assert.deepEqual(
+    marks({ related: { moment: 'a' }, depth: 'direct', mode: 'any' }, '0/1', '2000/1'),
+    ['d:x~m:a true true', 'm:a~m:c true true', 'm:b~m:c false true', 'm:b~m:far false false'],
+  );
+  // And everything connected to it, which here is every entity linked to anything.
+  assert.deepEqual(
+    marks({ related: { moment: 'a' }, depth: 'all', mode: 'any' }, '0/1', '2000/1'),
+    ['d:x~m:a true true', 'm:a~m:c true true', 'm:b~m:c true true', 'm:b~m:far true true'],
+  );
 });

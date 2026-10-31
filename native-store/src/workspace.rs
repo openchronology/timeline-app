@@ -144,6 +144,10 @@ pub struct Query {
     pub offset: Option<usize>,
     #[serde(default)]
     pub sort: Option<String>,
+    /// With a `filter`, `false` leaves an overview's arcs out (#415): the lower track of a
+    /// separation asks for none, since the upper track's answer has every arc.
+    #[serde(default)]
+    pub arcs: Option<bool>,
 }
 /// A private temporary directory, removed with the last snapshot that uses it.
 struct Directory(PathBuf);
@@ -375,6 +379,62 @@ impl Snapshot {
         }
         Ok(view)
     }
+    /// The arcs touching [lower, upper] at least `threshold` long, from this snapshot's arc
+    /// index (see `edge_window`): a separation's arcs, which are the whole timeline's (#415).
+    fn arcs(&self, lower: &str, upper: &str, threshold: &str) -> Result<Value, String> {
+        let _gate = self.query_gate.lock().map_err(|e| e.to_string())?;
+        for value in [lower, upper, threshold] {
+            if value.len() > 65536 {
+                return Err("Viewport rational exceeds query budget".into());
+            }
+        }
+        let mut db = Connection::open(&self.path, false)?;
+        db.limit_reads();
+        super::edge_window(&db, lower, upper, threshold)
+    }
+    /// Marks each end of `arcs` (an `edge_window` result) with whether this snapshot, one side
+    /// of a separation, holds it (`aIn`, `bIn`): one query of at most 512 primary-key lookups.
+    fn mark_ends(&self, mut arcs: Value) -> Result<Value, String> {
+        let key = |end: &Value| -> Option<String> {
+            if let Some(id) = end.get("moment").and_then(Value::as_str) {
+                Some(format!("m:{id}"))
+            } else {
+                end.get("duration")
+                    .and_then(Value::as_str)
+                    .map(|id| format!("d:{id}"))
+            }
+        };
+        let edges = arcs["edges"].as_array_mut().ok_or("Missing arcs")?;
+        if edges.is_empty() {
+            return Ok(arcs);
+        }
+        let ends: Vec<String> = edges
+            .iter()
+            .flat_map(|e| [key(&e["a"]), key(&e["b"])])
+            .flatten()
+            .collect();
+        let ends = serde_json::to_string(&ends).map_err(|e| e.to_string())?;
+        let _gate = self.query_gate.lock().map_err(|e| e.to_string())?;
+        let mut db = Connection::open(&self.path, false)?;
+        db.limit_reads();
+        let inside: std::collections::HashSet<String> = db
+            .query_limited(
+                "SELECT DISTINCT j.value FROM json_each(?) j WHERE CASE substr(j.value,1,2) WHEN 'm:' THEN EXISTS(SELECT 1 FROM events WHERE id=substr(j.value,3)) WHEN 'd:' THEN EXISTS(SELECT 1 FROM durations WHERE id=substr(j.value,3)) ELSE 0 END",
+                &[&ends],
+                512,
+                BUDGET,
+            )?
+            .into_iter()
+            .filter_map(|r| r[0].clone())
+            .collect();
+        for edge in edges.iter_mut() {
+            let a = key(&edge["a"]).is_some_and(|k| inside.contains(&k));
+            let b = key(&edge["b"]).is_some_and(|k| inside.contains(&k));
+            edge["aIn"] = json!(a);
+            edge["bIn"] = json!(b);
+        }
+        Ok(arcs)
+    }
     /// Answers one editor query, as JSON. The kinds and their results:
     /// - "overview": the viewport [lower, upper] at grouping distance `threshold`:
     ///   `{groups, durations, durationsTruncated, edges, edgesTruncated, visitedNodes,
@@ -391,17 +451,34 @@ impl Snapshot {
     /// - "tags": the 200 most used tags with their counts.
     /// - "related": an entity's direct relations, paged, with counts on the first page.
     ///
-    /// With a `filter`, the same query runs on the derived snapshot of that separation side.
-    /// Errors on invalid input (reversed bounds, a negative threshold, oversized values or
+    /// With a `filter`, the same query runs on the derived snapshot of that separation side,
+    /// except an overview's arcs (#415): those are the whole timeline's, from this snapshot's
+    /// arc index, each end marked with whether it is on that side (`aIn`, `bIn`), unless
+    /// `arcs` is false. Errors on invalid input (reversed bounds, a negative threshold, oversized values or
     /// cursors), when a read limit is hit, or when the reply would exceed `BUDGET` in the
     /// webview.
     pub fn query(&self, q: &Query) -> Result<Value, String> {
         if let Some(filter) = &q.filter {
             let view = self.view(filter)?;
-            return view.query(&Query {
+            let mut result = view.query(&Query {
                 filter: None,
                 ..q.clone()
-            });
+            })?;
+            if q.kind == "overview" {
+                let arcs = if q.arcs == Some(false) {
+                    json!({"edges": [], "edgesTruncated": false})
+                } else {
+                    // At the threshold the view used, which raises a fine one the same way.
+                    let threshold = result["threshold"]
+                        .as_str()
+                        .ok_or("Missing overview threshold")?
+                        .to_string();
+                    view.mark_ends(self.arcs(&q.lower, &q.upper, &threshold)?)?
+                };
+                result["edges"] = arcs["edges"].clone();
+                result["edgesTruncated"] = arcs["edgesTruncated"].clone();
+            }
+            return Ok(result);
         }
         let _gate = self.query_gate.lock().map_err(|e| e.to_string())?;
         for value in [&q.lower, &q.upper, &q.threshold] {
@@ -1655,6 +1732,77 @@ mod view_tests {
         assert!(snapshot
             .query(&serde_json::from_value(json!({"kind":"events","lower":"0/1","upper":"1/1","filter":{"tags":[],"mode":"any"}})).unwrap())
             .is_err());
+    }
+    /// A separation's overview carries the whole timeline's arcs, each end marked with whether
+    /// it is on that side (#415); `arcs: false` leaves them out.
+    #[test]
+    fn separation_overviews_mark_arc_ends_by_side() {
+        let doc: Document = serde_json::from_value(json!({
+            "format":"openchronology","version":1,"title":"Arcs","description":"",
+            "events":[
+                {"id":"a","time":"1/1","metadata":{"tags":["war"]}},
+                {"id":"b","time":"4/1","metadata":{"tags":["war"]}},
+                {"id":"c","time":"6/1","metadata":{}}
+            ],
+            "durations":[{"id":"x","start":"8/1","end":"9/1","metadata":{"tags":["war"]}}],
+            "relationships":[
+                {"a":{"moment":"a"},"b":{"moment":"b"}},
+                {"a":{"moment":"b"},"b":{"moment":"c"}},
+                {"a":{"duration":"x"},"b":{"moment":"c"}}
+            ]
+        }))
+        .unwrap();
+        let snapshot = Snapshot::from_document(&doc).unwrap();
+        let overview = |filter: Value, arcs: Option<bool>| {
+            let mut q = json!({"kind":"overview","lower":"0/1","upper":"10/1","threshold":"1/1024","filter":filter});
+            if let Some(arcs) = arcs {
+                q["arcs"] = json!(arcs);
+            }
+            snapshot.query(&serde_json::from_value(q).unwrap()).unwrap()
+        };
+        let frame = overview(json!({"tags":["war"],"mode":"any"}), None);
+        let mut ends: Vec<(String, bool, bool)> = frame["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| {
+                (
+                    e["id"].as_str().unwrap().to_string(),
+                    e["aIn"].as_bool().unwrap(),
+                    e["bIn"].as_bool().unwrap(),
+                )
+            })
+            .collect();
+        ends.sort();
+        assert_eq!(
+            ends,
+            vec![
+                ("d:x~m:c".to_string(), true, false),
+                ("m:a~m:b".to_string(), true, true),
+                ("m:b~m:c".to_string(), true, false),
+            ]
+        );
+        assert_eq!(frame["edgesTruncated"], json!(false));
+        // From the other side, the same arcs with the marks the other way round.
+        let rest = overview(json!({"tags":["war"],"mode":"none"}), Some(true));
+        assert_eq!(rest["edges"].as_array().unwrap().len(), 3);
+        assert!(rest["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|e| e["id"] != "m:a~m:b" || (e["aIn"] == false && e["bIn"] == false)));
+        let none = overview(json!({"tags":["war"],"mode":"none"}), Some(false));
+        assert_eq!(none["edges"], json!([]));
+        // Related separations mark ends the same way.
+        let related = overview(
+            json!({"related":{"moment":"a"},"depth":"direct","mode":"any"}),
+            None,
+        );
+        assert!(related["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e["id"] == "m:b~m:c" && e["aIn"] == true && e["bIn"] == false));
     }
 }
 /// Overview groups and duration summaries match a brute-force reference.
