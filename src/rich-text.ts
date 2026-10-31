@@ -25,27 +25,43 @@ export function safeNoteLink(value: string): string | null {
 export type MarkdownInline =
   | string
   | { tag: 'code'; text: string }
-  | { tag: 'strong' | 'em'; children: MarkdownInline[] }
+  | { tag: 'strong' | 'em' | 'del'; children: MarkdownInline[] }
   | { tag: 'a'; href: string; text: string };
 export type MarkdownBlock =
   | { tag: 'p'; lines: MarkdownInline[][] }
-  | { tag: 'h1' | 'h2' | 'h3' | 'blockquote'; children: MarkdownInline[] }
+  | { tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'blockquote'; children: MarkdownInline[] }
   | { tag: 'ul' | 'ol'; items: MarkdownInline[][] }
-  | { tag: 'pre'; text: string };
+  | { tag: 'pre'; text: string }
+  | { tag: 'hr' }
+  | {
+      tag: 'table';
+      /** Each column's alignment, from the delimiter row (`:--`, `:-:`, `--:`), or null. */
+      align: MarkdownAlign[];
+      /** The header row's cells, then the body's rows, each with one cell per column. */
+      head: MarkdownInline[][];
+      rows: MarkdownInline[][][];
+    };
+export type MarkdownAlign = 'left' | 'center' | 'right' | null;
+/** At most this many columns in a table; cells past it are dropped. */
+const TABLE_COLUMNS = 64;
 /**
- * Parses one line of inline Markdown: backslash escapes, `code`, **strong**, *emphasis* and
- * [text](https link). Everything else, including any HTML tags, stays text. Strong and
- * emphasis recurse into their contents; past twelve levels the rest is plain text, bounding
- * the recursion on hostile input.
+ * Parses one line of inline Markdown: backslash escapes, `code`, **strong** (or __strong__),
+ * *emphasis* (or _emphasis_), ~~strikethrough~~, [text](https link), <https link> and bare
+ * https links. Everything else, including any HTML tags, stays text. Underscores mark
+ * emphasis only at word edges, so snake_case names stay as they are. Strong, emphasis and
+ * strikethrough recurse into their contents; past twelve levels the rest is plain text,
+ * bounding the recursion on hostile input.
  */
 export function parseInline(text: string, depth = 0): MarkdownInline[] {
   if (depth > 12) return text ? [text] : [];
   // Alternatives, tried left to right at each position: an escaped punctuation character
   // (group 1), inline code (2), strong (3, lazy so `**a** and **b**` is two), emphasis (4),
-  // and a link's text and URL (5, 6). Every repetition is bounded, which limits the work
-  // each match attempt can do on long or hostile notes.
+  // a link's text and URL (5, 6), strong and emphasis with underscores at word edges (7, 8),
+  // strikethrough (9), an autolink in angle brackets (10) and a bare https URL (11), which
+  // leaves out punctuation that usually ends a sentence. Every repetition is bounded, which
+  // limits the work each match attempt can do on long or hostile notes.
   const pattern =
-    /\\([\\`*_[\]#>+.!-])|`([^`\n]{1,2048})`|\*\*([^\n]{1,2048}?)\*\*|\*([^*\n]{1,2048})\*|\[([^\]\n]{1,512})\]\(([^\s)]{1,4096})\)/g;
+    /\\([\\`*_[\]#>+.!|~-])|`([^`\n]{1,2048})`|\*\*([^\n]{1,2048}?)\*\*|\*([^*\n]{1,2048})\*|\[([^\]\n]{1,512})\]\(([^\s)]{1,4096})\)|(?<![\p{L}\p{N}_])__([^\n]{1,2048}?)__(?![\p{L}\p{N}_])|(?<![\p{L}\p{N}_])_([^_\n]{1,2048})_(?![\p{L}\p{N}_])|~~([^\n]{1,2048}?)~~|<(https:\/\/[^\s<>]{1,4096})>|(https:\/\/[^\s<>]{0,4095}[^\s<>.,;:!?'")\]])/gu;
   const out: MarkdownInline[] = [];
   /** Appends text, merged into the text before it. */
   const add = (s: string) => {
@@ -58,12 +74,16 @@ export function parseInline(text: string, depth = 0): MarkdownInline[] {
     add(text.slice(start, match.index));
     if (match[1]) add(match[1]);
     else if (match[2]) out.push({ tag: 'code', text: match[2] });
-    else if (match[3] || match[4])
+    else if (match[3] || match[4] || match[7] || match[8] || match[9])
       out.push({
-        tag: match[3] ? 'strong' : 'em',
-        children: parseInline(match[3] || match[4], depth + 1),
+        tag: match[3] || match[7] ? 'strong' : match[9] ? 'del' : 'em',
+        children: parseInline(match[3] || match[4] || match[7] || match[8] || match[9], depth + 1),
       });
-    else {
+    else if (match[10] || match[11]) {
+      const href = safeNoteLink(match[10] || match[11]);
+      if (href) out.push({ tag: 'a', href, text: match[10] || match[11] });
+      else add(match[0]);
+    } else {
       const href = safeNoteLink(match[6]);
       if (href) out.push({ tag: 'a', href, text: match[5] });
       else add(match[0]); // Unsafe URL: shown literally.
@@ -74,10 +94,51 @@ export function parseInline(text: string, depth = 0): MarkdownInline[] {
   return out;
 }
 /**
- * Parses `markdown` line by line: ``` fences (contents kept verbatim as text), `#` to `###`
- * headings, `>` quotes, `-`/`*` bullets and `1.` numbered items, and paragraphs, where
- * consecutive lines are kept as lines of one paragraph and a blank line ends the block. Only
- * the first 100,000 characters are read.
+ * The cells of one table row: split at pipes that aren't escaped (`\|`) or inside `code`, with
+ * one leading and one trailing pipe dropped, each cell trimmed.
+ */
+function tableCells(line: string): string[] {
+  const cells: string[] = [];
+  let cell = '',
+    code = false;
+  const text = line.trim().replace(/^\|/, '');
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '\\' && text[i + 1] === '|') {
+      cell += '\\|';
+      i++;
+    } else if (c === '`') {
+      code = !code;
+      cell += c;
+    } else if (c === '|' && !code) {
+      cells.push(cell);
+      cell = '';
+    } else cell += c;
+  }
+  // A trailing pipe ends the last cell rather than starting an empty one.
+  if (cell.trim() || !/\|\s*$/.test(text)) cells.push(cell);
+  return cells.map((c) => c.trim());
+}
+/** A table's delimiter row (`| --- | :-: |`) as its columns' alignments, or null if it isn't one. */
+function tableAlignment(line: string): MarkdownAlign[] | null {
+  if (!line.includes('-') || !/^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/.test(line)) return null;
+  return tableCells(line).map((c) =>
+    c.startsWith(':') && c.endsWith(':')
+      ? 'center'
+      : c.endsWith(':')
+        ? 'right'
+        : c.startsWith(':')
+          ? 'left'
+          : null,
+  );
+}
+/**
+ * Parses `markdown` line by line: ``` fences (contents kept verbatim as text), `#` to `######`
+ * headings, `>` quotes, `-`/`*`/`+` bullets and `1.` numbered items, rules (`---`, `***`,
+ * `___`), tables (a header row, a delimiter row with the same number of cells, then rows until
+ * a blank line or a line without a pipe), and paragraphs, where consecutive lines are kept as
+ * lines of one paragraph and a blank line ends the block. Only the first 100,000 characters
+ * are read.
  */
 export function parseMarkdown(markdown: string): MarkdownBlock[] {
   const blocks: MarkdownBlock[] = [];
@@ -86,7 +147,17 @@ export function parseMarkdown(markdown: string): MarkdownBlock[] {
   let list: Extract<MarkdownBlock, { items: unknown }> | null = null,
     paragraph: Extract<MarkdownBlock, { lines: unknown }> | null = null,
     code: Extract<MarkdownBlock, { tag: 'pre' }> | null = null;
-  for (const line of lines) {
+  let table: Extract<MarkdownBlock, { tag: 'table' }> | null = null;
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    // A row of the open table: its cells, one per column, padded or cut to the header's.
+    if (table && !code && line.includes('|') && line.trim()) {
+      const cells = tableCells(line).slice(0, table.align.length);
+      while (cells.length < table.align.length) cells.push('');
+      table.rows.push(cells.map((c) => parseInline(c)));
+      continue;
+    }
+    table = null;
     if (line.startsWith('```')) {
       if (code) code = null;
       else blocks.push((code = { tag: 'pre', text: '' }));
@@ -101,10 +172,28 @@ export function parseMarkdown(markdown: string): MarkdownBlock[] {
       list = paragraph = null;
       continue;
     }
-    const heading = /^(#{1,3})\s+(.*)$/.exec(line),
-      item = /^(?:([-*])|\d+\.)\s+(.*)$/.exec(line),
-      quote = /^>\s?(.*)$/.exec(line);
-    if (item) {
+    const heading = /^(#{1,6})\s+(.*)$/.exec(line),
+      item = /^(?:([-*+])|\d+\.)\s+(.*)$/.exec(line),
+      quote = /^>\s?(.*)$/.exec(line),
+      align = line.includes('|') ? tableAlignment(lines[index + 1] ?? '') : null;
+    if (/^ {0,3}([-*_])(\s*\1){2,}\s*$/.test(line)) {
+      blocks.push({ tag: 'hr' });
+      list = paragraph = null;
+    } else if (align && tableCells(line).length === align.length) {
+      const columns = align.slice(0, TABLE_COLUMNS);
+      blocks.push(
+        (table = {
+          tag: 'table',
+          align: columns,
+          head: tableCells(line)
+            .slice(0, columns.length)
+            .map((c) => parseInline(c)),
+          rows: [],
+        }),
+      );
+      index++;
+      list = paragraph = null;
+    } else if (item) {
       const tag = item[1] ? 'ul' : 'ol';
       // A change between bullets and numbers starts a new list; item numbers themselves are
       // not kept, an ordered list always counts from one.
@@ -113,7 +202,9 @@ export function parseMarkdown(markdown: string): MarkdownBlock[] {
       paragraph = null;
     } else if (heading || quote) {
       blocks.push({
-        tag: heading ? (`h${heading[1].length}` as 'h1' | 'h2' | 'h3') : 'blockquote',
+        tag: heading
+          ? (`h${heading[1].length}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6')
+          : 'blockquote',
         children: parseInline(heading ? heading[2] : quote![1]),
       });
       list = paragraph = null;
@@ -138,6 +229,7 @@ function inlineText(nodes: MarkdownInline[]): string {
  */
 export function markdownText(markdown: string): string {
   return parseMarkdown(markdown)
+    .filter((b) => b.tag !== 'hr')
     .map((b) =>
       'lines' in b
         ? b.lines.map(inlineText).join('\n')
@@ -145,7 +237,11 @@ export function markdownText(markdown: string): string {
           ? b.items.map(inlineText).join('\n')
           : 'children' in b
             ? inlineText(b.children)
-            : b.text.replace(/\n$/, ''),
+            : b.tag === 'table'
+              ? [b.head, ...b.rows].map((row) => row.map(inlineText).join(' · ')).join('\n')
+              : 'text' in b
+                ? b.text.replace(/\n$/, '')
+                : '',
     )
     .join('\n\n');
 }
@@ -170,6 +266,35 @@ function appendInline(parent: HTMLElement, nodes: MarkdownInline[]) {
   }
 }
 /**
+ * A table block as a table element, in a scrolling wrapper so a wide table doesn't widen the
+ * page; each cell carries its column's alignment.
+ */
+function tableElement(block: Extract<MarkdownBlock, { tag: 'table' }>): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'markdown-table';
+  const table = document.createElement('table');
+  const row = (cells: MarkdownInline[][], tag: 'th' | 'td') => {
+    const tr = document.createElement('tr');
+    cells.forEach((cell, i) => {
+      const td = document.createElement(tag);
+      if (block.align[i]) td.style.textAlign = block.align[i]!;
+      appendInline(td, cell);
+      tr.append(td);
+    });
+    return tr;
+  };
+  const head = document.createElement('thead');
+  head.append(row(block.head, 'th'));
+  table.append(head);
+  if (block.rows.length) {
+    const body = document.createElement('tbody');
+    for (const cells of block.rows) body.append(row(cells, 'td'));
+    table.append(body);
+  }
+  wrapper.append(table);
+  return wrapper;
+}
+/**
  * Replaces `container`'s contents with the rendering of `markdown` (see parseMarkdown), in
  * which consecutive lines of a paragraph are joined with line breaks. Builds DOM nodes
  * directly (no innerHTML), so no markup in the notes can run or load anything.
@@ -178,7 +303,15 @@ export function renderMarkdown(container: HTMLElement, markdown: string) {
   container.replaceChildren();
   container.classList.add('markdown-view');
   for (const block of parseMarkdown(markdown)) {
+    if (block.tag === 'table') {
+      container.append(tableElement(block));
+      continue;
+    }
     const node = document.createElement(block.tag);
+    if (block.tag === 'hr') {
+      container.append(node);
+      continue;
+    }
     if (block.tag === 'pre') {
       const code = document.createElement('code');
       code.textContent = block.text;
@@ -199,7 +332,7 @@ export function renderMarkdown(container: HTMLElement, markdown: string) {
   }
 }
 /** Backslash-escapes every character the Markdown vocabulary treats specially (inline undoes it). */
-const escapeText = (s: string) => s.replace(/([\\`*_[\]#>+.!-])/g, '\\$1');
+const escapeText = (s: string) => s.replace(/([\\`*_[\]#>+.!|~-])/g, '\\$1');
 /**
  * Serialises the visual editor's DOM back to the Markdown vocabulary that renderMarkdown
  * reads. Text is escaped, so typed asterisks and the like survive a round trip; formatting
@@ -230,6 +363,45 @@ export function editorMarkdown(container: HTMLElement): string {
       case 'EM':
       case 'I':
         return `*${children()}*`;
+      case 'DEL':
+      case 'S':
+      case 'STRIKE':
+        return `~~${children()}~~`;
+      case 'HR':
+        return '\n\n---\n\n';
+      case 'TABLE': {
+        // Each row on one line, its cells' line breaks as spaces; the first row is the header,
+        // and the delimiter row keeps the header cells' alignment.
+        const rows = Array.from(node.querySelectorAll('tr'))
+          .filter((tr) => tr.closest('table') === node)
+          .map((tr) => Array.from(tr.children).filter((c) => ['TH', 'TD'].includes(c.tagName)));
+        if (!rows.length || !rows[0].length) return '';
+        const columns = rows[0].length;
+        const line = (cells: string[]) => '| ' + cells.join(' | ') + ' |';
+        const text = (cell: Element | undefined) =>
+          cell
+            ? Array.from(cell.childNodes)
+                .map((n) => walk(n, depth + 2))
+                .join('')
+                .replace(/\s*\n\s*/g, ' ')
+                .trim()
+            : '';
+        const align = rows[0].map((cell) => {
+          const a = (cell as HTMLElement).style.textAlign;
+          return a === 'center' ? ':---:' : a === 'right' ? '---:' : a === 'left' ? ':---' : '---';
+        });
+        return (
+          '\n\n' +
+          [
+            line(rows[0].map(text)),
+            line(align),
+            ...rows
+              .slice(1)
+              .map((r) => line(Array.from({ length: columns }, (_, i) => text(r[i])))),
+          ].join('\n') +
+          '\n\n'
+        );
+      }
       // Inline code can't contain backticks (there is no escape inside code spans), nor a
       // fenced block a closing fence, so those are removed.
       case 'CODE':
@@ -246,6 +418,9 @@ export function editorMarkdown(container: HTMLElement): string {
       case 'H1':
       case 'H2':
       case 'H3':
+      case 'H4':
+      case 'H5':
+      case 'H6':
         return '\n\n' + '#'.repeat(Number(node.tagName[1])) + ' ' + children() + '\n\n';
       case 'BLOCKQUOTE':
         return (

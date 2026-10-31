@@ -477,9 +477,15 @@ Enabling/disabling the plugin does not rewrite notes. The manifest, including
 and runs in the standalone HTML. Custom definitions may declare this same host
 capability, without access to HTML, editor internals or executable handlers.
 
-The viewer supports headings (levels 1–3), bold/italic emphasis, inline and fenced
-code, flat lists, blockquotes and explicit HTTPS links. This is a restricted
-Markdown vocabulary, rather than a complete CommonMark editor. Raw HTML is text;
+The viewer supports headings (levels 1–6), bold/italic emphasis (with `*` or
+`_`), strikethrough (`~~`), inline and fenced code, flat lists (`-`, `*`, `+` or
+`1.`), blockquotes, horizontal rules, tables (a header row, a `| --- | :-: |`
+delimiter row setting each column's alignment, then rows; escape a pipe in a cell
+as `\|`), explicit HTTPS links, and HTTPS addresses written bare or in angle
+brackets. Timeline descriptions use the same vocabulary. Tables survive edits in
+the visual editor, each row kept on one line. This is a restricted Markdown
+vocabulary, rather than a complete CommonMark editor: nested lists, images, task
+lists and footnotes stay as text. Raw HTML is text;
 images and embeds are not loaded. Rich clipboard content is pasted as plain
 text, and dropped HTML/files are rejected. Links reject credentials and executable
 schemes; clicking an outbound link opens a separate tab without an opener/referrer.
