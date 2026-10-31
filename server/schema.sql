@@ -112,9 +112,11 @@ CREATE TABLE IF NOT EXISTS oc_device_logins (
 -- Expired-request sweep: expires_at<=now() in device-auth.mjs start.
 CREATE INDEX IF NOT EXISTS oc_device_expiry ON oc_device_logins(expires_at);
 -- Rate-limit counters shared by every server process (auth.mjs rateLimit; challenge.mjs for
--- sign-in failures). key: SHA-256 of what is limited (an address, an account, an email, a
--- kind of failure); count: attempts in the window, which starts at the first attempt and
--- ends at expires_at (1 minute for rateLimit, 15 for sign-in failures).
+-- sign-in failures; account-security.mjs factorFailed for wrong two-factor answers per
+-- account). key: SHA-256 of what is limited (an address, an account, an email, a kind of
+-- failure); count: attempts in the window, which starts at the first attempt and ends at
+-- expires_at (1 minute for rateLimit, 15 for sign-in and two-factor failures, a day for the
+-- marker that limits the two-factor failure email to one a day).
 CREATE TABLE IF NOT EXISTS oc_auth_attempts (
   key text PRIMARY KEY, count integer NOT NULL, expires_at timestamptz NOT NULL
 );

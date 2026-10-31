@@ -30,6 +30,18 @@ const generic = {
   message:
     'If the account is eligible, an email will arrive shortly. Check your inbox and spam folder.',
 };
+/**
+ * Wrong answers to the two-factor step of signing in allowed per account in a fifteen-minute
+ * window, across all of its challenges (factorFailed). Each challenge also closes after five.
+ */
+export const FACTOR_FAILURES = 10;
+/**
+ * The refusal of a password, a provider link or a passkey sign-in for an account that signs in
+ * only through its directory (AccountSecurity.directoryOnly).
+ */
+export const DIRECTORY_ONLY =
+  'This account signs in through your organisation’s directory, which manages access to it. ' +
+  'It cannot add a password or another way to sign in.';
 /** Whether `value` is shaped like the 256-bit hex secrets used in links and cookies here. */
 const validToken = (value) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 /**
@@ -147,6 +159,24 @@ export class AccountSecurity {
     await c.query('DELETE FROM oc_device_logins WHERE user_id=$1', [userId]);
     await c.query('DELETE FROM oc_auth_challenges WHERE user_id=$1', [userId]);
     await c.query('DELETE FROM oc_passkey_challenges WHERE user_id=$1', [userId]);
+  }
+  /**
+   * Whether account `userId` signs in only through its directory account (ldap.mjs): it has no
+   * password and its one linked identity is `ldap`, as an account made by a directory sign-in
+   * has. Such an account exists because the directory let the person in, and the directory
+   * (removing them, or LDAP_REQUIRED_GROUP) is how the organisation ends that, so it may not
+   * gain a way to sign in that bypasses the directory: a password, another provider, or a
+   * passkey on its own (passkeys still answer its two-factor step). `c` is a client or the
+   * pool; inside a transaction, the caller holds the account lock.
+   */
+  async directoryOnly(c, userId) {
+    const { rows } = await c.query(
+      `SELECT password_hash IS NULL
+        AND array(SELECT provider FROM oc_identities WHERE user_id=$1)='{ldap}'::text[] AS only
+      FROM oc_users WHERE id=$1`,
+      [userId],
+    );
+    return !!rows[0]?.only;
   }
   /**
    * Replaces account `userId`'s recovery codes with `codes` (stored as recoveryHash digests),
@@ -359,15 +389,84 @@ export class AccountSecurity {
     return false;
   }
   /**
+   * Account `userId`'s count of wrong answers to the two-factor step in its current window
+   * (factorFailed), read inside the caller's transaction `c`; 0 when there is none.
+   */
+  async factorFailures(c, userId) {
+    const { rows } = await c.query(
+      'SELECT count FROM oc_auth_attempts WHERE key=$1 AND expires_at>now()',
+      [digest('mfa-failure-account:' + userId)],
+    );
+    return rows[0]?.count ?? 0;
+  }
+  /**
+   * Counts a wrong answer to the two-factor step against account `user`, inside the caller's
+   * transaction `c` (which holds the account lock, so concurrent answers count one by one).
+   * Each challenge allows five tries, but a new sign-in makes a new challenge, so without a
+   * count per account someone holding the first factor could keep guessing from fresh
+   * challenges. The counter is a row of oc_auth_attempts, as the sign-in failure counters
+   * (challenge.mjs) are: a fixed window of fifteen minutes from its first failure, renewed here
+   * when it has expired. The failure that reaches FACTOR_FAILURES emails the account once a
+   * day at most (a second row, lasting a day), so a sustained attempt is not one email per
+   * window. Result: whether a notice was queued.
+   */
+  async factorFailed(c, user) {
+    const { rows } = await c.query(
+      `INSERT INTO oc_auth_attempts(key,count,expires_at) VALUES($1,1,now()+interval '15 minutes')
+      ON CONFLICT(key) DO UPDATE SET
+        count=CASE WHEN oc_auth_attempts.expires_at>now() THEN oc_auth_attempts.count+1 ELSE 1 END,
+        expires_at=CASE WHEN oc_auth_attempts.expires_at>now()
+          THEN oc_auth_attempts.expires_at ELSE excluded.expires_at END
+      RETURNING count`,
+      [digest('mfa-failure-account:' + user.id)],
+    );
+    if (rows[0].count !== FACTOR_FAILURES) return false;
+    // Claims the day's notice: inserted, or taken over from an expired row; an unexpired one
+    // matches no row, so RETURNING is empty and no second email goes.
+    const claimed = await c.query(
+      `INSERT INTO oc_auth_attempts(key,count,expires_at) VALUES($1,1,now()+interval '1 day')
+      ON CONFLICT(key) DO UPDATE SET count=1,expires_at=excluded.expires_at
+      WHERE oc_auth_attempts.expires_at<=now() RETURNING count`,
+      [digest('mfa-failure-notice:' + user.id)],
+    );
+    if (!claimed.rows.length) return false;
+    await this.notify(
+      c,
+      user,
+      'Someone completed the first step of signing in to your OpenChronology account (your ' +
+        `password, or a linked sign-in) and then entered ${FACTOR_FAILURES} wrong two-factor ` +
+        'codes. Codes are refused for up to fifteen minutes; a passkey still works. If this was ' +
+        'not you, change your password and review your linked sign-in methods.',
+    );
+    return true;
+  }
+  /**
+   * Forgets account `userId`'s wrong second-factor answers (factorFailed), inside the caller's
+   * transaction `c`: after a new password, whoever was guessing no longer has the first step,
+   * and the owner, who may have changed it because of the notice, should not wait out a
+   * window. The once-a-day notice marker stays.
+   */
+  async clearFactorFailures(c, userId) {
+    await c.query('DELETE FROM oc_auth_attempts WHERE key=$1', [
+      digest('mfa-failure-account:' + userId),
+    ]);
+  }
+  /**
    * The second step of signing in: checks `code` (authenticator or recovery), or `passkey` (an
    * answer to Passkeys.factorOptions), against this browser's `mfa` challenge and, if right,
    * issues the session the challenge was for. Rate-
-   * limited per client address `ip`, and each challenge allows five tries. Failures of every
-   * kind (no challenge, expired, wrong code) give the same 401, so nothing is learned from
-   * which one it was. Result: the session plus `returnTo`, and a cookie clearing the challenge.
+   * limited per client address `ip`, and each challenge allows five tries. Wrong answers also
+   * count against the account across challenges (factorFailed): once FACTOR_FAILURES are
+   * reached, codes (authenticator and recovery alike, since one field takes both) are refused
+   * with 429 until the window ends, without being checked. A passkey is still checked then:
+   * its answer is a signature that cannot be guessed, so it lets the account's owner in while
+   * someone else is guessing codes. Other failures (no challenge, expired, wrong code) give
+   * the same 401, so nothing is learned from which one it was. Result: the session plus
+   * `returnTo`, and a cookie clearing the challenge.
    */
   async complete(req, code, ip, passkey = null) {
     await this.auth.rateLimit('mfa-ip:' + ip);
+    let noticed = false;
     const result = await this.transaction(async (c) => {
       const pending = await this.pending(req, c);
       if (!pending || pending.purpose !== 'mfa') return { error: true };
@@ -382,17 +481,22 @@ export class AccountSecurity {
         pending.token_hash,
       ]);
       const live = await this.pending(req, c);
-      if (!live) return { error: true };
+      if (!live || !user) return { error: true };
+      // Past the account's limit, a code is not even checked (a passkey still is; see above).
+      if (!passkey && (await this.factorFailures(c, user.id)) >= FACTOR_FAILURES)
+        return { locked: true };
       // Counts the try before checking the code. A wrong code returns normally (not by
-      // throwing) so the transaction commits and the count sticks.
+      // throwing) so the transaction commits and the counts stick.
       await c.query('UPDATE oc_auth_challenges SET attempts=attempts+1 WHERE token_hash=$1', [
         pending.token_hash,
       ]);
       if (
-        !user?.email_verified_at ||
+        !user.email_verified_at ||
         !(await this.factor(c, user, code, passkey, 'browser:' + pending.browser_hash))
-      )
+      ) {
+        noticed = await this.factorFailed(c, user);
         return { error: true };
+      }
       // One use: the challenge is deleted in the same transaction that issues the session.
       await c.query('DELETE FROM oc_auth_challenges WHERE token_hash=$1', [pending.token_hash]);
       return {
@@ -400,6 +504,12 @@ export class AccountSecurity {
         returnTo: pending.return_to,
       };
     });
+    if (noticed) this.deliver();
+    if (result.locked)
+      throw new HttpError(
+        429,
+        'Too many wrong codes for this account. Try again in fifteen minutes, or use a passkey.',
+      );
     if (result.error)
       throw new HttpError(
         401,
@@ -695,6 +805,7 @@ export class AccountSecurity {
         [user.id],
       );
       await this.endAccess(c, user.id);
+      await this.clearFactorFailures(c, user.id);
       await this.notify(
         c,
         user,
@@ -878,6 +989,9 @@ export class AccountSecurity {
     await this.transaction(async (c) => {
       const user = (await c.query('SELECT * FROM oc_users WHERE id=$1 FOR UPDATE', [session.id]))
         .rows[0];
+      // Checked before fresh, so a refused request does not use up a code.
+      if (action === 'password' && (await this.directoryOnly(c, user.id)))
+        throw new HttpError(403, DIRECTORY_ONLY);
       await this.fresh(c, user, session, body);
       if (action === 'password') {
         // As for a reset: the new hash, then every session (this one too), API key, desktop
@@ -888,6 +1002,7 @@ export class AccountSecurity {
           [user.id],
         );
         await this.endAccess(c, user.id);
+        await this.clearFactorFailures(c, user.id);
         await c.query("DELETE FROM oc_email_tokens WHERE user_id=$1 AND purpose='reset'", [
           user.id,
         ]);

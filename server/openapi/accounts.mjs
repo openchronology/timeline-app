@@ -250,6 +250,7 @@ export const paths = {
       summary: 'Finish signing in with a two-factor code',
       description: [
         'The `mfa` step of a sign-in: send an authenticator or recovery code, or a passkey’s answer to `POST /api/auth/passkeys/factor/options`. Needs the `oc_challenge` cookie the sign-in set, in the same browser (`oc_login`), within five minutes; five wrong codes close the step, and signing in starts again.',
+        'Wrong answers also count against the account across sign-ins: after ten in fifteen minutes (counted from the first), codes are refused with 429 until the fifteen minutes end, without being checked, and the account is emailed (at most once a day). A passkey still works then, since its answer cannot be guessed. Changing or resetting the password clears the count.',
         SIGN_IN_TOKEN,
         'Signs in as the sign-in began: a browser session cookie, or a desktop `token`.',
       ].join('\n\n'),
@@ -412,7 +413,7 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Start signing in with a provider',
       description: [
-        'Begins signing in with Google, GitHub, Facebook or Microsoft (a work, school or personal Microsoft account, as the server’s tenant setting allows), or with `link: true`, linking one to the signed-in account (which needs a sign-in within the last five minutes). Send the browser to the `url` returned; the provider returns it to `GET /api/auth/{provider}/callback` within ten minutes.',
+        'Begins signing in with Google, GitHub, Facebook or Microsoft (a work, school or personal Microsoft account, as the server’s tenant setting allows), or with `link: true`, linking one to the signed-in account (which needs a sign-in within the last five minutes, and is refused with 403 for an account that signs in only through its directory, `directory_only` in `GET /api/auth/account`). Send the browser to the `url` returned; the provider returns it to `GET /api/auth/{provider}/callback` within ten minutes.',
         SIGN_IN_TOKEN,
       ].join('\n\n'),
       security: SIGN_IN,
@@ -659,7 +660,7 @@ export const paths = {
       tags: ['Account security'],
       summary: 'Change the password',
       description:
-        'Sets a new password (or a first one, for an account made with a sign-in provider). Signs the account out everywhere, this session included, and revokes its API keys. ' +
+        'Sets a new password (or a first one, for an account made with a sign-in provider). Signs the account out everywhere, this session included, and revokes its API keys. An account that signs in only through its directory (`directory_only` in `GET /api/auth/account`) cannot set one (403): its organisation’s directory decides who may sign in. ' +
         FRESH,
       security: SIGNED_IN,
       requestBody: body({
@@ -1289,6 +1290,11 @@ export const schemas = {
           totp_enabled: { type: 'boolean', description: 'An authenticator app is set up.' },
           passkeys: { type: 'array', items: ref('Passkey') },
           has_password: { type: 'boolean' },
+          directory_only: {
+            type: 'boolean',
+            description:
+              'The account signs in only through its directory account (no password, no other provider), as one made by a directory sign-in does. It cannot set a password, link another provider or sign in with a passkey alone (403); its passkeys answer the two-factor step.',
+          },
           recovery_remaining: {
             type: 'integer',
             description: 'Recovery codes not yet used.',

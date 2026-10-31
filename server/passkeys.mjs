@@ -16,6 +16,7 @@ import {
   userHandle,
 } from './webauthn.mjs';
 import { siteName } from './site.mjs';
+import { DIRECTORY_ONLY } from './account-security.mjs';
 
 /** A stored passkey (an oc_passkeys row) as webauthn.mjs's verifyAssertion reads it. */
 const keyOf = (row) => ({ publicKey: row.public_key, signCount: Number(row.sign_count) });
@@ -466,7 +467,9 @@ export class Passkeys {
    * person is two factors in itself (something held, and a PIN or biometric), so the session
    * counts as having passed two-factor authentication. Disabled accounts and unconfirmed
    * email addresses are refused as for any sign-in (Auth.issue). Every failure answers the
-   * same 401, but a counter that went backwards says so. Result: a web session.
+   * same 401, but a counter that went backwards says so, and an account that signs in only
+   * through its directory is refused with 403 (AccountSecurity.directoryOnly). Result: a web
+   * session.
    */
   async signIn(req, body, session = null) {
     if (!this.signInEnabled) throw new HttpError(404, 'Signing in with a passkey is off.');
@@ -510,6 +513,9 @@ export class Passkeys {
         throw error;
       }
       if (user.is_disabled || !user.email_verified_at) throw refused;
+      // An account that signs in only through its directory signs in there; its passkeys
+      // answer the two-factor step after it instead (AccountSecurity.directoryOnly).
+      if (await this.security.directoryOnly(c, user.id)) throw new HttpError(403, DIRECTORY_ONLY);
       await c.query('UPDATE oc_passkeys SET sign_count=$2,last_used_at=now() WHERE id=$1', [
         stored.id,
         signCount,

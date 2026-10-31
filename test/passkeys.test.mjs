@@ -358,6 +358,8 @@ test('signing in alone checks the passkey as it is once locked, not as first rea
       configured() {},
       browser: () => browser,
       transaction: (action) => action(client),
+      // Not an account that signs in only through its directory (passkeys-postgres.mjs).
+      directoryOnly: async () => false,
     };
     const passkeys = new Passkeys(security, { signIn: true });
     const { publicKey } = await passkeys.signInOptions({});
