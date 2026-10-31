@@ -4,7 +4,6 @@
  * interactive picture of the same thing. Its moments link to their own pages.
  */
 import {
-  excerpt,
   momentTitle,
   presentTime,
   sharedPath,
@@ -12,11 +11,12 @@ import {
   timelineTitle,
 } from '../lib/sharing.js';
 import { profilePath } from '../../src/addresses.ts';
+import Markdown from './markdown.jsx';
 export default function TimelineSummary({ timeline, moments = [], children }) {
   return (
     <section className="sr-only" aria-label="Timeline summary">
       <h1>{timelineTitle(timeline)}</h1>
-      {timeline.description && <p>{excerpt(timeline.description, 2000)}</p>}
+      {timeline.description?.trim() && <Markdown text={timeline.description} />}
       <p>
         {timelineFacts(timeline)}
         {timeline.owner && (

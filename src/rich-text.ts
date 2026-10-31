@@ -17,79 +17,84 @@ export function safeNoteLink(value: string): string | null {
   }
 }
 /**
- * Appends one line of inline Markdown to `parent` as DOM nodes, never as HTML: backslash
- * escapes, `code`, **strong**, *emphasis* and [text](https link). Everything else, including
- * any HTML tags, becomes text nodes. Strong and emphasis recurse into their contents; past
- * twelve levels the rest is shown as plain text, bounding the recursion on hostile input.
+ * Parsed Markdown, as plain data shared by every renderer (the editor's DOM, the website's
+ * React pages and the plain-text excerpts in page metadata), so all of them read the same
+ * small vocabulary. Text is only ever text: there is no node for HTML, and links carry an
+ * address already checked by safeNoteLink.
  */
-function inline(parent: HTMLElement, text: string, depth = 0) {
-  if (depth > 12) {
-    parent.append(document.createTextNode(text));
-    return;
-  }
+export type MarkdownInline =
+  | string
+  | { tag: 'code'; text: string }
+  | { tag: 'strong' | 'em'; children: MarkdownInline[] }
+  | { tag: 'a'; href: string; text: string };
+export type MarkdownBlock =
+  | { tag: 'p'; lines: MarkdownInline[][] }
+  | { tag: 'h1' | 'h2' | 'h3' | 'blockquote'; children: MarkdownInline[] }
+  | { tag: 'ul' | 'ol'; items: MarkdownInline[][] }
+  | { tag: 'pre'; text: string };
+/**
+ * Parses one line of inline Markdown: backslash escapes, `code`, **strong**, *emphasis* and
+ * [text](https link). Everything else, including any HTML tags, stays text. Strong and
+ * emphasis recurse into their contents; past twelve levels the rest is plain text, bounding
+ * the recursion on hostile input.
+ */
+export function parseInline(text: string, depth = 0): MarkdownInline[] {
+  if (depth > 12) return text ? [text] : [];
   // Alternatives, tried left to right at each position: an escaped punctuation character
   // (group 1), inline code (2), strong (3, lazy so `**a** and **b**` is two), emphasis (4),
   // and a link's text and URL (5, 6). Every repetition is bounded, which limits the work
   // each match attempt can do on long or hostile notes.
   const pattern =
     /\\([\\`*_[\]#>+.!-])|`([^`\n]{1,2048})`|\*\*([^\n]{1,2048}?)\*\*|\*([^*\n]{1,2048})\*|\[([^\]\n]{1,512})\]\(([^\s)]{1,4096})\)/g;
+  const out: MarkdownInline[] = [];
+  /** Appends text, merged into the text before it. */
+  const add = (s: string) => {
+    if (!s) return;
+    if (typeof out[out.length - 1] === 'string') out[out.length - 1] += s;
+    else out.push(s);
+  };
   let start = 0;
   for (const match of text.matchAll(pattern)) {
-    parent.append(document.createTextNode(text.slice(start, match.index)));
-    if (match[1]) parent.append(document.createTextNode(match[1]));
-    else if (match[2]) {
-      const code = document.createElement('code');
-      code.textContent = match[2];
-      parent.append(code);
-    } else if (match[3] || match[4]) {
-      const node = document.createElement(match[3] ? 'strong' : 'em');
-      inline(node, match[3] || match[4], depth + 1);
-      parent.append(node);
-    } else {
+    add(text.slice(start, match.index));
+    if (match[1]) add(match[1]);
+    else if (match[2]) out.push({ tag: 'code', text: match[2] });
+    else if (match[3] || match[4])
+      out.push({
+        tag: match[3] ? 'strong' : 'em',
+        children: parseInline(match[3] || match[4], depth + 1),
+      });
+    else {
       const href = safeNoteLink(match[6]);
-      if (href) {
-        const link = document.createElement('a');
-        link.textContent = match[5];
-        link.href = href;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.referrerPolicy = 'no-referrer';
-        parent.append(link);
-      } else parent.append(document.createTextNode(match[0])); // Unsafe URL: shown literally.
+      if (href) out.push({ tag: 'a', href, text: match[5] });
+      else add(match[0]); // Unsafe URL: shown literally.
     }
     start = match.index! + match[0].length;
   }
-  parent.append(document.createTextNode(text.slice(start)));
+  add(text.slice(start));
+  return out;
 }
 /**
- * Replaces `container`'s contents with the rendering of `markdown`, line by line: ``` fences
- * (contents kept verbatim as text), `#` to `###` headings, `>` quotes, `-`/`*` bullets and
- * `1.` numbered items, and paragraphs, where consecutive lines are joined with line breaks
- * and a blank line ends the block. Only the first 100,000 characters are rendered. Builds
- * DOM nodes directly (no innerHTML), so no markup in the notes can run or load anything.
+ * Parses `markdown` line by line: ``` fences (contents kept verbatim as text), `#` to `###`
+ * headings, `>` quotes, `-`/`*` bullets and `1.` numbered items, and paragraphs, where
+ * consecutive lines are kept as lines of one paragraph and a blank line ends the block. Only
+ * the first 100,000 characters are read.
  */
-export function renderMarkdown(container: HTMLElement, markdown: string) {
-  container.replaceChildren();
-  container.classList.add('markdown-view');
+export function parseMarkdown(markdown: string): MarkdownBlock[] {
+  const blocks: MarkdownBlock[] = [];
   const lines = markdown.slice(0, 100000).replace(/\r\n?/g, '\n').split('\n');
-  let list: HTMLElement | null = null,
-    paragraph: HTMLElement | null = null,
-    code: HTMLElement | null = null;
   // The open list, paragraph or code block that the next line may continue.
+  let list: Extract<MarkdownBlock, { items: unknown }> | null = null,
+    paragraph: Extract<MarkdownBlock, { lines: unknown }> | null = null,
+    code: Extract<MarkdownBlock, { tag: 'pre' }> | null = null;
   for (const line of lines) {
     if (line.startsWith('```')) {
       if (code) code = null;
-      else {
-        const pre = document.createElement('pre');
-        code = document.createElement('code');
-        pre.append(code);
-        container.append(pre);
-      }
+      else blocks.push((code = { tag: 'pre', text: '' }));
       list = paragraph = null;
       continue;
     }
     if (code) {
-      code.append(document.createTextNode(line + '\n'));
+      code.text += line + '\n';
       continue;
     }
     if (!line.trim()) {
@@ -100,30 +105,97 @@ export function renderMarkdown(container: HTMLElement, markdown: string) {
       item = /^(?:([-*])|\d+\.)\s+(.*)$/.exec(line),
       quote = /^>\s?(.*)$/.exec(line);
     if (item) {
-      const tag = item[1] ? 'UL' : 'OL';
+      const tag = item[1] ? 'ul' : 'ol';
       // A change between bullets and numbers starts a new list; item numbers themselves are
       // not kept, an ordered list always counts from one.
-      if (!list || list.tagName !== tag) {
-        list = document.createElement(tag.toLowerCase());
-        container.append(list);
-      }
-      const li = document.createElement('li');
-      inline(li, item[2]);
-      list.append(li);
+      if (!list || list.tag !== tag) blocks.push((list = { tag, items: [] }));
+      list.items.push(parseInline(item[2]));
       paragraph = null;
     } else if (heading || quote) {
-      const node = document.createElement(heading ? `h${heading[1].length}` : 'blockquote');
-      inline(node, heading ? heading[2] : quote![1]);
-      container.append(node);
+      blocks.push({
+        tag: heading ? (`h${heading[1].length}` as 'h1' | 'h2' | 'h3') : 'blockquote',
+        children: parseInline(heading ? heading[2] : quote![1]),
+      });
       list = paragraph = null;
     } else {
-      if (!paragraph) {
-        paragraph = document.createElement('p');
-        container.append(paragraph);
-      } else paragraph.append(document.createElement('br'));
-      inline(paragraph, line);
+      if (!paragraph) blocks.push((paragraph = { tag: 'p', lines: [] }));
+      paragraph.lines.push(parseInline(line));
       list = null;
     }
+  }
+  return blocks;
+}
+/** The text of inline Markdown, without its markup: a link is its text. */
+function inlineText(nodes: MarkdownInline[]): string {
+  return nodes
+    .map((n) => (typeof n === 'string' ? n : 'children' in n ? inlineText(n.children) : n.text))
+    .join('');
+}
+/**
+ * Markdown as plain text, for places that only take text (page metadata, previews, search
+ * results): the text of each block without its markup, blocks separated by blank lines and
+ * the lines within one by line breaks.
+ */
+export function markdownText(markdown: string): string {
+  return parseMarkdown(markdown)
+    .map((b) =>
+      'lines' in b
+        ? b.lines.map(inlineText).join('\n')
+        : 'items' in b
+          ? b.items.map(inlineText).join('\n')
+          : 'children' in b
+            ? inlineText(b.children)
+            : b.text.replace(/\n$/, ''),
+    )
+    .join('\n\n');
+}
+/** Appends inline Markdown to `parent` as DOM nodes, never as HTML. */
+function appendInline(parent: HTMLElement, nodes: MarkdownInline[]) {
+  for (const n of nodes) {
+    if (typeof n === 'string') parent.append(document.createTextNode(n));
+    else if (n.tag === 'a') {
+      const link = document.createElement('a');
+      link.textContent = n.text;
+      link.href = n.href;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.referrerPolicy = 'no-referrer';
+      parent.append(link);
+    } else {
+      const node = document.createElement(n.tag);
+      if (n.tag === 'code') node.textContent = n.text;
+      else appendInline(node, n.children);
+      parent.append(node);
+    }
+  }
+}
+/**
+ * Replaces `container`'s contents with the rendering of `markdown` (see parseMarkdown), in
+ * which consecutive lines of a paragraph are joined with line breaks. Builds DOM nodes
+ * directly (no innerHTML), so no markup in the notes can run or load anything.
+ */
+export function renderMarkdown(container: HTMLElement, markdown: string) {
+  container.replaceChildren();
+  container.classList.add('markdown-view');
+  for (const block of parseMarkdown(markdown)) {
+    const node = document.createElement(block.tag);
+    if (block.tag === 'pre') {
+      const code = document.createElement('code');
+      code.textContent = block.text;
+      node.append(code);
+    } else if ('lines' in block)
+      block.lines.forEach((line, i) => {
+        if (i) node.append(document.createElement('br'));
+        appendInline(node, line);
+      });
+    else if ('items' in block)
+      for (const item of block.items) {
+        const li = document.createElement('li');
+        appendInline(li, item);
+        node.append(li);
+      }
+    else appendInline(node, block.children);
+    container.append(node);
   }
 }
 /** Backslash-escapes every character the Markdown vocabulary treats specially (inline undoes it). */

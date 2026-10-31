@@ -10,6 +10,7 @@ import {
   describeLabels,
   entityTags,
   imageURL,
+  markdownText,
   printTimestamp,
   Q,
   validateInstalledPlugins,
@@ -185,9 +186,16 @@ export function timelineFacts(timeline) {
   if (timeline.owner) parts.push('by @' + timeline.owner);
   return parts.join(' · ');
 }
-/** A timeline's description for metadata: its own, as an excerpt, or else its facts. */
+/**
+ * A timeline's description as plain text (#398): its Markdown's text without the markup, as an
+ * excerpt of at most `length` characters.
+ */
+export function descriptionExcerpt(timeline, length = 200) {
+  return excerpt(markdownText(String(timeline.description ?? '')), length);
+}
+/** A timeline's description for metadata: its own, as plain text, or else its facts. */
 export function timelineDescription(timeline) {
-  return excerpt(timeline.description) || timelineFacts(timeline);
+  return descriptionExcerpt(timeline) || timelineFacts(timeline);
 }
 /** A moment's title, as a short excerpt, or "Untitled moment". */
 export function momentTitle(event) {

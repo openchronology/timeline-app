@@ -10,6 +10,7 @@ import { Q, describeLabels } from '../../dist/core.mjs';
 import { platformServices } from '../../server/platform.mjs';
 import {
   durationOf,
+  descriptionExcerpt,
   durationTitle,
   excerpt,
   momentOf,
@@ -226,7 +227,7 @@ export async function previewImage(id, entity) {
     <Card
       title={timelineTitle(timeline)}
       facts={timelineFacts(timeline)}
-      notes={excerpt(timeline.description, 140)}
+      notes={descriptionExcerpt(timeline, 140)}
       groups={groups}
     />,
     size,

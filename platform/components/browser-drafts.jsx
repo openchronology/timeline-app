@@ -10,7 +10,8 @@ import { deleteDraft, listDrafts } from '../../src/draft-store.ts';
 import { momentsText } from '../../src/wording.ts';
 import TimelineSearch, { useLayout } from './timeline-search.jsx';
 import { EmptyList, Pager, moveBetweenCards, plainClick } from './timeline-list.jsx';
-import { cardDate, excerpt } from './timeline-card.jsx';
+import { cardDate } from './timeline-card.jsx';
+import { MarkdownExcerpt } from './markdown.jsx';
 import {
   LISTS,
   listHref,
@@ -75,7 +76,9 @@ export default function BrowserDrafts({ userId }) {
                 )}
               </p>
               {draft.description?.trim() && (
-                <p className="timeline-card-description">{excerpt(draft.description)}</p>
+                <p className="timeline-card-description">
+                  <MarkdownExcerpt text={draft.description} />
+                </p>
               )}
               {draft.tags?.length > 0 && (
                 <ul className="tags" aria-label="Tags">
