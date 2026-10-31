@@ -395,7 +395,8 @@ const PROVIDERS = {
  * The sign-in methods card: each provider the site offers, linked (to unlink, confirmed by the
  * current credentials) or not (to link, through `link`, which opens the provider). A directory
  * account (`ldap`, when the site offers directory sign-in) links with its own username and
- * password instead, through POST /api/auth/ldap/link.
+ * password instead, through POST /api/auth/ldap/link. An account that signs in only through
+ * its directory (`security.directory_only`) is offered no links.
  * @param {object} props
  * @param {object} props.session GET /api/session's answer (`providers`, `providerLabels`,
  *   `directory`)
@@ -407,6 +408,9 @@ const PROVIDERS = {
 export function SignInMethodsCard({ session, account, refresh, link, linking }) {
   const { action, busy, failure } = useAccountAction(session, refresh);
   const identities = account?.identities ?? [];
+  // An account that signs in only through its directory gains no other way in
+  // (AccountSecurity.directoryOnly), so it is offered no links.
+  const directoryOnly = !!account?.security?.directory_only;
   // Linked providers the site no longer offers are still listed, so they can be unlinked.
   const names = [
     ...new Set([
@@ -492,15 +496,23 @@ export function SignInMethodsCard({ session, account, refresh, link, linking }) 
             ) : (
               <>
                 <span className="status-badge">Not linked</span>
-                <button disabled={busy || linking} onClick={() => link(name)}>
-                  Link
-                </button>
+                {!directoryOnly && (
+                  <button disabled={busy || linking} onClick={() => link(name)}>
+                    Link
+                  </button>
+                )}
               </>
             )}
           </li>
         ))}
       </ul>
       {!names.length && <p className="muted">This site offers no other ways to sign in.</p>}
+      {directoryOnly && (
+        <p className="muted">
+          This account signs in through your organisation’s directory, which manages access to it,
+          so it cannot add a password or another provider.
+        </p>
+      )}
       {failure('unlink')}
       {failure('link')}
     </section>

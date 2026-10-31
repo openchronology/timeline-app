@@ -1024,7 +1024,11 @@ export function createRequestHandler({
             )
           ).rows[0];
           return response(res, 200, {
-            security: { ...profile, passkeys: await auth.security.passkeys.list(userId) },
+            security: {
+              ...profile,
+              passkeys: await auth.security.passkeys.list(userId),
+              directory_only: await auth.security.directoryOnly(pool, userId),
+            },
             profile: {
               avatarUrl: session.avatar_url ?? '',
               minor: minor(session.birth_year),

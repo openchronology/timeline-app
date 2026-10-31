@@ -16,7 +16,8 @@ import { NEWCOMER_DAYS, FULL_DAYS } from '../../server/standing.mjs';
  * established account so, or every reason another is not.
  *
  * @param {object} item an account from /api/admin/users: `standing` (0 to 1), `created_at`,
- *   `is_admin`, `is_disabled`, `trust`, `endorsers`, `confirmed` and `restricted`
+ *   `is_admin`, `is_disabled`, `trust`, `endorsers`, `confirmed` and `restricted` (and
+ *   `directory_only`, used by the user card)
  * @returns {string}
  */
 function standing(item) {
@@ -325,6 +326,31 @@ export default function Admin() {
                     </label>
                     <button disabled={busy}>Apply user settings</button>
                   </form>
+                  {/* Only for an account that signs in only through the directory, which may
+                      not gain a password otherwise (AccountSecurity.releaseDirectory). */}
+                  {item.directory_only && (
+                    <div className="actions">
+                      <span className="muted">Signs in only through the directory.</span>
+                      <button
+                        className="danger"
+                        disabled={busy}
+                        onClick={() => {
+                          if (
+                            confirm(
+                              `Release @${item.username} from the directory? ` +
+                                'Its directory account is unlinked, it is signed out everywhere ' +
+                                'and its API keys are revoked. It is emailed a link to choose a ' +
+                                'password; signing in through the directory again makes a new ' +
+                                'account.',
+                            )
+                          )
+                            void change('users/' + item.id, { release_directory: true });
+                        }}
+                      >
+                        Release from directory
+                      </button>
+                    </div>
+                  )}
                 </>
               ) : (
                 <>

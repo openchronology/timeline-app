@@ -30,6 +30,18 @@ const generic = {
   message:
     'If the account is eligible, an email will arrive shortly. Check your inbox and spam folder.',
 };
+/**
+ * Wrong answers to the two-factor step of signing in allowed per account in a fifteen-minute
+ * window, across all of its challenges (factorFailed). Each challenge also closes after five.
+ */
+export const FACTOR_FAILURES = 10;
+/**
+ * The refusal of a password, a provider link or a passkey sign-in for an account that signs in
+ * only through its directory (AccountSecurity.directoryOnly).
+ */
+export const DIRECTORY_ONLY =
+  'This account signs in through your organisation’s directory, which manages access to it. ' +
+  'It cannot add a password or another way to sign in.';
 /** Whether `value` is shaped like the 256-bit hex secrets used in links and cookies here. */
 const validToken = (value) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 /**
@@ -153,6 +165,24 @@ export class AccountSecurity {
     await c.query('DELETE FROM oc_device_logins WHERE user_id=$1', [userId]);
     await c.query('DELETE FROM oc_auth_challenges WHERE user_id=$1', [userId]);
     await c.query('DELETE FROM oc_passkey_challenges WHERE user_id=$1', [userId]);
+  }
+  /**
+   * Whether account `userId` signs in only through its directory account (ldap.mjs): it has no
+   * password and its one linked identity is `ldap`, as an account made by a directory sign-in
+   * has. Such an account exists because the directory let the person in, and the directory
+   * (removing them, or LDAP_REQUIRED_GROUP) is how the organisation ends that, so it may not
+   * gain a way to sign in that bypasses the directory: a password, another provider, or a
+   * passkey on its own (passkeys still answer its two-factor step). `c` is a client or the
+   * pool; inside a transaction, the caller holds the account lock.
+   */
+  async directoryOnly(c, userId) {
+    const { rows } = await c.query(
+      `SELECT password_hash IS NULL
+        AND array(SELECT provider FROM oc_identities WHERE user_id=$1)='{ldap}'::text[] AS only
+      FROM oc_users WHERE id=$1`,
+      [userId],
+    );
+    return !!rows[0]?.only;
   }
   /**
    * Replaces account `userId`'s recovery codes with `codes` (stored as recoveryHash digests),
@@ -365,15 +395,84 @@ export class AccountSecurity {
     return false;
   }
   /**
+   * Account `userId`'s count of wrong answers to the two-factor step in its current window
+   * (factorFailed), read inside the caller's transaction `c`; 0 when there is none.
+   */
+  async factorFailures(c, userId) {
+    const { rows } = await c.query(
+      'SELECT count FROM oc_auth_attempts WHERE key=$1 AND expires_at>now()',
+      [digest('mfa-failure-account:' + userId)],
+    );
+    return rows[0]?.count ?? 0;
+  }
+  /**
+   * Counts a wrong answer to the two-factor step against account `user`, inside the caller's
+   * transaction `c` (which holds the account lock, so concurrent answers count one by one).
+   * Each challenge allows five tries, but a new sign-in makes a new challenge, so without a
+   * count per account someone holding the first factor could keep guessing from fresh
+   * challenges. The counter is a row of oc_auth_attempts, as the sign-in failure counters
+   * (challenge.mjs) are: a fixed window of fifteen minutes from its first failure, renewed here
+   * when it has expired. The failure that reaches FACTOR_FAILURES emails the account once a
+   * day at most (a second row, lasting a day), so a sustained attempt is not one email per
+   * window. Result: whether a notice was queued.
+   */
+  async factorFailed(c, user) {
+    const { rows } = await c.query(
+      `INSERT INTO oc_auth_attempts(key,count,expires_at) VALUES($1,1,now()+interval '15 minutes')
+      ON CONFLICT(key) DO UPDATE SET
+        count=CASE WHEN oc_auth_attempts.expires_at>now() THEN oc_auth_attempts.count+1 ELSE 1 END,
+        expires_at=CASE WHEN oc_auth_attempts.expires_at>now()
+          THEN oc_auth_attempts.expires_at ELSE excluded.expires_at END
+      RETURNING count`,
+      [digest('mfa-failure-account:' + user.id)],
+    );
+    if (rows[0].count !== FACTOR_FAILURES) return false;
+    // Claims the day's notice: inserted, or taken over from an expired row; an unexpired one
+    // matches no row, so RETURNING is empty and no second email goes.
+    const claimed = await c.query(
+      `INSERT INTO oc_auth_attempts(key,count,expires_at) VALUES($1,1,now()+interval '1 day')
+      ON CONFLICT(key) DO UPDATE SET count=1,expires_at=excluded.expires_at
+      WHERE oc_auth_attempts.expires_at<=now() RETURNING count`,
+      [digest('mfa-failure-notice:' + user.id)],
+    );
+    if (!claimed.rows.length) return false;
+    await this.notify(
+      c,
+      user,
+      'Someone completed the first step of signing in to your OpenChronology account (your ' +
+        `password, or a linked sign-in) and then entered ${FACTOR_FAILURES} wrong two-factor ` +
+        'codes. Codes are refused for up to fifteen minutes; a passkey still works. If this was ' +
+        'not you, change your password and review your linked sign-in methods.',
+    );
+    return true;
+  }
+  /**
+   * Forgets account `userId`'s wrong second-factor answers (factorFailed), inside the caller's
+   * transaction `c`: after a new password, whoever was guessing no longer has the first step,
+   * and the owner, who may have changed it because of the notice, should not wait out a
+   * window. The once-a-day notice marker stays.
+   */
+  async clearFactorFailures(c, userId) {
+    await c.query('DELETE FROM oc_auth_attempts WHERE key=$1', [
+      digest('mfa-failure-account:' + userId),
+    ]);
+  }
+  /**
    * The second step of signing in: checks `code` (authenticator or recovery), or `passkey` (an
    * answer to Passkeys.factorOptions), against this browser's `mfa` challenge and, if right,
    * issues the session the challenge was for. Rate-
-   * limited per client address `ip`, and each challenge allows five tries. Failures of every
-   * kind (no challenge, expired, wrong code) give the same 401, so nothing is learned from
-   * which one it was. Result: the session plus `returnTo`, and a cookie clearing the challenge.
+   * limited per client address `ip`, and each challenge allows five tries. Wrong answers also
+   * count against the account across challenges (factorFailed): once FACTOR_FAILURES are
+   * reached, codes (authenticator and recovery alike, since one field takes both) are refused
+   * with 429 until the window ends, without being checked. A passkey is still checked then:
+   * its answer is a signature that cannot be guessed, so it lets the account's owner in while
+   * someone else is guessing codes. Other failures (no challenge, expired, wrong code) give
+   * the same 401, so nothing is learned from which one it was. Result: the session plus
+   * `returnTo`, and a cookie clearing the challenge.
    */
   async complete(req, code, ip, passkey = null) {
     await this.auth.rateLimit('mfa-ip:' + ip);
+    let noticed = false;
     const result = await this.transaction(async (c) => {
       const pending = await this.pending(req, c);
       if (!pending || pending.purpose !== 'mfa') return { error: true };
@@ -388,17 +487,22 @@ export class AccountSecurity {
         pending.token_hash,
       ]);
       const live = await this.pending(req, c);
-      if (!live) return { error: true };
+      if (!live || !user) return { error: true };
+      // Past the account's limit, a code is not even checked (a passkey still is; see above).
+      if (!passkey && (await this.factorFailures(c, user.id)) >= FACTOR_FAILURES)
+        return { locked: true };
       // Counts the try before checking the code. A wrong code returns normally (not by
-      // throwing) so the transaction commits and the count sticks.
+      // throwing) so the transaction commits and the counts stick.
       await c.query('UPDATE oc_auth_challenges SET attempts=attempts+1 WHERE token_hash=$1', [
         pending.token_hash,
       ]);
       if (
-        !user?.email_verified_at ||
+        !user.email_verified_at ||
         !(await this.factor(c, user, code, passkey, 'browser:' + pending.browser_hash))
-      )
+      ) {
+        noticed = await this.factorFailed(c, user);
         return { error: true };
+      }
       // One use: the challenge is deleted in the same transaction that issues the session.
       await c.query('DELETE FROM oc_auth_challenges WHERE token_hash=$1', [pending.token_hash]);
       return {
@@ -406,6 +510,12 @@ export class AccountSecurity {
         returnTo: pending.return_to,
       };
     });
+    if (noticed) this.deliver();
+    if (result.locked)
+      throw new HttpError(
+        429,
+        'Too many wrong codes for this account. Try again in fifteen minutes, or use a passkey.',
+      );
     if (result.error)
       throw new HttpError(
         401,
@@ -616,9 +726,13 @@ export class AccountSecurity {
   }
   /**
    * A forgotten password: emails a reset link, valid 30 minutes, to `email` if it is a
-   * confirmed address of an account with a password. Rate-limited per client address `ip` and
-   * per address. The answer is the same in every case (generic), so it does not reveal whether
-   * the address has an account. Only the newest link works.
+   * confirmed address of an account with a password, or of one with neither a password nor a
+   * linked sign-in (an account an administrator released from its directory, releaseDirectory).
+   * An account that signs in through a provider or its directory, without a password, gets
+   * nothing: a directory account in particular must not gain a password by email
+   * (directoryOnly). Rate-limited per client address `ip` and per address. The answer is the
+   * same in every case (generic), so it does not reveal whether the address has an account,
+   * or what kind. Only the newest link works.
    */
   async forgot(email, ip) {
     this.configured();
@@ -627,31 +741,77 @@ export class AccountSecurity {
     await this.auth.rateLimit('reset-email:' + email);
     await this.transaction(async (c) => {
       // The account with this confirmed address (the oc_users_email index serves lower(email)),
-      // locked against a concurrent change. Social-only accounts have no password to reset.
+      // locked against a concurrent change.
       const user = (
         await c.query(
           'SELECT * FROM oc_users WHERE lower(email)=$1 AND email_verified_at IS NOT NULL FOR UPDATE',
           [email],
         )
       ).rows[0];
-      if (!user?.password_hash) return;
-      const token = randomBytes(32).toString('hex');
-      // Replaces any earlier reset link with this one; it records the address it was sent to,
-      // which reset checks is still the account's. It is not bound to a browser: the person may
-      // open it anywhere.
-      await c.query("DELETE FROM oc_email_tokens WHERE user_id=$1 AND purpose='reset'", [user.id]);
-      await c.query(
-        "INSERT INTO oc_email_tokens(token_hash,user_id,purpose,email,expires_at) VALUES($1,$2,'reset',$3,now()+interval '30 minutes')",
-        [digest(token), user.id, email],
-      );
-      await queueMail(c, this.key, {
-        to: email,
-        subject: 'Reset your OpenChronology password',
-        text: `Reset your password:\n${this.auth.origin}/login#reset=${token}\nThis link expires in 30 minutes. Resetting your password does not disable two-factor authentication. Ignore this message if you did not request it.`,
-      });
+      if (!user) return;
+      // Without a password, only an account with no linked sign-in either may choose one here;
+      // one that signs in through a provider or its directory stops quietly.
+      if (
+        !user.password_hash &&
+        (await c.query('SELECT 1 FROM oc_identities WHERE user_id=$1 LIMIT 1', [user.id])).rows
+          .length
+      )
+        return;
+      await this.queueReset(c, user, email);
     });
     this.deliver();
     return generic;
+  }
+  /**
+   * Queues a password-reset link, valid 30 minutes, to `email` (the account's confirmed
+   * address, lowercased) for account `user`, inside the caller's transaction `c`, which holds
+   * the account lock. `intro` opens the message: by default it answers a forgotten password.
+   * Callers decide whether the account may have one (forgot, releaseDirectory).
+   */
+  async queueReset(c, user, email, intro = 'Reset your password:') {
+    const token = randomBytes(32).toString('hex');
+    // Replaces any earlier reset link with this one; it records the address it was sent to,
+    // which reset checks is still the account's. It is not bound to a browser: the person may
+    // open it anywhere.
+    await c.query("DELETE FROM oc_email_tokens WHERE user_id=$1 AND purpose='reset'", [user.id]);
+    await c.query(
+      "INSERT INTO oc_email_tokens(token_hash,user_id,purpose,email,expires_at) VALUES($1,$2,'reset',$3,now()+interval '30 minutes')",
+      [digest(token), user.id, email],
+    );
+    await queueMail(c, this.key, {
+      to: email,
+      subject: 'Reset your OpenChronology password',
+      text: `${intro}\n${this.auth.origin}/login#reset=${token}\nThis link expires in 30 minutes. Resetting your password does not disable two-factor authentication. Ignore this message if you did not request it.`,
+    });
+  }
+  /**
+   * An administrator's release of account `userId` from its directory (Administration.change,
+   * `release_directory`), inside the caller's transaction `c`, which holds the account lock: for
+   * an account that signs in only through its directory (directoryOnly) when the directory can
+   * no longer let it in (directory sign-in turned off) or the operator moves the person off it.
+   * Its `ldap` identity goes, so it is directory-only no more, and everything that could still
+   * act for it ends (endAccess, API keys included). It then has no way to sign in
+   * until it chooses a password: with a confirmed address and email configured, a reset link
+   * is sent now, and **Forgot password** sends another (forgot accepts an account with neither
+   * a password nor a linked sign-in). A later directory sign-in by the same person makes a new
+   * account. Throws 409 for an account that is not directory-only. Result: whether a link was
+   * queued (the caller then calls deliver after committing).
+   */
+  async releaseDirectory(c, userId) {
+    if (!(await this.directoryOnly(c, userId)))
+      throw new HttpError(409, 'This account does not sign in only through the directory.');
+    const user = (await c.query('SELECT * FROM oc_users WHERE id=$1', [userId])).rows[0];
+    await c.query("DELETE FROM oc_identities WHERE user_id=$1 AND provider='ldap'", [userId]);
+    await this.endAccess(c, userId);
+    if (!user.email || !user.email_verified_at || !this.available) return false;
+    await this.queueReset(
+      c,
+      user,
+      user.email.toLowerCase(),
+      'An administrator moved your OpenChronology account off directory sign-in. ' +
+        'Choose a password to sign in:',
+    );
+    return true;
   }
   /**
    * Sets a new password from a reset link: `body` has the link's token, the password and its
@@ -691,11 +851,16 @@ export class AccountSecurity {
       // lowercased, and an account (such as the bootstrap administrator's) may keep capitals.
       if (user.email?.toLowerCase() !== row.email || !user.email_verified_at)
         throw new HttpError(400, 'This reset link is no longer valid.');
+      // forgot sends no link to an account that signs in only through its directory; this
+      // keeps one from setting a password even if a link exists (directoryOnly).
+      if (await this.directoryOnly(c, user.id))
+        throw new HttpError(400, 'This reset link is no longer valid.');
       // The new password, then the sign-out of everything: other reset links, then endAccess
       // (every session and API key, unclaimed desktop sign-ins and challenges).
       await c.query('UPDATE oc_users SET password_hash=$2 WHERE id=$1', [user.id, hash]);
       await c.query("DELETE FROM oc_email_tokens WHERE user_id=$1 AND purpose='reset'", [user.id]);
       await this.endAccess(c, user.id);
+      await this.clearFactorFailures(c, user.id);
       await this.notify(
         c,
         user,
@@ -879,12 +1044,16 @@ export class AccountSecurity {
     await this.transaction(async (c) => {
       const user = (await c.query('SELECT * FROM oc_users WHERE id=$1 FOR UPDATE', [session.id]))
         .rows[0];
+      // Checked before fresh, so a refused request does not use up a code.
+      if (action === 'password' && (await this.directoryOnly(c, user.id)))
+        throw new HttpError(403, DIRECTORY_ONLY);
       await this.fresh(c, user, session, body);
       if (action === 'password') {
         // As for a reset: the new hash, then every session (this one too), API key, desktop
         // sign-in, challenge and outstanding reset link ends.
         await c.query('UPDATE oc_users SET password_hash=$2 WHERE id=$1', [user.id, newHash]);
         await this.endAccess(c, user.id);
+        await this.clearFactorFailures(c, user.id);
         await c.query("DELETE FROM oc_email_tokens WHERE user_id=$1 AND purpose='reset'", [
           user.id,
         ]);

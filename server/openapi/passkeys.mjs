@@ -185,7 +185,7 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Sign in with a passkey',
       description:
-        'The browser’s answer to this browser’s challenge from `POST /api/auth/passkeys/sign-in/options`. A passkey that verified the person is two factors in itself, so no further step follows. Signs in a browser (the session cookie), replacing the caller’s previous session. The same 401 for every refusal, except a passkey whose signature counter went backwards, which says it may have been copied.',
+        'The browser’s answer to this browser’s challenge from `POST /api/auth/passkeys/sign-in/options`. A passkey that verified the person is two factors in itself, so no further step follows. Signs in a browser (the session cookie), replacing the caller’s previous session. The same 401 for every refusal, except a passkey whose signature counter went backwards, which says it may have been copied, and a passkey of an account that signs in only through its directory (`directory_only` in `GET /api/auth/account`), refused with 403: that account signs in with its directory account, and its passkeys answer the two-factor step after it.',
       security: SIGN_IN,
       requestBody: body({
         type: 'object',

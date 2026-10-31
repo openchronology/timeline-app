@@ -3,7 +3,8 @@
 // first sign-in makes an account named after the directory account, which confirms an email
 // before it has a session; later sign-ins find it by its entryUUID; wrong passwords, filter
 // injection and people outside the required group are refused alike; a directory account links
-// to an existing account and unlinks again.
+// to an existing account and unlinks again; an account made by a directory sign-in cannot add
+// a password or another provider.
 //
 // The directory is LDAP_TEST_URL (with LDAP_TEST_ADMIN_DN and LDAP_TEST_ADMIN_PASSWORD for an
 // account that may add entries under LDAP_TEST_BASE_DN), or else an osixia/openldap container
@@ -144,6 +145,7 @@ try {
     securityKey: key,
     passwordCheck: async () => {},
     trustProxy: true,
+    providers: { github: { clientId: 'test-client', clientSecret: 'test-secret' } },
     directory: directoryFromEnv({
       LDAP_URL: url,
       LDAP_ALLOW_INSECURE: '1',
@@ -243,6 +245,30 @@ try {
   assert.equal(signedIn.user.id, account.id);
   assert.equal((await browser.request('session')).user.username, account.username);
   assert.deepEqual((await browser.request('auth/account')).identities, ['ldap']);
+  // An account made by a directory sign-in stays under the directory: it may not add a
+  // password or link another provider, either of which would outlast its removal from the
+  // directory or the required group.
+  assert.equal((await browser.request('auth/account')).security.directory_only, true);
+  const local = 'a local passphrase for later';
+  assert.match(
+    (
+      await browser.request(
+        'auth/password/change',
+        { newPassword: local, passwordConfirmation: local },
+        403,
+      )
+    ).error,
+    /directory/,
+  );
+  assert.match(
+    (await browser.request('auth/github/start', { link: true, returnTo: '/account' }, 403)).error,
+    /directory/,
+  );
+  assert.equal(
+    (await pool.query('SELECT password_hash FROM oc_users WHERE id=$1', [account.id])).rows[0]
+      .password_hash,
+    null,
+  );
   // The directory password is never kept.
   const stored = JSON.stringify(
     (await pool.query('SELECT * FROM oc_users WHERE id=$1', [account.id])).rows,
@@ -263,6 +289,8 @@ try {
   await owner.request('auth/ldap/link', { username: carol.uid, password: 'wrong' }, 401);
   await owner.request('auth/ldap/link', { username: carol.uid, password: carol.password });
   assert.deepEqual((await owner.request('auth/account')).identities, ['ldap']);
+  // It had a password before the directory account: it keeps its other ways in.
+  assert.equal((await owner.request('auth/account')).security.directory_only, false);
   await owner.request('auth/ldap/link', { username: ana.uid, password: ana.password }, 409);
   // Carol's directory sign-in now opens the owner's account, with no email step.
   const carolBrowser = client();
