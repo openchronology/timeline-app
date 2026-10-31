@@ -194,6 +194,14 @@ try {
   const passkeyRow = security.locator('li.passkey-row').filter({ hasText: 'This laptop' });
   await passkeyRow.getByText('Remove', { exact: true }).click();
   const remove = passkeyRow.locator('form').filter({ hasText: 'only second factor' });
+  // A wrong password is refused, and the passkey's answer, used once, is dropped with it: the
+  // form asks for the passkey again rather than resending a spent answer.
+  await remove.getByLabel('Current password').fill('not the password');
+  await remove.getByRole('button', { name: 'Use a passkey' }).click();
+  await remove.getByText('Confirmed with a passkey.').waitFor();
+  await remove.getByRole('button', { name: 'Remove This laptop' }).click();
+  await remove.getByText('Current password is incorrect.').waitFor();
+  await remove.getByRole('button', { name: 'Use a passkey' }).waitFor();
   await remove.getByLabel('Current password').fill(password);
   await remove.getByRole('button', { name: 'Use a passkey' }).click();
   await remove.getByText('Confirmed with a passkey.').waitFor();

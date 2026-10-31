@@ -57,19 +57,29 @@ const suffix = Date.now().toString(36),
   username = 'passkey_' + suffix,
   email = username + '@example.test',
   password = 'a unique passkey testing passphrase',
+  soloId = randomUUID(),
+  // A pool with one connection, for a server that must not need two at once.
+  tight = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1 }),
+  userHandleOf = (id) => Buffer.from(id.replace(/-/g, ''), 'hex').toString('base64url'),
   uid = randomUUID(),
   adminId = randomUUID();
 let n = 0;
-/** A browser: its own cookies, address and CSRF token, against the server named `server`. */
+/**
+ * A browser: its own cookies, address and CSRF token, against the server named `server`
+ * (which it may change: sessions live in the database, so any server knows them). A request
+ * that does not answer within twenty seconds fails rather than waiting forever.
+ */
 function client(server = 'main') {
   const cookies = new Map(),
     ip = '203.0.113.' + ++n;
   let csrf;
   return {
+    server,
     async request(path, data, status = 200, method = data === undefined ? 'GET' : 'POST') {
-      const origin = `http://127.0.0.1:${servers[server].address().port}`;
+      const origin = `http://127.0.0.1:${servers[this.server].address().port}`;
       const response = await fetch(origin + '/api/' + path, {
         method,
+        signal: AbortSignal.timeout(20000),
         headers: {
           'X-Forwarded-For': ip,
           Cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join('; '),
@@ -216,6 +226,8 @@ try {
   // Signing in: the password, then the two-factor step answered by a passkey.
   const browser = client();
   assert.equal((await signIn(browser)).challenge, 'mfa');
+  // The step says a passkey can answer it.
+  assert.equal((await browser.request('session')).challengePasskey, true);
   const { publicKey: factor } = await browser.request('auth/passkeys/factor/options', {});
   assert.deepEqual(factor.allowCredentials.map((c) => c.id).sort(), [laptop.id, phone.id].sort());
   const answer = phone.get(factor, { origin: site });
@@ -387,14 +399,73 @@ try {
   );
   // And the password alone signs in again.
   assert.equal((await signIn(client())).user.id, uid);
+
+  // An account without a password (made through a provider): its enrollment, confirmed by a
+  // recent sign-in, may finish after that sign-in is five minutes old, as the browser's
+  // ceremony can take a while.
+  await pool.query(
+    'INSERT INTO oc_users(id,username,email_verified_at,password_hash,terms_version,terms_accepted_at) VALUES($1,$2,now(),$3,$4,now())',
+    [soloId, 'pksolo_' + suffix, hash, POLICY_VERSION],
+  );
+  const solo = client(),
+    soloKey = softAuthenticator({ userHandle: userHandleOf(soloId) });
+  await signIn(solo, 'pksolo_' + suffix);
+  await pool.query('UPDATE oc_users SET password_hash=NULL WHERE id=$1', [soloId]);
+  const { publicKey: late } = await solo.request('auth/passkeys/register/options', {});
+  await pool.query(
+    "UPDATE oc_sessions SET created_at=now()-interval '10 minutes' WHERE user_id=$1",
+    [soloId],
+  );
+  const soloFirst = await solo.request('auth/passkeys/register', {
+    name: 'Solo',
+    credential: soloKey.create(late, { origin: site }),
+  });
+  assert.equal(soloFirst.recoveryCodes.length, 10);
+  // Signed in already, a passkey sign-in works as a password one does: bound to the session
+  // open, which it then replaces.
+  const before = (
+    await pool.query('SELECT token_hash FROM oc_sessions WHERE user_id=$1', [soloId])
+  ).rows.map((r) => r.token_hash);
+  const { publicKey: again2 } = await solo.request('auth/passkeys/sign-in/options', {});
+  const replaced = await solo.request('auth/passkeys/sign-in', {
+    credential: soloKey.get(again2, { origin: site }),
+  });
+  assert.equal(replaced.user.id, soloId);
+  const after2 = (
+    await pool.query('SELECT token_hash FROM oc_sessions WHERE user_id=$1', [soloId])
+  ).rows.map((r) => r.token_hash);
+  assert.equal(after2.length, 1);
+  assert(!before.includes(after2[0]));
+  assert.equal((await solo.request('auth/account')).security.passkeys.length, 1);
+  // On a server whose pool has a single connection, a passkey still confirms a change: the
+  // challenge is used up on a connection of its own, not one the change's transaction holds.
+  servers.tight = await start({ pool: tight });
+  solo.server = 'tight';
+  const spare = await confirmWith(solo, soloKey);
+  await confirmWith(solo, soloKey);
+  const soloPasskey = (await solo.request('auth/account')).security.passkeys[0].id;
+  await solo.request('auth/passkeys/' + soloPasskey, { passkey: spare }, 200, 'DELETE');
+  // The change ended the account's other challenges too.
+  assert.equal(
+    (
+      await pool.query('SELECT count(*)::int AS n FROM oc_passkey_challenges WHERE user_id=$1', [
+        soloId,
+      ])
+    ).rows[0].n,
+    0,
+  );
+  assert.equal((await solo.request('auth/account')).security.mfa_enabled, false);
   console.log(
     'PostgreSQL passkeys: enrolling, two-factor sign-in, confirmation, single-use challenges, sign-in alone, copied-passkey refusal, administration, beside an authenticator app, removal passed.',
   );
 } finally {
-  await pool.query('DELETE FROM oc_users WHERE id=ANY($1)', [[uid, adminId]]);
+  await pool.query('DELETE FROM oc_users WHERE id=ANY($1)', [[uid, adminId, soloId]]);
   // The sign-in attempts this test counted (by hashed address and name).
   await pool.query('DELETE FROM oc_auth_attempts');
-  for (const server of Object.values(servers))
+  for (const server of Object.values(servers)) {
+    server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
+  }
+  await tight.end();
   await pool.end();
 }

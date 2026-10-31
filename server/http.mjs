@@ -518,6 +518,8 @@ export function createRequestHandler({
       if (pathname === '/api/session' && method === 'GET') {
         const session = auth ? await auth.session(req) : null;
         const nonce = !session && auth ? auth.nonce(req, 'login') : null;
+        // A sign-in step this browser has pending, if any.
+        const pending = auth ? await auth.security.pending(req) : null;
         return response(
           res,
           200,
@@ -554,7 +556,11 @@ export function createRequestHandler({
                     passkeys: auth.security.available,
                     passkeySignIn: auth.security.available && auth.security.passkeys.signInEnabled,
                   },
-                  challenge: (await auth.security.pending(req))?.purpose ?? null,
+                  challenge: pending?.purpose ?? null,
+                  // At a two-factor step: whether the account can answer it with a passkey.
+                  ...(pending?.purpose === 'mfa'
+                    ? { challengePasskey: await auth.security.passkeys.has(pending.user_id) }
+                    : {}),
                   // The version of the terms and privacy policy that agreeing agrees to (#277).
                   terms: POLICY_VERSION,
                 }

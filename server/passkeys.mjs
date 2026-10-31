@@ -4,8 +4,9 @@
 // change with one, and, where the site allows it, signing in with one alone. webauthn.mjs
 // verifies what the browser answers; this keeps the challenges and the stored credentials.
 import { randomBytes, randomUUID } from 'node:crypto';
+import pg from 'pg';
 import { HttpError } from './store.mjs';
-import { digest, recoveryCodes, recoveryHash } from './security-crypto.mjs';
+import { digest, recoveryCodes } from './security-crypto.mjs';
 import {
   ALGORITHMS,
   PasskeyError,
@@ -77,17 +78,56 @@ export class Passkeys {
   get rpId() {
     return new URL(this.origin).hostname;
   }
+  /**
+   * Where challenges are used up: a pool of its own (two connections, giving up after ten
+   * seconds) beside the main one. Using one up must commit on its own, so that it stays used
+   * even if the change it confirms rolls back, and its callers hold a transaction on the main
+   * pool meanwhile; were it taken from the main pool too, as many concurrent confirmations as
+   * the pool has connections would each wait for another one, forever. Tests' stand-ins for a
+   * pool are used as they are.
+   */
+  get claims() {
+    if (!this.claimPool) {
+      if (this.pool instanceof pg.Pool) {
+        this.claimPool = new pg.Pool({
+          ...this.pool.options,
+          max: 2,
+          connectionTimeoutMillis: 10000,
+          idleTimeoutMillis: 10000,
+          allowExitOnIdle: true,
+        });
+        // A connection lost while idle is replaced on next use, not a crash.
+        this.claimPool.on('error', () => {});
+      } else this.claimPool = this.pool;
+    }
+    return this.claimPool;
+  }
+  /**
+   * Deletes expired challenges, on its own statement outside any transaction, without
+   * waiting: those never answered (an abandoned sign-in, say) would otherwise stay.
+   */
+  sweep() {
+    void Promise.resolve(
+      this.claims.query('DELETE FROM oc_passkey_challenges WHERE expires_at<=now()'),
+    ).catch(() => {});
+  }
+  /** Whether account `userId` has a passkey. */
+  async has(userId) {
+    return (
+      (await this.pool.query('SELECT 1 FROM oc_passkeys WHERE user_id=$1 LIMIT 1', [userId])).rows
+        .length > 0
+    );
+  }
   /** What every verification is checked against, with the challenge expected. */
   expected(challenge) {
     return { challenge, origin: this.origin, rpId: this.rpId };
   }
   /**
-   * A new challenge for `purpose` bound to `binding`, stored by its hash for five minutes;
-   * expired ones are swept first. Result: the challenge, base64url.
+   * A new challenge for `purpose` bound to `binding`, stored by its hash for five minutes
+   * through `client` (the caller's transaction, or the pool). Result: the challenge, base64url.
    */
   async challenge(client, purpose, userId, binding) {
     const challenge = randomBytes(32).toString('base64url');
-    await client.query('DELETE FROM oc_passkey_challenges WHERE expires_at<=now()');
     await client.query(
       "INSERT INTO oc_passkey_challenges(challenge_hash,purpose,user_id,binding,expires_at) VALUES($1,$2,$3,$4,now()+interval '5 minutes')",
       [digest(challenge), purpose, userId, binding],
@@ -97,8 +137,8 @@ export class Passkeys {
   /**
    * Uses up the challenge the answer `credential` carries, if it is a live one for `purpose`,
    * `binding` and (for an account's own passkeys) `userId`: deleted whether or not the answer
-   * then verifies, on its own connection so that it stays used even if the change it
-   * confirms rolls back. Result: the challenge, or null.
+   * then verifies, on its own connection (claims) so that it stays used even if the change it
+   * confirms rolls back. Expired ones are swept after. Result: the challenge, or null.
    */
   async consume(credential, type, purpose, binding, userId = null) {
     let challenge;
@@ -107,11 +147,12 @@ export class Passkeys {
     } catch {
       return null;
     }
-    const { rows } = await this.pool.query(
+    const { rows } = await this.claims.query(
       `DELETE FROM oc_passkey_challenges WHERE challenge_hash=$1 AND purpose=$2 AND binding=$3
         AND user_id IS NOT DISTINCT FROM $4 AND expires_at>now() RETURNING challenge_hash`,
       [digest(challenge), purpose, binding, userId],
     );
+    this.sweep();
     return rows.length ? challenge : null;
   }
   /** The account's passkeys as the account page lists them, newest first. */
@@ -217,8 +258,10 @@ export class Passkeys {
     await this.security.transaction(async (c) => {
       const user = (await c.query('SELECT * FROM oc_users WHERE id=$1 FOR UPDATE', [session.id]))
         .rows[0];
-      // The session must still be live: the challenge was issued to it after it confirmed.
-      await this.security.live(c, user, session);
+      // The session must still be live. Its confirmation was checked when the challenge was
+      // issued to it (registrationOptions), at most five minutes ago, so an account without a
+      // password is not refused here for a sign-in that aged during the browser's ceremony.
+      await this.security.live(c, user, session, false);
       const count = Number(
         (await c.query('SELECT count(*) FROM oc_passkeys WHERE user_id=$1', [user.id])).rows[0]
           .count,
@@ -248,21 +291,11 @@ export class Passkeys {
       first = !user.mfa_enabled;
       if (first) {
         await c.query('UPDATE oc_users SET mfa_enabled=true WHERE id=$1', [user.id]);
-        await c.query('DELETE FROM oc_recovery_codes WHERE user_id=$1', [user.id]);
-        for (const code of codes)
-          await c.query('INSERT INTO oc_recovery_codes(user_id,code_hash) VALUES($1,$2)', [
-            user.id,
-            recoveryHash(code),
-          ]);
+        await this.security.setRecoveryCodes(c, user.id, codes);
       }
-      // As enabling an authenticator app: every other session and unclaimed desktop sign-in
-      // ends, and this session is marked as having passed two-factor authentication.
-      await c.query('DELETE FROM oc_sessions WHERE user_id=$1 AND token_hash!=$2', [
-        user.id,
-        session.token_hash,
-      ]);
-      await c.query('DELETE FROM oc_device_logins WHERE user_id=$1', [user.id]);
-      await c.query('DELETE FROM oc_auth_challenges WHERE user_id=$1', [user.id]);
+      // As enabling an authenticator app: every other session, unclaimed desktop sign-in and
+      // challenge ends, and this session is marked as having passed two-factor authentication.
+      await this.security.endAccess(c, user.id, session.token_hash);
       await c.query('UPDATE oc_sessions SET mfa_verified=true WHERE token_hash=$1', [
         session.token_hash,
       ]);
@@ -321,15 +354,9 @@ export class Passkeys {
         await c.query('UPDATE oc_users SET mfa_enabled=false,mfa_last_step=-1 WHERE id=$1', [
           user.id,
         ]);
-        await c.query('DELETE FROM oc_recovery_codes WHERE user_id=$1', [user.id]);
+        await this.security.setRecoveryCodes(c, user.id, null);
       }
-      await c.query('DELETE FROM oc_sessions WHERE user_id=$1 AND token_hash!=$2', [
-        user.id,
-        session.token_hash,
-      ]);
-      await c.query('DELETE FROM oc_auth_challenges WHERE user_id=$1', [user.id]);
-      await c.query('DELETE FROM oc_device_logins WHERE user_id=$1', [user.id]);
-      await c.query('DELETE FROM oc_passkey_challenges WHERE user_id=$1', [user.id]);
+      await this.security.endAccess(c, user.id, session.token_hash);
       await this.security.notify(
         c,
         user,
@@ -408,22 +435,29 @@ export class Passkeys {
     }
   }
   /**
-   * Request options for signing in with a passkey alone, bound to this browser's sign-in nonce
-   * (`oc_login`): no credentials are listed, so the browser offers the passkeys it holds for
-   * this site (discoverable credentials). 404 when the site does not allow it.
+   * What a sign-in's challenge is bound to: the browser's sign-in nonce (`oc_login`) when
+   * signed out, or, as a password sign-in allows, the session already open (which the sign-in
+   * then replaces). 403 without either.
    */
-  async signInOptions(req) {
-    if (!this.signInEnabled) throw new HttpError(404, 'Signing in with a passkey is off.');
-    this.security.configured();
+  signInBinding(req, session) {
+    if (session) return 'session:' + session.token_hash;
     const browser = this.security.browser(req);
     if (!/^[a-f0-9]{64}$/.test(browser ?? ''))
       throw new HttpError(403, 'Refresh the sign-in page.');
-    const challenge = await this.challenge(
-      this.pool,
-      'sign-in',
-      null,
-      'browser:' + digest(browser),
-    );
+    return 'browser:' + digest(browser);
+  }
+  /**
+   * Request options for signing in with a passkey alone, bound to this browser (signInBinding):
+   * no credentials are listed, so the browser offers the passkeys it holds for this site
+   * (discoverable credentials). 404 when the site does not allow it.
+   */
+  async signInOptions(req, session = null) {
+    if (!this.signInEnabled) throw new HttpError(404, 'Signing in with a passkey is off.');
+    this.security.configured();
+    const binding = this.signInBinding(req, session);
+    // Anyone may ask, and most never answer: expired ones are cleared as new ones are made.
+    this.sweep();
+    const challenge = await this.challenge(this.pool, 'sign-in', null, binding);
     return { publicKey: this.requestOptions(challenge) };
   }
   /**
@@ -434,33 +468,37 @@ export class Passkeys {
    * email addresses are refused as for any sign-in (Auth.issue). Every failure answers the
    * same 401, but a counter that went backwards says so. Result: a web session.
    */
-  async signIn(req, body) {
+  async signIn(req, body, session = null) {
     if (!this.signInEnabled) throw new HttpError(404, 'Signing in with a passkey is off.');
     this.security.configured();
     const refused = new HttpError(
       401,
       'That passkey was not recognized. Sign in with your password, or try another passkey.',
     );
-    const browser = this.security.browser(req);
-    if (!/^[a-f0-9]{64}$/.test(browser ?? ''))
-      throw new HttpError(403, 'Refresh the sign-in page.');
+    const binding = this.signInBinding(req, session);
     const credential = passkeyAnswer(body.credential);
     const challenge =
-      credential &&
-      (await this.consume(credential, 'webauthn.get', 'sign-in', 'browser:' + digest(browser)));
+      credential && (await this.consume(credential, 'webauthn.get', 'sign-in', binding));
     if (!challenge) throw refused;
+    const credentialId = typeof credential.id === 'string' ? credential.id : '';
     return this.security.transaction(async (c) => {
+      // Whose passkey it is, unlocked, to know which account to lock: the account first, then
+      // its passkey, in the order every security change locks them.
+      const owner = (
+        await c.query('SELECT user_id FROM oc_passkeys WHERE credential_id=$1', [credentialId])
+      ).rows[0];
+      if (!owner) throw refused;
+      const user = (await c.query('SELECT * FROM oc_users WHERE id=$1 FOR UPDATE', [owner.user_id]))
+        .rows[0];
+      // Read again under the locks: a passkey removed, or an account deleted, meanwhile is
+      // gone now, and the counter is the latest, so two copies racing cannot both pass it.
       const stored = (
-        await c.query('SELECT * FROM oc_passkeys WHERE credential_id=$1', [
-          typeof credential.id === 'string' ? credential.id : '',
-        ])
+        await c.query(
+          'SELECT * FROM oc_passkeys WHERE credential_id=$1 AND user_id=$2 FOR UPDATE',
+          [credentialId, owner.user_id],
+        )
       ).rows[0];
-      if (!stored) throw refused;
-      // The account first, then its passkey, in the order every security change locks them.
-      const user = (
-        await c.query('SELECT * FROM oc_users WHERE id=$1 FOR UPDATE', [stored.user_id])
-      ).rows[0];
-      await c.query('SELECT id FROM oc_passkeys WHERE id=$1 FOR UPDATE', [stored.id]);
+      if (!user || !stored) throw refused;
       // A discoverable credential names its account; it must be the passkey's.
       if (credential.response?.userHandle !== userHandle(user.id)) throw refused;
       let signCount;
@@ -495,7 +533,9 @@ export class Passkeys {
       else this.auth.requireLogin(req);
       await this.auth.rateLimit(ip);
       const input = await read();
-      return path === '/sign-in' ? this.signIn(req, input) : this.signInOptions(req);
+      return path === '/sign-in'
+        ? this.signIn(req, input, session)
+        : this.signInOptions(req, session);
     }
     if (method === 'POST' && path === '/factor/options') {
       if (session) this.auth.require(session, req);

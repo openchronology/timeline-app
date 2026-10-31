@@ -135,6 +135,32 @@ export class AccountSecurity {
       });
   }
   /**
+   * Ends what could still act for account `userId` after a security change, inside the
+   * caller's transaction `c`: its sessions (all of them, or all but `keep`, the token hash of
+   * the session making the change), unclaimed desktop sign-ins (so an earlier approval cannot
+   * restore access), sign-in challenges, and passkey challenges.
+   */
+  async endAccess(c, userId, keep = null) {
+    if (keep)
+      await c.query('DELETE FROM oc_sessions WHERE user_id=$1 AND token_hash!=$2', [userId, keep]);
+    else await c.query('DELETE FROM oc_sessions WHERE user_id=$1', [userId]);
+    await c.query('DELETE FROM oc_device_logins WHERE user_id=$1', [userId]);
+    await c.query('DELETE FROM oc_auth_challenges WHERE user_id=$1', [userId]);
+    await c.query('DELETE FROM oc_passkey_challenges WHERE user_id=$1', [userId]);
+  }
+  /**
+   * Replaces account `userId`'s recovery codes with `codes` (stored as recoveryHash digests),
+   * or deletes them all when `codes` is null, inside the caller's transaction `c`.
+   */
+  async setRecoveryCodes(c, userId, codes) {
+    await c.query('DELETE FROM oc_recovery_codes WHERE user_id=$1', [userId]);
+    for (const code of codes ?? [])
+      await c.query('INSERT INTO oc_recovery_codes(user_id,code_hash) VALUES($1,$2)', [
+        userId,
+        recoveryHash(code),
+      ]);
+  }
+  /**
    * Registration: `body` has the username, email, password and its confirmation, the year of
    * birth and `acceptTerms`, the version of the terms and privacy policy agreed to (#277;
    * policies.mjs requireAgreement). It creates a pending registration and emails a confirmation link, not an account or
@@ -562,9 +588,7 @@ export class AccountSecurity {
         row.email,
       ]);
       await c.query('DELETE FROM oc_email_tokens WHERE user_id=$1', [row.user_id]);
-      await c.query('DELETE FROM oc_auth_challenges WHERE user_id=$1', [row.user_id]);
-      await c.query('DELETE FROM oc_sessions WHERE user_id=$1', [row.user_id]);
-      await c.query('DELETE FROM oc_device_logins WHERE user_id=$1', [row.user_id]);
+      await this.endAccess(c, row.user_id);
       if (row.purpose === 'change')
         await this.notify(
           c,
@@ -666,13 +690,11 @@ export class AccountSecurity {
       // earlier approval cannot restore access) and sign-in challenges.
       await c.query('UPDATE oc_users SET password_hash=$2 WHERE id=$1', [user.id, hash]);
       await c.query("DELETE FROM oc_email_tokens WHERE user_id=$1 AND purpose='reset'", [user.id]);
-      await c.query('DELETE FROM oc_sessions WHERE user_id=$1', [user.id]);
       await c.query(
         'UPDATE oc_api_keys SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL',
         [user.id],
       );
-      await c.query('DELETE FROM oc_device_logins WHERE user_id=$1', [user.id]);
-      await c.query('DELETE FROM oc_auth_challenges WHERE user_id=$1', [user.id]);
+      await this.endAccess(c, user.id);
       await this.notify(
         c,
         user,
@@ -711,13 +733,18 @@ export class AccountSecurity {
   /**
    * The session half of fresh: `session` is still live (not revoked, expired or idle) and, if
    * two-factor authentication is on, completed it, and an account without a password signed
-   * in within five minutes. Throws 403.
+   * in within five minutes (unless not `recent`: the second step of a change whose first step,
+   * a few minutes earlier, checked it, such as finishing a passkey's enrollment). Throws 403.
    */
-  async live(c, user, session) {
+  async live(c, user, session, recent = true) {
     if (!session) throw new HttpError(403, 'Sign in before changing security settings.');
     // Without a password there is nothing to re-enter: a sign-in through the provider just now
     // confirms the person instead.
-    if (!user.password_hash && !(Date.now() - new Date(session.created_at).getTime() <= 5 * 60000))
+    if (
+      recent &&
+      !user.password_hash &&
+      !(Date.now() - new Date(session.created_at).getTime() <= 5 * 60000)
+    )
       throw new HttpError(
         403,
         'Your sign-in is more than five minutes old. Sign out and sign in again to confirm it is you.',
@@ -802,23 +829,12 @@ export class AccountSecurity {
         'UPDATE oc_users SET mfa_secret=$2,mfa_enabled=true,mfa_last_step=$3 WHERE id=$1',
         [user.id, seal(secret, this.key, 'mfa:' + user.id), step],
       );
-      if (codes) {
-        await c.query('DELETE FROM oc_recovery_codes WHERE user_id=$1', [user.id]);
-        for (const code of codes)
-          await c.query('INSERT INTO oc_recovery_codes(user_id,code_hash) VALUES($1,$2)', [
-            user.id,
-            recoveryHash(code),
-          ]);
-      }
+      if (codes) await this.setRecoveryCodes(c, user.id, codes);
       // The setup is used up; every other session, which never completed two-factor
       // authentication, ends, as do unclaimed desktop sign-ins; this one is marked as verified
       // so it keeps working under the new rule (Auth.session requires it).
       await c.query('DELETE FROM oc_mfa_setups WHERE user_id=$1', [user.id]);
-      await c.query('DELETE FROM oc_sessions WHERE user_id=$1 AND token_hash!=$2', [
-        user.id,
-        session.token_hash,
-      ]);
-      await c.query('DELETE FROM oc_device_logins WHERE user_id=$1', [user.id]);
+      await this.endAccess(c, user.id, session.token_hash);
       await c.query('UPDATE oc_sessions SET mfa_verified=true WHERE token_hash=$1', [
         session.token_hash,
       ]);
@@ -867,13 +883,11 @@ export class AccountSecurity {
         // As for a reset: the new hash, then every session (this one too), API key, desktop
         // sign-in, challenge and outstanding reset link ends.
         await c.query('UPDATE oc_users SET password_hash=$2 WHERE id=$1', [user.id, newHash]);
-        await c.query('DELETE FROM oc_sessions WHERE user_id=$1', [user.id]);
         await c.query(
           'UPDATE oc_api_keys SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL',
           [user.id],
         );
-        await c.query('DELETE FROM oc_device_logins WHERE user_id=$1', [user.id]);
-        await c.query('DELETE FROM oc_auth_challenges WHERE user_id=$1', [user.id]);
+        await this.endAccess(c, user.id);
         await c.query("DELETE FROM oc_email_tokens WHERE user_id=$1 AND purpose='reset'", [
           user.id,
         ]);
@@ -927,25 +941,13 @@ export class AccountSecurity {
             .length > 0;
         // Old recovery codes end either way; disabling also clears the secret, and the last
         // step goes back to its default so a later enrollment starts fresh.
-        if (!passkeysLeft)
-          await c.query('DELETE FROM oc_recovery_codes WHERE user_id=$1', [user.id]);
+        if (!passkeysLeft) await this.setRecoveryCodes(c, user.id, codes);
         if (action === 'disable')
           await c.query(
             'UPDATE oc_users SET mfa_enabled=$2,mfa_secret=NULL,mfa_last_step=-1 WHERE id=$1',
             [user.id, passkeysLeft],
           );
-        else
-          for (const code of codes)
-            await c.query('INSERT INTO oc_recovery_codes(user_id,code_hash) VALUES($1,$2)', [
-              user.id,
-              recoveryHash(code),
-            ]);
-        await c.query('DELETE FROM oc_sessions WHERE user_id=$1 AND token_hash!=$2', [
-          user.id,
-          session.token_hash,
-        ]);
-        await c.query('DELETE FROM oc_auth_challenges WHERE user_id=$1', [user.id]);
-        await c.query('DELETE FROM oc_device_logins WHERE user_id=$1', [user.id]);
+        await this.endAccess(c, user.id, session.token_hash);
         await this.notify(
           c,
           user,

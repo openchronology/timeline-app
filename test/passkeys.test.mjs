@@ -319,3 +319,64 @@ test('a challenge answers once, for its own session, and not after it is used', 
 
 /** The pool stands in for the caller's transaction too. */
 const pool = (passkeys) => passkeys.pool;
+
+test('signing in alone checks the passkey as it is once locked, not as first read', async () => {
+  const authenticator = softAuthenticator({ counter: 3 }),
+    stored = registered(authenticator),
+    user = { id: randomUUID(), email_verified_at: new Date(), is_disabled: false };
+  authenticator.state.userHandle = userHandle(user.id);
+  const browser = 'ab'.repeat(32);
+  // `row` is what the unlocked lookup finds; `locked`, what the read under the lock finds,
+  // which a concurrent removal, or a copy signing in first, has changed meanwhile.
+  const attempt = async (locked, account = user) => {
+    const challenges = new Map(),
+      issued = [];
+    const row = { id: 'p1', user_id: user.id, public_key: stored.publicKey, sign_count: '3' };
+    const client = {
+      async query(sql, params = []) {
+        if (sql.startsWith('INSERT INTO oc_passkey_challenges')) {
+          challenges.set(params[0], params);
+          return { rows: [] };
+        }
+        if (sql.startsWith('DELETE FROM oc_passkey_challenges WHERE expires_at'))
+          return { rows: [] };
+        if (sql.startsWith('DELETE FROM oc_passkey_challenges'))
+          return { rows: challenges.delete(params[0]) ? [{}] : [] };
+        if (sql.startsWith('SELECT user_id FROM oc_passkeys')) return { rows: [row] };
+        if (sql.startsWith('SELECT * FROM oc_users')) return { rows: account ? [account] : [] };
+        if (sql.startsWith('SELECT * FROM oc_passkeys')) return { rows: locked ? [locked] : [] };
+        if (sql.startsWith('UPDATE oc_passkeys')) return { rows: [] };
+        throw new Error('Unexpected query ' + sql);
+      },
+    };
+    const security = {
+      pool: client,
+      auth: {
+        origin,
+        issue: async (u) => (issued.push(u.id), { user: { id: u.id } }),
+      },
+      configured() {},
+      browser: () => browser,
+      transaction: (action) => action(client),
+    };
+    const passkeys = new Passkeys(security, { signIn: true });
+    const { publicKey } = await passkeys.signInOptions({});
+    const credential = authenticator.get(publicKey, { origin });
+    return passkeys.signIn({}, { credential }).then(
+      (result) => result.user.id,
+      (error) => error,
+    );
+  };
+  const fresh = { id: 'p1', user_id: user.id, public_key: stored.publicKey, sign_count: '3' };
+  authenticator.state.counter = 3;
+  assert.equal(await attempt(fresh), user.id);
+  // Removed between the lookup and the lock.
+  authenticator.state.counter = 4;
+  assert.equal((await attempt(null)).status, 401);
+  // A copy signed in meanwhile, moving the counter on: the locked counter refuses this one.
+  authenticator.state.counter = 5;
+  assert.equal((await attempt({ ...fresh, sign_count: '9' })).reason, 'clone');
+  // The account deleted meanwhile: refused, not a crash.
+  authenticator.state.counter = 10;
+  assert.equal((await attempt(fresh, null)).status, 401);
+});

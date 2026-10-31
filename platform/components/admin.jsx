@@ -62,7 +62,21 @@ export default function Admin() {
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
     // Bumped after a change, to fetch the list again.
-    [reload, setReload] = useState(0);
+    [reload, setReload] = useState(0),
+    // Whether a passkey can confirm changes: two-factor authentication on, with a passkey
+    // (the administrator's own account security, read once).
+    [passkeys, setPasskeys] = useState(false);
+  useEffect(() => {
+    let active = true;
+    api('auth/account')
+      .then((a) => {
+        if (active) setPasskeys(!!a.security?.mfa_enabled && a.security.passkeys?.length > 0);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
   // Fetches the session and the list whenever what is shown changes. A newer fetch replaces
   // an older one: the cleanup aborts it, and `active` keeps a reply that arrives anyway from
   // overwriting the newer one (typing in the search starts one per keystroke).
@@ -119,7 +133,7 @@ export default function Admin() {
     try {
       const code = document.getElementById('admin-code').value;
       // Without a code, a passkey confirms the change, when the account has one (#372).
-      const passkey = code ? null : await confirmWithPasskey(session.csrf);
+      const passkey = !code && passkeys ? await confirmWithPasskey(session.csrf) : null;
       await api('admin/' + path, {
         method: 'PATCH',
         csrf: session.csrf,

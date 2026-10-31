@@ -493,8 +493,9 @@ export default function Account({ returnTo = '/', login = false }) {
               <input name="code" autoComplete="one-time-code" maxLength={40} required />
             </label>
           )}
-          {/* A passkey answers the two-factor step instead of a code (#372). */}
-          {mode === 'mfa' && passkeysSupported() && (
+          {/* A passkey answers the two-factor step instead of a code (#372), for an account
+              that has one. */}
+          {mode === 'mfa' && session.challengePasskey && passkeysSupported() && (
             <button
               type="button"
               className="passkey-button"
@@ -709,7 +710,7 @@ function AccountSettings({
                         required
                       />
                     </label>
-                    <Confirmation security={security} />
+                    <Confirmation security={security} csrf={session.csrf} />
                     <button disabled={busy} value="auth/email/change">
                       Send email confirmation
                     </button>
@@ -742,7 +743,7 @@ function AccountSettings({
                         required
                       />
                     </label>
-                    <Confirmation security={security} />
+                    <Confirmation security={security} csrf={session.csrf} />
                     <button disabled={busy} value="auth/password/change">
                       Change password and sign out
                     </button>
@@ -769,7 +770,7 @@ function AccountSettings({
                       <p className="muted">
                         An authenticator app gives a code to enter after your password.
                       </p>
-                      <Confirmation security={security} />
+                      <Confirmation security={security} csrf={session.csrf} />
                       <button disabled={busy || !session.security?.mfa} value="auth/mfa/setup">
                         Continue
                       </button>
@@ -785,7 +786,7 @@ function AccountSettings({
                           : 'This turns off two-factor authentication.'}{' '}
                         This also signs out your other sessions.
                       </p>
-                      <Confirmation security={security} />
+                      <Confirmation security={security} csrf={session.csrf} />
                       <button className="danger" disabled={busy} value="auth/mfa/disable">
                         {security.passkeys?.length
                           ? 'Remove the authenticator app'
@@ -808,7 +809,7 @@ function AccountSettings({
                   <Disclosure label="Replace">
                     <form className="settings-form" onSubmit={securityForm}>
                       <p className="muted">This also signs out your other sessions.</p>
-                      <Confirmation security={security} />
+                      <Confirmation security={security} csrf={session.csrf} />
                       <button disabled={busy} value="auth/mfa/recovery">
                         Replace recovery codes
                       </button>

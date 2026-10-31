@@ -969,6 +969,11 @@ export const schemas = {
         description:
           'A sign-in step this browser has pending (`mfa`: a two-factor code; `email`: an email address to confirm), or null.',
       },
+      challengePasskey: {
+        type: 'boolean',
+        description:
+          'At an `mfa` step only: whether the account has a passkey to answer it with (`POST /api/auth/passkeys/factor/options`).',
+      },
       fileExchange: {
         type: 'boolean',
         description: 'Whether the server converts SQLite (.och) timeline files.',

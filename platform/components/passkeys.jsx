@@ -79,7 +79,7 @@ export function PasskeyList({ session, security, refresh, showCodes }) {
                   defaultValue={`Passkey ${passkeys.length + 1}`}
                 />
               </label>
-              <Confirmation security={security} />
+              <Confirmation security={security} csrf={session.csrf} />
               <button className="primary" disabled={busy}>
                 Continue
               </button>
@@ -143,7 +143,7 @@ export function PasskeyList({ session, security, refresh, showCodes }) {
                   : 'Remove it here, and from the device or password manager that holds it.'}{' '}
                 This also signs out your other sessions.
               </p>
-              <Confirmation security={security} />
+              <Confirmation security={security} csrf={session.csrf} />
               <button className="danger" disabled={busy}>
                 Remove {p.name}
               </button>

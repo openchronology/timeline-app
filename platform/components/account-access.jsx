@@ -2,7 +2,7 @@
 'use client';
 // The account page's cards beside its security settings: the profile picture and sensitive
 // content, API keys, linked sign-in methods, and deleting the account.
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { confirmWithPasskey, passkeysSupported } from '../lib/passkeys.js';
 import HelpTip from './help-tip.jsx';
@@ -47,23 +47,33 @@ export function useAccountAction(session, refresh) {
  * the account has one, and a code, when two-factor authentication is on (security.fresh). An
  * account without a password confirms with a sign-in in the last five minutes instead. An
  * account with passkeys may use one instead of the code: **Use a passkey** asks the browser
- * for it, and its answer goes with the form as the hidden `passkey` field.
+ * for it, and its answer goes with the form as the hidden `passkey` field. Each answer works
+ * once, so it is dropped as soon as the form is sent, whether the change then succeeds or not.
  * @param {object} props
  * @param {object} props.security the account's `security` (`has_password`, `mfa_enabled`,
  *   `passkeys`)
+ * @param {string} props.csrf the session's CSRF token
  */
-export function Confirmation({ security }) {
+export function Confirmation({ security, csrf }) {
   // The passkey's answer (JSON text) once given, and why asking for it failed.
   const [passkey, setPasskey] = useState(''),
     [problem, setProblem] = useState(''),
     [asking, setAsking] = useState(false);
   const offer = security?.mfa_enabled && security?.passkeys?.length > 0 && passkeysSupported();
+  // The form these fields are in: once it is sent (its own handler having read the answer,
+  // which happens as the event is dispatched), the answer is spent.
+  const marker = useRef(null);
+  useEffect(() => {
+    const form = marker.current?.closest('form');
+    if (!form) return;
+    const spent = () => setTimeout(() => setPasskey(''), 0);
+    form.addEventListener('submit', spent);
+    return () => form.removeEventListener('submit', spent);
+  }, []);
   async function ask() {
     setAsking(true);
     setProblem('');
     try {
-      // The session's CSRF token, read again: this form may be anywhere on the account page.
-      const { csrf } = await api('session');
       setPasskey((await confirmWithPasskey(csrf)) ?? '');
     } catch (e) {
       setProblem(e.message);
@@ -73,6 +83,7 @@ export function Confirmation({ security }) {
   }
   return (
     <>
+      <span ref={marker} hidden />
       {security?.has_password && (
         <label>
           Current password
@@ -95,11 +106,7 @@ export function Confirmation({ security }) {
         (passkey ? (
           <p className="passkey-ready" role="status">
             <input type="hidden" name="passkey" value={passkey} />
-            Confirmed with a passkey.{' '}
-            {/* Each answer works once: after a refused change, ask for another. */}
-            <button type="button" className="link-button" disabled={asking} onClick={ask}>
-              Use it again
-            </button>
+            Confirmed with a passkey.
           </p>
         ) : (
           <button type="button" className="passkey-button" disabled={asking} onClick={ask}>
@@ -364,7 +371,7 @@ export function ApiKeysCard({ session, account, refresh }) {
             <input name="write" type="checkbox" />
             Allow timeline writes (reads are always included)
           </label>
-          <Confirmation security={account?.security} />
+          <Confirmation security={account?.security} csrf={session.csrf} />
           <div className="actions">
             <button className="primary" disabled={busy}>
               Create API key
@@ -440,7 +447,7 @@ export function SignInMethodsCard({ session, account, refresh, link, linking }) 
                       });
                     }}
                   >
-                    <Confirmation security={account?.security} />
+                    <Confirmation security={account?.security} csrf={session.csrf} />
                     <button disabled={busy}>Unlink {label(name)}</button>
                   </form>
                 </Disclosure>
@@ -553,7 +560,7 @@ export function DeleteAccountCard({ session, account, refresh }) {
             Type your username to confirm
             <input name="confirm" autoComplete="off" required />
           </label>
-          <Confirmation security={account?.security} />
+          <Confirmation security={account?.security} csrf={session.csrf} />
           <button className="danger" disabled={busy}>
             Delete my account
           </button>
