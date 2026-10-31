@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // The dashboard's and profiles' timeline lists (#337): each list's own query parameters, read
 // from the address and written back into links, so every list searches, sorts and pages on
-// its own while keeping the others' state; and the search of browser drafts, done here.
+// its own while keeping the others' state; the search of browser drafts, done here; and the
+// last list this tab showed, which a timeline's "Timelines" link leads back to.
 /** What each sort order is called in the lists' Sort menus. */
 export const SORT_LABELS = {
   featured: 'Featured first',
@@ -318,3 +319,22 @@ export function statusText(list, state, result) {
 }
 /** Whether a list's state narrows it (search text, a tag or a visibility), for its messages. */
 export const isFiltered = (state) => !!(state.search?.trim() || state.tag || state.visibility);
+/** Where this tab keeps the address of the last timeline list it showed. */
+const LAST_LIST = 'openchronology:last-list';
+/** Notes the list at this address (its path and query) as the one to go back to. */
+export function rememberList(address) {
+  try {
+    sessionStorage.setItem(LAST_LIST, address);
+  } catch {
+    // Without storage, the link leads to the timeline browser.
+  }
+}
+/** The last list this tab showed, as a path and query on this site, or null. */
+export function lastList() {
+  try {
+    const address = sessionStorage.getItem(LAST_LIST);
+    return address?.startsWith('/') && !address.startsWith('//') ? address : null;
+  } catch {
+    return null;
+  }
+}

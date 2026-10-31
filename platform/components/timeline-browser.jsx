@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import TimelineSearch, { useLayout } from './timeline-search.jsx';
 import TimelineList from './timeline-list.jsx';
 import { api } from '../lib/api.js';
-import { LISTS, navigateList, readList, searchBody } from '../lib/timeline-lists.js';
+import { LISTS, navigateList, readList, rememberList, searchBody } from '../lib/timeline-lists.js';
 /**
  * The list's state is the address's (readList over useSearchParams), so a link, Back and
  * Forward all say what it shows. The page renders it on the server for the address it was
@@ -59,6 +59,10 @@ export default function TimelineBrowser({
   // A failed search keeps the cards shown before it; with none, a search shows skeletons.
   shown.current = result;
   if (!result && loading) result = { timelines: [], total: 0, page: 1, pages: 0 };
+  // A timeline opened from here leads back to this list, as it is searched (its "Timelines").
+  useEffect(() => {
+    rememberList(location.pathname + location.search);
+  }, [params]);
   useEffect(() => {
     if (key === serverKey || found?.key === key) return;
     const abort = new AbortController();

@@ -1,12 +1,15 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // The dashboard's and profiles' timeline lists (platform/lib/timeline-lists.js, #337): each
 // list's own query parameters, links that keep the other lists' state, and browser drafts
-// searched in the browser.
+// searched in the browser; and the last list a tab showed, for a timeline's "Timelines" link.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   LISTS,
   changeList,
+  lastList,
+  rememberList,
   searchBody,
   SORT_LABELS,
   listHref,
@@ -224,4 +227,34 @@ test('changing a list starts from page one, and a search sorts by relevance (#33
     { scope: 'mine', search: '', tag: '', sort: 'updated', page: 1, visibility: 'private' },
   );
   assert.equal('visibility' in searchBody(LISTS.explore, browse, { scope: 'public' }), false);
+});
+
+test('a timeline leads back to the last list its tab showed, on this site only', () => {
+  const stored = new Map();
+  globalThis.sessionStorage = {
+    getItem: (key) => stored.get(key) ?? null,
+    setItem: (key, value) => stored.set(key, value),
+  };
+  try {
+    assert.equal(lastList(), null);
+    rememberList('/explore?q=apollo&page=2');
+    assert.equal(lastList(), '/explore?q=apollo&page=2');
+    rememberList('//elsewhere.example/');
+    assert.equal(lastList(), null);
+    globalThis.sessionStorage = {
+      getItem() {
+        throw new Error('blocked');
+      },
+      setItem() {
+        throw new Error('blocked');
+      },
+    };
+    rememberList('/athan');
+    assert.equal(lastList(), null);
+  } finally {
+    delete globalThis.sessionStorage;
+  }
+  // The platform points the editor's link at its timeline browser by this markup
+  // (platform/lib/editor-html.js).
+  assert.match(readFileSync('src/index.html', 'utf8'), /<a id="timelines-link" href="\/"/);
 });

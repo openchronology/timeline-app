@@ -9,6 +9,7 @@ import StarButton from './star-button.jsx';
 import VersionActions from './version-actions.jsx';
 import ShareDialog from './share-dialog.jsx';
 import ReportDialog from './report-dialog.jsx';
+import { lastList } from '../lib/timeline-lists.js';
 /** The page to share for a link fragment of the editor (see src/links.ts). */
 function sharedAddress(path, fragment) {
   const base = location.origin + path;
@@ -16,6 +17,12 @@ function sharedAddress(path, fragment) {
   if (kind === 'moment' || kind === 'duration')
     return `${base}/${kind}s/${rest.slice(kind.length + 1)}`;
   return fragment ? base + '#' + fragment : base;
+}
+/** Points the frame's "Timelines" at the list the timeline was opened from, if there was one. */
+function leadBack(document) {
+  const back = lastList(),
+    link = document.getElementById('timelines-link');
+  if (back && link) link.href = back;
 }
 export default function Editor({
   id,
@@ -56,8 +63,10 @@ export default function Editor({
   // The frame can finish loading before this page's script runs (and misses onLoad).
   useEffect(() => {
     const document = frame.current?.contentDocument;
-    if (document?.readyState === 'complete' && document.location.pathname === '/editor/frame')
+    if (document?.readyState === 'complete' && document.location.pathname === '/editor/frame') {
       setActions(document.getElementById('platform-timeline-actions'));
+      leadBack(document);
+    }
   }, []);
   // The title naming the editor's timeline while it replaces the page's own, and that one.
   const titled = useRef(null),
@@ -216,11 +225,11 @@ export default function Editor({
       )}
       <iframe
         ref={frame}
-        onLoad={() =>
-          setActions(
-            frame.current?.contentDocument?.getElementById('platform-timeline-actions') ?? null,
-          )
-        }
+        onLoad={() => {
+          const document = frame.current?.contentDocument;
+          setActions(document?.getElementById('platform-timeline-actions') ?? null);
+          if (document) leadBack(document);
+        }}
         title="Timeline editor"
         className="editor-frame"
         src={
