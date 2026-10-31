@@ -57,7 +57,7 @@ export function PasskeyList({ session, security, refresh, showCodes }) {
   }
   return (
     <>
-      <li>
+      <li id="add-passkey">
         <strong>Passkeys</strong>
         <span className="muted">
           {passkeys.length ? `${passkeys.length} added` : 'None'}
