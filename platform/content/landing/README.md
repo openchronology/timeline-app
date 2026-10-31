@@ -8,7 +8,8 @@ Each file starts with front matter, `key: value` lines between `---` lines, then
 
 | Key           | What it is                                                                 |
 | ------------- | -------------------------------------------------------------------------- |
-| `title`       | The page's heading and title.                                              |
+| `title`       | The page's title in search results, browser tabs and link previews.        |
+| `heading`     | The page's heading, when it differs from its title (else the title).       |
 | `promise`     | The line under the heading.                                                |
 | `description` | The description for search engines and link previews.                      |
 | `label`       | An audience's name on its card, such as `Educators`.                       |

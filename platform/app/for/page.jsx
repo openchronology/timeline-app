@@ -35,7 +35,7 @@ export default async function Audiences() {
         })}
       />
       <section className="landing-hero" aria-labelledby="landing-title">
-        <h1 id="landing-title">{meta.title}</h1>
+        <h1 id="landing-title">{meta.heading ?? meta.title}</h1>
         {meta.promise && <p className="landing-promise">{meta.promise}</p>}
       </section>
       <section aria-labelledby="audiences-heading">

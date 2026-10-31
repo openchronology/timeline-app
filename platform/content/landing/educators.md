@@ -1,8 +1,9 @@
 ---
 label: Educators
-title: Timelines your class builds together
+heading: Timelines your class builds together
+title: Collaborative timeline maker for teachers and classrooms
 promise: Students read public timelines without an account. With one, they propose changes, and you review and merge them. Free, open source, and every moment can show its sources.
-description: Free, open-source timelines for teaching. Students read without an account, propose changes you review and merge, and every moment can carry its sources and how certain its date is.
+description: Free, open-source timelines for teaching. Students read without an account and propose changes you review, and every moment can carry its sources.
 card: Class timelines that students add to and you review.
 examples: Timelines to teach from
 video: OpenChronology for educators

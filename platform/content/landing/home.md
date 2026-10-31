@@ -1,7 +1,8 @@
 ---
-title: Any span of time, on one exact line
+heading: Any span of time, on one exact line
+title: OpenChronology: free timeline editor for history and research
 promise: Build timelines from deep time to fractions of a second, show where every moment comes from, and share them with anyone. Free and open source.
-description: OpenChronology is a free, open-source timeline editor. Times are exact at any scale, moments can carry their sources, and anyone can read a public timeline without an account.
+description: Free, open-source timeline editor for history, research and teaching. Exact dates at any scale, sources on every moment, and public timelines anyone can read.
 audiences: Who it’s for
 examples: Public timelines
 video: OpenChronology in a few minutes

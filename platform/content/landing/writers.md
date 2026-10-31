@@ -1,8 +1,9 @@
 ---
 label: Writers
-title: Every thread of your story, in order
+heading: Every thread of your story, in order
+title: Story timeline maker for writers and worldbuilders
 promise: Keep a canon straight: who did what and when, in your world's own reckoning, with each storyline on a track of its own.
-description: OpenChronology for writers and worldbuilders: story timelines and canons, storylines separated by tags, your world's own calendar, and co-writers who propose changes.
+description: OpenChronology for writers and worldbuilders: story timelines and canons, storylines on tracks of their own, your world's calendar, and co-writers.
 card: Story timelines and canons, in your world's own calendar.
 examples: Story timelines
 ---

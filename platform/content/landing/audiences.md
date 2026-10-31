@@ -1,5 +1,6 @@
 ---
-title: Who OpenChronology is for
+heading: Who OpenChronology is for
+title: Timelines for teaching, research, investigations and more
 promise: One timeline editor, put to work in classrooms, research, investigations, operations, fiction and code.
 description: How educators, researchers, investigators, operations teams, writers and developers use OpenChronology's exact, shareable timelines.
 ---

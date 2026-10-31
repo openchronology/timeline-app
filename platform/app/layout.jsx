@@ -15,18 +15,21 @@ import { THEME_BOOT } from '../../src/theme-choice.ts';
 import { POLICY_VERSION } from '../../server/policies.mjs';
 import { currentSession } from '../lib/session.js';
 import { headers } from 'next/headers';
-import { siteOrigin } from '../lib/sharing.js';
+import { siteOrigin, sitePreview } from '../lib/sharing.js';
 import { analyticsId, platformName, siteName, supportUrl } from '../../server/site.mjs';
 import { landingEnabled } from '../../server/landing.mjs';
 export function generateMetadata() {
-  const description = 'Exact timelines, shared on your terms.';
+  const description =
+    'A free, open-source timeline editor: exact times at any scale, sources on every moment, shared on your terms.';
+  // Pages without a preview image of their own show the site's (#390).
+  const images = [sitePreview()];
   return {
     // Relative addresses in pages' metadata (link previews, canonical links) are on this site.
     metadataBase: new URL(siteOrigin()),
     title: platformName() ? `${platformName()} · OpenChronology` : 'OpenChronology',
     description,
-    openGraph: { type: 'website', siteName: siteName(), locale: 'en_US', description },
-    twitter: { card: 'summary_large_image' },
+    openGraph: { type: 'website', siteName: siteName(), locale: 'en_US', description, images },
+    twitter: { card: 'summary_large_image', images },
     // Added to an iPhone's home screen, the site opens on its own, under its name.
     appleWebApp: { capable: true, title: siteName(), statusBarStyle: 'black-translucent' },
   };

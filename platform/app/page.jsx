@@ -25,8 +25,8 @@ export async function generateMetadata() {
   return landingMetadata('home', '/');
 }
 /**
- * The home page. With the landing page on: its opening ("Any span of time, on one exact
- * line"), the video if one is set, the audiences' cards, a few public timelines, and the
+ * The home page. With the landing page on: its opening (its heading, "Any span of time, on
+ * one exact line"), the video if one is set, the audiences' cards, a few public timelines, and the
  * copy of platform/content/landing/home.md (or the operator's).
  */
 export default async function Home({ searchParams }) {
