@@ -60,6 +60,7 @@ export {
   arrangeDurations,
   compareDurationRank,
   durationCountText,
+  durationsMovedWith,
   DURATION_COUNT_CAP,
 } from './durations.js';
 export {

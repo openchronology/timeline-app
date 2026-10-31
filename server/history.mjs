@@ -895,6 +895,40 @@ export async function valuesAt(client, revisionId, name, keys, levels = null) {
   }
   return values;
 }
+/**
+ * The durations that two lineages (differences' `lineages`) both hold with the same
+ * definition, whose start or end is anchored to one of `moments` (IDs, up to PAGE): those
+ * whose span moves with a moment though their definition does not (#395). Candidates are the
+ * versions each level of `to` sees whose start or end names one of them, found through the
+ * partial indexes oc_history_durations_start_moment and _end_moment (so the cost follows the
+ * durations anchored to those moments, never the timeline's size), then read at both
+ * revisions through the primary keys and kept when both see the same definition, still
+ * anchored to one of them. One query: their IDs in order, with the definitions of the first
+ * `limit` (null after).
+ * @returns {Promise<{id: string, definition: object | null}[]>}
+ */
+export async function anchoredDurations(client, from, to, moments, limit) {
+  const kind = KINDS.durations;
+  const end = (alias, side) => `${alias}.definition->'${side}'->>'moment'`;
+  const branches = to.flatMap((level) =>
+    ['start', 'end'].map(
+      (side) =>
+        `SELECT h.id FROM ${kind.table} h WHERE ${seen('h', level)}
+        AND ${end('h', side)} IS NOT NULL AND ${end('h', side)}=ANY($1::text[])`,
+    ),
+  );
+  const filter = (alias) => `AND ${alias}.id IN (SELECT id FROM c)`;
+  const { rows } = await client.query(
+    `WITH c AS (SELECT DISTINCT id FROM (${branches.join(' UNION ALL ')}) c),
+    a AS (${visible(kind, from, filter)}),b AS (${visible(kind, to, filter)})
+    SELECT b.id,CASE WHEN row_number() OVER (ORDER BY b.id)<=$2 THEN b.definition END AS definition
+    FROM a JOIN b ON a.id=b.id WHERE a.definition=b.definition
+    AND (${end('b', 'start')}=ANY($1::text[]) OR ${end('b', 'end')}=ANY($1::text[]))
+    ORDER BY b.id`,
+    [moments, limit],
+  );
+  return rows;
+}
 /** A key as `differences` gives it, as a string to look values up by. */
 export const keyName = (key) => (typeof key === 'string' ? key : JSON.stringify(key));
 /** The settings of a revision kept as rows, or null when it is not. */
