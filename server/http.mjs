@@ -26,6 +26,7 @@ import { mapTimes } from './time-map.mjs';
 import { saveBase } from './save-merge.mjs';
 import { timelineSettings } from './incremental.mjs';
 import { authorizeKey, keyRequestRead } from './api-keys.mjs';
+import { asKeyRequest } from './key-requests.mjs';
 import { BrowserForks } from './browser-forks.mjs';
 import { queryPlugins } from './query-plugins.mjs';
 import { Collaboration, searchTimelines } from './collaboration.mjs';
@@ -401,7 +402,7 @@ export function createRequestHandler({
   // The OpenAPI document, built on first request and kept.
   let apiDescription = null,
     proxyWarned = false;
-  return async (req, res) => {
+  const handle = async (req, res) => {
     // Enable only behind a proxy that overwrites X-Forwarded-For and blocks direct access.
     if (trustProxy) {
       const forwarded = req.headers['x-forwarded-for'];
@@ -2055,6 +2056,12 @@ export function createRequestHandler({
       });
     }
   };
+  // A request with an API key runs as one (key-requests.mjs), so the timeline access checks
+  // give it the key's scopes and the account's own timelines, never an administrator's access.
+  return (req, res) =>
+    (req.headers.authorization ?? '').startsWith('Bearer och_key_')
+      ? asKeyRequest(() => handle(req, res))
+      : handle(req, res);
 }
 
 // Lightweight Node harness retained for service tests; production is served by Next.js.

@@ -241,7 +241,8 @@ export default function Account({ returnTo = '/', login = false }) {
    * The security form has one button per change; the pressed button's value is the API path,
    * and every change sends the same fields (the current password and code the server asks for
    * to confirm it, and the new values). Disabling two-factor authentication and replacing the
-   * recovery codes are confirmed first, since both sign out the other sessions.
+   * recovery codes are confirmed first, since both sign out the other sessions and revoke API
+   * keys.
    */
   function securityForm(event) {
     event.preventDefault();
@@ -251,14 +252,14 @@ export default function Account({ returnTo = '/', login = false }) {
       path === 'auth/mfa/disable' &&
       !confirm(
         account?.security?.passkeys?.length
-          ? 'Remove the authenticator app and revoke other sessions?'
-          : 'Disable two-factor authentication and revoke other sessions?',
+          ? 'Remove the authenticator app and revoke other sessions and API keys?'
+          : 'Disable two-factor authentication and revoke other sessions and API keys?',
       )
     )
       return;
     if (
       path === 'auth/mfa/recovery' &&
-      !confirm('Replace all previous recovery codes and revoke other sessions?')
+      !confirm('Replace all previous recovery codes and revoke other sessions and API keys?')
     )
       return;
     void action(path, fields);
@@ -784,7 +785,7 @@ function AccountSettings({
                         {security.passkeys?.length
                           ? 'Your passkeys will still answer two-factor authentication.'
                           : 'This turns off two-factor authentication.'}{' '}
-                        This also signs out your other sessions.
+                        This also signs out your other sessions and revokes your API keys.
                       </p>
                       <Confirmation security={security} csrf={session.csrf} />
                       <button className="danger" disabled={busy} value="auth/mfa/disable">
@@ -808,7 +809,9 @@ function AccountSettings({
                   <span className="muted">{security.recovery_remaining} left</span>
                   <Disclosure label="Replace">
                     <form className="settings-form" onSubmit={securityForm}>
-                      <p className="muted">This also signs out your other sessions.</p>
+                      <p className="muted">
+                        This also signs out your other sessions and revokes your API keys.
+                      </p>
                       <Confirmation security={security} csrf={session.csrf} />
                       <button disabled={busy} value="auth/mfa/recovery">
                         Replace recovery codes
