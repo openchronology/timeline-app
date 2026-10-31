@@ -373,17 +373,21 @@ Every point has a place. Explore the spaces between them.</textarea>
           <section id="comparison-settings" class="comparison-settings" hidden>
             <div class="comparison-heading">
               <strong>Read-only comparison</strong>
-              <label
+              <label class="comparison-combined"
                 ><input id="compare-combined" type="checkbox" /> Combine into one timeline</label
               >
               <button id="compare-exit">Exit comparison</button>
             </div>
-            <p class="field-hint">
-              Shared time = original time × scale + offset. Alignment changes only this view.
-            </p>
-            <p id="comparison-offset-units" class="field-hint"></p>
-            <div id="comparison-tracks"></div>
-            <p id="comparison-conflicts" class="field-hint"></p>
+            <!-- Closed by default, so the timelines keep the room (one row per timeline). -->
+            <details id="comparison-alignment" class="comparison-alignment">
+              <summary id="comparison-alignment-summary">Align timelines</summary>
+              <p class="field-hint">
+                Shared time = original time × scale + offset. Alignment changes only this view.
+                <span id="comparison-offset-units"></span>
+              </p>
+              <div id="comparison-tracks"></div>
+            </details>
+            <p id="comparison-conflicts" class="field-hint" hidden></p>
           </section>
           <div id="time-context" class="time-context" hidden></div>
           <div
