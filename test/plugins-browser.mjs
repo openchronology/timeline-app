@@ -285,8 +285,15 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
     .click();
   const cell = rootEditor.locator('td').nth(1);
   assert.equal(await cell.textContent(), '1');
-  await cell.click();
-  await page.keyboard.press('End');
+  // The caret goes at the end of the cell's text (a click there doesn't place it in WebKit).
+  await cell.evaluate((td) => {
+    td.closest('[contenteditable]').focus();
+    const range = document.createRange();
+    range.selectNodeContents(td);
+    range.collapse(false);
+    getSelection().removeAllRanges();
+    getSelection().addRange(range);
+  });
   await page.keyboard.type('2');
   await page.waitForFunction(() =>
     document.getElementById('event-description').value.includes('| 12 |'),
