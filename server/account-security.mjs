@@ -825,6 +825,14 @@ export class AccountSecurity {
     this.configured();
     if (!validToken(body.token)) throw new HttpError(400, 'Invalid or expired reset link.');
     const password = newPassword(body.password, body.passwordConfirmation);
+    // A link that does not exist is refused before the breach lookup and the costly hashing,
+    // which is shared with every sign-in (auth.mjs derive); the transaction below checks again,
+    // as the link may be spent meanwhile.
+    const live = await this.pool.query(
+      "SELECT 1 FROM oc_email_tokens WHERE token_hash=$1 AND purpose='reset' AND expires_at>now()",
+      [digest(body.token)],
+    );
+    if (!live.rows.length) throw new HttpError(400, 'Invalid or expired reset link.');
     await this.passwordCheck(password);
     const hash = await passwordHash(password);
     await this.transaction(async (c) => {

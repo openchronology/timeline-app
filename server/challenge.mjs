@@ -31,6 +31,12 @@ const TURNSTILE_VERIFY = 'https://challenges.cloudflare.com/turnstile/v0/sitever
 const LIFETIME_SECONDS = 600;
 /** Sign-in failures counted per address and per account before a challenge is needed. */
 const SIGN_IN_FAILURES = 3;
+/**
+ * With checks off, how long each sign-in for an account waits once it has had SIGN_IN_FAILURES
+ * failures (milliseconds). Short enough for its owner to barely notice; it slows guessing one
+ * request at a time, and unlike a limit it never refuses anyone.
+ */
+const SIGN_IN_DELAY = 1500;
 /** Hex SHA-256 of a string. */
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 /**
@@ -49,7 +55,8 @@ export class Challenges {
    * off), `difficulty` (the largest number a proof of work may need, 1000 to 10,000,000), `key`
    * (AUTH_ENCRYPTION_KEY bytes, from which the signing key is derived), `turnstile` site and
    * secret keys, `origin` (APP_ORIGIN, whose hostname Turnstile answers must name) and
-   * `trustDays` (how old an account must be before contributing without a check).
+   * `trustDays` (how old an account must be before contributing without a check), plus
+   * `signInDelay` (milliseconds; see signInGate), which tests shorten.
    */
   constructor({
     pool,
@@ -60,6 +67,7 @@ export class Challenges {
     fetcher = fetch,
     origin = 'http://localhost:5173',
     trustDays = 7,
+    signInDelay = SIGN_IN_DELAY,
   } = {}) {
     if (!['pow', 'turnstile', 'off'].includes(provider))
       throw new Error('CHALLENGE_PROVIDER must be pow, turnstile, or off.');
@@ -82,6 +90,7 @@ export class Challenges {
     this.fetcher = fetcher;
     this.hostname = new URL(origin).hostname;
     this.trustDays = trustDays;
+    this.signInDelay = signInDelay;
   }
   /** Settings from the environment; the platform passes them to the request handler. */
   static settings(env) {
@@ -214,16 +223,41 @@ export class Challenges {
       result?.success === true && result.action === purpose && result.hostname === this.hostname
     );
   }
+  /**
+   * The largest of the unexpired failure counters that signInFailed keeps in oc_auth_attempts
+   * under `keys`, looked up by the hashes of the keys (the primary key); 0 when none.
+   */
+  async failures(keys) {
+    const { rows } = await this.pool.query(
+      'SELECT max(count) AS count FROM oc_auth_attempts WHERE key=ANY($1) AND expires_at>now()',
+      [keys.map(tokenHash)],
+    );
+    return Number(rows[0]?.count ?? 0);
+  }
   /** Sign-in needs a challenge after several failures from the address or for the account. */
   async signInNeeded(ip, username) {
     if (this.provider === 'off') return false;
-    // The larger of the two unexpired failure counters (address and account) that signInFailed
-    // keeps in oc_auth_attempts, looked up by the hashes of their keys (the primary key).
-    const { rows } = await this.pool.query(
-      'SELECT max(count) AS count FROM oc_auth_attempts WHERE key=ANY($1) AND expires_at>now()',
-      [[tokenHash('sign-in-failure:' + ip), tokenHash('sign-in-failure-account:' + username)]],
-    );
-    return (rows[0]?.count ?? 0) >= SIGN_IN_FAILURES;
+    const keys = ['sign-in-failure:' + ip, 'sign-in-failure-account:' + username];
+    return (await this.failures(keys)) >= SIGN_IN_FAILURES;
+  }
+  /**
+   * What a password or directory sign-in for `username` must pass before its password is
+   * checked, once several attempts have failed. With checks on: an answer to a challenge (428
+   * with one otherwise), for every further attempt from the address or for the account, so
+   * guessing costs each attempt a check while the account's owner can always still sign in by
+   * passing one. With checks off: a delay of signInDelay for each further attempt for the
+   * account, rather than a refusal, since usernames are public and a refusal per account would
+   * let anyone lock its owner out. The address still has its own rate limit (Auth.rateLimit).
+   * `session` is the caller's session, if any, which decides the kind of challenge.
+   */
+  async signInGate(req, username, session) {
+    if (this.provider !== 'off') {
+      if (await this.signInNeeded(req.clientAddress, username))
+        await this.require(req, 'sign-in', session);
+      return;
+    }
+    if ((await this.failures(['sign-in-failure-account:' + username])) >= SIGN_IN_FAILURES)
+      await new Promise((resolve) => setTimeout(resolve, this.signInDelay));
   }
   /**
    * Counts a failed password sign-in against the client address and the account: upserted

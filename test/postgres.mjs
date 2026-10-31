@@ -5,7 +5,7 @@ import pg from 'pg';
 import { readFile } from 'node:fs/promises';
 import { createApplication } from '../server/http.mjs';
 import { flushMail } from '../server/mail.mjs';
-import { tokenHash } from '../server/auth.mjs';
+import { tokenHash, configurePasswordWork } from '../server/auth.mjs';
 import assert from 'node:assert/strict';
 import {
   demo,
@@ -61,6 +61,8 @@ const app = createApplication({
   pool,
   providers,
   trustProxy: true,
+  // No human verification, as CHALLENGE_PROVIDER=off, with a shorter sign-in delay to test.
+  challenges: { provider: 'off', signInDelay: 300 },
   fetcher: async (url, options) => {
     if (String(url).endsWith('/access_token')) {
       assert.equal(new URLSearchParams(options.body).get('client_secret'), 'test-secret');
@@ -197,6 +199,51 @@ try {
     await confirmEmail(c, email);
     const r = await c.request('auth/login', 'POST', { username: `${prefix}_${suffix}`, password });
     accounts.push(r.user.id);
+  }
+  const testPassword = 'testing exact rational timelines';
+  // Without human verification, many failures for an account, each from its own address, slow
+  // its sign-ins down but never refuse its owner (usernames are public).
+  {
+    const target = `viewer_${suffix}`;
+    for (let i = 0; i < 12; i++) {
+      const guesser = client();
+      await guesser.request('session');
+      await guesser.request('auth/login', 'POST', { username: target, password: 'wrong' }, 401);
+    }
+    const returning = client();
+    await returning.request('session');
+    const started = Date.now();
+    await returning.request('auth/login', 'POST', { username: target, password: testPassword });
+    assert(Date.now() - started >= 300, 'sign-ins for a targeted account are delayed');
+  }
+  // Password checks wait briefly for a free slot rather than being refused at once: a burst of
+  // sign-ins for unknown usernames, from many addresses, does not turn the owner's away.
+  {
+    // Two slots, and a wait long enough for a slow test machine to clear the burst.
+    configurePasswordWork({ concurrency: 2, waitMs: 60000 });
+    const burst = [];
+    for (let i = 0; i < 6; i++) {
+      const stranger = client();
+      await stranger.request('session');
+      burst.push(
+        stranger.request(
+          'auth/login',
+          'POST',
+          { username: `nobody${i}_${suffix}`, password: 'wrong' },
+          401,
+        ),
+      );
+    }
+    const returning = client();
+    await returning.request('session');
+    burst.push(
+      returning.request('auth/login', 'POST', {
+        username: `owner_${suffix}`,
+        password: testPassword,
+      }),
+    );
+    await Promise.all(burst);
+    configurePasswordWork({ waitMs: 5000 });
   }
   // Community definitions use the same account/session protections as timeline writes.
   await anonymous.request('plugins/publish', 'POST', PLUGIN_EXAMPLE, 401);

@@ -586,7 +586,9 @@ export function createRequestHandler({
         // Sign-in and registration, for anyone. Checked first: the CSRF token of a session
         // already open (signing in as someone else), else the login nonce; then the
         // human-verification challenge (always to register; to sign in after repeated
-        // failures from the address or for the account). Rate limits are in auth.signIn. A
+        // failures from the address or for the account, or with checks off a short delay for
+        // the account: challenges.signInGate). These come before the password is checked, so
+        // they cost nothing scarce. Rate limits (per address) are in auth.signIn. A
         // session already open is ended once the new one is issued. A directory sign-in
         // (/api/auth/ldap, ldap.mjs) is checked the same way, its failures counted under its
         // own `ldap:` names.
@@ -606,8 +608,7 @@ export function createRequestHandler({
               (ldap ? 'ldap:' : '') +
               (typeof input.username === 'string' ? input.username.trim().toLowerCase() : '');
           if (register) await challenges.require(req, 'register', previous);
-          else if (await challenges.signInNeeded(req.clientAddress, username))
-            await challenges.require(req, 'sign-in', previous);
+          else await challenges.signInGate(req, username, previous);
           const kind = req.headers['x-oc-client'] === 'desktop' ? 'desktop' : 'web';
           let result;
           try {

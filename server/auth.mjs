@@ -4,6 +4,7 @@
 // and email build on it (account-security.mjs, api-keys.mjs, mail.mjs).
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual, createHash } from 'node:crypto';
 import { promisify } from 'node:util';
+import { availableParallelism } from 'node:os';
 import { checkPasswordBreach } from './security-crypto.mjs';
 import { ApiKeys } from './api-keys.mjs';
 import { AccountSecurity } from './account-security.mjs';
@@ -12,20 +13,86 @@ import { HttpError } from './store.mjs';
 const scrypt = promisify(scryptCallback);
 /** The refusal a rate limit gives unless its caller names another. */
 const SIGN_IN_LIMIT = 'Too many sign-in attempts. Please wait a minute.';
-/** Password derivations running now in this process (see derive). */
-let passwordWork = 0;
+/**
+ * How many password derivations may run at once in this process: PASSWORD_HASH_CONCURRENCY
+ * (1 to 64) when set, else one per CPU core the process may use, leaving at least one of
+ * libuv's worker threads (UV_THREADPOOL_SIZE, default 4) free, since scrypt runs on that pool
+ * alongside file and DNS work, and never fewer than two. Each derivation takes about 128 MiB, so
+ * the cap bounds memory as well as CPU. Throws on a bad setting, at start-up (see Auth).
+ */
+export function passwordConcurrency(env = process.env) {
+  if (env.PASSWORD_HASH_CONCURRENCY) {
+    const value = Number(env.PASSWORD_HASH_CONCURRENCY);
+    if (!Number.isInteger(value) || value < 1 || value > 64)
+      throw new Error('PASSWORD_HASH_CONCURRENCY must be an integer from 1 to 64.');
+    return value;
+  }
+  const threads = Number(env.UV_THREADPOOL_SIZE) || 4;
+  return Math.max(2, Math.min(availableParallelism(), threads - 1));
+}
+/**
+ * The password-work limits of this process (see derive): `concurrency` derivations at once;
+ * beyond that a request waits up to `waitMs` in line, and at most `queue` per slot may wait.
+ */
+const passwordWork = { concurrency: null, waitMs: 5000, queue: 32, running: 0, waiting: [] };
+/**
+ * Sets this process's password-work limits (Auth does, from the environment; tests may shorten
+ * the wait). The limits are per process rather than per Auth because the memory and CPU they
+ * protect are.
+ */
+export function configurePasswordWork({ concurrency, waitMs } = {}) {
+  if (concurrency !== undefined) passwordWork.concurrency = concurrency;
+  if (waitMs !== undefined) passwordWork.waitMs = waitMs;
+}
+const busy = () => new HttpError(503, 'Sign-in is busy. Try again shortly.');
+/**
+ * Waits for a password-work slot. A slot free now is taken at once; otherwise the request
+ * joins a first-come, first-served line, so a short burst is absorbed instead of refused, and
+ * is refused with 503 after waitMs (or at once when the line is full), which bounds how long a
+ * flood can hold connections open. Every caller waits in the same line, whatever the account,
+ * so the wait reveals nothing about which usernames exist.
+ */
+function acquirePasswordWork() {
+  passwordWork.concurrency ??= passwordConcurrency();
+  if (passwordWork.running < passwordWork.concurrency) {
+    passwordWork.running++;
+    return Promise.resolve();
+  }
+  if (passwordWork.waiting.length >= passwordWork.concurrency * passwordWork.queue)
+    return Promise.reject(busy());
+  return new Promise((resolve, reject) => {
+    const entry = { resolve };
+    entry.timer = setTimeout(() => {
+      passwordWork.waiting.splice(passwordWork.waiting.indexOf(entry), 1);
+      reject(busy());
+    }, passwordWork.waitMs);
+    // A request still waiting does not keep the process alive on its own.
+    entry.timer.unref();
+    passwordWork.waiting.push(entry);
+  });
+}
+/** Hands a finished derivation's slot to the next in line, or frees it. */
+function releasePasswordWork() {
+  const next =
+    passwordWork.running <= passwordWork.concurrency ? passwordWork.waiting.shift() : undefined;
+  if (!next) {
+    passwordWork.running--;
+    return;
+  }
+  clearTimeout(next.timer);
+  next.resolve();
+}
 /**
  * Derives the 64-byte scrypt key for `password` with hex `salt`. Version 2 uses N=131072, r=8,
  * p=1 (OWASP's scrypt guidance, about 128 MiB of memory each); version 1, the older format, used
  * N=16384 and is still verified so existing hashes keep working until upgraded at sign-in.
  *
- * At most two derivations run at once per process: each is deliberately costly, so without a
- * cap a burst of sign-in attempts could exhaust memory and CPU. Beyond that it refuses with 503
- * rather than queueing. Throws 503 when busy.
+ * Each derivation is deliberately costly, so without a cap a burst of sign-in attempts could
+ * exhaust memory and CPU: it holds one of the process's password-work slots while it runs
+ * (acquirePasswordWork), and only while it runs. Throws 503 when no slot frees up in time.
  */
 async function derive(password, salt, version) {
-  if (passwordWork >= 2) throw new HttpError(503, 'Sign-in is busy. Try again shortly.');
-  passwordWork++;
+  await acquirePasswordWork();
   try {
     return await scrypt(password, salt, 64, {
       N: version === '2' ? 131072 : 16384,
@@ -34,7 +101,7 @@ async function derive(password, salt, version) {
       maxmem: 256 * 1024 * 1024,
     });
   } finally {
-    passwordWork--;
+    releasePasswordWork();
   }
 }
 /**
@@ -111,6 +178,8 @@ export class Auth {
     this.attempts = new Map();
     this.origin = origin;
     this.security = new AccountSecurity(this, mailer, key, passwordCheck, passkeys);
+    // Reads PASSWORD_HASH_CONCURRENCY now, so a bad value stops start-up rather than sign-in.
+    configurePasswordWork({ concurrency: passwordConcurrency() });
   }
   /**
    * The in-memory throttle in front of rateLimit: at most `maximum` attempts per `key` per
@@ -202,7 +271,7 @@ export class Auth {
   }
   /**
    * The shared rate limit: at most `maximum` attempts a minute for the key `ip`, which is a
-   * client address or a prefixed key such as `account:<username>`, `email:<address>` or
+   * client address or a prefixed key such as `email:<address>`, `security-account:<id>` or
    * `mfa-ip:<address>`, with `message` for the refusal (the sign-in one by default). The
    * memory throttle answers first; then a counter in oc_auth_attempts
    * enforces the limit across every server instance. Throws 429.
@@ -244,10 +313,15 @@ export class Auth {
   /**
    * Password sign-in, or registration when `register` (AccountSecurity.register). `body` has the
    * username and password; `ip` is the client address; `kind` is the session to issue (`web`,
-   * or `desktop` for the desktop app's own sign-in form). Rate-limited per address and per
-   * account. Result: a session (finishPrimary), or a challenge when two-factor authentication or
-   * email confirmation must come first. Throws 400 on malformed input, 401 on a wrong username
-   * or password, 429 when limited.
+   * or `desktop` for the desktop app's own sign-in form). Rate-limited per address. Result: a
+   * session (finishPrimary), or a challenge when two-factor authentication or email
+   * confirmation must come first. Throws 400 on malformed input, 401 on a wrong username or
+   * password, 429 when limited, 503 when password checking is busy.
+   *
+   * There is deliberately no hard limit per account: usernames are public, so one would let
+   * anyone lock an account's owner out. Repeated failures for an account are answered by the
+   * caller instead, with human verification or a delay (Challenges.signInGate). The cheap checks
+   * (the address limit, the input) come before the costly password work.
    */
   async signIn(body, register, ip, kind = 'web', req) {
     await this.rateLimit(ip);
@@ -263,15 +337,13 @@ export class Auth {
     )
       throw new HttpError(400, 'Enter a valid username and password.');
     let user;
-    // Per account as well as per address, so guessing one account's password from many
-    // addresses is limited too.
-    await this.rateLimit('account:' + username);
     {
       const { rows } = await this.pool.query('SELECT * FROM oc_users WHERE username=$1', [
         username,
       ]);
       user = rows[0];
-      // Missing/social-only accounts still do the same expensive password work.
+      // Missing/social-only accounts still do the same expensive password work, waiting for
+      // and holding a password-work slot exactly as a real check does (and no longer).
       // (So response time does not reveal which usernames exist or have a password; the
       // failure message is the same too.)
       const dummy = 'scrypt:2:00000000000000000000000000000000:' + '00'.repeat(64);

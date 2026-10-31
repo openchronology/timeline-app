@@ -218,8 +218,10 @@ export class Directory {
     return name;
   }
   /**
-   * Signs in with a directory account: rate-limited per address and per directory name as
-   * password sign-in is, then the account holding that directory identity (a new one, named
+   * Signs in with a directory account: rate-limited per address as password sign-in is (with
+   * no hard limit per directory name, which would let anyone lock its owner out; repeated
+   * failures for a name ask for human verification instead, in the caller), then the account
+   * holding that directory identity (a new one, named
    * after the directory account when that name is free, for a first sign-in) goes through the
    * same next steps as any sign-in (finishPrimary: two-factor authentication, or giving and
    * confirming an email address and year of birth for a new account).
@@ -227,7 +229,6 @@ export class Directory {
   async signIn(req, input, kind = 'web') {
     await this.auth.rateLimit(req.clientAddress ?? 'unknown');
     const name = Directory.username(input);
-    await this.auth.rateLimit('ldap:' + name.toLowerCase());
     const found = await this.authenticate(name, input.password);
     const user = await this.oauth.identity(
       'ldap',
@@ -240,7 +241,8 @@ export class Directory {
   /**
    * Links a directory account to the signed-in account `session`, which must have signed in
    * within five minutes (as linking a social sign-in must). Refused with 409 when the directory
-   * account belongs to another account.
+   * account belongs to another account. Rate-limited per signed-in account and per address,
+   * not per directory name, so linking attempts cannot hold up that name's own sign-ins.
    */
   async link(req, input, session) {
     this.auth.require(session, req);
@@ -248,7 +250,8 @@ export class Directory {
     if (!Number.isFinite(started) || Date.now() - started > 5 * 60000)
       throw new HttpError(403, 'Sign in again before linking a directory account.');
     const name = Directory.username(input);
-    await this.auth.rateLimit('ldap:' + name.toLowerCase());
+    await this.auth.rateLimit(req.clientAddress ?? 'unknown');
+    await this.auth.rateLimit('ldap-link:' + session.id);
     const found = await this.authenticate(name, input.password);
     await this.oauth.identity('ldap', found.subject, session.id);
     return { ok: true };

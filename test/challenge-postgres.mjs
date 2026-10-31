@@ -130,6 +130,24 @@ try {
   assert(
     (await elsewhere.request('auth/login', { username: member.username, password })).challenged,
   );
+  // Failures for the account keep asking for a check, but never lock its owner out: a dozen
+  // more wrong passwords within the minute, each with a check passed and from its own address,
+  // and the owner still signs in by passing one too.
+  for (let i = 0; i < 12; i++) {
+    const guesser = client();
+    await guesser.request('session');
+    const guessed = await guesser.request(
+      'auth/login',
+      { username: member.username, password: 'wrong' },
+      401,
+    );
+    assert(guessed.challenged);
+  }
+  const returning = client();
+  await returning.request('session');
+  assert(
+    (await returning.request('auth/login', { username: member.username, password })).challenged,
+  );
 
   // Contributions: a new account posting to someone else's timeline is asked; members,
   // owners, administrators and established accounts are not.
