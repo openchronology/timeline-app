@@ -11,6 +11,7 @@
 import { Rational as Q } from 'rational-ordered-map';
 import type { PointEvent, TimelineDocument } from './core.js';
 import type { Duration, DurationEndpoint } from './durations.js';
+import { parseDecimal } from './numeric.js';
 import { filterMembership } from './tags.js';
 import type { ViewFilter } from './tags.js';
 
@@ -30,7 +31,7 @@ function rational(value: unknown, name: string): Q {
     throw new Error(`Give the ${name} as a number.`);
   const text = value.trim();
   try {
-    return text.includes('/') ? Q.parse(text) : Q.parseDecimal(text);
+    return text.includes('/') ? Q.parse(text) : parseDecimal(text);
   } catch {
     throw new Error(`Give the ${name} as a number.`);
   }

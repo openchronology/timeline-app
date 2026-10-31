@@ -186,7 +186,8 @@ export const schemas = {
   },
   Rational: {
     type: 'string',
-    description: 'An exact time or number: an integer or fraction (`-3/2`), in coordinates.',
+    description:
+      'An exact time or number: an integer or fraction (`-3/2`), in coordinates. Times in requests may also be finite decimals (exponents from -10000 to 10000) and are at most 20000 characters, also as an exact fraction.',
     example: '86400/1',
   },
   Ok: { type: 'object', properties: { ok: { const: true } } },

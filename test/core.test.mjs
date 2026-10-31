@@ -246,6 +246,34 @@ test('balanced PostgreSQL snapshots cache exact counts and use only integer node
   assert.equal(root.count, 20010);
   assert(root.height < 20);
 });
+test('times limit their exponents and length, so a short text cannot ask for a vast number', () => {
+  assert.equal(parseTime('1.5e3').toString(), '1500/1');
+  assert.equal(parseTime('1e10000').toString(), '1' + '0'.repeat(10000) + '/1');
+  assert.equal(parseTime('-25E-10000').toString(), '-1/4' + '0'.repeat(9998));
+  for (const text of ['1e10001', '1e-10001', '1e1000000000', '1e' + '9'.repeat(400)])
+    assert.throws(() => parseTime(text), /Scientific exponents must be between -10000 and 10000\./);
+  const limit = /Times must be at most 20000 characters, also as an exact fraction\./;
+  assert.equal(parseTime('7'.repeat(19998)).toString(), '7'.repeat(19998) + '/1');
+  for (const text of [
+    '7'.repeat(20001),
+    '1/' + '3'.repeat(20000),
+    '1970-01-01T00:00:00.' + '1'.repeat(20000) + 'Z',
+    // Short enough as written, but its exact fraction is not.
+    '1.' + '1'.repeat(10000) + 'e-10000',
+  ])
+    assert.throws(() => parseTime(text), limit);
+  assert.throws(
+    () =>
+      validateDocument({
+        format: 'openchronology',
+        version: 1,
+        title: 'Vast',
+        description: '',
+        events: [{ id: 'm', time: '1e1000000000', metadata: {} }],
+      }),
+    /Scientific exponents/,
+  );
+});
 test('calendar conversion is cosmetic and bijective for arbitrary rational seconds and fixed offsets', () => {
   assert.equal(parseTimestamp('1970-01-01T00:00:00Z').toString(), '0/1');
   assert.equal(parseTime('1970-01-01T01:00:00+01:00').toString(), '0/1');

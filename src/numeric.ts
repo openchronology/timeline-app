@@ -3,15 +3,31 @@
 // prefixes, never through floating point.
 import { Rational as Q } from 'rational-ordered-map';
 
+/** The largest scientific exponent parsed: `1e10000` is already a 10,001-digit number. */
+export const EXPONENT_LIMIT = 10000;
+function checkExponent(text: string | undefined): void {
+  const exponent = Number(text ?? 0);
+  if (!Number.isSafeInteger(exponent) || Math.abs(exponent) > EXPONENT_LIMIT)
+    throw new Error(
+      `Scientific exponents must be between -${EXPONENT_LIMIT} and ${EXPONENT_LIMIT}.`,
+    );
+}
+/**
+ * Q.parseDecimal with its exponent limited as in parseNumber: a few characters such as
+ * `1e1000000000` would otherwise ask for a number of billions of digits.
+ */
+export function parseDecimal(text: string): Q {
+  checkExponent(/[eE]([+-]?\d+)$/.exec(text)?.[1]);
+  return Q.parseDecimal(text);
+}
 /** Parse scientific notation without ever passing the value through binary floating point. */
 export function parseNumber(text: string): Q {
   const value = text.trim();
   if (value.includes('/')) return Q.parse(value);
   const match = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+))(?:[eE]([+-]?\d+))?$/.exec(value);
   if (!match) throw new Error('Expected a rational, decimal, or scientific number.');
+  checkExponent(match[2]);
   const exponent = Number(match[2] ?? 0);
-  if (!Number.isSafeInteger(exponent) || Math.abs(exponent) > 10000)
-    throw new Error('Scientific exponents must be between -10000 and 10000.');
   const base = Q.parseDecimal(match[1]);
   return exponent >= 0
     ? base.mul(Q.from(10n ** BigInt(exponent)))
