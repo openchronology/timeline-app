@@ -647,7 +647,11 @@ export function createRequestHandler({
         // does not resolve is refused here rather than treated as signed out. Keys are held to
         // their scopes (read or write) and to their own rate limit, API_KEY_REQUESTS_PER_MINUTE
         // (default 120, at most 1000).
-        const session = await auth.session(req),
+        // Polling a timeline's revision is the page checking on its own, not the person using
+        // it, so it does not count as activity for the idle limit (Auth.session).
+        const session = await auth.session(req, undefined, {
+            touch: !(method === 'GET' && /^\/api\/timelines\/[^/]+\/revision$/.test(pathname)),
+          }),
           userId = session?.id;
         if ((req.headers.authorization ?? '').startsWith('Bearer och_key_') && !session)
           throw new HttpError(401, 'API key is expired, revoked, or invalid.');

@@ -113,7 +113,7 @@ export async function liveResponse(request, services) {
   )
     return Response.json({ error: 'Expected one to eight timeline IDs.' }, { status: 400 });
   const headers = Object.fromEntries(request.headers),
-    session = await services.auth.session({ headers });
+    session = await services.auth.session({ headers }, undefined, { touch: false });
   const userId = session?.id ?? null;
   try {
     for (const id of ids)
@@ -157,7 +157,7 @@ export async function liveResponse(request, services) {
         if (closed || checking) return;
         checking = true;
         try {
-          const current = await services.auth.session({ headers });
+          const current = await services.auth.session({ headers }, undefined, { touch: false });
           if ((current?.id ?? null) !== userId) {
             send('access', { error: 'Session changed. Reconnect to view current access.' });
             stop();

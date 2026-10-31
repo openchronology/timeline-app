@@ -119,6 +119,17 @@ export async function passwordHash(password) {
   return `scrypt:2:${salt}:${(await derive(password, salt, '2')).toString('hex')}`;
 }
 /**
+ * Whether request value `given` equals the secret token `expected`, compared in constant time
+ * so response timing reveals nothing about how much of a guess matched. A missing value, or one
+ * of another length, never matches (the tokens' length is fixed and not secret).
+ */
+export function sameToken(given, expected) {
+  if (typeof given !== 'string' || typeof expected !== 'string') return false;
+  const a = Buffer.from(given),
+    b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+/**
  * Whether `password` matches the stored `hash` (version 1 or 2). A malformed or missing hash
  * never matches. The final comparison is constant-time, so response timing reveals nothing about
  * how much of the derived key matched.
@@ -203,9 +214,12 @@ export class Auth {
    * state joined with the account's id, username, flags, avatar, year of birth and content
    * preference. `client` lets a caller read it inside its transaction.
    *
-   * Side effect: refreshes the session's last-seen time, at most once every five minutes.
+   * Side effect: refreshes the session's last-seen time, at most once every five minutes,
+   * unless `touch` is false. Requests a page makes on its own while left open (the live
+   * stream, revision polling) pass false, so an open tab does not keep an idle session alive
+   * past the one-day limit.
    */
-  async session(req, client = this.pool) {
+  async session(req, client = this.pool, { touch = true } = {}) {
     if ((req.headers.authorization ?? '').startsWith('Bearer och_key_'))
       return this.keys.session(req, client);
     const bearer = /^Bearer ([a-f0-9]{64})$/.exec(req.headers.authorization ?? ''),
@@ -223,7 +237,7 @@ export class Auth {
     );
     // Keeps the session alive for the idle limit. The five-minute condition makes most requests
     // match no row, sparing a write (and its row lock) on every request.
-    if (rows[0])
+    if (rows[0] && touch)
       await client.query(
         "UPDATE oc_sessions SET last_seen_at=now() WHERE token_hash=$1 AND last_seen_at<now()-interval '5 minutes'",
         [rows[0].token_hash],
@@ -266,7 +280,7 @@ export class Auth {
    */
   requireLogin(req) {
     const token = this.readCookie(req, `${this.secure ? '__Host-' : ''}oc_login`);
-    if (!token || req.headers['x-csrf-token'] !== token)
+    if (!token || !sameToken(req.headers['x-csrf-token'], token))
       throw new HttpError(403, 'Refresh the sign-in page before continuing.');
   }
   /**
@@ -307,7 +321,7 @@ export class Auth {
   require(session, req) {
     if (!session) throw new HttpError(401, 'Sign in to continue.');
     if (session.kind === 'api') return;
-    if (req.headers['x-csrf-token'] !== session.csrf)
+    if (!sameToken(req.headers['x-csrf-token'], session.csrf))
       throw new HttpError(403, 'Session changed. Reload before saving.');
   }
   /**
