@@ -98,7 +98,8 @@ CREATE TABLE IF NOT EXISTS oc_oauth_flows (
 );
 -- Expired-flow sweep: expires_at<=now() in oauth.mjs start.
 CREATE INDEX IF NOT EXISTS oc_oauth_expiry ON oc_oauth_flows(expires_at);
--- Desktop sign-in by device code (device-auth.mjs), 10 minutes.
+-- Desktop sign-in by device code (device-auth.mjs), 10 minutes. Columns added further down:
+-- mfa_verified, and created_at, client_address and user_agent for the approval page.
 --   device_hash: SHA-256 of the secret device code the desktop app polls with;
 --   user_code: the short code the person approves in a browser where they are signed in;
 --   user_id: set on approval (only while still NULL, so approval happens once);
@@ -671,6 +672,16 @@ CREATE INDEX IF NOT EXISTS oc_mail_outbox_pending ON oc_mail_outbox(next_attempt
 -- Whether the browser session that approved a desktop sign-in passed two-factor
 -- authentication: the desktop session inherits it.
 ALTER TABLE oc_device_logins ADD COLUMN IF NOT EXISTS mfa_verified boolean NOT NULL DEFAULT false;
+-- What the approval page (/connect/desktop/<code>) shows about a desktop sign-in, recorded
+-- when the desktop app started it (device-auth.mjs start), so the person approving can tell a
+-- request of their own from one someone else started and sent them a link to:
+--   created_at: when it started (requests pending at this upgrade get the upgrade's time);
+--   client_address: the address it came from (http.mjs's client address, so behind a proxy
+--   only with TRUST_PROXY set); user_agent: the User-Agent header as sent, at most 200
+--   printable characters, NULL when absent. Kept only as long as the request (ten minutes).
+ALTER TABLE oc_device_logins ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE oc_device_logins ADD COLUMN IF NOT EXISTS client_address text;
+ALTER TABLE oc_device_logins ADD COLUMN IF NOT EXISTS user_agent text;
 
 -- Transactional, cross-process live invalidation. No timeline contents are broadcast.
 -- Each change to a timeline row (or to its memberships, below) notifies the channel

@@ -80,7 +80,7 @@ Drafts stay in this browser only, and only for your account. Save to the server 
 
 **Download** in the header offers:
 
-- **The desktop app** for Windows, macOS and Linux. It works with timeline files on your computer: **Open**, **Save** and **Save As…** read and write `.och` files, and **Import** reads `.ochx` files. It works without a network. **Server connection** connects it to OpenChronology servers (by default `https://timescale.info`), up to eight at once ([several servers](authentication.md#several-servers-on-the-desktop)). To sign in from the desktop, choose **Sign in using your browser**, then approve the code shown on the website with **Approve connection**. The desktop app does not remember your sign-in after it closes.
+- **The desktop app** for Windows, macOS and Linux. It works with timeline files on your computer: **Open**, **Save** and **Save As…** read and write `.och` files, and **Import** reads `.ochx` files. It works without a network. **Server connection** connects it to OpenChronology servers (by default `https://timescale.info`), up to eight at once ([several servers](authentication.md#several-servers-on-the-desktop)). To sign in from the desktop, choose **Sign in using your browser**, then, on the website, check when and where the request started, type the code the desktop app shows and choose **Approve connection**. Approve only a sign-in you just started on your own computer, never a link someone sent you. The desktop app does not remember your sign-in after it closes.
 - **The offline browser file** (`.html`): the whole editor in one file. It never uses the network. Work stays in memory, so export it as `.ochx` to keep it.
 
 ## Moving around

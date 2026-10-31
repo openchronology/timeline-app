@@ -960,12 +960,27 @@ export function createRequestHandler({
           );
         }
         // Desktop sign-in by code (device-auth.mjs): the desktop app starts and polls without a
-        // session; a browser session signed in within five minutes approves the code (CSRF
-        // token and rate limit checked in DeviceAuth.approve).
+        // session, its address and User-Agent recorded; the approval page reads them back
+        // (device/request), and a browser session signed in within five minutes approves the
+        // code (CSRF token and rate limit checked in DeviceAuth.approve).
         if (pathname === '/api/auth/device/start' && method === 'POST') {
           await body(req);
-          return response(res, 200, await devices.start(req.clientAddress));
+          return response(
+            res,
+            200,
+            await devices.start(req.clientAddress, req.headers['user-agent']),
+          );
         }
+        if (pathname === '/api/auth/device/request' && method === 'GET')
+          return response(
+            res,
+            200,
+            await devices.describe(
+              session,
+              req,
+              new URL(req.url, origin).searchParams.get('userCode'),
+            ),
+          );
         if (pathname === '/api/auth/device/poll' && method === 'POST')
           return response(res, 200, await devices.poll((await body(req)).deviceCode));
         if (pathname === '/api/auth/device/approve' && method === 'POST')

@@ -499,10 +499,30 @@ try {
     await deviceClient.request('auth/device/poll', 'POST', { deviceCode: challenge.deviceCode }),
     { pending: true },
   );
+  // The approval page shows what the server recorded when the request started: its time, its
+  // address (each test client sends its own X-Forwarded-For) and its User-Agent, and that the
+  // address is not the approving browser's.
+  const pending = 'auth/device/request?userCode=' + challenge.userCode;
+  await anonymous.request(pending, 'GET', undefined, 401);
+  await owner.request('auth/device/request?userCode=nope', 'GET', undefined, 400);
+  const details = await owner.request(pending);
+  assert.equal(details.clientAddress, clientAddresses.at(-1));
+  assert.equal(details.sameAddress, false);
+  assert.equal(typeof details.userAgent, 'string');
+  assert(Date.now() - new Date(details.requestedAt).getTime() < 60000);
+  assert(new Date(details.expiresAt) > new Date(details.requestedAt));
   await anonymous.request('auth/device/approve', 'POST', { userCode: challenge.userCode }, 401);
   await owner.request('auth/device/approve', 'POST', { userCode: challenge.userCode }, 403, false);
   await owner.request('auth/device/approve', 'POST', { userCode: challenge.userCode });
   await owner.request('auth/device/approve', 'POST', { userCode: challenge.userCode }, 400);
+  await owner.request(pending, 'GET', undefined, 400);
+  // The account is told, with when and where the request started.
+  await flushMail(pool, mailer, securityKey);
+  const notice = delivered.findLast(
+    (m) => m.to === `owner_${suffix}@example.test` && m.text.includes('desktop app was signed in'),
+  );
+  assert(notice, 'desktop approval email queued');
+  assert(notice.text.includes(details.clientAddress));
   await pool.query(
     "UPDATE oc_device_logins SET last_poll_at=now()-interval '4 seconds' WHERE user_code=$1",
     [challenge.userCode],
@@ -534,6 +554,17 @@ try {
     hash,
   ]);
   assert((await nativeClient.request('session')).user);
+  // Only a browser session approves, or reads a request: never a desktop session.
+  const chained = await deviceClient.request('auth/device/start', 'POST', {});
+  await nativeClient.request('session');
+  await nativeClient.request(
+    'auth/device/request?userCode=' + chained.userCode,
+    'GET',
+    undefined,
+    403,
+  );
+  await nativeClient.request('auth/device/approve', 'POST', { userCode: chained.userCode }, 403);
+  await pool.query('DELETE FROM oc_device_logins WHERE user_code=$1', [chained.userCode]);
   await owner.request('auth/revoke-others', 'POST', {});
   await nativeClient.request('timelines', 'GET', undefined, 401);
   const expired = await deviceClient.request('auth/device/start', 'POST', {});

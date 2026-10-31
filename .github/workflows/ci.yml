@@ -335,6 +335,8 @@ jobs:
         run: node test/terms-live-postgres.mjs
       - name: Passkeys in a live browser
         run: node test/passkeys-live-postgres.mjs
+      - name: Approving a desktop sign-in in a live browser
+        run: node test/device-approval-live-postgres.mjs
       - name: Searching and browsing timelines in a live browser
         run: node test/timeline-browser-live-postgres.mjs
       - name: The landing page and audience pages in a live browser

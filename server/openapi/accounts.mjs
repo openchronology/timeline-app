@@ -494,7 +494,7 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Start signing in the desktop app through a browser',
       description:
-        'The desktop app’s **Sign in using your browser**: it shows `userCode` and opens `verificationUri`, where a signed-in browser approves it (`POST /api/auth/device/approve`), then polls `POST /api/auth/device/poll` with `deviceCode`, which it keeps to itself. The request expires in ten minutes. Send an empty JSON object.',
+        'The desktop app’s **Sign in using your browser**: it shows `userCode` and opens `verificationUri`, where a signed-in browser approves it (`POST /api/auth/device/approve`), then polls `POST /api/auth/device/poll` with `deviceCode`, which it keeps to itself. The request expires in ten minutes. The caller’s address and `User-Agent` header are recorded with it, for the approval page to show (`GET /api/auth/device/request`). Send an empty JSON object.',
       security: ANYONE,
       requestBody: body({ type: 'object' }),
       responses: {
@@ -540,14 +540,36 @@ export const paths = {
       },
     },
   },
+  '/api/auth/device/request': {
+    get: {
+      operationId: 'describeDeviceSignIn',
+      tags: ['Sign-in'],
+      summary: 'What is known about a pending desktop sign-in',
+      description:
+        'For the approval page: when the desktop sign-in showing `userCode` started and expires, the address and `User-Agent` it started from, and whether that address is this browser’s. A browser session only (403 for a desktop session). Limited to ten a minute per client address (429). An expired, approved or unknown code is refused (400).',
+      security: [{ session: [] }],
+      parameters: [
+        queryParam(
+          'userCode',
+          'The ten-character code the desktop app shows.',
+          { type: 'string', pattern: '^[A-Z2-9]{10}$' },
+          true,
+        ),
+      ],
+      responses: {
+        200: json(ref('DeviceSignInRequest'), 'The pending request.'),
+        ...errors(400, 401, 403, 429, 503),
+      },
+    },
+  },
   '/api/auth/device/approve': {
     post: {
       operationId: 'approveDeviceSignIn',
       tags: ['Sign-in'],
       summary: 'Approve a desktop sign-in',
       description:
-        'Approves the desktop app showing `userCode`, signing it in to this account. Needs a sign-in within the last five minutes.',
-      security: SIGNED_IN,
+        'Approves the desktop app showing `userCode`, signing it in to this account. Needs a browser session (403 for a desktop session) signed in within the last five minutes. The approval is emailed to the account’s confirmed address, with when and where the request started. Clients should have the person type the code from the desktop app rather than take it from a link, and show `GET /api/auth/device/request` first.',
+      security: [{ session: [], csrf: [] }],
       requestBody: body({
         type: 'object',
         required: ['userCode'],
@@ -1191,6 +1213,27 @@ export const schemas = {
       },
       interval: { type: 'integer', const: 3, description: 'Seconds between polls, at least.' },
       expiresIn: { type: 'integer', const: 600, description: 'Seconds until it expires.' },
+    },
+  },
+  DeviceSignInRequest: {
+    type: 'object',
+    required: ['requestedAt', 'expiresAt', 'clientAddress', 'userAgent', 'sameAddress'],
+    properties: {
+      requestedAt: { type: 'string', format: 'date-time', description: 'When it started.' },
+      expiresAt: { type: 'string', format: 'date-time', description: 'When it expires.' },
+      clientAddress: {
+        type: ['string', 'null'],
+        description: 'The address it started from; null for a request older than this field.',
+      },
+      userAgent: {
+        type: ['string', 'null'],
+        description:
+          'The `User-Agent` it started with, as sent (printable, at most 200 characters); null when none. The requester chooses it.',
+      },
+      sameAddress: {
+        type: 'boolean',
+        description: 'Whether it started from the address this request comes from.',
+      },
     },
   },
   ApiKey: {
