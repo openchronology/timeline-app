@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Administration against PostgreSQL: the first administrator, CSRF and permissions, quotas under
-// concurrent saves, scoped and revoked API keys, profiles, migration and suspension.
+// concurrent saves, scoped and revoked API keys, profiles, migration, suspension, and releasing
+// an account from the directory.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -10,6 +11,8 @@ import { bootstrapInstallation } from '../server/administration.mjs';
 import { createApplication } from '../server/http.mjs';
 import { validateDocument } from '../dist/core.mjs';
 import { POLICY_VERSION } from '../server/policies.mjs';
+import { flushMail } from '../server/mail.mjs';
+import { digest } from '../server/security-crypto.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const schema = await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8');
@@ -19,12 +22,14 @@ const suffix = randomUUID().slice(0, 8),
   password = 'unique administration testing passphrase';
 const ids = [],
   tids = [];
-const app = createApplication({
-  pool,
-  mailer: { async send() {} },
-  securityKey: Buffer.alloc(32, 17),
-  passwordCheck: async () => {},
-});
+const key = Buffer.alloc(32, 17),
+  messages = [],
+  mailer = {
+    async send(message) {
+      messages.push(message);
+    },
+  };
+const app = createApplication({ pool, mailer, securityKey: key, passwordCheck: async () => {} });
 await new Promise((resolve) => app.listen(0, '127.0.0.1', resolve));
 const origin = `http://127.0.0.1:${app.address().port}`,
   auth = new Auth(pool, origin);
@@ -352,6 +357,110 @@ try {
     { status: 'lifted', appeal_outcome: 'lifted', decided: true },
   );
   await request('admin/users/' + owner.u.id, 'PATCH', { is_disabled: true, password }, admin);
+  // An account made by a directory sign-in (no password; `ldap` its only identity) gains no
+  // password by email: Forgot password sends it nothing, with the answer any address gets, and
+  // a reset link, were there one, is refused. An administrator releases it explicitly.
+  const security = new Auth(pool, origin, { mailer, key, passwordCheck: async () => {} }).security,
+    dirId = randomUUID(),
+    dirEmail = `dir_${suffix}@example.test`;
+  ids.push(dirId);
+  await pool.query(
+    'INSERT INTO oc_users(id,username,email,email_verified_at,terms_version) VALUES($1,$2,$3,now(),oc_policy_version())',
+    [dirId, 'dir_' + suffix, dirEmail],
+  );
+  await pool.query("INSERT INTO oc_identities(provider,subject,user_id) VALUES('ldap',$1,$2)", [
+    'uuid:' + dirId,
+    dirId,
+  ]);
+  const dirHeaders = await login(
+    (await pool.query('SELECT * FROM oc_users WHERE id=$1', [dirId])).rows[0],
+  );
+  await request(
+    'auth/api-keys',
+    'POST',
+    { name: 'Directory', days: 1, scopes: ['timelines:read'] },
+    dirHeaders,
+    201,
+  );
+  const sentTo = async (address) => {
+    await flushMail(pool, mailer, key);
+    return messages.filter((m) => m.to === address);
+  };
+  assert.deepEqual(
+    await security.forgot(dirEmail, '192.0.2.1'),
+    await security.forgot(`nobody_${suffix}@example.test`, '192.0.2.1'),
+  );
+  assert.equal((await sentTo(dirEmail)).length, 0);
+  const planted = 'c'.repeat(64),
+    chosen = 'a password chosen after leaving the directory';
+  await pool.query(
+    "INSERT INTO oc_email_tokens(token_hash,user_id,purpose,email,expires_at) VALUES($1,$2,'reset',$3,now()+interval '30 minutes')",
+    [digest(planted), dirId, dirEmail],
+  );
+  await assert.rejects(
+    security.reset({ token: planted, password: chosen, passwordConfirmation: chosen }),
+    { status: 400 },
+  );
+  // The user list says which accounts it is; releasing any other account is refused.
+  const listed = await request('admin/users?search=dir_' + suffix, 'GET', undefined, admin);
+  assert.equal(listed.items[0].directory_only, true);
+  await request(
+    'admin/users/' + stranger.u.id,
+    'PATCH',
+    { release_directory: true, password },
+    admin,
+    409,
+  );
+  await request(
+    'admin/users/' + dirId,
+    'PATCH',
+    { release_directory: true, password },
+    dirHeaders,
+    403,
+  );
+  // Released: unlinked from the directory, signed out, its keys revoked, and emailed a link.
+  await request('admin/users/' + dirId, 'PATCH', { release_directory: true, password }, admin);
+  assert.deepEqual(
+    (await pool.query('SELECT provider FROM oc_identities WHERE user_id=$1', [dirId])).rows,
+    [],
+  );
+  assert.equal((await request('session', 'GET', undefined, dirHeaders)).user, null);
+  assert.equal(
+    (
+      await pool.query(
+        'SELECT revoked_at IS NOT NULL AS revoked FROM oc_api_keys WHERE user_id=$1',
+        [dirId],
+      )
+    ).rows[0].revoked,
+    true,
+  );
+  const releaseMail = (await sentTo(dirEmail)).at(-1);
+  assert.match(releaseMail.text, /moved your OpenChronology account off directory sign-in/);
+  assert.deepEqual(
+    (
+      await pool.query(
+        "SELECT changes FROM oc_admin_audit WHERE target_id=$1 AND changes ? 'release_directory'",
+        [dirId],
+      )
+    ).rows[0].changes,
+    { release_directory: true, reset_link_sent: true },
+  );
+  // Forgot password now works for it too; the newest link sets its password, once.
+  await security.forgot(dirEmail, '192.0.2.2');
+  const links = await sentTo(dirEmail);
+  assert.equal(links.length, 2);
+  const token = links.at(-1).text.match(/#reset=([a-f0-9]{64})/)[1];
+  await security.reset({ token, password: chosen, passwordConfirmation: chosen });
+  assert(
+    await passwordMatches(
+      chosen,
+      (await pool.query('SELECT password_hash FROM oc_users WHERE id=$1', [dirId])).rows[0]
+        .password_hash,
+    ),
+  );
+  // No longer directory-only, so there is nothing more to release (the route would say 409;
+  // the administrators' per-minute limit is spent by now).
+  assert.equal(await security.directoryOnly(pool, dirId), false);
   const audit = (
     await pool.query('SELECT changes FROM oc_admin_audit WHERE actor_id=$1', [adminUser.id])
   ).rows;
@@ -359,7 +468,7 @@ try {
     audit.every((a) => !JSON.stringify(a.changes).includes(password) && !('password' in a.changes)),
   );
   console.log(
-    'Admin bootstrap, CSRF, permissions, concurrent quotas, scoped/revoked/expired API keys, profile validation, migration and suspension passed.',
+    'Admin bootstrap, CSRF, permissions, concurrent quotas, scoped/revoked/expired API keys, profile validation, migration, suspension and release from the directory passed.',
   );
 } finally {
   await new Promise((resolve) => app.close(resolve));

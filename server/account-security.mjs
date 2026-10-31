@@ -720,9 +720,13 @@ export class AccountSecurity {
   }
   /**
    * A forgotten password: emails a reset link, valid 30 minutes, to `email` if it is a
-   * confirmed address of an account with a password. Rate-limited per client address `ip` and
-   * per address. The answer is the same in every case (generic), so it does not reveal whether
-   * the address has an account. Only the newest link works.
+   * confirmed address of an account with a password, or of one with neither a password nor a
+   * linked sign-in (an account an administrator released from its directory, releaseDirectory).
+   * An account that signs in through a provider or its directory, without a password, gets
+   * nothing: a directory account in particular must not gain a password by email
+   * (directoryOnly). Rate-limited per client address `ip` and per address. The answer is the
+   * same in every case (generic), so it does not reveal whether the address has an account,
+   * or what kind. Only the newest link works.
    */
   async forgot(email, ip) {
     this.configured();
@@ -731,31 +735,81 @@ export class AccountSecurity {
     await this.auth.rateLimit('reset-email:' + email);
     await this.transaction(async (c) => {
       // The account with this confirmed address (the oc_users_email index serves lower(email)),
-      // locked against a concurrent change. Social-only accounts have no password to reset.
+      // locked against a concurrent change.
       const user = (
         await c.query(
           'SELECT * FROM oc_users WHERE lower(email)=$1 AND email_verified_at IS NOT NULL FOR UPDATE',
           [email],
         )
       ).rows[0];
-      if (!user?.password_hash) return;
-      const token = randomBytes(32).toString('hex');
-      // Replaces any earlier reset link with this one; it records the address it was sent to,
-      // which reset checks is still the account's. It is not bound to a browser: the person may
-      // open it anywhere.
-      await c.query("DELETE FROM oc_email_tokens WHERE user_id=$1 AND purpose='reset'", [user.id]);
-      await c.query(
-        "INSERT INTO oc_email_tokens(token_hash,user_id,purpose,email,expires_at) VALUES($1,$2,'reset',$3,now()+interval '30 minutes')",
-        [digest(token), user.id, email],
-      );
-      await queueMail(c, this.key, {
-        to: email,
-        subject: 'Reset your OpenChronology password',
-        text: `Reset your password:\n${this.auth.origin}/login#reset=${token}\nThis link expires in 30 minutes. Resetting your password does not disable two-factor authentication. Ignore this message if you did not request it.`,
-      });
+      if (!user) return;
+      // Without a password, only an account with no linked sign-in either may choose one here;
+      // one that signs in through a provider or its directory stops quietly.
+      if (
+        !user.password_hash &&
+        (await c.query('SELECT 1 FROM oc_identities WHERE user_id=$1 LIMIT 1', [user.id])).rows
+          .length
+      )
+        return;
+      await this.queueReset(c, user, email);
     });
     this.deliver();
     return generic;
+  }
+  /**
+   * Queues a password-reset link, valid 30 minutes, to `email` (the account's confirmed
+   * address, lowercased) for account `user`, inside the caller's transaction `c`, which holds
+   * the account lock. `intro` opens the message: by default it answers a forgotten password.
+   * Callers decide whether the account may have one (forgot, releaseDirectory).
+   */
+  async queueReset(c, user, email, intro = 'Reset your password:') {
+    const token = randomBytes(32).toString('hex');
+    // Replaces any earlier reset link with this one; it records the address it was sent to,
+    // which reset checks is still the account's. It is not bound to a browser: the person may
+    // open it anywhere.
+    await c.query("DELETE FROM oc_email_tokens WHERE user_id=$1 AND purpose='reset'", [user.id]);
+    await c.query(
+      "INSERT INTO oc_email_tokens(token_hash,user_id,purpose,email,expires_at) VALUES($1,$2,'reset',$3,now()+interval '30 minutes')",
+      [digest(token), user.id, email],
+    );
+    await queueMail(c, this.key, {
+      to: email,
+      subject: 'Reset your OpenChronology password',
+      text: `${intro}\n${this.auth.origin}/login#reset=${token}\nThis link expires in 30 minutes. Resetting your password does not disable two-factor authentication. Ignore this message if you did not request it.`,
+    });
+  }
+  /**
+   * An administrator's release of account `userId` from its directory (Administration.change,
+   * `release_directory`), inside the caller's transaction `c`, which holds the account lock: for
+   * an account that signs in only through its directory (directoryOnly) when the directory can
+   * no longer let it in (directory sign-in turned off) or the operator moves the person off it.
+   * Its `ldap` identity goes, so it is directory-only no more, and everything that could still
+   * act for it ends (endAccess, and its API keys are revoked). It then has no way to sign in
+   * until it chooses a password: with a confirmed address and email configured, a reset link
+   * is sent now, and **Forgot password** sends another (forgot accepts an account with neither
+   * a password nor a linked sign-in). A later directory sign-in by the same person makes a new
+   * account. Throws 409 for an account that is not directory-only. Result: whether a link was
+   * queued (the caller then calls deliver after committing).
+   */
+  async releaseDirectory(c, userId) {
+    if (!(await this.directoryOnly(c, userId)))
+      throw new HttpError(409, 'This account does not sign in only through the directory.');
+    const user = (await c.query('SELECT * FROM oc_users WHERE id=$1', [userId])).rows[0];
+    await c.query("DELETE FROM oc_identities WHERE user_id=$1 AND provider='ldap'", [userId]);
+    await c.query(
+      'UPDATE oc_api_keys SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL',
+      [userId],
+    );
+    await this.endAccess(c, userId);
+    if (!user.email || !user.email_verified_at || !this.available) return false;
+    await this.queueReset(
+      c,
+      user,
+      user.email.toLowerCase(),
+      'An administrator moved your OpenChronology account off directory sign-in. ' +
+        'Choose a password to sign in:',
+    );
+    return true;
   }
   /**
    * Sets a new password from a reset link: `body` has the link's token, the password and its
@@ -794,6 +848,10 @@ export class AccountSecurity {
       // Addresses are compared lowercased: the link holds the address as typed to ask for it,
       // lowercased, and an account (such as the bootstrap administrator's) may keep capitals.
       if (user.email?.toLowerCase() !== row.email || !user.email_verified_at)
+        throw new HttpError(400, 'This reset link is no longer valid.');
+      // forgot sends no link to an account that signs in only through its directory; this
+      // keeps one from setting a password even if a link exists (directoryOnly).
+      if (await this.directoryOnly(c, user.id))
         throw new HttpError(400, 'This reset link is no longer valid.');
       // The new password, then the sign-out of everything: other reset links, every session,
       // every active API key (revoked, kept for the list), unclaimed desktop sign-ins (so an
