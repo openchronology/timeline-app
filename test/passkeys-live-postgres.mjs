@@ -1,9 +1,10 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Passkeys in a live browser (#372), with Chromium's virtual authenticator (the DevTools
 // protocol's WebAuthn domain): adding one under Account → Security (recovery codes shown),
-// answering the two-factor step of a password sign-in with it, signing in with it alone, and
-// removing it, confirmed with the passkey. PASSKEY_SCREENSHOTS names a directory to save
-// screenshots of the security settings in, light and dark.
+// answering the two-factor step of a password sign-in with it, signing in with it alone (from
+// the button and from the username field's autofill, #403), and removing it, confirmed with
+// the passkey. PASSKEY_SCREENSHOTS names a directory to save screenshots of the security
+// settings in, light and dark.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { join, resolve } from 'node:path';
@@ -36,6 +37,8 @@ const env = {
   AUTH_EMAIL_FROM: 'OpenChronology <accounts@example.test>',
   AUTH_ENCRYPTION_KEY: randomBytes(32).toString('hex'),
   CHALLENGE_PROVIDER: 'off',
+  // The last steps come from an address of their own (X-Forwarded-For), with its own limits.
+  TRUST_PROXY: '1',
 };
 delete env.PASSKEY_SIGN_IN;
 for (const key of Object.keys(env))
@@ -81,6 +84,12 @@ try {
   const tab = await context.newPage();
   const errors = [];
   tab.on('pageerror', (e) => errors.push(e.message));
+  // Each ask for sign-in options, the button's and the autofill's (#403).
+  let asked = 0;
+  tab.on(
+    'requestfinished',
+    (r) => r.url().endsWith('/api/auth/passkeys/sign-in/options') && asked++,
+  );
   // A platform authenticator that holds discoverable passkeys and verifies the person (as a
   // fingerprint reader would), answering at once.
   const cdp = await context.newCDPSession(tab);
@@ -98,12 +107,34 @@ try {
   const held = async () =>
     (await cdp.send('WebAuthn.getCredentials', { authenticatorId })).credentials;
   const security = tab.locator('#security');
-  /** Signs in with the password on /login; lands on `/` unless a step follows. */
+  /**
+   * Whether the authenticator answers at once, as if touched. Chromium's virtual authenticator
+   * answers a conditional request (the username field's autofill, #403) as soon as it is made,
+   * focused field or not, as if the person had picked the passkey there; held back, it leaves
+   * the request pending, and letting it go again does not answer one already pending.
+   */
+  const presence = (enabled) =>
+    cdp.send('WebAuthn.setAutomaticPresenceSimulation', { authenticatorId, enabled });
+  /**
+   * Waits until the sign-in page has had options more than `count` times, and a moment more
+   * for its request to the browser.
+   */
+  async function askedMore(count) {
+    for (let i = 0; i < 100 && asked <= count; i++) await delay(100);
+    assert(asked > count, 'the sign-in page asked for a challenge');
+    await delay(500);
+  }
+  /**
+   * Signs in with the password on /login; lands on `/` unless a step follows. The
+   * authenticator is held back meanwhile, so the autofill's request stays pending.
+   */
   async function passwordSignIn() {
+    await presence(false);
     await tab.goto(origin + '/login');
     await tab.getByLabel('Username').fill(username);
     await tab.getByLabel('Password', { exact: true }).fill(password);
     await tab.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await presence(true);
   }
   const signedIn = async () =>
     (await tab.evaluate(() => fetch('/api/session').then((r) => r.json()))).user?.username;
@@ -168,11 +199,17 @@ try {
   await tab.waitForURL(origin + '/');
   assert.equal(await signedIn(), username);
 
-  // Signing in with the passkey alone.
+  // Signing in with the passkey alone, from the button: the autofill's pending request is
+  // aborted first, as a browser runs one passkey request at a time.
   await signOut();
+  await presence(false);
+  const shown = asked;
   await tab.goto(origin + '/login');
   const button = tab.getByRole('button', { name: 'Sign in with a passkey' });
   await button.waitFor();
+  assert.equal(await tab.getByLabel('Username').getAttribute('autocomplete'), 'username webauthn');
+  await askedMore(shown);
+  await presence(true);
   if (shots) {
     for (const scheme of ['light', 'dark']) {
       await tab.emulateMedia({ colorScheme: scheme });
@@ -188,6 +225,20 @@ try {
     (await pool.query('SELECT last_used_at FROM oc_passkeys WHERE user_id=$1', [id])).rows[0]
       .last_used_at,
   );
+
+  // Creating an account offers no passkeys in its username field.
+  await signOut();
+  await presence(false);
+  await tab.goto(origin + '/login?mode=register');
+  await tab.getByRole('heading', { name: 'Create your account' }).waitFor();
+  assert.equal(await tab.getByLabel('Username').getAttribute('autocomplete'), 'username');
+  // Signing in from the username field's autofill (#403): /login keeps a conditional request
+  // pending, which the authenticator answers (as a person picking the passkey there), and the
+  // page signs in with it, no button pressed.
+  await presence(true);
+  await tab.goto(origin + '/login');
+  await tab.waitForURL(origin + '/');
+  assert.equal(await signedIn(), username);
 
   // Removing it, confirmed with the password and the passkey itself.
   await tab.goto(origin + '/account');
@@ -214,15 +265,35 @@ try {
     )
   ).rows[0];
   assert.deepEqual(account, { mfa_enabled: false, passkeys: 0 });
-  // The authenticator still holds it, but it signs in no more.
+  // The authenticator still holds it, but it signs in no more: from the autofill, which then
+  // asks for a new challenge for the next pick, and from the button. The steps above used most
+  // of an address's sign-in requests for this minute, which the server also counts in memory,
+  // so these come from another address. The virtual authenticator answers every request at
+  // once, as no person would, so it answers the autofill once and is then held back: otherwise
+  // each refusal re-arms the page, which is answered again.
   await signOut();
+  // A blank page between, so the refusal waited for is the new page's, not one the page left
+  // behind was answered before it went.
+  await presence(false);
+  await tab.goto('about:blank');
+  await tab.setExtraHTTPHeaders({ 'X-Forwarded-For': '203.0.113.7' });
+  await presence(true);
+  const firstRefusal = tab.waitForResponse(
+    (r) => r.url().endsWith('/api/auth/passkeys/sign-in') && r.status() === 401,
+  );
   await tab.goto(origin + '/login');
+  await firstRefusal;
+  await presence(false);
+  const refused = asked;
+  await tab.getByText('That passkey was not recognized.', { exact: false }).waitFor();
+  await askedMore(refused);
+  await presence(true);
   await tab.getByRole('button', { name: 'Sign in with a passkey' }).click();
   await tab.getByText('That passkey was not recognized.', { exact: false }).waitFor();
   assert.equal(await signedIn(), undefined);
   assert.deepEqual(errors, []);
   console.log(
-    'PASS passkeys in a browser: adding one, the two-factor step, signing in alone, and removing it.',
+    'PASS passkeys in a browser: adding one, the two-factor step, signing in alone (button and autofill), and removing it.',
   );
 } finally {
   await browser?.close();
