@@ -30,7 +30,7 @@ export interface PluginManifest {
   description: string;
   fields: PluginField[];
   marker?: {
-    kind: 'image' | 'color' | 'shape' | 'size' | 'heading' | 'outline';
+    kind: 'image' | 'color' | 'shape' | 'heading' | 'outline';
     metadataKey: string;
   };
   hover?: { kind: 'card' };

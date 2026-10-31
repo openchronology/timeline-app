@@ -1476,8 +1476,9 @@ fn band_json(row: &[Option<String>]) -> Result<Value, String> {
 /// Viewport bands: durations at least as long as the threshold (shorter ones are summarized),
 /// with a bounded projection of title, a notes preview, and short text fields. A dense window
 /// keeps its 256 longest (#316), as src/durations.ts durationWindow and the PostgreSQL store
-/// do: the walk's matches in start order up to one past DURATION_COUNT_CAP (which counts them),
-/// ranked longest first, then by start and ID, returned in start order.
+/// do: the walk's matches (here in start order; PostgreSQL's walk goes a level at a time) up
+/// to one past DURATION_COUNT_CAP (which counts them), ranked longest first, then by start and
+/// ID, returned in start order.
 fn duration_window(
     db: &Connection,
     lower: &str,

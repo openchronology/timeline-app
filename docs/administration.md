@@ -144,7 +144,7 @@ A save reads the index nodes it changes in one statement, which follows the node
 paths to its moments rather than the moments themselves: appended log moments share nearly
 their whole path. `bench/save-size.mjs` measures saves against timeline size. The server
 stops any statement after 30 s and answers 503; the log importer and the syslog receiver
-save at most 5,000 entries at a time, and halve their saves when one takes 8 s or more or is
+save at most 5,000 entries at a time (the importer 4,999), and halve their saves when one takes 8 s or more or is
 stopped, so they keep working as timelines grow.
 
 Upgrading copies each timeline's current state into its saved history once, during
@@ -188,7 +188,7 @@ through. A deleted timeline's index is kept while forks read through to it, then
 Upgrading removes the versions earlier releases kept after a fork was deleted. A copy of a copy of a copy of a copy (four levels) reads through
 to all of them; a copy one level deeper copies only what its source changed itself, inside the
 database, and reads through to the rest, so it costs what its source changed rather than the
-whole timeline. When that is 20,000 events or more, the copy is answered at once
+whole timeline. When that is 20,000 rows or more, the copy is answered at once
 and made afterwards, while its page says it is being prepared. At 200,000 moments, a copy
 whose source changed 1,000 moments took 5.5 s (most of it refreshing the planner's statistics,
 as after a save of 1,000 changes to a fork), and one whose source changed 26,000 was

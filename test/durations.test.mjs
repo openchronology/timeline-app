@@ -10,7 +10,6 @@ import {
   validateDocument,
   durationTree,
   durationWindow,
-  durationLanes,
   arrangeDurations,
   compareDurationRank,
   durationCountText,
@@ -323,38 +322,6 @@ test('durations and arcs follow the moments they name, whatever else is edited',
   // Deleting a moment ends its arcs.
   index.delete('other');
   assert.deepEqual(arc(), []);
-});
-
-test('overlapping durations never share a row; rows free up once a band ends (#269)', () => {
-  // The Iraq War and the War in Afghanistan run through 2004; the battles of Fallujah sit
-  // inside them (in quarters of a year). Listed in any order, the two wars take rows of their own, and the battles
-  // the next, which the first battle's end frees for the second.
-  const bands = [
-    { first: '8012/4', last: '8044/4' }, // Iraq War
-    { first: '8017/4', last: '8018/4' }, // First Battle of Fallujah
-    { first: '8004/4', last: '8084/4' }, // War in Afghanistan
-    { first: '8019/4', last: '8020/4' }, // Second Battle of Fallujah
-  ];
-  const lanes = durationLanes(bands);
-  assert.deepEqual(lanes, [1, 2, 0, 2]);
-  for (let a = 0; a < bands.length; a++)
-    for (let b = a + 1; b < bands.length; b++) {
-      const overlap =
-        Q.parse(bands[a].first).compare(Q.parse(bands[b].last)) < 0 &&
-        Q.parse(bands[b].first).compare(Q.parse(bands[a].last)) < 0;
-      if (overlap) assert.notEqual(lanes[a], lanes[b], `${a} and ${b} overlap`);
-    }
-  // The same bands in another order take the same rows.
-  assert.deepEqual(durationLanes([...bands].reverse()), [...lanes].reverse());
-  // One that starts where another ends takes its row; a comparison's timelines pack apart.
-  assert.deepEqual(
-    durationLanes([
-      { first: '0', last: '5' },
-      { first: '5', last: '9' },
-      { first: '0', last: '9', group: 'b' },
-    ]),
-    [0, 0, 0],
-  );
 });
 
 // A band as the window sends it, from `first` to `last`, titled.

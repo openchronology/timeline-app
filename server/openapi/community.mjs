@@ -633,7 +633,7 @@ export const schemas = {
         items: ref('PluginField'),
         description: 'Each with a different metadata key.',
       },
-      marker: component(['image', 'color', 'shape', 'heading'], true),
+      marker: component(['image', 'color', 'shape', 'heading', 'outline'], true),
       hover: component('card'),
       summary: component('radial'),
       notes: component('markdown'),

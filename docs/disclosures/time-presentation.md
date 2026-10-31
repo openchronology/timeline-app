@@ -349,7 +349,7 @@ The repository has been public since its creation on 2026-10-05, so commit dates
 | Time written on its own (`printCalendarAlone`, #344)                                                            | `9153aaf` 2026-10-26 | v0.11.0       |
 | Timeline span at the precision its length calls for (`printTimeSpan`, #338)                                     | `a3f288b` 2026-10-26 | v0.12.0       |
 
-Note on the documentation: [docs/time-presentation.md](../time-presentation.md) (ruler section, line 71) says that at a common coordinate "differing calendar detail crossfades as two plain-text labels". Since `e8ebfb1` (#241) the code draws only the heaviest label text at a tick, with the combined weight ([`tickLabel`](https://github.com/openchronology/timeline-app/blob/007091ce62fdb402346c0712b0c420eac0a29dff/src/ruler.ts#L453-L477), used in [`src/app.ts`](https://github.com/openchronology/timeline-app/blob/007091ce62fdb402346c0712b0c420eac0a29dff/src/app.ts#L1365-L1377)). This document follows the code.
+Note on the documentation: [docs/time-presentation.md](../time-presentation.md) (ruler section, line 71) said that at a common coordinate "differing calendar detail crossfades as two plain-text labels". Since `e8ebfb1` (#241) the code draws only the heaviest label text at a tick, with the combined weight ([`tickLabel`](https://github.com/openchronology/timeline-app/blob/007091ce62fdb402346c0712b0c420eac0a29dff/src/ruler.ts#L453-L477), used in [`src/app.ts`](https://github.com/openchronology/timeline-app/blob/007091ce62fdb402346c0712b0c420eac0a29dff/src/app.ts#L1365-L1377)). The docs were corrected to match the code in #392.
 
 ## Figures
 

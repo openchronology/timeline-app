@@ -732,7 +732,7 @@ export const schemas = {
             items: ref('DurationBand'),
             maxItems: 256,
             description:
-              'In start order. When more touch the window, its 256 longest (then by start and ID), among the first 10,001 by start.',
+              'In start order. When more touch the window, its 256 longest (then by start and ID), among the first 10,001 the tree walk finds (on PostgreSQL not the earliest-starting).',
           },
           durationsTruncated: { type: 'boolean' },
           durationsTotal: {

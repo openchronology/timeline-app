@@ -9,7 +9,9 @@ import { labelResolution, validateContext, unitsPerPixel } from './view-context.
 import type { PresentationContext } from './view-context.js';
 
 // This is a small language interpreter, not a JavaScript execution sandbox.
-// No source text is passed to eval, Function, a browser worker, or the server runtime.
+// No source text is passed to eval, Function or a browser worker. The server compiles plugin
+// scripts with it (in worker threads, server/plugin-sandbox.mjs) to refuse ones that don't
+// compile, but never runs them.
 /**
  * Every value a script can hold: text, a JavaScript number (only small option literals such
  * as digit counts; exact numbers are rationals), a boolean, or an exact rational.

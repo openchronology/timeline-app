@@ -6,7 +6,7 @@ These documents describe OpenChronology's technical mechanisms in enough detail 
 
 **Purpose.** They are a defensive publication: dated, public descriptions of these mechanisms, so that the techniques stay free for anyone to use, OpenChronology included. They are engineering documentation, not legal advice, and they make no claim about what others may or may not patent.
 
-The repository has been public on GitHub since it was created on 2026-10-05, so a commit's date on `main` is the date its code became public. Every mechanism below is also in a published release; `v0.1.0` was released on 2026-10-18. The documents describe the code at commit [`007091c`](https://github.com/openchronology/timeline-app/tree/007091ce62fdb402346c0712b0c420eac0a29dff) (2026-10-30, after `v0.14.0`); where the code and the other docs disagree, they follow the code and say so in a "Note on the documentation".
+The repository has been public on GitHub since it was created on 2026-10-05, so a commit's date on `main` is the date its code became public. Every mechanism below is also in a published release; `v0.1.0` was released on 2026-10-18. The documents describe the code at commit [`007091c`](https://github.com/openchronology/timeline-app/tree/007091ce62fdb402346c0712b0c420eac0a29dff) (2026-10-30, after `v0.14.0`); where the code and the other docs disagreed, they follow the code and say so in a "Note on the documentation". The docs have since been corrected to match the code (#392).
 
 ## Contents
 
