@@ -90,8 +90,14 @@ who decided, any review request and its outcome, as a record. Reports and decisi
 kept while needed to moderate and as required by law.
 
 IP addresses are processed for connection handling and abuse prevention; temporary
-authentication rate-limit keys are hashed. The web server (nginx) logs each request's
-IP address, time, address requested, response status and size, referring page and
+authentication rate-limit keys are hashed. When the desktop app starts signing in
+through your browser, the service keeps the IP address it connected from and the
+program's own description of itself (its User-Agent) with the sign-in request, until the
+sign-in completes or the request expires, after ten minutes at most. They are shown to
+the signed-in person on the page that approves the request, so they can tell whether it
+is theirs, and the security email sent when a desktop app is approved includes that IP
+address and when the request started. The web server (nginx) logs each request's IP
+address, time, address requested, response status and size, referring page and
 browser identification; these logs are rotated daily and deleted after 14 days. The
 application's own service log records errors and operational events and is limited
 in size, so its oldest entries are removed as it fills. Support,

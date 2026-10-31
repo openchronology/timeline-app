@@ -3236,15 +3236,11 @@ async function route(force = false) {
     await forkInBrowser(guestCopy[1]);
     return;
   }
+  // The older desktop sign-in link, /#desktop/CODE: approval happens only on the website's
+  // approval page, which shows the request's details and asks for the code to be typed.
   const desktopRequest = /^#desktop\/([A-Z2-9]{10})$/.exec(location.hash);
-  if (desktopRequest) {
-    if (!session.user) {
-      el('account-button').click();
-      return;
-    }
-    text('desktop-approval-code', desktopRequest[1]);
-    if (!el<HTMLDialogElement>('desktop-approval-dialog').open)
-      el<HTMLDialogElement>('desktop-approval-dialog').showModal();
+  if (desktopRequest && !desktop) {
+    location.replace('/connect/desktop/' + desktopRequest[1]);
     return;
   }
   const compared = /^#compare\/([a-f0-9,-]+)$/i.exec(location.hash);
@@ -6869,7 +6865,7 @@ function desktopLogin(origin: string, status: string) {
       userCode: string;
       verificationUri: string;
     }>('desktop_auth_start', { server: origin });
-    text(status, `Confirm code ${result.userCode} in your browser. ${result.verificationUri}`);
+    text(status, `Enter code ${result.userCode} in your browser. ${result.verificationUri}`);
     const deadline = Date.now() + 600000;
     const poll = async () => {
       if (attempt !== desktopLoginAttempt || Date.now() > deadline) return;
@@ -6901,15 +6897,6 @@ function desktopLogin(origin: string, status: string) {
 }
 el('desktop-login').onclick = () => {
   if (desktop) desktopLogin(serverOrigin, 'desktop-login-status');
-};
-el('desktop-approve').onclick = () => {
-  void api('auth/device/approve', 'POST', { userCode: el('desktop-approval-code').textContent })
-    .then(() => {
-      el<HTMLDialogElement>('desktop-approval-dialog').close();
-      window.history.replaceState(null, '', '/');
-      toast('Desktop session approved. You can return to the application.');
-    })
-    .catch(fail);
 };
 for (const dialog of document.querySelectorAll<HTMLDialogElement>('dialog'))
   dismissOnBackdrop(dialog);

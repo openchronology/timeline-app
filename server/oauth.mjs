@@ -11,6 +11,7 @@ import {
 } from 'node:crypto';
 import { HttpError } from './store.mjs';
 import { tokenHash } from './auth.mjs';
+import { DIRECTORY_ONLY } from './account-security.mjs';
 /** A new 256-bit random secret in hex: OAuth state, PKCE verifier, OpenID nonce. */
 const secret = () => randomBytes(32).toString('hex');
 /**
@@ -151,6 +152,9 @@ export class OAuth {
         Date.now() - new Date(session.created_at).getTime() > 5 * 60000
       )
         throw new HttpError(403, 'Sign in again before linking a provider.');
+      // Refused here, before the person goes to the provider; identity checks again on return.
+      if (await this.auth.security.directoryOnly(this.pool, session.id))
+        throw new HttpError(403, DIRECTORY_ONLY);
     } else if (!session) this.auth.requireLogin(req);
     else this.auth.require(session, req);
     await this.auth.rateLimit(req.clientAddress ?? req.socket.remoteAddress ?? 'unknown');
@@ -474,7 +478,9 @@ export class OAuth {
    * are found only by this pair, never by email, so a matching address at a provider never
    * grants access to an account. With `linkUser`, the identity is attached to that account
    * (refused with 409 if it belongs to another, or if the account already has a different
-   * identity at that provider, from the UNIQUE(user_id,provider) constraint). Without it, an
+   * identity at that provider, from the UNIQUE(user_id,provider) constraint; refused with 403
+   * for an account that signs in only through its directory, AccountSecurity.directoryOnly).
+   * Without it, an
    * unknown identity gets a new account with no password, named `preferred` when that username
    * is free (a directory account's own name, ldap.mjs), else a generated one; it has no
    * confirmed email yet, so it must give one before it can have a session.
@@ -496,9 +502,15 @@ export class OAuth {
         );
       if (!user) {
         const id = linkUser ?? randomUUID();
-        if (linkUser)
-          user = (await client.query('SELECT id,username FROM oc_users WHERE id=$1', [id])).rows[0];
-        else {
+        if (linkUser) {
+          // Locks the account, as unlinking does, so this check and an unlink cannot interleave.
+          user = (
+            await client.query('SELECT id,username FROM oc_users WHERE id=$1 FOR UPDATE', [id])
+          ).rows[0];
+          // An account that signs in only through its directory gains no other way in.
+          if (await this.auth.security.directoryOnly(client, id))
+            throw new HttpError(403, DIRECTORY_ONLY);
+        } else {
           // The preferred name if no account (nor a pending registration) has it; ON CONFLICT
           // covers an account taking it meanwhile.
           if (

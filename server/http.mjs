@@ -586,7 +586,9 @@ export function createRequestHandler({
         // Sign-in and registration, for anyone. Checked first: the CSRF token of a session
         // already open (signing in as someone else), else the login nonce; then the
         // human-verification challenge (always to register; to sign in after repeated
-        // failures from the address or for the account). Rate limits are in auth.signIn. A
+        // failures from the address or for the account, or with checks off a short delay for
+        // the account: challenges.signInGate). These come before the password is checked, so
+        // they cost nothing scarce. Rate limits (per address) are in auth.signIn. A
         // session already open is ended once the new one is issued. A directory sign-in
         // (/api/auth/ldap, ldap.mjs) is checked the same way, its failures counted under its
         // own `ldap:` names.
@@ -606,8 +608,7 @@ export function createRequestHandler({
               (ldap ? 'ldap:' : '') +
               (typeof input.username === 'string' ? input.username.trim().toLowerCase() : '');
           if (register) await challenges.require(req, 'register', previous);
-          else if (await challenges.signInNeeded(req.clientAddress, username))
-            await challenges.require(req, 'sign-in', previous);
+          else await challenges.signInGate(req, username, previous);
           const kind = req.headers['x-oc-client'] === 'desktop' ? 'desktop' : 'web';
           let result;
           try {
@@ -961,12 +962,27 @@ export function createRequestHandler({
           );
         }
         // Desktop sign-in by code (device-auth.mjs): the desktop app starts and polls without a
-        // session; a browser session signed in within five minutes approves the code (CSRF
-        // token and rate limit checked in DeviceAuth.approve).
+        // session, its address and User-Agent recorded; the approval page reads them back
+        // (device/request), and a browser session signed in within five minutes approves the
+        // code (CSRF token and rate limit checked in DeviceAuth.approve).
         if (pathname === '/api/auth/device/start' && method === 'POST') {
           await body(req);
-          return response(res, 200, await devices.start(req.clientAddress));
+          return response(
+            res,
+            200,
+            await devices.start(req.clientAddress, req.headers['user-agent']),
+          );
         }
+        if (pathname === '/api/auth/device/request' && method === 'GET')
+          return response(
+            res,
+            200,
+            await devices.describe(
+              session,
+              req,
+              new URL(req.url, origin).searchParams.get('userCode'),
+            ),
+          );
         if (pathname === '/api/auth/device/poll' && method === 'POST')
           return response(res, 200, await devices.poll((await body(req)).deviceCode));
         if (pathname === '/api/auth/device/approve' && method === 'POST')
@@ -1024,7 +1040,11 @@ export function createRequestHandler({
             )
           ).rows[0];
           return response(res, 200, {
-            security: { ...profile, passkeys: await auth.security.passkeys.list(userId) },
+            security: {
+              ...profile,
+              passkeys: await auth.security.passkeys.list(userId),
+              directory_only: await auth.security.directoryOnly(pool, userId),
+            },
             profile: {
               avatarUrl: session.avatar_url ?? '',
               minor: minor(session.birth_year),

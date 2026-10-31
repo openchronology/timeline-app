@@ -963,6 +963,11 @@ export const schemas = {
         type: 'boolean',
         description: 'Whether a moderation restriction is in force on something it owns.',
       },
+      directory_only: {
+        type: 'boolean',
+        description:
+          'Whether it signs in only through its directory account (no password, no other provider), which `release_directory` can release.',
+      },
     },
   },
   AdminUserPage: adminPage('AdminUser'),
@@ -994,6 +999,11 @@ export const schemas = {
         enum: ['trusted', 'untrusted', null],
         description:
           'Trusted accounts have full standing; untrusted none; null decides by its record.',
+      },
+      release_directory: {
+        const: true,
+        description:
+          'Releases an account that signs in only through its directory (`directory_only`), for when directory sign-in is turned off or the person moves off the directory: its directory account is unlinked, its sessions, sign-in challenges and pending desktop sign-ins end, its API keys are revoked, and a password-reset link goes to its confirmed address (Forgot password sends another). 409 for any other account. A later directory sign-in by the person makes a new account.',
       },
       ...confirmation,
     },
