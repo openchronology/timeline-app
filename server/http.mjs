@@ -400,7 +400,8 @@ export function createRequestHandler({
     };
   };
   // The OpenAPI document, built on first request and kept.
-  let apiDescription = null;
+  let apiDescription = null,
+    proxyWarned = false;
   const handle = async (req, res) => {
     // Enable only behind a proxy that overwrites X-Forwarded-For and blocks direct access.
     if (trustProxy) {
@@ -409,6 +410,17 @@ export function createRequestHandler({
         req.clientAddress = forwarded.trim();
     }
     req.clientAddress ??= req.socket.remoteAddress ?? 'unknown';
+    // A proxy on this machine without TRUST_PROXY=1: every client is counted as the proxy.
+    if (!trustProxy && !proxyWarned && /^(?:::ffff:)?127\.|^::1$/.test(req.clientAddress)) {
+      const forwarded = req.headers['x-forwarded-for'];
+      if (typeof forwarded === 'string' && forwarded.trim() !== req.clientAddress) {
+        proxyWarned = true;
+        console.warn(
+          'Requests arrive through a local proxy (X-Forwarded-For) but TRUST_PROXY is not 1:' +
+            ' all clients share its per-address limits, such as sign-in (see README.md).',
+        );
+      }
+    }
     // Security headers on every answer: no MIME sniffing, no referrer, HSTS on HTTPS, and a
     // content security policy allowing only this origin's scripts and connections, images from
     // anywhere over HTTPS (timelines link to images where their owners host them, #109), and

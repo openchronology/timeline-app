@@ -21,6 +21,18 @@ export async function servicesOrUnavailable() {
   }
 }
 
+const PEER_HEADER = 'x-oc-peer-address';
+/**
+ * The address the request came from, as the launcher wrote it (server/peer-address.cjs), or
+ * 'unknown' when it carries none with this process's secret (as under next dev). The request
+ * handler counts per-address limits under it, or under X-Forwarded-For with TRUST_PROXY=1.
+ */
+function peerAddress(headers) {
+  const secret = globalThis[Symbol.for('openchronology.peerSecret')],
+    [token, address] = (headers.get(PEER_HEADER) ?? '').split(' ');
+  return secret && token === secret && address ? address : 'unknown';
+}
+
 // Stream the incoming Next request directly through the existing bounded service
 // controller. No localhost proxy or second HTTP listener is involved.
 export async function dispatchNextRequest(request, handler) {
@@ -35,8 +47,9 @@ export async function dispatchNextRequest(request, handler) {
     url: url.pathname + url.search,
     method: request.method,
     headers: Object.fromEntries(request.headers),
-    socket: { remoteAddress: 'unknown' },
+    socket: { remoteAddress: peerAddress(request.headers) },
   });
+  delete req.headers[PEER_HEADER];
   let status = 200,
     body = null;
   const headers = new Headers();

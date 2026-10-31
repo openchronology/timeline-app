@@ -320,6 +320,7 @@ jobs:
         run: sudo -E env "PATH=$PATH" node test/journald-live-postgres.mjs
       - run: npm run test:postgres
       - run: npm run test:platform:postgres
+      - run: node test/next-client-address-postgres.mjs
       # Chromium's system packages come from Ubuntu's archive; when it is slow, this fails on
       # its own rather than taking the job's whole budget (#351).
       - name: Chromium and its system packages
