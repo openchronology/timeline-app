@@ -317,7 +317,7 @@ export class Moderation {
       !value ||
       typeof value !== 'object' ||
       Object.keys(value).some(
-        (key) => !['action', 'reason', 'labels', 'password', 'code'].includes(key),
+        (key) => !['action', 'reason', 'labels', 'password', 'code', 'passkey'].includes(key),
       )
     )
       throw new HttpError(400, 'Invalid moderation decision.');

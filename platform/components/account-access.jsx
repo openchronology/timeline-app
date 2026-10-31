@@ -4,6 +4,7 @@
 // content, API keys, linked sign-in methods, and deleting the account.
 import { useState } from 'react';
 import { api } from '../lib/api.js';
+import { confirmWithPasskey, passkeysSupported } from '../lib/passkeys.js';
 import HelpTip from './help-tip.jsx';
 
 /**
@@ -44,11 +45,32 @@ export function useAccountAction(session, refresh) {
 /**
  * The fields that confirm a change which grants or removes access: the current password, when
  * the account has one, and a code, when two-factor authentication is on (security.fresh). An
- * account without a password confirms with a sign-in in the last five minutes instead.
+ * account without a password confirms with a sign-in in the last five minutes instead. An
+ * account with passkeys may use one instead of the code: **Use a passkey** asks the browser
+ * for it, and its answer goes with the form as the hidden `passkey` field.
  * @param {object} props
- * @param {object} props.security the account's `security` (`has_password`, `mfa_enabled`)
+ * @param {object} props.security the account's `security` (`has_password`, `mfa_enabled`,
+ *   `passkeys`)
  */
 export function Confirmation({ security }) {
+  // The passkey's answer (JSON text) once given, and why asking for it failed.
+  const [passkey, setPasskey] = useState(''),
+    [problem, setProblem] = useState(''),
+    [asking, setAsking] = useState(false);
+  const offer = security?.mfa_enabled && security?.passkeys?.length > 0 && passkeysSupported();
+  async function ask() {
+    setAsking(true);
+    setProblem('');
+    try {
+      // The session's CSRF token, read again: this form may be anywhere on the account page.
+      const { csrf } = await api('session');
+      setPasskey((await confirmWithPasskey(csrf)) ?? '');
+    } catch (e) {
+      setProblem(e.message);
+    } finally {
+      setAsking(false);
+    }
+  }
   return (
     <>
       {security?.has_password && (
@@ -63,11 +85,31 @@ export function Confirmation({ security }) {
           />
         </label>
       )}
-      {security?.mfa_enabled && (
+      {security?.mfa_enabled && !passkey && (
         <label>
-          Authenticator or recovery code
-          <input name="code" autoComplete="one-time-code" maxLength={40} required />
+          {security.totp_enabled ? 'Authenticator or recovery code' : 'Recovery code'}
+          <input name="code" autoComplete="one-time-code" maxLength={40} required={!offer} />
         </label>
+      )}
+      {offer &&
+        (passkey ? (
+          <p className="passkey-ready" role="status">
+            <input type="hidden" name="passkey" value={passkey} />
+            Confirmed with a passkey.{' '}
+            {/* Each answer works once: after a refused change, ask for another. */}
+            <button type="button" className="link-button" disabled={asking} onClick={ask}>
+              Use it again
+            </button>
+          </p>
+        ) : (
+          <button type="button" className="passkey-button" disabled={asking} onClick={ask}>
+            {security.totp_enabled ? 'Or use a passkey' : 'Use a passkey'}
+          </button>
+        ))}
+      {problem && (
+        <p className="error" role="alert">
+          {problem}
+        </p>
       )}
     </>
   );
@@ -231,6 +273,7 @@ export function ApiKeysCard({ session, account, refresh }) {
       scopes: d.has('write') ? ['timelines:read', 'timelines:write'] : ['timelines:read'],
       password: d.get('password'),
       code: d.get('code'),
+      passkey: d.get('passkey'),
     });
     if (r?.token) {
       setToken(r.token);
@@ -393,6 +436,7 @@ export function SignInMethodsCard({ session, account, refresh, link, linking }) 
                         provider: name,
                         password: d.get('password'),
                         code: d.get('code'),
+                        passkey: d.get('passkey'),
                       });
                     }}
                   >
@@ -495,6 +539,7 @@ export function DeleteAccountCard({ session, account, refresh }) {
                   // provider), or without two-factor authentication, sends none.
                   ...(d.get('password') ? { password: d.get('password') } : {}),
                   ...(d.get('code') ? { code: d.get('code') } : {}),
+                  ...(d.get('passkey') ? { passkey: d.get('passkey') } : {}),
                 },
               });
               window.location.assign('/');

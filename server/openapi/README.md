@@ -13,4 +13,5 @@ The HTTP API's description (#178) in OpenAPI 3.1, written as JavaScript modules:
 | [`common.mjs`](common.mjs)               | What every area shares: how requests are authorized, errors, and helpers for writing operations briefly.                                     |
 | [`community.mjs`](community.mjs)         | Describes the plugin and suite library, reports and moderation, site administration and the health check.                                    |
 | [`index.mjs`](index.mjs)                 | Assembles the whole OpenAPI document from the areas, with this build's version.                                                              |
+| [`passkeys.mjs`](passkeys.mjs)           | Describes passkeys: adding, renaming and removing them, confirming with one, the two-factor step and signing in with one.                    |
 | [`timelines.mjs`](timelines.mjs)         | Describes creating, reading, querying, saving, sharing and deleting timelines, file exchange, live updates and oEmbed.                       |

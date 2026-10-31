@@ -18,7 +18,9 @@ when, as a record of that agreement, kept with the account.
 
 The hosted service stores account usernames and identifiers, salted password
 hashes when password login is used, verified email addresses, encrypted authenticator
-secrets, hashed single-use recovery codes, confirmation/reset proofs, encrypted
+secrets, hashed single-use recovery codes, passkeys' public keys with their credential
+IDs, signature counters, the authenticator model and connection types the browser reports,
+names and when each was added and last used, confirmation/reset proofs, encrypted
 transactional email jobs, linked identity-provider names and subject
 identifiers, session records, and authorization-flow records. Password hashes are
 not plaintext passwords. Google, GitHub, Facebook or Microsoft sign-in contacts the provider
@@ -55,7 +57,9 @@ it never sends a plaintext password or complete password hash to that service.
 These services can observe the sending server's network address. Confirmation
 proofs expire in 24 hours, reset proofs in 30 minutes, and pending MFA challenges
 in five minutes. Temporary records are cleaned by the delivery worker. Authenticator
-secrets and recovery-code hashes remain until replaced, disabled, or account removal.
+secrets, recovery-code hashes and passkeys remain until replaced, disabled, removed, or
+account removal. A passkey's private key and the fingerprint, face or PIN that unlocks it
+stay on your device; the service never receives them.
 
 The database stores the timelines you explicitly save: exact rational times,
 titles, notes, tags, metadata, formatting scripts, plugin definitions, and links

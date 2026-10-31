@@ -17,7 +17,9 @@ export function keyInput(value) {
     !value ||
     typeof value !== 'object' ||
     Array.isArray(value) ||
-    Object.keys(value).some((k) => !['name', 'scopes', 'days', 'password', 'code'].includes(k))
+    Object.keys(value).some(
+      (k) => !['name', 'scopes', 'days', 'password', 'code', 'passkey'].includes(k),
+    )
   )
     throw new HttpError(400, 'Invalid API key definition.');
   const { name, scopes = ['timelines:read'], days = 90 } = value;

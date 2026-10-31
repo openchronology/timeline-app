@@ -1,11 +1,11 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // The marks on sign-in buttons: each identity provider's own logo, drawn inline (no request to
 // the provider, and nothing the content security policy would refuse), and a building for a
-// school or organisation's directory account.
+// school or organisation's directory account, and a person with a key for a passkey.
 
 /**
- * The logo for sign-in provider `name` (google, github, facebook, microsoft, or ldap for a
- * directory account), 18 pixels square and hidden from assistive technology: the button's text
+ * The logo for sign-in provider `name` (google, github, facebook, microsoft, ldap for a
+ * directory account, or passkey), 18 pixels square and hidden from assistive technology: the button's text
  * names the provider. Nothing for an unknown name.
  * @param {object} props
  * @param {string} props.name
@@ -82,6 +82,19 @@ export default function ProviderIcon({ name }) {
           strokeLinecap="round"
           strokeLinejoin="round"
           d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-5h6v5M9 11h.01M12 11h.01M15 11h.01"
+        />,
+      );
+    case 'passkey':
+      // A person and a key: the passkey on this device (#372).
+      return svg(
+        '0 0 24 24',
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a6 6 0 0 1 10-4.47M18 8.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM18 13.5V21l1.6-1.6M18 17.5l1.6-1.6"
         />,
       );
     default:

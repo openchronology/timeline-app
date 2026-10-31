@@ -4,6 +4,7 @@
 // report queue, with changes confirmed before they apply.
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api.js';
+import { confirmWithPasskey } from '../lib/passkeys.js';
 import { ReportCase } from './admin-reports.jsx';
 import { NEWCOMER_DAYS, FULL_DAYS } from '../../server/standing.mjs';
 /**
@@ -100,7 +101,8 @@ export default function Admin() {
   /**
    * Applies one administrative change, then reloads the list; a failure is shown above it.
    *
-   * Sends PATCH /api/admin/<path> with `changes`, plus the password and code from the
+   * Sends PATCH /api/admin/<path> with `changes`, plus the password and code (or, without a
+   * code, a passkey's answer, when the account has passkeys) from the
    * confirmation fields: the server applies a change only with the current password (or, without
    * one, a recent sign-in) and, when on, a second factor (security.fresh in server/administration.mjs). The
    * session's CSRF token goes in the X-CSRF-Token header, as every write on a cookie session
@@ -115,13 +117,17 @@ export default function Admin() {
     setBusy(true);
     setError('');
     try {
+      const code = document.getElementById('admin-code').value;
+      // Without a code, a passkey confirms the change, when the account has one (#372).
+      const passkey = code ? null : await confirmWithPasskey(session.csrf);
       await api('admin/' + path, {
         method: 'PATCH',
         csrf: session.csrf,
         data: {
           ...changes,
           password: document.getElementById('admin-password').value,
-          code: document.getElementById('admin-code').value,
+          code,
+          ...(passkey ? { passkey } : {}),
         },
       });
       document.getElementById('admin-code').value = '';
@@ -176,8 +182,9 @@ export default function Admin() {
         <h2>Confirm administrative changes</h2>
         <p>
           Changes require your current password and, if enabled, a fresh authenticator or recovery
-          code. Without a password (signed up through a provider), sign in again within five minutes
-          of the change.
+          code. With passkeys, leave the code empty to confirm each change with one instead. Without
+          a password (signed up through a provider), sign in again within five minutes of the
+          change.
         </p>
         <label>
           Current password

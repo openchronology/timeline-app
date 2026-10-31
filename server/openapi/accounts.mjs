@@ -29,7 +29,7 @@ const ANYONE = [{}];
 const SIGN_IN_TOKEN =
   'Before signing in, send `X-CSRF-Token` equal to the sign-in token: the `csrf` that `GET /api/session` returns along with its `oc_login` cookie (valid ten minutes). A caller that is already signed in sends its session’s CSRF token instead.';
 const FRESH =
-  'Like every security change, it needs a live session, the current `password` when the account has one (else 401) or, for an account without a password, a sign-in within the last five minutes (else 403), and, with two-factor authentication on, a fresh `code` from the authenticator or a recovery code (else 401).';
+  'Like every security change, it needs a live session, the current `password` when the account has one (else 401) or, for an account without a password, a sign-in within the last five minutes (else 403), and, with two-factor authentication on, a fresh `code` from the authenticator or a recovery code, or a `passkey` answering `POST /api/auth/passkeys/confirm/options` (else 401).';
 const COOKIE_NAMES =
   'Cookie names take the `__Host-` prefix (and `Secure`) when the server is on HTTPS.';
 
@@ -76,6 +76,12 @@ const factorCode = {
     'With two-factor authentication on: a six-digit authenticator code, or a recovery code. Codes already used do not work again.',
   example: '123456',
 };
+// A passkey's answer instead of a code (#372; passkeys.mjs).
+const passkeyAnswer = {
+  ...ref('PasskeyAssertion'),
+  description:
+    'Instead of `code`, with a passkey: its answer to `POST /api/auth/passkeys/confirm/options` (or, at a sign-in’s `mfa` step, `POST /api/auth/passkeys/factor/options`).',
+};
 const email = {
   type: 'string',
   format: 'email',
@@ -110,12 +116,12 @@ export const tags = [
   {
     name: 'Sign-in',
     description:
-      'Signing in with a password, a sign-in provider (Google, GitHub, Facebook) or, for the desktop app, a browser; registering; two-factor and email steps; confirming emails and resetting passwords. Sign-in, social starts and device approvals are limited to ten attempts a minute per client address (429). API keys cannot reach these endpoints (403).',
+      'Signing in with a password, a sign-in provider (Google, GitHub, Facebook), a passkey or, for the desktop app, a browser; registering; two-factor and email steps; confirming emails and resetting passwords. Sign-in, social starts and device approvals are limited to ten attempts a minute per client address (429). API keys cannot reach these endpoints (403).',
   },
   {
     name: 'Account security',
     description:
-      'Two-factor authentication, recovery codes, password and email changes, and unlinking sign-in providers. ' +
+      'Two-factor authentication (an authenticator app or passkeys), recovery codes, password and email changes, and unlinking sign-in providers. ' +
       FRESH,
   },
   {
@@ -243,15 +249,15 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Finish signing in with a two-factor code',
       description: [
-        'The `mfa` step of a sign-in: send an authenticator or recovery code. Needs the `oc_challenge` cookie the sign-in set, in the same browser (`oc_login`), within five minutes; five wrong codes close the step, and signing in starts again.',
+        'The `mfa` step of a sign-in: send an authenticator or recovery code, or a passkey’s answer to `POST /api/auth/passkeys/factor/options`. Needs the `oc_challenge` cookie the sign-in set, in the same browser (`oc_login`), within five minutes; five wrong codes close the step, and signing in starts again.',
         SIGN_IN_TOKEN,
         'Signs in as the sign-in began: a browser session cookie, or a desktop `token`.',
       ].join('\n\n'),
       security: SIGN_IN,
       requestBody: body({
         type: 'object',
-        required: ['code'],
-        properties: { code: factorCode },
+        description: 'A `code`, or a `passkey`.',
+        properties: { code: factorCode, passkey: passkeyAnswer },
       }),
       responses: {
         200: {
@@ -312,6 +318,7 @@ export const paths = {
           },
           password: currentPassword,
           code: factorCode,
+          passkey: passkeyAnswer,
         },
       }),
       responses: {
@@ -581,7 +588,7 @@ export const paths = {
       tags: ['Account security'],
       summary: 'Turn on two-factor authentication',
       description:
-        'Confirms the key from `POST /api/auth/mfa/setup` with a code from the authenticator, and gives ten recovery codes, shown only once. Signs out the account’s other sessions. ' +
+        'Confirms the key from `POST /api/auth/mfa/setup` with a code from the authenticator, and gives ten recovery codes, shown only once (an account that already has passkeys keeps its codes, and the answer is `{enabled: true, message}` instead). Signs out the account’s other sessions. ' +
         FRESH,
       security: SIGNED_IN,
       requestBody: body({
@@ -597,7 +604,19 @@ export const paths = {
         },
       }),
       responses: {
-        200: json(ref('RecoveryCodes'), 'Turned on.'),
+        200: json(
+          {
+            oneOf: [
+              ref('RecoveryCodes'),
+              {
+                type: 'object',
+                required: ['enabled', 'message'],
+                properties: { enabled: { const: true }, message: { type: 'string' } },
+              },
+            ],
+          },
+          'Turned on.',
+        ),
         ...errors(400, 401, 403, 413, 429, 503),
       },
     },
@@ -606,9 +625,9 @@ export const paths = {
     post: {
       operationId: 'disableTwoFactor',
       tags: ['Account security'],
-      summary: 'Turn off two-factor authentication',
+      summary: 'Remove the authenticator app',
       description:
-        'Turns two-factor authentication off and removes the recovery codes. Signs out the account’s other sessions. ' +
+        'Removes the authenticator app. Without passkeys, that turns two-factor authentication off and removes the recovery codes; with them, it stays on and the codes stay. Signs out the account’s other sessions. ' +
         FRESH,
       security: SIGNED_IN,
       requestBody: body(ref('SecurityConfirmation')),
@@ -651,6 +670,7 @@ export const paths = {
           newPassword,
           passwordConfirmation: confirmation,
           code: factorCode,
+          passkey: passkeyAnswer,
         },
       }),
       responses: {
@@ -671,7 +691,7 @@ export const paths = {
       requestBody: body({
         type: 'object',
         required: ['email'],
-        properties: { email, password: currentPassword, code: factorCode },
+        properties: { email, password: currentPassword, code: factorCode, passkey: passkeyAnswer },
       }),
       responses: {
         200: { ...json(ref('AccountMessage'), 'Confirmation sent.'), headers: verifyCookie },
@@ -695,6 +715,7 @@ export const paths = {
           provider: ref('IdentityProvider'),
           password: currentPassword,
           code: factorCode,
+          passkey: passkeyAnswer,
         },
       }),
       responses: {
@@ -934,6 +955,12 @@ export const schemas = {
           email: { type: 'boolean' },
           mfa: { type: 'boolean' },
           registration: { type: 'boolean' },
+          passkeys: { type: 'boolean', description: 'Passkeys can be added as a second factor.' },
+          passkeySignIn: {
+            type: 'boolean',
+            description:
+              'Signing in with a passkey alone is on (`POST /api/auth/passkeys/sign-in`; PASSKEY_SIGN_IN).',
+          },
         },
       },
       challenge: {
@@ -1091,7 +1118,7 @@ export const schemas = {
   SecurityConfirmation: {
     type: 'object',
     description: 'What confirms a security change.',
-    properties: { password: currentPassword, code: factorCode },
+    properties: { password: currentPassword, code: factorCode, passkey: passkeyAnswer },
   },
   TwoFactorSetup: {
     type: 'object',
@@ -1207,6 +1234,7 @@ export const schemas = {
       },
       password: currentPassword,
       code: factorCode,
+      passkey: passkeyAnswer,
     },
   },
   CreatedApiKey: {
@@ -1249,7 +1277,12 @@ export const schemas = {
         properties: {
           email: { type: ['string', 'null'] },
           email_verified_at: nullableTimestamp,
-          mfa_enabled: { type: 'boolean' },
+          mfa_enabled: {
+            type: 'boolean',
+            description: 'Two-factor authentication is on: an authenticator app or a passkey.',
+          },
+          totp_enabled: { type: 'boolean', description: 'An authenticator app is set up.' },
+          passkeys: { type: 'array', items: ref('Passkey') },
           has_password: { type: 'boolean' },
           recovery_remaining: {
             type: 'integer',
@@ -1313,6 +1346,7 @@ export const schemas = {
       confirm: { type: 'string', description: 'The account’s username, to confirm.' },
       password: currentPassword,
       code: factorCode,
+      passkey: passkeyAnswer,
     },
   },
   AccountDeleted: {

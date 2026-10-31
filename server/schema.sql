@@ -625,6 +625,36 @@ CREATE TABLE IF NOT EXISTS oc_recovery_codes (
   user_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE,code_hash text NOT NULL,
   PRIMARY KEY(user_id,code_hash)
 );
+-- Passkeys (#372; passkeys.mjs, webauthn.mjs), a second factor and, where the site allows it,
+-- a way to sign in alone. An account has two-factor authentication on (mfa_enabled) while it
+-- has an authenticator app (mfa_secret) or at least one passkey. credential_id: the
+-- credential's ID, base64url, unique across accounts; public_key: its COSE public key (not a
+-- secret); algorithm: its COSE algorithm (-8, -7 or -257); sign_count: the authenticator's
+-- signature counter, last seen (0 for those that keep none), for detecting a copied
+-- credential; transports: what the browser said reaches it (usb, nfc, ble, internal,
+-- hybrid), to offer it again; aaguid: the authenticator model it reported, hex, unverified;
+-- name: the account's own name for it; last_used_at: its last sign-in or confirmation.
+CREATE TABLE IF NOT EXISTS oc_passkeys (
+  id uuid PRIMARY KEY,user_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE,
+  credential_id text NOT NULL UNIQUE,public_key bytea NOT NULL,algorithm integer NOT NULL,
+  sign_count bigint NOT NULL DEFAULT 0,transports text[] NOT NULL DEFAULT '{}',
+  aaguid text NOT NULL DEFAULT '',name text NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),
+  last_used_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS oc_passkeys_user ON oc_passkeys(user_id);
+-- Passkey challenges, each used once and for five minutes (passkeys.mjs). challenge_hash:
+-- SHA-256 of the random challenge; purpose: 'register' (a new passkey), 'assert' (confirming a
+-- security change, or a sign-in's second step, with one of user_id's passkeys) or 'sign-in'
+-- (signing in with any passkey, user_id NULL); binding: the session (`session:<token hash>`)
+-- or browser (`browser:<oc_login hash>`) that must answer it.
+CREATE TABLE IF NOT EXISTS oc_passkey_challenges (
+  challenge_hash text PRIMARY KEY,
+  purpose text NOT NULL CHECK(purpose IN ('register','assert','sign-in')),
+  user_id uuid REFERENCES oc_users ON DELETE CASCADE,binding text NOT NULL,
+  expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS oc_passkey_challenges_expiry ON oc_passkey_challenges(expires_at);
+CREATE INDEX IF NOT EXISTS oc_passkey_challenges_user ON oc_passkey_challenges(user_id);
 -- Outgoing mail (mail.mjs queueMail and flushMail). Queued in the transaction that needs it,
 -- so a message goes out only if that transaction commits. payload: the message, sealed with
 -- the server's key (it holds sign-in links); failed sends are retried with backoff (attempts,

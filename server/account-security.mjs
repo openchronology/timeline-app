@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Account security (docs/authentication.md): verified registration, email confirmation and
 // change, forgotten passwords, the two-factor step of signing in, authenticator enrollment,
-// recovery codes and the recent-sign-in check every security change needs.
+// recovery codes and the recent-sign-in check every security change needs. Passkeys, the
+// other second factor, are in passkeys.mjs (`this.passkeys`).
 import { randomBytes, randomUUID } from 'node:crypto';
 import { HttpError } from './store.mjs';
 import { passwordHash, passwordMatches, ACCOUNT_AGE } from './auth.mjs';
@@ -19,6 +20,7 @@ import {
 import { queueMail, flushMail } from './mail.mjs';
 import { POLICY_VERSION, requireAgreement } from './policies.mjs';
 import { availableUsername } from '../dist/core.mjs';
+import { Passkeys } from './passkeys.mjs';
 /**
  * The answer to every request that may send email (registration, a forgotten password, an
  * email address to confirm), whether or not a message is sent, so the answer does not reveal
@@ -55,14 +57,16 @@ export const AGE_REFUSED = "Sorry, we can't create an account for you.";
 export class AccountSecurity {
   /**
    * `auth` is the Auth instance; `mailer` the email sender (mail.mjs) or null; `key` the
-   * AUTH_ENCRYPTION_KEY bytes or null; `passwordCheck` the breach lookup for new passwords.
+   * AUTH_ENCRYPTION_KEY bytes or null; `passwordCheck` the breach lookup for new passwords;
+   * `passkeys` the Passkeys options (`signIn`: PASSKEY_SIGN_IN).
    */
-  constructor(auth, mailer, key, passwordCheck) {
+  constructor(auth, mailer, key, passwordCheck, passkeys = {}) {
     this.auth = auth;
     this.pool = auth.pool;
     this.mailer = mailer;
     this.key = key;
     this.passwordCheck = passwordCheck;
+    this.passkeys = new Passkeys(this, passkeys);
   }
   /** Whether email delivery and the encryption key are both configured. */
   get available() {
@@ -264,7 +268,7 @@ export class AccountSecurity {
         challenge: purpose,
         message:
           purpose === 'mfa'
-            ? 'Enter your authenticator code or a recovery code.'
+            ? 'Enter your authenticator code or a recovery code, or use a passkey.'
             : 'Confirm an email address before signing in.',
         challengeCookie: this.auth.nonceCookie('challenge', token),
       };
@@ -290,19 +294,24 @@ export class AccountSecurity {
     );
   }
   /**
-   * Whether `code` is a valid second factor for `user`, consuming it if so, inside transaction
-   * `c` (the caller holds the account row lock). An authenticator code must be for a step later
-   * than the last accepted one, which is then recorded, so a code cannot be replayed; a recovery
-   * code is deleted as it is accepted, so each works once. False when two-factor authentication
-   * is off.
+   * Whether `code`, or `passkey`, is a valid second factor for `user`, consuming it if so,
+   * inside transaction `c` (the caller holds the account row lock). An authenticator code must
+   * be for a step later than the last accepted one, which is then recorded, so a code cannot be
+   * replayed; a recovery code is deleted as it is accepted, so each works once; a passkey must
+   * answer a challenge issued to `binding` (this session, or this browser's sign-in), which it
+   * uses up (Passkeys.answers). False when two-factor authentication is off.
    */
-  async factor(c, user, code) {
+  async factor(c, user, code, passkey = null, binding = null) {
     if (!user.mfa_enabled) return false;
-    const step = matchingStep(
-      unseal(user.mfa_secret, this.key, 'mfa:' + user.id),
-      code,
-      Number(user.mfa_last_step),
-    );
+    if (passkey && binding) return this.passkeys.answers(c, user, passkey, binding);
+    // Without an authenticator app (an account with only passkeys) there is no code to match.
+    const step = user.mfa_secret
+      ? matchingStep(
+          unseal(user.mfa_secret, this.key, 'mfa:' + user.id),
+          code,
+          Number(user.mfa_last_step),
+        )
+      : null;
     if (step !== null) {
       // Records the step so this code, and any earlier one, is refused from now on.
       await c.query('UPDATE oc_users SET mfa_last_step=$2 WHERE id=$1', [user.id, step]);
@@ -324,13 +333,14 @@ export class AccountSecurity {
     return false;
   }
   /**
-   * The second step of signing in: checks `code` (authenticator or recovery) against this
-   * browser's `mfa` challenge and, if right, issues the session the challenge was for. Rate-
+   * The second step of signing in: checks `code` (authenticator or recovery), or `passkey` (an
+   * answer to Passkeys.factorOptions), against this browser's `mfa` challenge and, if right,
+   * issues the session the challenge was for. Rate-
    * limited per client address `ip`, and each challenge allows five tries. Failures of every
    * kind (no challenge, expired, wrong code) give the same 401, so nothing is learned from
    * which one it was. Result: the session plus `returnTo`, and a cookie clearing the challenge.
    */
-  async complete(req, code, ip) {
+  async complete(req, code, ip, passkey = null) {
     await this.auth.rateLimit('mfa-ip:' + ip);
     const result = await this.transaction(async (c) => {
       const pending = await this.pending(req, c);
@@ -352,7 +362,11 @@ export class AccountSecurity {
       await c.query('UPDATE oc_auth_challenges SET attempts=attempts+1 WHERE token_hash=$1', [
         pending.token_hash,
       ]);
-      if (!user?.email_verified_at || !(await this.factor(c, user, code))) return { error: true };
+      if (
+        !user?.email_verified_at ||
+        !(await this.factor(c, user, code, passkey, 'browser:' + pending.browser_hash))
+      )
+        return { error: true };
       // One use: the challenge is deleted in the same transaction that issues the session.
       await c.query('DELETE FROM oc_auth_challenges WHERE token_hash=$1', [pending.token_hash]);
       return {
@@ -675,11 +689,31 @@ export class AccountSecurity {
    * confirms the person at any time in the session, or else (an account signed up through a
    * provider, with no password) a session that began within five minutes; and, when
    * `requireFactor` and two-factor authentication is on, a fresh authenticator or recovery code
-   * (`body.code`), which it consumes. Someone who finds a signed-in browser, or steals a
-   * session, cannot change security settings with it alone. Throws 403 for the session, 401 for
-   * the password or code.
+   * (`body.code`) or a passkey's answer to this session's challenge (`body.passkey`;
+   * Passkeys.confirmOptions), which it consumes. Someone who finds a signed-in browser, or
+   * steals a session, cannot change security settings with it alone. Throws 403 for the
+   * session, 401 for the password or code.
    */
   async fresh(c, user, session, body, requireFactor = true) {
+    await this.live(c, user, session);
+    if (user.password_hash && !(await passwordMatches(body.password ?? '', user.password_hash)))
+      throw new HttpError(401, 'Current password is incorrect.');
+    if (
+      user.mfa_enabled &&
+      requireFactor &&
+      !(await this.factor(c, user, body.code, body.passkey, 'session:' + session.token_hash))
+    )
+      throw new HttpError(
+        401,
+        'Enter a fresh authenticator code or recovery code, or confirm with a passkey.',
+      );
+  }
+  /**
+   * The session half of fresh: `session` is still live (not revoked, expired or idle) and, if
+   * two-factor authentication is on, completed it, and an account without a password signed
+   * in within five minutes. Throws 403.
+   */
+  async live(c, user, session) {
     if (!session) throw new HttpError(403, 'Sign in before changing security settings.');
     // Without a password there is nothing to re-enter: a sign-in through the provider just now
     // confirms the person instead.
@@ -702,10 +736,6 @@ export class AccountSecurity {
         403,
         'This session has ended. Sign in again to change security settings.',
       );
-    if (user.password_hash && !(await passwordMatches(body.password ?? '', user.password_hash)))
-      throw new HttpError(401, 'Current password is incorrect.');
-    if (user.mfa_enabled && requireFactor && !(await this.factor(c, user, body.code)))
-      throw new HttpError(401, 'Enter a fresh authenticator code or recovery code.');
   }
   /**
    * Starts authenticator enrollment: a new secret, kept encrypted in oc_mfa_setups for ten
@@ -719,8 +749,7 @@ export class AccountSecurity {
       const user = (await c.query('SELECT * FROM oc_users WHERE id=$1 FOR UPDATE', [session.id]))
         .rows[0];
       if (!user.email_verified_at) throw new HttpError(403, 'Verify an email address first.');
-      if (user.mfa_enabled)
-        throw new HttpError(400, 'Two-factor authentication is already enabled.');
+      if (user.mfa_secret) throw new HttpError(400, 'An authenticator app is already set up.');
       await this.fresh(c, user, session, body);
       const secret = newSecret();
       // One setup per account (user_id is the key): starting again replaces the earlier
@@ -742,16 +771,20 @@ export class AccountSecurity {
    * re-sealed for `mfa:<id>`; ten new recovery codes replace any old ones; other sessions and
    * pending desktop sign-ins end, and this session is marked as having completed two-factor
    * authentication. The account is notified. Result: the recovery codes, shown this once.
+   *
+   * An account that already has two-factor authentication through passkeys adds the app as a
+   * second way to answer it and keeps its recovery codes; no second factor is asked for here,
+   * since starting the setup in this session (setup) already asked for one.
    */
   async enable(session, body) {
     this.configured();
-    const codes = recoveryCodes();
+    let codes = recoveryCodes();
     await this.transaction(async (c) => {
       const user = (await c.query('SELECT * FROM oc_users WHERE id=$1 FOR UPDATE', [session.id]))
         .rows[0];
-      if (user.mfa_enabled)
-        throw new HttpError(400, 'Two-factor authentication is already enabled.');
-      await this.fresh(c, user, session, body);
+      if (user.mfa_secret) throw new HttpError(400, 'An authenticator app is already set up.');
+      await this.fresh(c, user, session, body, false);
+      if (user.mfa_enabled) codes = null;
       // The setup must belong to this session and be unexpired: a setup started elsewhere (by
       // someone else holding another session) cannot be confirmed from here.
       const setup = (
@@ -769,12 +802,14 @@ export class AccountSecurity {
         'UPDATE oc_users SET mfa_secret=$2,mfa_enabled=true,mfa_last_step=$3 WHERE id=$1',
         [user.id, seal(secret, this.key, 'mfa:' + user.id), step],
       );
-      await c.query('DELETE FROM oc_recovery_codes WHERE user_id=$1', [user.id]);
-      for (const code of codes)
-        await c.query('INSERT INTO oc_recovery_codes(user_id,code_hash) VALUES($1,$2)', [
-          user.id,
-          recoveryHash(code),
-        ]);
+      if (codes) {
+        await c.query('DELETE FROM oc_recovery_codes WHERE user_id=$1', [user.id]);
+        for (const code of codes)
+          await c.query('INSERT INTO oc_recovery_codes(user_id,code_hash) VALUES($1,$2)', [
+            user.id,
+            recoveryHash(code),
+          ]);
+      }
       // The setup is used up; every other session, which never completed two-factor
       // authentication, ends, as do unclaimed desktop sign-ins; this one is marked as verified
       // so it keeps working under the new rule (Auth.session requires it).
@@ -790,22 +825,27 @@ export class AccountSecurity {
       await this.notify(
         c,
         user,
-        'Two-factor authentication was enabled. Other sessions were revoked. Keep your recovery codes offline.',
+        codes
+          ? 'Two-factor authentication was enabled. Other sessions were revoked. Keep your recovery codes offline.'
+          : 'An authenticator app was added for two-factor authentication. Other sessions were revoked.',
       );
     });
     this.deliver();
-    return {
-      recoveryCodes: codes,
-      message:
-        'Two-factor authentication enabled. Store these recovery codes safely; they are shown only once.',
-    };
+    return codes
+      ? {
+          recoveryCodes: codes,
+          message:
+            'Two-factor authentication enabled. Store these recovery codes safely; they are shown only once.',
+        }
+      : { enabled: true, message: 'Authenticator app added. Your recovery codes are unchanged.' };
   }
   /**
    * A security change of the signed-in account, after fresh: `action` is `password` (set
    * `body.newPassword`; every session, API key, desktop sign-in, challenge and reset link
    * ends), `email` (email a confirmation link for `body.email` to the new address, bound to
    * this browser, and tell the old one; the address changes only when confirmed, in verify),
-   * `disable` (turn two-factor authentication off) or `recovery` (replace the recovery codes).
+   * `disable` (remove the authenticator app, which turns two-factor authentication off unless
+   * the account has passkeys) or `recovery` (replace the recovery codes).
    * The last two end other sessions, challenges and desktop sign-ins. Each is notified. The
    * slow work (breach check, password hashing) happens before the transaction so the account
    * row is not locked during it. Result: a message, plus new recovery codes or the proof cookie.
@@ -818,6 +858,7 @@ export class AccountSecurity {
     const email = action === 'email' ? emailAddress(body.email) : null,
       proof = action === 'email' ? this.verificationProof(req) : null;
     const codes = action === 'recovery' ? recoveryCodes() : null;
+    let passkeysLeft = false;
     await this.transaction(async (c) => {
       const user = (await c.query('SELECT * FROM oc_users WHERE id=$1 FOR UPDATE', [session.id]))
         .rows[0];
@@ -876,13 +917,22 @@ export class AccountSecurity {
       } else {
         if (!user.mfa_enabled)
           throw new HttpError(400, 'Two-factor authentication is not enabled.');
+        if (action === 'disable' && !user.mfa_secret)
+          throw new HttpError(400, 'No authenticator app is set up.');
+        // With passkeys left, removing the app leaves two-factor authentication on, and the
+        // recovery codes with it (#372).
+        passkeysLeft =
+          action === 'disable' &&
+          (await c.query('SELECT 1 FROM oc_passkeys WHERE user_id=$1 LIMIT 1', [user.id])).rows
+            .length > 0;
         // Old recovery codes end either way; disabling also clears the secret, and the last
         // step goes back to its default so a later enrollment starts fresh.
-        await c.query('DELETE FROM oc_recovery_codes WHERE user_id=$1', [user.id]);
+        if (!passkeysLeft)
+          await c.query('DELETE FROM oc_recovery_codes WHERE user_id=$1', [user.id]);
         if (action === 'disable')
           await c.query(
-            'UPDATE oc_users SET mfa_enabled=false,mfa_secret=NULL,mfa_last_step=-1 WHERE id=$1',
-            [user.id],
+            'UPDATE oc_users SET mfa_enabled=$2,mfa_secret=NULL,mfa_last_step=-1 WHERE id=$1',
+            [user.id, passkeysLeft],
           );
         else
           for (const code of codes)
@@ -900,7 +950,9 @@ export class AccountSecurity {
           c,
           user,
           action === 'disable'
-            ? 'Two-factor authentication was disabled. Other sessions were revoked.'
+            ? passkeysLeft
+              ? 'The authenticator app was removed from two-factor authentication; your passkeys still answer it. Other sessions were revoked.'
+              : 'Two-factor authentication was disabled. Other sessions were revoked.'
             : 'Recovery codes were replaced. Previous codes no longer work. Other sessions were revoked.',
         );
       }
