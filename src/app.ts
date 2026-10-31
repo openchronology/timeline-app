@@ -67,6 +67,8 @@ import {
   PLUGIN_EXAMPLE,
   validateTags,
   validateTimelineImage,
+  validateTimelineView,
+  sameSeparation,
   contentLabels,
   describeLabels,
   CONTENT_LABELS_KEY,
@@ -143,6 +145,8 @@ import type {
   PointEvent,
   TimelineDocument,
   TimelineImage,
+  TimelineView,
+  ViewSeparation,
   TimePresentation,
   PresentationContext,
   RulerPlan,
@@ -234,6 +238,8 @@ interface RemoteTimeline {
   tags?: string[];
   /** Its own image (#339), set in its settings (the server sends null for none). */
   image?: TimelineImage;
+  /** How it opens (#416): its default separation, if any (the server sends null for none). */
+  view?: TimelineView;
   assets?: Record<string, string>;
   /** Its sensitive-content labels (#115): its owner's and moderators'. */
   labels?: string[];
@@ -478,7 +484,9 @@ async function openDraftById(id: string) {
   }
   historyReplace();
   sqlitePath = null;
-  loadDocument(validateDocument(doc), id);
+  const opened = validateDocument(doc);
+  loadDocument(opened, id);
+  void openDefaultView(opened.view).catch(fail);
 }
 function hasDashboard() {
   return session.dashboard ?? session.server;
@@ -2560,6 +2568,7 @@ function heading() {
   void live?.update();
   el('comparison-settings').hidden = !comparison || !!separation;
   el('separation-settings').hidden = !separation;
+  updateDefaultViewControls();
   for (const id of [
     'publish-button',
     'och-export',
@@ -2589,11 +2598,13 @@ function heading() {
   }
   picture.alt = image?.alt ?? '';
   picture.hidden = !source;
-  input('timeline-title').value = comparison
-    ? remote?.comparison
-      ? remote.title
-      : 'Timeline comparison'
-    : (model?.title ?? remote?.title ?? 'Loading timeline…');
+  // A separation is the open timeline itself (#416: often how it opens), so it keeps its title.
+  input('timeline-title').value =
+    comparison && !separation
+      ? remote?.comparison
+        ? remote.title
+        : 'Timeline comparison'
+      : (model?.title ?? remote?.title ?? 'Loading timeline…');
   el<HTMLTextAreaElement>('timeline-description').value =
     model?.description ?? remote?.description ?? '';
   input('timeline-title').disabled = !editable();
@@ -2603,7 +2614,7 @@ function heading() {
   const count = momentCount();
   text(
     'event-count',
-    comparison
+    comparison && !separation
       ? `${comparison.tracks.length} timelines · Read-only comparison`
       : momentsText(count),
   );
@@ -3116,6 +3127,7 @@ async function openRemote(id: string, restoreSeparation = true) {
   if (info.assets) info.assets = validateAssets(info.assets);
   if (info.tags) info.tags = validateTags(info.tags);
   info.image = info.image ? validateTimelineImage(info.image) : undefined;
+  info.view = readTimelineView(info.view);
   if (info.comparison) {
     const sources = await comparisonSources(info.comparison.sources);
     if (request !== documentRequest) return;
@@ -3138,6 +3150,7 @@ async function openRemote(id: string, restoreSeparation = true) {
       plugins: info.plugins,
       tags: info.tags,
       image: info.image,
+      view: info.view,
       assets: info.assets,
       events: [],
     });
@@ -3148,10 +3161,15 @@ async function openRemote(id: string, restoreSeparation = true) {
     (sparseWorkspace() ? undefined : model?.points.maxKey()) ??
       (info.last ? Q.parse(info.last) : undefined),
   );
-  const separated = restoreView().separation;
+  const stored = restoreView();
   dirty = false;
   heading();
-  if (separated && restoreSeparation) startSeparation(separated);
+  // A reload in this tab shows it as it was, separated or rejoined (#128); otherwise it opens
+  // in its default view (#416). A link to a moment shows the whole timeline.
+  if (restoreSeparation) {
+    if (stored.separation) startSeparation(stored.separation);
+    else if (!stored.left) await openDefaultView(info.view);
+  }
   requestRender();
 }
 let browserForkBusy = false;
@@ -6630,6 +6648,7 @@ input('json-file').onchange = () => {
       // An imported file is a draft of its own at once (#188).
       loadDocument(doc, memoryOnly() || desktop ? null : newDraftId());
       toast(withBackgroundWarning('JSON timeline imported.', doc));
+      return openDefaultView(doc.view);
     })
     .catch(fail);
 };
@@ -6723,6 +6742,7 @@ input('och-file').onchange = () => {
       historyReplace();
       loadDocument(doc);
       toast(withBackgroundWarning('.och timeline imported through the server.', doc));
+      return openDefaultView(doc.view);
     })
     .catch(fail);
 };
@@ -7226,6 +7246,7 @@ async function moveToLatest(id: string) {
   if (info.assets) info.assets = validateAssets(info.assets);
   if (info.tags) info.tags = validateTags(info.tags);
   info.image = info.image ? validateTimelineImage(info.image) : undefined;
+  info.view = readTimelineView(info.view);
   // Settings not edited here are as `before` had them: they take the latest.
   adoptSettings(index, before!, info);
   if (
@@ -7256,6 +7277,7 @@ const SETTING_KEYS = [
   'description',
   'tags',
   'image',
+  'view',
   'presentation',
   'plugins',
   'assets',
@@ -7316,6 +7338,7 @@ function takeSetting(
   if (key === 'description') index.description = saved.description;
   if (key === 'tags') index.tags = saved.tags ? validateTags(saved.tags) : undefined;
   if (key === 'image') index.image = saved.image ? validateTimelineImage(saved.image) : undefined;
+  if (key === 'view') index.view = readTimelineView(saved.view);
   if (key === 'presentation')
     index.presentation = saved.presentation ? validatePresentation(saved.presentation) : undefined;
   if (key === 'plugins')
@@ -7327,6 +7350,7 @@ const SETTING_NAMES: Record<string, string> = {
   description: 'The description',
   tags: 'The tags',
   image: 'The image',
+  view: 'The default view',
   presentation: 'The time display',
   plugins: 'The plugins',
   assets: 'The images',
@@ -7641,6 +7665,7 @@ if (desktop) {
     sqliteSavedVersion = savedFile ? editVersion : null;
     heading();
     requestRender();
+    await openDefaultView(document.view);
   };
   el('sqlite-open').onclick = () => {
     if (!mayReplace()) return;
@@ -7996,8 +8021,10 @@ void (async () => {
           const chosen = drafts.find((d) => d.id === asked) ?? (asked ? undefined : drafts[0]);
           const draft = chosen ? await loadDraft(chosen.id) : null;
           if (draft && !location.hash && !freshTimeline && !sampleTimeline) {
-            loadDocument(validateDocument(draft), chosen!.id);
+            const opened = validateDocument(draft);
+            loadDocument(opened, chosen!.id);
             setDashboard(!platformEditor);
+            await openDefaultView(opened.view);
           } else if (asked) toast('That draft is no longer in this browser.');
           await restoreAfterSignIn();
         } catch {
@@ -8681,6 +8708,74 @@ async function loadTagCounts(): Promise<{ tag: string; count: number }[]> {
 }
 type Separation =
   { tags: string[] } | { related: EntityRef; depth: 'direct' | 'all'; label: string };
+/**
+ * A timeline's default view as a server or file sent it (#416), or nothing when it has none or
+ * it isn't one this version reads: the timeline then opens whole.
+ */
+function readTimelineView(value: unknown): TimelineView | undefined {
+  try {
+    return value == null ? undefined : validateTimelineView(value);
+  } catch {
+    return undefined;
+  }
+}
+/** The open timeline's default view (#416): as edited here, or as its server has it. */
+function timelineView(): TimelineView | undefined {
+  return model ? model.view : remote?.view;
+}
+/** The separation shown, as a default view keeps it (without the entity's title). */
+function shownSeparation(): ViewSeparation | null {
+  if (!separation) return null;
+  return 'tags' in separation
+    ? { tags: [...separation.tags] }
+    : { related: separation.related, depth: separation.depth };
+}
+/**
+ * An entity's title, or null when it is not on the timeline (as it was saved, for an indexed
+ * one, which is what a separation shows). Reads one moment or duration, never the timeline.
+ */
+async function entityTitle(ref: EntityRef): Promise<string | null> {
+  if (!sparseWorkspace() && model) {
+    const found = 'moment' in ref ? model.byId.get(ref.moment) : model.durations.get(ref.duration);
+    return found ? (found.metadata.title ?? '') : null;
+  }
+  const revision = (local ?? remote)?.revision;
+  if ('moment' in ref) {
+    const { event } = await timelineQuery<{ event: PointEvent | null }>({
+      kind: 'moment',
+      id: ref.moment,
+      ...(revision ? { revision } : {}),
+    });
+    return event ? (event.metadata.title ?? '') : null;
+  }
+  const { duration } = await timelineQuery<{ duration: Duration | null }>({
+    kind: 'duration',
+    id: ref.duration,
+    ...(revision ? { revision } : {}),
+  });
+  return duration ? (duration.metadata.title ?? '') : null;
+}
+/**
+ * Shows a timeline that has just opened in its default view (#416), when it has one: separated
+ * by its tags, or by an entity's relationships, named by the entity's title. An entity no longer
+ * on the timeline, or one that can't be read, leaves the whole timeline, quietly.
+ */
+async function openDefaultView(view: TimelineView | undefined) {
+  const chosen = view?.separation;
+  if (!chosen || comparison) return;
+  if ('tags' in chosen) {
+    startSeparation(chosen.tags);
+    return;
+  }
+  const request = documentRequest;
+  const title = await entityTitle(chosen.related).catch(() => null);
+  if (title === null || request !== documentRequest || comparison) return;
+  startSeparation({
+    related: chosen.related,
+    depth: chosen.depth,
+    label: title || ('moment' in chosen.related ? 'this moment' : 'this duration'),
+  });
+}
 function startSeparation(by: string[] | Separation) {
   const choice: Separation = Array.isArray(by) ? { tags: by } : by;
   flushEventEdit();
@@ -8803,6 +8898,73 @@ el<HTMLFormElement>('separate-form').onsubmit = (event) => {
   } catch (error) {
     text('separate-error', error instanceof Error ? error.message : String(error));
   }
+};
+/**
+ * The default view's controls (#416): in the separation bar, whether what is shown is the
+ * timeline's default view, and for those who can edit it, making it so or clearing it; in the
+ * Separate dialog, what the timeline opens separated by, and clearing it.
+ */
+function updateDefaultViewControls() {
+  const saved = timelineView()?.separation ?? null,
+    shown = shownSeparation(),
+    isDefault = !!shown && sameSeparation(shown, saved),
+    settable = !viewMode && mayEditTimeline();
+  el('separation-default').hidden = !shown || isDefault || !settable;
+  el('separation-default-clear').hidden = !isDefault || !settable;
+  el('separation-default-note').hidden = !isDefault;
+  text(
+    'separation-default-note',
+    isDefault
+      ? settable && dirty && (remote || local)
+        ? 'This is the timeline’s default view once saved: it opens this way for everyone.'
+        : 'This is the timeline’s default view: it opens this way for everyone.'
+      : '',
+  );
+  el('separate-default').hidden = !saved;
+  el('separate-default-clear').hidden = !saved || !settable;
+  text(
+    'separate-default-text',
+    !saved
+      ? ''
+      : 'tags' in saved
+        ? `This timeline opens separated by tags: ${saved.tags.join(', ')}.`
+        : saved.depth === 'direct'
+          ? 'This timeline opens with an event and the events related to it separated above.'
+          : 'This timeline opens with an event and everything connected to it separated above.',
+  );
+}
+/** Sets or clears the timeline's default view (#416): a setting, saved with the timeline. */
+function setTimelineView(view: TimelineView | undefined) {
+  if (viewMode || !mayEditTimeline() || !model) return;
+  model.view = view;
+  changed();
+  updateDefaultViewControls();
+}
+el('separation-default').onclick = () => {
+  const shown = shownSeparation();
+  if (!shown) return;
+  setTimelineView({ separation: shown });
+  toast(
+    remote || local
+      ? 'This is now the default view. Rejoin and save the timeline to keep it.'
+      : 'This is now the timeline’s default view.',
+  );
+};
+el('separation-default-clear').onclick = () => {
+  setTimelineView(undefined);
+  toast(
+    remote || local
+      ? 'The timeline will open whole once you rejoin and save it.'
+      : 'The timeline opens whole again.',
+  );
+};
+el('separate-default-clear').onclick = () => {
+  setTimelineView(undefined);
+  toast(
+    remote || local
+      ? 'The timeline will open whole once you save it.'
+      : 'The timeline opens whole again.',
+  );
 };
 el('separation-rejoin').onclick = () => {
   stopComparison();

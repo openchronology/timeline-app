@@ -387,6 +387,7 @@ impl Snapshot {
     ///   with `overlapping`, those touching it, sorted, searched and paged by offset:
     ///   `{durations, next, total, totalMore?}` (#316).
     /// - "duration": one duration by ID with its full metadata: `{duration}`.
+    /// - "moment": one moment by ID with its full metadata, or null: `{event}`.
     /// - "search": a page of 25 moments and durations matching `text`.
     /// - "tags": the 200 most used tags with their counts.
     /// - "related": an entity's direct relations, paged, with counts on the first page.
@@ -426,6 +427,27 @@ impl Snapshot {
         if q.kind == "duration" {
             let id = q.id.as_deref().ok_or("A duration lookup needs its ID")?;
             return Ok(json!({"duration": super::duration_by_id(&db, id)?}));
+        }
+        if q.kind == "moment" {
+            // One moment by its ID alone (a primary-key lookup), or null: such as the entity a
+            // default view separates by (#416), which may have been deleted since.
+            let id = q.id.as_deref().ok_or("A moment lookup needs its ID")?;
+            let rows = db.query_limited(
+                "SELECT id,q(time),metadata FROM events WHERE id=?",
+                &[id],
+                1,
+                BUDGET,
+            )?;
+            let event = match rows.first() {
+                Some(row) => json!({
+                    "id": row[0],
+                    "time": row[1],
+                    "metadata": serde_json::from_str::<Value>(row[2].as_deref().ok_or("Missing metadata")?)
+                        .map_err(|e| e.to_string())?,
+                }),
+                None => Value::Null,
+            };
+            return Ok(json!({ "event": event }));
         }
         if q.kind == "search" {
             let moments = match q.only.as_deref() {
@@ -1092,7 +1114,7 @@ fn apply_changes(
     db.execute("DELETE FROM timeline_extras", &[])?;
     db.execute(
         "INSERT INTO timeline_extras VALUES(1,?)",
-        &[&json!({"tags":patch.settings.tags,"assets":patch.settings.assets}).to_string()],
+        &[&json!({"tags":patch.settings.tags,"assets":patch.settings.assets,"view":patch.settings.view}).to_string()],
     )?;
     intervals::set_layout(db, token)
 }
@@ -1655,6 +1677,15 @@ mod view_tests {
         assert!(snapshot
             .query(&serde_json::from_value(json!({"kind":"events","lower":"0/1","upper":"1/1","filter":{"tags":[],"mode":"any"}})).unwrap())
             .is_err());
+        // One moment by its ID alone, as a default view's entity is looked up (#416).
+        let moment = |id: &str| {
+            snapshot
+                .query(&serde_json::from_value(json!({"kind":"moment","id":id})).unwrap())
+                .unwrap()
+        };
+        assert_eq!(moment("b")["event"]["time"], "2/1");
+        assert_eq!(moment("b")["event"]["metadata"]["title"], "B");
+        assert_eq!(moment("gone")["event"], Value::Null);
     }
 }
 /// Overview groups and duration summaries match a brute-force reference.

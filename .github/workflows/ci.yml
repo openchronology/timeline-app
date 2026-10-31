@@ -352,6 +352,8 @@ jobs:
         run: node test/save-merge-live-postgres.mjs
       - name: Sensitive-content labels in a live browser
         run: node test/labels-live-postgres.mjs
+      - name: A timeline's default view in a live browser
+        run: node test/default-view-live-postgres.mjs
       - name: Deleting comments and accounts in a live browser
         run: node test/deletion-live-postgres.mjs
       - name: Shifting and scaling times in a live browser

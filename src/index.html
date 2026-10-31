@@ -364,11 +364,14 @@ Every point has a place. Explore the spaces between them.</textarea>
               <strong id="separation-heading">Separated by tags</strong>
               <span id="separation-tags" class="separation-tags"></span>
               <button id="separation-map" hidden>Shift or scale these…</button>
+              <button id="separation-default" hidden>Make this the default view</button>
+              <button id="separation-default-clear" hidden>Clear default view</button>
               <button id="separation-rejoin">Rejoin</button>
             </div>
             <p id="separation-note" class="field-hint">
               Read-only. Events with any of these tags are shown above; everything else stays below.
             </p>
+            <p id="separation-default-note" class="field-hint" hidden></p>
           </section>
           <section id="comparison-settings" class="comparison-settings" hidden>
             <div class="comparison-heading">
@@ -618,6 +621,10 @@ Every point has a place. Explore the spaces between them.</textarea>
         <p class="field-hint">
           Events with any chosen tag move into a track above the rest of the timeline. Nothing is
           changed or saved.
+        </p>
+        <p id="separate-default" class="field-hint" hidden>
+          <span id="separate-default-text"></span>
+          <button type="button" id="separate-default-clear" hidden>Clear default view</button>
         </p>
         <div id="separate-tags" class="separate-tags" role="group" aria-label="Tags"></div>
         <label

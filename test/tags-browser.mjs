@@ -89,8 +89,57 @@ export async function checkTags(page, restore) {
     await page.locator('#separation-rejoin').click();
     await page.locator('#separation-settings').waitFor({ state: 'hidden' });
     await page.locator('#add-button').waitFor({ state: 'visible' });
+    // A default view (#416): a timeline saved separated opens that way, keeping its title.
+    const viewed = {
+      ...doc,
+      title: 'Default view regression',
+      relationships: [{ a: { moment: 'a' }, b: { moment: 'b' } }],
+      view: { separation: { related: { moment: 'b' }, depth: 'direct' } },
+    };
+    await imported(viewed);
+    await page.locator('#separation-settings').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#separation-heading').textContent(), 'Separated: related to');
+    assert.equal(await page.locator('#separation-tags').textContent(), 'Market');
+    assert.equal(await page.locator('#timeline-title').inputValue(), 'Default view regression');
+    assert.match(await page.locator('#separation-default-note').textContent(), /default view/);
+    // Cleared, it opens whole; made again from the bar, it is saved with the timeline.
+    await page.locator('#separation-default-clear').click();
+    await page.locator('#separation-default').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#separation-default-note').isVisible(), false);
+    await page.locator('#separation-rejoin').click();
+    await page.locator('#separation-settings').waitFor({ state: 'hidden' });
+    assert.equal('view' in (await exported()), false);
+    await page.locator('#separate-button').click();
+    assert.equal(await page.locator('#separate-default').isVisible(), false);
+    await page.locator('#separate-dialog').getByLabel('war (3)').check();
+    await page.locator('#separate-submit').click();
+    await page.locator('#separation-default').click();
+    await page.locator('#separation-default-clear').waitFor({ state: 'visible' });
+    await page.locator('#separation-rejoin').click();
+    assert.deepEqual((await exported()).view, { separation: { tags: ['war'] } });
+    // The Separate dialog says what it opens separated by, and clears it too.
+    await page.locator('#separate-button').click();
+    await page.locator('#separate-default').waitFor({ state: 'visible' });
+    assert.equal(
+      await page.locator('#separate-default-text').textContent(),
+      'This timeline opens separated by tags: war.',
+    );
+    await page.locator('#separate-default-clear').click();
+    await page.locator('#separate-default').waitFor({ state: 'hidden' });
+    await page.locator('#separate-dialog [data-close="separate-dialog"]').first().click();
+    assert.equal('view' in (await exported()), false);
+    // An entity deleted since opens the whole timeline, quietly.
+    await imported({
+      ...viewed,
+      view: { separation: { related: { moment: 'gone' }, depth: 'all' } },
+    });
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    assert.equal(await page.locator('#separation-settings').isVisible(), false);
+    assert.deepEqual((await exported()).view, {
+      separation: { related: { moment: 'gone' }, depth: 'all' },
+    });
     console.log(
-      'PASS tags: editing, normalized storage, tag counts, separation into tracks and rejoin.',
+      'PASS tags: editing, normalized storage, tag counts, separation into tracks and rejoin; a default view opened, made, cleared and exported, and one naming a deleted entity opening whole.',
     );
   } finally {
     if (await page.locator('#separation-settings').isVisible())
