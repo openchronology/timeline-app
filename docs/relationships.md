@@ -10,6 +10,8 @@ To link an entity, open **Add a relationship** and search titles and notes. Choo
 
 **Separate related** moves the entity and its directly related entities into a track above everything else, like [separating by tags](tags.md). **Separate all connected** also follows relationships transitively: everything reachable through any chain of links moves up. The bar above the tracks says which entity was separated and how, such as "Separated: related to Alpha". Separated tracks are read-only and draw no arcs; **Rejoin** returns to the whole timeline.
 
+Either separation can be made the timeline's [default view](tags.md#a-default-view), so it opens separated that way. If the entity is deleted later, the timeline opens whole.
+
 ## Arcs
 
 Each relationship is drawn as an arc above the axis between its two entities: at a moment's time, or at a duration's start. An arc whose other end is outside the view runs off the edge of the timeline. Only the part over the timeline is drawn, as the same curve, so an arc whose ends are far off screen stays at the same height as the view pans. Arcs shorter than the grouping distance are not drawn, because both ends are inside one summary at that zoom; zooming in reveals them. A window shows at most 256 arcs, with a notice when more cross it. Hover over an arc to see what it connects.

@@ -54,6 +54,7 @@ export const SETTINGS = [
   'description',
   'tags',
   'image',
+  'view',
   'presentation',
   'plugins',
   'assets',
