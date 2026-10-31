@@ -185,7 +185,7 @@ Relationships show as arcs above the axis. Two buttons pull them out of the crow
 - **Separate related:** moves this entity and what is linked to it into a track above the rest.
 - **Separate all connected:** also follows links of links, as far as they go.
 
-**Rejoin** returns to the whole timeline. See [relationships](relationships.md#viewing-and-editing).
+Arcs stay while separated, and a link between the tracks crosses from one to the other. **Rejoin** returns to the whole timeline. See [relationships](relationships.md#viewing-and-editing).
 
 ## Tags and tracks
 

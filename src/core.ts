@@ -40,6 +40,8 @@ export {
   arcFromBand,
   arcPath,
   arrowheadPath,
+  crossArcPath,
+  crossArrowheadPath,
 } from './relationships.js';
 export type { EdgeBand, EntityRef, Relationship } from './relationships.js';
 export { durationGroups, coalesceGroups, entityCount } from './summaries.js';
@@ -136,6 +138,7 @@ export {
   normalizeEntityTags,
   filterDocument,
   filterMembership,
+  separationArcs,
   tagCounts,
   viewFilterKey,
 } from './tags.js';

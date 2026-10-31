@@ -184,6 +184,12 @@ export const schemas = {
       last: ref('Rational'),
       aTime: ref('Rational'),
       bTime: ref('Rational'),
+      aIn: {
+        type: 'boolean',
+        description:
+          'In an overview with a `filter`: whether `a` is in that view (otherwise it is on the other side of the separation).',
+      },
+      bIn: { type: 'boolean', description: 'Likewise for `b`.' },
     },
   },
   TimePresentation: {
@@ -583,7 +589,17 @@ export const schemas = {
           lower: ref('Rational'),
           upper: ref('Rational'),
           threshold: { ...ref('Rational'), description: 'The grouping distance; nonnegative.' },
-          filter: ref('ViewFilter'),
+          filter: {
+            ...ref('ViewFilter'),
+            description:
+              'Reads one side of a separation. Its arcs are still the whole timeline’s, each end marked with whether it is on this side (`aIn`, `bIn`).',
+          },
+          arcs: {
+            type: 'boolean',
+            default: true,
+            description:
+              'With a `filter`, false leaves out the arcs, such as for the second side of a separation, whose arcs the first side’s answer already has.',
+          },
           plugins: {
             type: 'array',
             maxItems: 256,

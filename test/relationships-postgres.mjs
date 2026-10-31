@@ -5,7 +5,14 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { PostgresStore } from '../server/store.mjs';
-import { Q, TimelineIndex, Viewport, validateDocument, filterDocument } from '../dist/core.mjs';
+import {
+  Q,
+  TimelineIndex,
+  Viewport,
+  validateDocument,
+  filterDocument,
+  separationArcs,
+} from '../dist/core.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const user = randomUUID();
@@ -26,7 +33,7 @@ try {
   const events = Array.from({ length: 150 }, (_, i) => ({
     id: 'm' + i,
     time: Q.from(BigInt(Math.floor(random() * 4000)), 4n).toString(),
-    metadata: { title: 'M' + i },
+    metadata: { title: 'M' + i, ...(i % 3 ? {} : { tags: ['war'] }) },
   }));
   const durations = Array.from({ length: 40 }, (_, i) => {
     const start = BigInt(Math.floor(random() * 4000));
@@ -37,7 +44,7 @@ try {
           ? { moment: 'm' + Math.floor(random() * 150) }
           : Q.from(start, 4n).toString(),
       end: Q.from(start + BigInt(Math.floor(random() * 300)), 4n).toString(),
-      metadata: { title: 'D' + i },
+      metadata: { title: 'D' + i, ...(i % 4 ? {} : { tags: ['war'] }) },
     };
   });
   const ref = () =>
@@ -134,6 +141,50 @@ try {
         `${depth} ${mode}`,
       );
     }
+  // Separations draw the whole timeline's arcs, each end marked with whether it is in the
+  // view (#415); the other side can ask for none.
+  let marked = 0;
+  for (const filter of [
+    { tags: ['war'], mode: 'any' },
+    { tags: ['war'], mode: 'none' },
+    { related: { moment: 'm0' }, depth: 'direct', mode: 'any' },
+    { related: { duration: 'd3' }, depth: 'all', mode: 'any' },
+  ]) {
+    const oracle = separationArcs(doc, filter);
+    for (let i = 0; i < 6; i++) {
+      const viewport = new Viewport(
+        Q.from(BigInt(Math.floor(random() * 4400) - 200), 4n),
+        Q.from(BigInt(1 + Math.floor(random() * 4000)), 4n),
+      );
+      const threshold = viewport.threshold(1000, [4, 24, 80][i % 3]);
+      const actual = await store.query(timeline.id, user, {
+        kind: 'overview',
+        lower: viewport.left.toString(),
+        upper: viewport.right.toString(),
+        threshold: threshold.toString(),
+        filter,
+      });
+      const expected = oracle(
+        viewport.left,
+        viewport.right,
+        Q.parse(actual.threshold).compare(Q.zero) > 0 ? Q.parse(actual.threshold) : null,
+      );
+      const ends = (edges) => edges.map((e) => `${e.id} ${e.aIn} ${e.bIn}`).sort();
+      assert.deepEqual(ends(actual.edges), ends(expected.edges), `${JSON.stringify(filter)} ${i}`);
+      assert.equal(actual.edgesTruncated, expected.edgesTruncated);
+      marked += actual.edges.filter((e) => e.aIn !== e.bIn).length;
+    }
+  }
+  assert(marked > 0, 'some arcs cross between the tracks');
+  const none = await store.query(timeline.id, user, {
+    kind: 'overview',
+    lower: '0/1',
+    upper: '1000/1',
+    threshold: '0/1',
+    filter: { tags: ['war'], mode: 'none' },
+    arcs: false,
+  });
+  assert.deepEqual(none.edges, []);
   // Sparse saves add and remove links; deleting a moment removes its links.
   timeline = await store.save(timeline.id, user, timeline.revision, undefined, {
     settings: { ...doc, events: [], durations: undefined, relationships: undefined },
@@ -145,7 +196,7 @@ try {
   assert(!links.some((r) => r.a.moment === 'm0' || r.b.moment === 'm0'));
   assert(links.some((r) => r.a.moment === 'm1' && r.b.moment === 'm2'));
   console.log(
-    `PASS PostgreSQL relationships: arcs match the browser index over 30 views, ${checked} related listings with exact counts, relationship separations and sparse link edits.`,
+    `PASS PostgreSQL relationships: arcs match the browser index over 30 views, ${checked} related listings with exact counts, relationship separations, their arcs marked by side, and sparse link edits.`,
   );
 } finally {
   if (timeline) await pool.query('DELETE FROM oc_timelines WHERE id=$1', [timeline.id]);

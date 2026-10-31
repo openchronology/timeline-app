@@ -106,7 +106,10 @@ export async function checkRelationships(page, restore) {
       const delta = y('Delta');
       return ['Alpha', 'Bravo', 'Charlie'].every((name) => y(name) < delta);
     });
-    assert.equal(await page.locator('.edge-arc').count(), 0, 'Separated tracks draw no arcs.');
+    // Separated tracks still draw arcs (#415): both links are within the upper track, over its
+    // axis.
+    await page.waitForFunction(() => document.querySelectorAll('.edge-arc').length === 2);
+    assert.equal(await page.locator('.edge-arc-between').count(), 0);
     await page.locator('#separation-rejoin').click();
     await page.locator('#separation-settings').waitFor({ state: 'hidden' });
     await page.waitForFunction(() => document.querySelectorAll('.edge-arc').length === 2);
@@ -118,6 +121,41 @@ export async function checkRelationships(page, restore) {
       await bar(),
       'Separated: related to | Alpha | Read-only. Shown above: Alpha and the events related to it; everything else stays below.',
     );
+    // Alpha and Bravo are above, Charlie below: Bravo's link to Charlie crosses between the
+    // tracks, from Bravo's marker down to Charlie's, and says what it connects.
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll('.edge-arc').length === 2 &&
+        document.querySelectorAll('.edge-arc-between').length === 1,
+    );
+    const crossing = await page.evaluate(() => {
+      const arc = document.querySelector('.edge-arc-between'),
+        svg = document.getElementById('edge-arcs'),
+        box = svg.getBoundingClientRect(),
+        scale = box.width / parseFloat(svg.style.width);
+      const length = arc.getTotalLength(),
+        start = arc.getPointAtLength(0),
+        end = arc.getPointAtLength(length);
+      const marker = (name) => {
+        const r = document
+          .querySelector(`.event-marker[aria-label="${name}"]`)
+          .getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      };
+      const at = (p) => ({ x: box.x + p.x * scale, y: box.y + p.y * scale });
+      return {
+        title: arc.querySelector('title').textContent,
+        ends: [at(start), at(end)],
+        bravo: marker('Bravo'),
+        charlie: marker('Charlie'),
+      };
+    });
+    assert.equal(crossing.title, 'Bravo ↔ Charlie');
+    const near = (p, q) => Math.hypot(p.x - q.x, p.y - q.y) < 12;
+    assert(
+      near(crossing.ends[0], crossing.bravo) && near(crossing.ends[1], crossing.charlie),
+      JSON.stringify(crossing),
+    );
     await page.locator('#separation-rejoin').click();
     await page.locator('#separation-settings').waitFor({ state: 'hidden' });
     await page.locator('#separate-button').click();
@@ -127,6 +165,12 @@ export async function checkRelationships(page, restore) {
     assert.equal(
       await bar(),
       'Separated by tags | anything | Read-only. Events with any of these tags are shown above; everything else stays below.',
+    );
+    // Nothing carries the tag, so both arcs are within the lower track.
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll('.edge-arc').length === 2 &&
+        !document.querySelector('.edge-arc-between'),
     );
     await page.locator('#separation-rejoin').click();
     await page.locator('#separation-settings').waitFor({ state: 'hidden' });
@@ -192,7 +236,7 @@ export async function checkRelationships(page, restore) {
     // axis, in every frame.
     for (const y of heights) assert(Math.abs(y - (192 - 150)) < 0.5, `arc height ${heights}`);
     console.log(
-      'PASS relationships: linking by search, transitive count, arcs, navigation, unlink and undo, separation by connections, arcs far off screen.',
+      'PASS relationships: linking by search, transitive count, arcs, navigation, unlink and undo, separation by connections with arcs within and between tracks, arcs far off screen.',
     );
   } finally {
     if (await page.locator('#separation-settings').isVisible())
