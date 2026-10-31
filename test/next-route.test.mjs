@@ -7,6 +7,29 @@ import { dispatchNextRequest } from '../server/next-handler.mjs';
 import { createRequestHandler } from '../server/http.mjs';
 import { safeReturnTo } from '../platform/lib/navigation.js';
 
+test('Next route bridge takes the client address only from the launcher', async () => {
+  const address = (value) =>
+    dispatchNextRequest(
+      new Request('https://timescale.info/healthz', { headers: { 'X-OC-Peer-Address': value } }),
+      async (req, res) => {
+        assert.equal(req.headers['x-oc-peer-address'], undefined);
+        res.end(req.socket.remoteAddress);
+      },
+    ).then((response) => response.text());
+  const key = Symbol.for('openchronology.peerSecret');
+  // Without server/peer-address.cjs (next dev), a client's header is not believed.
+  delete globalThis[key];
+  assert.equal(await address('guess 192.0.2.1'), 'unknown');
+  globalThis[key] = 'secret';
+  try {
+    assert.equal(await address('secret 192.0.2.1'), '192.0.2.1');
+    assert.equal(await address('guess 192.0.2.1'), 'unknown');
+    assert.equal(await address('secret'), 'unknown');
+  } finally {
+    delete globalThis[key];
+  }
+});
+
 test('Next route bridge preserves streamed requests, redirects, and separate session cookies', async () => {
   const request = new Request('https://timescale.info/api/auth/example?state=abc', {
     method: 'POST',

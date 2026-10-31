@@ -138,7 +138,7 @@ Actions spam would use ask for a quick check first. The server refuses them with
 - `turnstile` uses [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/). Create a widget for your hostname and set `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. The server checks each token with Cloudflare's siteverify API, including its action and hostname, and the content security policy then allows `https://challenges.cloudflare.com` scripts and frames. Visitors' browsers contact Cloudflare. Signed-in desktop and API-key sessions, which cannot show the widget, are given proof of work; signing up or signing in from the desktop app is not possible with Turnstile, so use **Sign in using your browser**.
 - `off` disables checks, for example behind another bot filter.
 
-Challenges are signed with a key derived from `AUTH_ENCRYPTION_KEY`; without it, each process signs its own, which only suits a single development server. Without `TRUST_PROXY=1` behind Next.js, every anonymous visitor shares one client address, so after three sign-in failures from anyone, every sign-in asks for a check until the window passes (rather than being locked out).
+Challenges are signed with a key derived from `AUTH_ENCRYPTION_KEY`; without it, each process signs its own, which only suits a single development server. Without `TRUST_PROXY=1` behind a reverse proxy, every anonymous visitor shares the proxy's address, so after three sign-in failures from anyone, every sign-in asks for a check until the window passes (rather than being locked out).
 
 ## Resend and verified registration
 
