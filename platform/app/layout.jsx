@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// Every page's frame: the site's header with its navigation and the visitor's account (sign in
+// Every page's frame: the site's header, which stays at the top of the screen, with its
+// navigation (a side menu on phones) and the visitor's account (sign in
 // and sign up, or the account's menu) and, for an account that has not agreed to the terms in
 // force, a request to (#277), its footer with the build, a Support link, the color scheme's
 // choice (#382) and analytics when enabled; also the site's default metadata for link previews.
@@ -9,6 +10,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import Analytics, { AnalyticsSettings } from '../components/analytics.jsx';
 import AccountMenu from '../components/account-menu.jsx';
+import SiteMenu from '../components/site-menu.jsx';
 import TermsPrompt from '../components/terms-prompt.jsx';
 import ThemeChoice from '../components/theme-choice.jsx';
 import { THEME_BOOT } from '../../src/theme-choice.ts';
@@ -83,7 +85,7 @@ export default async function RootLayout({ children }) {
             <img src="/logo-mark.svg" alt="" width="28" height="28" />
             {name ?? 'openchronology'}
           </a>
-          <nav aria-label="Platform navigation">
+          <SiteMenu>
             {landing ? <a href="/explore">Explore</a> : null}
             <a href="/editor?new=1">＋ New timeline</a>
             <a href="/plugins">Plugin library</a>
@@ -94,7 +96,7 @@ export default async function RootLayout({ children }) {
                 ♥ Support
               </a>
             ) : null}
-          </nav>
+          </SiteMenu>
           {user ? (
             <AccountMenu
               username={user.username}
