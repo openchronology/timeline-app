@@ -285,7 +285,7 @@ An open server timeline updates as others save it, without moving your view. You
 
 **Compare** above the timeline lists the timelines you can see. Choose two or more, or add an `.ochx` file under **Add .ochx timeline**, then **Compare selected**. On the home page, tick **Compare** on timeline cards and choose **Compare timelines**.
 
-The comparison stacks the timelines on one shared time axis. Each track has a **Scale** and an **Offset** to line up timelines that count time differently; **Apply alignment** applies them. **Combine into one timeline** merges the tracks. A comparison is read-only and changes nothing; **Exit comparison** returns to your timeline. See [comparing timelines](comparison.md).
+The comparison stacks the timelines on one shared time axis. **Align timelines** above the tracks opens a row for each timeline, with a **Scale** and an **Offset** to line up timelines that count time differently; **Apply alignment** applies them. **Combine into one timeline** merges the tracks. A comparison is read-only and changes nothing; **Exit comparison** returns to your timeline. See [comparing timelines](comparison.md).
 
 ## Changing many times at once
 

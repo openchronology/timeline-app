@@ -16,7 +16,9 @@ Desktop can compare its current SQLite timeline with server timelines or JSON fi
 The result is a read-only view: source titles, moments, metadata and plugin
 configurations cannot be edited, saved, or exported from this view. Exit comparison
 to return to the original timeline, including its unsaved edits and viewport.
-Alignment and display controls affect the comparison only.
+Alignment and display controls affect the comparison only. The alignment rows,
+one per timeline, sit under **Align timelines**, which starts closed so the tracks
+keep the room; with many timelines the rows scroll within it.
 
 Each track uses `shared time = original time × scale + offset`, with exact
 rational arithmetic. Scale must be positive to preserve chronology and accepts
