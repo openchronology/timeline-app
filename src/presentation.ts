@@ -439,21 +439,33 @@ function relativeContext(
 /**
  * A moment's time, or a duration's start – end, as its reader writes it (`alone`): for lists
  * of changes, such as a pull request's (#384). A duration's end anchored to a moment reads as
- * that moment's, as the revision's own times are not at hand; a time the display cannot write
- * reads as its exact coordinate. With no presenter (invalid settings), every time is exact.
+ * that moment's time, which `momentTime` gives (the moment's exact time in the revision the
+ * duration belongs to; #386): without it, or when it gives null (not at hand), as "the time
+ * of moment <id>", and when it gives undefined (the revision lacks the moment, as when it was
+ * removed there), as that with "(anchored moment missing)". A
+ * time the display cannot write reads as its exact coordinate. With no presenter (invalid
+ * settings), every time is exact.
  */
 export function printEntityTime(
   presenter: TimePresenter | null,
   entity:
     { time: string } | { start: string | { moment: string }; end: string | { moment: string } },
+  momentTime?: (id: string) => string | null | undefined,
 ): string {
-  const one = (time: string | { moment: string }) => {
-    if (typeof time !== 'string') return `the time of moment ${time.moment}`;
+  const exact = (time: string) => {
     try {
       return presenter ? presenter.alone(Q.parse(time)) : time;
     } catch {
       return time;
     }
+  };
+  const one = (time: string | { moment: string }) => {
+    if (typeof time === 'string') return exact(time);
+    const resolved = momentTime ? momentTime(time.moment) : null;
+    if (resolved === null) return `the time of moment ${time.moment}`;
+    return resolved === undefined
+      ? `the time of moment ${time.moment} (anchored moment missing)`
+      : exact(resolved);
   };
   if ('time' in entity) return one(entity.time);
   const [start, end] = [one(entity.start), one(entity.end)];

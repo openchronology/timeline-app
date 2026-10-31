@@ -735,7 +735,8 @@ export async function pruneHistoryRows(client, timelineId) {
  * and after its settings, event or definition (true for a relationship), or null where it is
  * absent. Only the entities that either revision's history saved since they last shared a
  * state are compared, so the cost follows the differences, not the timeline's size. Null when
- * either revision is not kept as rows.
+ * either revision is not kept as rows. The iterable's `lineages` has both revisions' lineages
+ * (`from`, `to`), for valuesAt to read more of either without looking them up again.
  */
 export async function differences(client, fromId, toId) {
   // Both revisions by primary key, only if kept as rows.
@@ -748,7 +749,7 @@ export async function differences(client, fromId, toId) {
   const [from, to] = await Promise.all(
     [fromId, toId].map((id) => lineage(client, revision(id).timeline_id, revision(id).number)),
   );
-  return comparePages(client, from, to);
+  return Object.assign(comparePages(client, from, to), { lineages: { from, to } });
 }
 /**
  * The pages `differences` yields, given both lineages: the settings first (when they
@@ -857,16 +858,20 @@ async function compareKeys(client, kind, from, to, keys) {
 /**
  * The versions of entities of one kind ('moments', 'durations' or 'relationships') at a
  * revision kept as rows, by key (as `differences` gives keys): a Map from keyName to the
- * event, definition or true. Keys the revision does not hold are absent.
+ * event, definition or true. Keys the revision does not hold are absent. `levels`, the
+ * revision's lineage when already read (differences' `lineages`), saves looking it up: then
+ * up to PAGE keys cost one query.
  */
-export async function valuesAt(client, revisionId, name, keys) {
+export async function valuesAt(client, revisionId, name, keys, levels = null) {
   const kind = KINDS[name];
-  const { rows: found } = await client.query(
-    'SELECT timeline_id,number::text FROM oc_revisions WHERE id=$1 AND history_rows',
-    [revisionId],
-  );
-  if (!found[0]) throw new Error('Expected a revision kept as rows.');
-  const levels = await lineage(client, found[0].timeline_id, found[0].number);
+  if (!levels) {
+    const { rows: found } = await client.query(
+      'SELECT timeline_id,number::text FROM oc_revisions WHERE id=$1 AND history_rows',
+      [revisionId],
+    );
+    if (!found[0]) throw new Error('Expected a revision kept as rows.');
+    levels = await lineage(client, found[0].timeline_id, found[0].number);
+  }
   const values = new Map();
   const columnsOf = (key) => (kind.key.length === 1 ? [key] : kind.key.map((c) => key[c]));
   for (let i = 0; i < keys.length; i += PAGE) {

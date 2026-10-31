@@ -504,7 +504,7 @@ const changeExample = (entity) => ({
     times: {
       type: 'object',
       description:
-        'Each version’s time (a duration’s start – end) as the timeline displays it, as its reader shows it; null for a version that does not exist.',
+        'Each version’s time (a duration’s start – end) as the timeline displays it, as its reader shows it; null for a version that does not exist. An end anchored to a moment shows that moment’s time in the version’s revision (the base’s for `before`, the proposal’s for `after`), or “the time of moment <id> (anchored moment missing)” when that revision lacks the moment.',
       properties: {
         before: { type: ['string', 'null'] },
         after: { type: ['string', 'null'] },

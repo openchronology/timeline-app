@@ -19,7 +19,7 @@ import {
   Q,
 } from '../dist/core.mjs';
 import { commonAncestor, lockTimelines, revisionId } from './versioning.mjs';
-import { differences } from './history.mjs';
+import { differences, valuesAt } from './history.mjs';
 /** Why a timeline that keeps no saved history takes no pull requests. */
 export const PULLS_UNAVAILABLE =
   'This timeline does not keep saved history, so it cannot take pull requests: they are reviewed and merged against saved revisions.';
@@ -503,7 +503,11 @@ export class Collaboration {
    * (`examples`) and durations (`durationExamples`) of each. Each example's `times` has its
    * `before` and `after` time as the timeline displays it (printEntityTime; #384): in the
    * `presentation` given, the timeline's, or in the base's and the proposal's when the pull
-   * request changes it. Computed from saved history, so it costs what changed, not the
+   * request changes it. A duration's end anchored to a moment prints as that moment's time in
+   * the revision the version belongs to (the base's for `before`, the proposal's for `after`;
+   * #386), the anchors of all the examples read in one query per revision, or from the
+   * documents already read; an anchor that revision lacks prints as "(anchored moment
+   * missing)". Computed from saved history, so it costs what changed, not the
    * timeline's size. When either revision is no longer kept (its timeline stopped keeping
    * saved history), nothing is counted and `unavailable` says why.
    */
@@ -516,19 +520,20 @@ export class Collaboration {
       examples: [],
       durationExamples: [],
     };
-    let pages = await differences(this.pool, baseId, sourceId);
+    let pages = await differences(this.pool, baseId, sourceId),
+      documents = null;
     if (!pages)
       try {
-        pages = documentDifferences(
-          await this.store.revisionDocument(this.pool, baseId),
-          await this.store.revisionDocument(this.pool, sourceId),
-        );
+        documents = {
+          before: await this.store.revisionDocument(this.pool, baseId),
+          after: await this.store.revisionDocument(this.pool, sourceId),
+        };
+        pages = documentDifferences(documents.before, documents.after);
       } catch (error) {
         if (error.status !== 409) throw error;
         return { ...summary, unavailable: error.message };
       }
     const presenters = { before: presenterOf(presentation), after: presenterOf(presentation) };
-    const time = (presenter, entity) => (entity ? printEntityTime(presenter, entity) : null);
     const shown = {
       moments: { added: 0, removed: 0, changed: 0 },
       durations: { added: 0, removed: 0, changed: 0 },
@@ -551,17 +556,48 @@ export class Collaboration {
         const change = before === null ? 'added' : after === null ? 'removed' : 'changed';
         summary[kind][change]++;
         if (lists[kind] && shown[kind][change]++ < EXAMPLES)
-          lists[kind].push({
-            change,
-            before,
-            after,
-            times: {
-              before: time(presenters.before, before),
-              after: time(presenters.after, after),
-            },
-          });
+          lists[kind].push({ change, before, after });
       }
+    const momentTimes = await this.anchorTimes(summary.durationExamples, {
+      before: { id: baseId, levels: pages.lineages?.from, document: documents?.before },
+      after: { id: sourceId, levels: pages.lineages?.to, document: documents?.after },
+    });
+    const time = (side, entity) =>
+      entity ? printEntityTime(presenters[side], entity, momentTimes[side]) : null;
+    for (const example of [...summary.examples, ...summary.durationExamples])
+      example.times = {
+        before: time('before', example.before),
+        after: time('after', example.after),
+      };
     return summary;
+  }
+  /**
+   * The times of the moments the durations of `examples` are anchored to, for each side
+   * (`before`, read at the base; `after`, at the proposal): a lookup from a moment's ID to its
+   * exact time there, undefined when that revision lacks it. Each revision's anchors are
+   * read in one query, through its lineage (`levels`, as differences read it), or from its
+   * `document` when it is kept as one; none for a side without anchors.
+   */
+  async anchorTimes(examples, revisions) {
+    const anchors = { before: new Set(), after: new Set() };
+    for (const example of examples)
+      for (const side of ['before', 'after'])
+        for (const end of example[side] ? [example[side].start, example[side].end] : [])
+          if (end && typeof end === 'object') anchors[side].add(end.moment);
+    const times = {};
+    for (const side of ['before', 'after']) {
+      const { id, levels, document } = revisions[side];
+      const ids = [...anchors[side]];
+      if (!ids.length) continue;
+      if (document) {
+        const events = new Map(document.events.map((e) => [e.id, e.time]));
+        times[side] = (moment) => events.get(moment);
+      } else {
+        const events = await valuesAt(this.pool, id, 'moments', ids, levels);
+        times[side] = (moment) => events.get(moment)?.time;
+      }
+    }
+    return times;
   }
   /**
    * The revisions a fork's pull request pins: its source, a saved (numbered) revision of the
