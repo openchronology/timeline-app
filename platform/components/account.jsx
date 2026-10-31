@@ -18,6 +18,7 @@ import {
 import { api } from '../lib/api.js';
 import { passkeysSupported, usePasskey } from '../lib/passkeys.js';
 import { PasskeyList } from './passkeys.jsx';
+import { recoveryCodesOnly } from '../lib/second-factor.js';
 import ModerationDecisions from './moderation-decisions.jsx';
 import { profilePath } from '../../src/addresses.ts';
 import HelpTip from './help-tip.jsx';
@@ -334,6 +335,12 @@ export default function Account({ returnTo = '/', login = false }) {
           <p className="muted">Save timelines to your account and share them with anyone.</p>
         )}
         {mode === 'forgot' && <p className="muted">We'll email a link to choose a new password.</p>}
+        {mode === 'reset' && (
+          <p className="muted">
+            Resetting removes your passkeys; add them again after signing in. Two-factor
+            authentication stays on.
+          </p>
+        )}
       </header>
       {!session && !error && <p role="status">Loading your session…</p>}
       {session?.server === false && (
@@ -583,6 +590,22 @@ const PROVIDERS = {
   microsoft: 'Microsoft',
 };
 
+/**
+ * A click on a link to a row of the Security card (its `href`, such as `#add-passkey`):
+ * scrolls to the row and opens its form (the row's Disclosure), so the person lands on what to
+ * fill in. Without the row (passkeys unavailable, say) the link does nothing more than a link.
+ * @param {import('react').MouseEvent<HTMLAnchorElement>} event
+ */
+function openDisclosure(event) {
+  const row = document.getElementById(event.currentTarget.hash.slice(1));
+  if (!row) return;
+  event.preventDefault();
+  const details = row.querySelector('details');
+  if (details) details.open = true;
+  row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  row.querySelector('summary')?.focus();
+}
+
 /** Bytes as people read them: B, KiB, MiB or GiB, to a tenth below ten. */
 function size(bytes) {
   const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
@@ -695,6 +718,26 @@ function AccountSettings({
                 GitHub or Facebook) confirms them with a sign-in in the last five minutes instead.
               </HelpTip>
             </h2>
+            {/* Two-factor authentication answered by recovery codes alone (as a password reset
+                leaves an account whose passkeys were its only second factor): ask for a
+                factor before the codes run out. */}
+            {recoveryCodesOnly(security) && (
+              <div className="notice" role="note">
+                <p>
+                  Two-factor authentication is on, but only your recovery codes can answer it. Add a
+                  passkey or an authenticator app before they run out ({security.recovery_remaining}{' '}
+                  left).
+                </p>
+                <p className="actions">
+                  <a href="#add-passkey" onClick={openDisclosure}>
+                    Add a passkey
+                  </a>
+                  <a href="#authenticator-app" onClick={openDisclosure}>
+                    Set up an authenticator app
+                  </a>
+                </p>
+              </div>
+            )}
             <ul className="settings-list">
               <li>
                 <strong>Email</strong>
@@ -768,7 +811,7 @@ function AccountSettings({
                     : 'Add an authenticator app or a passkey to turn it on.'}
                 </span>
               </li>
-              <li>
+              <li id="authenticator-app">
                 <strong>Authenticator app</strong>
                 <span className="muted">{security?.totp_enabled ? 'Set up' : 'None'}</span>
                 {!security?.totp_enabled && !setup && (

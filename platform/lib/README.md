@@ -2,7 +2,7 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-Helpers the platform's pages and components share. Files that import `server-only` run only on the server (they read the session, the database or the built editor); [`api.js`](api.js), [`navigation.js`](navigation.js), [`releases.js`](releases.js), [`timeline-lists.js`](timeline-lists.js) and [`api-reference.js`](api-reference.js) work anywhere. Storage and the API's logic are in [`server/`](../../server/README.md).
+Helpers the platform's pages and components share. Files that import `server-only` run only on the server (they read the session, the database or the built editor); [`api.js`](api.js), [`navigation.js`](navigation.js), [`releases.js`](releases.js), [`second-factor.js`](second-factor.js), [`timeline-lists.js`](timeline-lists.js) and [`api-reference.js`](api-reference.js) work anywhere. Storage and the API's logic are in [`server/`](../../server/README.md).
 
 ## Contents
 
@@ -17,6 +17,7 @@ Helpers the platform's pages and components share. Files that import `server-onl
 | [`passkeys.js`](passkeys.js)             | Passkeys in the browser: making and using one with the server's options, in base64url JSON, and confirming a change with one.                                                               |
 | [`preview-image.jsx`](preview-image.jsx) | Draws the link-preview image of a shared timeline, moment or duration (public timelines only).                                                                                              |
 | [`releases.js`](releases.js)             | What the download page offers: desktop apps, the offline file and server packages, with their release asset names.                                                                          |
+| [`second-factor.js`](second-factor.js)   | Whether two-factor authentication is answered by recovery codes alone, so the account page asks for a passkey or an authenticator app.                                                      |
 | [`session.js`](session.js)               | The visitor's session on a server-rendered page, and how many timelines they may compare.                                                                                                   |
 | [`sharing.js`](sharing.js)               | What shared links show: titles, descriptions, preview facts, entity facts and structured data, embed code and addresses, for public timelines only where a guest would see them.            |
 | [`sitemap.js`](sitemap.js)               | The sitemap (`/sitemap.xml` and its pages): the site's pages, then every public timeline, every profile that owns one, and small public timelines' moments and durations, 45,000 to a page. |

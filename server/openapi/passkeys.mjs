@@ -170,7 +170,7 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Ask to sign in with a passkey',
       description:
-        'Options for `navigator.credentials.get()` listing no passkeys, so the browser offers those it holds for this site (discoverable credentials), with a challenge for this browser that works once within five minutes. 404 when the server turns signing in with a passkey off (`passkeySignIn` in `GET /api/session`; PASSKEY_SIGN_IN). Shares the password sign-in’s ten attempts a minute per client address. Signed in already, the challenge is bound to the session instead, which the sign-in replaces, as a password sign-in does.',
+        'Options for `navigator.credentials.get()` listing no passkeys, so the browser offers those it holds for this site (discoverable credentials), with a challenge for this browser that works once within five minutes. 404 when the server turns signing in with a passkey off (`passkeySignIn` in `GET /api/session`; PASSKEY_SIGN_IN). Has its own ten attempts a minute per client address; the sign-in that answers it uses the password sign-in’s. Signed in already, the challenge is bound to the session instead, which the sign-in replaces, as a password sign-in does.',
       security: SIGN_IN,
       requestBody: body({ type: 'object' }, { required: false }),
       responses: {

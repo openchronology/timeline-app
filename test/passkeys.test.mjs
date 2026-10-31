@@ -16,6 +16,7 @@ import {
 import { Passkeys, passkeySignIn, passkeyAnswer } from '../server/passkeys.mjs';
 import { digest } from '../server/security-crypto.mjs';
 import { softAuthenticator, encodeCbor } from './webauthn-authenticator.mjs';
+import { recoveryCodesOnly } from '../platform/lib/second-factor.js';
 
 const origin = 'https://timescale.info',
   rpId = 'timescale.info';
@@ -205,6 +206,33 @@ test('CBOR and COSE keys are read strictly', () => {
   assert.equal(passkeyAnswer('not json'), null);
   assert.equal(passkeyAnswer(null), null);
   assert.equal(passkeyAnswer('[1]'), null);
+});
+
+test('an RSA key is measured by its modulus, not by the bytes it is sent in', () => {
+  // A 1024-bit modulus sent as 256 bytes (128 of them leading zeros) is still 1024 bits.
+  const short = softAuthenticator({ algorithm: -257, modulusLength: 1024, pad: 128 }),
+    c = challenge();
+  assert.throws(() => verifyRegistration(short.create(creation(c), { origin }), expected(c)), {
+    reason: 'key',
+  });
+  // A 2048-bit one with a leading zero byte is fine.
+  const padded = softAuthenticator({ algorithm: -257, pad: 1 });
+  assert.equal(registered(padded).algorithm, -257);
+});
+
+test('the account page asks for a factor when only recovery codes answer two-factor', () => {
+  const key = { id: 'k', name: 'Key' };
+  // As a reset leaves an account whose passkeys were its only factor.
+  assert.equal(recoveryCodesOnly({ mfa_enabled: true, totp_enabled: false, passkeys: [] }), true);
+  assert.equal(recoveryCodesOnly({ mfa_enabled: true, totp_enabled: false }), true);
+  // An app, a passkey, or two-factor off: nothing to ask.
+  assert.equal(recoveryCodesOnly({ mfa_enabled: true, totp_enabled: true, passkeys: [] }), false);
+  assert.equal(
+    recoveryCodesOnly({ mfa_enabled: true, totp_enabled: false, passkeys: [key] }),
+    false,
+  );
+  assert.equal(recoveryCodesOnly({ mfa_enabled: false, totp_enabled: false, passkeys: [] }), false);
+  assert.equal(recoveryCodesOnly(undefined), false);
 });
 
 test('PASSKEY_SIGN_IN allows signing in with a passkey unless turned off', () => {

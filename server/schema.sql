@@ -630,7 +630,8 @@ CREATE TABLE IF NOT EXISTS oc_recovery_codes (
 );
 -- Passkeys (#372; passkeys.mjs, webauthn.mjs), a second factor and, where the site allows it,
 -- a way to sign in alone. An account has two-factor authentication on (mfa_enabled) while it
--- has an authenticator app (mfa_secret) or at least one passkey. credential_id: the
+-- has an authenticator app (mfa_secret) or at least one passkey, and also after a password
+-- reset removed its passkeys (its recovery codes answer it then). credential_id: the
 -- credential's ID, base64url, unique across accounts; public_key: its COSE public key (not a
 -- secret); algorithm: its COSE algorithm (-8, -7 or -257); sign_count: the authenticator's
 -- signature counter, last seen (0 for those that keep none), for detecting a copied
