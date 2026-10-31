@@ -1,10 +1,10 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // The landing page and the audience pages (#379) against PostgreSQL and in a live browser: with
 // LANDING_PAGE off, / is the timeline browser and nothing else changes; on, / is the landing
-// page, /explore the browser with its query and in-place search, each /for/<audience> page
-// renders with its metadata and structured data, an unknown one is not found, examples skip
-// private, labelled and missing timelines, the operator's copy replaces the built-in, and the
-// sitemap lists the pages. In the browser, at phone and desktop widths, in light and dark, no
+// page, /explore the browser with its query and in-place search (a timeline opened from it
+// leads back to it), each /for/<audience> page renders with its metadata and structured data,
+// an unknown one is not found, examples skip private, labelled and missing timelines, the
+// operator's copy replaces the built-in, and the sitemap lists the pages. In the browser, at phone and desktop widths, in light and dark, no
 // page scrolls sideways, the pages read without JavaScript, and the video loads only when
 // played. LANDING_SCREENSHOTS names a directory to save screenshots in.
 import assert from 'node:assert/strict';
@@ -336,6 +336,31 @@ try {
     word,
   );
   assert.equal(await tab.evaluate(() => window.marker), before, 'no page load');
+  // A timeline opened from the search leads back to it; one opened in a new tab, to /explore.
+  const searched = new URL(tab.url());
+  await tab
+    .getByRole('link', { name: `Alpha ${word}` })
+    .first()
+    .click();
+  await tab.waitForURL((url) => url.pathname === '/' + address(alpha));
+  const back = tab.frameLocator('.editor-frame').locator('#timelines-link');
+  await tab.waitForFunction(
+    (want) =>
+      document
+        .querySelector('.editor-frame')
+        ?.contentDocument?.getElementById('timelines-link')
+        ?.getAttribute('href') === want,
+    searched.pathname + searched.search,
+  );
+  await back.click();
+  await tab.waitForURL((url) => url.pathname + url.search === searched.pathname + searched.search);
+  const fresh = await context.newPage();
+  await fresh.goto(o + '/' + address(alpha));
+  await fresh.frameLocator('.editor-frame').locator('#timelines-link').waitFor();
+  assert.equal(
+    await fresh.frameLocator('.editor-frame').locator('#timelines-link').getAttribute('href'),
+    '/explore',
+  );
   await context.close();
 
   // Without JavaScript the pages read the same, and the video is a link to YouTube.
@@ -355,7 +380,7 @@ try {
   await still.getByRole('link', { name: `Alpha ${word}` }).waitFor();
   await plain.close();
   console.log(
-    'PASS landing page: off keeps / as the browser; on, the landing page, /explore with its query and in-place search, six audience pages with metadata and structured data, unknown audiences not found, examples without private, labelled or missing timelines, the operator’s copy, the sitemap, phone and desktop in light and dark, the video on request, and no JavaScript needed.',
+    'PASS landing page: off keeps / as the browser; on, the landing page, /explore with its query and in-place search and the way back to it, six audience pages with metadata and structured data, unknown audiences not found, examples without private, labelled or missing timelines, the operator’s copy, the sitemap, phone and desktop in light and dark, the video on request, and no JavaScript needed.',
   );
 } finally {
   await browser?.close();

@@ -6,9 +6,13 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { THEME_BOOT } from '../../src/theme-choice.ts';
+import { browserPath } from '../../server/landing.mjs';
 /** The editor page's one inline script, which sets the chosen color scheme first (#382). */
 const BOOT = `'sha256-${createHash('sha256').update(THEME_BOOT).digest('base64')}'`;
-/** The editor's page, with its assets addressed from the site's root. */
+/**
+ * The editor's page, with its assets addressed from the site's root, and its "Timelines" link
+ * at the timeline browser (/explore with the landing page on).
+ */
 export async function editorHtml() {
   return (
     await readFile(resolve(process.env.OCH_APP_ROOT ?? process.cwd(), 'dist/index.html'), 'utf8')
@@ -16,6 +20,7 @@ export async function editorHtml() {
     .replace('href="./app.css"', 'href="/app.css"')
     .replace('src="./app.js"', 'src="/app.js"')
     .replace('href="legal.html"', 'href="/legal"')
+    .replace('id="timelines-link" href="/"', `id="timelines-link" href="${browserPath()}"`)
     .replace('href="openchronology-web-source.tar.gz"', 'href="/openchronology-web-source.tar.gz"');
 }
 /** The editor's content security policy; `ancestors` are the pages that may frame it. */
