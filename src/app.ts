@@ -27,7 +27,7 @@ import {
   renderPluginHeading,
 } from './plugin-ui.js';
 import type { RelationshipContext } from './plugin-ui.js';
-import { attachRichText } from './rich-text.js';
+import { attachRichText, renderMarkdown } from './rich-text.js';
 import { pluginRichText } from './plugins.js';
 import { dismissOnBackdrop } from './dialogs.js';
 import { advise, record as recordSample, LIMIT } from './capacity.js';
@@ -2596,9 +2596,9 @@ function heading() {
     : (model?.title ?? remote?.title ?? 'Loading timeline…');
   el<HTMLTextAreaElement>('timeline-description').value =
     model?.description ?? remote?.description ?? '';
-  fitDescription();
   input('timeline-title').disabled = !editable();
   el<HTMLTextAreaElement>('timeline-description').disabled = !editable();
+  showDescription();
   updatePageTitle();
   const count = momentCount();
   text(
@@ -6504,6 +6504,43 @@ function fitDescription() {
   }
 }
 el('timeline-description').addEventListener('input', fitDescription);
+/**
+ * The description under the title as its Markdown renders (#398), with the notes' vocabulary
+ * and safety (src/rich-text.ts). Its source, the textarea, shows instead while an editor edits
+ * it, and when it is empty so there is somewhere to type one; the view swaps for it on a click
+ * or on keyboard focus, and comes back when it loses focus.
+ */
+function showDescription() {
+  const area = el<HTMLTextAreaElement>('timeline-description'),
+    view = el('timeline-description-view');
+  const empty = !area.value.trim(),
+    editing = editable() && (document.activeElement === area || empty);
+  renderMarkdown(view, area.value);
+  view.hidden = editing || empty;
+  area.hidden = !editing;
+  if (editable()) {
+    view.tabIndex = 0;
+    view.title = 'Edit the description';
+  } else {
+    view.removeAttribute('tabindex');
+    view.removeAttribute('title');
+  }
+  fitDescription();
+}
+// Focus reaches the view itself on a click outside its links, or by Tab, only while editable.
+el('timeline-description-view').addEventListener('focus', () => {
+  if (!editable()) return;
+  const area = el<HTMLTextAreaElement>('timeline-description');
+  area.hidden = false;
+  el('timeline-description-view').hidden = true;
+  area.focus();
+  fitDescription();
+});
+// Links in an editor's view open in a new tab without starting an edit.
+el('timeline-description-view').addEventListener('mousedown', (event) => {
+  if ((event.target as Element).closest('a')) event.preventDefault();
+});
+el('timeline-description').addEventListener('blur', () => showDescription());
 // The title is one line of text that wraps: Enter commits it, and pasted line breaks become
 // spaces.
 el<HTMLTextAreaElement>('timeline-title').addEventListener('keydown', (event) => {

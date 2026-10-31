@@ -5,6 +5,7 @@
 import Link from 'next/link';
 import StarButton from './star-button.jsx';
 import TimelineCardImage from './timeline-image.jsx';
+import { MarkdownExcerpt } from './markdown.jsx';
 import { describeLabels } from '../../src/content-labels.ts';
 import { CompareCheckbox } from './compare-selection.jsx';
 import { profilePath, timelinePath } from '../../src/addresses.ts';
@@ -18,13 +19,6 @@ export const cardDate = (value) =>
     year: 'numeric',
     timeZone: 'UTC',
   });
-/** Plain text of at most `length` characters, on one line, ending with … when cut. */
-export function excerpt(text, length = 240) {
-  const line = String(text ?? '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return line.length > length ? line.slice(0, length - 1).trimEnd() + '…' : line;
-}
 /**
  * A strip of bars, one for each part of the timeline's span, as tall as that part is dense
  * with moments (the search result's `shape`). Drawn with SVG attributes, which the content
@@ -114,7 +108,9 @@ export default function TimelineCard({
         </p>
       )}
       {t.description?.trim() && (
-        <p className="timeline-card-description">{excerpt(t.description)}</p>
+        <p className="timeline-card-description">
+          <MarkdownExcerpt text={t.description} />
+        </p>
       )}
       <dl className="timeline-card-facts">
         <div>

@@ -538,6 +538,30 @@ main {
   /* As tall as its text (app.ts sizes it): the whole description, without a scroll of its own. */
   overflow: hidden;
 }
+/* The description rendered from its Markdown (#398), in the source's type and colour. */
+.description-view {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+  min-height: 26px;
+}
+.description-view > :last-child {
+  margin-bottom: 0;
+}
+.description-view strong {
+  color: var(--ink);
+}
+.description-view[tabindex] {
+  cursor: text;
+  border-radius: 4px;
+}
+.description-view[tabindex]:hover {
+  background: var(--tint);
+}
+.description-input[hidden],
+.description-view[hidden] {
+  display: none;
+}
 .document-meta {
   display: flex;
   align-items: center;
@@ -1568,7 +1592,8 @@ dialog h3 {
   .title-input {
     font-size: 30px;
   }
-  .description-input {
+  .description-input,
+  .description-view {
     font-size: 13px;
   }
   .view-toolbar {
@@ -2469,7 +2494,8 @@ body[data-embed] .title-input {
   flex: 1 1 12em;
   font-size: 22px;
 }
-body[data-embed] .description-input {
+body[data-embed] .description-input,
+body[data-embed] .description-view {
   display: none;
 }
 /* Embeds keep the license notice and source offer, compactly. */

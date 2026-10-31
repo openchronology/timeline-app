@@ -3,6 +3,7 @@
 // stars, forks and comparisons, and reviewing, discussing and merging pull requests.
 import { printEntityTime, validateDocument } from './core.js';
 import { describeLabels } from './content-labels.js';
+import { markdownText } from './rich-text.js';
 import { changeText, exactTimeText } from './wording.js';
 import type { ChangeExample } from './wording.js';
 import type { TimelineDocument, PointEvent } from './core.js';
@@ -315,7 +316,8 @@ export function createCommunityUI(host: Host) {
         badge.className = 'sensitive-badge';
         card.append(badge);
       }
-      card.append(paragraph(t.description.slice(0, 220)));
+      // Its description as plain text (#398), on one line.
+      card.append(paragraph(markdownText(t.description).replace(/\s+/g, ' ').trim().slice(0, 220)));
       // Starring reloads the dashboard, which brings the new count and the starred list.
       const star = button(`${t.starred ? '★ Starred' : '☆ Star'} · ${t.star_count ?? '0'}`, () => {
         star.disabled = true;
