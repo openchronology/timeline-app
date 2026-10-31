@@ -26,6 +26,27 @@ const identifier = (v: unknown): v is string =>
 export function anchorOf(endpoint: DurationEndpoint): string | null {
   return typeof endpoint === 'string' ? null : endpoint.moment;
 }
+/**
+ * The durations `after` holds unchanged from `before` (the same JSON) whose start or end is
+ * anchored to one of `moved`, moments whose times differ between the two, in ID order: their
+ * spans move though they are not edited (a pull request's moved durations, #395).
+ */
+export function durationsMovedWith(
+  before: readonly Duration[],
+  after: readonly Duration[],
+  moved: ReadonlySet<string>,
+): Duration[] {
+  const old = new Map(before.map((d) => [d.id, d]));
+  return after
+    .filter(
+      (d) =>
+        [d.start, d.end].some((end) => {
+          const anchor = anchorOf(end);
+          return anchor !== null && moved.has(anchor);
+        }) && JSON.stringify(old.get(d.id)) === JSON.stringify(d),
+    )
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
 function endpoint(value: unknown, parse: (text: string) => Q): DurationEndpoint {
   if (typeof value === 'string') return parse(value).toString();
   if (

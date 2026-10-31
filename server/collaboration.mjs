@@ -12,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { HttpError, restrictedTimeline, withoutImageCopies } from './store.mjs';
 import {
   createPresenter,
+  durationsMovedWith,
   printEntityTime,
   printTimeSpan,
   relationshipKey,
@@ -19,7 +20,7 @@ import {
   Q,
 } from '../dist/core.mjs';
 import { commonAncestor, lockTimelines, revisionId } from './versioning.mjs';
-import { differences, valuesAt } from './history.mjs';
+import { anchoredDurations, differences, valuesAt } from './history.mjs';
 /** Why a timeline that keeps no saved history takes no pull requests. */
 export const PULLS_UNAVAILABLE =
   'This timeline does not keep saved history, so it cannot take pull requests: they are reviewed and merged against saved revisions.';
@@ -507,15 +508,24 @@ export class Collaboration {
    * the revision the version belongs to (the base's for `before`, the proposal's for `after`;
    * #386), the anchors of all the examples read in one query per revision, or from the
    * documents already read; an anchor that revision lacks prints as "(anchored moment
-   * missing)". Computed from saved history, so it costs what changed, not the
-   * timeline's size. When either revision is no longer kept (its timeline stopped keeping
-   * saved history), nothing is counted and `unavailable` says why.
+   * missing)".
+   *
+   * A duration whose definition is the same in both but whose start or end is anchored to a
+   * moment whose time differs (moved, removed or added) counts as `moved` (#395), and its
+   * examples (change 'moved') name those moments (`movedWith`): its span changes though the
+   * pull request does not edit it. Those are found per page of moved moments
+   * (movedDurations), so they cost what moved, not the timeline's size; one the pull request
+   * also edits is listed only as changed.
+   *
+   * Computed from saved history, so it costs what changed, not the timeline's size. When
+   * either revision is no longer kept (its timeline stopped keeping saved history), nothing
+   * is counted and `unavailable` says why.
    */
   async changes(baseId, sourceId, presentation) {
     const summary = {
       settings: [],
       moments: { added: 0, removed: 0, changed: 0 },
-      durations: { added: 0, removed: 0, changed: 0 },
+      durations: { added: 0, removed: 0, changed: 0, moved: 0 },
       relationships: { added: 0, removed: 0 },
       examples: [],
       durationExamples: [],
@@ -536,12 +546,16 @@ export class Collaboration {
     const presenters = { before: presenterOf(presentation), after: presenterOf(presentation) };
     const shown = {
       moments: { added: 0, removed: 0, changed: 0 },
-      durations: { added: 0, removed: 0, changed: 0 },
+      durations: { added: 0, removed: 0, changed: 0, moved: 0 },
     };
     const lists = { moments: summary.examples, durations: summary.durationExamples };
+    // Durations already counted as moved: one anchored at both ends to moments on different
+    // pages is found twice.
+    const counted = new Set();
     // The settings come first, so the presentations are known before any example.
-    for await (const page of pages)
-      for (const { kind, before, after } of page) {
+    for await (const page of pages) {
+      const moved = [];
+      for (const { kind, key, before, after } of page) {
         if (kind === 'settings') {
           for (const key of new Set([...Object.keys(before), ...Object.keys(after)]))
             if (JSON.stringify(before[key]) !== JSON.stringify(after[key]))
@@ -557,11 +571,29 @@ export class Collaboration {
         summary[kind][change]++;
         if (lists[kind] && shown[kind][change]++ < EXAMPLES)
           lists[kind].push({ change, before, after });
+        if (kind === 'moments' && before?.time !== after?.time) moved.push(key);
       }
-    const momentTimes = await this.anchorTimes(summary.durationExamples, {
+      if (!moved.length) continue;
+      const found = await this.movedDurations(moved, {
+        lineages: pages.lineages,
+        documents,
+        limit: Math.max(0, EXAMPLES - shown.durations.moved),
+      });
+      for (const { id, definition } of found) {
+        if (counted.has(id)) continue;
+        counted.add(id);
+        summary.durations.moved++;
+        if (definition && shown.durations.moved++ < EXAMPLES)
+          summary.durationExamples.push({ change: 'moved', before: definition, after: definition });
+      }
+    }
+    const momentEvents = await this.anchorMoments(summary.durationExamples, {
       before: { id: baseId, levels: pages.lineages?.from, document: documents?.before },
       after: { id: sourceId, levels: pages.lineages?.to, document: documents?.after },
     });
+    const momentTimes = Object.fromEntries(
+      Object.entries(momentEvents).map(([side, event]) => [side, (id) => event(id)?.time]),
+    );
     const time = (side, entity) =>
       entity ? printEntityTime(presenters[side], entity, momentTimes[side]) : null;
     for (const example of [...summary.examples, ...summary.durationExamples])
@@ -569,35 +601,62 @@ export class Collaboration {
         before: time('before', example.before),
         after: time('after', example.after),
       };
+    // A moved duration names the moments it moves with: its anchors whose times differ.
+    for (const example of summary.durationExamples) {
+      if (example.change !== 'moved') continue;
+      const anchors = new Set(
+        [example.after.start, example.after.end]
+          .filter((end) => end && typeof end === 'object')
+          .map((end) => end.moment),
+      );
+      example.movedWith = [...anchors]
+        .filter((id) => momentTimes.before?.(id) !== momentTimes.after?.(id))
+        .map((id) => {
+          const title = (momentEvents.after?.(id) ?? momentEvents.before?.(id))?.metadata?.title;
+          return title ? { id, title } : { id };
+        });
+    }
     return summary;
   }
   /**
-   * The times of the moments the durations of `examples` are anchored to, for each side
-   * (`before`, read at the base; `after`, at the proposal): a lookup from a moment's ID to its
-   * exact time there, undefined when that revision lacks it. Each revision's anchors are
-   * read in one query, through its lineage (`levels`, as differences read it), or from its
-   * `document` when it is kept as one; none for a side without anchors.
+   * The durations whose definitions both revisions share and whose start or end is anchored
+   * to one of `moments` (IDs of moments whose times differ between them), as {id,
+   * definition} in ID order, the definitions of only the first `limit` given (null after).
+   * From history rows, one query through both `lineages` (anchoredDurations, history.mjs);
+   * from `documents` already read, without one.
    */
-  async anchorTimes(examples, revisions) {
+  async movedDurations(moments, { lineages, documents, limit }) {
+    if (lineages) return anchoredDurations(this.pool, lineages.from, lineages.to, moments, limit);
+    return durationsMovedWith(
+      documents.before.durations ?? [],
+      documents.after.durations ?? [],
+      new Set(moments),
+    ).map((d, i) => ({ id: d.id, definition: i < limit ? d : null }));
+  }
+  /**
+   * The moments the durations of `examples` are anchored to, for each side (`before`, read
+   * at the base; `after`, at the proposal): a lookup from a moment's ID to its event there,
+   * undefined when that revision lacks it. Each revision's anchors are read in one query,
+   * through its lineage (`levels`, as differences read it), or from its `document` when it is
+   * kept as one; none for a side without anchors.
+   */
+  async anchorMoments(examples, revisions) {
     const anchors = { before: new Set(), after: new Set() };
     for (const example of examples)
       for (const side of ['before', 'after'])
         for (const end of example[side] ? [example[side].start, example[side].end] : [])
           if (end && typeof end === 'object') anchors[side].add(end.moment);
-    const times = {};
+    const events = {};
     for (const side of ['before', 'after']) {
       const { id, levels, document } = revisions[side];
       const ids = [...anchors[side]];
       if (!ids.length) continue;
-      if (document) {
-        const events = new Map(document.events.map((e) => [e.id, e.time]));
-        times[side] = (moment) => events.get(moment);
-      } else {
-        const events = await valuesAt(this.pool, id, 'moments', ids, levels);
-        times[side] = (moment) => events.get(moment)?.time;
-      }
+      const found = document
+        ? new Map(document.events.map((e) => [e.id, e]))
+        : await valuesAt(this.pool, id, 'moments', ids, levels);
+      events[side] = (moment) => found.get(moment);
     }
-    return times;
+    return events;
   }
   /**
    * The revisions a fork's pull request pins: its source, a saved (numbered) revision of the

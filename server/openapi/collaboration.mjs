@@ -494,11 +494,14 @@ const counts = (kinds) => ({
   type: 'object',
   properties: Object.fromEntries(kinds.map((k) => [k, { type: 'integer', minimum: 0 }])),
 });
-/** A moment or duration a pull request changes: its versions, and their times as text. */
-const changeExample = (entity) => ({
+/**
+ * A moment or duration a pull request changes: its versions, and their times as text. A
+ * duration's example may also be `moved` (#395), with the moments it moves with.
+ */
+const changeExample = (entity, changes = ['added', 'removed', 'changed'], more = {}) => ({
   type: 'object',
   properties: {
-    change: { type: 'string', enum: ['added', 'removed', 'changed'] },
+    change: { type: 'string', enum: changes },
     before: { oneOf: [entity, { type: 'null' }] },
     after: { oneOf: [entity, { type: 'null' }] },
     times: {
@@ -510,6 +513,7 @@ const changeExample = (entity) => ({
         after: { type: ['string', 'null'] },
       },
     },
+    ...more,
   },
 });
 
@@ -756,7 +760,11 @@ export const schemas = {
         description: 'The timeline settings it changes (such as `title`, `tags`).',
       },
       moments: counts(['added', 'removed', 'changed']),
-      durations: counts(['added', 'removed', 'changed']),
+      durations: {
+        ...counts(['added', 'removed', 'changed', 'moved']),
+        description:
+          '`moved`: durations it leaves alone whose start or end is anchored to a moment whose time it changes (moves, removes or adds), so their span changes. A duration it also edits counts only as changed. Older servers omit `moved`.',
+      },
       relationships: counts(['added', 'removed']),
       examples: {
         type: 'array',
@@ -765,8 +773,20 @@ export const schemas = {
       },
       durationExamples: {
         type: 'array',
-        description: 'The first thirty durations of each kind of change.',
-        items: changeExample(ref('Duration')),
+        description:
+          'The first thirty durations of each kind of change, `moved` included (a reader that does not know a kind skips it). A moved duration’s `before` and `after` are its one definition; its `times` are its span in the base and in the proposal, old → new.',
+        items: changeExample(ref('Duration'), ['added', 'removed', 'changed', 'moved'], {
+          movedWith: {
+            type: 'array',
+            description:
+              'Only on a `moved` duration: the moments it is anchored to whose times differ, with their titles where they have one (the proposal’s, else the base’s).',
+            items: {
+              type: 'object',
+              required: ['id'],
+              properties: { id: { type: 'string' }, title: { type: 'string' } },
+            },
+          },
+        }),
       },
       unavailable: { type: 'string', description: 'Why nothing could be counted.' },
     },

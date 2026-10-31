@@ -1503,6 +1503,11 @@ CREATE INDEX IF NOT EXISTS oc_history_relationships_until ON oc_history_relation
 CREATE INDEX IF NOT EXISTS oc_history_moment_overrides_since ON oc_history_moment_overrides(timeline_id,since);
 CREATE INDEX IF NOT EXISTS oc_history_duration_overrides_since ON oc_history_duration_overrides(timeline_id,since);
 CREATE INDEX IF NOT EXISTS oc_history_relationship_overrides_since ON oc_history_relationship_overrides(timeline_id,since);
+-- A pull request's summary lists the durations that move with a moment it moves though their
+-- definitions do not change (anchoredDurations in history.mjs, #395): it finds the versions
+-- whose start or end names those moments.
+CREATE INDEX IF NOT EXISTS oc_history_durations_start_moment ON oc_history_durations(timeline_id,(definition->'start'->>'moment')) WHERE definition->'start'->>'moment' IS NOT NULL;
+CREATE INDEX IF NOT EXISTS oc_history_durations_end_moment ON oc_history_durations(timeline_id,(definition->'end'->>'moment')) WHERE definition->'end'->>'moment' IS NOT NULL;
 -- Pull requests keep no documents of their own: their base and source are saved revisions
 -- (a submitted source is kept as rows that read through to its base). Documents stored by
 -- earlier versions are copies of those revisions, read from there instead.

@@ -6,7 +6,12 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '../lib/api.js';
 import ReportDialog from './report-dialog.jsx';
-import { changeText, exactTimeText, REBASE_PULL_REQUEST } from '../../src/wording.ts';
+import {
+  changeText,
+  exactTimeText,
+  movedDurationsText,
+  REBASE_PULL_REQUEST,
+} from '../../src/wording.ts';
 /**
  * A pull request's page (/<owner>/<timeline>/pulls/<id>): what it changes, the buttons the
  * reader may use on it, and its discussion.
@@ -125,7 +130,8 @@ export default function PullReview({ timelineId, initial, initialComments, signe
   // The server summarizes what the pull request changes, with the first entities of each kind.
   // Counts of added, removed and changed moments and durations, added and removed
   // relationships, the names of changed timeline settings, and example moments and durations
-  // with their `before` and `after` versions and times as the timeline displays them.
+  // with their `before` and `after` versions and times as the timeline displays them; and the
+  // durations it leaves alone that move with moments it moves (`moved`, #395).
   const { moments, durations, relationships, settings, examples } = p.changes;
   const kinds = [
     ['moment', examples, moments],
@@ -156,6 +162,7 @@ export default function PullReview({ timelineId, initial, initialComments, signe
             durations.
           </p>
         )}
+        {durations.moved > 0 && <p>{movedDurationsText(durations.moved)}</p>}
         {relationships.added + relationships.removed > 0 && (
           <p>
             {relationships.added} added, {relationships.removed} removed relationships.
@@ -164,7 +171,7 @@ export default function PullReview({ timelineId, initial, initialComments, signe
         {settings.map((k) => (
           <p key={k}>Changed timeline {k}.</p>
         ))}
-        {['added', 'removed', 'changed'].map((change) => (
+        {['added', 'removed', 'changed', 'moved'].map((change) => (
           <div key={change}>
             {kinds.map(([kind, list, counts]) => {
               const shown = list.filter((e) => e.change === change);
@@ -180,12 +187,14 @@ export default function PullReview({ timelineId, initial, initialComments, signe
                           {changeText(example, kind)}
                         </summary>
                         {/* A changed one shows its old version, then its new one. */}
-                        {before && after && <pre>{JSON.stringify(before, null, 2)}</pre>}
+                        {before && after && example.change === 'changed' && (
+                          <pre>{JSON.stringify(before, null, 2)}</pre>
+                        )}
                         <pre>{JSON.stringify(e, null, 2)}</pre>
                       </details>
                     );
                   })}
-                  {counts[change] > shown.length && (
+                  {(counts[change] ?? 0) > shown.length && (
                     <p>
                       {counts[change] - shown.length} more {change} {kind}s in the proposed
                       timeline.
