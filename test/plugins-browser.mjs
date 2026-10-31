@@ -273,6 +273,29 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
   assert.equal(await rootEditor.locator('h2').textContent(), 'New heading');
   richSaved = await exported();
   assert.equal(richSaved.events[0].metadata.description, '## New heading\n\n**Kept Markdown**');
+  // A table survives an edit in the visual editor: the edited cell's text is written back into
+  // a table, with its alignment, and a cell's pipe stays escaped.
+  await rawToggle.click();
+  await input('event-description').fill(
+    '| Name | Count |\n| --- | ---: |\n| a\\|b | 1 |\n\n~~old~~ text',
+  );
+  await input('event-form')
+    .getByRole('button', { name: 'Visual editor', exact: true })
+    .first()
+    .click();
+  const cell = rootEditor.locator('td').nth(1);
+  assert.equal(await cell.textContent(), '1');
+  await cell.click();
+  await page.keyboard.press('End');
+  await page.keyboard.type('2');
+  await page.waitForFunction(() =>
+    document.getElementById('event-description').value.includes('| 12 |'),
+  );
+  richSaved = await exported();
+  assert.equal(
+    richSaved.events[0].metadata.description,
+    '| Name | Count |\n| --- | ---: |\n| a\\|b | 12 |\n\n~~old~~ text',
+  );
   if (offline) {
     const plugins = [
       MOMENT_ICONS,

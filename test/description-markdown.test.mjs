@@ -123,3 +123,84 @@ test('Cards show the start of the description on one line, formatted, without li
   assert.equal(html(site.MarkdownExcerpt, { text: '<b>hi</b>' }), '&lt;b&gt;hi&lt;/b&gt;');
   assert.equal(html(site.MarkdownExcerpt, { text: '' }), '');
 });
+
+const table =
+  'Legend:\n\n| Feature | Meaning \\| here |\n| :--- | ---: |\n| **Ellipses** | Conditions |\n' +
+  '| `a|b` | extra | dropped |\n| short |\n\nAfter.';
+
+test('Tables: a header, alignment from the delimiter row, rows padded or cut to its columns', () => {
+  const [, block, after] = parseMarkdown(table);
+  assert.deepEqual(block, {
+    tag: 'table',
+    align: ['left', 'right'],
+    head: [['Feature'], ['Meaning | here']],
+    rows: [
+      [[{ tag: 'strong', children: ['Ellipses'] }], ['Conditions']],
+      [[{ tag: 'code', text: 'a|b' }], ['extra']],
+      [['short'], []],
+    ],
+  });
+  assert.deepEqual(after, { tag: 'p', lines: [['After.']] });
+  // Without a matching delimiter row, pipes are just text.
+  assert.deepEqual(parseMarkdown('a | b\nc | d'), [{ tag: 'p', lines: [['a | b'], ['c | d']] }]);
+  assert.deepEqual(parseMarkdown('| a | b |\n| --- |'), [
+    { tag: 'p', lines: [['| a | b |'], ['| --- |']] },
+  ]);
+  assert.equal(
+    markdownText(table),
+    'Legend:\n\nFeature · Meaning | here\nEllipses · Conditions\na|b · extra\nshort · \n\nAfter.',
+  );
+});
+
+test('Rules, deeper headings, + bullets, strikethrough, underscores and https autolinks', () => {
+  assert.deepEqual(parseMarkdown('---\n#### Four\n###### Six\n+ one\n* * *'), [
+    { tag: 'hr' },
+    { tag: 'h4', children: ['Four'] },
+    { tag: 'h6', children: ['Six'] },
+    { tag: 'ul', items: [['one']] },
+    { tag: 'hr' },
+  ]);
+  assert.deepEqual(parseMarkdown('~~gone~~ _soft_ __loud__ snake_case_name'), [
+    {
+      tag: 'p',
+      lines: [
+        [
+          { tag: 'del', children: ['gone'] },
+          ' ',
+          { tag: 'em', children: ['soft'] },
+          ' ',
+          { tag: 'strong', children: ['loud'] },
+          ' snake_case_name',
+        ],
+      ],
+    },
+  ]);
+  assert.deepEqual(
+    parseMarkdown('See https://example.com/a_b. Or <https://example.org>, not http://x.example'),
+    [
+      {
+        tag: 'p',
+        lines: [
+          [
+            'See ',
+            { tag: 'a', href: 'https://example.com/a_b', text: 'https://example.com/a_b' },
+            '. Or ',
+            { tag: 'a', href: 'https://example.org/', text: 'https://example.org' },
+            ', not http://x.example',
+          ],
+        ],
+      },
+    ],
+  );
+  assert.equal(markdownText('One\n\n---\n\nTwo'), 'One\n\nTwo');
+});
+
+test('The page’s text renders tables and rules; cards read a table’s cells', () => {
+  const out = html(site.Markdown, { text: table + '\n\n---' });
+  assert.match(
+    out,
+    /<div class="markdown-table"><table><thead><tr><th style="text-align:left">Feature<\/th><th style="text-align:right">Meaning \| here<\/th><\/tr><\/thead><tbody><tr><td style="text-align:left"><strong>Ellipses<\/strong><\/td>/,
+  );
+  assert.match(out, /<hr\/><\/div>$/);
+  assert.equal(html(site.MarkdownExcerpt, { text: '| A | B |\n| - | - |\n| 1 | 2 |' }), 'A B 1 2');
+});

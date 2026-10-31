@@ -2363,9 +2363,44 @@ body[data-platform-editor] .app-header {
 }
 .markdown-view h1,
 .markdown-view h2,
-.markdown-view h3 {
+.markdown-view h3,
+.markdown-view h4,
+.markdown-view h5,
+.markdown-view h6 {
   font-size: 1.1em;
   margin: 8px 0;
+}
+.markdown-view h4,
+.markdown-view h5,
+.markdown-view h6 {
+  font-size: 1em;
+}
+.markdown-view hr {
+  border: 0;
+  border-top: 1px solid var(--line-strong);
+  margin: 12px 0;
+}
+/* A wide table scrolls within the description rather than widening it. */
+.markdown-view .markdown-table {
+  overflow-x: auto;
+  margin: 8px 0;
+}
+.markdown-view table {
+  border-collapse: collapse;
+  font-size: 0.95em;
+  overflow-wrap: normal;
+}
+.markdown-view th,
+.markdown-view td {
+  border: 1px solid var(--line-strong);
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+  min-width: 6em;
+}
+.markdown-view th {
+  background: var(--code);
+  font-weight: 600;
 }
 .markdown-view ul,
 .markdown-view ol {
