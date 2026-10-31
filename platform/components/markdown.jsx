@@ -28,11 +28,39 @@ function Inline({ nodes, links = true }) {
   });
 }
 
-/** Markdown as blocks: paragraphs, headings, quotes, lists and code. */
+/** A table block, in a scrolling wrapper so a wide table doesn't widen the page. */
+function Table({ block }) {
+  const row = (cells, Cell) =>
+    cells.map((cell, i) => (
+      <Cell key={i} style={block.align[i] ? { textAlign: block.align[i] } : undefined}>
+        <Inline nodes={cell} />
+      </Cell>
+    ));
+  return (
+    <div className="markdown-table">
+      <table>
+        <thead>
+          <tr>{row(block.head, 'th')}</tr>
+        </thead>
+        {block.rows.length > 0 && (
+          <tbody>
+            {block.rows.map((cells, j) => (
+              <tr key={j}>{row(cells, 'td')}</tr>
+            ))}
+          </tbody>
+        )}
+      </table>
+    </div>
+  );
+}
+
+/** Markdown as blocks: paragraphs, headings, quotes, lists, tables, rules and code. */
 export default function Markdown({ text, className = '' }) {
   return (
     <div className={('markdown-view ' + className).trim()}>
       {parseMarkdown(String(text ?? '')).map((block, i) => {
+        if (block.tag === 'hr') return <hr key={i} />;
+        if (block.tag === 'table') return <Table key={i} block={block} />;
         if (block.tag === 'pre')
           return (
             <pre key={i}>
@@ -82,6 +110,7 @@ export default function Markdown({ text, className = '' }) {
 export function MarkdownExcerpt({ text, length = 240 }) {
   const inlines = [];
   for (const block of parseMarkdown(String(text ?? ''))) {
+    if (block.tag === 'hr') continue;
     const parts =
       block.tag === 'pre'
         ? [[block.text]]
@@ -89,7 +118,9 @@ export function MarkdownExcerpt({ text, length = 240 }) {
           ? block.lines
           : block.tag === 'ul' || block.tag === 'ol'
             ? block.items
-            : [block.children];
+            : block.tag === 'table'
+              ? [block.head, ...block.rows].flat()
+              : [block.children];
     for (const part of parts) inlines.push(' ', ...part);
   }
   // Whitespace is collapsed within each text, and the text measured, before cutting.

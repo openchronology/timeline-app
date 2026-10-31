@@ -56,6 +56,43 @@ export async function checkDescriptionMarkdown(page, restore) {
   assert(!shown.text.includes('**'), shown.text);
   assert.equal(await page.evaluate(() => window.pwned), undefined);
 
+  // Tables render as tables, inside a wrapper that scrolls when the table is wide.
+  await load({
+    format: 'openchronology',
+    version: 1,
+    title: 'Tabled',
+    description: '| Feature | Meaning |\n| --- | :-: |\n| Ellipses | *Conditions* |\n\n---',
+    events: [{ id: 'a', time: '0/1', metadata: { title: 'A' } }],
+  });
+  await view.locator('table').waitFor();
+  assert.deepEqual(
+    await view.evaluate((v) => ({
+      cells: [...v.querySelectorAll('th, td')].map((c) => [c.tagName, c.textContent]),
+      centered: getComputedStyle(v.querySelectorAll('td')[1]).textAlign,
+      wrapped: v.querySelector('table').parentElement.className,
+      rules: v.querySelectorAll('hr').length,
+    })),
+    {
+      cells: [
+        ['TH', 'Feature'],
+        ['TH', 'Meaning'],
+        ['TD', 'Ellipses'],
+        ['TD', 'Conditions'],
+      ],
+      centered: 'center',
+      wrapped: 'markdown-table',
+      rules: 1,
+    },
+  );
+  await load({
+    format: 'openchronology',
+    version: 1,
+    title: 'Described',
+    description: source,
+    events: [{ id: 'a', time: '0/1', metadata: { title: 'A' } }],
+  });
+  await view.waitFor();
+
   // Clicking it (not its link) edits the Markdown source; leaving renders it again.
   await view.click({ position: { x: 4, y: 4 } });
   await area.waitFor();
@@ -76,6 +113,6 @@ export async function checkDescriptionMarkdown(page, restore) {
   assert.equal(await view.isHidden(), true);
   await load(restore);
   console.log(
-    'PASS description markdown: rendered under the title with safe links and no HTML, edited as source on click.',
+    'PASS description markdown: rendered under the title with safe links, tables and no HTML, edited as source on click.',
   );
 }
