@@ -114,7 +114,7 @@ function cborWhole(bytes) {
 /**
  * A COSE_Key (RFC 9053) as `{ algorithm, key }`, `key` being a node:crypto public KeyObject:
  * EdDSA over Ed25519 (alg -8), ECDSA P-256 with SHA-256 (ES256, -7) or RSASSA-PKCS1-v1_5 with
- * SHA-256 (RS256, -257, a modulus of at least 2048 bits). Anything else is refused.
+ * SHA-256 (RS256, -257, a modulus of 2048 to 8192 bits). Anything else is refused.
  */
 export function coseKey(bytes) {
   const map = bytes instanceof Map ? bytes : cborWhole(bytes);
@@ -134,15 +134,21 @@ export function coseKey(bytes) {
     jwk = { kty: 'OKP', crv: 'Ed25519', x: b64(-2, 32) };
   else if (kty === 2 && algorithm === -7 && map.get(-1) === 1)
     jwk = { kty: 'EC', crv: 'P-256', x: b64(-2, 32), y: b64(-3, 32) };
-  else if (kty === 3 && algorithm === -257) {
-    jwk = { kty: 'RSA', n: b64(-1), e: b64(-2) };
-    if (map.get(-1).length < 256) unsupported();
-  } else unsupported();
+  else if (kty === 3 && algorithm === -257) jwk = { kty: 'RSA', n: b64(-1), e: b64(-2) };
+  else unsupported();
+  let key;
   try {
-    return { algorithm, key: createPublicKey({ key: jwk, format: 'jwk' }) };
+    key = createPublicKey({ key: jwk, format: 'jwk' });
   } catch {
     return unsupported();
   }
+  // The modulus's size in bits as node:crypto reads it, not its encoding's length: leading
+  // zero bytes would make a short modulus look long. The upper bound keeps verifying cheap.
+  if (jwk.kty === 'RSA') {
+    const bits = key.asymmetricKeyDetails?.modulusLength ?? 0;
+    if (bits < 2048 || bits > 8192) unsupported();
+  }
+  return { algorithm, key };
 }
 
 /**

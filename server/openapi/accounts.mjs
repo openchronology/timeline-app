@@ -383,7 +383,7 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Reset a password',
       description: [
-        'Sets a new password with the token from a reset link. It signs the account out everywhere, revokes its API keys and pending desktop approvals, and does not turn two-factor authentication off.',
+        'Sets a new password with the token from a reset link. It signs the account out everywhere, revokes its API keys and pending desktop approvals, and removes its passkeys (they must be added again). It does not turn two-factor authentication off: when passkeys were its only factor, the recovery codes answer it until an authenticator app or a passkey is added.',
         SIGN_IN_TOKEN,
       ].join('\n\n'),
       security: SIGN_IN,

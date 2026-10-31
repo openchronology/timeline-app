@@ -4,15 +4,19 @@
 // answering a sign-in's two-factor step and a security change with one, each challenge once,
 // signing in with one alone (and not when the site turns it off), refusing a copied passkey
 // by its counter, an administrator's change confirmed with one, living beside an
-// authenticator app, and removing them.
+// authenticator app, and removing them. Then the refusals: a passkey sign-in to a suspended
+// account or an unconfirmed address, another account's passkey, a desktop session, a missing
+// or wrong CSRF token, a challenge answered for another purpose; a passkey sign-in counting
+// once against the sign-in limit; and a password reset removing the account's passkeys while
+// two-factor authentication stays on.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { createApplication } from '../server/http.mjs';
 import { flushMail } from '../server/mail.mjs';
 import { passwordHash } from '../server/auth.mjs';
-import { totp } from '../server/security-crypto.mjs';
+import { digest, totp } from '../server/security-crypto.mjs';
 import { POLICY_VERSION } from '../server/policies.mjs';
 import { softAuthenticator } from './webauthn-authenticator.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
@@ -62,11 +66,15 @@ const suffix = Date.now().toString(36),
   tight = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1 }),
   userHandleOf = (id) => Buffer.from(id.replace(/-/g, ''), 'hex').toString('base64url'),
   uid = randomUUID(),
-  adminId = randomUUID();
+  adminId = randomUUID(),
+  victimId = randomUUID(),
+  victim = 'pkvictim_' + suffix,
+  victimEmail = victim + '@example.test';
 let n = 0;
 /**
  * A browser: its own cookies, address and CSRF token, against the server named `server`
- * (which it may change: sessions live in the database, so any server knows them). A request
+ * (which it may change: sessions live in the database, so any server knows them). Setting
+ * `csrfHeader` sends that token instead (null: none), as a forged request would. A request
  * that does not answer within twenty seconds fails rather than waiting forever.
  */
 function client(server = 'main') {
@@ -75,15 +83,17 @@ function client(server = 'main') {
   let csrf;
   return {
     server,
+    csrfHeader: undefined,
     async request(path, data, status = 200, method = data === undefined ? 'GET' : 'POST') {
       const origin = `http://127.0.0.1:${servers[this.server].address().port}`;
+      const token = this.csrfHeader === undefined ? csrf : this.csrfHeader;
       const response = await fetch(origin + '/api/' + path, {
         method,
         signal: AbortSignal.timeout(20000),
         headers: {
           'X-Forwarded-For': ip,
           Cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join('; '),
-          ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
+          ...(token ? { 'X-CSRF-Token': token } : {}),
           ...(data ? { 'Content-Type': 'application/json' } : {}),
         },
         ...(data ? { body: JSON.stringify(data) } : {}),
@@ -455,11 +465,189 @@ try {
     0,
   );
   assert.equal((await solo.request('auth/account')).security.mfa_enabled, false);
+
+  // The refusals, on an account of its own with one passkey.
+  await fresh();
+  await pool.query(
+    'INSERT INTO oc_users(id,username,email,email_verified_at,password_hash,terms_version,terms_accepted_at) VALUES($1,$2,$3,now(),$4,$5,now())',
+    [victimId, victim, victimEmail, hash, POLICY_VERSION],
+  );
+  const holder = client(),
+    victimKey = softAuthenticator({ userHandle: userHandleOf(victimId) });
+  await signIn(holder, victim);
+  const victimCodes = (await enroll(holder, victimKey, 'Key')).recoveryCodes;
+  const victimPasskey = (await holder.request('auth/account')).security.passkeys[0].id;
+  /** Signs in with victimKey alone from `browser` (a new one by default), expecting `status`. */
+  const passkeyOnly = async (status, browser = client()) => {
+    await browser.request('session');
+    const { publicKey } = await browser.request('auth/passkeys/sign-in/options', {});
+    return browser.request(
+      'auth/passkeys/sign-in',
+      { credential: victimKey.get(publicKey, { origin: site }) },
+      status,
+    );
+  };
+  await passkeyOnly(200);
+  // Not for a suspended account, nor one whose address is unconfirmed.
+  await pool.query('UPDATE oc_users SET is_disabled=true WHERE id=$1', [victimId]);
+  await passkeyOnly(401);
+  await pool.query('UPDATE oc_users SET is_disabled=false,email_verified_at=NULL WHERE id=$1', [
+    victimId,
+  ]);
+  await passkeyOnly(401);
+  await pool.query('UPDATE oc_users SET email_verified_at=now() WHERE id=$1', [victimId]);
+
+  // Another signed-in account cannot rename or remove it: it is not found.
+  assert.equal((await owner.request('session')).user.id, uid);
+  await owner.request('auth/passkeys/' + victimPasskey, { name: 'Mine' }, 404, 'PATCH');
+  await owner.request('auth/passkeys/' + victimPasskey, { password }, 404, 'DELETE');
+  // Nor a desktop session of the account itself: passkeys are managed in a browser.
+  const desktop = randomBytes(32).toString('hex');
+  await pool.query(
+    "INSERT INTO oc_sessions(token_hash,user_id,csrf,kind,mfa_verified,expires_at) VALUES($1,$2,'desk','desktop',true,now()+interval '1 day')",
+    [digest(desktop), victimId],
+  );
+  for (const [path, method, data] of [
+    ['auth/passkeys/' + victimPasskey, 'PATCH', { name: 'Desk' }],
+    ['auth/passkeys/' + victimPasskey, 'DELETE', { password, code: victimCodes[9] }],
+    ['auth/passkeys/register/options', 'POST', { password, code: victimCodes[9] }],
+  ]) {
+    const response = await fetch(`http://127.0.0.1:${servers.main.address().port}/api/${path}`, {
+      method,
+      headers: {
+        Authorization: 'Bearer ' + desktop,
+        'X-CSRF-Token': 'desk',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    assert.equal(response.status, 403, `${method} ${path} from the desktop`);
+  }
+  // Nor the browser's own session without its CSRF token, or with a wrong one.
+  for (const forged of [null, 'f'.repeat(64)]) {
+    holder.csrfHeader = forged;
+    await holder.request('auth/passkeys/' + victimPasskey, { name: 'Forged' }, 403, 'PATCH');
+    await holder.request(
+      'auth/passkeys/' + victimPasskey,
+      { password, code: victimCodes[9] },
+      403,
+      'DELETE',
+    );
+  }
+  holder.csrfHeader = undefined;
+  let victimAccount = await holder.request('auth/account');
+  assert.deepEqual(
+    victimAccount.security.passkeys.map((p) => p.name),
+    ['Key'],
+  );
+  assert.equal(victimAccount.security.recovery_remaining, 10);
+
+  // A challenge answers only the step it was made for. A sign-in's challenge does not answer
+  // the two-factor step in the same browser...
+  const stepped = client();
+  assert.equal((await signIn(stepped, victim)).challenge, 'mfa');
+  const { publicKey: forSignIn } = await stepped.request('auth/passkeys/sign-in/options', {});
+  await stepped.request(
+    'auth/mfa/complete',
+    { passkey: victimKey.get(forSignIn, { origin: site }) },
+    401,
+  );
+  // ...nor does the two-factor step's challenge sign in alone...
+  const { publicKey: forFactor } = await stepped.request('auth/passkeys/factor/options', {});
+  await stepped.request(
+    'auth/passkeys/sign-in',
+    { credential: victimKey.get(forFactor, { origin: site }) },
+    401,
+  );
+  // ...while the step's own challenge still completes it.
+  const { publicKey: ownFactor } = await stepped.request('auth/passkeys/factor/options', {});
+  assert.equal(
+    (
+      await stepped.request('auth/mfa/complete', {
+        passkey: victimKey.get(ownFactor, { origin: site }),
+      })
+    ).user.id,
+    victimId,
+  );
+  // In a session: a confirmation's challenge does not sign in, and a sign-in's does not
+  // confirm a change.
+  await stepped.request(
+    'auth/passkeys/sign-in',
+    { credential: await confirmWith(stepped, victimKey) },
+    401,
+  );
+  const { publicKey: inSession } = await stepped.request('auth/passkeys/sign-in/options', {});
+  await stepped.request(
+    'auth/passkeys/register/options',
+    { password, passkey: victimKey.get(inSession, { origin: site }) },
+    401,
+  );
+
+  // One passkey sign-in (its options, then its answer) counts once against the address's ten
+  // sign-in attempts a minute, so six in a row from one address all succeed.
+  const repeated = client();
+  for (let i = 0; i < 6; i++) await passkeyOnly(200, repeated);
+
+  // A password reset removes the passkeys: the one added before it no longer signs in, and
+  // the account lists none. Two-factor authentication stays on, answered by recovery codes.
+  const resetToken = randomBytes(32).toString('hex'),
+    newPassword = 'another unique passkey testing passphrase';
+  await pool.query(
+    "INSERT INTO oc_email_tokens(token_hash,user_id,purpose,email,expires_at) VALUES($1,$2,'reset',$3,now()+interval '30 minutes')",
+    [digest(resetToken), victimId, victimEmail],
+  );
+  const resetting = client();
+  await resetting.request('session');
+  const reset = await resetting.request('auth/password/reset', {
+    token: resetToken,
+    password: newPassword,
+    passwordConfirmation: newPassword,
+  });
+  assert.match(reset.message, /passkeys were removed/);
+  await flushMail(pool, mailer, key);
+  assert.match(
+    messages.filter((m) => m.to === victimEmail).at(-1).text,
+    /passkeys were removed.*remains on: use a recovery code/s,
+  );
+  assert.equal((await holder.request('session')).user, null);
+  await passkeyOnly(401);
+  assert.equal(
+    (await pool.query('SELECT count(*)::int AS n FROM oc_passkeys WHERE user_id=$1', [victimId]))
+      .rows[0].n,
+    0,
+  );
+  const returning = client();
+  await returning.request('session');
+  assert.equal(
+    (await returning.request('auth/login', { username: victim, password: newPassword })).challenge,
+    'mfa',
+  );
+  // The step offers no passkey and takes a recovery code.
+  assert.equal((await returning.request('session')).challengePasskey, false);
+  await returning.request('auth/passkeys/factor/options', {}, 401);
+  await returning.request('auth/mfa/complete', { code: victimCodes[0] });
+  victimAccount = await returning.request('auth/account');
+  assert.equal(victimAccount.security.mfa_enabled, true);
+  assert.equal(victimAccount.security.totp_enabled, false);
+  assert.deepEqual(victimAccount.security.passkeys, []);
+  assert.equal(victimAccount.security.recovery_remaining, 9);
+  // A recovery code confirms adding a passkey again, which keeps the codes.
+  const again3 = await enroll(returning, softAuthenticator(), 'New key', {
+    password: newPassword,
+    code: victimCodes[1],
+  });
+  assert.equal(again3.recoveryCodes, undefined);
+  victimAccount = await returning.request('auth/account');
+  assert.deepEqual(
+    victimAccount.security.passkeys.map((p) => p.name),
+    ['New key'],
+  );
+  assert.equal(victimAccount.security.recovery_remaining, 8);
   console.log(
-    'PostgreSQL passkeys: enrolling, two-factor sign-in, confirmation, single-use challenges, sign-in alone, copied-passkey refusal, administration, beside an authenticator app, removal passed.',
+    'PostgreSQL passkeys: enrolling, two-factor sign-in, confirmation, single-use challenges, sign-in alone, copied-passkey refusal, administration, beside an authenticator app, removal, refusals, the sign-in limit and a reset removing passkeys passed.',
   );
 } finally {
-  await pool.query('DELETE FROM oc_users WHERE id=ANY($1)', [[uid, adminId, soloId]]);
+  await pool.query('DELETE FROM oc_users WHERE id=ANY($1)', [[uid, adminId, soloId, victimId]]);
   // The sign-in attempts this test counted (by hashed address and name).
   await pool.query('DELETE FROM oc_auth_attempts');
   for (const server of Object.values(servers)) {

@@ -521,9 +521,10 @@ export class Passkeys {
    * The routes under /api/auth/passkeys (http.mjs), for `req` with `session` (or null) and
    * `read()`, which reads the JSON body. Result: what to answer, or undefined for a path this
    * does not handle. Each has the CSRF token (the session's, or the sign-in nonce's) and a rate
-   * limit: signing in shares the password sign-in's per address; starting an enrollment and
-   * removing a passkey count as security changes, per address and per account; the rest have
-   * thirty a minute per account.
+   * limit: signing in shares the password sign-in's per address, and asking for its options
+   * has its own count per address, so one passkey sign-in (options, then the answer) uses one
+   * of the shared attempts, not two; starting an enrollment and removing a passkey count as
+   * security changes, per address and per account; the rest have thirty a minute per account.
    */
   async route(req, pathname, method, session, read) {
     const path = pathname.slice('/api/auth/passkeys'.length);
@@ -531,7 +532,7 @@ export class Passkeys {
     if (method === 'POST' && (path === '/sign-in/options' || path === '/sign-in')) {
       if (session) this.auth.require(session, req);
       else this.auth.requireLogin(req);
-      await this.auth.rateLimit(ip);
+      await this.auth.rateLimit(path === '/sign-in' ? ip : 'passkey-options:' + ip);
       const input = await read();
       return path === '/sign-in'
         ? this.signIn(req, input, session)

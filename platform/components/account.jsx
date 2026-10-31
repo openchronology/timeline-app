@@ -333,6 +333,12 @@ export default function Account({ returnTo = '/', login = false }) {
           <p className="muted">Save timelines to your account and share them with anyone.</p>
         )}
         {mode === 'forgot' && <p className="muted">We'll email a link to choose a new password.</p>}
+        {mode === 'reset' && (
+          <p className="muted">
+            Resetting removes your passkeys; add them again after signing in. Two-factor
+            authentication stays on.
+          </p>
+        )}
       </header>
       {!session && !error && <p role="status">Loading your session…</p>}
       {session?.server === false && (

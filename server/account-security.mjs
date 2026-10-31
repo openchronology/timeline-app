@@ -641,7 +641,7 @@ export class AccountSecurity {
       await queueMail(c, this.key, {
         to: email,
         subject: 'Reset your OpenChronology password',
-        text: `Reset your password:\n${this.auth.origin}/login#reset=${token}\nThis link expires in 30 minutes. Resetting your password does not disable two-factor authentication. Ignore this message if you did not request it.`,
+        text: `Reset your password:\n${this.auth.origin}/login#reset=${token}\nThis link expires in 30 minutes. Resetting your password removes your passkeys but does not disable two-factor authentication. Ignore this message if you did not request it.`,
       });
     });
     this.deliver();
@@ -652,8 +652,11 @@ export class AccountSecurity {
    * confirmation. The link works once and only while the address it went to is still the
    * account's confirmed address. Everything that could still act for the account ends: all
    * sessions, pending desktop sign-ins, sign-in challenges and other reset links, and its API
-   * keys are revoked. Two-factor authentication stays on (resetting by email must not be a way
-   * around it). The account is notified.
+   * keys are revoked. Its passkeys are removed: one may sign in on its own (PASSKEY_SIGN_IN), so
+   * a passkey someone else added would otherwise outlast the reset. Two-factor authentication
+   * stays on (resetting by email must not be a way around it), even when passkeys were its only
+   * factor: the recovery codes then answer it until the person adds an app or a passkey again.
+   * The account is notified.
    */
   async reset(body) {
     this.configured();
@@ -690,6 +693,9 @@ export class AccountSecurity {
       // earlier approval cannot restore access) and sign-in challenges.
       await c.query('UPDATE oc_users SET password_hash=$2 WHERE id=$1', [user.id, hash]);
       await c.query("DELETE FROM oc_email_tokens WHERE user_id=$1 AND purpose='reset'", [user.id]);
+      // Every passkey goes, mfa_enabled untouched: the account keeps its recovery codes.
+      const passkeys = (await c.query('DELETE FROM oc_passkeys WHERE user_id=$1', [user.id]))
+        .rowCount;
       await c.query(
         'UPDATE oc_api_keys SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL',
         [user.id],
@@ -698,11 +704,22 @@ export class AccountSecurity {
       await this.notify(
         c,
         user,
-        'Your OpenChronology password was reset. All sessions were signed out. Two-factor authentication remains unchanged.',
+        'Your OpenChronology password was reset. All sessions were signed out. ' +
+          (passkeys
+            ? 'Your passkeys were removed; add them again under Account → Security. '
+            : '') +
+          (passkeys && user.mfa_enabled && !user.mfa_secret
+            ? 'Two-factor authentication remains on: use a recovery code to sign in until you ' +
+              'add a passkey or an authenticator app.'
+            : 'Two-factor authentication remains unchanged.'),
       );
     });
     this.deliver();
-    return { message: 'Password reset. Sign in again; two-factor authentication still applies.' };
+    return {
+      message:
+        'Password reset. Sign in again; two-factor authentication still applies. ' +
+        'Any passkeys were removed: add them again after signing in.',
+    };
   }
   /**
    * The check every security change makes, inside its transaction `c` with `user` locked: the

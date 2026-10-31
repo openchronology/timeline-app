@@ -39,14 +39,21 @@ const b64 = (bytes) => Buffer.from(bytes).toString('base64url');
 
 /**
  * A passkey held by the test: `algorithm` -7 (ES256), -8 (EdDSA) or -257 (RS256). `counter`
- * is the signature counter it reports next (0 keeps none, as synced passkeys do).
+ * is the signature counter it reports next (0 keeps none, as synced passkeys do). An RS256
+ * key has `modulusLength` bits, its modulus sent after `pad` zero bytes.
  */
-export function softAuthenticator({ algorithm = -7, counter = 0, userHandle = null } = {}) {
+export function softAuthenticator({
+  algorithm = -7,
+  counter = 0,
+  userHandle = null,
+  modulusLength = 2048,
+  pad = 0,
+} = {}) {
   const pair =
     algorithm === -8
       ? generateKeyPairSync('ed25519')
       : algorithm === -257
-        ? generateKeyPairSync('rsa', { modulusLength: 2048 })
+        ? generateKeyPairSync('rsa', { modulusLength })
         : generateKeyPairSync('ec', { namedCurve: 'P-256' });
   const jwk = pair.publicKey.export({ format: 'jwk' });
   const cose =
@@ -61,7 +68,7 @@ export function softAuthenticator({ algorithm = -7, counter = 0, userHandle = nu
         ? new Map([
             [1, 3],
             [3, -257],
-            [-1, Buffer.from(jwk.n, 'base64url')],
+            [-1, Buffer.concat([Buffer.alloc(pad), Buffer.from(jwk.n, 'base64url')])],
             [-2, Buffer.from(jwk.e, 'base64url')],
           ])
         : new Map([

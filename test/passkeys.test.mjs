@@ -207,6 +207,18 @@ test('CBOR and COSE keys are read strictly', () => {
   assert.equal(passkeyAnswer('[1]'), null);
 });
 
+test('an RSA key is measured by its modulus, not by the bytes it is sent in', () => {
+  // A 1024-bit modulus sent as 256 bytes (128 of them leading zeros) is still 1024 bits.
+  const short = softAuthenticator({ algorithm: -257, modulusLength: 1024, pad: 128 }),
+    c = challenge();
+  assert.throws(() => verifyRegistration(short.create(creation(c), { origin }), expected(c)), {
+    reason: 'key',
+  });
+  // A 2048-bit one with a leading zero byte is fine.
+  const padded = softAuthenticator({ algorithm: -257, pad: 1 });
+  assert.equal(registered(padded).algorithm, -257);
+});
+
 test('PASSKEY_SIGN_IN allows signing in with a passkey unless turned off', () => {
   for (const value of [undefined, '', '1', 'true', 'YES', 'on'])
     assert.equal(passkeySignIn(value), true);
