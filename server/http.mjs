@@ -1666,6 +1666,8 @@ export function createRequestHandler({
               Q.parse(threshold).compare(Q.zero) < 0
             )
               throw new HttpError(400, 'Overview needs bounds and a nonnegative threshold.');
+            if (input.arcs !== undefined && typeof input.arcs !== 'boolean')
+              throw new HttpError(400, 'Expected arcs to be true or false.');
             return response(
               res,
               200,
@@ -1675,6 +1677,7 @@ export function createRequestHandler({
                 upper,
                 threshold,
                 ...(filter ? { filter } : {}),
+                ...(input.arcs === false ? { arcs: false } : {}),
                 ...(input.revision ? { revision: input.revision } : {}),
                 ...(input.plugins !== undefined
                   ? {

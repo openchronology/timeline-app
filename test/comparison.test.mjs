@@ -170,3 +170,44 @@ test('comparison source refresh preserves exact alignment and invalidates only i
   const frame = await view.frame(new Viewport(Q.zero, Q.from(10n)), 1000, 1);
   assert.equal(frame.groups.find((g) => g.id === 'a:event-000').first, '6/1');
 });
+
+test("arcs come through on their track, mapped onto the shared axis, from a source's own arcs (#415)", async () => {
+  const a = source('a', ['1/1', '2/1'], {
+      arcs: (lower, upper) => ({
+        edges: [
+          {
+            id: 'm:event-000~m:other',
+            a: { moment: 'event-000' },
+            b: { moment: 'other' },
+            aTime: '1/1',
+            bTime: '5/1',
+            first: '1/1',
+            last: '5/1',
+            aIn: true,
+            bIn: false,
+          },
+        ].filter(() => lower.compare(Q.from(5n)) <= 0 && upper.compare(Q.from(1n)) >= 0),
+        edgesTruncated: false,
+      }),
+    }),
+    b = source('b', ['3/1'], { arcs: () => ({ edges: [], edgesTruncated: false }) });
+  const view = new ComparisonView([a, b]);
+  view.transform('a', Q.one, Q.from(10n));
+  const frame = await view.frame(new Viewport(Q.from(0n), Q.from(20n)), 1000, 1);
+  assert.deepEqual(frame.edges, [
+    {
+      id: 'a:m:event-000~m:other',
+      a: { moment: 'event-000' },
+      b: { moment: 'other' },
+      aTime: '11/1',
+      bTime: '15/1',
+      first: '11/1',
+      last: '15/1',
+      aIn: true,
+      bIn: false,
+      sourceKey: 'a',
+    },
+  ]);
+  assert.equal(frame.edgesTruncated, false);
+  assert.deepEqual(view.cached(new Viewport(Q.from(0n), Q.from(20n)), 1000, 1).edges, frame.edges);
+});

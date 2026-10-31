@@ -46,6 +46,21 @@ const queries = [
   { kind: 'overview', lower: '-10/1', upper: '700/1', threshold: '7/1' },
   { kind: 'overview', lower: '100/1', upper: '300/1', threshold: '1/1' },
   { kind: 'overview', lower: '0/1', upper: '600/1', threshold: '61/1' },
+  // Separations: their arcs are the timeline's own, read through, marked by side (#415).
+  {
+    kind: 'overview',
+    lower: '-10/1',
+    upper: '700/1',
+    threshold: '1/1',
+    filter: { tags: ['five', 'three'], mode: 'any' },
+  },
+  {
+    kind: 'overview',
+    lower: '100/1',
+    upper: '300/1',
+    threshold: '0/1',
+    filter: { related: { moment: 'm3' }, depth: 'all', mode: 'any' },
+  },
   { kind: 'events', lower: '50/1', upper: '450/1', limit: 500, after: null },
   { kind: 'events', lower: null, upper: null, limit: 40, after: { time: '200/1', id: 'm1' } },
   { kind: 'durations', lower: '-10/1', upper: '700/1', limit: 500, after: null },

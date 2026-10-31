@@ -49,6 +49,12 @@ export interface ComparisonSource {
   /** The in-memory index of a local source; when present, `query` is never called. */
   index?: TimelineIndex;
   /**
+   * For a local source that is one side of a separation (#415): the whole timeline's arcs in
+   * a window (in source coordinates, at a grouping threshold), each end marked with whether it
+   * is on this side, in place of the index's own (only links within the side).
+   */
+  arcs?: (lower: Q, upper: Q, threshold: Q | null) => Pick<Frame, 'edges' | 'edgesTruncated'>;
+  /**
    * Reads a remote source: `{kind: 'overview', lower, upper, threshold}` answers a Frame,
    * `{kind: 'events', lower, upper, after, limit, id?}` an EventPage, all in source
    * coordinates. Rejects with an AbortError when `signal` fires.
@@ -268,8 +274,14 @@ export class ComparisonView {
   private localFrame(track: Track, view: Viewport, width: number, pixels: number): Frame {
     const index = track.source.index!;
     const frame = index.frame(view, width, pixels);
+    const threshold = view.threshold(width, pixels);
     return {
       ...frame,
+      ...track.source.arcs?.(
+        view.left,
+        view.right,
+        threshold.compare(Q.zero) > 0 ? threshold : null,
+      ),
       groups: frame.groups.map((g) =>
         g.id ? { ...g, metadata: index.byId.get(g.id)?.metadata } : g,
       ),
@@ -279,7 +291,8 @@ export class ComparisonView {
    * Re-expresses a source frame on the shared axis: every time goes through
    * `× scale + offset` (exact, so no rounding drift between tracks), every ID is qualified
    * with the source key, and every group and band is tagged with `sourceKey`. Counts and
-   * the grouping itself are unchanged; a positive scale keeps their order.
+   * the grouping itself are unchanged; a positive scale keeps their order. Arcs keep their
+   * entity references, which name the source's own entities.
    */
   private mapFrame(track: Track, frame: Frame): Frame {
     // A duration band attached to a group; the frame's own `durations` get the same mapping.
@@ -294,8 +307,18 @@ export class ComparisonView {
       first: Q.parse(b.first).mul(track.scale).add(track.offset).toString(),
       last: Q.parse(b.last).mul(track.scale).add(track.offset).toString(),
     });
+    const time = (t: string) => Q.parse(t).mul(track.scale).add(track.offset).toString();
     return {
       ...frame,
+      edges: frame.edges?.map((e) => ({
+        ...e,
+        id: track.source.key + ':' + e.id,
+        sourceKey: track.source.key,
+        aTime: time(e.aTime),
+        bTime: time(e.bTime),
+        first: time(e.first),
+        last: time(e.last),
+      })),
       durations: frame.durations?.map((b) => ({
         ...b,
         id: track.source.key + ':' + b.id,
@@ -320,7 +343,7 @@ export class ComparisonView {
   }
   /**
    * Concatenates the tracks' mapped frames. Stacked mode keeps them as they are (each group
-   * still carries its `sourceKey`, so the renderer can put it on its track); combined mode
+   * and arc still carries its `sourceKey`, so the renderer can put it on its track); combined mode
    * regroups everything at `threshold`, the shared-axis grouping distance, so nearby
    * moments from different sources merge.
    */
@@ -338,6 +361,8 @@ export class ComparisonView {
             ...(frames.some((f) => f.durationsTotalMore) ? { durationsTotalMore: true } : {}),
           }
         : {}),
+      edges: frames.flatMap((f) => f.edges ?? []),
+      edgesTruncated: frames.some((f) => f.edgesTruncated),
       groups: frames.flatMap((f) => f.groups),
       visitedNodes: frames.reduce((n, f) => n + f.visitedNodes, 0),
     };

@@ -24,6 +24,12 @@ export interface EdgeBand {
   aTime: string;
   bTime: string;
   sourceKey?: string;
+  /**
+   * In a separation view's answer (#415), whether each end is in that view: the view's arcs
+   * are the whole timeline's, so an end that isn't is on the other track.
+   */
+  aIn?: boolean;
+  bIn?: boolean;
 }
 const identifier = (v: unknown): v is string =>
   typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v);
@@ -239,6 +245,101 @@ export function arrowheadPath(
   const n = (v: number) => Math.round(v * 100) / 100;
   return (
     `M ${n(tipX)} ${n(tipY)} L ${n(bx - uy * half)} ${n(by + ux * half)} ` +
+    `L ${n(bx + uy * half)} ${n(by - ux * half)} Z`
+  );
+}
+/**
+ * The cubic curve of an arc between two tracks of a separation (#415): from `(xa, ya)` on one
+ * track's axis to `(xb, yb)` on the other's, leaving and arriving vertically, with both control
+ * points at the gap's middle height. Its x runs as the smoothstep 3t² − 2t³ of its parameter t,
+ * so it is monotone and crosses the gap as an S.
+ */
+function crossCurve(xa: number, ya: number, xb: number, yb: number) {
+  const dx = xb - xa,
+    dy = yb - ya,
+    ym = (ya + yb) / 2;
+  return {
+    at: (t: number) => ({
+      x: xa + dx * t * t * (3 - 2 * t),
+      y: ya * (1 - t) ** 3 + 3 * ym * t * (1 - t) + yb * t ** 3,
+    }),
+    slope: (t: number) => ({ x: 6 * dx * t * (1 - t), y: 1.5 * dy * ((1 - t) ** 2 + t * t) }),
+  };
+}
+/**
+ * The SVG path of an arc between two tracks of a separation (#415), drawn only over
+ * `left`–`right` like arcPath: the part of crossCurve in view, as its own cubic with the same
+ * shape (so an endpoint far off screen never puts a coordinate millions of pixels away). An
+ * arc whose ends are far apart crosses the view nearly level in the gap's middle, running off
+ * toward both. Empty when no part of the arc is in view.
+ */
+export function crossArcPath(
+  xa: number,
+  ya: number,
+  xb: number,
+  yb: number,
+  left: number,
+  right: number,
+): string {
+  const curve = crossCurve(xa, ya, xb, yb),
+    n = (v: number) => Math.round(v * 100) / 100;
+  if (Math.max(xa, xb) < left || Math.min(xa, xb) > right) return '';
+  // Where x reaches a bound: the inverse of the smoothstep, t = 1/2 − sin(asin(1 − 2u)/3).
+  const at = (x: number) => {
+    const u = Math.min(1, Math.max(0, (x - xa) / (xb - xa)));
+    return 0.5 - Math.sin(Math.asin(1 - 2 * u) / 3);
+  };
+  const [t0, t1] = xa === xb ? [0, 1] : [at(left), at(right)].sort((p, q) => p - q);
+  if (!(t1 > t0)) return '';
+  // The part from t0 to t1 as a cubic of its own: control points a third of the way along
+  // each end's tangent.
+  const p0 = curve.at(t0),
+    p1 = curve.at(t1),
+    s0 = curve.slope(t0),
+    s1 = curve.slope(t1),
+    h = (t1 - t0) / 3;
+  return (
+    `M ${n(p0.x)} ${n(p0.y)} C ${n(p0.x + h * s0.x)} ${n(p0.y + h * s0.y)} ` +
+    `${n(p1.x - h * s1.x)} ${n(p1.y - h * s1.y)} ${n(p1.x)} ${n(p1.y)}`
+  );
+}
+/**
+ * An arrowhead on an arc between tracks (#415), as arrowheadPath does for arcs on one track:
+ * at the end `(x, y)` of crossArcPath's curve toward `(otherX, otherY)`, its tip on the curve
+ * `gap` pixels from the endpoint, pointing into it along the curve. Empty when the ends meet.
+ */
+export function crossArrowheadPath(
+  x: number,
+  y: number,
+  otherX: number,
+  otherY: number,
+  length = 9,
+  gap = 12,
+): string {
+  if (!(Math.hypot(otherX - x, otherY - y) > 2 * gap)) return '';
+  const curve = crossCurve(x, y, otherX, otherY);
+  // The parameter whose point is `gap` from the end, by bisection on the distance, which grows
+  // along the first half of the curve.
+  let lo = 0,
+    hi = 0.5;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2,
+      p = curve.at(mid);
+    if (Math.hypot(p.x - x, p.y - y) < gap) lo = mid;
+    else hi = mid;
+  }
+  const tip = curve.at(lo),
+    slope = curve.slope(lo),
+    norm = Math.hypot(slope.x, slope.y);
+  // The tangent there, heading back toward the endpoint.
+  const ux = -slope.x / norm,
+    uy = -slope.y / norm,
+    half = length / 2;
+  const bx = tip.x - ux * length,
+    by = tip.y - uy * length;
+  const n = (v: number) => Math.round(v * 100) / 100;
+  return (
+    `M ${n(tip.x)} ${n(tip.y)} L ${n(bx - uy * half)} ${n(by + ux * half)} ` +
     `L ${n(bx + uy * half)} ${n(by - ux * half)} Z`
   );
 }

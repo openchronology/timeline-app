@@ -11,6 +11,8 @@ import {
   filterDocument,
   arcPath,
   arrowheadPath,
+  crossArcPath,
+  crossArrowheadPath,
 } from '../dist/core.mjs';
 import { RemoteWorkspace } from '../dist/remote-cache.mjs';
 import { applyPatch } from '../server/store.mjs';
@@ -216,4 +218,77 @@ test('an arrowhead sits on its arc near the end, pointing into it along the tang
     assert(Math.abs(l[i + 1] - r[j + 1]) < 0.02);
   }
   assert.equal(arrowheadPath(100, 100, 192, 18), '');
+});
+
+test('an arc between separated tracks crosses the gap as one S curve, drawn only over the stage (#415)', () => {
+  const numbers = (d) => d.match(/-?[\d.e+]+/g).map(Number);
+  /** The curve both ends describe: smoothstep in x, a cubic in y, vertical at both ends. */
+  const point = (xa, ya, xb, yb, t) => ({
+    x: xa + (xb - xa) * t * t * (3 - 2 * t),
+    y: ya * (1 - t) ** 3 + 3 * ((ya + yb) / 2) * t * (1 - t) + yb * t ** 3,
+  });
+  const cubic = ([x0, y0, x1, y1, x2, y2, x3, y3], t) => ({
+    x: (1 - t) ** 3 * x0 + 3 * t * (1 - t) ** 2 * x1 + 3 * t * t * (1 - t) * x2 + t ** 3 * x3,
+    y: (1 - t) ** 3 * y0 + 3 * t * (1 - t) ** 2 * y1 + 3 * t * t * (1 - t) * y2 + t ** 3 * y3,
+  });
+  // Wholly in view: from one axis to the other, leaving and arriving vertically.
+  const whole = crossArcPath(100, 192, 300, 532, -64, 464);
+  assert.equal(whole, 'M 100 192 C 100 362 300 362 300 532');
+  // Ends far apart and panned: only the stage's part, on the same curve, with small numbers.
+  for (const [xa, xb] of [
+    [-1e7, 1e7 + 25],
+    [-5e6, 300],
+    [200, 9e6],
+    [1e7, -1e7],
+  ]) {
+    const d = crossArcPath(xa, 192, xb, 532, -64, 464);
+    const n = numbers(d);
+    assert(
+      n.every((v) => Math.abs(v) < 2000),
+      d,
+    );
+    assert(Math.min(n[0], n[6]) >= -64.01 && Math.max(n[0], n[6]) <= 464.01, d);
+    // Points along the drawn piece lie on the whole curve: at their x, the curve's y.
+    for (const t of [0, 0.3, 0.7, 1]) {
+      const p = cubic(n, t);
+      let lo = 0,
+        hi = 1;
+      const rising = xb > xa;
+      for (let i = 0; i < 80; i++) {
+        const mid = (lo + hi) / 2;
+        if (point(xa, 192, xb, 532, mid).x < p.x === rising) lo = mid;
+        else hi = mid;
+      }
+      assert(Math.abs(point(xa, 192, xb, 532, lo).y - p.y) < 0.05, `${d} at ${t}`);
+    }
+  }
+  // Ends at one time: a vertical line; nothing when the curve is off screen.
+  assert.equal(crossArcPath(50, 192, 50, 532, -64, 464), 'M 50 192 C 50 362 50 362 50 532');
+  assert.equal(crossArcPath(1000, 192, 2000, 532, -64, 464), '');
+  assert.equal(crossArcPath(-2000, 532, -1000, 192, -64, 464), '');
+});
+
+test('an arrowhead on an arc between tracks sits near its end and points into it (#415)', () => {
+  for (const [x, y, ox, oy] of [
+    [100, 192, 300, 532],
+    [300, 532, 100, 192],
+    [100, 192, 100, 532],
+    [0, 532, 5000, 192],
+  ]) {
+    const d = crossArrowheadPath(x, y, ox, oy);
+    assert.match(d, /^M [-\d. ]+ L [-\d. ]+ L [-\d. ]+ Z$/);
+    const [tx, ty, ax, ay, bx, by] = d.match(/-?[\d.]+/g).map(Number);
+    // The tip is 12 pixels from the end, toward the other track; it points into the end,
+    // nearly vertically when the ends are close in time, since the curve leaves the axis
+    // upright.
+    assert(Math.abs(Math.hypot(tx - x, ty - y) - 12) < 0.05, d);
+    assert(Math.sign(ty - y) === Math.sign(oy - y), d);
+    const mx = (ax + bx) / 2,
+      my = (ay + by) / 2;
+    assert(Math.abs(Math.hypot(tx - mx, ty - my) - 9) < 0.05, d);
+    assert(Math.abs(Math.hypot(ax - bx, ay - by) - 9) < 0.05, d);
+    assert(Math.sign(my - ty) === Math.sign(oy - y), d);
+    if (Math.abs(ox - x) < 1000) assert(Math.abs(tx - mx) < 3, d);
+  }
+  assert.equal(crossArrowheadPath(100, 192, 100, 200), '');
 });

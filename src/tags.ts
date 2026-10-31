@@ -1,15 +1,19 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Tags (docs/tags.md) and separations: validating timeline and entity tags, splitting a timeline
 // into what carries chosen tags (or relates to a chosen entity) and the rest, and tag counts.
-import { resolveDuration } from './durations.js';
+import { durationWindow, resolveDuration } from './durations.js';
 import {
   adjacency,
+  arcFromBand,
+  edgeTree,
+  entityTimes,
   reachable,
   refKey,
   validateRef,
   validateRelationships,
 } from './relationships.js';
-import type { EntityRef } from './relationships.js';
+import type { EdgeBand, EntityRef } from './relationships.js';
+import type { Rational } from 'rational-ordered-map';
 import type { Metadata, PointEvent, TimelineDocument } from './core.js';
 import type { Duration } from './durations.js';
 
@@ -111,6 +115,38 @@ export function filterMembership(
     inside = (_key, metadata) => entityTags(metadata).some((tag) => wanted.has(tag));
   }
   return (key, metadata) => inside(key, metadata) === (filter.mode === 'any');
+}
+/**
+ * Relationship arcs for a separation of a timeline held in memory (#415): the whole timeline's
+ * arcs touching a window, each end marked with whether it is on the side `filter` selects
+ * (`aIn`, `bIn`), so the view can draw arcs within a track and between the tracks. The arcs
+ * come from an interval tree of the whole document's links, built once, with the same limits
+ * as a timeline's own (TimelineIndex.frame): at most 256 a window, none shorter than the
+ * grouping `threshold` (when there is one).
+ */
+export function separationArcs(document: TimelineDocument, filter: ViewFilter) {
+  const keep = filterMembership(document, filter);
+  const metadata = new Map<string, Metadata>();
+  for (const e of document.events) metadata.set('m:' + e.id, e.metadata);
+  for (const d of document.durations ?? []) metadata.set('d:' + d.id, d.metadata);
+  const moments = new Map(document.events.map((e) => [e.id, e.time]));
+  const times = entityTimes(document.events, document.durations ?? [], (id) => moments.get(id));
+  const tree = edgeTree(document.relationships ?? [], (key) => times.get(key));
+  const inside = (key: string) => keep(key, metadata.get(key) ?? {});
+  return (
+    lower: Rational,
+    upper: Rational,
+    threshold: Rational | null,
+  ): { edges: EdgeBand[]; edgesTruncated: boolean } => {
+    const arcs = durationWindow(tree, lower, upper, 256, threshold);
+    return {
+      edges: arcs.durations.map((band) => {
+        const edge = arcFromBand(band);
+        return { ...edge, aIn: inside(refKey(edge.a)), bIn: inside(refKey(edge.b)) };
+      }),
+      edgesTruncated: arcs.durationsTruncated,
+    };
+  };
 }
 /** Tags used by moments and durations, most used first. */
 export function tagCounts(

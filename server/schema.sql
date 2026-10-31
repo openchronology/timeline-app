@@ -1288,6 +1288,8 @@ ALTER TABLE oc_view_duration_nodes DROP COLUMN IF EXISTS first_approx;
 ALTER TABLE oc_view_duration_nodes ADD COLUMN IF NOT EXISTS first_key numeric
   GENERATED ALWAYS AS (oc_qkey(first_time)) STORED;
 CREATE INDEX IF NOT EXISTS oc_view_duration_nodes_first_key ON oc_view_duration_nodes(timeline_id,first_key);
+-- Whether a duration is in a view, for arcs between a separation's tracks (#415, store.mjs query).
+CREATE INDEX IF NOT EXISTS oc_view_duration_nodes_id ON oc_view_duration_nodes(timeline_id,(band->>'id'));
 -- View variants of the traversal functions, generated from the originals so the summary
 -- algorithms have a single definition: only table names (and the root's table) differ.
 -- Regenerated on every run from the originals as defined above, before forks' dispatch is

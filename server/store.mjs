@@ -21,6 +21,7 @@ import {
   entityTimes,
   arcFromBand,
   relationshipKey,
+  refKey,
   snippet,
   SEARCH_PAGE_SIZE,
   BUILTIN_PLUGINS,
@@ -2075,6 +2076,9 @@ export class PostgresStore {
        * pruned paths (`prune`, SQL on node `n`): joined by ID, or for a fork read through,
        * looked up node by node (a join would read every node it sees at every step).
        *
+       * `own` (by default, when reading a view) joins the table's own rows: views are never
+       * read through.
+       *
        * The text is a recursive CTE `visible` that the caller follows with its SELECT. The
        * seed is the root (named by the roots row whose ID is $1); each step follows a node's
        * left and right children by primary key (timeline, node ID), keeping only nodes
@@ -2082,8 +2086,8 @@ export class PostgresStore {
        * zero, skipping subtrees whose longest interval is shorter than it (those are
        * summarized instead). UNION ALL: a tree has no cycles, so no duplicate check.
        */
-      const walk = (table, roots, root, prune) =>
-        view || !index.depth
+      const walk = (table, roots, root, prune, own = !!view) =>
+        own || !index.depth
           ? `WITH RECURSIVE visible AS (
             SELECT n.* FROM ${table} n JOIN ${roots} t ON t.id=n.timeline_id AND t.${root}=n.id
             WHERE n.timeline_id=$1 AND ${prune}
@@ -2130,14 +2134,46 @@ export class PostgresStore {
         );
         const total = intervals.rows[0]?.total ?? 0;
         // Arcs use the same pruned interval query, over the relationship arc tree
-        // (oc_edge_nodes, rooted at edge_root); separation views draw none.
-        const arcs = view
-          ? { rows: [] }
-          : await c.query(
-              `${walk('oc_edge_nodes', 'oc_timelines', 'edge_root', pruned)} SELECT band FROM visible WHERE first_time<=$3::mpq AND last_time>=$2::mpq
+        // (oc_edge_nodes, rooted at edge_root). A separation view (#415) answers the whole
+        // timeline's arcs, read from the timeline's own tree, unless asked for none
+        // (`arcs: false`, which the lower track sends: the upper one's answer covers every
+        // arc).
+        const arcs =
+          view && query.arcs === false
+            ? { rows: [] }
+            : await c.query(
+                `${walk('oc_edge_nodes', 'oc_timelines', 'edge_root', pruned, false)} SELECT band FROM visible WHERE first_time<=$3::mpq AND last_time>=$2::mpq
           AND ($4::mpq='0'::mpq OR last_time-first_time>=$4::mpq) LIMIT 257`,
-              [id, query.lower, query.upper, threshold],
-            );
+                [id, query.lower, query.upper, threshold],
+              );
+        const edges = arcs.rows.slice(0, 256).map((r) => arcFromBand(r.band));
+        if (view && edges.length) {
+          // Which ends are in the view: at most 512 lookups by primary key in its moments,
+          // and by ID in its duration tree (oc_view_duration_nodes_id), never the timeline.
+          const ends = edges.flatMap((e) => [e.a, e.b]),
+            moments = ends.filter((r) => 'moment' in r).map((r) => r.moment),
+            spans = ends.filter((r) => 'duration' in r).map((r) => r.duration);
+          const inside = new Set([
+            ...(moments.length
+              ? await c.query(
+                  'SELECT id FROM oc_view_moments WHERE timeline_id=$1 AND id=ANY($2::text[])',
+                  [view, moments],
+                )
+              : { rows: [] }
+            ).rows.map((r) => 'm:' + r.id),
+            ...(spans.length
+              ? await c.query(
+                  "SELECT band->>'id' AS id FROM oc_view_duration_nodes WHERE timeline_id=$1 AND band->>'id'=ANY($2::text[])",
+                  [view, spans],
+                )
+              : { rows: [] }
+            ).rows.map((r) => 'd:' + r.id),
+          ]);
+          for (const edge of edges) {
+            edge.aIn = inside.has(refKey(edge.a));
+            edge.bIn = inside.has(refKey(edge.b));
+          }
+        }
         // Durations shorter than the threshold, grouped like moments (oc_duration_overview,
         // from the duration tree's subtree summaries), to merge into the moment groups.
         const collapsed = await c.query(
@@ -2176,7 +2212,7 @@ export class PostgresStore {
                 ...(total > DURATION_COUNT_CAP ? { durationsTotalMore: true } : {}),
               }
             : {}),
-          edges: arcs.rows.slice(0, 256).map((r) => arcFromBand(r.band)),
+          edges,
           edgesTruncated: arcs.rows.length > 256,
           revision: t.revision,
           threshold,
