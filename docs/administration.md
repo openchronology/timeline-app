@@ -347,6 +347,25 @@ When it is off, `/` is the timeline browser as before, `/explore` shows the same
 
 **The copy** is Markdown in [`platform/content/landing/`](../platform/content/landing/README.md): `home.md`, `audiences.md` and one file for each audience. Each begins with front matter: `title` (the page's title in search results, browser tabs and link previews, followed by the site's name unless it already contains it), `heading` (the heading the page shows, when it differs from its title, such as "Any span of time, on one exact line"), `promise`, `description` (for search engines and link previews; at most about 160 characters shows whole), and for an audience its `label` and the `card` line on the landing page. To write your own, copy the files you want to change into a directory, edit them, and set `LANDING_CONTENT_DIR` to it; a file it lacks is read from the built-in copy. Pages read the files as they are asked for, so changes show without a restart. The Markdown can have headings, lists, emphasis, code and links to the site's pages or to `https:` and `mailto:` addresses; HTML shows as text. A directory that does not exist stops the server starting. In Docker, mount it into the `app` service, for example `- ./landing:/landing:ro` under `volumes` with `LANDING_CONTENT_DIR=/landing`.
 
+## IndexNow
+
+[IndexNow](https://www.indexnow.org/documentation) tells search engines that take it (Bing, Yandex, Naver, Seznam and others; not Google, which reads the [sitemap](sharing.md#search-engines)) which pages changed, so they visit them within minutes instead of at their next crawl ([#389](https://github.com/openchronology/timeline-app/issues/389)). It is off unless you set a key:
+
+```sh
+INDEXNOW_KEY=$(openssl rand -hex 16)
+```
+
+The key is 8 to 128 letters, digits and dashes; anything else stops the server starting. Once it is set:
+
+- The site serves the key at `/<key>.txt`, which is how the engines know submissions for your site are yours. Keep the same key; a new one is fine, but the old file stops being served.
+- About once a minute, the server compares the pages the sitemap lists (public timelines, and the profiles of accounts that own one and are not suspended) with what it saw a minute before, and sends the addresses that changed to `https://api.indexnow.org/indexnow`, which passes them on to every participating engine: a timeline created or made public, saved, given a new address (the old and the new), made private or deleted (its old address, so engines drop it), and a profile that gains or loses public timelines. Up to 10,000 addresses go in one request, with `APP_ORIGIN`'s host and `/<key>.txt` as the key's location.
+- Each address is sent at most once an hour, so a timeline a log stream saves all day is sent hourly. A timeline that was never public is never sent, and nor are moments' and durations' pages, which only the sitemap lists.
+- It runs in the background of the platform's process, with a ten-second limit on each request, and never holds up a page or a save. A request that gets no answer, `429` or a server error is tried again after a minute, then two, four and so on up to an hour; one refused (`400`, `403`, `422`: a wrong key or `APP_ORIGIN`) is logged and dropped.
+- What changed while the server was stopped is not sent: the first comparison after a start only takes stock. The sitemap covers it.
+- Nothing is sent while `APP_ORIGIN` is `localhost` or a loopback address, which the engines could not reach.
+
+Check it works by opening `https://<your site>/<key>.txt`, then watch the log for `IndexNow: submitted …` after you save a public timeline. Bing Webmaster Tools lists what it received under **IndexNow**.
+
 ## Terms and privacy policy
 
 Every account agrees to the terms of service and privacy policy in force: at registration, at a social account's email step, or, for an account made earlier (including the first administrator), when asked on its next visit. Until then it can read and manage its account but not save or share. Each account records the version (`oc_users.terms_version`, the policies' effective date) and when (`terms_accepted_at`); `SELECT username,terms_version,terms_accepted_at FROM oc_users` lists them. Changing the policies materially means changing `POLICY_VERSION` in `server/policies.mjs` and `oc_policy_version()` in `schema.sql`; see [authentication](authentication.md#agreeing-to-the-terms).

@@ -2,7 +2,7 @@
 /**
  * The platform's services, made once per process from the environment: the PostgreSQL pool,
  * the store, authentication, the request handler (http.mjs) and its settings, and the
- * background work (retention, standing, catching up interrupted refreshes). The Next.js
+ * background work (retention, standing, catching up interrupted refreshes, IndexNow). The Next.js
  * routes (next-handler.mjs, platform/proxy.js) ask for them through platformServices.
  */
 import pg from 'pg';
@@ -28,6 +28,7 @@ import { analyticsId, platformName, SiteError, supportUrl } from './site.mjs';
 import { landingSettings } from './landing.mjs';
 import { applyEnvironmentQuota } from './administration.mjs';
 import { ExportCacheError, exportCacheSettings } from './export-cache.mjs';
+import { IndexNowError, indexNowKey, startIndexNow } from './indexnow.mjs';
 /**
  * Where the services are kept: a global symbol rather than a module variable, so every copy
  * of this module the framework loads (route bundles, hot reloads) shares one pool and one set
@@ -86,8 +87,8 @@ async function pluginLibrary(path) {
 }
 /**
  * Builds the services from the environment (APP_ORIGIN, DATABASE_URL or the PG variables,
- * limits, PLUGIN_LIBRARY, OAuth providers, FEATURED_TIMELINES, TRUST_PROXY, challenge and
- * export cache settings) and starts the background work. Without a database the platform serves the
+ * limits, PLUGIN_LIBRARY, OAuth providers, FEATURED_TIMELINES, TRUST_PROXY, challenge,
+ * export cache and IndexNow settings) and starts the background work. Without a database the platform serves the
  * static app and the plugin library only.
  */
 async function initialize() {
@@ -119,7 +120,7 @@ async function initialize() {
         })
       : null;
   // Limits from the environment file: refused at startup rather than misapplied.
-  let limits, entries;
+  let limits, entries, indexNow;
   try {
     limits = compareLimits();
     entries = entryLimit();
@@ -130,11 +131,13 @@ async function initialize() {
     analyticsId();
     landingSettings();
     exportCacheSettings();
+    indexNow = indexNowKey();
   } catch (error) {
     if (
       error instanceof LimitError ||
       error instanceof SiteError ||
-      error instanceof ExportCacheError
+      error instanceof ExportCacheError ||
+      error instanceof IndexNowError
     )
       throw new ConfigurationError(error.message);
     throw error;
@@ -176,6 +179,8 @@ async function initialize() {
   if (store) startRetention(store);
   // Account standing and popularity follow accounts ageing, forks and trending (#103).
   if (pool) startStanding(pool);
+  // With INDEXNOW_KEY, search engines hear of public pages' changes within minutes (#389).
+  if (pool && indexNow) startIndexNow(pool, { origin, key: indexNow });
   return {
     ...options,
     auth: pool ? new Auth(pool, origin) : null,
