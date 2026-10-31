@@ -12,7 +12,7 @@ import pg from 'pg';
 import { createApplication } from '../server/http.mjs';
 import { flushMail } from '../server/mail.mjs';
 import { passwordHash } from '../server/auth.mjs';
-import { totp } from '../server/security-crypto.mjs';
+import { digest, totp } from '../server/security-crypto.mjs';
 import { POLICY_VERSION } from '../server/policies.mjs';
 import { softAuthenticator } from './webauthn-authenticator.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
@@ -252,6 +252,23 @@ try {
   const replay = client();
   await signIn(replay);
   await replay.request('auth/mfa/complete', { passkey: answer }, 401);
+  // Past the account's limit of wrong answers across sign-ins, codes are refused without being
+  // checked, but a passkey, whose answer cannot be guessed, still lets its owner in.
+  const failures = digest('mfa-failure-account:' + uid);
+  await pool.query(
+    "INSERT INTO oc_auth_attempts(key,count,expires_at) VALUES($1,10,now()+interval '15 minutes') ON CONFLICT(key) DO UPDATE SET count=10,expires_at=excluded.expires_at",
+    [failures],
+  );
+  const lockedOut = client();
+  await signIn(lockedOut);
+  await lockedOut.request('auth/mfa/complete', { code: '000000' }, 429);
+  const { publicKey: past } = await lockedOut.request('auth/passkeys/factor/options', {});
+  assert.equal(
+    (await lockedOut.request('auth/mfa/complete', { passkey: phone.get(past, { origin: site }) }))
+      .user.id,
+    uid,
+  );
+  await pool.query('DELETE FROM oc_auth_attempts WHERE key=$1', [failures]);
   // Without a sign-in step there is nothing to answer.
   await client()
     .request('session')
@@ -437,6 +454,26 @@ try {
   assert.equal(after2.length, 1);
   assert(!before.includes(after2[0]));
   assert.equal((await solo.request('auth/account')).security.passkeys.length, 1);
+  // As an account made by a directory sign-in (no password, and `ldap` its only identity), it
+  // may not sign in with a passkey alone: leaving the directory must end its access.
+  await pool.query("INSERT INTO oc_identities(provider,subject,user_id) VALUES('ldap',$1,$2)", [
+    'uuid:' + soloId,
+    soloId,
+  ]);
+  assert.equal((await solo.request('auth/account')).security.directory_only, true);
+  const { publicKey: directed } = await solo.request('auth/passkeys/sign-in/options', {});
+  assert.match(
+    (
+      await solo.request(
+        'auth/passkeys/sign-in',
+        { credential: soloKey.get(directed, { origin: site }) },
+        403,
+      )
+    ).error,
+    /directory/,
+  );
+  await pool.query('DELETE FROM oc_identities WHERE user_id=$1', [soloId]);
+  assert.equal((await solo.request('auth/account')).security.directory_only, false);
   // On a server whose pool has a single connection, a passkey still confirms a change: the
   // challenge is used up on a connection of its own, not one the change's transaction holds.
   servers.tight = await start({ pool: tight });

@@ -174,7 +174,8 @@ export class Administration {
   }
   /**
    * A page of accounts (`kind` 'users') or timelines (any other kind) for /admin: `search`
-   * (up to 200 characters) and `page` (25 a page). Accounts come with their standing (#103);
+   * (up to 200 characters) and `page` (25 a page). Accounts come with their standing (#103)
+   * and whether they sign in only through the directory (`directory_only`);
    * the result also carries the site's default quota and whether the environment sets it.
    * @returns {Promise<{total: number, items: object[], page: number, settings: object}>}
    */
@@ -192,7 +193,7 @@ export class Administration {
     // These are full scans, acceptable for an administrator's occasional search.
     const result = await this.pool.query(
       kind === 'users'
-        ? `WITH matching AS (SELECT id,username,email,is_admin,is_disabled,quota_bypass,quota_bytes,used_bytes,created_at,trust FROM oc_users WHERE strpos(lower(username||' '||coalesce(email,'')),lower($1))>0) SELECT (SELECT count(*) FROM matching) AS total,coalesce((SELECT jsonb_agg(p) FROM (SELECT * FROM matching ORDER BY username,id LIMIT 25 OFFSET $2)p),'[]') AS items`
+        ? `WITH matching AS (SELECT id,username,email,is_admin,is_disabled,quota_bypass,quota_bytes,used_bytes,created_at,trust,password_hash IS NULL AND array(SELECT provider FROM oc_identities i WHERE i.user_id=oc_users.id)='{ldap}'::text[] AS directory_only FROM oc_users WHERE strpos(lower(username||' '||coalesce(email,'')),lower($1))>0) SELECT (SELECT count(*) FROM matching) AS total,coalesce((SELECT jsonb_agg(p) FROM (SELECT * FROM matching ORDER BY username,id LIMIT 25 OFFSET $2)p),'[]') AS items`
         : `WITH matching AS (SELECT t.id,t.title,t.visibility,t.featured,t.event_count,u.username AS owner FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id WHERE strpos(lower(t.title||' '||u.username),lower($1))>0) SELECT (SELECT count(*) FROM matching) AS total,coalesce((SELECT jsonb_agg(p) FROM (SELECT * FROM matching ORDER BY title,id LIMIT 25 OFFSET $2)p),'[]') AS items`,
       [search, (page - 1) * 25],
     );
@@ -230,6 +231,9 @@ export class Administration {
    * - `users` (`id` an account): is_admin, is_disabled, quota_bypass, quota_bytes, trust.
    *   Suspending or demoting ends the account's sessions, API keys and pending desktop
    *   sign-ins; the last active administrator cannot be suspended or demoted (409).
+   *   `release_directory: true` releases an account that signs in only through its directory
+   *   (AccountSecurity.releaseDirectory: its `ldap` identity, sessions and API keys end, and
+   *   a password-reset link goes to its confirmed address); 409 for any other account.
    * - `settings`: default_quota_bytes, unless the environment file sets it (409).
    * - timelines (`id` a timeline): visibility, featured, or delete. Making one public is
    *   refused for a private fork's copy, a timeline moderators restricted, and a comparison
@@ -243,13 +247,15 @@ export class Administration {
       throw new HttpError(400, 'Invalid administration request.');
     const allowed =
       kind === 'users'
-        ? ['is_admin', 'is_disabled', 'quota_bypass', 'quota_bytes', 'trust']
+        ? ['is_admin', 'is_disabled', 'quota_bypass', 'quota_bytes', 'trust', 'release_directory']
         : kind === 'settings'
           ? ['default_quota_bytes']
           : ['visibility', 'featured', 'delete'];
     if (Object.keys(value).some((k) => ![...allowed, 'password', 'code', 'passkey'].includes(k)))
       throw new HttpError(400, 'Unknown administration field.');
-    return this.store.transaction(async (c) => {
+    // Whether a release from the directory queued a reset link, to send once committed.
+    let released = false;
+    const result = await this.store.transaction(async (c) => {
       // All administration changes (and moderation decisions) take this transaction-scoped
       // advisory lock, so they run one at a time. Without it two administrators could each
       // demote the other, each seeing two active administrators, and leave none.
@@ -296,6 +302,17 @@ export class Administration {
               ' WHERE id=$1',
             [id, ...fields.map((f) => changes[f])],
           );
+        // Released only when asked for explicitly, never because directory sign-in is off:
+        // a configuration mistake must not let these accounts gain a password by email. After
+        // the UPDATE, whose columns are the fields in `changes` so far; these two are for the
+        // audit only.
+        if ('release_directory' in value) {
+          if (value.release_directory !== true)
+            throw new HttpError(400, 'release_directory is true or absent.');
+          released = await this.auth.security.releaseDirectory(c, id);
+          changes.release_directory = true;
+          changes.reset_link_sent = released;
+        }
         // Re-enabling an account lifts a moderation restriction on it too (#193), as lifting
         // the case would: otherwise it stays without standing and in the restricted queue,
         // and a later lift could undo a suspension made since. A review awaiting decision is
@@ -403,6 +420,8 @@ export class Administration {
       );
       return { ok: true };
     });
+    if (released) this.auth.security.deliver();
+    return result;
   }
 }
 /**

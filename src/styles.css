@@ -1700,12 +1700,6 @@ dialog h3 {
   overflow-wrap: anywhere;
   white-space: pre-line;
 }
-#desktop-approval-code {
-  display: block;
-  font: 600 24px monospace;
-  letter-spacing: 0.15em;
-  margin: 20px 0;
-}
 #session-list {
   max-height: 160px;
   overflow: auto;

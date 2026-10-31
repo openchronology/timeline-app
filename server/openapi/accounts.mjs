@@ -165,7 +165,7 @@ export const paths = {
         SIGN_IN_TOKEN,
         'A signed-in browser gets the session cookie; the desktop app (`X-OC-Client: desktop`) gets a session `token` instead. Signing in replaces the caller’s previous session.',
         'When the account needs another step, the answer is a `SignInStep` instead, with the `oc_challenge` cookie (five minutes): `mfa` asks for `POST /api/auth/mfa/complete`, `email` for `POST /api/auth/email/enroll`.',
-        'After three failures in fifteen minutes from the client address or for the account, it asks for human verification (428) instead of locking the account. Ten attempts a minute per client address and per account (429).',
+        'After three failures in fifteen minutes from the client address or for the account, every further attempt asks for human verification (428) instead of locking the account; when the server has checks off, each waits a moment instead. Ten attempts a minute per client address (429); there is no limit per account. 503 when the server’s password checks stay busy for several seconds: try again shortly.',
       ].join('\n\n'),
       security: SIGN_IN,
       parameters: [clientHeader, challengeHeader],
@@ -229,7 +229,7 @@ export const paths = {
       summary: 'Register',
       description: [
         SIGN_IN_TOKEN,
-        'Makes a pending registration and emails a confirmation, which `POST /api/auth/email/verify` accepts in this browser within 24 hours; the account exists only then, and no session is made here. The answer is the same whether or not the username or email is taken. Always asks for human verification (428). Unavailable (503) until the server has email and an encryption key configured.',
+        'Makes a pending registration and emails a confirmation, which `POST /api/auth/email/verify` accepts in this browser within 24 hours; the account exists only then, and no session is made here. The answer is the same whether or not the username or email is taken. Always asks for human verification (428). Unavailable (503) until the server has email and an encryption key configured, or for a moment while its password checks stay busy.',
       ].join('\n\n'),
       security: SIGN_IN,
       parameters: [challengeHeader],
@@ -250,6 +250,7 @@ export const paths = {
       summary: 'Finish signing in with a two-factor code',
       description: [
         'The `mfa` step of a sign-in: send an authenticator or recovery code, or a passkey’s answer to `POST /api/auth/passkeys/factor/options`. Needs the `oc_challenge` cookie the sign-in set, in the same browser (`oc_login`), within five minutes; five wrong codes close the step, and signing in starts again.',
+        'Wrong answers also count against the account across sign-ins: after ten in fifteen minutes (counted from the first), codes are refused with 429 until the fifteen minutes end, without being checked, and the account is emailed (at most once a day). A passkey still works then, since its answer cannot be guessed. Changing or resetting the password clears the count.',
         SIGN_IN_TOKEN,
         'Signs in as the sign-in began: a browser session cookie, or a desktop `token`.',
       ].join('\n\n'),
@@ -383,7 +384,7 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Reset a password',
       description: [
-        'Sets a new password with the token from a reset link. It signs the account out everywhere, revokes its API keys and pending desktop approvals, and does not turn two-factor authentication off.',
+        'Sets a new password with the token from a reset link. It signs the account out everywhere, revokes its API keys and pending desktop approvals, and does not turn two-factor authentication off. An unknown or expired link is refused (400) before the password is hashed; 503 when the server’s password checks stay busy for several seconds.',
         SIGN_IN_TOKEN,
       ].join('\n\n'),
       security: SIGN_IN,
@@ -412,7 +413,7 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Start signing in with a provider',
       description: [
-        'Begins signing in with Google, GitHub, Facebook or Microsoft (a work, school or personal Microsoft account, as the server’s tenant setting allows), or with `link: true`, linking one to the signed-in account (which needs a sign-in within the last five minutes). Send the browser to the `url` returned; the provider returns it to `GET /api/auth/{provider}/callback` within ten minutes.',
+        'Begins signing in with Google, GitHub, Facebook or Microsoft (a work, school or personal Microsoft account, as the server’s tenant setting allows), or with `link: true`, linking one to the signed-in account (which needs a sign-in within the last five minutes, and is refused with 403 for an account that signs in only through its directory, `directory_only` in `GET /api/auth/account`). Send the browser to the `url` returned; the provider returns it to `GET /api/auth/{provider}/callback` within ten minutes.',
         SIGN_IN_TOKEN,
       ].join('\n\n'),
       security: SIGN_IN,
@@ -494,7 +495,7 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Start signing in the desktop app through a browser',
       description:
-        'The desktop app’s **Sign in using your browser**: it shows `userCode` and opens `verificationUri`, where a signed-in browser approves it (`POST /api/auth/device/approve`), then polls `POST /api/auth/device/poll` with `deviceCode`, which it keeps to itself. The request expires in ten minutes. Send an empty JSON object.',
+        'The desktop app’s **Sign in using your browser**: it shows `userCode` and opens `verificationUri`, where a signed-in browser approves it (`POST /api/auth/device/approve`), then polls `POST /api/auth/device/poll` with `deviceCode`, which it keeps to itself. The request expires in ten minutes. The caller’s address and `User-Agent` header are recorded with it, for the approval page to show (`GET /api/auth/device/request`). Send an empty JSON object.',
       security: ANYONE,
       requestBody: body({ type: 'object' }),
       responses: {
@@ -540,14 +541,36 @@ export const paths = {
       },
     },
   },
+  '/api/auth/device/request': {
+    get: {
+      operationId: 'describeDeviceSignIn',
+      tags: ['Sign-in'],
+      summary: 'What is known about a pending desktop sign-in',
+      description:
+        'For the approval page: when the desktop sign-in showing `userCode` started and expires, the address and `User-Agent` it started from, and whether that address is this browser’s. A browser session only (403 for a desktop session). Limited to ten a minute per client address (429). An expired, approved or unknown code is refused (400).',
+      security: [{ session: [] }],
+      parameters: [
+        queryParam(
+          'userCode',
+          'The ten-character code the desktop app shows.',
+          { type: 'string', pattern: '^[A-Z2-9]{10}$' },
+          true,
+        ),
+      ],
+      responses: {
+        200: json(ref('DeviceSignInRequest'), 'The pending request.'),
+        ...errors(400, 401, 403, 429, 503),
+      },
+    },
+  },
   '/api/auth/device/approve': {
     post: {
       operationId: 'approveDeviceSignIn',
       tags: ['Sign-in'],
       summary: 'Approve a desktop sign-in',
       description:
-        'Approves the desktop app showing `userCode`, signing it in to this account. Needs a sign-in within the last five minutes.',
-      security: SIGNED_IN,
+        'Approves the desktop app showing `userCode`, signing it in to this account. Needs a browser session (403 for a desktop session) signed in within the last five minutes. The approval is emailed to the account’s confirmed address, with when and where the request started. Clients should have the person type the code from the desktop app rather than take it from a link, and show `GET /api/auth/device/request` first.',
+      security: [{ session: [], csrf: [] }],
       requestBody: body({
         type: 'object',
         required: ['userCode'],
@@ -659,7 +682,7 @@ export const paths = {
       tags: ['Account security'],
       summary: 'Change the password',
       description:
-        'Sets a new password (or a first one, for an account made with a sign-in provider). Signs the account out everywhere, this session included, and revokes its API keys. ' +
+        'Sets a new password (or a first one, for an account made with a sign-in provider). Signs the account out everywhere, this session included, and revokes its API keys. An account that signs in only through its directory (`directory_only` in `GET /api/auth/account`) cannot set one (403): its organisation’s directory decides who may sign in. ' +
         FRESH,
       security: SIGNED_IN,
       requestBody: body({
@@ -1193,6 +1216,27 @@ export const schemas = {
       expiresIn: { type: 'integer', const: 600, description: 'Seconds until it expires.' },
     },
   },
+  DeviceSignInRequest: {
+    type: 'object',
+    required: ['requestedAt', 'expiresAt', 'clientAddress', 'userAgent', 'sameAddress'],
+    properties: {
+      requestedAt: { type: 'string', format: 'date-time', description: 'When it started.' },
+      expiresAt: { type: 'string', format: 'date-time', description: 'When it expires.' },
+      clientAddress: {
+        type: ['string', 'null'],
+        description: 'The address it started from; null for a request older than this field.',
+      },
+      userAgent: {
+        type: ['string', 'null'],
+        description:
+          'The `User-Agent` it started with, as sent (printable, at most 200 characters); null when none. The requester chooses it.',
+      },
+      sameAddress: {
+        type: 'boolean',
+        description: 'Whether it started from the address this request comes from.',
+      },
+    },
+  },
   ApiKey: {
     type: 'object',
     required: ['id', 'name', 'prefix', 'scopes', 'created_at', 'expires_at'],
@@ -1289,6 +1333,11 @@ export const schemas = {
           totp_enabled: { type: 'boolean', description: 'An authenticator app is set up.' },
           passkeys: { type: 'array', items: ref('Passkey') },
           has_password: { type: 'boolean' },
+          directory_only: {
+            type: 'boolean',
+            description:
+              'The account signs in only through its directory account (no password, no other provider), as one made by a directory sign-in does. It cannot set a password, link another provider or sign in with a passkey alone (403); its passkeys answer the two-factor step.',
+          },
           recovery_remaining: {
             type: 'integer',
             description: 'Recovery codes not yet used.',

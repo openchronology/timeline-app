@@ -5,7 +5,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign, createHmac, scryptSync } from 'node:crypto';
-import { Auth, tokenHash, passwordMatches, sameToken } from '../server/auth.mjs';
+import {
+  Auth,
+  tokenHash,
+  passwordMatches,
+  sameToken,
+  passwordHash,
+  passwordConcurrency,
+  configurePasswordWork,
+} from '../server/auth.mjs';
 import { MICROSOFT_CONSUMERS, OAuth, pkce, providersFromEnv } from '../server/oauth.mjs';
 
 const rejects = (status) => (error) => error.status === status;
@@ -468,4 +476,36 @@ test('legacy salted password hashes remain usable during an upgrade', async () =
   assert(await passwordMatches(password, hash));
   assert.equal(await passwordMatches('incorrect password', hash), false);
   assert.equal(await passwordMatches(password, 'scrypt:1:bad:bad'), false);
+});
+
+test('password checks share CPU-sized slots and wait a bounded time for one', async () => {
+  assert.equal(passwordConcurrency({ PASSWORD_HASH_CONCURRENCY: '6' }), 6);
+  for (const bad of ['0', '65', '2.5', 'many'])
+    assert.throws(
+      () => passwordConcurrency({ PASSWORD_HASH_CONCURRENCY: bad }),
+      /PASSWORD_HASH_CONCURRENCY/,
+    );
+  // Never below two, and below libuv's worker threads, which scrypt shares with file work.
+  assert(passwordConcurrency({}) >= 2);
+  assert(passwordConcurrency({ UV_THREADPOOL_SIZE: '4' }) <= 3);
+  assert.equal(passwordConcurrency({ UV_THREADPOOL_SIZE: '2' }), 2);
+  const hash = await passwordHash('a unique queue testing passphrase');
+  try {
+    // One slot: two checks at once queue and both finish, rather than one being refused.
+    configurePasswordWork({ concurrency: 1, waitMs: 60000 });
+    const checks = Array.from({ length: 2 }, () =>
+      passwordMatches('a unique queue testing passphrase', hash),
+    );
+    assert.deepEqual(await Promise.all(checks), [true, true]);
+    // A wait that ends before a slot frees up is refused with 503, and the slot still works.
+    configurePasswordWork({ waitMs: 1 });
+    const results = await Promise.allSettled(
+      Array.from({ length: 3 }, () => passwordMatches('wrong', hash)),
+    );
+    assert.equal(results[0].status, 'fulfilled');
+    assert(results.slice(1).every((r) => r.status === 'rejected' && r.reason.status === 503));
+    assert.equal(await passwordMatches('wrong', hash), false);
+  } finally {
+    configurePasswordWork({ concurrency: passwordConcurrency(), waitMs: 5000 });
+  }
 });

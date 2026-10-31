@@ -172,7 +172,9 @@ test('MFA challenges bind to the requesting browser and invalid attempts commit 
           ? [challenge]
           : sql.includes('FROM oc_users')
             ? [user]
-            : [],
+            : sql.startsWith('INSERT INTO oc_auth_attempts')
+              ? [{ count: 1 }]
+              : [],
       };
     },
     release() {},
@@ -198,6 +200,8 @@ test('MFA challenges bind to the requesting browser and invalid attempts commit 
   assert(queries.includes('COMMIT'));
   assert(!queries.includes('ROLLBACK'));
   assert(queries.some((sql) => sql.includes('attempts=attempts+1')));
+  // The wrong code counts against the account too, across its challenges (factorFailed).
+  assert(queries.some((sql) => sql.startsWith('INSERT INTO oc_auth_attempts')));
   const userLock = queries.findIndex((sql) => sql.includes('FROM oc_users'));
   const challengeLock = queries.findIndex((sql) => sql.includes('SELECT token_hash'));
   assert(userLock < challengeLock);

@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 import pg from 'pg';
 import { createApplication } from '../server/http.mjs';
 import { flushMail } from '../server/mail.mjs';
-import { totp, unseal } from '../server/security-crypto.mjs';
+import { digest, totp, unseal } from '../server/security-crypto.mjs';
 import { POLICY_VERSION } from '../server/policies.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -210,6 +210,45 @@ try {
   for (let i = 0; i < 4; i++) await blocked.request('auth/mfa/complete', { code: 'invalid' }, 401);
   assert.equal((await blocked.request('session')).challenge, null);
   await blocked.request('auth/mfa/complete', { code: enabled.recoveryCodes[1] }, 401);
+  // A new sign-in brings a new challenge, but wrong answers count against the account across
+  // them: blocked's five, then five more here reach the limit of ten in fifteen minutes. The
+  // account is emailed once, and then even a right code is refused without being checked.
+  const guesser = client();
+  await guesser.request('session');
+  await guesser.request('auth/login', { username, password });
+  for (let i = 0; i < 5; i++) await guesser.request('auth/mfa/complete', { code: '000000' }, 401);
+  await flushMail(pool, mailer, key);
+  const notices = () =>
+    messages.filter((m) => m.to === email && m.text.includes('wrong two-factor codes'));
+  assert.equal(notices().length, 1);
+  const lockedOut = client();
+  await lockedOut.request('session');
+  await lockedOut.request('auth/login', { username, password });
+  assert.match(
+    (await lockedOut.request('auth/mfa/complete', { code: enabled.recoveryCodes[1] }, 429)).error,
+    /Too many wrong codes/,
+  );
+  // The recovery code was not checked, so not spent.
+  assert.equal(
+    (await pool.query('SELECT count(*)::int AS n FROM oc_recovery_codes WHERE user_id=$1', [uid]))
+      .rows[0].n,
+    9,
+  );
+  // Once the window has passed the count starts again, and a later limit in the same day sends
+  // no second email.
+  await pool.query('UPDATE oc_auth_attempts SET expires_at=now() WHERE key=$1', [
+    digest('mfa-failure-account:' + uid),
+  ]);
+  for (let i = 0; i < 5; i++) await lockedOut.request('auth/mfa/complete', { code: '000000' }, 401);
+  const persistent = client();
+  await persistent.request('session');
+  await persistent.request('auth/login', { username, password });
+  for (let i = 0; i < 5; i++)
+    await persistent.request('auth/mfa/complete', { code: '000000' }, 401);
+  // The limit is reached again; the password reset below clears it, so the recovery code that
+  // was refused above then signs in.
+  await flushMail(pool, mailer, key);
+  assert.equal(notices().length, 1);
   // Email recovery cannot remove MFA or keep old application sessions alive.
   const pendingDevice = client();
   const device = await pendingDevice.request('auth/device/start', {});

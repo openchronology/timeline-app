@@ -721,35 +721,41 @@ function AccountSettings({
               <li>
                 <strong>Password</strong>
                 <span className="muted">{security?.has_password ? 'Set' : 'None'}</span>
-                <Disclosure label="Change">
-                  <form className="settings-form" onSubmit={securityForm}>
-                    <label>
-                      New password
-                      <input
-                        name="newPassword"
-                        type="password"
-                        autoComplete="new-password"
-                        minLength={15}
-                        maxLength={1024}
-                        required
-                      />
-                    </label>
-                    <label>
-                      Confirm new password
-                      <input
-                        name="passwordConfirmation"
-                        type="password"
-                        autoComplete="new-password"
-                        maxLength={1024}
-                        required
-                      />
-                    </label>
-                    <Confirmation security={security} csrf={session.csrf} />
-                    <button disabled={busy} value="auth/password/change">
-                      Change password and sign out
-                    </button>
-                  </form>
-                </Disclosure>
+                {/* An account that signs in only through its directory cannot add one: the
+                    directory decides who may sign in (AccountSecurity.directoryOnly). */}
+                {security?.directory_only ? (
+                  <span className="muted">Managed by your organisation’s directory</span>
+                ) : (
+                  <Disclosure label="Change">
+                    <form className="settings-form" onSubmit={securityForm}>
+                      <label>
+                        New password
+                        <input
+                          name="newPassword"
+                          type="password"
+                          autoComplete="new-password"
+                          minLength={15}
+                          maxLength={1024}
+                          required
+                        />
+                      </label>
+                      <label>
+                        Confirm new password
+                        <input
+                          name="passwordConfirmation"
+                          type="password"
+                          autoComplete="new-password"
+                          maxLength={1024}
+                          required
+                        />
+                      </label>
+                      <Confirmation security={security} csrf={session.csrf} />
+                      <button disabled={busy} value="auth/password/change">
+                        Change password and sign out
+                      </button>
+                    </form>
+                  </Disclosure>
+                )}
               </li>
               <li>
                 <strong>Two-factor authentication</strong>
