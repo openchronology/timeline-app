@@ -238,8 +238,8 @@ export class Passkeys {
    * Finishes adding a passkey: `body.credential` must answer this session's registration
    * challenge, and `body.name` names it. The first second factor of an account turns
    * two-factor authentication on and gives ten recovery codes (shown once); every new passkey
-   * signs out the account's other sessions and pending desktop sign-ins, and the account is
-   * notified, as for an authenticator app. Result: a message, and the recovery codes if new.
+   * signs out the account's other sessions, API keys and pending desktop sign-ins, and the
+   * account is notified, as for an authenticator app. Result: a message, and the recovery codes if new.
    */
   async register(session, body) {
     this.security.configured();
@@ -294,8 +294,8 @@ export class Passkeys {
         await c.query('UPDATE oc_users SET mfa_enabled=true WHERE id=$1', [user.id]);
         await this.security.setRecoveryCodes(c, user.id, codes);
       }
-      // As enabling an authenticator app: every other session, unclaimed desktop sign-in and
-      // challenge ends, and this session is marked as having passed two-factor authentication.
+      // As enabling an authenticator app: every other session, API key, unclaimed desktop
+      // sign-in and challenge ends, and this session is marked as having passed two-factor authentication.
       await this.security.endAccess(c, user.id, session.token_hash);
       await c.query('UPDATE oc_sessions SET mfa_verified=true WHERE token_hash=$1', [
         session.token_hash,
@@ -303,7 +303,7 @@ export class Passkeys {
       await this.security.notify(
         c,
         user,
-        `A passkey ("${name}") was added to your OpenChronology account. Other sessions were revoked.` +
+        `A passkey ("${name}") was added to your OpenChronology account. Other sessions and API keys were revoked.` +
           (first ? ' Two-factor authentication is now on; keep your recovery codes offline.' : '') +
           ' Contact the operator if you did not do this.',
       );
@@ -329,8 +329,8 @@ export class Passkeys {
   /**
    * Removes one of the account's passkeys, confirmed as any security change (another passkey,
    * or this one, may be the second factor). Without passkeys or an authenticator app left,
-   * two-factor authentication goes off and the recovery codes go. Other sessions, sign-in
-   * challenges and desktop sign-ins end, and the account is notified.
+   * two-factor authentication goes off and the recovery codes go. Other sessions, API keys,
+   * sign-in challenges and desktop sign-ins end, and the account is notified.
    */
   async remove(session, id, body) {
     this.security.configured();
@@ -361,7 +361,7 @@ export class Passkeys {
       await this.security.notify(
         c,
         user,
-        `A passkey ("${removed.name}") was removed from your OpenChronology account. Other sessions were revoked.` +
+        `A passkey ("${removed.name}") was removed from your OpenChronology account. Other sessions and API keys were revoked.` +
           (off ? ' Two-factor authentication is now off.' : ''),
       );
     });

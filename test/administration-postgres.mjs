@@ -199,6 +199,27 @@ try {
   await request('admin/users', 'GET', undefined, bearer, 403);
   await request('auth/account', 'GET', undefined, bearer, 403);
   await request('timelines/' + timeline.id, 'GET', undefined, stranger.headers, 404);
+  // An administrator sees every timeline, but their API key has only its scopes: someone
+  // else's private timeline is unavailable through it, to read, check or change.
+  await request('timelines/' + timeline.id, 'GET', undefined, admin);
+  const adminKey = await request(
+    'auth/api-keys',
+    'POST',
+    { name: 'Administrator', scopes: ['timelines:read', 'timelines:write'], password },
+    admin,
+    201,
+  );
+  const adminBearer = { Authorization: 'Bearer ' + adminKey.token };
+  await request('timelines/' + timeline.id, 'GET', undefined, adminBearer, 404);
+  await request('timelines/' + timeline.id + '/revision', 'GET', undefined, adminBearer, 404);
+  await request(
+    'timelines/' + timeline.id,
+    'PUT',
+    { revision: timeline.revision, document: { ...document, title: 'Not theirs' } },
+    adminBearer,
+    404,
+  );
+  await request('timelines/' + timeline.id, 'DELETE', undefined, adminBearer, 404);
   const writeKey = await request(
     'auth/api-keys',
     'POST',

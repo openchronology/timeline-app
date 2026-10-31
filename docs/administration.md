@@ -383,7 +383,7 @@ flow; unlinking requires fresh confirmation and retains at least one sign-in
 method. Avatars accept HTTPS image URLs or PNG/JPEG/WebP uploads up to 256 KiB.
 Remote images are requested by the browser, not fetched by the server; their
 hosts receive the viewer's network request. SVG and executable URL schemes are
-not accepted. Changing/resetting a password also revokes existing API keys.
+not accepted. Changing or resetting a password, confirming a new email address, and changing two-factor authentication, recovery codes or passkeys also revoke existing API keys.
 
 ## API keys
 

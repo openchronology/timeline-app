@@ -3,6 +3,7 @@
 // queries, forks that read through to their source's index, and the repairs migrate.mjs runs
 // (docs/architecture.md).
 import { compareLimit } from './limits.mjs';
+import { adminId } from './key-requests.mjs';
 import {
   Q,
   pluginMetadata,
@@ -297,15 +298,15 @@ export class PostgresStore {
    */
   async liveState(id, userId, client = this.pool) {
     // The same rule as access, in one row lookup by primary key: public, the owner, an
-    // enabled administrator, or a member of a timeline not restricted by moderators (a
+    // enabled administrator (not through an API key: adminId), or a member of a timeline not restricted by moderators (a
     // restricted timeline is also private, so `public` cannot let anyone else in).
     const { rows } = await client.query(
       `SELECT t.id,t.revision FROM oc_timelines t
       WHERE t.id=$1 AND (t.visibility='public' OR t.owner_id=$2::uuid
-      OR EXISTS(SELECT 1 FROM oc_users a WHERE a.id=$2::uuid AND a.is_admin AND NOT a.is_disabled)
+      OR EXISTS(SELECT 1 FROM oc_users a WHERE a.id=$3::uuid AND a.is_admin AND NOT a.is_disabled)
       OR (EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$2::uuid)
         AND NOT ${restrictedTimeline('t')}))`,
-      [id, userId ?? null],
+      [id, userId ?? null, adminId(userId)],
     );
     if (!rows[0]) throw new HttpError(404, 'Timeline unavailable.');
     return rows[0];
@@ -393,20 +394,21 @@ export class PostgresStore {
     const columns = await timelineColumns(client);
     // One row by primary key with what the permissions need: the owner's username, whether
     // the person starred it (the stars' primary key, user then timeline), their role (an
-    // enabled administrator, the owner, else their membership by oc_members' primary key)
-    // and any moderation case restricting it (oc_moderation_cases_current). The role is
-    // NULL for someone with none, who then sees only a public timeline.
+    // enabled administrator not using an API key, adminId; the owner; else their membership
+    // by oc_members' primary key) and any moderation case restricting it
+    // (oc_moderation_cases_current). The role is NULL for someone with none, who then sees
+    // only a public timeline.
     const { rows } = await client.query(
       `SELECT ${columns},u.username AS owner,
       EXISTS(SELECT 1 FROM oc_timeline_stars s WHERE s.timeline_id=t.id AND s.user_id=$2::uuid) AS starred,
-      CASE WHEN EXISTS(SELECT 1 FROM oc_users admin WHERE admin.id=$2::uuid AND admin.is_admin AND NOT admin.is_disabled) THEN 'admin' WHEN t.owner_id=$2::uuid THEN 'owner' ELSE m.role END AS role,
+      CASE WHEN EXISTS(SELECT 1 FROM oc_users admin WHERE admin.id=$3::uuid AND admin.is_admin AND NOT admin.is_disabled) THEN 'admin' WHEN t.owner_id=$2::uuid THEN 'owner' ELSE m.role END AS role,
       (SELECT jsonb_build_object('case',mc.id,'reason',mc.reason,'decided_at',mc.decided_at,
         'appealed_at',mc.appealed_at,'appeal_outcome',mc.appeal_outcome)
         FROM oc_moderation_cases mc WHERE mc.target_kind='timeline' AND mc.target_id=t.id::text
         AND mc.status='restricted') AS moderation
       FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id
       LEFT JOIN oc_members m ON m.timeline_id=t.id AND m.user_id=$2::uuid WHERE t.id=$1`,
-      [id, userId ?? null],
+      [id, userId ?? null, adminId(userId)],
     );
     const timeline = rows[0];
     // A timeline restricted by moderators (#115) is seen only by its owner and administrators.
@@ -423,10 +425,10 @@ export class PostgresStore {
       const sources = await client.query(
         `SELECT t.id FROM oc_timelines t
         WHERE t.id=ANY($1::uuid[]) AND t.comparison IS NULL AND
-        (t.owner_id=$2::uuid OR EXISTS(SELECT 1 FROM oc_users a WHERE a.id=$2::uuid AND a.is_admin AND NOT a.is_disabled)
+        (t.owner_id=$2::uuid OR EXISTS(SELECT 1 FROM oc_users a WHERE a.id=$3::uuid AND a.is_admin AND NOT a.is_disabled)
           OR ((t.visibility='public' OR EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$2::uuid))
             AND NOT ${restrictedTimeline('t')}))`,
-        [timeline.comparison.sources, userId ?? null],
+        [timeline.comparison.sources, userId ?? null, adminId(userId)],
       );
       if (sources.rows.length !== timeline.comparison.sources.length)
         throw new HttpError(404, 'A comparison source is unavailable.');
