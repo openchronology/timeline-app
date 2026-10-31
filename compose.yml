@@ -145,6 +145,7 @@ services:
       LDAP_REQUIRED_GROUP: ${LDAP_REQUIRED_GROUP:-}
       LDAP_NESTED_GROUPS: ${LDAP_NESTED_GROUPS:-}
       LDAP_LABEL: ${LDAP_LABEL:-}
+      LDAP_CHECK_MINUTES: ${LDAP_CHECK_MINUTES:-}
     ports:
       - '127.0.0.1:5173:5173'
     depends_on:

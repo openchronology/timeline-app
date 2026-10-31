@@ -303,6 +303,10 @@ jobs:
       - run: node test/ldap-postgres.mjs
         env:
           LDAP_TEST_REQUIRED: '1'
+      # Ending access when someone leaves the directory (#408), against another such container.
+      - run: node test/directory-check-postgres.mjs
+        env:
+          LDAP_TEST_REQUIRED: '1'
       - run: node test/microsoft-postgres.mjs
       - run: node test/challenge-postgres.mjs
       - run: node test/moderation-postgres.mjs

@@ -2,8 +2,9 @@
 /**
  * The platform's services, made once per process from the environment: the PostgreSQL pool,
  * the store, authentication, the request handler (http.mjs) and its settings, and the
- * background work (retention, standing, catching up interrupted refreshes, IndexNow). The Next.js
- * routes (next-handler.mjs, platform/proxy.js) ask for them through platformServices.
+ * background work (retention, standing, directory checks, catching up interrupted refreshes,
+ * IndexNow). The Next.js routes (next-handler.mjs, platform/proxy.js) ask for them through
+ * platformServices.
  */
 import pg from 'pg';
 import { resolve } from 'node:path';
@@ -16,6 +17,8 @@ import { PostgresStore } from './store.mjs';
 import { pluginCompiler } from './plugin-sandbox.mjs';
 import { startRetention } from './retention.mjs';
 import { startStanding } from './standing.mjs';
+import { directoryFromEnv, Directory } from './ldap.mjs';
+import { startDirectoryCheck } from './directory-check.mjs';
 import { providersFromEnv } from './oauth.mjs';
 import {
   compareLimits,
@@ -181,9 +184,19 @@ async function initialize() {
   if (pool) startStanding(pool);
   // With INDEXNOW_KEY, search engines hear of public pages' changes within minutes (#389).
   if (pool && indexNow) startIndexNow(pool, { origin, key: indexNow });
+  const auth = pool ? new Auth(pool, origin) : null;
+  // With directory sign-in, accounts whose person left the directory lose access (#408).
+  const directory = auth ? directoryFromEnv() : null;
+  if (directory)
+    startDirectoryCheck(
+      pool,
+      auth.security,
+      new Directory(auth, null, directory),
+      directory.checkEvery,
+    );
   return {
     ...options,
-    auth: pool ? new Auth(pool, origin) : null,
+    auth,
     store,
     handler: createRequestHandler(options),
   };

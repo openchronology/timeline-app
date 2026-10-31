@@ -83,6 +83,11 @@ CREATE TABLE IF NOT EXISTS oc_identities (
 ALTER TABLE oc_identities DROP CONSTRAINT IF EXISTS oc_identities_provider_check;
 ALTER TABLE oc_identities ADD CONSTRAINT oc_identities_provider_check
   CHECK(provider IN ('google','github','facebook','microsoft','ldap'));
+-- When the periodic directory check (directory-check.mjs, #408) found an 'ldap' identity's
+-- person gone from the directory, disabled or out of LDAP_REQUIRED_GROUP, and ended its
+-- account's access; null while the directory lets them in. Cleared when they are found again or
+-- sign in through the directory, so each departure is acted on once.
+ALTER TABLE oc_identities ADD COLUMN IF NOT EXISTS left_at timestamptz;
 -- A provider sign-in in progress (oauth.mjs): inserted by start, and deleted with RETURNING
 -- by the callback, so each flow is used once; 10 minutes.
 --   state_hash: SHA-256 of the OAuth state; browser_hash: hash of the oc_oauth cookie, which
@@ -760,6 +765,9 @@ CREATE TABLE IF NOT EXISTS oc_site_settings (
 );
 -- The one row, inserted once.
 INSERT INTO oc_site_settings(singleton) VALUES(true) ON CONFLICT DO NOTHING;
+-- When the last periodic directory check started (directory-check.mjs), so that one check
+-- runs per LDAP_CHECK_MINUTES however many server processes share the database.
+ALTER TABLE oc_site_settings ADD COLUMN IF NOT EXISTS directory_checked_at timestamptz;
 -- API keys for automation (api-keys.mjs). token_hash: SHA-256 of the key, which is sent as a
 -- bearer token och_key_<id>_<secret>; prefix: och_key_ and the start of the id, shown so a
 -- person can tell keys apart; scopes: a non-empty subset of timelines:read and
