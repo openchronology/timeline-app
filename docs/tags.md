@@ -8,6 +8,29 @@ Events (moments and durations) can carry tags: short labels you choose, such as 
 
 Each track has its own summaries, so nearby moments and collapsed durations group within their own side. Server and desktop timelines show the saved version while separated; unsaved edits are kept and reappear when you rejoin. Complete in-memory timelines, such as browser drafts and offline HTML, include unsaved edits.
 
+## A default view
+
+Someone who can edit a timeline can make a separation its default view: separate it, by tags or by **Separate related** or **Separate all connected**, and select **Make this the default view** in the bar above the tracks. Everyone then opens it that way: readers, embeds, shared links, imported files, desktop files and browser drafts. The bar says "This is the timeline's default view", and **Rejoin** still returns to the whole timeline. **Clear default view**, in the bar or in the **Separate by tags** dialog (which also says what the timeline opens separated by), makes it open whole again.
+
+The default view is one of the timeline's settings, like its title and tags, so it is an unsaved change until the timeline is saved (for a server or desktop timeline: rejoin, then save; a browser draft keeps it at once). Saves, exports (`.ochx`, `.och`), forks, copies, merges, pull requests and saved history keep it. In a document it is `view`:
+
+```json
+{ "view": { "separation": { "tags": ["war", "trade"] } } }
+```
+
+```json
+{ "view": { "separation": { "related": { "moment": "launch" }, "depth": "all" } } }
+```
+
+`depth` is `direct` (Separate related) or `all` (Separate all connected). Tags are normalized like entity tags: one to forty, 1–64 characters each, trimmed and lowercased, without commas. The entity is named like a relationship's end and must be a valid ID, but it need not exist: a deleted entity is kept in the setting, and the timeline then opens whole, quietly. Anything else is refused when the document is saved or imported. Only the separation is saved. The bar's label comes from the entity's title when the timeline opens.
+
+How it fits with the rest:
+
+- **Reloads:** a server timeline's tab remembers its view. A reload shows it as it was, separated or rejoined; a new tab or a shared link opens the default view.
+- **Links to an event or a search** ([`/moments/<id>`, `#moment/<id>`, `#duration/<id>`, `#search/<words>`](sharing.md)) open the whole timeline with that event's details or the search, as before: they name something to show in the editable timeline, and separated tracks are read-only. A link to a range (`#view/<left>..<right>`) opens the default view over that range.
+- **Comparisons** of timelines ignore their default views: each track is a whole timeline.
+- **Editing:** a separation is read-only, so someone who opens their timeline to edit it rejoins first. Unsaved edits are kept while separated, as before. **Make this the default view** is shown only to those who could edit the timeline, and not in View mode.
+
 ## Views
 
 A separation reads two filtered views of one saved state: entities with any of the tags, and entities with none of them. Each view is a full index of its filtered document, so summaries, duration bands, collapsed-duration clusters, pages of moments and of durations run at normal index speed and match the same rules as the whole timeline.

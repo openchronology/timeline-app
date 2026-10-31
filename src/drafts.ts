@@ -75,6 +75,7 @@ export function draftSettings(index: TimelineIndex): DraftSettings {
     ...(index.presentation ? { presentation: index.presentation } : {}),
     ...(index.plugins === undefined ? {} : { plugins: index.plugins }),
     ...(index.tags === undefined ? {} : { tags: index.tags }),
+    ...(index.view === undefined ? {} : { view: index.view }),
   };
 }
 /** The document a draft's records describe. */

@@ -193,6 +193,8 @@ Tags are short labels on events, such as `war` or `trade`. Each can carry up to 
 
 **Separate by tags** lists the timeline's tags and how often each is used. Choose some (or type others under **Other tags**) and select **Separate**. Everything carrying any of them moves into a track above; everything else stays below. Both tracks pan and zoom together, and both are read-only. Separating never changes or saves the timeline. **Rejoin** brings it back together. See [separating by tags](tags.md#separating-by-tags).
 
+To have a timeline open separated, for everyone who reads it, separate it and select **Make this the default view**, then rejoin and save. **Clear default view** undoes it. See [a default view](tags.md#a-default-view).
+
 ## Searching
 
 **Search** above the timeline, or the `/` key, opens **Search this timeline**. Type words from titles or notes; a result must contain every word. Results come 25 a page, with each one's time and a preview of its notes. Choosing a result moves the view to it, and it pulses briefly; click it to open it. On the website, **Share these results** links to the search. See [searching a timeline](search.md).

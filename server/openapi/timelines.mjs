@@ -221,6 +221,39 @@ export const schemas = {
       },
     },
   },
+  TimelineView: {
+    type: 'object',
+    description:
+      'How the timeline opens for readers, embeds and shared links (#416): separated by tags, or by an entity and what is related to it (`direct`) or connected to it (`all`). An entity that no longer exists opens the whole timeline.',
+    required: ['separation'],
+    additionalProperties: false,
+    properties: {
+      separation: {
+        oneOf: [
+          {
+            type: 'object',
+            required: ['tags'],
+            additionalProperties: false,
+            properties: {
+              tags: {
+                type: 'array',
+                minItems: 1,
+                maxItems: 40,
+                items: { type: 'string', minLength: 1, maxLength: 64 },
+                description: 'Normalized like entity tags: trimmed, lowercased, without commas.',
+              },
+            },
+          },
+          {
+            type: 'object',
+            required: ['related', 'depth'],
+            additionalProperties: false,
+            properties: { related: ref('EntityRef'), depth: { enum: ['direct', 'all'] } },
+          },
+        ],
+      },
+    },
+  },
   TimelineImage: {
     type: 'object',
     description:
@@ -332,6 +365,7 @@ export const schemas = {
         description: 'The timeline’s tags: lowercased, without commas or control characters.',
       },
       image: ref('TimelineImage'),
+      view: ref('TimelineView'),
       assets: {
         type: 'object',
         maxProperties: 200,
@@ -359,6 +393,7 @@ export const schemas = {
       plugins: { type: 'array', maxItems: 32, items: { type: 'object' } },
       tags: { type: 'array', items: { type: 'string' }, maxItems: 40 },
       image: ref('TimelineImage'),
+      view: ref('TimelineView'),
       assets: { type: 'object' },
     },
   },
@@ -390,6 +425,7 @@ export const schemas = {
       plugins: { type: ['array', 'null'], items: { type: 'object' } },
       tags: { type: ['array', 'null'], items: { type: 'string' } },
       image: nullable(ref('TimelineImage')),
+      view: nullable(ref('TimelineView')),
       assets: { type: ['object', 'null'] },
       comparison: nullable(ref('SavedComparison')),
       featured: { type: 'boolean' },
