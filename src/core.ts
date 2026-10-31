@@ -55,7 +55,6 @@ export {
   durationTree,
   durationWindow,
   durationSummaries,
-  durationLanes,
   collapses,
   arrangeDurations,
   compareDurationRank,

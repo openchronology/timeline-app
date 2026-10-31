@@ -194,7 +194,7 @@ the rows that fit under a vertically centred axis, where bands start 35 px below
 
 **The "more" chip.** Per source timeline, the hidden bands, plus (for the main timeline) any durations the window holds beyond the 256 sent (`durationsTotal − sent`), are represented by one chip "＋N more durations ▾" placed on the row after the last used row (at most row `maxRows`). It spans the visible extent of the hidden bands (at least 150 px wide), or the whole width when unsent durations are included. Choosing it lists the hidden bands, or, when the window was truncated, queries every duration touching the view (`{"kind": "durations", "overlapping": true, ...}`), paged 25 at a time and sortable by extent, start or title.
 
-An older function `durationLanes` (rows by start, longer first) remains exported and tested but is not used for drawing.
+An older function `durationLanes` (rows by start, longer first) was exported and tested but not used for drawing; it was removed in #392.
 
 ### Separating moments into tracks by tags
 

@@ -43,7 +43,7 @@ Durations have a separate interval query, so a period crossing the viewport is v
 
 When more than 256 durations touch a window, every store keeps its **256 longest** (then by start and ID) and reports how many touch it (`durationsTotal`, counted up to 10,000; `durationsTotalMore` beyond), so an era starting after thousands of short spans is still sent:
 
-- **PostgreSQL and SQLite** rank the window's first 10,001 matches in start order, which also counts them: a dense window costs at most 10,001 matches. Past that many, the longest are chosen among those.
+- **PostgreSQL and SQLite** rank the first 10,001 matches their walk of the tree finds, which also counts them: a dense window costs at most 10,001 matches. SQLite's walk finds them in start order; PostgreSQL's goes down the tree a level at a time, so its 10,001 are not the earliest-starting ones. Past that many, the longest are chosen among those, so which 256 are kept is then approximate on both, and the count reads as 10,000+.
 - **The browser** finds the exact 256 longest best-first, without visiting every match: a priority queue of subtrees ranked by the best duration each could hold (its longest extent, earliest start and the first ID at that start, all cached on the node), so the work follows the 256 kept and the tree's height. It counts a subtree whose durations all touch the window and reach the threshold from its cached size (each node also caches its smallest end). Exact comparisons reuse each rational's cached numerator and denominator. A drag over 5,000 identical spans computes each frame in about 3 ms.
 
 ## Dense windows

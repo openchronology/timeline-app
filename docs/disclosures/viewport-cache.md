@@ -49,7 +49,7 @@ dyadic(q):                                   # q = n/d > 0, exact
 
 Snapping down to a power of two means every view whose own threshold lies in `[2^k, 2^(k+1))` asks for the same level, so zooming by less than a factor of two (at a fixed width and grouping distance) and panning by less than a quarter span reuse one window. Snapping down, not up, keeps the window's groups at most as wide as the view's own grouping; the view then coarsens them exactly (see [Display](#display-while-loading-and-after-a-hit)). The `minimum` keeps a planned window to at most about 1,025 anchored groups, which matches the server, which raises any requested threshold below `(upper − lower) / 1024` to that value.
 
-Note on the documentation: [`docs/architecture.md`](../architecture.md#window-summaries) (line 106) says resolution levels "use exact powers of two". In the code, when the power of two at or below the threshold falls under `minimum`, the level is `minimum` itself, which is not in general a power of two. This can happen only when `t < 2 × minimum`, that is `P/W < 3/1024`: with the default 24-pixel grouping, a drawable width above 8,192 pixels. On ordinary screens levels are powers of two.
+Note on the documentation: [`docs/architecture.md`](../architecture.md#window-summaries) (line 106) said resolution levels "use exact powers of two". In the code, when the power of two at or below the threshold falls under `minimum`, the level is `minimum` itself, which is not in general a power of two. This can happen only when `t < 2 × minimum`, that is `P/W < 3/1024`: with the default 24-pixel grouping, a drawable width above 8,192 pixels. On ordinary screens levels are powers of two. The docs were corrected to match the code in #392.
 
 ### Lookup
 
@@ -92,7 +92,7 @@ nearest(view, threshold):
 
 `octaves(a, b)` is `|bitlength(num(a/b)) − bitlength(den(a/b))|`, an integer estimate of `|log2(a/b)|` computed from the exact ratio. Preferring the window already drawn keeps markers in place during a zoom out instead of switching to a coarser covering window with different groups.
 
-Note on the documentation: [`docs/architecture.md`](../architecture.md#window-summaries) (line 106) says "the cached window covering it at the closest resolution stays on screen meanwhile". The code first keeps the window last drawn whenever it overlaps the view at all, even if it does not cover it, and only otherwise ranks windows as above.
+Note on the documentation: [`docs/architecture.md`](../architecture.md#window-summaries) (line 106) said "the cached window covering it at the closest resolution stays on screen meanwhile". The code first keeps the window last drawn whenever it overlaps the view at all, even if it does not cover it, and only otherwise ranks windows as above. The docs were corrected to match the code in #392.
 
 ### Request ordering and staleness
 

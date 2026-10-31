@@ -435,4 +435,4 @@ Anchored spans on one axis with threshold `T`. The group interval is half-open, 
   group 1         group 2                 group 3
 ```
 
-Note on the documentation: [`docs/architecture.md`](https://github.com/openchronology/timeline-app/blob/007091ce62fdb402346c0712b0c420eac0a29dff/docs/architecture.md#L63) names the SQL operation `oc_overview`; the server now calls `oc_overview_v2` (same arguments, plus a metadata column), and `oc_overview` remains as a wrapper for existing callers and the conformance test.
+Note on the documentation: [`docs/architecture.md`](https://github.com/openchronology/timeline-app/blob/007091ce62fdb402346c0712b0c420eac0a29dff/docs/architecture.md#L63) named the SQL operation `oc_overview`; the server now calls `oc_overview_v2` (same arguments, plus a metadata column), and `oc_overview` remains as a wrapper for existing callers and the conformance test. The docs were corrected to match the code in #392.

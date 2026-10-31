@@ -2112,9 +2112,12 @@ export class PostgresStore {
           [tree, query.lower, query.upper, threshold],
         );
         // Bands are durations at least as long as the threshold; shorter ones are summarized.
-        // A dense window sends its 256 longest (#316): the walk's matches in start order, up
-        // to one past DURATION_COUNT_CAP (which also counts them), ranked longest first, then
-        // by start and ID, the first 256 kept and returned in start order.
+        // A dense window sends its 256 longest (#316): the walk's matches, up to one past
+        // DURATION_COUNT_CAP (which also counts them), ranked longest first, then by start and
+        // ID, the first 256 kept and returned in start order. The recursive walk yields its
+        // matches a tree level at a time, not in start order: past the cap the 256 are the
+        // longest of those it reached first. Sorting by start before the LIMIT would read every
+        // match, which the cap is there to avoid; the browser's best-first search is exact.
         const intervals = await c.query(
           `${walk(names.durations, names.roots, 'duration_root', pruned)},
           matches AS (SELECT band,first_time,last_time FROM visible WHERE first_time<=$3::mpq AND last_time>=$2::mpq

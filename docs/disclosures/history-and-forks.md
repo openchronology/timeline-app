@@ -398,8 +398,10 @@ v0.1.0 is dated 2026-10-17. The merge primitives (`mergeValue`, `rebaseDocument`
 
 **Note on the documentation.**
 
-- `docs/architecture.md` ("Saved history", L69) says saves that rebuild the index "compare the whole timeline with its current versions in one query". The code pages that comparison `PAGE = 20000` keys per statement (`recordAll` and `recordKeys`, `server/history.mjs` L443-L547).
-- `docs/architecture.md` L74 says a copy is prepared later "when that is 20,000 events or more". The code counts the source's own `oc_moments` rows plus its own `oc_duration_nodes` rows, hidden ones included (`shareIndex`, `server/store.mjs` L549-L557).
+- `docs/architecture.md` ("Saved history", L69) said saves that rebuild the index "compare the whole timeline with its current versions in one query". The code pages that comparison `PAGE = 20000` keys per statement (`recordAll` and `recordKeys`, `server/history.mjs` L443-L547).
+- `docs/architecture.md` L74 said a copy is prepared later "when that is 20,000 events or more". The code counts the source's own `oc_moments` rows plus its own `oc_duration_nodes` rows, hidden ones included (`shareIndex`, `server/store.mjs` L549-L557).
+
+The docs were corrected to match the code in #392.
 
 ## Figures
 
