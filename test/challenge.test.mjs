@@ -174,3 +174,30 @@ test('challenges can be turned off, and settings are validated', async () => {
     turnstile: undefined,
   });
 });
+
+test('without checks, account failures delay sign-ins rather than refuse them', async () => {
+  const counted = (count) => ({
+    async query() {
+      return { rows: [{ count }] };
+    },
+  });
+  const timed = async (challenges) => {
+    const started = Date.now();
+    await challenges.signInGate({ headers: {}, clientAddress: '203.0.113.9' }, 'someone');
+    return Date.now() - started;
+  };
+  assert(
+    (await timed(new Challenges({ provider: 'off', pool: counted(2), signInDelay: 200 }))) < 150,
+  );
+  assert(
+    (await timed(new Challenges({ provider: 'off', pool: counted(40), signInDelay: 200 }))) >= 190,
+  );
+  // With checks on, the same failures ask for a check (428) instead.
+  await assert.rejects(
+    new Challenges({ provider: 'pow', pool: counted(40) }).signInGate(
+      { headers: {}, clientAddress: '203.0.113.9' },
+      'someone',
+    ),
+    (error) => error.status === 428 && error.challenge.purpose === 'sign-in',
+  );
+});

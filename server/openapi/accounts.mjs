@@ -165,7 +165,7 @@ export const paths = {
         SIGN_IN_TOKEN,
         'A signed-in browser gets the session cookie; the desktop app (`X-OC-Client: desktop`) gets a session `token` instead. Signing in replaces the caller’s previous session.',
         'When the account needs another step, the answer is a `SignInStep` instead, with the `oc_challenge` cookie (five minutes): `mfa` asks for `POST /api/auth/mfa/complete`, `email` for `POST /api/auth/email/enroll`.',
-        'After three failures in fifteen minutes from the client address or for the account, it asks for human verification (428) instead of locking the account. Ten attempts a minute per client address and per account (429).',
+        'After three failures in fifteen minutes from the client address or for the account, every further attempt asks for human verification (428) instead of locking the account; when the server has checks off, each waits a moment instead. Ten attempts a minute per client address (429); there is no limit per account. 503 when the server’s password checks stay busy for several seconds: try again shortly.',
       ].join('\n\n'),
       security: SIGN_IN,
       parameters: [clientHeader, challengeHeader],
@@ -229,7 +229,7 @@ export const paths = {
       summary: 'Register',
       description: [
         SIGN_IN_TOKEN,
-        'Makes a pending registration and emails a confirmation, which `POST /api/auth/email/verify` accepts in this browser within 24 hours; the account exists only then, and no session is made here. The answer is the same whether or not the username or email is taken. Always asks for human verification (428). Unavailable (503) until the server has email and an encryption key configured.',
+        'Makes a pending registration and emails a confirmation, which `POST /api/auth/email/verify` accepts in this browser within 24 hours; the account exists only then, and no session is made here. The answer is the same whether or not the username or email is taken. Always asks for human verification (428). Unavailable (503) until the server has email and an encryption key configured, or for a moment while its password checks stay busy.',
       ].join('\n\n'),
       security: SIGN_IN,
       parameters: [challengeHeader],
@@ -383,7 +383,7 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Reset a password',
       description: [
-        'Sets a new password with the token from a reset link. It signs the account out everywhere, revokes its API keys and pending desktop approvals, and does not turn two-factor authentication off.',
+        'Sets a new password with the token from a reset link. It signs the account out everywhere, revokes its API keys and pending desktop approvals, and does not turn two-factor authentication off. An unknown or expired link is refused (400) before the password is hashed; 503 when the server’s password checks stay busy for several seconds.',
         SIGN_IN_TOKEN,
       ].join('\n\n'),
       security: SIGN_IN,
