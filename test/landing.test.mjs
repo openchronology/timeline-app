@@ -134,7 +134,11 @@ test('the built-in copy has every page, with what the pages show', async () => {
   for (const name of CONTENT_FILES) {
     const { meta, html } = await landingContent(name, env);
     for (const key of ['title', 'promise', 'description']) assert.ok(meta[key], `${name}: ${key}`);
-    assert.ok(meta.description.length <= 200, `${name}: a description search engines show whole`);
+    assert.ok(meta.description.length <= 160, `${name}: a description search engines show whole`);
+    // A title says what the page offers, in words people search for (#390); the heading may
+    // say it in the page's own voice.
+    assert.ok(meta.title.length <= 70, `${name}: a title search engines show whole`);
+    assert.ok(meta.heading, `${name}: its heading`);
     if (AUDIENCES.includes(name)) {
       assert.ok(meta.label && meta.card, `${name}: its card`);
       assert.match(html, /<h2[^>]*>What you can do<\/h2>/);
@@ -142,7 +146,8 @@ test('the built-in copy has every page, with what the pages show', async () => {
     }
   }
   const home = await landingContent('home', env);
-  assert.equal(home.meta.title, 'Any span of time, on one exact line');
+  assert.equal(home.meta.heading, 'Any span of time, on one exact line');
+  assert.equal(home.meta.title, 'OpenChronology: free timeline editor for history and research');
   const educators = await landingContent('educators', env);
   assert.match(educators.html, /Accounts are for people 13 and older/);
   assert.match(educators.html, /No account needed to read/);

@@ -7,11 +7,12 @@ import { AUDIENCES, browserPath, landingContent } from '../../server/landing.mjs
 import { jsonLd } from '../lib/sharing.js';
 
 /**
- * A page's opening: its title, its promise in a line, and what to do next: explore the
+ * A page's opening: its heading (or title), its promise in a line, and what to do next: explore the
  * public timelines, sign up (where the site takes registrations; or see one's own timelines,
  * signed in), or start a timeline in the browser.
  * @param {object} props
- * @param {Record<string, string>} props.meta the copy's front matter (`title`, `promise`)
+ * @param {Record<string, string>} props.meta the copy's front matter (`heading` or `title`,
+ *   `promise`)
  * @param {{user: object|null, registration: boolean}} props.data from lib/landing.js
  * @param {string} [props.eyebrow] a line above the title: whom the page is for
  */
@@ -20,7 +21,7 @@ export function LandingHero({ meta, data, eyebrow }) {
   return (
     <section className="landing-hero" aria-labelledby="landing-title">
       {eyebrow && <p className="landing-eyebrow">{eyebrow}</p>}
-      <h1 id="landing-title">{meta.title}</h1>
+      <h1 id="landing-title">{meta.heading ?? meta.title}</h1>
       {meta.promise && <p className="landing-promise">{meta.promise}</p>}
       <div className="landing-actions">
         <a className="button primary" href={browser}>

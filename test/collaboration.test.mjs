@@ -17,6 +17,8 @@ import {
   CUSTOM_EXAMPLE,
   changeText,
   exactTimeText,
+  movedDurationsText,
+  durationsMovedWith,
   createPresenter,
   printEntityTime,
   Q,
@@ -389,6 +391,118 @@ test('pull request changes print anchored duration ends at their moments’ time
   assert.equal(
     printEntityTime(null, anchored, (id) => (id === 'a' ? '5/1' : undefined)),
     '5/1 – the time of moment b (anchored moment missing)',
+  );
+});
+
+test('pull request changes list durations that move with moments they move (#395)', async () => {
+  const gregorian = {
+    version: 1,
+    mode: 'gregorian',
+    significantDigits: 6,
+    unit: '',
+    scale: '1',
+    origin: '0',
+    offsetMinutes: 0,
+  };
+  const day = 86400;
+  const moment = (id, time, title = id) => ({ id, time, metadata: { title } });
+  const span = (id, start, end, title = id) => ({ id, start, end, metadata: { title } });
+  // Unvalidated: saving refuses a dangling anchor, but a summary must not fail on one.
+  const doc = (events, durations = []) => ({
+    format: 'openchronology',
+    version: 1,
+    title: 'T',
+    description: '',
+    events,
+    durations,
+  });
+  const summary = (base, proposed) =>
+    new Collaboration({
+      // Neither revision is kept as rows: only differences' lookup of them is a query.
+      pool: { query: async () => ({ rows: [] }) },
+      revisionDocument: async (_client, id) => ({ base, proposed })[id],
+    }).changes('base', 'proposed', gregorian);
+  const base = doc(
+    [
+      moment('coronation', '0/1', 'Coronation'),
+      moment('abdication', `${10 * day}/1`, 'Abdication'),
+      moment('doomed', `${20 * day}/1`, 'Doomed'),
+      moment('still', `${30 * day}/1`, 'Still'),
+    ],
+    [
+      span('reign', { moment: 'coronation' }, { moment: 'abdication' }, 'Reign'),
+      span('after', { moment: 'coronation' }, `${5 * day}/1`, 'After'),
+      span('edited', { moment: 'coronation' }, `${6 * day}/1`, 'Edited'),
+      span('orphan', '0/1', { moment: 'doomed' }, 'Orphan'),
+      span('unmoved', { moment: 'still' }, `${40 * day}/1`, 'Unmoved'),
+    ],
+  );
+  const proposed = doc(
+    [
+      // Moved a day later, and retitled.
+      moment('coronation', `${day}/1`, 'Crowning'),
+      // Moved two days later.
+      moment('abdication', `${12 * day}/1`, 'Abdication'),
+      // Retitled only: its time is the same.
+      moment('still', `${30 * day}/1`, 'Renamed'),
+    ],
+    [
+      span('reign', { moment: 'coronation' }, { moment: 'abdication' }, 'Reign'),
+      span('after', { moment: 'coronation' }, `${5 * day}/1`, 'After'),
+      // Edited as well: listed once, as changed.
+      span('edited', { moment: 'coronation' }, `${6 * day}/1`, 'Edited again'),
+      span('orphan', '0/1', { moment: 'doomed' }, 'Orphan'),
+      span('unmoved', { moment: 'still' }, `${40 * day}/1`, 'Unmoved'),
+    ],
+  );
+  const changes = await summary(base, proposed);
+  assert.deepEqual(changes.durations, { added: 0, removed: 0, changed: 1, moved: 3 });
+  assert.deepEqual(
+    changes.durationExamples.map((e) => changeText(e, 'duration')),
+    [
+      // Anchored at both ends, both moved.
+      'Moved duration: After · 1970 CE – 1970-01-06 CE → 1970-01-02 CE – 1970-01-06 CE (moves with moment Crowning)',
+      // Its anchor removed: it says so rather than hiding it.
+      'Moved duration: Orphan · 1970 CE – 1970-01-21 CE → 1970 CE – the time of moment doomed (anchored moment missing) (moves with moment Doomed)',
+      'Moved duration: Reign · 1970 CE – 1970-01-11 CE → 1970-01-02 CE – 1970-01-13 CE (moves with moments Crowning and Abdication)',
+      'Changed duration: Edited again · 1970 CE – 1970-01-07 CE → 1970-01-02 CE – 1970-01-07 CE',
+    ],
+  );
+  const reign = changes.durationExamples.find((e) => e.after?.id === 'reign');
+  assert.deepEqual(reign.movedWith, [
+    { id: 'coronation', title: 'Crowning' },
+    { id: 'abdication', title: 'Abdication' },
+  ]);
+  assert.equal(reign.before, reign.after);
+  assert.equal(
+    movedDurationsText(changes.durations.moved),
+    '3 durations move with moments it moves.',
+  );
+  assert.equal(movedDurationsText(1), '1 duration moves with a moment it moves.');
+  // Nothing moved: no moved durations, and the count stays zero.
+  const retitled = await summary(
+    base,
+    doc(
+      base.events.map((e) => ({ ...e, metadata: { title: 'x' } })),
+      base.durations,
+    ),
+  );
+  assert.equal(retitled.durations.moved, 0);
+  assert.deepEqual(retitled.durationExamples, []);
+  // Bounded like the other examples: thirty shown, all counted.
+  const many = Array.from({ length: 45 }, (_, i) =>
+    span('d' + String(i).padStart(2, '0'), { moment: 'coronation' }, `${day}/1`),
+  );
+  const crowded = await summary(doc(base.events, many), doc(proposed.events, many));
+  assert.equal(crowded.durations.moved, 45);
+  assert.equal(crowded.durationExamples.length, 30);
+  assert.equal(crowded.durationExamples[0].after.id, 'd00');
+  // The shared helper the editor's fallback uses for older servers' documents.
+  assert.deepEqual(
+    durationsMovedWith(base.durations, proposed.durations, new Set(['coronation'])).map(
+      (d) => d.id,
+    ),
+    ['after', 'reign'],
   );
 });
 

@@ -44,13 +44,16 @@ interface ChangedEntity {
 }
 /**
  * A moment or duration a pull request adds, removes or changes, with its `before` and `after`
- * versions and, from current servers, their times as the timeline displays them (#384).
+ * versions and, from current servers, their times as the timeline displays them (#384). A
+ * duration it leaves alone whose anchor moments it moves is `moved` (#395): the same version
+ * on both sides, with the moments it moves with (`movedWith`).
  */
 export interface ChangeExample {
-  change: 'added' | 'removed' | 'changed';
+  change: 'added' | 'removed' | 'changed' | 'moved';
   before: ChangedEntity | null;
   after: ChangedEntity | null;
   times?: { before: string | null; after: string | null };
+  movedWith?: { id: string; title?: string }[];
 }
 /** "x → y" when they differ, else the one there is. */
 const changed = (before: string | null, after: string | null) =>
@@ -66,21 +69,40 @@ function exactTime(entity: ChangedEntity): string {
 /**
  * Its line in a pull request's list of changes, on the website and in the editor: `Added:
  * Coronation · 1953-06-02`, its time as the timeline displays it, and a changed time as
- * old → new. Without display times (older servers), its exact times.
+ * old → new. Without display times (older servers), its exact times. A moved duration says
+ * which moments it moves with: `Moved duration: Reign · 1952 – 2022 → 1953 – 2022 (moves with
+ * moment Coronation)`.
  */
 export function changeText(example: ChangeExample, kind: 'moment' | 'duration'): string {
   const { before, after } = example;
   const entity = (after ?? before)!;
-  const label = { added: 'Added', removed: 'Removed', changed: 'Changed' }[example.change];
+  const label = { added: 'Added', removed: 'Removed', changed: 'Changed', moved: 'Moved' }[
+    example.change
+  ];
   const title =
     entity.metadata?.title || (kind === 'moment' ? 'Untitled moment' : 'Untitled duration');
   const time = example.times
     ? changed(example.times.before, example.times.after)
     : exactTimeText(example);
-  return `${label}${kind === 'duration' ? ' duration' : ''}: ${title} · ${time}`;
+  const names = (example.movedWith ?? []).map((m) => m.title || m.id);
+  const moves = names.length
+    ? ` (moves with moment${names.length > 1 ? 's' : ''} ${
+        names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]
+      })`
+    : '';
+  return `${label}${kind === 'duration' ? ' duration' : ''}: ${title} · ${time}${moves}`;
 }
 /** Its exact stored times, old → new when they changed: for a tooltip, to debug with. */
 export function exactTimeText(example: ChangeExample): string {
   const { before, after } = example;
   return changed(before && exactTime(before), after && exactTime(after)) ?? '';
+}
+/**
+ * How many durations a pull request leaves alone move with moments it moves (#395), for its
+ * summary's counts on the website and in the editor.
+ */
+export function movedDurationsText(count: number): string {
+  return count === 1
+    ? '1 duration moves with a moment it moves.'
+    : `${count} durations move with moments it moves.`;
 }

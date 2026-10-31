@@ -181,9 +181,17 @@ try {
     const home = await get(o, '/');
     assert.equal(home.status, 200);
     assert.match(home.html, /<h1[^>]*>Any span of time, on one exact line<\/h1>/);
-    assert.match(home.html, /<title>Any span of time, on one exact line · OpenChronology<\/title>/);
+    // The title says what the site is (#390), naming it once.
+    assert.match(
+      home.html,
+      /<title>OpenChronology: free timeline editor for history and research<\/title>/,
+    );
     assert.equal(canonical(home.html), o);
-    assert.match(home.html, /<meta property="og:title" content="Any span of time/);
+    assert.match(home.html, /<meta property="og:title" content="OpenChronology: free timeline/);
+    assert.match(
+      home.html,
+      new RegExp(`<meta property="og:image" content="${o}/social-preview\\.jpg"`),
+    );
     assert.match(home.html, /href="\/explore"/, 'the header and opening link to the browser');
     for (const audience of ['educators', 'researchers', 'operations', 'developers'])
       assert.match(home.html, new RegExp(`href="/for/${audience}"`));
@@ -226,6 +234,13 @@ try {
       if (audience !== 'writers') assert.match(page.html, /What you can count on/, audience);
     }
     const educators = await get(o, '/for/educators');
+    // Its title is what people search for; its heading, the page's own voice (#390).
+    assert.match(
+      educators.html,
+      /<title>Collaborative timeline maker for teachers and classrooms · OpenChronology<\/title>/,
+    );
+    assert.match(educators.html, /<h1[^>]*>Timelines your class builds together<\/h1>/);
+    assert.match(educators.html, /<meta property="og:image:alt" content="[^"]+"/);
     assert.match(educators.html, /Accounts are for people 13 and older/);
     // Its examples, in the order named, without the private, labelled or missing ones.
     assert.match(educators.html, new RegExp(`Alpha ${word}[\\s\\S]*Beta ${word}`));
@@ -241,6 +256,8 @@ try {
     const writers = await get(o, '/for/writers');
     assert.match(writers.html, new RegExp(`Our own page for writers ${word}`));
     assert.match(writers.html, /<title>Our own page for writers/);
+    // Without a heading of its own, the operator's title is the heading.
+    assert.match(writers.html, /<h1[^>]*>Our own page for writers/);
     for (const path of ['/for/nobody', '/for/Educators', '/for/educators/more'])
       assert.equal((await get(o, path)).status, 404, path);
     const index = await get(o, '/for');

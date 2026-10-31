@@ -82,6 +82,11 @@ Twitter cards) and search engines. Each has:
 Facebook, X, LinkedIn, Slack, Discord, iMessage and others show these as a card with a large
 image.
 
+The site's other pages (the landing page, the audience pages, profiles, help and the rest)
+preview with the site's own image, `/social-preview.jpg`: a 1200 × 630 screenshot of a large
+timeline in the editor, with its size and a description for screen readers. Every preview
+image's address is absolute, on the site's address (`APP_ORIGIN`).
+
 Previews are made as a guest sees the timeline: a private timeline's preview image is the
 site's own card, and its pages ask search engines not to index them, so nothing private
 appears in a preview even when a member shares the link.

@@ -268,6 +268,9 @@ try {
   // Next names preview images by the route they are in, at the timeline's ID.
   assert(image.startsWith(`${origin}/timelines/${timelineId}/opengraph-image`), image);
   assert.equal(meta(page, 'og:image:width'), '1200');
+  // Its drawn image alone, not the site's (#390).
+  assert.equal(page.match(/property="og:image"/g).length, 1);
+  assert.doesNotMatch(page, /social-preview/);
   assert.match(page, /type="application\/json\+oembed"/);
   // Its moments, in text and linked to their own pages.
   assert(page.includes(`href="${momentPath}"`));
@@ -430,6 +433,9 @@ try {
   await guest.request('/sitemap/other.xml', { status: 404 });
   const profile = await guest.request('/' + username);
   assert.equal(meta(profile, 'og:title'), '@' + username);
+  // A profile previews with the site's image (#390).
+  assert.equal(meta(profile, 'og:image'), origin + '/social-preview.jpg');
+  assert.equal(meta(profile, 'twitter:card'), 'summary_large_image');
 
   // In a browser: links open what they name, the address follows what is open, and the
   // share dialog offers links, social sites and embed code.

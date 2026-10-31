@@ -357,6 +357,116 @@ try {
   const exact = await spansReview(display('gregorian'), '0/1', '0/1');
   assert.equal(exact.times.span0.before, '1925-11-04 CE – 1970 CE');
   assert.equal(anchored.queries, exact.queries + 2);
+  // A duration the pull request leaves alone whose anchor moment it moves is listed as moved
+  // (#395), its span old → new, once even when anchored at both ends; one it also edits only
+  // as changed. They are found through the anchors' indexes: one query for the moved moments'
+  // page, and the moved examples' anchors one query per revision, whatever the timeline's size.
+  /** A pull request on a timeline of `plain` unanchored durations and 40 anchored ones. */
+  const movesReview = async (plain, move) => {
+    const anchoredSpans = [
+      ...Array.from({ length: 38 }, (_, i) => ({
+        id: 'with' + String(i).padStart(2, '0'),
+        start: { moment: 'm0' },
+        end: `${10 * day}/1`,
+        metadata: { title: 'With ' + i },
+      })),
+      { id: 'both', start: { moment: 'm0' }, end: { moment: 'm1' }, metadata: { title: 'Both' } },
+      { id: 'edited', start: { moment: 'm0' }, end: `${9 * day}/1`, metadata: { title: 'Old' } },
+    ];
+    const dated = validateDocument({
+      ...original,
+      presentation: display('gregorian'),
+      events: [moment(0), { ...moment(1), time: `${day}/1` }, moment(2)],
+      durations: [
+        ...Array.from({ length: plain }, (_, i) => ({
+          id: 'plain' + i,
+          start: `${i}/1`,
+          end: `${i + 1}/1`,
+          metadata: { title: 'Plain ' + i },
+        })),
+        ...anchoredSpans,
+      ],
+      relationships: [],
+    });
+    const d = await store.create(owner, dated);
+    timelines.push(d.id);
+    await pool.query(
+      "INSERT INTO oc_members(timeline_id,user_id,role) VALUES($1,$2,'contributor')",
+      [d.id, author],
+    );
+    const pull = await pulls.create(d.id, author, {
+      title: 'Moves',
+      body: '',
+      baseRevision: d.revision,
+      document: validateDocument({
+        ...dated,
+        // m0 a day later and m1 two, or neither: m2 retitled either way.
+        events: move
+          ? [
+              { ...moment(0), time: `${day}/1` },
+              { ...moment(1, 'Second'), time: `${3 * day}/1` },
+              moment(2, 'Renamed'),
+            ]
+          : [dated.events[0], dated.events[1], moment(2, 'Renamed')],
+        durations: dated.durations.map((x) =>
+          x.id === 'edited' ? { ...x, metadata: { title: 'New' } } : x,
+        ),
+      }),
+    });
+    let queries = 0;
+    const counting = Object.assign(Object.create(store), {
+      pool: {
+        query: (...args) => {
+          queries++;
+          return pool.query(...args);
+        },
+      },
+    });
+    const changes = await new Collaboration(counting).changes(
+      pull.base_revision_id,
+      pull.source_revision_id,
+      display('gregorian'),
+    );
+    return { changes, queries };
+  };
+  const moves = await movesReview(200, true);
+  assert.deepEqual(moves.changes.durations, { added: 0, removed: 0, changed: 1, moved: 39 });
+  const movedExamples = moves.changes.durationExamples.filter((e) => e.change === 'moved');
+  // Thirty shown, in ID order; all thirty-nine counted.
+  assert.equal(movedExamples.length, 30);
+  assert.deepEqual(
+    movedExamples.slice(0, 2).map((e) => [e.after.id, e.times, e.movedWith]),
+    [
+      [
+        'both',
+        { before: '1970 CE – 1970-01-02 CE', after: '1970-01-02 CE – 1970-01-04 CE' },
+        [
+          { id: 'm0', title: 'Moment 0' },
+          { id: 'm1', title: 'Second' },
+        ],
+      ],
+      [
+        'with00',
+        { before: '1970 CE – 1970-01-11 CE', after: '1970-01-02 CE – 1970-01-11 CE' },
+        [{ id: 'm0', title: 'Moment 0' }],
+      ],
+    ],
+  );
+  // The edited one only as changed, its span old → new.
+  assert.deepEqual(
+    moves.changes.durationExamples
+      .filter((e) => e.after?.id === 'edited')
+      .map((e) => [e.change, e.times.after]),
+    [['changed', '1970-01-02 CE – 1970-01-10 CE']],
+  );
+  // The cost: one query to find them, one per revision for their anchors (the edited
+  // duration's anchors are read in the same two), whatever the number of durations.
+  const still = await movesReview(200, false);
+  assert.deepEqual(still.changes.durations, { added: 0, removed: 0, changed: 1, moved: 0 });
+  assert.equal(moves.queries, still.queries + 1);
+  const larger = await movesReview(2000, true);
+  assert.equal(larger.changes.durations.moved, 39);
+  assert.equal(larger.queries, moves.queries);
   console.log(
     'PASS pull requests keep no documents: submitted timelines are kept as rows charged their changes, reviewed from history, updated, rebased and merged, and removed with their timeline.',
   );

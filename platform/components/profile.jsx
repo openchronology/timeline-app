@@ -7,7 +7,7 @@ import { browserPath } from '../../server/landing.mjs';
 import { accountCompareLimit, currentSession, userCompareLimit } from '../lib/session.js';
 import { searchTimelines } from '../../server/collaboration.mjs';
 import TimelineBrowser from './timeline-browser.jsx';
-import { siteName } from '../lib/sharing.js';
+import { siteName, sitePreview } from '../lib/sharing.js';
 import { minor } from '../../server/auth.mjs';
 import ReportLink from './report-link.jsx';
 import { profilePath } from '../../src/addresses.ts';
@@ -20,8 +20,16 @@ export function profileMetadata(username) {
     title: `${title} · ${siteName()}`,
     description,
     alternates: { canonical: url },
-    openGraph: { type: 'profile', siteName: siteName(), title, description, url, username },
-    twitter: { card: 'summary', title, description },
+    openGraph: {
+      type: 'profile',
+      siteName: siteName(),
+      title,
+      description,
+      url,
+      username,
+      images: [sitePreview()],
+    },
+    twitter: { card: 'summary_large_image', title, description, images: [sitePreview()] },
   };
 }
 export default async function Profile({ username, searchParams }) {

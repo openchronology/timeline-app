@@ -1,8 +1,9 @@
 ---
 label: Researchers
-title: Timelines you can cite and check
+heading: Timelines you can cite and check
+title: Timeline software for research, with sources and exact dates
 promise: Exact times, sources on every moment, and how precise each date is, in files you can export and keep.
-description: OpenChronology for research: exact times at any scale, sources and date precision on each moment, saved history, search, and export in open formats.
+description: OpenChronology for research: exact times at any scale, sources and date precision on each moment, saved history, and export in open formats.
 card: Exact times, sources and date precision, exported in open formats.
 ---
 

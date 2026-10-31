@@ -1,10 +1,10 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // The dashboard and pull requests in the editor: lists of timelines (yours, starred and public),
 // stars, forks and comparisons, and reviewing, discussing and merging pull requests.
-import { printEntityTime, validateDocument } from './core.js';
+import { durationsMovedWith, printEntityTime, validateDocument } from './core.js';
 import { describeLabels } from './content-labels.js';
 import { markdownText } from './rich-text.js';
-import { changeText, exactTimeText } from './wording.js';
+import { changeText, exactTimeText, movedDurationsText } from './wording.js';
 import type { ChangeExample } from './wording.js';
 import type { TimelineDocument, PointEvent } from './core.js';
 import type { Duration } from './durations.js';
@@ -17,7 +17,10 @@ interface MomentChange extends ChangeExample {
   before: PointEvent | null;
   after: PointEvent | null;
 }
-/** A duration a pull request adds, removes or changes, likewise. */
+/**
+ * A duration a pull request adds, removes or changes, likewise, or one it leaves alone that
+ * moves with a moment it moves (`moved`, from current servers; #395).
+ */
 interface DurationChange extends ChangeExample {
   before: Duration | null;
   after: Duration | null;
@@ -26,7 +29,8 @@ interface DurationChange extends ChangeExample {
 interface ProposalChanges {
   settings: string[];
   moments: { added: number; removed: number; changed: number };
-  durations: { added: number; removed: number; changed: number };
+  /** `moved` (current servers): durations it leaves alone that move with their moments. */
+  durations: { added: number; removed: number; changed: number; moved?: number };
   relationships: { added: number; removed: number };
   /** The first changed moments of each kind. */
   examples: MomentChange[];
@@ -127,35 +131,70 @@ function paragraph(text: string) {
   return p;
 }
 /**
- * What `after` changes from `base`, as the server summarizes it (for older servers).
- * Compares moments by ID and JSON, and a fixed list of settings; durations and
- * relationships are not compared and count as unchanged.
+ * What `after` changes from `base`, as the server summarizes it (for older servers that sent
+ * both documents): moments and durations by ID and JSON, durations that move with moments
+ * whose times differ (durationsMovedWith), and a fixed list of settings; relationships are not
+ * compared and count as unchanged. Examples are cut to 30 of each kind when shown.
  */
 function summarize(base: TimelineDocument, after: TimelineDocument): ProposalChanges {
-  const before = new Map(base.events.map((e) => [e.id, e])),
-    proposed = new Map(after.events.map((e) => [e.id, e]));
-  const examples: MomentChange[] = [
-    ...after.events
-      .filter((e) => !before.has(e.id))
-      .map((e) => ({ change: 'added' as const, before: null, after: e })),
-    ...base.events
-      .filter((e) => !proposed.has(e.id))
-      .map((e) => ({ change: 'removed' as const, before: e, after: null })),
-    ...after.events
-      .filter((e) => before.has(e.id) && JSON.stringify(before.get(e.id)) !== JSON.stringify(e))
-      .map((e) => ({ change: 'changed' as const, before: before.get(e.id)!, after: e })),
-  ];
-  const count = (change: MomentChange['change']) =>
-    examples.filter((e) => e.change === change).length;
+  const compare = <T extends { id: string }>(before: readonly T[], proposed: readonly T[]) => {
+    const [a, b] = [new Map(before.map((e) => [e.id, e])), new Map(proposed.map((e) => [e.id, e]))];
+    return [
+      ...proposed
+        .filter((e) => !a.has(e.id))
+        .map((e) => ({ change: 'added' as const, before: null, after: e })),
+      ...before
+        .filter((e) => !b.has(e.id))
+        .map((e) => ({ change: 'removed' as const, before: e, after: null })),
+      ...proposed
+        .filter((e) => a.has(e.id) && JSON.stringify(a.get(e.id)) !== JSON.stringify(e))
+        .map((e) => ({ change: 'changed' as const, before: a.get(e.id)!, after: e })),
+    ];
+  };
+  const examples: MomentChange[] = compare(base.events, after.events);
+  const durationExamples: DurationChange[] = compare(base.durations ?? [], after.durations ?? []);
+  const moved = new Set(
+    examples.filter((e) => e.before?.time !== e.after?.time).map((e) => (e.after ?? e.before)!.id),
+  );
+  const titles = new Map(examples.map((e) => [(e.after ?? e.before)!.id, e]));
+  for (const d of durationsMovedWith(base.durations ?? [], after.durations ?? [], moved))
+    durationExamples.push({
+      change: 'moved',
+      before: d,
+      after: d,
+      movedWith: [
+        ...new Set(
+          [d.start, d.end].flatMap((end) => (typeof end === 'object' ? [end.moment] : [])),
+        ),
+      ]
+        .filter((id) => moved.has(id))
+        .map((id) => {
+          const e = titles.get(id);
+          const title = (e?.after ?? e?.before)?.metadata?.title;
+          return title ? { id, title } : { id };
+        }),
+    });
+  const count = (list: ChangeExample[], change: ChangeExample['change']) =>
+    list.filter((e) => e.change === change).length;
   const settings = (
     ['title', 'description', 'tags', 'image', 'presentation', 'plugins', 'assets'] as const
   ).filter((key) => JSON.stringify(base[key]) !== JSON.stringify(after[key]));
   return {
     settings,
-    moments: { added: count('added'), removed: count('removed'), changed: count('changed') },
-    durations: { added: 0, removed: 0, changed: 0 },
+    moments: {
+      added: count(examples, 'added'),
+      removed: count(examples, 'removed'),
+      changed: count(examples, 'changed'),
+    },
+    durations: {
+      added: count(durationExamples, 'added'),
+      removed: count(durationExamples, 'removed'),
+      changed: count(durationExamples, 'changed'),
+      moved: count(durationExamples, 'moved'),
+    },
     relationships: { added: 0, removed: 0 },
     examples,
+    durationExamples,
   };
 }
 /**
@@ -550,6 +589,7 @@ export function createCommunityUI(host: Host) {
           `${durations.added} added, ${durations.removed} removed, ${durations.changed} changed durations.`,
         ),
       );
+    if (durations.moved) el('pull-diff').append(paragraph(movedDurationsText(durations.moved)));
     if (relationships.added + relationships.removed)
       el('pull-diff').append(
         paragraph(`${relationships.added} added, ${relationships.removed} removed relationships.`),
@@ -587,7 +627,7 @@ export function createCommunityUI(host: Host) {
         },
       };
     };
-    for (const change of ['added', 'removed', 'changed'] as const)
+    for (const change of ['added', 'removed', 'changed', 'moved'] as const)
       for (const [kind, list] of [
         ['moment', changes.examples],
         ['duration', changes.durationExamples ?? []],
