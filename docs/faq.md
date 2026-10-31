@@ -112,7 +112,11 @@ Choose **Report** on the timeline's page, in a moment's or duration's details, u
 
 ## How do I turn on two-factor authentication?
 
-On the **Account** page, under **Account security**, choose **Set up two-factor authentication** (available once the site's operator has set up email and encryption). Add the key to an authenticator app, enter its six-digit code, and choose **Confirm and enable MFA**. Store the ten recovery codes it shows; they are shown only once. See [two-factor authentication](authentication.md#two-factor-authentication-and-recovery).
+On the **Account** page, under **Security**, add an authenticator app or a passkey (available once the site's operator has set up email and encryption). For an app, choose **Set up** beside **Authenticator app**, add the key to the app, enter its six-digit code, and choose **Confirm and turn on**. For a passkey, see below. Store the ten recovery codes it shows; they are shown only once. See [two-factor authentication](authentication.md#two-factor-authentication-and-recovery).
+
+## How do I use a passkey?
+
+On the **Account** page, under **Security**, choose **Add a passkey**, name it, confirm with your password, and let your browser save it (on this device, your phone or a security key). From then on, signing in with your password offers **Use a passkey instead** of a code, and, where the site allows it, **Sign in with a passkey** on the sign-in page signs you in with no password at all. A passkey works only on the site it was made for, so a look-alike site cannot use it. Remove one from the same list. In the desktop app, sign in through your browser to use a passkey. See [passkeys](authentication.md#passkeys).
 
 ## I forgot my password. What now?
 

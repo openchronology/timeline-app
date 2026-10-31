@@ -321,6 +321,8 @@ export function createRequestHandler({
   mailer = mailFromEnv(),
   securityKey = encryptionKey(process.env.AUTH_ENCRYPTION_KEY),
   passwordCheck,
+  // Passkey settings (passkeys.mjs; `{ signIn }`, else PASSKEY_SIGN_IN).
+  passkeys,
   trustProxy = false,
   plugins,
   featured = [],
@@ -342,6 +344,7 @@ export function createRequestHandler({
           mailer,
           key: securityKey,
           ...(passwordCheck ? { passwordCheck } : {}),
+          ...(passkeys ? { passkeys } : {}),
         })
       : null,
     oauth = auth ? new OAuth(auth, providers, fetcher) : null,
@@ -515,6 +518,8 @@ export function createRequestHandler({
       if (pathname === '/api/session' && method === 'GET') {
         const session = auth ? await auth.session(req) : null;
         const nonce = !session && auth ? auth.nonce(req, 'login') : null;
+        // A sign-in step this browser has pending, if any.
+        const pending = auth ? await auth.security.pending(req) : null;
         return response(
           res,
           200,
@@ -547,8 +552,15 @@ export function createRequestHandler({
                     email: auth.security.available,
                     mfa: auth.security.available,
                     registration: auth.security.available,
+                    // Passkeys (#372): as a second factor, and to sign in alone.
+                    passkeys: auth.security.available,
+                    passkeySignIn: auth.security.available && auth.security.passkeys.signInEnabled,
                   },
-                  challenge: (await auth.security.pending(req))?.purpose ?? null,
+                  challenge: pending?.purpose ?? null,
+                  // At a two-factor step: whether the account can answer it with a passkey.
+                  ...(pending?.purpose === 'mfa'
+                    ? { challengePasskey: await auth.security.passkeys.has(pending.user_id) }
+                    : {}),
                   // The version of the terms and privacy policy that agreeing agrees to (#277).
                   terms: POLICY_VERSION,
                 }
@@ -813,6 +825,24 @@ export function createRequestHandler({
           });
           return response(res, 200, { ok: true });
         }
+        // Passkeys (passkeys.mjs, #372): adding, renaming and removing them, confirming a change
+        // or a sign-in's second step with one, and signing in with one. A sign-in ends a
+        // session already open, as a password sign-in does.
+        if (pathname.startsWith('/api/auth/passkeys/')) {
+          const result = await auth.security.passkeys.route(req, pathname, method, session, () =>
+            body(req, 16384),
+          );
+          if (result === undefined) throw new HttpError(404, 'Unknown endpoint.');
+          const { cookie, ...publicResult } = result;
+          if (cookie && session)
+            await pool.query('DELETE FROM oc_sessions WHERE token_hash=$1', [session.token_hash]);
+          return response(
+            res,
+            200,
+            publicResult,
+            cookie ? { 'Set-Cookie': [cookie, auth.nonceCookie('login', '', true)] } : {},
+          );
+        }
         // Account security (AccountSecurity in auth.mjs): the first five work signed out too
         // (finishing a two-factor sign-in, confirming an email, recovering a password); the rest
         // need a session. Checked first: the CSRF token or login nonce, and a rate limit per
@@ -845,7 +875,7 @@ export function createRequestHandler({
             await challenges.require(req, 'email', session);
           let result;
           if (securityAction === 'mfa/complete')
-            result = await security.complete(req, input.code, req.clientAddress);
+            result = await security.complete(req, input.code, req.clientAddress, input.passkey);
           else if (securityAction === 'email/enroll')
             result = await security.enrollEmail(req, input, session);
           else if (securityAction === 'email/verify')
@@ -988,12 +1018,12 @@ export function createRequestHandler({
           ).rows;
           const profile = (
             await pool.query(
-              'SELECT email,email_verified_at,mfa_enabled,password_hash IS NOT NULL AS has_password,(SELECT count(*)::integer FROM oc_recovery_codes WHERE user_id=oc_users.id) AS recovery_remaining FROM oc_users WHERE id=$1',
+              'SELECT email,email_verified_at,mfa_enabled,mfa_secret IS NOT NULL AS totp_enabled,password_hash IS NOT NULL AS has_password,(SELECT count(*)::integer FROM oc_recovery_codes WHERE user_id=oc_users.id) AS recovery_remaining FROM oc_users WHERE id=$1',
               [userId],
             )
           ).rows[0];
           return response(res, 200, {
-            security: profile,
+            security: { ...profile, passkeys: await auth.security.passkeys.list(userId) },
             profile: {
               avatarUrl: session.avatar_url ?? '',
               minor: minor(session.birth_year),

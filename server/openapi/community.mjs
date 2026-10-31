@@ -63,6 +63,11 @@ const confirmation = {
     description:
       'A fresh authenticator or recovery code, when the administrator has two-factor authentication on.',
   },
+  passkey: {
+    $ref: '#/components/schemas/PasskeyAssertion',
+    description:
+      'Instead of `code`: a passkey’s answer to `POST /api/auth/passkeys/confirm/options`.',
+  },
 };
 
 const slug = { type: 'string', pattern: '^[a-z][a-z0-9-]{0,63}$' };

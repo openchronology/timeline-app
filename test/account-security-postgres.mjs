@@ -186,6 +186,8 @@ try {
   const challenge = await owner.request('auth/login', { username, password });
   assert.equal(challenge.challenge, 'mfa');
   assert.equal(challenge.user, undefined);
+  // An authenticator app only: the step offers no passkey (#372).
+  assert.equal((await owner.request('session')).challengePasskey, false);
   await owner.request('auth/account', undefined, 401);
   // Enrollment consumed this TOTP step; a recovery code must still work exactly once.
   await owner.request('auth/mfa/complete', { code: enabled.recoveryCodes[0] });

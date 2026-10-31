@@ -91,7 +91,8 @@ export class Auth {
   /**
    * `pool` is the PostgreSQL pool; `origin` is APP_ORIGIN, whose scheme decides whether cookies
    * are Secure and `__Host-` prefixed. `mailer`, `key` (AUTH_ENCRYPTION_KEY) and `passwordCheck`
-   * (the breach lookup) are injectable for tests.
+   * (the breach lookup) are injectable for tests, as are `passkeys` (`{ signIn }`, else
+   * PASSKEY_SIGN_IN; passkeys.mjs).
    */
   constructor(
     pool,
@@ -100,6 +101,7 @@ export class Auth {
       mailer = mailFromEnv(),
       key = encryptionKey(process.env.AUTH_ENCRYPTION_KEY),
       passwordCheck = checkPasswordBreach,
+      passkeys = {},
     } = {},
   ) {
     this.pool = pool;
@@ -108,7 +110,7 @@ export class Auth {
     this.cookieName = this.secure ? '__Host-oc_session' : 'oc_session';
     this.attempts = new Map();
     this.origin = origin;
-    this.security = new AccountSecurity(this, mailer, key, passwordCheck);
+    this.security = new AccountSecurity(this, mailer, key, passwordCheck, passkeys);
   }
   /**
    * The in-memory throttle in front of rateLimit: at most `maximum` attempts per `key` per

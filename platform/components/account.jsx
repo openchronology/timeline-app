@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 'use client';
-// Signing in and the account page: registration, sign-in by password or provider, two-factor
-// and email checks, password and email changes, active sessions and recovery codes.
+// Signing in and the account page: registration, sign-in by password, provider or passkey,
+// two-factor and email checks, password and email changes, passkeys, active sessions and
+// recovery codes.
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -15,6 +16,8 @@ import {
   SignInMethodsCard,
 } from './account-access.jsx';
 import { api } from '../lib/api.js';
+import { passkeysSupported, usePasskey } from '../lib/passkeys.js';
+import { PasskeyList } from './passkeys.jsx';
 import ModerationDecisions from './moderation-decisions.jsx';
 import { profilePath } from '../../src/addresses.ts';
 import HelpTip from './help-tip.jsx';
@@ -177,6 +180,34 @@ export default function Account({ returnTo = '/', login = false }) {
     }
   }
   /**
+   * Signs in with a passkey (#372): `factor` answers this browser's two-factor step with one of
+   * the account's passkeys (POST /api/auth/passkeys/factor/options, then /api/auth/mfa/complete
+   * with the answer as `passkey`); otherwise it signs in with a passkey alone, which the browser
+   * chooses (POST /api/auth/passkeys/sign-in/options, then /api/auth/passkeys/sign-in). Then
+   * on to `returnTo`, as any sign-in.
+   */
+  async function passkey(factor) {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const post = (path, data = {}) =>
+        api('auth/' + path, { method: 'POST', csrf: session?.csrf, data });
+      const { publicKey } = await post(
+        factor ? 'passkeys/factor/options' : 'passkeys/sign-in/options',
+      );
+      const answer = await usePasskey(publicKey);
+      if (factor) await post('mfa/complete', { passkey: answer });
+      else await post('passkeys/sign-in', { credential: answer });
+      router.replace(returnTo);
+      router.refresh();
+    } catch (e) {
+      setError(e.message);
+      setBusy(false);
+    }
+  }
+  /**
    * A signed-in account's change: POST /api/<path> with `data`, then shows the server's message
    * and reads the account again. A two-factor setup answers `{secret, uri}`, kept until it is
    * confirmed; enabling it or replacing the codes answers `{recoveryCodes}`, shown once.
@@ -195,6 +226,8 @@ export default function Account({ returnTo = '/', login = false }) {
         setCodes(result.recoveryCodes);
         setSetup(null);
       }
+      // An authenticator app added beside passkeys keeps the recovery codes it had.
+      if (result.enabled) setSetup(null);
       await refresh();
       router.refresh();
       return result;
@@ -216,7 +249,11 @@ export default function Account({ returnTo = '/', login = false }) {
     const path = event.nativeEvent.submitter?.value;
     if (
       path === 'auth/mfa/disable' &&
-      !confirm('Disable two-factor authentication and revoke other sessions?')
+      !confirm(
+        account?.security?.passkeys?.length
+          ? 'Remove the authenticator app and revoke other sessions?'
+          : 'Disable two-factor authentication and revoke other sessions?',
+      )
     )
       return;
     if (
@@ -258,6 +295,7 @@ export default function Account({ returnTo = '/', login = false }) {
         }}
         link={provider}
         feedback={feedback}
+        showCodes={setCodes}
       />
     );
   // Signing in and creating an account offer the site's providers first, then the password
@@ -265,6 +303,9 @@ export default function Account({ returnTo = '/', login = false }) {
   const entry = ['login', 'register'].includes(mode);
   const providers = session?.server && entry ? (session.providers ?? []) : [];
   const directory = session?.server && entry ? session.directory : null;
+  // Signing in with a passkey alone (#372), where the site allows it and the browser can.
+  const passkeys =
+    session?.server && mode === 'login' && session.security?.passkeySignIn && passkeysSupported();
   const label = (name) => session?.providerLabels?.[name] ?? PROVIDERS[name] ?? name;
   const go = (next) => {
     setMode(next);
@@ -299,9 +340,15 @@ export default function Account({ returnTo = '/', login = false }) {
           Server accounts are unavailable. <Link href="/editor">Open a local timeline</Link>.
         </p>
       )}
-      {(providers.length > 0 || directory) && (
+      {(providers.length > 0 || directory || passkeys) && (
         <>
           <div className="auth-providers">
+            {passkeys && (
+              <button type="button" disabled={busy} onClick={() => passkey(false)}>
+                <ProviderIcon name="passkey" />
+                <span>Sign in with a passkey</span>
+              </button>
+            )}
             {providers.map((name) => (
               <button key={name} type="button" disabled={busy} onClick={() => provider(name)}>
                 <ProviderIcon name={name} />
@@ -446,6 +493,18 @@ export default function Account({ returnTo = '/', login = false }) {
               <input name="code" autoComplete="one-time-code" maxLength={40} required />
             </label>
           )}
+          {/* A passkey answers the two-factor step instead of a code (#372), for an account
+              that has one. */}
+          {mode === 'mfa' && session.challengePasskey && passkeysSupported() && (
+            <button
+              type="button"
+              className="passkey-button"
+              disabled={busy}
+              onClick={() => passkey(true)}
+            >
+              Use a passkey instead
+            </button>
+          )}
           {/* No token yet (the session is loading) means the server would refuse it. */}
           <button className="primary auth-submit" disabled={busy || !session?.csrf}>
             {
@@ -555,6 +614,7 @@ function AccountSettings({
   signOut,
   link,
   feedback,
+  showCodes,
 }) {
   const security = account?.security;
   const usage = account?.usage;
@@ -630,8 +690,8 @@ function AccountSettings({
                 about="account security"
               >
                 Changes ask for your current password and, with two-factor authentication on, a
-                fresh code. An account without a password (signed up through Google, GitHub or
-                Facebook) confirms them with a sign-in in the last five minutes instead.
+                fresh code or a passkey. An account without a password (signed up through Google,
+                GitHub or Facebook) confirms them with a sign-in in the last five minutes instead.
               </HelpTip>
             </h2>
             <ul className="settings-list">
@@ -650,7 +710,7 @@ function AccountSettings({
                         required
                       />
                     </label>
-                    <Confirmation security={security} />
+                    <Confirmation security={security} csrf={session.csrf} />
                     <button disabled={busy} value="auth/email/change">
                       Send email confirmation
                     </button>
@@ -683,7 +743,7 @@ function AccountSettings({
                         required
                       />
                     </label>
-                    <Confirmation security={security} />
+                    <Confirmation security={security} csrf={session.csrf} />
                     <button disabled={busy} value="auth/password/change">
                       Change password and sign out
                     </button>
@@ -695,20 +755,53 @@ function AccountSettings({
                 <span className={'status-badge' + (security?.mfa_enabled ? ' on' : '')}>
                   {security?.mfa_enabled ? 'On' : 'Off'}
                 </span>
-                {!security?.mfa_enabled && !setup && (
+                <span className="muted">
+                  {security?.mfa_enabled
+                    ? 'Signing in asks for a passkey or a code after your password.'
+                    : 'Add an authenticator app or a passkey to turn it on.'}
+                </span>
+              </li>
+              <li>
+                <strong>Authenticator app</strong>
+                <span className="muted">{security?.totp_enabled ? 'Set up' : 'None'}</span>
+                {!security?.totp_enabled && !setup && (
                   <Disclosure label="Set up">
                     <form className="settings-form" onSubmit={securityForm}>
                       <p className="muted">
                         An authenticator app gives a code to enter after your password.
                       </p>
-                      <Confirmation security={security} />
+                      <Confirmation security={security} csrf={session.csrf} />
                       <button disabled={busy || !session.security?.mfa} value="auth/mfa/setup">
                         Continue
                       </button>
                     </form>
                   </Disclosure>
                 )}
+                {security?.totp_enabled && (
+                  <Disclosure label="Remove" className="danger">
+                    <form className="settings-form" onSubmit={securityForm}>
+                      <p className="muted">
+                        {security.passkeys?.length
+                          ? 'Your passkeys will still answer two-factor authentication.'
+                          : 'This turns off two-factor authentication.'}{' '}
+                        This also signs out your other sessions.
+                      </p>
+                      <Confirmation security={security} csrf={session.csrf} />
+                      <button className="danger" disabled={busy} value="auth/mfa/disable">
+                        {security.passkeys?.length
+                          ? 'Remove the authenticator app'
+                          : 'Turn off two-factor authentication'}
+                      </button>
+                    </form>
+                  </Disclosure>
+                )}
               </li>
+              <PasskeyList
+                session={session}
+                security={security}
+                refresh={refresh}
+                showCodes={showCodes}
+              />
               {security?.mfa_enabled && (
                 <li>
                   <strong>Recovery codes</strong>
@@ -716,18 +809,9 @@ function AccountSettings({
                   <Disclosure label="Replace">
                     <form className="settings-form" onSubmit={securityForm}>
                       <p className="muted">This also signs out your other sessions.</p>
-                      <Confirmation security={security} />
+                      <Confirmation security={security} csrf={session.csrf} />
                       <button disabled={busy} value="auth/mfa/recovery">
                         Replace recovery codes
-                      </button>
-                    </form>
-                  </Disclosure>
-                  <Disclosure label="Turn off two-factor" className="danger">
-                    <form className="settings-form" onSubmit={securityForm}>
-                      <p className="muted">This also signs out your other sessions.</p>
-                      <Confirmation security={security} />
-                      <button className="danger" disabled={busy} value="auth/mfa/disable">
-                        Turn off two-factor authentication
                       </button>
                     </form>
                   </Disclosure>

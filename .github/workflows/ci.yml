@@ -298,6 +298,7 @@ jobs:
       - run: node test/limits-postgres.mjs
       - run: node test/admin-reset-postgres.mjs
       - run: node test/account-security-postgres.mjs
+      - run: node test/passkeys-postgres.mjs
       # Directory sign-in against an OpenLDAP container the test starts (Docker is on the runner).
       - run: node test/ldap-postgres.mjs
         env:
@@ -332,6 +333,8 @@ jobs:
         run: node test/moderation-live-postgres.mjs
       - name: Agreeing to the terms in a live browser
         run: node test/terms-live-postgres.mjs
+      - name: Passkeys in a live browser
+        run: node test/passkeys-live-postgres.mjs
       - name: Searching and browsing timelines in a live browser
         run: node test/timeline-browser-live-postgres.mjs
       - name: The landing page and audience pages in a live browser

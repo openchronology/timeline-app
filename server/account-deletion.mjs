@@ -27,7 +27,7 @@ export async function deleteAccount({ store, auth, session, value }) {
   if (
     !value ||
     typeof value !== 'object' ||
-    Object.keys(value).some((key) => !['confirm', 'password', 'code'].includes(key))
+    Object.keys(value).some((key) => !['confirm', 'password', 'code', 'passkey'].includes(key))
   )
     throw new HttpError(400, 'Invalid account deletion.');
   return store.transaction(async (c) => {

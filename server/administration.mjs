@@ -247,7 +247,7 @@ export class Administration {
         : kind === 'settings'
           ? ['default_quota_bytes']
           : ['visibility', 'featured', 'delete'];
-    if (Object.keys(value).some((k) => ![...allowed, 'password', 'code'].includes(k)))
+    if (Object.keys(value).some((k) => ![...allowed, 'password', 'code', 'passkey'].includes(k)))
       throw new HttpError(400, 'Unknown administration field.');
     return this.store.transaction(async (c) => {
       // All administration changes (and moderation decisions) take this transaction-scoped

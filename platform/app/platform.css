@@ -1135,6 +1135,24 @@ dialog::backdrop {
   background: var(--success-tint);
   color: var(--success);
 }
+/* Passkeys (#372): a message across its row, and a passkey's answer ready to confirm a change. */
+.passkey-message {
+  flex-basis: 100%;
+  margin: 0;
+}
+.passkey-ready {
+  margin: 8px 0;
+  color: var(--success);
+}
+.passkey-button {
+  display: block;
+  margin: 4px 0 8px;
+}
+/* A passkey's name and its actions on one line, when it was added and used beneath. */
+.passkey-row > .muted {
+  order: 1;
+  flex-basis: 100%;
+}
 /* A change kept closed until chosen: its button, then its form beneath, the row's width. */
 .account-disclosure > summary {
   list-style: none;
