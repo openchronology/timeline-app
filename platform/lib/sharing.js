@@ -347,6 +347,21 @@ export function previewOf(timeline) {
     ? timeline.image
     : null;
 }
+/** The site's own link-preview image's address, on the site (platform/icons/). */
+export const SITE_PREVIEW_PATH = '/social-preview.jpg';
+/**
+ * The image links to the site's own pages preview with (#390): a screenshot of a large
+ * timeline in the editor, for pages with no image of their own (a timeline's page draws one).
+ * @returns {{url: string, alt: string, width: number, height: number}}
+ */
+export function sitePreview() {
+  return {
+    url: siteOrigin() + SITE_PREVIEW_PATH,
+    width: 1200,
+    height: 630,
+    alt: 'The timeline of ancient Rome in the OpenChronology editor, from 171 BCE to 225 CE: its battles, emperors and dynasties along one line.',
+  };
+}
 /**
  * A page's metadata (Next.js's `generateMetadata` result): title, description, canonical
  * address, link previews (Open Graph and Twitter cards) and oEmbed discovery.
@@ -415,21 +430,31 @@ export function pageMetadata(
   };
 }
 /**
- * A page of the site's own (not a timeline's) metadata: its title before the site's name, its
- * description, its canonical address and link previews, as pageMetadata gives a timeline's
- * pages, without oEmbed.
+ * A page of the site's own (not a timeline's) metadata: its title before the site's name
+ * (unless the title already names the site), its description, its canonical address and link
+ * previews with the site's image (sitePreview), as pageMetadata gives a timeline's pages,
+ * without oEmbed.
  * @param {string} path the page's path, made absolute with siteOrigin()
  * @param {string} title the page's own title
  * @param {string} description its plain-text description
  */
 export function sitePageMetadata(path, title, description) {
-  const url = siteOrigin() + path;
+  const url = siteOrigin() + path,
+    images = [sitePreview()];
   return {
-    title: pageTitle(title),
+    title: title.includes(siteName()) ? title : pageTitle(title),
     description,
     alternates: { canonical: url },
-    openGraph: { type: 'website', siteName: siteName(), locale: 'en_US', title, description, url },
-    twitter: { card: 'summary_large_image', title, description },
+    openGraph: {
+      type: 'website',
+      siteName: siteName(),
+      locale: 'en_US',
+      title,
+      description,
+      url,
+      images,
+    },
+    twitter: { card: 'summary_large_image', title, description, images },
   };
 }
 /**

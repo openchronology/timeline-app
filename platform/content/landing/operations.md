@@ -1,8 +1,9 @@
 ---
 label: Operations
-title: Your logs and incidents on one timeline
+heading: Your logs and incidents on one timeline
+title: Log and incident timelines from syslog and journald
 promise: Stream syslog and the systemd journal into timelines, import old log files, and watch an incident unfold to the microsecond.
-description: OpenChronology for operations: syslog and journald receivers, a log importer for syslog, Apache, nginx, JSON lines and journald, live updates, severity colors and retention.
+description: OpenChronology for operations: syslog and journald receivers, a log importer for syslog, Apache, nginx and JSON lines, live updates and retention.
 card: Syslog, journald and log files, live and at their exact times.
 ---
 

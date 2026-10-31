@@ -144,6 +144,30 @@ try {
   }
   for (const path of ['/favicon.ico', '/apple-icon.png', '/logo-mark.svg'])
     assert.equal((await fetch(origin + path)).status, 200, path);
+  // Links to the site's own pages preview with its screenshot (#390), at its full address.
+  const escaped = origin.replace(/[.]/g, '\\.');
+  assert.match(
+    html,
+    new RegExp(`<meta property="og:image" content="${escaped}/social-preview\\.jpg"`),
+  );
+  assert.match(html, /<meta property="og:image:width" content="1200"/);
+  assert.match(html, /<meta property="og:image:height" content="630"/);
+  assert.match(html, /<meta property="og:image:alt" content="The timeline of ancient Rome/);
+  assert.match(html, /<meta name="twitter:card" content="summary_large_image"/);
+  assert.match(
+    html,
+    new RegExp(`<meta name="twitter:image" content="${escaped}/social-preview\\.jpg"`),
+  );
+  {
+    const image = await fetch(origin + '/social-preview.jpg');
+    assert.equal(image.status, 200);
+    assert.equal(image.headers.get('content-type'), 'image/jpeg');
+    const bytes = Buffer.from(await image.arrayBuffer());
+    assert.ok(bytes.length < 300_000, 'a preview image small enough to fetch quickly');
+    // A baseline JPEG's frame header holds its height and width.
+    const frame = bytes.indexOf(Buffer.from([0xff, 0xc0]));
+    assert.deepEqual([bytes.readUInt16BE(frame + 7), bytes.readUInt16BE(frame + 5)], [1200, 630]);
+  }
   assert.match(html, /<title>timescale\.test · OpenChronology<\/title>/);
   assert.match(html, /Powered by OpenChronology/);
   // The footer links to the source repository (#276).
