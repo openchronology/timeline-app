@@ -1,11 +1,12 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Runs before the site's pages (Next.js's proxy): gives them their content security policy,
-// and serves a timeline's pages at its own address, /<owner>/<slug or id>/…, by rewriting them
-// to /timelines/<id>/… (#148).
+// serves a timeline's pages at its own address, /<owner>/<slug or id>/…, by rewriting them
+// to /timelines/<id>/… (#148), and serves the IndexNow key's file, /<key>.txt (#389).
 import { NextResponse } from 'next/server';
 import { analyticsPolicy } from '../server/site.mjs';
 import { landingFramePolicy } from '../server/landing.mjs';
 import { platformServices } from '../server/platform.mjs';
+import { indexNowKeyFile } from '../server/indexnow.mjs';
 import { RESERVED_NAMES, USERNAME, timelineAddress } from '../src/addresses.ts';
 /**
  * The site's own pages, which get the content security policy: the home page (the empty
@@ -25,12 +26,13 @@ const PASS = crypto.randomUUID();
  * Next.js's proxy (formerly middleware), run before every page the `config.matcher` below
  * covers.
  *
- * 1. A timeline's own address (`/<owner>/<slug or id>/…`, #148) is looked up in the store and
+ * 1. The IndexNow key's file, /<key>.txt (#389), is answered here.
+ * 2. A timeline's own address (`/<owner>/<slug or id>/…`, #148) is looked up in the store and
  *    rewritten to its `/timelines/<id>/…` page; an address that names no timeline goes on
  *    unchanged (and is a 404 there). The page is told, in the `x-timeline-address` request
  *    header, which address was asked for, so that it can redirect other addresses of the
  *    timeline to its current one once it knows the reader may open it (lib/timeline.js).
- * 2. The site's pages, profiles and timelines get a per-request nonce (`x-nonce`; the root
+ * 3. The site's pages, profiles and timelines get a per-request nonce (`x-nonce`; the root
  *    layout reads it for the analytics scripts it writes) and the security headers below.
  *    Everything else (files, embeds, the editor's frame) sets its own headers.
  *
@@ -39,6 +41,16 @@ const PASS = crypto.randomUUID();
  */
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
+  // The IndexNow key's file (#389), when INDEXNOW_KEY is set: the key, as plain text.
+  const key = indexNowKeyFile(pathname);
+  if (key)
+    return new NextResponse(key, {
+      headers: {
+        'content-type': 'text/plain; charset=utf-8',
+        'cache-control': 'public, max-age=3600',
+        'x-content-type-options': 'nosniff',
+      },
+    });
   // A rewritten request (below) comes through again, as already handled.
   try {
     if (JSON.parse(request.headers.get('x-timeline-address'))?.pass === PASS)

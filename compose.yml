@@ -85,6 +85,8 @@ services:
       LANDING_VIDEO_DEVELOPERS: ${LANDING_VIDEO_DEVELOPERS:-}
       # Their copy from a directory mounted into the container; empty uses the built-in.
       LANDING_CONTENT_DIR: ${LANDING_CONTENT_DIR:-}
+      # IndexNow's key (docs/administration.md#indexnow); empty is off.
+      INDEXNOW_KEY: ${INDEXNOW_KEY:-}
       API_KEY_REQUESTS_PER_MINUTE: ${API_KEY_REQUESTS_PER_MINUTE:-120}
       FEATURED_TIMELINES: ${FEATURED_TIMELINES:-}
       DEFAULT_USER_STORAGE_BYTES: ${DEFAULT_USER_STORAGE_BYTES:-}

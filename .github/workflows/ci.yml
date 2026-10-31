@@ -289,6 +289,7 @@ jobs:
       - run: node test/index-cleanup-postgres.mjs
       - run: node test/index-versions-postgres.mjs
       - run: node test/retention-postgres.mjs
+      - run: node test/indexnow-postgres.mjs
       - run: node test/summaries-equivalence-postgres.mjs
       - run: node test/log-import-postgres.mjs
       - run: node test/stars-postgres.mjs

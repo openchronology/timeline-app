@@ -47,6 +47,8 @@ env.PLATFORM_NAME = 'timescale.test';
 env.SUPPORT_URL = 'https://example.com/support';
 env.RELEASES_API_URL = `http://127.0.0.1:${github.address().port}/latest`;
 env.GOOGLE_ANALYTICS_ID = 'G-TEST12345';
+// IndexNow's key (#389): its file is served; without a database nothing is submitted.
+env.INDEXNOW_KEY = 'platform-test-key-389';
 env.PORT = String(port);
 env.HOSTNAME = '127.0.0.1';
 const child = spawn(
@@ -162,6 +164,14 @@ try {
   assert(html.includes(`nonce="${nonce}"`), 'Next hydration scripts must use the response nonce');
   const again = await fetch(origin);
   assert.notEqual(again.headers.get('content-security-policy'), csp);
+  // The IndexNow key's file (#389): the key as plain text, and no other key's.
+  {
+    const file = await fetch(origin + '/platform-test-key-389.txt');
+    assert.equal(file.status, 200);
+    assert.match(file.headers.get('content-type'), /^text\/plain/);
+    assert.equal(await file.text(), 'platform-test-key-389');
+    assert.equal((await fetch(origin + '/another-key-1234.txt')).status, 404);
+  }
   // Each page's title says what it is, then the site's name (#210).
   for (const [path, title] of [
     ['/login', 'Sign in · timescale.test'],
