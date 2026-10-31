@@ -2116,6 +2116,8 @@ function startComparison(sources: ComparisonSource[], presentation: TimePresenta
     row.className = 'comparison-track';
     const title = document.createElement('strong');
     title.textContent = track.source.title;
+    // A long title is cut to fit its row; the whole one shows on hover.
+    title.title = track.source.title;
     const fields: HTMLInputElement[] = [];
     for (const name of ['Scale', 'Offset']) {
       const label = document.createElement('label');
@@ -2165,12 +2167,16 @@ function startComparison(sources: ComparisonSource[], presentation: TimePresenta
     el('comparison-tracks').append(row);
   }
   describeOffsetUnits();
+  el<HTMLDetailsElement>('comparison-alignment').open = false;
+  text('comparison-alignment-summary', `Align timelines (${view.tracks.length})`);
+  // Only a conflict between the sources' plugins is worth the room.
   text(
     'comparison-conflicts',
     view.conflicts.length
       ? `Different definitions share a plugin ID: ${view.conflicts.join(', ')}. The first selected timeline’s definition is used once; plugins enabled in any source are enabled in the view.`
-      : 'Source plugins are combined once per plugin ID.',
+      : '',
   );
+  el('comparison-conflicts').hidden = !view.conflicts.length;
   setDashboard(false);
   heading();
   fit();

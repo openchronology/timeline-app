@@ -140,6 +140,21 @@ export async function checkComparison(browser) {
       .locator('.event-marker')
       .evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect().y));
     assert(Math.abs(y[0] - y[1]) > 40);
+    // Alignment starts closed, so the tracks keep the room; it opens to one row per timeline.
+    assert.equal(await page.locator('#comparison-tracks').isVisible(), false);
+    assert.equal(
+      await page.locator('#comparison-alignment-summary').textContent(),
+      'Align timelines (2)',
+    );
+    assert.equal(await page.locator('#comparison-conflicts').isVisible(), false);
+    await page.locator('#comparison-alignment-summary').click();
+    const rows = await page
+      .locator('.comparison-track')
+      .evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect().height));
+    assert(
+      rows.every((h) => h < 60),
+      `one line per timeline: ${rows}`,
+    );
     const scale = page.getByRole('textbox', { name: 'Scale for Compare source 1' });
     await scale.fill('2');
     await page
