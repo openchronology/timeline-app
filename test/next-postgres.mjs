@@ -455,6 +455,11 @@ try {
           ...document.events,
           { id: 'dated', time: '-1393545600/1', metadata: { title: 'Trick or treat' } },
         ],
+        // Anchored to the moment it adds: printed at that moment's date (#386).
+        durations: [
+          ...(document.durations ?? []),
+          { id: 'since', start: { moment: 'dated' }, end: '0/1', metadata: { title: 'Since' } },
+        ],
       },
     },
   });
@@ -464,6 +469,12 @@ try {
   assert(
     datedReview.includes(`title="-1393545600/1">Added: Trick or treat · ${date}</summary>`),
     'the added moment with its date',
+  );
+  assert(
+    datedReview.includes(
+      `title="moment dated – 0/1">Added duration: Since · ${date} – 1970 CE</summary>`,
+    ),
+    'the added duration with its anchored start as a date',
   );
   await contributor.request(api + '/proposals/' + dated.id + '/resolve', {
     method: 'POST',

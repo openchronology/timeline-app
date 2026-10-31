@@ -6972,6 +6972,7 @@ const community = createCommunityUI({
   user: () => session.user,
   server: () => session.server,
   presenter: () => timelinePresenter(),
+  momentTime: (id) => model?.momentTime(id),
   compareLimit: () => compareLimit(),
   guestCopies: () => !desktop && !offlineHtml,
   timeline: () => remote,

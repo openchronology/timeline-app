@@ -9,7 +9,7 @@ import { readFile } from 'node:fs/promises';
 import pg from 'pg';
 import { PostgresStore } from '../server/store.mjs';
 import { Collaboration } from '../server/collaboration.mjs';
-import { validateDocument } from '../dist/core.mjs';
+import { validateDocument, createPresenter, CUSTOM_EXAMPLE, Q } from '../dist/core.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
   store = new PostgresStore(pool),
@@ -278,6 +278,85 @@ try {
     before: '-0.0000441588 million years',
     after: '1925-11-04 CE 12:40 UTC',
   });
+  // A duration's end anchored to a moment prints as that moment's time in the revision the
+  // version belongs to (#386): the base's for the old, the proposal's for the new, so a moved
+  // anchor reads old → new. The anchors of every example are read in one query per revision.
+  const day = 86400;
+  /** A pull request moving m0 a day later and retitling twelve spans, with what its summary costs. */
+  const spansReview = async (presentation, end, since) => {
+    const dated = validateDocument({
+      ...original,
+      presentation,
+      events: [moment(0), { ...moment(1), time: '-1393545600/1' }, moment(2)],
+      durations: Array.from({ length: 12 }, (_, i) => ({
+        id: 'span' + i,
+        start: '-1393545600/1',
+        end,
+        metadata: { title: 'Span ' + i },
+      })),
+      relationships: [],
+    });
+    const d = await store.create(owner, dated);
+    timelines.push(d.id);
+    await pool.query(
+      "INSERT INTO oc_members(timeline_id,user_id,role) VALUES($1,$2,'contributor')",
+      [d.id, author],
+    );
+    const pull = await pulls.create(d.id, author, {
+      title: 'Spans',
+      body: '',
+      baseRevision: d.revision,
+      document: validateDocument({
+        ...dated,
+        events: [{ ...moment(0), time: `${day}/1` }, dated.events[1], moment(2)],
+        durations: [
+          ...dated.durations.map((x) => ({ ...x, metadata: { title: 'Renamed ' + x.id } })),
+          { id: 'since', start: since, end: `${2 * day}/1`, metadata: { title: 'Since' } },
+        ],
+      }),
+    });
+    // The summary again, counting its queries.
+    let queries = 0;
+    const counting = Object.assign(Object.create(store), {
+      pool: {
+        query: (...args) => {
+          queries++;
+          return pool.query(...args);
+        },
+      },
+    });
+    const changes = await new Collaboration(counting).changes(
+      pull.base_revision_id,
+      pull.source_revision_id,
+      presentation,
+    );
+    const times = Object.fromEntries(
+      changes.durationExamples.map((e) => [(e.after ?? e.before).id, e.times]),
+    );
+    return { times, count: changes.durationExamples.length, queries };
+  };
+  const anchored = await spansReview(display('gregorian'), { moment: 'm0' }, { moment: 'm1' });
+  assert.equal(anchored.count, 13);
+  // An anchored end, as a date, old → new as its moment moved.
+  assert.deepEqual(anchored.times.span0, {
+    before: '1925-11-04 CE – 1970 CE',
+    after: '1925-11-04 CE – 1970-01-02 CE',
+  });
+  // An anchored start.
+  assert.deepEqual(anchored.times.since, { before: null, after: '1925-11-04 CE – 1970-01-03 CE' });
+  // A custom display prints anchors as its script does.
+  const custom = display('custom', { source: CUSTOM_EXAMPLE });
+  const scripted = await spansReview(custom, { moment: 'm0' }, { moment: 'm1' });
+  const presenter = createPresenter(custom);
+  assert.equal(
+    scripted.times.span0.after,
+    `${presenter.alone(Q.parse('-1393545600/1'))} – ${presenter.alone(Q.parse(`${day}/1`))}`,
+  );
+  // Thirteen anchored examples on both sides cost one query per revision more than the same
+  // summary with exact times: no query per anchor.
+  const exact = await spansReview(display('gregorian'), '0/1', '0/1');
+  assert.equal(exact.times.span0.before, '1925-11-04 CE – 1970 CE');
+  assert.equal(anchored.queries, exact.queries + 2);
   console.log(
     'PASS pull requests keep no documents: submitted timelines are kept as rows charged their changes, reviewed from history, updated, rebased and merged, and removed with their timeline.',
   );

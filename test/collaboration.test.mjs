@@ -18,6 +18,7 @@ import {
   changeText,
   exactTimeText,
   createPresenter,
+  printEntityTime,
   Q,
 } from '../dist/core.mjs';
 import {
@@ -308,6 +309,89 @@ test('timeline sorting defaults and bookmark queries are validated', async () =>
   await assert.rejects(searchTimelines({}, null, { scope: 'starred' }), (e) => e.status === 401);
 });
 
+test('pull request changes print anchored duration ends at their moments’ times (#386)', async () => {
+  const display = (mode, more = {}) => ({
+    version: 1,
+    mode,
+    significantDigits: 6,
+    unit: '',
+    scale: '1',
+    origin: '0',
+    offsetMinutes: 0,
+    ...more,
+  });
+  const moment = (id, time) => ({ id, time, metadata: { title: id } });
+  // Unvalidated: saving refuses a dangling anchor, but a summary must not fail on one.
+  const doc = (events, durations = []) => ({
+    format: 'openchronology',
+    version: 1,
+    title: 'T',
+    description: '',
+    events,
+    durations,
+  });
+  const summary = (base, proposed, presentation) =>
+    new Collaboration({
+      pool: { query: async () => ({ rows: [] }) },
+      revisionDocument: async (_client, id) => ({ base, proposed })[id],
+    }).changes('base', 'proposed', presentation);
+  const lines = (changes) => changes.durationExamples.map((e) => changeText(e, 'duration')).sort();
+  const span = (id, start, end) => ({ id, start, end, metadata: { title: id } });
+  const day = 86400;
+  // `moving` moves a day later in the proposal; `doomed` is removed by it.
+  const base = doc(
+    [moment('moving', '0/1'), moment('doomed', `${day}/1`), moment('fixed', `${2 * day}/1`)],
+    [
+      span('to-moving', '-86400/1', { moment: 'moving' }),
+      span('to-doomed', '0/1', { moment: 'doomed' }),
+    ],
+  );
+  const proposed = doc(
+    [moment('moving', `${day}/1`), moment('fixed', `${2 * day}/1`)],
+    [
+      // Its end moved with its anchor, and its title changed.
+      { ...span('to-moving', '-86400/1', { moment: 'moving' }), metadata: { title: 'Renamed' } },
+      // Its start anchored, its end exact.
+      span('from-fixed', { moment: 'fixed' }, `${3 * day}/1`),
+      // Anchored to a moment the proposal removes.
+      { ...span('to-doomed', '0/1', { moment: 'doomed' }), metadata: { title: 'Orphan' } },
+    ],
+  );
+  const gregorian = await summary(base, proposed, display('gregorian'));
+  assert.deepEqual(lines(gregorian), [
+    // An anchored start, as a date.
+    'Added duration: from-fixed · 1970-01-03 CE – 1970-01-04 CE',
+    // An anchor the proposal lacks: said, not hidden; the base still had it.
+    'Changed duration: Orphan · 1970 CE – 1970-01-02 CE → 1970 CE – the time of moment doomed (anchored moment missing)',
+    // An anchored end, as a date, old → new as its moment moved.
+    'Changed duration: Renamed · 1969-12-31 CE – 1970 CE → 1969-12-31 CE – 1970-01-02 CE',
+  ]);
+  const removed = await summary(proposed, doc([moment('fixed', `${2 * day}/1`)]), null);
+  assert.equal(
+    removed.durationExamples.find((e) => e.before.id === 'from-fixed').times.before,
+    '172800/1 – 259200/1',
+  );
+  // A custom display prints the anchor's time as its script does.
+  const custom = display('custom', { source: CUSTOM_EXAMPLE });
+  const scripted = await summary(base, proposed, custom);
+  assert.equal(
+    scripted.durationExamples.find((e) => e.after.id === 'from-fixed').times.after,
+    `${createPresenter(custom).alone(Q.parse(`${2 * day}/1`))} – ${createPresenter(custom).alone(Q.parse(`${3 * day}/1`))}`,
+  );
+  // The editor's fallback for older servers: a moment the open timeline does not have (null)
+  // keeps the old wording, a missing one says so, a known one prints.
+  const anchored = span('x', { moment: 'a' }, { moment: 'b' });
+  assert.equal(printEntityTime(null, anchored), 'the time of moment a – the time of moment b');
+  assert.equal(
+    printEntityTime(null, anchored, (id) => (id === 'a' ? '5/1' : null)),
+    '5/1 – the time of moment b',
+  );
+  assert.equal(
+    printEntityTime(null, anchored, (id) => (id === 'a' ? '5/1' : undefined)),
+    '5/1 – the time of moment b (anchored moment missing)',
+  );
+});
+
 test('pull request changes list times as the timeline displays them, old → new when changed (#384)', async () => {
   // Revisions read whole (no history rows): what a summary compares when they are not kept as rows.
   const display = (mode, more = {}) => ({
@@ -361,7 +445,7 @@ test('pull request changes list times as the timeline displays them, old → new
   // start to end.
   const gregorian = await summary(base, proposed, display('gregorian'));
   assert.deepEqual(lines(gregorian), [
-    'Added duration: Since · the time of moment new – 1970 CE',
+    'Added duration: Since · 1925-11-04 CE – 1970 CE',
     'Added: Trick or treat · 1925-11-04 CE',
     'Changed duration: Span · 1970 CE – 1970-01-02 CE → 1970 CE – 1970-01-03 CE',
     'Changed: Moved · 1970 CE → 1925-11-04 CE',

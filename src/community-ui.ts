@@ -83,6 +83,11 @@ interface Host {
   server(): boolean;
   /** The open timeline's time display, for changes an older server sends without times. */
   presenter?(): TimePresenter;
+  /**
+   * A moment's exact time in the open timeline, if loaded: for durations anchored to it in
+   * changes an older server sends without times.
+   */
+  momentTime?(id: string): string | undefined;
   /** How many timelines this account may compare at once (default 8). */
   compareLimit?(): number;
   /** Whether guests may fork public timelines into the browser (default true). */
@@ -551,7 +556,8 @@ export function createCommunityUI(host: Host) {
       el('pull-diff').append(paragraph('Changed timeline ' + key + '.'));
     // Each as the timeline displays its time (the exact time and ID on hover), and a changed
     // one with its versions as truncated JSON. Older servers send no times: the open
-    // timeline's display writes them.
+    // timeline's display writes them, an anchored end at its moment's time in the open timeline
+    // (or the documents sent, from servers that sent them) where known.
     const withTimes = <T extends ChangeExample>(example: T): T => {
       if (example.times) return example;
       let presenter: TimePresenter | null = null;
@@ -560,9 +566,24 @@ export function createCommunityUI(host: Host) {
       } catch {
         // Unreadable settings: exact times.
       }
-      const time = (e: ChangeExample['before']) =>
-        e && printEntityTime(presenter, e as PointEvent | Duration);
-      return { ...example, times: { before: time(example.before), after: time(example.after) } };
+      const momentTime = (document?: TimelineDocument) => {
+        if (document) {
+          const times = new Map(document.events.map((e) => [e.id, e.time]));
+          return (id: string) => times.get(id);
+        }
+        // The open timeline is not the pull request's revision: a moment it lacks is not at hand
+        // (null), rather than missing.
+        return host.momentTime && ((id: string) => host.momentTime!(id) ?? null);
+      };
+      const time = (e: ChangeExample['before'], document?: TimelineDocument) =>
+        e && printEntityTime(presenter, e as PointEvent | Duration, momentTime(document));
+      return {
+        ...example,
+        times: {
+          before: time(example.before, p.base_document),
+          after: time(example.after, p.document),
+        },
+      };
     };
     for (const change of ['added', 'removed', 'changed'] as const)
       for (const [kind, list] of [
