@@ -346,6 +346,8 @@ jobs:
         run: node test/timeline-browser-live-postgres.mjs
       - name: The landing page and audience pages in a live browser
         run: node test/landing-live-postgres.mjs
+      - name: The site's header and its phone menu in a live browser
+        run: node test/site-menu-live-postgres.mjs
       - name: Light and dark themes in a live browser
         run: node test/theme-live-postgres.mjs
       - name: Saving while others save, in a live browser
