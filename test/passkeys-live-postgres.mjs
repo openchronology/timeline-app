@@ -149,6 +149,9 @@ try {
         .then((r) => r.json())
         .then((s) => !s.user),
     );
+    // The account page refreshes itself after signing out; a blank page ends that, so it
+    // can't take over the next page the test opens.
+    await tab.goto('about:blank');
   }
 
   // Adding a passkey: the password confirms it, the browser makes it, recovery codes show.
