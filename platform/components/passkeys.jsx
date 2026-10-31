@@ -141,7 +141,7 @@ export function PasskeyList({ session, security, refresh, showCodes }) {
                 {passkeys.length === 1 && !security.totp_enabled
                   ? 'This is your only second factor: removing it turns off two-factor authentication.'
                   : 'Remove it here, and from the device or password manager that holds it.'}{' '}
-                This also signs out your other sessions.
+                This also signs out your other sessions and revokes your API keys.
               </p>
               <Confirmation security={security} csrf={session.csrf} />
               <button className="danger" disabled={busy}>
