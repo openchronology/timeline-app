@@ -3,7 +3,7 @@
 // Signing in and the account page: registration, sign-in by password, provider or passkey,
 // two-factor and email checks, password and email changes, passkeys, active sessions and
 // recovery codes.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ProviderIcon from './provider-icon.jsx';
@@ -16,7 +16,8 @@ import {
   SignInMethodsCard,
 } from './account-access.jsx';
 import { api } from '../lib/api.js';
-import { passkeysSupported, usePasskey } from '../lib/passkeys.js';
+import { conditionalMediationAvailable, passkeysSupported, usePasskey } from '../lib/passkeys.js';
+import { passkeyAutofill } from '../lib/passkey-autofill.js';
 import { PasskeyList } from './passkeys.jsx';
 import { recoveryCodesOnly } from '../lib/second-factor.js';
 import ModerationDecisions from './moderation-decisions.jsx';
@@ -56,7 +57,11 @@ export default function Account({ returnTo = '/', login = false }) {
     // A two-factor setup in progress: `{secret, uri}` from /api/auth/mfa/setup, until enabled.
     [setup, setSetup] = useState(null),
     // Fresh recovery codes, shown once, until the reader says they stored them.
-    [codes, setCodes] = useState(null);
+    [codes, setCodes] = useState(null),
+    // Whether this browser offers passkeys in the username field's autofill (#403).
+    [conditional, setConditional] = useState(false);
+  // The pending autofill request on the sign-in form (passkeyAutofill), while there is one.
+  const autofill = useRef(null);
   /**
    * Reads the session again, and the account when signed in, after anything that may have
    * changed them; signing out also drops a pending two-factor setup and unsaved codes.
@@ -105,6 +110,52 @@ export default function Account({ returnTo = '/', login = false }) {
       active = false;
     };
   }, [login, returnTo, router]);
+  useEffect(() => {
+    let active = true;
+    void conditionalMediationAvailable().then((yes) => active && setConditional(yes));
+    return () => {
+      active = false;
+    };
+  }, []);
+  // Passkeys in the username field's autofill (#403): while the sign-in form is shown, where
+  // the site allows signing in with a passkey alone and the browser offers them there, a
+  // request stays pending (lib/passkey-autofill.js). Picking a passkey signs in as the
+  // **Sign in with a passkey** button does. Leaving the form, or the page, aborts it.
+  const csrf = session?.csrf;
+  const offerAutofill =
+    conditional &&
+    !!session?.server &&
+    !session.user &&
+    mode === 'login' &&
+    !!session.security?.passkeySignIn;
+  useEffect(() => {
+    if (!offerAutofill) return;
+    const post = (path, data, signal) =>
+      api('auth/' + path, { method: 'POST', csrf, data, signal });
+    const control = passkeyAutofill({
+      options: async (signal) => (await post('passkeys/sign-in/options', {}, signal)).publicKey,
+      get: (publicKey, signal) => usePasskey(publicKey, { mediation: 'conditional', signal }),
+      signIn: async (credential) => {
+        setBusy(true);
+        setError('');
+        setMessage('');
+        try {
+          await post('passkeys/sign-in', { credential });
+        } catch (e) {
+          setError(e.message);
+          setBusy(false);
+          throw e;
+        }
+        router.replace(returnTo);
+        router.refresh();
+      },
+    });
+    autofill.current = control;
+    return () => {
+      autofill.current = null;
+      control.stop();
+    };
+  }, [offerAutofill, csrf, returnTo, router]);
   /**
    * Sends the guest's form for the current step to POST /api/auth/<step> with its fields (and
    * the emailed token for verify and reset), then moves on by what the server answers:
@@ -115,6 +166,8 @@ export default function Account({ returnTo = '/', login = false }) {
   async function submit(event) {
     event.preventDefault();
     if (busy) return;
+    // A password sign-in replaces the passkey request pending in the username field.
+    autofill.current?.pause();
     setBusy(true);
     setError('');
     setMessage('');
@@ -142,6 +195,7 @@ export default function Account({ returnTo = '/', login = false }) {
         return;
       }
       if (result.verificationRequired || ['email', 'forgot'].includes(mode)) {
+        autofill.current?.resume();
         await refresh();
         return;
       }
@@ -155,6 +209,7 @@ export default function Account({ returnTo = '/', login = false }) {
       router.refresh();
     } catch (e) {
       setError(e.message);
+      autofill.current?.resume();
     } finally {
       setBusy(false);
     }
@@ -185,10 +240,13 @@ export default function Account({ returnTo = '/', login = false }) {
    * the account's passkeys (POST /api/auth/passkeys/factor/options, then /api/auth/mfa/complete
    * with the answer as `passkey`); otherwise it signs in with a passkey alone, which the browser
    * chooses (POST /api/auth/passkeys/sign-in/options, then /api/auth/passkeys/sign-in). Then
-   * on to `returnTo`, as any sign-in.
+   * on to `returnTo`, as any sign-in. The request pending in the username field's autofill is
+   * aborted first, since a browser has one passkey request at a time, and starts again if this
+   * one fails.
    */
   async function passkey(factor) {
     if (busy) return;
+    autofill.current?.pause();
     setBusy(true);
     setError('');
     setMessage('');
@@ -206,6 +264,7 @@ export default function Account({ returnTo = '/', login = false }) {
     } catch (e) {
       setError(e.message);
       setBusy(false);
+      autofill.current?.resume();
     }
   }
   /**
@@ -388,7 +447,8 @@ export default function Account({ returnTo = '/', login = false }) {
               Username
               <input
                 name="username"
-                autoComplete="username"
+                // Offers the site's passkeys in the autofill too, where they sign in (#403).
+                autoComplete={offerAutofill ? 'username webauthn' : 'username'}
                 pattern="[A-Za-z0-9][A-Za-z0-9_-]{2,31}"
                 minLength={3}
                 maxLength={32}

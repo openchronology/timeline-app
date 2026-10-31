@@ -9,6 +9,21 @@ export function passkeysSupported() {
   return typeof window !== 'undefined' && !!window.PublicKeyCredential && !!navigator.credentials;
 }
 
+/**
+ * Whether this browser offers passkeys in a field's autofill (conditional mediation, #403):
+ * false where it cannot say, or the check fails.
+ */
+export async function conditionalMediationAvailable() {
+  try {
+    return (
+      passkeysSupported() &&
+      (await window.PublicKeyCredential.isConditionalMediationAvailable?.()) === true
+    );
+  } catch {
+    return false;
+  }
+}
+
 const bytes = (text) =>
   Uint8Array.from(atob(text.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
 const text = (buffer) =>
@@ -62,11 +77,18 @@ export async function createPasskey(publicKey) {
 /**
  * Uses a passkey with the server's request options (`publicKey`). Result: the assertion as
  * JSON, for the `passkey` (or `credential`) field the server asks for.
+ * @param {object} publicKey the server's request options
+ * @param {object} [request]
+ * @param {'conditional'} [request.mediation] 'conditional' to offer the passkeys in the
+ *   autofill of a field marked `autocomplete="username webauthn"`, rather than in a dialog
+ * @param {AbortSignal} [request.signal] aborts the request, which then rejects with AbortError
  */
-export async function usePasskey(publicKey) {
+export async function usePasskey(publicKey, { mediation, signal } = {}) {
   let credential;
   try {
     credential = await navigator.credentials.get({
+      ...(mediation ? { mediation } : {}),
+      ...(signal ? { signal } : {}),
       publicKey: {
         ...publicKey,
         challenge: bytes(publicKey.challenge),
