@@ -37,6 +37,8 @@ const env = {
   AUTH_EMAIL_FROM: 'OpenChronology <accounts@example.test>',
   AUTH_ENCRYPTION_KEY: randomBytes(32).toString('hex'),
   CHALLENGE_PROVIDER: 'off',
+  // The last steps come from an address of their own (X-Forwarded-For), with its own limits.
+  TRUST_PROXY: '1',
 };
 delete env.PASSKEY_SIGN_IN;
 for (const key of Object.keys(env))
@@ -264,15 +266,28 @@ try {
   ).rows[0];
   assert.deepEqual(account, { mfa_enabled: false, passkeys: 0 });
   // The authenticator still holds it, but it signs in no more: from the autofill, which then
-  // asks for a new challenge for the next pick, and from the button. The virtual authenticator
-  // answers each new request at once, so the sign-ins above are forgotten first: these share
-  // their limit of ten a minute per address.
+  // asks for a new challenge for the next pick, and from the button. The steps above used most
+  // of an address's sign-in requests for this minute, which the server also counts in memory,
+  // so these come from another address. The virtual authenticator answers every request at
+  // once, as no person would, so it answers the autofill once and is then held back: otherwise
+  // each refusal re-arms the page, which is answered again.
   await signOut();
-  await pool.query('DELETE FROM oc_auth_attempts');
+  // A blank page between, so the refusal waited for is the new page's, not one the page left
+  // behind was answered before it went.
+  await presence(false);
+  await tab.goto('about:blank');
+  await tab.setExtraHTTPHeaders({ 'X-Forwarded-For': '203.0.113.7' });
+  await presence(true);
+  const firstRefusal = tab.waitForResponse(
+    (r) => r.url().endsWith('/api/auth/passkeys/sign-in') && r.status() === 401,
+  );
   await tab.goto(origin + '/login');
-  await tab.getByText('That passkey was not recognized.', { exact: false }).waitFor();
+  await firstRefusal;
+  await presence(false);
   const refused = asked;
+  await tab.getByText('That passkey was not recognized.', { exact: false }).waitFor();
   await askedMore(refused);
+  await presence(true);
   await tab.getByRole('button', { name: 'Sign in with a passkey' }).click();
   await tab.getByText('That passkey was not recognized.', { exact: false }).waitFor();
   assert.equal(await signedIn(), undefined);
