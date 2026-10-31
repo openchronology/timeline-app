@@ -7,8 +7,10 @@ import {
   DEFAULT_FILTER,
   Directory,
   directoryFromEnv,
+  disabled,
   escapeFilter,
   preferredUsername,
+  subjectFilter,
   subjectOf,
   userFilter,
 } from '../server/ldap.mjs';
@@ -202,6 +204,64 @@ test('authentication searches as the service account, then binds as the person',
     ),
     rejects(502),
   );
+});
+
+test('the periodic check finds entries by subject and tells an outage from people leaving', async () => {
+  // An objectGUID filter has the bytes subjectOf read, in the order the directory keeps them.
+  const guid = Buffer.from('00112233445566778899aabbccddeeff', 'hex');
+  const subject = subjectOf({ objectGUID: guid });
+  assert.equal(
+    subjectFilter(subject),
+    '(objectGUID=' + guid.toString('hex').replace(/../g, '\\$&') + ')',
+  );
+  assert.equal(
+    subjectFilter('uuid:6f1c2a8e-0000-4000-8000-000000000001'),
+    '(entryUUID=6f1c2a8e-0000-4000-8000-000000000001)',
+  );
+  assert.equal(subjectFilter('dn:uid=ana,ou=people'), null);
+  assert.equal(disabled({ userAccountControl: '514' }), true);
+  assert.equal(disabled({ userAccountControl: ['512'] }), false);
+  assert.equal(disabled({}), false);
+  const config = directoryFromEnv({
+    ...base,
+    LDAP_REQUIRED_GROUP: 'CN=Staff,DC=school,DC=example',
+    LDAP_BIND_DN: 'CN=svc',
+    LDAP_BIND_PASSWORD: 'service secret',
+  });
+  assert.equal(config.checkEvery, 3600000);
+  assert.equal(directoryFromEnv({ ...base, LDAP_CHECK_MINUTES: '0' }).checkEvery, 0);
+  assert.throws(
+    () => directoryFromEnv({ ...base, LDAP_CHECK_MINUTES: '-5' }),
+    /LDAP_CHECK_MINUTES/,
+  );
+  assert.throws(
+    () => directoryFromEnv({ ...base, LDAP_CHECK_MINUTES: 'hourly' }),
+    /LDAP_CHECK_MINUTES/,
+  );
+  const entry = { dn: 'CN=Ana', entryUUID: '6f1c2a8e-0000-4000-8000-000000000001' };
+  const fake = fakeDirectory({ entries: [entry], passwords: { 'CN=svc': 'service secret' } });
+  const found = await new Directory(null, null, config, fake.connect).present([
+    'uuid:6f1c2a8e-0000-4000-8000-000000000001',
+    'uuid:6f1c2a8e-0000-4000-8000-000000000002',
+  ]);
+  assert.deepEqual([...found], [['uuid:6f1c2a8e-0000-4000-8000-000000000001', false]]);
+  // One search for both, within the required group.
+  assert.deepEqual(
+    fake.calls.filter(([c]) => c === 'search'),
+    [
+      [
+        'search',
+        base.LDAP_BASE_DN,
+        '(&(|(entryUUID=6f1c2a8e-0000-4000-8000-000000000001)(entryUUID=6f1c2a8e-0000-4000-8000-000000000002))(memberOf=CN=Staff,DC=school,DC=example))',
+      ],
+    ],
+  );
+  // A directory that cannot be reached, or refuses the service account, throws rather than
+  // finding nobody.
+  for (const options of [{ down: true }, {}])
+    await assert.rejects(
+      new Directory(null, null, config, fakeDirectory(options).connect).present(['uuid:x']),
+    );
 });
 
 test('directory usernames are bounded and may not hold control characters', () => {

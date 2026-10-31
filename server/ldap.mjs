@@ -63,6 +63,9 @@ export function directoryFromEnv(env = process.env) {
       throw new Error(`LDAP_TLS_CA: cannot read ${env.LDAP_TLS_CA}.`);
     }
   const label = (env.LDAP_LABEL || 'Directory account').trim().slice(0, 40);
+  const minutes = (env.LDAP_CHECK_MINUTES ?? '').trim() || '60';
+  if (!/^\d{1,6}$/.test(minutes))
+    throw new Error('LDAP_CHECK_MINUTES must be a whole number of minutes, or 0 for no checks.');
   return {
     url: `${url.protocol}//${url.host}`,
     startTls,
@@ -74,6 +77,8 @@ export function directoryFromEnv(env = process.env) {
     nestedGroups: env.LDAP_NESTED_GROUPS === '1',
     usernameAttribute: env.LDAP_USERNAME_ATTRIBUTE || 'sAMAccountName',
     label,
+    // How often accounts are checked against the directory (directory-check.mjs); 0 for never.
+    checkEvery: Number(minutes) * 60000,
     tls: { minVersion: 'TLSv1.2', ...(ca ? { ca } : {}) },
   };
 }
@@ -85,9 +90,38 @@ export function directoryFromEnv(env = process.env) {
  */
 export function userFilter(config, username) {
   const person = config.filter.replaceAll('{username}', escapeFilter(username));
-  if (!config.group) return person;
+  return config.group ? `(&${person}${groupFilter(config)})` : person;
+}
+/** Membership of LDAP_REQUIRED_GROUP as a filter (through nested groups when asked), or null. */
+export function groupFilter(config) {
+  if (!config.group) return null;
   const rule = config.nestedGroups ? `memberOf:${IN_CHAIN}:` : 'memberOf';
-  return `(&${person}(${rule}=${escapeFilter(config.group)}))`;
+  return `(${rule}=${escapeFilter(config.group)})`;
+}
+/**
+ * A filter that finds the entry with subject `subject` (subjectOf): by objectGUID, its bytes
+ * escaped in the order the directory stores them, or by entryUUID. Null for a `dn:` subject,
+ * which is read at its DN instead.
+ */
+export function subjectFilter(subject) {
+  const guid = /^guid:([0-9a-f]{8})-([0-9a-f]{4})-([0-9a-f]{4})-([0-9a-f]{4})-([0-9a-f]{12})$/.exec(
+    subject,
+  );
+  if (guid) {
+    // The first three fields back to little-endian, as subjectOf read them.
+    const swap = (s) => s.match(/../g).reverse().join('');
+    const hex = swap(guid[1]) + swap(guid[2]) + swap(guid[3]) + guid[4] + guid[5];
+    return `(objectGUID=${hex.replace(/../g, '\\$&')})`;
+  }
+  if (subject.startsWith('uuid:')) return `(entryUUID=${escapeFilter(subject.slice(5))})`;
+  return null;
+}
+/** Whether an Active Directory entry is disabled: userAccountControl's ACCOUNTDISABLE bit. */
+export function disabled(entry) {
+  const control = Array.isArray(entry.userAccountControl)
+    ? entry.userAccountControl[0]
+    : entry.userAccountControl;
+  return (Number(control) & 2) === 2;
 }
 
 /**
@@ -205,6 +239,59 @@ export class Directory {
     return { subject: subjectOf(entry), username: Array.isArray(named) ? named[0] : named };
   }
   /**
+   * Which of the directory identities `subjects` (subjectOf) the directory still lets in, for
+   * the periodic check (directory-check.mjs): searched for with the service account, a
+   * hundred at a time, under LDAP_BASE_DN and, with LDAP_REQUIRED_GROUP, in that group. Result:
+   * a Map from each subject found to whether its entry is disabled (Active Directory's
+   * userAccountControl); a subject missing from it was not found. Throws when the directory
+   * cannot be reached, the bind fails or a search fails, so the caller can tell an outage
+   * from people leaving.
+   */
+  async present(subjects) {
+    const found = new Map();
+    const group = groupFilter(this.config);
+    const attributes = ['objectGUID', 'entryUUID', 'userAccountControl'];
+    const keep = (entries) => {
+      for (const entry of entries) found.set(subjectOf(entry), disabled(entry));
+    };
+    const client = await this.client();
+    try {
+      if (this.config.bindDn) await client.bind(this.config.bindDn, this.config.bindPassword);
+      const filters = subjects.map((s) => [s, subjectFilter(s)]);
+      const searched = filters.filter(([, f]) => f).map(([, f]) => f);
+      for (let i = 0; i < searched.length; i += 100) {
+        const any = `(|${searched.slice(i, i + 100).join('')})`;
+        const { searchEntries } = await client.search(this.config.baseDn, {
+          scope: 'sub',
+          filter: group ? `(&${any}${group})` : any,
+          attributes,
+          explicitBufferAttributes: ['objectGUID'],
+          timeLimit: 30,
+        });
+        keep(searchEntries);
+      }
+      // A `dn:` subject (a directory with neither objectGUID nor entryUUID) is read at its DN;
+      // an entry no longer there is not found.
+      for (const [subject] of filters.filter(([, f]) => !f)) {
+        try {
+          const { searchEntries } = await client.search(subject.slice(3), {
+            scope: 'base',
+            filter: group ?? '(objectClass=*)',
+            attributes,
+            explicitBufferAttributes: ['objectGUID'],
+          });
+          // Found by its DN: kept under that subject, whatever subjectOf would now make of it.
+          for (const entry of searchEntries) found.set(subject, disabled(entry));
+        } catch (error) {
+          if (error?.name !== 'NoSuchObjectError') throw error;
+        }
+      }
+    } finally {
+      await client.unbind().catch(() => {});
+    }
+    return found;
+  }
+  /**
    * `input.username` as a directory name: 1–256 characters, none of them control characters
    * (they are escaped in the filter anyway). Throws 400.
    */
@@ -230,6 +317,11 @@ export class Directory {
     await this.auth.rateLimit(req.clientAddress ?? 'unknown');
     const name = Directory.username(input);
     const found = await this.authenticate(name, input.password);
+    // The directory lets them in again: a later departure is ended again (directory-check.mjs).
+    await this.auth.pool.query(
+      "UPDATE oc_identities SET left_at=NULL WHERE provider='ldap' AND subject=$1 AND left_at IS NOT NULL",
+      [found.subject],
+    );
     const user = await this.oauth.identity(
       'ldap',
       found.subject,
