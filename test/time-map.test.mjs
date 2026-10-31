@@ -22,6 +22,9 @@ test('a mapping is a positive scale around a point, then an offset, in exact rat
   assert.equal(mapTime(Q.parse('4/1'), timeMapping({ scale: '2', offset: '1' })).toString(), '9/1');
   assert.deepEqual(timeMappingInput(m), { scale: '3/2', offset: '-1/4', around: '10/1' });
   assert(unchangedMapping(timeMapping({ scale: '1', offset: '0', around: '5' })));
+  // A huge exponent is refused rather than expanded.
+  assert.throws(() => timeMapping({ scale: '1e1000000000', offset: '0' }), /scale as a number/);
+  assert.throws(() => timeMapping({ scale: '1', offset: '1e-1000000000' }), /offset as a number/);
   for (const scale of ['0', '-1', 'x', '', undefined])
     assert.throws(() => timeMapping({ scale, offset: '0' }));
   assert.throws(() => timeMapping({ scale: '1', offset: 'later' }), /offset/);

@@ -34,8 +34,9 @@ const nullable = (schema) => ({ oneOf: [schema, { type: 'null' }] });
 const COUNT = { type: 'string', pattern: '^\\d+$', description: 'A count, as a decimal string.' };
 const INPUT_TIME = {
   type: 'string',
+  maxLength: 20000,
   description:
-    'An exact time in coordinates: a rational (`-3/2`), a finite decimal (`1.25`), or an ISO 8601 timestamp (one with a `T`), which is read as Unix seconds. Stored and returned as a canonical rational.',
+    'An exact time in coordinates: a rational (`-3/2`), a finite decimal (`1.25`, `1.5e-3`, exponents from -10000 to 10000), or an ISO 8601 timestamp (one with a `T`), which is read as Unix seconds. Stored and returned as a canonical rational, which must also be at most 20000 characters.',
   example: '1704067200',
 };
 const REVISION_BODY = {

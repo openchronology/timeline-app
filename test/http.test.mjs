@@ -95,6 +95,10 @@ test('query validation rejects bad bounds, search text and duration IDs before a
     { kind: 'overview', lower: '0', upper: '1', threshold: '-1/2' },
     { kind: 'overview', lower: 0, upper: '1', threshold: '1/2' },
     { kind: 'overview', lower: '0', upper: '1/0', threshold: '1/2' },
+    // Huge exponents and over-long times are refused before they are expanded.
+    { kind: 'overview', lower: '0', upper: '1e1000000000', threshold: '1/2' },
+    { kind: 'overview', lower: '0', upper: '1', threshold: '1e-10001' },
+    { kind: 'overview', lower: '0', upper: '9'.repeat(20001), threshold: '1/2' },
     { kind: 'search' },
     { kind: 'search', text: 'x'.repeat(201) },
     { kind: 'search', text: 'harbor', page: 0 },

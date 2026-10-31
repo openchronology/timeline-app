@@ -100,6 +100,7 @@ import type { TimelineImage } from './timeline-image.js';
 export * from './drafts.js';
 export { stackWindow, scaleTimeline } from './stack-layout.js';
 import { parseTimestamp } from './calendar.js';
+import { parseDecimal } from './numeric.js';
 import { validatePresentation } from './presentation.js';
 import type { TimePresentation } from './presentation.js';
 export {
@@ -224,9 +225,22 @@ export interface Frame {
   revision?: string;
   threshold?: string;
 }
+/**
+ * The longest time accepted, as given and as its exact fraction: well past the 10,001 digits of
+ * the largest scientific exponent, short enough that reading one stays quick.
+ */
+export const TIME_TEXT_LIMIT = 20000;
+const TIME_TEXT_ERROR = `Times must be at most ${TIME_TEXT_LIMIT} characters, also as an exact fraction.`;
 export function parseTime(text: string): Q {
-  if (text.includes('T')) return parseTimestamp(text);
-  return text.includes('/') ? Q.parse(text) : Q.parseDecimal(text);
+  if (text.length > TIME_TEXT_LIMIT) throw new Error(TIME_TEXT_ERROR);
+  const time = text.includes('T')
+    ? parseTimestamp(text)
+    : text.includes('/')
+      ? Q.parse(text)
+      : parseDecimal(text);
+  // A long decimal with a large exponent expands; keep every stored time readable again.
+  if (time.toString().length > TIME_TEXT_LIMIT) throw new Error(TIME_TEXT_ERROR);
+  return time;
 }
 export function validateAssets(value: unknown): Record<string, string> {
   if (
