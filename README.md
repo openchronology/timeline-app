@@ -6,6 +6,8 @@ The [user guide](docs/guide.md), the [FAQ](docs/faq.md) and everything in [`docs
 
 To change it, start with [contributing](CONTRIBUTING.md): where everything is, with a table of contents in every folder, and how to make a change.
 
+The [technical disclosures](docs/disclosures/README.md) describe its original mechanisms (exact rational time, the database indexes, history and forks, grouping, presentation, plugins and more) in enough detail to implement them, as a dated public record.
+
 ## Try the browser editor
 
 Use Node.js 22 or 24:

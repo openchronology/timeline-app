@@ -2,12 +2,13 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-The documentation: how to use OpenChronology, run a server and work on the code. The site's help area (`/help`) presents these same files as the site runs ([`server/help.mjs`](../server/help.mjs)), grouped into sections there, so a change here changes the help with the code it ships with; this README is for reading the repository and is not a help page. Start with [Using OpenChronology](guide.md) or the [frequently asked questions](faq.md); the project's [README](../README.md) covers installing and building. Link between docs with relative links such as `[durations](durations.md)`, which the help area turns into its own addresses.
+The documentation: how to use OpenChronology, run a server and work on the code. The site's help area (`/help`) presents these same files as the site runs ([`server/help.mjs`](../server/help.mjs)), grouped into sections there, so a change here changes the help with the code it ships with; this README is for reading the repository and is not a help page. Start with [Using OpenChronology](guide.md) or the [frequently asked questions](faq.md); the project's [README](../README.md) covers installing and building. The [technical disclosures](disclosures/README.md) describe the code's mechanisms in implementable detail, as a dated public record; they are for reading the repository and are not help pages. Link between docs with relative links such as `[durations](durations.md)`, which the help area turns into its own addresses.
 
 ## Contents
 
 | File                                           | What it is for                                                                                                                             |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`disclosures/`](disclosures/README.md)        | Technical disclosures: OpenChronology's mechanisms described in enough detail to implement them, with when each became public.             |
 | [`administration.md`](administration.md)       | Running an installation: the administrator account, data quotas, timeline size, the site's name and analytics, account settings, API keys. |
 | [`api.md`](api.md)                             | The HTTP API the web app, desktop app and command-line tools use, described in OpenAPI 3.1 (#178).                                         |
 | [`architecture.md`](architecture.md)           | The timeline and query contract: the data model, the `.ochx` and `.och` file formats, HTTP operations, saved history and storage.          |
