@@ -194,6 +194,23 @@ try {
   await request('admin/users', 'GET', undefined, bearer, 403);
   await request('auth/account', 'GET', undefined, bearer, 403);
   await request('timelines/' + timeline.id, 'GET', undefined, stranger.headers, 404);
+  // Revision polling, which an open page does on its own, is not activity: it leaves the
+  // session's last-seen time alone, so an open tab does not keep an idle session alive.
+  const seen = async () =>
+    (
+      await pool.query(
+        "SELECT last_seen_at<now()-interval '23 hours' AS idle FROM oc_sessions WHERE user_id=$1",
+        [owner.u.id],
+      )
+    ).rows.every((row) => row.idle);
+  await pool.query(
+    "UPDATE oc_sessions SET last_seen_at=now()-interval '23 hours' WHERE user_id=$1",
+    [owner.u.id],
+  );
+  await request('timelines/' + timeline.id + '/revision', 'GET', undefined, owner.headers);
+  assert.equal(await seen(), true);
+  await request('timelines/' + timeline.id, 'GET', undefined, owner.headers);
+  assert.equal(await seen(), false);
   const writeKey = await request(
     'auth/api-keys',
     'POST',

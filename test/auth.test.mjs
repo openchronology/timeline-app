@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign, createHmac, scryptSync } from 'node:crypto';
-import { Auth, tokenHash, passwordMatches } from '../server/auth.mjs';
+import { Auth, tokenHash, passwordMatches, sameToken } from '../server/auth.mjs';
 import { MICROSOFT_CONSUMERS, OAuth, pkce, providersFromEnv } from '../server/oauth.mjs';
 
 const rejects = (status) => (error) => error.status === status;
@@ -82,6 +82,20 @@ test('anonymous sign-in requires a browser-bound CSRF nonce', () => {
     rejects(403),
   );
   assert.match(auth.nonceCookie('login', nonce), /HttpOnly; SameSite=Lax; Max-Age=600; Secure$/);
+});
+test('tokens compare whole, in constant time, and a missing one never matches', () => {
+  const token = 'a'.repeat(64);
+  assert.equal(sameToken(token, token), true);
+  assert.equal(sameToken('a'.repeat(63) + 'b', token), false);
+  assert.equal(sameToken(token.slice(1), token), false);
+  assert.equal(sameToken(undefined, token), false);
+  assert.equal(sameToken(['x'], token), false);
+  assert.equal(sameToken(token, undefined), false);
+  const auth = new Auth(null, 'https://timescale.info');
+  const session = { kind: 'web', csrf: token };
+  auth.require(session, { headers: { 'x-csrf-token': token } });
+  assert.throws(() => auth.require(session, { headers: {} }), rejects(403));
+  assert.throws(() => auth.require(session, { headers: { 'x-csrf-token': 'b' } }), rejects(403));
 });
 test('the sign-in throttle limits each key, and a flood of keys forgets the oldest (#193)', () => {
   const auth = new Auth(null, 'https://timescale.info');

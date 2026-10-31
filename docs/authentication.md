@@ -113,7 +113,7 @@ Accounts are identified by `(provider, provider subject)`. Matching email addres
 
 **Sign in using your browser** in the desktop opens the configured server in the operating system browser. The desktop displays a ten-character code. After signing in, the website requires explicit approval of the matching code. Approval exchanges a separate secret held by the native process for a desktop session, expires after ten minutes and can be consumed only once. Polling is limited to once every three seconds. A desktop session is accepted only as a Bearer credential; a browser cookie is accepted only as a web session. Native HTTPS requests verify certificates, do not follow redirects, and stay under the configured origin's API. The bearer and pending authorization secret never enter the webview, localStorage or browser cookies. Switching servers/disconnecting invalidates pending native responses and clears all credentials.
 
-Sessions expire after fourteen days or twenty-four hours of inactivity. Activity updates at most once every five minutes. Logout revokes the current database record; **Sign out other sessions** revokes all other browser and desktop records immediately. There is no silent refresh token or persistent desktop login store.
+Sessions expire after fourteen days or twenty-four hours of inactivity. Activity updates at most once every five minutes. What an open page does on its own (the live-update stream and its revision polling) is not activity, so a tab left open does not keep an idle session alive. Logout revokes the current database record; **Sign out other sessions** revokes all other browser and desktop records immediately. There is no silent refresh token or persistent desktop login store.
 
 ## Passwords and throttles
 
