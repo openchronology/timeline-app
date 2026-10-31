@@ -126,8 +126,17 @@ input[type='radio'] {
   width: auto;
   margin-right: 8px;
 }
+/* The header stays at the top of every page as it scrolls, as it does over the editor (whose
+   page doesn't scroll); anchors and sticky contents keep clear of it. */
+:root {
+  --header-height: 72px;
+  scroll-padding-top: calc(var(--header-height) + 8px);
+}
 .platform-header {
-  min-height: 72px;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  min-height: var(--header-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -161,6 +170,12 @@ input[type='radio'] {
    up, or the account's menu, which drops down as a light panel. */
 .platform-header > nav {
   margin-left: auto;
+}
+/* The menu button and the side panel's parts are for phones only. */
+.site-menu-button,
+.site-menu-close,
+.site-menu-backdrop {
+  display: none;
 }
 .header-account {
   display: flex;
@@ -889,12 +904,15 @@ body:has(.editor-page) > .platform-footer {
   color: var(--danger);
 }
 @media (max-width: 650px) {
+  :root {
+    --header-height: 60px;
+  }
   .platform-header {
-    padding: 14px;
+    padding: 10px 14px;
     gap: 12px;
     flex-wrap: wrap;
   }
-  /* The brand and the account on the first row, the navigation beneath. */
+  /* Without JavaScript: the brand and the account on the first row, the navigation beneath. */
   .platform-header > nav {
     order: 3;
     flex-basis: 100%;
@@ -902,6 +920,109 @@ body:has(.editor-page) > .platform-footer {
   }
   .platform-header > :is(.account-menu, .header-account) {
     margin-left: auto;
+  }
+  /* With it, one row: the menu button, the brand and the account; the links in a panel that
+     slides in from the side over a dimmed page. */
+  .platform-header:has(.site-nav[data-ready='true']) {
+    flex-wrap: nowrap;
+  }
+  .site-menu-button:not([hidden]) {
+    order: -1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    padding: 0;
+    flex-shrink: 0;
+  }
+  .site-menu-icon {
+    display: grid;
+    gap: 4px;
+    width: 18px;
+  }
+  .site-menu-icon span {
+    display: block;
+    height: 2px;
+    border-radius: 1px;
+    background: currentColor;
+  }
+  .site-menu-backdrop:not([hidden]) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    background: rgb(0 0 0 / 45%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 220ms ease;
+  }
+  .site-menu-backdrop[data-open='true'] {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .platform-header > .site-nav[data-ready='true'] {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 100;
+    order: 0;
+    flex-basis: auto;
+    width: min(80vw, 300px);
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 0;
+    margin: 0;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 0 16px;
+    overflow-y: auto;
+    background: var(--header);
+    border-right: 1px solid var(--header-line);
+    box-shadow: 4px 0 24px rgb(0 0 0 / 30%);
+    transform: translateX(-100%);
+    visibility: hidden;
+  }
+  /* Hidden only once it has slid out, so closing animates too. */
+  .platform-header > .site-nav[data-animate='true'] {
+    transition:
+      transform 220ms ease,
+      visibility 0s linear 220ms;
+  }
+  .platform-header > .site-nav[data-open='true'] {
+    transform: none;
+    visibility: visible;
+  }
+  .platform-header > .site-nav[data-animate='true'][data-open='true'] {
+    transition:
+      transform 220ms ease,
+      visibility 0s;
+  }
+  .platform-header > .site-nav[data-ready='true'] {
+    align-items: stretch;
+    text-align: left;
+  }
+  .site-nav[data-ready='true'] a {
+    display: block;
+    padding: 12px 20px;
+    font-size: 17px;
+  }
+  .site-nav[data-ready='true'] a:hover,
+  .site-nav[data-ready='true'] a:focus-visible {
+    background: var(--header-hover);
+  }
+  .site-nav[data-ready='true'] .site-menu-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: flex-end;
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    margin: 0 12px 4px 0;
+    padding: 0;
+    font-size: 24px;
+    line-height: 1;
   }
   .brand {
     font-size: 18px;
@@ -1586,8 +1707,8 @@ main.api-reference {
 }
 .api-contents {
   position: sticky;
-  top: 1rem;
-  max-height: calc(100vh - 2rem);
+  top: calc(var(--header-height) + 1rem);
+  max-height: calc(100vh - var(--header-height) - 2rem);
   overflow: auto;
   font-size: 13px;
 }
@@ -1744,8 +1865,8 @@ main.help {
 }
 .help-contents {
   position: sticky;
-  top: 1rem;
-  max-height: calc(100vh - 2rem);
+  top: calc(var(--header-height) + 1rem);
+  max-height: calc(100vh - var(--header-height) - 2rem);
   overflow: auto;
   font-size: 14px;
 }
@@ -2184,5 +2305,13 @@ main.landing section {
   }
   .landing-actions .button {
     flex: 1 1 100%;
+  }
+}
+/* The side menu appears and goes without sliding when motion is reduced. */
+@media (prefers-reduced-motion: reduce) {
+  .site-menu-backdrop,
+  .platform-header > .site-nav[data-animate='true'],
+  .platform-header > .site-nav[data-animate='true'][data-open='true'] {
+    transition: none;
   }
 }
