@@ -866,12 +866,19 @@ ul.tags {
   font-size: 14px;
 }
 /* The editor owns scrolling, including its footer at the end of the document.
-   Size the frame below navigation without introducing a second scrollbar. */
+   Size the frame below navigation without introducing a second scrollbar. The page is one
+   screen tall, so it doesn't scroll either way; with a mouse it is also clipped, so no
+   rounding shows a scrollbar. On touch screens it isn't: a clipped page turns off the
+   browser's pull-to-refresh, which a pull past the top of the editor reaches through its frame. */
 body:has(.editor-page) {
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+}
+@media (hover: hover) and (pointer: fine) {
+  body:has(.editor-page) {
+    overflow: hidden;
+  }
 }
 body:has(.editor-page) > .platform-header {
   flex-shrink: 0;

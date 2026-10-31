@@ -2,7 +2,8 @@
 // The site's header in a live browser against PostgreSQL: it stays at the top of a scrolling
 // page, on wide screens and phones; on phones its links are a side menu that the menu button
 // slides in and out, closed by Escape (focus back on the button), a tap outside, its close
-// button or a link; without JavaScript the links stay in the header. SITE_MENU_SCREENSHOTS
+// button or a link; without JavaScript the links stay in the header. A timeline's page on a
+// touch screen isn't clipped, so pull-to-refresh works. SITE_MENU_SCREENSHOTS
 // names a directory to save screenshots in.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -147,6 +148,28 @@ try {
   await menu.waitFor();
   assert.equal(await menu.getAttribute('aria-expanded'), 'false');
   await phone.context().close();
+
+  // A timeline's page on a touch screen fills the screen without scrolling, and isn't clipped,
+  // so the browser's pull-to-refresh still works; with a mouse it is clipped.
+  for (const touch of [true, false]) {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      ...(touch && process.env.BROWSER !== 'firefox' ? { isMobile: true, hasTouch: true } : {}),
+    });
+    const editor = await context.newPage();
+    await editor.goto(origin + '/editor?new=1');
+    await editor.locator('.editor-frame').waitFor();
+    const page = await editor.evaluate(() => ({
+      overflow: getComputedStyle(document.body).overflow,
+      mouse: matchMedia('(hover: hover) and (pointer: fine)').matches,
+      fits: document.scrollingElement.scrollHeight <= innerHeight + 1,
+    }));
+    assert(page.fits, 'one screen tall');
+    // A headless browser may have no mouse; what it reports decides.
+    assert.equal(page.overflow, page.mouse ? 'hidden' : 'visible');
+    if (touch && process.env.BROWSER !== 'firefox') assert(!page.mouse, 'a touch screen');
+    await context.close();
+  }
 
   // Without JavaScript, a phone's header keeps its links, beneath the brand.
   const plain = await open({ width: 390, height: 844 }, false);
