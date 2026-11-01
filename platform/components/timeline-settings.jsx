@@ -74,7 +74,12 @@ export default function TimelineSettings({
     [imageSize, setImageSize] = useState(null);
   // A click outside either confirmation dialog closes it.
   useEffect(() => dismissOnBackdrop(dialog.current), []);
-  useEffect(() => dismissOnBackdrop(historyDialog.current), []);
+  // The history dialog is there only while history is kept: a timeline that stopped keeping it
+  // has none, until it starts again.
+  useEffect(
+    () => (historyDialog.current ? dismissOnBackdrop(historyDialog.current) : undefined),
+    [timeline.keep_history],
+  );
   const base = 'timelines/' + timeline.id;
   /**
    * Sends one change and shows its result; one at a time, so a click while one is being sent

@@ -213,6 +213,18 @@ try {
     assert(i < 49, 'The setting is saved.');
     await delay(100);
   }
+  // Saved history stopped, the settings page still opens (its confirmation dialog is gone until
+  // history is kept again), and keeping it again brings back a dialog a backdrop click closes.
+  await ownerTab.getByRole('button', { name: 'Stop keeping saved history…' }).click();
+  await ownerTab.getByRole('button', { name: 'Delete saved history' }).click();
+  await ownerTab.getByRole('button', { name: 'Keep saved history from now on' }).waitFor();
+  await ownerTab.reload();
+  await ownerTab.getByRole('button', { name: 'Keep saved history from now on' }).click();
+  await ownerTab.getByRole('button', { name: 'Stop keeping saved history…' }).click();
+  const confirm = ownerTab.locator('dialog', { hasText: 'Stop keeping saved history?' });
+  await confirm.waitFor();
+  await ownerTab.mouse.click(5, 5);
+  await confirm.waitFor({ state: 'hidden' });
   // An adult who turned the warnings off sees it as it is; a teenager cannot turn them off.
   const year = new Date().getUTCFullYear();
   for (const [name, born] of [
@@ -237,7 +249,7 @@ try {
 
   assert.deepEqual(errors, []);
   console.log(
-    'PASS labels in a browser: warnings, blurred images, moment labels, owners’ view, adults’ choice and minors.',
+    'PASS labels in a browser: warnings, blurred images, moment labels, owners’ view, adults’ choice and minors; settings with saved history stopped.',
   );
 } finally {
   await browser?.close();
