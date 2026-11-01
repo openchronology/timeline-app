@@ -60,7 +60,7 @@ export async function checkFullscreen(page) {
     assert.equal(box.stageBottom, box.footerTop, JSON.stringify(box));
     assert.equal(box.footerBottom, window[1], JSON.stringify(box));
     assert.ok(box.corners, 'The card covers the window');
-    assert.equal(await button.textContent(), 'Exit full screen');
+    assert.equal((await button.textContent()).trim(), 'Exit full screen');
     assert.equal(await button.getAttribute('aria-pressed'), 'true');
   };
   const left = async () => {

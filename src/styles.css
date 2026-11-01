@@ -2623,8 +2623,10 @@ dialog button {
   overflow-wrap: anywhere;
 }
 
+/* Its checkbox, label and "?" on one line (a label's fields otherwise stack). */
 .follow-latest-control {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 6px;
   font-size: 12px;
@@ -3466,5 +3468,209 @@ body[data-warnings]:not([data-images-shown])
 @media (prefers-reduced-motion: reduce) {
   .tour-spotlight {
     transition: none;
+  }
+}
+
+/* The toolbars on a phone (toolbar-menus.ts): one row each, and a menu for the rest. Above
+   the title, View mode and the main action, with File holding the file chores; on the
+   timeline card, zooming, Fit all, Full screen and ＋ Event, with Tools holding the other
+   controls, the settings and Help. The menus' buttons and the icons show only here. */
+.toolbar-icon {
+  display: none;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.toolbar-menu-button .toolbar-icon {
+  display: block;
+  fill: currentColor;
+  stroke: none;
+}
+.menu-caret {
+  font-size: 10px;
+  opacity: 0.7;
+}
+.toolbar-menu-button[aria-expanded='true'] {
+  background: var(--tint-strong);
+  border-color: var(--line-hover);
+}
+.toolbar-menu {
+  position: absolute;
+  z-index: 40;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--raised);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px var(--shadow-strong);
+}
+.file-menu {
+  top: calc(100% - 4px);
+  right: 0;
+  min-width: 210px;
+  gap: 4px;
+  padding: 6px;
+}
+.file-menu button {
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 14px;
+}
+.file-menu button:hover,
+.file-menu button:focus-visible {
+  background: var(--hover);
+}
+.toolbar-menu-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.toolbar-menu-grid button {
+  min-height: 44px;
+  white-space: normal;
+}
+.toolbar-menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--label);
+}
+.toolbar-menu-pair {
+  display: flex;
+  gap: 6px;
+}
+.toolbar-menu-pair button {
+  min-width: 52px;
+  min-height: 44px;
+}
+.toolbar-menu-settings {
+  display: grid;
+  border-top: 1px solid var(--line);
+}
+.toolbar-menu-settings > label {
+  min-height: 44px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--label);
+}
+.toolbar-menu-settings .density-control input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+}
+.toolbar-menu-settings .follow-latest-control input {
+  width: 20px;
+  height: 20px;
+}
+@media (max-width: 650px) {
+  .document-toolbar {
+    position: relative;
+    min-height: 56px;
+  }
+  .file-actions {
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+    align-items: center;
+    min-width: 0;
+  }
+  .file-actions .view-mode-switch {
+    min-height: 40px;
+    margin-right: 0;
+  }
+  .file-actions > button {
+    min-height: 40px;
+  }
+  #file-menu-button {
+    margin-left: auto;
+  }
+  .view-toolbar {
+    position: relative;
+    flex-wrap: nowrap;
+    padding: 6px;
+  }
+  .view-heading {
+    display: none !important;
+  }
+  /* One row down to 360 pixels wide, wrapping only on narrower screens. */
+  .view-toolbar .view-controls {
+    flex: 1 1 auto;
+    gap: 5px;
+    min-width: 0;
+  }
+  .view-controls > button {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0 10px;
+  }
+  #view-tools-button {
+    margin-left: auto;
+  }
+  #fullscreen-button .button-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  #fullscreen-button[aria-pressed='false'] .enter-icon,
+  #fullscreen-button[aria-pressed='true'] .exit-icon {
+    display: block;
+  }
+  #fullscreen-button[aria-pressed='true'] {
+    background: var(--tint-strong);
+  }
+  /* As tall as the stage at most, which the card would otherwise clip; it scrolls. */
+  .view-tools {
+    top: calc(100% + 4px);
+    left: 6px;
+    right: 6px;
+    max-height: calc(max(330px, 52svh) + 20px);
+  }
+  /* What the timeline shows, on one line; its title keeps the whole of it. */
+  .time-context {
+    padding: 4px 12px;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    overflow-wrap: normal;
+  }
+  /* Help and Group within are in Tools. */
+  .timeline-footer {
+    display: none;
+  }
+  /* The website's own actions (Star, Pull requests, Share…), in a tighter row. */
+  .timeline-actions,
+  .timeline-actions nav {
+    gap: 6px;
+  }
+  .timeline-actions :is(a, button) {
+    min-height: 40px;
+  }
+  /* Full screen: the stage takes all but the one slim row, clear of notches and bars. */
+  html.timeline-fullscreen .timeline-card {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+  }
+  html.timeline-fullscreen .view-tools {
+    max-height: calc(100dvh - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   }
 }

@@ -70,11 +70,13 @@ export async function checkResponsiveTimeline(page) {
       assert.equal(geometry.scale, phone ? 0.75 : 1);
       if (viewport.width <= 650)
         assert(geometry.width >= viewport.width - 1, 'Upright phones give the timeline full width');
-      // Upright phones wrap the timeline's controls onto more rows instead of scrolling them.
+      // Upright phones keep the timeline's controls to one row, the rest in Tools, without
+      // scrolling them (test/mobile-toolbar-browser.mjs checks the row and the menu).
       if (viewport.width <= 650)
         assert(
-          geometry.controls.scroll <= geometry.controls.client + 1 && geometry.controls.height > 50,
-          'Upright phones wrap the timeline controls: ' + JSON.stringify(geometry.controls),
+          geometry.controls.scroll <= geometry.controls.client + 1 && geometry.controls.height < 50,
+          'Upright phones keep the timeline controls to a row: ' +
+            JSON.stringify(geometry.controls),
         );
       if (viewport.height <= 500)
         assert(

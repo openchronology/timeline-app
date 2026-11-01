@@ -255,6 +255,14 @@
             <!-- For those who can edit (#233): read the timeline as viewers do. -->
             <label id="view-mode-control" class="view-mode-switch" hidden
               ><input id="view-mode" type="checkbox" role="switch" /> View mode</label
+            ><button
+              id="file-menu-button"
+              class="toolbar-menu-button"
+              aria-expanded="false"
+              aria-controls="file-menu"
+              hidden
+            >
+              File<span class="menu-caret" aria-hidden="true">▾</span></button
             ><button id="import-button">Import</button><button id="export-button">Export</button
             ><button id="och-import" hidden>Import .och</button
             ><button id="och-export" hidden>Export .och ↗</button
@@ -263,6 +271,14 @@
             ><button id="sqlite-save-as" hidden>Save As…</button
             ><button id="publish-button" class="button-primary">Save to server</button>
           </div>
+          <!-- On a phone, the file chores wait in this menu, and the row keeps the main action. -->
+          <div
+            id="file-menu"
+            class="toolbar-menu file-menu"
+            role="group"
+            aria-label="File"
+            hidden
+          ></div>
         </div>
         <section class="document-heading">
           <!-- The timeline's own image (#339), set in its settings on the website. -->
@@ -323,7 +339,7 @@ Every point has a place. Explore the spaces between them.</textarea>
         ></label>
         <section class="timeline-card" aria-label="Timeline window">
           <div class="view-toolbar">
-            <div>
+            <div class="view-heading">
               <span class="view-name">Timeline</span
               ><span id="visible-count" class="muted">All moments</span>
             </div>
@@ -349,9 +365,39 @@ Every point has a place. Explore the spaces between them.</textarea>
               ><button id="fit-button">Fit all</button
               ><button id="center-vertical">Center axis</button
               ><button id="fullscreen-button" aria-pressed="false" title="Full screen (F)">
-                Full screen</button
+                <svg class="toolbar-icon enter-icon" viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" /></svg
+                ><svg class="toolbar-icon exit-icon" viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M6 2v4H2M10 2v4h4M14 10h-4v4M2 10h4v4" /></svg
+                ><span class="button-label">Full screen</span></button
+              ><button
+                id="view-tools-button"
+                class="toolbar-menu-button"
+                aria-expanded="false"
+                aria-controls="view-tools"
+                hidden
+              >
+                <svg class="toolbar-icon" viewBox="0 0 16 16" aria-hidden="true">
+                  <circle cx="3" cy="8" r="1.4" />
+                  <circle cx="8" cy="8" r="1.4" />
+                  <circle cx="13" cy="8" r="1.4" /></svg
+                >Tools</button
               ><button id="clear-selection" hidden>Clear selection</button
               ><button id="add-button" class="button-primary">＋ Event</button>
+            </div>
+            <!-- On a phone, the rest of the controls wait in this menu (toolbar-menus.ts). -->
+            <div
+              id="view-tools"
+              class="toolbar-menu view-tools"
+              role="group"
+              aria-label="Tools"
+              hidden
+            >
+              <div id="view-tools-actions" class="toolbar-menu-grid"></div>
+              <div class="toolbar-menu-row">
+                <span>Text size</span><span id="view-tools-size" class="toolbar-menu-pair"></span>
+              </div>
+              <div id="view-tools-settings" class="toolbar-menu-settings"></div>
             </div>
           </div>
           <div id="live-notice" class="comparison-settings" hidden role="status">

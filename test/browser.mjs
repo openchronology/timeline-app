@@ -42,6 +42,7 @@ import { checkFollowLatest } from './follow-browser.mjs';
 import { checkComparison } from './comparison-browser.mjs';
 import { checkDesktopCache } from './desktop-cache-browser.mjs';
 import { checkResponsiveTimeline } from './layout-browser.mjs';
+import { checkMobileToolbars } from './mobile-toolbar-browser.mjs';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium, firefox, webkit } from 'playwright';
@@ -332,6 +333,7 @@ try {
   await checkTimelineTheme(page, document);
   await checkViewMode(page, document);
   await checkFullscreen(page);
+  await checkMobileToolbars(page);
   await checkHeadings(page, document);
   await checkDescriptionMarkdown(page, document);
   await checkEllipseShape(page, document);

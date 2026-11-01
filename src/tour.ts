@@ -48,12 +48,18 @@ export const TOUR_STEPS: readonly TourStep[] = [
     text: 'Stack this timeline with others on one time axis, lining them up when they count time differently.',
   },
   {
+    // On a phone, the controls above wait in Tools, and the tour shows it instead of them.
+    selectors: ['#view-tools-button'],
+    title: 'Tools',
+    text: 'On a small screen, Search, Separate by tags, Time display, Plugins, Compare, the text size and Help are here.',
+  },
+  {
     selectors: ['.window-bounds'],
     title: 'Go to exact times',
     text: 'Type the times to show at the left and right edges, then Go. Undo and Redo are here too.',
   },
   {
-    selectors: ['#publish-button', '#sqlite-save', '#export-button'],
+    selectors: ['#publish-button', '#sqlite-save', '#export-button', '#file-menu-button'],
     title: 'Keep your work',
     text: 'Save to the server, save the desktop file, or export an .ochx file. The status under the title says where your work stands.',
   },
