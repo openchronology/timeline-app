@@ -17,6 +17,7 @@ import { checkSelection } from './selection-browser.mjs';
 import { checkLabelMotion } from './label-motion-browser.mjs';
 import { checkPlugins } from './plugins-browser.mjs';
 import { checkEllipseShape } from './ellipse-shape-browser.mjs';
+import { checkMobileToolbars } from './mobile-toolbar-browser.mjs';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -197,6 +198,7 @@ try {
   await checkCapacity(page, document, { offline: true });
   await checkTags(page, document);
   await checkRelationships(page, document);
+  await checkMobileToolbars(page);
   await closeMomentDetails(page);
   await input('json-file').setInputFiles({
     name: 'sample.ochx',

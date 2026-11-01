@@ -99,6 +99,10 @@ Type the bounds the way the timeline's display writes times. To see and type the
 
 **Help** under the timeline lists these controls. The count above the timeline says how many moments are in view.
 
+### On a phone
+
+On a narrow screen the toolbars keep one row each. Above the title are **View mode** (for those who can edit), the main action, such as **Save to server**, and **File**, which holds **Import**, **Export**, **Import .och** and **Export .och ↗**. Above the timeline are **−**, **＋**, **Fit all**, full screen (the corners icon), **＋ Event** and **Tools**. **Tools** holds the rest: **Search**, **Separate by tags**, **Time display**, **Plugins**, **Compare**, **Center axis**, **Help**, the text size (**A−** and **A＋**), **Follow latest moments**, **Group within**, and **Clear selection** once a time is selected. A menu closes when you choose an action, tap outside it or press Escape. In full screen the timeline takes all of the screen but that one row.
+
 ### What markers show
 
 - **A dot** is one moment. A titled moment shows its title and time; an untitled one shows only its dot.

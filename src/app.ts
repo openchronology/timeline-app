@@ -178,6 +178,7 @@ import {
 import { parseLink, linkFragment, sharePath } from './links.js';
 import { profilePath, timelinePath } from './addresses.js';
 import { addHelpTips } from './help-tips.js';
+import { toolbarMenu } from './toolbar-menus.js';
 import { startTour } from './tour.js';
 import { momentsText, SAVE_TO_SERVER } from './wording.js';
 import {
@@ -4574,7 +4575,7 @@ document.addEventListener('visibilitychange', () => follow.wake());
 document.addEventListener('pointerdown', (event) => {
   if (
     (event.target as HTMLElement).closest(
-      '.view-controls, .window-bounds, #comparison-settings, .timeline-footer, #timeline-actions, dialog',
+      '.view-controls, .toolbar-menu, .window-bounds, #comparison-settings, .timeline-footer, #timeline-actions, dialog',
     )
   )
     follow.navigation();
@@ -5283,6 +5284,47 @@ function openHelp(url: string) {
   else window.open(url, '_blank', 'noopener,noreferrer');
 }
 addHelpTips(document, helpAddress, openHelp);
+/**
+ * On a phone the toolbars keep one row each: the file chores wait in File, beside the
+ * main action, and the timeline's tools, settings and Help in Tools, beside zooming, Fit all,
+ * Full screen and ＋ Event. The controls themselves move, so they keep their handlers and states.
+ */
+const phone = matchMedia('(max-width: 650px)');
+toolbarMenu({
+  button: el<HTMLButtonElement>('file-menu-button'),
+  panel: el('file-menu'),
+  query: phone,
+  items: [
+    'import-button',
+    'export-button',
+    'och-import',
+    'och-export',
+    'sqlite-open',
+    'sqlite-save-as',
+  ].map((id) => [el(id), el('file-menu')] as const),
+});
+const viewTools = toolbarMenu({
+  button: el<HTMLButtonElement>('view-tools-button'),
+  panel: el('view-tools'),
+  query: phone,
+  items: [
+    ...[
+      'clear-selection',
+      'search-button',
+      'separate-button',
+      'presentation-button',
+      'plugins-button',
+      'compare-button',
+      'center-vertical',
+      'timeline-help-button',
+    ].map((id) => [el(id), el('view-tools-actions')] as const),
+    [el('size-down'), el('view-tools-size')],
+    [el('size-up'), el('view-tools-size')],
+    [el('follow-latest-control'), el('view-tools-settings')],
+    [document.querySelector<HTMLElement>('.density-control')!, el('view-tools-settings')],
+  ],
+  stay: [el('size-down'), el('size-up')],
+});
 const tour = () => startTour(document, helpAddress('guide'), openHelp);
 el('tour-button').onclick = () => {
   // Once Help has closed, and given the focus back, the tour takes it.
@@ -5315,7 +5357,8 @@ const fullscreen = () => document.documentElement.classList.contains('timeline-f
 function setFullscreen(on: boolean) {
   document.documentElement.classList.toggle('timeline-fullscreen', on);
   const button = el('fullscreen-button');
-  button.textContent = on ? 'Exit full screen' : 'Full screen';
+  button.querySelector('.button-label')!.textContent = on ? 'Exit full screen' : 'Full screen';
+  viewTools.close();
   button.setAttribute('aria-pressed', String(on));
 }
 function toggleFullscreen(on = !fullscreen()) {
