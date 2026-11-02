@@ -363,6 +363,15 @@ export async function checkPresumptive(page, restore) {
     await page.locator('#reader-panel .reader-stack .reader-flags li').allTextContents(),
     ['Presumptive (unconfirmed)', 'Presumptive (unconfirmed)'],
   );
+  // Its two cards share the stack's width rather than keeping to narrow columns.
+  const widths = await page.evaluate(() => {
+    const stack = document.querySelector('#reader-panel .reader-stack');
+    return [stack, ...stack.querySelectorAll('article')].map(
+      (e) => e.getBoundingClientRect().width,
+    );
+  });
+  for (const card of widths.slice(1))
+    assert.ok(card > widths[0] * 0.4, `card ${card} of ${widths[0]}`);
   await page.locator('#reader-close').click();
   await page.waitForFunction(() => !document.getElementById('inspector').open);
   await page.locator('#markers .event-marker[data-first="100/1"]').click({ force: true });

@@ -1141,6 +1141,11 @@ dialog.moment-dialog.reading {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 12px;
 }
+/* A stack's cards share the reader's width: one card takes all of it, two take half each,
+   rather than keeping to 200px columns beside empty ones. */
+.reader-stack {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
 .reader-stack article {
   padding: 10px;
   border: 1px solid var(--line);
