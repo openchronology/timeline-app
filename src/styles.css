@@ -1344,6 +1344,8 @@ dialog.moment-dialog.reading {
   overflow: auto;
 }
 .group-events button {
+  /* A long list scrolls; its rows never shrink to fit, which would clip each one's time. */
+  flex: none;
   display: block;
   text-align: left;
   white-space: normal;
