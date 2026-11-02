@@ -12,6 +12,8 @@ import { passwordHash } from '../server/auth.mjs';
 import { createPresenter, demo, PLUGIN_EXAMPLE, Q } from '../dist/core.mjs';
 import { POLICY_VERSION } from '../server/policies.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
+/** The frame a timeline's page shows it in, headed by it (#428). */
+const framed = (id) => `/editor/frame?timeline=${id}#timeline/${id}`;
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 await pool.query(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
 const port = Number(process.env.PLATFORM_TEST_PORT ?? 5199),
@@ -407,7 +409,7 @@ try {
   // Its older address leads to its page, keeping the rest of the address.
   const moved = await guest.request(legacy + '/pulls?page=1', { status: 307, headers: true });
   assert.equal(moved.headers.get('location'), base + '/pulls?page=1');
-  assert(publicPage.includes('/editor/frame#timeline/' + timeline.id));
+  assert(publicPage.includes(framed(timeline.id)));
   assert(
     (await guest.request('/?search=' + term + '&tag=framework-ci')).includes(`href="${base}"`),
   );
@@ -502,7 +504,7 @@ try {
     forkBase = '/' + contributorName + '/' + fork.id;
   // Timeline actions are mounted into the editor frame after hydration.
   const forkPage = await contributor.request(forkBase);
-  assert(forkPage.includes('/editor/frame#timeline/' + fork.id));
+  assert(forkPage.includes(framed(fork.id)));
   assert(forkPage.includes(timeline.id));
   // While a large copy's index is still being copied, its page waits for it, its other pages
   // lead there, and the API refuses its index but shows it as preparing.
@@ -518,7 +520,7 @@ try {
     await held.query('SELECT 1 FROM oc_timelines WHERE id=$1 FOR UPDATE', [fork.id]);
     const waiting = await contributor.request(forkBase);
     assert.match(waiting, /Preparing your copy/);
-    assert(!waiting.includes('/editor/frame#timeline/' + fork.id));
+    assert(!waiting.includes(framed(fork.id)));
     await contributor.request(forkBase + '/history', { status: 307 });
     assert.equal((await contributor.request(forkApi)).preparing, true);
     await contributor.request(forkApi + '/document', { status: 409 });
@@ -528,7 +530,7 @@ try {
     await held.query('COMMIT');
     held.release();
   }
-  assert((await contributor.request(forkBase)).includes('/editor/frame#timeline/'));
+  assert(/\/editor\/frame\?timeline=[^#"]+#timeline\//.test(await contributor.request(forkBase)));
   assert.match(await contributor.request(forkBase + '/pulls/new'), /Open pull request/);
   assert.match(await contributor.request(forkBase + '/sync'), /Sync saved fork/);
   const saved = await contributor.request(forkApi, {
@@ -689,7 +691,7 @@ try {
   assert.equal(taken.error, `Another timeline of @${ownerName} is at ${address}-readdress.`);
   await owner.request(other, { method: 'PATCH', data: { slug: term } });
   assert.match(await owner.request(address), /title="Timeline editor"/);
-  assert(!(await owner.request(address)).includes('/editor/frame#timeline/' + timeline.id));
+  assert(!(await owner.request(address)).includes(framed(timeline.id)));
   await guest.request(address, { status: 404 });
   // Without a slug, it is at its ID again.
   timeline = await owner.request(api + '/settings', { method: 'PATCH', data: { slug: null } });
