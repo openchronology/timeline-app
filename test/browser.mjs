@@ -160,6 +160,15 @@ try {
   assert.match(await input('group-title').textContent(), /20,001/);
   const firstGroupTitle = await input('group-events').getByRole('button').first().textContent();
   assert.equal(await input('group-events').getByRole('button').count(), 25);
+  // Each row shows its whole title and time: a long list scrolls rather than squeezing them.
+  assert.deepEqual(
+    await page.evaluate(() =>
+      [...document.querySelectorAll('#group-events button')]
+        .filter((b) => b.scrollHeight > b.clientHeight + 1)
+        .map((b) => b.textContent),
+    ),
+    [],
+  );
   await input('group-more').click();
   await poll(async () => (await input('group-page-status').textContent()).startsWith('Page 2'));
   assert.equal(await input('group-events').getByRole('button').count(), 25);
