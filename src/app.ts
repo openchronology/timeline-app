@@ -852,6 +852,11 @@ let toastTimer: ReturnType<typeof setTimeout>,
   sqlitePath: string | null = null,
   sqliteSavedVersion: number | null = null,
   documentRequest = 0,
+  // The timeline whose heading the page arrived with (#428, platform/app/editor/frame), and the
+  // document request it is held through: from the start until the editor has opened it.
+  prefilled: string | null =
+    document.querySelector<HTMLElement>('.document-heading')?.dataset.prefill ?? null,
+  prefillRequest = 0,
   selectionRequest = 0,
   editVersion = 0,
   saving = false;
@@ -2597,37 +2602,49 @@ function heading() {
       : (model?.assets ?? remote?.assets),
     offlineHtml,
   );
-  // The timeline's own image (#339) above its title, from its copy when it carries one; a
-  // comparison shows its sources and has none.
-  const image = comparison ? null : model ? model.image : remote?.image;
-  const picture = el<HTMLImageElement>('timeline-image'),
-    source = imageSource(image?.url ?? null);
-  if (picture.getAttribute('src') !== source) {
-    if (source) picture.src = source;
-    else picture.removeAttribute('src');
+  // The heading the page arrived with stands until its timeline has loaded (#428), instead of
+  // the sample's or "Loading timeline…"; any other document ends it.
+  const holding =
+    prefilled !== null && documentRequest === prefillRequest && remote?.id !== prefilled;
+  if (prefilled !== null && !holding) {
+    prefilled = null;
+    delete el('timeline-description-view').closest<HTMLElement>('.document-heading')!.dataset
+      .prefill;
   }
-  picture.alt = image?.alt ?? '';
-  picture.hidden = !source;
-  // A separation is the open timeline itself (#416: often how it opens), so it keeps its title.
-  input('timeline-title').value =
-    comparison && !separation
-      ? remote?.comparison
-        ? remote.title
-        : 'Timeline comparison'
-      : (model?.title ?? remote?.title ?? 'Loading timeline…');
-  el<HTMLTextAreaElement>('timeline-description').value =
-    model?.description ?? remote?.description ?? '';
+  if (!holding) {
+    // The timeline's own image (#339) above its title, from its copy when it carries one; a
+    // comparison shows its sources and has none.
+    const image = comparison ? null : model ? model.image : remote?.image;
+    const picture = el<HTMLImageElement>('timeline-image'),
+      source = imageSource(image?.url ?? null);
+    if (picture.getAttribute('src') !== source) {
+      if (source) picture.src = source;
+      else picture.removeAttribute('src');
+    }
+    picture.alt = image?.alt ?? '';
+    picture.hidden = !source;
+    // A separation is the open timeline itself (#416: often how it opens), so it keeps its title.
+    input('timeline-title').value =
+      comparison && !separation
+        ? remote?.comparison
+          ? remote.title
+          : 'Timeline comparison'
+        : (model?.title ?? remote?.title ?? 'Loading timeline…');
+    el<HTMLTextAreaElement>('timeline-description').value =
+      model?.description ?? remote?.description ?? '';
+  }
   input('timeline-title').disabled = !editable();
   el<HTMLTextAreaElement>('timeline-description').disabled = !editable();
-  showDescription();
+  if (!holding) showDescription();
   updatePageTitle();
   const count = momentCount();
-  text(
-    'event-count',
-    comparison && !separation
-      ? `${comparison.tracks.length} timelines · Read-only comparison`
-      : momentsText(count),
-  );
+  if (!holding)
+    text(
+      'event-count',
+      comparison && !separation
+        ? `${comparison.tracks.length} timelines · Read-only comparison`
+        : momentsText(count),
+    );
   text('owner-label', remote ? remote.owner : desktop ? 'Offline workspace' : 'Local workspace');
   const ownerLink = el<HTMLAnchorElement>('owner-label');
   if (remote) {
@@ -3105,6 +3122,8 @@ async function openRemote(id: string, restoreSeparation = true) {
   setDashboard(false);
   workingProposal = null;
   const request = ++documentRequest;
+  // Opening the timeline the page arrived with keeps its heading until it has loaded.
+  if (id === prefilled && prefillRequest === request - 1) prefillRequest = request;
   resetTimeSelection();
   selectionRequest++;
   model = null;
