@@ -2237,8 +2237,9 @@ main.landing section {
 .landing-video-frame {
   display: block;
   position: relative;
+  /* The column's full width: YouTube picks the player's quality from its size, and at 820px
+     wide it often started grainy. */
   width: 100%;
-  max-width: 820px;
   aspect-ratio: 16 / 9;
   border-radius: 12px;
   overflow: hidden;

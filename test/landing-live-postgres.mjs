@@ -320,6 +320,13 @@ try {
   await tab.getByRole('link', { name: /^Play: / }).click();
   const frame = tab.locator('.landing-video-frame iframe');
   await frame.waitFor();
+  // It fills the page's column, so YouTube chooses a sharper quality.
+  const widths = await tab.evaluate(() =>
+    ['.landing-video-frame', '.landing-video'].map((s) =>
+      Math.round(document.querySelector(s).getBoundingClientRect().width),
+    ),
+  );
+  assert.equal(widths[0], widths[1], `the player's width: ${widths}`);
   assert.match(await frame.getAttribute('src'), /^https:\/\/www\.youtube-nocookie\.com\/embed\//);
   assert.equal(new URL(tab.url()).pathname, '/for/educators');
 
