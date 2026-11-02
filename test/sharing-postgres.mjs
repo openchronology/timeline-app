@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// Sharing a timeline and what is in it (issues 60, 61, 95, 97, 335 and 339): page metadata
+// Sharing a timeline and what is in it (issues 60, 61, 95, 97, 335, 339 and 428): page metadata
 // and link previews, preview images, a timeline's own image, entity pages and their
 // structured data, links into a timeline, embeds, oEmbed, robots and the sitemap; private
 // timelines show none of it.
@@ -228,6 +228,12 @@ try {
   await owner.request('/embed/' + timelineId, { status: 404 });
   await guest.request('/api/oembed?url=' + encodeURIComponent(origin + base), { status: 404 });
   assert(!(await sitemapAddresses(guest)).some((a) => a.includes(timelineId)));
+  // The editor's frame arrives with the heading only for someone who may read it (#428).
+  const prefill = (html) => /data-prefill="([^"]*)"/.exec(html)?.[1] ?? null;
+  const strangerFrame = await guest.request('/editor/frame?timeline=' + timelineId);
+  assert.equal(prefill(strangerFrame), null);
+  assert(!strangerFrame.includes('Voyages of ' + suffix));
+  assert.equal(prefill(await owner.request('/editor/frame?timeline=' + timelineId)), timelineId);
   const privateImage = await guest.request(base + '/opengraph-image', { raw: true });
   assert.equal(privateImage.headers.get('content-type'), 'image/png');
   // An ID-only moment lookup, as links use.
@@ -350,6 +356,28 @@ try {
   assert(embedHtml.includes(`<title>Voyages of ${suffix} · OpenChronology</title>`));
   const frame = await guest.request('/editor/frame', { raw: true });
   assert.match(frame.headers.get('content-security-policy'), /frame-ancestors 'self'/);
+  // Its structured data (#428), and the frame its page shows, already headed by it: its title,
+  // its description rendered, its count; indexed only as part of the page that frames it.
+  const described = structuredData(page);
+  assert.equal(described['@type'], 'CreativeWork');
+  assert.equal(described.name, 'Voyages of ' + suffix);
+  assert.equal(described.url, origin + base);
+  assert.equal(described.description, 'Ships & the sea, from departure to return.');
+  assert.equal(described.author.name, '@' + username);
+  assert.match(
+    page,
+    new RegExp(`src="/editor/frame\\?timeline=${timelineId}#timeline/${timelineId}"`),
+  );
+  assert.equal(frame.headers.get('x-robots-tag'), 'noindex, indexifembedded');
+  const headed = await guest.request('/editor/frame?timeline=' + timelineId);
+  assert.equal(prefill(headed), timelineId);
+  assert.match(headed, new RegExp(`id="timeline-title"[^>]*>Voyages of ${suffix}</textarea`));
+  assert.match(
+    headed,
+    /<div id="timeline-description-view"[^>]*><p>Ships &amp; the sea, from departure to return\.<\/p><\/div>/,
+  );
+  assert.match(headed, /<span id="event-count">\d+ moments?<\/span>/);
+  assert.equal(prefill(await guest.request('/editor/frame?timeline=not-an-id')), null);
 
   // oEmbed for the timeline, a moment page and a link fragment.
   const oembed = (url, extra = '', status = 200) =>
@@ -382,6 +410,7 @@ try {
   const robots = await guest.request('/robots.txt');
   assert.match(robots, /Disallow: \/api\//);
   assert.match(robots, /Allow: \/api\/oembed/);
+  assert.match(robots, /Allow: \/editor\/frame/);
   assert(robots.includes(`Sitemap: ${origin}/sitemap.xml`));
   const sitemap = await sitemapAddresses(guest);
   assert(sitemap.includes(origin + base));
@@ -441,9 +470,27 @@ try {
   // share dialog offers links, social sites and embed code.
   browser = await chromium.launch();
   const context = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+  // Every title the editor's heading shows while its page loads (#428), frame by frame.
+  await context.addInitScript(() => {
+    if (location.pathname !== '/editor/frame') return;
+    window.titlesShown = [];
+    const look = () => {
+      const title = document.getElementById('timeline-title')?.value;
+      if (title !== undefined && window.titlesShown.at(-1) !== title)
+        window.titlesShown.push(title);
+      requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
   const tab = await context.newPage();
   const editor = () => tab.frameLocator('iframe.editor-frame');
   await tab.goto(origin + base + '#moment/leg%3A2');
+  // It arrives headed by the timeline and stays so as the editor loads it: never the editor's
+  // sample or "Loading timeline…" first.
+  await editor().locator('#reader-panel').waitFor({ state: 'visible' });
+  assert.deepEqual(await tab.frame({ url: /\/editor\/frame/ }).evaluate(() => window.titlesShown), [
+    'Voyages of ' + suffix,
+  ]);
   // A guest reads it in the reader (#233), with nothing to edit.
   await editor().locator('#reader-panel').waitFor({ state: 'visible' });
   assert.equal(await editor().locator('#reader-title').textContent(), 'Storm ' + suffix);
@@ -608,12 +655,22 @@ try {
   assert.equal(await heading.getAttribute('src'), picture);
   assert.equal(await heading.getAttribute('alt'), 'A ship under sail');
   await shot(imaging, 'timeline-image-heading');
+  // The frame arrives with it already above the title (#428).
+  assert.match(
+    await guest.request('/editor/frame?timeline=' + timelineId),
+    new RegExp(
+      `<img id="timeline-image" class="timeline-image" src="${picture}" alt="A ship under sail"`,
+    ),
+  );
   // Labelled, it previews and lists without it (#115).
   await owner.request(`/api/timelines/${timelineId}/settings`, {
     method: 'PATCH',
     data: { labels: ['violence'] },
   });
   assert.notEqual(meta(await guest.request(named), 'og:image'), picture);
+  // And its frame waits for the editor's warning instead of arriving with its heading.
+  assert.equal(prefill(await guest.request('/editor/frame?timeline=' + timelineId)), null);
+  assert.equal(structuredData(await guest.request(named)), null);
   assert.equal((await oembed(origin + named)).thumbnail_url, undefined);
   const labelledProfile = await owner.request('/' + username);
   assert.doesNotMatch(labelledProfile, card);

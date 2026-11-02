@@ -10,7 +10,7 @@ import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { markdownText, parseMarkdown } from '../dist/core.mjs';
+import { markdownHtml, markdownText, parseMarkdown } from '../dist/core.mjs';
 
 process.env.APP_ORIGIN = 'https://chronology.example';
 
@@ -203,4 +203,34 @@ test('The page’s text renders tables and rules; cards read a table’s cells',
   );
   assert.match(out, /<hr\/><\/div>$/);
   assert.equal(html(site.MarkdownExcerpt, { text: '| A | B |\n| - | - |\n| 1 | 2 |' }), 'A B 1 2');
+});
+
+test('The editor’s heading served with its page renders the description as the editor does (#428)', () => {
+  // Element for element renderMarkdown's DOM, as HTML text, with every string escaped.
+  assert.equal(
+    markdownHtml(
+      '**Bold** & *em* `<x>`\nnext line\n\n- one\n- [two](https://example.com/?a=1&b="2")',
+    ),
+    '<p><strong>Bold</strong> &amp; <em>em</em> <code>&lt;x&gt;</code><br>next line</p>' +
+      '<ul><li>one</li><li><a href="https://example.com/?a=1&amp;b=%222%22" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">two</a></li></ul>',
+  );
+  assert.equal(
+    markdownHtml(table),
+    '<p>Legend:</p><div class="markdown-table"><table><thead><tr>' +
+      '<th style="text-align: left;">Feature</th><th style="text-align: right;">Meaning | here</th>' +
+      '</tr></thead><tbody><tr><td style="text-align: left;"><strong>Ellipses</strong></td>' +
+      '<td style="text-align: right;">Conditions</td></tr><tr><td style="text-align: left;">' +
+      '<code>a|b</code></td><td style="text-align: right;">extra</td></tr><tr>' +
+      '<td style="text-align: left;">short</td><td style="text-align: right;"></td></tr>' +
+      '</tbody></table></div><p>After.</p>',
+  );
+  assert.equal(
+    markdownHtml('<script>alert(1)</script>'),
+    '<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>',
+  );
+  assert.equal(
+    markdownHtml('# Title\n\n---\n\n```\na < b\n```'),
+    '<h1>Title</h1><hr><pre><code>a &lt; b\n</code></pre>',
+  );
+  assert.equal(markdownHtml(''), '');
 });

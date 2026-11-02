@@ -331,6 +331,67 @@ export function renderMarkdown(container: HTMLElement, markdown: string) {
     container.append(node);
   }
 }
+/** Text escaped for HTML: element content and quoted attribute values alike. */
+const escapeHtml = (s: string) =>
+  s.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
+/** Inline Markdown as HTML text, as appendInline builds it. */
+function inlineHtml(nodes: MarkdownInline[]): string {
+  return nodes
+    .map((n) =>
+      typeof n === 'string'
+        ? escapeHtml(n)
+        : n.tag === 'a'
+          ? `<a href="${escapeHtml(n.href)}" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">${escapeHtml(n.text)}</a>`
+          : n.tag === 'code'
+            ? `<code>${escapeHtml(n.text)}</code>`
+            : `<${n.tag}>${inlineHtml(n.children)}</${n.tag}>`,
+    )
+    .join('');
+}
+/**
+ * The rendering of `markdown` as HTML text, element for element what renderMarkdown builds,
+ * for a page served before the editor runs (the timeline's heading, #428). Every string is
+ * escaped, and the elements are only the vocabulary's, so nothing in it can run or load.
+ */
+export function markdownHtml(markdown: string): string {
+  return parseMarkdown(markdown)
+    .map((block) => {
+      if (block.tag === 'hr') return '<hr>';
+      if (block.tag === 'table') {
+        const row = (cells: MarkdownInline[][], tag: 'th' | 'td') =>
+          '<tr>' +
+          cells
+            .map((cell, i) => {
+              const align = block.align[i];
+              return `<${tag}${align ? ` style="text-align: ${align};"` : ''}>${inlineHtml(cell)}</${tag}>`;
+            })
+            .join('') +
+          '</tr>';
+        return (
+          '<div class="markdown-table"><table><thead>' +
+          row(block.head, 'th') +
+          '</thead>' +
+          (block.rows.length
+            ? '<tbody>' + block.rows.map((cells) => row(cells, 'td')).join('') + '</tbody>'
+            : '') +
+          '</table></div>'
+        );
+      }
+      const inner =
+        block.tag === 'pre'
+          ? `<code>${escapeHtml(block.text)}</code>`
+          : 'lines' in block
+            ? block.lines.map(inlineHtml).join('<br>')
+            : 'items' in block
+              ? block.items.map((item) => `<li>${inlineHtml(item)}</li>`).join('')
+              : inlineHtml(block.children);
+      return `<${block.tag}>${inner}</${block.tag}>`;
+    })
+    .join('');
+}
 /** Backslash-escapes every character the Markdown vocabulary treats specially (inline undoes it). */
 const escapeText = (s: string) => s.replace(/([\\`*_[\]#>+.!|~-])/g, '\\$1');
 /**

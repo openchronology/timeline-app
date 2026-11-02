@@ -99,7 +99,14 @@ described by their labels instead of their notes, and ask search engines not to 
 ## Search engines
 
 - `/robots.txt` lets crawlers read pages but not the API, accounts, the bare editor or embeds,
-  and names the sitemap.
+  and names the sitemap. It does let them read the editor's frame, `/editor/frame`, which
+  answers `X-Robots-Tag: noindex, indexifembedded`: indexed only as part of the page that
+  frames it ([#428](https://github.com/openchronology/timeline-app/issues/428)).
+- **A timeline's page arrives with its heading:** the frame its page shows is asked for with
+  `?timeline=<id>`, and for someone who may read that timeline it is served with the
+  timeline's image, title, description (its Markdown rendered) and moment count already in
+  place, which the editor keeps while it loads the timeline. A comparison, a timeline still
+  being prepared and a timeline with sensitive-content labels arrive without it.
 - `/sitemap.xml` is a sitemap index: it names the pages of the sitemap under `/sitemap/`, so
   it covers the site however many timelines it has.
   - `/sitemap/pages.xml` lists the site's own pages (the dashboard, plugins, download, the API
@@ -147,6 +154,9 @@ described by their labels instead of their notes, and ask search engines not to 
   - up to 50 of the moments and durations [related](relationships.md) to it, each linked to
     its own page;
   - a link into the timeline open at it.
+- **A timeline's structured data:** a public, unlabelled timeline's page describes it as a
+  schema.org `CreativeWork` in JSON-LD: its title, description, own image, tags as keywords,
+  when it was made and last changed, and its owner as author.
 - **Structured data:** each moment and duration page also describes itself as
   [schema.org](https://schema.org) JSON-LD:
   - an `Event` with its `startDate` (and a duration's `endDate`) on a timeline of Gregorian

@@ -311,6 +311,40 @@ export function entityStructuredData(timeline, entity) {
   };
 }
 /**
+ * A timeline's schema.org description (#428), for a JSON-LD script on its page: a
+ * `CreativeWork` with its title, its description as text, its own image, its author, its tags
+ * and when it was made and changed. Null where its page is not for search engines (as for its
+ * moments: private or labelled).
+ * @param {object} timeline the timeline
+ */
+export function timelineStructuredData(timeline) {
+  if (!entitiesIndexable(timeline) || timeline.comparison) return null;
+  const origin = siteOrigin(),
+    image = previewOf(timeline),
+    description = descriptionExcerpt(timeline, 500);
+  const date = (value) => (value ? new Date(value).toISOString() : null);
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'CreativeWork',
+    name: timelineTitle(timeline),
+    url: origin + timelinePath(timeline),
+    ...(description ? { description } : {}),
+    ...(image ? { image: image.url } : {}),
+    ...(timeline.tags?.length ? { keywords: timeline.tags.join(', ') } : {}),
+    ...(date(timeline.created_at) ? { dateCreated: date(timeline.created_at) } : {}),
+    ...(date(timeline.updated_at) ? { dateModified: date(timeline.updated_at) } : {}),
+    ...(timeline.owner
+      ? {
+          author: {
+            '@type': 'Person',
+            name: '@' + timeline.owner,
+            url: origin + profilePath(timeline.owner),
+          },
+        }
+      : {}),
+  };
+}
+/**
  * Structured data as the text of a `<script type="application/ld+json">`: JSON with every
  * `<` escaped, so no title or note can close the script.
  */

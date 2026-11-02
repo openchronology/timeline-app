@@ -18,6 +18,13 @@ function sharedAddress(path, fragment) {
     return `${base}/${kind}s/${rest.slice(kind.length + 1)}`;
   return fragment ? base + '#' + fragment : base;
 }
+/** The frame's query string from its parameters, leaving out those that are null. */
+function frameQuery(parameters) {
+  const query = new URLSearchParams(
+    Object.entries(parameters).filter(([, value]) => value != null && value !== ''),
+  ).toString();
+  return query ? '?' + query : '';
+}
 /** Points the frame's "Timelines" at the list the timeline was opened from, if there was one. */
 function leadBack(document) {
   const back = lastList(),
@@ -234,11 +241,14 @@ export default function Editor({
         className="editor-frame"
         src={
           '/editor/frame' +
-          (sample ? '?demo=dense' : fresh ? '?new=1' : '') +
-          (tour ? (sample || fresh ? '&' : '?') + 'tour=1' : '') +
-          (draft
-            ? (sample || fresh || tour ? '&' : '?') + 'draft=' + encodeURIComponent(draft)
-            : '') +
+          frameQuery({
+            demo: sample ? 'dense' : null,
+            new: !sample && fresh ? '1' : null,
+            tour: tour ? '1' : null,
+            draft,
+            // The timeline whose heading the frame arrives with (#428).
+            timeline: id && !forkId && !comparisonIds && !sample && !fresh && !draft ? id : null,
+          }) +
           (forkId
             ? '#guest-fork/' + forkId
             : comparisonIds

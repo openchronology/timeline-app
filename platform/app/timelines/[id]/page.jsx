@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // A timeline's page, at /<owner>/<slug> (#148) or /timelines/<id>: the editor open at it, its
-// first moments as text, and its link-preview metadata (its own image, when it has one, #339).
+// first moments as text, its link-preview metadata (its own image, when it has one, #339) and
+// its structured data (#428).
 // A copy still being prepared waits.
 import Editor from '../../../components/editor.jsx';
 import TimelineSummary from '../../../components/timeline-summary.jsx';
@@ -9,9 +10,11 @@ import { accessibleTimeline, versionInfo } from '../../../lib/timeline.js';
 import { timelinePath } from '../../../../src/addresses.ts';
 import {
   firstMoments,
+  jsonLd,
   pageMetadata,
   previewOf,
   timelineDescription,
+  timelineStructuredData,
   timelineTitle,
   siteName,
 } from '../../../lib/sharing.js';
@@ -48,8 +51,12 @@ export default async function TimelinePage({ params }) {
       : [],
     timeline.comparison ? [] : firstMoments(services, timeline, 50, user?.id).catch(() => []),
   ]);
+  const data = timelineStructuredData(timeline);
   return (
     <main className="editor-page">
+      {data && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(data) }} />
+      )}
       <TimelineSummary timeline={timeline} moments={moments} />
       <Editor
         siteName={siteName()}
