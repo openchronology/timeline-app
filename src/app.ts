@@ -6611,7 +6611,38 @@ function showDescription() {
     view.removeAttribute('title');
   }
   fitDescription();
+  capDescription();
 }
+/** Whether the open timeline's long description is shown whole (#424), and whose it is. */
+let descriptionExpanded = false,
+  descriptionOwner: unknown = null;
+/**
+ * A long description shows its first lines under the title, fading out, with Read more to show
+ * the rest and Show less to fold it again (#424); a short one shows whole, with neither. Each
+ * timeline opens folded.
+ */
+function capDescription() {
+  const view = el('timeline-description-view'),
+    more = el<HTMLButtonElement>('timeline-description-more');
+  // The open timeline: a server's by its ID, else the comparison or the document itself, which
+  // a new import or file replaces.
+  const owner = remote?.id ?? comparison ?? model;
+  if (owner !== descriptionOwner) {
+    descriptionOwner = owner;
+    descriptionExpanded = false;
+  }
+  view.classList.toggle('expanded', descriptionExpanded);
+  // Folded, it overflows when its text is taller than the five lines it shows.
+  const overflowing = !view.hidden && view.scrollHeight > view.clientHeight + 1;
+  view.classList.toggle('overflowing', overflowing);
+  more.hidden = view.hidden || (!descriptionExpanded && !overflowing);
+  more.textContent = descriptionExpanded ? 'Show less' : 'Read more…';
+  more.setAttribute('aria-expanded', String(descriptionExpanded));
+}
+el('timeline-description-more').addEventListener('click', () => {
+  descriptionExpanded = !descriptionExpanded;
+  capDescription();
+});
 // Focus reaches the view itself on a click outside its links, or by Tab, only while editable.
 el('timeline-description-view').addEventListener('focus', () => {
   if (!editable()) return;
@@ -6647,6 +6678,13 @@ new ResizeObserver(([entry]) => {
   descriptionWidth = entry.contentRect.width;
   requestAnimationFrame(fitDescription);
 }).observe(el('timeline-description'));
+// Rewrapped at a new width, a description may come to need Read more, or no longer need it.
+let descriptionViewWidth = 0;
+new ResizeObserver(([entry]) => {
+  if (entry.contentRect.width === descriptionViewWidth) return;
+  descriptionViewWidth = entry.contentRect.width;
+  requestAnimationFrame(capDescription);
+}).observe(el('timeline-description-view'));
 el<HTMLTextAreaElement>('timeline-description').onchange = () => {
   if (!editable()) return;
   model!.description = el<HTMLTextAreaElement>('timeline-description').value;

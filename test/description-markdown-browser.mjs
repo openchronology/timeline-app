@@ -111,8 +111,41 @@ export async function checkDescriptionMarkdown(page, restore) {
   await page.locator('#timeline-title').focus();
   assert.equal(await area.isVisible(), true);
   assert.equal(await view.isHidden(), true);
+
+  // A long description shows its first lines, with Read more for the rest and Show less to fold
+  // it again (#424); the next timeline opens folded. A short one has neither.
+  const more = page.locator('#timeline-description-more');
+  const long = {
+    format: 'openchronology',
+    version: 1,
+    title: 'Long described',
+    description: Array.from(
+      { length: 12 },
+      (_, i) => `Paragraph ${i + 1} of a long description.`,
+    ).join('\n\n'),
+    events: [{ id: 'a', time: '0/1', metadata: { title: 'A' } }],
+  };
+  await load(long);
+  await more.waitFor();
+  assert.equal((await more.textContent()).trim(), 'Read more…');
+  assert.equal(await more.getAttribute('aria-expanded'), 'false');
+  const height = () => view.evaluate((v) => v.getBoundingClientRect().height);
+  const folded = await height();
+  assert(folded < 160, `folded description is ${folded}px tall`);
+  await more.click();
+  assert.equal((await more.textContent()).trim(), 'Show less');
+  assert.equal(await more.getAttribute('aria-expanded'), 'true');
+  assert((await height()) > folded * 2, 'Read more shows the whole description');
+  await more.click();
+  assert.equal(await height(), folded);
+  await more.click();
+  await load({ ...long, title: 'Long again' });
+  assert.equal((await more.textContent()).trim(), 'Read more…');
+  assert.equal(await height(), folded);
+  await load({ ...long, title: 'Short', description: 'One line.' });
+  assert.equal(await more.isHidden(), true);
   await load(restore);
   console.log(
-    'PASS description markdown: rendered under the title with safe links, tables and no HTML, edited as source on click.',
+    'PASS description markdown: rendered under the title with safe links, tables and no HTML, edited as source on click, long ones folded with Read more.',
   );
 }

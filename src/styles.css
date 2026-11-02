@@ -548,6 +548,21 @@ main {
 .description-view > :last-child {
   margin-bottom: 0;
 }
+/* A long description shows its first five lines, fading out, until Read more (#424). */
+.description-view:not(.expanded) {
+  max-height: 8.5em;
+  overflow: hidden;
+}
+.description-view.overflowing:not(.expanded) {
+  mask-image: linear-gradient(to bottom, #000 60%, transparent);
+}
+.description-more {
+  margin-top: 2px;
+  font-size: 13px;
+}
+.description-more[hidden] {
+  display: none;
+}
 .description-view strong {
   color: var(--ink);
 }
@@ -2578,7 +2593,8 @@ body[data-embed] .title-input {
   font-size: 22px;
 }
 body[data-embed] .description-input,
-body[data-embed] .description-view {
+body[data-embed] .description-view,
+body[data-embed] .description-more {
   display: none;
 }
 /* Embeds keep the license notice and source offer, compactly. */
