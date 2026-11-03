@@ -25,6 +25,7 @@ export async function exportSqlite(
 }
 /** The offline page makes no requests, so there are no cookies to leave out. */
 export function anonymousRequests() {}
+export function onLocalFilesWithheld(_report: (count: number) => void) {}
 export async function requestProgress<T>(
   _path: string,
   _data: unknown,

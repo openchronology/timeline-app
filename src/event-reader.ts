@@ -6,6 +6,8 @@ import { imageSource } from './image-assets.js';
 import { imageURL, pluginBackground, pluginMarker, stackEntries, toggleValue } from './plugins.js';
 import { renderMarkdown } from './rich-text.js';
 import { entityTags } from './tags.js';
+import { localFileURL } from './local-files.js';
+import { localFileItem } from './local-file-links.js';
 import type { InstalledPlugin } from './plugins.js';
 
 export interface ReaderEntity {
@@ -67,7 +69,14 @@ function links(values: unknown) {
   const list = document.createElement('ul');
   list.className = 'reader-links';
   for (const url of Array.isArray(values) ? values.slice(0, 100) : []) {
-    if (typeof url !== 'string' || !imageURL(url)) continue;
+    if (typeof url !== 'string') continue;
+    if (localFileURL(url)) {
+      const li = document.createElement('li');
+      li.append(...localFileItem(localFileURL(url)!));
+      list.append(li);
+      continue;
+    }
+    if (!imageURL(url)) continue;
     const li = document.createElement('li'),
       link = document.createElement('a');
     link.textContent = url;

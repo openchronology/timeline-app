@@ -3164,6 +3164,27 @@ dialog button {
   width: auto;
   min-height: 0;
 }
+/* The file populator's picked folders and files (#433). */
+.populate-roots {
+  margin: 0;
+  padding-left: 18px;
+  max-height: 120px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.populate-roots:empty {
+  display: none;
+}
+#populate-dialog [hidden] {
+  display: none;
+}
+/* A source that is a file on this computer (#433): its name, and Show in folder. */
+.local-file-reveal {
+  min-height: 0;
+  padding: 1px 8px;
+  font-size: 12px;
+}
 #map-tags {
   margin-left: 24px;
   width: calc(100% - 24px);

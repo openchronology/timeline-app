@@ -84,6 +84,7 @@ import {
   stackEntries,
   validatePresentation,
   DEFAULT_PRESENTATION,
+  MOMENT_SOURCES,
   UNIT_PRESETS,
   CUSTOM_EXAMPLE,
   anchorOf,
@@ -178,6 +179,7 @@ import {
   anonymousRequests,
   useNativeServer,
   requestProgress,
+  onLocalFilesWithheld,
 } from './transport.js';
 import { parseLink, linkFragment, sharePath } from './links.js';
 import { profilePath, timelinePath } from './addresses.js';
@@ -274,6 +276,29 @@ interface NativeOpened {
   event_count: string;
   first?: string;
   last?: string;
+}
+/** How a file population went (#433, src-tauri/src/populate.rs): moments made, files left out. */
+interface PopulateReport {
+  added: number;
+  skipped: Record<string, { count: number; examples: string[] }>;
+  truncated: boolean;
+}
+/** A population's report in a sentence or two. */
+function populateSummary(report: PopulateReport) {
+  const reasons: Record<string, string> = {
+    'no recorded date': 'had no recorded date',
+    'no file date': 'had no date of that kind',
+    unreadable: "couldn't be read",
+  };
+  const skipped = Object.entries(report.skipped).map(
+    ([reason, { count }]) => `${count.toLocaleString()} ${reasons[reason] ?? reason}`,
+  );
+  return (
+    `Made ${report.added.toLocaleString()} moment${report.added === 1 ? '' : 's'} from files.` +
+    (skipped.length ? ` Left out: ${skipped.join('; ')}.` : '') +
+    (report.truncated ? ' It stopped before the end: at the limit, or when asked to.' : '') +
+    ' Save As to keep it.'
+  );
 }
 interface LocalTimeline extends NativeOpened {
   id: string;
@@ -969,6 +994,12 @@ function withBackgroundWarning(message: string, doc: TimelineDocument): string {
 function fail(error: unknown) {
   toast(error instanceof Error ? error.message : String(error));
 }
+// Links to files on this computer (#433) stay here: the transport leaves them out of requests.
+onLocalFilesWithheld((count) =>
+  toast(
+    `${count} link${count === 1 ? '' : 's'} to files on this computer stayed here: file paths are never sent to a server.`,
+  ),
+);
 function eventId(): string {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
   return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
@@ -5325,6 +5356,7 @@ toolbarMenu({
     'och-export',
     'sqlite-open',
     'sqlite-save-as',
+    'populate-button',
   ].map((id) => [el(id), el('file-menu')] as const),
 });
 const viewTools = toolbarMenu({
@@ -7752,7 +7784,8 @@ if (desktop) {
       text('connection-error', error.message),
     );
   };
-  for (const id of ['sqlite-open', 'sqlite-save', 'sqlite-save-as']) el(id).hidden = false;
+  for (const id of ['sqlite-open', 'sqlite-save', 'sqlite-save-as', 'populate-button'])
+    el(id).hidden = false;
   const adoptNative = async (
     result: NativeOpened | null,
     workspace: number,
@@ -7796,6 +7829,147 @@ if (desktop) {
       .__TAURI__!.core.invoke<NativeOpened | null>('desktop_import')
       .then((result) => adoptNative(result, workspace, false))
       .catch(fail);
+  };
+  // Sources open outside the page (#433): HTTPS links in the system browser, and a file on
+  // this computer in its own app, once its timeline is trusted (asked the first time one of its
+  // files is opened), or shown in its folder.
+  let trustedFiles = -1;
+  document.addEventListener('click', (event) => {
+    const target = event.target as Element;
+    const reveal = target.closest<HTMLButtonElement>('.local-file-reveal');
+    if (reveal) {
+      event.preventDefault();
+      void window
+        .__TAURI__!.core.invoke('desktop_reveal_file', { url: reveal.dataset.localFile })
+        .catch(fail);
+      return;
+    }
+    const link = target.closest<HTMLAnchorElement>('a.local-file-link, .plugin-source-links a');
+    if (!link) return;
+    event.preventDefault();
+    if (!link.classList.contains('local-file-link')) {
+      void window.__TAURI__!.core.invoke('desktop_open_image', { url: link.href }).catch(fail);
+      return;
+    }
+    if (
+      trustedFiles !== documentRequest &&
+      !confirm(
+        `Open ${link.title} in its app? Open files from a timeline only when you trust where it came from.`,
+      )
+    )
+      return;
+    trustedFiles = documentRequest;
+    void window.__TAURI__!.core.invoke('desktop_open_file', { url: link.href }).catch(fail);
+  });
+  // The file populator (#433): a new timeline of the files in folders picked natively, each
+  // moment's source the file itself, dated as chosen. The page never names a path: Rust scans
+  // only what was picked in its own dialog.
+  const invoke = window.__TAURI__!.core.invoke;
+  const checked = (name: string) =>
+    document.querySelector<HTMLInputElement>(`#populate-dialog input[name="${name}"]:checked`)!
+      .value;
+  const populateRoots = (roots: string[]) => {
+    el('populate-roots').replaceChildren(
+      ...roots.map((root) => {
+        const item = document.createElement('li');
+        item.textContent = root;
+        return item;
+      }),
+    );
+    el<HTMLButtonElement>('populate-clear').disabled = !roots.length;
+    if (roots.length && !input('populate-title').value.trim())
+      input('populate-title').value = roots[0].split(/[\\/]/).filter(Boolean).at(-1) ?? '';
+  };
+  /** Shows the choices the kind of file allows: only media has metadata, a zone and a place. */
+  const populateChoices = () => {
+    const media = checked('populate-type') === 'mediaFile';
+    for (const node of document.querySelectorAll<HTMLElement>('#populate-dialog [data-media-only]'))
+      node.hidden = !media;
+    if (!media && checked('populate-date') === 'metadata')
+      document.querySelector<HTMLInputElement>(
+        '#populate-dialog input[name="populate-date"][value="modified"]',
+      )!.checked = true;
+    el('populate-zone-row').hidden = !media || checked('populate-date') !== 'metadata';
+  };
+  for (const radio of document.querySelectorAll<HTMLInputElement>(
+    '#populate-dialog input[type="radio"]',
+  ))
+    radio.onchange = populateChoices;
+  const populateFailed = (error: unknown) =>
+    text('populate-error', error instanceof Error ? error.message : String(error));
+  el('populate-button').onclick = () => {
+    if (!mayReplace()) return;
+    text('populate-error', '');
+    text('populate-status', '');
+    populateChoices();
+    el<HTMLDialogElement>('populate-dialog').showModal();
+  };
+  for (const [id, folders] of [
+    ['populate-folders', true],
+    ['populate-files', false],
+  ] as const)
+    el(id).onclick = () => {
+      text('populate-error', '');
+      void invoke<string[]>('desktop_populate_pick', { folders })
+        .then(populateRoots)
+        .catch(populateFailed);
+    };
+  el('populate-clear').onclick = () => {
+    void invoke('desktop_populate_clear')
+      .then(() => populateRoots([]))
+      .catch(populateFailed);
+  };
+  el('populate-stop').onclick = () => void invoke('desktop_populate_cancel').catch(populateFailed);
+  el<HTMLFormElement>('populate-form').onsubmit = (event) => {
+    event.preventDefault();
+    const workspace = documentRequest,
+      media = checked('populate-type') === 'mediaFile';
+    const settings = {
+      fileType: { type: checked('populate-type'), date: checked('populate-date') },
+      recursive: input('populate-recursive').checked,
+      zone: el<HTMLSelectElement>('populate-zone').value,
+      location: media && input('populate-location').checked,
+    };
+    // Dated in this computer's zone, with each moment's file listed by Sources.
+    const template: TimelineDocument = {
+      format: 'openchronology',
+      version: 1,
+      title: input('populate-title').value.trim(),
+      description: '',
+      presentation: {
+        ...DEFAULT_PRESENTATION,
+        mode: 'gregorian',
+        offsetMinutes: Math.max(-1439, Math.min(1439, -new Date().getTimezoneOffset())),
+      },
+      plugins: [{ manifest: MOMENT_SOURCES, enabled: true }],
+      events: [],
+    };
+    const progress = new window.__TAURI__!.core.Channel<{ scanned: number; added: number }>();
+    progress.onmessage = ({ scanned, added }) =>
+      text(
+        'populate-status',
+        `Looked at ${scanned.toLocaleString()} files and folders; ${added.toLocaleString()} moments so far.`,
+      );
+    const busy = (on: boolean) => {
+      el<HTMLButtonElement>('populate-start').disabled = on;
+      el('populate-stop').hidden = !on;
+      el('populate-working').hidden = !on;
+    };
+    text('populate-error', '');
+    busy(true);
+    void invoke<NativeOpened & { report: PopulateReport }>('desktop_populate', {
+      settings,
+      template,
+      progress,
+    })
+      .then(async (result) => {
+        await adoptNative(result, workspace, false);
+        el<HTMLDialogElement>('populate-dialog').close();
+        text('populate-status', '');
+        toast(populateSummary(result.report));
+      })
+      .catch(populateFailed)
+      .finally(() => busy(false));
   };
   for (const [id, saveAs] of [
     ['sqlite-save', false],

@@ -3,11 +3,28 @@
 // (Tauri), answering challenges, and SQLite import and export with progress.
 import { boundedJSON } from './browser-copy.js';
 import { withChallenges } from './challenge.js';
+import { withoutLocalFiles } from './local-files.js';
 /** Whether browser API requests send the session cookie (see anonymousRequests). */
 let credentials: RequestCredentials = 'same-origin';
 /** Requests carry no cookies from here on: an embedded timeline is seen as a guest sees it. */
 export function anonymousRequests() {
   credentials = 'omit';
+}
+/** Told how many links to files on this computer (#433) were left out of a request. */
+let withheld: (count: number) => void = () => {};
+/** Has `report` told whenever links to local files are left out of what a server is sent. */
+export function onLocalFilesWithheld(report: (count: number) => void) {
+  withheld = report;
+}
+/**
+ * `data` as a server may have it: without links to files on this computer (#433), whose paths
+ * name the user and their folders and are never stored on a server.
+ */
+function forServer<T>(data: T): T {
+  if (data === undefined) return data;
+  const { value, removed } = withoutLocalFiles(data);
+  if (removed) withheld(removed);
+  return value;
 }
 /** The desktop's server in use: its requests go there unless they name another. */
 let nativeServer = '';
@@ -20,6 +37,7 @@ export function useNativeServer(origin: string) {
  * fetch with the current credentials mode, a JSON body when `data` is given, and the CSRF
  * token for state-changing requests; in the desktop app the native `desktop_request`
  * command sends it to `server` (or the server in use), with the session held natively.
+ * Links to files on this computer are left out of `data` (forServer).
  * Human-verification challenges (428) are answered and the request retried. A non-2xx
  * reply rejects with an Error carrying the server's message, the `status`, and any save
  * `conflicts`. Rejects with an AbortError if `signal` fires (on the desktop, only checked
@@ -34,6 +52,7 @@ export async function requestApi<T>(
   server?: string,
 ): Promise<T> {
   signal?.throwIfAborted();
+  data = forServer(data);
   const send = async (challenge?: string) => {
     if (window.__TAURI__) {
       const reply = await window.__TAURI__.core.invoke<{
@@ -113,6 +132,7 @@ export async function exportSqlite(
   data?: unknown,
   csrf?: string | null,
 ): Promise<Blob> {
+  data = forServer(data);
   const response = await fetch('/api/' + path, {
     method: data === undefined ? 'GET' : 'POST',
     credentials: 'same-origin',
@@ -136,6 +156,7 @@ export async function requestProgress<T, P = unknown>(
   csrf: string | null | undefined,
   progress: (step: P) => void,
 ): Promise<T> {
+  data = forServer(data);
   if (window.__TAURI__) return requestApi<T>(path, 'POST', data, csrf);
   const response = await fetch('/api/' + path, {
     method: 'POST',

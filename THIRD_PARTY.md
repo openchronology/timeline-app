@@ -6,6 +6,7 @@
 - **GNU MP (GMP)**, LGPL 3 or later / GPL 2 or later. Desktop and PostgreSQL modules dynamically link system GMP; no GMP source or static GMP copy is bundled here. See `vendor/sqlite-rational/THIRD_PARTY.md` and your system package's notices/source provisions.
 - **SQLite**, public domain; linked from the system package in desktop and server-converter builds.
 - **reqwest 0.12.28**, MIT/Apache-2.0; native HTTPS transport, with **rustls** and **webpki-roots** as recorded in `src-tauri/Cargo.lock`. Their licenses remain in the crate packages.
+- **nom-exif 3.8.0**, MIT (Min Deng), which reads photos' and videos' recorded dates and places for the desktop's file populator, with **walkdir 2.5.0** (Unlicense/MIT) and **chrono 0.4.45** (MIT/Apache-2.0). Their licenses remain in the crate packages.
 - **Tauri and its Rust dependencies**, MIT/Apache-2.0 and other licenses recorded in crate packages and `src-tauri/Cargo.lock`. **serde/serde_json**, MIT/Apache-2.0.
 - **Next.js 16.3.8**, MIT (Vercel); **React / React DOM 19.2.8**, MIT (Meta and contributors). Their original licenses are retained in installed packages and the standalone server distribution. The platform browser bundles retain dependency license notices. These packages are used only by the hosted platform, not the standalone HTML or Tauri editor.
 - **ldapts 9.2.0**, MIT, the LDAP client for directory sign-in on the hosted platform, with its dependency **strict-event-emitter-types 2.0.0**, ISC. Its license is retained in the installed package and the platform's `THIRD_PARTY.txt`.

@@ -1,5 +1,5 @@
 # The desktop app's crate: the Tauri shell, its dialog plugin, the native store
-# (../native-store) and an HTTP client for servers.
+# (../native-store), an HTTP client for servers, and the file populator's readers.
 [package]
 name = "openchronology-desktop"
 version = "0.1.0"
@@ -18,3 +18,7 @@ openchronology-store = { path = "../native-store" }
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "=1.0.151"
 reqwest = { version = "=0.12.28", default-features = false, features = ["json", "rustls-tls"] }
+# The file populator (#433): media files' recorded dates and places, folders walked, local times.
+nom-exif = "=3.8.0"
+walkdir = "=2.5.0"
+chrono = { version = "=0.4.45", default-features = false, features = ["clock", "std"] }

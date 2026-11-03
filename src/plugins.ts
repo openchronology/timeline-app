@@ -2,6 +2,7 @@
 // Plugins (docs/plugins.md): manifests of the fields moments and durations carry (images, stacks,
 // colors, shapes, headings and more), their validation, the built-in plugins and the library,
 // and reading each field's value.
+import { localFileURL } from './local-files.js';
 import { compilePluginScript } from './custom-time.js';
 import { contentLabels, CONTENT_LABELS_KEY } from './content-labels.js';
 import { validateTags } from './tags.js';
@@ -965,16 +966,24 @@ export function imageURL(value: unknown): string | null {
     return null;
   }
 }
-/** Explicit outbound references; never fetched or interpreted by the plugin. */
+/**
+ * Explicit outbound references; never fetched or interpreted by the plugin: HTTPS links, and
+ * links to files on this computer (#433, localFileURL), which open only in the desktop app and
+ * never reach a server.
+ */
 export function sourceLinks(value: unknown): string[] {
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.length > 100)
-    throw new Error('Sources must be an array of at most 100 HTTPS links.');
+    throw new Error('Sources must be an array of at most 100 links.');
   return value.map((raw) => {
-    const url = imageURL(raw);
-    if (!url) throw new Error('Use HTTPS links without embedded credentials.');
+    const url = sourceLink(raw);
+    if (!url) throw new Error('Use HTTPS links without embedded credentials, or file:/// paths.');
     return url;
   });
+}
+/** One source: an HTTPS link (imageURL) or a file link (localFileURL); null otherwise. */
+export function sourceLink(value: unknown): string | null {
+  return imageURL(value) ?? localFileURL(value);
 }
 /** The first Sources, for moments only; kept for its URL and the timelines pinned to it. */
 const LEGACY_MOMENT_SOURCES: PluginManifest = validatePluginManifest({
@@ -1225,7 +1234,7 @@ export function pluginMetadata(
           if (typeof metadata[key] === 'string')
             result[key] = key === 'title' ? metadata[key] : metadata[key].slice(0, 2000);
       if ((manifest.hover || manifest.source) && Array.isArray(metadata.sources))
-        result.sources = metadata.sources.filter((v) => imageURL(v)).slice(0, 100);
+        result.sources = metadata.sources.filter((v) => sourceLink(v)).slice(0, 100);
       for (const name of [
         ...manifest.fields.map((f) => f.metadataKey),
         ...(manifest.marker ? [manifest.marker.metadataKey] : []),

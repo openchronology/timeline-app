@@ -265,6 +265,7 @@ export const HELP_SECTIONS = [
       'search',
       'browsing',
       'comparison',
+      'file-populator',
       'time-mapping',
       'plugins',
       'capacity',
