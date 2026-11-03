@@ -311,13 +311,13 @@ try {
   assert(
     moment.includes(`<a href="${base}#moment/leg%3A2">Open Storm ${suffix} in the timeline</a>`),
   );
-  // And as structured data: an event on its date, in its timeline, by its owner.
+  // And as structured data: a work covering its date, in its timeline, by its owner.
   assert.deepEqual(structuredData(moment), {
     '@context': 'https://schema.org',
-    '@type': 'Event',
+    '@type': 'CreativeWork',
     name: 'Storm ' + suffix,
     url: origin + momentPath,
-    startDate: '1970-01-02T00:00:00Z',
+    temporalCoverage: '1970-01-02T00:00:00Z',
     keywords: 'weather',
     isPartOf: {
       '@type': 'CreativeWork',
@@ -340,10 +340,10 @@ try {
   assert.equal(meta(duration, 'og:title'), `The crossing · Voyages of ${suffix}`);
   assert(duration.includes(`#timeline/${timelineId}/duration/crossing`));
   const during = structuredData(duration);
-  assert.equal(during['@type'], 'Event');
+  assert.equal(during['@type'], 'CreativeWork');
   assert.deepEqual(
-    [during.startDate, during.endDate, during.description],
-    ['1970-01-01T00:00:00Z', '1970-01-03T00:00:00Z', 'Two days at sea.'],
+    [during.temporalCoverage, during.description],
+    ['1970-01-01T00:00:00Z/1970-01-03T00:00:00Z', 'Two days at sea.'],
   );
   assert(duration.includes(`<a href="${momentPath}">Storm ${suffix}</a>`));
   await guest.request(base + '/durations/absent', { status: 404 });

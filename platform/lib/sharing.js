@@ -266,10 +266,11 @@ export function entityMetadata(timeline, entity, title, time, notes) {
   );
 }
 /**
- * A moment's or duration's schema.org description (#335), for a JSON-LD script: an `Event`
- * with its start (and a duration's end) on a timeline of Gregorian dates, otherwise a
- * `CreativeWork` covering its time as the timeline displays it; either part of the
- * timeline, by its owner. Null where its page is not for search engines.
+ * A moment's or duration's schema.org description (#335), for a JSON-LD script: a
+ * `CreativeWork` covering its time, as an ISO 8601 date or interval on a timeline of Gregorian
+ * dates, otherwise as the timeline displays it; part of the timeline, by its owner. Not an
+ * `Event`: search engines take those for happenings to attend, and want a place and tickets.
+ * Null where its page is not for search engines.
  * @param {object} timeline its timeline
  * @param {{kind: 'moment'|'duration', id: string, title: string, notes?: string,
  *   first: string, last: string, tags?: string[]}} entity it, with its exact times
@@ -286,13 +287,11 @@ export function entityStructuredData(timeline, entity) {
   const description = excerpt(entity.notes, 500);
   return {
     '@context': 'https://schema.org',
-    '@type': start && end ? 'Event' : 'CreativeWork',
+    '@type': 'CreativeWork',
     name: entity.title,
     url: origin + sharedPath(timeline, entity),
     ...(description ? { description } : {}),
-    ...(start && end
-      ? { startDate: start, ...(duration ? { endDate: end } : {}) }
-      : { temporalCoverage: shown }),
+    temporalCoverage: start && end ? (duration ? `${start}/${end}` : start) : shown,
     ...(entity.tags?.length ? { keywords: entity.tags.join(', ') } : {}),
     isPartOf: {
       '@type': 'CreativeWork',
