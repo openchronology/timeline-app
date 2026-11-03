@@ -117,6 +117,18 @@ A plugin may declare up to twelve `settings`: values for the whole timeline, set
 - **Backdrop:** `backdrop` shows an image setting's value behind the whole timeline. When several enabled plugins set one, the last one wins.
 - **Theme:** `theme` maps parts of the timeline's look to settings; see [Timeline theme](#timeline-theme).
 
+## Background chart
+
+Install **Background chart** (`background-chart`) to chart how many moments lie across the view, as a smooth curve behind the timeline ([#289](https://github.com/openchronology/timeline-app/issues/289)). The curve rises from the foot of the timeline and reaches its highest point, a fifth of the way down from the top, where the view's moments are most numerous, so its heights compare parts of the view rather than give counts.
+
+- **Follows the view:** panning and zooming redraw it for what is in view; zoomed into a quiet stretch, that stretch's busiest part reaches the top.
+- **Smooth:** each moment adds a bell-shaped rise about twice the grouping distance (**Group within**) wide, at least 24 pixels, so nearby moments make one hill. Near the view's edges the curve counts only what lies inside, so moments spread evenly chart level to the edges.
+- **What it counts:** moments, from the summaries the view already has, so it costs nothing more to draw, and a server or desktop timeline reads no moment for it. Durations and stack entries aren't counted.
+- **Look:** a translucent area under a thin line, above the timeline's and durations' backgrounds and beneath the axis, bands, links and markers. It takes the color of moments (the theme's marker color, if set), or the **Chart color** set under the plugin in the **Plugins** dialog; **Use default** clears it.
+- **Disabling:** disabling or removing the plugin removes the chart.
+
+A plugin's `chart` is `{ "kind": "moments" }`, with a `setting` naming one of its own `color` settings for the color. When several enabled plugins draw one, the last one wins.
+
 ## Timeline theme
 
 Install **Timeline theme** to choose the timeline's colors, fonts and text sizes. Like the timeline background, it belongs to the whole timeline, so it's set in the **Plugins** dialog under the plugin:

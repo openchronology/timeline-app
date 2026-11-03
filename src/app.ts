@@ -95,6 +95,9 @@ import {
   arrowsToward,
   pluginDrawsArrows,
   pluginBackdrop,
+  pluginChart,
+  momentCurve,
+  chartPaths,
   pluginTheme,
   settingValue,
   TEXT_SIZE,
@@ -9961,6 +9964,49 @@ function renderTimelineBackdrop(host: HTMLElement) {
   }
   return !!timelineBackdrop;
 }
+let timelineChart: { svg: SVGSVGElement; area: SVGPathElement; line: SVGPathElement } | null = null;
+/**
+ * The background chart (#289): the view's moments as a smooth curve over the stage's lower
+ * part, above the backgrounds and beneath the axis and markers. Its highest point is where
+ * they are most numerous in view.
+ */
+function renderBackgroundChart(host: HTMLElement) {
+  const chart = pluginChart(installedPlugins());
+  const values =
+    chart &&
+    momentCurve(
+      frame.groups,
+      (time) => viewport.x(parsedTime(time), width()),
+      width(),
+      Math.max(24, 2 * pixels()),
+    );
+  if (!values) {
+    timelineChart?.svg.remove();
+    timelineChart = null;
+    return;
+  }
+  if (!timelineChart) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg'),
+      area = document.createElementNS(ns, 'path'),
+      line = document.createElementNS(ns, 'path');
+    svg.classList.add('timeline-chart');
+    area.classList.add('timeline-chart-area');
+    line.classList.add('timeline-chart-line');
+    svg.append(area, line);
+    timelineChart = { svg, area, line };
+  }
+  const { svg, area, line } = timelineChart;
+  // Above the durations' backgrounds, whose z-indexes count up from 1.
+  if (svg.parentNode !== host || host.lastChild !== svg) host.append(svg);
+  const full = stageWidth(),
+    height = stageHeight();
+  svg.setAttribute('viewBox', `0 0 ${full} ${height}`);
+  svg.style.color = chart.color ?? '';
+  const paths = chartPaths(values, inset(), width(), height * 0.2, height);
+  area.setAttribute('d', paths.area);
+  line.setAttribute('d', paths.line);
+}
 let appliedTheme = '';
 /** How large the theme draws label and tick text (#267): 1 is the usual size. */
 function textScales() {
@@ -10048,6 +10094,7 @@ function renderDurationBackgrounds() {
     .forEach(({ box }, index) => {
       if (box.style.zIndex !== String(index + 1)) box.style.zIndex = String(index + 1);
     });
+  renderBackgroundChart(host);
   for (const [key, entry] of durationBackgrounds)
     if (!shown.has(key)) {
       entry.box.remove();

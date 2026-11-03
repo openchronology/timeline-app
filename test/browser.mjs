@@ -9,6 +9,7 @@ import { checkRangeDelete } from './range-delete-browser.mjs';
 import { checkTimeMap } from './time-map-browser.mjs';
 import { checkHelp } from './help-browser.mjs';
 import { checkDurationBackgrounds } from './duration-backgrounds-browser.mjs';
+import { checkBackgroundChart } from './background-chart-browser.mjs';
 import { checkTimelineTheme } from './timeline-theme-browser.mjs';
 import { checkFullscreen } from './fullscreen-browser.mjs';
 import { checkViewMode } from './view-mode-browser.mjs';
@@ -339,6 +340,7 @@ try {
   await checkTimeMap(page, document);
   await checkHelp(page);
   await checkDurationBackgrounds(page, document);
+  await checkBackgroundChart(page, document);
   await checkTimelineTheme(page, document);
   await checkViewMode(page, document);
   await checkFullscreen(page);

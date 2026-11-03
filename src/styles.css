@@ -730,6 +730,26 @@ html.timeline-fullscreen .timeline-stage {
 :is(.duration-background, .timeline-backdrop) img.loaded {
   opacity: 1;
 }
+/* The background chart (#289): the view's moments as a curve, above the backgrounds (their
+   z-indexes count up from 1, so it is placed last) and beneath everything else on the stage. */
+.timeline-chart {
+  position: absolute;
+  inset: 0;
+  z-index: 100000;
+  width: 100%;
+  height: 100%;
+  color: var(--timeline-marker, var(--stage-marker));
+}
+.timeline-chart-area {
+  fill: currentColor;
+  fill-opacity: 0.16;
+}
+.timeline-chart-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-opacity: 0.55;
+  stroke-width: 1.5;
+}
 /* While a background shows, text sits on frosted white, and lines and markers carry a white
    halo, setting the timeline apart from whatever image is behind it (#220). */
 .timeline-stage.over-backgrounds .event-label {
