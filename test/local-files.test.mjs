@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// Links to files on a computer (#433): what a source may hold, and how they are kept from servers.
+// Links to files on a computer (#433): what a source may hold, how they are kept from servers,
+// and the photo a moment's thumbnail shows (#440).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -11,6 +12,10 @@ import {
   sourceLinks,
   pluginMetadata,
   MOMENT_SOURCES,
+  FILE_THUMBNAILS,
+  localPhoto,
+  pluginMarker,
+  validatePluginManifest,
 } from '../dist/core.mjs';
 
 test('a source may be a file:/// link to this computer, and only that kind of file link', () => {
@@ -68,4 +73,24 @@ test('file links are left out of what a server is sent, and found anywhere in it
   const plain = { title: 'x', events: [] };
   assert.equal(withoutLocalFiles(plain).value, plain);
   assert.equal(withoutLocalFiles(plain).removed, 0);
+});
+
+test('File thumbnails marks a moment with its first photo on this computer (#440)', () => {
+  const photo = 'file:///home/someone/Pictures/IMG_0042.JPG';
+  const sources = [
+    'https://example.org/a.jpg',
+    'file:///home/someone/notes.txt',
+    photo,
+    'file:///home/someone/Pictures/IMG_0043.heic',
+  ];
+  assert.equal(localPhoto(sources), photo);
+  assert.equal(localPhoto(['file:///home/someone/clip.mp4', 'https://example.org/a.jpg']), null);
+  assert.equal(localPhoto('file:///a.jpg'), null, 'a list of sources');
+  const plugins = [{ manifest: FILE_THUMBNAILS, enabled: true }];
+  assert.equal(pluginMarker(plugins, { sources }), photo);
+  assert.equal(pluginMarker(plugins, { sources: ['https://example.org/a.jpg'] }), null);
+  assert.equal(pluginMarker([{ manifest: FILE_THUMBNAILS, enabled: false }], { sources }), null);
+  // Overviews carry the photo the marker shows, and nothing else of the list.
+  assert.deepEqual(pluginMetadata(plugins, { sources }).sources, [photo]);
+  assert.deepEqual(validatePluginManifest(FILE_THUMBNAILS), FILE_THUMBNAILS);
 });

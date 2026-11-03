@@ -35,7 +35,7 @@ const VIDEOS: &[&str] = &["mp4", "m4v", "mov", "3gp", "mkv", "webm", "avi"];
 const AUDIO: &[&str] = &["mp3", "m4a", "aac", "flac", "wav", "ogg", "opus", "mka"];
 
 /// What a file is, by its extension: one of the media kinds, or `other`.
-fn kind(path: &Path) -> &'static str {
+pub(crate) fn kind(path: &Path) -> &'static str {
     let extension = path
         .extension()
         .and_then(|e| e.to_str())

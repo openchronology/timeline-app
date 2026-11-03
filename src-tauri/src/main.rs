@@ -21,6 +21,7 @@
 //! never stall the async runtime that serves IPC.
 mod populate;
 mod server;
+mod thumbnails;
 use openchronology_store::{Document, Header, Patch, Query, Snapshot};
 use std::{
     path::PathBuf,
@@ -485,6 +486,39 @@ async fn desktop_populate(
 fn desktop_open_file(url: String) -> Result<(), String> {
     populate::open_file(&url)
 }
+/// Thumbnails of the photos `urls` (`file:///` links) name (#440), in order, each a `data:` URL
+/// or null when it isn't a photo on this computer or can't be read; made in parallel, and kept
+/// in the app's cache folder (thumbnails.rs). At most 64 at once.
+#[tauri::command]
+async fn desktop_thumbnails(
+    app: tauri::AppHandle,
+    urls: Vec<String>,
+) -> Result<Vec<Option<String>>, String> {
+    if urls.len() > thumbnails::MOST_AT_ONCE {
+        return Err("Ask for at most 64 thumbnails at once.".into());
+    }
+    let cache = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| e.to_string())?
+        .join("thumbnails");
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut found = vec![None; urls.len()];
+        std::thread::scope(|scope| {
+            for (chunk, found) in urls.chunks(16).zip(found.chunks_mut(16)) {
+                let cache = &cache;
+                scope.spawn(move || {
+                    for (url, slot) in chunk.iter().zip(found) {
+                        *slot = thumbnails::thumbnail(cache, url);
+                    }
+                });
+            }
+        });
+        found
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
 /// Shows a moment's `file:///` source in its folder, in the system's file manager.
 #[tauri::command]
 fn desktop_reveal_file(url: String) -> Result<(), String> {
@@ -703,6 +737,7 @@ fn main() {
             desktop_open_image,
             desktop_open_file,
             desktop_reveal_file,
+            desktop_thumbnails,
             desktop_populate_pick,
             desktop_populate_clear,
             desktop_populate_cancel,

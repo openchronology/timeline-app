@@ -29,6 +29,7 @@ Choose **From files…** (on a phone-sized window it's in **File**). The dialog 
 - **Source:** the file, as a `file:///` link (its path, with spaces and other characters written as `%20` and so on). The timeline has the **Sources** plugin, which lists it.
 - **Tags:** the kind of file: `file:photo`, `file:video`, `file:audio`, or `file:other`.
 - **Location:** only when chosen, as above.
+- **Thumbnail:** a photo shows a small picture of itself as its marker (see [Thumbnails](#thumbnails)).
 
 Each moment's ID comes from its file's path, so the same file gives the same ID each time.
 
@@ -43,6 +44,15 @@ Each moment's ID comes from its file's path, so the same file gives the same ID 
 One population makes at most 100,000 moments and looks at most at a million files and folders; past either it stops and says so. A timeline holds at most 200,000 moments.
 
 Photos: `jpg`, `jpeg`, `heic`, `heif`, `avif`, `png`, `webp`, `tif`, `tiff`, `dng`, `cr2`, `cr3`, `nef`, `arw`, `raf`, `orf`, `rw2`, `iiq`. Videos: `mp4`, `m4v`, `mov`, `3gp`, `mkv`, `webm`, `avi`. Sound: `mp3`, `m4a`, `aac`, `flac`, `wav`, `ogg`, `opus`, `mka`. Recorded dates are read from JPEG, HEIC/HEIF, AVIF, PNG, WebP, TIFF and the raw formats listed, and from MP4, MOV, 3GP, MKV, WebM and MKA.
+
+## Thumbnails
+
+In the desktop app, a moment whose source is a photo on this computer shows a small picture of it as its marker, which grows on hover like any marker picture ([#440](https://github.com/openchronology/timeline-app/issues/440)). The **File thumbnails** plugin (`file-thumbnails`) does this, and a timeline made from files has it; add it in **Plugins** to any timeline whose moments have photos among their sources. A moment uses its first source that is a photo.
+
+- **Where they come from:** the photo's own small preview, which most cameras and phones store in the photo's EXIF and many raw files carry too, or else the photo itself scaled down. Each is turned the way the photo was taken.
+- **Where they are kept:** in the app's cache folder, at most 160 pixels a side, named by the photo's path, size and modification time, so a changed photo gets a new one. Deleting the folder only means they're made again. The page holds them while it shows them; they are never saved into the timeline or sent anywhere.
+- **Which photos:** JPEG, PNG, WebP, TIFF, GIF and BMP are scaled down when they carry no preview of their own; HEIC, AVIF and raw files show one only when they carry their own JPEG preview. Photos over 256 MB without one aren't read. Videos and sound show no picture yet.
+- **Elsewhere:** on the website and in the offline file, which can't read your files, these moments keep their usual markers.
 
 ## Opening a moment's file
 

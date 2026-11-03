@@ -2,14 +2,25 @@
 // Images a timeline carries with it: copied into the document as data (for files and the
 // offline HTML), and shown from those copies instead of fetching their URLs.
 import { imageURL } from './plugins.js';
+import { isLocalFileLink } from './local-files.js';
 import type { TimelineDocument } from './core.js';
 let assets: Record<string, string> = {};
 let offline = false;
+/** Thumbnails of photos on this computer (#440), in the desktop app; none elsewhere. */
+let localImages: ((url: string) => string | null) | null = null;
+/**
+ * Shows photos on this computer (`file:///` links) as `thumbnail` gives them: a `data:` URL, or
+ * null until it has one. The desktop app sets it; elsewhere such a photo shows no picture.
+ */
+export function useLocalImages(thumbnail: (url: string) => string | null) {
+  localImages = thumbnail;
+}
 export function configureImages(value?: Record<string, string> | null, localOnly = false) {
   assets = value ?? {};
   offline = localOnly;
 }
 export function imageSource(url: string | null): string | null {
+  if (url && isLocalFileLink(url)) return localImages?.(url) ?? null;
   return url ? (assets[url] ?? (offline ? null : url)) : null;
 }
 export function imagesOffline() {
