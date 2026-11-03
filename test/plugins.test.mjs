@@ -20,6 +20,9 @@ import {
   TIMELINE_BACKGROUND,
   pluginBackdrop,
   BACKGROUND_CHART,
+  LOG_SEVERITY_CHART,
+  seriesCurve,
+  momentDensity,
   pluginChart,
   momentCurve,
   chartPaths,
@@ -60,6 +63,7 @@ import {
   pluginMetadata,
   imageURL,
   TimelineIndex,
+  Q,
   validateDocument,
   demo,
   searchPluginLibrary,
@@ -437,16 +441,17 @@ test('public plugin API works without accounts or PostgreSQL and validates its i
       'geological-ages',
       'moment-headings',
       'historical-dates',
+      'log-severity-chart',
       'log-severity-colors',
       'moment-colors',
       'moment-icons',
-      'moment-shapes',
     ],
   );
   // Twelve to a page: the thirteenth and on are on the next.
   assert.deepEqual(
     (await request(app, '/api/plugins?page=2')).body.plugins.map((p) => p.id),
     [
+      'moment-shapes',
       'moment-stacks',
       'presumptive-outline',
       'relationship-arrows',
@@ -1012,12 +1017,15 @@ test("background chart: the view's moments as a smooth curve, its color set on t
   assert.deepEqual(BACKGROUND_CHART.chart, { kind: 'moments', setting: 'color' });
   // Enabled, it draws in the usual marker color until one is chosen; disabled, not at all.
   assert.equal(pluginChart([]), null);
-  assert.deepEqual(pluginChart([{ manifest: BACKGROUND_CHART, enabled: true }]), { color: null });
+  assert.deepEqual(pluginChart([{ manifest: BACKGROUND_CHART, enabled: true }]), {
+    color: null,
+    series: [],
+  });
   assert.equal(pluginChart([{ manifest: BACKGROUND_CHART, enabled: false }]), null);
   const [installed] = validateInstalledPlugins([
     { manifest: BACKGROUND_CHART, enabled: true, settings: { color: '#bc6663' } },
   ]);
-  assert.deepEqual(pluginChart([installed]), { color: '#bc6663' });
+  assert.deepEqual(pluginChart([installed]), { color: '#bc6663', series: [] });
   assert.throws(() =>
     validateInstalledPlugins([
       { manifest: BACKGROUND_CHART, enabled: true, settings: { color: 'red' } },
@@ -1070,6 +1078,93 @@ test("background chart: the view's moments as a smooth curve, its color set on t
   const ys = [...line.matchAll(/[\d.]+ ([\d.]+)/g)].map((m) => Number(m[1]));
   assert(Math.max(...ys) <= 200 && Math.min(...ys) >= 20 - 0.5);
   assert(ys.some((y) => Math.abs(y - 20) < 0.2));
+});
+test('chart series: moments with any of their tags, each a curve beneath the total (#434)', () => {
+  assert(isOfficialPlugin(LOG_SEVERITY_CHART));
+  // Errors, warnings and information by their severity tags, in Log severity colors' colors.
+  const chart = pluginChart([{ manifest: LOG_SEVERITY_CHART, enabled: true }]);
+  assert.deepEqual(chart, {
+    color: null,
+    series: [
+      {
+        label: 'Errors',
+        tags: ['severity:emerg', 'severity:alert', 'severity:crit', 'severity:err'],
+        color: '#bc6663',
+      },
+      { label: 'Warnings', tags: ['severity:warning'], color: '#d6ad4c' },
+      { label: 'Information', tags: ['severity:notice', 'severity:info'], color: '#7aadc4' },
+    ],
+  });
+  // Each series' color can be chosen in the plugin list.
+  const [installed] = validateInstalledPlugins([
+    { manifest: LOG_SEVERITY_CHART, enabled: true, settings: { warningColor: '#AA5500' } },
+  ]);
+  assert.equal(pluginChart([installed]).series[1].color, '#aa5500');
+  assert.equal(pluginChart([installed]).series[0].color, '#bc6663');
+  // A series has a label, one to forty tags (kept as tags are) and a color; one to eight of them.
+  const series = (s) => ({ ...BACKGROUND_CHART, chart: { kind: 'moments', series: s } });
+  const one = { label: 'Errors', tags: [' Severity:Err '], color: '#BC6663' };
+  assert.deepEqual(validatePluginManifest(series([one])).chart.series, [
+    { label: 'Errors', tags: ['severity:err'], color: '#bc6663' },
+  ]);
+  for (const bad of [
+    [],
+    Array(9).fill(one),
+    [{ ...one, tags: [] }],
+    [{ ...one, tags: ['a,b'] }],
+    [{ ...one, color: 'red' }],
+    [{ ...one, label: '' }],
+    [{ ...one, setting: 'missing' }],
+    [{ ...one, extra: 1 }],
+    'Errors',
+  ])
+    assert.throws(() => validatePluginManifest(series(bad)), JSON.stringify(bad));
+
+  // Curves: relative to the total's most, so a series lies beneath it, and meets it where all
+  // the moments are its own.
+  const x = (t) => Number(t),
+    group = (first, count) => ({ first, last: first, count: String(count) });
+  const all = [group('100', 4), group('300', 2)],
+    errors = [group('100', 1), group('300', 2)];
+  const density = momentDensity(all, x, 600, 24),
+    most = Math.max(...density);
+  const curve = seriesCurve(errors, x, 600, 24, most),
+    at = (px) => curve[Math.round(px / CHART_STEP)];
+  assert(Math.abs(at(100) - 0.25) < 0.02, 'a quarter of the most');
+  assert(Math.abs(at(300) - 0.5) < 0.02, 'all of the moments there');
+  assert.equal(seriesCurve([], x, 600, 24, most), null);
+  assert.equal(seriesCurve([group('900', 3)], x, 600, 24, most), null, 'none in view');
+  assert.equal(Math.max(...seriesCurve(all, x, 600, 24, most / 2)), 1, 'never above the top');
+
+  // In the browser's index, counted from its moments and kept up to date as they change.
+  const index = new TimelineIndex({
+    title: 'Logs',
+    description: '',
+    events: [
+      { id: 'a', time: '1/1', metadata: { tags: ['severity:err'] } },
+      { id: 'b', time: '1/1', metadata: { tags: ['severity:crit', 'web'] } },
+      { id: 'c', time: '5/1', metadata: { tags: ['severity:info'] } },
+      { id: 'd', time: '9/1', metadata: { title: 'untagged' } },
+    ],
+  });
+  const tags = LOG_SEVERITY_CHART.chart.series[0].tags;
+  const counted = () =>
+    index
+      .taggedGroups(tags, Q.parse('0/1'), Q.parse('10/1'), Q.zero)
+      .map((g) => `${g.first}:${g.count}`);
+  assert.deepEqual(counted(), ['1/1:2']);
+  index.put({ id: 'd', time: '9/1', metadata: { tags: ['severity:alert'] } });
+  index.put({ id: 'a', time: '3/1', metadata: { tags: ['severity:err'] } });
+  index.put({ id: 'b', time: '1/1', metadata: { tags: ['web'] } });
+  assert.deepEqual(counted(), ['3/1:1', '9/1:1']);
+  index.delete('d');
+  assert.deepEqual(counted(), ['3/1:1']);
+  // Grouped as the view's moments are.
+  index.put({ id: 'e', time: '4/1', metadata: { tags: ['severity:emerg'] } });
+  assert.deepEqual(
+    index.taggedGroups(tags, Q.parse('0/1'), Q.parse('10/1'), Q.parse('2/1')).map((g) => g.count),
+    ['2'],
+  );
 });
 test('timeline theme: colors and fonts for the whole timeline, set on the plugin (#230)', () => {
   assert(isOfficialPlugin(TIMELINE_THEME));

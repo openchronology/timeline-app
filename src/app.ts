@@ -96,7 +96,8 @@ import {
   pluginDrawsArrows,
   pluginBackdrop,
   pluginChart,
-  momentCurve,
+  momentDensity,
+  seriesCurve,
   chartPaths,
   pluginTheme,
   settingValue,
@@ -9964,48 +9965,170 @@ function renderTimelineBackdrop(host: HTMLElement) {
   }
   return !!timelineBackdrop;
 }
-let timelineChart: { svg: SVGSVGElement; area: SVGPathElement; line: SVGPathElement } | null = null;
+type ChartPaths = { area: SVGPathElement; line: SVGPathElement };
+let timelineChart: (ChartPaths & { svg: SVGSVGElement; series: ChartPaths[] }) | null = null;
+type ChartGroups = Pick<FrameGroup, 'first' | 'last' | 'count'>[];
+/**
+ * Chart series' summaries from the server or the desktop (#434), by timeline, series and
+ * window, the most recent last, with the revision each counts and when it came; and the latest
+ * of each series, shown while its own window is asked for. A series is asked for one at a time,
+ * after the view's own window. Each revision's series are built from the whole saved timeline
+ * (as a separation's are), so a timeline that keeps changing, such as one taking in logs, has
+ * them asked for again at most every CHART_SERIES_REFRESH milliseconds: meanwhile they show an
+ * earlier revision.
+ */
+const chartSeriesWindows = new Map<string, { revision: string; at: number; groups: ChartGroups }>(),
+  chartSeriesLatest = new Map<string, ChartGroups>();
+const CHART_SERIES_REFRESH = 30_000;
+let chartSeriesTimer: ReturnType<typeof setTimeout> | undefined,
+  chartSeriesInFlight = false;
+/** Where a chart series' window is kept, and whether it needs asking for (#434). */
+function chartSeriesWindow(tags: readonly string[]) {
+  const source = (local ?? remote)!,
+    series = `${source.id} ${[...tags].sort().join(',')}`,
+    query = remoteCache.plan(viewport, width(), pixels()),
+    key = `${series} ${query.lower} ${query.upper} ${query.threshold}`,
+    found = chartSeriesWindows.get(key);
+  const current =
+    !!found &&
+    (found.revision === source.revision || performance.now() - found.at < CHART_SERIES_REFRESH);
+  return { source, series, query, key, found, current };
+}
+/**
+ * A chart series' moments in view, grouped as the view's own (#434): from this page's index,
+ * unsaved edits and all; or, for an indexed timeline, its saved state as the server or the
+ * desktop counts it, asked for when the view has not been, and meanwhile the latest answer.
+ * None in a comparison.
+ */
+function chartSeriesGroups(tags: string[]): ChartGroups | null {
+  if (comparison) return null;
+  if (model && !sparseWorkspace())
+    return model.taggedGroups(
+      tags,
+      viewport.left,
+      viewport.right,
+      viewport.threshold(width(), pixels()),
+    );
+  if (!local && !remote) return null;
+  const { series, found, current } = chartSeriesWindow(tags);
+  if (!current) {
+    clearTimeout(chartSeriesTimer);
+    chartSeriesTimer = setTimeout(() => void askChartSeries(), 150);
+  }
+  if (found) chartSeriesLatest.set(series, found.groups);
+  return found?.groups ?? chartSeriesLatest.get(series) ?? null;
+}
+/** Asks for the view's missing chart series windows, one after another (#434). */
+async function askChartSeries() {
+  if (chartSeriesInFlight) return;
+  const chart = pluginChart(installedPlugins()),
+    source = local ?? remote;
+  if (!chart?.series.length || !source || comparison) return;
+  // The view's own window goes first; the series follow it.
+  if (windowInFlight) {
+    chartSeriesTimer = setTimeout(() => void askChartSeries(), 150);
+    return;
+  }
+  chartSeriesInFlight = true;
+  try {
+    for (const { tags } of chart.series) {
+      const { series, query, key, current } = chartSeriesWindow(tags);
+      if (current) continue;
+      const revision = source.revision;
+      const answer = await timelineQuery<Frame>({
+        kind: 'overview',
+        ...query,
+        revision,
+        filter: { tags, mode: 'any' },
+        arcs: false,
+      });
+      if ((local ?? remote) !== source) return;
+      const groups = answer.groups
+        .filter((group) => BigInt(group.count) > 0n)
+        .map(({ first, last, count }) => ({ first, last, count }));
+      chartSeriesWindows.delete(key);
+      chartSeriesWindows.set(key, { revision, at: performance.now(), groups });
+      chartSeriesLatest.set(series, groups);
+      while (chartSeriesWindows.size > 64)
+        chartSeriesWindows.delete(chartSeriesWindows.keys().next().value!);
+      requestRender(false);
+    }
+  } catch {
+    // A series that can't be read is left out; the total still shows.
+  } finally {
+    chartSeriesInFlight = false;
+  }
+}
 /**
  * The background chart (#289): the view's moments as a smooth curve over the stage's lower
  * part, above the backgrounds and beneath the axis and markers. Its highest point is where
- * they are most numerous in view.
+ * they are most numerous in view. A chart's series (#434) are curves beneath it, each relative
+ * to the total, so where one meets the total all the moments there are in it.
  */
 function renderBackgroundChart(host: HTMLElement) {
   const chart = pluginChart(installedPlugins());
-  const values =
-    chart &&
-    momentCurve(
-      frame.groups,
-      (time) => viewport.x(parsedTime(time), width()),
-      width(),
-      Math.max(24, 2 * pixels()),
-    );
-  if (!values) {
+  const x = (time: string) => viewport.x(parsedTime(time), width()),
+    spread = Math.max(24, 2 * pixels());
+  const density = chart && momentDensity(frame.groups, x, width(), spread);
+  const most = density ? Math.max(...density) : 0;
+  if (!chart || !(most > 0)) {
     timelineChart?.svg.remove();
     timelineChart = null;
     return;
   }
-  if (!timelineChart) {
-    const ns = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(ns, 'svg'),
-      area = document.createElementNS(ns, 'path'),
+  const ns = 'http://www.w3.org/2000/svg';
+  const paths = (kind: string): ChartPaths => {
+    const area = document.createElementNS(ns, 'path'),
       line = document.createElementNS(ns, 'path');
+    area.classList.add(`timeline-chart-${kind}area`);
+    line.classList.add(`timeline-chart-${kind}line`);
+    return { area, line };
+  };
+  if (!timelineChart) {
+    const svg = document.createElementNS(ns, 'svg');
     svg.classList.add('timeline-chart');
-    area.classList.add('timeline-chart-area');
-    line.classList.add('timeline-chart-line');
-    svg.append(area, line);
-    timelineChart = { svg, area, line };
+    const total = paths('');
+    svg.append(total.area, total.line);
+    timelineChart = { svg, ...total, series: [] };
   }
   const { svg, area, line } = timelineChart;
   // Above the durations' backgrounds, whose z-indexes count up from 1.
   if (svg.parentNode !== host || host.lastChild !== svg) host.append(svg);
   const full = stageWidth(),
-    height = stageHeight();
+    height = stageHeight(),
+    top = height * 0.2;
   svg.setAttribute('viewBox', `0 0 ${full} ${height}`);
   svg.style.color = chart.color ?? '';
-  const paths = chartPaths(values, inset(), width(), height * 0.2, height);
-  area.setAttribute('d', paths.area);
-  line.setAttribute('d', paths.line);
+  const total = chartPaths(
+    density!.map((v) => v / most),
+    inset(),
+    width(),
+    top,
+    height,
+  );
+  area.setAttribute('d', total.area);
+  line.setAttribute('d', total.line);
+  // The series between the total's area and its line, in the plugin's order.
+  while (timelineChart.series.length > chart.series.length) {
+    const gone = timelineChart.series.pop()!;
+    gone.area.remove();
+    gone.line.remove();
+  }
+  while (timelineChart.series.length < chart.series.length) {
+    const added = paths('series-');
+    line.before(added.area, added.line);
+    timelineChart.series.push(added);
+  }
+  chart.series.forEach((series, i) => {
+    const drawn = timelineChart!.series[i],
+      groups = chartSeriesGroups(series.tags),
+      values = groups && seriesCurve(groups, x, width(), spread, most);
+    drawn.area.style.color = drawn.line.style.color = series.color;
+    drawn.line.dataset.series = series.label;
+    const d = values ? chartPaths(values, inset(), width(), top, height) : null;
+    drawn.area.setAttribute('d', d?.area ?? '');
+    drawn.line.setAttribute('d', d?.line ?? '');
+  });
 }
 let appliedTheme = '';
 /** How large the theme draws label and tick text (#267): 1 is the usual size. */

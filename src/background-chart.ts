@@ -20,6 +20,36 @@ export function momentCurve(
   width: number,
   spread: number,
 ): number[] | null {
+  const values = momentDensity(groups, x, width, spread);
+  const most = values ? Math.max(...values) : 0;
+  return most > 0 ? values!.map((v) => v / most) : null;
+}
+/**
+ * A series' curve beside its chart's total (#434): its moments smoothed as momentCurve smooths
+ * the total's, relative to the total's most (`most`, from momentDensity), so it lies beneath the
+ * total's curve; at most 1. Null when none of its moments is in view.
+ */
+export function seriesCurve(
+  groups: readonly Pick<FrameGroup, 'first' | 'last' | 'count'>[],
+  x: (time: string) => number,
+  width: number,
+  spread: number,
+  most: number,
+): number[] | null {
+  const values = momentDensity(groups, x, width, spread);
+  if (!values || !(most > 0) || !values.some((v) => v > 0)) return null;
+  return values.map((v) => Math.min(1, v / most));
+}
+/**
+ * The smoothed number of moments at points CHART_STEP pixels apart, as momentCurve describes,
+ * before it is made relative to the most. Null when no moment is in view.
+ */
+export function momentDensity(
+  groups: readonly Pick<FrameGroup, 'first' | 'last' | 'count'>[],
+  x: (time: string) => number,
+  width: number,
+  spread: number,
+): number[] | null {
   if (!(width > 0)) return null;
   const n = Math.ceil(width / CHART_STEP) + 1,
     mass = new Float64Array(n);
@@ -44,7 +74,6 @@ export function momentCurve(
       Math.exp(-((k - reach) ** 2) / (2 * sigma * sigma)),
     );
   const values = new Array<number>(n);
-  let most = 0;
   for (let i = 0; i < n; i++) {
     let sum = 0,
       weight = 0;
@@ -54,9 +83,8 @@ export function momentCurve(
       weight += w;
     }
     values[i] = sum / weight;
-    most = Math.max(most, values[i]);
   }
-  return most > 0 ? values.map((v) => v / most) : null;
+  return values;
 }
 
 /**

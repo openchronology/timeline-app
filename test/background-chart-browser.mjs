@@ -2,12 +2,12 @@
 // The background chart (#289): the view's moments as a smooth curve behind the timeline.
 import assert from 'node:assert/strict';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
-import { BACKGROUND_CHART } from '../dist/core.mjs';
+import { BACKGROUND_CHART, LOG_SEVERITY_CHART } from '../dist/core.mjs';
 /**
  * The background chart (#289): with the plugin enabled, a curve fills the stage's lower part,
  * highest over the cluster of moments, above the backgrounds and beneath the markers. It
  * follows the view, takes the color set in the plugin list, and goes when the plugin is
- * disabled.
+ * disabled. Log severity chart (#434) adds a curve for each severity beneath the total.
  */
 export async function checkBackgroundChart(page, restore) {
   const load = async (doc) => {
@@ -125,8 +125,70 @@ export async function checkBackgroundChart(page, restore) {
   await page.locator('.installed-plugin input[type="checkbox"]').first().uncheck();
   await page.locator('[data-close="plugins-dialog"]').click();
   await page.waitForFunction(() => !document.querySelector('.timeline-chart'));
+
+  // Series (#434): the cluster is all errors, and the three alone are a warning and two notices.
+  await load({
+    format: 'openchronology',
+    version: 1,
+    title: 'Severity chart',
+    description: '',
+    plugins: [{ manifest: LOG_SEVERITY_CHART, enabled: true }],
+    events: events.map((e) => ({
+      ...e,
+      metadata: {
+        title: '',
+        tags: [
+          e.id.startsWith('c')
+            ? 'severity:err'
+            : e.id === 'a200'
+              ? 'severity:warning'
+              : 'severity:notice',
+        ],
+      },
+    })),
+  });
+  await view(0, 1000);
+  await page.waitForFunction(
+    () => document.querySelectorAll('.timeline-chart-series-line[d^="M"]').length === 3,
+  );
+  const series = await page.evaluate(() => {
+    const stage = document.getElementById('timeline-stage').getBoundingClientRect();
+    const top = (path) => {
+      const length = path.getTotalLength();
+      return Math.min(
+        ...Array.from({ length: 200 }, (_, i) => path.getPointAtLength((i / 199) * length).y),
+      );
+    };
+    const total = top(document.querySelector('.timeline-chart-line'));
+    return {
+      height: stage.height,
+      total,
+      lines: [...document.querySelectorAll('.timeline-chart-series-line')].map((line) => ({
+        label: line.dataset.series,
+        color: getComputedStyle(line).color,
+        top: top(line),
+        beforeTotal: !!(
+          line.compareDocumentPosition(document.querySelector('.timeline-chart-line')) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+        ),
+      })),
+    };
+  });
+  assert.deepEqual(
+    series.lines.map((l) => [l.label, l.color, l.beforeTotal]),
+    [
+      ['Errors', 'rgb(188, 102, 99)', true],
+      ['Warnings', 'rgb(214, 173, 76)', true],
+      ['Information', 'rgb(122, 173, 196)', true],
+    ],
+  );
+  const [errors, warnings, information] = series.lines.map((l) => series.height - l.top);
+  // Errors reach the total's top; the others stay low beneath it, information above warnings.
+  assert(Math.abs(series.height - errors - series.total) < 2, `errors at ${errors}`);
+  assert(warnings < 0.2 * errors && information > warnings, `${warnings} ${information}`);
+
   await load(restore);
   console.log(
-    'PASS background chart: a smooth curve of the view’s moments behind the timeline, highest over the most, following the view, in the color set in the plugin list, gone when disabled.',
+    'PASS background chart: a smooth curve of the view’s moments behind the timeline, highest over the most, following the view, in the color set in the plugin list, gone when disabled; and a curve per severity beneath it.',
   );
 }

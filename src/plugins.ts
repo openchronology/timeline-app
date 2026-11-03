@@ -4,6 +4,7 @@
 // and reading each field's value.
 import { compilePluginScript } from './custom-time.js';
 import { contentLabels, CONTENT_LABELS_KEY } from './content-labels.js';
+import { validateTags } from './tags.js';
 /** Versioned host components and optional source interpreted by our bounded language. */
 export interface PluginField {
   kind:
@@ -47,9 +48,10 @@ export interface PluginManifest {
   backdrop?: { kind: 'image'; setting: string };
   /**
    * A chart behind the timeline (#289): how many moments lie across the view, relative to the
-   * most, as a smooth curve; in the color of one of its plugin's color settings, if given.
+   * most, as a smooth curve; in the color of one of its plugin's color settings, if given. Its
+   * `series` (#434) chart the moments with any of their tags beside the total, each in its color.
    */
-  chart?: { kind: 'moments'; setting?: string };
+  chart?: { kind: 'moments'; setting?: string; series?: ChartSeries[] };
   /** The timeline's colors and fonts (#230): each theme role's setting, by role. */
   theme?: PluginTheme;
   /** Entities the plugin applies to; omitted means moments, plus durations for colors/cards. */
@@ -64,6 +66,18 @@ export interface PluginManifest {
   source?: string;
 }
 export type PluginTarget = 'moments' | 'durations';
+/**
+ * One curve of a background chart beside the total (#434): the moments carrying any of its
+ * tags, in its color, or one of its plugin's color settings when that is set.
+ */
+export interface ChartSeries {
+  label: string;
+  tags: string[];
+  color: string;
+  setting?: string;
+}
+/** How many series a chart may draw beside its total. */
+export const CHART_SERIES_LIMIT = 8;
 /**
  * A timeline-wide plugin setting: the HTTPS address of an image, a color, a font family, or a
  * text size (a percentage of the usual size, #267).
@@ -799,16 +813,39 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     result.backdrop = { kind: 'image', setting: backdrop.setting as string };
   }
   if (p.chart !== undefined) {
-    const chart = object(p.chart, ['kind', 'setting']);
-    if (
-      chart.kind !== 'moments' ||
-      (chart.setting !== undefined &&
-        !result.settings?.some((s) => s.key === chart.setting && s.kind === 'color'))
-    )
+    const chart = object(p.chart, ['kind', 'setting', 'series']);
+    const colorSetting = (key: unknown) =>
+      key === undefined || !!result.settings?.some((s) => s.key === key && s.kind === 'color');
+    if (chart.kind !== 'moments' || !colorSetting(chart.setting))
       throw new Error("A background chart counts moments, in one of its plugin's color settings.");
+    let series: ChartSeries[] | undefined;
+    if (chart.series !== undefined) {
+      if (
+        !Array.isArray(chart.series) ||
+        !chart.series.length ||
+        chart.series.length > CHART_SERIES_LIMIT
+      )
+        throw new Error(`A background chart has one to ${CHART_SERIES_LIMIT} series.`);
+      series = chart.series.map((value) => {
+        const one = object(value, ['label', 'tags', 'color', 'setting']);
+        const tags = validateTags(one.tags);
+        const color = colorValue(one.color);
+        if (!tags.length || !color || !colorSetting(one.setting))
+          throw new Error(
+            "A chart series has tags and a color, and may read one of its plugin's color settings.",
+          );
+        return {
+          label: text(one.label, 100),
+          tags,
+          color,
+          ...(one.setting === undefined ? {} : { setting: one.setting as string }),
+        };
+      });
+    }
     result.chart = {
       kind: 'moments',
       ...(chart.setting === undefined ? {} : { setting: chart.setting as string }),
+      ...(series ? { series } : {}),
     };
   }
   if (p.theme !== undefined) {
@@ -1088,12 +1125,22 @@ export function pluginBackdrop(plugins: readonly InstalledPlugin[] = []): string
  */
 export function pluginChart(
   plugins: readonly InstalledPlugin[] = [],
-): { color: string | null } | null {
-  let chart: { color: string | null } | null = null;
+): { color: string | null; series: { label: string; tags: string[]; color: string }[] } | null {
+  let chart: ReturnType<typeof pluginChart> = null;
   for (const { manifest, enabled, settings } of plugins)
     if (enabled && manifest.chart) {
-      const setting = manifest.settings?.find((s) => s.key === manifest.chart!.setting);
-      chart = { color: (setting && settingValue(setting, settings?.[setting.key])) || null };
+      const color = (key: string | undefined) => {
+        const setting = manifest.settings?.find((s) => s.key === key);
+        return (setting && settingValue(setting, settings?.[setting.key])) || null;
+      };
+      chart = {
+        color: color(manifest.chart.setting),
+        series: (manifest.chart.series ?? []).map((s) => ({
+          label: s.label,
+          tags: s.tags,
+          color: color(s.setting) ?? s.color,
+        })),
+      };
     }
   return chart;
 }
@@ -1607,6 +1654,45 @@ export const LOG_SEVERITY_COLORS: PluginManifest = validatePluginManifest({
   marker: { kind: 'color', metadataKey: 'color' },
 });
 /**
+ * Log severity chart (#434): the background chart's total, with a curve each for imported log
+ * entries' errors, warnings and information beside it, by their `severity:<level>` tags, in
+ * Log severity colors' colors.
+ */
+export const LOG_SEVERITY_CHART: PluginManifest = validatePluginManifest({
+  apiVersion: 1,
+  id: 'log-severity-chart',
+  version: 1,
+  name: 'Log severity chart',
+  description:
+    'Chart imported log entries behind the timeline: all of them as a smooth curve, and beneath it a curve each for errors (red), warnings (yellow) and information (blue), by their severity tags. It follows the view as you pan and zoom. Choose the colors here in the plugin list.',
+  fields: [],
+  settings: [
+    { kind: 'color', key: 'color', label: 'All entries color' },
+    { kind: 'color', key: 'errorColor', label: 'Errors color' },
+    { kind: 'color', key: 'warningColor', label: 'Warnings color' },
+    { kind: 'color', key: 'infoColor', label: 'Information color' },
+  ],
+  chart: {
+    kind: 'moments',
+    setting: 'color',
+    series: [
+      {
+        label: 'Errors',
+        tags: ['severity:emerg', 'severity:alert', 'severity:crit', 'severity:err'],
+        color: '#bc6663',
+        setting: 'errorColor',
+      },
+      { label: 'Warnings', tags: ['severity:warning'], color: '#d6ad4c', setting: 'warningColor' },
+      {
+        label: 'Information',
+        tags: ['severity:notice', 'severity:info'],
+        color: '#7aadc4',
+        setting: 'infoColor',
+      },
+    ],
+  },
+});
+/**
  * Presumptive outline (#325): marks moments, stack entries and durations as presumptive (not
  * yet confirmed by evidence), drawn with a dashed outline, as events and causal factors charts
  * draw presumptive events and conditions.
@@ -1646,6 +1732,7 @@ export const BUILTIN_PLUGINS: readonly PluginManifest[] = [
   DURATION_BACKGROUNDS,
   TIMELINE_BACKGROUND,
   BACKGROUND_CHART,
+  LOG_SEVERITY_CHART,
   LEGACY_TIMELINE_THEME,
   TIMELINE_THEME,
   MOMENT_HEADINGS,

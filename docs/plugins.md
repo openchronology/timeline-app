@@ -127,7 +127,18 @@ Install **Background chart** (`background-chart`) to chart how many moments lie 
 - **Look:** a translucent area under a thin line, above the timeline's and durations' backgrounds and beneath the axis, bands, links and markers. It takes the color of moments (the theme's marker color, if set), or the **Chart color** set under the plugin in the **Plugins** dialog; **Use default** clears it.
 - **Disabling:** disabling or removing the plugin removes the chart.
 
-A plugin's `chart` is `{ "kind": "moments" }`, with a `setting` naming one of its own `color` settings for the color. When several enabled plugins draw one, the last one wins.
+A plugin's `chart` is `{ "kind": "moments" }`, with a `setting` naming one of its own `color` settings for the color, and optionally `series`. When several enabled plugins draw one, the last one wins.
+
+### Series
+
+A chart can draw a curve for some of its moments beneath the total ([#434](https://github.com/openchronology/timeline-app/issues/434)): one per series, each the moments carrying any of its tags. Install **Log severity chart** (`log-severity-chart`) to chart imported log entries this way: all of them, with errors (`severity:err` and anything more severe) in red, warnings (`severity:warning`) in yellow and information (`severity:notice`, `severity:info`) in blue, the colors Log severity colors gives the entries themselves. Each color can be changed under the plugin in the **Plugins** dialog.
+
+- **On one scale:** each series is measured against the total's busiest point, so it lies beneath the total's curve, and meets it where all the moments there are in it. Where errors rise to the total, the entries there are errors.
+- **Look:** a lighter area under a line in the series' color, between the total's area and its line.
+- **Where the counts come from:** a timeline held in the browser counts its series from its moments, unsaved edits and all, kept up to date as they change. A server or desktop timeline asks for each series' summaries of the view, built from its saved state as a separation by tags is (built once per saved version, from the whole timeline), so a series shows the saved version: unsaved edits appear once saved. While a timeline keeps changing, such as one taking in logs, each series is asked for again at most every 30 seconds, and meanwhile shows a slightly earlier version than the total. A series that can't be read is left out.
+- **Comparisons:** a comparison or separation draws the total only.
+
+Each of `series` (one to eight) is `{ "label": "Errors", "tags": ["severity:err", "severity:crit"], "color": "#bc6663" }`: a label of up to 100 characters, one to forty tags (kept as tags are: trimmed and lower case) and a color, with an optional `setting` naming one of the plugin's `color` settings that, when set, is used instead.
 
 ## Timeline theme
 
