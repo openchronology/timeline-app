@@ -63,12 +63,14 @@ import {
   BACKGROUND_URL_LIMIT,
   longBackgrounds,
   longBackgroundsText,
+  hasLocalFiles,
 } from '../dist/core.mjs';
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 /**
  * The request's JSON body, read up to `maximum` bytes (16 MiB by default; routes pass less).
  * 415 unless sent as application/json, 413 past the limit (stopping as soon as it is passed),
- * 400 for invalid JSON.
+ * 400 for invalid JSON, and 400 for one holding a link to a file on someone's computer
+ * (`file://`, #433): local paths name a person and their folders, and are never stored here.
  */
 async function body(req, maximum = 16 * 1024 * 1024) {
   if (!req.headers['content-type']?.startsWith('application/json'))
@@ -80,11 +82,18 @@ async function body(req, maximum = 16 * 1024 * 1024) {
     if (size > maximum) throw new HttpError(413, `Request exceeds the ${maximum}-byte limit.`);
     parts.push(part);
   }
+  let value;
   try {
-    return JSON.parse(Buffer.concat(parts).toString());
+    value = JSON.parse(Buffer.concat(parts).toString());
   } catch {
     throw new HttpError(400, 'Invalid JSON.');
   }
+  if (hasLocalFiles(value))
+    throw new HttpError(
+      400,
+      'Links to files on a computer (file://) are never stored on the server. Remove them and try again.',
+    );
+  return value;
 }
 /**
  * A SQLite timeline file uploaded as the body, up to `limit` bytes (TIMELINE_FILE_BYTES);

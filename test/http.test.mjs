@@ -109,6 +109,25 @@ test('query validation rejects bad bounds, search text and duration IDs before a
   ])
     assert.equal((await request(app, path, 'POST', headers, input)).status, 400);
 });
+test('requests holding a link to a file on a computer are refused before anything else (#433)', async () => {
+  const app = createApplication({
+    pool: {
+      query() {
+        throw new Error('A local path must never reach storage');
+      },
+    },
+  });
+  const path = '/api/timelines/00000000-0000-0000-0000-000000000001/query',
+    headers = { 'content-type': 'application/json' };
+  for (const link of ['file:///home/someone/Pictures/a.jpg', ' FILE://localhost/C:/x.jpg']) {
+    const refused = await request(app, path, 'POST', headers, {
+      kind: 'overview',
+      events: [{ id: 'a', time: '1/1', metadata: { sources: ['https://example.org', link] } }],
+    });
+    assert.equal(refused.status, 400);
+    assert.match(refused.body.error, /file:\/\/\) are never stored on the server/);
+  }
+});
 test('passwords use salted scrypt; cookie and CSRF checks protect mutation requests', async () => {
   const hash = await passwordHash('correct horse battery staple');
   assert(!hash.includes('correct horse'));

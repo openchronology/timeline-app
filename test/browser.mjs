@@ -42,6 +42,7 @@ import { checkDrafts } from './drafts-browser.mjs';
 import { checkFollowLatest } from './follow-browser.mjs';
 import { checkComparison } from './comparison-browser.mjs';
 import { checkDesktopCache } from './desktop-cache-browser.mjs';
+import { checkPopulate } from './populate-browser.mjs';
 import { checkResponsiveTimeline } from './layout-browser.mjs';
 import { checkMobileToolbars } from './mobile-toolbar-browser.mjs';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
@@ -364,6 +365,7 @@ try {
   await checkDrafts(browser);
   await checkFollowLatest(browser);
   await checkDesktopCache(browser);
+  await checkPopulate(browser);
   await checkComparison(browser);
   console.log(
     `PASS ${engine}: editing, pan/zoom, dense summaries, exact JSON, in-memory guest editing${engine === 'chromium' ? ', touch pan/pinch/tap' : ''}.`,

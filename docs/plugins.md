@@ -450,7 +450,8 @@ Custom plugins can declare a `size` field and return `api.size(api.get("fieldKey
 
 The official **Sources** plugin (`moment-sources`, version 2) reads the existing
 `sources` metadata array of a moment, stack entry or duration as a list of HTTPS URL
-strings. The inspector displays
+strings, and of `file:///` links to files on a computer, which the desktop app opens in their
+own app and which never reach a server ([timelines from files](file-populator.md)). The inspector displays
 clickable references and, for editors, a text area with one URL per line. Valid
 edits use the existing debounced moment editing flow. Invalid links do not replace
 saved references. Links open in a separate tab with no opener or referrer; the

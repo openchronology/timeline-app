@@ -128,6 +128,7 @@ export { parseLink, linkFragment, sharePath } from './links.js';
 export { markdownHtml, markdownText, parseMarkdown, safeNoteLink } from './rich-text.js';
 export type { MarkdownBlock, MarkdownInline } from './rich-text.js';
 export * from './addresses.js';
+export * from './local-files.js';
 export * from './wording.js';
 export type { TimelineLink } from './links.js';
 export type { DifferenceUnit, TimeDifference } from './difference.js';

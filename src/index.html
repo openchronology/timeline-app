@@ -269,6 +269,7 @@
             ><button id="sqlite-open" hidden>Open</button
             ><button id="sqlite-save" hidden>Save</button
             ><button id="sqlite-save-as" hidden>Save As…</button
+            ><button id="populate-button" hidden>From files…</button
             ><button id="publish-button" class="button-primary">Save to server</button>
           </div>
           <!-- On a phone, the file chores wait in this menu, and the row keeps the main action. -->
@@ -1207,6 +1208,80 @@ Every point has a place. Explore the spaces between them.</textarea>
           <button id="presentation-save" class="button-primary" type="submit">
             Save display settings
           </button>
+        </div>
+      </form>
+    </dialog>
+    <!-- The desktop's file populator (#433): a new timeline of the files in chosen folders. -->
+    <dialog id="populate-dialog" aria-labelledby="populate-heading">
+      <form id="populate-form">
+        <div class="dialog-heading">
+          <h2 id="populate-heading">New timeline from files</h2>
+          <button type="button" data-close="populate-dialog" aria-label="Close">×</button>
+        </div>
+        <p class="field-hint">
+          A moment for each file, dated as you choose. Its source is the file itself: open it from
+          the moment in the file's own app. Nothing is copied, and file paths are never saved to a
+          server.
+        </p>
+        <fieldset class="map-scope">
+          <legend>Folders and files</legend>
+          <ul id="populate-roots" class="populate-roots"></ul>
+          <div class="view-controls">
+            <button type="button" id="populate-folders">Add folders…</button
+            ><button type="button" id="populate-files">Add files…</button
+            ><button type="button" id="populate-clear" disabled>Clear</button>
+          </div>
+          <label class="checkbox-label"
+            ><input id="populate-recursive" type="checkbox" checked /> Search subfolders too</label
+          >
+        </fieldset>
+        <fieldset class="map-scope">
+          <legend>Which files</legend>
+          <label class="checkbox-label"
+            ><input type="radio" name="populate-type" value="mediaFile" checked /> Photos, videos
+            and sound</label
+          >
+          <label class="checkbox-label"
+            ><input type="radio" name="populate-type" value="anyFile" /> Any file</label
+          >
+        </fieldset>
+        <fieldset class="map-scope">
+          <legend>Date each moment by</legend>
+          <label class="checkbox-label" data-media-only
+            ><input type="radio" name="populate-date" value="metadata" checked /> When it was taken
+            or recorded, from the file's metadata</label
+          >
+          <label class="checkbox-label"
+            ><input type="radio" name="populate-date" value="created" /> When the file was
+            created</label
+          >
+          <label class="checkbox-label"
+            ><input type="radio" name="populate-date" value="modified" /> When the file was last
+            modified</label
+          >
+          <label id="populate-zone-row" data-media-only
+            >Times recorded without a time zone are in<select id="populate-zone">
+              <option value="local">this computer's time zone</option>
+              <option value="utc">UTC</option>
+            </select></label
+          >
+        </fieldset>
+        <fieldset class="map-scope" data-media-only>
+          <legend>Metadata</legend>
+          <label class="checkbox-label"
+            ><input id="populate-location" type="checkbox" role="switch" /> Add where each was taken
+            (GPS)</label
+          >
+        </fieldset>
+        <label>Title<input id="populate-title" maxlength="200" required /></label>
+        <div id="populate-working" class="map-working" hidden>
+          <progress id="populate-progress"></progress>
+        </div>
+        <p id="populate-status" class="field-hint" role="status"></p>
+        <div id="populate-error" class="form-error" role="alert"></div>
+        <div class="dialog-actions">
+          <button type="button" id="populate-stop" hidden>Stop</button>
+          <button type="submit" id="populate-start" class="button-primary">Make timeline</button>
         </div>
       </form>
     </dialog>

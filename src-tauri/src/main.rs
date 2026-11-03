@@ -14,14 +14,17 @@
 //!   Its `generation` counts every change of baseline; the editor passes the generation it
 //!   last saw, and commands refuse to act on a baseline it has not seen.
 //! - `server::Server`: the connected servers and their sign-ins (server.rs).
+//! - `Population`: the folders and files picked for the file populator (populate.rs), the only
+//!   paths it scans, and whether the one running was cancelled.
 //!
 //! File work runs on Tauri's blocking thread pool (`spawn_blocking`), so long reads and saves
 //! never stall the async runtime that serves IPC.
+mod populate;
 mod server;
 use openchronology_store::{Document, Header, Patch, Query, Snapshot};
 use std::{
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{atomic::AtomicBool, Arc, Mutex},
 };
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
@@ -376,6 +379,117 @@ async fn desktop_import(app: tauri::AppHandle) -> Result<Option<Opened>, String>
     .await
     .map_err(|e| e.to_string())?
 }
+/// The file populator's picked folders and files (#433): the only paths it scans, chosen in the
+/// native dialog so the page never names one; and whether the population running was cancelled.
+#[derive(Default)]
+struct Population {
+    roots: Mutex<Vec<PathBuf>>,
+    cancel: AtomicBool,
+}
+/// Adds folders (or, with `folders` false, files) picked in the native dialog to the file
+/// populator's list, and resolves to the whole list. A cancelled dialog leaves it as it was.
+#[tauri::command]
+async fn desktop_populate_pick(
+    app: tauri::AppHandle,
+    folders: bool,
+) -> Result<Vec<String>, String> {
+    let dialog = app.dialog().file();
+    let picked = if folders {
+        dialog.blocking_pick_folders()
+    } else {
+        dialog.blocking_pick_files()
+    };
+    let state = app.state::<Population>();
+    let mut roots = state.roots.lock().map_err(|e| e.to_string())?;
+    for path in picked.unwrap_or_default() {
+        let path = path.into_path().map_err(|e| e.to_string())?;
+        if !roots.contains(&path) {
+            roots.push(path);
+        }
+    }
+    Ok(roots
+        .iter()
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect())
+}
+/// Empties the file populator's list of folders and files.
+#[tauri::command]
+fn desktop_populate_clear(state: tauri::State<'_, Population>) -> Result<(), String> {
+    state.roots.lock().map_err(|e| e.to_string())?.clear();
+    Ok(())
+}
+/// Stops the population running, which then stages what it made so far.
+#[tauri::command]
+fn desktop_populate_cancel(state: tauri::State<'_, Population>) {
+    state
+        .cancel
+        .store(true, std::sync::atomic::Ordering::Relaxed);
+}
+/// What a population answers: the staged timeline, as `desktop_import`'s, and its report.
+#[derive(serde::Serialize)]
+struct Populated {
+    #[serde(flatten)]
+    opened: Opened,
+    report: populate::Report,
+}
+/// Makes a new timeline of the picked folders' and files' files (populate.rs), one moment per
+/// file, `template` giving its title, display and plugins, and stages it as `desktop_import`
+/// does: the editor adopts it, unsaved, for Save As. Tells `progress` how far it has got.
+/// Errors when nothing is picked or no file was found.
+#[tauri::command]
+async fn desktop_populate(
+    app: tauri::AppHandle,
+    settings: populate::Settings,
+    template: Document,
+    progress: tauri::ipc::Channel<populate::Progress>,
+) -> Result<Populated, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<Population>();
+        let roots = state.roots.lock().map_err(|e| e.to_string())?.clone();
+        if roots.is_empty() {
+            return Err("Choose a folder or files to populate from.".into());
+        }
+        state
+            .cancel
+            .store(false, std::sync::atomic::Ordering::Relaxed);
+        let (events, report) = populate::populate(&roots, &settings, &state.cancel, &|step| {
+            let _ = progress.send(step);
+        });
+        if events.is_empty() {
+            return Err("No files there matched. Check the folders and the kind of file.".into());
+        }
+        let baseline = Arc::new(Snapshot::from_document(&populate::document(
+            template, events,
+        ))?);
+        let path = baseline.path().to_path_buf();
+        let before = stamp(&path)?;
+        let header = baseline.header()?;
+        let files = app.state::<Mutex<Files>>();
+        let mut files = files.lock().map_err(|e| e.to_string())?;
+        files.pending = Some((path.clone(), baseline, before));
+        Ok(Populated {
+            opened: Opened {
+                header,
+                path: path.to_string_lossy().into_owned(),
+                generation: files.generation + 1,
+            },
+            report,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+/// Opens a moment's `file:///` source in the system's app for that file (#433). Refuses
+/// programs, scripts and anything that isn't a file on this computer (populate::local_file).
+#[tauri::command]
+fn desktop_open_file(url: String) -> Result<(), String> {
+    populate::open_file(&url)
+}
+/// Shows a moment's `file:///` source in its folder, in the system's file manager.
+#[tauri::command]
+fn desktop_reveal_file(url: String) -> Result<(), String> {
+    populate::reveal_file(&url)
+}
 /// Moves a document the editor holds in the page into a disk-backed baseline, pending like
 /// `desktop_open`'s: the editor does this when a timeline grows past 2048 moments, so it can
 /// browse it with windowed queries. Errors when the document is invalid.
@@ -557,6 +671,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Mutex::new(Files::default()))
+        .manage(Population::default())
         .manage(server::Server::new().expect("Invalid server configuration"))
         .setup(|app| {
             // The servers connected last time; before several, the one server (or none).
@@ -586,6 +701,12 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             desktop_open_image,
+            desktop_open_file,
+            desktop_reveal_file,
+            desktop_populate_pick,
+            desktop_populate_clear,
+            desktop_populate_cancel,
+            desktop_populate,
             desktop_open,
             desktop_accept_open,
             desktop_stage,

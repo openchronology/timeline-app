@@ -3,6 +3,8 @@
 // inspector's inputs for each kind of plugin field (text, images, stacks, colors and the rest).
 import { attachRichText } from './rich-text.js';
 import { imageSource, imagesOffline } from './image-assets.js';
+import { localFileURL } from './local-files.js';
+import { localFileItem } from './local-file-links.js';
 import {
   imageURL,
   sourceLinks,
@@ -304,6 +306,11 @@ export function renderPluginFields(
         list.replaceChildren();
         for (const url of links) {
           const item = document.createElement('li');
+          if (localFileURL(url)) {
+            item.append(...localFileItem(url));
+            list.append(item);
+            continue;
+          }
           const link = document.createElement('a');
           link.textContent = url;
           link.href = url;
@@ -315,7 +322,7 @@ export function renderPluginFields(
         }
         list.hidden = links.length === 0;
       };
-      // Validates the lines as a whole (sourceLinks: HTTPS only, at most 100); an invalid
+      // Validates the lines as a whole (sourceLinks: HTTPS or file links, at most 100); an invalid
       // list is reported on the textarea and not saved, so the last valid one stays.
       const update = (commit: boolean) => {
         try {
@@ -335,7 +342,8 @@ export function renderPluginFields(
       input.oninput = () => update(true);
       const hint = document.createElement('p');
       hint.className = 'field-hint';
-      hint.textContent = 'One HTTPS source link per line. Links open only when clicked.';
+      hint.textContent =
+        'One HTTPS source link per line, or a file:/// path on this computer. Links open only when clicked; file paths are never saved to a server.';
       heading.append(input);
       section.append(list, heading, hint);
       update(false);
