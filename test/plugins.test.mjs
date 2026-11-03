@@ -1165,6 +1165,15 @@ test('chart series: moments with any of their tags, each a curve beneath the tot
     index.taggedGroups(tags, Q.parse('0/1'), Q.parse('10/1'), Q.parse('2/1')).map((g) => g.count),
     ['2'],
   );
+
+  // A server's overview sends a moment's tags that the series count, so the browser can tell
+  // the view's moments apart; a summary of many is in the total alone.
+  const plugins = [{ manifest: LOG_SEVERITY_CHART, enabled: true }];
+  assert.deepEqual(
+    pluginMetadata(plugins, { title: 'x', tags: ['web', 'severity:err', 'severity:info'] }),
+    { tags: ['severity:err', 'severity:info'] },
+  );
+  assert.deepEqual(pluginMetadata(plugins, { tags: ['web'] }), {});
 });
 test('timeline theme: colors and fonts for the whole timeline, set on the plugin (#230)', () => {
   assert(isOfficialPlugin(TIMELINE_THEME));

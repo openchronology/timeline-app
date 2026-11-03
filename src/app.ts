@@ -1125,6 +1125,7 @@ async function timelineQuery<T>(query: Record<string, unknown>, signal?: AbortSi
             ...(p.manifest.marker ? [p.manifest.marker.metadataKey] : []),
             ...(p.manifest.hover || p.manifest.source ? ['title', 'description'] : []),
             ...(p.manifest.hover ? ['sources'] : []),
+            ...(p.manifest.chart?.series?.length ? ['tags'] : []),
             ...derivationKeys(p.manifest),
           ]),
       ]),
@@ -9969,36 +9970,10 @@ type ChartPaths = { area: SVGPathElement; line: SVGPathElement };
 let timelineChart: (ChartPaths & { svg: SVGSVGElement; series: ChartPaths[] }) | null = null;
 type ChartGroups = Pick<FrameGroup, 'first' | 'last' | 'count'>[];
 /**
- * Chart series' summaries from the server or the desktop (#434), by timeline, series and
- * window, the most recent last, with the revision each counts and when it came; and the latest
- * of each series, shown while its own window is asked for. A series is asked for one at a time,
- * after the view's own window. Each revision's series are built from the whole saved timeline
- * (as a separation's are), so a timeline that keeps changing, such as one taking in logs, has
- * them asked for again at most every CHART_SERIES_REFRESH milliseconds: meanwhile they show an
- * earlier revision.
- */
-const chartSeriesWindows = new Map<string, { revision: string; at: number; groups: ChartGroups }>(),
-  chartSeriesLatest = new Map<string, ChartGroups>();
-const CHART_SERIES_REFRESH = 30_000;
-let chartSeriesTimer: ReturnType<typeof setTimeout> | undefined,
-  chartSeriesInFlight = false;
-/** Where a chart series' window is kept, and whether it needs asking for (#434). */
-function chartSeriesWindow(tags: readonly string[]) {
-  const source = (local ?? remote)!,
-    series = `${source.id} ${[...tags].sort().join(',')}`,
-    query = remoteCache.plan(viewport, width(), pixels()),
-    key = `${series} ${query.lower} ${query.upper} ${query.threshold}`,
-    found = chartSeriesWindows.get(key);
-  const current =
-    !!found &&
-    (found.revision === source.revision || performance.now() - found.at < CHART_SERIES_REFRESH);
-  return { source, series, query, key, found, current };
-}
-/**
- * A chart series' moments in view, grouped as the view's own (#434): from this page's index,
- * unsaved edits and all; or, for an indexed timeline, its saved state as the server or the
- * desktop counts it, asked for when the view has not been, and meanwhile the latest answer.
- * None in a comparison.
+ * A chart series' moments in view (#434), only as far as this page knows them: from its index,
+ * unsaved edits and all, when it holds the whole timeline; otherwise the view's own moments that
+ * it shows one by one, with their tags. Where the view has only counts, those moments are in the
+ * total alone. None in a comparison.
  */
 function chartSeriesGroups(tags: string[]): ChartGroups | null {
   if (comparison) return null;
@@ -10009,55 +9984,10 @@ function chartSeriesGroups(tags: string[]): ChartGroups | null {
       viewport.right,
       viewport.threshold(width(), pixels()),
     );
-  if (!local && !remote) return null;
-  const { series, found, current } = chartSeriesWindow(tags);
-  if (!current) {
-    clearTimeout(chartSeriesTimer);
-    chartSeriesTimer = setTimeout(() => void askChartSeries(), 150);
-  }
-  if (found) chartSeriesLatest.set(series, found.groups);
-  return found?.groups ?? chartSeriesLatest.get(series) ?? null;
-}
-/** Asks for the view's missing chart series windows, one after another (#434). */
-async function askChartSeries() {
-  if (chartSeriesInFlight) return;
-  const chart = pluginChart(installedPlugins()),
-    source = local ?? remote;
-  if (!chart?.series.length || !source || comparison) return;
-  // The view's own window goes first; the series follow it.
-  if (windowInFlight) {
-    chartSeriesTimer = setTimeout(() => void askChartSeries(), 150);
-    return;
-  }
-  chartSeriesInFlight = true;
-  try {
-    for (const { tags } of chart.series) {
-      const { series, query, key, current } = chartSeriesWindow(tags);
-      if (current) continue;
-      const revision = source.revision;
-      const answer = await timelineQuery<Frame>({
-        kind: 'overview',
-        ...query,
-        revision,
-        filter: { tags, mode: 'any' },
-        arcs: false,
-      });
-      if ((local ?? remote) !== source) return;
-      const groups = answer.groups
-        .filter((group) => BigInt(group.count) > 0n)
-        .map(({ first, last, count }) => ({ first, last, count }));
-      chartSeriesWindows.delete(key);
-      chartSeriesWindows.set(key, { revision, at: performance.now(), groups });
-      chartSeriesLatest.set(series, groups);
-      while (chartSeriesWindows.size > 64)
-        chartSeriesWindows.delete(chartSeriesWindows.keys().next().value!);
-      requestRender(false);
-    }
-  } catch {
-    // A series that can't be read is left out; the total still shows.
-  } finally {
-    chartSeriesInFlight = false;
-  }
+  const wanted = new Set(tags);
+  return frame.groups.filter(
+    (group) => group.metadata && entityTags(group.metadata).some((tag) => wanted.has(tag)),
+  );
 }
 /**
  * The background chart (#289): the view's moments as a smooth curve over the stage's lower

@@ -1249,6 +1249,14 @@ export function pluginMetadata(
           result[rule.metadataKey] = (metadata[rule.metadataKey] as string).slice(0, 10000);
         for (const source of rule.from) projectSource(source, metadata, result);
       }
+      // The tags its chart's series count (#434), so the view's moments can be told apart.
+      for (const series of manifest.chart?.series ?? []) {
+        const tags = (Array.isArray(metadata.tags) ? metadata.tags : []).filter(
+          (t): t is string => typeof t === 'string' && series.tags.includes(t),
+        );
+        if (tags.length)
+          result.tags = [...new Set([...((result.tags as string[] | undefined) ?? []), ...tags])];
+      }
     }
   // Its sensitive-content labels (#115), so its images are blurred wherever they show.
   const labels = contentLabels(metadata[CONTENT_LABELS_KEY]);
