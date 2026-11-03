@@ -2,7 +2,7 @@
 // Plugins (docs/plugins.md): manifests of the fields moments and durations carry (images, stacks,
 // colors, shapes, headings and more), their validation, the built-in plugins and the library,
 // and reading each field's value.
-import { localFileURL, localPhoto } from './local-files.js';
+import { localSource, localSourcesAllowed, localPhoto } from './local-files.js';
 import { compilePluginScript } from './custom-time.js';
 import { contentLabels, CONTENT_LABELS_KEY } from './content-labels.js';
 import { validateTags } from './tags.js';
@@ -976,9 +976,8 @@ export function imageURL(value: unknown): string | null {
   }
 }
 /**
- * Explicit outbound references; never fetched or interpreted by the plugin: HTTPS links, and
- * links to files on this computer (#433, localFileURL), which open only in the desktop app and
- * never reach a server.
+ * Explicit outbound references; never fetched or interpreted by the plugin: HTTPS links, and in
+ * the desktop app links to files on this computer (#433, localSource), which never reach a server.
  */
 export function sourceLinks(value: unknown): string[] {
   if (value === undefined) return [];
@@ -986,13 +985,18 @@ export function sourceLinks(value: unknown): string[] {
     throw new Error('Sources must be an array of at most 100 links.');
   return value.map((raw) => {
     const url = sourceLink(raw);
-    if (!url) throw new Error('Use HTTPS links without embedded credentials, or file:/// paths.');
+    if (!url)
+      throw new Error(
+        localSourcesAllowed()
+          ? 'Use HTTPS links without embedded credentials, or file:/// paths.'
+          : 'Use HTTPS links without embedded credentials.',
+      );
     return url;
   });
 }
-/** One source: an HTTPS link (imageURL) or a file link (localFileURL); null otherwise. */
+/** One source: an HTTPS link (imageURL) or, in the desktop app, a file link; null otherwise. */
 export function sourceLink(value: unknown): string | null {
-  return imageURL(value) ?? localFileURL(value);
+  return imageURL(value) ?? localSource(value);
 }
 /** The first Sources, for moments only; kept for its URL and the timelines pinned to it. */
 const LEGACY_MOMENT_SOURCES: PluginManifest = validatePluginManifest({

@@ -454,8 +454,9 @@ The official **File thumbnails** plugin (`file-thumbnails`, [#440](https://githu
 
 The official **Sources** plugin (`moment-sources`, version 2) reads the existing
 `sources` metadata array of a moment, stack entry or duration as a list of HTTPS URL
-strings, and of `file:///` links to files on a computer, which the desktop app opens in their
-own app and which never reach a server ([timelines from files](file-populator.md)). The inspector displays
+strings. In the desktop app it also reads `file:///` links to files on the computer, which open
+in their own app and never reach a server ([timelines from files](file-populator.md)); the
+website and the offline file neither list nor accept them. The inspector displays
 clickable references and, for editors, a text area with one URL per line. Valid
 edits use the existing debounced moment editing flow. Invalid links do not replace
 saved references. Links open in a separate tab with no opener or referrer; the

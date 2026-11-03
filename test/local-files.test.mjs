@@ -10,16 +10,30 @@ import {
   withoutLocalFiles,
   hasLocalFiles,
   sourceLinks,
+  sourceLink,
   pluginMetadata,
   MOMENT_SOURCES,
   FILE_THUMBNAILS,
   localPhoto,
   pluginMarker,
+  allowLocalSources,
+  localSourcesAllowed,
   validatePluginManifest,
 } from '../dist/core.mjs';
 
 test('a source may be a file:/// link to this computer, and only that kind of file link', () => {
   const photo = 'file:///home/someone/Pictures/Trip%202024/IMG_0042.JPG';
+  // Not in the offline file or on the platform: only the desktop app allows them, as it alone
+  // can open them.
+  assert.equal(localSourcesAllowed(), false);
+  assert.throws(
+    () => sourceLinks([photo]),
+    /^Error: Use HTTPS links without embedded credentials\.$/,
+  );
+  assert.equal(sourceLink(photo), null);
+  assert.equal(sourceLink('https://example.org/a'), 'https://example.org/a');
+  assert.equal(localPhoto([photo]), null);
+  allowLocalSources();
   assert.equal(localFileURL(photo), photo);
   assert.equal(localFileURL('file://localhost/C:/Photos/a.jpg'), 'file:///C:/Photos/a.jpg');
   assert.equal(localFileName(photo), 'IMG_0042.JPG');

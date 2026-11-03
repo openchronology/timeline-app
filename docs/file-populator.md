@@ -72,4 +72,4 @@ A file's path says who you are and how your folders are arranged (`/home/someone
 - **The app leaves them out.** Saving to a server, sending a pull request or anything else sent to a server goes without `file://` links, and a message says how many stayed on this computer. The `.och` file on your computer keeps them.
 - **The server refuses them.** A request holding a `file://` link anywhere is refused, so no other program can store one there either.
 
-On the website, and in the offline file, a file source is shown by its name as text, noting it's a file on the computer that added it.
+Only the desktop app uses file sources. On the website and in the offline file, which can't open a file on your computer, they aren't listed and can't be added.

@@ -16,6 +16,7 @@ import { createCommunityUI } from './community-ui.js';
 import { createSuiteUI } from './suite-ui.js';
 import type { Proposal } from './community-ui.js';
 import { configureImages, imageSource, embedImages, useLocalImages } from './image-assets.js';
+import { allowLocalSources } from './local-files.js';
 import { stageScheme, themeProperties, themeScales } from './timeline-theme.js';
 import { chooseTheme, followChoice, parseChoice, storedChoice } from './theme-choice.js';
 import './styles.css';
@@ -332,6 +333,8 @@ interface Session {
 const el = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
 const desktop = !offlineHtml && !!window.__TAURI__,
   stage = el('timeline-stage');
+// Only the desktop app lists and accepts file links as sources (#433): it alone can open them.
+if (desktop) allowLocalSources();
 const platformEditor = !offlineHtml && !desktop && location.pathname === '/editor/frame';
 const sampleTimeline =
   platformEditor && new URLSearchParams(location.search).get('demo') === 'dense';
