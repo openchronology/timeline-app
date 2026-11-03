@@ -19,6 +19,11 @@ import {
   DURATION_BACKGROUNDS,
   TIMELINE_BACKGROUND,
   pluginBackdrop,
+  BACKGROUND_CHART,
+  pluginChart,
+  momentCurve,
+  chartPaths,
+  CHART_STEP,
   TIMELINE_THEME,
   pluginTheme,
   settingValue,
@@ -424,6 +429,7 @@ test('public plugin API works without accounts or PostgreSQL and validates its i
   assert.deepEqual(
     (await request(app, '/api/plugins')).body.plugins.map((p) => p.id),
     [
+      'background-chart',
       'dating-context',
       'duration-backgrounds',
       'expand-on-hover',
@@ -435,13 +441,13 @@ test('public plugin API works without accounts or PostgreSQL and validates its i
       'moment-colors',
       'moment-icons',
       'moment-shapes',
-      'moment-stacks',
     ],
   );
   // Twelve to a page: the thirteenth and on are on the next.
   assert.deepEqual(
     (await request(app, '/api/plugins?page=2')).body.plugins.map((p) => p.id),
     [
+      'moment-stacks',
       'presumptive-outline',
       'relationship-arrows',
       'rich-text-notes',
@@ -999,6 +1005,71 @@ test('timeline background: one image for the whole timeline, set on the plugin (
     second,
   );
   assert.equal(pluginBackdrop([installed, { manifest: other, enabled: true }]), image);
+});
+test("background chart: the view's moments as a smooth curve, its color set on the plugin (#289)", () => {
+  assert(isOfficialPlugin(BACKGROUND_CHART));
+  assert.deepEqual(BACKGROUND_CHART.fields, []);
+  assert.deepEqual(BACKGROUND_CHART.chart, { kind: 'moments', setting: 'color' });
+  // Enabled, it draws in the usual marker color until one is chosen; disabled, not at all.
+  assert.equal(pluginChart([]), null);
+  assert.deepEqual(pluginChart([{ manifest: BACKGROUND_CHART, enabled: true }]), { color: null });
+  assert.equal(pluginChart([{ manifest: BACKGROUND_CHART, enabled: false }]), null);
+  const [installed] = validateInstalledPlugins([
+    { manifest: BACKGROUND_CHART, enabled: true, settings: { color: '#bc6663' } },
+  ]);
+  assert.deepEqual(pluginChart([installed]), { color: '#bc6663' });
+  assert.throws(() =>
+    validateInstalledPlugins([
+      { manifest: BACKGROUND_CHART, enabled: true, settings: { color: 'red' } },
+    ]),
+  );
+  // A chart counts moments, in its own plugin's color setting if it names one.
+  for (const change of [
+    { chart: { kind: 'durations' } },
+    { chart: { kind: 'moments', setting: 'missing' } },
+    {
+      chart: { kind: 'moments', setting: 'image' },
+      settings: [{ kind: 'image-url', key: 'image', label: 'Image' }],
+    },
+    { chart: { kind: 'moments', extra: 1 } },
+  ])
+    assert.throws(() => validatePluginManifest({ ...BACKGROUND_CHART, ...change }));
+  assert.deepEqual(
+    validatePluginManifest({ ...BACKGROUND_CHART, settings: undefined, chart: { kind: 'moments' } })
+      .chart,
+    { kind: 'moments' },
+  );
+
+  // The curve: times here are pixels; each group's moments sit at its middle.
+  const x = (t) => Number(t),
+    group = (first, count, last = first) => ({ first, last, count: String(count) });
+  assert.equal(momentCurve([], x, 600, 24), null);
+  assert.equal(momentCurve([group('-50', 3), group('900', 2)], x, 600, 24), null, 'none in view');
+  const curve = momentCurve([group('100', 1), group('290', 4, '310'), group('500', 1)], x, 600, 24);
+  assert.equal(curve.length, Math.ceil(600 / CHART_STEP) + 1);
+  assert.equal(Math.max(...curve), 1);
+  const at = (px) => curve[Math.round(px / CHART_STEP)];
+  assert.equal(at(300), 1, 'highest where most moments lie');
+  assert(Math.abs(at(100) - 0.25) < 0.02 && Math.abs(at(500) - 0.25) < 0.02, 'relative heights');
+  assert(at(200) < 0.01, 'smooth, and low between them');
+  // Near the edges, weighed by what lies inside: moments spread evenly chart level to the edges.
+  const even = momentCurve(
+    Array.from({ length: 61 }, (_, i) => group(String(i * 10), 1)),
+    x,
+    600,
+    24,
+  );
+  assert(Math.min(...even) > 0.9, 'level to the edges');
+  // Counts are whole numbers of any size, as summaries give them.
+  assert.equal(momentCurve([group('10', '0')], x, 600, 24), null);
+
+  // Paths: closed down to the base, never below it, highest at the top given.
+  const { line, area } = chartPaths(curve, 48, 600, 20, 200);
+  assert.match(line, /^M48 200C/);
+  assert.match(area, /^M48 200L48 200C.*L648 200Z$/);
+  const ys = [...line.matchAll(/[\d.]+ ([\d.]+)/g)].map((m) => Number(m[1]));
+  assert(Math.max(...ys) <= 200 && Math.min(...ys) >= 20 - 0.5);
+  assert(ys.some((y) => Math.abs(y - 20) < 0.2));
 });
 test('timeline theme: colors and fonts for the whole timeline, set on the plugin (#230)', () => {
   assert(isOfficialPlugin(TIMELINE_THEME));

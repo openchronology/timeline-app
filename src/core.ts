@@ -92,6 +92,7 @@ import { Rational as Q, RationalMap } from 'rational-ordered-map';
 import { validateInstalledPlugins, imageURL } from './plugins.js';
 import type { InstalledPlugin } from './plugins.js';
 export * from './plugins.js';
+export * from './background-chart.js';
 export * from './suites.js';
 export * from './editions.js';
 export * from './capacity.js';

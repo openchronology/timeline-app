@@ -45,6 +45,11 @@ export interface PluginManifest {
   settings?: PluginSetting[];
   /** An image behind the whole timeline, beneath durations' backgrounds: a setting's value. */
   backdrop?: { kind: 'image'; setting: string };
+  /**
+   * A chart behind the timeline (#289): how many moments lie across the view, relative to the
+   * most, as a smooth curve; in the color of one of its plugin's color settings, if given.
+   */
+  chart?: { kind: 'moments'; setting?: string };
   /** The timeline's colors and fonts (#230): each theme role's setting, by role. */
   theme?: PluginTheme;
   /** Entities the plugin applies to; omitted means moments, plus durations for colors/cards. */
@@ -687,6 +692,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     'background',
     'settings',
     'backdrop',
+    'chart',
     'theme',
     'targets',
     'derive',
@@ -791,6 +797,19 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     )
       throw new Error("A timeline background reads one of its plugin's image settings.");
     result.backdrop = { kind: 'image', setting: backdrop.setting as string };
+  }
+  if (p.chart !== undefined) {
+    const chart = object(p.chart, ['kind', 'setting']);
+    if (
+      chart.kind !== 'moments' ||
+      (chart.setting !== undefined &&
+        !result.settings?.some((s) => s.key === chart.setting && s.kind === 'color'))
+    )
+      throw new Error("A background chart counts moments, in one of its plugin's color settings.");
+    result.chart = {
+      kind: 'moments',
+      ...(chart.setting === undefined ? {} : { setting: chart.setting as string }),
+    };
   }
   if (p.theme !== undefined) {
     const theme = object(p.theme, [...THEME_ROLES]);
@@ -1062,6 +1081,21 @@ export function pluginBackdrop(plugins: readonly InstalledPlugin[] = []): string
       if (candidate) image = candidate;
     }
   return image;
+}
+/**
+ * The chart behind the timeline (#289): null when no enabled plugin draws one, or the color of
+ * the last that does (null for the usual marker color).
+ */
+export function pluginChart(
+  plugins: readonly InstalledPlugin[] = [],
+): { color: string | null } | null {
+  let chart: { color: string | null } | null = null;
+  for (const { manifest, enabled, settings } of plugins)
+    if (enabled && manifest.chart) {
+      const setting = manifest.settings?.find((s) => s.key === manifest.chart!.setting);
+      chart = { color: (setting && settingValue(setting, settings?.[setting.key])) || null };
+    }
+  return chart;
 }
 /**
  * A duration's background image: the last enabled background plugin's valid image URL. Bands
@@ -1464,6 +1498,17 @@ export const TIMELINE_BACKGROUND: PluginManifest = validatePluginManifest({
   settings: [{ kind: 'image-url', key: 'imageUrl', label: 'Background image URL' }],
   backdrop: { kind: 'image', setting: 'imageUrl' },
 });
+export const BACKGROUND_CHART: PluginManifest = validatePluginManifest({
+  apiVersion: 1,
+  id: 'background-chart',
+  version: 1,
+  name: 'Background chart',
+  description:
+    'Chart how many moments lie across the view, as a smooth curve behind the timeline, its highest point where they are most numerous. It follows the view as you pan and zoom. Choose its color here in the plugin list; left blank, it takes the color of moments.',
+  fields: [],
+  settings: [{ kind: 'color', key: 'color', label: 'Chart color' }],
+  chart: { kind: 'moments', setting: 'color' },
+});
 /** The first Timeline theme (#230), with colors and fonts but no sizes; kept for its URL. */
 const LEGACY_TIMELINE_THEME: PluginManifest = validatePluginManifest({
   apiVersion: 1,
@@ -1600,6 +1645,7 @@ export const BUILTIN_PLUGINS: readonly PluginManifest[] = [
   EXPAND_ON_HOVER,
   DURATION_BACKGROUNDS,
   TIMELINE_BACKGROUND,
+  BACKGROUND_CHART,
   LEGACY_TIMELINE_THEME,
   TIMELINE_THEME,
   MOMENT_HEADINGS,
