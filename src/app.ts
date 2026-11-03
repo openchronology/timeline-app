@@ -96,7 +96,8 @@ import {
   pluginDrawsArrows,
   pluginBackdrop,
   pluginChart,
-  momentCurve,
+  momentDensity,
+  stackedCurves,
   chartPaths,
   pluginTheme,
   settingValue,
@@ -1124,6 +1125,7 @@ async function timelineQuery<T>(query: Record<string, unknown>, signal?: AbortSi
             ...(p.manifest.marker ? [p.manifest.marker.metadataKey] : []),
             ...(p.manifest.hover || p.manifest.source ? ['title', 'description'] : []),
             ...(p.manifest.hover ? ['sources'] : []),
+            ...(p.manifest.chart?.series?.length ? ['tags'] : []),
             ...derivationKeys(p.manifest),
           ]),
       ]),
@@ -9964,48 +9966,111 @@ function renderTimelineBackdrop(host: HTMLElement) {
   }
   return !!timelineBackdrop;
 }
-let timelineChart: { svg: SVGSVGElement; area: SVGPathElement; line: SVGPathElement } | null = null;
+type ChartPaths = { area: SVGPathElement; line: SVGPathElement };
+let timelineChart: (ChartPaths & { svg: SVGSVGElement; series: ChartPaths[] }) | null = null;
+type ChartGroups = Pick<FrameGroup, 'first' | 'last' | 'count'>[];
+/**
+ * A chart's series' moments in view (#434), each moment in the first series holding one of its
+ * tags, only as far as this page knows them: from its index, unsaved edits and all, when it holds
+ * the whole timeline; otherwise the view's own moments that it shows one by one, with their tags.
+ * Where the view has only counts, those moments are in the total alone. None in a comparison.
+ */
+function chartSeriesGroups(series: readonly (readonly string[])[]): ChartGroups[] {
+  if (comparison) return series.map(() => []);
+  if (model && !sparseWorkspace())
+    return model.chartSeriesGroups(
+      series,
+      viewport.left,
+      viewport.right,
+      viewport.threshold(width(), pixels()),
+    );
+  const wanted = series.map((tags) => new Set(tags)),
+    groups = series.map((): ChartGroups => []);
+  for (const group of frame.groups) {
+    if (!group.metadata) continue;
+    const tags = entityTags(group.metadata),
+      i = wanted.findIndex((wanted) => tags.some((tag) => wanted.has(tag)));
+    if (i >= 0) groups[i].push(group);
+  }
+  return groups;
+}
 /**
  * The background chart (#289): the view's moments as a smooth curve over the stage's lower
  * part, above the backgrounds and beneath the axis and markers. Its highest point is where
- * they are most numerous in view.
+ * they are most numerous in view. A chart's series (#434) are curves beneath it, each relative
+ * to the total, so where one meets the total all the moments there are in it.
  */
 function renderBackgroundChart(host: HTMLElement) {
   const chart = pluginChart(installedPlugins());
-  const values =
-    chart &&
-    momentCurve(
-      frame.groups,
-      (time) => viewport.x(parsedTime(time), width()),
-      width(),
-      Math.max(24, 2 * pixels()),
-    );
-  if (!values) {
+  const x = (time: string) => viewport.x(parsedTime(time), width()),
+    spread = Math.max(24, 2 * pixels());
+  const density = chart && momentDensity(frame.groups, x, width(), spread);
+  const most = density ? Math.max(...density) : 0;
+  if (!chart || !(most > 0)) {
     timelineChart?.svg.remove();
     timelineChart = null;
     return;
   }
-  if (!timelineChart) {
-    const ns = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(ns, 'svg'),
-      area = document.createElementNS(ns, 'path'),
+  const ns = 'http://www.w3.org/2000/svg';
+  const paths = (kind: string): ChartPaths => {
+    const area = document.createElementNS(ns, 'path'),
       line = document.createElementNS(ns, 'path');
+    area.classList.add(`timeline-chart-${kind}area`);
+    line.classList.add(`timeline-chart-${kind}line`);
+    return { area, line };
+  };
+  if (!timelineChart) {
+    const svg = document.createElementNS(ns, 'svg');
     svg.classList.add('timeline-chart');
-    area.classList.add('timeline-chart-area');
-    line.classList.add('timeline-chart-line');
-    svg.append(area, line);
-    timelineChart = { svg, area, line };
+    const total = paths('');
+    svg.append(total.area, total.line);
+    timelineChart = { svg, ...total, series: [] };
   }
   const { svg, area, line } = timelineChart;
   // Above the durations' backgrounds, whose z-indexes count up from 1.
   if (svg.parentNode !== host || host.lastChild !== svg) host.append(svg);
   const full = stageWidth(),
-    height = stageHeight();
+    height = stageHeight(),
+    top = height * 0.2;
   svg.setAttribute('viewBox', `0 0 ${full} ${height}`);
   svg.style.color = chart.color ?? '';
-  const paths = chartPaths(values, inset(), width(), height * 0.2, height);
-  area.setAttribute('d', paths.area);
-  line.setAttribute('d', paths.line);
+  const total = chartPaths(
+    density!.map((v) => v / most),
+    inset(),
+    width(),
+    top,
+    height,
+  );
+  area.setAttribute('d', total.area);
+  line.setAttribute('d', total.line);
+  // The series between the total's area and its line, in the plugin's order.
+  while (timelineChart.series.length > chart.series.length) {
+    const gone = timelineChart.series.pop()!;
+    gone.area.remove();
+    gone.line.remove();
+  }
+  while (timelineChart.series.length < chart.series.length) {
+    const added = paths('series-');
+    line.before(added.area, added.line);
+    timelineChart.series.push(added);
+  }
+  // Stacked in the plugin's order: each series' band lies on those before it.
+  const stacked = stackedCurves(
+    chartSeriesGroups(chart.series.map((series) => series.tags)),
+    x,
+    width(),
+    spread,
+    most,
+  );
+  chart.series.forEach((series, i) => {
+    const drawn = timelineChart!.series[i],
+      values = stacked[i];
+    drawn.area.style.color = drawn.line.style.color = series.color;
+    drawn.line.dataset.series = series.label;
+    const d = values ? chartPaths(values.top, inset(), width(), top, height, values.floor) : null;
+    drawn.area.setAttribute('d', d?.area ?? '');
+    drawn.line.setAttribute('d', d?.line ?? '');
+  });
 }
 let appliedTheme = '';
 /** How large the theme draws label and tick text (#267): 1 is the usual size. */

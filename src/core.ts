@@ -371,6 +371,12 @@ export class TimelineIndex {
    * only what changed.
    */
   protected journal = new Set<string>();
+  /**
+   * The moments carrying any of a chart series' tags (#434), counted by time: built when a
+   * series is first read, then kept up to date as moments change.
+   */
+  private charted: { key: string; wanted: Set<string>[]; counts: RationalMap<number>[] } | null =
+    null;
   title: string;
   description: string;
   presentation?: TimePresentation;
@@ -523,6 +529,7 @@ export class TimelineIndex {
     );
     this.points.set(time, Object.freeze(bucket));
     this.byId.set(event.id, normalized);
+    this.tally(normalized, 1);
   }
   delete(id: string): boolean {
     const event = this.byId.get(id);
@@ -546,7 +553,52 @@ export class TimelineIndex {
     if (bucket.length) this.points.set(key, Object.freeze(bucket));
     else this.points.delete(key);
     this.byId.delete(id);
+    this.tally(event, -1);
     return true;
+  }
+  /** Counts a moment in (or, -1, out of) the first chart series that holds one of its tags. */
+  private tally(event: PointEvent, change: 1 | -1) {
+    if (!this.charted) return;
+    const tags = entityTags(event.metadata),
+      i = this.charted.wanted.findIndex((wanted) => tags.some((tag) => wanted.has(tag)));
+    if (i < 0) return;
+    const counts = this.charted.counts[i],
+      time = Q.parse(event.time),
+      count = (counts.get(time) ?? 0) + change;
+    if (count > 0) counts.set(time, count);
+    else counts.delete(time);
+  }
+  /**
+   * A background chart's series between `left` and `right`, grouped at `threshold` as the frame
+   * groups its moments (#434): for each of `series` (its tags), the moments carrying any of them
+   * and of no earlier series', so that stacked, no moment counts twice. From this index as it is
+   * now, unsaved edits and all, and kept up to date as it changes. Only times and counts.
+   */
+  chartSeriesGroups(
+    series: readonly (readonly string[])[],
+    left: Q,
+    right: Q,
+    threshold: Q,
+  ): Pick<FrameGroup, 'first' | 'last' | 'count'>[][] {
+    const wanted = series.map((tags) => new Set(validateTags(tags)));
+    const key = JSON.stringify(wanted.map((tags) => [...tags].sort()));
+    if (this.charted?.key !== key) {
+      this.charted = {
+        key,
+        wanted,
+        counts: wanted.map(() => new RationalMap<number>((count) => BigInt(count))),
+      };
+      for (const event of this.byId.values()) this.tally(event, 1);
+    }
+    return this.charted.counts.map((counts) =>
+      counts
+        .overview(left, right, threshold, 'span', { includeUpper: true })
+        .groups.map((group) => ({
+          first: group.firstTime.toString(),
+          last: group.lastTime.toString(),
+          count: group.entryCount.toString(),
+        })),
+    );
   }
   /** The journal of changes since the last call, which it clears. */
   takeChanges(): string[] {

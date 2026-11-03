@@ -60,7 +60,7 @@ Each moment or duration keeps a list of arrows under the metadata key `arrows`. 
 - **Union:** an arc shows the arrowheads either of its ends asks for. If Pump failure says "to" Flood and Flood says "to" Pump failure, the arc has both. If one says "both" and the other says "none", it also has both.
 - **Editing:** the **Relationship arrows** section of moment details and the duration dialog lists the entries: the other end's name, a choice of arrow, and **×** to remove it. **Add an arrow…** lists the event's relationships that have no entry yet; choosing one adds it with an arrow toward that end. When the other end's own arrows add arrowheads to the same arc, the entry says so.
 - **Gone relationships:** an entry whose relationship was removed, or whose target doesn't exist, draws nothing. It is outlined in red with "No relationship with this entity", and stays as stored until removed with **×**. Unreadable entries (anything but a target and one of the four arrows) are drawn as nothing, shown as unreadable, and also kept. A value that isn't a list is shown but not edited here; edit it under **Additional metadata**.
-- **Look:** an arrowhead sits on its arc just short of the end, so the marker there doesn't cover it, and points into the end along the arc: at a moment's time, or at a duration's start, where the arc ends. It takes the arc's color, highlights with it when the arc is hovered, and grows and shrinks with the content as the timeline is scaled (**A−** and **A+**).
+- **Look:** each series is a lighter band in its color, from the line beneath it to its own line, between the total's area and its line.
 - **Edges of the view:** an end beyond the view shows no arrowhead.
 - **Hover text:** with an arrowhead at exactly one end, the arc's hover text reads toward it, such as "Pump failure → Flood"; otherwise it reads "A ↔ B" as before.
 - **Not analyzed:** the app doesn't follow arrows. **Separate related** and **Separate all connected** treat relationships as undirected, and there are no labels (such as "causes" or "barrier failed"). Separated tracks draw arrowheads like the whole timeline, on arcs within a track and between the tracks.
@@ -127,7 +127,18 @@ Install **Background chart** (`background-chart`) to chart how many moments lie 
 - **Look:** a translucent area under a thin line, above the timeline's and durations' backgrounds and beneath the axis, bands, links and markers. It takes the color of moments (the theme's marker color, if set), or the **Chart color** set under the plugin in the **Plugins** dialog; **Use default** clears it.
 - **Disabling:** disabling or removing the plugin removes the chart.
 
-A plugin's `chart` is `{ "kind": "moments" }`, with a `setting` naming one of its own `color` settings for the color. When several enabled plugins draw one, the last one wins.
+A plugin's `chart` is `{ "kind": "moments" }`, with a `setting` naming one of its own `color` settings for the color, and optionally `series`. When several enabled plugins draw one, the last one wins.
+
+### Series
+
+A chart can draw a curve for some of its moments beneath the total ([#434](https://github.com/openchronology/timeline-app/issues/434)): one per series, each the moments carrying any of its tags. Install **Log severity chart** (`log-severity-chart`) to chart imported log entries this way: all of them, with errors (`severity:err` and anything more severe) in red, warnings (`severity:warning`) in yellow and information (`severity:notice`, `severity:info`) in blue, the colors Log severity colors gives the entries themselves. Each color can be changed under the plugin in the **Plugins** dialog.
+
+- **Stacked:** the series add up, in the plugin's order, each lying on those before it, all on the total's scale. Where two moments are together, one of each of two series, the first series' line is at one and the second's at two: the band between them is one more, of the second kind. A moment carrying the tags of two series counts once, in the first. Where every moment is in some series, the last series' line meets the total; the gap between them is the moments in none, or ones the browser doesn't know (below).
+- **Look:** a lighter area under a line in the series' color, between the total's area and its line.
+- **Only what the browser knows:** a series counts only moments the page knows the tags of. A timeline held in the browser knows them all, unsaved edits included, so its series cover the whole view. A server or desktop timeline sends a crowded stretch as a count alone, so there a series counts just the moments the view shows one by one (with the tags its series name), and a summary of many is in the total alone; zoom in and more of the total takes its colors. No more is asked of the server or the desktop.
+- **Comparisons:** a comparison or separation draws the total only.
+
+Each of `series` (one to eight) is `{ "label": "Errors", "tags": ["severity:err", "severity:crit"], "color": "#bc6663" }`: a label of up to 100 characters, one to forty tags (kept as tags are: trimmed and lower case) and a color, with an optional `setting` naming one of the plugin's `color` settings that, when set, is used instead.
 
 ## Timeline theme
 

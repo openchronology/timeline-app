@@ -750,6 +750,17 @@ html.timeline-fullscreen .timeline-stage {
   stroke-opacity: 0.55;
   stroke-width: 1.5;
 }
+/* A chart's series (#434): lighter fills beneath the total, each line in its own color. */
+.timeline-chart-series-area {
+  fill: currentColor;
+  fill-opacity: 0.12;
+}
+.timeline-chart-series-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-opacity: 0.8;
+  stroke-width: 1.5;
+}
 /* While a background shows, text sits on frosted white, and lines and markers carry a white
    halo, setting the timeline apart from whatever image is behind it (#220). */
 .timeline-stage.over-backgrounds .event-label {
