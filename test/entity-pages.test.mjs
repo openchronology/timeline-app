@@ -98,7 +98,7 @@ test('Times are ISO 8601 only on Gregorian timelines, in years schema.org allows
   assert.equal(sharing.isoTime(timeline(), 'soon'), null);
 });
 
-test('Structured data: an Event on Gregorian timelines, otherwise a CreativeWork', () => {
+test('Structured data: a CreativeWork covering its time, in ISO 8601 on Gregorian timelines', () => {
   const moment = {
     kind: 'moment',
     id: 'leg:2',
@@ -110,11 +110,11 @@ test('Structured data: an Event on Gregorian timelines, otherwise a CreativeWork
   };
   assert.deepEqual(sharing.entityStructuredData(timeline(), moment), {
     '@context': 'https://schema.org',
-    '@type': 'Event',
+    '@type': 'CreativeWork',
     name: 'Storm',
     url: 'https://chronology.example/ada/voyages/moments/leg%3A2',
     description: 'Rough seas',
-    startDate: '1970-01-02T00:00:00Z',
+    temporalCoverage: '1970-01-02T00:00:00Z',
     keywords: 'weather, sea',
     isPartOf: {
       '@type': 'CreativeWork',
@@ -131,11 +131,11 @@ test('Structured data: an Event on Gregorian timelines, otherwise a CreativeWork
     last: '172800/1',
   });
   assert.deepEqual(
-    [duration['@type'], duration.startDate, duration.endDate, duration.url],
+    [duration['@type'], duration.temporalCoverage, duration.startDate, duration.url],
     [
-      'Event',
-      '1970-01-01T00:00:00Z',
-      '1970-01-03T00:00:00Z',
+      'CreativeWork',
+      '1970-01-01T00:00:00Z/1970-01-03T00:00:00Z',
+      undefined,
       'https://chronology.example/ada/voyages/durations/crossing',
     ],
   );

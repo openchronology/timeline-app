@@ -159,10 +159,12 @@ described by their labels instead of their notes, and ask search engines not to 
   when it was made and last changed, and its owner as author.
 - **Structured data:** each moment and duration page also describes itself as
   [schema.org](https://schema.org) JSON-LD:
-  - an `Event` with its `startDate` (and a duration's `endDate`) on a timeline of Gregorian
-    dates in years 0000–9999;
-  - otherwise a `CreativeWork` whose `temporalCoverage` is its time as displayed;
-  - either way, with its notes, tags as keywords, and the timeline and its owner (`isPartOf`).
+  - a `CreativeWork` whose `temporalCoverage` is its time: an ISO 8601 date (a duration's,
+    an interval `start/end`) on a timeline of Gregorian dates in years 0000–9999, otherwise
+    its time as displayed;
+  - with its notes, tags as keywords, and the timeline and its owner (`isPartOf`);
+  - never an `Event`, which search engines take for a happening to attend, and fault for
+    lacking a place, tickets and organizer.
   - Private and labelled timelines' pages have none.
 
 ## Embedding
