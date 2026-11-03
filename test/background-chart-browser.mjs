@@ -152,21 +152,29 @@ export async function checkBackgroundChart(page, restore) {
     () => document.querySelectorAll('.timeline-chart-series-line[d^="M"]').length === 3,
   );
   const series = await page.evaluate(() => {
-    const stage = document.getElementById('timeline-stage').getBoundingClientRect();
-    const top = (path) => {
-      const length = path.getTotalLength();
-      return Math.min(
-        ...Array.from({ length: 200 }, (_, i) => path.getPointAtLength((i / 199) * length).y),
-      );
+    const stage = document.getElementById('timeline-stage'),
+      box = stage.getBoundingClientRect();
+    const [left, right] = [stage.dataset.viewLeft, stage.dataset.viewRight].map((q) =>
+      q.split('/').reduce((n, d) => Number(n) / Number(d)),
+    );
+    const inset = box.width < 600 ? 20 : 48;
+    // A line's height over the cluster (700) and over the warning between two notices (200).
+    const heights = (path) => {
+      const length = path.getTotalLength(),
+        points = Array.from({ length: 600 }, (_, i) => path.getPointAtLength((i / 599) * length));
+      return [700, 200].map((t) => {
+        const x = ((t - left) / (right - left)) * (box.width - 2 * inset) + inset;
+        return (
+          box.height - points.reduce((a, c) => (Math.abs(c.x - x) < Math.abs(a.x - x) ? c : a)).y
+        );
+      });
     };
-    const total = top(document.querySelector('.timeline-chart-line'));
     return {
-      height: stage.height,
-      total,
+      total: heights(document.querySelector('.timeline-chart-line')),
       lines: [...document.querySelectorAll('.timeline-chart-series-line')].map((line) => ({
         label: line.dataset.series,
         color: getComputedStyle(line).color,
-        top: top(line),
+        heights: heights(line),
         beforeTotal: !!(
           line.compareDocumentPosition(document.querySelector('.timeline-chart-line')) &
           Node.DOCUMENT_POSITION_FOLLOWING
@@ -182,10 +190,18 @@ export async function checkBackgroundChart(page, restore) {
       ['Information', 'rgb(122, 173, 196)', true],
     ],
   );
-  const [errors, warnings, information] = series.lines.map((l) => series.height - l.top);
-  // Errors reach the total's top; the others stay low beneath it, information above warnings.
-  assert(Math.abs(series.height - errors - series.total) < 2, `errors at ${errors}`);
-  assert(warnings < 0.2 * errors && information > warnings, `${warnings} ${information}`);
+  const [errors, warnings, information] = series.lines.map((l) => l.heights);
+  const near = (a, b, what) => assert(Math.abs(a - b) < 3, `${what}: ${a} against ${b}`);
+  // Stacked: over the cluster, all errors, the errors reach the total and the others add none.
+  near(errors[0], series.total[0], 'errors over the cluster');
+  near(warnings[0], errors[0], 'no warnings over the cluster');
+  near(information[0], errors[0], 'no information over the cluster');
+  // Over the three alone, the warning lies on the (no) errors, and the notices on it, making
+  // the total: each is more of its own kind.
+  assert(errors[1] < 2, `no errors there: ${errors[1]}`);
+  assert(warnings[1] > errors[1] + 5, `a warning there: ${warnings}`);
+  assert(information[1] > warnings[1] + 5, `notices on the warning: ${information}`);
+  near(information[1], series.total[1], 'all of them, the total');
 
   await load(restore);
   console.log(

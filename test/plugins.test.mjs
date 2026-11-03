@@ -21,7 +21,7 @@ import {
   pluginBackdrop,
   BACKGROUND_CHART,
   LOG_SEVERITY_CHART,
-  seriesCurve,
+  stackedCurves,
   momentDensity,
   pluginChart,
   momentCurve,
@@ -1120,51 +1120,56 @@ test('chart series: moments with any of their tags, each a curve beneath the tot
   ])
     assert.throws(() => validatePluginManifest(series(bad)), JSON.stringify(bad));
 
-  // Curves: relative to the total's most, so a series lies beneath it, and meets it where all
-  // the moments are its own.
+  // Curves: stacked in order and relative to the total's most, so two moments together of two
+  // series put the first at one and the second at two, and where all the moments are in series
+  // the last meets the total.
   const x = (t) => Number(t),
     group = (first, count) => ({ first, last: first, count: String(count) });
   const all = [group('100', 4), group('300', 2)],
-    errors = [group('100', 1), group('300', 2)];
+    errors = [group('100', 1), group('300', 1)],
+    warnings = [group('300', 1)];
   const density = momentDensity(all, x, 600, 24),
     most = Math.max(...density);
-  const curve = seriesCurve(errors, x, 600, 24, most),
-    at = (px) => curve[Math.round(px / CHART_STEP)];
-  assert(Math.abs(at(100) - 0.25) < 0.02, 'a quarter of the most');
-  assert(Math.abs(at(300) - 0.5) < 0.02, 'all of the moments there');
-  assert.equal(seriesCurve([], x, 600, 24, most), null);
-  assert.equal(seriesCurve([group('900', 3)], x, 600, 24, most), null, 'none in view');
-  assert.equal(Math.max(...seriesCurve(all, x, 600, 24, most / 2)), 1, 'never above the top');
+  const [e, none, w] = stackedCurves([errors, [group('900', 3)], warnings], x, 600, 24, most),
+    at = (curve, px) => curve[Math.round(px / CHART_STEP)];
+  assert(Math.abs(at(e.top, 100) - 0.25) < 0.02, 'a quarter of the most');
+  assert(Math.abs(at(e.top, 300) - 0.25) < 0.02, 'one of the two');
+  assert.equal(none, null, 'none in view');
+  assert.deepEqual(w.floor, e.top, 'on the series before it');
+  assert(Math.abs(at(w.top, 300) - 0.5) < 0.02, 'one more, of its kind: the total there');
+  assert(Math.abs(at(w.top, 100) - 0.25) < 0.02, 'none of its own there');
+  assert.deepEqual(stackedCurves([], x, 600, 24, most), []);
+  const [, over] = stackedCurves([all, all], x, 600, 24, most / 2);
+  assert.equal(Math.max(...over.top), 1, 'never above the top');
 
-  // In the browser's index, counted from its moments and kept up to date as they change.
+  // In the browser's index, counted from its moments and kept up to date as they change, each
+  // moment in the first series holding one of its tags.
   const index = new TimelineIndex({
     title: 'Logs',
     description: '',
     events: [
       { id: 'a', time: '1/1', metadata: { tags: ['severity:err'] } },
       { id: 'b', time: '1/1', metadata: { tags: ['severity:crit', 'web'] } },
-      { id: 'c', time: '5/1', metadata: { tags: ['severity:info'] } },
+      { id: 'c', time: '5/1', metadata: { tags: ['severity:info', 'severity:err'] } },
       { id: 'd', time: '9/1', metadata: { title: 'untagged' } },
     ],
   });
-  const tags = LOG_SEVERITY_CHART.chart.series[0].tags;
-  const counted = () =>
+  const severities = LOG_SEVERITY_CHART.chart.series.map((s) => s.tags);
+  const counted = (threshold = Q.zero) =>
     index
-      .taggedGroups(tags, Q.parse('0/1'), Q.parse('10/1'), Q.zero)
-      .map((g) => `${g.first}:${g.count}`);
-  assert.deepEqual(counted(), ['1/1:2']);
+      .chartSeriesGroups(severities, Q.parse('0/1'), Q.parse('10/1'), threshold)
+      .map((groups) => groups.map((g) => `${g.first}:${g.count}`));
+  assert.deepEqual(counted(), [['1/1:2', '5/1:1'], [], []]);
   index.put({ id: 'd', time: '9/1', metadata: { tags: ['severity:alert'] } });
-  index.put({ id: 'a', time: '3/1', metadata: { tags: ['severity:err'] } });
+  index.put({ id: 'a', time: '3/1', metadata: { tags: ['severity:warning'] } });
   index.put({ id: 'b', time: '1/1', metadata: { tags: ['web'] } });
-  assert.deepEqual(counted(), ['3/1:1', '9/1:1']);
+  index.put({ id: 'c', time: '5/1', metadata: { tags: ['severity:info'] } });
+  assert.deepEqual(counted(), [['9/1:1'], ['3/1:1'], ['5/1:1']]);
   index.delete('d');
-  assert.deepEqual(counted(), ['3/1:1']);
+  assert.deepEqual(counted(), [[], ['3/1:1'], ['5/1:1']]);
   // Grouped as the view's moments are.
-  index.put({ id: 'e', time: '4/1', metadata: { tags: ['severity:emerg'] } });
-  assert.deepEqual(
-    index.taggedGroups(tags, Q.parse('0/1'), Q.parse('10/1'), Q.parse('2/1')).map((g) => g.count),
-    ['2'],
-  );
+  index.put({ id: 'e', time: '4/1', metadata: { tags: ['severity:warning'] } });
+  assert.deepEqual(counted(Q.parse('2/1'))[1], ['3/1:2']);
 
   // A server's overview sends a moment's tags that the series count, so the browser can tell
   // the view's moments apart; a summary of many is in the total alone.

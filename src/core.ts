@@ -89,7 +89,7 @@ export {
 } from './search.js';
 export type { SearchResult, SearchPage } from './search.js';
 import { Rational as Q, RationalMap } from 'rational-ordered-map';
-import { validateInstalledPlugins, imageURL, CHART_SERIES_LIMIT } from './plugins.js';
+import { validateInstalledPlugins, imageURL } from './plugins.js';
 import type { InstalledPlugin } from './plugins.js';
 export * from './plugins.js';
 export * from './background-chart.js';
@@ -375,7 +375,8 @@ export class TimelineIndex {
    * The moments carrying any of a chart series' tags (#434), counted by time: built when a
    * series is first read, then kept up to date as moments change.
    */
-  private tagged = new Map<string, { wanted: Set<string>; counts: RationalMap<number> }>();
+  private charted: { key: string; wanted: Set<string>[]; counts: RationalMap<number>[] } | null =
+    null;
   title: string;
   description: string;
   presentation?: TimePresentation;
@@ -555,51 +556,49 @@ export class TimelineIndex {
     this.tally(event, -1);
     return true;
   }
-  /** Counts a moment in (or, -1, out of) the series counts that hold its tags. */
+  /** Counts a moment in (or, -1, out of) the first chart series that holds one of its tags. */
   private tally(event: PointEvent, change: 1 | -1) {
-    if (!this.tagged.size) return;
-    const tags = entityTags(event.metadata);
-    for (const { wanted, counts } of this.tagged.values())
-      if (tags.some((tag) => wanted.has(tag))) {
-        const time = Q.parse(event.time),
-          count = (counts.get(time) ?? 0) + change;
-        if (count > 0) counts.set(time, count);
-        else counts.delete(time);
-      }
+    if (!this.charted) return;
+    const tags = entityTags(event.metadata),
+      i = this.charted.wanted.findIndex((wanted) => tags.some((tag) => wanted.has(tag)));
+    if (i < 0) return;
+    const counts = this.charted.counts[i],
+      time = Q.parse(event.time),
+      count = (counts.get(time) ?? 0) + change;
+    if (count > 0) counts.set(time, count);
+    else counts.delete(time);
   }
   /**
-   * The moments carrying any of `tags` between `left` and `right`, grouped at `threshold` as the
-   * frame groups its moments (#434): a background chart's series, from this index as it is now,
-   * unsaved edits and all. Only their times and counts.
+   * A background chart's series between `left` and `right`, grouped at `threshold` as the frame
+   * groups its moments (#434): for each of `series` (its tags), the moments carrying any of them
+   * and of no earlier series', so that stacked, no moment counts twice. From this index as it is
+   * now, unsaved edits and all, and kept up to date as it changes. Only times and counts.
    */
-  taggedGroups(
-    tags: readonly string[],
+  chartSeriesGroups(
+    series: readonly (readonly string[])[],
     left: Q,
     right: Q,
     threshold: Q,
-  ): Pick<FrameGroup, 'first' | 'last' | 'count'>[] {
-    const key = validateTags(tags).sort().join(',');
-    let entry = this.tagged.get(key);
-    if (!entry) {
-      const wanted = new Set(key.split(','));
-      const times = new Map<string, number>();
-      for (const event of this.byId.values())
-        if (entityTags(event.metadata).some((tag) => wanted.has(tag)))
-          times.set(event.time, (times.get(event.time) ?? 0) + 1);
-      const counts = new RationalMap<number>((count) => BigInt(count));
-      for (const [time, count] of times) counts.set(Q.parse(time), count);
-      // Series that are no longer charted go once there are more than a chart draws.
-      if (this.tagged.size >= CHART_SERIES_LIMIT)
-        this.tagged.delete(this.tagged.keys().next().value!);
-      this.tagged.set(key, (entry = { wanted, counts }));
+  ): Pick<FrameGroup, 'first' | 'last' | 'count'>[][] {
+    const wanted = series.map((tags) => new Set(validateTags(tags)));
+    const key = JSON.stringify(wanted.map((tags) => [...tags].sort()));
+    if (this.charted?.key !== key) {
+      this.charted = {
+        key,
+        wanted,
+        counts: wanted.map(() => new RationalMap<number>((count) => BigInt(count))),
+      };
+      for (const event of this.byId.values()) this.tally(event, 1);
     }
-    return entry.counts
-      .overview(left, right, threshold, 'span', { includeUpper: true })
-      .groups.map((group) => ({
-        first: group.firstTime.toString(),
-        last: group.lastTime.toString(),
-        count: group.entryCount.toString(),
-      }));
+    return this.charted.counts.map((counts) =>
+      counts
+        .overview(left, right, threshold, 'span', { includeUpper: true })
+        .groups.map((group) => ({
+          first: group.firstTime.toString(),
+          last: group.lastTime.toString(),
+          count: group.entryCount.toString(),
+        })),
+    );
   }
   /** The journal of changes since the last call, which it clears. */
   takeChanges(): string[] {

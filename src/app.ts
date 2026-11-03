@@ -97,7 +97,7 @@ import {
   pluginBackdrop,
   pluginChart,
   momentDensity,
-  seriesCurve,
+  stackedCurves,
   chartPaths,
   pluginTheme,
   settingValue,
@@ -9970,24 +9970,29 @@ type ChartPaths = { area: SVGPathElement; line: SVGPathElement };
 let timelineChart: (ChartPaths & { svg: SVGSVGElement; series: ChartPaths[] }) | null = null;
 type ChartGroups = Pick<FrameGroup, 'first' | 'last' | 'count'>[];
 /**
- * A chart series' moments in view (#434), only as far as this page knows them: from its index,
- * unsaved edits and all, when it holds the whole timeline; otherwise the view's own moments that
- * it shows one by one, with their tags. Where the view has only counts, those moments are in the
- * total alone. None in a comparison.
+ * A chart's series' moments in view (#434), each moment in the first series holding one of its
+ * tags, only as far as this page knows them: from its index, unsaved edits and all, when it holds
+ * the whole timeline; otherwise the view's own moments that it shows one by one, with their tags.
+ * Where the view has only counts, those moments are in the total alone. None in a comparison.
  */
-function chartSeriesGroups(tags: string[]): ChartGroups | null {
-  if (comparison) return null;
+function chartSeriesGroups(series: readonly (readonly string[])[]): ChartGroups[] {
+  if (comparison) return series.map(() => []);
   if (model && !sparseWorkspace())
-    return model.taggedGroups(
-      tags,
+    return model.chartSeriesGroups(
+      series,
       viewport.left,
       viewport.right,
       viewport.threshold(width(), pixels()),
     );
-  const wanted = new Set(tags);
-  return frame.groups.filter(
-    (group) => group.metadata && entityTags(group.metadata).some((tag) => wanted.has(tag)),
-  );
+  const wanted = series.map((tags) => new Set(tags)),
+    groups = series.map((): ChartGroups => []);
+  for (const group of frame.groups) {
+    if (!group.metadata) continue;
+    const tags = entityTags(group.metadata),
+      i = wanted.findIndex((wanted) => tags.some((tag) => wanted.has(tag)));
+    if (i >= 0) groups[i].push(group);
+  }
+  return groups;
 }
 /**
  * The background chart (#289): the view's moments as a smooth curve over the stage's lower
@@ -10049,13 +10054,20 @@ function renderBackgroundChart(host: HTMLElement) {
     line.before(added.area, added.line);
     timelineChart.series.push(added);
   }
+  // Stacked in the plugin's order: each series' band lies on those before it.
+  const stacked = stackedCurves(
+    chartSeriesGroups(chart.series.map((series) => series.tags)),
+    x,
+    width(),
+    spread,
+    most,
+  );
   chart.series.forEach((series, i) => {
     const drawn = timelineChart!.series[i],
-      groups = chartSeriesGroups(series.tags),
-      values = groups && seriesCurve(groups, x, width(), spread, most);
+      values = stacked[i];
     drawn.area.style.color = drawn.line.style.color = series.color;
     drawn.line.dataset.series = series.label;
-    const d = values ? chartPaths(values, inset(), width(), top, height) : null;
+    const d = values ? chartPaths(values.top, inset(), width(), top, height, values.floor) : null;
     drawn.area.setAttribute('d', d?.area ?? '');
     drawn.line.setAttribute('d', d?.line ?? '');
   });
