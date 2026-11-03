@@ -2,7 +2,7 @@
 // Plugins (docs/plugins.md): manifests of the fields moments and durations carry (images, stacks,
 // colors, shapes, headings and more), their validation, the built-in plugins and the library,
 // and reading each field's value.
-import { localFileURL } from './local-files.js';
+import { localFileURL, localPhoto } from './local-files.js';
 import { compilePluginScript } from './custom-time.js';
 import { contentLabels, CONTENT_LABELS_KEY } from './content-labels.js';
 import { validateTags } from './tags.js';
@@ -32,7 +32,8 @@ export interface PluginManifest {
   description: string;
   fields: PluginField[];
   marker?: {
-    kind: 'image' | 'color' | 'shape' | 'heading' | 'outline';
+    /** `file-thumbnail` (#440): the moment's photo on this computer, from a list of sources. */
+    kind: 'image' | 'color' | 'shape' | 'heading' | 'outline' | 'file-thumbnail';
     metadataKey: string;
   };
   hover?: { kind: 'card' };
@@ -557,6 +558,10 @@ function scriptEffects(
         const icon = imageURL(metadata[manifest.marker.metadataKey]);
         if (icon) effects.icon = icon;
       }
+      if (manifest.marker?.kind === 'file-thumbnail') {
+        const photo = localPhoto(metadata[manifest.marker.metadataKey]);
+        if (photo) effects.icon = photo;
+      }
       if (manifest.marker?.kind === 'heading') {
         const level = headingValue(metadata[manifest.marker.metadataKey]);
         const font = manifest.fields.find((f) => f.kind === 'font');
@@ -759,7 +764,11 @@ export function validatePluginManifest(value: unknown): PluginManifest {
   };
   if (p.marker !== undefined) {
     const m = object(p.marker, ['kind', 'metadataKey']);
-    if (!['image', 'color', 'shape', 'heading', 'outline'].includes(m.kind as string))
+    if (
+      !['image', 'color', 'shape', 'heading', 'outline', 'file-thumbnail'].includes(
+        m.kind as string,
+      )
+    )
       throw new Error('Unsupported marker component.');
     result.marker = {
       kind: m.kind as NonNullable<PluginManifest['marker']>['kind'],
@@ -1243,6 +1252,11 @@ export function pluginMetadata(
         if (typeof metadata[name] === 'string')
           result[name] = (metadata[name] as string).slice(0, 10000);
         else if (metadata[name] === true) result[name] = true; // A toggle that is on (#325).
+      // The photo a thumbnail marker shows (#440): the list's first, on this computer.
+      if (manifest.marker?.kind === 'file-thumbnail') {
+        const photo = localPhoto(metadata[manifest.marker.metadataKey]);
+        if (photo) result[manifest.marker.metadataKey] = [photo];
+      }
       for (const field of manifest.fields)
         if (
           (field.kind === 'stack' ||
@@ -1311,6 +1325,21 @@ export const MOMENT_ICONS: PluginManifest = validatePluginManifest({
   fields: [{ kind: 'image-url', metadataKey: 'iconUrl', label: 'Moment icon URL' }],
   marker: { kind: 'image', metadataKey: 'iconUrl' },
   source: 'function render(moment: string, api: PluginAPI): string { return api.icon("iconUrl"); }',
+});
+/**
+ * File thumbnails (#440): a moment whose source is a photo on this computer (a `file:///` link,
+ * as the desktop's file populator gives, #433) shows a small picture of it as its marker. Only
+ * the desktop app can show them, from the photo itself; elsewhere the marker is as before.
+ */
+export const FILE_THUMBNAILS: PluginManifest = validatePluginManifest({
+  apiVersion: 1,
+  id: 'file-thumbnails',
+  version: 1,
+  name: 'File thumbnails',
+  description:
+    "In the desktop app, show a small picture of each moment's photo, from its first source that is a photo on this computer.",
+  fields: [],
+  marker: { kind: 'file-thumbnail', metadataKey: 'sources' },
 });
 export interface StackEntry {
   id: string;
@@ -1740,6 +1769,7 @@ export const BUILTIN_PLUGINS: readonly PluginManifest[] = [
   MOMENT_SHAPES,
   LEGACY_MOMENT_SOURCES,
   MOMENT_SOURCES,
+  FILE_THUMBNAILS,
   LEGACY_DATING_CONTEXT,
   DATING_CONTEXT,
   HISTORICAL_DATES,

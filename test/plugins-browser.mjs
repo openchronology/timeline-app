@@ -505,6 +505,11 @@ export async function checkPlugins(page, restoreDocument, offline = false) {
       new RegExp(`${official} official plugins included`),
     );
     assert.equal(await page.locator('.library-plugin').count(), firstPage);
+    // Searched for, as alphabetically it may be past the first page.
+    await input('plugin-search').fill('icons');
+    await page.waitForFunction(() =>
+      document.getElementById('plugin-library-status').textContent.includes('1 official plugins'),
+    );
     assert(
       await page
         .locator('.library-plugin', { hasText: 'Moment icons' })

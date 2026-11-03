@@ -12,6 +12,9 @@ import { Q, Viewport, TimelineIndex } from '../dist/core.mjs';
  * makes opens unsaved with a summary; and a moment's file opens in its app once the timeline is
  * trusted, or shows in its folder.
  */
+// A one-pixel picture, as the desktop's thumbnails come: a data: URL.
+const THUMBNAIL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 export async function checkPopulate(browser) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const photo = 'file:///home/someone/Pictures/Trip%202024/IMG_0042.JPG';
@@ -71,12 +74,19 @@ export async function checkPopulate(browser) {
       if (q.kind === 'events')
         return { events: index.eventsBetween(q.lower, q.upper, 100), next: null };
       const view = new Viewport(Q.parse(q.lower), Q.parse(q.upper).sub(Q.parse(q.lower)));
-      return index.frame(
+      const frame = index.frame(
         view,
         1000,
         Q.parse(q.threshold).div(view.span).toApproximateNumber() * 1000,
       );
+      // A lone moment's metadata, as native-store sends it.
+      for (const group of frame.groups)
+        if (group.id) group.metadata = document.events.find((e) => e.id === group.id)?.metadata;
+      return frame;
     }
+    // A thumbnail (#440) for each photo asked for; a video has none.
+    if (command === 'desktop_thumbnails')
+      return args.urls.map((url) => (/\.jpg$/i.test(url) ? THUMBNAIL : null));
     if (['desktop_open_file', 'desktop_reveal_file', 'desktop_populate_clear'].includes(command))
       return null;
     throw new Error('Unexpected desktop command ' + command);
@@ -169,13 +179,28 @@ export async function checkPopulate(browser) {
     assert.equal(asked.template.presentation.mode, 'gregorian');
     assert.deepEqual(
       asked.template.plugins.map((p) => p.manifest.id),
-      ['moment-sources'],
+      ['moment-sources', 'file-thumbnails'],
     );
     assert(!JSON.stringify(asked).includes('/home/someone'), 'the page names no path');
     assert.match(
       await page.locator('#toast').textContent(),
       /Made 2 moments from files\. Left out: 1 had no recorded date\./,
     );
+
+    // The photo's marker shows its thumbnail (#440); the video's, none.
+    await page.locator('#fit-button').click();
+    await page.waitForFunction(
+      (src) =>
+        [...document.querySelectorAll('.event-marker.icon img')].some((img) => img.src === src),
+      THUMBNAIL,
+    );
+    const asks = calls.filter(([command]) => command === 'desktop_thumbnails');
+    assert.deepEqual(
+      [...new Set(asks.flatMap(([, args]) => args.urls))],
+      [photo],
+      'only the photo is asked for',
+    );
+    assert.equal(await page.locator('.event-marker.icon').count(), 1);
 
     // A moment's file: its name as a link, opened in its app once the timeline is trusted.
     await page.locator('#fit-button').click();
@@ -201,7 +226,7 @@ export async function checkPopulate(browser) {
     assert.deepEqual(calls.find(([c]) => c === 'desktop_reveal_file')[1], { url: photo });
     assert.deepEqual(errors, []);
     console.log(
-      'PASS file populator: choices follow the kind of file, Rust is asked without a path, the new timeline opens with a summary, and a file opens in its app or folder.',
+      'PASS file populator: choices follow the kind of file, Rust is asked without a path, the new timeline opens with a summary, a photo shows its thumbnail, and a file opens in its app or folder.',
     );
   } finally {
     await context.close();

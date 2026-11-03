@@ -446,6 +446,10 @@ Moment shapes version 2 adds **Moment size**: small (16 px), medium (22 px, the 
 
 Custom plugins can declare a `size` field and return `api.size(api.get("fieldKey"))`, or use `api.size("small")`, `api.size("medium")`, and `api.size("large")`. Combine it with other effects using `api.merge`. Sizes are bounded host settings; arbitrary CSS and dimensions are unavailable. A later plugin may override an earlier size effect.
 
+## File thumbnails
+
+The official **File thumbnails** plugin (`file-thumbnails`, [#440](https://github.com/openchronology/timeline-app/issues/440)) shows, in the desktop app, a small picture of a moment's photo as its marker: the first of its `sources` that is a `file:///` link to a photo on this computer. Its marker component is `{ "kind": "file-thumbnail", "metadataKey": "sources" }`; it has no fields. On the website and in the offline file such moments keep their usual markers. See [timelines from files](file-populator.md#thumbnails).
+
 ## Sources
 
 The official **Sources** plugin (`moment-sources`, version 2) reads the existing

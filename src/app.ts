@@ -15,7 +15,7 @@ import { comparisonUI } from './comparison-ui.js';
 import { createCommunityUI } from './community-ui.js';
 import { createSuiteUI } from './suite-ui.js';
 import type { Proposal } from './community-ui.js';
-import { configureImages, imageSource, embedImages } from './image-assets.js';
+import { configureImages, imageSource, embedImages, useLocalImages } from './image-assets.js';
 import { stageScheme, themeProperties, themeScales } from './timeline-theme.js';
 import { chooseTheme, followChoice, parseChoice, storedChoice } from './theme-choice.js';
 import './styles.css';
@@ -85,6 +85,7 @@ import {
   validatePresentation,
   DEFAULT_PRESENTATION,
   MOMENT_SOURCES,
+  FILE_THUMBNAILS,
   UNIT_PRESETS,
   CUSTOM_EXAMPLE,
   anchorOf,
@@ -7861,6 +7862,29 @@ if (desktop) {
     trustedFiles = documentRequest;
     void window.__TAURI__!.core.invoke('desktop_open_file', { url: link.href }).catch(fail);
   });
+  // Thumbnails of photos on this computer (#440), as markers show them: asked of Rust in
+  // batches of up to 64 as markers need them, kept here (the latest 2,000, and the photos that
+  // have none), and drawn when they come. They stay in this page: they are never saved.
+  const thumbnails = new Map<string, string | null>(),
+    wantedThumbnails = new Set<string>();
+  let thumbnailTimer: ReturnType<typeof setTimeout> | undefined;
+  const askThumbnails = async () => {
+    const urls = [...wantedThumbnails].slice(0, 64);
+    for (const url of urls) wantedThumbnails.delete(url);
+    const found = await window
+      .__TAURI__!.core.invoke<(string | null)[]>('desktop_thumbnails', { urls })
+      .catch(() => [] as (string | null)[]);
+    urls.forEach((url, i) => thumbnails.set(url, found[i] ?? null));
+    while (thumbnails.size > 2000) thumbnails.delete(thumbnails.keys().next().value!);
+    requestRender(false);
+    thumbnailTimer = wantedThumbnails.size ? setTimeout(() => void askThumbnails(), 0) : undefined;
+  };
+  useLocalImages((url) => {
+    if (thumbnails.has(url)) return thumbnails.get(url)!;
+    wantedThumbnails.add(url);
+    thumbnailTimer ??= setTimeout(() => void askThumbnails(), 30);
+    return null;
+  });
   // The file populator (#433): a new timeline of the files in folders picked natively, each
   // moment's source the file itself, dated as chosen. The page never names a path: Rust scans
   // only what was picked in its own dialog.
@@ -7930,7 +7954,8 @@ if (desktop) {
       zone: el<HTMLSelectElement>('populate-zone').value,
       location: media && input('populate-location').checked,
     };
-    // Dated in this computer's zone, with each moment's file listed by Sources.
+    // Dated in this computer's zone, each moment's file listed by Sources and, when it is a
+    // photo, shown as its marker by File thumbnails (#440).
     const template: TimelineDocument = {
       format: 'openchronology',
       version: 1,
@@ -7941,7 +7966,10 @@ if (desktop) {
         mode: 'gregorian',
         offsetMinutes: Math.max(-1439, Math.min(1439, -new Date().getTimezoneOffset())),
       },
-      plugins: [{ manifest: MOMENT_SOURCES, enabled: true }],
+      plugins: [
+        { manifest: MOMENT_SOURCES, enabled: true },
+        { manifest: FILE_THUMBNAILS, enabled: true },
+      ],
       events: [],
     };
     const progress = new window.__TAURI__!.core.Channel<{ scanned: number; added: number }>();

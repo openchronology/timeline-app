@@ -22,3 +22,6 @@ reqwest = { version = "=0.12.28", default-features = false, features = ["json", 
 nom-exif = "=3.8.0"
 walkdir = "=2.5.0"
 chrono = { version = "=0.4.45", default-features = false, features = ["clock", "std"] }
+# Thumbnails of those files' photos (#440).
+image = { version = "=0.25.10", default-features = false, features = ["jpeg", "png", "webp", "tiff", "gif", "bmp"] }
+base64 = "=0.22.1"

@@ -437,6 +437,7 @@ test('public plugin API works without accounts or PostgreSQL and validates its i
       'dating-context',
       'duration-backgrounds',
       'expand-on-hover',
+      'file-thumbnails',
       'focus-on-hover',
       'geological-ages',
       'moment-headings',
@@ -444,13 +445,13 @@ test('public plugin API works without accounts or PostgreSQL and validates its i
       'log-severity-chart',
       'log-severity-colors',
       'moment-colors',
-      'moment-icons',
     ],
   );
   // Twelve to a page: the thirteenth and on are on the next.
   assert.deepEqual(
     (await request(app, '/api/plugins?page=2')).body.plugins.map((p) => p.id),
     [
+      'moment-icons',
       'moment-shapes',
       'moment-stacks',
       'presumptive-outline',

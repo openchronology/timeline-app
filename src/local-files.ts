@@ -32,6 +32,22 @@ export function localFileURL(value: unknown): string | null {
     return null;
   }
 }
+/**
+ * Photos a thumbnail can be made of (#440), by extension: the desktop's file populator's photos
+ * (src-tauri/src/populate.rs).
+ */
+const PHOTOS = new Set(
+  'jpg jpeg heic heif avif png webp tif tiff dng cr2 cr3 nef arw raf orf rw2 iiq'.split(' '),
+);
+/** The first of a list of sources that is a photo on this computer (#440); null when none is. */
+export function localPhoto(value: unknown): string | null {
+  for (const item of Array.isArray(value) ? value.slice(0, 100) : []) {
+    const url = localFileURL(item);
+    const extension = url?.split('.').at(-1)?.toLowerCase();
+    if (url && extension && PHOTOS.has(extension)) return url;
+  }
+  return null;
+}
 /** The file's name, from the last part of its link's path ("IMG_0042.jpg"). */
 export function localFileName(url: string): string {
   const last = new URL(url).pathname.split('/').filter(Boolean).at(-1) ?? url;
