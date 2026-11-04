@@ -523,10 +523,15 @@ const SCENARIOS = [
     async run(d, t) {
       await closeDialogs(d);
       await d.focus('#timeline-stage');
-      await timed(d, visible('#search-dialog'), () => d.press('/'));
-      await d.eval(`document.getElementById('search-text').value = ''`);
+      // "/" goes to the search bar; Enter there opens the results.
+      await timed(d, `document.activeElement?.id === 'search-bar-text'`, () => d.press('/'));
+      await d.eval(`document.getElementById('search-bar-text').value = ''`);
       await d.type(t.alone.title.split(' ')[0]);
-      const ms = await timed(d, `/match/.test(${text('#search-status')})`, () => d.press('Enter'));
+      const ms = await timed(
+        d,
+        `${visible('#search-dialog')} && /match/.test(${text('#search-status')})`,
+        () => d.press('Enter'),
+      );
       await closeDialogs(d);
       return ms;
     },
@@ -538,7 +543,9 @@ const SCENARIOS = [
     async run(d) {
       await closeDialogs(d);
       await d.focus('#timeline-stage');
-      const ms = await timed(d, visible('#search-dialog'), () => d.press('/'));
+      const ms = await timed(d, `document.activeElement?.id === 'search-bar-text'`, () =>
+        d.press('/'),
+      );
       await closeDialogs(d);
       return ms;
     },
