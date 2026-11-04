@@ -80,7 +80,7 @@ export async function checkHelp(page) {
   await card.getByRole('button', { name: 'Next' }).click();
   await at('Add an event', '#add-button');
   await page.keyboard.press('ArrowRight');
-  await at('Search', '#search-button');
+  await at('Search', '#search-bar');
   await page.keyboard.press('ArrowLeft');
   await at('Add an event', '#add-button');
   await card.getByRole('button', { name: 'Back' }).click();

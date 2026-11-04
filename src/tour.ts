@@ -23,9 +23,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     text: 'An event is a moment, at one time, or a duration, a period with a start and an end. ＋ Event adds a moment at the selected time, or in the middle of the view; its Duration tab makes it a duration. You can also right-click the timeline, or press and hold it.',
   },
   {
-    selectors: ['#search-button'],
+    selectors: ['#search-bar'],
     title: 'Search',
-    text: 'Finds events by the words in their titles and notes. The / key opens it too.',
+    text: 'Finds events by the words in their titles and notes: type them here and press Enter or Search to see what matches. The / key goes here too.',
   },
   {
     selectors: ['#separate-button'],
