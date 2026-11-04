@@ -1626,9 +1626,15 @@ function drawFrame() {
     button.title = count > 1n ? `${summaryName(group)}; select to explore` : name;
     const sourceLane = trackLanes.get(sourceKey ?? '') ?? 0;
     trackLanes.set(sourceKey ?? '', sourceLane + 1);
-    const top = (comparison ? sourceLane : lane++) % 4,
+    // Labels below the axis go beneath the duration bands, whose titles they would cover; a
+    // comparison's tracks keep their own heights, so there they stay where they were.
+    const below =
+        comparison && !comparison.combined
+          ? 272
+          : Math.max(272, DURATION_TOP + (durationDepth.get('') ?? 0) * DURATION_ROW + 8),
+      top = (comparison ? sourceLane : lane++) % 4,
       labelTop =
-        rowOffset + (top < 2 ? 160 - labelHeight - top * labelRow : 272 + (top - 2) * labelRow);
+        rowOffset + (top < 2 ? 160 - labelHeight - top * labelRow : below + (top - 2) * labelRow);
     button.style.top = '';
     button.style.translate = `0 ${rowOffset}px`;
     stem.style.left = `${(inset() + x) / uiScale}px`;
@@ -10380,14 +10386,22 @@ function renderDurationBackgrounds() {
 const durationButtons = new Map<string, HTMLButtonElement>(),
   bandContent = new WeakMap<HTMLButtonElement, string>(),
   moreChips = new Map<string, HTMLButtonElement>();
+/** Where the first row of duration bands is (35 pixels below the axis), and how far apart rows
+ * are: a band is 18 pixels tall. */
+const DURATION_TOP = 227,
+  DURATION_ROW = 19;
+/**
+ * How many rows the window's bands and "more" chip take beneath the axis, by comparison track
+ * ('' outside a comparison); moment labels below the axis go beneath them (drawFrame).
+ */
+const durationDepth = new Map<string, number>();
 /**
  * How many rows of bands are drawn beneath the axis before the rest go into a "more" chip
- * (#316): what fits under the ruler with the axis centered (bands start 35 pixels below the
- * axis, rows are 13 apart), so it doesn't change as the view pans; at least three, and at most
- * eight on a phone or sixteen otherwise.
+ * (#316): what fits under the ruler with the axis centered, so it doesn't change as the view
+ * pans; at least three, and at most eight on a phone or sixteen otherwise.
  */
 function durationRows() {
-  const fit = Math.floor((stageHeight() / 2 / uiScale - 45) / 13);
+  const fit = Math.floor((stageHeight() / 2 / uiScale - 45) / DURATION_ROW);
   return Math.max(3, Math.min(compactScreen.matches ? 8 : 16, fit));
 }
 /**
@@ -10416,7 +10430,12 @@ function renderDurationBands() {
     maxRows,
   );
   const top = (source: string | undefined, row: number) =>
-    227 + (rows.get(source ?? '')?.offset ?? 0) + row * 13 + 'px';
+    DURATION_TOP + (rows.get(source ?? '')?.offset ?? 0) + row * DURATION_ROW + 'px';
+  durationDepth.clear();
+  for (const { band, row } of arranged) {
+    const source = band.sourceKey ?? '';
+    durationDepth.set(source, Math.max(durationDepth.get(source) ?? 0, row + 1));
+  }
   for (const { band, members, row } of arranged) {
     const left = Math.max(0, viewport.x(parsedTime(band.first), width())),
       right = Math.min(width(), viewport.x(parsedTime(band.last), width()));
@@ -10516,6 +10535,7 @@ function renderDurationBands() {
     chip.style.left = (inset() + from) / uiScale + 'px';
     chip.style.width = Math.max(150, (to - from) / uiScale) + 'px';
     chip.style.top = top(source || undefined, Math.min(maxRows, used + 1));
+    durationDepth.set(source, Math.min(maxRows, used + 1) + 1);
     const label = durationCountText(
       count,
       source === '' && !comparison && !!frame.durationsTotalMore,

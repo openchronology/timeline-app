@@ -1,17 +1,25 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Dense durations in the editor (#316): thousands of spans over the same time are drawn as one
 // band, rows stop at what fits, the rest sit behind a "more" chip that lists them all, and the
-// arrangement holds still while the view pans.
+// arrangement holds still while the view pans; moment labels below the axis sit beneath the bands.
 import assert from 'node:assert/strict';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
-/** A document of `same` durations over 100–900, an era over 0–1000, and staggered spans. */
+/**
+ * A document of `same` durations over 100–900, an era over 0–1000, staggered spans, and moments
+ * spread across them all (so Fit all still shows every span), far enough apart to be labelled
+ * one by one.
+ */
 export function denseDocument(same = 3000) {
   return {
     format: 'openchronology',
     version: 1,
     title: 'Dense durations',
     description: '',
-    events: [],
+    events: Array.from({ length: 8 }, (_, i) => ({
+      id: 'moment' + i,
+      time: `${50 + i * 350}/1`,
+      metadata: { title: 'Moment ' + i },
+    })),
     durations: [
       { id: 'era', start: '0/1', end: '1000/1', metadata: { title: 'Era' } },
       ...Array.from({ length: same }, (_, i) => ({
@@ -73,6 +81,26 @@ export async function checkDenseDurations(page, restore) {
       'shown and hidden add up to every duration in the window',
     );
     assert.match(await chip.textContent(), /^＋[\d,]+ more durations ▾$/);
+    // Moment labels below the axis go beneath the bands and the chip, never over their titles.
+    const overlaps = await page.evaluate(() => {
+      const axis = document.querySelector('.axis-baseline').getBoundingClientRect().bottom;
+      const below = [...document.querySelectorAll('#markers .event-label:not([hidden])')]
+        .map((label) => label.getBoundingClientRect())
+        .filter((box) => box.top > axis);
+      const bands = [...document.querySelectorAll('.duration-band, .duration-more')].map((band) =>
+        band.getBoundingClientRect(),
+      );
+      return {
+        below: below.length,
+        overlaps: below.filter((l) =>
+          bands.some(
+            (b) => l.left < b.right && b.left < l.right && l.top < b.bottom && b.top < l.bottom,
+          ),
+        ).length,
+      };
+    });
+    assert(overlaps.below > 0, 'some labels are below the axis');
+    assert.equal(overlaps.overlaps, 0, 'no label below the axis covers a band');
     // The arrangement holds still while the view pans in small steps.
     const arrangement = () =>
       page.evaluate(() =>
