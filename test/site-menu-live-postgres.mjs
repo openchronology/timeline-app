@@ -149,6 +149,16 @@ try {
   assert.equal(await menu.getAttribute('aria-expanded'), 'false');
   await phone.context().close();
 
+  // Before React arrives (its scripts held back here), a phone's header is already its one
+  // row with the menu button: its links don't show in the header and then move away.
+  const early = await open({ width: 390, height: 844 });
+  await early.route('**/_next/static/chunks/**', (route) => route.abort());
+  await early.goto(origin + '/help');
+  assert(await early.getByRole('button', { name: 'Menu', exact: true }).isVisible());
+  assert.equal(await early.getByRole('link', { name: 'Plugin library' }).isVisible(), false);
+  assert((await header(early).boundingBox()).height < 70, 'one row from the first frame');
+  await early.context().close();
+
   // A timeline's page on a touch screen fills the screen without scrolling, and isn't clipped,
   // so the browser's pull-to-refresh still works; with a mouse it is clipped.
   for (const touch of [true, false]) {

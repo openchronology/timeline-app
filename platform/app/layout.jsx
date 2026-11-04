@@ -20,6 +20,9 @@ import { headers } from 'next/headers';
 import { siteOrigin, sitePreview } from '../lib/sharing.js';
 import { analyticsId, platformName, siteName, supportUrl } from '../../server/site.mjs';
 import { landingEnabled } from '../../server/landing.mjs';
+// Marks the page as scripted before it paints, so a phone's header is a menu from the first
+// frame (components/site-menu.jsx) rather than once React arrives.
+const SCRIPTED = ";document.documentElement.classList.add('scripted')";
 export function generateMetadata() {
   const description =
     'A free, open-source timeline editor: exact times at any scale, sources on every moment, shared on your terms.';
@@ -76,7 +79,7 @@ export default async function RootLayout({ children }) {
         <script
           nonce={nonce ?? undefined}
           suppressHydrationWarning
-          dangerouslySetInnerHTML={{ __html: THEME_BOOT }}
+          dangerouslySetInnerHTML={{ __html: THEME_BOOT + SCRIPTED }}
         />
       </head>
       <body>

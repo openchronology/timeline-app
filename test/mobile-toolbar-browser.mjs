@@ -57,6 +57,24 @@ function menu(page, name) {
 }
 
 export async function checkMobileToolbars(page) {
+  // The first frame, before the editor's script runs: already the phone's rows, so nothing
+  // shows in the desktop's places and then folds away into the menus.
+  const first = await page.context().newPage();
+  try {
+    await first.setViewportSize({ width: 390, height: 844 });
+    await first.route('**/app.js', (route) => route.abort());
+    await first.goto(page.url());
+    for (const name of ['Separate by tags', 'Plugins', 'Import', 'Export', 'Help'])
+      assert.equal(
+        await first.getByRole('button', { name, exact: true }).isVisible(),
+        false,
+        name + ' waits for its menu',
+      );
+    assert(await first.getByRole('button', { name: 'Tools', exact: true }).isVisible());
+    assert(await first.getByRole('button', { name: 'Zoom in', exact: true }).isVisible());
+  } finally {
+    await first.close();
+  }
   const phone = await page.context().newPage();
   const errors = [];
   phone.on('pageerror', (error) => errors.push(error.message));

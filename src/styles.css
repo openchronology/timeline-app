@@ -3662,7 +3662,18 @@ body[data-warnings]:not([data-images-shown])
   width: 20px;
   height: 20px;
 }
+/* A phone paints its one-row toolbars from the first frame: the controls bound for a menu wait
+   hidden until toolbar-menus.ts moves them in, and Tools shows already, rather than the full
+   desktop rows showing and then folding away as the editor's script arrives. */
+@media (min-width: 651px) {
+  #view-tools-button {
+    display: none;
+  }
+}
 @media (max-width: 650px) {
+  [data-phone-menu]:not(.toolbar-menu [data-phone-menu]) {
+    display: none;
+  }
   .document-toolbar {
     position: relative;
     min-height: 56px;
