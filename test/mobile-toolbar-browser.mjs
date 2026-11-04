@@ -153,7 +153,7 @@ export async function checkMobileToolbars(page) {
     assert.equal(await tools.open(), false);
     await tools.button.click();
     assert(await tools.open());
-    assert(await tools.panel.getByRole('button', { name: 'Search' }).isVisible());
+    assert(await tools.panel.getByRole('button', { name: 'Separate by tags' }).isVisible());
     await tools.button.click();
     assert.equal(await tools.open(), false);
     await tools.button.click();
@@ -179,14 +179,14 @@ export async function checkMobileToolbars(page) {
     await phone.keyboard.press('Enter');
     assert(await tools.open());
     const focused = () => phone.evaluate(() => document.activeElement?.id);
-    assert.equal(await focused(), 'search-button');
-    await phone.keyboard.press('ArrowDown');
     assert.equal(await focused(), 'separate-button');
+    await phone.keyboard.press('ArrowDown');
+    assert.equal(await focused(), 'presentation-button');
     await phone.keyboard.press('ArrowUp');
     await phone.keyboard.press('ArrowUp');
-    assert.notEqual(await focused(), 'search-button', 'Arrows wrap around');
+    assert.notEqual(await focused(), 'separate-button', 'Arrows wrap around');
     await phone.keyboard.press('Home');
-    assert.equal(await focused(), 'search-button');
+    assert.equal(await focused(), 'separate-button');
     await phone.keyboard.press('Escape');
     assert.equal(await tools.open(), false);
 

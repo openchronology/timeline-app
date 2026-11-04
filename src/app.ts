@@ -2734,7 +2734,7 @@ function heading() {
 
   el('add-button').hidden = !editable();
   el('separate-button').hidden = !!comparison || (!model && !remote && !local);
-  el('search-button').hidden = !!comparison || (!model && !remote && !local);
+  el('search-bar').hidden = !!comparison || (!model && !remote && !local);
   el<HTMLButtonElement>('undo-button').disabled = !history.length;
   el<HTMLButtonElement>('redo-button').disabled = !future.length;
   text(
@@ -5370,7 +5370,6 @@ const viewTools = toolbarMenu({
   items: [
     ...[
       'clear-selection',
-      'search-button',
       'separate-button',
       'presentation-button',
       'plugins-button',
@@ -9509,7 +9508,7 @@ async function followLink(link: TimelineLink | null) {
   }
   if (comparison) return;
   if (link.kind === 'search') {
-    input('search-text').value = link.text;
+    input('search-text').value = input('search-bar-text').value = link.text;
     const dialog = el<HTMLDialogElement>('search-dialog');
     if (!dialog.open) dialog.showModal();
     await runSearch(1);
@@ -9607,12 +9606,23 @@ el('search-share').onclick = () =>
     { kind: 'search', text: searchState.text },
     `“${searchState.text}” in ${remote?.title ?? 'a timeline'}`,
   );
-el('search-dialog').addEventListener('close', () => forgetLink('search'));
-el('search-button').onclick = () => {
-  if (comparison) return;
+el('search-dialog').addEventListener('close', () => {
+  forgetLink('search');
+  // The bar keeps the words last searched, refined in the dialog or not.
+  input('search-bar-text').value = input('search-text').value;
+});
+// The bar's words, searched with Search or Enter, open their results in the search dialog,
+// where they can be refined.
+el<HTMLFormElement>('search-bar').onsubmit = (event) => {
+  event.preventDefault();
+  const words = input('search-bar-text').value;
+  if (comparison || !searchTerms(words).length) {
+    input('search-bar-text').focus();
+    return;
+  }
+  input('search-text').value = words;
   el<HTMLDialogElement>('search-dialog').showModal();
-  input('search-text').focus();
-  input('search-text').select();
+  void runSearch(1);
 };
 el<HTMLFormElement>('search-form').onsubmit = (event) => {
   event.preventDefault();
@@ -9621,13 +9631,14 @@ el<HTMLFormElement>('search-form').onsubmit = (event) => {
 el('search-previous').onclick = () => void runSearch(Math.max(1, searchState.page - 1));
 el('search-next').onclick = () => void runSearch(searchState.page + 1);
 document.addEventListener('keydown', (event) => {
-  // "/" opens search, as in many web apps; typing in fields is unaffected.
+  // "/" goes to the search bar, as in many web apps; typing in fields is unaffected.
   if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
   const target = event.target as HTMLElement;
   if (target.closest('input, textarea, select, [contenteditable]')) return;
-  if (document.querySelector('dialog[open]') || el('search-button').hidden) return;
+  if (document.querySelector('dialog[open]') || el('search-bar').hidden) return;
   event.preventDefault();
-  el('search-button').click();
+  input('search-bar-text').focus();
+  input('search-bar-text').select();
 });
 // Escape in an empty search field closes its dialog. WebKit (the desktop app) keeps Escape
 // in search fields, even empty ones, so search and the moment picker never closed with it.

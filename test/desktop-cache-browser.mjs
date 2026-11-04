@@ -244,9 +244,8 @@ export async function checkDesktopCache(browser) {
     await page.getByRole('button', { name: 'Edited SQLite moment', exact: true }).waitFor();
     assert.equal(reads, 0);
     // Native search covers the saved file; unsaved edits replace their saved matches.
-    await page.locator('#search-button').click();
-    await page.locator('#search-text').fill('edited');
-    await page.locator('#search-submit').click();
+    await page.locator('#search-bar-text').fill('edited');
+    await page.locator('#search-bar-text').press('Enter');
     await page.waitForFunction(() =>
       /includes unsaved edits/.test(document.getElementById('search-status').textContent),
     );

@@ -363,7 +363,6 @@ Every point has a place. Explore the spaces between them.</textarea>
                 title="Follow new server moments after 15 seconds without navigation"
                 ><input id="follow-latest" type="checkbox" /> Follow latest moments</label
               >
-              <button id="search-button" title="Search events (/)">Search</button>
               <button id="separate-button">Separate by tags</button>
               <button id="presentation-button">Time display</button>
               <button id="plugins-button">Plugins</button>
@@ -412,6 +411,18 @@ Every point has a place. Explore the spaces between them.</textarea>
               <div id="view-tools-settings" class="toolbar-menu-settings"></div>
             </div>
           </div>
+          <!-- Search across the timeline's width; its results open in the search dialog. -->
+          <form id="search-bar" class="search-bar search-row" role="search">
+            <input
+              id="search-bar-text"
+              type="search"
+              maxlength="200"
+              autocomplete="off"
+              spellcheck="false"
+              aria-label="Search this timeline"
+              placeholder="Search titles and notes (/)"
+            /><button id="search-button" type="submit">Search</button>
+          </form>
           <div id="live-notice" class="comparison-settings" hidden role="status">
             New server changes are available. Your unsaved edits are retained: Save to server adds
             them to the latest version, and Reload latest discards them.

@@ -2985,6 +2985,14 @@ dialog button {
   display: flex;
   gap: 8px;
 }
+/* The timeline's search bar, the width of the card beneath its toolbar. */
+.search-bar {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.search-bar[hidden] {
+  display: none;
+}
 .search-row input {
   flex: 1;
 }

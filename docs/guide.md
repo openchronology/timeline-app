@@ -101,7 +101,7 @@ Type the bounds the way the timeline's display writes times. To see and type the
 
 ### On a phone
 
-On a narrow screen the toolbars keep one row each. Above the title are **View mode** (for those who can edit), the main action, such as **Save to server**, and **File**, which holds **Import**, **Export**, **Import .och** and **Export .och ↗**. Above the timeline are **−**, **＋**, **Fit all**, full screen (the corners icon), **＋ Event** and **Tools**. **Tools** holds the rest: **Search**, **Separate by tags**, **Time display**, **Plugins**, **Compare**, **Center axis**, **Help**, the text size (**A−** and **A＋**), **Follow latest moments**, **Group within**, and **Clear selection** once a time is selected. A menu closes when you choose an action, tap outside it or press Escape. In full screen the timeline takes all of the screen but that one row.
+On a narrow screen the toolbars keep one row each. Above the title are **View mode** (for those who can edit), the main action, such as **Save to server**, and **File**, which holds **Import**, **Export**, **Import .och** and **Export .och ↗**. Above the timeline are **−**, **＋**, **Fit all**, full screen (the corners icon), **＋ Event** and **Tools**. The search bar stays beneath them, the width of the screen. **Tools** holds the rest: **Separate by tags**, **Time display**, **Plugins**, **Compare**, **Center axis**, **Help**, the text size (**A−** and **A＋**), **Follow latest moments**, **Group within**, and **Clear selection** once a time is selected. A menu closes when you choose an action, tap outside it or press Escape. In full screen the timeline takes all of the screen but that one row.
 
 ### What markers show
 
@@ -201,7 +201,7 @@ To have a timeline open separated, for everyone who reads it, separate it and se
 
 ## Searching
 
-**Search** above the timeline, or the `/` key, opens **Search this timeline**. Type words from titles or notes; a result must contain every word. Results come 25 a page, with each one's time and a preview of its notes. Choosing a result moves the view to it, and it pulses briefly; click it to open it. On the website, **Share these results** links to the search. See [searching a timeline](search.md).
+The search bar across the top of the timeline searches it: type words from titles or notes and press Enter or **Search**, and the results open in **Search this timeline**, where you can change the words and search again. The `/` key goes to the search bar. A result must contain every word. Results come 25 a page, with each one's time and a preview of its notes. Choosing a result moves the view to it, and it pulses briefly; click it to open it. On the website, **Share these results** links to the search. See [searching a timeline](search.md).
 
 ## Display settings
 
