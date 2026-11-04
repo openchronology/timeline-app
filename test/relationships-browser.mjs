@@ -113,6 +113,24 @@ export async function checkRelationships(page, restore) {
     await page.locator('#separation-rejoin').click();
     await page.locator('#separation-settings').waitFor({ state: 'hidden' });
     await page.waitForFunction(() => document.querySelectorAll('.edge-arc').length === 2);
+    // Rejoining re-keys the markers back onto one axis: Alpha is clicked once there is one
+    // marker for it, drawn, and still between two frames, not the one being replaced.
+    let last = null;
+    for (let i = 0; i < 100; i++) {
+      const box = await page.evaluate(
+        () =>
+          new Promise((done) =>
+            requestAnimationFrame(() => {
+              const all = document.querySelectorAll('.event-marker[aria-label="Alpha"]');
+              const r = all.length === 1 ? all[0].getBoundingClientRect() : null;
+              done(r && r.width > 0 ? [r.x, r.y] : null);
+            }),
+          ),
+      );
+      if (box && last && box[0] === last[0] && box[1] === last[1]) break;
+      last = box;
+      await page.waitForTimeout(50);
+    }
     // Separate related says so; separating by tags afterwards returns to the tag wording.
     await page.getByRole('button', { name: 'Alpha', exact: true }).click({ force: true });
     await related.getByRole('button', { name: 'Separate related' }).click();
