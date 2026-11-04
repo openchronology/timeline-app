@@ -45,12 +45,23 @@ export async function checkSearch(page, restore) {
     await page.locator('#apply-bounds').click();
     await page.waitForFunction(() => document.getElementById('left-bound').value !== '-10');
     const before = await left();
-    // "/" opens search from the timeline.
+    // "/" goes to the search bar from the timeline; Enter there opens the results.
     await page.locator('#timeline-stage').focus();
     await page.keyboard.press('/');
-    await dialog.waitFor({ state: 'visible' });
-    await page.locator('#search-text').fill('harbor');
+    await page.waitForFunction(() => document.activeElement?.id === 'search-bar-text');
+    assert.equal(await dialog.isVisible(), false, 'nothing opens before a search');
+    // The bar spans the timeline's card.
+    const [bar, card] = await Promise.all(
+      ['#search-bar', '.timeline-card'].map((s) => page.locator(s).boundingBox()),
+    );
+    assert(bar.width >= card.width - 2, `${bar.width} of ${card.width}`);
+    // Searching for nothing opens nothing.
     await page.keyboard.press('Enter');
+    assert.equal(await dialog.isVisible(), false);
+    await page.keyboard.type('harbor');
+    await page.keyboard.press('Enter');
+    await dialog.waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#search-text').inputValue(), 'harbor');
     await page.waitForFunction(() =>
       /3 matches/.test(document.getElementById('search-status').textContent),
     );
@@ -81,6 +92,8 @@ export async function checkSearch(page, restore) {
     await results.first().waitFor();
     await results.first().click();
     await dialog.waitFor({ state: 'hidden' });
+    // The bar keeps the words refined in the dialog.
+    assert.equal(await page.locator('#search-bar-text').inputValue(), 'lighthouse');
     await page.waitForFunction(
       (old) => document.getElementById('left-bound').value !== old,
       before,
@@ -92,9 +105,8 @@ export async function checkSearch(page, restore) {
     );
     assert.equal(await page.locator('#inspector').isVisible(), false);
     // Choosing a duration fits it in view.
+    await page.locator('#search-bar-text').fill('works');
     await page.locator('#search-button').click();
-    await page.locator('#search-text').fill('works');
-    await page.locator('#search-submit').click();
     await results.first().waitFor();
     await results.first().click();
     await page.locator('.duration-band.search-hit').waitFor();
