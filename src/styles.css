@@ -2793,14 +2793,14 @@ dialog button {
 .duration-band {
   position: absolute;
   pointer-events: auto;
-  height: 12px;
+  height: 18px;
   padding: 0 2px;
   border: 1px solid var(--stage-ground);
   border-radius: 3px;
   background: var(--timeline-duration, var(--stage-duration));
   color: var(--timeline-duration-text, var(--stage-duration-text));
   font-size: 9px;
-  line-height: 10px;
+  line-height: 16px;
   overflow: hidden;
   white-space: nowrap;
   opacity: 0.7;
@@ -2808,7 +2808,6 @@ dialog button {
 .duration-band:hover,
 .duration-band:focus-visible {
   opacity: 1;
-  height: 18px;
   z-index: 3;
 }
 .duration-limit {
@@ -2847,6 +2846,7 @@ dialog button {
   border: 2px solid var(--stage-ground);
   outline: 2px dashed var(--ink);
   outline-offset: -2px;
+  line-height: 14px;
 }
 /* A band standing for several nearly identical spans (#316) is outlined twice. */
 .duration-band[data-grouped]:not([data-grouped='1']) {
