@@ -9370,6 +9370,8 @@ async function searchPage(words: string, page: number, only?: 'moment'): Promise
 }
 async function runSearch(page: number) {
   const words = input('search-text').value;
+  // The bar keeps the words last searched, refined in the dialog or not.
+  input('search-bar-text').value = words;
   const request = ++searchState.request;
   searchState = { ...searchState, text: words, page };
   el<HTMLButtonElement>('search-previous').disabled = true;
@@ -9508,7 +9510,7 @@ async function followLink(link: TimelineLink | null) {
   }
   if (comparison) return;
   if (link.kind === 'search') {
-    input('search-text').value = input('search-bar-text').value = link.text;
+    input('search-text').value = link.text;
     const dialog = el<HTMLDialogElement>('search-dialog');
     if (!dialog.open) dialog.showModal();
     await runSearch(1);
@@ -9606,11 +9608,7 @@ el('search-share').onclick = () =>
     { kind: 'search', text: searchState.text },
     `“${searchState.text}” in ${remote?.title ?? 'a timeline'}`,
   );
-el('search-dialog').addEventListener('close', () => {
-  forgetLink('search');
-  // The bar keeps the words last searched, refined in the dialog or not.
-  input('search-bar-text').value = input('search-text').value;
-});
+el('search-dialog').addEventListener('close', () => forgetLink('search'));
 // The bar's words, searched with Search or Enter, open their results in the search dialog,
 // where they can be refined.
 el<HTMLFormElement>('search-bar').onsubmit = (event) => {
