@@ -42,11 +42,28 @@ const PHOTOS = new Set(
 /** The first of a list of sources that is a photo on this computer (#440); null when none is. */
 export function localPhoto(value: unknown): string | null {
   for (const item of Array.isArray(value) ? value.slice(0, 100) : []) {
-    const url = localFileURL(item);
+    const url = localSource(item);
     const extension = url?.split('.').at(-1)?.toLowerCase();
     if (url && extension && PHOTOS.has(extension)) return url;
   }
   return null;
+}
+/** Whether file links are sources here: only in the desktop app, which can open them. */
+let localSources = false;
+/** Lets file links be sources; the desktop app calls this, and no other build does. */
+export function allowLocalSources(): void {
+  localSources = true;
+}
+/** Whether file links are sources here (allowLocalSources). */
+export function localSourcesAllowed(): boolean {
+  return localSources;
+}
+/**
+ * A file link as a source (localFileURL), only in the desktop app; null elsewhere, so the
+ * offline file and the platform neither list nor accept one.
+ */
+export function localSource(value: unknown): string | null {
+  return localSources ? localFileURL(value) : null;
 }
 /** The file's name, from the last part of its link's path ("IMG_0042.jpg"). */
 export function localFileName(url: string): string {
