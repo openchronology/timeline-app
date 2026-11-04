@@ -263,13 +263,14 @@
               hidden
             >
               File<span class="menu-caret" aria-hidden="true">▾</span></button
-            ><button id="import-button">Import</button><button id="export-button">Export</button
-            ><button id="och-import" hidden>Import .och</button
-            ><button id="och-export" hidden>Export .och ↗</button
-            ><button id="sqlite-open" hidden>Open</button
+            ><button id="import-button" data-phone-menu>Import</button
+            ><button id="export-button" data-phone-menu>Export</button
+            ><button id="och-import" data-phone-menu hidden>Import .och</button
+            ><button id="och-export" data-phone-menu hidden>Export .och ↗</button
+            ><button id="sqlite-open" data-phone-menu hidden>Open</button
             ><button id="sqlite-save" hidden>Save</button
-            ><button id="sqlite-save-as" hidden>Save As…</button
-            ><button id="populate-button" hidden>From files…</button
+            ><button id="sqlite-save-as" data-phone-menu hidden>Save As…</button
+            ><button id="populate-button" data-phone-menu hidden>From files…</button
             ><button id="publish-button" class="button-primary">Save to server</button>
           </div>
           <!-- On a phone, the file chores wait in this menu, and the row keeps the main action. -->
@@ -358,24 +359,35 @@ Every point has a place. Explore the spaces between them.</textarea>
             <div class="view-controls">
               <label
                 id="follow-latest-control"
+                data-phone-menu
                 class="follow-latest-control"
                 hidden
                 title="Follow new server moments after 15 seconds without navigation"
                 ><input id="follow-latest" type="checkbox" /> Follow latest moments</label
               >
-              <button id="search-button" title="Search events (/)">Search</button>
-              <button id="separate-button">Separate by tags</button>
-              <button id="presentation-button">Time display</button>
-              <button id="plugins-button">Plugins</button>
-              <button id="compare-button">Compare</button>
+              <button id="search-button" data-phone-menu title="Search events (/)">Search</button>
+              <button id="separate-button" data-phone-menu>Separate by tags</button>
+              <button id="presentation-button" data-phone-menu>Time display</button>
+              <button id="plugins-button" data-phone-menu>Plugins</button>
+              <button id="compare-button" data-phone-menu>Compare</button>
               <button id="zoom-out" aria-label="Zoom out">−</button
               ><button id="zoom-in" aria-label="Zoom in">＋</button
-              ><button id="size-down" aria-label="Smaller" title="Smaller markers and labels">
+              ><button
+                id="size-down"
+                data-phone-menu
+                aria-label="Smaller"
+                title="Smaller markers and labels"
+              >
                 A−</button
-              ><button id="size-up" aria-label="Larger" title="Larger markers and labels">
+              ><button
+                id="size-up"
+                data-phone-menu
+                aria-label="Larger"
+                title="Larger markers and labels"
+              >
                 A＋</button
               ><button id="fit-button">Fit all</button
-              ><button id="center-vertical">Center axis</button
+              ><button id="center-vertical" data-phone-menu>Center axis</button
               ><button id="fullscreen-button" aria-pressed="false" title="Full screen (F)">
                 <svg class="toolbar-icon enter-icon" viewBox="0 0 16 16" aria-hidden="true">
                   <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" /></svg
@@ -387,14 +399,13 @@ Every point has a place. Explore the spaces between them.</textarea>
                 class="toolbar-menu-button"
                 aria-expanded="false"
                 aria-controls="view-tools"
-                hidden
               >
                 <svg class="toolbar-icon" viewBox="0 0 16 16" aria-hidden="true">
                   <circle cx="3" cy="8" r="1.4" />
                   <circle cx="8" cy="8" r="1.4" />
                   <circle cx="13" cy="8" r="1.4" /></svg
                 >Tools</button
-              ><button id="clear-selection" hidden>Clear selection</button
+              ><button id="clear-selection" data-phone-menu hidden>Clear selection</button
               ><button id="add-button" class="button-primary">＋ Event</button>
             </div>
             <!-- On a phone, the rest of the controls wait in this menu (toolbar-menus.ts). -->
@@ -475,8 +486,8 @@ Every point has a place. Explore the spaces between them.</textarea>
             <div id="loading-window" class="loading-window" hidden>Loading this window…</div>
           </div>
           <div class="timeline-footer">
-            <button id="timeline-help-button">Help</button>
-            <label class="density-control"
+            <button id="timeline-help-button" data-phone-menu>Help</button>
+            <label class="density-control" data-phone-menu
               >Group within
               <input
                 id="density"

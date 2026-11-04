@@ -5,8 +5,9 @@
 import { useEffect, useRef, useState } from 'react';
 /**
  * The header's navigation links (`children`). On wide screens they stay a row. On phones (at
- * most 650px), once this script runs, they move into a panel at the side of the screen, which
- * the menu button slides in and out. It closes on a link, its close button, a tap outside,
+ * most 650px) they are in a panel at the side of the screen from the first frame, which the
+ * menu button slides in and out: the stylesheet places them, once layout.jsx's first script
+ * has marked the page as scripted, so nothing moves when React arrives. It closes on a link, its close button, a tap outside,
  * Escape (returning the focus to the menu button), the focus leaving it, or the screen
  * widening; while it is open the page behind doesn't scroll. Without JavaScript, the links stay
  * in the header, wrapped onto their own row.
@@ -14,19 +15,16 @@ import { useEffect, useRef, useState } from 'react';
  * @param {import('react').ReactNode} props.children the links
  */
 export default function SiteMenu({ children }) {
-  const [ready, setReady] = useState(false),
-    // Sliding starts a frame after the panel takes its place, so loading the page doesn't
-    // animate it out of the header.
-    [animate, setAnimate] = useState(false),
+  // Sliding starts once React has the page, so loading it, or turning a phone, doesn't
+  // animate the panel out of the header.
+  const [animate, setAnimate] = useState(false),
     [open, setOpen] = useState(false);
   const button = useRef(null),
     panel = useRef(null);
-  useEffect(() => setReady(true), []);
   useEffect(() => {
-    if (!ready) return;
     const frame = requestAnimationFrame(() => setAnimate(true));
     return () => cancelAnimationFrame(frame);
-  }, [ready]);
+  }, []);
   useEffect(() => {
     if (!open) return;
     const narrow = window.matchMedia('(max-width: 650px)');
@@ -55,7 +53,6 @@ export default function SiteMenu({ children }) {
         ref={button}
         type="button"
         className="site-menu-button"
-        hidden={!ready}
         aria-expanded={open}
         aria-controls="site-navigation"
         aria-label="Menu"
@@ -70,7 +67,6 @@ export default function SiteMenu({ children }) {
       <div
         className="site-menu-backdrop"
         data-open={open}
-        hidden={!ready}
         aria-hidden="true"
         onClick={() => setOpen(false)}
       />
@@ -79,7 +75,6 @@ export default function SiteMenu({ children }) {
         id="site-navigation"
         aria-label="Platform navigation"
         className="site-nav"
-        data-ready={ready}
         data-animate={animate}
         data-open={open}
         onClick={(event) => event.target.closest('a') && setOpen(false)}

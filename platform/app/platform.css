@@ -919,21 +919,23 @@ body:has(.editor-page) > .platform-footer {
     gap: 12px;
     flex-wrap: wrap;
   }
-  /* Without JavaScript: the brand and the account on the first row, the navigation beneath. */
-  .platform-header > nav {
+  .platform-header > :is(.account-menu, .header-account) {
+    margin-left: auto;
+  }
+  /* Without JavaScript: the brand and the account on the first row, the navigation beneath.
+     (layout.jsx marks <html> as scripted before the page paints.) */
+  :root:not(.scripted) .platform-header > nav {
     order: 3;
     flex-basis: 100%;
     margin-left: 0;
   }
-  .platform-header > :is(.account-menu, .header-account) {
-    margin-left: auto;
-  }
-  /* With it, one row: the menu button, the brand and the account; the links in a panel that
-     slides in from the side over a dimmed page. */
-  .platform-header:has(.site-nav[data-ready='true']) {
+  /* With it, one row from the first frame: the menu button, the brand and the account; the
+     links in a panel that slides in from the side over a dimmed page. None of this waits for
+     React, so a page doesn't load with its links in the header and then move them. */
+  .scripted .platform-header {
     flex-wrap: nowrap;
   }
-  .site-menu-button:not([hidden]) {
+  .scripted .site-menu-button {
     order: -1;
     display: inline-flex;
     align-items: center;
@@ -955,7 +957,7 @@ body:has(.editor-page) > .platform-footer {
     border-radius: 1px;
     background: currentColor;
   }
-  .site-menu-backdrop:not([hidden]) {
+  .scripted .site-menu-backdrop {
     display: block;
     position: fixed;
     inset: 0;
@@ -965,11 +967,11 @@ body:has(.editor-page) > .platform-footer {
     pointer-events: none;
     transition: opacity 220ms ease;
   }
-  .site-menu-backdrop[data-open='true'] {
+  .scripted .site-menu-backdrop[data-open='true'] {
     opacity: 1;
     pointer-events: auto;
   }
-  .platform-header > .site-nav[data-ready='true'] {
+  .scripted .platform-header > .site-nav {
     position: fixed;
     top: 0;
     bottom: 0;
@@ -980,10 +982,12 @@ body:has(.editor-page) > .platform-footer {
     width: min(80vw, 300px);
     flex-direction: column;
     flex-wrap: nowrap;
+    align-items: stretch;
     gap: 0;
     margin: 0;
     padding: calc(12px + env(safe-area-inset-top, 0px)) 0 16px;
     overflow-y: auto;
+    text-align: left;
     background: var(--header);
     border-right: 1px solid var(--header-line);
     box-shadow: 4px 0 24px rgb(0 0 0 / 30%);
@@ -991,34 +995,30 @@ body:has(.editor-page) > .platform-footer {
     visibility: hidden;
   }
   /* Hidden only once it has slid out, so closing animates too. */
-  .platform-header > .site-nav[data-animate='true'] {
+  .scripted .platform-header > .site-nav[data-animate='true'] {
     transition:
       transform 220ms ease,
       visibility 0s linear 220ms;
   }
-  .platform-header > .site-nav[data-open='true'] {
+  .scripted .platform-header > .site-nav[data-open='true'] {
     transform: none;
     visibility: visible;
   }
-  .platform-header > .site-nav[data-animate='true'][data-open='true'] {
+  .scripted .platform-header > .site-nav[data-animate='true'][data-open='true'] {
     transition:
       transform 220ms ease,
       visibility 0s;
   }
-  .platform-header > .site-nav[data-ready='true'] {
-    align-items: stretch;
-    text-align: left;
-  }
-  .site-nav[data-ready='true'] a {
+  .scripted .site-nav a {
     display: block;
     padding: 12px 20px;
     font-size: 17px;
   }
-  .site-nav[data-ready='true'] a:hover,
-  .site-nav[data-ready='true'] a:focus-visible {
+  .scripted .site-nav a:hover,
+  .scripted .site-nav a:focus-visible {
     background: var(--header-hover);
   }
-  .site-nav[data-ready='true'] .site-menu-close {
+  .scripted .site-nav .site-menu-close {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2317,9 +2317,9 @@ main.landing section {
 }
 /* The side menu appears and goes without sliding when motion is reduced. */
 @media (prefers-reduced-motion: reduce) {
-  .site-menu-backdrop,
-  .platform-header > .site-nav[data-animate='true'],
-  .platform-header > .site-nav[data-animate='true'][data-open='true'] {
+  .scripted .site-menu-backdrop,
+  .scripted .platform-header > .site-nav[data-animate='true'],
+  .scripted .platform-header > .site-nav[data-animate='true'][data-open='true'] {
     transition: none;
   }
 }

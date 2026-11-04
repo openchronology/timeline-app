@@ -469,7 +469,8 @@ function setDashboard(show: boolean) {
   el('dashboard').hidden = !show;
   if (show) void showDrafts().catch(() => (el('dashboard-drafts').hidden = true));
   document.body.dataset.dashboard = String(show);
-  el('memory-notice').hidden = show || !memoryOnly() || !!remote || !!comparison || !model;
+  el('memory-notice').hidden =
+    show || !sessionKnown || !memoryOnly() || !!remote || !!comparison || !model;
   updatePageTitle();
   updateCapacity();
   if (!show) requestRender();
@@ -901,6 +902,11 @@ let pluginSearchRequest = 0;
 let pluginSearchTimer: ReturnType<typeof setTimeout> | undefined;
 let pluginPage = 1;
 const memoryOnly = () => !desktop && (offlineHtml || !session.user);
+/**
+ * Whether the website has said who is signed in. Until then everyone looks like a guest, so the
+ * in-memory notice waits rather than flashing at someone signed in while their account loads.
+ */
+let sessionKnown = offlineHtml || desktop;
 /** Whether the open timeline can be edited here, view mode and comparisons aside. */
 const mayEditTimeline = () => !embedded && !!model && (!remote || remote.canEdit);
 /** Whether the open timeline can be edited here, view mode aside. */
@@ -2610,6 +2616,7 @@ function heading() {
   document.documentElement.dataset.storage =
     local?.id === 'local-sqlite' ? 'sqlite' : remote ? 'server' : 'memory';
   el('memory-notice').hidden =
+    !sessionKnown ||
     !memoryOnly() ||
     !!remote ||
     !!comparison ||
@@ -8357,8 +8364,10 @@ void (async () => {
         }
         await directory();
       }
+      sessionKnown = true;
       if (!hasDashboard()) setDashboard(false);
     } catch {
+      sessionKnown = true;
       setDashboard(false);
     }
   }
