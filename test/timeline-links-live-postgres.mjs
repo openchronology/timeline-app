@@ -1,8 +1,9 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Links between timelines (#422) in a live browser: a moment's details list its links to
 // entities on other timelines, each opening that timeline there; its owner links it to an
-// event on another of their timelines by searching for the timeline, then the event, and
-// removes a link; comparing the two timelines draws each link as an arc between the tracks,
+// event on another of their timelines found in the picker's search (the words marked, nothing
+// on its own timeline offered), or to a whole timeline by its pasted address, and removes a
+// link; comparing the two timelines draws each link as an arc between the tracks,
 // and on one axis when combined, on desktop and phone. SCREENSHOT_DIR keeps screenshots.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -136,13 +137,32 @@ try {
       'the moment’s own page, Greece open at it',
     );
 
-    // Linking to another of one's timelines: find the timeline, then the event.
-    await section.locator('summary', { hasText: 'Link to another timeline' }).click();
-    await section.locator('input[type=search]').fill('Greece');
-    await section.locator('.related-results button', { hasText: `Greece ${suffix}` }).click();
-    await section.locator('summary', { hasText: `Link to an event on Greece ${suffix}` }).waitFor();
-    await section.locator('input[type=search]').fill('Athenian');
-    await section.locator('.related-results button', { hasText: 'Athenian democracy' }).click();
+    // Linking to an event on another of one's timelines, found in the picker as Explore's
+    // search finds it (#459), the words marked; nothing on Rome itself is offered.
+    const picker = page.frameLocator('iframe.editor-frame').locator('#link-picker');
+    const words = picker.getByRole('searchbox');
+    await section.getByRole('button', { name: 'Link to another timeline…' }).click();
+    await words.fill('Augustus');
+    await picker.getByText('Nothing you can link to matches.').waitFor();
+    await words.fill('Greece');
+    const greeceChoice = picker.locator('#link-picker-results .search-result', {
+      hasText: `Greece ${suffix}`,
+    });
+    await greeceChoice.waitFor();
+    assert.equal(await greeceChoice.locator('.picker-kind').textContent(), 'Timeline');
+    await words.fill('Athenian');
+    const athens = picker.locator('#link-picker-results .search-result', {
+      hasText: 'Athenian democracy',
+    });
+    await athens.waitFor();
+    assert.equal(await athens.locator('mark').textContent(), 'Athenian');
+    assert.match(
+      await athens.locator('.search-meta').textContent(),
+      new RegExp(`on Greece ${suffix} by ${username}`),
+    );
+    await shot('picker');
+    await athens.click();
+    await picker.waitFor({ state: 'hidden' });
     await section.locator('a.related-entity', { hasText: 'Athenian democracy' }).waitFor();
     frame = page.frameLocator('iframe.editor-frame');
     const links = frame.locator('#inspector .timeline-links a.related-entity');
@@ -160,13 +180,21 @@ try {
       .waitFor({ state: 'detached' });
     assert.equal(await count(), 1);
 
-    // Linking to Greece as a whole opens Greece itself.
-    await section.locator('summary', { hasText: 'Link to another timeline' }).click();
-    await section.locator('input[type=search]').fill('Greece');
-    await section.locator('.related-results button', { hasText: `Greece ${suffix}` }).click();
-    await section
-      .locator('.related-results button', { hasText: 'Link to the whole timeline' })
+    // Linking to Greece as a whole by pasting its address; Rome's own is refused.
+    await section.getByRole('button', { name: 'Link to another timeline…' }).click();
+    await picker.getByRole('tab', { name: 'Address' }).click();
+    const address = picker.getByRole('textbox', { name: 'Address' });
+    await address.fill(`${origin}/${username}/${rome.id}`);
+    await address.press('Enter');
+    await picker
+      .getByText('That’s this timeline: relate its events with Add a relationship.')
+      .waitFor();
+    await address.fill(`${origin}/${username}/${greece.id}`);
+    await picker.getByRole('button', { name: 'Find' }).click();
+    await picker
+      .locator('#link-picker-found .search-result', { hasText: `Greece ${suffix}` })
       .click();
+    await picker.waitFor({ state: 'hidden' });
     const wholeLink = section.locator('a.related-entity', { hasText: 'the whole timeline' });
     await wholeLink.waitFor();
     assert.equal(await wholeLink.textContent(), `Greece ${suffix} · the whole timeline`);
@@ -243,7 +271,7 @@ try {
     ),
   );
   console.log(
-    'PASS links between timelines in a browser: listed in a moment’s details, opening the other entity’s page; added by finding a timeline then an event or the whole timeline, and removed; drawn between compared timelines’ tracks, and over one axis combined, on desktop and phone; in the pages search engines read, both ways, and on a timeline’s page for links to all of it.',
+    'PASS links between timelines in a browser: listed in a moment’s details, opening the other entity’s page; added from the picker by searching or by an address, and removed; drawn between compared timelines’ tracks, and over one axis combined, on desktop and phone; in the pages search engines read, both ways, and on a timeline’s page for links to all of it.',
   );
 } finally {
   await browser?.close();

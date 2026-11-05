@@ -865,6 +865,108 @@ Every point has a place. Explore the spaces between them.</textarea>
         </div>
       </form>
     </dialog>
+    <!-- Choosing what an event relates to (#422): an event of this timeline, or a timeline or
+         event on another the account may save; found by searching or by a pasted address. -->
+    <dialog
+      id="link-picker"
+      class="search-dialog link-picker"
+      aria-labelledby="link-picker-heading"
+    >
+      <form id="link-picker-form">
+        <div class="dialog-heading">
+          <h2 id="link-picker-heading">Add a relationship</h2>
+          <button type="button" data-close="link-picker" aria-label="Close">×</button>
+        </div>
+        <div class="event-kind" role="tablist" aria-label="Find it by">
+          <button
+            type="button"
+            role="tab"
+            id="link-picker-search-tab"
+            aria-controls="link-picker-search"
+            aria-selected="true"
+          >
+            Search</button
+          ><button
+            type="button"
+            role="tab"
+            id="link-picker-address-tab"
+            aria-controls="link-picker-address"
+            aria-selected="false"
+          >
+            Address
+          </button>
+        </div>
+        <div id="link-picker-search" role="tabpanel" aria-labelledby="link-picker-search-tab">
+          <div class="search-row">
+            <input
+              id="link-picker-text"
+              type="search"
+              maxlength="300"
+              autocomplete="off"
+              spellcheck="false"
+              aria-label="Search titles and notes"
+              placeholder="Words in titles and notes"
+            /><button class="button-primary" type="submit">Search</button>
+          </div>
+          <details id="link-picker-filters" class="link-picker-filters">
+            <summary>Filters</summary>
+            <fieldset id="link-picker-show">
+              <legend>Show</legend>
+              <label id="link-picker-show-timelines"
+                ><input type="checkbox" value="timelines" checked /> Timelines</label
+              >
+              <label><input type="checkbox" value="moments" checked /> Moments</label>
+              <label><input type="checkbox" value="durations" checked /> Durations</label>
+            </fieldset>
+            <label id="link-picker-tag-label"
+              >Tag <input id="link-picker-tag" maxlength="64" autocomplete="off"
+            /></label>
+            <fieldset id="link-picker-within">
+              <legend>Search in</legend>
+              <label
+                ><input type="radio" name="link-picker-within" value="" checked /> Timelines I can
+                edit</label
+              >
+              <label
+                ><input type="radio" name="link-picker-within" value="mine" /> My timelines</label
+              >
+            </fieldset>
+          </details>
+          <p id="link-picker-status" class="field-hint" role="status" aria-live="polite"></p>
+          <ol id="link-picker-results" class="search-results"></ol>
+          <div id="link-picker-pages" class="dialog-actions" hidden>
+            <button id="link-picker-previous" type="button">Previous</button
+            ><button id="link-picker-next" type="button">Next</button>
+          </div>
+        </div>
+        <div
+          id="link-picker-address"
+          role="tabpanel"
+          aria-labelledby="link-picker-address-tab"
+          hidden
+        >
+          <p id="link-picker-address-hint" class="field-hint"></p>
+          <div class="search-row">
+            <input
+              id="link-picker-url"
+              type="text"
+              inputmode="url"
+              autocomplete="off"
+              spellcheck="false"
+              aria-label="Address"
+              placeholder="https://…"
+            /><button id="link-picker-find" class="button-primary" type="button">Find</button>
+          </div>
+          <p
+            id="link-picker-address-status"
+            class="field-hint"
+            role="status"
+            aria-live="polite"
+          ></p>
+          <ol id="link-picker-found" class="search-results"></ol>
+        </div>
+      </form>
+    </dialog>
     <input id="json-file" type="file" accept=".ochx,.json,application/json" hidden />
     <input id="och-file" type="file" accept=".och,application/vnd.openchronology.sqlite" hidden />
     <dialog id="pull-dialog">

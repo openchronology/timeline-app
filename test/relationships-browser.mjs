@@ -60,9 +60,34 @@ export async function checkRelationships(page, restore) {
     // Link Alpha to Bravo by searching from Alpha's details.
     await page.getByRole('button', { name: 'Alpha', exact: true }).click({ force: true });
     await related.getByText('No relationships yet.').waitFor();
-    await related.locator('summary').click();
-    await related.getByRole('searchbox').fill('bravo');
-    await related.locator('.related-results button', { hasText: 'Bravo' }).click();
+    // The picker (#422): its words marked in what it finds; Alpha itself isn't offered.
+    await related.getByRole('button', { name: 'Add a relationship…' }).click();
+    const picker = page.locator('#link-picker');
+    await picker.getByRole('searchbox').fill('bravo');
+    const choice = picker.locator('#link-picker-results .search-result', { hasText: 'Bravo' });
+    await choice.waitFor();
+    assert.equal(await choice.locator('mark').first().textContent(), 'Bravo');
+    assert.equal(await choice.locator('.picker-kind').textContent(), 'Moment');
+    // Its filters are folded away, and offer no other timelines here.
+    assert.equal(await picker.locator('#link-picker-filters').getAttribute('open'), null);
+    assert.equal(await picker.locator('#link-picker-within').isHidden(), true);
+    // An address names an event of this timeline: not Alpha itself, nor one it lacks.
+    await picker.getByRole('tab', { name: 'Address' }).click();
+    const address = picker.getByRole('textbox', { name: 'Address' });
+    for (const [link, refusal] of [
+      ['#moment/a', 'That’s this event itself.'],
+      ['#moment/nothing', 'That isn’t a link to an event on this timeline.'],
+    ]) {
+      await address.fill(link);
+      await address.press('Enter');
+      await picker.getByText(refusal).waitFor();
+    }
+    await address.fill('#moment/b');
+    await picker.getByRole('button', { name: 'Find' }).click();
+    await picker.locator('#link-picker-found .search-result', { hasText: 'Bravo' }).waitFor();
+    await picker.getByRole('tab', { name: 'Search' }).click();
+    await choice.click();
+    await picker.waitFor({ state: 'hidden' });
     await related.locator('.related-entity', { hasText: 'Bravo' }).waitFor();
     // Charlie is connected through Bravo.
     await related.getByText('1 more through other relationships.').waitFor();

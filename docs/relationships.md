@@ -6,7 +6,12 @@ A relationship links two different entities: two moments, two durations, or a mo
 
 Moment details and the duration dialog have a **Related to** section. It lists directly related entities 25 at a time, each with its time or extent; choose one to open it. When more entities are connected through other relationships, the section says how many, e.g. "14 more through other relationships".
 
-To link an entity, open **Add a relationship** and search titles and notes. Choose a result to link it. **×** removes a link. Undo and Redo cover adding and removing links. Deleting an event removes its links; undoing the deletion restores them.
+To link an entity, choose **Add a relationship…**. A picker opens with two tabs:
+
+- **Search:** words from this timeline's events' titles and notes, matched as Explore's search matches them ([browsing](browsing.md#searching-events)), with the words highlighted. **Filters**, folded away, choose moments, durations or both.
+- **Address:** paste a link to one of this timeline's moments or durations: its page's address, or a link fragment such as `#moment/<id>`.
+
+Choose a result to link it. **×** removes a link. Undo and Redo cover adding and removing links. Deleting an event removes its links; undoing the deletion restores them.
 
 **Separate related** moves the entity and its directly related entities into a track above everything else, like [separating by tags](tags.md). **Separate all connected** also follows relationships transitively: everything reachable through any chain of links moves up. The bar above the tracks says which entity was separated and how, such as "Separated: related to Alpha". Separated tracks are read-only and still draw arcs (see [Arcs between tracks](#arcs-between-tracks)); **Rejoin** returns to the whole timeline.
 
@@ -41,9 +46,16 @@ timeline, or to another timeline as a whole. Related to lists these under **On o
 each with the other timeline's name. Choosing a link opens the other entity's page, with its timeline open at
 it, or the other timeline's page.
 
-To add one, open **Link to another timeline** and search the timelines you can save. Choose
-one, then either **Link to the whole timeline** or search its titles and notes for an event and
-choose it. **×** removes a link. Linking and removing a link need permission to save both
+To add one, choose **Link to another timeline…**. The same picker opens:
+
+- **Search** finds timelines and their events at once, as Explore's search does, with the words highlighted. It finds only what you can link to:
+  - timelines you can save: your own, and those shared with you as a writer;
+  - timelines below the [link limit](administration.md#links-between-timelines);
+  - never this timeline or its events, which are related with **Add a relationship…** instead.
+- **Filters**, folded away, choose timelines, moments or durations, a tag, and **Timelines I can edit** or only **My timelines**.
+- **Address:** paste the address of a timeline's page, or of a moment's or duration's page. A link fragment, an embed's address and the editor's own address work too. The server looks it up and says why it can't be linked, if it can't: it's this timeline, you can't save it, or it's at the limit.
+
+Choosing a timeline links to it as a whole; choosing an event links to that event. A fork shows only the events it changed in search; link to its other events by their address. **×** removes a link. Linking and removing a link need permission to save both
 timelines, since the link belongs to both. Undo and Redo do not cover them: a link is kept by
 the server, apart from either timeline, and takes effect at once. Unsaved entities can't be
 linked yet; save first.

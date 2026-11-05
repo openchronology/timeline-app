@@ -194,7 +194,7 @@ Give each image's HTTPS address. A server keeps only the link, not a copy, and c
 
 ## Relationships
 
-Open an event and find **Related to**. It lists what is linked to it, 25 at a time; choose one to open it. To link something, open **Add a relationship**, search for it by title or notes, and choose it. **×** removes a link.
+Open an event and find **Related to**. It lists what is linked to it, 25 at a time; choose one to open it. To link something, choose **Add a relationship…** and find it by searching titles and notes, or by pasting its address, then choose it. On the website, **Link to another timeline…** does the same for timelines you can edit and their events. **×** removes a link.
 
 Relationships show as arcs above the axis. Two buttons pull them out of the crowd:
 
