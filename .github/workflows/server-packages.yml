@@ -3,7 +3,7 @@ name: Server packages
 # Debian and Ubuntu, .rpm for Rocky/RHEL and Fedora. Each is installed in a fresh container of
 # its distribution (test/server-deb.mjs, test/server-rpm.mjs) and uploaded. From the
 # platform archive it also builds and tests the FreeBSD packages, the Homebrew formula on
-# macOS and the Windows installer. Called by ci.yml and release.yml.
+# macOS, the AUR package on Arch Linux and the Windows installer. Called by ci.yml and release.yml.
 on:
   workflow_call:
     inputs:
@@ -91,6 +91,33 @@ jobs:
           name: server-platform
           path: server-artifacts/openchronology-server-platform.tar.gz
           if-no-files-found: error
+  # Arch Linux (#331): the AUR's openchronology-server, rendered for the platform archive, built
+  # with makepkg and installed, set up, run, upgraded and removed in a fresh Arch container.
+  arch:
+    name: Server / arch
+    needs: platform
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.1
+        with:
+          name: server-platform
+          path: server-artifacts/
+      - name: Render the AUR package
+        run: node scripts/aur-packages.mjs --out aur --platform server-artifacts/openchronology-server-platform.tar.gz
+      - name: Build, install, set up, run, upgrade and remove it on Arch Linux
+        timeout-minutes: 40
+        run: node test/server-arch.mjs aur/openchronology-server
   # FreeBSD (#116): a FreeBSD virtual machine builds och-convert and pgmp from the platform and
   # makes the package (deploy/freebsd-server/build.sh).
   freebsd:

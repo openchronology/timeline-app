@@ -1,7 +1,7 @@
 name: Tagged release
 # A version tag or published release: builds the desktop and server packages, the offline HTML
 # and matching source, checks every asset (scripts/release-assets.mjs) and attaches them, then
-# publishes the Homebrew formula for a stable release.
+# publishes the Homebrew formula and the AUR packages for a stable release.
 on:
   push:
     tags: ['v*']
@@ -143,3 +143,72 @@ jobs:
           git -c user.name="OpenChronology releases" -c user.email="releases@openchronology.invalid" \
             commit -m "openchronology-server ${RELEASE_TAG#v}"
           git push origin HEAD:main
+  # Stable releases publish the AUR packages (#331), openchronology-server and
+  # openchronology-desktop-bin, for the platform archive and desktop .deb this release attached,
+  # once AUR_SSH_KEY holds the private key of an AUR account that may push them (the first
+  # push creates each package). Without it the job says so and publishes nothing.
+  aur:
+    name: Publish the AUR packages
+    needs: publish
+    if: ${{ !contains(github.event.release.tag_name || github.ref_name, '-') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref_name }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Render the packages for this release's assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release download "$RELEASE_TAG" --dir release \
+            --pattern openchronology-server-platform.tar.gz \
+            --pattern openchronology-desktop-linux-amd64.deb
+          base="https://github.com/${GH_REPO}/releases/download/${RELEASE_TAG}"
+          node scripts/aur-packages.mjs --out aur \
+            --platform release/openchronology-server-platform.tar.gz \
+            --platform-url "$base/openchronology-server-platform.tar.gz" \
+            --desktop release/openchronology-desktop-linux-amd64.deb \
+            --desktop-url "$base/openchronology-desktop-linux-amd64.deb"
+      # The AUR reads each package's .SRCINFO, which makepkg writes from its PKGBUILD.
+      - name: Write each .SRCINFO with makepkg
+        run: |
+          docker run --rm -v "$PWD/aur:/aur" archlinux:latest bash -euc '
+            pacman -Sy --noconfirm --needed base-devel >/dev/null
+            useradd -m builder
+            for dir in /aur/*/; do
+              chown -R builder "$dir"
+              (cd "$dir" && runuser -u builder -- makepkg --printsrcinfo) > "$dir/.SRCINFO"
+            done
+            chmod -R a+rwX /aur'
+      - name: Push them to the AUR
+        env:
+          AUR_KEY: ${{ secrets.AUR_SSH_KEY }}
+        run: |
+          if [ -z "$AUR_KEY" ]; then
+            echo "::notice::AUR_SSH_KEY is not set: the AUR packages were not published."
+            exit 0
+          fi
+          install -m 0700 -d ~/.ssh
+          printf '%s\n' "$AUR_KEY" > ~/.ssh/aur && chmod 0600 ~/.ssh/aur
+          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/aur -o IdentitiesOnly=yes"
+          for dir in aur/*/; do
+            name=$(basename "$dir")
+            git clone "ssh://aur@aur.archlinux.org/${name}.git" "repo-$name"
+            find "repo-$name" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+            cp -a "$dir/." "repo-$name/"
+            git -C "repo-$name" add -A
+            if git -C "repo-$name" diff --cached --quiet; then continue; fi
+            git -C "repo-$name" -c user.name="OpenChronology releases" \
+              -c user.email="releases@openchronology.invalid" \
+              commit -m "${name} ${RELEASE_TAG#v}"
+            git -C "repo-$name" push origin HEAD:master
+          done

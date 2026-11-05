@@ -1,0 +1,82 @@
+# Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+# The OpenChronology server for Arch Linux (#331), published to the AUR by releases
+# (scripts/aur-packages.mjs renders this template). It builds och-convert and pgmp from the
+# release's platform archive, and lays the server out as the Debian package does, running on
+# Arch's Node.js and PostgreSQL.
+# Maintainer: Athan Clark <athan.clark@gmail.com>
+pkgname=openchronology-server
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc='Exact timelines, shared on your terms: the OpenChronology platform server'
+arch=('x86_64')
+url='https://github.com/openchronology/timeline-app'
+license=('GPL-3.0-only')
+depends=('nodejs>=24' 'postgresql' 'gmp' 'sqlite' 'util-linux' 'ca-certificates')
+makedepends=('cargo' 'cmake' 'pkgconf' 'python')
+# The platform's Node.js modules are built already; stripping or debug packages would only
+# touch och-convert and pgmp, which are small.
+options=('!strip' '!debug' '!lto')
+install=openchronology-server.install
+# The exact-rational type for PostgreSQL, pinned as the other packages pin it.
+_pgmp=1849585416f2bc3d070bf8cef6a659907687ec7f
+source=("openchronology-server-platform-$pkgver.tar.gz::@PLATFORM_URL@"
+        "pgmp-$_pgmp.tar.gz::https://codeload.github.com/dvarrazzo/pgmp/tar.gz/$_pgmp"
+@LOCAL_SOURCES@)
+noextract=("openchronology-server-platform-$pkgver.tar.gz")
+sha256sums=(@SHA256SUMS@)
+
+prepare() {
+  # The archive has no top folder: into its own.
+  mkdir -p platform
+  bsdtar -xf "openchronology-server-platform-$pkgver.tar.gz" -C platform
+}
+
+build() {
+  # The SQLite converter, from the crates vendored in the platform archive.
+  cd "$srcdir/platform/native"
+  cargo build --manifest-path native-store/Cargo.toml --release --locked --offline \
+    --bin och-convert
+  # pgmp, for this system's PostgreSQL.
+  cd "$srcdir/pgmp-$_pgmp"
+  python tools/unmix.py < sql/pgmp.pysql > sql/pgmp--1.1.sql
+  python tools/sql2extension.py --extname pgmp sql/pgmp--1.1.sql > sql/pgmp--unpackaged--1.1.sql
+  make with_llvm=no
+}
+
+package() {
+  local app="$pkgdir/usr/lib/openchronology" doc="$pkgdir/usr/share/doc/openchronology-server"
+  # The platform (Next.js and the editor), laid out as the other packages lay it out, with
+  # this system's Node.js where theirs bundle it.
+  install -d "$app"
+  cp -a "$srcdir/platform/lib/openchronology/." "$app/"
+  install -Dm755 "$srcdir/platform/native/native-store/target/release/och-convert" \
+    "$app/bin/och-convert"
+  install -d "$app/node/bin"
+  ln -s /usr/bin/node "$app/node/bin/node"
+
+  make -C "$srcdir/pgmp-$_pgmp" with_llvm=no DESTDIR="$pkgdir" install
+  install -Dm644 "$srcdir/pgmp-$_pgmp/COPYING" "$doc/pgmp/COPYING"
+
+  # The Debian package's services, configuration templates and commands.
+  local unit
+  for unit in openchronology openchronology-mail openchronology-syslog openchronology-journald; do
+    sed 's|README.Debian|README.Arch|' "$srcdir/$unit.service" > "$srcdir/$unit.arch.service"
+    install -Dm644 "$srcdir/$unit.arch.service" "$pkgdir/usr/lib/systemd/system/$unit.service"
+  done
+  install -Dm644 "$srcdir/openchronology.env" "$pkgdir/usr/share/openchronology/openchronology.env.example"
+  install -Dm644 "$srcdir/syslog.env" "$pkgdir/usr/share/openchronology/syslog.env.example"
+  install -Dm644 "$srcdir/journald.env" "$pkgdir/usr/share/openchronology/journald.env.example"
+  install -Dm755 "$srcdir/openchronology-setup" "$pkgdir/usr/bin/openchronology-setup"
+  install -Dm755 "$srcdir/openchronology-migrate" "$pkgdir/usr/bin/openchronology-migrate"
+  install -Dm755 "$srcdir/openchronology-reset-admin-password" \
+    "$pkgdir/usr/bin/openchronology-reset-admin-password"
+  install -Dm755 "$srcdir/och-import-logs" "$pkgdir/usr/bin/och-import-logs"
+  install -Dm644 "$srcdir/openchronology-server.sysusers" "$pkgdir/usr/lib/sysusers.d/openchronology-server.conf"
+  install -Dm644 "$srcdir/openchronology-server.tmpfiles" "$pkgdir/usr/lib/tmpfiles.d/openchronology-server.conf"
+
+  # The documentation, the project's README over docs/README.md.
+  install -d "$doc"
+  cp -a "$srcdir/platform/doc/." "$doc/"
+  install -Dm644 "$srcdir/README.Arch" "$doc/README.Arch"
+  install -Dm644 "$srcdir/platform/doc/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
