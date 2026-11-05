@@ -14,6 +14,7 @@ import {
   compareLimits as compareLimitsFromEnv,
   compareLimit,
   entryLimit as entryLimitFromEnv,
+  linkLimit as linkLimitFromEnv,
   mebibytes,
 } from './limits.mjs';
 import { deleteWhere, parseRetention, printRetention } from './retention.mjs';
@@ -31,6 +32,7 @@ import { BrowserForks } from './browser-forks.mjs';
 import { queryPlugins } from './query-plugins.mjs';
 import { Collaboration, relatedTimelines, searchTimelines } from './collaboration.mjs';
 import { Versioning, revisionId } from './versioning.mjs';
+import { TimelineLinks } from './timeline-links.mjs';
 import { createPluginLibrary, createSuiteLibrary } from './plugins.mjs';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -342,6 +344,8 @@ export function createRequestHandler({
   compareLimits: limits = compareLimitsFromEnv(),
   // How many entries of each kind a timeline holds (TIMELINE_ENTRY_LIMIT); Infinity for none.
   entryLimit: entries = entryLimitFromEnv(),
+  // How many links to other timelines a timeline may have (#422; TIMELINE_LINK_LIMIT).
+  linkLimit: linkCap = linkLimitFromEnv(),
   // Downloads kept to serve again (#204; export-cache.mjs), or null for none.
   exportCache = exportCacheFromEnv({ pool }),
 } = {}) {
@@ -373,6 +377,7 @@ export function createRequestHandler({
   const administration = store ? new Administration(store, auth) : null;
   const moderation = store ? new Moderation(store, auth, administration) : null;
   const collaboration = store ? new Collaboration(store) : null;
+  const links = store ? new TimelineLinks(store, { limit: linkCap }) : null;
   const browserForks = store ? new BrowserForks(store, auth) : null;
   /**
    * The files downloads are made from, for the export cache (export-cache.mjs respond): the
@@ -1142,6 +1147,10 @@ export function createRequestHandler({
             200,
             await searchTimelines(pool, userId, await body(req, 4096), featured),
           );
+        // Arcs between a comparison's timelines (#422; timeline-links.mjs): anyone who may read
+        // every one of them.
+        if (pathname === '/api/timelines/links/query' && method === 'POST')
+          return response(res, 200, await links.between(userId, await body(req, 16384)));
         // Timelines related to one the reader can read, for its page to recommend (#447).
         const related = /^\/api\/timelines\/([a-f0-9-]{36})\/related$/.exec(pathname);
         if (related && uuid.test(related[1]) && method === 'GET') {
@@ -1403,7 +1412,7 @@ export function createRequestHandler({
         // checked by the store or here. Sharing, settings, members and deletion: its owner
         // (or an administrator), checked further down.
         const match =
-          /^\/api\/timelines\/([^/]+)(?:\/(document|query|members|settings|file|changes|delete-range|map-times|revision|recent))?$/.exec(
+          /^\/api\/timelines\/([^/]+)(?:\/(document|query|members|settings|file|changes|delete-range|map-times|revision|recent|links))?$/.exec(
             pathname,
           );
         if (!match || !uuid.test(match[1])) throw new HttpError(404, 'Unknown endpoint.');
@@ -1420,6 +1429,34 @@ export function createRequestHandler({
           );
         if (action === 'revision' && method === 'GET')
           return response(res, 200, await store.liveState(id, userId));
+        // Links of one of its moments or durations to other timelines (#422): read by anyone
+        // who may read it, each shown only to those who may read the other timeline; added and
+        // removed with write access to both, with the CSRF token, 60 a minute per account.
+        if (action === 'links' && method === 'GET') {
+          const params = new URL(req.url, origin).searchParams;
+          // Neither: the links to the timeline as a whole.
+          const entity = params.has('moment')
+            ? { moment: params.get('moment') }
+            : params.has('duration')
+              ? { duration: params.get('duration') }
+              : {};
+          return response(
+            res,
+            200,
+            await links.list(id, userId, entity, {
+              after: params.get('after'),
+              limit: params.has('limit') ? Number(params.get('limit')) : 25,
+            }),
+          );
+        }
+        if (action === 'links' && ['POST', 'DELETE'].includes(method)) {
+          auth.require(session, req);
+          await auth.rateLimit('timeline-link:' + userId, 60);
+          const input = await body(req, 4096);
+          if (method === 'DELETE')
+            return response(res, 200, await links.remove(id, userId, input.link));
+          return response(res, 201, await links.create(id, userId, input.from, input.to));
+        }
         if (!action && method === 'GET')
           return response(res, 200, await store.metadata(id, userId));
         if (action === 'document' && method === 'GET') {

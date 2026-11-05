@@ -30,6 +30,14 @@ export interface EdgeBand {
    */
   aIn?: boolean;
   bIn?: boolean;
+  /**
+   * In a comparison, a link between entities on two of its timelines (#422): the source key
+   * of each end's timeline, and each end's title (the view holds neither entity by these IDs).
+   */
+  aKey?: string;
+  bKey?: string;
+  aTitle?: string;
+  bTitle?: string;
 }
 const identifier = (v: unknown): v is string =>
   typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v);

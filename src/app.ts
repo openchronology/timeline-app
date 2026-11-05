@@ -141,6 +141,7 @@ import {
   crossArrowheadPath,
 } from './core.js';
 import type {
+  EdgeBand,
   EntityRef,
   TimeMapping,
   ViewFilter,
@@ -2086,6 +2087,7 @@ function currentComparisonSource(): ComparisonSource | null {
     .sort((a, b) => a.compare(b));
   return {
     key: remoteId ?? 'local-sqlite',
+    timeline: remoteId,
     revision: remoteId ? source.revision : undefined,
     event_generation: remote?.event_generation,
     working: !!workspace?.dirtyCount || dirty,
@@ -2117,6 +2119,7 @@ async function comparisonSources(ids: string[]): Promise<ComparisonSource[]> {
     seen.add(id);
     sources.push({
       key: id,
+      timeline: id,
       revision: info.revision,
       event_generation: info.event_generation,
       title: info.title,
@@ -2163,6 +2166,10 @@ function startComparison(sources: ComparisonSource[], presentation: TimePresenta
   cancelZoomAnimation();
   flushEventEdit();
   const view = new ComparisonView(sources, presentation);
+  // Arcs between entities on different timelines (#422) come from the server.
+  if (!offlineHtml)
+    view.links = (query, signal) =>
+      api<Pick<Frame, 'edges' | 'edgesTruncated'>>('timelines/links/query', 'POST', query, signal);
   if (!comparisonBefore)
     comparisonBefore = {
       viewport: viewport.clone(),
@@ -8173,6 +8180,13 @@ if (!offlineHtml)
     available: () => !offlineHtml && !!session.server,
     native: () => desktop || !platformEditor,
     check: (id) => api<{ id: string; revision: string }>(`timelines/${id}/revision`),
+    // Links between a comparison's timelines are read again and redrawn (#422).
+    linked() {
+      if (!comparison) return;
+      comparison.clearLinks();
+      frameRequest++;
+      requestRender();
+    },
     async refresh(id, revision) {
       const request = documentRequest,
         view = comparison;
@@ -9978,7 +9992,13 @@ function renderRelated(host: HTMLElement, ref: EntityRef | null, readOnly = fals
   };
   more.onclick = () => void load(cursor).catch(fail);
   void load(null).catch(fail);
-  if (!canEdit) return;
+  // Links to other timelines (#422) come last, after adding a relationship here.
+  const elsewhere = document.createElement('div');
+  renderTimelineLinks(elsewhere, host, ref, readOnly);
+  if (!canEdit) {
+    host.append(elsewhere);
+    return;
+  }
   // New links are found by text search over titles and notes.
   const add = document.createElement('details');
   add.className = 'related-add';
@@ -9991,7 +10011,7 @@ function renderRelated(host: HTMLElement, ref: EntityRef | null, readOnly = fals
   const results = document.createElement('div');
   results.className = 'related-results';
   add.append(summary, search, results);
-  host.append(add);
+  host.append(add, elsewhere);
   let timer: ReturnType<typeof setTimeout> | undefined;
   search.oninput = () => {
     clearTimeout(timer);
@@ -10032,6 +10052,219 @@ function renderRelated(host: HTMLElement, ref: EntityRef | null, readOnly = fals
   };
 }
 let relatedGeneration = 0;
+/**
+ * A link from an entity to one on another timeline, or to another timeline as a whole (kind
+ * `timeline`, no times) (#422), as the server lists it.
+ */
+interface TimelineLinkEntry {
+  id: string;
+  timeline: { id: string; title: string; owner: string; slug: string | null };
+  kind: 'moment' | 'duration' | 'timeline';
+  entity: string;
+  title: string;
+  first: string;
+  last: string;
+}
+/**
+ * The section of Related to (`host`), in `container`, listing an entity's links to entities on other timelines (#422;
+ * docs/relationships.md#links-to-other-timelines), 25 at a time, each opening the other
+ * timeline at that entity. Only for a saved server timeline: links join saved entities and
+ * are kept by the server, apart from the timeline. Those who may save it can link to an
+ * entity on another timeline they may save, found by searching their timelines, then that
+ * timeline's events; and remove links (the server checks the other timeline too).
+ */
+function renderTimelineLinks(
+  container: HTMLElement,
+  host: HTMLElement,
+  ref: EntityRef,
+  readOnly: boolean,
+) {
+  const timeline = remote;
+  if (!timeline || local || comparison || offlineHtml) return;
+  const generation = relatedGeneration;
+  const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+  const section = document.createElement('div');
+  section.className = 'timeline-links';
+  const heading = document.createElement('h4');
+  heading.textContent = 'On other timelines';
+  const list = document.createElement('div');
+  list.className = 'related-list';
+  const status = document.createElement('p');
+  status.className = 'field-hint';
+  status.setAttribute('role', 'status');
+  section.append(heading, list, status);
+  container.append(section);
+  const entity: Record<string, string> =
+    'moment' in ref ? { moment: ref.moment } : { duration: ref.duration };
+  const canLink = !readOnly && !!timeline.canWrite && !!session.user;
+  let cursor: string | null = null;
+  const more = document.createElement('button');
+  more.type = 'button';
+  more.textContent = 'Next 25 links';
+  const rerender = () => {
+    if (generation === relatedGeneration) renderRelated(host, ref, readOnly);
+  };
+  const load = async (after: string | null) => {
+    const page = await api<{ links: TimelineLinkEntry[]; next: string | null }>(
+      `timelines/${timeline.id}/links?` +
+        new URLSearchParams({ ...entity, ...(after ? { after } : {}) }),
+    );
+    if (generation !== relatedGeneration) return;
+    list.replaceChildren();
+    for (const link of page.links) {
+      const row = document.createElement('div');
+      row.className = 'related-row';
+      // The other entity's own page (its timeline open at it), or the other timeline's: the
+      // addresses its page and search engines use (#335).
+      const open = document.createElement('a');
+      open.className = 'related-entity';
+      const titled = link.timeline.title || 'Untitled timeline';
+      open.target = '_top';
+      const other = timelinePath(link.timeline);
+      if (link.kind === 'timeline') {
+        open.href = other;
+        open.textContent = `${titled} · the whole timeline`;
+      } else {
+        open.href = `${other}/${link.kind === 'moment' ? 'moments' : 'durations'}/${encodeURIComponent(link.entity)}`;
+        open.textContent =
+          (link.title || (link.kind === 'moment' ? 'Untitled moment' : 'Untitled duration')) +
+          ' · on ' +
+          titled;
+      }
+      open.title = `${link.timeline.title} by ${link.timeline.owner}`;
+      row.append(open);
+      if (canLink) {
+        const unlink = document.createElement('button');
+        unlink.type = 'button';
+        unlink.className = 'related-unlink';
+        unlink.textContent = '×';
+        unlink.setAttribute(
+          'aria-label',
+          `Remove the link with ${link.kind === 'timeline' ? link.timeline.title : link.title || link.entity}`,
+        );
+        unlink.onclick = () =>
+          void api(`timelines/${timeline.id}/links`, 'DELETE', { link: link.id })
+            .then(rerender)
+            .catch((error) => (status.textContent = errorText(error)));
+        row.append(unlink);
+      }
+      list.append(row);
+    }
+    cursor = page.next;
+    if (cursor) list.append(more);
+    status.textContent = page.links.length || after ? '' : 'No links to other timelines.';
+  };
+  more.onclick = () => void load(cursor).catch((error) => (status.textContent = errorText(error)));
+  void load(null).catch((error) => (status.textContent = errorText(error)));
+  if (!canLink) return;
+  // Choosing a timeline, then the whole of it or one of its events, links them.
+  const add = document.createElement('details');
+  add.className = 'related-add';
+  const summary = document.createElement('summary');
+  summary.textContent = 'Link to another timeline';
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.placeholder = 'Search your timelines';
+  search.setAttribute('aria-label', 'Find a timeline to link to');
+  const results = document.createElement('div');
+  results.className = 'related-results';
+  add.append(summary, search, results);
+  section.append(add);
+  let chosen: { id: string; title: string } | null = null,
+    timer: ReturnType<typeof setTimeout> | undefined;
+  const link = (target: { id: string }, to: Record<string, string>) =>
+    void api(`timelines/${timeline.id}/links`, 'POST', {
+      from: entity,
+      to: { timeline: target.id, ...to },
+    })
+      .then(rerender)
+      .catch((error) => (status.textContent = errorText(error)));
+  /** After choosing a timeline: linking to all of it, and going back to choose another. */
+  const choices = (target: { id: string; title: string }) => {
+    const whole = document.createElement('button');
+    whole.type = 'button';
+    whole.textContent = 'Link to the whole timeline';
+    whole.onclick = () => link(target, {});
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.textContent = 'Choose another timeline';
+    back.onclick = () => {
+      chosen = null;
+      summary.textContent = 'Link to another timeline';
+      search.placeholder = 'Search your timelines';
+      search.setAttribute('aria-label', 'Find a timeline to link to');
+      search.value = '';
+      results.replaceChildren();
+      search.focus();
+    };
+    return [whole, back];
+  };
+  const find = async (words: string) => {
+    if (!chosen) {
+      const page = await api<{ timelines: { id: string; title: string; owner: string }[] }>(
+        'timelines/search',
+        'POST',
+        {
+          search: words,
+          scope: 'writable',
+          limit: 10,
+          sort: words.trim() ? 'relevance' : 'updated',
+        },
+      );
+      if (search.value !== words || generation !== relatedGeneration) return;
+      results.replaceChildren();
+      for (const found of page.timelines) {
+        if (found.id === timeline.id) continue;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = `${found.title || 'Untitled timeline'} · ${found.owner}`;
+        button.onclick = () => {
+          chosen = found;
+          summary.textContent = `Link to an event on ${found.title || 'Untitled timeline'}`;
+          search.placeholder = 'Search its events';
+          search.setAttribute('aria-label', `Find an event on ${found.title} to link to`);
+          search.value = '';
+          results.replaceChildren(...choices(found));
+          search.focus();
+        };
+        results.append(button);
+      }
+      if (!page.timelines.some((t) => t.id !== timeline.id))
+        results.textContent = 'None of the timelines you can edit match.';
+      return;
+    }
+    const target = chosen;
+    const page = await api<SearchPage>(`timelines/${target.id}/query`, 'POST', {
+      kind: 'search',
+      text: words,
+      page: 1,
+    });
+    if (search.value !== words || generation !== relatedGeneration || chosen !== target) return;
+    results.replaceChildren(...choices(target));
+    for (const result of page.results) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent =
+        (result.title || 'Untitled') + ' · ' + (result.kind === 'moment' ? 'moment' : 'duration');
+      button.onclick = () => link(target, { [result.kind]: result.id });
+      results.append(button);
+    }
+    if (!page.results.length && searchTerms(words).length) {
+      const none = document.createElement('p');
+      none.className = 'field-hint';
+      none.textContent = 'No events match.';
+      results.append(none);
+    }
+  };
+  search.oninput = () => {
+    clearTimeout(timer);
+    const words = search.value;
+    timer = setTimeout(
+      () => void find(words).catch((error) => (status.textContent = errorText(error))),
+      200,
+    );
+  };
+}
 function describeLabel(ref: EntityRef) {
   const entry = describe(refKey(ref));
   return entry?.title || ('moment' in ref ? 'this moment' : 'this duration');
@@ -10108,17 +10341,23 @@ function arrowheadLookup(
   return (a, b) => arcArrowheads(end(a), end(b));
 }
 /**
- * The axes arcs are drawn on: the timeline's, or on a separation (#415) the upper track's for
- * ends on it (`aIn`/`bIn`) and the lower track's for the rest. Other comparisons draw no arcs.
+ * Where each end of an arc is drawn: the height of the axis it rises from. On the timeline,
+ * its axis; on a separation (#415) the upper track's for ends on it (`aIn`/`bIn`) and the
+ * lower track's for the rest; in a comparison, the axis of the track each end's timeline is
+ * on (`aKey`/`bKey` for a link between two of them, #422, else the arc's own track), or the
+ * one axis of a combined comparison.
  */
-function arcAxes(): { upper: number; lower: number } | null {
-  if (!comparison) return { upper: 192, lower: 192 };
-  if (!separation || comparison.combined || comparison.tracks.length !== 2) return null;
+function arcAxes(): ((edge: EdgeBand, end: 'a' | 'b') => number) | null {
+  if (!comparison) return () => 192;
+  if (comparison.combined) return () => 192;
   const rows = comparisonRows().rows;
-  return {
-    upper: 192 + (rows.get(comparison.tracks[0].source.key)?.offset ?? 0),
-    lower: 192 + (rows.get(comparison.tracks[1].source.key)?.offset ?? 0),
-  };
+  const axis = (key: string | undefined) => 192 + (rows.get(key ?? '')?.offset ?? 0);
+  if (separation && comparison.tracks.length === 2) {
+    const upper = axis(comparison.tracks[0].source.key),
+      lower = axis(comparison.tracks[1].source.key);
+    return (edge, end) => ((end === 'a' ? edge.aIn : edge.bIn) === false ? lower : upper);
+  }
+  return (edge, end) => axis((end === 'a' ? edge.aKey : edge.bKey) ?? edge.sourceKey);
 }
 function renderEdgeArcs() {
   const svg = el('edge-arcs');
@@ -10130,7 +10369,8 @@ function renderEdgeArcs() {
   let entities: ReturnType<typeof frameEntities> | null = null;
   const onScreen = () => (entities ??= frameEntities());
   const arrowhead = arrowheadLookup(onScreen);
-  const name = (ref: EntityRef) =>
+  const name = (ref: EntityRef, title?: string) =>
+    title ||
     describe(refKey(ref))?.title ||
     onScreen().get(refKey(ref))?.title ||
     ('moment' in ref ? 'Moment' : 'Duration');
@@ -10139,8 +10379,8 @@ function renderEdgeArcs() {
       xb = (inset() + viewport.x(parsedTime(edge.bTime), width())) / uiScale;
     // Each end on its track's axis: an arc within a track rises above it; one between the
     // tracks crosses the gap from one end to the other.
-    const ya = edge.aIn === false ? axes!.lower : axes!.upper,
-      yb = edge.bIn === false ? axes!.lower : axes!.upper;
+    const ya = axes!(edge, 'a'),
+      yb = axes!(edge, 'b');
     const distance = Math.abs(xb - xa);
     const lift = Math.min(150, 18 + distance * 0.3);
     let arc = edgeArcs.get(edge.id);
@@ -10198,12 +10438,9 @@ function renderEdgeArcs() {
     // an arrowhead at exactly one end, the name reads toward it.
     const named = `${generation}:${toA}:${toB}`;
     if (arc.named !== named) {
-      arc.title.textContent =
-        toA === toB
-          ? `${name(edge.a)} ↔ ${name(edge.b)}`
-          : toB
-            ? `${name(edge.a)} → ${name(edge.b)}`
-            : `${name(edge.b)} → ${name(edge.a)}`;
+      const a = name(edge.a, edge.aTitle),
+        b = name(edge.b, edge.bTitle);
+      arc.title.textContent = toA === toB ? `${a} ↔ ${b}` : toB ? `${a} → ${b}` : `${b} → ${a}`;
       arc.named = named;
     }
   }

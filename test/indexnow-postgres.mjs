@@ -2,7 +2,8 @@
 // IndexNow (#389) against PostgreSQL, through the HTTP API: creating, publishing, saving,
 // renaming, making private and deleting timelines sends their public addresses (and their
 // owner's profile) to a stand-in endpoint, a private timeline's never, matching the sitemap;
-// so do the pages of the moments and durations a save changes (#453).
+// so do the pages of the moments and durations a save changes (#453), and of
+// the ends of links between timelines added or removed (#422).
 // No request leaves the machine.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -194,6 +195,34 @@ try {
     changes: [{ id: 'leg:1', event: { ...departure, metadata: { title: 'Cast off' } } }],
   });
   assert.deepEqual(await next(), [boats, `${boats}/moments/leg%3A1`].sort());
+  // Links between timelines (#422): the pages of both ends, which list them; a link to a
+  // timeline as a whole, that timeline's page; removing one, the same.
+  const harbours = await call('POST', '/api/timelines', {
+    ...document('Harbours'),
+    events: [{ id: 'port', time: '3/1', metadata: { title: 'Port' } }],
+  });
+  await call('PATCH', `/api/timelines/${harbours.id}/settings`, {
+    visibility: 'public',
+    slug: 'harbours',
+  });
+  const port = `/${username}/harbours/moments/port`;
+  assert.deepEqual(await next(), [`/${username}`, `/${username}/harbours`, port].sort());
+  now += RESUBMIT_AFTER;
+  const crossing = await call('POST', `/api/timelines/${harbours.id}/links`, {
+    from: { moment: 'port' },
+    to: { timeline: voyage.id, moment: 'leg:1' },
+  });
+  assert.deepEqual(await next(), [`${boats}/moments/leg%3A1`, port].sort());
+  now += RESUBMIT_AFTER;
+  await call('POST', `/api/timelines/${harbours.id}/links`, {
+    from: { moment: 'port' },
+    to: { timeline: voyage.id },
+  });
+  assert.deepEqual(await next(), [boats, port].sort());
+  now += RESUBMIT_AFTER;
+  await call('DELETE', `/api/timelines/${harbours.id}/links`, { link: crossing.id });
+  assert.deepEqual(await next(), [`${boats}/moments/leg%3A1`, port].sort());
+
   // Labelled, its entities are not listed: a save sends its page alone.
   now += RESUBMIT_AFTER;
   await pool.query("UPDATE oc_timelines SET content_labels=ARRAY['violence'] WHERE id=$1", [
@@ -202,7 +231,7 @@ try {
   await save(ships([{ ...departure, metadata: { title: 'Setting out' } }], linked));
   assert.deepEqual(await next(), [boats]);
   console.log(
-    'PASS IndexNow: public timelines created, published, saved, renamed, made private and deleted are sent with their profile, at most hourly; private ones never; the pages of moments and durations published, renamed, edited (whole or sparse), linked and removed, not of labelled timelines.',
+    'PASS IndexNow: public timelines created, published, saved, renamed, made private and deleted are sent with their profile, at most hourly; private ones never; the pages of moments and durations published, renamed, edited (whole or sparse), linked and removed, not of labelled timelines; both ends of links between timelines.',
   );
 } finally {
   globalThis.fetch = realFetch;

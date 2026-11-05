@@ -146,9 +146,13 @@ described by their labels instead of their notes, and ask search engines not to 
 - With [IndexNow](administration.md#indexnow) on, Bing, Yandex and the other engines that take
   it are told within minutes which of the sitemap's timeline, profile, moment and duration
   pages were added, changed or removed, rather than waiting for their next crawl. Editing one
-  moment sends its timeline's page and that moment's.
+  moment sends its timeline's page and that moment's. Adding or removing a
+  [link to another timeline](relationships.md#links-to-other-timelines) sends the pages of
+  both its ends.
 - Each timeline page includes its title, description, owner and first 50 moments as text, for
-  screen readers and crawlers. Each moment links to its own page.
+  screen readers and crawlers. Each moment links to its own page. Up to 50 moments and
+  durations on other timelines that link to it as a whole are listed under **Linked from**,
+  each linked to its own page.
 - **Moment and duration pages as text:** each includes, as text:
   - its title;
   - its time or extent as the timeline displays it (with the ISO date for machines on a
@@ -158,6 +162,10 @@ described by their labels instead of their notes, and ask search engines not to 
     sources (https only, marked `ugc nofollow`);
   - up to 50 of the moments and durations [related](relationships.md) to it, each linked to
     its own page;
+  - up to 50 of its [links to other timelines](relationships.md#links-to-other-timelines),
+    each linked to the other moment's or duration's page, or the other timeline's. A link
+    appears on the pages of both its ends, so each leads to the other. Only links to
+    timelines the reader may read are shown, so crawlers see those between public timelines;
   - a link into the timeline open at it.
 - **A timeline's structured data:** a public, unlabelled timeline's page describes it as a
   schema.org `CreativeWork` in JSON-LD: its title, description, own image, tags as keywords,

@@ -34,7 +34,9 @@ controls every track; vertical pan and Ctrl-scroll scaling remain available.
 Stacked mode has separate axes and source labels. **Combine into one timeline**
 merges the visible summaries and groups nearby moments across sources; disabling
 it restores the tracks. Qualified moment IDs avoid collisions between sources.
-Moment details identify their source and original coordinate. Group inspection
+Moment details identify their source and original coordinate. Each timeline's
+relationships are drawn on its track, and [links between the compared timelines](relationships.md#links-to-other-timelines)
+cross between their tracks, or arc over the one axis when combined. Group inspection
 uses disposable 25-moment pages in either mode.
 
 When source presentations differ, a dialog requires choosing a common printer/

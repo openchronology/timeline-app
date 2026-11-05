@@ -3371,6 +3371,36 @@ dialog button {
   white-space: normal;
   padding: 8px 10px;
 }
+/* Links to entities on other timelines (#422) open those timelines, so they are links drawn
+   like the buttons beside them. */
+.timeline-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.timeline-links h4 {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+a.related-entity {
+  display: flex;
+  align-items: center;
+  min-height: var(--control-height);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+a.related-entity:hover {
+  background: var(--hover);
+  border-color: var(--line-hover);
+}
 .related-unlink {
   flex-shrink: 0;
   width: var(--control-height);

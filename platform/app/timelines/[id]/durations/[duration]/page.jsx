@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // A duration's own page: the timeline open at the duration, the duration as text and as
-// structured data for search engines (#335), and what link previews show of it.
+// structured data for search engines (#335) with its links to other timelines (#422), and
+// what link previews show of it.
 import { notFound } from 'next/navigation';
 import Editor from '../../../../../components/editor.jsx';
 import EntitySummary from '../../../../../components/entity-summary.jsx';
@@ -15,6 +16,7 @@ import {
   entityParam,
   entityStructuredData,
   jsonLd,
+  linksOf,
   presentTime,
   relatedOf,
   siteName,
@@ -43,7 +45,11 @@ export async function generateMetadata({ params }) {
 export default async function DurationPage({ params }) {
   const { timeline, user, services, duration, band } = await load(params);
   const entity = { kind: 'duration', id: band.id };
-  const related = await relatedOf(services, timeline, entity, user?.id).catch(() => []);
+  const [related, elsewhere] = await Promise.all([
+    relatedOf(services, timeline, entity, user?.id).catch(() => []),
+    // Its links to other timelines (#422), so either end's page leads to the other.
+    linksOf(services, timeline, entity, user?.id).catch(() => []),
+  ]);
   const data = entityStructuredData(timeline, {
     ...entity,
     title: durationTitle(duration),
@@ -66,6 +72,7 @@ export default async function DurationPage({ params }) {
           last={band.last}
           metadata={duration.metadata}
           related={related}
+          elsewhere={elsewhere}
         />
       </TimelineSummary>
       <Editor

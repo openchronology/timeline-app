@@ -88,7 +88,8 @@ export class TimelineNotifications {
  * requests (403) and servers without PostgreSQL (503).
  *
  * Events: `revision` `{id, revision}` when a timeline's revision differs from the last sent
- * (the first check sends each one's current revision); `access` when the session changed or a
+ * (the first check sends each one's current revision); `links` `{id, links}` when its links to
+ * other timelines changed (#422); `access` when the session changed or a
  * timeline became unavailable, after which the stream ends. Every 25 seconds it re-checks
  * every timeline (catching notifications missed, and access lost without one) and sends a
  * comment as a heartbeat so proxies keep the connection open.
@@ -130,9 +131,11 @@ export async function liveResponse(request, services) {
         unsubscribe = () => {},
         timer,
         checking = false;
-      // `pending`: timelines to re-check; `known`: the revision last sent for each.
+      // `pending`: timelines to re-check; `known`: the revision last sent for each, and
+      // `linked` their link generation (#422), announced only when it changes.
       const pending = new Set(ids),
-        known = new Map();
+        known = new Map(),
+        linked = new Map();
       const send = (type, value) => {
         if (!closed)
           controller.enqueue(encoder.encode(`event: ${type}\ndata: ${JSON.stringify(value)}\n\n`));
@@ -175,6 +178,11 @@ export async function liveResponse(request, services) {
               if (known.get(id) !== timeline.revision) {
                 known.set(id, timeline.revision);
                 send('revision', { id, revision: timeline.revision });
+              }
+              if (timeline.links !== undefined) {
+                if (linked.has(id) && linked.get(id) !== timeline.links)
+                  send('links', { id, links: timeline.links });
+                linked.set(id, timeline.links);
               }
             } catch (error) {
               if (error.status === 403 || error.status === 404) {

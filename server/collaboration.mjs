@@ -92,7 +92,7 @@ export function searchInput(value = {}) {
     !Number.isSafeInteger(limit) ||
     limit < 1 ||
     limit > 50 ||
-    !['public', 'mine', 'visible', 'starred'].includes(scope) ||
+    !['public', 'mine', 'visible', 'starred', 'writable'].includes(scope) ||
     !SEARCH_SORTS.includes(sort) ||
     !['', 'public', 'private'].includes(visibility) ||
     typeof starredBy !== 'string' ||
@@ -118,8 +118,9 @@ export function searchInput(value = {}) {
  * Scopes: `public` (public timelines; with no search text, owner or starredBy this is
  * browsing, which lists only established accounts' and featured timelines, #103), `mine`
  * (the reader's own, of any visibility), `visible` (public ones plus those the reader owns or
- * is a member of) and `starred` (of those, the ones the reader starred). 401 for mine and
- * starred when signed out.
+ * is a member of), `starred` (of those, the ones the reader starred) and `writable` (those the
+ * reader may save: their own and those shared with them as a writer, not comparisons; to link
+ * to, #422). 401 for mine, starred and writable when signed out.
  * @param {import('pg').Pool} pool
  * @param {string|null} userId the reader
  * @param {object} value the search (searchInput)
@@ -131,12 +132,12 @@ export function searchInput(value = {}) {
 export async function searchTimelines(pool, userId, value, featured = []) {
   const { search, tag, page, limit, scope, owner, sort, starredBy, visibility } =
     searchInput(value);
-  if (['mine', 'starred'].includes(scope) && !userId)
+  if (['mine', 'starred', 'writable'].includes(scope) && !userId)
     throw new HttpError(401, 'Sign in to see your timelines.');
   // One query for a page and its total. Parameters: $1 the mine scope, $2 search text, $3 and
   // $4 limit and offset, $5 featured ids, $6 the reader (null when signed out), $7 tag, $8 the
   // visible scope, $9 owner, $10 sort, $11 the starred scope, $12 starredBy, $13 browsing,
-  // $14 visibility.
+  // $14 visibility, $15 the writable scope.
   //
   // `matching` is every timeline the scope and filters allow, with what ranking needs: the
   // reader's star, popularity and trending (oc_timeline_popularity, standing.mjs), whether its
@@ -166,7 +167,9 @@ export async function searchTimelines(pool, userId, value, featured = []) {
     FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id
     LEFT JOIN oc_account_standing a ON a.user_id=t.owner_id
     LEFT JOIN oc_timeline_popularity p ON p.timeline_id=t.id
-    WHERE (CASE WHEN $1::boolean THEN t.owner_id=$6::uuid ELSE (t.visibility='public' OR (($8::boolean OR $11::boolean) AND (t.owner_id=$6::uuid OR (EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$6::uuid) AND NOT ${restrictedTimeline('t')})))) END)
+    WHERE (CASE WHEN $1::boolean THEN t.owner_id=$6::uuid
+      WHEN $15::boolean THEN t.comparison IS NULL AND (t.owner_id=$6::uuid OR (EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$6::uuid AND m.role IN ('writer','editor')) AND NOT ${restrictedTimeline('t')}))
+      ELSE (t.visibility='public' OR (($8::boolean OR $11::boolean) AND (t.owner_id=$6::uuid OR (EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$6::uuid) AND NOT ${restrictedTimeline('t')})))) END)
       AND ($2='' OR t.search_document @@ websearch_to_tsquery('english',$2))
       AND ($7='' OR t.tags @> ARRAY[$7]::text[])
       AND ($9='' OR u.username=$9)
@@ -210,6 +213,7 @@ export async function searchTimelines(pool, userId, value, featured = []) {
       // Browsing: public timelines found by neither text, owner nor a reader's favorites.
       scope === 'public' && !search && !owner && !starredBy,
       visibility,
+      scope === 'writable',
     ],
   );
   const total = Number(rows[0].total);

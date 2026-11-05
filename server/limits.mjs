@@ -41,6 +41,23 @@ export function compareLimit(limits, account) {
   return account.isAdmin || account.is_admin ? limits.admin : limits.user;
 }
 
+/** Cross-timeline links a timeline may have (#422) when the environment sets no limit. */
+export const DEFAULT_LINK_LIMIT = 10000;
+/**
+ * How many links to entities on other timelines a timeline may have (#422), from
+ * TIMELINE_LINK_LIMIT: a whole number from 1, or "unlimited" (Infinity). Unset or empty,
+ * 10,000. A link counts against both its timelines.
+ */
+export function linkLimit(env = process.env) {
+  const text = env.TIMELINE_LINK_LIMIT?.trim().replaceAll(/[_,]/g, '');
+  if (!text) return DEFAULT_LINK_LIMIT;
+  if (text.toLowerCase() === 'unlimited') return Infinity;
+  const value = /^\d+$/.test(text) ? Number(text) : NaN;
+  if (!Number.isSafeInteger(value) || value < 1)
+    throw new LimitError('TIMELINE_LINK_LIMIT must be a whole number of at least 1, or unlimited.');
+  return value;
+}
+
 /** Size units, lower-cased, to bytes: none or b, decimal (kb…tb) and binary (kib…tib). */
 const UNITS = new Map([
   ['', 1n],

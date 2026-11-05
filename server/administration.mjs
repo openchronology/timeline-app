@@ -190,11 +190,12 @@ export class Administration {
     // username and email (accounts), or title and owner's username (timelines), contain the
     // search case-insensitively (strpos, so the search is plain text, not a LIKE pattern; an
     // empty search matches all). The page is ordered by name then id, so pages are stable.
-    // These are full scans, acceptable for an administrator's occasional search.
+    // These are full scans, acceptable for an administrator's occasional search. A page of
+    // timelines also counts each one's links to other timelines (#422), by their indexes.
     const result = await this.pool.query(
       kind === 'users'
         ? `WITH matching AS (SELECT id,username,email,is_admin,is_disabled,quota_bypass,quota_bytes,used_bytes,created_at,trust,password_hash IS NULL AND array(SELECT provider FROM oc_identities i WHERE i.user_id=oc_users.id)='{ldap}'::text[] AS directory_only FROM oc_users WHERE strpos(lower(username||' '||coalesce(email,'')),lower($1))>0) SELECT (SELECT count(*) FROM matching) AS total,coalesce((SELECT jsonb_agg(p) FROM (SELECT * FROM matching ORDER BY username,id LIMIT 25 OFFSET $2)p),'[]') AS items`
-        : `WITH matching AS (SELECT t.id,t.title,t.visibility,t.featured,t.event_count,u.username AS owner FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id WHERE strpos(lower(t.title||' '||u.username),lower($1))>0) SELECT (SELECT count(*) FROM matching) AS total,coalesce((SELECT jsonb_agg(p) FROM (SELECT * FROM matching ORDER BY title,id LIMIT 25 OFFSET $2)p),'[]') AS items`,
+        : `WITH matching AS (SELECT t.id,t.title,t.visibility,t.featured,t.event_count,u.username AS owner FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id WHERE strpos(lower(t.title||' '||u.username),lower($1))>0) SELECT (SELECT count(*) FROM matching) AS total,coalesce((SELECT jsonb_agg(p) FROM (SELECT *,(SELECT count(*) FROM oc_timeline_links l WHERE l.a_timeline=m.id)+(SELECT count(*) FROM oc_timeline_links l WHERE l.b_timeline=m.id) AS link_count FROM matching m ORDER BY title,id LIMIT 25 OFFSET $2)p),'[]') AS items`,
       [search, (page - 1) * 25],
     );
     const listed = result.rows[0];

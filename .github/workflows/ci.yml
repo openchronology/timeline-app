@@ -290,6 +290,7 @@ jobs:
       - run: node test/index-versions-postgres.mjs
       - run: node test/retention-postgres.mjs
       - run: node test/indexnow-postgres.mjs
+      - run: node test/timeline-links-postgres.mjs
       - run: node test/summaries-equivalence-postgres.mjs
       - run: node test/log-import-postgres.mjs
       - run: node test/stars-postgres.mjs
@@ -359,6 +360,8 @@ jobs:
         run: node test/default-view-live-postgres.mjs
       - name: Following moment links in a live browser
         run: node test/moment-link-live-postgres.mjs
+      - name: Links between timelines in a live browser
+        run: node test/timeline-links-live-postgres.mjs
       - name: Deleting comments and accounts in a live browser
         run: node test/deletion-live-postgres.mjs
       - name: Shifting and scaling times in a live browser

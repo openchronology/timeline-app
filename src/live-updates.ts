@@ -20,6 +20,8 @@ interface Host {
   refresh(id: string, revision: string): Promise<void>;
   /** Access to a timeline was lost (403/404 or the stream's `access` event). */
   denied(id?: string): void;
+  /** A timeline's links to other timelines changed (#422; the stream's `links` event). */
+  linked?(id: string): void;
 }
 /**
  * Push invalidates cache revisions; native/disconnected transports use bounded metadata polling.
@@ -102,6 +104,12 @@ export function liveUpdates(host: Host) {
           const message = JSON.parse((event as MessageEvent).data);
           if (typeof message.id === 'string' && /^\d+$/.test(message.revision))
             changed(message.id, message.revision);
+        } catch {}
+      });
+      stream.addEventListener('links', (event) => {
+        try {
+          const message = JSON.parse((event as MessageEvent).data);
+          if (typeof message.id === 'string') host.linked?.(message.id);
         } catch {}
       });
       // The server found the session no longer allowed to read a source: report it and

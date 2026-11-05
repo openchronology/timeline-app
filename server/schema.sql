@@ -2222,3 +2222,39 @@ CREATE TABLE IF NOT EXISTS oc_export_cache (
 -- A timeline's entries (forgetting them), and the eviction order.
 CREATE INDEX IF NOT EXISTS oc_export_cache_timeline ON oc_export_cache(timeline_id);
 CREATE INDEX IF NOT EXISTS oc_export_cache_accessed ON oc_export_cache(accessed_at);
+-- Links between entities on different timelines (#422; timeline-links.mjs), or from an entity
+-- to another timeline as a whole (kind 'timeline', ID ''). Not part of either
+-- timeline's content (no history, forks or exports): one row per link, its ends in canonical
+-- order (a_timeline < b_timeline). Deleting either timeline deletes its links; a save that
+-- deletes an entity deletes that entity's links (pruneLinks). The unique key finds links
+-- from their `a` end, oc_timeline_links_b from their `b` end, and oc_timeline_links_pair
+-- those between two timelines (a comparison's arcs).
+CREATE TABLE IF NOT EXISTS oc_timeline_links (
+  id bigserial PRIMARY KEY,
+  a_timeline uuid NOT NULL REFERENCES oc_timelines(id) ON DELETE CASCADE,
+  a_kind text NOT NULL CHECK(a_kind IN ('moment','duration','timeline')),
+  a_id text NOT NULL,
+  b_timeline uuid NOT NULL REFERENCES oc_timelines(id) ON DELETE CASCADE,
+  b_kind text NOT NULL CHECK(b_kind IN ('moment','duration','timeline')),
+  b_id text NOT NULL,
+  created_by uuid REFERENCES oc_users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CHECK(a_timeline<b_timeline),
+  UNIQUE(a_timeline,a_kind,a_id,b_timeline,b_kind,b_id)
+);
+CREATE INDEX IF NOT EXISTS oc_timeline_links_b ON oc_timeline_links(b_timeline,b_kind,b_id);
+CREATE INDEX IF NOT EXISTS oc_timeline_links_pair ON oc_timeline_links(a_timeline,b_timeline);
+-- The ends of links added or removed (#422) in the last day, which IndexNow (indexnow.mjs) reads
+-- after the last it saw to send their pages, each of which lists its links. No foreign key: a
+-- deleted timeline's changes are skipped as its pages are gone.
+CREATE TABLE IF NOT EXISTS oc_link_changes (
+  id bigserial PRIMARY KEY,
+  timeline_id uuid NOT NULL,
+  kind text NOT NULL,
+  entity_id text NOT NULL,
+  changed_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS oc_link_changes_at ON oc_link_changes(changed_at);
+-- Advanced by each link added or removed, so live updates (live.mjs) tell those viewing the
+-- timeline to read its links again.
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS link_generation bigint NOT NULL DEFAULT 0;

@@ -211,6 +211,8 @@ export class IndexNow {
     this.store = new PostgresStore(pool);
     /** The last snapshot, or null before the first poll. */
     this.known = null;
+    /** The last link change read (oc_link_changes; #422), or null before the first poll. */
+    this.linkMark = null;
     /** Paths waiting to be sent, in the order they changed. */
     this.pending = new Set();
     /** When each recently sent path was sent. */
@@ -220,16 +222,35 @@ export class IndexNow {
   }
   /**
    * Reads the public pages and queues those that changed since the last poll, with the
-   * pages of the moments and durations that changed in timelines whose entities are listed.
+   * pages of the moments and durations that changed in timelines whose entities are listed,
+   * and the pages of both ends of links between timelines added or removed since (#422).
    */
   async poll() {
     const limit = timelineEntityLimit();
     const { rows } = await this.pool.query(PUBLIC_PAGES, [limit]);
     const next = snapshot(rows);
+    const links = await this.pool.query(
+      `SELECT id::text,timeline_id,kind,entity_id FROM oc_link_changes
+      WHERE $1::bigint IS NULL OR id>$1 ORDER BY id DESC LIMIT 10000`,
+      [this.linkMark],
+    );
     if (this.known) {
       for (const path of changedPaths(this.known, next)) this.pending.add(path);
       await this.queueEntities(entityChanges(this.known, next), next, limit);
+      // A whole timeline's end is its own page, which lists the links to it; an entity's,
+      // its page where the timeline's entities are listed.
+      for (const change of [...links.rows].reverse()) {
+        const timeline = next.timelines.get(change.timeline_id);
+        if (!timeline) continue;
+        if (change.kind === 'timeline') this.pending.add(timeline.path);
+        else if (timeline.listed)
+          this.pending.add(entityPath(timeline.path, change.kind, change.entity_id));
+      }
     }
+    // The newest change read (the first, newest first); past 10,000, the older are skipped.
+    this.linkMark = links.rows.length
+      ? links.rows.reduce((a, r) => (BigInt(r.id) > BigInt(a) ? r.id : a), '0')
+      : (this.linkMark ?? '0');
     this.known = next;
   }
   /** Queues the entity pages of `changes` (see entityChanges), at most `limit` a timeline. */
