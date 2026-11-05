@@ -19,11 +19,11 @@ const escape = (text) =>
 /**
  * The editor's page, with its assets addressed from the site's root, and its "Timelines" link
  * at the timeline browser (/explore with the landing page on). Given a timeline's `heading`
- * (#428), the page arrives with it already shown: its image, title, description and count, as
- * the editor would draw them, marked with the timeline's id so the editor keeps them while it
+ * (#428), the page arrives with it already shown: its owner in the breadcrumb, and its image,
+ * title, description and count, as the editor would draw them, marked with the timeline's id so the editor keeps them while it
  * loads that timeline (src/app.ts, heading()).
  * @param {{id: string, title: string, description: string, image: {url: string, alt?: string}|null,
- *   count: string}} [heading]
+ *   count: string, owner: string, ownerPath: string}} [heading]
  */
 export async function editorHtml(heading) {
   let html = (
@@ -49,7 +49,11 @@ export async function editorHtml(heading) {
       /(<textarea\s+id="timeline-description"[^>]*>)[\s\S]*?(<\/textarea)/,
       (_, open, close) => open + escape(heading.description) + close,
     )
-    .replace(/(<span id="event-count">)[^<]*/, (_, open) => open + escape(heading.count));
+    .replace(/(<span id="event-count">)[^<]*/, (_, open) => open + escape(heading.count))
+    .replace(
+      /<a id="owner-label"><\/a>/,
+      `<a id="owner-label" href="${escape(heading.ownerPath)}" target="_top">${escape(heading.owner)}</a>`,
+    );
   if (description)
     html = html
       // The description's source waits hidden, as the editor shows a description it renders.

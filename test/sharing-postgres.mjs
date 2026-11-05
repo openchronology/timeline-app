@@ -377,6 +377,8 @@ try {
     /<div id="timeline-description-view"[^>]*><p>Ships &amp; the sea, from departure to return\.<\/p><\/div>/,
   );
   assert.match(headed, /<span id="event-count">\d+ moments?<\/span>/);
+  // Its owner in the breadcrumb too, linked to their profile.
+  assert(headed.includes(`<a id="owner-label" href="/${username}" target="_top">${username}</a>`));
   assert.equal(prefill(await guest.request('/editor/frame?timeline=not-an-id')), null);
 
   // oEmbed for the timeline, a moment page and a link fragment.
@@ -474,10 +476,14 @@ try {
   await context.addInitScript(() => {
     if (location.pathname !== '/editor/frame') return;
     window.titlesShown = [];
+    window.ownersShown = [];
     const look = () => {
       const title = document.getElementById('timeline-title')?.value;
       if (title !== undefined && window.titlesShown.at(-1) !== title)
         window.titlesShown.push(title);
+      const owner = document.getElementById('owner-label')?.textContent;
+      if (owner !== undefined && window.ownersShown.at(-1) !== owner)
+        window.ownersShown.push(owner);
       requestAnimationFrame(look);
     };
     requestAnimationFrame(look);
@@ -490,6 +496,10 @@ try {
   await editor().locator('#reader-panel').waitFor({ state: 'visible' });
   assert.deepEqual(await tab.frame({ url: /\/editor\/frame/ }).evaluate(() => window.titlesShown), [
     'Voyages of ' + suffix,
+  ]);
+  // Its breadcrumb names its owner from the first frame, never "Local workspace" first.
+  assert.deepEqual(await tab.frame({ url: /\/editor\/frame/ }).evaluate(() => window.ownersShown), [
+    username,
   ]);
   // A guest reads it in the reader (#233), with nothing to edit.
   await editor().locator('#reader-panel').waitFor({ state: 'visible' });
