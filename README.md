@@ -142,6 +142,21 @@ Upgrades keep the configuration and database, stop the server, and list the sett
 
 Releases attach every package, and every push to `main` builds them as artifacts of the CI run. Build them yourself with Docker (`node scripts/server-package.mjs [debian13|ubuntu24.04|rocky10|fedora44]`, into `server-artifacts/`). They download the Node.js they bundle from nodejs.org unless `OCH_NODE_TARBALL` names one already downloaded (`node scripts/node-tarball.mjs <folder>` downloads and checks it); either way it must match the Dockerfile's checksum. For FreeBSD, `node scripts/server-package.mjs freebsd15` builds the platform, and `sh deploy/freebsd-server/build.sh` on FreeBSD (as root) makes the package. CI does both in a FreeBSD virtual machine, then installs the package on a fresh one (`test/server-freebsd.mjs`). Check one with `node test/server-deb.mjs` or `node test/server-rpm.mjs` and the package's path. Those tests install, run, upgrade and remove it in a fresh container.
 
+## Nix and NixOS
+
+The repository is a Nix flake ([docs/nix.md](docs/nix.md)): it builds the server, the desktop app, `och-convert` and `pgmp` from source, and its NixOS module runs a server with PostgreSQL:
+
+```nix
+services.openchronology = {
+  enable = true;
+  origin = "https://timelines.example.org";
+  nginx.enable = true;
+  environmentFile = "/run/secrets/openchronology.env";
+};
+```
+
+`nix run github:openchronology/timeline-app#openchronology-desktop` runs the desktop app. `nix flake check` builds everything and runs the module's NixOS test.
+
 ## Offline desktop and SQLite files
 
 On Linux, install Rust, CMake, a C compiler, pkg-config, GMP/SQLite development packages, GTK 3, WebKitGTK 4.1, and the Tauri Linux dependencies. On Ubuntu 24.04:

@@ -21,3 +21,7 @@ desktop-artifacts/
 bench/data/
 bench/results/
 server-artifacts
+
+# Nix build output links (nix build without --no-link; docs/nix.md).
+/result
+/result-*

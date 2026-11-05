@@ -15,6 +15,7 @@ OpenChronology is one codebase for four editions: the website (a Next.js platfor
 | [`legal/`](legal/README.md)                  | The hosted site's terms, privacy policy, copyright policy and launch checklist.                                                         |
 | [`logo/`](logo/README.md)                    | The logo, drawn as SVG, from which every icon is made.                                                                                  |
 | [`native-store/`](native-store/README.md)    | The native SQLite store (Rust) behind the desktop app and `och-convert`.                                                                |
+| [`nix/`](nix/README.md)                      | The Nix packages and NixOS module the flake builds (docs/nix.md).                                                                       |
 | [`platform/`](platform/README.md)            | The website: Next.js pages and API routes over the server.                                                                              |
 | [`scripts/`](scripts/README.md)              | Build, packaging and release scripts.                                                                                                   |
 | [`server/`](server/README.md)                | The Node server: the HTTP API, the PostgreSQL store, accounts, moderation, and log receivers and importers.                             |
@@ -29,6 +30,9 @@ OpenChronology is one codebase for four editions: the website (a Next.js platfor
 | [`.yarnrc.yml`](.yarnrc.yml)                 | Yarn 4's settings.                                                                                                                      |
 | [`compose.yml`](compose.yml)                 | Docker Compose for a self-hosted server (docs/docker.md).                                                                               |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md)         | This page: where everything is, and how to change it.                                                                                   |
+| [`default.nix`](default.nix)                 | The flake for Nix without flakes, such as `nix-env` (docs/nix.md).                                                                      |
+| [`flake.lock`](flake.lock)                   | The nixpkgs revision the flake builds with.                                                                                             |
+| [`flake.nix`](flake.nix)                     | The Nix flake: packages, the NixOS module and its test (docs/nix.md).                                                                   |
 | [`LICENSE`](LICENSE)                         | The GNU General Public License, version 3.                                                                                              |
 | [`NOTICE`](NOTICE)                           | Who holds the copyright, the licence in brief, and where third-party notices are.                                                       |
 | [`package.json`](package.json)               | The Node project: dependencies and the `npm run` scripts.                                                                               |

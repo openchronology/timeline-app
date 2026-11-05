@@ -1,0 +1,50 @@
+# Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+# The NixOS test of services.openchronology (#461): a machine with the module and nginx in
+# front, whose server answers through nginx; PostgreSQL has pgmp; the client (test-client.mjs)
+# signs in as the configured administrator, saves, searches and downloads a timeline as .och;
+# and the generated key survives a restart. Run: nix build .#checks.x86_64-linux.nixos
+{ pkgs, module }:
+pkgs.testers.runNixOSTest {
+  name = "openchronology";
+
+  nodes.machine = {
+    imports = [ module ];
+    virtualisation.memorySize = 2048;
+    virtualisation.cores = 2;
+    # Without KVM the machine is emulated, many times slower: PostgreSQL's first initdb and
+    # the first migration then outlast systemd's usual 90 seconds.
+    systemd.services.postgresql.serviceConfig.TimeoutStartSec = "20min";
+    systemd.services.openchronology.serviceConfig.TimeoutStartSec = "20min";
+    services.openchronology = {
+      enable = true;
+      origin = "http://localhost";
+      nginx.enable = true;
+      # A test's secrets may be in the store; a real server's belong outside it.
+      environmentFile = pkgs.writeText "openchronology-test.env" ''
+        ADMIN_USERNAME=nixadmin
+        ADMIN_INITIAL_PASSWORD=a long test password for nixos
+      '';
+    };
+  };
+
+  testScript = ''
+    machine.wait_for_unit("openchronology.service")
+    machine.wait_until_succeeds("curl -fs http://127.0.0.1:5173/healthz", timeout=1800)
+    machine.wait_for_unit("nginx.service")
+    machine.succeed("curl -fs http://localhost/healthz | grep -q '\"status\":\"ok\"'")
+    machine.succeed("curl -fs http://localhost/ | grep -q 'Explore timelines'")
+    machine.succeed(
+        "runuser -u postgres -- psql -d openchronology -tAc "
+        "\"SELECT extname FROM pg_extension WHERE extname='pgmp'\" | grep -qx pgmp"
+    )
+    key = machine.succeed("cat /var/lib/openchronology/generated.env")
+    machine.succeed(
+        "${pkgs.nodejs_24}/bin/node ${./test-client.mjs} http://localhost nixadmin "
+        "'a long test password for nixos' >&2"
+    )
+    # Restarted (the setup and its migration again), the server keeps its key.
+    machine.systemctl("restart openchronology-setup.service openchronology.service")
+    machine.wait_until_succeeds("curl -fs http://127.0.0.1:5173/healthz", timeout=1800)
+    assert key == machine.succeed("cat /var/lib/openchronology/generated.env"), "the key changed"
+  '';
+}
