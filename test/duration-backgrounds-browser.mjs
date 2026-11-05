@@ -7,7 +7,7 @@ import { DURATION_BACKGROUNDS, TIMELINE_BACKGROUND } from '../dist/core.mjs';
  * Duration backgrounds (#94): a duration's image fills the timeline behind it, centered
  * between its visible start and end, smaller durations above larger ones, edges in view
  * fading out over a fixed width, narrow ones fading away (#222); collapsed durations show none.
- * The images lie behind the timeline, which carries a white halo over them (#220). The
+ * The images lie behind the timeline, which is drawn crisply over them in white (#220). The
  * timeline's own background, set in the plugin list, lies beneath them all (#223). A
  * duration's menu fits it in the view (#268).
  */
@@ -169,22 +169,38 @@ export async function checkDurationBackgrounds(page, restore) {
     return { onMarker: marker.contains(hit), hit: hit?.className };
   });
   assert(front.onMarker, `a background covers the moment: ${front.hit}`);
-  // Over them the timeline's text and lines carry a white halo: a filter on markers, but
-  // shadows on the axis's lines rather than a filter on its whole layer, which lagged (#232).
+  // Over them the timeline is drawn crisply, never blurred: labels on solid white cards, the
+  // ruler's labels outlined in white, the axis bold and edged in white, and no filter on
+  // markers or on a whole layer, which lagged (#232).
   assert.deepEqual(
     await page.evaluate(() => {
       const stage = document.getElementById('timeline-stage'),
         style = (selector) => getComputedStyle(stage.querySelector(selector));
       return [
         stage.classList.contains('over-backgrounds'),
-        style('.tick-label').textShadow.includes('255, 255, 255'),
+        style('.event-label').backgroundColor,
+        style('.event-label').backdropFilter,
+        style('.event-label').textShadow,
+        style('.tick-label').webkitTextStrokeColor,
+        style('.axis-baseline').borderTopWidth,
         style('.axis-baseline').boxShadow.includes('255, 255, 255'),
-        style('.event-marker').filter.startsWith('drop-shadow'),
+        style('.event-marker').filter,
         getComputedStyle(document.getElementById('axis')).filter,
         getComputedStyle(document.getElementById('edge-arcs')).filter,
       ];
     }),
-    [true, true, true, true, 'none', 'none'],
+    [
+      true,
+      'rgb(255, 255, 255)',
+      'none',
+      'none',
+      'rgb(255, 255, 255)',
+      '3px',
+      true,
+      'none',
+      'none',
+      'none',
+    ],
   );
 
   // Its start beyond the view: centered between the view's edge and its end, which alone fades.

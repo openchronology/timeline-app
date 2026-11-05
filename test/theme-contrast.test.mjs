@@ -110,6 +110,8 @@ const TEXT_PAIRS = [
   ['--toast-ink', '--toast'],
   ['--stage-text', '--stage-ground'],
   ['--stage-text-strong', '--stage-heading-backing'],
+  // Labels over backgrounds sit on cards of the halo color.
+  ['--stage-text', '--stage-halo'],
   ['--stage-measure', '--stage-ground'],
   ['--stage-duration-text', '--stage-duration'],
 ];

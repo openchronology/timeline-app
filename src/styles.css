@@ -761,35 +761,65 @@ html.timeline-fullscreen .timeline-stage {
   stroke-opacity: 0.8;
   stroke-width: 1.5;
 }
-/* While a background shows, text sits on frosted white, and lines and markers carry a white
-   halo, setting the timeline apart from whatever image is behind it (#220). */
+/* While a background shows, the timeline is drawn crisply over it (#220), never blurred: its
+   labels on solid cards, its axis and ticks bold and edged in the halo color, its markers,
+   stems, bands and arcs edged too, with soft shadows lifting them off whatever image is
+   behind. A soft glow smeared over a busy image; edges stay sharp on any of them. */
 .timeline-stage.over-backgrounds .event-label {
   width: max-content;
   max-width: 150px;
-  padding: 0 4px;
-  border-radius: 4px;
-  background: var(--timeline-halo-backing, var(--stage-halo-backing));
-  backdrop-filter: blur(3px);
-  text-shadow:
-    0 0 1px var(--timeline-halo, var(--stage-halo)),
-    0 0 3px var(--timeline-halo, var(--stage-halo));
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--timeline-halo, var(--stage-halo));
+  box-shadow:
+    0 1px 3px rgb(0 0 0 / 28%),
+    0 0 0 1px rgb(0 0 0 / 6%);
 }
-/* Tick labels fade as they get too fine to show, so they take no backing that would stay. */
-.timeline-stage.over-backgrounds :is(.tick-label, .duration-band) {
-  text-shadow:
-    0 0 1px var(--timeline-halo, var(--stage-halo)),
-    0 0 3px var(--timeline-halo, var(--stage-halo));
+/* Tick labels fade as they get too fine to show, so they take no card that would stay: an
+   outline drawn behind their letters instead. */
+.timeline-stage.over-backgrounds .tick-label {
+  -webkit-text-stroke: 3px var(--timeline-halo, var(--stage-halo));
+  paint-order: stroke fill;
 }
-/* Markers and stems take the halo as a filter, which follows their shapes. The axis's lines
-   and the arcs, whose layers fill the stage, take box-shadows and halo strokes instead: a filter
-   on a whole layer is drawn again on every frame, which made panning lag (#232). */
-.timeline-stage.over-backgrounds :is(.event-stem, .event-marker) {
-  filter: drop-shadow(0 0 1px var(--timeline-halo, var(--stage-halo)))
-    drop-shadow(0 0 2px var(--timeline-halo, var(--stage-halo)))
-    drop-shadow(0 0 4px var(--timeline-halo, var(--stage-halo)));
+.timeline-stage.over-backgrounds .axis-baseline {
+  margin-top: -1px;
+  border-top: 3px solid var(--timeline-measure, var(--stage-text-strong));
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 2px var(--timeline-halo, var(--stage-halo)),
+    0 1px 6px rgb(0 0 0 / 40%);
 }
-.timeline-stage.over-backgrounds :is(.axis-baseline, .tick-notch) {
-  box-shadow: 0 0 2px 1px var(--timeline-halo, var(--stage-halo));
+.timeline-stage.over-backgrounds .tick-notch {
+  border-left: 2px solid var(--timeline-measure, var(--stage-text-strong));
+  box-shadow: 0 0 0 1px var(--timeline-halo, var(--stage-halo));
+}
+.timeline-stage.over-backgrounds .event-stem {
+  width: 2px;
+  background: var(--timeline-marker, var(--stage-marker));
+  box-shadow: 0 0 0 1px var(--timeline-halo, var(--stage-halo));
+}
+/* Markers keep their ring in the halo color, edged dark and shadowed. */
+.timeline-stage.over-backgrounds .event-marker {
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 45%),
+    0 2px 6px rgb(0 0 0 / 45%);
+}
+/* Bands are solid rather than translucent over an image, their titles bold. */
+.timeline-stage.over-backgrounds .duration-band {
+  opacity: 1;
+  font-weight: 600;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 35%),
+    0 1px 4px rgb(0 0 0 / 40%);
+}
+/* A presumptive band's dashes (#325) go just outside it, clear of its title. */
+.timeline-stage.over-backgrounds .duration-band[data-outline='dashed'] {
+  outline-offset: 0;
+}
+.timeline-stage.over-backgrounds .edge-arc {
+  stroke: var(--timeline-measure, var(--stage-text-strong));
+  stroke-width: 2;
+  opacity: 1;
 }
 .edge-arc-halo {
   display: none;
@@ -797,7 +827,7 @@ html.timeline-fullscreen .timeline-stage {
   stroke: var(--timeline-halo, var(--stage-halo));
   stroke-width: 5;
   stroke-linecap: round;
-  opacity: 0.8;
+  opacity: 1;
   pointer-events: none;
 }
 .timeline-stage.over-backgrounds .edge-arc-halo {

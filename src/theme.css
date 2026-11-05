@@ -117,7 +117,6 @@
   --stage-marker-ring: #e3eccb;
   --stage-ground: #fff;
   --stage-halo: #fff;
-  --stage-halo-backing: #ffffffb8;
   --stage-heading-backing: #fbfcf9e6;
   --stage-duration: #73958b;
   --stage-duration-text: #102a20;
@@ -196,7 +195,6 @@
     --stage-marker-ring: light-dark(#e3eccb, #3d5a45);
     --stage-ground: light-dark(#fff, #1a2720);
     --stage-halo: light-dark(#fff, #1a2720);
-    --stage-halo-backing: light-dark(#ffffffb8, #1a2720c2);
     --stage-heading-backing: light-dark(#fbfcf9e6, #1a2720e6);
     --stage-duration: light-dark(#73958b, #587b70);
     --stage-duration-text: light-dark(#102a20, #fff);

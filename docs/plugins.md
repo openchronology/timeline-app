@@ -85,7 +85,7 @@ Install **Duration backgrounds** to show an image behind the timeline wherever a
 - **Collapsed durations:** a duration too short to draw as a band is summarized, and it shows no background.
 - **Narrow durations:** like the ruler's finest marks, a background fades out as its duration narrows on screen: it shows in full while the duration is at least 192 pixels wide, fades as it narrows, and is gone below 96 pixels, while its band still shows.
 - **Stacking:** smaller durations show above larger ones, and all of them lie behind the timeline's axis, links and moments. An edge inside the view fades to transparency over 48 pixels, however wide the duration, so backgrounds blend into each other; an edge where the duration continues past the view does not fade.
-- **Readability:** while any background shows, moment labels sit on frosted white, and the axis, links and markers carry a white halo, so they stand out from any image.
+- **Readability:** while any background shows, the timeline is drawn crisply over it: moment labels sit on solid white cards, the axis is bold, and the axis, links, markers and duration bands are edged in white with soft shadows, so they stand out from any image without blurring it.
 - **Address length:** duration bands carry web addresses of at most 1,024 characters ([#365](https://github.com/openchronology/timeline-app/issues/365)), so a longer image address shows nothing. The duration dialog says so, importing a file says how many durations have one, and the API's answer to a save or import carries a warning naming them (see [images](images.md#image-addresses)).
 - **Offline:** exports embed copies of background images, as for icons, so the offline edition can show them.
 
@@ -144,18 +144,18 @@ Each of `series` (one to eight) is `{ "label": "Errors", "tags": ["severity:err"
 
 Install **Timeline theme** to choose the timeline's colors, fonts and text sizes. Like the timeline background, it belongs to the whole timeline, so it's set in the **Plugins** dialog under the plugin:
 
-| Setting          | What it changes                                                                                                                |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Label color      | Event labels and headings; their dates take a lighter shade.                                                                   |
-| Label font       | Event labels.                                                                                                                  |
-| Label size       | Event labels and their dates, from 75% to 200% of the usual size.                                                              |
-| Measure color    | The axis, tick marks, tick labels, guide lines, stems and relationship arcs.                                                   |
-| Measure font     | Tick labels.                                                                                                                   |
-| Measure size     | Tick labels, from 75% to 200% of the usual size.                                                                               |
-| Halo color       | The glow and frosted backing that keep text and lines readable over images and background colors.                              |
-| Marker color     | Moment and summary markers (summaries take a darker shade). A color chosen on a moment still wins.                             |
-| Duration color   | Duration bands (with dark or light text to suit) and collapsed durations on the axis. A color chosen on a duration still wins. |
-| Background color | The timeline's background, beneath any images. The halo shows over it, as over an image.                                       |
+| Setting          | What it changes                                                                                                                              |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Label color      | Event labels and headings; their dates take a lighter shade.                                                                                 |
+| Label font       | Event labels.                                                                                                                                |
+| Label size       | Event labels and their dates, from 75% to 200% of the usual size.                                                                            |
+| Measure color    | The axis, tick marks, tick labels, guide lines, stems and relationship arcs.                                                                 |
+| Measure font     | Tick labels.                                                                                                                                 |
+| Measure size     | Tick labels, from 75% to 200% of the usual size.                                                                                             |
+| Halo color       | The cards behind labels, and the edges around the axis, links, markers and bands, that keep them readable over images and background colors. |
+| Marker color     | Moment and summary markers (summaries take a darker shade). A color chosen on a moment still wins.                                           |
+| Duration color   | Duration bands (with dark or light text to suit) and collapsed durations on the axis. A color chosen on a duration still wins.               |
+| Background color | The timeline's background, beneath any images. The halo shows over it, as over an image.                                                     |
 
 Colors are picked with the browser's color picker; **Use default** clears one. Fonts are typed or picked from the suggestions, and only fonts installed on the viewer's device are used: no web font is downloaded. Sizes are picked from a list; **Default (100%)** clears one. Anything left blank keeps the usual look.
 
