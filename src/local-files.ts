@@ -33,18 +33,23 @@ export function localFileURL(value: unknown): string | null {
   }
 }
 /**
- * Photos a thumbnail can be made of (#440), by extension: the desktop's file populator's photos
- * (src-tauri/src/populate.rs).
+ * Files a thumbnail can be made of, by extension: the desktop's file populator's photos (#440)
+ * and videos (#442) (src-tauri/src/populate.rs).
  */
-const PHOTOS = new Set(
-  'jpg jpeg heic heif avif png webp tif tiff dng cr2 cr3 nef arw raf orf rw2 iiq'.split(' '),
+const PICTURED = new Set(
+  'jpg jpeg heic heif avif png webp tif tiff dng cr2 cr3 nef arw raf orf rw2 iiq mp4 m4v mov 3gp mkv webm avi'.split(
+    ' ',
+  ),
 );
-/** The first of a list of sources that is a photo on this computer (#440); null when none is. */
-export function localPhoto(value: unknown): string | null {
+/**
+ * The first of a list of sources that is a photo or video on this computer (#440, #442); null
+ * when none is.
+ */
+export function localPicture(value: unknown): string | null {
   for (const item of Array.isArray(value) ? value.slice(0, 100) : []) {
     const url = localSource(item);
     const extension = url?.split('.').at(-1)?.toLowerCase();
-    if (url && extension && PHOTOS.has(extension)) return url;
+    if (url && extension && PICTURED.has(extension)) return url;
   }
   return null;
 }

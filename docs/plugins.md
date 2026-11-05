@@ -448,7 +448,7 @@ Custom plugins can declare a `size` field and return `api.size(api.get("fieldKey
 
 ## File thumbnails
 
-The official **File thumbnails** plugin (`file-thumbnails`, [#440](https://github.com/openchronology/timeline-app/issues/440)) shows, in the desktop app, a small picture of a moment's photo as its marker: the first of its `sources` that is a `file:///` link to a photo on this computer. Its marker component is `{ "kind": "file-thumbnail", "metadataKey": "sources" }`; it has no fields. On the website and in the offline file such moments keep their usual markers. See [timelines from files](file-populator.md#thumbnails).
+The official **File thumbnails** plugin (`file-thumbnails`, [#440](https://github.com/openchronology/timeline-app/issues/440)) shows, in the desktop app, a small picture of a moment's photo or video as its marker: the first of its `sources` that is a `file:///` link to a photo or video on this computer ([#442](https://github.com/openchronology/timeline-app/issues/442) added videos). Its marker component is `{ "kind": "file-thumbnail", "metadataKey": "sources" }`; it has no fields. On the website and in the offline file such moments keep their usual markers. See [timelines from files](file-populator.md#thumbnails).
 
 ## Sources
 
