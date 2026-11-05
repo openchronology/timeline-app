@@ -2,7 +2,14 @@
 // Search terms, and ranking a complete timeline’s matches (titles first) a page at a time.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TimelineIndex, validateDocument, searchTerms, searchIndex } from '../dist/core.mjs';
+import {
+  TimelineIndex,
+  validateDocument,
+  searchTerms,
+  searchIndex,
+  matchRanges,
+  matchSnippet,
+} from '../dist/core.mjs';
 
 const doc = () => {
   const events = [
@@ -74,4 +81,21 @@ test('complete timelines rank title matches first, then earlier entities, with p
   // Anchored durations report their current extent after a moment moves.
   index.put({ ...index.byId.get('late'), time: '9/1' });
   assert.equal(searchIndex(index, 'works').results[0].last, '9/1');
+});
+
+test('a search’s words are found where they begin words, to highlight them (#459)', () => {
+  const text = 'Romulus founded Rome; the ROMANS, not aromatic Romé.';
+  const marked = (t, words) => matchRanges(t, searchTerms(words)).map(([a, b]) => t.slice(a, b));
+  assert.deepEqual(marked(text, 'rom'), ['Romulus', 'Rome', 'ROMANS', 'Romé']);
+  assert.deepEqual(marked(text, 'founded romé'), ['founded', 'Romé']);
+  assert.deepEqual(marked(text, ''), []);
+  // A snippet starts at the notes' start when the match is near it, otherwise just before it.
+  const long = 'Lorem ipsum dolor sit amet. '.repeat(20) + 'The harbour was built.';
+  assert.equal(matchSnippet('Near the harbour.', ['harbour']), 'Near the harbour.');
+  const around = matchSnippet(long, ['harbour']);
+  assert(around.startsWith('…') && around.includes('The harbour was built.'), around);
+  assert(around.length <= 240);
+  assert.equal(matchSnippet(long, ['absent']), long.slice(0, 239) + '…');
+  const middle = matchSnippet(long + ' More.'.repeat(80), ['harbour']);
+  assert(middle.startsWith('…') && middle.endsWith('…') && middle.length === 240, middle);
 });

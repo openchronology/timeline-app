@@ -343,7 +343,7 @@ try {
       await page.waitForFunction(() => window.tagLoaded === true);
       await page.locator('#explore').waitFor();
       assert.equal(await page.locator('#mine').count(), 0);
-      await page.getByLabel('Search timelines').fill('history');
+      await page.getByRole('searchbox', { name: 'Search timelines and events' }).fill('history');
       await page.getByRole('button', { name: 'Search', exact: true }).click();
       await page.waitForURL((url) => url.searchParams.get('search') === 'history');
       await page.getByRole('link', { name: 'New timeline' }).click();

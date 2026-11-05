@@ -6,6 +6,7 @@ import Link from 'next/link';
 import StarButton from './star-button.jsx';
 import TimelineCardImage from './timeline-image.jsx';
 import { MarkdownExcerpt } from './markdown.jsx';
+import Highlight from './highlight.jsx';
 import { describeLabels } from '../../src/content-labels.ts';
 import { CompareCheckbox } from './compare-selection.jsx';
 import { profilePath, timelinePath } from '../../src/addresses.ts';
@@ -67,6 +68,7 @@ export function TimelineCardMedia({ timeline }) {
  * @param {number} [props.compareLimit]
  * @param {boolean} [props.compare] whether it has a Compare checkbox: not where the page has
  *   no tray to compare from (the landing pages, #379)
+ * @param {string[]} [props.terms] the search's words, marked in its title and description (#459)
  */
 export default function TimelineCard({
   timeline: t,
@@ -76,6 +78,7 @@ export default function TimelineCard({
   guest,
   compareLimit = 8,
   compare = true,
+  terms,
 }) {
   const title = t.title?.trim() || 'Untitled timeline',
     tags = t.tags ?? [],
@@ -84,7 +87,9 @@ export default function TimelineCard({
     <article className="timeline-card" data-timeline={t.id}>
       <TimelineCardMedia timeline={t} />
       <h3 className="timeline-card-title">
-        <Link href={timelinePath(t)}>{title}</Link>
+        <Link href={timelinePath(t)}>
+          <Highlight text={title} terms={terms} />
+        </Link>
       </h3>
       <p className="timeline-card-byline">
         <Link href={profilePath(t.owner)}>@{t.owner}</Link>
@@ -109,7 +114,7 @@ export default function TimelineCard({
       )}
       {t.description?.trim() && (
         <p className="timeline-card-description">
-          <MarkdownExcerpt text={t.description} />
+          <MarkdownExcerpt text={t.description} terms={terms} />
         </p>
       )}
       <dl className="timeline-card-facts">

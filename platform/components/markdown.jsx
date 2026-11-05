@@ -5,11 +5,15 @@
  * every string, there is no raw HTML, and links carry only safeNoteLink's https addresses.
  */
 import { parseMarkdown } from '../../src/rich-text.ts';
+import Highlight from './highlight.jsx';
 
-/** Inline Markdown as elements; `links` false renders a link as its text (inside a link). */
-function Inline({ nodes, links = true }) {
+/**
+ * Inline Markdown as elements; `links` false renders a link as its text (inside a link), and
+ * `terms` marks the words a search matched in its plain text (#459).
+ */
+function Inline({ nodes, links = true, terms }) {
   return nodes.map((n, i) => {
-    if (typeof n === 'string') return n;
+    if (typeof n === 'string') return terms ? <Highlight key={i} text={n} terms={terms} /> : n;
     if (n.tag === 'code') return <code key={i}>{n.text}</code>;
     if (n.tag === 'a')
       return links ? (
@@ -22,7 +26,7 @@ function Inline({ nodes, links = true }) {
     const Tag = n.tag;
     return (
       <Tag key={i}>
-        <Inline nodes={n.children} links={links} />
+        <Inline nodes={n.children} links={links} terms={terms} />
       </Tag>
     );
   });
@@ -105,9 +109,9 @@ export default function Markdown({ text, className = '' }) {
  * The start of Markdown on one line, for a card: its blocks' inline formatting (strong,
  * emphasis, code) kept, links shown as their text (so a card's only links are its own),
  * blocks joined by spaces and the whole cut to `length` characters of text, ending with … when
- * cut.
+ * cut. With `terms`, the words a search matched are marked (#459).
  */
-export function MarkdownExcerpt({ text, length = 240 }) {
+export function MarkdownExcerpt({ text, length = 240, terms }) {
   const inlines = [];
   for (const block of parseMarkdown(String(text ?? ''))) {
     if (block.tag === 'hr') continue;
@@ -159,5 +163,5 @@ export function MarkdownExcerpt({ text, length = 240 }) {
   };
   const nodes = cut(all);
   if (over) nodes.push('…');
-  return <Inline nodes={nodes} links={false} />;
+  return <Inline nodes={nodes} links={false} terms={terms} />;
 }

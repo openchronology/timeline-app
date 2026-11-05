@@ -5,9 +5,10 @@ import { Rational as Q } from 'rational-ordered-map';
 import { resolveDuration } from './durations.js';
 import { entityTags } from './tags.js';
 import type { Metadata, PointEvent, TimelineIndex } from './core.js';
+import { matchRanges, searchTerms, SEARCH_MAX_TERMS } from './highlight.js';
+export { matchRanges, searchTerms, SEARCH_MAX_TERMS };
 
 export const SEARCH_PAGE_SIZE = 25;
-export const SEARCH_MAX_TERMS = 8;
 export interface SearchResult {
   kind: 'moment' | 'duration';
   id: string;
@@ -21,19 +22,6 @@ export interface SearchPage {
   results: SearchResult[];
   total: string;
   page: number;
-}
-/**
- * Lowercased words of letters and digits. Every term must occur; the same normalization
- * feeds PostgreSQL prefix queries, SQLite and in-memory matching.
- */
-export function searchTerms(text: string): string[] {
-  const terms = text
-    .normalize('NFC')
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter((term) => term.length > 0)
-    .map((term) => term.slice(0, 64));
-  return [...new Set(terms)].slice(0, SEARCH_MAX_TERMS);
 }
 /** Searchable title and body: notes plus the titles and notes of nested entries (stacks). */
 export function searchText(metadata: Metadata): { title: string; body: string } {
@@ -54,6 +42,20 @@ export function searchText(metadata: Metadata): { title: string; body: string } 
 }
 export function snippet(body: string) {
   return body.length > 240 ? body.slice(0, 239) + '…' : body;
+}
+/**
+ * At most `length` characters of `body` showing where `terms` first match in it (#459): its
+ * start when the match is near it (snippet), otherwise from shortly before the match, at a
+ * word's start, with an ellipsis for each end cut.
+ */
+export function matchSnippet(body: string, terms: string[], length = 240) {
+  const first = matchRanges(body, terms)[0];
+  if (!first || first[1] <= length - 40) return snippet(body);
+  let start = Math.max(0, first[0] - 60);
+  const space = body.indexOf(' ', start);
+  if (space >= 0 && space < first[0]) start = space + 1;
+  const rest = body.slice(start);
+  return '…' + (rest.length > length - 1 ? rest.slice(0, length - 2) + '…' : rest);
 }
 /** Complete in-memory timelines: title matches rank first, then earlier entities. */
 export function searchIndex(

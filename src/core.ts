@@ -84,6 +84,8 @@ export {
   searchIndex,
   searchRows,
   snippet,
+  matchRanges,
+  matchSnippet,
   SEARCH_PAGE_SIZE,
   SEARCH_MAX_TERMS,
 } from './search.js';
