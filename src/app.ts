@@ -10283,7 +10283,7 @@ async function pickerSearch() {
       exclude: timeline.id,
     };
     const [timelines, entities] = await Promise.all([
-      shown.includes('timelines') && current.page === 1
+      shown.includes('timelines')
         ? api<{
             timelines: {
               id: string;
@@ -10293,9 +10293,11 @@ async function pickerSearch() {
               description?: string;
               time_span?: string | null;
             }[];
+            pages: number;
           }>('timelines/search', 'POST', {
             ...filters,
             search: words,
+            page: current.page,
             limit: 5,
             sort: terms.length ? 'relevance' : 'updated',
           })
@@ -10329,7 +10331,8 @@ async function pickerSearch() {
         timeline: { id: t.id, title: t.title, owner: t.owner, slug: t.slug ?? null },
       });
     for (const e of entities?.entities ?? []) choices.push({ ...e });
-    pages = entities?.pages ?? 1;
+    // Both lists page together, five timelines and twenty events at a time, until both end.
+    pages = Math.max(timelines?.pages ?? 0, entities?.pages ?? 0);
   }
   if (picker !== current || el<HTMLInputElement>('link-picker-text').value !== words) return;
   el('link-picker-results').replaceChildren(...choices.map((choice) => pickerItem(choice, terms)));

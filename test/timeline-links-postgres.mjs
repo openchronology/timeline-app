@@ -361,6 +361,13 @@ try {
     ]),
   );
   assert.equal(await count(), 0);
+  // The next links' IDs cross from one length to the next (99, 100, …), so a page ordered by
+  // their text instead of their number shows.
+  const { last_value: last } = (await pool.query('SELECT last_value FROM oc_timeline_links_id_seq'))
+    .rows[0];
+  await pool.query("SELECT setval('oc_timeline_links_id_seq',$1)", [
+    String(10n ** BigInt(String(BigInt(last) + 2n).length) - 2n),
+  ]);
   for (const id of ['a', 'b', 'c'])
     await call(owner, 'POST', `/api/timelines/${many.id}/links`, {
       from: { moment: id },
@@ -377,15 +384,6 @@ try {
   assert.deepEqual(
     second.links.map((l) => l.entity),
     ['c'],
-    JSON.stringify({
-      first,
-      second,
-      rows: (
-        await pool.query('SELECT * FROM oc_timeline_links WHERE a_timeline=$1 OR b_timeline=$1', [
-          rome.id,
-        ])
-      ).rows,
-    }),
   );
   assert.equal(second.next, null);
   // Finding what to link to: the events and timelines the account may save, below the limit,

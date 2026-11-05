@@ -342,7 +342,7 @@ export class TimelineLinks {
           UNION ALL SELECT id,a_timeline,a_kind,a_id FROM oc_timeline_links
           WHERE b_timeline=$1 AND b_kind=$2 AND b_id=$3) l
         WHERE ($4::bigint IS NULL OR id>$4) AND ($5::bigint IS NULL OR id=$5)
-        ORDER BY id LIMIT $6`,
+        ORDER BY l.id LIMIT $6`,
         [id, own.kind, own.id, cursor, only, batch],
       );
       if (!rows.length) break;
