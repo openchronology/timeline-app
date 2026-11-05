@@ -1,12 +1,13 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // GET /editor/frame: the editor's own page (dist/index.html), which the platform's pages
 // frame (components/editor.jsx). With `?timeline=<id>`, a timeline its reader may open, the
-// page arrives with that timeline's heading already shown (#428): its image, title,
+// page arrives with that timeline's heading already shown (#428): its owner, image, title,
 // description and count, which the editor keeps while it loads the timeline. Search engines
 // may read it only as part of the page that frames it.
 import { editorHtml, editorPolicy } from '../../../lib/editor-html.js';
 import { currentSession } from '../../../lib/session.js';
 import { momentsText } from '../../../../src/wording.ts';
+import { profilePath } from '../../../../src/addresses.ts';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const UUID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
@@ -28,6 +29,9 @@ async function headingOf(id) {
       description: timeline.description ?? '',
       image: timeline.image?.url ? timeline.image : null,
       count: momentsText(BigInt(timeline.event_count ?? 0)),
+      // The breadcrumb's owner, linked to their profile as the editor links it.
+      owner: timeline.owner,
+      ownerPath: profilePath(timeline.owner),
     };
   } catch {
     return null;

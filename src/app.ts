@@ -2698,9 +2698,17 @@ function heading() {
         ? `${comparison.tracks.length} timelines · Read-only comparison`
         : momentsText(count),
     );
-  text('owner-label', remote ? remote.owner : desktop ? 'Offline workspace' : 'Local workspace');
+  // Whose timeline: its owner on a server, the workspace for a local one, and nothing while one
+  // loads (or the owner the page arrived with, #428), rather than a workspace that isn't it.
+  if (!holding)
+    text(
+      'owner-label',
+      remote ? remote.owner : !model ? '' : desktop ? 'Offline workspace' : 'Local workspace',
+    );
   const ownerLink = el<HTMLAnchorElement>('owner-label');
-  if (remote) {
+  if (holding) {
+    /* The link the page arrived with stays. */
+  } else if (remote) {
     ownerLink.href =
       (desktop ? serverOrigin : '') +
       ('slug' in remote ? profilePath(remote.owner) : '/users/' + encodeURIComponent(remote.owner));
