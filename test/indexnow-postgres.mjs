@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // IndexNow (#389) against PostgreSQL, through the HTTP API: creating, publishing, saving,
 // renaming, making private and deleting timelines sends their public addresses (and their
-// owner's profile) to a stand-in endpoint, a private timeline's never, matching the sitemap.
+// owner's profile) to a stand-in endpoint, a private timeline's never, matching the sitemap;
+// so do the pages of the moments and durations a save changes (#453).
 // No request leaves the machine.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -132,8 +133,76 @@ try {
     !submitted.some((body) => body.urlList.some((url) => /hidden/i.test(url))),
     'nothing of the private timeline',
   );
+
+  // Moments and durations (#453): published, all of their pages; then what each save changed.
+  const era = { id: 'era', start: '0/1', end: '10/1', metadata: { title: 'Voyage' } },
+    departure = { id: 'leg:1', time: '0/1', metadata: { title: 'Departure' } },
+    storm = { id: 'leg:2', time: '10/1', metadata: { title: 'Storm' } };
+  const ships = (events, more = {}) => ({
+    ...document('Ships'),
+    events,
+    durations: [era],
+    ...more,
+  });
+  const voyage = await call('POST', '/api/timelines', ships([departure, storm]));
+  const save = async (doc) =>
+    call('PUT', `/api/timelines/${voyage.id}`, {
+      revision: String(await revision(voyage.id)),
+      document: doc,
+    });
+  now += RESUBMIT_AFTER;
+  await call('PATCH', `/api/timelines/${voyage.id}/settings`, {
+    visibility: 'public',
+    slug: 'ships',
+  });
+  const base = `/${username}/ships`,
+    pages = {
+      era: `${base}/durations/era`,
+      departure: `${base}/moments/leg%3A1`,
+      storm: `${base}/moments/leg%3A2`,
+    };
+  assert.deepEqual(
+    await next(),
+    [`/${username}`, base, pages.era, pages.departure, pages.storm].sort(),
+  );
+  // One moment's text edited: the timeline's page and that moment's.
+  now += RESUBMIT_AFTER;
+  await save(ships([departure, { ...storm, metadata: { title: 'Storm', description: 'Rough.' } }]));
+  assert.deepEqual(await next(), [base, pages.storm].sort());
+  // A relationship added: both of its ends, whose pages list what they relate to.
+  now += RESUBMIT_AFTER;
+  const linked = { relationships: [{ a: { moment: 'leg:1' }, b: { duration: 'era' } }] };
+  await save(ships([departure, storm], linked));
+  assert.deepEqual(await next(), [base, pages.era, pages.departure, pages.storm].sort());
+  // A moment removed: its page, now gone, so engines drop it.
+  now += RESUBMIT_AFTER;
+  await save(ships([departure], linked));
+  assert.deepEqual(await next(), [base, pages.storm].sort());
+  // Renamed: all its entities at the new address.
+  now += RESUBMIT_AFTER;
+  await call('PATCH', `/api/timelines/${voyage.id}/settings`, { slug: 'boats' });
+  const boats = `/${username}/boats`;
+  assert.deepEqual(
+    await next(),
+    [`/${username}`, base, boats, `${boats}/durations/era`, `${boats}/moments/leg%3A1`].sort(),
+  );
+  // The editor's sparse saves too: one moment's change, its page.
+  now += RESUBMIT_AFTER;
+  await call('PUT', `/api/timelines/${voyage.id}/changes`, {
+    revision: String(await revision(voyage.id)),
+    settings: document('Ships'),
+    changes: [{ id: 'leg:1', event: { ...departure, metadata: { title: 'Cast off' } } }],
+  });
+  assert.deepEqual(await next(), [boats, `${boats}/moments/leg%3A1`].sort());
+  // Labelled, its entities are not listed: a save sends its page alone.
+  now += RESUBMIT_AFTER;
+  await pool.query("UPDATE oc_timelines SET content_labels=ARRAY['violence'] WHERE id=$1", [
+    voyage.id,
+  ]);
+  await save(ships([{ ...departure, metadata: { title: 'Setting out' } }], linked));
+  assert.deepEqual(await next(), [boats]);
   console.log(
-    'PASS IndexNow: public timelines created, published, saved, renamed, made private and deleted are sent with their profile, at most hourly; private ones never.',
+    'PASS IndexNow: public timelines created, published, saved, renamed, made private and deleted are sent with their profile, at most hourly; private ones never; the pages of moments and durations published, renamed, edited (whole or sparse), linked and removed, not of labelled timelines.',
   );
 } finally {
   globalThis.fetch = realFetch;

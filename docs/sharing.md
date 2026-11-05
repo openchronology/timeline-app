@@ -140,8 +140,9 @@ described by their labels instead of their notes, and ask search engines not to 
   how many addresses it found. `robots.txt` names the sitemap too, which other search engines
   (and Google) also follow.
 - With [IndexNow](administration.md#indexnow) on, Bing, Yandex and the other engines that take
-  it are told within minutes which of the sitemap's timeline and profile pages were added,
-  changed or removed, rather than waiting for their next crawl.
+  it are told within minutes which of the sitemap's timeline, profile, moment and duration
+  pages were added, changed or removed, rather than waiting for their next crawl. Editing one
+  moment sends its timeline's page and that moment's.
 - Each timeline page includes its title, description, owner and first 50 moments as text, for
   screen readers and crawlers. Each moment links to its own page.
 - **Moment and duration pages as text:** each includes, as text:
