@@ -46,6 +46,10 @@ copied at any time. Events also have pages of their own,
 timeline at them the same way. They are what **Share** offers, because social sites and search engines read
 pages but not fragments.
 
+Following a link to an event scrolls the page to the timeline, so it is in view behind the
+event's details. A moment that the view would count in a group is zoomed into until it is drawn
+on its own, unless other moments share its time.
+
 The same fragments work for embeds (`/embed/<id>#moment/…`) and in the editor's own address
 (`#timeline/<id>/moment/…`). A link to an event that no longer exists opens the
 timeline and says so.
