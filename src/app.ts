@@ -8381,7 +8381,11 @@ void (async () => {
   await route();
   // Started from the help (/editor?tour=1).
   if (new URLSearchParams(location.search).get('tour') === '1') tour();
-})().catch(fail);
+})()
+  .catch(fail)
+  // The file actions show once the opening timeline has set them (styles.css), whether or not
+  // it opened.
+  .finally(() => (document.documentElement.dataset.settled = ''));
 
 /** What a summary's menu item opening its details says: what the summary holds. */
 function viewGroupLabel(group: FrameGroup) {
