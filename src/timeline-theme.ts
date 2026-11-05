@@ -56,7 +56,6 @@ export function themeProperties(theme: PluginTheme): Record<string, string> {
   if (theme.measureSize) set('measure-scale', String(themeScales(theme).measure));
   if (theme.halo) {
     set('halo', theme.halo);
-    set('halo-backing', mix(theme.halo, 72));
     set('heading-backing', mix(theme.halo, 90));
   }
   if (theme.marker) {

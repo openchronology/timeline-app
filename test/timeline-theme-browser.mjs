@@ -50,7 +50,7 @@ export async function checkTimelineTheme(page, restore) {
         marker: style('.event-marker[data-first="100/1"]').backgroundColor,
         background: getComputedStyle(stage).backgroundColor,
         halo: stage.classList.contains('over-backgrounds'),
-        labelShadow: style('.event-label').textShadow,
+        labelCard: style('.event-label').backgroundColor,
       };
     });
   let shown = await look();
@@ -83,7 +83,7 @@ export async function checkTimelineTheme(page, restore) {
   assert.equal(shown.marker, 'rgb(170, 0, 0)');
   assert.equal(shown.background, 'rgb(32, 48, 64)');
   assert.equal(shown.halo, true, 'the halo shows over a background color');
-  assert.match(shown.labelShadow, /rgb\(0, 0, 0\)/);
+  assert.equal(shown.labelCard, 'rgb(0, 0, 0)', 'labels sit on cards of the halo color');
   // A color chosen on a moment still wins.
   assert.equal(
     await page.evaluate(
