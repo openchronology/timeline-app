@@ -54,18 +54,41 @@ The total is capped at 1. An account that isn't established has standing 0. Admi
 
 Every timeline list on the dashboard and on profiles searches, sorts and pages on its own, with its own query parameters, so a search in one keeps the others' state ([#337](https://github.com/openchronology/timeline-app/issues/337)):
 
-| List                   | Parameters                                                                            |
-| ---------------------- | ------------------------------------------------------------------------------------- |
-| Explore timelines      | `search`, `tag`, `sort`, `page` (and `owner`, for one account's)                      |
-| Your timelines         | `mineSearch`, `mineTag`, `mineSort`, `mineVisibility`, `minePage`                     |
-| Your favorites         | `favoriteSearch`, `favoriteTag`, `favoriteSort`, `favoriteVisibility`, `favoritePage` |
-| Drafts in this browser | `draftSearch`, `draftTag`, `draftSort`, `draftPage`                                   |
-| A profile's timelines  | `search`, `tag`, `sort`, `page`                                                       |
-| A profile's favorites  | `favoriteSearch`, `favoriteTag`, `favoriteSort`, `favoritePage`                       |
+| List                   | Parameters                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------ |
+| Explore timelines      | `search`, `tag`, `sort`, `page`, `show`, `within`, `entityPage` (and `owner`, for one account's) |
+| Your timelines         | `mineSearch`, `mineTag`, `mineSort`, `mineVisibility`, `minePage`                                |
+| Your favorites         | `favoriteSearch`, `favoriteTag`, `favoriteSort`, `favoriteVisibility`, `favoritePage`            |
+| Drafts in this browser | `draftSearch`, `draftTag`, `draftSort`, `draftPage`                                              |
+| A profile's timelines  | `search`, `tag`, `sort`, `page`                                                                  |
+| A profile's favorites  | `favoriteSearch`, `favoriteTag`, `favoriteSort`, `favoritePage`                                  |
 
 Your own lists include private timelines and filter by visibility (`public` or `private`). Drafts are searched in the browser, by their titles, descriptions and tags, with the same syntax: words, `"quoted phrases"` and `-exclusions`. The API's search takes the same `visibility` filter and the `updated` sort ([API](api.md)).
 
 With JavaScript, each list searches in place ([#338](https://github.com/openchronology/timeline-app/issues/338)): it changes the address with `history.pushState` (or `replaceState` while typing) and fetches its page from the search API, so the page doesn't load again and Back works. Each result also carries what its card shows of its moments: `first_time` and `last_time` (exact), `time_span` (the two in the timeline's own time display, as precise as the span calls for: years for a 200-year timeline, clock times for a 3-hour incident, ages in deep time) and `shape` (how densely 24 equal parts of the span hold moments, read from the top three levels of its moment tree). Forks that read through to their source, and comparisons, have none of these, as reading them would cost far more.
+
+## Searching events
+
+Explore's search also finds events: moments and durations on every timeline the reader may search ([#459](https://github.com/openchronology/timeline-app/issues/459)). Its parameters:
+
+| Parameter    | Means                                                                                   |
+| ------------ | --------------------------------------------------------------------------------------- |
+| `show`       | `timelines`, `moments`, `durations`, comma-separated or repeated; all three when absent |
+| `within`     | `mine`: the signed-in account's own timelines only                                      |
+| `entityPage` | The page of events, 20 to a page; the timelines keep their own `page`                   |
+
+What it searches:
+
+- **Scope:** signed out, public timelines. Signed in, a search with words also covers the account's own private timelines and those it's a member of (not one moderators restricted). Browsing without words stays public and follows the rules above.
+- **Matching:** each word matches the start of a word in an event's title (which counts most) or notes. Every word must match.
+- **Order:** established accounts' events first, as for timelines, then by how well they match.
+- **Not searched:** comparisons, copies still being prepared, and labelled timelines' events, unless the reader is a signed-in adult.
+- **Forks:** a fork that reads through to its source shows only the events it changed. The rest are found on the source.
+- **Cap:** the text index finds every match, but each search reads and ranks at most 5,000 of them, so a common word doesn't read every event that has it. Past the cap, the count reads "5,000+" ([benchmarks](benchmarks.md#searching-events)).
+
+The words searched for are highlighted in the results: in timelines' titles and descriptions, and events' titles and notes. An event's notes are shown from where the words first match.
+
+The API is `POST /api/timelines/entities/search` ([API](api.md)).
 
 ## Related timelines
 

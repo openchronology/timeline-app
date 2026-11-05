@@ -199,9 +199,11 @@ try {
     mine = tab.locator('#mine'),
     drafts = tab.locator('#drafts');
   const titles = (section) => section.locator('.timeline-card-title').allTextContents();
-  const status = (section) => section.locator('.list-status').textContent();
+  // The first status line: the timelines', above Explore's events (#459).
+  const status = (section) => section.locator('.list-status').first().textContent();
   await explore.locator('.timeline-card').first().waitFor();
-  assert.equal(await status(explore), '14 timelines · Page 1 of 2');
+  // Signed in, a search finds the account's private timelines too (#459).
+  assert.equal(await status(explore), '16 timelines · Page 1 of 2');
   // A page that loads again would lose this.
   await tab.evaluate(() => (window.stillHere = true));
   const stillHere = () => tab.evaluate(() => window.stillHere === true);
@@ -217,7 +219,7 @@ try {
   assert.equal(await card.locator('.timeline-shape-span').textContent(), '0 – 24');
 
   // Searching as you type, in place: the address follows, focus and scroll stay.
-  const words = explore.getByLabel('Search timelines');
+  const words = explore.getByRole('searchbox');
   await words.evaluate((input) => input.scrollIntoView({ block: 'center' }));
   assert((await tab.evaluate(() => window.scrollY)) > 0);
   await words.fill('Apollo ' + word);
@@ -232,7 +234,9 @@ try {
   assert(top >= 0 && top < 900, `the search box moved out of view (${top})`);
   assert((await tab.evaluate(() => window.scrollY)) > 0, 'the page jumped to its top');
   assert.equal(new URL(tab.url()).hash, '#explore');
-  // Sort applies at once; a search sorts by relevance until another order is chosen.
+  // Sort applies at once; a search sorts by relevance until another order is chosen. It is
+  // among the filters, folded away until opened (#459).
+  await explore.locator('.search-filters summary').click();
   assert.equal(await explore.getByLabel('Sort timelines').inputValue(), 'relevance');
   await explore.getByLabel('Sort timelines').selectOption('alphabetical');
   await tab.waitForURL((url) => url.searchParams.get('sort') === 'alphabetical');
@@ -269,11 +273,11 @@ try {
     document.querySelector('#explore .list-status')?.textContent.startsWith('3 timelines'),
   );
   assert(await stillHere(), 'Back loaded the page');
-  assert.equal(await explore.getByLabel('Filter by tag').inputValue(), '');
+  assert.equal(await explore.getByLabel('Tag', { exact: true }).inputValue(), '');
 
   // Nothing found: why, and a way back.
   await words.fill('nothing-like-this ' + word);
-  await explore.getByText('No public timelines match this search.').waitFor();
+  await explore.getByText('No timelines match this search.').waitFor();
   await explore.getByRole('link', { name: 'Clear the search' }).click();
   await tab.waitForURL((url) => !url.searchParams.has('search'));
   // Unsearched, explore lists established accounts' timelines (#103): there may be none.
@@ -284,7 +288,7 @@ try {
   await words.fill(word);
   await tab.waitForURL((url) => url.searchParams.get('search') === word);
   await tab.waitForFunction(() =>
-    document.querySelector('#explore .list-status')?.textContent.startsWith('14 timelines'),
+    document.querySelector('#explore .list-status')?.textContent.startsWith('16 timelines'),
   );
   await mine.getByLabel('Visibility').selectOption('private');
   await tab.waitForURL((url) => url.searchParams.get('mineVisibility') === 'private');
@@ -319,15 +323,18 @@ try {
     await held;
     await route.continue();
   });
+  // Measured with the link in view, as clicking it scrolls there first.
+  const previous = explore.getByRole('link', { name: '← Previous' });
+  await previous.scrollIntoViewIfNeeded();
   const box = await explore.locator('.timeline-grid').boundingBox();
-  await explore.getByRole('link', { name: '← Previous' }).click();
+  await previous.click();
   await explore.locator('.timeline-grid[aria-busy="true"]').waitFor();
   assert.equal(await status(explore), 'Searching…');
   assert.deepEqual(await explore.locator('.timeline-grid').boundingBox(), box);
   release();
   await explore.locator('.timeline-grid:not([aria-busy])').waitFor();
   await tab.unroute('**/api/timelines/search');
-  assert.equal(await status(explore), '14 timelines · Page 1 of 2');
+  assert.equal(await status(explore), '16 timelines · Page 1 of 2');
 
   // Arrow keys move between the cards' titles; Down goes a row.
   const first = explore.locator('.timeline-card-title a').first();
@@ -364,7 +371,7 @@ try {
   // Reloaded, the address says it all: the lists show what they showed.
   await tab.reload();
   await explore.locator('.timeline-grid.list-layout').waitFor();
-  assert.equal(await explore.getByLabel('Search timelines').inputValue(), word);
+  assert.equal(await explore.getByRole('searchbox').inputValue(), word);
   assert.equal(await mine.getByLabel('Visibility').inputValue(), 'private');
   await drafts.locator('.timeline-card').first().waitFor();
   assert.deepEqual(await titles(drafts), ['Draft about mountains']);
@@ -413,14 +420,14 @@ try {
   await plain.addCookies([...cookies].map(([name, value]) => ({ name, value, url: origin })));
   const still = await plain.newPage();
   await still.goto(origin + '/?mineSort=alphabetical');
-  await still.locator('#explore').getByLabel('Search timelines').fill(word);
+  await still.locator('#explore').getByRole('searchbox').fill(word);
   await still.locator('#explore').getByRole('button', { name: 'Search', exact: true }).click();
   await still.waitForURL((url) => url.searchParams.get('search') === word);
   assert.equal(new URL(still.url()).hash, '#explore');
   assert.equal(new URL(still.url()).searchParams.get('mineSort'), 'alphabetical');
   assert.equal(
-    await still.locator('#explore .list-status').textContent(),
-    '14 timelines · Page 1 of 2',
+    await still.locator('#explore .list-status').first().textContent(),
+    '16 timelines · Page 1 of 2',
   );
   await still.locator('#explore').getByRole('link', { name: 'Next →' }).click();
   await still.waitForURL((url) => url.searchParams.get('page') === '2');

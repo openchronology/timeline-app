@@ -312,6 +312,7 @@ jobs:
       - run: node test/moderation-postgres.mjs
       - run: node test/standing-postgres.mjs
       - run: node test/related-postgres.mjs
+      - run: node test/library-search-postgres.mjs
       - run: node test/save-merge-postgres.mjs
       - run: node test/labels-postgres.mjs
       - run: node test/ages-postgres.mjs
@@ -345,6 +346,8 @@ jobs:
         run: node test/device-approval-live-postgres.mjs
       - name: Searching and browsing timelines in a live browser
         run: node test/timeline-browser-live-postgres.mjs
+      - name: Explore's search of timelines and events in a live browser
+        run: node test/library-search-live-postgres.mjs
       - name: The landing page and audience pages in a live browser
         run: node test/landing-live-postgres.mjs
       - name: The site's header and its phone menu in a live browser

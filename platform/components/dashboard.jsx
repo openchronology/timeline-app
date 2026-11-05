@@ -6,18 +6,23 @@ import { accountCompareLimit, currentSession, userCompareLimit } from '../lib/se
 import { searchTimelines } from '../../server/collaboration.mjs';
 import { CompareTray } from './compare-selection.jsx';
 import TimelineBrowser from './timeline-browser.jsx';
+import LibraryBrowser from './library-browser.jsx';
+import { searchEntities } from '../../server/library-search.mjs';
 import LegacyLinks from './legacy-links.jsx';
 import BrowserDrafts from './browser-drafts.jsx';
 import { profilePath } from '../../src/addresses.ts';
-import { LISTS, readList, searchBody } from '../lib/timeline-lists.js';
+import { LISTS, librarySearches, readList, searchBody } from '../lib/timeline-lists.js';
 /**
  * The dashboard, at `basePath`: / or /explore.
  *
  * Reads the visitor's session, then searches the database directly (server/collaboration.mjs's
- * `searchTimelines`, not the HTTP API) for three lists at once: the public timelines that
- * match the query, and, when signed in, the account's own timelines and the ones it starred.
+ * `searchTimelines` and server/library-search.mjs's `searchEntities`, not the HTTP API) for
+ * its lists at once: Explore's timelines and, with search text, its moments and durations
+ * (#459; components/library-browser.jsx), and, when signed in, the account's own timelines
+ * and the ones it starred.
  * Each list searches, sorts and pages on its own, in its own query parameters
- * (lib/timeline-lists.js): `search`, `tag`, `sort` and `page` for the public timelines;
+ * (lib/timeline-lists.js): `search`, `tag`, `sort` and `page` for Explore, with `show`,
+ * `within` and `entityPage`;
  * `mineSearch`, `mineTag`, `mineSort`, `mineVisibility` and `minePage` for the account's own;
  * likewise `favorite…` for its favorites and `draft…` for its browser drafts, which are
  * searched in the browser. So the address carries them all, and each list's links keep the
@@ -52,6 +57,7 @@ export default async function Dashboard({ searchParams, basePath = '/' }) {
     userLimit = 8,
     mine,
     publicResults,
+    entityResults,
     favorites,
     error;
   try {
@@ -61,17 +67,24 @@ export default async function Dashboard({ searchParams, basePath = '/' }) {
     userLimit = userCompareLimit(current);
     if (!current.services.pool)
       error = 'Server storage is unavailable. You can create or import a local timeline.';
-    else
-      [publicResults, mine, favorites] = await Promise.all([
-        searchTimelines(
-          current.services.pool,
-          user?.id,
-          search('explore'),
-          current.services.featured,
-        ),
+    else {
+      // Explore's two searches (#459): its timelines, and with words its moments and durations.
+      const library = librarySearches(LISTS.explore, states.explore, fixed.explore, {
+        signedIn: !!user,
+      });
+      [publicResults, entityResults, mine, favorites] = await Promise.all([
+        library.timelines &&
+          searchTimelines(
+            current.services.pool,
+            user?.id,
+            library.timelines,
+            current.services.featured,
+          ),
+        library.entities && searchEntities(current.services.pool, user?.id, library.entities),
         user ? searchTimelines(current.services.pool, user.id, search('mine')) : null,
         user ? searchTimelines(current.services.pool, user.id, search('favorites')) : null,
       ]);
+    }
   } catch {
     error = 'The timeline browser is temporarily unavailable. Local editing remains available.';
   }
@@ -128,11 +141,19 @@ export default async function Dashboard({ searchParams, basePath = '/' }) {
         <h2 id="explore-heading">{owner ? `${owner}’s public timelines` : 'Explore timelines'}</h2>
         {owner && <Link href={basePath + '#explore'}>Browse all timelines</Link>}
         <p className="muted">
-          Search titles, notes and tags across public timelines. Popularity combines stars and
-          public forks.
+          Search the titles and notes of timelines and their events (moments and durations).
+          Popularity combines stars and public forks.
         </p>
         {!user && <Link href="/login">Sign in to see your timelines</Link>}
-        {list('explore', publicResults, { guest: !user })}
+        <LibraryBrowser
+          initialState={states.explore}
+          initialTimelines={error ? null : (publicResults ?? null)}
+          initialEntities={error ? null : (entityResults ?? null)}
+          fixed={fixed.explore}
+          signedIn={!!user}
+          compareLimit={compareLimit}
+          basePath={basePath}
+        />
         {error && (
           <p className="notice" role="status">
             {error}

@@ -5,7 +5,7 @@
 // (lib/timeline-lists.js), and the grid or list layout.
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { SORT_LABELS, otherParams, paramName } from '../lib/timeline-lists.js';
+import { SHOWN, SORT_LABELS, defaultSort, otherParams, paramName } from '../lib/timeline-lists.js';
 /** How long typing pauses before the list searches, in milliseconds. */
 export const TYPING_DELAY = 350;
 /** Where the visitor's choice of layout is kept, for every list (#338). */
@@ -68,6 +68,7 @@ function LayoutToggle({ layout, onLayout, noun }) {
  * @param {(changes: object, options?: {replace?: boolean}) => void} [props.onNavigate]
  * @param {'grid'|'list'} [props.layout] with `onLayout`, the layout buttons
  * @param {(layout: string) => void} [props.onLayout]
+ * @param {boolean} [props.signedIn] a library list offers the account's own timelines alone
  */
 export default function TimelineSearch({
   list,
@@ -76,6 +77,7 @@ export default function TimelineSearch({
   onNavigate,
   layout,
   onLayout,
+  signedIn = false,
 }) {
   const params = useSearchParams();
   const [search, setSearch] = useState(state.search),
@@ -119,6 +121,13 @@ export default function TimelineSearch({
     if (!typing.current) spell.current = false;
   };
   const others = Object.entries(otherParams(Object.fromEntries(params), list));
+  if (list.library)
+    return (
+      <LibrarySearch
+        {...{ list, state, basePath, onNavigate, layout, onLayout, signedIn, others }}
+        {...{ search, setSearch, tag, setTag, typed, submit, endSpell, ready, name }}
+      />
+    );
   return (
     <form
       action={basePath + '#' + list.id}
@@ -219,5 +228,157 @@ function ChoiceSelect({ name, value, options, onChange }) {
         </option>
       ))}
     </select>
+  );
+}
+/** How many of a library list's filters narrow or reorder it, for its Filters button. */
+export function filterCount(list, state) {
+  return [
+    state.show.length < SHOWN.length,
+    !!state.tag,
+    !!state.within,
+    state.sort !== defaultSort(list, state.search),
+  ].filter(Boolean).length;
+}
+/** What each kind a library list shows is called beside its box. */
+const SHOWN_LABELS = { timelines: 'Timelines', moments: 'Moments', durations: 'Durations' };
+/**
+ * The Explore list's controls (#459): one search field across the page's width, finding
+ * timelines, moments and durations, with the rest folded under Filters (closed until opened,
+ * saying how many are on): what to show, a tag, whose timelines (signed in) and the
+ * timelines' order. Without JavaScript the folding is a details element and the boxes are
+ * fields of the form, so it works the same.
+ */
+function LibrarySearch({
+  list,
+  state,
+  basePath,
+  onNavigate,
+  layout,
+  onLayout,
+  signedIn,
+  others,
+  search,
+  setSearch,
+  tag,
+  setTag,
+  typed,
+  submit,
+  endSpell,
+  ready,
+  name,
+}) {
+  const count = filterCount(list, state);
+  const show = (kind, on) => {
+    const next = SHOWN.filter((k) => (k === kind ? on : state.show.includes(k)));
+    if (next.length) onNavigate?.({ search, tag, show: next });
+  };
+  return (
+    <form
+      action={basePath + '#' + list.id}
+      method="get"
+      className="search-controls library-search"
+      role="search"
+      aria-label="Search timelines and events"
+      onSubmit={submit}
+    >
+      {others.map(([key, value]) => (
+        <input key={key} type="hidden" name={key} value={value} />
+      ))}
+      <div className="library-search-row">
+        <label className="search-words">
+          <span className="sr-only">Search timelines and events</span>
+          <input
+            name={name('search')}
+            type="search"
+            maxLength={300}
+            value={search}
+            autoComplete="off"
+            onBlur={endSpell}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              typed({ search: e.target.value, tag });
+            }}
+            placeholder="Search timelines and events"
+          />
+        </label>
+        <button type="submit">Search</button>
+        {ready && onLayout && <LayoutToggle layout={layout} onLayout={onLayout} noun="timelines" />}
+      </div>
+      <details className="search-filters">
+        <summary>{count ? `Filters (${count})` : 'Filters'}</summary>
+        <div className="search-filters-body">
+          <fieldset>
+            <legend>Show</legend>
+            {SHOWN.map((kind) => {
+              const checked = state.show.includes(kind);
+              return (
+                <label key={kind} className="checkbox">
+                  <input
+                    type="checkbox"
+                    name={name('show')}
+                    value={kind}
+                    // Without JavaScript a box's own state is sent; with it, the address's.
+                    {...(onNavigate ? { checked } : { defaultChecked: checked })}
+                    // One kind at least: the last one shown can't be cleared.
+                    disabled={!!onNavigate && checked && state.show.length === 1}
+                    onChange={onNavigate && ((e) => show(kind, e.target.checked))}
+                  />
+                  {SHOWN_LABELS[kind]}
+                </label>
+              );
+            })}
+          </fieldset>
+          <label>
+            Tag
+            <input
+              name={name('tag')}
+              maxLength={64}
+              value={tag}
+              autoComplete="off"
+              onBlur={endSpell}
+              onChange={(e) => {
+                setTag(e.target.value);
+                typed({ search, tag: e.target.value });
+              }}
+            />
+          </label>
+          {signedIn && (
+            <fieldset>
+              <legend>Search in</legend>
+              {[
+                ['', 'The whole library'],
+                ['mine', 'My timelines'],
+              ].map(([value, text]) => (
+                <label key={value} className="checkbox">
+                  <input
+                    type="radio"
+                    name={name('within')}
+                    value={value}
+                    {...(onNavigate
+                      ? { checked: state.within === value }
+                      : { defaultChecked: state.within === value })}
+                    onChange={onNavigate && (() => onNavigate({ search, tag, within: value }))}
+                  />
+                  {text}
+                </label>
+              ))}
+            </fieldset>
+          )}
+          <label>
+            Sort timelines
+            <ChoiceSelect
+              name={name('sort')}
+              value={state.sort}
+              options={list.sorts.map((sort) => [
+                sort,
+                SORT_LABELS[sort],
+                sort === 'relevance' && !search.trim(),
+              ])}
+              onChange={onNavigate && ((sort) => onNavigate({ search, tag, sort }))}
+            />
+          </label>
+        </div>
+      </details>
+    </form>
   );
 }

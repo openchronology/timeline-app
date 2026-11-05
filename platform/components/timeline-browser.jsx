@@ -2,11 +2,11 @@
 'use client';
 // One timeline list on the dashboard or a profile, searched in place (#338): its controls
 // change the address without loading the page, and its results come from the search API.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import TimelineSearch, { useLayout } from './timeline-search.jsx';
 import TimelineList from './timeline-list.jsx';
-import { api } from '../lib/api.js';
+import { useSearchResult } from '../lib/use-search-result.js';
 import { LISTS, navigateList, readList, rememberList, searchBody } from '../lib/timeline-lists.js';
 /**
  * The list's state is the address's (readList over useSearchParams), so a link, Back and
@@ -40,42 +40,20 @@ export default function TimelineBrowser({
 }) {
   const list = LISTS[name],
     params = useSearchParams(),
-    state = readList(params, list),
-    key = JSON.stringify(state),
-    serverKey = JSON.stringify(initialState);
+    state = readList(params, list);
   const [layout, setLayout] = useLayout();
-  // The latest answer, and a search that failed, each with the state it was for.
-  const [found, setFound] = useState(null),
-    [failed, setFailed] = useState(null),
-    [attempt, setAttempt] = useState(0);
-  const shown = useRef(initialResult),
-    results = useRef(null),
+  const { result, loading, error, retry } = useSearchResult(
+    'timelines/search',
+    searchBody(list, state, fixed),
+    { body: searchBody(list, initialState, fixed), result: initialResult },
+    { timelines: [], total: 0, page: 1, pages: 0 },
+  );
+  const results = useRef(null),
     paged = useRef(false);
-  let result = shown.current,
-    loading = false;
-  if (key === serverKey) result = initialResult;
-  else if (found?.key === key) result = found.result;
-  else loading = failed?.key !== key;
-  // A failed search keeps the cards shown before it; with none, a search shows skeletons.
-  shown.current = result;
-  if (!result && loading) result = { timelines: [], total: 0, page: 1, pages: 0 };
   // A timeline opened from here leads back to this list, as it is searched (its "Timelines").
   useEffect(() => {
     rememberList(location.pathname + location.search);
   }, [params]);
-  useEffect(() => {
-    if (key === serverKey || found?.key === key) return;
-    const abort = new AbortController();
-    api('timelines/search', {
-      method: 'POST',
-      data: searchBody(list, state, fixed),
-      signal: abort.signal,
-    }).then(
-      (answer) => setFound({ key, result: answer }),
-      (error) => abort.signal.aborted || setFailed({ key, message: error.message }),
-    );
-    return () => abort.abort();
-  }, [key, serverKey, attempt]);
   // After a new page, its cards: focus moves to them, and the window scrolls back to their
   // top only if it is below it (the pager is under the cards).
   useEffect(() => {
@@ -99,10 +77,10 @@ export default function TimelineBrowser({
         layout={layout}
         onLayout={setLayout}
       />
-      {failed?.key === key && (
+      {error && (
         <p className="notice" role="alert">
-          {failed.message}{' '}
-          <button type="button" onClick={() => (setFailed(null), setAttempt((n) => n + 1))}>
+          {error}{' '}
+          <button type="button" onClick={retry}>
             Try again
           </button>
         </p>
