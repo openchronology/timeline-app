@@ -139,6 +139,20 @@ The first rebuild on a connection, which compiled its plans, took about 2.2 s be
 
 A cached file is read from disk, so its time follows its size and the connection, not the database. At 5,000 moments the `.och` file (1.7 MB) took 2.3 s to convert and 0.06 s from the cache.
 
+## Links between timelines
+
+`node bench/links.mjs [links…]` (with `BENCH_DATABASE_URL`; default 1,000 and 10,000) times [links between timelines](relationships.md#links-to-other-timelines) against how many a timeline has, the limit being 10,000 by default. For each count it makes four timelines of that many moments: two linked moment to moment, a third whose first moment is linked from every moment of the second, and one without links. Times are medians of five runs, in milliseconds, on a 16-core virtual machine with PostgreSQL 16:
+
+|  Links | Comparison, whole span | Comparison, 1% of it | A page of Related to | The same, for an entity with every link | Save deleting 10 linked moments | The same without links | Deleting a linked timeline |
+| -----: | ---------------------: | -------------------: | -------------------: | --------------------------------------: | ------------------------------: | ---------------------: | -------------------------: |
+|  1,000 |                     55 |                   39 |                   23 |                                      19 |                             137 |                    150 |                         67 |
+| 10,000 |                     25 |                  217 |                   14 |                                      20 |                             145 |                    508 |                        270 |
+
+- **Comparisons:** a comparison reads the links between its timelines for a window three views wide. Over the whole span it stops at the 256 arcs a window shows, so more links cost no more. A narrow window looks up both ends of every link between the two timelines to find those crossing it, so its time grows with the links: about 0.02 ms a link. Panning within the window reads nothing.
+- **Related to:** a page costs the same however many links an entity has.
+- **Saves:** a sparse save checks only the links of the entities it deletes (the save times vary as much between runs as between the columns). Saves that rebuild a timeline whole, and imports, check every link the timeline has: at 10,000 links that added 100–300 ms to a save, measured when every save checked them all.
+- **Deleting a timeline** deletes its links with it, in time growing with how many it has.
+
 ## Searching events
 
 `node bench/library-search.mjs [timelines] [moments each]` (with `BENCH_DATABASE_URL`; default 10 and 50,000) creates that many public timelines and times Explore's search of every timeline's events ([#459](https://github.com/openchronology/timeline-app/issues/459); `server/library-search.mjs`), the median of five runs each. Measured on a 16-core virtual machine with PostgreSQL 16:

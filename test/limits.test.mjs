@@ -9,6 +9,7 @@ import {
   storageBytes,
   defaultQuota,
   entryLimit,
+  linkLimit,
   LimitError,
   mebibytes,
   timelineFileBytes,
@@ -80,6 +81,19 @@ test('the entry limit comes from TIMELINE_ENTRY_LIMIT: a number from 1000, or un
     assert.throws(
       () => entryLimit({ TIMELINE_ENTRY_LIMIT: value }),
       (error) => error instanceof LimitError && /TIMELINE_ENTRY_LIMIT/.test(error.message),
+      value,
+    );
+});
+test('the link limit comes from TIMELINE_LINK_LIMIT: a number from 1, or unlimited (#422)', () => {
+  assert.equal(linkLimit({}), 10000);
+  assert.equal(linkLimit({ TIMELINE_LINK_LIMIT: ' ' }), 10000);
+  assert.equal(linkLimit({ TIMELINE_LINK_LIMIT: '50_000' }), 50000);
+  assert.equal(linkLimit({ TIMELINE_LINK_LIMIT: '1' }), 1);
+  assert.equal(linkLimit({ TIMELINE_LINK_LIMIT: 'unlimited' }), Infinity);
+  for (const value of ['0', '-5', '1.5', 'many'])
+    assert.throws(
+      () => linkLimit({ TIMELINE_LINK_LIMIT: value }),
+      (error) => error instanceof LimitError && /TIMELINE_LINK_LIMIT/.test(error.message),
       value,
     );
 });

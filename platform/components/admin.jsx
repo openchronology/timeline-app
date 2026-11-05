@@ -360,6 +360,9 @@ export default function Admin() {
                   <p>
                     @{item.owner} · {item.visibility} · {Number(item.event_count).toLocaleString()}{' '}
                     moments
+                    {/* Links to other timelines (#422), held to TIMELINE_LINK_LIMIT. */}
+                    {Number(item.link_count) > 0 &&
+                      ` · ${Number(item.link_count).toLocaleString()} link${Number(item.link_count) === 1 ? '' : 's'} to other timelines`}
                   </p>
                   <div className="actions">
                     <button

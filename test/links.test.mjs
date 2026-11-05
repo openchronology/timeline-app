@@ -3,7 +3,7 @@
 // their own for shared moments and durations.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Q, parseLink, linkFragment, sharePath } from '../dist/core.mjs';
+import { Q, parseLink, linkFragment, sharePath, addressedEntity } from '../dist/core.mjs';
 
 const id = '6f1c4e2a-9b3d-4c5e-8f70-112233445566';
 test('link fragments name moments, durations, searches and views', () => {
@@ -66,4 +66,45 @@ test('shared addresses give moments and durations pages of their own', () => {
     '/ada/voyages/moments/leg%3A2',
   );
   assert.equal(sharePath({ id, owner: 'admin', slug: 'voyages' }, null), '/timelines/' + id);
+});
+
+test('a pasted address names a timeline, and a moment or duration on it (#422)', () => {
+  const id = '0f8fad5b-d9cb-469f-a165-70867728950e',
+    origin = 'https://chronology.example';
+  const moment = { kind: 'moment', id: 'm-1' };
+  // A timeline's pages, by its owner's name or its ID; paths alone or on this site.
+  assert.deepEqual(addressedEntity(`${origin}/ada/rome`, origin), {
+    timeline: { owner: 'ada', name: 'rome' },
+    entity: null,
+  });
+  assert.deepEqual(addressedEntity(`/ada/rome/moments/m-1`), {
+    timeline: { owner: 'ada', name: 'rome' },
+    entity: moment,
+  });
+  assert.deepEqual(addressedEntity(`/timelines/${id}/durations/d%3A2/`), {
+    timeline: { id },
+    entity: { kind: 'duration', id: 'd:2' },
+  });
+  // A link fragment, an embed and the editor's own address.
+  assert.deepEqual(addressedEntity(`/ada/rome#moment/m-1`).entity, moment);
+  assert.deepEqual(addressedEntity(`${origin}/embed/${id}#moment/m-1`, origin), {
+    timeline: { id },
+    entity: moment,
+  });
+  assert.deepEqual(addressedEntity(`${origin}/editor#timeline/${id}/moment/m-1`, origin), {
+    timeline: { id },
+    entity: moment,
+  });
+  assert.deepEqual(addressedEntity(`/timelines/${id}#view/0..1`).entity, null);
+  // Not another site's, another page of a timeline, or a site page.
+  for (const text of [
+    `https://elsewhere.example/ada/rome`,
+    `/ada/rome/history`,
+    `/timelines/not-an-id`,
+    `/embed/not-an-id`,
+    `/help/relationships`,
+    `/ada/rome/moments/bad id`,
+    'http://[',
+  ])
+    assert.equal(addressedEntity(text, origin), null, text);
 });

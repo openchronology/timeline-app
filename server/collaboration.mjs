@@ -28,6 +28,8 @@ export const PULLS_UNAVAILABLE =
 export const FORK_PULLS_UNAVAILABLE =
   'This fork does not keep saved history, so it cannot propose its changes: turn on Keep saved history in its settings first.';
 /** The orders a timeline search may ask for (searchInput's `sort`). */
+/** A timeline ID's form. */
+const UUID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 export const SEARCH_SORTS = [
   'featured',
   'stars',
@@ -41,8 +43,9 @@ export const SEARCH_SORTS = [
 /**
  * A timeline search as the dashboard and API send it, checked and normalized: `search` (web
  * search syntax, up to 300 characters), `tag`, `owner` (a username), `starredBy` (a username
- * whose public favorites to list; only with the public scope), `scope` (public, mine, visible
- * or starred), `visibility` (public or private only; empty for both), `sort` (relevance by
+ * whose public favorites to list; only with the public scope), `scope` (public, mine, visible,
+ * starred or writable), `linkable` (only timelines below the link limit, #422), `exclude` (a
+ * timeline ID to leave out), `visibility` (public or private only; empty for both), `sort` (relevance by
  * default when there is search text, else featured), `page` and `limit` (up to 50). Tags are
  * compared lower-cased and NFC-normalized, as they are stored.
  * @throws {HttpError} 400 for unknown keys or values out of range
@@ -64,6 +67,8 @@ export function searchInput(value = {}) {
           'sort',
           'starredBy',
           'visibility',
+          'linkable',
+          'exclude',
         ].includes(k),
     )
   )
@@ -78,6 +83,8 @@ export function searchInput(value = {}) {
     sort = typeof search === 'string' && search.trim() ? 'relevance' : 'featured',
     starredBy = '',
     visibility = '',
+    linkable = false,
+    exclude = null,
   } = value;
   if (
     typeof search !== 'string' ||
@@ -92,12 +99,14 @@ export function searchInput(value = {}) {
     !Number.isSafeInteger(limit) ||
     limit < 1 ||
     limit > 50 ||
-    !['public', 'mine', 'visible', 'starred'].includes(scope) ||
+    !['public', 'mine', 'visible', 'starred', 'writable'].includes(scope) ||
     !SEARCH_SORTS.includes(sort) ||
     !['', 'public', 'private'].includes(visibility) ||
     typeof starredBy !== 'string' ||
     starredBy.length > 64 ||
-    (starredBy !== '' && scope !== 'public')
+    (starredBy !== '' && scope !== 'public') ||
+    typeof linkable !== 'boolean' ||
+    (exclude !== null && (typeof exclude !== 'string' || !UUID.test(exclude)))
   )
     throw new HttpError(400, 'Invalid search or pagination.');
   return {
@@ -110,6 +119,8 @@ export function searchInput(value = {}) {
     starredBy: starredBy.normalize('NFC').trim(),
     owner: owner.normalize('NFC').trim(),
     visibility,
+    linkable,
+    exclude,
   };
 }
 /**
@@ -118,25 +129,29 @@ export function searchInput(value = {}) {
  * Scopes: `public` (public timelines; with no search text, owner or starredBy this is
  * browsing, which lists only established accounts' and featured timelines, #103), `mine`
  * (the reader's own, of any visibility), `visible` (public ones plus those the reader owns or
- * is a member of) and `starred` (of those, the ones the reader starred). 401 for mine and
- * starred when signed out.
+ * is a member of), `starred` (of those, the ones the reader starred) and `writable` (those the
+ * reader may save: their own and those shared with them as a writer, not comparisons; to link
+ * to, #422). 401 for mine, starred and writable when signed out.
  * @param {import('pg').Pool} pool
  * @param {string|null} userId the reader
  * @param {object} value the search (searchInput)
  * @param {string[]} featured timeline ids the site features besides those flagged featured
  *   (FEATURED_TIMELINES in the environment; platform.mjs)
+ * @param {{linkLimit?: number}} [options] the most links a timeline may have (limits.mjs), which
+ *   `linkable` searches keep below
  * @returns {Promise<{timelines: object[], total: number, page: number, limit: number, pages: number}>}
  *   star_count and popularity come as strings (bigint and real kept exact for JSON)
  */
-export async function searchTimelines(pool, userId, value, featured = []) {
-  const { search, tag, page, limit, scope, owner, sort, starredBy, visibility } =
+export async function searchTimelines(pool, userId, value, featured = [], { linkLimit } = {}) {
+  const { search, tag, page, limit, scope, owner, sort, starredBy, visibility, linkable, exclude } =
     searchInput(value);
-  if (['mine', 'starred'].includes(scope) && !userId)
+  if (['mine', 'starred', 'writable'].includes(scope) && !userId)
     throw new HttpError(401, 'Sign in to see your timelines.');
   // One query for a page and its total. Parameters: $1 the mine scope, $2 search text, $3 and
   // $4 limit and offset, $5 featured ids, $6 the reader (null when signed out), $7 tag, $8 the
   // visible scope, $9 owner, $10 sort, $11 the starred scope, $12 starredBy, $13 browsing,
-  // $14 visibility.
+  // $14 visibility, $15 the writable scope, $16 the link limit for `linkable` searches (null:
+  // any), $17 a timeline to leave out.
   //
   // `matching` is every timeline the scope and filters allow, with what ranking needs: the
   // reader's star, popularity and trending (oc_timeline_popularity, standing.mjs), whether its
@@ -166,11 +181,16 @@ export async function searchTimelines(pool, userId, value, featured = []) {
     FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id
     LEFT JOIN oc_account_standing a ON a.user_id=t.owner_id
     LEFT JOIN oc_timeline_popularity p ON p.timeline_id=t.id
-    WHERE (CASE WHEN $1::boolean THEN t.owner_id=$6::uuid ELSE (t.visibility='public' OR (($8::boolean OR $11::boolean) AND (t.owner_id=$6::uuid OR (EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$6::uuid) AND NOT ${restrictedTimeline('t')})))) END)
+    WHERE (CASE WHEN $1::boolean THEN t.owner_id=$6::uuid
+      WHEN $15::boolean THEN t.comparison IS NULL AND (t.owner_id=$6::uuid OR (EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$6::uuid AND m.role IN ('writer','editor')) AND NOT ${restrictedTimeline('t')}))
+      ELSE (t.visibility='public' OR (($8::boolean OR $11::boolean) AND (t.owner_id=$6::uuid OR (EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$6::uuid) AND NOT ${restrictedTimeline('t')})))) END)
       AND ($2='' OR t.search_document @@ websearch_to_tsquery('english',$2))
       AND ($7='' OR t.tags @> ARRAY[$7]::text[])
       AND ($9='' OR u.username=$9)
       AND ($14='' OR t.visibility=$14)
+      -- To link to (#422): below the link limit, and not the timeline linking.
+      AND ($16::int IS NULL OR t.link_count<$16::int)
+      AND ($17::uuid IS NULL OR t.id<>$17::uuid)
       AND (NOT $11::boolean OR EXISTS(SELECT 1 FROM oc_timeline_stars s WHERE s.timeline_id=t.id AND s.user_id=$6::uuid))
       -- A reader's public favorites; not those of an account that may be under 18, private by
       -- default (the UK Children's Code; #166).
@@ -210,6 +230,9 @@ export async function searchTimelines(pool, userId, value, featured = []) {
       // Browsing: public timelines found by neither text, owner nor a reader's favorites.
       scope === 'public' && !search && !owner && !starredBy,
       visibility,
+      scope === 'writable',
+      linkable && Number.isFinite(linkLimit) ? linkLimit : null,
+      exclude,
     ],
   );
   const total = Number(rows[0].total);

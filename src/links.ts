@@ -7,7 +7,7 @@
  */
 import { Rational as Q } from 'rational-ordered-map';
 import { parseNumber } from './numeric.js';
-import { timelinePath } from './addresses.js';
+import { TIMELINE_UUID, timelineAddress, timelinePath } from './addresses.js';
 
 export type TimelineLink =
   | { kind: 'moment'; id: string }
@@ -72,4 +72,60 @@ export function sharePath(
   if (link.kind === 'moment') return `${base}/moments/${encodeURIComponent(link.id)}`;
   if (link.kind === 'duration') return `${base}/durations/${encodeURIComponent(link.id)}`;
   return base + '#' + linkFragment(link);
+}
+
+/** What a pasted address names (addressedEntity): its timeline, and a moment or duration. */
+export interface AddressedEntity {
+  timeline: { id?: string; owner?: string; name?: string };
+  entity: { kind: 'moment' | 'duration'; id: string } | null;
+}
+/**
+ * What a page address someone pasted names (#422), to link to it: its timeline, by ID or by
+ * owner and name (which the server looks up), and the moment or duration it opens at, if any.
+ * It reads a timeline's pages (`/<owner>/<slug>`, `/timelines/<id>`, and their `/moments/<id>`
+ * and `/durations/<id>`), embeds (`/embed/<id>`), the editor's `#timeline/<id>/…`, and a link
+ * fragment on any of them; a path alone, or a full address on `origin` when it is given. Null
+ * for anything else, such as another site's address or another page of a timeline.
+ */
+export function addressedEntity(text: string, origin?: string): AddressedEntity | null {
+  let url: URL;
+  try {
+    url = new URL(text.trim(), origin ?? 'http://localhost');
+  } catch {
+    return null;
+  }
+  if (origin && url.origin !== new URL(origin).origin) return null;
+  const fragment = (hash: string) => {
+    const link = parseLink(hash);
+    return link && (link.kind === 'moment' || link.kind === 'duration')
+      ? { kind: link.kind, id: link.id }
+      : null;
+  };
+  // The editor's own address of a server timeline, with what it opens at after it.
+  const editor = /^#timeline\/([a-f0-9-]+)(?:\/(.+))?$/i.exec(url.hash);
+  if (editor)
+    return TIMELINE_UUID.test(editor[1])
+      ? { timeline: { id: editor[1].toLowerCase() }, entity: fragment(editor[2] ?? '') }
+      : null;
+  const path = url.pathname.replace(/\/+$/, '');
+  const embed = /^\/embed\/([^/]+)$/.exec(path);
+  if (embed)
+    return TIMELINE_UUID.test(embed[1])
+      ? { timeline: { id: embed[1].toLowerCase() }, entity: fragment(url.hash) }
+      : null;
+  const address = timelineAddress(path);
+  if (!address) return null;
+  const { rest, ...timeline } = address;
+  if (!rest) return { timeline, entity: fragment(url.hash) };
+  const page = /^\/(moments|durations)\/([^/]+)$/.exec(rest);
+  if (!page) return null;
+  let id: string;
+  try {
+    id = decodeURIComponent(page[2]);
+  } catch {
+    return null;
+  }
+  return ENTITY.test(id)
+    ? { timeline, entity: { kind: page[1] === 'moments' ? 'moment' : 'duration', id } }
+    : null;
 }

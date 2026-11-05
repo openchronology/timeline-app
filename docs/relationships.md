@@ -6,7 +6,12 @@ A relationship links two different entities: two moments, two durations, or a mo
 
 Moment details and the duration dialog have a **Related to** section. It lists directly related entities 25 at a time, each with its time or extent; choose one to open it. When more entities are connected through other relationships, the section says how many, e.g. "14 more through other relationships".
 
-To link an entity, open **Add a relationship** and search titles and notes. Choose a result to link it. **×** removes a link. Undo and Redo cover adding and removing links. Deleting an event removes its links; undoing the deletion restores them.
+To link an entity, choose **Add a relationship…**. A picker opens with two tabs:
+
+- **Search:** words from this timeline's events' titles and notes, matched as Explore's search matches them ([browsing](browsing.md#searching-events)), with the words highlighted. **Filters**, folded away, choose moments, durations or both.
+- **Address:** paste a link to one of this timeline's moments or durations: its page's address, or a link fragment such as `#moment/<id>`.
+
+Choose a result to link it. **×** removes a link. Undo and Redo cover adding and removing links. Deleting an event removes its links; undoing the deletion restores them.
 
 **Separate related** moves the entity and its directly related entities into a track above everything else, like [separating by tags](tags.md). **Separate all connected** also follows relationships transitively: everything reachable through any chain of links moves up. The bar above the tracks says which entity was separated and how, such as "Separated: related to Alpha". Separated tracks are read-only and still draw arcs (see [Arcs between tracks](#arcs-between-tracks)); **Rejoin** returns to the whole timeline.
 
@@ -33,6 +38,62 @@ The arcs are the whole timeline's, not each track's: the upper track's overview 
 | In-memory           | An arc tree of the whole document, built when separating | The separation's membership test (the chosen tags, or the related set found by breadth-first search)                                      |
 
 Views already hold exactly the entities on their side, so looking an end up in the upper view answers the question for both tracks, whatever the separation.
+
+## Links to other timelines
+
+A moment or duration on a server timeline can also link to a moment or duration on another
+timeline, or to another timeline as a whole. Related to lists these under **On other timelines**,
+each with the other timeline's name. Choosing a link opens the other entity's page, with its timeline open at
+it, or the other timeline's page.
+
+To add one, choose **Link to another timeline…**. The same picker opens:
+
+- **Search** finds timelines and their events at once, as Explore's search does, with the words highlighted. It finds only what you can link to:
+  - timelines you can save: your own, and those shared with you as a writer;
+  - timelines below the [link limit](administration.md#links-between-timelines);
+  - never this timeline or its events, which are related with **Add a relationship…** instead.
+- **Filters**, folded away, choose timelines, moments or durations, a tag, and **Timelines I can edit** or only **My timelines**.
+- **Address:** paste the address of a timeline's page, or of a moment's or duration's page. A link fragment, an embed's address and the editor's own address work too. The server looks it up and says why it can't be linked, if it can't: it's this timeline, you can't save it, or it's at the limit.
+
+Choosing a timeline links to it as a whole; choosing an event links to that event. A fork shows only the events it changed in search; link to its other events by their address. **×** removes a link. Linking and removing a link need permission to save both
+timelines, since the link belongs to both. Undo and Redo do not cover them: a link is kept by
+the server, apart from either timeline, and takes effect at once. Unsaved entities can't be
+linked yet; save first.
+
+Who sees a link: anyone who may read both timelines. A link to a private timeline you can't read
+is not shown, and nothing says it exists.
+
+The pages search engines read show links too ([sharing](sharing.md#search-engines)): a
+moment's or duration's page lists its links to other timelines, each leading to the other
+entity's page or the other timeline's, and a timeline's page lists what links to it as a whole,
+under **Linked from**. A link shows on the pages of both its ends, so they lead to each other.
+With [IndexNow](administration.md#indexnow) on, adding or removing a link tells search engines
+about both pages.
+
+When the two timelines are [compared](comparison.md), each link between their entities is drawn
+as an arc. On stacked tracks it crosses between the tracks as an S-shaped curve, like [arcs between
+tracks](#arcs-between-tracks). With **Combine into one timeline** it is an ordinary arc over the
+one axis. Arcs follow each track's alignment, and hovering one names both ends. As on a single
+timeline, arcs shorter than the grouping distance are hidden until you zoom in. A window shows at
+most 256 arcs, with a notice when more cross it. Links to a whole timeline have no time, so they
+are listed but not drawn. Comparisons also draw each timeline's own relationships on its track.
+
+Links are not part of either timeline's content. They are not in saved history, forks, pull
+requests or exports (`.ochx`, `.och`), and the desktop app and offline file show only those of a
+server timeline. A link goes away when either end does:
+
+- **An entity is deleted:** a save deleting a moment or duration, whether in the editor, a
+  merge, a restore or an import, deletes its links. A fork reading through to its source keeps
+  links to entities it still has.
+- **A timeline is deleted:** deleting a timeline deletes its links.
+
+The server stores each link once, in `oc_timeline_links`, indexed from both ends and by pair of
+timelines. Each read looks both entities up in their timelines' indexes, so a link never outlives
+its entities. A timeline holds at most 10,000 links by default
+([administration](administration.md#links-between-timelines)). The API is
+`GET`, `POST` and `DELETE /api/timelines/{id}/links` and `POST /api/timelines/links/query` (the
+arcs between a comparison's timelines in a window). Live updates announce when a timeline's links
+change, and comparisons redraw them.
 
 ## Exchange format
 

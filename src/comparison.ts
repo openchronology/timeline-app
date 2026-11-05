@@ -11,6 +11,7 @@ import type {
   TimePresentation,
 } from './core.js';
 import type { InstalledPlugin } from './plugins.js';
+import type { EdgeBand } from './relationships.js';
 import { ViewportCache, regroup } from './remote-cache.js';
 /**
  * Where a page of moments ends: the last moment's time (an exact rational as a string) and
@@ -32,6 +33,11 @@ export interface EventPage {
 export interface ComparisonSource {
   /** Unique within a comparison; it prefixes qualified moment and band IDs (`key:id`). */
   key: string;
+  /**
+   * A saved server timeline's ID, whose links to the comparison's other server timelines are
+   * drawn (#422). Absent for local sources and the editor's own timeline with unsaved edits.
+   */
+  timeline?: string;
   /** The saved revision and event generation, used by live refresh to spot changes. */
   revision?: string;
   event_generation?: string;
@@ -70,6 +76,28 @@ export interface ComparisonGroup extends FrameGroup {
  * The cache holds windows in the source's own coordinates, so it is cleared whenever the
  * alignment or the source changes.
  */
+/**
+ * Reads the links between server timelines of a comparison crossing a shared window (#422;
+ * POST /api/timelines/links/query): `sources` with their alignment, the window and the
+ * grouping threshold, all exact rationals as strings. Arcs come with shared times.
+ */
+export type LinkQuery = (
+  query: {
+    sources: { id: string; scale: string; offset: string }[];
+    lower: string;
+    upper: string;
+    threshold: string;
+  },
+  signal?: AbortSignal,
+) => Promise<Pick<Frame, 'edges' | 'edgesTruncated'>>;
+/** Links read for a window three views wide, at a threshold, reused while the view is in it. */
+interface LinkWindow {
+  lower: Q;
+  upper: Q;
+  threshold: Q;
+  edges: NonNullable<Frame['edges']>;
+  truncated: boolean;
+}
 interface Track {
   source: ComparisonSource;
   scale: Q;
@@ -124,6 +152,9 @@ export class ComparisonView {
   presentation: TimePresentation;
   /** Merge all tracks into one timeline instead of stacking them. */
   combined = false;
+  /** Reads links between the server timelines, when the editor can (#422). */
+  links: LinkQuery | null = null;
+  private linkWindow: LinkWindow | null = null;
   /**
    * Starts every track unaligned (scale 1, offset 0) with an empty cache.
    * Throws unless there are two to eight sources with distinct keys; the per-account limit
@@ -160,6 +191,7 @@ export class ComparisonView {
     if (!track) return;
     track.source = source;
     track.cache.clear();
+    this.linkWindow = null;
     const union = unionPlugins(this.tracks.map((t) => t.source));
     this.plugins = union.plugins;
     this.conflicts = union.conflicts;
@@ -177,6 +209,7 @@ export class ComparisonView {
     track.scale = scale;
     track.offset = offset;
     track.cache.clear();
+    this.linkWindow = null;
   }
   /**
    * The Fit all viewport: every source's first and last moment, transformed onto the shared
@@ -215,7 +248,10 @@ export class ComparisonView {
       if (!frame) return null;
       frames.push(this.mapFrame(track, frame));
     }
-    return this.join(frames, view.threshold(width, pixels));
+    const threshold = view.threshold(width, pixels);
+    const links = this.linking() ? this.linksFor(view, threshold) : { edges: [], truncated: false };
+    if (!links) return null;
+    return this.withLinks(this.join(frames, threshold), links);
   }
   /** Last confirmed source windows remain drawable while new resolutions load. */
   visible(view: Viewport, width: number, pixels: number): Frame {
@@ -231,7 +267,10 @@ export class ComparisonView {
           : track.cache.visible(sourceView),
       );
     });
-    return this.join(frames, Q.zero);
+    return this.withLinks(this.join(frames, Q.zero), {
+      edges: this.linkWindow?.edges ?? [],
+      truncated: !!this.linkWindow?.truncated,
+    });
   }
   /**
    * The frame for a shared-axis view, fetching each remote track's missing window and storing
@@ -264,7 +303,96 @@ export class ComparisonView {
       }
       frames.push(this.mapFrame(track, frame));
     }
-    return this.join(frames, view.threshold(width, pixels));
+    const threshold = view.threshold(width, pixels);
+    let links = this.linking() ? this.linksFor(view, threshold) : null;
+    if (!links && this.linking()) {
+      if (signal?.aborted) throw new DOMException('Comparison cancelled', 'AbortError');
+      // Three views wide, so panning a view's width either way needs no read.
+      const lower = view.left.sub(view.span),
+        upper = view.right.add(view.span);
+      // A window that can't be read (a timeline became unavailable) draws no links rather
+      // than no comparison, and isn't asked again until the view leaves it.
+      const found = await this.links!(
+        {
+          sources: this.linkedSources().map((t) => ({
+            id: t.source.timeline!,
+            scale: t.scale.toString(),
+            offset: t.offset.toString(),
+          })),
+          lower: lower.toString(),
+          upper: upper.toString(),
+          threshold: threshold.toString(),
+        },
+        signal,
+      ).catch((error: unknown) => {
+        if (signal?.aborted) throw error;
+        return { edges: [], edgesTruncated: false };
+      });
+      if (signal?.aborted) throw new DOMException('Comparison cancelled', 'AbortError');
+      this.linkWindow = {
+        lower,
+        upper,
+        threshold,
+        edges: (found.edges ?? []).map((e) => ({
+          ...e,
+          aKey: this.keyOf(e.aKey),
+          bKey: this.keyOf(e.bKey),
+        })),
+        truncated: !!found.edgesTruncated,
+      };
+      links = this.linksFor(view, threshold);
+    }
+    return this.withLinks(this.join(frames, threshold), links ?? { edges: [], truncated: false });
+  }
+  /** Whether links are drawn: read by the editor, between two server timelines or more. */
+  private linking() {
+    return !!this.links && this.linkedSources().length >= 2;
+  }
+  /** The tracks whose links are drawn: saved server timelines. */
+  private linkedSources() {
+    return this.tracks.filter((t) => t.source.timeline);
+  }
+  /** The source key of the track showing server timeline `timeline`. */
+  private keyOf(timeline: string | undefined) {
+    return this.tracks.find((t) => t.source.timeline === timeline)?.source.key ?? timeline;
+  }
+  /** Forgets the links read, so the next frame reads them again (they changed; #422). */
+  clearLinks() {
+    this.linkWindow = null;
+  }
+  /**
+   * The links read that cross the view and span its threshold, if the window read covers the
+   * view at a threshold no larger (shorter arcs were left out) and not much smaller than its
+   * own (a far wider view reads again, to show the arcs that matter there); else null.
+   */
+  private linksFor(view: Viewport, threshold: Q): { edges: EdgeBand[]; truncated: boolean } | null {
+    const read = this.linkWindow;
+    if (
+      !read ||
+      view.left.compare(read.lower) < 0 ||
+      view.right.compare(read.upper) > 0 ||
+      threshold.compare(read.threshold) < 0 ||
+      threshold.compare(read.threshold.mul(Q.from(4n))) > 0
+    )
+      return null;
+    const edges = read.edges.filter((e) => {
+      const first = Q.parse(e.first),
+        last = Q.parse(e.last);
+      return (
+        first.compare(view.right) <= 0 &&
+        last.compare(view.left) >= 0 &&
+        last.sub(first).compare(threshold) >= 0
+      );
+    });
+    return { edges, truncated: read.truncated };
+  }
+  private withLinks(frame: Frame, links: { edges: EdgeBand[]; truncated: boolean }): Frame {
+    if (!links.edges.length && !links.truncated) return frame;
+    return {
+      ...frame,
+      edges: [...(frame.edges ?? []), ...links.edges],
+      edgesTruncated: frame.edgesTruncated || links.truncated,
+    };
   }
   /**
    * A local source's overview straight from its index, in source coordinates. The index's

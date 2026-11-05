@@ -5,6 +5,9 @@
 import { createPresenter, matchSnippet, printEntityTime, searchTerms } from '../dist/core.mjs';
 import { HttpError, restrictedTimeline } from './store.mjs';
 
+/** A timeline ID's form. */
+const UUID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
+
 /** The most matches a search ranks; past it, `totalMore` says there are more (#459). */
 export const ENTITY_SEARCH_CAP = 5000;
 /** How many moments and durations a page of results has unless asked otherwise. */
@@ -12,8 +15,9 @@ export const ENTITY_PAGE_SIZE = 20;
 
 /**
  * A search's input, made safe, or 400: `search` (text, required), `kinds` (moments,
- * durations or both, the default), `tag`, `scope` (`public`, `visible` or `mine`; see
- * searchEntities), `owner` (one account's timelines), `page` and `limit` (at most 50).
+ * durations or both, the default), `tag`, `scope` (`public`, `visible`, `mine` or `writable`;
+ * see searchEntities), `owner` (one account's timelines), `page`, `limit` (at most 50),
+ * `linkable` and `exclude` (a timeline ID).
  */
 export function entitySearchInput(value = {}) {
   if (
@@ -21,7 +25,18 @@ export function entitySearchInput(value = {}) {
     typeof value !== 'object' ||
     Array.isArray(value) ||
     Object.keys(value).some(
-      (k) => !['search', 'kinds', 'tag', 'scope', 'owner', 'page', 'limit'].includes(k),
+      (k) =>
+        ![
+          'search',
+          'kinds',
+          'tag',
+          'scope',
+          'owner',
+          'page',
+          'limit',
+          'linkable',
+          'exclude',
+        ].includes(k),
     )
   )
     throw new HttpError(400, 'Invalid search.');
@@ -33,6 +48,8 @@ export function entitySearchInput(value = {}) {
     owner = '',
     page = 1,
     limit = ENTITY_PAGE_SIZE,
+    linkable = false,
+    exclude = null,
   } = value;
   if (
     typeof search !== 'string' ||
@@ -44,13 +61,15 @@ export function entitySearchInput(value = {}) {
     tag.length > 64 ||
     typeof owner !== 'string' ||
     owner.length > 64 ||
-    !['public', 'visible', 'mine'].includes(scope) ||
+    !['public', 'visible', 'mine', 'writable'].includes(scope) ||
     !Number.isSafeInteger(page) ||
     page < 1 ||
     page > 10000 ||
     !Number.isSafeInteger(limit) ||
     limit < 1 ||
-    limit > 50
+    limit > 50 ||
+    typeof linkable !== 'boolean' ||
+    (exclude !== null && (typeof exclude !== 'string' || !UUID.test(exclude)))
   )
     throw new HttpError(400, 'Invalid search or pagination.');
   return {
@@ -61,6 +80,8 @@ export function entitySearchInput(value = {}) {
     owner: owner.normalize('NFC').trim(),
     page,
     limit,
+    linkable,
+    exclude,
   };
 }
 
@@ -69,7 +90,7 @@ export function entitySearchInput(value = {}) {
  * precision (printEntityTime): a moment's, or a duration's start and end; its exact
  * coordinates if the presentation cannot be read.
  */
-function when(presentation, { kind, first, last }) {
+export function entityWhen(presentation, { kind, first, last }) {
   let presenter = null;
   try {
     presenter = createPresenter(presentation ?? undefined);
@@ -84,7 +105,10 @@ function when(presentation, { kind, first, last }) {
  * may search (#459): `{ entities, total, totalMore?, page, limit, pages }`.
  *
  * Scopes: `public` (public timelines), `visible` (those, and the ones the reader owns or is a
- * member of, unless moderators restricted it) and `mine` (the reader's own; 401 signed out).
+ * member of, unless moderators restricted it), `mine` (the reader's own) and `writable` (those
+ * the reader may save, to link to: their own and those shared with them as a writer, unless
+ * restricted; #422); 401 signed out for the last two. `linkable` leaves out timelines at the
+ * link limit (`linkLimit`), and `exclude` one timeline (the one linking).
  * Never comparisons, whose entities are their sources', or copies still being prepared. The
  * moments and durations of labelled timelines (#115) only for signed-in adults.
  *
@@ -108,15 +132,18 @@ function when(presentation, { kind, first, last }) {
  * @param {import('pg').Pool} pool
  * @param {string|null} userId the reader
  * @param {object} value the search (entitySearchInput)
+ * @param {{linkLimit?: number}} [options] the most links a timeline may have (limits.mjs)
  */
-export async function searchEntities(pool, userId, value) {
-  const { terms, kinds, tag, scope, owner, page, limit } = entitySearchInput(value);
-  if (scope === 'mine' && !userId) throw new HttpError(401, 'Sign in to see your timelines.');
+export async function searchEntities(pool, userId, value, { linkLimit } = {}) {
+  const { terms, kinds, tag, scope, owner, page, limit, linkable, exclude } =
+    entitySearchInput(value);
+  if (['mine', 'writable'].includes(scope) && !userId)
+    throw new HttpError(401, 'Sign in to see your timelines.');
   if (!terms.length) return { entities: [], total: 0, page, limit, pages: 0 };
   // Terms hold only letters and digits, so they are safe tsquery prefix operands.
   const query = terms.map((term) => term + ':*').join(' & ');
   // $1 the query, $2 kinds, $3 tag, $4 scope, $5 the reader, $6 owner, $7 the cap, $8 limit,
-  // $9 offset. `matching` is at most the cap's matches the reader may search, in no order
+  // $9 offset, $10 the link limit (null: any), $11 a timeline to leave out. `matching` is at most the cap's matches the reader may search, in no order
   // (the index's), counted for the total; `page` orders them and takes the page, whose rows
   // are then read by their key.
   const { rows } = await pool.query(
@@ -139,11 +166,17 @@ export async function searchEntities(pool, userId, value) {
       LEFT JOIN oc_account_standing a ON a.user_id=t.owner_id
       WHERE t.comparison IS NULL AND t.preparing_revision_id IS NULL
         AND CASE $4 WHEN 'mine' THEN t.owner_id=$5::uuid
+          WHEN 'writable' THEN t.owner_id=$5::uuid
+            OR (EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$5::uuid
+                AND m.role IN ('writer','editor'))
+              AND NOT ${restrictedTimeline('t')})
           WHEN 'visible' THEN t.visibility='public' OR t.owner_id=$5::uuid
             OR (EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$5::uuid)
               AND NOT ${restrictedTimeline('t')})
           ELSE t.visibility='public' END
         AND ($6='' OR u.username=$6)
+        AND ($10::int IS NULL OR t.link_count<$10::int)
+        AND ($11::uuid IS NULL OR t.id<>$11::uuid)
         -- Labelled timelines' entities (#115), only for signed-in adults.
         AND (cardinality(t.content_labels||t.moderator_labels)=0
           OR EXISTS(SELECT 1 FROM oc_users me WHERE me.id=$5::uuid
@@ -172,6 +205,8 @@ export async function searchEntities(pool, userId, value) {
       ENTITY_SEARCH_CAP + 1,
       limit,
       (page - 1) * limit,
+      linkable && Number.isFinite(linkLimit) ? linkLimit : null,
+      exclude,
     ],
   );
   let total = Number(rows[0].total);
@@ -181,7 +216,7 @@ export async function searchEntities(pool, userId, value) {
     entities: rows[0].entities.map(({ body, presentation, ...entity }) => ({
       ...entity,
       snippet: matchSnippet(body, terms),
-      when: when(presentation, entity),
+      when: entityWhen(presentation, entity),
     })),
     total,
     ...(more ? { totalMore: true } : {}),

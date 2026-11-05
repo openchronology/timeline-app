@@ -16,6 +16,7 @@ import {
   validateInstalledPlugins,
   validatePresentation,
 } from '../../dist/core.mjs';
+import { TimelineLinks } from '../../server/timeline-links.mjs';
 import { siteName } from '../../server/site.mjs';
 import { profilePath, timelinePath } from '../../src/addresses.ts';
 
@@ -108,6 +109,27 @@ export async function relatedOf(services, timeline, entity, userId = null, limit
     after: { kind: '', id: '' },
   });
   return related;
+}
+/**
+ * Up to `limit` links of an entity (`{kind, id}`), or of the timeline as a whole (`entity`
+ * null), to entities on other timelines or to other timelines (#422), read as `userId` (a guest
+ * when null): only those to timelines they may read. Each `{id, timeline: {id, title, owner,
+ * slug}, kind, entity, title, first, last}`; kind `timeline` is the other timeline as a whole.
+ */
+export async function linksOf(services, timeline, entity, userId = null, limit = 50) {
+  const { links } = await new TimelineLinks(services.store, { limit: Infinity }).list(
+    timeline.id,
+    userId,
+    entity ? { [entity.kind]: entity.id } : {},
+    { limit },
+  );
+  return links;
+}
+/** The page a link (see linksOf) leads to: the other entity's, or the other timeline's. */
+export function linkPath(link) {
+  return link.kind === 'timeline'
+    ? timelinePath(link.timeline)
+    : sharedPath(link.timeline, { kind: link.kind, id: link.entity });
 }
 /**
  * The first moments of a timeline in time order, at most `limit` of them (for previews):

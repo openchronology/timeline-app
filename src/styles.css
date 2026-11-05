@@ -3122,6 +3122,66 @@ dialog button {
   font-weight: 400;
   overflow-wrap: anywhere;
 }
+/* The link picker (#422): what each choice is, the words a search matched, and its filters
+   folded under the field as Explore folds them (#459). */
+.picker-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.picker-kind {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--hover);
+  font-size: 11px;
+  font-weight: 600;
+}
+.link-picker mark {
+  background: var(--highlight);
+  color: inherit;
+}
+.link-picker .event-kind {
+  margin: 0 0 12px;
+}
+.link-picker-filters {
+  margin: 8px 0;
+}
+.link-picker-filters summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.link-picker-filters fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 10px 0 0;
+  padding: 0;
+  border: 0;
+}
+.link-picker-filters legend {
+  width: 100%;
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.link-picker-filters label[hidden],
+.link-picker-filters fieldset[hidden] {
+  display: none;
+}
+.link-picker-filters > label {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.link-picker-filters > label input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+}
 /* A chosen search result pulses briefly where the view lands. */
 .event-marker.search-hit,
 .duration-band.search-hit {
@@ -3370,6 +3430,36 @@ dialog button {
   text-align: left;
   white-space: normal;
   padding: 8px 10px;
+}
+/* Links to entities on other timelines (#422) open those timelines, so they are links drawn
+   like the buttons beside them. */
+.timeline-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.timeline-links h4 {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+a.related-entity {
+  display: flex;
+  align-items: center;
+  min-height: var(--control-height);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+a.related-entity:hover {
+  background: var(--hover);
+  border-color: var(--line-hover);
 }
 .related-unlink {
   flex-shrink: 0;

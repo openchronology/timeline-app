@@ -2,13 +2,15 @@
 /**
  * A moment or duration as text (#335), inside its page's TimelineSummary: what its reader
  * shows (time, tags, notes, its plugins' text and sources), the entities linked to it as
- * links to their own pages, and a link into the timeline open at it.
+ * links to their own pages, its links to entities on other timelines and to other timelines
+ * (#422) as links to theirs, and a link into the timeline open at it.
  */
 import {
   durationTitle,
   entityFacts,
   excerpt,
   isoTime,
+  linkPath,
   momentTitle,
   presentTime,
   sharedPath,
@@ -31,6 +33,7 @@ function Time({ timeline, time }) {
  * @param {string} [props.last] a duration's end, exact
  * @param {object} [props.metadata] its metadata (notes, tags, plugin fields)
  * @param {object[]} [props.related] the entities linked to it (see relatedOf)
+ * @param {object[]} [props.elsewhere] its links to other timelines (see linksOf)
  */
 export default function EntitySummary({
   timeline,
@@ -41,6 +44,7 @@ export default function EntitySummary({
   last,
   metadata = {},
   related = [],
+  elsewhere = [],
 }) {
   const { tags, details, links } = entityFacts(timeline, metadata);
   const notes = excerpt(metadata.description, 4000);
@@ -105,11 +109,39 @@ export default function EntitySummary({
           </ul>
         </section>
       )}
+      {elsewhere.length > 0 && <TimelineLinkList links={elsewhere} />}
       <p>
         <a href={`${timelinePath(timeline)}#${kind}/${encodeURIComponent(id)}`}>
           {`Open ${title} in the timeline`}
         </a>
       </p>
     </article>
+  );
+}
+
+/**
+ * Links to entities on other timelines, or to other timelines (#422; see linksOf), each to
+ * that entity's or timeline's own page, with the timeline it is on.
+ */
+export function TimelineLinkList({ links, label = 'On other timelines' }) {
+  return (
+    <section aria-label={label}>
+      <h3>{label}</h3>
+      <ul>
+        {links.map((link) => (
+          <li key={link.id}>
+            <a href={linkPath(link)}>
+              {link.kind === 'timeline'
+                ? link.timeline.title || 'Untitled timeline'
+                : link.kind === 'moment'
+                  ? momentTitle({ metadata: { title: link.title } })
+                  : durationTitle({ metadata: { title: link.title } })}
+            </a>
+            {link.kind !== 'timeline' && ` on ${link.timeline.title || 'Untitled timeline'}`} by @
+            {link.timeline.owner}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

@@ -227,6 +227,26 @@ Some limits stay the same whatever this setting is:
   its indexes: 200,000 moments with a title and a 150-character note make about 61 MB of
   JSON and a file just over 64 MiB. A conversion stopped by a limit says which one.
 
+### Links between timelines
+
+A timeline's moments and durations can link to entities on other timelines, or to other
+timelines as a whole ([links to other timelines](relationships.md#links-to-other-timelines)).
+A timeline has at most **10,000** such links, counting the links at both ends: a link from
+one timeline to another counts against both. `TIMELINE_LINK_LIMIT` in the environment file
+changes this: a whole number of at least 1, or `unlimited`. Empty or unset is 10,000; an
+invalid value stops the server at startup. Adding a link past either timeline's limit is
+refused, with how many links it has. The administration page shows each timeline's count.
+
+The limit bounds what links cost. The cost of these grows with how many links a timeline has:
+
+- **Saving** a timeline with links checks that the entities they join still exist.
+- **Comparing** two linked timelines finds the links crossing the view.
+- **Deleting** a timeline deletes its links.
+
+Creating and removing links is limited to 60 a minute per account, besides the rate limit
+of API keys. Only someone who may save both timelines can link them, so nobody can attach
+links to someone else's timeline.
+
 ## Cached downloads
 
 Downloading a whole timeline (`.ochx` or `.och`) makes the file from the database each time,
@@ -361,7 +381,7 @@ The key is 8 to 128 letters, digits and dashes; anything else stops the server s
 
 - The site serves the key at `/<key>.txt`, which is how the engines know submissions for your site are yours. Keep the same key; a new one is fine, but the old file stops being served.
 - About once a minute, the server compares the pages the sitemap lists (public timelines, and the profiles of accounts that own one and are not suspended) with what it saw a minute before, and sends the addresses that changed to `https://api.indexnow.org/indexnow`, which passes them on to every participating engine: a timeline created or made public, saved, given a new address (the old and the new), made private or deleted (its old address, so engines drop it), and a profile that gains or loses public timelines. Up to 10,000 addresses go in one request, with `APP_ORIGIN`'s host and `/<key>.txt` as the key's location.
-- The pages of moments and durations go too ([#453](https://github.com/openchronology/timeline-app/issues/453)), for the timelines whose entities the sitemap lists (public, without sensitive-content labels, and with at most `SITEMAP_TIMELINE_ENTITIES` moments): all of a timeline's when it is made public or given a new address, and after a save those it added, changed or removed, and both ends of each relationship it added or removed, read from the timeline's saved history. A timeline that keeps no saved history sends only its own page. When a timeline is renamed, made private or deleted, its entities' old addresses are not sent; engines drop them at their next crawl, as the sitemap no longer lists them.
+- The pages of moments and durations go too ([#453](https://github.com/openchronology/timeline-app/issues/453)), for the timelines whose entities the sitemap lists (public, without sensitive-content labels, and with at most `SITEMAP_TIMELINE_ENTITIES` moments): all of a timeline's when it is made public or given a new address, and after a save those it added, changed or removed, and both ends of each relationship it added or removed, read from the timeline's saved history. A timeline that keeps no saved history sends only its own page. Adding or removing a [link between timelines](relationships.md#links-to-other-timelines) sends the pages of both its ends: a moment's or duration's where its timeline's entities are listed, a timeline's own page for a link to it as a whole. When a timeline is renamed, made private or deleted, its entities' old addresses are not sent; engines drop them at their next crawl, as the sitemap no longer lists them.
 - Each address is sent at most once an hour, so a timeline a log stream saves all day is sent hourly. A timeline that was never public is never sent.
 - It runs in the background of the platform's process, with a ten-second limit on each request, and never holds up a page or a save. A request that gets no answer, `429` or a server error is tried again after a minute, then two, four and so on up to an hour; one refused (`400`, `403`, `422`: a wrong key or `APP_ORIGIN`) is logged and dropped.
 - What changed while the server was stopped is not sent: the first comparison after a start only takes stock. The sitemap covers it.
