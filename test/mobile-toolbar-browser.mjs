@@ -70,6 +70,12 @@ export async function checkMobileToolbars(page) {
         false,
         name + ' waits for its menu',
       );
+    // The file actions wait unseen until the editor knows which of them apply.
+    assert.equal(
+      await first.getByRole('button', { name: 'Save to server', exact: true }).isVisible(),
+      false,
+      'Save to server waits for the editor',
+    );
     assert(await first.getByRole('button', { name: 'Tools', exact: true }).isVisible());
     assert(await first.getByRole('button', { name: 'Zoom in', exact: true }).isVisible());
   } finally {

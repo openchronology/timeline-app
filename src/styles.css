@@ -1274,6 +1274,12 @@ dialog.moment-dialog.reading {
 .view-mode-switch[hidden] {
   display: none;
 }
+/* Which file actions show (View mode, File, Save to server and the rest) depends on who is
+   reading and what opens, so until the editor has opened its timeline (app.ts marks the page
+   settled) they keep their row unseen, rather than appearing and going as it loads. */
+:root:not([data-settled]) .file-actions {
+  visibility: hidden;
+}
 .inspector-heading {
   display: flex;
   align-items: center;
