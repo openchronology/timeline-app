@@ -14,7 +14,7 @@ import {
   pluginMetadata,
   MOMENT_SOURCES,
   FILE_THUMBNAILS,
-  localPhoto,
+  localPicture,
   pluginMarker,
   allowLocalSources,
   localSourcesAllowed,
@@ -32,7 +32,7 @@ test('a source may be a file:/// link to this computer, and only that kind of fi
   );
   assert.equal(sourceLink(photo), null);
   assert.equal(sourceLink('https://example.org/a'), 'https://example.org/a');
-  assert.equal(localPhoto([photo]), null);
+  assert.equal(localPicture([photo]), null);
   allowLocalSources();
   assert.equal(localFileURL(photo), photo);
   assert.equal(localFileURL('file://localhost/C:/Photos/a.jpg'), 'file:///C:/Photos/a.jpg');
@@ -97,9 +97,14 @@ test('File thumbnails marks a moment with its first photo on this computer (#440
     photo,
     'file:///home/someone/Pictures/IMG_0043.heic',
   ];
-  assert.equal(localPhoto(sources), photo);
-  assert.equal(localPhoto(['file:///home/someone/clip.mp4', 'https://example.org/a.jpg']), null);
-  assert.equal(localPhoto('file:///a.jpg'), null, 'a list of sources');
+  assert.equal(localPicture(sources), photo);
+  // A video's too (#442); not a sound's, nor a picture elsewhere.
+  assert.equal(
+    localPicture(['file:///home/someone/song.mp3', 'file:///home/someone/clip.MP4']),
+    'file:///home/someone/clip.MP4',
+  );
+  assert.equal(localPicture(['file:///home/someone/song.mp3', 'https://example.org/a.jpg']), null);
+  assert.equal(localPicture('file:///a.jpg'), null, 'a list of sources');
   const plugins = [{ manifest: FILE_THUMBNAILS, enabled: true }];
   assert.equal(pluginMarker(plugins, { sources }), photo);
   assert.equal(pluginMarker(plugins, { sources: ['https://example.org/a.jpg'] }), null);

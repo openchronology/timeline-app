@@ -21,6 +21,7 @@
 //! never stall the async runtime that serves IPC.
 mod populate;
 mod server;
+mod system_thumbnails;
 mod thumbnails;
 use openchronology_store::{Document, Header, Patch, Query, Snapshot};
 use std::{
