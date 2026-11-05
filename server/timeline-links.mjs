@@ -12,7 +12,8 @@
 import { HttpError, restrictedTimeline } from './store.mjs';
 import { indexReader, lineageOf } from './index-versions.mjs';
 import { adminId } from './key-requests.mjs';
-import { Q } from '../dist/core.mjs';
+import { Q, addressedEntity } from '../dist/core.mjs';
+import { entityWhen } from './library-search.mjs';
 
 const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const entityId = /^[A-Za-z0-9_.:-]{1,128}$/;
@@ -244,6 +245,64 @@ export class TimelineLinks {
           { timeline: r.b_timeline, kind: r.b_kind, id: r.b_id },
         ]);
       return { removed: linkId };
+    });
+  }
+  /**
+   * What a pasted page address names (#422; addressedEntity), for timeline `id` to link to or
+   * relate: `{ timeline: {id, title, owner, slug}, entity: {kind, id, title, first, last,
+   * when} | null, same, canWrite, full }`. `same` is timeline `id` itself (whose entities are
+   * related, not linked), `canWrite` whether `userId` may save it, `full` whether it has as
+   * many links as it may. 400 for an address that names no timeline on this site (`origin`),
+   * 404 for a timeline `userId` may not read or an entity it lacks (read through a fork's
+   * source, as links are).
+   */
+  async resolve(id, userId, address, origin) {
+    if (typeof address !== 'string' || address.length > 4096)
+      throw new HttpError(400, 'Give the address of a timeline, moment or duration.');
+    const named = addressedEntity(address, origin);
+    if (!named)
+      throw new HttpError(
+        400,
+        'That isn’t the address of a timeline, moment or duration on this site.',
+      );
+    const target =
+      named.timeline.id ?? (await this.store.addressed(named.timeline.owner, named.timeline.name));
+    if (!target) throw new HttpError(404, 'There is no timeline at that address.');
+    return this.store.transaction(async (c) => {
+      await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+      await this.store.access(id, userId, c);
+      const access = await this.store.access(target, userId, c);
+      const { rows } = await c.query(
+        `SELECT t.id,t.title,t.slug,t.presentation,t.link_count,u.username AS owner
+        FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id WHERE t.id=$1`,
+        [target],
+      );
+      const t = rows[0];
+      let entity = null;
+      if (named.entity) {
+        const found = (await this.entities(c, target, [named.entity])).get(
+          `${named.entity.kind}:${named.entity.id}`,
+        );
+        if (!found)
+          throw new HttpError(
+            404,
+            `That ${named.entity.kind} isn’t on ${t.title || 'the timeline'} any more.`,
+          );
+        entity = {
+          ...named.entity,
+          title: found.title,
+          first: found.first,
+          last: found.last,
+          when: entityWhen(t.presentation, { kind: named.entity.kind, ...found }),
+        };
+      }
+      return {
+        timeline: { id: t.id, title: t.title, owner: t.owner, slug: t.slug ?? null },
+        entity,
+        same: t.id === id,
+        canWrite: !!access.canWrite,
+        full: t.link_count >= this.limit,
+      };
     });
   }
   /**

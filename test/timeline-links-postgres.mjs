@@ -388,8 +388,134 @@ try {
     }),
   );
   assert.equal(second.next, null);
+  // Finding what to link to: the events and timelines the account may save, below the limit,
+  // never on the timeline linking; and what a pasted address names.
+  const lyra = await call(
+    owner,
+    'POST',
+    '/api/timelines',
+    timeline(
+      'Lyra',
+      [
+        ['vega', '1/1'],
+        ['sheliak', '2/1'],
+      ],
+      [['summer', '1/1', '3/1']],
+    ),
+  );
+  const draco = await call(owner, 'POST', '/api/timelines', timeline('Draco', [['thuban', '1/1']]));
+  /** What `who` finds to link to, as `timeline title/kind:id`, retried while it is indexed. */
+  const linkable = async (who, body, expected) => {
+    let found;
+    for (let attempt = 0; attempt < 50; attempt++) {
+      found = (
+        await call(who, 'POST', '/api/timelines/entities/search', {
+          scope: 'writable',
+          linkable: true,
+          ...body,
+        })
+      ).entities.map((e) => `${e.timeline.title}/${e.kind}:${e.id}`);
+      if (JSON.stringify(found) === JSON.stringify(expected)) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.deepEqual(found, expected, JSON.stringify(body));
+  };
+  const timelinesFound = async (who, body) =>
+    (
+      await call(who, 'POST', '/api/timelines/search', {
+        scope: 'writable',
+        linkable: true,
+        ...body,
+      })
+    ).timelines.map((t) => t.title);
+  await linkable(owner, { search: 'thuban' }, ['Draco/moment:thuban']);
+  await linkable(owner, { search: 'vega' }, ['Lyra/moment:vega']);
+  // From Lyra, nothing on Lyra itself.
+  await linkable(owner, { search: 'vega', exclude: lyra.id }, []);
+  await linkable(owner, { search: 'lyra summer', exclude: draco.id }, ['Lyra/duration:summer']);
+  assert.deepEqual(await timelinesFound(owner, { search: 'lyra', exclude: lyra.id }), []);
+  assert.deepEqual(await timelinesFound(owner, { search: 'draco', exclude: lyra.id }), ['Draco']);
+  // Not another account's timelines, which it may not save.
+  await linkable(other, { search: 'thuban' }, []);
+  assert.deepEqual(await timelinesFound(other, { search: 'draco' }), []);
+  const [signedOut] = await request(null, 'POST', '/api/timelines/entities/search', {
+    search: 'thuban',
+    scope: 'writable',
+  });
+  assert.equal(signedOut, 401);
+  // Each timeline counts its links; at the limit (3 here) it is left out, until one goes.
+  const added = [];
+  for (const from of [{ moment: 'vega' }, { moment: 'sheliak' }, { duration: 'summer' }])
+    added.push(
+      await call(owner, 'POST', `/api/timelines/${lyra.id}/links`, {
+        from,
+        to: { timeline: draco.id, moment: 'thuban' },
+      }),
+    );
+  const linkCount = async (id) =>
+    (await pool.query('SELECT link_count FROM oc_timelines WHERE id=$1', [id])).rows[0].link_count;
+  assert.deepEqual([await linkCount(lyra.id), await linkCount(draco.id)], [3, 3]);
+  await linkable(owner, { search: 'thuban' }, []);
+  assert.deepEqual(await timelinesFound(owner, { search: 'draco' }), []);
+  await linkable(owner, { search: 'thuban', linkable: false }, ['Draco/moment:thuban']);
+  await call(owner, 'DELETE', `/api/timelines/${lyra.id}/links`, { link: added[0].id });
+  assert.equal(await linkCount(draco.id), 2);
+  await linkable(owner, { search: 'thuban' }, ['Draco/moment:thuban']);
+
+  // What an address names: a moment's page, a timeline's at its owner's name, an embed and the
+  // editor's own address with what they open at; a timeline itself is `same`. Only addresses
+  // on this site, of timelines the account may read, and entities they have.
+  const resolve = (address) =>
+    request(owner, 'POST', `/api/timelines/${rome.id}/links/resolve`, { address });
+  const [found, thuban] = await resolve(`/timelines/${draco.id}/moments/thuban`);
+  assert.equal(found, 200);
+  assert.deepEqual(
+    { ...thuban, entity: { ...thuban.entity, when: undefined } },
+    {
+      timeline: {
+        id: draco.id,
+        title: 'Draco',
+        owner: 'links_' + owner.slice(0, 8),
+        slug: draco.slug ?? null,
+      },
+      entity: {
+        kind: 'moment',
+        id: 'thuban',
+        title: 'Draco thuban',
+        first: '1/1',
+        last: '1/1',
+        when: undefined,
+      },
+      same: false,
+      canWrite: true,
+      full: false,
+    },
+  );
+  const named = `http://localhost:5173/links_${owner.slice(0, 8)}/${draco.slug ?? draco.id}`;
+  assert.deepEqual((await resolve(named))[1].entity, null);
+  assert.equal((await resolve(named))[1].timeline.id, draco.id);
+  for (const address of [
+    `http://localhost:5173/embed/${draco.id}#moment/thuban`,
+    `http://localhost:5173/editor#timeline/${draco.id}/moment/thuban`,
+    `/timelines/${draco.id}#moment/thuban`,
+  ])
+    assert.equal((await resolve(address))[1].entity?.id, 'thuban', address);
+  assert.equal((await resolve(`/timelines/${rome.id}`))[1].same, true);
+  assert.equal((await resolve(`/timelines/${lyra.id}`))[1].full, false);
+  for (const [address, status] of [
+    [`/timelines/${draco.id}/moments/nothing`, 404],
+    [`/timelines/${persia.id}`, 404],
+    [`/timelines/${randomUUID()}`, 404],
+    [`https://elsewhere.example/timelines/${draco.id}`, 400],
+    [`/timelines/${draco.id}/history`, 400],
+    ['not an address at all', 400],
+  ])
+    assert.equal((await resolve(address))[0], status, address);
+  // Deleting a timeline takes its links off the other's count.
+  await call(owner, 'DELETE', `/api/timelines/${lyra.id}`);
+  assert.equal(await linkCount(draco.id), 0);
   console.log(
-    'PASS links between timelines: added and removed with write access to both, listed to readers of both, a comparison’s arcs aligned in a window, removed with deleted entities (sparse, whole, on a fork) and timelines, held to the limit, paged.',
+    'PASS links between timelines: added and removed with write access to both, listed to readers of both, a comparison’s arcs aligned in a window, removed with deleted entities (sparse, whole, on a fork) and timelines, held to the limit, paged; what to link to found among the timelines and events the account may save, below the limit and off the timeline linking; pasted addresses resolved.',
   );
 } finally {
   if (app) await new Promise((resolve) => app.close(resolve));

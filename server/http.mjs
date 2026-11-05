@@ -1146,16 +1146,31 @@ export function createRequestHandler({
           return response(
             res,
             200,
-            await searchTimelines(pool, userId, await body(req, 4096), featured),
+            await searchTimelines(pool, userId, await body(req, 4096), featured, {
+              linkLimit: linkCap,
+            }),
           );
         // Arcs between a comparison's timelines (#422; timeline-links.mjs): anyone who may read
         // every one of them.
+        // What a pasted address names, for a timeline to link to or relate (#422): anyone who
+        // may read both.
+        const resolving = /^\/api\/timelines\/([a-f0-9-]{36})\/links\/resolve$/.exec(pathname);
+        if (resolving && uuid.test(resolving[1]) && method === 'POST')
+          return response(
+            res,
+            200,
+            await links.resolve(resolving[1], userId, (await body(req, 8192)).address, origin),
+          );
         if (pathname === '/api/timelines/links/query' && method === 'POST')
           return response(res, 200, await links.between(userId, await body(req, 16384)));
         // Searching every timeline's moments and durations (library-search.mjs; #459): anyone;
         // the scope mine needs a session.
         if (pathname === '/api/timelines/entities/search' && method === 'POST')
-          return response(res, 200, await searchEntities(pool, userId, await body(req, 4096)));
+          return response(
+            res,
+            200,
+            await searchEntities(pool, userId, await body(req, 4096), { linkLimit: linkCap }),
+          );
         // Timelines related to one the reader can read, for its page to recommend (#447).
         const related = /^\/api\/timelines\/([a-f0-9-]{36})\/related$/.exec(pathname);
         if (related && uuid.test(related[1]) && method === 'GET') {

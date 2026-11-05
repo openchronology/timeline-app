@@ -2263,3 +2263,27 @@ CREATE INDEX IF NOT EXISTS oc_link_changes_at ON oc_link_changes(changed_at);
 -- Advanced by each link added or removed, so live updates (live.mjs) tell those viewing the
 -- timeline to read its links again.
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS link_generation bigint NOT NULL DEFAULT 0;
+-- How many links each timeline has (#422), both ends counted, so searches for timelines to
+-- link to leave out those at the limit (library-search.mjs, collaboration.mjs) without
+-- counting them. Kept by statement triggers over the rows each statement adds or removes,
+-- including those a deleted timeline's cascade removes.
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS link_count integer NOT NULL DEFAULT 0;
+CREATE OR REPLACE FUNCTION oc_timeline_link_count() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP='INSERT' THEN
+    UPDATE oc_timelines t SET link_count=t.link_count+c.n FROM (SELECT tid,count(*)::int AS n
+      FROM (SELECT a_timeline AS tid FROM changed UNION ALL SELECT b_timeline FROM changed) e
+      GROUP BY tid) c WHERE t.id=c.tid;
+  ELSE
+    UPDATE oc_timelines t SET link_count=t.link_count-c.n FROM (SELECT tid,count(*)::int AS n
+      FROM (SELECT a_timeline AS tid FROM changed UNION ALL SELECT b_timeline FROM changed) e
+      GROUP BY tid) c WHERE t.id=c.tid;
+  END IF;
+  RETURN NULL;
+END $$;
+DROP TRIGGER IF EXISTS oc_timeline_links_added ON oc_timeline_links;
+CREATE TRIGGER oc_timeline_links_added AFTER INSERT ON oc_timeline_links
+  REFERENCING NEW TABLE AS changed FOR EACH STATEMENT EXECUTE FUNCTION oc_timeline_link_count();
+DROP TRIGGER IF EXISTS oc_timeline_links_removed ON oc_timeline_links;
+CREATE TRIGGER oc_timeline_links_removed AFTER DELETE ON oc_timeline_links
+  REFERENCING OLD TABLE AS changed FOR EACH STATEMENT EXECUTE FUNCTION oc_timeline_link_count();

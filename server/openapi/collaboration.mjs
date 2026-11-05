@@ -94,7 +94,24 @@ export const paths = {
               maxLength: 64,
               description: 'Only moments and durations with this tag (any case).',
             },
-            scope: { type: 'string', enum: ['public', 'visible', 'mine'], default: 'public' },
+            scope: {
+              type: 'string',
+              enum: ['public', 'visible', 'mine', 'writable'],
+              default: 'public',
+              description:
+                '`writable`: the timelines the caller may save, to link to (#422). `mine` and `writable` need sign-in.',
+            },
+            linkable: {
+              type: 'boolean',
+              default: false,
+              description:
+                'Only timelines with fewer links to other timelines than the server allows (`TIMELINE_LINK_LIMIT`), to link to (#422).',
+            },
+            exclude: {
+              ...ref('Uuid'),
+              description: 'A timeline to leave out: the one linking (#422).',
+            },
+
             owner: {
               type: 'string',
               maxLength: 64,
@@ -664,10 +681,20 @@ export const schemas = {
       },
       scope: {
         type: 'string',
-        enum: ['public', 'mine', 'visible', 'starred'],
+        enum: ['public', 'mine', 'visible', 'starred', 'writable'],
         default: 'public',
         description:
-          '`public`: public timelines. `mine`: the caller’s own. `visible`: public ones and those shared with the caller. `starred`: those the caller starred. All but `public` need sign-in.',
+          '`public`: public timelines. `mine`: the caller’s own. `visible`: public ones and those shared with the caller. `starred`: those the caller starred. `writable`: those the caller may save, to link to (#422). All but `public` need sign-in.',
+      },
+      linkable: {
+        type: 'boolean',
+        default: false,
+        description:
+          'Only timelines with fewer links to other timelines than the server allows (`TIMELINE_LINK_LIMIT`), to link to (#422).',
+      },
+      exclude: {
+        ...ref('Uuid'),
+        description: 'A timeline to leave out: the one linking (#422).',
       },
       visibility: {
         type: 'string',
