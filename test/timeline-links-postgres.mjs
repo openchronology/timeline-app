@@ -360,11 +360,12 @@ try {
       ['c', '3/1'],
     ]),
   );
+  assert.equal(await count(), 0);
   for (const id of ['a', 'b', 'c'])
     await call(owner, 'POST', `/api/timelines/${many.id}/links`, {
       from: { moment: id },
       to: { timeline: rome.id, moment: 'founding' },
-    }).catch((error) => assert.match(String(error), /409/));
+    });
   const first = await call(owner, 'GET', `/api/timelines/${rome.id}/links?moment=founding&limit=2`);
   assert.equal(first.links.length, 2);
   assert.ok(first.next);
@@ -376,6 +377,15 @@ try {
   assert.deepEqual(
     second.links.map((l) => l.entity),
     ['c'],
+    JSON.stringify({
+      first,
+      second,
+      rows: (
+        await pool.query('SELECT * FROM oc_timeline_links WHERE a_timeline=$1 OR b_timeline=$1', [
+          rome.id,
+        ])
+      ).rows,
+    }),
   );
   assert.equal(second.next, null);
   console.log(
