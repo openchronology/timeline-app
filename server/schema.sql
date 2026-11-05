@@ -1237,6 +1237,11 @@ CREATE TRIGGER oc_entity_search_document BEFORE INSERT OR UPDATE ON oc_entity_se
 -- first needs the btree_gin extension, which not every PostgreSQL package installs. Retired
 -- versions get the same index below, for forks searching what their source has changed.
 CREATE INDEX IF NOT EXISTS oc_entity_search_document ON oc_entity_search USING gin(document);
+-- Durations alone, for searching every timeline's durations (#459; library-search.mjs): they
+-- are far fewer than moments, so through the index above such a search would read mostly
+-- moments' matches only to drop them.
+CREATE INDEX IF NOT EXISTS oc_entity_search_durations ON oc_entity_search USING gin(document)
+  WHERE kind='duration';
 
 -- Derived indexes for tag separation: one saved revision filtered to entities with any of a
 -- set of tags, or none of them. Built on first use and cached per revision; a save discards

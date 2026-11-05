@@ -20,11 +20,23 @@ import {
   searchDrafts,
   searchTerms,
   statusText,
+  librarySearches,
+  SHOWN,
 } from '../platform/lib/timeline-lists.js';
+import { entitySearchInput } from '../server/library-search.mjs';
 import { SEARCH_SORTS, searchInput } from '../server/collaboration.mjs';
 
 test('every list has its own query parameters, and offers only sorts the server knows', () => {
-  assert.deepEqual(paramNames(LISTS.explore), ['search', 'tag', 'sort', 'visibility', 'page']);
+  assert.deepEqual(paramNames(LISTS.explore), [
+    'search',
+    'tag',
+    'sort',
+    'visibility',
+    'page',
+    'show',
+    'within',
+    'entityPage',
+  ]);
   assert.deepEqual(paramNames(LISTS.mine), [
     'mineSearch',
     'mineTag',
@@ -257,4 +269,89 @@ test('a timeline leads back to the last list its tab showed, on this site only',
   // The platform points the editor's link at its timeline browser by this markup
   // (platform/lib/editor-html.js).
   assert.match(readFileSync('src/index.html', 'utf8'), /<a id="timelines-link" href="\/"/);
+});
+
+test('Explore’s search finds timelines and events, as its filters say (#459)', () => {
+  const explore = LISTS.explore,
+    fixed = { scope: 'public' };
+  // All three kinds unless the address names some; several boxes or a list.
+  assert.deepEqual(readList({}, explore).show, SHOWN);
+  assert.deepEqual(readList({ show: 'moments' }, explore).show, ['moments']);
+  assert.deepEqual(readList({ show: ['durations', 'timelines'] }, explore).show, [
+    'timelines',
+    'durations',
+  ]);
+  assert.deepEqual(readList({ show: 'durations,moments' }, explore).show, ['moments', 'durations']);
+  assert.deepEqual(readList({ show: 'nothing' }, explore).show, SHOWN);
+  assert.deepEqual(readList(new URLSearchParams('show=moments&show=timelines'), explore).show, [
+    'timelines',
+    'moments',
+  ]);
+  assert.equal(readList({ within: 'everyone' }, explore).within, '');
+  // Addresses keep only what isn't the default.
+  const state = readList(
+    { search: 'rome', show: 'moments', within: 'mine', entityPage: '2' },
+    explore,
+  );
+  assert.deepEqual(listQuery(explore, state), {
+    search: 'rome',
+    show: 'moments',
+    within: 'mine',
+    entityPage: '2',
+  });
+  assert.deepEqual(listQuery(explore, readList({}, explore)), {});
+  // Paging one list keeps the other's page; anything else starts both again.
+  const both = readList({ search: 'rome', page: '3', entityPage: '2' }, explore);
+  assert.deepEqual(
+    [
+      changeList(explore, both, { page: 4 }).entityPage,
+      changeList(explore, both, { entityPage: 5 }).page,
+    ],
+    [2, 3],
+  );
+  const changed = changeList(explore, both, { tag: 'war' });
+  assert.deepEqual([changed.page, changed.entityPage], [1, 1]);
+
+  // Without words: timelines only, public. A guest's words search public timelines and events.
+  assert.deepEqual(librarySearches(explore, readList({}, explore), fixed).entities, null);
+  assert.equal(librarySearches(explore, readList({}, explore), fixed).timelines.scope, 'public');
+  const guest = librarySearches(explore, readList({ search: 'rome', tag: 'war' }, explore), fixed);
+  assert.deepEqual(guest.entities, {
+    search: 'rome',
+    kinds: ['moment', 'duration'],
+    tag: 'war',
+    scope: 'public',
+    page: 1,
+  });
+  // Signed in, words search what the account may read, or its own; browsing stays public.
+  const signedIn = { signedIn: true };
+  const visible = librarySearches(explore, readList({ search: 'rome' }, explore), fixed, signedIn);
+  assert.deepEqual([visible.timelines.scope, visible.entities.scope], ['visible', 'visible']);
+  assert.equal(
+    librarySearches(explore, readList({}, explore), fixed, signedIn).timelines.scope,
+    'public',
+  );
+  const own = librarySearches(
+    explore,
+    readList({ search: 'rome', within: 'mine' }, explore),
+    fixed,
+    signedIn,
+  );
+  assert.deepEqual([own.timelines.scope, own.entities.scope], ['mine', 'mine']);
+  assert.equal(
+    librarySearches(explore, readList({ within: 'mine' }, explore), fixed).timelines.scope,
+    'public',
+    'not for a guest',
+  );
+  // What it shows; one account's timelines on its own Explore.
+  const durations = librarySearches(
+    explore,
+    readList({ search: 'rome', show: 'durations' }, explore),
+    { scope: 'public', owner: 'ada' },
+  );
+  assert.equal(durations.timelines, null);
+  assert.deepEqual([durations.entities.kinds, durations.entities.owner], [['duration'], 'ada']);
+  // Each is a search the server accepts.
+  searchInput(visible.timelines);
+  entitySearchInput(visible.entities);
 });

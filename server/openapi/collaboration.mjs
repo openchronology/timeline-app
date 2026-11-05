@@ -68,6 +68,101 @@ export const paths = {
       },
     },
   },
+  '/api/timelines/entities/search': {
+    post: {
+      operationId: 'searchEntities',
+      tags: [SEARCH],
+      summary: 'Search moments and durations on every timeline',
+      description:
+        'Lists the moments and durations matching `search` across every timeline the reader may search, a page at a time (#459). Every word matches as a prefix, against titles (weighted most) and notes. Scopes: `public` (public timelines), `visible` (those and the ones the account owns or is a member of) and `mine` (its own; 401 signed out). Never comparisons; the moments and durations of labelled timelines only for signed-in adults; a fork that reads through to its source shows only what it changed. At most 5,000 matches are ranked: past that, `total` is 5,000 and `totalMore` is true. Established accounts’ matches come first, then the best. A POST, so it counts as a read for API keys.',
+      security: TIMELINE_READ,
+      requestBody: body(
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['search'],
+          properties: {
+            search: { type: 'string', maxLength: 300, description: 'The words to find.' },
+            kinds: {
+              type: 'array',
+              minItems: 1,
+              items: { type: 'string', enum: ['moment', 'duration'] },
+              description: 'What to find; both by default.',
+            },
+            tag: {
+              type: 'string',
+              maxLength: 64,
+              description: 'Only moments and durations with this tag (any case).',
+            },
+            scope: { type: 'string', enum: ['public', 'visible', 'mine'], default: 'public' },
+            owner: {
+              type: 'string',
+              maxLength: 64,
+              description: 'Only on this account’s timelines, by username.',
+            },
+            page: { type: 'integer', minimum: 1, maximum: 10000, default: 1 },
+            limit: { type: 'integer', minimum: 1, maximum: 50, default: 20 },
+          },
+        },
+        { required: true },
+      ),
+      responses: {
+        200: json({
+          type: 'object',
+          required: ['entities', 'total', 'page', 'limit', 'pages'],
+          properties: {
+            entities: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: [
+                  'kind',
+                  'id',
+                  'title',
+                  'snippet',
+                  'first',
+                  'last',
+                  'when',
+                  'tags',
+                  'timeline',
+                ],
+                properties: {
+                  kind: { type: 'string', enum: ['moment', 'duration'] },
+                  id: { type: 'string' },
+                  title: { type: 'string' },
+                  snippet: { type: 'string', description: 'The start of its notes.' },
+                  first: ref('Rational'),
+                  last: ref('Rational'),
+                  when: {
+                    type: 'string',
+                    description:
+                      'Its time, or a duration’s start and end, as its timeline shows times.',
+                  },
+                  tags: { type: 'array', items: { type: 'string' } },
+                  timeline: {
+                    type: 'object',
+                    required: ['id', 'title', 'slug', 'owner'],
+                    properties: {
+                      id: ref('Uuid'),
+                      title: { type: 'string' },
+                      slug: { type: ['string', 'null'] },
+                      owner: { type: 'string', description: 'Its owner’s username.' },
+                    },
+                  },
+                },
+              },
+            },
+            total: { type: 'integer', description: 'How many match, at most 5,000.' },
+            totalMore: { type: 'boolean', description: 'More than 5,000 match.' },
+            page: { type: 'integer' },
+            limit: { type: 'integer' },
+            pages: { type: 'integer' },
+          },
+        }),
+        ...errors(400, 401, 403, 413, 429),
+      },
+    },
+  },
   '/api/timelines/{id}/related': {
     get: {
       operationId: 'relatedTimelines',

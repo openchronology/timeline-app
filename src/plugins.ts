@@ -2,7 +2,7 @@
 // Plugins (docs/plugins.md): manifests of the fields moments and durations carry (images, stacks,
 // colors, shapes, headings and more), their validation, the built-in plugins and the library,
 // and reading each field's value.
-import { localSource, localSourcesAllowed, localPhoto } from './local-files.js';
+import { localSource, localSourcesAllowed, localPicture } from './local-files.js';
 import { compilePluginScript } from './custom-time.js';
 import { contentLabels, CONTENT_LABELS_KEY } from './content-labels.js';
 import { validateTags } from './tags.js';
@@ -32,7 +32,10 @@ export interface PluginManifest {
   description: string;
   fields: PluginField[];
   marker?: {
-    /** `file-thumbnail` (#440): the moment's photo on this computer, from a list of sources. */
+    /**
+     * `file-thumbnail` (#440, #442): the moment's photo or video on this computer, from a list of
+     * sources.
+     */
     kind: 'image' | 'color' | 'shape' | 'heading' | 'outline' | 'file-thumbnail';
     metadataKey: string;
   };
@@ -559,8 +562,8 @@ function scriptEffects(
         if (icon) effects.icon = icon;
       }
       if (manifest.marker?.kind === 'file-thumbnail') {
-        const photo = localPhoto(metadata[manifest.marker.metadataKey]);
-        if (photo) effects.icon = photo;
+        const picture = localPicture(metadata[manifest.marker.metadataKey]);
+        if (picture) effects.icon = picture;
       }
       if (manifest.marker?.kind === 'heading') {
         const level = headingValue(metadata[manifest.marker.metadataKey]);
@@ -1256,10 +1259,11 @@ export function pluginMetadata(
         if (typeof metadata[name] === 'string')
           result[name] = (metadata[name] as string).slice(0, 10000);
         else if (metadata[name] === true) result[name] = true; // A toggle that is on (#325).
-      // The photo a thumbnail marker shows (#440): the list's first, on this computer.
+      // The photo or video a thumbnail marker shows (#440, #442): the list's first, on this
+      // computer.
       if (manifest.marker?.kind === 'file-thumbnail') {
-        const photo = localPhoto(metadata[manifest.marker.metadataKey]);
-        if (photo) result[manifest.marker.metadataKey] = [photo];
+        const picture = localPicture(metadata[manifest.marker.metadataKey]);
+        if (picture) result[manifest.marker.metadataKey] = [picture];
       }
       for (const field of manifest.fields)
         if (
@@ -1338,10 +1342,10 @@ export const MOMENT_ICONS: PluginManifest = validatePluginManifest({
 export const FILE_THUMBNAILS: PluginManifest = validatePluginManifest({
   apiVersion: 1,
   id: 'file-thumbnails',
-  version: 1,
+  version: 2,
   name: 'File thumbnails',
   description:
-    "In the desktop app, show a small picture of each moment's photo, from its first source that is a photo on this computer.",
+    "In the desktop app, show a small picture of each moment's photo or video, from its first source that is one on this computer.",
   fields: [],
   marker: { kind: 'file-thumbnail', metadataKey: 'sources' },
 });

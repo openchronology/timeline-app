@@ -3,6 +3,7 @@
 // saying how many there are, an empty state, and Previous and Next links (#337, #338).
 import TimelineCard, { SkeletonCard } from './timeline-card.jsx';
 import { isFiltered, listHref, statusText } from '../lib/timeline-lists.js';
+import { searchTerms } from '../../src/highlight.ts';
 /** Whether a click is a plain one, which a list may handle in place; others open as links. */
 export const plainClick = (event) =>
   event.button === 0 &&
@@ -114,6 +115,8 @@ export default function TimelineList({
 }) {
   const href = (changes) => listHref(basePath, query, list, state, changes);
   const empty = !result.timelines.length;
+  // The search's words, marked where they match (#459).
+  const terms = searchTerms(state.search ?? '');
   return (
     <>
       <div
@@ -132,6 +135,7 @@ export default function TimelineList({
             timeline={t}
             guest={guest}
             compareLimit={compareLimit}
+            terms={terms}
             activeTag={state.tag}
             tagHref={(tag) => href({ tag })}
             onTag={

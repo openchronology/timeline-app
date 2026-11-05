@@ -31,6 +31,7 @@ import { asKeyRequest } from './key-requests.mjs';
 import { BrowserForks } from './browser-forks.mjs';
 import { queryPlugins } from './query-plugins.mjs';
 import { Collaboration, relatedTimelines, searchTimelines } from './collaboration.mjs';
+import { searchEntities } from './library-search.mjs';
 import { Versioning, revisionId } from './versioning.mjs';
 import { TimelineLinks } from './timeline-links.mjs';
 import { createPluginLibrary, createSuiteLibrary } from './plugins.mjs';
@@ -1151,6 +1152,10 @@ export function createRequestHandler({
         // every one of them.
         if (pathname === '/api/timelines/links/query' && method === 'POST')
           return response(res, 200, await links.between(userId, await body(req, 16384)));
+        // Searching every timeline's moments and durations (library-search.mjs; #459): anyone;
+        // the scope mine needs a session.
+        if (pathname === '/api/timelines/entities/search' && method === 'POST')
+          return response(res, 200, await searchEntities(pool, userId, await body(req, 4096)));
         // Timelines related to one the reader can read, for its page to recommend (#447).
         const related = /^\/api\/timelines\/([a-f0-9-]{36})\/related$/.exec(pathname);
         if (related && uuid.test(related[1]) && method === 'GET') {
