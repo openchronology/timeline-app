@@ -199,6 +199,8 @@ import {
 } from './draft-store.js';
 import type { DraftEntry } from './draft-store.js';
 import { readViewState, viewStorageKey, VIEW_PREFIX } from './view-state.js';
+import { showRelated } from './related-timelines.js';
+import type { RelatedTimeline } from './related-timelines.js';
 import type { ViewState } from './view-state.js';
 import type { TimelineLink } from './links.js';
 declare const __OFFLINE_HTML__: boolean;
@@ -2607,8 +2609,26 @@ function updatePageTitle() {
   if (platformEditor)
     window.parent.postMessage({ type: 'openchronology:title', title: name }, location.origin);
 }
+/**
+ * Related timelines (#447), below a server timeline on the website: asked for once per
+ * timeline, and hidden for anything else, such as a draft or a comparison. They are extra, so a
+ * failure to load them just leaves them out.
+ */
+let relatedFor: string | null = null;
+function updateRelated() {
+  const id = platformEditor && remote && !remote.comparison && !comparison ? remote.id : null;
+  if (id === relatedFor) return;
+  relatedFor = id;
+  const section = el('related-timelines');
+  section.hidden = true;
+  if (id)
+    void api<{ timelines: RelatedTimeline[] }>(`timelines/${id}/related`)
+      .then(({ timelines }) => relatedFor === id && showRelated(section, timelines))
+      .catch(() => {});
+}
 function heading() {
   updateSensitive();
+  updateRelated();
   el('view-mode-control').hidden = !mayEdit();
   input('view-mode').checked = viewMode;
   updateFollowControl();

@@ -29,7 +29,7 @@ import { authorizeKey, keyRequestRead } from './api-keys.mjs';
 import { asKeyRequest } from './key-requests.mjs';
 import { BrowserForks } from './browser-forks.mjs';
 import { queryPlugins } from './query-plugins.mjs';
-import { Collaboration, searchTimelines } from './collaboration.mjs';
+import { Collaboration, relatedTimelines, searchTimelines } from './collaboration.mjs';
 import { Versioning, revisionId } from './versioning.mjs';
 import { createPluginLibrary, createSuiteLibrary } from './plugins.mjs';
 import { createServer } from 'node:http';
@@ -1142,6 +1142,12 @@ export function createRequestHandler({
             200,
             await searchTimelines(pool, userId, await body(req, 4096), featured),
           );
+        // Timelines related to one the reader can read, for its page to recommend (#447).
+        const related = /^\/api\/timelines\/([a-f0-9-]{36})\/related$/.exec(pathname);
+        if (related && uuid.test(related[1]) && method === 'GET') {
+          await store.access(related[1], userId);
+          return response(res, 200, await relatedTimelines(pool, userId, related[1], featured));
+        }
         // Starring (stars.mjs): signed in, with the CSRF token and a rate limit.
         const star = /^\/api\/timelines\/([a-f0-9-]{36})\/star$/.exec(pathname);
         if (star && uuid.test(star[1]) && method === 'POST') {

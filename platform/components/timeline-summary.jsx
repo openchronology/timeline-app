@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 /**
  * The timeline as text, for screen readers and search engines: the editor beside it is an
- * interactive picture of the same thing. Its moments link to their own pages.
+ * interactive picture of the same thing. Its moments link to their own pages, and related
+ * timelines (#447) to theirs.
  */
 import {
   momentTitle,
@@ -10,9 +11,9 @@ import {
   timelineFacts,
   timelineTitle,
 } from '../lib/sharing.js';
-import { profilePath } from '../../src/addresses.ts';
+import { profilePath, timelinePath } from '../../src/addresses.ts';
 import Markdown from './markdown.jsx';
-export default function TimelineSummary({ timeline, moments = [], children }) {
+export default function TimelineSummary({ timeline, moments = [], related = [], children }) {
   return (
     <section className="sr-only" aria-label="Timeline summary">
       <h1>{timelineTitle(timeline)}</h1>
@@ -40,6 +41,18 @@ export default function TimelineSummary({ timeline, moments = [], children }) {
               </li>
             ))}
           </ol>
+        </>
+      )}
+      {related.length > 0 && (
+        <>
+          <h2>Related timelines</h2>
+          <ul>
+            {related.map((t) => (
+              <li key={t.id}>
+                <a href={timelinePath(t)}>{t.title || 'Untitled timeline'}</a> by @{t.owner}
+              </li>
+            ))}
+          </ul>
         </>
       )}
     </section>

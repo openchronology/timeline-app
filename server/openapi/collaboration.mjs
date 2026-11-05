@@ -68,6 +68,25 @@ export const paths = {
       },
     },
   },
+  '/api/timelines/{id}/related': {
+    get: {
+      operationId: 'relatedTimelines',
+      tags: [SEARCH],
+      summary: 'Timelines related to a timeline',
+      description:
+        'Up to six public timelines about the same things as a timeline the account can read, best first, as its page recommends them. They match the words of its title, tags and description against the same parts of other timelines (not their moments’ text), and sharing a tag counts for more. They follow browsing’s rules: established accounts’ timelines or featured ones, with labelled timelines only for signed-in adults. Never the timeline itself, its copies or comparisons, and at most two from any one owner.',
+      security: TIMELINE_READ,
+      parameters: [timelineId],
+      responses: {
+        200: json({
+          type: 'object',
+          required: ['timelines'],
+          properties: { timelines: { type: 'array', items: ref('TimelineSearchResult') } },
+        }),
+        ...errors(400, 401, 403, 404, 429),
+      },
+    },
+  },
   '/api/timelines/{id}/star': {
     post: {
       operationId: 'starTimeline',

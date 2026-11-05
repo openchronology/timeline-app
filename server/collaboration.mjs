@@ -218,6 +218,81 @@ export async function searchTimelines(pool, userId, value, featured = []) {
     : rows[0].timelines;
   return { timelines, total, page, limit, pages: Math.ceil(total / limit) };
 }
+/** How many related timelines a timeline's page recommends (#447). */
+export const RELATED_LIMIT = 6;
+/**
+ * Timelines related to timeline `id`, which the reader can read (the caller checks), for its
+ * page to recommend (#447; GET /api/timelines/{id}/related): `{ timelines }`, at most `limit`,
+ * as search results with their shapes (withShapes), best first.
+ *
+ * Related means about the same things: the words of its title and tags (weighted A in
+ * search_document) and description (B), its 24 most telling, become one OR query matched
+ * against the same parts of other timelines, never their moments' text, which would match
+ * nearly anything. Sharing a tag counts too, and for more than the words. Results are ranked by
+ * how well those parts match (ts_rank_cd over a vector of just them, cheap where the stored
+ * one holds every moment), plus half a point per shared tag, with stars breaking near-ties.
+ *
+ * They follow browsing's rules (#103, #115), as nobody asked for them: public, of established
+ * accounts or featured, and unlabelled unless the reader is signed in and an adult. Never the
+ * timeline itself, its copies (forked from any of its revisions) or comparisons, and at most
+ * two from any one owner, so one prolific account doesn't fill the list.
+ * @param {import('pg').Pool} pool
+ * @param {string|null} userId the reader
+ * @param {string} id the timeline being read
+ * @param {string[]} featured ids the site features besides those flagged (searchTimelines)
+ */
+export async function relatedTimelines(pool, userId, id, featured = [], limit = RELATED_LIMIT) {
+  const { rows } = await pool.query(
+    `WITH source AS (
+      SELECT t.id,t.tags,
+        -- Its telling words, title and tags first, then the most repeated; only plain words,
+        -- so they can be quoted into a query safely.
+        (SELECT to_tsquery('simple',string_agg(quote_literal(w.lexeme)||':AB',' | '))
+          FROM (SELECT v.lexeme FROM unnest(ts_filter(t.search_document,'{a,b}')) v
+            WHERE v.lexeme ~ '^[[:alnum:]]+$' AND length(v.lexeme)>2
+            ORDER BY 'A'=ANY(v.weights) DESC,cardinality(v.positions) DESC,v.lexeme LIMIT 24) w) AS query
+      FROM oc_timelines t WHERE t.id=$1::uuid
+    ), candidates AS (
+      SELECT t.id,t.owner_id,t.title,t.description,t.tags,t.star_count,s.query,
+        cardinality(ARRAY(SELECT unnest(t.tags) INTERSECT SELECT unnest(s.tags))) AS shared
+      FROM source s JOIN oc_timelines t ON t.id<>s.id AND t.visibility='public' AND t.comparison IS NULL
+        AND ((s.query IS NOT NULL AND t.search_document @@ s.query) OR t.tags && s.tags)
+      LEFT JOIN oc_account_standing a ON a.user_id=t.owner_id
+      WHERE (coalesce(a.standing,0)>0
+          OR ((t.featured OR t.id=ANY($2::uuid[])) AND cardinality(t.content_labels||t.moderator_labels)=0))
+        AND (cardinality(t.content_labels||t.moderator_labels)=0
+          OR EXISTS(SELECT 1 FROM oc_users me WHERE me.id=$3::uuid
+            AND (me.birth_year IS NULL OR extract(year FROM now())::int-me.birth_year>=18)))
+        -- Not its copies.
+        AND NOT EXISTS(SELECT 1 FROM oc_revisions r WHERE r.id=t.fork_base_revision_id AND r.timeline_id=s.id)
+      LIMIT 400
+    ), ranked AS (
+      SELECT c.id,
+        coalesce(ts_rank_cd(setweight(to_tsvector('english',c.title),'A')
+          || setweight(to_tsvector('english',coalesce(oc_tag_text(c.tags),'')),'A')
+          || setweight(to_tsvector('english',c.description),'B'),c.query),0)
+          + 0.5*c.shared + 0.01*ln(1+c.star_count) AS score,
+        c.owner_id
+      FROM candidates c
+    ), chosen AS (
+      SELECT id,score FROM (SELECT r.*,row_number() OVER (PARTITION BY owner_id ORDER BY score DESC,id) AS n FROM ranked r) x
+      WHERE n<=2 ORDER BY score DESC,id LIMIT $4
+    )
+    SELECT coalesce(jsonb_agg(to_jsonb(r) ORDER BY ch.score DESC,ch.id),'[]'::jsonb) AS timelines FROM chosen ch
+    JOIN LATERAL (
+      SELECT t.id,t.slug,t.title,t.description,t.tags,t.image,t.visibility,t.revision,t.event_count,t.comparison,t.updated_at,t.created_at,t.star_count::text AS star_count,u.username AS owner,
+        EXISTS(SELECT 1 FROM oc_timeline_stars st WHERE st.timeline_id=t.id AND st.user_id=$3::uuid) AS starred,
+        coalesce(p.popularity,0)::text AS popularity,
+        ((t.featured OR t.id=ANY($2::uuid[])) AND cardinality(t.content_labels||t.moderator_labels)=0) AS featured,
+        ARRAY(SELECT DISTINCT unnest(t.content_labels||t.moderator_labels)) AS labels
+      FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id
+      LEFT JOIN oc_timeline_popularity p ON p.timeline_id=t.id WHERE t.id=ch.id
+    ) r ON true`,
+    [id, featured, userId ?? null, limit],
+  );
+  const timelines = rows[0].timelines;
+  return { timelines: timelines.length ? await withShapes(pool, timelines) : timelines };
+}
 /** How many parts of a timeline's span a result's `shape` counts its moments in. */
 export const SHAPE_BINS = 24;
 /** How deep into the moment tree a result's shape reads: at most 2^(depth+1)-1 nodes. */

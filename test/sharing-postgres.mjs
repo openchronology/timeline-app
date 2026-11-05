@@ -256,6 +256,27 @@ try {
     method: 'PATCH',
     data: { visibility: 'public' },
   });
+  // A sequel about the same voyages, featured, so its page recommends it (#447) though its
+  // owner is new.
+  const sequel = (
+    await owner.request('/api/timelines', {
+      method: 'POST',
+      status: 201,
+      data: {
+        format: 'openchronology',
+        version: 1,
+        title: `Voyages of ${suffix}: the return`,
+        description: '',
+        events: [],
+      },
+    })
+  ).id;
+  extraTimelines.push(sequel);
+  await owner.request(`/api/timelines/${sequel}/settings`, {
+    method: 'PATCH',
+    data: { visibility: 'public' },
+  });
+  await pool.query('UPDATE oc_timelines SET featured=true WHERE id=$1', [sequel]);
 
   // The timeline's page: title, description, canonical address, link previews and oEmbed.
   const page = await guest.request(base);
@@ -507,6 +528,19 @@ try {
   assert(!(await editor().locator('#moment-panel').isVisible()));
   await editor().locator('#reader-close').click();
   await tab.waitForFunction((path) => location.hash === '' && location.pathname === path, base);
+  // Below it, related timelines (#447): the sequel, opening its page in the whole window.
+  const relatedCard = editor().locator('#related-timelines .related-timeline');
+  await relatedCard.first().waitFor();
+  assert.equal(await relatedCard.count(), 1);
+  assert.match(await relatedCard.textContent(), new RegExp(`Voyages of ${suffix}: the return`));
+  assert.equal(await relatedCard.getAttribute('href'), `/${username}/${sequel}`);
+  assert.equal(await relatedCard.getAttribute('target'), '_top');
+  // The page's text summary links to it too.
+  assert(
+    (await guest.request(base)).includes(
+      `<a href="/${username}/${sequel}">Voyages of ${suffix}: the return</a>`,
+    ),
+  );
   // Opening a moment puts it in the address.
   await tab.goto(origin + momentPath);
   await editor().locator('#reader-panel').waitFor({ state: 'visible' });

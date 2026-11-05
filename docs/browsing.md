@@ -67,6 +67,21 @@ Your own lists include private timelines and filter by visibility (`public` or `
 
 With JavaScript, each list searches in place ([#338](https://github.com/openchronology/timeline-app/issues/338)): it changes the address with `history.pushState` (or `replaceState` while typing) and fetches its page from the search API, so the page doesn't load again and Back works. Each result also carries what its card shows of its moments: `first_time` and `last_time` (exact), `time_span` (the two in the timeline's own time display, as precise as the span calls for: years for a 200-year timeline, clock times for a 3-hour incident, ages in deep time) and `shape` (how densely 24 equal parts of the span hold moments, read from the top three levels of its moment tree). Forks that read through to their source, and comparisons, have none of these, as reading them would cost far more.
 
+## Related timelines
+
+Below a timeline on the website, **Related timelines** lists up to six others about the same things ([#447](https://github.com/openchronology/timeline-app/issues/447)), as cards that open their pages. The page's text summary, which screen readers and search engines read, lists them as links too.
+
+They match the timeline's own words: the 24 most telling words of its title and tags, then its description, against the same parts of other timelines. Moments' text isn't used, as it would match nearly anything. Sharing a tag counts for more than a word. Ties go to the timeline with more stars.
+
+They follow browsing's rules, since nobody searched for them:
+
+- public timelines of established accounts, or featured ones;
+- labelled timelines only for signed-in adults;
+- never the timeline itself, its copies or comparisons;
+- at most two from any one owner.
+
+The list comes from `GET /api/timelines/{id}/related` ([API](api.md)), which needs the reader to be able to read the timeline. It isn't shown for drafts, comparisons or in the desktop app.
+
 ## Popularity and trending
 
 | Sort                    | Ranks by                                                                        |
