@@ -121,19 +121,23 @@ export async function searchEntities(pool, userId, value) {
   // are then read by their key.
   const { rows } = await pool.query(
     `WITH matching AS (
-      SELECT s.timeline_id,s.kind,s.entity_id,s.first_time,ts_rank(s.document,q) AS rank,
+      SELECT s.timeline_id,s.kind,s.entity_id,s.first_time,s.rank,
         coalesce(a.standing,0)>0 AS established
-      FROM to_tsquery('simple',$1) q
-      JOIN oc_entity_search s ON s.document @@ q
+      -- The text index's matches, found once (OFFSET 0 keeps the planner from searching it
+      -- again for each timeline), streamed through the timelines they may come from.
+      FROM (SELECT x.timeline_id,x.kind,x.entity_id,x.first_time,
+          ts_rank(x.document,to_tsquery('simple',$1)) AS rank
+        FROM oc_entity_search x
+        WHERE x.document @@ to_tsquery('simple',$1) AND NOT x.hidden AND x.kind=ANY($2::text[])${
+          // Written out, so the planner may use the durations' own index.
+          kinds.length === 1 ? ` AND x.kind='${kinds[0]}'` : ''
+        }
+          AND ($3='' OR x.tags @> ARRAY[$3]::text[])
+        OFFSET 0) s
       JOIN oc_timelines t ON t.id=s.timeline_id
       JOIN oc_users u ON u.id=t.owner_id
       LEFT JOIN oc_account_standing a ON a.user_id=t.owner_id
-      WHERE NOT s.hidden AND s.kind=ANY($2::text[])${
-        // Written out, so the planner may use the durations' own index.
-        kinds.length === 1 ? ` AND s.kind='${kinds[0]}'` : ''
-      }
-        AND ($3='' OR s.tags @> ARRAY[$3]::text[])
-        AND t.comparison IS NULL AND t.preparing_revision_id IS NULL
+      WHERE t.comparison IS NULL AND t.preparing_revision_id IS NULL
         AND CASE $4 WHEN 'mine' THEN t.owner_id=$5::uuid
           WHEN 'visible' THEN t.visibility='public' OR t.owner_id=$5::uuid
             OR (EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$5::uuid)
