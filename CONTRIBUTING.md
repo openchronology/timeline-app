@@ -30,6 +30,7 @@ OpenChronology is one codebase for four editions: the website (a Next.js platfor
 | [`.yarnrc.yml`](.yarnrc.yml)                 | Yarn 4's settings.                                                                                                                      |
 | [`compose.yml`](compose.yml)                 | Docker Compose for a self-hosted server (docs/docker.md).                                                                               |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md)         | This page: where everything is, and how to change it.                                                                                   |
+| [`default.nix`](default.nix)                 | The flake for Nix without flakes, such as `nix-env` (docs/nix.md).                                                                      |
 | [`flake.lock`](flake.lock)                   | The nixpkgs revision the flake builds with.                                                                                             |
 | [`flake.nix`](flake.nix)                     | The Nix flake: packages, the NixOS module and its test (docs/nix.md).                                                                   |
 | [`LICENSE`](LICENSE)                         | The GNU General Public License, version 3.                                                                                              |

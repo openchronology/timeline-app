@@ -20,7 +20,13 @@ nix run github:openchronology/timeline-app#openchronology-desktop
 nix profile install github:openchronology/timeline-app#openchronology-server
 ```
 
-A release's packages are at its tag: `github:openchronology/timeline-app/<tag>`. Without one, they are `main`'s. The server's commands are the Debian package's:
+A release's packages are at its tag: `github:openchronology/timeline-app/<tag>`. Without one, they are `main`'s.
+
+Without flakes, `default.nix` gives `nix-env` and `nix-build` the same packages, from a release's archive:
+
+````sh
+nix-env -f https://github.com/openchronology/timeline-app/archive/<tag>.tar.gz -iA openchronology-desktop
+``` The server's commands are the Debian package's:
 
 - `openchronology-server`, `openchronology-migrate` and `openchronology-reset-admin-password`;
 - the workers: `openchronology-mail`, `openchronology-syslog` and `openchronology-journald`;
@@ -71,7 +77,7 @@ Add the flake to your system's flake, then turn the service on:
       };
     };
 }
-```
+````
 
 What the module sets up:
 
