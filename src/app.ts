@@ -846,6 +846,11 @@ let menuGeneration = 0;
 let menuAnchor: { node: Element; left: number; top: number } | null = null;
 let longPressTimer: ReturnType<typeof setTimeout> | undefined;
 let longPressed = false;
+/**
+ * A moment a link opened: zoomed into, a step per frame of groups, until it stands alone
+ * rather than counted in a group, unless moments share its time. Navigating ends it.
+ */
+let revealing: { id: string; time: Q; steps: number } | null = null;
 let frame: Frame = { groups: [], visitedNodes: 0 },
   selectedGroup: FrameGroup | null = null,
   groupCursor: { time: string; id: string } | null = null;
@@ -1830,6 +1835,7 @@ function render(refreshFrame = true) {
     if (refreshFrame) frame = model.frame(viewport, width(), pixels());
     el('loading-window').hidden = true;
     drawFrame();
+    revealStep();
     // Opening is measured until its first view is painted; then each new view from a
     // navigation input, from that input until the view is painted.
     const view = viewKey();
@@ -1888,6 +1894,7 @@ function render(refreshFrame = true) {
     drawFrame();
     if (!refreshFrame || cached) {
       if (cached) {
+        revealStep();
         clearTimeout(frameTimer);
         ++frameRequest;
         windowController?.abort();
@@ -4763,7 +4770,10 @@ function fitDuration(id: string, known?: DurationBand) {
   if (band) navigate(Viewport.fit(Q.parse(band.first), Q.parse(band.last)));
 }
 function navigate(view: Viewport, manual = true) {
-  if (manual) follow.navigation();
+  if (manual) {
+    follow.navigation();
+    revealing = null;
+  }
   cancelZoomAnimation();
   closeTimelineMenu();
   viewport = view.rasterize(width());
@@ -9514,6 +9524,35 @@ function parentLink(): TimelineLink | null {
   }
 }
 let reportedLink: TimelineLink | null = null;
+/** Zooms into the moment a link opened (see `revealing`) while it is counted in a group. */
+function revealStep() {
+  const target = revealing;
+  if (!target || comparison) return;
+  const group = frame.groups.find(
+    (g) => Q.parse(g.first).compare(target.time) <= 0 && Q.parse(g.last).compare(target.time) >= 0,
+  );
+  const spread = group ? Q.parse(group.last).sub(Q.parse(group.first)) : Q.zero;
+  if (
+    !group ||
+    group.id === target.id ||
+    --target.steps < 0 ||
+    (spread.compare(Q.zero) <= 0 && !BigInt(group.durationCount ?? '0'))
+  ) {
+    revealing = null;
+    return;
+  }
+  // At most half the span, or enough that the group's moments are twice the grouping
+  // distance apart.
+  const half = Q.from(1n, 2n),
+    threshold = viewport.threshold(width(), pixels()),
+    enough = spread.compare(Q.zero) > 0 ? spread.div(threshold.mul(Q.from(2n))) : half,
+    span = viewport.span.mul(enough.compare(half) < 0 ? enough : half);
+  navigate(new Viewport(target.time.sub(span.div(Q.from(2n))), span), false);
+}
+/** Brings the timeline into view on the page, as a link into it was followed. */
+function scrollToStage() {
+  el('timeline-stage').scrollIntoView({ block: 'center' });
+}
 /** Tells the page what is open, so its address links to it (see links.ts). */
 function reportLink(link: TimelineLink | null) {
   if (!remote || local || comparison) return;
@@ -9581,6 +9620,8 @@ async function followLink(link: TimelineLink | null) {
       title: '',
       snippet: '',
     });
+    revealing = { id: event.id, time: Q.parse(event.time), steps: 24 };
+    scrollToStage();
     selectedGroup = null;
     eventForm(event);
     return;
@@ -9608,6 +9649,7 @@ async function followLink(link: TimelineLink | null) {
     title: '',
     snippet: '',
   });
+  scrollToStage();
   await openDurationById(link.id);
 }
 if (platformEditor && window.parent !== window)
