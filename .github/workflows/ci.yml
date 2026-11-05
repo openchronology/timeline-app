@@ -2,7 +2,7 @@ name: OpenChronology
 # Every push and pull request: the Docker Compose stack; types and tests with npm, pnpm and
 # Yarn on Node 22 and 24; the platform in Chromium, Firefox and WebKit; PostgreSQL with pgmp
 # and the live-browser suites; UI capacity advice and budgets; and the desktop and server
-# packages (desktop.yml, server-packages.yml).
+# packages (desktop.yml, server-packages.yml) and the Nix flake (nix.yml).
 on:
   push:
   pull_request:
@@ -400,6 +400,10 @@ jobs:
   server:
     name: Server packages
     uses: ./.github/workflows/server-packages.yml
+  # The Nix flake's packages and the NixOS test of its module (#461).
+  nix:
+    name: Nix
+    uses: ./.github/workflows/nix.yml
   desktop-ui:
     name: Desktop app / UI interactions within budget
     runs-on: ubuntu-24.04

@@ -279,7 +279,7 @@ export const HELP_SECTIONS = [
   { title: 'Accounts and the API', pages: ['authentication', 'api'] },
   {
     title: 'Running a server',
-    pages: ['administration', 'docker', 'seeding', 'syslog', 'journald', 'log-import', 'licensing'],
+    pages: ['administration', 'docker', 'nix', 'seeding', 'syslog', 'journald', 'log-import', 'licensing'],
   },
   { title: 'How it works', pages: ['architecture', 'benchmarks'] },
 ];

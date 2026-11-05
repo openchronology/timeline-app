@@ -1,0 +1,77 @@
+name: Nix
+# The Nix flake (#461; docs/nix.md): its packages built on x86_64 and aarch64 Linux, and the
+# NixOS test of its module (nix/test.nix), which boots a machine with KVM. With a Cachix cache
+# configured (the CACHIX_CACHE variable and CACHIX_AUTH_TOKEN secret), builds read from it, and
+# releases (`push`) write what they built to it. Called by ci.yml and release.yml.
+on:
+  workflow_call:
+    inputs:
+      push:
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  build:
+    name: Nix / ${{ matrix.system }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { system: x86_64-linux, runner: ubuntu-24.04 }
+          - { system: aarch64-linux, runner: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
+      - name: The project's binary cache, if it has one
+        if: vars.CACHIX_CACHE != ''
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          name: ${{ vars.CACHIX_CACHE }}
+          authToken: ${{ inputs.push && secrets.CACHIX_AUTH_TOKEN || '' }}
+          skipPush: ${{ !inputs.push }}
+      - name: Build the packages
+        run: |
+          nix build -L --no-link \
+            .#packages.${{ matrix.system }}.openchronology-server \
+            .#packages.${{ matrix.system }}.och-convert \
+            .#packages.${{ matrix.system }}.pgmp \
+            .#packages.${{ matrix.system }}.openchronology-desktop
+      - name: The server's commands run
+        run: |
+          server=$(nix build --no-link --print-out-paths .#packages.${{ matrix.system }}.openchronology-server)
+          test -x "$server/bin/openchronology-server"
+          "$server/lib/openchronology/bin/och-convert" 2>&1 | grep -q 'Usage: och-convert'
+          test -s "$server/lib/openchronology/platform/public/openchronology-web-source.tar.gz"
+      - name: Say when no binary cache was written
+        if: inputs.push && vars.CACHIX_CACHE == ''
+        run: echo "::notice::No Cachix cache is configured (CACHIX_CACHE, CACHIX_AUTH_TOKEN), so nothing was pushed."
+  nixos:
+    name: Nix / NixOS test of the module
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The runner has KVM, which the test's virtual machine needs to be quick.
+      - name: Let the runner's user use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
+        with:
+          extra_nix_config: system-features = nixos-test benchmark big-parallel kvm
+      - name: The project's binary cache, if it has one
+        if: vars.CACHIX_CACHE != ''
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          name: ${{ vars.CACHIX_CACHE }}
+          skipPush: true
+      - name: Boot a machine with the module and check it
+        run: nix build -L .#checks.x86_64-linux.nixos

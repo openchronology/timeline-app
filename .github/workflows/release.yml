@@ -21,6 +21,12 @@ jobs:
     uses: ./.github/workflows/server-packages.yml
     with:
       tag: ${{ github.event.release.tag_name || github.ref_name }}
+  # The Nix flake built at the tag, and written to the binary cache when one is configured.
+  nix:
+    uses: ./.github/workflows/nix.yml
+    with:
+      push: true
+    secrets: inherit
   web:
     name: Offline HTML and matching source
     runs-on: ubuntu-24.04

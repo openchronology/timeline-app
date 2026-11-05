@@ -29,6 +29,7 @@ The documentation: how to use OpenChronology, run a server and work on the code.
 | [`licensing.md`](licensing.md)                 | Copyright, the GPLv3 and distributions: source for releases, contributions and license changes.                                            |
 | [`log-import.md`](log-import.md)               | Importing historic log files into timelines with `och-import-logs`.                                                                        |
 | [`moderation.md`](moderation.md)               | Reporting content and how the site's administrators review reports (#115).                                                                 |
+| [`nix.md`](nix.md)                             | Nix and NixOS: the flake's packages, and the `services.openchronology` module with PostgreSQL, nginx and secrets.                          |
 | [`plugins.md`](plugins.md)                     | Timeline plugins: installing them, what they can change, writing and publishing your own, and where they run.                              |
 | [`relationships.md`](relationships.md)         | Relationships: undirected links between events (moments and durations), and how to view and edit them.                                     |
 | [`retention.md`](retention.md)                 | Keeping only a timeline's recent past, not keeping saved history, and deleting everything in a view.                                       |
