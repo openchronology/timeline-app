@@ -8,6 +8,7 @@ import { helpPages } from '../../server/help.mjs';
 import { AUDIENCES, landingEnabled } from '../../server/landing.mjs';
 import { sharedPath, siteOrigin } from './sharing.js';
 import { profilePath, timelinePath } from '../../src/addresses.ts';
+import { entitiesListed, timelineEntityLimit } from '../../server/indexnow.mjs';
 
 /**
  * Addresses per page. A sitemap may hold 50,000 addresses and 50 MB; 45,000 of these stay well
@@ -16,17 +17,6 @@ import { profilePath, timelinePath } from '../../src/addresses.ts';
 export function pageSize() {
   const size = Math.floor(Number(process.env.SITEMAP_PAGE_SIZE));
   return size >= 1 && size <= 45000 ? size : 45000;
-}
-/**
- * The most moments and durations a timeline's entity pages may list (#335):
- * SITEMAP_TIMELINE_ENTITIES, 5,000 unless set (1 to 45,000). A timeline with more moments
- * than this is left out of the entity sitemap altogether (a log import can have millions,
- * which are not pages anyone searches for one by one); one with fewer moments lists its
- * first this many entities, durations first.
- */
-export function timelineEntityLimit() {
-  const limit = Math.floor(Number(process.env.SITEMAP_TIMELINE_ENTITIES));
-  return limit >= 1 && limit <= 45000 ? limit : 5000;
 }
 /**
  * How many timelines' entities share one page: as many as fit in a page (pageSize) at the
@@ -68,13 +58,10 @@ async function database() {
 // the ID of its first entry, so a page is read by an index range (`id >= start`) rather than
 // by skipping rows, and the index reads every ID once.
 const TIMELINES = `SELECT t.id, t.updated_at FROM oc_timelines t WHERE t.visibility='public'`;
-// Timelines whose moments and durations are listed (#335): public (a restricted timeline is
-// made private), without sensitive-content labels (their previews show nothing of them), not
-// a comparison (its entities are its sources') or a copy still being prepared, and with at
-// most $2 moments (event_count is kept on the row, so this reads no entities).
+// Timelines whose moments and durations are listed (#335), with at most $2 moments (see
+// entitiesListed, which IndexNow shares).
 const ENTITY_TIMELINES = `SELECT t.id, t.updated_at FROM oc_timelines t WHERE t.visibility='public'
-  AND t.content_labels='{}' AND t.moderator_labels='{}' AND t.comparison IS NULL
-  AND t.preparing_revision_id IS NULL AND t.event_count <= $2`;
+  AND ${entitiesListed('$2')}`;
 const PROFILES = `SELECT u.id, max(t.updated_at) AS updated_at FROM oc_users u
   JOIN oc_timelines t ON t.owner_id=u.id AND t.visibility='public'
   WHERE NOT u.is_disabled GROUP BY u.id`;

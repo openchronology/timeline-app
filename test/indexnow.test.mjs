@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// IndexNow (#389, server/indexnow.mjs): the key, its file, which public pages count as changed,
-// and submissions in batches, at most hourly per address, retried with a wait. Every request
+// IndexNow (#389, server/indexnow.mjs): the key, its file, which public pages count as changed
+// (with the timelines whose moment and duration pages may have, #453), and submissions in batches, at most hourly per address, retried with a wait. Every request
 // goes to a stand-in; none reaches the network.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,6 +10,8 @@ import {
   IndexNow,
   RESUBMIT_AFTER,
   changedPaths,
+  entityChanges,
+  entityPath,
   indexNowKey,
   indexNowKeyFile,
   localOrigin,
@@ -116,6 +118,55 @@ test('a disabled account’s profile is not sent unless it was listed', () => {
     changedPaths(before, snapshot([row(A, 'ada', 'rome', 1, true)])),
     new Set(['/ada']),
   );
+});
+
+test('entity pages: all of a timeline newly listed or moved, and what saves changed', () => {
+  const listed = (id, owner, slug, head, more = {}) => ({
+    ...row(id, owner, slug),
+    head,
+    listed: true,
+    ...more,
+  });
+  const before = snapshot([
+    listed(A, 'ada', 'rome', 'r1'),
+    listed(B, 'ada', 'egypt', 'e1'),
+    row(C, 'bo', 'c'),
+  ]);
+  assert.deepEqual(entityChanges(before, before), { all: [], saved: [] });
+  // A sparse save moves the head, though not always the last change: the timeline's page.
+  assert.deepEqual(
+    changedPaths(
+      before,
+      snapshot([
+        listed(A, 'ada', 'rome', 'r2'),
+        listed(B, 'ada', 'egypt', 'e1'),
+        row(C, 'bo', 'c'),
+      ]),
+    ),
+    new Set(['/ada/rome']),
+  );
+  // Saved: compared from head to head. Renamed: all of it, at its new address. Listed since
+  // (labels removed, say): all of it. New: all of it.
+  const D = '00000000-0000-4000-8000-00000000000d';
+  assert.deepEqual(
+    entityChanges(
+      before,
+      snapshot([
+        listed(A, 'ada', 'rome', 'r2'),
+        listed(B, 'ada', 'egypt2', 'e2'),
+        listed(C, 'bo', 'c', 'c1'),
+        listed(D, 'bo', 'd', 'd1'),
+      ]),
+    ),
+    { all: [B, C, D], saved: [[A, 'r1', 'r2']] },
+  );
+  // No longer listed (labelled, too many moments, private or gone): nothing of its entities.
+  assert.deepEqual(
+    entityChanges(before, snapshot([listed(A, 'ada', 'rome', 'r2', { listed: false })])),
+    { all: [], saved: [] },
+  );
+  assert.equal(entityPath('/ada/rome', 'moment', 'leg:1'), '/ada/rome/moments/leg%3A1');
+  assert.equal(entityPath('/ada/rome', 'duration', 'era'), '/ada/rome/durations/era');
 });
 
 /** A stand-in pool answering the public pages query with `rows`. */

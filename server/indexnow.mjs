@@ -9,11 +9,16 @@
  * and the profiles of accounts that own one) and compares them with what it read before: a
  * timeline made public or created public, saved, renamed (both addresses), made private or
  * deleted (its old address, which was public, so engines drop it), and a profile that gains or
- * loses a public timeline. The addresses are sent in batches, each address at most once an
- * hour (a timeline that a log stream saves all day is sent hourly), in the background, never
- * holding up a request. A timeline that was never public is never sent.
+ * loses a public timeline. The pages of moments and durations go too (#453), for the
+ * timelines whose entities the sitemap lists: those a save added, changed, removed or linked,
+ * read from saved history, and all of a timeline's at an address it newly has. The addresses
+ * are sent in batches, each address at most once an hour (a timeline that a log stream saves
+ * all day is sent hourly), in the background, never holding up a request. A timeline that was
+ * never public is never sent.
  */
 import { profilePath, timelinePath } from '../dist/core.mjs';
+import { differences } from './history.mjs';
+import { PostgresStore } from './store.mjs';
 
 /** A setting the server cannot start with. */
 export class IndexNowError extends Error {}
@@ -56,16 +61,37 @@ export function indexNowKeyFile(pathname, env = process.env) {
   return key && pathname === `/${key}.txt` ? key : null;
 }
 
-// The addresses the sitemap lists (platform/lib/sitemap.js): every public timeline, and each
-// account that owns one and is not disabled, for its profile.
-const PUBLIC_PAGES = `SELECT t.id, t.slug, u.username AS owner, u.is_disabled AS disabled, t.updated_at
+/**
+ * The most moments and durations a timeline's entity pages may list (#335):
+ * SITEMAP_TIMELINE_ENTITIES, 5,000 unless set (1 to 45,000). A timeline with more moments
+ * than this is left out of the entity sitemap altogether (a log import can have millions,
+ * which are not pages anyone searches for one by one); one with fewer moments lists its
+ * first this many entities, durations first.
+ */
+export function timelineEntityLimit(env = process.env) {
+  const limit = Math.floor(Number(env.SITEMAP_TIMELINE_ENTITIES));
+  return limit >= 1 && limit <= 45000 ? limit : 5000;
+}
+/**
+ * SQL for whether a public timeline `t`'s moments and durations are listed (#335), with the
+ * most moments a listed timeline may have as `limit` (a parameter's placeholder): without
+ * sensitive-content labels (their previews show nothing of them), not a comparison (its
+ * entities are its sources') or a copy still being prepared, and with at most that many
+ * moments (event_count is kept on the row, so this reads no entities).
+ */
+export const entitiesListed = (limit) => `t.content_labels='{}' AND t.moderator_labels='{}'
+  AND t.comparison IS NULL AND t.preparing_revision_id IS NULL AND t.event_count <= ${limit}`;
+// The addresses the sitemap lists (platform/lib/sitemap.js): every public timeline, whether
+// its entities are listed, and each account that owns one and is not disabled, for its profile.
+const PUBLIC_PAGES = `SELECT t.id, t.slug, u.username AS owner, u.is_disabled AS disabled, t.updated_at,
+  t.head_revision_id AS head, (${entitiesListed('$1')}) AS listed
   FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id WHERE t.visibility='public'`;
 
 /**
- * The public pages as one read sees them: each public timeline's address and last change by
- * id, and the profiles listed.
- * @returns {{timelines: Map<string, {path: string, owner: string, updated: number}>,
- *   profiles: Set<string>}}
+ * The public pages as one read sees them: each public timeline's address, last change, head
+ * revision and whether its entities are listed, by id, and the profiles listed.
+ * @returns {{timelines: Map<string, {path: string, owner: string, updated: number,
+ *   head?: string, listed?: boolean}>, profiles: Set<string>}}
  */
 export function snapshot(rows) {
   const timelines = new Map(),
@@ -75,14 +101,17 @@ export function snapshot(rows) {
       path: timelinePath(row),
       owner: row.owner,
       updated: new Date(row.updated_at).getTime(),
+      head: row.head ?? undefined,
+      listed: !!row.listed,
     });
     if (!row.disabled) profiles.add(profilePath(row.owner));
   }
   return { timelines, profiles };
 }
 /**
- * The paths that changed between two snapshots: timelines added, saved, moved or removed (the
- * old and the new address), and profiles that appeared, disappeared or whose public timelines
+ * The paths that changed between two snapshots: timelines added, saved (a new last change or
+ * head revision: a sparse save moves its last change at most once a minute), moved or
+ * removed (the old and the new address), and profiles that appeared, disappeared or whose public timelines
  * were added, moved or removed.
  */
 export function changedPaths(before, after) {
@@ -98,7 +127,7 @@ export function changedPaths(before, after) {
       paths.add(now.path);
       touched.add(profilePath(then.owner));
       touched.add(profilePath(now.owner));
-    } else if (then.updated !== now.updated) paths.add(now.path);
+    } else if (then.updated !== now.updated || then.head !== now.head) paths.add(now.path);
   }
   for (const [id, then] of before.timelines)
     if (!after.timelines.has(id)) {
@@ -111,6 +140,51 @@ export function changedPaths(before, after) {
     if (touched.has(path) || before.profiles.has(path) !== after.profiles.has(path))
       paths.add(path);
   return paths;
+}
+
+/**
+ * The timelines whose entity pages may have changed between two snapshots, of those whose
+ * entities are listed now: `all` at an address they did not list entities at before (newly
+ * public or listed, or moved), and `saved`, [id, from, to] head revisions, for the others
+ * saved since.
+ */
+export function entityChanges(before, after) {
+  const all = [],
+    saved = [];
+  for (const [id, now] of after.timelines) {
+    if (!now.listed) continue;
+    const then = before.timelines.get(id);
+    if (!then?.listed || then.path !== now.path) all.push(id);
+    else if (then.head && now.head && then.head !== now.head) saved.push([id, then.head, now.head]);
+  }
+  return { all, saved };
+}
+/** The page of a timeline's moment or duration, under the timeline's `path`. */
+export function entityPath(path, kind, id) {
+  return `${path}/${kind === 'moment' ? 'moments' : 'durations'}/${encodeURIComponent(id)}`;
+}
+/**
+ * The moments and durations that differ between two revisions kept as rows, as
+ * { kind, id }: those added, changed or removed, and both ends of each relationship added or
+ * removed (their pages list what they relate to). At most `limit`; none when either revision's
+ * content is not kept (a timeline that keeps no saved history, or one pruned since).
+ */
+export async function changedEntities(client, from, to, limit) {
+  const found = new Map();
+  const add = (kind, id) => found.size < limit && found.set(`${kind}\0${id}`, { kind, id });
+  const pages = await differences(client, from, to);
+  if (!pages) return [];
+  for await (const page of pages) {
+    for (const change of page)
+      if (change.kind === 'moments') add('moment', change.key);
+      else if (change.kind === 'durations') add('duration', change.key);
+      else if (change.kind === 'relationships') {
+        add(change.key.a_kind, change.key.a_id);
+        add(change.key.b_kind, change.key.b_id);
+      }
+    if (found.size >= limit) break;
+  }
+  return [...found.values()];
 }
 
 /**
@@ -134,6 +208,7 @@ export class IndexNow {
     this.log = log;
     this.endpoint = endpoint ?? INDEXNOW_ENDPOINT;
     this.now = now ?? Date.now;
+    this.store = new PostgresStore(pool);
     /** The last snapshot, or null before the first poll. */
     this.known = null;
     /** Paths waiting to be sent, in the order they changed. */
@@ -143,12 +218,42 @@ export class IndexNow {
     this.backoff = 0;
     this.retryAt = 0;
   }
-  /** Reads the public pages and queues those that changed since the last poll. */
+  /**
+   * Reads the public pages and queues those that changed since the last poll, with the
+   * pages of the moments and durations that changed in timelines whose entities are listed.
+   */
   async poll() {
-    const { rows } = await this.pool.query(PUBLIC_PAGES);
+    const limit = timelineEntityLimit();
+    const { rows } = await this.pool.query(PUBLIC_PAGES, [limit]);
     const next = snapshot(rows);
-    if (this.known) for (const path of changedPaths(this.known, next)) this.pending.add(path);
+    if (this.known) {
+      for (const path of changedPaths(this.known, next)) this.pending.add(path);
+      await this.queueEntities(entityChanges(this.known, next), next, limit);
+    }
     this.known = next;
+  }
+  /** Queues the entity pages of `changes` (see entityChanges), at most `limit` a timeline. */
+  async queueEntities({ all, saved }, next, limit) {
+    const queue = (id, entities) => {
+      for (const entity of entities)
+        this.pending.add(entityPath(next.timelines.get(id).path, entity.kind, entity.id));
+    };
+    for (const id of all)
+      queue(
+        id,
+        // Gone, private or being prepared since the read: its next poll sees that.
+        await this.store.entityKeys(id, limit).catch((error) => {
+          if (error.status === 404 || error.status === 409) return [];
+          throw error;
+        }),
+      );
+    if (!saved.length) return;
+    const client = await this.pool.connect();
+    try {
+      for (const [id, from, to] of saved) queue(id, await changedEntities(client, from, to, limit));
+    } finally {
+      client.release();
+    }
   }
   /**
    * Sends the queued paths that are due, in batches of at most BATCH_LIMIT: a path sent less
