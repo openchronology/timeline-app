@@ -139,6 +139,43 @@ The first rebuild on a connection, which compiled its plans, took about 2.2 s be
 
 A cached file is read from disk, so its time follows its size and the connection, not the database. At 5,000 moments the `.och` file (1.7 MB) took 2.3 s to convert and 0.06 s from the cache.
 
+## Links between timelines
+
+`node bench/links.mjs [links…]` (with `BENCH_DATABASE_URL`; default 1,000 and 10,000) times [links between timelines](relationships.md#links-to-other-timelines) against how many a timeline has, the limit being 10,000 by default. For each count it makes four timelines of that many moments: two linked moment to moment, a third whose first moment is linked from every moment of the second, and one without links. Times are medians of five runs, in milliseconds, on a 16-core virtual machine with PostgreSQL 16:
+
+|  Links | Comparison, whole span | Comparison, 1% of it | A page of Related to | The same, for an entity with every link | Save deleting 10 linked moments | The same without links | Deleting a linked timeline |
+| -----: | ---------------------: | -------------------: | -------------------: | --------------------------------------: | ------------------------------: | ---------------------: | -------------------------: |
+|  1,000 |                     55 |                   39 |                   23 |                                      19 |                             137 |                    150 |                         67 |
+| 10,000 |                     25 |                  217 |                   14 |                                      20 |                             145 |                    508 |                        270 |
+
+- **Comparisons:** a comparison reads the links between its timelines for a window three views wide. Over the whole span it stops at the 256 arcs a window shows, so more links cost no more. A narrow window looks up both ends of every link between the two timelines to find those crossing it, so its time grows with the links: about 0.02 ms a link. Panning within the window reads nothing.
+- **Related to:** a page costs the same however many links an entity has.
+- **Saves:** a sparse save checks only the links of the entities it deletes (the save times vary as much between runs as between the columns). Saves that rebuild a timeline whole, and imports, check every link the timeline has: at 10,000 links that added 100–300 ms to a save, measured when every save checked them all.
+- **Deleting a timeline** deletes its links with it, in time growing with how many it has.
+
+## Searching events
+
+`node bench/library-search.mjs [timelines] [moments each]` (with `BENCH_DATABASE_URL`; default 10 and 50,000) creates that many public timelines and times Explore's search of every timeline's events ([#459](https://github.com/openchronology/timeline-app/issues/459); `server/library-search.mjs`), the median of five runs each. Measured on a 16-core virtual machine with PostgreSQL 16:
+
+| Search                                  | 110,000 events | 1.76 million rows |
+| --------------------------------------- | -------------: | ----------------: |
+| A word on a few events                  |          27 ms |            7.5 ms |
+| A word on about a third of them         |          41 ms |            141 ms |
+| The same, durations only                |          49 ms |             58 ms |
+| The same, with a tag                    |          97 ms |            198 ms |
+| The same, signed in (the visible scope) |          41 ms |            254 ms |
+| Its 50th page                           |          44 ms |            190 ms |
+| Two common words                        |          97 ms |            196 ms |
+
+Every common search found more than 5,000 matches. The larger table held 1.1 million live events, plus 660,000 rows of an earlier run's deleted timelines that hadn't been released yet. The text index still reads those.
+
+The text index finds every match: a common word's list of matches is long, but cheap to read. Of those matches, at most 5,000 from timelines the reader may search are read, ranked and counted. So a search reads about the same number of rows whatever the table's size, and its time grows only with the length of the index's list.
+
+Two things keep the index from being read more than once:
+
+- **The match runs on its own, fenced from the planner** (`OFFSET 0`). Without the fence, PostgreSQL went through the few timelines one at a time and read the whole index for each: durations alone took 955 ms at the larger size.
+- **Durations alone have a text index of their own** (`oc_entity_search_durations`), so a search for durations doesn't read every moment's match only to drop it.
+
 ## Interactions
 
 `bench/ui.mjs` drives the editor with real input and times each interaction. In Chromium the input comes from Playwright's mouse, keyboard and touch. In the desktop app it comes from W3C WebDriver actions, through `tauri-driver` and WebKitWebDriver. Timing runs from the input event that triggers the result (a click on release, a key on its press, each wheel step) to the frame in which the result is painted. For zooming and panning, that is the frame showing the moments at the new view, which the editor records on `#markers` as it draws them; the axis and the bounds fields can move a frame earlier. The editor's capacity advice times navigation the same way. This is how Event Timing measures interactions, so the time a button is held down is not counted. For continuous gestures it records the longest frame while the gesture runs. An injected probe (`bench/ui/probe.js`) does the timing in the page, with no browser-specific APIs and no `eval`, so it works the same in both engines and under the editor's content security policy.

@@ -169,9 +169,12 @@ test('entity pages: all of a timeline newly listed or moved, and what saves chan
   assert.equal(entityPath('/ada/rome', 'duration', 'era'), '/ada/rome/durations/era');
 });
 
-/** A stand-in pool answering the public pages query with `rows`. */
+/** A stand-in pool answering the public pages query with `rows`, and no link changes (#422). */
 function pool(rows) {
-  const stand = { rows, query: async () => ({ rows: stand.rows }) };
+  const stand = {
+    rows,
+    query: async (sql) => ({ rows: sql.includes('oc_link_changes') ? [] : stand.rows }),
+  };
   return stand;
 }
 /** A stand-in IndexNow endpoint answering each submission with the next status. */

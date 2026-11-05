@@ -4,7 +4,12 @@
 // search rows change only where the patch reaches. The result matches rebuilding the index
 // from applyPatch(current, patch); test/incremental-postgres.mjs checks this.
 // See "Incremental saves" in docs/architecture.md.
-import { beginIndexWrite, indexReader, removeRows } from './index-versions.mjs';
+import {
+  beginIndexWrite,
+  indexReader,
+  removeRows,
+  removedEntities as noteRemoved,
+} from './index-versions.mjs';
 import {
   validateDocument,
   validateDuration,
@@ -140,7 +145,8 @@ export function slicePatch(patch, size = PATCH_SLICE) {
 export async function applyIncrementally(c, t, patch) {
   const id = t.id;
   // Index writes record the clock of this transaction (index-versions.mjs).
-  await beginIndexWrite(c, id);
+  // Sparse: it says which entities it removes (noteRemoved, below).
+  await beginIndexWrite(c, id, { entities: [] });
   const index = await indexReader(c, t);
   const fail = (message) => {
     throw new HttpError(400, message);
@@ -540,6 +546,7 @@ export async function applyIncrementally(c, t, patch) {
     ...deleted.map((m) => ['moment', m]),
     ...[...bands].filter(([, b]) => !b).map(([k]) => ['duration', k]),
   ];
+  noteRemoved(c, id, searchDeletes);
   if (searchDeletes.length)
     await removeRows(
       c,

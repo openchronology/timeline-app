@@ -45,6 +45,8 @@ const OWN_SORTS = [
  * - `sorts`: the orders it offers, and `browse`: its order without search text (a search
  *   sorts by relevance unless asked otherwise);
  * - `visibility`: whether it filters by public or private (the account's own lists);
+ * - `library`: whether its search also finds moments and durations, with the filters for
+ *   what it shows and whose timelines it searches (#459; LIBRARY_FIELDS);
  * - `noun`: what its controls and messages call what it lists, `count` how it counts one and
  *   many of them, and `empty`: what it says
  *   when it has nothing at all, before any search, and `none` when a search finds nothing.
@@ -55,10 +57,11 @@ export const LISTS = {
     prefix: '',
     sorts: PUBLIC_SORTS,
     browse: 'featured',
+    library: true,
     noun: 'timelines',
     count: ['timeline', 'timelines'],
     empty: 'No public timelines yet.',
-    none: 'No public timelines match this search.',
+    none: 'No timelines match this search.',
   },
   mine: {
     id: 'mine',
@@ -116,12 +119,35 @@ export const LISTS = {
 };
 /** The fields of a list's state, which each have a query parameter. */
 const FIELDS = ['search', 'tag', 'sort', 'visibility', 'page'];
+/**
+ * A library list's fields besides (#459): `show`, what it finds (SHOWN, all by default);
+ * `within`, `mine` for the account's own timelines alone; `entityPage`, the page of moments
+ * and durations.
+ */
+const LIBRARY_FIELDS = ['show', 'within', 'entityPage'];
+/** What a library list may show, in order. */
+export const SHOWN = ['timelines', 'moments', 'durations'];
 /** The query parameter of `field` (search, tag, sort, visibility or page) for `list`. */
 export function paramName(list, field) {
   return list.prefix ? list.prefix + field[0].toUpperCase() + field.slice(1) : field;
 }
 /** Every query parameter `list` uses. */
-export const paramNames = (list) => FIELDS.map((field) => paramName(list, field));
+export const paramNames = (list) =>
+  [...FIELDS, ...(list.library ? LIBRARY_FIELDS : [])].map((field) => paramName(list, field));
+/**
+ * What a library list shows, from its `show` parameter: one value, a comma-separated list or
+ * (from a form without JavaScript, one box each) several; what it names of SHOWN, in order,
+ * or all of them when it names none.
+ */
+export function readShown(value) {
+  const names = new Set(
+    (Array.isArray(value) ? value : typeof value === 'string' ? [value] : []).flatMap((v) =>
+      String(v).split(','),
+    ),
+  );
+  const shown = SHOWN.filter((kind) => names.has(kind));
+  return shown.length ? shown : [...SHOWN];
+}
 /** A page number from the address: a whole number from 1 to 10,000, or 1 when it is not one. */
 export const pageNumber = (value) =>
   Math.max(1, Math.min(10000, Number.isSafeInteger(Number(value)) ? Number(value) : 1));
@@ -145,7 +171,7 @@ export function readList(params, list) {
   };
   const search = get('search').slice(0, 300),
     sort = get('sort');
-  return {
+  const state = {
     search,
     tag: get('tag').slice(0, 64),
     sort:
@@ -155,6 +181,14 @@ export function readList(params, list) {
     visibility:
       list.visibility && ['public', 'private'].includes(get('visibility')) ? get('visibility') : '',
     page: pageNumber(get('page')),
+  };
+  if (!list.library) return state;
+  const name = paramName(list, 'show');
+  return {
+    ...state,
+    show: readShown(params instanceof URLSearchParams ? params.getAll(name) : params[name]),
+    within: get('within') === 'mine' ? 'mine' : '',
+    entityPage: pageNumber(get('entityPage')),
   };
 }
 /**
@@ -171,6 +205,11 @@ export function listQuery(list, state) {
   if (state.sort && state.sort !== defaultSort(list, state.search ?? '')) set('sort', state.sort);
   if (list.visibility) set('visibility', state.visibility);
   if (state.page > 1) set('page', state.page);
+  if (list.library) {
+    if (state.show && state.show.length < SHOWN.length) set('show', state.show.join(','));
+    set('within', state.within);
+    if (state.entityPage > 1) set('entityPage', state.entityPage);
+  }
   return query;
 }
 /**
@@ -212,7 +251,9 @@ export function listHref(basePath, query, list, state, changes = {}) {
  */
 export function changeList(list, state, changes) {
   const next = { ...state, ...changes };
-  if (!('page' in changes)) next.page = 1;
+  // Moving through one list's pages keeps the other's; anything else starts both again.
+  if (!('page' in changes) && !('entityPage' in changes)) next.page = 1;
+  if (list.library && !('entityPage' in changes) && !('page' in changes)) next.entityPage = 1;
   if ('search' in changes && !('sort' in changes)) {
     const had = !!state.search.trim(),
       has = !!next.search.trim();
@@ -240,6 +281,35 @@ export function navigateList(list, changes, { replace = false } = {}) {
 export function searchBody(list, state, fixed) {
   const { search, tag, sort, visibility, page } = state;
   return { ...fixed, search, tag, sort, page, ...(list.visibility ? { visibility } : {}) };
+}
+/**
+ * A library list's two searches (#459), as the search APIs take them, or null for one it
+ * doesn't show: its timelines (POST /api/timelines/search, with `fixed` over them) and, with
+ * search text, its moments and durations (POST /api/timelines/entities/search). Signed in,
+ * a search with text looks through the timelines the account may read (`visible`), and
+ * `within` mine through its own; browsing without text, and guests, public timelines.
+ */
+export function librarySearches(list, state, fixed, { signedIn = false } = {}) {
+  const text = !!state.search.trim();
+  const scope =
+    signedIn && state.within === 'mine' ? 'mine' : signedIn && text ? 'visible' : fixed.scope;
+  const kinds = state.show.filter((s) => s !== 'timelines').map((s) => s.slice(0, -1));
+  return {
+    timelines: state.show.includes('timelines')
+      ? { ...searchBody(list, state, fixed), scope }
+      : null,
+    entities:
+      text && kinds.length
+        ? {
+            search: state.search,
+            kinds,
+            tag: state.tag,
+            scope: scope === 'mine' ? 'mine' : signedIn ? 'visible' : 'public',
+            ...(fixed.owner ? { owner: fixed.owner } : {}),
+            page: state.entityPage,
+          }
+        : null,
+  };
 }
 /** How many drafts a page of them shows. */
 export const DRAFT_PAGE_SIZE = 12;
@@ -318,7 +388,8 @@ export function statusText(list, state, result) {
   return `${result.total.toLocaleString('en')} ${result.total === 1 ? one : many} · Page ${result.page} of ${result.pages}`;
 }
 /** Whether a list's state narrows it (search text, a tag or a visibility), for its messages. */
-export const isFiltered = (state) => !!(state.search?.trim() || state.tag || state.visibility);
+export const isFiltered = (state) =>
+  !!(state.search?.trim() || state.tag || state.visibility || state.within);
 /** Where this tab keeps the address of the last timeline list it showed. */
 const LAST_LIST = 'openchronology:last-list';
 /** Notes the list at this address (its path and query) as the one to go back to. */

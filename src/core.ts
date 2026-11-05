@@ -84,6 +84,8 @@ export {
   searchIndex,
   searchRows,
   snippet,
+  matchRanges,
+  matchSnippet,
   SEARCH_PAGE_SIZE,
   SEARCH_MAX_TERMS,
 } from './search.js';
@@ -124,13 +126,13 @@ export {
 export type { TimePresentation } from './presentation.js';
 export type { PresentationContext, TimePresenter } from './presentation.js';
 export { createDifference, exactText } from './difference.js';
-export { parseLink, linkFragment, sharePath } from './links.js';
+export { parseLink, linkFragment, sharePath, addressedEntity } from './links.js';
 export { markdownHtml, markdownText, parseMarkdown, safeNoteLink } from './rich-text.js';
 export type { MarkdownBlock, MarkdownInline } from './rich-text.js';
 export * from './addresses.js';
 export * from './local-files.js';
 export * from './wording.js';
-export type { TimelineLink } from './links.js';
+export type { TimelineLink, AddressedEntity } from './links.js';
 export type { DifferenceUnit, TimeDifference } from './difference.js';
 export { planRuler, tickLabel, validateRulerPolicy } from './ruler.js';
 export type { RulerPolicy, RulerTick, RulerPlan } from './ruler.js';

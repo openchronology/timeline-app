@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // A timeline's page, at /<owner>/<slug> (#148) or /timelines/<id>: the editor open at it, its
-// first moments and related timelines (#447) as text, its link-preview metadata (its own image,
+// first moments, related timelines (#447) and the entities on other timelines linking to it
+// (#422) as text, its link-preview metadata (its own image,
 // when it has one, #339) and its structured data (#428).
 // A copy still being prepared waits.
 import Editor from '../../../components/editor.jsx';
@@ -12,6 +13,7 @@ import { relatedTimelines } from '../../../../server/collaboration.mjs';
 import {
   firstMoments,
   jsonLd,
+  linksOf,
   pageMetadata,
   previewOf,
   timelineDescription,
@@ -44,7 +46,7 @@ export default async function TimelinePage({ params }) {
         <PreparingCopy id={id} />
       </main>
     );
-  const [comparisonSources, moments, related] = await Promise.all([
+  const [comparisonSources, moments, related, linkedFrom] = await Promise.all([
     timeline.comparison
       ? Promise.all(
           timeline.comparison.sources.map((source) => services.store.access(source, user?.id)),
@@ -56,6 +58,7 @@ export default async function TimelinePage({ params }) {
       : relatedTimelines(services.pool, user?.id ?? null, timeline.id, services.featured ?? [])
           .then((r) => r.timelines)
           .catch(() => []),
+    timeline.comparison ? [] : linksOf(services, timeline, null, user?.id).catch(() => []),
   ]);
   const data = timelineStructuredData(timeline);
   return (
@@ -63,7 +66,12 @@ export default async function TimelinePage({ params }) {
       {data && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(data) }} />
       )}
-      <TimelineSummary timeline={timeline} moments={moments} related={related} />
+      <TimelineSummary
+        timeline={timeline}
+        moments={moments}
+        related={related}
+        linkedFrom={linkedFrom}
+      />
       <Editor
         siteName={siteName()}
         id={id}

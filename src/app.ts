@@ -122,6 +122,8 @@ import {
   searchIndex,
   searchTerms,
   searchText,
+  matchRanges,
+  addressedEntity,
   snippet,
   SEARCH_PAGE_SIZE,
   createDifference,
@@ -141,6 +143,7 @@ import {
   crossArrowheadPath,
 } from './core.js';
 import type {
+  EdgeBand,
   EntityRef,
   TimeMapping,
   ViewFilter,
@@ -2086,6 +2089,7 @@ function currentComparisonSource(): ComparisonSource | null {
     .sort((a, b) => a.compare(b));
   return {
     key: remoteId ?? 'local-sqlite',
+    timeline: remoteId,
     revision: remoteId ? source.revision : undefined,
     event_generation: remote?.event_generation,
     working: !!workspace?.dirtyCount || dirty,
@@ -2117,6 +2121,7 @@ async function comparisonSources(ids: string[]): Promise<ComparisonSource[]> {
     seen.add(id);
     sources.push({
       key: id,
+      timeline: id,
       revision: info.revision,
       event_generation: info.event_generation,
       title: info.title,
@@ -2163,6 +2168,10 @@ function startComparison(sources: ComparisonSource[], presentation: TimePresenta
   cancelZoomAnimation();
   flushEventEdit();
   const view = new ComparisonView(sources, presentation);
+  // Arcs between entities on different timelines (#422) come from the server.
+  if (!offlineHtml)
+    view.links = (query, signal) =>
+      api<Pick<Frame, 'edges' | 'edgesTruncated'>>('timelines/links/query', 'POST', query, signal);
   if (!comparisonBefore)
     comparisonBefore = {
       viewport: viewport.clone(),
@@ -8173,6 +8182,13 @@ if (!offlineHtml)
     available: () => !offlineHtml && !!session.server,
     native: () => desktop || !platformEditor,
     check: (id) => api<{ id: string; revision: string }>(`timelines/${id}/revision`),
+    // Links between a comparison's timelines are read again and redrawn (#422).
+    linked() {
+      if (!comparison) return;
+      comparison.clearLinks();
+      frameRequest++;
+      requestRender();
+    },
     async refresh(id, revision) {
       const request = documentRequest,
         view = comparison;
@@ -9978,60 +9994,571 @@ function renderRelated(host: HTMLElement, ref: EntityRef | null, readOnly = fals
   };
   more.onclick = () => void load(cursor).catch(fail);
   void load(null).catch(fail);
-  if (!canEdit) return;
-  // New links are found by text search over titles and notes.
-  const add = document.createElement('details');
+  // Links to other timelines (#422) come last, after adding a relationship here.
+  const elsewhere = document.createElement('div');
+  renderTimelineLinks(elsewhere, host, ref, readOnly);
+  if (!canEdit) {
+    host.append(elsewhere);
+    return;
+  }
+  // New relationships are found in the picker: by searching this timeline's events, or by
+  // the address of one of them.
+  const add = document.createElement('button');
+  add.type = 'button';
   add.className = 'related-add';
-  const summary = document.createElement('summary');
-  summary.textContent = 'Add a relationship';
-  const search = document.createElement('input');
-  search.type = 'search';
-  search.placeholder = 'Search events';
-  search.setAttribute('aria-label', 'Find an entity to relate');
-  const results = document.createElement('div');
-  results.className = 'related-results';
-  add.append(summary, search, results);
-  host.append(add);
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  search.oninput = () => {
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      const words = search.value;
-      void (async () => {
-        const page: SearchPage =
-          !sparseWorkspace() && model
-            ? searchIndex(model, words, 1)
-            : await timelineQuery<SearchPage>({
-                kind: 'search',
-                text: words,
-                page: 1,
-                revision: (local ?? remote)!.revision,
-              });
-        if (search.value !== words || generation !== relatedGeneration) return;
-        results.replaceChildren();
-        for (const result of page.results) {
-          const other: EntityRef =
-            result.kind === 'moment' ? { moment: result.id } : { duration: result.id };
-          if (refKey(other) === refKey(ref)) continue;
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.textContent =
-            (result.title || 'Untitled') +
-            ' · ' +
-            (result.kind === 'moment' ? 'moment' : 'duration');
-          button.onclick = () => {
-            setLink(ref, other, true, result);
-            renderRelated(host, ref, readOnly);
-          };
-          results.append(button);
-        }
-        if (!page.results.length && searchTerms(words).length)
-          results.textContent = 'No events match.';
-      })().catch(fail);
-    }, 200);
-  };
+  add.textContent = 'Add a relationship…';
+  add.onclick = () =>
+    openLinkPicker(ref, 'here', () => {
+      if (generation === relatedGeneration) renderRelated(host, ref, readOnly);
+    });
+  host.append(add, elsewhere);
 }
 let relatedGeneration = 0;
+/**
+ * A link from an entity to one on another timeline, or to another timeline as a whole (kind
+ * `timeline`, no times) (#422), as the server lists it.
+ */
+interface TimelineLinkEntry {
+  id: string;
+  timeline: { id: string; title: string; owner: string; slug: string | null };
+  kind: 'moment' | 'duration' | 'timeline';
+  entity: string;
+  title: string;
+  first: string;
+  last: string;
+}
+/**
+ * The section of Related to (`host`), in `container`, listing an entity's links to entities on other timelines (#422;
+ * docs/relationships.md#links-to-other-timelines), 25 at a time, each opening the other
+ * timeline at that entity. Only for a saved server timeline: links join saved entities and
+ * are kept by the server, apart from the timeline. Those who may save it can link to an
+ * entity on another timeline they may save, found by searching their timelines, then that
+ * timeline's events; and remove links (the server checks the other timeline too).
+ */
+function renderTimelineLinks(
+  container: HTMLElement,
+  host: HTMLElement,
+  ref: EntityRef,
+  readOnly: boolean,
+) {
+  const timeline = remote;
+  if (!timeline || local || comparison || offlineHtml) return;
+  const generation = relatedGeneration;
+  const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+  const section = document.createElement('div');
+  section.className = 'timeline-links';
+  const heading = document.createElement('h4');
+  heading.textContent = 'On other timelines';
+  const list = document.createElement('div');
+  list.className = 'related-list';
+  const status = document.createElement('p');
+  status.className = 'field-hint';
+  status.setAttribute('role', 'status');
+  section.append(heading, list, status);
+  container.append(section);
+  const entity: Record<string, string> =
+    'moment' in ref ? { moment: ref.moment } : { duration: ref.duration };
+  const canLink = !readOnly && !!timeline.canWrite && !!session.user;
+  let cursor: string | null = null;
+  const more = document.createElement('button');
+  more.type = 'button';
+  more.textContent = 'Next 25 links';
+  const rerender = () => {
+    if (generation === relatedGeneration) renderRelated(host, ref, readOnly);
+  };
+  const load = async (after: string | null) => {
+    const page = await api<{ links: TimelineLinkEntry[]; next: string | null }>(
+      `timelines/${timeline.id}/links?` +
+        new URLSearchParams({ ...entity, ...(after ? { after } : {}) }),
+    );
+    if (generation !== relatedGeneration) return;
+    list.replaceChildren();
+    for (const link of page.links) {
+      const row = document.createElement('div');
+      row.className = 'related-row';
+      // The other entity's own page (its timeline open at it), or the other timeline's: the
+      // addresses its page and search engines use (#335).
+      const open = document.createElement('a');
+      open.className = 'related-entity';
+      const titled = link.timeline.title || 'Untitled timeline';
+      open.target = '_top';
+      const other = timelinePath(link.timeline);
+      if (link.kind === 'timeline') {
+        open.href = other;
+        open.textContent = `${titled} · the whole timeline`;
+      } else {
+        open.href = `${other}/${link.kind === 'moment' ? 'moments' : 'durations'}/${encodeURIComponent(link.entity)}`;
+        open.textContent =
+          (link.title || (link.kind === 'moment' ? 'Untitled moment' : 'Untitled duration')) +
+          ' · on ' +
+          titled;
+      }
+      open.title = `${link.timeline.title} by ${link.timeline.owner}`;
+      row.append(open);
+      if (canLink) {
+        const unlink = document.createElement('button');
+        unlink.type = 'button';
+        unlink.className = 'related-unlink';
+        unlink.textContent = '×';
+        unlink.setAttribute(
+          'aria-label',
+          `Remove the link with ${link.kind === 'timeline' ? link.timeline.title : link.title || link.entity}`,
+        );
+        unlink.onclick = () =>
+          void api(`timelines/${timeline.id}/links`, 'DELETE', { link: link.id })
+            .then(rerender)
+            .catch((error) => (status.textContent = errorText(error)));
+        row.append(unlink);
+      }
+      list.append(row);
+    }
+    cursor = page.next;
+    if (cursor) list.append(more);
+    status.textContent = page.links.length || after ? '' : 'No links to other timelines.';
+  };
+  more.onclick = () => void load(cursor).catch((error) => (status.textContent = errorText(error)));
+  void load(null).catch((error) => (status.textContent = errorText(error)));
+  if (!canLink) return;
+  // What to link to is found in the picker: searching the timelines the account may save, and
+  // their events, or by a pasted address.
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'related-add';
+  add.textContent = 'Link to another timeline…';
+  add.onclick = () => openLinkPicker(ref, 'elsewhere', rerender);
+  section.append(add);
+}
+/**
+ * What the link picker (#422) offers: an event of this timeline (`timeline` null, with its
+ * search `result` for the relationship's display), or a timeline or one of its events on
+ * another timeline the account may save.
+ */
+interface PickerChoice {
+  kind: 'moment' | 'duration' | 'timeline';
+  id: string;
+  title: string;
+  when: string;
+  snippet: string;
+  timeline: { id: string; title: string; owner: string; slug: string | null } | null;
+  result?: SearchResult;
+}
+/** What the server makes of a pasted address (POST /api/timelines/{id}/links/resolve). */
+interface ResolvedAddress {
+  timeline: { id: string; title: string; owner: string; slug: string | null };
+  entity: {
+    kind: 'moment' | 'duration';
+    id: string;
+    title: string;
+    first: string;
+    last: string;
+    when: string;
+  } | null;
+  same: boolean;
+  canWrite: boolean;
+  full: boolean;
+}
+/** The picker as it is open: the event linking, where to look, and what to do after. */
+let picker: { ref: EntityRef; where: 'here' | 'elsewhere'; done: () => void; page: number } | null =
+  null;
+let pickerTimer: ReturnType<typeof setTimeout> | undefined;
+/** Text with the words a search matched marked (#459), as Explore marks them. */
+function markedText(text: string, terms: string[]): DocumentFragment {
+  const fragment = document.createDocumentFragment();
+  let at = 0;
+  for (const [start, end] of matchRanges(text, terms)) {
+    if (start > at) fragment.append(text.slice(at, start));
+    const mark = document.createElement('mark');
+    mark.textContent = text.slice(start, end);
+    fragment.append(mark);
+    at = end;
+  }
+  if (at < text.length) fragment.append(text.slice(at));
+  return fragment;
+}
+/** Where the picker says what it is doing: the open tab's status line. */
+function pickerStatus(text: string) {
+  const address = el('link-picker-address-tab').getAttribute('aria-selected') === 'true';
+  el(address ? 'link-picker-address-status' : 'link-picker-status').textContent = text;
+}
+/**
+ * Opens the picker for entity `ref` (#422): `here`, to relate it to another event of this
+ * timeline; `elsewhere`, to link it to another timeline or an event on one. It searches as
+ * Explore does (#459), titles and notes with the words marked, its filters folded away:
+ * here, this timeline's events (in the browser, or through the server's search of it);
+ * elsewhere, the timelines and events the account may save that are below the link limit,
+ * never on this timeline. Or it reads a pasted address. Choosing relates or links them, then
+ * `done`.
+ */
+function openLinkPicker(ref: EntityRef, where: 'here' | 'elsewhere', done: () => void) {
+  const elsewhere = where === 'elsewhere';
+  picker = { ref, where, done, page: 1 };
+  el('link-picker-heading').textContent = elsewhere
+    ? 'Link to another timeline'
+    : 'Add a relationship';
+  el('link-picker-show-timelines').hidden = !elsewhere;
+  el('link-picker-tag-label').hidden = !elsewhere;
+  el('link-picker-within').hidden = !elsewhere;
+  el('link-picker-address-hint').textContent = elsewhere
+    ? 'Paste the address of a timeline you can edit, or of an event on it.'
+    : 'Paste the address of an event on this timeline, or a link to one.';
+  for (const id of ['link-picker-text', 'link-picker-url', 'link-picker-tag'])
+    el<HTMLInputElement>(id).value = '';
+  for (const box of el('link-picker-show').querySelectorAll('input')) box.checked = true;
+  el<HTMLInputElement>('link-picker-within').querySelector('input')!.checked = true;
+  el<HTMLDetailsElement>('link-picker-filters').open = false;
+  for (const id of ['link-picker-results', 'link-picker-found']) el(id).replaceChildren();
+  el('link-picker-status').textContent = '';
+  el('link-picker-address-status').textContent = '';
+  el('link-picker-pages').hidden = true;
+  pickerTab('search');
+  el<HTMLDialogElement>('link-picker').showModal();
+  el('link-picker-text').focus();
+  void pickerSearch();
+}
+/** Shows the picker's Search or Address tab. */
+function pickerTab(tab: 'search' | 'address') {
+  for (const name of ['search', 'address'] as const) {
+    el(`link-picker-${name}-tab`).setAttribute('aria-selected', String(name === tab));
+    el(`link-picker-${name}`).hidden = name !== tab;
+  }
+}
+/** The kinds the picker's boxes show, of those it offers. */
+function pickerShown(): string[] {
+  return [...el('link-picker-show').querySelectorAll<HTMLInputElement>('input')]
+    .filter((box) => box.checked && !box.closest('label')!.hidden)
+    .map((box) => box.value);
+}
+/** Searches as the picker's fields say, and lists what it may choose. */
+async function pickerSearch() {
+  const current = picker;
+  if (!current) return;
+  const words = el<HTMLInputElement>('link-picker-text').value,
+    terms = searchTerms(words),
+    shown = pickerShown(),
+    kinds = shown.filter((k) => k !== 'timelines').map((k) => k.slice(0, -1));
+  const choices: PickerChoice[] = [];
+  let pages = 0;
+  if (current.where === 'here') {
+    if (!terms.length) {
+      el('link-picker-results').replaceChildren();
+      el('link-picker-pages').hidden = true;
+      pickerStatus('Type words from the title or notes of an event on this timeline.');
+      return;
+    }
+    const page: SearchPage =
+      !sparseWorkspace() && model
+        ? searchIndex(model, words, current.page)
+        : await timelineQuery<SearchPage>({
+            kind: 'search',
+            text: words,
+            page: current.page,
+            revision: (local ?? remote)!.revision,
+          });
+    pages = Math.ceil(Number(page.total) / SEARCH_PAGE_SIZE);
+    for (const result of page.results) {
+      const other: EntityRef =
+        result.kind === 'moment' ? { moment: result.id } : { duration: result.id };
+      if (!kinds.includes(result.kind) || refKey(other) === refKey(current.ref)) continue;
+      choices.push({
+        kind: result.kind,
+        id: result.id,
+        title: result.title,
+        when:
+          result.kind === 'moment'
+            ? presentedAlone(Q.parse(result.first))
+            : `${presentedAlone(Q.parse(result.first))} → ${presentedAlone(Q.parse(result.last))}`,
+        snippet: result.snippet,
+        timeline: null,
+        result,
+      });
+    }
+  } else {
+    const timeline = remote!,
+      within = el('link-picker-within').querySelector<HTMLInputElement>('input:checked')!.value,
+      tag = el<HTMLInputElement>('link-picker-tag').value.trim();
+    const filters = {
+      scope: within === 'mine' ? 'mine' : 'writable',
+      tag,
+      linkable: true,
+      exclude: timeline.id,
+    };
+    const [timelines, entities] = await Promise.all([
+      shown.includes('timelines')
+        ? api<{
+            timelines: {
+              id: string;
+              title: string;
+              owner: string;
+              slug: string | null;
+              description?: string;
+              time_span?: string | null;
+            }[];
+            pages: number;
+          }>('timelines/search', 'POST', {
+            ...filters,
+            search: words,
+            page: current.page,
+            limit: 5,
+            sort: terms.length ? 'relevance' : 'updated',
+          })
+        : null,
+      terms.length && kinds.length
+        ? api<{
+            entities: {
+              kind: 'moment' | 'duration';
+              id: string;
+              title: string;
+              when: string;
+              snippet: string;
+              timeline: { id: string; title: string; owner: string; slug: string | null };
+            }[];
+            pages: number;
+          }>('timelines/entities/search', 'POST', {
+            ...filters,
+            search: words,
+            kinds,
+            page: current.page,
+          })
+        : null,
+    ]);
+    for (const t of timelines?.timelines ?? [])
+      choices.push({
+        kind: 'timeline',
+        id: '',
+        title: t.title,
+        when: t.time_span ?? '',
+        snippet: snippet(t.description ?? ''),
+        timeline: { id: t.id, title: t.title, owner: t.owner, slug: t.slug ?? null },
+      });
+    for (const e of entities?.entities ?? []) choices.push({ ...e });
+    // Both lists page together, five timelines and twenty events at a time, until both end.
+    pages = Math.max(timelines?.pages ?? 0, entities?.pages ?? 0);
+  }
+  if (picker !== current || el<HTMLInputElement>('link-picker-text').value !== words) return;
+  el('link-picker-results').replaceChildren(...choices.map((choice) => pickerItem(choice, terms)));
+  el('link-picker-pages').hidden = pages <= 1;
+  el<HTMLButtonElement>('link-picker-previous').disabled = current.page <= 1;
+  el<HTMLButtonElement>('link-picker-next').disabled = current.page >= pages;
+  pickerStatus(
+    choices.length
+      ? ''
+      : current.where === 'here'
+        ? 'No events match.'
+        : terms.length || shown.includes('timelines')
+          ? 'Nothing you can link to matches.'
+          : 'Type words to find events.',
+  );
+}
+/** One choice in the picker's lists, as a button choosing it. */
+function pickerItem(choice: PickerChoice, terms: string[]): HTMLLIElement {
+  const item = document.createElement('li');
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'search-result';
+  const heading = document.createElement('span');
+  heading.className = 'picker-heading';
+  const kind = document.createElement('span');
+  kind.className = 'picker-kind';
+  kind.textContent = { moment: 'Moment', duration: 'Duration', timeline: 'Timeline' }[choice.kind];
+  const title = document.createElement('strong');
+  title.append(
+    markedText(
+      choice.title ||
+        (choice.kind === 'timeline' ? 'Untitled timeline' : `Untitled ${choice.kind}`),
+      terms,
+    ),
+  );
+  heading.append(kind, title);
+  const meta = document.createElement('span');
+  meta.className = 'search-meta';
+  meta.textContent = [
+    choice.when,
+    choice.timeline &&
+      (choice.kind === 'timeline'
+        ? `by ${choice.timeline.owner}`
+        : `on ${choice.timeline.title || 'Untitled timeline'} by ${choice.timeline.owner}`),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  button.append(heading, meta);
+  if (choice.snippet) {
+    const notes = document.createElement('span');
+    notes.className = 'search-snippet';
+    notes.append(markedText(choice.snippet, terms));
+    button.append(notes);
+  }
+  button.onclick = () => void pickerChoose(choice);
+  item.append(button);
+  return item;
+}
+/** Relates or links the picker's entity to `choice`, then closes it. */
+async function pickerChoose(choice: PickerChoice) {
+  const current = picker;
+  if (!current) return;
+  try {
+    if (current.where === 'here') {
+      setLink(
+        current.ref,
+        choice.kind === 'moment' ? { moment: choice.id } : { duration: choice.id },
+        true,
+        choice.result,
+      );
+    } else {
+      const from =
+        'moment' in current.ref
+          ? { moment: current.ref.moment }
+          : { duration: current.ref.duration };
+      await api(`timelines/${remote!.id}/links`, 'POST', {
+        from,
+        to: {
+          timeline: choice.timeline!.id,
+          ...(choice.kind === 'timeline' ? {} : { [choice.kind]: choice.id }),
+        },
+      });
+    }
+  } catch (error) {
+    pickerStatus(error instanceof Error ? error.message : String(error));
+    return;
+  }
+  picker = null;
+  el<HTMLDialogElement>('link-picker').close();
+  current.done();
+}
+/** Reads the picker's pasted address and offers what it names, if it may be chosen. */
+async function pickerFind() {
+  const current = picker,
+    address = el<HTMLInputElement>('link-picker-url').value.trim();
+  if (!current || !address) return;
+  const found = el('link-picker-found');
+  found.replaceChildren();
+  const refuse = (text: string) => (el('link-picker-address-status').textContent = text);
+  refuse('Looking it up…');
+  let choice: PickerChoice;
+  try {
+    if (current.where === 'here' && (!remote || local || offlineHtml)) {
+      // A timeline without a server address: a link to one of its events (#moment/<id>).
+      const hash = address.includes('#') ? address.slice(address.indexOf('#')) : address;
+      const named = addressedEntity(address)?.entity ?? parseLink(hash);
+      const entry =
+        named && (named.kind === 'moment' || named.kind === 'duration')
+          ? describe(
+              refKey(named.kind === 'moment' ? { moment: named.id } : { duration: named.id }),
+            )
+          : null;
+      if (!entry) return refuse('That isn’t a link to an event on this timeline.');
+      choice = {
+        kind: entry.kind,
+        id: entry.id,
+        title: entry.title,
+        when: presentedAlone(Q.parse(entry.first)),
+        snippet: '',
+        timeline: null,
+        result: { ...entry, snippet: '' },
+      };
+    } else {
+      const named = await api<ResolvedAddress>(`timelines/${remote!.id}/links/resolve`, 'POST', {
+        address,
+      });
+      if (current.where === 'here') {
+        if (!named.same)
+          return refuse('That’s on another timeline: link to it with Link to another timeline.');
+        if (!named.entity)
+          return refuse('That’s this timeline: paste the address of one of its events.');
+        const e = named.entity;
+        choice = {
+          kind: e.kind,
+          id: e.id,
+          title: e.title,
+          when: e.when,
+          snippet: '',
+          timeline: null,
+          result: {
+            kind: e.kind,
+            id: e.id,
+            first: e.first,
+            last: e.last,
+            title: e.title,
+            snippet: '',
+          },
+        };
+      } else {
+        if (named.same)
+          return refuse('That’s this timeline: relate its events with Add a relationship.');
+        if (!named.canWrite)
+          return refuse('You can’t edit that timeline, so you can’t link to it.');
+        if (named.full) return refuse('That timeline already has as many links as it may have.');
+        choice = named.entity
+          ? { ...named.entity, snippet: '', timeline: named.timeline }
+          : {
+              kind: 'timeline',
+              id: '',
+              title: named.timeline.title,
+              when: '',
+              snippet: '',
+              timeline: named.timeline,
+            };
+      }
+    }
+  } catch (error) {
+    return refuse(error instanceof Error ? error.message : String(error));
+  }
+  if (
+    current.where === 'here' &&
+    refKey(choice.kind === 'moment' ? { moment: choice.id } : { duration: choice.id }) ===
+      refKey(current.ref)
+  )
+    return refuse('That’s this event itself.');
+  if (picker !== current) return;
+  refuse('');
+  found.replaceChildren(pickerItem(choice, []));
+}
+el('link-picker-search-tab').onclick = () => {
+  pickerTab('search');
+  el('link-picker-text').focus();
+};
+el('link-picker-address-tab').onclick = () => {
+  pickerTab('address');
+  el('link-picker-url').focus();
+};
+/** Searches again from the first page, once typing pauses (`delay`). */
+function pickerChanged(delay = 250) {
+  clearTimeout(pickerTimer);
+  if (picker) picker.page = 1;
+  pickerTimer = setTimeout(
+    () => void pickerSearch().catch((error) => pickerStatus(String(error?.message ?? error))),
+    delay,
+  );
+}
+el('link-picker-text').oninput = () => pickerChanged();
+el('link-picker-tag').oninput = () => pickerChanged();
+el('link-picker-within').onchange = () => pickerChanged(0);
+el('link-picker-show').onchange = (event) => {
+  // One kind at least: clearing the last box shown checks it again.
+  const box = event.target as HTMLInputElement;
+  if (!pickerShown().length) box.checked = true;
+  pickerChanged(0);
+};
+for (const [id, step] of [
+  ['link-picker-previous', -1],
+  ['link-picker-next', 1],
+] as const)
+  el(id).onclick = () => {
+    if (!picker) return;
+    picker.page += step;
+    void pickerSearch().catch((error) => pickerStatus(String(error?.message ?? error)));
+  };
+el('link-picker-find').onclick = () => void pickerFind();
+el('link-picker-url').onkeydown = (event) => {
+  if ((event as KeyboardEvent).key === 'Enter') {
+    event.preventDefault();
+    void pickerFind();
+  }
+};
+el('link-picker-form').onsubmit = (event) => {
+  event.preventDefault();
+  pickerChanged(0);
+};
+el('link-picker').addEventListener('close', () => (picker = null));
 function describeLabel(ref: EntityRef) {
   const entry = describe(refKey(ref));
   return entry?.title || ('moment' in ref ? 'this moment' : 'this duration');
@@ -10108,17 +10635,23 @@ function arrowheadLookup(
   return (a, b) => arcArrowheads(end(a), end(b));
 }
 /**
- * The axes arcs are drawn on: the timeline's, or on a separation (#415) the upper track's for
- * ends on it (`aIn`/`bIn`) and the lower track's for the rest. Other comparisons draw no arcs.
+ * Where each end of an arc is drawn: the height of the axis it rises from. On the timeline,
+ * its axis; on a separation (#415) the upper track's for ends on it (`aIn`/`bIn`) and the
+ * lower track's for the rest; in a comparison, the axis of the track each end's timeline is
+ * on (`aKey`/`bKey` for a link between two of them, #422, else the arc's own track), or the
+ * one axis of a combined comparison.
  */
-function arcAxes(): { upper: number; lower: number } | null {
-  if (!comparison) return { upper: 192, lower: 192 };
-  if (!separation || comparison.combined || comparison.tracks.length !== 2) return null;
+function arcAxes(): ((edge: EdgeBand, end: 'a' | 'b') => number) | null {
+  if (!comparison) return () => 192;
+  if (comparison.combined) return () => 192;
   const rows = comparisonRows().rows;
-  return {
-    upper: 192 + (rows.get(comparison.tracks[0].source.key)?.offset ?? 0),
-    lower: 192 + (rows.get(comparison.tracks[1].source.key)?.offset ?? 0),
-  };
+  const axis = (key: string | undefined) => 192 + (rows.get(key ?? '')?.offset ?? 0);
+  if (separation && comparison.tracks.length === 2) {
+    const upper = axis(comparison.tracks[0].source.key),
+      lower = axis(comparison.tracks[1].source.key);
+    return (edge, end) => ((end === 'a' ? edge.aIn : edge.bIn) === false ? lower : upper);
+  }
+  return (edge, end) => axis((end === 'a' ? edge.aKey : edge.bKey) ?? edge.sourceKey);
 }
 function renderEdgeArcs() {
   const svg = el('edge-arcs');
@@ -10130,7 +10663,8 @@ function renderEdgeArcs() {
   let entities: ReturnType<typeof frameEntities> | null = null;
   const onScreen = () => (entities ??= frameEntities());
   const arrowhead = arrowheadLookup(onScreen);
-  const name = (ref: EntityRef) =>
+  const name = (ref: EntityRef, title?: string) =>
+    title ||
     describe(refKey(ref))?.title ||
     onScreen().get(refKey(ref))?.title ||
     ('moment' in ref ? 'Moment' : 'Duration');
@@ -10139,8 +10673,8 @@ function renderEdgeArcs() {
       xb = (inset() + viewport.x(parsedTime(edge.bTime), width())) / uiScale;
     // Each end on its track's axis: an arc within a track rises above it; one between the
     // tracks crosses the gap from one end to the other.
-    const ya = edge.aIn === false ? axes!.lower : axes!.upper,
-      yb = edge.bIn === false ? axes!.lower : axes!.upper;
+    const ya = axes!(edge, 'a'),
+      yb = axes!(edge, 'b');
     const distance = Math.abs(xb - xa);
     const lift = Math.min(150, 18 + distance * 0.3);
     let arc = edgeArcs.get(edge.id);
@@ -10198,12 +10732,9 @@ function renderEdgeArcs() {
     // an arrowhead at exactly one end, the name reads toward it.
     const named = `${generation}:${toA}:${toB}`;
     if (arc.named !== named) {
-      arc.title.textContent =
-        toA === toB
-          ? `${name(edge.a)} ↔ ${name(edge.b)}`
-          : toB
-            ? `${name(edge.a)} → ${name(edge.b)}`
-            : `${name(edge.b)} → ${name(edge.a)}`;
+      const a = name(edge.a, edge.aTitle),
+        b = name(edge.b, edge.bTitle);
+      arc.title.textContent = toA === toB ? `${a} ↔ ${b}` : toB ? `${a} → ${b}` : `${b} → ${a}`;
       arc.named = named;
     }
   }

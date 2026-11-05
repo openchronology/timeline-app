@@ -375,6 +375,111 @@ h2 {
   flex: 1;
   min-width: 190px;
 }
+/* Explore's search (#459): one field across the width, its filters folded under it. */
+.library-search {
+  display: block;
+}
+.library-search-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+.search-controls .library-search-row label {
+  flex: 1;
+  min-width: 0;
+}
+.library-search-row input[type='search'] {
+  min-height: 44px;
+  font-size: 16px;
+}
+.search-filters {
+  margin-top: 10px;
+}
+.search-filters summary {
+  display: inline-block;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label);
+}
+.search-filters summary::before {
+  content: '▸ ';
+}
+.search-filters[open] summary::before {
+  content: '▾ ';
+}
+.search-filters-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.search-filters fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.search-filters legend {
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label);
+}
+.search-filters label.checkbox {
+  flex: none;
+  min-width: 0;
+  font-weight: 400;
+  color: inherit;
+}
+/* Moments and durations found by Explore's search (#459). */
+.entity-results {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.entity-results[aria-busy='true'] {
+  opacity: 0.6;
+}
+.entity-result {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.entity-result-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0;
+  font-size: 16px;
+}
+.entity-kind {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--tint);
+  font-size: 12px;
+  font-weight: 600;
+}
+.entity-result-meta,
+.entity-result p {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+.entity-result-meta {
+  color: var(--label);
+}
 .tags {
   display: flex;
   flex-wrap: wrap;
@@ -2025,7 +2130,9 @@ main.help {
   color: var(--muted);
 }
 .help-results mark,
-.help-article mark {
+.help-article mark,
+.entity-result mark,
+.timeline-card mark {
   background: var(--highlight);
   color: inherit;
 }

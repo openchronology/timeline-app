@@ -39,6 +39,7 @@ import { cursorRows, documentChunks, inSnapshot, RELATIONSHIP_ORDER } from './do
 import { MOMENT_TREE, INTERVAL_TREE, intervalPayload, upsertRows } from './avl.mjs';
 import { applyIncrementally, incremental, slicePatch, timelineSettings } from './incremental.mjs';
 import { rebaseSave } from './save-merge.mjs';
+import { pruneLinks } from './timeline-links.mjs';
 import {
   beginIndexWrite,
   copyLevel,
@@ -293,7 +294,8 @@ export class PostgresStore {
     }
   }
   /**
-   * Timeline `id`'s current revision number, `{ id, revision }`, if `userId` (null when
+   * Timeline `id`'s current revision number and link generation (#422), `{ id, revision,
+   * links }`, if `userId` (null when
    * signed out) may see it; HttpError 404 otherwise. A cheap check for clients polling or
    * subscribing to changes (GET /timelines/:id/revision, live.mjs): unlike access it reads
    * no other columns, and it does not refuse a copy still being prepared.
@@ -303,7 +305,7 @@ export class PostgresStore {
     // enabled administrator (not through an API key: adminId), or a member of a timeline not restricted by moderators (a
     // restricted timeline is also private, so `public` cannot let anyone else in).
     const { rows } = await client.query(
-      `SELECT t.id,t.revision FROM oc_timelines t
+      `SELECT t.id,t.revision,t.link_generation::text AS links FROM oc_timelines t
       WHERE t.id=$1 AND (t.visibility='public' OR t.owner_id=$2::uuid
       OR EXISTS(SELECT 1 FROM oc_users a WHERE a.id=$3::uuid AND a.is_admin AND NOT a.is_disabled)
       OR (EXISTS(SELECT 1 FROM oc_members m WHERE m.timeline_id=t.id AND m.user_id=$2::uuid)
@@ -588,7 +590,7 @@ export class PostgresStore {
     const { index_bases: bases, index_clocks: clocks } = await lineageOf(client, id);
     const taken = bases.length - this.levels();
     if (taken <= 0) return;
-    await beginIndexWrite(client, id);
+    await beginIndexWrite(client, id, { entities: [] });
     let entities = 0;
     // Nearest first: a nearer level's copied rows then hide the same keys of the next, as
     // they did when read through.
@@ -720,7 +722,7 @@ export class PostgresStore {
         [id],
       );
       if (!rows[0]?.index_bases.length) return true;
-      await beginIndexWrite(c, id);
+      await beginIndexWrite(c, id, { entities: [] });
       const index = await indexReader(c, rows[0]);
       // One table at a time, one page per step: the fork's visible rows (indexReader) that
       // come from a level rather than its own (timeline_id is another's), inserted as its
@@ -945,7 +947,8 @@ export class PostgresStore {
    * another level first) and may set on it: `afterCommit`, a function run once committed
    * (background work such as refreshText or prepare); `analyze`, true or a list of tables
    * whose statistics to refresh after commit; `compact`, a fork to compact after commit.
-   * beginIndexWrite sets `indexWrites`. Resolves to what `action` returns. On any error it
+   * beginIndexWrite sets `indexWrites` and `indexWritten`, whose timelines' links to entities
+   * they no longer hold are removed before committing (#422; pruneLinks). Resolves to what `action` returns. On any error it
    * rolls back and rethrows, turning the storage trigger's "Account storage limit"
    * exception into HttpError 413.
    */
@@ -954,10 +957,12 @@ export class PostgresStore {
     c.afterCommit = null;
     c.analyze = false;
     c.indexWrites = false;
+    c.indexWritten = null;
     c.compact = null;
     try {
       await c.query('BEGIN');
       const result = await action(c);
+      if (c.indexWritten) await pruneLinks(c, c.indexWritten);
       if (c.indexWrites && !c.analyze) {
         // The retiring triggers count the transaction's retired rows in the transaction-local
         // setting oc.retired (unset, or empty, when none were): many make the retired tables'
@@ -983,6 +988,7 @@ export class PostgresStore {
       throw e;
     } finally {
       c.afterCommit = null;
+      c.indexWritten = null;
       c.release();
     }
   }
@@ -2609,7 +2615,7 @@ export async function backfillEntitySearch(client) {
       walk(node.right);
     };
     walk(durationTree(document.durations ?? [], (moment) => times.get(moment)));
-    await beginIndexWrite(client, timeline.id);
+    await beginIndexWrite(client, timeline.id, { entities: [] });
     await store.indexSearch(client, timeline.id, document, bands);
   }
   return rows.length;

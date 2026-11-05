@@ -37,10 +37,13 @@ export const VERSIONED_TABLES = [
  * Must precede any change to the index: inserts made without it fail. Returns the clock.
  * Side effects: the UPDATE locks the timeline row until the transaction ends, so writers of
  * one timeline's index take turns; sets `client.indexWrites` (the store's transaction then
- * checks how many versions were retired, to refresh statistics). Throws when the timeline
- * is missing.
+ * checks how many versions were retired, to refresh statistics) and records in
+ * `client.indexWritten` which of the timeline's links to other timelines to check before
+ * committing (pruneLinks in timeline-links.mjs): all of them (null), unless every write in the
+ * transaction says which entities it removed (`entities`, then removedEntities); a write that
+ * removes none, such as compacting a fork, passes none. Throws when the timeline is missing.
  */
-export async function beginIndexWrite(client, timelineId) {
+export async function beginIndexWrite(client, timelineId, { entities } = {}) {
   // Advances the clock and reads the highest pin (empty text when nothing pins the index).
   const { rows } = await client.query(
     `UPDATE oc_timelines SET index_clock=index_clock+1 WHERE id=$1
@@ -49,6 +52,10 @@ export async function beginIndexWrite(client, timelineId) {
   );
   if (!rows[0]) throw new Error('Writing the index of a missing timeline.');
   client.indexWrites = true;
+  const written = (client.indexWritten ??= new Map());
+  if (!entities) written.set(timelineId, null);
+  else if (!written.has(timelineId)) written.set(timelineId, new Set());
+  if (entities) removedEntities(client, timelineId, entities);
   // Transaction-local settings (set_config's third argument) the triggers read: oc.clock is
   // the `since` default of every index table and the clock recorded by updates and
   // retirements; a row is retired only when it belongs to oc.timeline and was written at or
@@ -59,6 +66,15 @@ export async function beginIndexWrite(client, timelineId) {
     [rows[0].clock, timelineId, rows[0].pinned],
   );
   return rows[0].clock;
+}
+
+/**
+ * Records that a write to timeline `timelineId`'s index (begun with beginIndexWrite's
+ * `entities`) removed `entities` ([kind, id] pairs), whose links pruneLinks then checks.
+ */
+export function removedEntities(client, timelineId, entities) {
+  const removed = client.indexWritten?.get(timelineId);
+  for (const [kind, id] of entities) removed?.add(kind + '\0' + id);
 }
 
 /**

@@ -18,6 +18,7 @@ const THUMBNAIL =
 export async function checkPopulate(browser) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const photo = 'file:///home/someone/Pictures/Trip%202024/IMG_0042.JPG';
+  const video = 'file:///home/someone/Pictures/Trip%202024/clip.mp4';
   let document = null,
     index = null;
   const calls = [];
@@ -47,7 +48,7 @@ export async function checkPopulate(browser) {
             time: '1714979289/1',
             metadata: {
               title: 'clip.mp4',
-              sources: ['file:///home/someone/Pictures/Trip%202024/clip.mp4'],
+              sources: [video],
               tags: ['file:video'],
             },
           },
@@ -84,7 +85,7 @@ export async function checkPopulate(browser) {
         if (group.id) group.metadata = document.events.find((e) => e.id === group.id)?.metadata;
       return frame;
     }
-    // A thumbnail (#440) for each photo asked for; a video has none.
+    // A thumbnail (#440, #442) for each photo asked for; this video has none to give.
     if (command === 'desktop_thumbnails')
       return args.urls.map((url) => (/\.jpg$/i.test(url) ? THUMBNAIL : null));
     if (['desktop_open_file', 'desktop_reveal_file', 'desktop_populate_clear'].includes(command))
@@ -187,7 +188,8 @@ export async function checkPopulate(browser) {
       /Made 2 moments from files\. Left out: 1 had no recorded date\./,
     );
 
-    // The photo's marker shows its thumbnail (#440); the video's, none.
+    // The photo's marker shows its thumbnail (#440); the video is asked for too (#442), and
+    // without one keeps its marker.
     await page.locator('#fit-button').click();
     await page.waitForFunction(
       (src) =>
@@ -196,9 +198,9 @@ export async function checkPopulate(browser) {
     );
     const asks = calls.filter(([command]) => command === 'desktop_thumbnails');
     assert.deepEqual(
-      [...new Set(asks.flatMap(([, args]) => args.urls))],
-      [photo],
-      'only the photo is asked for',
+      [...new Set(asks.flatMap(([, args]) => args.urls))].sort(),
+      [photo, video].sort(),
+      'the photo and the video are asked for',
     );
     assert.equal(await page.locator('.event-marker.icon').count(), 1);
 

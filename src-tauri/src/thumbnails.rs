@@ -1,16 +1,19 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-//! Thumbnails of photos on this computer (#440), for moments whose source is one (#433): a small
-//! JPEG, turned the way the photo says it was taken, as a `data:` URL the page shows as the
-//! moment's marker (the desktop's content policy allows `data:` images and no local files).
+//! Thumbnails of photos and videos on this computer (#440, #442), for moments whose source is
+//! one (#433): a small JPEG, turned the way the photo says it was taken, as a `data:` URL the page
+//! shows as the moment's marker (the desktop's content policy allows `data:` images and no local
+//! files).
 //!
-//! A thumbnail is the photo's own EXIF thumbnail where it has one (most cameras' and phones'
-//! JPEGs and many raw files do), or else the photo scaled down. They are kept in the app's cache
-//! folder, named by a hash of the file's path, size and modification time, so a changed photo
+//! A photo's thumbnail is its own EXIF thumbnail where it has one (most cameras' and phones'
+//! JPEGs and many raw files do), or else the photo scaled down. A video's is the cover picture
+//! it carries, where it has one. Failing those (videos, and HEIC, AVIF or raw photos this app
+//! can't decode), the system makes one (system_thumbnails.rs). They are kept in the app's cache
+//! folder, named by a hash of the file's path, size and modification time, so a changed file
 //! gets a new one. They are never sent anywhere: the page holds them only to draw them.
 use base64::Engine;
 use image::{codecs::jpeg::JpegEncoder, DynamicImage, ImageFormat, ImageReader, Limits};
 use std::{
-    fs,
+    fs::{self, File},
     io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
     time::UNIX_EPOCH,
@@ -23,12 +26,16 @@ const MOST_BYTES: u64 = 256 * 1024 * 1024;
 /// The most thumbnails asked for at once.
 pub const MOST_AT_ONCE: usize = 64;
 
-/// The photo a `file:` link names, when a thumbnail can be made of it: an existing regular file
-/// with a photo's extension (populate::kind).
-fn photo(link: &str) -> Option<(PathBuf, fs::Metadata)> {
+/// The largest cover picture read from a video.
+const MOST_COVER_BYTES: u64 = 16 * 1024 * 1024;
+
+/// The photo or video a `file:` link names, when a thumbnail can be made of it: an existing
+/// regular file with a photo's or a video's extension (populate::kind), and which it is.
+fn picturable(link: &str) -> Option<(PathBuf, fs::Metadata, &'static str)> {
     let path = fs::canonicalize(crate::populate::local_path(link).ok()?).ok()?;
     let metadata = fs::metadata(&path).ok()?;
-    (metadata.is_file() && crate::populate::kind(&path) == "photo").then_some((path, metadata))
+    let kind = crate::populate::kind(&path);
+    (metadata.is_file() && (kind == "photo" || kind == "video")).then_some((path, metadata, kind))
 }
 /// The cache file of a photo's thumbnail: FNV-1a of its path, size and modification time.
 fn cache_name(path: &Path, metadata: &fs::Metadata) -> String {
@@ -48,15 +55,15 @@ fn cache_name(path: &Path, metadata: &fs::Metadata) -> String {
     }
     format!("{hash:016x}.jpg")
 }
-/// The thumbnail of the photo `link` names, as a `data:image/jpeg;base64,…` URL, from `cache` or
-/// made and kept there; None when it isn't a photo on this computer or can't be read.
+/// The thumbnail of the photo or video `link` names, as a `data:image/jpeg;base64,…` URL, from
+/// `cache` or made and kept there; None when it isn't one on this computer or none can be made.
 pub fn thumbnail(cache: &Path, link: &str) -> Option<String> {
-    let (path, metadata) = photo(link)?;
+    let (path, metadata, kind) = picturable(link)?;
     let kept = cache.join(cache_name(&path, &metadata));
     let jpeg = match fs::read(&kept) {
         Ok(jpeg) => jpeg,
         Err(_) => {
-            let jpeg = make(&path, metadata.len())?;
+            let jpeg = make(&path, metadata.len(), kind)?;
             // Written whole, then renamed, so a half-written file is never read back.
             let _ = fs::create_dir_all(cache);
             let partial = kept.with_extension(format!("{}.part", std::process::id()));
@@ -71,32 +78,28 @@ pub fn thumbnail(cache: &Path, link: &str) -> Option<String> {
         base64::engine::general_purpose::STANDARD.encode(jpeg)
     ))
 }
-/// Makes a photo's thumbnail: its own EXIF thumbnail, or else the photo scaled down; turned
-/// upright; at most SIDE pixels a side; as a JPEG.
-fn make(path: &Path, size: u64) -> Option<Vec<u8>> {
-    let exif = read_exif(path);
-    let decoded = exif
-        .thumbnail
-        .and_then(|bytes| image::load_from_memory_with_format(&bytes, ImageFormat::Jpeg).ok());
-    let mut picture = match decoded {
-        Some(picture) => picture,
-        None if size <= MOST_BYTES => {
-            let mut reader = ImageReader::open(path).ok()?.with_guessed_format().ok()?;
-            let mut limits = Limits::default();
-            limits.max_image_width = Some(20_000);
-            limits.max_image_height = Some(20_000);
-            limits.max_alloc = Some(512 * 1024 * 1024);
-            reader.limits(limits);
-            reader.decode().ok()?
-        }
-        None => return None,
+/// Makes a thumbnail: a photo's own EXIF thumbnail or the photo scaled down, turned upright; a
+/// video's cover picture; or else the system's (already upright); at most SIDE pixels a side; as
+/// a JPEG.
+fn make(path: &Path, size: u64, kind: &str) -> Option<Vec<u8>> {
+    let own = if kind == "video" {
+        cover(path)
+    } else {
+        let exif = read_exif(path);
+        exif.thumbnail
+            .and_then(|bytes| image::load_from_memory_with_format(&bytes, ImageFormat::Jpeg).ok())
+            .or_else(|| (size <= MOST_BYTES).then(|| decode(path)).flatten())
+            .map(|mut picture| {
+                if let Some(orientation) = exif
+                    .orientation
+                    .and_then(image::metadata::Orientation::from_exif)
+                {
+                    picture.apply_orientation(orientation);
+                }
+                picture
+            })
     };
-    if let Some(orientation) = exif
-        .orientation
-        .and_then(image::metadata::Orientation::from_exif)
-    {
-        picture.apply_orientation(orientation);
-    }
+    let mut picture = own.or_else(|| crate::system_thumbnails::thumbnail(path))?;
     // Shrunk, never enlarged: a small embedded thumbnail stays as it is.
     if picture.width() > SIDE || picture.height() > SIDE {
         picture = picture.thumbnail(SIDE, SIDE);
@@ -107,6 +110,77 @@ fn make(path: &Path, size: u64) -> Option<Vec<u8>> {
         .write_with_encoder(JpegEncoder::new_with_quality(&mut jpeg, 80))
         .ok()?;
     Some(jpeg)
+}
+
+/// A photo decoded by the image crate, within limits on its size and memory.
+fn decode(path: &Path) -> Option<DynamicImage> {
+    let mut reader = ImageReader::open(path).ok()?.with_guessed_format().ok()?;
+    let mut limits = Limits::default();
+    limits.max_image_width = Some(20_000);
+    limits.max_image_height = Some(20_000);
+    limits.max_alloc = Some(512 * 1024 * 1024);
+    reader.limits(limits);
+    reader.decode().ok()
+}
+
+/// The cover picture an MP4 or QuickTime video carries, as phones' and editors' may: the JPEG or
+/// PNG in moov/udta/meta/ilst/covr/data, decoded. None for other formats and videos without one.
+fn cover(path: &Path) -> Option<DynamicImage> {
+    let mut file = File::open(path).ok()?;
+    let end = file.metadata().ok()?.len();
+    let moov = find_box(&mut file, 0, end, b"moov")?;
+    let udta = find_box(&mut file, moov.0, moov.1, b"udta")?;
+    let meta = find_box(&mut file, udta.0, udta.1, b"meta")?;
+    // MP4's meta is a full box (four bytes of version and flags before its children);
+    // QuickTime's is not: its first child, hdlr, follows at once.
+    let mut kind = [0u8; 4];
+    file.seek(SeekFrom::Start(meta.0 + 4)).ok()?;
+    file.read_exact(&mut kind).ok()?;
+    let children = if &kind == b"hdlr" { meta.0 } else { meta.0 + 4 };
+    let ilst = find_box(&mut file, children, meta.1, b"ilst")?;
+    let covr = find_box(&mut file, ilst.0, ilst.1, b"covr")?;
+    let data = find_box(&mut file, covr.0, covr.1, b"data")?;
+    // The data box: its type (13 JPEG, 14 PNG) and locale, then the picture.
+    let length = data.1.checked_sub(data.0 + 8)?;
+    if length > MOST_COVER_BYTES {
+        return None;
+    }
+    let mut picture = vec![0u8; length as usize];
+    file.seek(SeekFrom::Start(data.0 + 8)).ok()?;
+    file.read_exact(&mut picture).ok()?;
+    image::load_from_memory(&picture).ok()
+}
+/// The first box of type `kind` between `start` and `end` of an MP4 or QuickTime file: where its
+/// contents start and end. None when there is none, or the boxes there are malformed.
+fn find_box(file: &mut File, start: u64, end: u64, kind: &[u8; 4]) -> Option<(u64, u64)> {
+    let mut at = start;
+    for _ in 0..10_000 {
+        if at + 8 > end {
+            return None;
+        }
+        let mut header = [0u8; 8];
+        file.seek(SeekFrom::Start(at)).ok()?;
+        file.read_exact(&mut header).ok()?;
+        let (size, skip) = match u32::from_be_bytes([header[0], header[1], header[2], header[3]]) {
+            // A 64-bit size follows the type.
+            1 => {
+                let mut large = [0u8; 8];
+                file.read_exact(&mut large).ok()?;
+                (u64::from_be_bytes(large), 16)
+            }
+            // To the end of its parent.
+            0 => (end - at, 8),
+            size => (size as u64, 8),
+        };
+        if size < skip || at.checked_add(size)? > end {
+            return None;
+        }
+        if &header[4..] == kind {
+            return Some((at + skip, at + size));
+        }
+        at += size;
+    }
+    None
 }
 
 /// What a photo's EXIF says about its thumbnail: the embedded JPEG, and which way is up.
@@ -315,6 +389,79 @@ mod tests {
         let changed = picture(&thumbnail(&cache, &link(&camera)).unwrap());
         assert_eq!(changed.dimensions(), (160, 160));
         assert_eq!(fs::read_dir(&cache).unwrap().count(), 3);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// An MP4 box: its size, type and contents.
+    fn mp4_box(kind: &[u8; 4], contents: &[u8]) -> Vec<u8> {
+        [
+            &((contents.len() + 8) as u32).to_be_bytes()[..],
+            kind,
+            contents,
+        ]
+        .concat()
+    }
+    /// A video file holding `cover` as its cover picture, in MP4's layout (meta a full box) or
+    /// QuickTime's, after a media data box.
+    fn video_with_cover(cover: &[u8], quicktime: bool) -> Vec<u8> {
+        let data = mp4_box(
+            b"data",
+            &[&13u32.to_be_bytes()[..], &[0; 4], cover].concat(),
+        );
+        let ilst = mp4_box(b"ilst", &mp4_box(b"covr", &data));
+        let hdlr = mp4_box(b"hdlr", &[0; 24]);
+        let meta = if quicktime {
+            mp4_box(b"meta", &[hdlr, ilst].concat())
+        } else {
+            mp4_box(b"meta", &[&[0u8; 4][..], &hdlr, &ilst].concat())
+        };
+        let moov = mp4_box(
+            b"moov",
+            &[mp4_box(b"mvhd", &[0; 100]), mp4_box(b"udta", &meta)].concat(),
+        );
+        [
+            mp4_box(b"ftyp", b"isom\0\0\0\0isom"),
+            mp4_box(b"mdat", &[7; 4000]),
+            moov,
+        ]
+        .concat()
+    }
+
+    #[test]
+    fn videos_show_the_cover_they_carry() {
+        let dir = folder("cover");
+        let cache = dir.join("cache");
+        for (name, quicktime) in [("clip.mp4", false), ("clip.mov", true)] {
+            let video = dir.join(name);
+            fs::write(
+                &video,
+                video_with_cover(&jpeg_of(320, 180, [30, 30, 200]), quicktime),
+            )
+            .unwrap();
+            let cover = picture(&thumbnail(&cache, &link(&video)).unwrap());
+            assert_eq!(cover.dimensions(), (160, 90), "{name}");
+            let Rgb([r, _, b]) = cover.to_rgb8().get_pixel(80, 45).to_owned();
+            assert!(b > 150 && r < 100, "{name}: the cover");
+        }
+        // Boxes that run past their parent are refused, not followed.
+        let mut broken = video_with_cover(&jpeg_of(32, 32, [30, 30, 200]), false);
+        let at = broken.windows(4).position(|w| w == b"covr").unwrap() - 4;
+        broken[at..at + 4].copy_from_slice(&u32::MAX.to_be_bytes());
+        let video = dir.join("broken.mp4");
+        fs::write(&video, broken).unwrap();
+        assert!(cover(&video).is_none());
+        // Without one, a video's cover is none.
+        let plain = dir.join("plain.mp4");
+        fs::write(
+            &plain,
+            [
+                mp4_box(b"ftyp", b"isom"),
+                mp4_box(b"moov", &mp4_box(b"mvhd", &[0; 100])),
+            ]
+            .concat(),
+        )
+        .unwrap();
+        assert!(cover(&plain).is_none());
         fs::remove_dir_all(dir).unwrap();
     }
 

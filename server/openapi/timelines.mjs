@@ -29,6 +29,42 @@ const NOT_JSON = { 415: error('The body is not JSON (`Content-Type: application/
 
 /** An ID of an event: a moment or a duration. */
 const ENTITY_ID = { type: 'string', pattern: '^[A-Za-z0-9_.:-]{1,128}$', example: 'm1' };
+/** A link to another timeline (#422), as listed. */
+const TIMELINE_LINK = {
+  type: 'object',
+  properties: {
+    id: { type: 'string', pattern: '^\\d+$', description: 'The link’s ID.' },
+    timeline: {
+      type: 'object',
+      description: 'The other timeline.',
+      properties: {
+        id: ref('Uuid'),
+        title: { type: 'string' },
+        owner: { type: 'string' },
+        slug: { type: ['string', 'null'] },
+      },
+    },
+    kind: {
+      enum: ['moment', 'duration', 'timeline'],
+      description: '`timeline`: the other timeline as a whole.',
+    },
+    entity: { type: 'string', description: 'The other entity’s ID; empty for a whole timeline.' },
+    title: { type: 'string', description: 'The other entity’s title, or the timeline’s.' },
+    first: {
+      type: ['string', 'null'],
+      description: 'Its time, or a duration’s start; null for a whole timeline.',
+    },
+    last: { type: ['string', 'null'] },
+  },
+};
+/** One end of a link: a moment or duration. */
+const ENTITY_END = {
+  type: 'object',
+  description: 'An entity: `{"moment": id}` or `{"duration": id}`.',
+  properties: { moment: ENTITY_ID, duration: ENTITY_ID },
+  minProperties: 1,
+  maxProperties: 1,
+};
 const nullable = (schema) => ({ oneOf: [schema, { type: 'null' }] });
 /** A count PostgreSQL gives as a decimal string (a bigint). */
 const COUNT = { type: 'string', pattern: '^\\d+$', description: 'A count, as a decimal string.' };
@@ -1163,11 +1199,199 @@ export const paths = {
         200: json(
           {
             type: 'object',
-            properties: { id: ref('Uuid'), revision: ref('Revision') },
+            properties: {
+              id: ref('Uuid'),
+              revision: ref('Revision'),
+              links: {
+                ...COUNT,
+                description: 'Advances whenever its links to other timelines change (#422).',
+              },
+            },
           },
           'Its revision.',
         ),
         ...errors(403, 404, 429),
+      },
+    },
+  },
+  '/api/timelines/{id}/links': {
+    parameters: [timelineId],
+    get: {
+      operationId: 'listTimelineLinks',
+      tags: ['Timelines'],
+      summary: 'List an entity’s links to other timelines',
+      description:
+        'Links from one of its moments or durations to entities on other timelines, or to other timelines as a whole (#422), 25 at a time by default. Only links to timelines the reader may read, whose entities still exist, are listed. Name the entity with `moment` or `duration`.',
+      security: TIMELINE_READ,
+      parameters: [
+        queryParam('moment', 'The moment’s ID.'),
+        queryParam('duration', 'The duration’s ID.'),
+        queryParam('after', 'The `next` cursor of the page before.', {
+          type: 'string',
+          pattern: '^\\d+$',
+        }),
+        queryParam('limit', 'How many links, 1 to 100.', {
+          type: 'integer',
+          minimum: 1,
+          maximum: 100,
+          default: 25,
+        }),
+      ],
+      responses: {
+        200: json(
+          {
+            type: 'object',
+            properties: {
+              links: { type: 'array', items: TIMELINE_LINK },
+              next: {
+                type: ['string', 'null'],
+                description: 'The cursor of the next page; null at the end.',
+              },
+            },
+          },
+          'A page of links.',
+        ),
+        ...errors(400, 404, 429),
+      },
+    },
+    post: {
+      operationId: 'addTimelineLink',
+      tags: ['Timelines'],
+      summary: 'Link an entity to one on another timeline',
+      description:
+        'Links one of its moments or durations (`from`) to a moment or duration on another timeline, or to that timeline as a whole when `to` names only the timeline. Needs write access to both timelines; both entities must exist. A link counts against both timelines’ limit (`TIMELINE_LINK_LIMIT`, 10,000 by default; 409 past it). Adding a link that exists answers it again. Sixty a minute per account.',
+      security: TIMELINE_WRITE,
+      requestBody: body({
+        type: 'object',
+        required: ['from', 'to'],
+        properties: {
+          from: ENTITY_END,
+          to: {
+            type: 'object',
+            required: ['timeline'],
+            properties: { timeline: ref('Uuid'), moment: ENTITY_ID, duration: ENTITY_ID },
+            description:
+              'The other timeline, and a moment or duration on it unless linking to it as a whole.',
+          },
+        },
+      }),
+      responses: {
+        201: json(TIMELINE_LINK, 'The link.'),
+        ...errors(400, 401, 403, 404, 409, 429),
+        ...NOT_JSON,
+      },
+    },
+    delete: {
+      operationId: 'removeTimelineLink',
+      tags: ['Timelines'],
+      summary: 'Remove a link to another timeline',
+      description: 'Needs write access to both timelines.',
+      security: TIMELINE_WRITE,
+      requestBody: body({
+        type: 'object',
+        required: ['link'],
+        properties: { link: { type: 'string', pattern: '^\\d+$' } },
+      }),
+      responses: {
+        200: json({ type: 'object', properties: { removed: { type: 'string' } } }, 'Removed.'),
+        ...errors(400, 401, 403, 404, 429),
+        ...NOT_JSON,
+      },
+    },
+  },
+  '/api/timelines/{id}/links/resolve': {
+    post: {
+      operationId: 'resolveLinkAddress',
+      tags: ['Timelines'],
+      summary: 'What a pasted address names, to link to',
+      description:
+        'Reads a page address someone pasted (#422): a timeline’s page at `/<owner>/<slug>` or `/timelines/<id>`, a moment’s or duration’s page under it, an embed (`/embed/<id>`), the editor’s `#timeline/<id>/…`, or any of these with a `#moment/<id>` or `#duration/<id>` fragment; a path, or a full address on this site. Answers the timeline it names and the moment or duration, with whether it is this timeline (`same`: relate its entities instead), whether the caller may save it, and whether it already has as many links as it may (`full`). 400 for an address that names no timeline here; 404 for one the caller may not read, or an entity it lacks.',
+      security: TIMELINE_READ,
+      parameters: [timelineId],
+      requestBody: body({
+        type: 'object',
+        required: ['address'],
+        properties: { address: { type: 'string', maxLength: 4096 } },
+      }),
+      responses: {
+        200: json({
+          type: 'object',
+          required: ['timeline', 'entity', 'same', 'canWrite', 'full'],
+          properties: {
+            timeline: {
+              type: 'object',
+              properties: {
+                id: ref('Uuid'),
+                title: { type: 'string' },
+                owner: { type: 'string' },
+                slug: { type: ['string', 'null'] },
+              },
+            },
+            entity: {
+              type: ['object', 'null'],
+              description: 'The moment or duration it names; null for the timeline as a whole.',
+              properties: {
+                kind: { type: 'string', enum: ['moment', 'duration'] },
+                id: { type: 'string' },
+                title: { type: 'string' },
+                first: ref('Rational'),
+                last: ref('Rational'),
+                when: { type: 'string' },
+              },
+            },
+            same: { type: 'boolean' },
+            canWrite: { type: 'boolean' },
+            full: { type: 'boolean' },
+          },
+        }),
+        ...errors(400, 401, 403, 404, 413, 429),
+      },
+    },
+  },
+  '/api/timelines/links/query': {
+    post: {
+      operationId: 'queryTimelineLinkArcs',
+      tags: ['Timelines'],
+      summary: 'Arcs between a comparison’s timelines',
+      description:
+        'Links between entities on two of `sources` (two to eight timelines the reader may read) crossing the shared window `lower`…`upper` and at least `threshold` long, each end’s time mapped by its timeline’s `× scale + offset`. At most 256, with `edgesTruncated` when more cross it. Links to whole timelines have no time and are left out.',
+      security: TIMELINE_READ,
+      requestBody: body({
+        type: 'object',
+        required: ['sources', 'lower', 'upper'],
+        properties: {
+          sources: {
+            type: 'array',
+            minItems: 2,
+            maxItems: 8,
+            items: {
+              type: 'object',
+              required: ['id'],
+              properties: {
+                id: ref('Uuid'),
+                scale: { type: 'string', default: '1' },
+                offset: { type: 'string', default: '0' },
+              },
+            },
+          },
+          lower: { type: 'string' },
+          upper: { type: 'string' },
+          threshold: { type: 'string', default: '0' },
+        },
+      }),
+      responses: {
+        200: json(
+          {
+            type: 'object',
+            properties: {
+              edges: { type: 'array', items: { type: 'object' } },
+              edgesTruncated: { type: 'boolean' },
+            },
+          },
+          'The arcs, with shared times and each end’s timeline (`aKey`, `bKey`) and title.',
+        ),
+        ...errors(400, 404, 429),
+        ...NOT_JSON,
       },
     },
   },

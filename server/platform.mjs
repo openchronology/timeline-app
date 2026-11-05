@@ -24,6 +24,7 @@ import {
   compareLimits,
   defaultQuota,
   entryLimit,
+  linkLimit,
   LimitError,
   timelineFileBytes,
 } from './limits.mjs';
@@ -123,10 +124,11 @@ async function initialize() {
         })
       : null;
   // Limits from the environment file: refused at startup rather than misapplied.
-  let limits, entries, indexNow;
+  let limits, entries, linkCap, indexNow;
   try {
     limits = compareLimits();
     entries = entryLimit();
+    linkCap = linkLimit();
     timelineFileBytes();
     defaultQuota();
     platformName();
@@ -172,6 +174,7 @@ async function initialize() {
     challenges: Challenges.settings(process.env),
     compareLimits: limits,
     entryLimit: entries,
+    linkLimit: linkCap,
   };
   const store = pool ? new PostgresStore(pool, { compareLimits: limits }) : null;
   // Catalogue text left stale by an interrupted refresh catches up in the background.
