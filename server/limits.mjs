@@ -3,7 +3,12 @@
  * Limits operators set in the environment: how many timelines each kind of account may
  * compare at once, how many entries a timeline holds, and the default storage quota.
  */
-import { DEFAULT_ENTRY_LIMIT } from '../dist/core.mjs';
+import {
+  DEFAULT_ENTRY_LIMIT,
+  DEFAULT_TIME_DIGITS,
+  setTimeDigitLimit,
+  UNBOUNDED_TIME_DIGITS,
+} from '../dist/core.mjs';
 
 /** No comparison holds more than this: live updates, layouts and saved views assume it. */
 export const COMPARE_CEILING = 8;
@@ -123,6 +128,31 @@ export function mebibytes(bytes) {
  * TIMELINE_ENTRY_LIMIT: a whole number from 1,000, or "unlimited" (Infinity). Unset or
  * empty, 200,000.
  */
+/**
+ * The most digits this server accepts in a time, as an exact fraction in lowest terms, from
+ * TIME_DIGIT_LIMIT: `<numerator>/<denominator>` digits (each at least 20), or `unlimited`;
+ * 1000/65 unless set (core's DEFAULT_TIME_DIGITS). Unlimited keeps times as unbounded on the
+ * server as everywhere else, at a cost the operator accepts: anyone who may save a timeline
+ * can then make the server spend minutes reading times of thousands of digits.
+ */
+export function timeDigits(env = process.env) {
+  const text = env.TIME_DIGIT_LIMIT?.trim().replaceAll(/[_,]/g, '');
+  if (!text) return DEFAULT_TIME_DIGITS;
+  if (text.toLowerCase() === 'unlimited') return UNBOUNDED_TIME_DIGITS;
+  const match = /^(\d+)\/(\d+)$/.exec(text);
+  const [numerator, denominator] = match ? [Number(match[1]), Number(match[2])] : [NaN, NaN];
+  if (!(numerator >= 20 && denominator >= 20 && numerator <= 1e6 && denominator <= 1e6))
+    throw new LimitError(
+      'TIME_DIGIT_LIMIT must be <numerator>/<denominator> digits, each from 20 to 1000000 (such as 1000/65), or unlimited.',
+    );
+  return { numerator, denominator };
+}
+/** Applies TIME_DIGIT_LIMIT to this process's parsing of times (core's parseTime). */
+export function applyTimeDigits(env = process.env) {
+  const limit = timeDigits(env);
+  setTimeDigitLimit(limit);
+  return limit;
+}
 export function entryLimit(env = process.env) {
   const text = env.TIMELINE_ENTRY_LIMIT?.trim().replaceAll(/[_,]/g, '');
   if (!text) return DEFAULT_ENTRY_LIMIT;

@@ -246,26 +246,51 @@ export interface Frame {
 export const TIME_TEXT_LIMIT = 20000;
 const TIME_TEXT_ERROR = `Times must be at most ${TIME_TEXT_LIMIT} characters, also as an exact fraction.`;
 /**
- * The most digits a time may have, as an exact fraction in lowest terms: its numerator and its
- * denominator. Times far larger than any timeline needs (from 10^-64 to below 10^1000 seconds, or
- * whatever its unit is) cost far more to read, compare and summarize: a few moments with
- * thousand-digit denominators keep the server's index busy for minutes. The largest real
+ * A server's limit on the digits of a time, as an exact fraction in lowest terms: its numerator
+ * and its denominator. Times far larger than any timeline needs cost far more to read, compare
+ * and summarize: on a shared server, a few moments with thousand-digit denominators keep its
+ * index busy for minutes. So a server sets one (TIME_DIGIT_LIMIT, 1000/65 unless its operator
+ * says otherwise: from 10^-64 to below 10^1000 of the timeline's unit), while the editor, the
+ * desktop app and the offline file keep times unbounded, as rationals are. The largest real
  * timelines use 18 and 7 digits.
  */
-export const TIME_NUMERATOR_DIGITS = 1000;
-export const TIME_DENOMINATOR_DIGITS = 65;
-const TIME_SIZE_ERROR = `Times must be fractions of at most ${TIME_NUMERATOR_DIGITS} digits over at most ${TIME_DENOMINATOR_DIGITS} digits.`;
+export const DEFAULT_TIME_DIGITS = Object.freeze({ numerator: 1000, denominator: 65 });
+/** Unbounded: no limit on either. */
+export const UNBOUNDED_TIME_DIGITS = Object.freeze({ numerator: Infinity, denominator: Infinity });
+export interface TimeDigits {
+  numerator: number;
+  denominator: number;
+}
+// Kept on the global object, so every copy of this module a bundler makes reads the limit the
+// server set at startup.
+const TIME_DIGITS_KEY = Symbol.for('openchronology.timeDigits');
+const timeDigitStore = globalThis as unknown as Record<symbol, TimeDigits | undefined>;
+/** The limit on times' digits in this process: unbounded unless a server set one. */
+export function timeDigitLimit(): TimeDigits {
+  return timeDigitStore[TIME_DIGITS_KEY] ?? UNBOUNDED_TIME_DIGITS;
+}
+/** Sets the limit on times' digits for this process (a server, at startup). */
+export function setTimeDigitLimit(limit: TimeDigits) {
+  timeDigitStore[TIME_DIGITS_KEY] = Object.freeze({ ...limit });
+}
 /** Digits in a bigint, without its sign. */
 const digits = (n: bigint) => (n < 0n ? -n : n).toString().length;
 export function parseTime(text: string): Q {
   if (text.length > TIME_TEXT_LIMIT) throw new Error(TIME_TEXT_ERROR);
+  const limit = timeDigitLimit(),
+    bounded = Number.isFinite(limit.numerator) || Number.isFinite(limit.denominator);
+  const sizeError = () =>
+    new Error(
+      `Times must be fractions of at most ${limit.numerator} digits over at most ${limit.denominator} digits on this server.`,
+    );
   // Counted before any arithmetic, so a time too large to keep is refused before it costs anything
   // to read (a reduction or an expansion).
-  let count = 0;
-  for (let i = 0; i < text.length; i++)
-    if (text.charCodeAt(i) >= 48 && text.charCodeAt(i) <= 57) count++;
-  if (count > TIME_NUMERATOR_DIGITS + TIME_DENOMINATOR_DIGITS + 16)
-    throw new Error(TIME_SIZE_ERROR);
+  if (bounded) {
+    let count = 0;
+    for (let i = 0; i < text.length; i++)
+      if (text.charCodeAt(i) >= 48 && text.charCodeAt(i) <= 57) count++;
+    if (count > limit.numerator + limit.denominator + 16) throw sizeError();
+  }
   const time = text.includes('T')
     ? parseTimestamp(text)
     : text.includes('/')
@@ -273,10 +298,10 @@ export function parseTime(text: string): Q {
       : parseDecimal(text);
   // A large exponent expands a short decimal, as `1e9999` does.
   if (
-    digits(time.numerator) > TIME_NUMERATOR_DIGITS ||
-    digits(time.denominator) > TIME_DENOMINATOR_DIGITS
+    bounded &&
+    (digits(time.numerator) > limit.numerator || digits(time.denominator) > limit.denominator)
   )
-    throw new Error(TIME_SIZE_ERROR);
+    throw sizeError();
   return time;
 }
 export function validateAssets(value: unknown): Record<string, string> {

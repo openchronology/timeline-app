@@ -119,6 +119,24 @@ a whole number of at least 1000 (such as `1000000`), or `unlimited`. Empty or un
 200,000. An invalid value stops the server at startup with a message saying why. The server
 tells its pages the limit, and they warn when a timeline reaches three quarters of it.
 
+### How large a time may be
+
+Times are exact rationals of any size in the editor, the desktop app and the offline file. On
+a server, a time's exact fraction (in lowest terms) may have at most **1,000 digits over 65**:
+from 10^-64 to below 10^1000 of the timeline's unit, such as seconds. That's far beyond any
+timeline so far (the largest use 18 and 7 digits). `TIME_DIGIT_LIMIT` in the environment file
+changes it: `<numerator>/<denominator>` digits, each from 20 to 1,000,000 (such as
+`5000/500`), or `unlimited`. Empty or unset is `1000/65`. An invalid value stops the server at
+startup with a message saying why.
+
+The limit is there because a shared server reads, compares and summarizes every time it
+stores, and the cost of that grows quickly with their digits: a few moments timed in
+fractions of thousands of digits each keep the server busy for minutes, and anyone who may
+save a timeline could send them. Times past the limit are refused, counted by their digits
+before any arithmetic, with a message naming the limit. Set `unlimited` where everyone who
+may save a timeline is trusted, such as a server of your own or your team's, to keep times as
+unbounded on the server as everywhere else.
+
 The default suits a public platform, where the server is shared. Most work on a timeline
 reads or changes only part of it, at a cost that grows slowly with its size:
 

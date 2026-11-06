@@ -17,6 +17,7 @@ import {
   entryLimit as entryLimitFromEnv,
   linkLimit as linkLimitFromEnv,
   mebibytes,
+  timeDigits as timeDigitsFromEnv,
 } from './limits.mjs';
 import { deleteWhere, parseRetention, printRetention } from './retention.mjs';
 import { setTimelineStar } from './stars.mjs';
@@ -52,22 +53,23 @@ import { openApiDocument } from './openapi/index.mjs';
 import { siteName } from './site.mjs';
 import { HttpError, PostgresStore, restrictedTimeline, withoutImageCopies } from './store.mjs';
 import {
-  Q,
-  parseTime,
-  validateDocument,
-  validateDuration,
-  validateTags,
-  validateTimelineImage,
-  validateRef,
-  canonicalRelationship,
-  setEntryLimit,
-  contentLabels,
-  timeMapping,
-  DURATION_COUNT_CAP,
   BACKGROUND_URL_LIMIT,
+  canonicalRelationship,
+  contentLabels,
+  DURATION_COUNT_CAP,
+  hasLocalFiles,
   longBackgrounds,
   longBackgroundsText,
-  hasLocalFiles,
+  parseTime,
+  Q,
+  setEntryLimit,
+  setTimeDigitLimit,
+  timeMapping,
+  validateDocument,
+  validateDuration,
+  validateRef,
+  validateTags,
+  validateTimelineImage,
 } from '../dist/core.mjs';
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 /**
@@ -350,8 +352,11 @@ export function createRequestHandler({
   linkLimit: linkCap = linkLimitFromEnv(),
   // Downloads kept to serve again (#204; export-cache.mjs), or null for none.
   exportCache = exportCacheFromEnv({ pool }),
+  // How many digits a time may have (TIME_DIGIT_LIMIT): 1000/65 unless set, or unbounded.
+  timeDigits: digitLimit = timeDigitsFromEnv(),
 } = {}) {
   setEntryLimit(entries);
+  setTimeDigitLimit(digitLimit);
   const library = createPluginLibrary(plugins, pool);
   const suites = createSuiteLibrary(undefined, pool);
   const store = pool ? new PostgresStore(pool, { compareLimits: limits }) : null,

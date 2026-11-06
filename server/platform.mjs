@@ -26,6 +26,7 @@ import {
   entryLimit,
   linkLimit,
   LimitError,
+  applyTimeDigits,
   timelineFileBytes,
 } from './limits.mjs';
 import { analyticsId, platformName, SiteError, supportUrl } from './site.mjs';
@@ -129,6 +130,8 @@ async function initialize() {
     limits = compareLimits();
     entries = entryLimit();
     linkCap = linkLimit();
+    // How large a time may be on this server (TIME_DIGIT_LIMIT), for every time it reads.
+    applyTimeDigits();
     timelineFileBytes();
     defaultQuota();
     platformName();
