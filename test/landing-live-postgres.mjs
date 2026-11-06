@@ -234,10 +234,11 @@ try {
       if (audience !== 'writers') assert.match(page.html, /What you can count on/, audience);
     }
     const educators = await get(o, '/for/educators');
-    // Its title is what people search for; its heading, the page's own voice (#390).
+    // Its title is what people search for; its heading, the page's own voice (#390). Too
+    // long for search results with the site's name, it goes without (#469).
     assert.match(
       educators.html,
-      /<title>Collaborative timeline maker for teachers and classrooms · OpenChronology<\/title>/,
+      /<title>Collaborative timeline maker for teachers and classrooms<\/title>/,
     );
     assert.match(educators.html, /<h1[^>]*>Timelines your class builds together<\/h1>/);
     assert.match(educators.html, /<meta property="og:image:alt" content="[^"]+"/);

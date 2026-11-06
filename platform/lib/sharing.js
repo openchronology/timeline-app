@@ -23,9 +23,58 @@ import { profilePath, timelinePath } from '../../src/addresses.ts';
 
 /** The platform's name in titles and link previews (PLATFORM_NAME, or OpenChronology). */
 export { siteName };
-/** A page's title: what it is, then what it belongs to, then the site's name (#210). */
+/**
+ * A page's title: what it is, then what it belongs to, then the site's name (#210), fitted to
+ * what search results show (fitTitle, #469).
+ */
 export function pageTitle(...parts) {
-  return [...parts.filter(Boolean), siteName()].join(' · ');
+  return fitTitle(parts);
+}
+
+/** How long a title search results show whole, in characters (#469). */
+export const TITLE_LENGTH = 60;
+/** Text cut between words to at most `length` characters, ending with "…" when cut. */
+function cutWords(text, length) {
+  if (text.length <= length) return text;
+  const cut = text.slice(0, length - 1);
+  const space = cut.lastIndexOf(' ');
+  return (space > length / 2 ? cut.slice(0, space) : cut).replace(/[\s,;:.·–—-]+$/, '') + '…';
+}
+/**
+ * A title's head: its part before a subtitle (" · ", ": ", " — " or " – "), when that part
+ * is long enough to name it alone; otherwise the whole title.
+ */
+export function titleHead(title) {
+  const head = title.split(/ · |: | — | – /)[0];
+  return head.length >= 12 ? head : title;
+}
+/**
+ * A page's `<title>` that search results show whole (#469): its own title, then what it
+ * belongs to (`parts` after the first), then the site's name, as long as it fits in
+ * TITLE_LENGTH. Otherwise, in turn: what it belongs to by its head (titleHead); without the
+ * site's name; that cut between words; its own title alone; and that cut. Link previews keep
+ * the whole form (pageMetadata).
+ * @param {string[]} parts the page's title and what it belongs to, nearest first
+ */
+export function fitTitle(parts) {
+  const [own, ...rest] = parts.filter(Boolean),
+    site = siteName();
+  const fits = (list) => {
+    const text = list.join(' · ');
+    return text.length <= TITLE_LENGTH ? text : null;
+  };
+  const heads = rest.map(titleHead);
+  // What it belongs to, cut to the room left after its own title.
+  const room = TITLE_LENGTH - own.length - 3 * rest.length;
+  const cut = rest.length === 1 && room >= 20 ? [cutWords(heads[0], room)] : null;
+  return (
+    fits([own, ...rest, site]) ??
+    fits([own, ...heads, site]) ??
+    fits([own, ...rest]) ??
+    fits([own, ...heads]) ??
+    (cut && fits([own, ...cut])) ??
+    cutWords(own, TITLE_LENGTH)
+  );
 }
 
 /** A timeline's id, a UUID, as it appears in a `/timelines/<id>` address. */
@@ -347,7 +396,7 @@ export function entityMetadata(timeline, entity, title, time, notes, { listed = 
   return pageMetadata(
     timeline,
     sharedPath(timeline, entity),
-    `${title} · ${timelineTitle(timeline)}`,
+    [title, timelineTitle(timeline)],
     labelled
       ? `Sensitive content: ${describeLabels(timeline.labels).toLowerCase()}`
       : entityDescription(time, notes),
@@ -503,7 +552,8 @@ export function sitePreview() {
  *
  * @param {object} timeline the timeline the page is about (its `visibility` decides)
  * @param {string} path the page's path, made absolute with siteOrigin()
- * @param {string} title the page's own title, before the site's name
+ * @param {string|string[]} title the page's own title, or it and what it belongs to (an
+ *   event's, its timeline's), fitted to search results (fitTitle) and whole in link previews
  * @param {string} description its plain-text description
  * @param {{url: string, alt: string, width?: number, height?: number}|null} [image] the
  *   preview image (previewOf) in place of the page's drawn one (its opengraph-image)
@@ -520,7 +570,9 @@ export function pageMetadata(
 ) {
   const origin = siteOrigin(),
     url = origin + path,
-    shown = timeline.visibility === 'public';
+    shown = timeline.visibility === 'public',
+    parts = [title].flat(),
+    whole = parts.filter(Boolean).join(' · ');
   // Linked where it is hosted, as everywhere (docs/images.md); given here, it takes the place
   // of the drawn image Next.js would otherwise name.
   const images = image
@@ -535,7 +587,7 @@ export function pageMetadata(
       }
     : {};
   return {
-    title: `${title} · ${siteName()}`,
+    title: fitTitle(parts),
     description,
     alternates: {
       canonical: url,
@@ -553,12 +605,12 @@ export function pageMetadata(
       type: 'website',
       siteName: siteName(),
       locale: 'en_US',
-      title,
+      title: whole,
       description,
       url,
       ...images,
     },
-    twitter: { card: 'summary_large_image', title, description, ...images },
+    twitter: { card: 'summary_large_image', title: whole, description, ...images },
   };
 }
 /**
