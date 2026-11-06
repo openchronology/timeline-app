@@ -14,6 +14,8 @@ import {
   MOMENT_SHAPES,
   PLUGIN_EXAMPLE,
   validatePluginManifest,
+  setTimeDigitLimit,
+  UNBOUNDED_TIME_DIGITS,
 } from '../dist/core.mjs';
 const converter = new TimelineFiles();
 assert(converter.enabled, 'Build och-convert and set OCH_CONVERTER before running this test.');
@@ -182,7 +184,14 @@ const pool = {
     throw new Error('Unexpected file route storage operation ' + sql);
   },
 };
-const app = createApplication({ pool, converter, providers: {} });
+// Times as unbounded on this server as in the editor (TIME_DIGIT_LIMIT=unlimited), so the
+// exact round trip above holds for the tiny moment's thousand-digit denominator too.
+const app = createApplication({
+  pool,
+  converter,
+  providers: {},
+  timeDigits: { numerator: Infinity, denominator: Infinity },
+});
 async function call(path, input, mime, headers = {}) {
   const req = Readable.from([input]);
   Object.assign(req, {
@@ -243,6 +252,20 @@ const download = await call(
   headers,
 );
 assert.equal(download.status, 200);
+// By default a server limits times to 1000/65 digits, and refuses that one, naming the limit.
+// The limit is the process's, so this test's own server is made unbounded again after.
+{
+  createApplication({ pool, converter, providers: {} });
+  const refused = await call(
+    'files/export',
+    Buffer.from(JSON.stringify(document)),
+    'application/json',
+    headers,
+  );
+  assert.equal(refused.status, 400);
+  assert.match(refused.body.error, /at most 1000 digits over at most 65 digits/);
+  setTimeDigitLimit(UNBOUNDED_TIME_DIGITS);
+}
 assert.match(download.headers['Content-Disposition'], /filename="timeline\.och"/);
 const upload = await call(
   'files/import',

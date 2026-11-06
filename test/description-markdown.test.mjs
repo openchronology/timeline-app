@@ -152,6 +152,27 @@ test('Tables: a header, alignment from the delimiter row, rows padded or cut to 
   );
 });
 
+test('Text built to slow the parser down is read in linear time, as tables still are', () => {
+  // A delimiter row of spaces round one dash once took cubic time (4 KB: 10 s, 20 KB: minutes),
+  // and a run of `<` quadratic time in excerpts; both are rendered on the server for anyone.
+  const row = ' '.repeat(10000) + '-' + ' '.repeat(9990) + 'x';
+  let started = Date.now();
+  assert.match(markdownText('a|b\n' + row), /^a\|b\n *- *x$/);
+  markdownHtml('a|b\n' + row);
+  assert(Date.now() - started < 1000, `a long delimiter row took ${Date.now() - started} ms`);
+  started = Date.now();
+  assert.equal(site.excerpt('<'.repeat(40000), 20), '<'.repeat(19) + '…');
+  assert(Date.now() - started < 1000, `a run of < took ${Date.now() - started} ms`);
+  // Tags are still dropped, and delimiter rows still read with or without their outer pipes.
+  assert.equal(site.excerpt('<b>Rough</b> seas'), 'Rough seas');
+  for (const delimiter of ['| :--- | ---: |', ':--- | ---:', '|:---|---:|'])
+    assert.deepEqual(parseMarkdown(`| a | b |\n${delimiter}\n| c | d |`)[0].align, [
+      'left',
+      'right',
+    ]);
+  assert.equal(parseMarkdown('| a | b |\n| --- | x |')[0].tag, 'p');
+});
+
 test('Rules, deeper headings, + bullets, strikethrough, underscores and https autolinks', () => {
   assert.deepEqual(parseMarkdown('---\n#### Four\n###### Six\n+ one\n* * *'), [
     { tag: 'hr' },

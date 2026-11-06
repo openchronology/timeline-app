@@ -10,6 +10,9 @@ import {
   validateDocument,
   parseTime,
   parseTimestamp,
+  setTimeDigitLimit,
+  DEFAULT_TIME_DIGITS,
+  UNBOUNDED_TIME_DIGITS,
   printTimestamp,
   demo,
   wheelZoomFactor,
@@ -248,8 +251,10 @@ test('balanced PostgreSQL snapshots cache exact counts and use only integer node
 });
 test('times limit their exponents and length, so a short text cannot ask for a vast number', () => {
   assert.equal(parseTime('1.5e3').toString(), '1500/1');
+  // Unbounded rationals unless a server sets a limit: exponents to ±10,000, 20,000 characters.
   assert.equal(parseTime('1e10000').toString(), '1' + '0'.repeat(10000) + '/1');
   assert.equal(parseTime('-25E-10000').toString(), '-1/4' + '0'.repeat(9998));
+  assert.equal(parseTime('7'.repeat(2000) + '/' + '3'.repeat(2000)).toString().length > 0, true);
   for (const text of ['1e10001', '1e-10001', '1e1000000000', '1e' + '9'.repeat(400)])
     assert.throws(() => parseTime(text), /Scientific exponents must be between -10000 and 10000\./);
   const limit = /Times must be at most 20000 characters, also as an exact fraction\./;
@@ -258,8 +263,6 @@ test('times limit their exponents and length, so a short text cannot ask for a v
     '7'.repeat(20001),
     '1/' + '3'.repeat(20000),
     '1970-01-01T00:00:00.' + '1'.repeat(20000) + 'Z',
-    // Short enough as written, but its exact fraction is not.
-    '1.' + '1'.repeat(10000) + 'e-10000',
   ])
     assert.throws(() => parseTime(text), limit);
   assert.throws(
@@ -273,6 +276,38 @@ test('times limit their exponents and length, so a short text cannot ask for a v
       }),
     /Scientific exponents/,
   );
+});
+test('a server may limit times to a number of digits, counted before any arithmetic', () => {
+  setTimeDigitLimit(DEFAULT_TIME_DIGITS);
+  try {
+    // From 10^-64 to below 10^1000: a fraction of at most 1000 digits over at most 65.
+    assert.equal(parseTime('1e999').toString(), '1' + '0'.repeat(999) + '/1');
+    assert.equal(parseTime('-25E-64').toString(), '-1/4' + '0'.repeat(62));
+    assert.equal(parseTime('7'.repeat(1000)).toString(), '7'.repeat(1000) + '/1');
+    assert.equal(parseTime('1773451806953389/1000000').toString(), '1773451806953389/1000000');
+    const size =
+      /Times must be fractions of at most 1000 digits over at most 65 digits on this server\./;
+    for (const text of [
+      '1e1000',
+      '1e-65',
+      '7'.repeat(1001),
+      '1/' + '3'.repeat(66),
+      '1970-01-01T00:00:00.' + '1'.repeat(66) + 'Z',
+      // Short enough as written, but its exact fraction is not.
+      '1.' + '1'.repeat(70) + 'e-10',
+      // Two huge numbers, refused by their digits before any reduction.
+      '7'.repeat(9990) + '/' + '3'.repeat(9990),
+    ])
+      assert.throws(() => parseTime(text), size);
+    // Refused at once, whatever they would have cost to read.
+    const started = Date.now();
+    for (let i = 0; i < 50; i++)
+      assert.throws(() => parseTime('9'.repeat(9000) + '/' + '7'.repeat(9000)), size);
+    assert(Date.now() - started < 1000, 'refusing huge times stays quick');
+  } finally {
+    setTimeDigitLimit(UNBOUNDED_TIME_DIGITS);
+  }
+  assert.equal(parseTime('1e1000').toString().length, 1003);
 });
 test('calendar conversion is cosmetic and bijective for arbitrary rational seconds and fixed offsets', () => {
   assert.equal(parseTimestamp('1970-01-01T00:00:00Z').toString(), '0/1');

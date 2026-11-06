@@ -116,13 +116,22 @@ function tableCells(line: string): string[] {
     } else cell += c;
   }
   // A trailing pipe ends the last cell rather than starting an empty one.
-  if (cell.trim() || !/\|\s*$/.test(text)) cells.push(cell);
+  if (cell.trim() || !text.trimEnd().endsWith('|')) cells.push(cell);
   return cells.map((c) => c.trim());
 }
-/** A table's delimiter row (`| --- | :-: |`) as its columns' alignments, or null if it isn't one. */
+/**
+ * A table's delimiter row (`| --- | :-: |`) as its columns' alignments, or null if it isn't one.
+ * Split at its pipes and each cell checked on its own, rather than with one pattern over the
+ * line: that pattern took cubic time on a row of spaces, which any description could hold.
+ */
 function tableAlignment(line: string): MarkdownAlign[] | null {
-  if (!line.includes('-') || !/^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/.test(line)) return null;
-  return tableCells(line).map((c) =>
+  if (!line.includes('-')) return null;
+  let row = line.trim();
+  if (row.startsWith('|')) row = row.slice(1);
+  if (row.endsWith('|')) row = row.slice(0, -1);
+  const cells = row.split('|').map((c) => c.trim());
+  if (!cells.every((c) => /^:?-+:?$/.test(c))) return null;
+  return cells.map((c) =>
     c.startsWith(':') && c.endsWith(':')
       ? 'center'
       : c.endsWith(':')

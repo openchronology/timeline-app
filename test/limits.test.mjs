@@ -13,8 +13,16 @@ import {
   LimitError,
   mebibytes,
   timelineFileBytes,
+  timeDigits,
+  applyTimeDigits,
 } from '../server/limits.mjs';
 import { quotaValue } from '../server/administration.mjs';
+import {
+  parseTime,
+  timeDigitLimit,
+  UNBOUNDED_TIME_DIGITS,
+  setTimeDigitLimit,
+} from '../dist/core.mjs';
 
 test('comparison limits come from the environment, per kind of account', () => {
   const defaults = compareLimits({});
@@ -111,4 +119,33 @@ test('the .och file limit comes from TIMELINE_FILE_BYTES: 1 MiB to 1 GiB, 64 MiB
     );
   assert.equal(mebibytes(64 * 1024 * 1024), '64 MiB');
   assert.equal(mebibytes(1.5 * 1024 * 1024), '1.5 MiB');
+});
+
+test('a time may have 1000/65 digits on a server unless TIME_DIGIT_LIMIT says otherwise', () => {
+  assert.deepEqual(timeDigits({}), { numerator: 1000, denominator: 65 });
+  assert.deepEqual(timeDigits({ TIME_DIGIT_LIMIT: ' 5000/200 ' }), {
+    numerator: 5000,
+    denominator: 200,
+  });
+  assert.deepEqual(timeDigits({ TIME_DIGIT_LIMIT: '10_000/1,000' }), {
+    numerator: 10000,
+    denominator: 1000,
+  });
+  // Unbounded rationals on the server too, at the operator's choice.
+  assert.deepEqual(timeDigits({ TIME_DIGIT_LIMIT: 'Unlimited' }), {
+    numerator: Infinity,
+    denominator: Infinity,
+  });
+  for (const value of ['1000', '10/65', '1000/10', 'many/few', '-5/10', '1000/65/2', '2000000/65'])
+    assert.throws(() => timeDigits({ TIME_DIGIT_LIMIT: value }), /TIME_DIGIT_LIMIT must be/, value);
+  // Applied to this process's times.
+  try {
+    applyTimeDigits({ TIME_DIGIT_LIMIT: '30/30' });
+    assert.deepEqual(timeDigitLimit(), { numerator: 30, denominator: 30 });
+    assert.throws(() => parseTime('1e40'), /at most 30 digits over at most 30 digits/);
+    applyTimeDigits({ TIME_DIGIT_LIMIT: 'unlimited' });
+    assert.equal(parseTime('1e40').toString().length, 43);
+  } finally {
+    setTimeDigitLimit(UNBOUNDED_TIME_DIGITS);
+  }
 });

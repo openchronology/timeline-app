@@ -266,8 +266,10 @@ export function htmlTime(timeline, time) {
  * the last fifth of the room, so a word isn't broken (#466).
  */
 export function excerpt(text, length = 200) {
+  // A tag runs to its first `>` with no `<` inside, so a run of `<` costs linear time, not
+  // quadratic, however long the text.
   const line = String(text ?? '')
-    .replace(/<[^>]*>/g, ' ')
+    .replace(/<[^<>]*>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   if (line.length <= length) return line;
