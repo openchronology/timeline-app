@@ -1,5 +1,7 @@
 # Using OpenChronology
 
+<!-- description: A walk through OpenChronology: making a timeline, adding moments and durations, zooming from millennia to fractions of a second, and sharing it. -->
+
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
 OpenChronology is a timeline editor. You place moments and periods on a line of time, zoom from millennia down to fractions of a second, and share what you make. This guide walks through the app task by task. Each chapter links to a more detailed page when you want the full story. For quick answers, see the [frequently asked questions](faq.md).

@@ -1,5 +1,7 @@
 # Importing log files
 
+<!-- description: Import log files into timelines: syslog, Apache, nginx, JSON lines and journald exports, one moment per entry at its exact time, with its fields kept. -->
+
 `och-import-logs` (`server/import-logs.mjs`) imports historic logs into timelines: one moment per log entry, at the entry's exact time, with its fields as metadata. It runs beside the [syslog receiver](syslog.md) and the [journald follower](journald.md), which handle live streams, and uses the same API key, variables and routing rules.
 
 ```sh

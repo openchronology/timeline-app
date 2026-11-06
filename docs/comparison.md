@@ -1,5 +1,7 @@
 # Comparing timelines and live viewing
 
+<!-- description: Compare timelines side by side or combined on one axis, keep a comparison as a public page, and see others' edits live. -->
+
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
 Select timeline cards in the dashboard and use **Compare timelines**. Selection

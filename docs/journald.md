@@ -1,5 +1,7 @@
 # The systemd journal to timelines
 
+<!-- description: Follow the systemd journal into timelines: each journal entry becomes a moment, live, routed to timelines by unit and fields, through the API. -->
+
 `server/journald-receiver.mjs` follows the systemd journal and adds each entry as a moment to a timeline, or to the timelines chosen by routing rules ([#151](https://github.com/openchronology/timeline-app/issues/151)). It runs `journalctl --follow --output=json`, on this machine or over SSH on another. It writes through the public API with an [API key](administration.md#api-keys), and viewers with the timeline open see new entries as they arrive.
 
 It reads entries exactly as the [log importer](log-import.md) reads `journalctl -o json`, and makes the same moments with the same IDs. A history imported with `och-import-logs --format journald` and a live stream started afterwards fit together: entries both cover are the same moments, never duplicates.

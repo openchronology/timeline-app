@@ -1,5 +1,7 @@
 # Syslog to timelines
 
+<!-- description: Receive syslog over UDP and TCP into timelines: each message becomes a moment, routed to timelines by rules, live, through the API. -->
+
 `server/syslog-receiver.mjs` listens for syslog over UDP and TCP and adds each message as a moment to the timelines chosen by your routing rules. To import historic log files (syslog, Apache, nginx, JSON lines, journald), use the [log importer](log-import.md) instead of replaying them into the receiver. To stream the systemd journal live, with its units and fields, use the [journald follower](journald.md), which compares the two. It uses the public API with an [API key](administration.md#api-keys), so it can run beside the platform or on another machine, and viewers with the timeline open see new messages as they arrive ([live refresh](comparison.md#live-refresh)).
 
 ## Set up

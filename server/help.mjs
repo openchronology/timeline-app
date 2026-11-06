@@ -279,7 +279,16 @@ export const HELP_SECTIONS = [
   { title: 'Accounts and the API', pages: ['authentication', 'api'] },
   {
     title: 'Running a server',
-    pages: ['administration', 'docker', 'nix', 'seeding', 'syslog', 'journald', 'log-import', 'licensing'],
+    pages: [
+      'administration',
+      'docker',
+      'nix',
+      'seeding',
+      'syslog',
+      'journald',
+      'log-import',
+      'licensing',
+    ],
   },
   { title: 'How it works', pages: ['architecture', 'benchmarks'] },
 ];
@@ -308,11 +317,32 @@ const readmeLink = (href) =>
         ? helpLink(href.slice('docs/'.length))
         : helpLink('../' + href);
 
-/** One page: its title, summary, HTML, headings and sections (for search). */
+/** How long a page's summary may be: what search results show of a description (#470). */
+export const SUMMARY_LENGTH = 160;
+/**
+ * The first sentences of `text` that fit in SUMMARY_LENGTH, or, when the first is longer,
+ * it cut between words with "…": a summary for a page with no description of its own.
+ */
+export function firstSentences(text) {
+  if (text.length <= SUMMARY_LENGTH) return text;
+  const room = text.slice(0, SUMMARY_LENGTH);
+  const end = Math.max(room.lastIndexOf('. '), room.lastIndexOf('? '), room.lastIndexOf('! '));
+  if (end >= 60) return room.slice(0, end + 1);
+  const cut = room.slice(0, SUMMARY_LENGTH - 1);
+  return cut.slice(0, cut.lastIndexOf(' ')).replace(/[\s,;:]+$/, '') + '…';
+}
+/**
+ * One page: its title, summary (its `<!-- description: … -->` line, or its first sentences),
+ * HTML, headings and sections (for search).
+ */
 export function helpPage(slug, source) {
   const link = slug === 'readme' ? readmeLink : helpLink;
-  // The copyright line is the source's, not the reader's.
-  const text = source.replace(/^Copyright \(c\)[^\n]*\n/m, '');
+  // The copyright line is the source's, not the reader's; the description, its metadata
+  // (#470), is said once, in the page's description and the help's list.
+  const description = /^<!-- description: (.+?) -->$/m.exec(source)?.[1].trim();
+  const text = source
+    .replace(/^Copyright \(c\)[^\n]*\n/m, '')
+    .replace(/^<!-- description: .+? -->\n/m, '');
   const { html, headings } = renderMarkdown(text, { link });
   // The README's title is the project's name: in the help, it is the overview.
   const title =
@@ -347,7 +377,7 @@ export function helpPage(slug, source) {
   return {
     slug,
     title,
-    summary: plainText(firstParagraph.join(' ')),
+    summary: description ?? firstSentences(plainText(firstParagraph.join(' '))),
     html,
     headings,
     sections: sections

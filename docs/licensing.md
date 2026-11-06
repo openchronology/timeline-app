@@ -1,5 +1,7 @@
 # Copyright, GPLv3, and distributions
 
+<!-- description: OpenChronology's licence, the GNU GPL version 3: where the source and releases are, contributions, and how licence changes are handled. -->
+
 OpenChronology first-party software and documentation are copyright (c) 2026
 Athan Clark, an individual, and licensed **GPL-3.0-only**. See [LICENSE](../LICENSE)
 for the unmodified GPLv3 text and [NOTICE](../NOTICE) for scope and attribution.

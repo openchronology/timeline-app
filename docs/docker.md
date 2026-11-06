@@ -1,5 +1,7 @@
 # Docker deployment
 
+<!-- description: Run your own OpenChronology server with Docker Compose: public hosting, upgrades and backups, and email for account security. -->
+
 Run commands from `timeline-app` (or the root of its GitHub repository). Install Docker Engine with the Compose plugin. The suite builds PostgreSQL 16 with native GMP-backed pgmp, a Next.js App Router server on Node 24, and the native SQLite `.och` converter. Rust and Node build tools remain in separate build stages; the web container runs as the unprivileged `node` user.
 
 ```sh

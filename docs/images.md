@@ -1,5 +1,7 @@
 # Images and copyright
 
+<!-- description: Images on timelines: icons, backgrounds and a timeline's own picture are linked where they are hosted, not copied, and what the service does with them. -->
+
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
 Timelines show images by linking to them: a moment's icon, a duration's background, a stack entry's picture or the timeline's own image is an HTTPS address where its owner hosts it ([#109](https://github.com/openchronology/timeline-app/issues/109)). The server stores the link, never a copy of the image, and readers' browsers load the image from its host.

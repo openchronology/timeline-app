@@ -1,5 +1,7 @@
 # Nix and NixOS
 
+<!-- description: Install OpenChronology with Nix or NixOS: the flake's packages, nix-env without flakes, and the NixOS module that runs a server with PostgreSQL. -->
+
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
 The repository is a Nix flake ([#461](https://github.com/openchronology/timeline-app/issues/461)). It builds OpenChronology from source and has a NixOS module that runs a server, with PostgreSQL and the `pgmp` extension, as the Debian package does.

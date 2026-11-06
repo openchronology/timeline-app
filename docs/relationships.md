@@ -1,5 +1,7 @@
 # Relationships
 
+<!-- description: Relationships link two events on a timeline, drawn as arcs, and links join events across timelines: how to add, browse and remove them. -->
+
 A relationship links two different entities: two moments, two durations, or a moment and a duration. Links are undirected, an entity can link to any number of others, and an entity cannot link to itself. A relationship carries no label; it records only that the two entities are related.
 
 ## Viewing and editing

@@ -1,5 +1,7 @@
 # Accounts, sessions and deployment
 
+<!-- description: Sign-in on an OpenChronology server: passwords, passkeys, two-factor codes, directory sign-in, human verification, and connecting the desktop app. -->
+
 The official desktop default is `https://timescale.info`. In **Server connection**, connect to other HTTPS origins as well, or disconnect from all of them and continue working locally. HTTP is accepted only for loopback development origins. Only the connected origins are persisted; desktop credentials live in native process memory and a restart requires signing in again.
 
 ## Several servers on the desktop

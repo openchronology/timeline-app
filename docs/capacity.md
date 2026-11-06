@@ -1,5 +1,7 @@
 # Timeline size and platforms
 
+<!-- description: How large a timeline can be: up to 200,000 moments, durations and relationships, which platform suits which size, and how the app advises you. -->
+
 A timeline holds at most **200,000 moments** (and at most 200,000 durations and 200,000 relationships) on every platform. A self-hosted server can raise or remove that limit for its own timelines with `TIMELINE_ENTRY_LIMIT` ([Timeline size](administration.md#timeline-size)); the offline HTML file and the desktop app's `.och` files keep it. Within that limit, the platforms differ in how responsive large timelines feel. The data below comes from the [capacity benchmarks](benchmarks.md#capacity).
 
 ## Which platform to use

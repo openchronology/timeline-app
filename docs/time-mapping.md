@@ -1,5 +1,7 @@
 # Shifting and scaling times
 
+<!-- description: Shift or scale the times of many events at once, for good: a whole timeline or the events a separation selects, by an offset or a factor. -->
+
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
 **Shift or scale times…** changes the times of many events (moments and durations) at once, for good ([#96](https://github.com/openchronology/timeline-app/issues/96)): every one in the timeline, or those a [separation](tags.md#separating-by-tags) would select. Use it to correct a whole timeline recorded against the wrong clock or epoch, to move one strand of a story, or to stretch or compress a period. It uses the alignment [comparisons](comparison.md) use, but changes the timeline itself rather than one view of it.

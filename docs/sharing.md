@@ -1,5 +1,7 @@
 # Sharing timelines
 
+<!-- description: Share timelines: their addresses, links to events and views, the share dialog, link previews, what search engines get, and embedding on other sites. -->
+
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
 Timelines, and the events (moments and durations), searches and views in them, have addresses

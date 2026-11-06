@@ -1,5 +1,7 @@
 # Administration, storage limits and automation
 
+<!-- description: Run an OpenChronology server: the first administrator, storage quotas, the landing page, IndexNow, terms, API keys and other operator settings. -->
+
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
 ## Installation administrator

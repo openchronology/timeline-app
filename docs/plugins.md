@@ -1,5 +1,7 @@
 # Timeline plugins
 
+<!-- description: Timeline plugins: icons, headings, backgrounds, themes, charts and fields that extend moments and durations, where they run, and how to publish them. -->
+
 Open **Plugins** beside **Time display**. The dialog lists this timeline's installed plugins, in application order. **Add plugin** opens the server catalogue with search and twelve results per page. Add, enable, disable, remove, and reorder take effect immediately in the browser's rational map. Save the timeline to persist these settings to the server or a file.
 
 Plugins belong to a timeline, not a user account or the application as a whole. Viewers use the timeline's saved plugins but cannot change them. Installed entries contain a version-pinned manifest snapshot and an enabled flag. Order and settings survive `.ochx`, `.och`, PostgreSQL snapshots and browser drafts. A server catalogue update does not silently change an existing timeline's plugin. Upgrade explicitly: **Update to v…** in the plugin library replaces an older installed version in place. **Edit / export definition** opens the saved manifest and script; edits apply only to this timeline until published.
