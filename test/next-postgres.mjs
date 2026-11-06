@@ -117,7 +117,7 @@ try {
     homeHtml = await home.text();
   assert.match(homeHtml, /src="\/logo-mark\.svg"[^>]*\/>(<!-- -->)?openchronology<\/a>/);
   assert.match(homeHtml, /<title>OpenChronology<\/title>/);
-  assert.doesNotMatch(homeHtml, /Powered by OpenChronology|Analytics settings|Support this site/);
+  assert.doesNotMatch(homeHtml, /Powered by |Analytics settings|Support this site/);
   assert.doesNotMatch(home.headers.get('content-security-policy'), /google/);
   const download = await (
     await fetch(origin + '/download', { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh)' } })

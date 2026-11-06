@@ -268,6 +268,30 @@ test('Explore and profiles say what is there, and how much (#471)', async () => 
   assert.match(await sharing.profileDescription(broken, 'ada'), /^Public timelines and favorites/);
 });
 
+test('The site is named with the software it runs, where they differ (#472)', () => {
+  const before = process.env.PLATFORM_NAME;
+  try {
+    process.env.PLATFORM_NAME = 'timescale.example';
+    assert.deepEqual(sharing.websiteData(), {
+      '@type': 'WebSite',
+      name: 'timescale.example',
+      url: 'https://chronology.example/',
+      alternateName: 'OpenChronology',
+      description: 'timescale.example runs OpenChronology, a free, open-source timeline editor.',
+    });
+    assert.deepEqual(sharing.webPageData('/for', 'For', 'Who').isPartOf, sharing.websiteData());
+    delete process.env.PLATFORM_NAME;
+    assert.deepEqual(sharing.websiteData(), {
+      '@type': 'WebSite',
+      name: 'OpenChronology',
+      url: 'https://chronology.example/',
+    });
+  } finally {
+    if (before === undefined) delete process.env.PLATFORM_NAME;
+    else process.env.PLATFORM_NAME = before;
+  }
+});
+
 test('Metadata: labelled timelines describe their labels, not the notes, and are not indexed', () => {
   const entity = { kind: 'moment', id: 'leg:2' };
   const shown = sharing.entityMetadata(timeline(), entity, 'Storm', '2 Jan 1970', 'Rough seas');

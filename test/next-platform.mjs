@@ -184,7 +184,11 @@ try {
     assert.deepEqual([bytes.readUInt16BE(frame + 7), bytes.readUInt16BE(frame + 5)], [1200, 630]);
   }
   assert.match(html, /<title>timescale\.test · OpenChronology<\/title>/);
-  assert.match(html, /Powered by OpenChronology/);
+  // The software the site runs, linked from its footer (#472).
+  assert.match(
+    html,
+    /Powered by (<!-- -->)?<a href="https:\/\/github\.com\/openchronology\/timeline-app">OpenChronology<\/a>/,
+  );
   // The footer links to the source repository (#276).
   assert.match(html, /href="https:\/\/github\.com\/openchronology\/timeline-app">GitHub<\/a>/);
   assert.match(

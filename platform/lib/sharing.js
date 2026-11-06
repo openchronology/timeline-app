@@ -661,7 +661,7 @@ export function webPageData(path, title, description, more = {}) {
     name: title,
     description,
     url: origin + path,
-    isPartOf: { '@type': 'WebSite', name: siteName(), url: origin + '/' },
+    isPartOf: websiteData(),
     ...more,
   };
 }
@@ -728,4 +728,26 @@ export async function profileDescription(pool, username) {
   } catch {
     return fallback;
   }
+}
+/** The software's own name, which a server named otherwise runs. */
+export const SOFTWARE_NAME = 'OpenChronology';
+/**
+ * The site as schema.org's `WebSite` (#472): its name, address and, when its name isn't the
+ * software's (PLATFORM_NAME, such as timescale.info), the software's as another name for it
+ * and in a description, so search engines and AI answers tie the two together.
+ */
+export function websiteData() {
+  const name = siteName(),
+    named = name !== SOFTWARE_NAME;
+  return {
+    '@type': 'WebSite',
+    name,
+    url: siteOrigin() + '/',
+    ...(named
+      ? {
+          alternateName: SOFTWARE_NAME,
+          description: `${name} runs ${SOFTWARE_NAME}, a free, open-source timeline editor.`,
+        }
+      : {}),
+  };
 }
