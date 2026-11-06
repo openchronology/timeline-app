@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import {
+  faqData,
   firstSentences,
   HELP_SECTIONS,
   helpLink,
@@ -120,6 +121,23 @@ test('each page is described for search results, in its own words (#470)', async
     assert.doesNotMatch(page.summary, /^(server|docs)\/|…$/, slug);
     assert(!/(<|&lt;)!-- description/.test(page.html), `${slug} shows its description`);
   }
+  // The FAQ as structured data (#483): every question with its answer's first paragraph.
+  const questions = pages.get('faq');
+  const data = faqData(questions, 'https://example.org/help/faq');
+  assert.equal(data['@type'], 'FAQPage');
+  const asked = questions.sections.filter((s) => s.title.endsWith('?'));
+  assert.equal(data.mainEntity.length, asked.length);
+  assert(data.mainEntity.length >= 10);
+  const first = data.mainEntity[0];
+  assert.equal(first.name, 'What is OpenChronology?');
+  assert.match(first.acceptedAnswer.text, /timeline editor/);
+  for (const q of data.mainEntity) {
+    assert.equal(q['@type'], 'Question');
+    assert(q.acceptedAnswer.text.length > 20, q.name);
+    assert.doesNotMatch(q.acceptedAnswer.text, /\]\(|\*\*|`/, q.name);
+  }
+  // A page that asks nothing has none.
+  assert.equal(faqData(pages.get('durations'), 'https://example.org/help/durations'), null);
   // Its line is metadata: not in the page, nor in search.
   const described = helpPage(
     'example',
