@@ -41,6 +41,12 @@ import { applyIncrementally, incremental, slicePatch, timelineSettings } from '.
 import { rebaseSave } from './save-merge.mjs';
 import { pruneLinks } from './timeline-links.mjs';
 import {
+  LISTED_NOTES,
+  listedAutomatically,
+  TEMPLATE_SAMPLE,
+  templatedNotes,
+} from './event-listing.mjs';
+import {
   beginIndexWrite,
   copyLevel,
   indexReader,
@@ -110,6 +116,8 @@ export class HttpError extends Error {
     this.status = status;
   }
 }
+/** How many timelines' templated-notes verdicts the store keeps (#467). */
+const LISTING_CACHE = 1000;
 /** Why a past revision of a timeline that keeps no saved history cannot be read. */
 export const HISTORY_OFF =
   'This revision is not kept: the timeline does not keep saved history, so only its latest revision can be read.';
@@ -271,6 +279,9 @@ export class PostgresStore {
     this.pool = pool;
     this.compareLimits = compareLimits;
     this.compiler = compiler;
+    // Whether timelines' notes are templated (#467), by timeline and revision: read again only
+    // after a save. The oldest go first past LISTING_CACHE.
+    this.listings = new Map();
   }
   /**
    * Refuses (HTTP 400) installed plugins `plugins` whose scripts do not compile, compiling
@@ -2008,24 +2019,94 @@ export class PostgresStore {
       return viewId;
     });
   }
+
   /**
-   * The first `limit` moments and durations of timeline `id` as a guest may see them, for
-   * its entity sitemap (#335): `{kind, id}` in key order (kind, then ID in "C" order), read
-   * from its entity search rows (a fork's read through), which hold one row per moment and
-   * duration. HttpError 404 unless a guest may open it; a comparison has none.
+   * How a public timeline's moments and durations are listed for search engines (#467;
+   * server/event-listing.mjs), as a guest reads it: `{ mode, templated }`, its `index_events`
+   * setting and, set to `auto`, whether its notes are templated, from a sample of
+   * TEMPLATE_SAMPLE of its notes chosen by a hash of their keys, so not by their order. Cached
+   * by revision. `limit` is the most moments a listed timeline may have (timelineEntityLimit):
+   * a larger one, which lists none, is not sampled. HttpError 404 or 409 as access answers.
+   * @returns {Promise<{mode: 'auto'|'all'|'none', templated: boolean}>}
    */
-  async entityKeys(id, limit) {
+  async eventListing(id, limit) {
+    return this.transaction(async (c) => {
+      await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+      return this.#eventListing(c, await this.access(id, null, c), limit);
+    });
+  }
+  async #eventListing(c, t, limit) {
+    const mode = t.index_events ?? 'auto';
+    if (mode !== 'auto' || t.comparison || Number(t.event_count) > limit)
+      return { mode, templated: false };
+    const key = `${t.id}:${t.revision}`;
+    const known = this.listings.get(key);
+    if (known !== undefined) return { mode, templated: known };
+    const index = await indexReader(c, t);
+    const { rows } = await c.query(
+      `SELECT left(s.body,400) AS body FROM ${index('oc_entity_search', '$1', { scan: true })} s
+      WHERE length(s.body) >= ${LISTED_NOTES} ORDER BY md5(s.kind||':'||s.entity_id) LIMIT $2`,
+      [t.id, TEMPLATE_SAMPLE],
+    );
+    const templated = templatedNotes(rows.map((r) => r.body));
+    this.listings.set(key, templated);
+    if (this.listings.size > LISTING_CACHE) this.listings.delete(this.listings.keys().next().value);
+    return { mode, templated };
+  }
+  /**
+   * The first `limit` moments and durations of timeline `id` listed for search engines, for
+   * its entity sitemap (#335) and IndexNow (#467): as a guest may see them, `{kind, id}` in key
+   * order (kind, then ID in "C" order), read from its entity search rows (a fork's read
+   * through), which hold one row per moment and duration. All of them (`all`), none (`none`,
+   * or `auto` with templated notes), or those with notes and titles of their own (`auto`).
+   * HttpError 404 unless a guest may open it; a comparison has none.
+   */
+  async listedEntityKeys(id, limit) {
     return this.transaction(async (c) => {
       await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
       const t = await this.access(id, null, c);
       if (t.comparison) return [];
+      const { mode, templated } = await this.#eventListing(c, t, limit);
+      if (mode === 'none' || templated) return [];
       const index = await indexReader(c, t);
-      const { rows } = await c.query(
-        `SELECT s.kind,s.entity_id FROM ${index('oc_entity_search', '$1', { scan: true })} s
-        ORDER BY s.kind,s.entity_id COLLATE "C" LIMIT $2`,
+      const rows = index('oc_entity_search', '$1', { scan: true });
+      // Automatically: notes long enough, and a title no other row has (counted once for all
+      // rows, by a window, rather than looked up for each).
+      const { rows: keys } = await c.query(
+        mode === 'auto'
+          ? `SELECT kind,entity_id FROM (SELECT s.kind,s.entity_id,length(s.body) AS notes,
+              count(*) OVER (PARTITION BY lower(s.title)) AS same FROM ${rows} s) s
+            WHERE notes >= ${LISTED_NOTES} AND same=1
+            ORDER BY s.kind,s.entity_id COLLATE "C" LIMIT $2`
+          : `SELECT s.kind,s.entity_id FROM ${rows} s
+            ORDER BY s.kind,s.entity_id COLLATE "C" LIMIT $2`,
         [id, limit],
       );
-      return rows.map((r) => ({ kind: r.kind, id: r.entity_id }));
+      return keys.map((r) => ({ kind: r.kind, id: r.entity_id }));
+    });
+  }
+  /**
+   * Of `entities` ({kind, id}) of public timeline `id`, those listed for search engines
+   * (#467), and those it no longer has (whose pages, gone, search engines should hear of).
+   * `limit` as for eventListing.
+   */
+  async listedOf(id, entities, limit) {
+    if (!entities.length) return [];
+    return this.transaction(async (c) => {
+      await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+      const t = await this.access(id, null, c);
+      const { mode, templated } = await this.#eventListing(c, t, limit);
+      if (mode === 'none' || templated) return [];
+      if (mode === 'all') return entities;
+      const index = await indexReader(c, t);
+      const rows = index('oc_entity_search', '$1', { scan: true });
+      const { rows: found } = await c.query(
+        `SELECT s.kind,s.entity_id,(${listedAutomatically(rows)}) AS listed FROM ${rows} s
+        WHERE (s.kind,s.entity_id) IN (SELECT * FROM unnest($2::text[],$3::text[]))`,
+        [id, entities.map((e) => e.kind), entities.map((e) => e.id)],
+      );
+      const listed = new Map(found.map((r) => [`${r.kind}:${r.entity_id}`, r.listed]));
+      return entities.filter((e) => listed.get(`${e.kind}:${e.id}`) ?? true);
     });
   }
   /**

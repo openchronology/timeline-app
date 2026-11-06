@@ -125,8 +125,10 @@ described by their labels instead of their notes, and ask search engines not to 
     ([#335](https://github.com/openchronology/timeline-app/issues/335)), several timelines to
     a page and never more than 45,000 addresses, each with its timeline's last change.
   - **Which timelines' entities are listed:** public timelines without
-    sensitive-content labels, that are not comparisons, with at most 5,000 moments.
-    For each, its first 5,000 entities by kind and ID (durations, then moments).
+    sensitive-content labels, that are not comparisons, with at most 5,000 moments, and not
+    set to list none.
+    For each, its first 5,000 entities by kind and ID (durations, then moments) of those its
+    setting lists ([below](#which-events-search-engines-list)).
     - A timeline with more moments (a log import can have millions) is left out
       altogether. Its own page is listed, and links to its first 50 moments.
     - On a server, `SITEMAP_TIMELINE_ENTITIES` sets the limit, from 1 to 45,000.
@@ -187,6 +189,32 @@ described by their labels instead of their notes, and ask search engines not to 
   - never an `Event`, which search engines take for a happening to attend, and fault for
     lacking a place, tickets and organizer.
   - Private and labelled timelines' pages have none.
+
+### Which events search engines list
+
+Every moment and duration of a public timeline has a page, but search engines don't get them
+all ([#467](https://github.com/openchronology/timeline-app/issues/467)). Thousands of pages that
+say little, such as a log's lines, would lower how search engines rate the site's other pages.
+**Sharing & settings** → **Search engines** chooses for each timeline:
+
+| Setting                     | Lists                                                                                                                                              |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Automatically** (default) | Events with at least 150 characters of notes and a title no other event of the timeline has. None when most of its notes are one template (below). |
+| **All of them**             | Every event                                                                                                                                        |
+| **None**                    | Only the timeline's own page                                                                                                                       |
+
+An event that isn't listed keeps its page, and its timeline's page still links to it. It is
+left out of the sitemap and of IndexNow, and its page asks search engines not to index it
+(`noindex`).
+
+**Templated notes:** notes a program wrote, such as "At 02:35:04 UTC, `nginx` on `web-1` emitted
+an `info` record…", are long but tell search engines nothing new from one event to the next.
+To find them, the server takes a sample of up to 200 of a timeline's events with notes long
+enough to list, chosen by a hash of their IDs. It reduces each note to its first 12 words
+without numbers, addresses, `code` and quoted text. If at least 20 notes are sampled and
+half of them reduce to the same words, the timeline lists none automatically. **All of them**
+lists them anyway. The verdict is kept until the timeline's next save. A plan for a model to
+judge this more finely is [#476](https://github.com/openchronology/timeline-app/issues/476).
 
 ## Embedding
 

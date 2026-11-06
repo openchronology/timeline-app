@@ -252,10 +252,12 @@ try {
     null,
   );
 
-  await owner.request(`/api/timelines/${timelineId}/settings`, {
+  // Its events have short notes, which the automatic setting wouldn't list (#467): all of them.
+  const listedAll = await owner.request(`/api/timelines/${timelineId}/settings`, {
     method: 'PATCH',
-    data: { visibility: 'public' },
+    data: { visibility: 'public', indexEvents: 'all' },
   });
+  assert.equal(listedAll.index_events, 'all');
   // A sequel about the same voyages, featured, so its page recommends it (#447) though its
   // owner is new.
   const sequel = (
@@ -482,6 +484,78 @@ try {
   assert(crawled.includes(`${origin}/${username}/${large}`));
   for (const id of [labelled, large])
     assert(!crawled.some((a) => a.startsWith(`${origin}/${username}/${id}/`)), id);
+
+  // Which events search engines get (#467). Automatically: notes of their own (150
+  // characters) and a title no other event has; never a timeline whose notes are templated.
+  const noted = (text) => text + ' It was written down in the log and read aloud later.'.repeat(3);
+  const notes = await publish({
+    format: 'openchronology',
+    version: 1,
+    title: 'Notes ' + suffix,
+    description: '',
+    events: [
+      { id: 'rich', time: '1/1', metadata: { title: 'Rich', description: noted('A gale.') } },
+      { id: 'thin', time: '2/1', metadata: { title: 'Thin', description: 'Short.' } },
+      { id: 'twin:1', time: '3/1', metadata: { title: 'Twin', description: noted('Calm.') } },
+      { id: 'twin:2', time: '4/1', metadata: { title: 'twin', description: noted('Fog.') } },
+    ],
+  });
+  const logged = await publish({
+    format: 'openchronology',
+    version: 1,
+    title: 'Logged ' + suffix,
+    description: '',
+    events: [],
+    // Durations, which the sitemap's limit of moments (4 here) doesn't count: 25, so the
+    // sample is large enough to judge.
+    durations: Array.from({ length: 25 }, (_, i) => ({
+      id: 'log-' + i,
+      start: `${i}/1`,
+      end: `${i + 1}/1`,
+      metadata: {
+        title: `GET /api/orders 200 ${i}ms`,
+        description: noted(
+          `At 02:${10 + i}:04 UTC, \`nginx\` on \`web-${i % 3}\` emitted a record.`,
+        ),
+      },
+    })),
+  });
+  const quiet = await publish({ ...document, title: 'Quiet ' + suffix });
+  const none = await owner.request(`/api/timelines/${quiet}/settings`, {
+    method: 'PATCH',
+    data: { indexEvents: 'none' },
+  });
+  assert.equal(none.index_events, 'none');
+  await owner.request(`/api/timelines/${quiet}/settings`, {
+    method: 'PATCH',
+    data: { indexEvents: 'sometimes' },
+    status: 400,
+  });
+  const automatic = await sitemapAddresses(guest);
+  const at = (id, path) => `${origin}/${username}/${id}${path}`;
+  assert(automatic.includes(at(notes, '/moments/rich')));
+  for (const path of ['/moments/thin', '/moments/twin%3A1', '/moments/twin%3A2'])
+    assert(!automatic.includes(at(notes, path)), path);
+  for (const id of [logged, quiet]) {
+    assert(automatic.includes(at(id, '')), 'its own page stays');
+    assert(!automatic.some((a) => a.startsWith(at(id, '/'))), id);
+  }
+  // Their pages: indexed if listed; otherwise not, their links still followed.
+  assert.equal(meta(await guest.request(`/${username}/${notes}/moments/rich`), 'robots'), null);
+  for (const path of [
+    `/${username}/${notes}/moments/thin`,
+    `/${username}/${notes}/moments/twin%3A2`,
+    `/${username}/${logged}/durations/log-3`,
+    `/${username}/${quiet}/moments/leg%3A1`,
+  ])
+    assert.equal(meta(await guest.request(path), 'robots'), 'noindex, follow', path);
+  // All of them, and the templated timeline's are listed.
+  await owner.request(`/api/timelines/${logged}/settings`, {
+    method: 'PATCH',
+    data: { indexEvents: 'all' },
+  });
+  assert((await sitemapAddresses(guest)).includes(at(logged, '/durations/log-0')));
+  assert.equal(meta(await guest.request(`/${username}/${logged}/durations/log-0`), 'robots'), null);
   // A page that isn't one of the sitemap's is not found.
   await guest.request('/sitemap/timelines-not-an-id.xml', { status: 404 });
   await guest.request('/sitemap/other.xml', { status: 404 });

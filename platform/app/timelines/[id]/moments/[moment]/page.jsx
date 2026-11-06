@@ -12,6 +12,7 @@ import {
   entityFacts,
   entityMetadata,
   entityParam,
+  eventListed,
   entityStructuredData,
   jsonLd,
   linksOf,
@@ -33,13 +34,16 @@ async function load(params) {
   return { ...found, event };
 }
 export async function generateMetadata({ params }) {
-  const { timeline, event } = await load(params);
+  const { timeline, services, event } = await load(params);
+  const entity = { kind: 'moment', id: event.id };
   return entityMetadata(
     timeline,
-    { kind: 'moment', id: event.id },
+    entity,
     momentTitle(event),
     presentTime(timeline, event.time),
     event.metadata?.description,
+    // Not for search engines unless its timeline lists it (#467).
+    { listed: await eventListed(services, timeline, entity) },
   );
 }
 export default async function MomentPage({ params }) {

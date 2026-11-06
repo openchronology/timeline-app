@@ -10,6 +10,7 @@
 // the data-provider check for writes to timelines. Each route group below says who may call it
 // and what it checks first. Writes by browser sessions carry the session's CSRF token
 // (auth.require), and anonymous forms the login nonce (auth.requireLogin).
+import { EVENT_LISTINGS } from './event-listing.mjs';
 import {
   compareLimits as compareLimitsFromEnv,
   compareLimit,
@@ -1923,7 +1924,7 @@ export function createRequestHandler({
           return response(res, 200, { ok: true });
         }
         // Sharing and settings: visibility, private forks, retention, saved history, content
-        // labels, address, image. Rechecked under the timeline's row lock; publishing is
+        // labels, address, image, and which events search engines list. Rechecked under the timeline's row lock; publishing is
         // refused for a comparison with a private source, a copy of a private timeline, and a
         // timeline moderators restricted.
         if (action === 'settings' && method === 'PATCH') {
@@ -1941,8 +1942,10 @@ export function createRequestHandler({
                   'labels',
                   'slug',
                   'image',
+                  'indexEvents',
                 ].includes(k),
             ) ||
+            (input.indexEvents !== undefined && !EVENT_LISTINGS.includes(input.indexEvents)) ||
             (input.labels !== undefined &&
               (!Array.isArray(input.labels) ||
                 contentLabels(input.labels).length !== input.labels.length)) ||
@@ -1957,7 +1960,7 @@ export function createRequestHandler({
           )
             throw new HttpError(
               400,
-              'Choose visibility, a private forking policy, a retention period, whether to keep saved history, content labels, an address and/or an image.',
+              'Choose visibility, a private forking policy, a retention period, whether to keep saved history, content labels, an address, an image and/or which events search engines list.',
             );
           // The timeline's image (#339): a link and alt text, or null to remove it.
           let image;
@@ -2032,7 +2035,7 @@ export function createRequestHandler({
             // A changed retention period clears retention_applied_at, so the next run applies
             // it at once; the revision is bumped, as a save does.
             await c.query(
-              'UPDATE oc_timelines SET visibility=$2,allow_private_forks=$3,retention_seconds=$4,retention_applied_at=CASE WHEN retention_seconds IS DISTINCT FROM $4 THEN NULL ELSE retention_applied_at END,content_labels=$5,revision=revision+1,updated_at=now() WHERE id=$1',
+              'UPDATE oc_timelines SET visibility=$2,allow_private_forks=$3,retention_seconds=$4,retention_applied_at=CASE WHEN retention_seconds IS DISTINCT FROM $4 THEN NULL ELSE retention_applied_at END,content_labels=$5,index_events=$6,revision=revision+1,updated_at=now() WHERE id=$1',
               [
                 id,
                 input.visibility ?? current.visibility,
@@ -2040,6 +2043,8 @@ export function createRequestHandler({
                 retention,
                 // What its owner marks it as containing (#115); moderators' labels stay.
                 input.labels === undefined ? current.content_labels : contentLabels(input.labels),
+                // Which of its events search engines list (#467; server/event-listing.mjs).
+                input.indexEvents ?? current.index_events,
               ],
             );
           });

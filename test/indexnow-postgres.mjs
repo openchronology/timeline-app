@@ -152,9 +152,11 @@ try {
       document: doc,
     });
   now += RESUBMIT_AFTER;
+  // Its events have no notes, which the automatic setting wouldn't list (#467): all of them.
   await call('PATCH', `/api/timelines/${voyage.id}/settings`, {
     visibility: 'public',
     slug: 'ships',
+    indexEvents: 'all',
   });
   const base = `/${username}/ships`,
     pages = {
@@ -204,6 +206,7 @@ try {
   await call('PATCH', `/api/timelines/${harbours.id}/settings`, {
     visibility: 'public',
     slug: 'harbours',
+    indexEvents: 'all',
   });
   const port = `/${username}/harbours/moments/port`;
   assert.deepEqual(await next(), [`/${username}`, `/${username}/harbours`, port].sort());
@@ -223,6 +226,46 @@ try {
   await call('DELETE', `/api/timelines/${harbours.id}/links`, { link: crossing.id });
   assert.deepEqual(await next(), [`${boats}/moments/leg%3A1`, port].sort());
 
+  // Automatically (#467): only events with notes and titles of their own, published or saved;
+  // set to none, a save sends the timeline's page alone.
+  const noted = (text) => text + ' It was written down in the log and read aloud later.'.repeat(3);
+  const rich = {
+      id: 'rich',
+      time: '1/1',
+      metadata: { title: 'Rich', description: noted('Gale.') },
+    },
+    thin = { id: 'thin', time: '2/1', metadata: { title: 'Thin', description: 'Short.' } };
+  const journal = await call('POST', '/api/timelines', {
+    ...document('Journal'),
+    events: [rich, thin],
+  });
+  now += RESUBMIT_AFTER;
+  await call('PATCH', `/api/timelines/${journal.id}/settings`, {
+    visibility: 'public',
+    slug: 'journal',
+  });
+  const diary = `/${username}/journal`;
+  assert.deepEqual(await next(), [`/${username}`, diary, `${diary}/moments/rich`].sort());
+  const keep = async (events) =>
+    call('PUT', `/api/timelines/${journal.id}`, {
+      revision: String(await revision(journal.id)),
+      document: { ...document('Journal'), events },
+    });
+  // Both edited: only the one listed.
+  now += RESUBMIT_AFTER;
+  await keep([
+    { ...rich, metadata: { ...rich.metadata, title: 'Rich gale' } },
+    { ...thin, metadata: { title: 'Thinner', description: 'Shorter.' } },
+  ]);
+  assert.deepEqual(await next(), [diary, `${diary}/moments/rich`].sort());
+  // Set to none: its events aren't sent.
+  now += RESUBMIT_AFTER;
+  await call('PATCH', `/api/timelines/${journal.id}/settings`, { indexEvents: 'none' });
+  await next();
+  now += RESUBMIT_AFTER;
+  await keep([{ ...rich, metadata: { ...rich.metadata, title: 'Rich storm' } }]);
+  assert.deepEqual(await next(), [diary]);
+
   // Labelled, its entities are not listed: a save sends its page alone.
   now += RESUBMIT_AFTER;
   await pool.query("UPDATE oc_timelines SET content_labels=ARRAY['violence'] WHERE id=$1", [
@@ -231,7 +274,7 @@ try {
   await save(ships([{ ...departure, metadata: { title: 'Setting out' } }], linked));
   assert.deepEqual(await next(), [boats]);
   console.log(
-    'PASS IndexNow: public timelines created, published, saved, renamed, made private and deleted are sent with their profile, at most hourly; private ones never; the pages of moments and durations published, renamed, edited (whole or sparse), linked and removed, not of labelled timelines; both ends of links between timelines.',
+    'PASS IndexNow: public timelines created, published, saved, renamed, made private and deleted are sent with their profile, at most hourly; private ones never; the pages of moments and durations published, renamed, edited (whole or sparse), linked and removed, only those listed (automatically, all or none), not of labelled timelines; both ends of links between timelines.',
   );
 } finally {
   globalThis.fetch = realFetch;

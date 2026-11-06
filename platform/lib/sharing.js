@@ -18,6 +18,7 @@ import {
 } from '../../dist/core.mjs';
 import { TimelineLinks } from '../../server/timeline-links.mjs';
 import { siteName } from '../../server/site.mjs';
+import { timelineEntityLimit } from '../../server/indexnow.mjs';
 import { profilePath, timelinePath } from '../../src/addresses.ts';
 
 /** The platform's name in titles and link previews (PLATFORM_NAME, or OpenChronology). */
@@ -310,6 +311,25 @@ function entityDescription(time, notes) {
   return text ? excerpt(`${time}. ${text}`, DESCRIPTION_LENGTH) : time;
 }
 /**
+ * Whether a moment's or duration's page is for search engines (#467): its timeline's are
+ * (entitiesIndexable), the timeline isn't too large for its entities to be listed, and the
+ * event is listed by its timeline's setting and notes (server/event-listing.mjs), as the
+ * sitemap lists it. If that can't be read, as before: indexed.
+ * @param {{store: object}} services
+ * @param {object} timeline its timeline
+ * @param {{kind: 'moment'|'duration', id: string}} entity
+ */
+export async function eventListed(services, timeline, entity) {
+  const limit = timelineEntityLimit();
+  if (!entitiesIndexable(timeline) || timeline.comparison) return false;
+  if (Number(timeline.event_count ?? 0) > limit) return false;
+  try {
+    return (await services.store.listedOf(timeline.id, [entity], limit)).length > 0;
+  } catch {
+    return true;
+  }
+}
+/**
  * A moment's or duration's page metadata (see pageMetadata): its title and the timeline's,
  * and its time and notes, as plain text without their Markdown, cut to what search results
  * show (#466); for a timeline with sensitive-content labels, the labels instead of its notes,
@@ -319,8 +339,10 @@ function entityDescription(time, notes) {
  * @param {string} title its title
  * @param {string} time its time (or extent) as the timeline displays it
  * @param {string} [notes] its notes
+ * @param {{listed?: boolean}} [options] `listed` false keeps it from search engines
+ *   (eventListed)
  */
-export function entityMetadata(timeline, entity, title, time, notes) {
+export function entityMetadata(timeline, entity, title, time, notes, { listed = true } = {}) {
   const labelled = timeline.labels?.length > 0;
   return pageMetadata(
     timeline,
@@ -330,7 +352,8 @@ export function entityMetadata(timeline, entity, title, time, notes) {
       ? `Sensitive content: ${describeLabels(timeline.labels).toLowerCase()}`
       : entityDescription(time, notes),
     null,
-    { index: entitiesIndexable(timeline) },
+    // An event its timeline doesn't list still leads to those it relates to and its timeline.
+    { index: entitiesIndexable(timeline) && listed, follow: entitiesIndexable(timeline) },
   );
 }
 /**
@@ -484,7 +507,8 @@ export function sitePreview() {
  * @param {string} description its plain-text description
  * @param {{url: string, alt: string, width?: number, height?: number}|null} [image] the
  *   preview image (previewOf) in place of the page's drawn one (its opengraph-image)
- * @param {{index?: boolean}} [options] `index` false asks search engines not to index it
+ * @param {{index?: boolean, follow?: boolean}} [options] `index` false asks search engines not
+ *   to index it, and not to follow its links unless `follow`
  */
 export function pageMetadata(
   timeline,
@@ -492,7 +516,7 @@ export function pageMetadata(
   title,
   description,
   image = null,
-  { index = true } = {},
+  { index = true, follow = index } = {},
 ) {
   const origin = siteOrigin(),
     url = origin + path,
@@ -524,7 +548,7 @@ export function pageMetadata(
         : {}),
     },
     // Private pages are for their members: not for search engines.
-    ...(shown && index ? {} : { robots: { index: false, follow: false } }),
+    ...(shown && index ? {} : { robots: { index: false, follow: shown && follow } }),
     openGraph: {
       type: 'website',
       siteName: siteName(),

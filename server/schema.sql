@@ -2014,6 +2014,11 @@ DROP TRIGGER IF EXISTS oc_track_storage ON oc_revisions;
 CREATE TRIGGER oc_track_storage AFTER INSERT OR UPDATE OF snapshot_id,patch,history_rows,stored_bytes OR DELETE
   ON oc_revisions FOR EACH ROW EXECUTE FUNCTION oc_track_storage();
 
+-- Which of a timeline's moments and durations have pages for search engines (#467;
+-- server/event-listing.mjs): 'auto' those with notes and titles of their own, unless its notes
+-- are templated; 'all'; or 'none'.
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS index_events text NOT NULL DEFAULT 'auto'
+  CHECK (index_events IN ('auto','all','none'));
 -- Maintenance of the large tables (#135). Autovacuum's defaults wait for 20% of a table to
 -- change, or 20% more rows (10% changes for statistics): at hundreds of millions of rows
 -- that is far too late for vacuums to stay short and for the planner's statistics to hold.
