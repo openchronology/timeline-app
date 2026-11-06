@@ -146,48 +146,88 @@ export async function firstMoments(services, timeline, limit, userId = null) {
   return events;
 }
 /**
- * A time as the timeline displays it (its own presentation: calendar, units and so on), or
- * its exact coordinate if the coordinate or the presentation cannot be read.
+ * A time as the timeline displays it (its own presentation: calendar, units and so on), written
+ * alone, at its own precision: "539 BCE" or "1861-03-04 CE 12:00 UTC" rather than a full
+ * timestamp (#466). Its exact coordinate if the coordinate or the presentation cannot be read.
  * @param {object} timeline the timeline, with its `presentation`
  * @param {string} time an exact time coordinate as the store keeps it
  */
 export function presentTime(timeline, time) {
   try {
-    return createPresenter(timeline.presentation ?? undefined).print(Q.parse(time));
+    return createPresenter(timeline.presentation ?? undefined).alone(Q.parse(time));
   } catch {
     return time;
   }
 }
 /**
- * A time as an ISO 8601 timestamp (`1861-03-04T12:00:00-05:00`), for structured data: only
- * on a timeline displayed as Gregorian dates, and only years 0000 to 9999 that end on a
- * finite decimal, which is what schema.org's dates allow; null otherwise.
+ * A time as ISO 8601, for structured data (#468): only on a timeline displayed as Gregorian
+ * dates, at the precision the timeline writes it alone (`1975`, `1975-03`, `1975-03-14`, or a
+ * timestamp with its offset, `1861-03-04T12:00:00-05:00`), with years counted astronomically
+ * as ISO 8601 does (1 BCE is `0000`, 539 BCE `-0538`), from -9999 to 9999 and ending on a
+ * finite decimal; null otherwise. HTML's `datetime` takes no years before 1, so callers that
+ * write one check for the sign (htmlTime). `precision` (0 a year, 1 a month, 2 a day, 3 in
+ * full) writes it at least that finely, as both ends of an interval must agree.
  */
-export function isoTime(timeline, time) {
+export function isoTime(timeline, time, precision = 0) {
+  const found = isoParts(timeline, time);
+  if (!found) return null;
+  const level = Math.max(found.level, precision);
+  if (level === 3) return found.full;
+  return found.parts.slice(1, level + 2).join('-');
+}
+/** isoTime's parts: the full timestamp, its year, month and day, and its precision. */
+function isoParts(timeline, time) {
   try {
     const presentation = validatePresentation(timeline.presentation);
     if (presentation.mode !== 'gregorian') return null;
-    const text = printTimestamp(
-      Q.parse(time).sub(Q.parse(presentation.origin)).div(Q.parse(presentation.scale)),
+    const exact = Q.parse(time);
+    const full = printTimestamp(
+      exact.sub(Q.parse(presentation.origin)).div(Q.parse(presentation.scale)),
       presentation.offsetMinutes,
     );
-    return /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/.test(text) ? text : null;
+    const parts = /^(-?\d{4})-(\d\d)-(\d\d)T\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/.exec(
+      full,
+    );
+    if (!parts) return null;
+    // How the timeline writes it alone: a year, a month or a day, or a time of day too.
+    const alone = createPresenter(presentation).alone(exact);
+    const date = /^\d+(-\d\d)?(-\d\d)? B?CE$/.exec(alone);
+    return { full, parts, level: !date ? 3 : date[2] ? 2 : date[1] ? 1 : 0 };
   } catch {
     return null;
   }
 }
+/** An interval's ends in ISO 8601, at the finer of their precisions, or null. */
+export function isoInterval(timeline, first, last) {
+  const [a, b] = [isoParts(timeline, first), isoParts(timeline, last)];
+  if (!a || !b) return null;
+  const level = Math.max(a.level, b.level);
+  return `${isoTime(timeline, first, level)}/${isoTime(timeline, last, level)}`;
+}
+/** A time's ISO 8601 form for HTML's `datetime`, which takes only years from 1: or null. */
+export function htmlTime(timeline, time) {
+  const iso = isoTime(timeline, time);
+  return iso && !iso.startsWith('-') && !iso.startsWith('0000') ? iso : null;
+}
 /**
  * Plain text, on one line, of at most `length` characters: tags are dropped and whitespace
  * collapsed, and a longer text is cut and ends with an ellipsis. For descriptions in
- * metadata and previews, which are plain text.
+ * metadata and previews, which are plain text. The cut falls between words when one ends in
+ * the last fifth of the room, so a word isn't broken (#466).
  */
 export function excerpt(text, length = 200) {
   const line = String(text ?? '')
     .replace(/<[^>]*>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  return line.length > length ? line.slice(0, length - 1).trimEnd() + '…' : line;
+  if (line.length <= length) return line;
+  let cut = line.slice(0, length - 1);
+  const space = cut.lastIndexOf(' ');
+  if (line[length - 1] !== ' ' && space >= length * 0.8) cut = cut.slice(0, space);
+  return cut.replace(/[\s,;:.–—-]+$/, '') + '…';
 }
+/** How long a page's description is: about what search results show of it (#466). */
+export const DESCRIPTION_LENGTH = 155;
 /** A timeline's title, or "Untitled timeline" when it has none. */
 export function timelineTitle(timeline) {
   return timeline.title?.trim() || 'Untitled timeline';
@@ -264,10 +304,16 @@ export function entityFacts(timeline, metadata = {}) {
 export function entitiesIndexable(timeline) {
   return timeline.visibility === 'public' && !timeline.labels?.length;
 }
+/** A moment's or duration's description: its time, then its notes as plain text, if any. */
+function entityDescription(time, notes) {
+  const text = markdownText(String(notes ?? '')).trim();
+  return text ? excerpt(`${time}. ${text}`, DESCRIPTION_LENGTH) : time;
+}
 /**
  * A moment's or duration's page metadata (see pageMetadata): its title and the timeline's,
- * and its time and notes; for a timeline with sensitive-content labels, the labels instead
- * of its notes, and not for search engines.
+ * and its time and notes, as plain text without their Markdown, cut to what search results
+ * show (#466); for a timeline with sensitive-content labels, the labels instead of its notes,
+ * and not for search engines.
  * @param {object} timeline its timeline
  * @param {{kind: 'moment'|'duration', id: string}} entity which entity
  * @param {string} title its title
@@ -282,7 +328,7 @@ export function entityMetadata(timeline, entity, title, time, notes) {
     `${title} · ${timelineTitle(timeline)}`,
     labelled
       ? `Sensitive content: ${describeLabels(timeline.labels).toLowerCase()}`
-      : excerpt(`${time}. ${notes ?? ''}`) || time,
+      : entityDescription(time, notes),
     null,
     { index: entitiesIndexable(timeline) },
   );
@@ -290,7 +336,8 @@ export function entityMetadata(timeline, entity, title, time, notes) {
 /**
  * A moment's or duration's schema.org description (#335), for a JSON-LD script: a
  * `CreativeWork` covering its time, as an ISO 8601 date or interval on a timeline of Gregorian
- * dates, otherwise as the timeline displays it; part of the timeline, by its owner. Not an
+ * dates (isoTime), and none otherwise, as schema.org reads only ISO 8601 there (#468); part of
+ * the timeline, by its owner. Not an
  * `Event`: search engines take those for happenings to attend, and want a place and tickets.
  * Null where its page is not for search engines.
  * @param {object} timeline its timeline
@@ -301,19 +348,17 @@ export function entityStructuredData(timeline, entity) {
   if (!entitiesIndexable(timeline)) return null;
   const origin = siteOrigin(),
     duration = entity.kind === 'duration';
-  const start = isoTime(timeline, entity.first),
-    end = duration ? isoTime(timeline, entity.last) : start;
-  const shown = duration
-    ? `${presentTime(timeline, entity.first)} – ${presentTime(timeline, entity.last)}`
-    : presentTime(timeline, entity.first);
-  const description = excerpt(entity.notes, 500);
+  const coverage = duration
+    ? isoInterval(timeline, entity.first, entity.last)
+    : isoTime(timeline, entity.first);
+  const description = excerpt(markdownText(String(entity.notes ?? '')), 500);
   return {
     '@context': 'https://schema.org',
     '@type': 'CreativeWork',
     name: entity.title,
     url: origin + sharedPath(timeline, entity),
     ...(description ? { description } : {}),
-    temporalCoverage: start && end ? (duration ? `${start}/${end}` : start) : shown,
+    ...(coverage ? { temporalCoverage: coverage } : {}),
     ...(entity.tags?.length ? { keywords: entity.tags.join(', ') } : {}),
     isPartOf: {
       '@type': 'CreativeWork',

@@ -80,15 +80,30 @@ const timeline = (extra = {}) => ({
   ...extra,
 });
 
-test('Times are ISO 8601 only on Gregorian timelines, in years schema.org allows', () => {
-  assert.equal(sharing.isoTime(timeline(), '86400/1'), '1970-01-02T00:00:00Z');
+test('Times are ISO 8601 only on Gregorian timelines, at the precision they show (#468)', () => {
+  // A day, a month or a year, as the timeline writes the time alone; a time of day in full.
+  const at = (text) => {
+    const days = Date.parse(text) / 1000;
+    return `${days}/1`;
+  };
+  assert.equal(sharing.isoTime(timeline(), '86400/1'), '1970-01-02');
+  assert.equal(sharing.isoTime(timeline(), at('1975-03-01T00:00:00Z')), '1975-03');
+  assert.equal(sharing.isoTime(timeline(), at('1975-01-01T00:00:00Z')), '1975');
+  assert.equal(sharing.isoTime(timeline(), at('1861-03-04T12:00:00Z')), '1861-03-04T12:00:00Z');
   assert.equal(sharing.isoTime(timeline(), '1/2'), '1970-01-01T00:00:00.5Z');
   assert.equal(
     sharing.isoTime(timeline({ presentation: gregorian(-300) }), '0/1'),
     '1969-12-31T19:00:00-05:00',
   );
-  // Before year 0, an endless fraction, another display, none, or an unreadable time.
-  assert.equal(sharing.isoTime(timeline(), '-70000000000/1'), null);
+  // Years before 1 counted as ISO 8601 does: 539 BCE is -0538, 1 BCE 0000.
+  assert.equal(sharing.isoTime(timeline(), at('-000538-01-01T00:00:00Z')), '-0538');
+  assert.equal(sharing.isoTime(timeline(), at('0000-01-01T00:00:00Z')), '0000');
+  // HTML's datetime takes neither.
+  assert.equal(sharing.htmlTime(timeline(), at('-000538-01-01T00:00:00Z')), null);
+  assert.equal(sharing.htmlTime(timeline(), at('1975-03-01T00:00:00Z')), '1975-03');
+  // Past ISO's four-digit years, an endless fraction, another display, none, or an
+  // unreadable time.
+  assert.equal(sharing.isoTime(timeline(), '-1000000000000/1'), null);
   assert.equal(sharing.isoTime(timeline(), '1/3'), null);
   assert.equal(
     sharing.isoTime(timeline({ presentation: { ...gregorian(), mode: 'rational' } }), '0/1'),
@@ -96,6 +111,9 @@ test('Times are ISO 8601 only on Gregorian timelines, in years schema.org allows
   );
   assert.equal(sharing.isoTime(timeline({ presentation: null }), '0/1'), null);
   assert.equal(sharing.isoTime(timeline(), 'soon'), null);
+  // Shown alone, at its own precision, not as a full timestamp (#466).
+  assert.equal(sharing.presentTime(timeline(), at('-000538-01-01T00:00:00Z')), '539 BCE');
+  assert.equal(sharing.presentTime(timeline(), at('1975-01-01T00:00:00Z')), '1975 CE');
 });
 
 test('Structured data: a CreativeWork covering its time, in ISO 8601 on Gregorian timelines', () => {
@@ -103,7 +121,7 @@ test('Structured data: a CreativeWork covering its time, in ISO 8601 on Gregoria
     kind: 'moment',
     id: 'leg:2',
     title: 'Storm',
-    notes: '<b>Rough</b> seas',
+    notes: '<b>Rough</b> **seas**',
     first: '86400/1',
     last: '86400/1',
     tags: ['weather', 'sea'],
@@ -114,7 +132,7 @@ test('Structured data: a CreativeWork covering its time, in ISO 8601 on Gregoria
     name: 'Storm',
     url: 'https://chronology.example/ada/voyages/moments/leg%3A2',
     description: 'Rough seas',
-    temporalCoverage: '1970-01-02T00:00:00Z',
+    temporalCoverage: '1970-01-02',
     keywords: 'weather, sea',
     isPartOf: {
       '@type': 'CreativeWork',
@@ -134,15 +152,16 @@ test('Structured data: a CreativeWork covering its time, in ISO 8601 on Gregoria
     [duration['@type'], duration.temporalCoverage, duration.startDate, duration.url],
     [
       'CreativeWork',
-      '1970-01-01T00:00:00Z/1970-01-03T00:00:00Z',
+      '1970-01-01/1970-01-03',
       undefined,
       'https://chronology.example/ada/voyages/durations/crossing',
     ],
   );
-  // Another display: the time as it shows it.
+  // Another display, such as a fictional calendar's years: no temporalCoverage, which
+  // schema.org reads only as ISO 8601.
   const ages = sharing.entityStructuredData(timeline({ presentation: null }), moment);
   assert.equal(ages['@type'], 'CreativeWork');
-  assert.equal(ages.temporalCoverage, '86400/1');
+  assert.equal('temporalCoverage' in ages, false);
   assert.equal(ages.startDate, undefined);
   // Nothing for a private timeline, or one with sensitive-content labels.
   assert.equal(sharing.entityStructuredData(timeline({ visibility: 'private' }), moment), null);
@@ -159,6 +178,24 @@ test('Metadata: labelled timelines describe their labels, not the notes, and are
   const shown = sharing.entityMetadata(timeline(), entity, 'Storm', '2 Jan 1970', 'Rough seas');
   assert.equal(shown.title, 'Storm · Voyages · OpenChronology');
   assert.equal(shown.description, '2 Jan 1970. Rough seas');
+  // Notes as plain text, without their Markdown, cut between words near 155 characters.
+  const long = sharing.entityMetadata(
+    timeline(),
+    entity,
+    'Storm',
+    '539 BCE',
+    '**Rough** seas, [logged](https://example.com) by the crew. ' +
+      'Waves rose all night. '.repeat(10),
+  );
+  assert.match(long.description, /^539 BCE\. Rough seas, logged by the crew\. Waves/);
+  assert(long.description.length <= 155, long.description.length);
+  assert.match(long.description, /[a-z]…$/);
+  assert.doesNotMatch(long.description, /\*|\]\(/);
+  // Without notes, the time alone.
+  assert.equal(
+    sharing.entityMetadata(timeline(), entity, 'Storm', '539 BCE').description,
+    '539 BCE',
+  );
   assert.equal(
     shown.alternates.canonical,
     'https://chronology.example/ada/voyages/moments/leg%3A2',
@@ -195,7 +232,8 @@ test('Its page as text: tags, notes, enabled plugins’ fields, https sources, r
       related: [{ kind: 'duration', id: 'crossing', first: '0/1', last: '1/1', title: '' }],
     }),
   );
-  assert.match(html, /<time datetime="1970-01-02T00:00:00Z">/i);
+  // The day it falls on, as the timeline writes it alone (#466, #468).
+  assert.match(html, /<time datetime="1970-01-02">1970-01-02 CE<\/time>/i);
   assert(html.includes('<ul aria-label="Tags"><li>weather</li></ul>'));
   assert(html.includes('<p>Rough seas</p>'));
   assert(html.includes('<h3>Sources</h3>'));

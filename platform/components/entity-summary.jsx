@@ -9,7 +9,7 @@ import {
   durationTitle,
   entityFacts,
   excerpt,
-  isoTime,
+  htmlTime,
   linkPath,
   momentTitle,
   presentTime,
@@ -19,7 +19,7 @@ import { timelinePath } from '../../src/addresses.ts';
 
 /** A time as the timeline displays it, with its ISO form for machines when it has one. */
 function Time({ timeline, time }) {
-  const iso = isoTime(timeline, time);
+  const iso = htmlTime(timeline, time);
   return <time {...(iso ? { dateTime: iso } : {})}>{presentTime(timeline, time)}</time>;
 }
 
