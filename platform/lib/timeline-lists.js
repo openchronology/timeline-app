@@ -26,7 +26,7 @@ const PUBLIC_SORTS = [
   'updated',
   'relevance',
 ];
-/** The orders of the account's own lists: nothing in them is featured for its owner. */
+/** The orders of favorites: nothing in them is featured for the one who starred them. */
 const OWN_SORTS = [
   'updated',
   'age',
@@ -38,13 +38,13 @@ const OWN_SORTS = [
 ];
 /**
  * The lists. Each has:
- * - `id`: its section's id on the page, which its links end with (`#mine`), so a page loaded
- *   without JavaScript opens at the list that was used (#338);
- * - `prefix`: what its query parameters begin with (`mineSearch`, `mineTag`, `mineSort`,
- *   `mineVisibility`, `minePage`); none for the page's main list (`search`, `tag`, …);
+ * - `id`: its section's id on the page, which its links end with (`#explore`), so a page
+ *   loaded without JavaScript opens at the list that was used (#338);
+ * - `prefix`: what its query parameters begin with (`draftSearch`, `draftTag`, `draftSort`,
+ *   `draftPage`); none for the page's main list (`search`, `tag`, …);
  * - `sorts`: the orders it offers, and `browse`: its order without search text (a search
  *   sorts by relevance unless asked otherwise);
- * - `visibility`: whether it filters by public or private (the account's own lists);
+ * - `visibility`: whether it filters by public or private (Explore, signed in);
  * - `library`: whether its search also finds moments and durations, with the filters for
  *   what it shows and whose timelines it searches (#459; LIBRARY_FIELDS);
  * - `noun`: what its controls and messages call what it lists, `count` how it counts one and
@@ -58,32 +58,12 @@ export const LISTS = {
     sorts: PUBLIC_SORTS,
     browse: 'featured',
     library: true,
+    // Signed in, it also searches the account's private timelines (librarySearches).
+    visibility: true,
     noun: 'timelines',
     count: ['timeline', 'timelines'],
     empty: 'No public timelines yet.',
     none: 'No timelines match this search.',
-  },
-  mine: {
-    id: 'mine',
-    prefix: 'mine',
-    sorts: OWN_SORTS,
-    browse: 'updated',
-    visibility: true,
-    noun: 'your timelines',
-    count: ['timeline', 'timelines'],
-    empty: 'You have no server timelines yet.',
-    none: 'None of your timelines match this search.',
-  },
-  favorites: {
-    id: 'favorites',
-    prefix: 'favorite',
-    sorts: OWN_SORTS,
-    browse: 'age',
-    visibility: true,
-    noun: 'your favorites',
-    count: ['favorite', 'favorites'],
-    empty: 'No favorites yet.',
-    none: 'None of your favorites match this search.',
   },
   // Searched in the browser (searchDrafts below), by what the list of drafts records.
   drafts: {
@@ -121,10 +101,10 @@ export const LISTS = {
 const FIELDS = ['search', 'tag', 'sort', 'visibility', 'page'];
 /**
  * A library list's fields besides (#459): `show`, what it finds (SHOWN, all by default);
- * `within`, `mine` for the account's own timelines alone; `entityPage`, the page of moments
- * and durations.
+ * `within`, `mine` for the account's own timelines alone; `starred`, `1` for only those the
+ * account starred; `entityPage`, the page of moments and durations.
  */
-const LIBRARY_FIELDS = ['show', 'within', 'entityPage'];
+const LIBRARY_FIELDS = ['show', 'within', 'starred', 'entityPage'];
 /** What a library list may show, in order. */
 export const SHOWN = ['timelines', 'moments', 'durations'];
 /** The query parameter of `field` (search, tag, sort, visibility or page) for `list`. */
@@ -188,6 +168,7 @@ export function readList(params, list) {
     ...state,
     show: readShown(params instanceof URLSearchParams ? params.getAll(name) : params[name]),
     within: get('within') === 'mine' ? 'mine' : '',
+    starred: get('starred') === '1',
     entityPage: pageNumber(get('entityPage')),
   };
 }
@@ -208,6 +189,7 @@ export function listQuery(list, state) {
   if (list.library) {
     if (state.show && state.show.length < SHOWN.length) set('show', state.show.join(','));
     set('within', state.within);
+    if (state.starred) set('starred', '1');
     if (state.entityPage > 1) set('entityPage', state.entityPage);
   }
   return query;
@@ -286,18 +268,30 @@ export function searchBody(list, state, fixed) {
  * A library list's two searches (#459), as the search APIs take them, or null for one it
  * doesn't show: its timelines (POST /api/timelines/search, with `fixed` over them) and, with
  * search text, its moments and durations (POST /api/timelines/entities/search). Signed in,
- * a search with text looks through the timelines the account may read (`visible`), and
- * `within` mine through its own; browsing without text, and guests, public timelines.
+ * a search with text, of starred timelines or by visibility looks through the timelines the
+ * account may read (`visible`), `within` mine through its own, and `starred` only those it
+ * starred; browsing without them, and guests, public timelines. The visibility and starred
+ * filters apply only signed in.
  */
 export function librarySearches(list, state, fixed, { signedIn = false } = {}) {
-  const text = !!state.search.trim();
+  const text = !!state.search.trim(),
+    starred = signedIn && !!state.starred;
   const scope =
-    signedIn && state.within === 'mine' ? 'mine' : signedIn && text ? 'visible' : fixed.scope;
+    signedIn && state.within === 'mine'
+      ? 'mine'
+      : signedIn && (text || starred || state.visibility)
+        ? 'visible'
+        : fixed.scope;
+  const own = {
+    ...(starred ? { starred: true } : {}),
+    ...(signedIn && state.visibility ? { visibility: state.visibility } : {}),
+  };
   const kinds = state.show.filter((s) => s !== 'timelines').map((s) => s.slice(0, -1));
+  // The visibility goes in `own`, signed in only.
+  const body = searchBody(list, state, fixed);
+  delete body.visibility;
   return {
-    timelines: state.show.includes('timelines')
-      ? { ...searchBody(list, state, fixed), scope }
-      : null,
+    timelines: state.show.includes('timelines') ? { ...body, scope, ...own } : null,
     entities:
       text && kinds.length
         ? {
@@ -306,6 +300,7 @@ export function librarySearches(list, state, fixed, { signedIn = false } = {}) {
             tag: state.tag,
             scope: scope === 'mine' ? 'mine' : signedIn ? 'visible' : 'public',
             ...(fixed.owner ? { owner: fixed.owner } : {}),
+            ...own,
             page: state.entityPage,
           }
         : null,
@@ -387,9 +382,9 @@ export function statusText(list, state, result) {
   const [one, many] = list.count;
   return `${result.total.toLocaleString('en')} ${result.total === 1 ? one : many} · Page ${result.page} of ${result.pages}`;
 }
-/** Whether a list's state narrows it (search text, a tag or a visibility), for its messages. */
+/** Whether a list's state narrows it (search text, a tag, a visibility, whose or starred). */
 export const isFiltered = (state) =>
-  !!(state.search?.trim() || state.tag || state.visibility || state.within);
+  !!(state.search?.trim() || state.tag || state.visibility || state.within || state.starred);
 /** Where this tab keeps the address of the last timeline list it showed. */
 const LAST_LIST = 'openchronology:last-list';
 /** Notes the list at this address (its path and query) as the one to go back to. */

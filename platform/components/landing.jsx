@@ -28,7 +28,7 @@ export function LandingHero({ meta, data, eyebrow }) {
           Explore timelines
         </a>
         {data.user ? (
-          <a className="button" href={browser + '#mine'}>
+          <a className="button" href={browser + '?within=mine#explore'}>
             Your timelines
           </a>
         ) : data.registration ? (

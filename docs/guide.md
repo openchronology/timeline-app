@@ -34,7 +34,7 @@ What a time _means_ is up to the timeline's **Time display**. A new timeline sho
 
 ### On the website
 
-The home page, **Timelines**, lists **Your timelines** and **Your favorites** once you are signed in, and **Explore timelines** for everyone.
+The home page, **Timelines**, has **Explore timelines** for everyone. Signed in, its filters also find your own timelines and the ones you starred, and **＋ New timeline** and **Your public profile** sit beside the heading.
 
 **Explore timelines** has one search field across the page. It finds timelines by their titles, notes and tags, and events (moments and durations) by their titles and notes ([#459](https://github.com/openchronology/timeline-app/issues/459)):
 
@@ -44,6 +44,8 @@ The home page, **Timelines**, lists **Your timelines** and **Your favorites** on
   - **Show:** **Timelines**, **Moments** and **Durations**, all at first;
   - **Tag:** only timelines and events with that tag;
   - **Search in:** **The whole library** or, signed in, **My timelines**;
+  - **Only timelines I starred**, signed in: your favorites, and their events;
+  - **Visibility**, signed in: public, private or both;
   - **Sort timelines:** **Featured first**, **By stars**, **By popularity** and others.
 - **Who sees what:** signed out, only public timelines and their events. Signed in, the whole library also includes your private timelines and those shared with you.
 - **Words:** each one matches the start of a word, so `light` finds "lighthouse". Without words, Explore lists public timelines to browse; events need words.
@@ -53,7 +55,6 @@ Every list on the home page and on a profile has its own search, so searching on
 | List                                                      | Search, filter and sort by                                                                                                                                                                                                      |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Explore timelines**                                     | Words, and under **Filters**: what to show, a tag, whose timelines, and **Featured first**, **By stars**, **By popularity**, **Trending this month**, **Alphabetical**, **Newest first**, **Recently changed** or **Relevance** |
-| **Your timelines**, **Your favorites**                    | The same, private timelines included, and **Visibility**: public, private or both                                                                                                                                               |
 | **Drafts in this browser**                                | Words and a tag, searched in this browser; **Recently changed**, **Alphabetical**, **Most moments** or **Relevance**                                                                                                            |
 | A profile's **Public timelines** and **Public favorites** | Words, a tag and the same orders as **Explore timelines**                                                                                                                                                                       |
 
@@ -265,7 +266,7 @@ New server timelines are private. To change that, open **Sharing & settings** ab
 
 **Share** opens the share dialog, with **Copy link**, links to post on social sites, and **Embed on a website** for public timelines. Events have **Share** in their details. Right-click the timeline and choose **Share this view** to share exactly what you see. The address bar also follows what is open, so you can copy it at any time. See [sharing timelines](sharing.md).
 
-**☆ Star** adds a timeline to **Your favorites**. **Report** tells the site's administrators about a timeline that breaks the rules ([reporting](moderation.md#reporting)).
+**☆ Star** adds a timeline to your favorites: **Only timelines I starred**, among Explore's filters, lists them. **Report** tells the site's administrators about a timeline that breaks the rules ([reporting](moderation.md#reporting)).
 
 ## Working together
 
