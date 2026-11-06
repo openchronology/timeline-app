@@ -527,19 +527,22 @@ export function previewOf(timeline) {
     ? timeline.image
     : null;
 }
-/** The site's own link-preview image's address, on the site (platform/icons/). */
-export const SITE_PREVIEW_PATH = '/social-preview.jpg';
 /**
- * The image links to the site's own pages preview with (#390): a screenshot of a large
- * timeline in the editor, for pages with no image of their own (a timeline's page draws one).
+ * The image links to the site's own pages preview with: a card the server draws
+ * (lib/site-preview.jsx, /previews/<name>.png) with its name, what OpenChronology is and its
+ * address over a strip of a timeline, for pages with no image of their own (a timeline's page
+ * draws one). `name` is `site`, or an audience for its page's card, with that page's heading;
+ * `alt` describes it.
  * @returns {{url: string, alt: string, width: number, height: number}}
  */
-export function sitePreview() {
+export function sitePreview(name = 'site', alt = null) {
   return {
-    url: siteOrigin() + SITE_PREVIEW_PATH,
+    url: `${siteOrigin()}/previews/${name}.png`,
     width: 1200,
     height: 630,
-    alt: 'The timeline of ancient Rome in the OpenChronology editor, from 171 BCE to 225 CE: its battles, emperors and dynasties along one line.',
+    alt:
+      alt ??
+      'OpenChronology: a free, open-source timeline editor for exact dates at any scale, from deep time to fractions of a second, with sources on every event. Below, a timeline of ancient Rome.',
   };
 }
 /**
@@ -621,10 +624,11 @@ export function pageMetadata(
  * @param {string} path the page's path, made absolute with siteOrigin()
  * @param {string} title the page's own title
  * @param {string} description its plain-text description
+ * @param {{url: string, alt: string}} [preview] its preview image, if not the site's card
  */
-export function sitePageMetadata(path, title, description) {
+export function sitePageMetadata(path, title, description, preview = sitePreview()) {
   const url = siteOrigin() + path,
-    images = [sitePreview()];
+    images = [preview];
   return {
     title: title.includes(siteName()) ? title : pageTitle(title),
     description,

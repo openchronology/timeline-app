@@ -93,13 +93,18 @@ Twitter cards) and search engines. Each has:
 Facebook, X, LinkedIn, Slack, Discord, iMessage and others show these as a card with a large
 image.
 
-The site's other pages (the landing page, the audience pages, profiles, help and the rest)
-preview with the site's own image, `/social-preview.jpg`: a 1200 × 630 screenshot of a large
-timeline in the editor, with its size and a description for screen readers. Every preview
+The site's other pages (the landing page, profiles, help and the rest) preview with the site's
+own card, `/previews/site.png`, which each server draws for itself at 1200 × 630: the logo and
+"OpenChronology", what it is in one sentence, and the server's name (`PLATFORM_NAME`) or address,
+over a strip of the ancient Rome timeline cut from `/social-preview.jpg`, a screenshot of the
+editor. Each audience's page has a card of its own, `/previews/<audience>.png`, with its heading
+and promise in place of the sentence, so a link to `/for/educators` speaks to teachers. Each has
+its size and a description for screen readers. A private timeline's preview is the site's card
+too. Every preview
 image's address is absolute, on the site's address (`APP_ORIGIN`).
 
 Previews are made as a guest sees the timeline: a private timeline's preview image is the
-site's own card, and its pages ask search engines not to index them, so nothing private
+site's card, and its pages ask search engines not to index them, so nothing private
 appears in a preview even when a member shares the link.
 
 A timeline with [sensitive-content labels](moderation.md#sensitive-content-labels) previews as
