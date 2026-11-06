@@ -190,7 +190,7 @@ try {
     assert.match(home.html, /<meta property="og:title" content="OpenChronology: free timeline/);
     assert.match(
       home.html,
-      new RegExp(`<meta property="og:image" content="${o}/social-preview\\.jpg"`),
+      new RegExp(`<meta property="og:image" content="${o}/previews/site\\.png"`),
     );
     assert.match(home.html, /href="\/explore"/, 'the header and opening link to the browser');
     for (const audience of ['educators', 'researchers', 'operations', 'developers'])
@@ -241,7 +241,15 @@ try {
       /<title>Collaborative timeline maker for teachers and classrooms<\/title>/,
     );
     assert.match(educators.html, /<h1[^>]*>Timelines your class builds together<\/h1>/);
-    assert.match(educators.html, /<meta property="og:image:alt" content="[^"]+"/);
+    // Its own card: its heading over the timeline.
+    assert.match(
+      educators.html,
+      new RegExp(`<meta property="og:image" content="${o}/previews/educators\\.png"`),
+    );
+    assert.match(
+      educators.html,
+      /<meta property="og:image:alt" content="Timelines your class builds together\. /,
+    );
     assert.match(educators.html, /Accounts are for people 13 and older/);
     // Its examples, in the order named, without the private, labelled or missing ones.
     assert.match(educators.html, new RegExp(`Alpha ${word}[\\s\\S]*Beta ${word}`));

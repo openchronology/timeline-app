@@ -527,19 +527,22 @@ export function previewOf(timeline) {
     ? timeline.image
     : null;
 }
-/** The site's own link-preview image's address, on the site (platform/icons/). */
-export const SITE_PREVIEW_PATH = '/social-preview.jpg';
 /**
- * The image links to the site's own pages preview with (#390): a screenshot of a large
- * timeline in the editor, for pages with no image of their own (a timeline's page draws one).
+ * The image links to the site's own pages preview with: a card the server draws
+ * (lib/site-preview.jsx, /previews/<name>.png) with its name, what OpenChronology is and its
+ * address over a strip of a timeline, for pages with no image of their own (a timeline's page
+ * draws one). `name` is `site`, or an audience for its page's card, with that page's heading;
+ * `alt` describes it.
  * @returns {{url: string, alt: string, width: number, height: number}}
  */
-export function sitePreview() {
+export function sitePreview(name = 'site', alt = null) {
   return {
-    url: siteOrigin() + SITE_PREVIEW_PATH,
+    url: `${siteOrigin()}/previews/${name}.png`,
     width: 1200,
     height: 630,
-    alt: 'The timeline of ancient Rome in the OpenChronology editor, from 171 BCE to 225 CE: its battles, emperors and dynasties along one line.',
+    alt:
+      alt ??
+      'OpenChronology: a free, open-source timeline editor for exact dates at any scale, from deep time to fractions of a second, with sources on every event. Below, a timeline of ancient Rome.',
   };
 }
 /**
@@ -621,10 +624,11 @@ export function pageMetadata(
  * @param {string} path the page's path, made absolute with siteOrigin()
  * @param {string} title the page's own title
  * @param {string} description its plain-text description
+ * @param {{url: string, alt: string}} [preview] its preview image, if not the site's card
  */
-export function sitePageMetadata(path, title, description) {
+export function sitePageMetadata(path, title, description, preview = sitePreview()) {
   const url = siteOrigin() + path,
-    images = [sitePreview()];
+    images = [preview];
   return {
     title: title.includes(siteName()) ? title : pageTitle(title),
     description,
@@ -660,4 +664,68 @@ export function webPageData(path, title, description, more = {}) {
     isPartOf: { '@type': 'WebSite', name: siteName(), url: origin + '/' },
     ...more,
   };
+}
+
+/** A count for a description: exact under 1,000, else its first two digits and "+". */
+export function roughCount(n) {
+  const value = Number(n);
+  if (value < 1000) return value.toLocaleString('en');
+  const step = 10 ** (Math.floor(Math.log10(value)) - 1);
+  return (Math.floor(value / step) * step).toLocaleString('en') + '+';
+}
+/** "1 timeline" or "65 timelines", with roughCount. */
+const counted = (n, one, many) => `${roughCount(n)} ${Number(n) === 1 ? one : many}`;
+/**
+ * Explore's description (#471): what it searches, and how much of it there is: the public
+ * timelines and their moments. Without a database (`pool`), what it does alone.
+ * @param {import('pg').Pool|null} pool
+ */
+export async function exploreDescription(pool) {
+  const fallback =
+    'Search public timelines and their dated events by title and notes, or browse them by tag, stars and popularity.';
+  try {
+    if (!pool) return fallback;
+    const { rows } = await pool.query(
+      `SELECT count(*) AS timelines, coalesce(sum(event_count),0) AS moments FROM oc_timelines
+      WHERE visibility='public' AND comparison IS NULL`,
+    );
+    const { timelines, moments } = rows[0];
+    if (!Number(timelines)) return fallback;
+    return excerpt(
+      `Search ${counted(timelines, 'public timeline', 'public timelines')} and their ${counted(moments, 'dated event', 'dated events')} by title and notes, or browse them by tag, stars and popularity.`,
+      DESCRIPTION_LENGTH,
+    );
+  } catch {
+    return fallback;
+  }
+}
+/**
+ * A profile's description (#471): how many public timelines the account has, and the
+ * titles of up to three, its most starred (none with sensitive-content labels).
+ * @param {import('pg').Pool|null} pool
+ * @param {string} username
+ */
+export async function profileDescription(pool, username) {
+  const fallback = `Public timelines and favorites of @${username} on ${siteName()}.`;
+  try {
+    if (!pool) return fallback;
+    const { rows } = await pool.query(
+      `SELECT count(*) AS total,
+        (array_agg(t.title ORDER BY t.star_count DESC, t.updated_at DESC)
+          FILTER (WHERE t.content_labels='{}' AND t.moderator_labels='{}' AND t.title<>''))[1:3] AS titles
+      FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id
+      WHERE u.username=$1 AND NOT u.is_disabled AND t.visibility='public' AND t.comparison IS NULL`,
+      [username],
+    );
+    const { total, titles } = rows[0];
+    if (!Number(total)) return fallback;
+    const named = (titles ?? []).map((t) => titleHead(t));
+    return excerpt(
+      `@${username} has ${counted(total, 'public timeline', 'public timelines')} on ${siteName()}` +
+        (named.length ? `, including ${named.join(', ')}.` : '.'),
+      DESCRIPTION_LENGTH,
+    );
+  } catch {
+    return fallback;
+  }
 }

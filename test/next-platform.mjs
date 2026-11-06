@@ -146,20 +146,33 @@ try {
   }
   for (const path of ['/favicon.ico', '/apple-icon.png', '/logo-mark.svg'])
     assert.equal((await fetch(origin + path)).status, 200, path);
-  // Links to the site's own pages preview with its screenshot (#390), at its full address.
+  // Links to the site's own pages preview with its card, drawn by the server with its own name
+  // and address over a strip of a timeline, at its full address.
   const escaped = origin.replace(/[.]/g, '\\.');
   assert.match(
     html,
-    new RegExp(`<meta property="og:image" content="${escaped}/social-preview\\.jpg"`),
+    new RegExp(`<meta property="og:image" content="${escaped}/previews/site\\.png"`),
   );
   assert.match(html, /<meta property="og:image:width" content="1200"/);
   assert.match(html, /<meta property="og:image:height" content="630"/);
-  assert.match(html, /<meta property="og:image:alt" content="The timeline of ancient Rome/);
+  assert.match(html, /<meta property="og:image:alt" content="OpenChronology: a free, open-source/);
   assert.match(html, /<meta name="twitter:card" content="summary_large_image"/);
   assert.match(
     html,
-    new RegExp(`<meta name="twitter:image" content="${escaped}/social-preview\\.jpg"`),
+    new RegExp(`<meta name="twitter:image" content="${escaped}/previews/site\\.png"`),
   );
+  // The card, the site's and an audience page's, 1200 × 630; no other names.
+  for (const name of ['site', 'educators']) {
+    const card = await fetch(`${origin}/previews/${name}.png`);
+    assert.equal(card.status, 200, name);
+    assert.equal(card.headers.get('content-type'), 'image/png');
+    const png = Buffer.from(await card.arrayBuffer());
+    assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1200, 630], name);
+    assert.ok(png.length < 1_000_000, 'small enough to fetch quickly');
+  }
+  for (const path of ['/previews/nobody.png', '/previews/site.jpg'])
+    assert.equal((await fetch(origin + path)).status, 404, path);
+  // The screenshot its strip is cut from.
   {
     const image = await fetch(origin + '/social-preview.jpg');
     assert.equal(image.status, 200);
@@ -222,6 +235,15 @@ try {
     assert.match(full, /^Source: http[^\n]*\/help\/faq$/m);
     assert.doesNotMatch(full, /<!-- description|^Copyright \(c\)/m);
     assert.match(html, /<a href="\/llms\.txt">llms\.txt<\/a>/);
+  }
+  // A help page's own heading comes before the help's navigation, whose group names are not
+  // headings, so its outline is its own (#484).
+  {
+    const help = await (await fetch(origin + '/help/faq')).text();
+    const main = help.slice(help.indexOf('<main'));
+    assert(main.indexOf('<h1') >= 0 && main.indexOf('<h1') < main.indexOf('help-contents'));
+    const nav = main.slice(main.indexOf('<nav class="help-contents"'));
+    assert.doesNotMatch(nav.slice(0, nav.indexOf('</nav>')), /<h[1-6]/);
   }
   // Each page's title says what it is, then the site's name (#210).
   for (const [path, title] of [

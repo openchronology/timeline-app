@@ -6,10 +6,11 @@ Images the site serves from its root, which `scripts/platform-assets.mjs` copies
 
 ## Contents
 
-| File                                             | What it is for                                                                                   |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| [`icon-192.png`](icon-192.png)                   | The web app manifest's small icon, for Android's home screen.                                    |
-| [`icon-512.png`](icon-512.png)                   | The manifest's large icon, for the splash screen and installed app lists.                        |
-| [`icon-maskable-512.png`](icon-maskable-512.png) | The manifest's maskable icon: the mark kept inside the circle or shape Android may crop it to.   |
-| [`logo-mark.svg`](logo-mark.svg)                 | The logo in the site's header.                                                                   |
-| [`social-preview.jpg`](social-preview.jpg)       | The site's link-preview image (#390): a 1200 × 630 screenshot of a large timeline in the editor. |
+| File                                             | What it is for                                                                                                                                                     |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`github-preview.png`](github-preview.png)       | The repository's GitHub social preview (#479): 1280 × 640, the name, the one-sentence definition and a strip of a timeline, drawn by `scripts/github-preview.mjs`. |
+| [`icon-192.png`](icon-192.png)                   | The web app manifest's small icon, for Android's home screen.                                                                                                      |
+| [`icon-512.png`](icon-512.png)                   | The manifest's large icon, for the splash screen and installed app lists.                                                                                          |
+| [`icon-maskable-512.png`](icon-maskable-512.png) | The manifest's maskable icon: the mark kept inside the circle or shape Android may crop it to.                                                                     |
+| [`logo-mark.svg`](logo-mark.svg)                 | The logo in the site's header.                                                                                                                                     |
+| [`social-preview.jpg`](social-preview.jpg)       | The site's link-preview image (#390): a 1200 × 630 screenshot of a large timeline in the editor.                                                                   |

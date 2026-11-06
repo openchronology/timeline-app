@@ -7,14 +7,16 @@ import { browserPath } from '../../server/landing.mjs';
 import { accountCompareLimit, currentSession, userCompareLimit } from '../lib/session.js';
 import { searchTimelines } from '../../server/collaboration.mjs';
 import TimelineBrowser from './timeline-browser.jsx';
-import { siteName, sitePreview } from '../lib/sharing.js';
+import { profileDescription, siteName, sitePreview } from '../lib/sharing.js';
 import { minor } from '../../server/auth.mjs';
+import { platformServices } from '../../server/platform.mjs';
 import ReportLink from './report-link.jsx';
 import { profilePath } from '../../src/addresses.ts';
 import { LISTS, readList, searchBody } from '../lib/timeline-lists.js';
-export function profileMetadata(username) {
+export async function profileMetadata(username) {
   const title = '@' + username,
-    description = `Public timelines and favorites of @${username} on ${siteName()}.`,
+    // How many public timelines, and a few of them by name (#471).
+    description = await profileDescription((await platformServices()).pool, username),
     url = profilePath(username);
   return {
     title: `${title} · ${siteName()}`,

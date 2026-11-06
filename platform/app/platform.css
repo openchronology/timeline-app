@@ -1981,6 +1981,15 @@ main.help {
   gap: 2.5rem;
   align-items: start;
 }
+/* The page comes first in the HTML (#484); the contents are placed beside it, on the left. */
+main.help > .help-contents {
+  grid-column: 1;
+  grid-row: 1;
+}
+main.help > .help-body {
+  grid-column: 2;
+  grid-row: 1;
+}
 .help-contents {
   position: sticky;
   top: calc(var(--header-height) + 1rem);
@@ -1988,8 +1997,9 @@ main.help {
   overflow: auto;
   font-size: 14px;
 }
-.help-contents h2 {
+.help-contents .help-group {
   margin: 1rem 0 0.25rem;
+  font-weight: 600;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -2150,8 +2160,13 @@ main.help {
   }
 }
 @media (max-width: 900px) {
+  /* Narrow, the contents stay above the page, as they read before (#484). */
   main.help {
-    display: block;
+    display: flex;
+    flex-direction: column;
+  }
+  main.help > .help-contents {
+    order: -1;
   }
   .help-contents {
     position: static;
