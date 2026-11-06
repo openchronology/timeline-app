@@ -153,10 +153,15 @@ described by their labels instead of their notes, and ask search engines not to 
   screen readers and crawlers. Each moment links to its own page. Up to 50 moments and
   durations on other timelines that link to it as a whole are listed under **Linked from**,
   each linked to its own page.
+- **Moment and duration pages' descriptions**, which search results and link previews show,
+  are its time as the timeline writes it, then its notes as plain text without their Markdown,
+  cut between words near 155 characters
+  ([#466](https://github.com/openchronology/timeline-app/issues/466)).
 - **Moment and duration pages as text:** each includes, as text:
   - its title;
-  - its time or extent as the timeline displays it (with the ISO date for machines on a
-    timeline of Gregorian dates);
+  - its time or extent as the timeline displays it, each time at its own precision ("539
+    BCE", "1975-03 CE"), with the ISO date for machines on a timeline of Gregorian dates in
+    years 1–9999;
   - its tags and notes;
   - what its timeline's plugins record, such as dating notes, and their links, such as
     sources (https only, marked `ugc nofollow`);
@@ -172,9 +177,12 @@ described by their labels instead of their notes, and ask search engines not to 
   when it was made and last changed, and its owner as author.
 - **Structured data:** each moment and duration page also describes itself as
   [schema.org](https://schema.org) JSON-LD:
-  - a `CreativeWork` whose `temporalCoverage` is its time: an ISO 8601 date (a duration's,
-    an interval `start/end`) on a timeline of Gregorian dates in years 0000–9999, otherwise
-    its time as displayed;
+  - a `CreativeWork` whose `temporalCoverage` is its time in ISO 8601
+    ([#468](https://github.com/openchronology/timeline-app/issues/468)): a date as precise as
+    the timeline writes it (`1975`, `1975-03`, `1975-03-14`, or a full timestamp), and for a
+    duration an interval `start/end`, both ends at the finer of their precisions. Years count
+    as ISO 8601 does, so 539 BCE is `-0538` and 1 BCE `0000`, from -9999 to 9999. A timeline
+    of other times, such as a fictional calendar's years or a plain number line, gives none;
   - with its notes, tags as keywords, and the timeline and its owner (`isPartOf`);
   - never an `Event`, which search engines take for a happening to attend, and fault for
     lacking a place, tickets and organizer.

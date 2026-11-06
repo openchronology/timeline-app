@@ -323,7 +323,9 @@ try {
   assert(moment.includes(`<link rel="canonical" href="${origin + momentPath}"/>`));
   // As text (#335): its date, tags, sources (https only), dating note, what it is related
   // to, and a link into the timeline at it.
-  assert.match(moment, /<time datetime="1970-01-02T00:00:00Z">/i, 'Its date, for machines.');
+  // As the timeline writes it alone, the day, and in its description (#466, #468).
+  assert.match(moment, /<time datetime="1970-01-02">1970-01-02 CE<\/time>/i, 'Its date.');
+  assert.equal(meta(moment, 'description'), '1970-01-02 CE');
   assert.match(moment, /<ul aria-label="Tags"><li>weather<\/li><\/ul>/);
   assert(moment.includes('href="https://example.com/logbook"'));
   assert(!moment.includes('javascript:alert'));
@@ -338,7 +340,7 @@ try {
     '@type': 'CreativeWork',
     name: 'Storm ' + suffix,
     url: origin + momentPath,
-    temporalCoverage: '1970-01-02T00:00:00Z',
+    temporalCoverage: '1970-01-02',
     keywords: 'weather',
     isPartOf: {
       '@type': 'CreativeWork',
@@ -364,7 +366,7 @@ try {
   assert.equal(during['@type'], 'CreativeWork');
   assert.deepEqual(
     [during.temporalCoverage, during.description],
-    ['1970-01-01T00:00:00Z/1970-01-03T00:00:00Z', 'Two days at sea.'],
+    ['1970-01-01/1970-01-03', 'Two days at sea.'],
   );
   assert(duration.includes(`<a href="${momentPath}">Storm ${suffix}</a>`));
   await guest.request(base + '/durations/absent', { status: 404 });
