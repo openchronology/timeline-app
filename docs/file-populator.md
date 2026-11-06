@@ -1,5 +1,7 @@
 # Timelines from files
 
+<!-- description: Make a timeline from the files on your computer in the desktop app: a moment for each photo, video, recording or document, at the time you choose. -->
+
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
 The desktop app can make a timeline from the files on your computer: a moment for each photo, video, recording or any other file, at the time you choose ([#433](https://github.com/openchronology/timeline-app/issues/433)). A folder of photos becomes an album you browse by when each was taken. Each moment's source is the file itself, so opening a moment's source opens the file in its own app, such as your photo viewer or video player. Nothing is copied: the timeline links to the files where they are.

@@ -1,5 +1,7 @@
 # Public example timelines
 
+<!-- description: The example timelines a new server can load: how to load them, the plugins and time conventions they use, and the World War II campaign comparison. -->
+
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
 After building and migrating the platform, run:

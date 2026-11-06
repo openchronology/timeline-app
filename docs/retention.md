@@ -1,5 +1,7 @@
 # Data retention and quick deletion
 
+<!-- description: Keep only a timeline's recent past, for logs that keep growing; stop keeping saved history; and delete everything in a view. -->
+
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
 Timelines that keep growing, such as the ones the [syslog receiver](syslog.md) and the

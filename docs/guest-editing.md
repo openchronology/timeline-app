@@ -1,5 +1,7 @@
 # Guest and standalone editing
 
+<!-- description: Editing without an account: the guest editor and the offline HTML file keep timelines in memory, and how to keep your work before closing. -->
+
 The standalone HTML build and guest editor keep timeline data **only in memory**.
 The banner at the top of the editor explains that refreshing or closing the tab
 loses edits, and offers **Export .ochx**. Import/export preserves exact rationals,

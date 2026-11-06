@@ -4,7 +4,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { HELP_SECTIONS, helpLink, helpPages, renderMarkdown, searchHelp } from '../server/help.mjs';
+import {
+  firstSentences,
+  HELP_SECTIONS,
+  helpLink,
+  helpPage,
+  helpPages,
+  renderMarkdown,
+  searchHelp,
+  SUMMARY_LENGTH,
+} from '../server/help.mjs';
 
 const render = (source) => renderMarkdown(source).html;
 
@@ -101,6 +110,31 @@ test('every doc renders, belongs to a section, and links only to what exists', a
     }
   }
   assert.deepEqual(problems, []);
+});
+
+test('each page is described for search results, in its own words (#470)', async () => {
+  const pages = await helpPages(new URL('..', import.meta.url).pathname);
+  for (const [slug, page] of pages) {
+    // Every doc has a description of its own, which search results show whole.
+    assert(page.summary.length >= 40 && page.summary.length <= SUMMARY_LENGTH, slug);
+    assert.doesNotMatch(page.summary, /^(server|docs)\/|…$/, slug);
+    assert(!/(<|&lt;)!-- description/.test(page.html), `${slug} shows its description`);
+  }
+  // Its line is metadata: not in the page, nor in search.
+  const described = helpPage(
+    'example',
+    '# Example\n\n<!-- description: An example page, described. -->\n\nFirst `server/x.mjs` runs.\n',
+  );
+  assert.equal(described.summary, 'An example page, described.');
+  assert(!described.sections.some((s) => s.text.includes('described')));
+  // Without one, its first sentences that fit, or the first cut between words.
+  const plain = helpPage(
+    'plain',
+    '# Plain\n\n' + 'A sentence that runs on for a while. '.repeat(8),
+  );
+  assert.equal(plain.summary, 'A sentence that runs on for a while. '.repeat(4).trim());
+  assert.match(firstSentences('word '.repeat(60).trim()), /^(word ){30,}word…$/);
+  assert.equal(firstSentences('Short.'), 'Short.');
 });
 
 test('search finds the sections that mention every word, headings first', async () => {

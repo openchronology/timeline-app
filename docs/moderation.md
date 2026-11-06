@@ -1,5 +1,7 @@
 # Reports and moderation
 
+<!-- description: Reporting timelines and accounts, sensitive-content labels, and how a site's administrators review reports and restrict what breaks the rules. -->
+
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
 Anyone who can see something on the platform can report it to the site's administrators. They review reports in **Site administration → Reports** and decide what happens. The design and the law behind it are in [#115](https://github.com/openchronology/timeline-app/issues/115).

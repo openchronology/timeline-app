@@ -1,5 +1,7 @@
 # Timeline and query contract
 
+<!-- description: How OpenChronology stores and exchanges timelines: the .ochx and .och formats, exact times, window summaries, saved history and server operations. -->
+
 The browser model is `RationalMap<readonly PointEvent[]>`, weighted by bucket size. An auxiliary ID map locates edits without searching the time domain. Different moments can occupy the same rational coordinate. IDs are unique ASCII strings of 1–128 characters from `[A-Za-z0-9_.:-]`; this preserves identical moment ordering across JavaScript, PostgreSQL's C collation, and SQLite.
 
 ## JSON exchange version 1 (.ochx)

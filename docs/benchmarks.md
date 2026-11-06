@@ -1,5 +1,7 @@
 # Benchmarks
 
+<!-- description: How OpenChronology's speed holds up as timelines grow: measured times for saves, searches, downloads and interactions on each storage backend. -->
+
 The benchmark suite measures how operation latency grows with timeline size on each storage backend:
 
 - **PostgreSQL**: the server's store (`server/store.mjs`), as the HTTP API calls it: viewport and page queries, and sparse saves.

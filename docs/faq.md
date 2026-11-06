@@ -1,5 +1,7 @@
 # Frequently asked questions
 
+<!-- description: Short answers to common questions about OpenChronology: what it is, whether it is free, accounts, where data is kept, offline use, file formats and dates. -->
+
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
 Short answers to common questions, from the basics to running your own server. For a walk through the whole app, read [using OpenChronology](guide.md).

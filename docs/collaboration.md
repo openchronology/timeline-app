@@ -1,5 +1,7 @@
 # Dashboard and timeline collaboration
 
+<!-- description: Working on timelines together: collaborators and permissions, forks and duplicates, saving while others save, pull requests, and saved history. -->
+
 The server root opens the dashboard for guests and signed-in users alike. Guests see the public browser with twelve results per page. Signed-in users also see their own timelines above it. The dashboard remains the landing page when database storage is unconfigured, with an availability message and the option to create a local timeline. A retained local draft does not replace the dashboard on a fresh visit. The sidebar inside the editor also lists timelines shared with the account. Static deployments and a disconnected desktop keep local editing available.
 
 The public browser starts with featured timelines, then recently updated timelines. Set `FEATURED_TIMELINES` to a comma-separated list of public timeline UUIDs, or have the operator set `oc_timelines.featured=true`. Featuring a private timeline never exposes it. Owners cannot self-feature through the timeline API.

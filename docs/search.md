@@ -1,5 +1,7 @@
 # Searching a timeline
 
+<!-- description: Search the open timeline by its events' titles and notes: how matching and ranking work, and how the server stores and serves the search. -->
+
 The search bar across the top of the timeline searches the open timeline: type words from a title or notes, then press Enter or **Search**, and the results open in a dialog, where the words can be changed and searched again. **/** outside a text field goes to the search bar. Every word must match. Results list moments and [durations](durations.md), 25 per page, with each one's time or extent and a preview of its notes. A moment also matches through the titles and notes of its nested entries, such as stacks. The view does not move while you search. Choosing a result closes the dialog and moves the view to it: a moment is centred at the current zoom; a duration is fitted with a margin on both sides. The chosen moment or band pulses briefly. Nothing else opens; click it to edit.
 
 Matching depends on where the timeline lives:

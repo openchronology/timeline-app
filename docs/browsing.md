@@ -1,5 +1,7 @@
 # Browsing, popularity and account standing
 
+<!-- description: How Explore lists, searches and ranks timelines and events: established accounts, standing against spam, popularity, trends and related timelines. -->
+
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
 The dashboard's timeline browser lists public timelines. To keep spam out of it without blocking anyone from publishing, it ranks by **account standing**. Standing is computed from what an account has done and how long it has existed. Only administrators see it ([#103](https://github.com/openchronology/timeline-app/issues/103)).

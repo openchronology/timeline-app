@@ -1,5 +1,7 @@
 # Durations
 
+<!-- description: Durations: periods with a start and an end, anchored to times or to moments, with notes and metadata like moments, drawn as bands on the timeline. -->
+
 A duration is a timeline entity in its own right, with an ID, a start, an end, a title, notes and arbitrary metadata. Each endpoint is either:
 
 - **A fixed time**, an exact rational coordinate stored with the duration.

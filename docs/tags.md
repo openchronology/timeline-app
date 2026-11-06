@@ -1,5 +1,7 @@
 # Entity tags and separation
 
+<!-- description: Tags on events: short labels such as war or trade, how to add them, filter by them, and separate a timeline into tracks by tag. -->
+
 Events (moments and durations) can carry tags: short labels you choose, such as `war` or `trade`. Enter them as a comma-separated list in the **Tags** field of a moment's details or the duration dialog. Tags are stored as `metadata.tags` and normalized like timeline tags: trimmed, lowercased, deduplicated, at most 40 per entity, 1–64 characters each, without commas or control characters. Search indexes them with the rest of the timeline, and they travel through `.ochx`, `.och`, server saves, forks and merges like other metadata. `tags` is reserved, so plugin fields cannot use it. Older documents that used a `tags` key for something other than a list of tag strings open unchanged, and that value is ignored for tagging.
 
 ## Separating by tags

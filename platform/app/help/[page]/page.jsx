@@ -3,7 +3,7 @@
 import { notFound } from 'next/navigation';
 import HelpShell from '../../../components/help-shell.jsx';
 import { helpPages } from '../../../../server/help.mjs';
-import { siteName } from '../../../lib/sharing.js';
+import { pageTitle } from '../../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
 async function load(params) {
   const { page: slug } = await params;
@@ -15,8 +15,9 @@ async function load(params) {
 export async function generateMetadata({ params }) {
   const { page } = await load(params);
   return {
-    title: `${page.title} · Help · ${siteName()}`,
-    description: page.summary.slice(0, 200),
+    title: pageTitle(page.title, 'Help'),
+    // Its own description, or its first sentences (#470).
+    description: page.summary,
     alternates: { canonical: '/help/' + page.slug },
   };
 }
