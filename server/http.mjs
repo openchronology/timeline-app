@@ -1587,6 +1587,9 @@ export function createRequestHandler({
         if (action === 'changes' && method === 'PUT') {
           auth.require(session, req);
           const input = await body(req);
+          // Access first, as for a whole save.
+          if (!(await store.access(id, userId)).canWrite)
+            throw new HttpError(403, 'Write access is required to save this timeline.');
           const durationInput = input.durationChanges ?? [];
           const relationshipInput = input.relationshipChanges ?? [];
           if (!Array.isArray(relationshipInput) || relationshipInput.length > 5000)
@@ -1673,6 +1676,10 @@ export function createRequestHandler({
           const input = await body(req);
           if (typeof input.revision !== 'string' || !/^\d+$/.test(input.revision))
             throw new HttpError(400, 'Expected a revision string.');
+          // Access first, so only those who may save a timeline make the server read a whole
+          // document for it (store.save checks again, under the timeline's lock).
+          if (!(await store.access(id, userId)).canWrite)
+            throw new HttpError(403, 'Write access is required to save this timeline.');
           const saved = document(input.document);
           return response(res, 200, {
             ...(await store.save(id, userId, input.revision, saved)),

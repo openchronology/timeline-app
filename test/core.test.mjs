@@ -143,8 +143,9 @@ test('repeated wheel, button, pan and pinch gestures retain bounded camera preci
   }
 });
 test('zooming can gain visible precision without changing exact timeline events or explicit bounds', () => {
-  const offset = Q.from(10n ** 1200n),
-    tiny = Q.from(1n, 10n ** 1100n),
+  // Far out and fine, within what a time may be: 10^900 and a step of 10^-60.
+  const offset = Q.from(10n ** 900n),
+    tiny = Q.from(1n, 10n ** 60n),
     document = validateDocument({
       format: 'openchronology',
       version: 1,
@@ -248,19 +249,32 @@ test('balanced PostgreSQL snapshots cache exact counts and use only integer node
 });
 test('times limit their exponents and length, so a short text cannot ask for a vast number', () => {
   assert.equal(parseTime('1.5e3').toString(), '1500/1');
-  assert.equal(parseTime('1e10000').toString(), '1' + '0'.repeat(10000) + '/1');
-  assert.equal(parseTime('-25E-10000').toString(), '-1/4' + '0'.repeat(9998));
+  // From 10^-64 to below 10^1000: a fraction of at most 1000 digits over at most 65.
+  assert.equal(parseTime('1e999').toString(), '1' + '0'.repeat(999) + '/1');
+  assert.equal(parseTime('-25E-64').toString(), '-1/4' + '0'.repeat(62));
+  assert.equal(parseTime('7'.repeat(1000)).toString(), '7'.repeat(1000) + '/1');
   for (const text of ['1e10001', '1e-10001', '1e1000000000', '1e' + '9'.repeat(400)])
     assert.throws(() => parseTime(text), /Scientific exponents must be between -10000 and 10000\./);
-  const limit = /Times must be at most 20000 characters, also as an exact fraction\./;
-  assert.equal(parseTime('7'.repeat(19998)).toString(), '7'.repeat(19998) + '/1');
+  const size = /Times must be fractions of at most 1000 digits over at most 65 digits\./;
   for (const text of [
-    '7'.repeat(20001),
-    '1/' + '3'.repeat(20000),
-    '1970-01-01T00:00:00.' + '1'.repeat(20000) + 'Z',
+    '1e1000',
+    '1e-65',
+    '7'.repeat(1001),
+    '1/' + '3'.repeat(66),
+    '1970-01-01T00:00:00.' + '1'.repeat(66) + 'Z',
     // Short enough as written, but its exact fraction is not.
-    '1.' + '1'.repeat(10000) + 'e-10000',
+    '1.' + '1'.repeat(70) + 'e-10',
+    // Two huge numbers, refused by their digits before any reduction.
+    '7'.repeat(9990) + '/' + '3'.repeat(9990),
   ])
+    assert.throws(() => parseTime(text), size);
+  // Those are refused at once, whatever they would have cost to read.
+  const started = Date.now();
+  for (let i = 0; i < 50; i++)
+    assert.throws(() => parseTime('9'.repeat(9000) + '/' + '7'.repeat(9000)), size);
+  assert(Date.now() - started < 1000, 'refusing huge times stays quick');
+  const limit = /Times must be at most 20000 characters, also as an exact fraction\./;
+  for (const text of ['7'.repeat(20001), '1/' + '3'.repeat(20000)])
     assert.throws(() => parseTime(text), limit);
   assert.throws(
     () =>
