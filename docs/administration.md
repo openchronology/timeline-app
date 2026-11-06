@@ -331,7 +331,7 @@ for it and is then sent from the cache.
 
 ## Name and analytics
 
-`PLATFORM_NAME` (for example `timescale.info`) replaces "openchronology" in the platform's header. It is also used as the site name in page titles, link previews and oEmbed responses, and the footer then adds "Powered by OpenChronology". When it is empty, OpenChronology's name is shown. The name is at most 60 characters, and the server refuses to start if it is longer.
+`PLATFORM_NAME` (for example `timescale.info`) replaces "openchronology" in the platform's header. It is also used as the site name in page titles, link previews and oEmbed responses, and the footer then adds "Powered by OpenChronology", linked to the project. The pages' structured data names the site with OpenChronology as its other name, and says that it runs OpenChronology, so search engines and AI answers tie the two names together ([#472](https://github.com/openchronology/timeline-app/issues/472)). When it is empty, OpenChronology's name is shown. The name is at most 60 characters, and the server refuses to start if it is longer.
 
 `SUPPORT_URL` is where visitors can support the platform, such as `https://github.com/sponsors/you`, an Open Collective page or a page of your own. When it is set, the header ends with a **♥ Support** link and the footer has **Support this site**. When it is empty, neither appears. It must be an `https://` address; the server refuses to start with anything else.
 

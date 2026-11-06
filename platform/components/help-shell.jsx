@@ -1,5 +1,9 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// The help area's frame (#172): its sections and pages beside what is open, and search.
+// The help area's frame (#172): its sections and pages beside what is open, and search. The
+// page comes first in the HTML, and the help's navigation after it (placed beside it, or above
+// it when narrow, by CSS), so readers that read in order (screen readers, search engines and
+// agents) reach the page's own heading first (#484); the navigation's group names are not
+// headings, so the page's outline is its own.
 import { helpSections } from '../../server/help.mjs';
 
 export function HelpSearch({ query = '' }) {
@@ -16,15 +20,18 @@ export function HelpSearch({ query = '' }) {
 export default function HelpShell({ pages, current = null, query = '', children }) {
   return (
     <main className="platform help">
+      <div className="help-body">{children}</div>
       <nav className="help-contents" aria-label="Help contents">
         <a className={current === '' ? 'help-current' : undefined} href="/help">
           Help
         </a>
         <HelpSearch query={query} />
-        {helpSections(pages).map((section) => (
+        {helpSections(pages).map((section, i) => (
           <div key={section.title}>
-            <h2>{section.title}</h2>
-            <ul>
+            <p className="help-group" id={'help-group-' + i}>
+              {section.title}
+            </p>
+            <ul aria-labelledby={'help-group-' + i}>
               {section.pages.map((page) => (
                 <li key={page.slug}>
                   <a
@@ -45,7 +52,6 @@ export default function HelpShell({ pages, current = null, query = '', children 
           </div>
         ))}
       </nav>
-      <div className="help-body">{children}</div>
     </main>
   );
 }

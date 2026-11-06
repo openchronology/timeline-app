@@ -8,6 +8,7 @@ import 'server-only';
 import { ImageResponse } from 'next/og';
 import { Q, describeLabels } from '../../dist/core.mjs';
 import { platformServices } from '../../server/platform.mjs';
+import { sitePreviewImage } from './site-preview.jsx';
 import {
   durationOf,
   descriptionExcerpt,
@@ -17,7 +18,6 @@ import {
   momentTitle,
   presentTime,
   publicTimeline,
-  siteName,
   timelineFacts,
   timelineTitle,
 } from './sharing.js';
@@ -160,13 +160,8 @@ function Card({ eyebrow, title, facts, notes, groups, mark }) {
     </div>
   );
 }
-/** The site's own card, for anything that is not public. */
-function siteCard() {
-  return new ImageResponse(
-    <Card title={siteName()} facts="Exact timelines, shared on your terms." groups={[]} />,
-    size,
-  );
-}
+/** The site's own card (lib/site-preview.jsx), for anything that is not public. */
+const siteCard = () => sitePreviewImage('site');
 /** A preview of a public timeline, or of one of its moments (`moment`) or durations. */
 export async function previewImage(id, entity) {
   let services, timeline;

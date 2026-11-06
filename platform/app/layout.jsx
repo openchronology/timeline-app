@@ -17,7 +17,7 @@ import { THEME_BOOT } from '../../src/theme-choice.ts';
 import { POLICY_VERSION } from '../../server/policies.mjs';
 import { currentSession } from '../lib/session.js';
 import { headers } from 'next/headers';
-import { siteOrigin, sitePreview } from '../lib/sharing.js';
+import { SOFTWARE_NAME, siteOrigin, sitePreview } from '../lib/sharing.js';
 import { analyticsId, platformName, siteName, supportUrl } from '../../server/site.mjs';
 import { landingEnabled } from '../../server/landing.mjs';
 // Marks the page as scripted before it paints, so a phone's header is a menu from the first
@@ -139,7 +139,13 @@ export default async function RootLayout({ children }) {
           {' · '}
           <span className="build-identity">Build: {build.label}</span>
           <ThemeChoice />
-          {name ? ' · Powered by OpenChronology' : ''}
+          {/* The site's name and the software it runs, together (#472). */}
+          {name ? (
+            <>
+              {' · Powered by '}
+              <a href="https://github.com/openchronology/timeline-app">{SOFTWARE_NAME}</a>
+            </>
+          ) : null}
           {analytics ? (
             <>
               {' · '}

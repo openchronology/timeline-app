@@ -11,7 +11,7 @@ import {
   landingContent,
   landingVideo,
 } from '../../server/landing.mjs';
-import { sitePageMetadata } from './sharing.js';
+import { sitePageMetadata, sitePreview } from './sharing.js';
 
 /**
  * A landing page's metadata from its copy's front matter: its title, description and
@@ -21,7 +21,15 @@ import { sitePageMetadata } from './sharing.js';
  */
 export async function landingMetadata(name, path) {
   const { meta } = await landingContent(name);
-  return sitePageMetadata(path, meta.title ?? '', meta.description ?? meta.promise ?? '');
+  // An audience's page previews with its own card, its heading over the timeline (#479).
+  const preview =
+    name === 'home'
+      ? undefined
+      : sitePreview(
+          name,
+          `${meta.heading ?? meta.title}. ${meta.promise ?? meta.description ?? ''}`.trim(),
+        );
+  return sitePageMetadata(path, meta.title ?? '', meta.description ?? meta.promise ?? '', preview);
 }
 
 /**
