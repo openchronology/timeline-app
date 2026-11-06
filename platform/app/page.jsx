@@ -13,7 +13,8 @@ import {
 } from '../components/landing.jsx';
 import { landingContent, landingEnabled } from '../../server/landing.mjs';
 import { landingData, landingMetadata } from '../lib/landing.js';
-import { webPageData } from '../lib/sharing.js';
+import { exploreDescription, webPageData } from '../lib/sharing.js';
+import { platformServices } from '../../server/platform.mjs';
 // Rendered for every request: it depends on who is signed in and on the query.
 export const dynamic = 'force-dynamic';
 /**
@@ -21,7 +22,12 @@ export const dynamic = 'force-dynamic';
  * whatever the query, since its searches, tags, sorts and pages are views of the same page.
  */
 export async function generateMetadata() {
-  if (!landingEnabled()) return { alternates: { canonical: '/' } };
+  // Without the landing page, the home page is Explore (#471).
+  if (!landingEnabled())
+    return {
+      description: await exploreDescription((await platformServices()).pool),
+      alternates: { canonical: '/' },
+    };
   return landingMetadata('home', '/');
 }
 /**
