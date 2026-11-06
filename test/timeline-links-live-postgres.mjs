@@ -4,7 +4,8 @@
 // event on another of their timelines found in the picker's search (the words marked, nothing
 // on its own timeline offered), or to a whole timeline by its pasted address, and removes a
 // link; comparing the two timelines draws each link as an arc between the tracks,
-// and on one axis when combined, on desktop and phone. SCREENSHOT_DIR keeps screenshots.
+// and on one axis when combined, on desktop and phone. The other timeline's editor lists the link
+// to it as a whole under Linked from, and removes it (#458). SCREENSHOT_DIR keeps screenshots.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -199,10 +200,25 @@ try {
     await wholeLink.waitFor();
     assert.equal(await wholeLink.textContent(), `Greece ${suffix} · the whole timeline`);
     assert.equal(await wholeLink.getAttribute('href'), `/${username}/${greece.id}`);
-    await section
-      .locator(`.related-unlink[aria-label="Remove the link with Greece ${suffix}"]`)
+    assert.equal(await count(), 2);
+
+    // Greece, opened in the editor, lists under Linked from what links to it as a whole
+    // (#458), folded until opened; its editor removes the link from that end.
+    await page.goto(`${origin}/timelines/${greece.id}`);
+    frame = page.frameLocator('iframe.editor-frame');
+    const linkedFrom = frame.locator('#linked-from');
+    await linkedFrom.waitFor();
+    await linkedFrom.locator('summary', { hasText: 'Linked from other timelines' }).click();
+    const backLink = linkedFrom.locator('a.related-entity');
+    await backLink.waitFor();
+    assert.equal(await backLink.count(), 1, 'only the link to all of Greece');
+    assert.equal(await backLink.textContent(), `Founding of Rome · on Rome ${suffix}`);
+    assert.equal(await backLink.getAttribute('href'), `/${username}/${rome.id}/moments/founding`);
+    await shot('linked-from');
+    await linkedFrom
+      .locator('.related-unlink[aria-label="Remove the link with Founding of Rome"]')
       .click();
-    await wholeLink.waitFor({ state: 'detached' });
+    await linkedFrom.waitFor({ state: 'hidden' });
     assert.equal(await count(), 1);
 
     // Compared, the link is an arc between the tracks; combined, an arc over the one axis.
@@ -271,7 +287,7 @@ try {
     ),
   );
   console.log(
-    'PASS links between timelines in a browser: listed in a moment’s details, opening the other entity’s page; added from the picker by searching or by an address, and removed; drawn between compared timelines’ tracks, and over one axis combined, on desktop and phone; in the pages search engines read, both ways, and on a timeline’s page for links to all of it.',
+    'PASS links between timelines in a browser: listed in a moment’s details, opening the other entity’s page; added from the picker by searching or by an address, and removed; links to a whole timeline under its Linked from, removed there; drawn between compared timelines’ tracks, and over one axis combined, on desktop and phone; in the pages search engines read, both ways, and on a timeline’s page for links to all of it.',
   );
 } finally {
   await browser?.close();

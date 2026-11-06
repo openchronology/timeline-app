@@ -2645,6 +2645,7 @@ function updateRelated() {
 function heading() {
   updateSensitive();
   updateRelated();
+  updateLinkedFrom();
   el('view-mode-control').hidden = !mayEdit();
   input('view-mode').checked = viewMode;
   updateFollowControl();
@@ -8183,7 +8184,8 @@ if (!offlineHtml)
     native: () => desktop || !platformEditor,
     check: (id) => api<{ id: string; revision: string }>(`timelines/${id}/revision`),
     // Links between a comparison's timelines are read again and redrawn (#422).
-    linked() {
+    linked(id) {
+      if (id === remote?.id) updateLinkedFrom(true);
       if (!comparison) return;
       comparison.clearLinks();
       frameRequest++;
@@ -10073,45 +10075,12 @@ function renderTimelineLinks(
     );
     if (generation !== relatedGeneration) return;
     list.replaceChildren();
-    for (const link of page.links) {
-      const row = document.createElement('div');
-      row.className = 'related-row';
-      // The other entity's own page (its timeline open at it), or the other timeline's: the
-      // addresses its page and search engines use (#335).
-      const open = document.createElement('a');
-      open.className = 'related-entity';
-      const titled = link.timeline.title || 'Untitled timeline';
-      open.target = '_top';
-      const other = timelinePath(link.timeline);
-      if (link.kind === 'timeline') {
-        open.href = other;
-        open.textContent = `${titled} · the whole timeline`;
-      } else {
-        open.href = `${other}/${link.kind === 'moment' ? 'moments' : 'durations'}/${encodeURIComponent(link.entity)}`;
-        open.textContent =
-          (link.title || (link.kind === 'moment' ? 'Untitled moment' : 'Untitled duration')) +
-          ' · on ' +
-          titled;
-      }
-      open.title = `${link.timeline.title} by ${link.timeline.owner}`;
-      row.append(open);
-      if (canLink) {
-        const unlink = document.createElement('button');
-        unlink.type = 'button';
-        unlink.className = 'related-unlink';
-        unlink.textContent = '×';
-        unlink.setAttribute(
-          'aria-label',
-          `Remove the link with ${link.kind === 'timeline' ? link.timeline.title : link.title || link.entity}`,
-        );
-        unlink.onclick = () =>
-          void api(`timelines/${timeline.id}/links`, 'DELETE', { link: link.id })
-            .then(rerender)
-            .catch((error) => (status.textContent = errorText(error)));
-        row.append(unlink);
-      }
-      list.append(row);
-    }
+    for (const link of page.links)
+      list.append(
+        timelineLinkRow(link, timeline.id, canLink, rerender, (error) => {
+          status.textContent = errorText(error);
+        }),
+      );
     cursor = page.next;
     if (cursor) list.append(more);
     status.textContent = page.links.length || after ? '' : 'No links to other timelines.';
@@ -10127,6 +10096,109 @@ function renderTimelineLinks(
   add.textContent = 'Link to another timeline…';
   add.onclick = () => openLinkPicker(ref, 'elsewhere', rerender);
   section.append(add);
+}
+/**
+ * One link to another timeline (#422) in a list: opening the other entity's page (its timeline
+ * open at it), or the other timeline's, at the addresses its pages and search engines use
+ * (#335). With `canLink`, × removes it from `timelineId`'s end; the server also checks the other.
+ */
+function timelineLinkRow(
+  link: TimelineLinkEntry,
+  timelineId: string,
+  canLink: boolean,
+  removed: () => void,
+  failed: (error: unknown) => void,
+) {
+  const row = document.createElement('div');
+  row.className = 'related-row';
+  const open = document.createElement('a');
+  open.className = 'related-entity';
+  const titled = link.timeline.title || 'Untitled timeline';
+  open.target = '_top';
+  const other = timelinePath(link.timeline);
+  if (link.kind === 'timeline') {
+    open.href = other;
+    open.textContent = `${titled} · the whole timeline`;
+  } else {
+    open.href = `${other}/${link.kind === 'moment' ? 'moments' : 'durations'}/${encodeURIComponent(link.entity)}`;
+    open.textContent =
+      (link.title || (link.kind === 'moment' ? 'Untitled moment' : 'Untitled duration')) +
+      ' · on ' +
+      titled;
+  }
+  open.title = `${link.timeline.title} by ${link.timeline.owner}`;
+  row.append(open);
+  if (canLink) {
+    const unlink = document.createElement('button');
+    unlink.type = 'button';
+    unlink.className = 'related-unlink';
+    unlink.textContent = '×';
+    unlink.setAttribute(
+      'aria-label',
+      `Remove the link with ${link.kind === 'timeline' ? link.timeline.title : link.title || link.entity}`,
+    );
+    unlink.onclick = () =>
+      void api(`timelines/${timelineId}/links`, 'DELETE', { link: link.id })
+        .then(removed)
+        .catch(failed);
+    row.append(unlink);
+  }
+  return row;
+}
+/** Which timeline's Linked from list is shown, and whether it offers ×, so it loads once each. */
+let linkedFromKey: string | null = null;
+let linkedFromRequest = 0;
+/**
+ * The timeline's Linked from list (#458): the moments, durations and timelines elsewhere that
+ * link to the open server timeline as a whole, 25 at a time, as its page on the website lists
+ * them. Only those on timelines the viewer may read are served. Hidden when nothing links here,
+ * and folded until opened. Those who may edit it can remove a link with ×; the server checks
+ * the other timeline too. `force` reads it again, as when live updates say its links changed.
+ */
+function updateLinkedFrom(force = false) {
+  const timeline = remote;
+  const shown = !!timeline && !local && !comparison && !offlineHtml && !!session.server;
+  const canLink = shown && editable() && !!timeline.canWrite && !!session.user;
+  const key = shown ? `${timeline.id}:${canLink}` : null;
+  if (!force && key === linkedFromKey) return;
+  linkedFromKey = key;
+  const request = ++linkedFromRequest;
+  const details = el<HTMLDetailsElement>('linked-from');
+  const list = el('linked-from-list');
+  const status = el('linked-from-status');
+  if (!force || !key) {
+    details.hidden = true;
+    list.replaceChildren();
+    status.textContent = '';
+  }
+  if (!key || !timeline) return;
+  let cursor: string | null = null;
+  const more = document.createElement('button');
+  more.type = 'button';
+  more.textContent = 'Next 25 links';
+  const failed = (error: unknown) => {
+    if (request === linkedFromRequest)
+      status.textContent = error instanceof Error ? error.message : String(error);
+  };
+  const load = async (after: string | null) => {
+    const page = await api<{ links: TimelineLinkEntry[]; next: string | null }>(
+      `timelines/${timeline.id}/links?` + new URLSearchParams(after ? { after } : {}),
+    );
+    if (request !== linkedFromRequest) return;
+    list.replaceChildren(
+      ...page.links.map((link) =>
+        timelineLinkRow(link, timeline.id, canLink, () => updateLinkedFrom(true), failed),
+      ),
+    );
+    cursor = page.next;
+    if (cursor) list.append(more);
+    status.textContent = '';
+    // Hidden only when nothing links here at all, so removing the last of a later page
+    // leaves the list to page back from.
+    details.hidden = !page.links.length && !after;
+  };
+  more.onclick = () => void load(cursor).catch(failed);
+  void load(null).catch(failed);
 }
 /**
  * What the link picker (#422) offers: an event of this timeline (`timeline` null, with its
