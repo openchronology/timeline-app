@@ -131,6 +131,8 @@ export async function sitemapPage(file) {
       ['/download', 'weekly'],
       ['/docs/api', 'weekly'],
       ['/help', 'weekly'],
+      // For AI engines and agents (#482).
+      ['/llms.txt', 'weekly'],
       ['/terms', 'monthly'],
       ['/privacy', 'monthly'],
       ['/legal', 'monthly'],

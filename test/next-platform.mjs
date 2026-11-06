@@ -196,6 +196,33 @@ try {
     assert.equal(await file.text(), 'platform-test-key-389');
     assert.equal((await fetch(origin + '/another-key-1234.txt')).status, 404);
   }
+  // For AI engines and agents (#482): what the site is, its help and API, as Markdown text;
+  // and the help in full. Linked from every page's footer.
+  {
+    const llms = await fetch(origin + '/llms.txt');
+    assert.equal(llms.status, 200);
+    assert.match(llms.headers.get('content-type'), /^text\/plain/);
+    const text = await llms.text();
+    assert.match(
+      text,
+      /^# timescale\.test\n\n> timescale\.test runs OpenChronology\. OpenChronology is a free, open-source timeline editor/,
+    );
+    for (const path of [
+      '/help/faq',
+      '/help/guide',
+      '/download',
+      '/docs/api',
+      '/api/openapi.json',
+      '/llms-full.txt',
+    ])
+      assert(text.includes(`](${origin}${path})`), path);
+    assert.match(text, /^- \[Durations\]\(http[^)]*\/help\/durations\): Durations: periods/m);
+    const full = await (await fetch(origin + '/llms-full.txt')).text();
+    assert.match(full, /^# Frequently asked questions$/m);
+    assert.match(full, /^Source: http[^\n]*\/help\/faq$/m);
+    assert.doesNotMatch(full, /<!-- description|^Copyright \(c\)/m);
+    assert.match(html, /<a href="\/llms\.txt">llms\.txt<\/a>/);
+  }
   // Each page's title says what it is, then the site's name (#210).
   for (const [path, title] of [
     ['/login', 'Sign in · timescale.test'],

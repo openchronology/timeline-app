@@ -147,6 +147,13 @@ described by their labels instead of their notes, and ask search engines not to 
   - A timeline's entities are read by the primary key of its search rows (see
     [search](search.md#storage-and-api)), as a guest sees them, so its size costs nothing beyond
     the addresses listed.
+- **For AI engines and agents** ([#482](https://github.com/openchronology/timeline-app/issues/482)):
+  `/llms.txt` ([llmstxt.org](https://llmstxt.org)) says in Markdown what the site is (its name,
+  and that it runs OpenChronology), and links its main pages, every help page, the API reference
+  and its OpenAPI description, and up to ten featured public timelines, each with a line from its
+  description. `/llms-full.txt` holds every help page's Markdown in one file. Both are generated
+  from the help and the site's settings, so they follow the docs; every page's footer links
+  `/llms.txt`, and the sitemap lists it.
 - To tell Google about it, open [Search Console](https://search.google.com/search-console)
   for the site's domain (verified by a DNS record or an HTML file), choose **Sitemaps**, and
   submit `sitemap.xml`. Google reads the index and then each page it names; the report shows
