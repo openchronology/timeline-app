@@ -8,7 +8,7 @@ Short answers to common questions, from the basics to running your own server. F
 
 ## What is OpenChronology?
 
-A timeline editor. You place events (moments and durations) and the links between them on a line of time, then zoom, search, compare and share. Times are exact: a third of a second stays exactly a third, however far you zoom. It runs on the website, as a desktop app, and as a single offline HTML file. See [what a timeline is](guide.md#what-a-timeline-is).
+OpenChronology is a free, open-source timeline editor for exact dates at any scale, from deep time to fractions of a second, with sources on every event. You place events (moments and durations) and the links between them on a line of time, then zoom, search, compare and share. Times are exact: a third of a second stays exactly a third, however far you zoom. It runs on the website, as a desktop app, and as a single offline HTML file. See [what a timeline is](guide.md#what-a-timeline-is).
 
 ## Is it free?
 
