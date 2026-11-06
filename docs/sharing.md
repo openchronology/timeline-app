@@ -74,7 +74,12 @@ Unsaved moments and edits cannot be shared until they are saved.
 Timeline, moment and duration pages describe themselves for link previews (Open Graph and
 Twitter cards) and search engines. Each has:
 
-- a title;
+- a title: a moment's or duration's own, then its timeline's, then the site's name. Search
+  results show about 60 characters, so the page's `<title>` fits in that
+  ([#469](https://github.com/openchronology/timeline-app/issues/469)). It tries, in turn: the
+  timeline by its name before a subtitle, without the site's name, the timeline's name cut
+  between words, and the event's title alone, cut if need be. Link previews keep the whole
+  title. The site's own pages fit theirs the same way;
 - a description: the timeline's description, or how many moments it has, over what time and
   by whom; for a moment or duration, its time and notes;
 - the canonical address;

@@ -173,6 +173,56 @@ test('Structured data: a CreativeWork covering its time, in ISO 8601 on Gregoria
   );
 });
 
+test('Titles fit search results: shorter forms in turn, link previews whole (#469)', () => {
+  const site = sharing.siteName();
+  const fit = (...parts) => sharing.fitTitle(parts);
+  // Short enough: all of it.
+  assert.equal(fit('Storm', 'Voyages'), `Storm · Voyages · ${site}`);
+  // The timeline by its head, before its subtitle.
+  assert.equal(
+    fit('Beedle the Bard’s tales', 'Harry Potter: an unofficial chronology of the wizarding world'),
+    `Beedle the Bard’s tales · Harry Potter · ${site}`,
+  );
+  // Without the site's name.
+  assert.equal(
+    fit('Founding of the Republic', 'Ancient Rome and its neighbours'),
+    'Founding of the Republic · Ancient Rome and its neighbours',
+  );
+  // The timeline cut between words, to the room left.
+  const cut = fit(
+    'Dennis and Misunas present data-flow',
+    'Evolution of computer architecture · CPUs, parallel systems and alternative machines',
+  );
+  assert.equal(cut, 'Dennis and Misunas present data-flow · Evolution of…');
+  // The event alone, cut between words.
+  const alone = fit(
+    'Dennis and Misunas present a basic data-flow processor architecture',
+    'Evolution of computer architecture',
+  );
+  assert.equal(alone, 'Dennis and Misunas present a basic data-flow processor…');
+  for (const title of [cut, alone]) assert(title.length <= sharing.TITLE_LENGTH, title);
+  // A short head names nothing alone: the whole title.
+  assert.equal(sharing.titleHead('Rome: the city'), 'Rome: the city');
+  // A timeline's own page: without the site's name, then cut.
+  assert.equal(
+    fit('JavaScript and TypeScript · origins, standards, runtimes and security'),
+    'JavaScript and TypeScript · origins, standards, runtimes…',
+  );
+  // Link previews keep the whole form; the page's title fits.
+  const long = sharing.entityMetadata(
+    timeline({ title: 'Evolution of computer architecture · CPUs and alternative machines' }),
+    { kind: 'moment', id: 'dataflow' },
+    'Dennis and Misunas present a basic data-flow processor architecture',
+    '1975 CE',
+  );
+  assert.equal(long.title, 'Dennis and Misunas present a basic data-flow processor…');
+  assert.equal(
+    long.openGraph.title,
+    'Dennis and Misunas present a basic data-flow processor architecture · Evolution of computer architecture · CPUs and alternative machines',
+  );
+  assert.equal(long.twitter.title, long.openGraph.title);
+});
+
 test('Metadata: labelled timelines describe their labels, not the notes, and are not indexed', () => {
   const entity = { kind: 'moment', id: 'leg:2' };
   const shown = sharing.entityMetadata(timeline(), entity, 'Storm', '2 Jan 1970', 'Rough seas');
