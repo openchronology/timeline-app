@@ -209,7 +209,20 @@ try {
   const shown = asked;
   await tab.goto(origin + '/login');
   const button = tab.getByRole('button', { name: 'Sign in with a passkey' });
-  await button.waitFor();
+  // It once never appeared (#465): if so, what the page showed and what the session said.
+  await button.waitFor().catch(async (error) => {
+    console.error('The passkey button never appeared (#465):', {
+      url: tab.url(),
+      card: await tab
+        .locator('.auth-card')
+        .innerText({ timeout: 1000 })
+        .catch(() => null),
+      session: await tab
+        .evaluate(() => fetch('/api/session').then((r) => r.json()))
+        .catch((e) => String(e)),
+    });
+    throw error;
+  });
   assert.equal(await tab.getByLabel('Username').getAttribute('autocomplete'), 'username webauthn');
   await askedMore(shown);
   await presence(true);
