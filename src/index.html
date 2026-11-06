@@ -350,6 +350,12 @@ Every point has a place. Explore the spaces between them.</textarea>
             role="alert"
           ></span
         ></label>
+        <!-- What on other timelines links to this one as a whole (#458), shown when anything does. -->
+        <details id="linked-from" class="linked-from" hidden>
+          <summary>Linked from other timelines</summary>
+          <div id="linked-from-list" class="related-list"></div>
+          <p id="linked-from-status" class="field-hint" role="status"></p>
+        </details>
         <section class="timeline-card" aria-label="Timeline window">
           <div class="view-toolbar">
             <div class="view-heading">

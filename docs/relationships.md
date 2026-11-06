@@ -55,7 +55,11 @@ To add one, choose **Link to another timeline…**. The same picker opens:
 - **Filters**, folded away, choose timelines, moments or durations, a tag, and **Timelines I can edit** or only **My timelines**.
 - **Address:** paste the address of a timeline's page, or of a moment's or duration's page. A link fragment, an embed's address and the editor's own address work too. The server looks it up and says why it can't be linked, if it can't: it's this timeline, you can't save it, or it's at the limit.
 
-Choosing a timeline links to it as a whole; choosing an event links to that event. A fork shows only the events it changed in search; link to its other events by their address. **×** removes a link. Linking and removing a link need permission to save both
+Choosing a timeline links to it as a whole; choosing an event links to that event. The linked
+timeline's editor lists what links to it as a whole under **Linked from other timelines**, below
+its tags, 25 at a time. It is folded until opened, and shown only when something links there.
+Each entry opens the linking moment's or duration's page, and **×** removes the link from that
+end too. A fork shows only the events it changed in search; link to its other events by their address. **×** removes a link. Linking and removing a link need permission to save both
 timelines, since the link belongs to both. Undo and Redo do not cover them: a link is kept by
 the server, apart from either timeline, and takes effect at once. Unsaved entities can't be
 linked yet; save first.
