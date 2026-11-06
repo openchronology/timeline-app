@@ -121,6 +121,10 @@ test('each page is described for search results, in its own words (#470)', async
     assert.doesNotMatch(page.summary, /^(server|docs)\/|…$/, slug);
     assert(!/(<|&lt;)!-- description/.test(page.html), `${slug} shows its description`);
   }
+  // What it is, in one sentence with its name, answering the FAQ's first question (#481).
+  const faq = pages.get('faq');
+  const what = faq.sections.find((s) => s.title === 'What is OpenChronology?');
+  assert.match(what.text, /^OpenChronology is a free, open-source timeline editor for /);
   // The FAQ as structured data (#483): every question with its answer's first paragraph.
   const questions = pages.get('faq');
   const data = faqData(questions, 'https://example.org/help/faq');

@@ -188,6 +188,11 @@ try {
     );
     assert.equal(canonical(home.html), o);
     assert.match(home.html, /<meta property="og:title" content="OpenChronology: free timeline/);
+    // What it is, in one sentence with its name, under the heading (#481).
+    assert.match(
+      home.html,
+      /<p class="landing-promise">OpenChronology is a free, open-source timeline editor for exact dates at any scale/,
+    );
     assert.match(
       home.html,
       new RegExp(`<meta property="og:image" content="${o}/previews/site\\.png"`),
