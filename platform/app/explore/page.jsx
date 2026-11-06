@@ -3,18 +3,20 @@
 // is off, with every list's search, tag, sort and page in its query.
 import Dashboard from '../../components/dashboard.jsx';
 import { landingEnabled } from '../../../server/landing.mjs';
-import { pageTitle, webPageData } from '../../lib/sharing.js';
+import { exploreDescription, pageTitle, webPageData } from '../../lib/sharing.js';
+import { platformServices } from '../../../server/platform.mjs';
 import { StructuredData } from '../../components/landing.jsx';
 export const dynamic = 'force-dynamic';
 /**
  * One address for search engines, whatever the query: /explore with the landing page on;
  * without it the dashboard is the home page, which this repeats.
  */
-export function generateMetadata() {
+export async function generateMetadata() {
   return landingEnabled()
     ? {
         title: pageTitle('Explore timelines'),
-        description: 'Search, sort and browse public timelines.',
+        // What it searches, and how much there is (#471).
+        description: await exploreDescription((await platformServices()).pool),
         alternates: { canonical: '/explore' },
       }
     : { alternates: { canonical: '/' } };

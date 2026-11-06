@@ -223,6 +223,51 @@ test('Titles fit search results: shorter forms in turn, link previews whole (#46
   assert.equal(long.twitter.title, long.openGraph.title);
 });
 
+test('Explore and profiles say what is there, and how much (#471)', async () => {
+  assert.deepEqual([0, 1, 65, 999, 1000, 9533, 123456].map(sharing.roughCount), [
+    '0',
+    '1',
+    '65',
+    '999',
+    '1,000+',
+    '9,500+',
+    '120,000+',
+  ]);
+  // A stand-in database answering each description's query.
+  const pool = (row) => ({ query: async () => ({ rows: [row] }) });
+  assert.equal(
+    await sharing.exploreDescription(pool({ timelines: '65', moments: '9533' })),
+    'Search 65 public timelines and their 9,500+ dated events by title and notes, or browse them by tag, stars and popularity.',
+  );
+  assert.match(await sharing.exploreDescription(null), /^Search public timelines/);
+  assert.match(
+    await sharing.exploreDescription(pool({ timelines: '0', moments: '0' })),
+    /^Search public/,
+  );
+  const site = sharing.siteName();
+  assert.equal(
+    await sharing.profileDescription(
+      pool({
+        total: '65',
+        titles: ['Ancient Mesopotamia', 'Rome: the city and its empire', 'Deep time'],
+      }),
+      'ada',
+    ),
+    `@ada has 65 public timelines on ${site}, including Ancient Mesopotamia, Rome: the city and its empire, Deep time.`,
+  );
+  assert.equal(
+    await sharing.profileDescription(pool({ total: '1', titles: null }), 'ada'),
+    `@ada has 1 public timeline on ${site}.`,
+  );
+  assert.equal(
+    await sharing.profileDescription(pool({ total: '0', titles: null }), 'ada'),
+    `Public timelines and favorites of @ada on ${site}.`,
+  );
+  // A failed read describes it without counts.
+  const broken = { query: async () => Promise.reject(new Error('down')) };
+  assert.match(await sharing.profileDescription(broken, 'ada'), /^Public timelines and favorites/);
+});
+
 test('Trails and kinds of page for search engines and previews (#474)', () => {
   const o = 'https://chronology.example';
   assert.deepEqual(
