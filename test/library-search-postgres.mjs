@@ -201,6 +201,26 @@ try {
     'Secret/moment:plan',
   ]);
   await search({ search: harbor, scope: 'mine' }, null, 401);
+  // Only the timelines the reader starred, and only public or private ones (Explore's filters).
+  await pool.query('INSERT INTO oc_timeline_stars(user_id,timeline_id) VALUES($1,$2)', [
+    alice.id,
+    secret.id,
+  ]);
+  assert.deepEqual(await found({ search: harbor, scope: 'visible', starred: true }, alice), [
+    'Secret/moment:plan',
+  ]);
+  assert.deepEqual(await found({ search: harbor, scope: 'public', starred: true }, alice), []);
+  assert.deepEqual(
+    (await found({ search: harbor, scope: 'mine', visibility: 'private' }, alice)).sort(),
+    ['Secret/moment:plan'],
+  );
+  assert(
+    !(await found({ search: harbor, scope: 'mine', visibility: 'public' }, alice)).includes(
+      'Secret/moment:plan',
+    ),
+  );
+  await search({ search: harbor, starred: true }, null, 401);
+  await search({ search: harbor, visibility: 'hidden' }, alice, 400);
   // Labelled timelines' entities: for signed-in adults, not for someone under 18.
   assert((await found({ search: harbor }, bob)).includes('Labelled/moment:wreck'));
   assert(!(await found({ search: harbor }, young)).includes('Labelled/moment:wreck'));
@@ -293,7 +313,7 @@ try {
   ])
     await search(body, null, 400);
   console.log(
-    'PASS searching every timeline’s moments and durations: by prefix in titles and notes, ranked with established accounts first; kinds, tags, owners and scopes (public, visible with memberships unless restricted, mine); labelled timelines for adults; forks show their changes; deleted timelines none; paged and capped.',
+    'PASS searching every timeline’s moments and durations: by prefix in titles and notes, ranked with established accounts first; kinds, tags, owners and scopes (public, visible with memberships unless restricted, mine); starred and visibility filters; labelled timelines for adults; forks show their changes; deleted timelines none; paged and capped.',
   );
 } finally {
   await store.idle();

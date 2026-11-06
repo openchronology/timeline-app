@@ -95,8 +95,13 @@ try {
     ],
     [{ id: 'age', start: '1700/1', end: '1900/1', metadata: { title: `The ${word} age` } }],
   );
-  await timeline(`Private ${suffix}`, 'private', [
+  const diary = await timeline(`Private ${suffix}`, 'private', [
     { id: 'diary', time: '1/1', metadata: { title: `Keeper’s ${word} diary` } },
+  ]);
+  // Starred, for the filter of starred timelines.
+  await pool.query('INSERT INTO oc_timeline_stars(timeline_id,user_id) VALUES($1,$2)', [
+    diary.id,
+    id,
   ]);
   await store.idle();
   await sweepStanding(pool);
@@ -196,6 +201,23 @@ try {
   // My timelines alone: still their private events.
   await mine.getByRole('radio', { name: 'My timelines' }).check();
   await page.waitForURL((url) => url.searchParams.get('within') === 'mine');
+  await page.waitForFunction(
+    () => document.querySelectorAll('#explore .entity-result').length === 4,
+  );
+  // Only the timelines it starred: the private one's event.
+  const onlyStarred = mine.getByRole('switch', { name: 'Only timelines I starred' });
+  await onlyStarred.check();
+  await page.waitForURL((url) => url.searchParams.get('starred') === '1');
+  await page.waitForFunction(
+    () => document.querySelectorAll('#explore .entity-result').length === 1,
+  );
+  assert.deepEqual(await mine.locator('.entity-result-title a').allTextContents(), [
+    `Keeper’s ${word} diary`,
+  ]);
+  // What it shows, whose and starred.
+  assert.equal(await mine.locator('.search-filters summary').textContent(), 'Filters (3)');
+  await onlyStarred.uncheck();
+  await page.waitForURL((url) => !url.searchParams.has('starred'));
   await page.waitForFunction(
     () => document.querySelectorAll('#explore .entity-result').length === 4,
   );

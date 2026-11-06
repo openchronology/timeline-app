@@ -236,6 +236,8 @@ export function filterCount(list, state) {
     state.show.length < SHOWN.length,
     !!state.tag,
     !!state.within,
+    !!state.starred,
+    !!state.visibility,
     state.sort !== defaultSort(list, state.search),
   ].filter(Boolean).length;
 }
@@ -244,8 +246,8 @@ const SHOWN_LABELS = { timelines: 'Timelines', moments: 'Moments', durations: 'D
 /**
  * The Explore list's controls (#459): one search field across the page's width, finding
  * timelines, moments and durations, with the rest folded under Filters (closed until opened,
- * saying how many are on): what to show, a tag, whose timelines (signed in) and the
- * timelines' order. Without JavaScript the folding is a details element and the boxes are
+ * saying how many are on): what to show, a tag; signed in, whose timelines, only starred
+ * ones, and public or private; and the timelines' order. Without JavaScript the folding is a details element and the boxes are
  * fields of the form, so it works the same.
  */
 function LibrarySearch({
@@ -363,6 +365,36 @@ function LibrarySearch({
                 </label>
               ))}
             </fieldset>
+          )}
+          {signedIn && (
+            <label className="checkbox switch">
+              <input
+                type="checkbox"
+                role="switch"
+                name={name('starred')}
+                value="1"
+                {...(onNavigate ? { checked: state.starred } : { defaultChecked: state.starred })}
+                onChange={
+                  onNavigate && ((e) => onNavigate({ search, tag, starred: e.target.checked }))
+                }
+              />
+              Only timelines I starred
+            </label>
+          )}
+          {signedIn && (
+            <label>
+              Visibility
+              <ChoiceSelect
+                name={name('visibility')}
+                value={state.visibility}
+                options={[
+                  ['', 'Public and private'],
+                  ['public', 'Public'],
+                  ['private', 'Private'],
+                ]}
+                onChange={onNavigate && ((visibility) => onNavigate({ search, tag, visibility }))}
+              />
+            </label>
           )}
           <label>
             Sort timelines

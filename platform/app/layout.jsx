@@ -105,7 +105,7 @@ export default async function RootLayout({ children }) {
               username={user.username}
               avatarUrl={user.avatarUrl}
               isAdmin={user.isAdmin}
-              timelinesHref={landing ? '/explore#mine' : null}
+              timelinesHref={(landing ? '/explore' : '/') + '?within=mine#explore'}
             />
           ) : accounts ? (
             <div className="header-account">

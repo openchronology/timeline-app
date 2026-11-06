@@ -196,7 +196,6 @@ try {
   );
   await tab.goto(origin + '/?search=' + word);
   const explore = tab.locator('#explore'),
-    mine = tab.locator('#mine'),
     drafts = tab.locator('#drafts');
   const titles = (section) => section.locator('.timeline-card-title').allTextContents();
   // The first status line: the timelines', above Explore's events (#459).
@@ -284,22 +283,29 @@ try {
   await statusMatches(tab, 'explore', /^[\d,]+ timelines? · Page|^No public timelines yet\.$/);
   assert.equal(await words.inputValue(), '');
 
-  // Pages, in place: the cards take focus, and the other lists keep their state.
+  // Pages, in place: the cards take focus.
   await words.fill(word);
   await tab.waitForURL((url) => url.searchParams.get('search') === word);
   await tab.waitForFunction(() =>
     document.querySelector('#explore .list-status')?.textContent.startsWith('16 timelines'),
   );
-  await mine.getByLabel('Visibility').selectOption('private');
-  await tab.waitForURL((url) => url.searchParams.get('mineVisibility') === 'private');
+  // The account's private timelines alone, among Explore's filters (in place of a list of
+  // its own); then both again.
+  await explore.getByLabel('Visibility').selectOption('private');
+  await tab.waitForURL((url) => url.searchParams.get('visibility') === 'private');
   await tab.waitForFunction(
-    (word) =>
-      [...document.querySelectorAll('#mine .timeline-card-title')].every((t) =>
+    () =>
+      [...document.querySelectorAll('#explore .timeline-card-title')].every((t) =>
         /^Survey 1[45] /.test(t.textContent),
-      ) && document.querySelectorAll('#mine .timeline-card').length === 2,
-    word,
+      ) && document.querySelectorAll('#explore .timeline-card').length === 2,
   );
-  assert.equal(await mine.locator('.badge', { hasText: 'Private' }).count(), 2);
+  assert.equal(await explore.locator('.badge', { hasText: 'Private' }).count(), 2);
+  assert.match(await explore.locator('.search-filters summary').textContent(), /Filters \(\d\)/);
+  await explore.getByLabel('Visibility').selectOption('');
+  await tab.waitForURL((url) => !url.searchParams.has('visibility'));
+  await tab.waitForFunction(() =>
+    document.querySelector('#explore .list-status')?.textContent.startsWith('16 timelines'),
+  );
   await explore
     .getByRole('navigation', { name: 'Pages of timelines' })
     .getByRole('link', { name: 'Next →' })
@@ -308,7 +314,6 @@ try {
   await tab.waitForFunction(() =>
     document.querySelector('#explore .list-status')?.textContent.endsWith('Page 2 of 2'),
   );
-  assert.equal(new URL(tab.url()).searchParams.get('mineVisibility'), 'private');
   assert.equal(new URL(tab.url()).searchParams.get('search'), word);
   assert.equal(
     await tab.evaluate(() => document.activeElement?.getAttribute('aria-label')),
@@ -357,10 +362,10 @@ try {
     .getByRole('button', { name: 'List' })
     .click();
   await explore.locator('.timeline-grid.list-layout').waitFor();
-  assert.equal(await mine.locator('.timeline-grid.list-layout').count(), 1);
 
-  // Drafts, searched in the browser and in place.
+  // Drafts, searched in the browser and in place, in the layout chosen for every list.
   await drafts.locator('.timeline-card').first().waitFor();
+  assert.equal(await drafts.locator('.timeline-grid.list-layout').count(), 1);
   assert.deepEqual(await titles(drafts), ['Draft about rivers', 'Draft about mountains']);
   await drafts.getByLabel('Search drafts').fill('peaks');
   await tab.waitForURL((url) => url.searchParams.get('draftSearch') === 'peaks');
@@ -372,7 +377,6 @@ try {
   await tab.reload();
   await explore.locator('.timeline-grid.list-layout').waitFor();
   assert.equal(await explore.getByRole('searchbox').inputValue(), word);
-  assert.equal(await mine.getByLabel('Visibility').inputValue(), 'private');
   await drafts.locator('.timeline-card').first().waitFor();
   assert.deepEqual(await titles(drafts), ['Draft about mountains']);
   if (process.env.SCREENSHOTS) {

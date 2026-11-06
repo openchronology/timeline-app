@@ -1,30 +1,29 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// The dashboard: the signed-in account's timelines, favorites and browser drafts, and the
-// public timelines to search and browse; at / or, with the landing page on, /explore (#379).
+// The dashboard: the signed-in account's browser drafts, and Explore, which searches and
+// browses the library, the account's own timelines and those it starred; at / or, with the
+// landing page on, /explore (#379).
 import Link from 'next/link';
 import { accountCompareLimit, currentSession, userCompareLimit } from '../lib/session.js';
 import { searchTimelines } from '../../server/collaboration.mjs';
 import { CompareTray } from './compare-selection.jsx';
-import TimelineBrowser from './timeline-browser.jsx';
 import LibraryBrowser from './library-browser.jsx';
 import { searchEntities } from '../../server/library-search.mjs';
 import LegacyLinks from './legacy-links.jsx';
 import BrowserDrafts from './browser-drafts.jsx';
 import { profilePath } from '../../src/addresses.ts';
-import { LISTS, librarySearches, readList, searchBody } from '../lib/timeline-lists.js';
+import { LISTS, librarySearches, readList } from '../lib/timeline-lists.js';
 /**
  * The dashboard, at `basePath`: / or /explore.
  *
  * Reads the visitor's session, then searches the database directly (server/collaboration.mjs's
  * `searchTimelines` and server/library-search.mjs's `searchEntities`, not the HTTP API) for
- * its lists at once: Explore's timelines and, with search text, its moments and durations
- * (#459; components/library-browser.jsx), and, when signed in, the account's own timelines
- * and the ones it starred.
+ * Explore's timelines and, with search text, its moments and durations (#459;
+ * components/library-browser.jsx). Signed in, Explore's filters also narrow it to the
+ * account's own timelines (`within`), those it starred (`starred`) and public or private ones
+ * (`visibility`), in place of the separate lists of its own timelines and favorites.
  * Each list searches, sorts and pages on its own, in its own query parameters
- * (lib/timeline-lists.js): `search`, `tag`, `sort` and `page` for Explore, with `show`,
- * `within` and `entityPage`;
- * `mineSearch`, `mineTag`, `mineSort`, `mineVisibility` and `minePage` for the account's own;
- * likewise `favorite…` for its favorites and `draft…` for its browser drafts, which are
+ * (lib/timeline-lists.js): `search`, `tag`, `sort`, `visibility` and `page` for Explore, with
+ * `show`, `within`, `starred` and `entityPage`; `draft…` for its browser drafts, which are
  * searched in the browser. So the address carries them all, and each list's links keep the
  * others'. What renders here is what shows without JavaScript; with it, each list
  * (components/timeline-browser.jsx) then searches in place, without loading the page again.
@@ -40,25 +39,14 @@ export default async function Dashboard({ searchParams, basePath = '/' }) {
   const params = await searchParams;
   const owner = typeof params.owner === 'string' ? params.owner.slice(0, 64) : '';
   // Each list's state, made safe, and what the page fixes in its search.
-  const states = {
-    explore: readList(params, LISTS.explore),
-    mine: readList(params, LISTS.mine),
-    favorites: readList(params, LISTS.favorites),
-  };
-  const fixed = {
-    explore: { scope: 'public', ...(owner ? { owner } : {}) },
-    mine: { scope: 'mine' },
-    favorites: { scope: 'starred' },
-  };
-  const search = (name) => searchBody(LISTS[name], states[name], fixed[name]);
+  const state = readList(params, LISTS.explore);
+  const fixed = { scope: 'public', ...(owner ? { owner } : {}) };
   // A guest's defaults, until the session says otherwise (and if reading it fails).
   let user = null,
     compareLimit = 8,
     userLimit = 8,
-    mine,
     publicResults,
     entityResults,
-    favorites,
     error;
   try {
     const current = await currentSession();
@@ -69,10 +57,8 @@ export default async function Dashboard({ searchParams, basePath = '/' }) {
       error = 'Server storage is unavailable. You can create or import a local timeline.';
     else {
       // Explore's two searches (#459): its timelines, and with words its moments and durations.
-      const library = librarySearches(LISTS.explore, states.explore, fixed.explore, {
-        signedIn: !!user,
-      });
-      [publicResults, entityResults, mine, favorites] = await Promise.all([
+      const library = librarySearches(LISTS.explore, state, fixed, { signedIn: !!user });
+      [publicResults, entityResults] = await Promise.all([
         library.timelines &&
           searchTimelines(
             current.services.pool,
@@ -81,55 +67,30 @@ export default async function Dashboard({ searchParams, basePath = '/' }) {
             current.services.featured,
           ),
         library.entities && searchEntities(current.services.pool, user?.id, library.entities),
-        user ? searchTimelines(current.services.pool, user.id, search('mine')) : null,
-        user ? searchTimelines(current.services.pool, user.id, search('favorites')) : null,
       ]);
     }
   } catch {
     error = 'The timeline browser is temporarily unavailable. Local editing remains available.';
   }
-  /** A list, searched in place: its controls, then its page of timelines. */
-  const list = (name, result, props = {}) => (
-    <TimelineBrowser
-      name={name}
-      initialState={states[name]}
-      initialResult={error ? null : (result ?? null)}
-      fixed={fixed[name]}
-      compareLimit={compareLimit}
-      basePath={basePath}
-      {...props}
-    />
-  );
   return (
     <main className="platform">
       <LegacyLinks />
       <div className="page-heading">
         <h1>Timelines</h1>
+        {user && (
+          <div className="page-actions">
+            <a className="button primary" href="/editor?new=1">
+              ＋ New timeline
+            </a>
+            <Link className="button" href={profilePath(user.username)}>
+              Your public profile
+            </Link>
+          </div>
+        )}
       </div>
       {/* The timelines picked to compare, from any of the lists below. */}
       <CompareTray limit={compareLimit} userLimit={userLimit} signedIn={!!user} />
       {user && <BrowserDrafts userId={user.id} />}
-      {user && (
-        <section id="mine" aria-labelledby="mine-heading">
-          <h2 id="mine-heading">Your timelines</h2>
-          {list('mine', mine, {
-            emptyAction: (
-              <a className="button primary" href="/editor?new=1">
-                ＋ New timeline
-              </a>
-            ),
-          })}
-        </section>
-      )}
-      {user && (
-        <section id="favorites" aria-labelledby="favorites-heading">
-          <h2 id="favorites-heading">Your favorites</h2>
-          <Link href={profilePath(user.username)}>Your public profile</Link>
-          {list('favorites', favorites, {
-            emptyAction: <p className="muted">Star a timeline (☆ Star) to keep it here.</p>,
-          })}
-        </section>
-      )}
       <section className="dashboard-introduction">
         <h2>Explore an exact timeline</h2>
         <p>Pan and zoom through a sample timeline to see nearby moments gather and separate.</p>
@@ -143,13 +104,14 @@ export default async function Dashboard({ searchParams, basePath = '/' }) {
         <p className="muted">
           Search the titles and notes of timelines and their events (moments and durations).
           Popularity combines stars and public forks.
+          {user && ' Filters narrow it to your own timelines, or those you starred.'}
         </p>
         {!user && <Link href="/login">Sign in to see your timelines</Link>}
         <LibraryBrowser
-          initialState={states.explore}
+          initialState={state}
           initialTimelines={error ? null : (publicResults ?? null)}
           initialEntities={error ? null : (entityResults ?? null)}
-          fixed={fixed.explore}
+          fixed={fixed}
           signedIn={!!user}
           compareLimit={compareLimit}
           basePath={basePath}

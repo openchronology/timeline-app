@@ -35,20 +35,17 @@ test('every list has its own query parameters, and offers only sorts the server 
     'page',
     'show',
     'within',
+    'starred',
     'entityPage',
   ]);
-  assert.deepEqual(paramNames(LISTS.mine), [
-    'mineSearch',
-    'mineTag',
-    'mineSort',
-    'mineVisibility',
-    'minePage',
-  ]);
-  assert.deepEqual(paramNames(LISTS.favorites).at(-1), 'favoritePage');
+  assert.deepEqual(paramNames(LISTS.profileFavorites).at(-1), 'favoritePage');
   assert.deepEqual(paramNames(LISTS.drafts)[0], 'draftSearch');
+  // Explore covers the account's own timelines and favorites, in its filters.
+  assert.equal(LISTS.mine, undefined);
+  assert.equal(LISTS.favorites, undefined);
   // The dashboard's lists never share a parameter, nor do a profile's.
   for (const page of [
-    ['explore', 'mine', 'favorites', 'drafts'],
+    ['explore', 'drafts'],
     ['profile', 'profileFavorites'],
   ]) {
     const names = page.flatMap((name) => paramNames(LISTS[name]));
@@ -64,7 +61,7 @@ test('every list has its own query parameters, and offers only sorts the server 
       for (const sort of list.sorts) assert(SEARCH_SORTS.includes(sort), sort);
       const { search, tag, sort, visibility, page } = readList({}, list);
       searchInput({
-        scope: list.visibility ? 'mine' : 'public',
+        scope: list.visibility ? 'visible' : 'public',
         search,
         tag,
         sort,
@@ -77,8 +74,8 @@ test('every list has its own query parameters, and offers only sorts the server 
 });
 
 test('a list reads its state from the address, made safe', () => {
-  const mine = LISTS.mine;
-  assert.deepEqual(readList({}, mine), {
+  const drafts = LISTS.drafts;
+  assert.deepEqual(readList({}, drafts), {
     search: '',
     tag: '',
     sort: 'updated',
@@ -88,24 +85,25 @@ test('a list reads its state from the address, made safe', () => {
   assert.deepEqual(
     readList(
       {
-        mineSearch: 'roman',
-        mineTag: 'history',
-        mineSort: 'alphabetical',
-        mineVisibility: 'private',
-        minePage: '3',
+        draftSearch: 'roman',
+        draftTag: 'history',
+        draftSort: 'alphabetical',
+        draftPage: '3',
         search: 'other list',
       },
-      mine,
+      drafts,
     ),
-    { search: 'roman', tag: 'history', sort: 'alphabetical', visibility: 'private', page: 3 },
+    { search: 'roman', tag: 'history', sort: 'alphabetical', visibility: '', page: 3 },
   );
   // A search sorts by relevance unless asked otherwise; relevance needs search text.
-  assert.equal(readList({ mineSearch: 'roman' }, mine).sort, 'relevance');
-  assert.equal(readList({ mineSort: 'relevance' }, mine).sort, 'updated');
+  assert.equal(readList({ draftSearch: 'roman' }, drafts).sort, 'relevance');
+  assert.equal(readList({ draftSort: 'relevance' }, drafts).sort, 'updated');
   // Unknown or repeated values, and sorts or filters the list doesn't offer, are ignored.
-  assert.equal(readList({ mineSort: 'featured' }, mine).sort, 'updated');
-  assert.equal(readList({ mineVisibility: 'secret' }, mine).visibility, '');
-  assert.equal(readList({ visibility: 'private' }, LISTS.explore).visibility, '');
+  assert.equal(readList({ draftSort: 'featured' }, drafts).sort, 'updated');
+  assert.equal(readList({ draftVisibility: 'private' }, drafts).visibility, '');
+  assert.equal(readList({ visibility: 'secret' }, LISTS.explore).visibility, '');
+  assert.equal(readList({ visibility: 'private' }, LISTS.explore).visibility, 'private');
+  assert.equal(readList({ visibility: 'private' }, LISTS.profile).visibility, '');
   assert.equal(readList({ search: ['a', 'b'] }, LISTS.explore).search, '');
   assert.equal(readList({ page: '0' }, LISTS.explore).page, 1);
   assert.equal(readList({ page: '99999' }, LISTS.explore).page, 10000);
@@ -119,9 +117,7 @@ test('a list reads its state from the address, made safe', () => {
 test('links change one list and keep the others', () => {
   const states = {
     explore: readList({ search: 'rome', sort: 'stars', page: '2' }, LISTS.explore),
-    mine: readList({ mineTag: 'war', minePage: '4' }, LISTS.mine),
-    favorites: readList({}, LISTS.favorites),
-    drafts: readList({ draftSearch: 'notes' }, LISTS.drafts),
+    drafts: readList({ draftSearch: 'notes', draftPage: '4' }, LISTS.drafts),
   };
   const query = pageQuery(states, { owner: 'seed' });
   // Only what differs from each list's defaults.
@@ -130,19 +126,26 @@ test('links change one list and keep the others', () => {
     search: 'rome',
     sort: 'stars',
     page: '2',
-    mineTag: 'war',
-    minePage: '4',
     draftSearch: 'notes',
+    draftPage: '4',
   });
-  // The next page of the account's timelines keeps the public search, its page and the drafts.
+  // The next page of drafts keeps the library's search and its page.
   assert.equal(
-    listHref('/', query, LISTS.mine, states.mine, { page: 5 }),
-    '/?owner=seed&search=rome&sort=stars&page=2&draftSearch=notes&mineTag=war&minePage=5#mine',
+    listHref('/', query, LISTS.drafts, states.drafts, { page: 5 }),
+    '/?owner=seed&search=rome&sort=stars&page=2&draftSearch=notes&draftPage=5#drafts',
   );
   // A tag filters its own list, from page one.
   assert.equal(
     listHref('/', query, LISTS.explore, states.explore, { tag: 'empire', page: 1 }),
-    '/?owner=seed&mineTag=war&minePage=4&draftSearch=notes&search=rome&tag=empire&sort=stars#explore',
+    '/?owner=seed&draftSearch=notes&draftPage=4&search=rome&tag=empire&sort=stars#explore',
+  );
+  // Only starred, and private: in the address as `starred=1` and `visibility`.
+  assert.equal(
+    listHref('/', {}, LISTS.explore, readList({}, LISTS.explore), {
+      starred: true,
+      visibility: 'private',
+    }),
+    '/?visibility=private&starred=1#explore',
   );
   // The default order is left out: relevance with search text, the list's own without.
   assert.deepEqual(listQuery(LISTS.explore, { search: 'rome', sort: 'relevance', page: 1 }), {
@@ -151,7 +154,7 @@ test('links change one list and keep the others', () => {
   assert.deepEqual(listQuery(LISTS.explore, { search: '', sort: 'relevance', page: 1 }), {
     sort: 'relevance',
   });
-  assert.deepEqual(listQuery(LISTS.favorites, { search: '', sort: 'age', page: 1 }), {});
+  assert.deepEqual(listQuery(LISTS.profileFavorites, { search: '', sort: 'age', page: 1 }), {});
   assert.equal(listHref('/ada', {}, LISTS.profile, readList({}, LISTS.profile)), '/ada#timelines');
 });
 
@@ -196,20 +199,21 @@ test('browser drafts are searched, sorted and paged in the browser', () => {
 });
 
 test('a list says how many it has, or why it has none', () => {
-  const state = readList({}, LISTS.mine);
+  const state = readList({}, LISTS.explore);
   assert.equal(
-    statusText(LISTS.mine, state, { total: 1, page: 1, pages: 1 }),
+    statusText(LISTS.explore, state, { total: 1, page: 1, pages: 1 }),
     '1 timeline · Page 1 of 1',
   );
   assert.equal(
-    statusText(LISTS.favorites, state, { total: 1200, page: 2, pages: 100 }),
-    '1,200 favorites · Page 2 of 100',
+    statusText(LISTS.profileFavorites, state, { total: 1200, page: 2, pages: 100 }),
+    '1,200 public favorites · Page 2 of 100',
   );
-  assert.equal(statusText(LISTS.mine, state, { total: 0 }), 'You have no server timelines yet.');
-  assert.equal(
-    statusText(LISTS.mine, { ...state, visibility: 'private' }, { total: 0 }),
-    'None of your timelines match this search.',
-  );
+  assert.equal(statusText(LISTS.explore, state, { total: 0 }), 'No public timelines yet.');
+  for (const filter of [{ visibility: 'private' }, { starred: true }, { within: 'mine' }])
+    assert.equal(
+      statusText(LISTS.explore, { ...state, ...filter }, { total: 0 }),
+      'No timelines match this search.',
+    );
 });
 
 test('changing a list starts from page one, and a search sorts by relevance (#338)', () => {
@@ -226,19 +230,24 @@ test('changing a list starts from page one, and a search sorts by relevance (#33
   assert.equal(changeList(LISTS.explore, stars, { search: 'rome' }).sort, 'stars');
   const found = readList({ search: 'rome' }, LISTS.explore);
   assert.equal(changeList(LISTS.explore, found, { search: '' }).sort, 'featured');
-  assert.equal(changeList(LISTS.mine, readList({}, LISTS.mine), { search: 'x' }).sort, 'relevance');
+  assert.equal(
+    changeList(LISTS.drafts, readList({}, LISTS.drafts), { search: 'x' }).sort,
+    'relevance',
+  );
   // Every list's links open at its section, and no two sections on a page share an id.
   for (const page of [
-    ['explore', 'mine', 'favorites', 'drafts'],
+    ['explore', 'drafts'],
     ['profile', 'profileFavorites'],
   ])
     assert.equal(new Set(page.map((name) => LISTS[name].id)).size, page.length);
   // The search a list sends the API.
   assert.deepEqual(
-    searchBody(LISTS.mine, readList({ mineVisibility: 'private' }, LISTS.mine), { scope: 'mine' }),
-    { scope: 'mine', search: '', tag: '', sort: 'updated', page: 1, visibility: 'private' },
+    searchBody(LISTS.explore, readList({ visibility: 'private' }, LISTS.explore), {
+      scope: 'visible',
+    }),
+    { scope: 'visible', search: '', tag: '', sort: 'featured', page: 1, visibility: 'private' },
   );
-  assert.equal('visibility' in searchBody(LISTS.explore, browse, { scope: 'public' }), false);
+  assert.equal('visibility' in searchBody(LISTS.profile, browse, { scope: 'public' }), false);
 });
 
 test('a timeline leads back to the last list its tab showed, on this site only', () => {
@@ -299,6 +308,7 @@ test('Explore’s search finds timelines and events, as its filters say (#459)',
     within: 'mine',
     entityPage: '2',
   });
+  assert.deepEqual(listQuery(explore, { ...state, starred: true }).starred, '1');
   assert.deepEqual(listQuery(explore, readList({}, explore)), {});
   // Paging one list keeps the other's page; anything else starts both again.
   const both = readList({ search: 'rome', page: '3', entityPage: '2' }, explore);
@@ -354,4 +364,46 @@ test('Explore’s search finds timelines and events, as its filters say (#459)',
   // Each is a search the server accepts.
   searchInput(visible.timelines);
   entitySearchInput(visible.entities);
+
+  // Only starred, and public or private (in place of the dashboard's own lists): signed in,
+  // they search what the account may read, or its own; a guest's are ignored.
+  assert.equal(readList({ starred: 'yes' }, explore).starred, false);
+  const starred = librarySearches(
+    explore,
+    readList({ search: 'rome', starred: '1', visibility: 'private' }, explore),
+    fixed,
+    signedIn,
+  );
+  assert.deepEqual(
+    [starred.timelines.scope, starred.timelines.starred, starred.timelines.visibility],
+    ['visible', true, 'private'],
+  );
+  assert.deepEqual(
+    [starred.entities.scope, starred.entities.starred, starred.entities.visibility],
+    ['visible', true, 'private'],
+  );
+  searchInput(starred.timelines);
+  entitySearchInput(starred.entities);
+  // Browsing starred ones, or by visibility, looks past the public library.
+  for (const filter of [{ starred: '1' }, { visibility: 'private' }])
+    assert.equal(
+      librarySearches(explore, readList(filter, explore), fixed, signedIn).timelines.scope,
+      'visible',
+    );
+  const ownStarred = librarySearches(
+    explore,
+    readList({ within: 'mine', starred: '1' }, explore),
+    fixed,
+    signedIn,
+  ).timelines;
+  assert.deepEqual([ownStarred.scope, ownStarred.starred], ['mine', true]);
+  const guestStarred = librarySearches(
+    explore,
+    readList({ starred: '1', visibility: 'private' }, explore),
+    fixed,
+  ).timelines;
+  assert.deepEqual(
+    [guestStarred.scope, 'starred' in guestStarred, 'visibility' in guestStarred],
+    ['public', false, false],
+  );
 });

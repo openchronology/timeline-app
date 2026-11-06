@@ -82,6 +82,22 @@ try {
   await setTimelineStar(pool, store, tids[2], ids[0], { starred: true });
   const own = await searchTimelines(pool, ids[0], { scope: 'starred' });
   assert.equal(own.total, 2);
+  // Only starred, in any scope (Explore's filter): with the account's own, by visibility,
+  // or among public timelines, where browsing doesn't hide newcomers' stars.
+  const starredIds = async (userId, value) =>
+    (await searchTimelines(pool, userId, { starred: true, ...value })).timelines
+      .map((t) => t.id)
+      .sort();
+  assert.deepEqual(await starredIds(ids[0], { scope: 'mine' }), [tids[0], tids[2]].sort());
+  assert.deepEqual(await starredIds(ids[0], { scope: 'visible', visibility: 'private' }), [
+    tids[2],
+  ]);
+  assert.deepEqual(await starredIds(ids[0], { scope: 'public' }), [tids[0]]);
+  assert.deepEqual(await starredIds(ids[1], { scope: 'visible' }), [tids[0]]);
+  await assert.rejects(
+    searchTimelines(pool, null, { scope: 'public', starred: true }),
+    (e) => e.status === 401,
+  );
   const profile = await searchTimelines(pool, null, { scope: 'public', starredBy: username + '0' });
   assert.deepEqual(
     profile.timelines.map((t) => t.id),

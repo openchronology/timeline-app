@@ -54,16 +54,14 @@ The total is capped at 1. An account that isn't established has standing 0. Admi
 
 Every timeline list on the dashboard and on profiles searches, sorts and pages on its own, with its own query parameters, so a search in one keeps the others' state ([#337](https://github.com/openchronology/timeline-app/issues/337)):
 
-| List                   | Parameters                                                                                       |
-| ---------------------- | ------------------------------------------------------------------------------------------------ |
-| Explore timelines      | `search`, `tag`, `sort`, `page`, `show`, `within`, `entityPage` (and `owner`, for one account's) |
-| Your timelines         | `mineSearch`, `mineTag`, `mineSort`, `mineVisibility`, `minePage`                                |
-| Your favorites         | `favoriteSearch`, `favoriteTag`, `favoriteSort`, `favoriteVisibility`, `favoritePage`            |
-| Drafts in this browser | `draftSearch`, `draftTag`, `draftSort`, `draftPage`                                              |
-| A profile's timelines  | `search`, `tag`, `sort`, `page`                                                                  |
-| A profile's favorites  | `favoriteSearch`, `favoriteTag`, `favoriteSort`, `favoritePage`                                  |
+| List                   | Parameters                                                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Explore timelines      | `search`, `tag`, `sort`, `visibility`, `page`, `show`, `within`, `starred`, `entityPage` (and `owner`, for one account's) |
+| Drafts in this browser | `draftSearch`, `draftTag`, `draftSort`, `draftPage`                                                                       |
+| A profile's timelines  | `search`, `tag`, `sort`, `page`                                                                                           |
+| A profile's favorites  | `favoriteSearch`, `favoriteTag`, `favoriteSort`, `favoritePage`                                                           |
 
-Your own lists include private timelines and filter by visibility (`public` or `private`). Drafts are searched in the browser, by their titles, descriptions and tags, with the same syntax: words, `"quoted phrases"` and `-exclusions`. The API's search takes the same `visibility` filter and the `updated` sort ([API](api.md)).
+Explore takes the place of separate lists of your own timelines and your favorites: signed in, `within=mine` keeps your own timelines, `starred=1` the ones you starred, and `visibility` (`public` or `private`) one or the other, each for timelines and events alike. Any of them, like search text, looks through every timeline you may read rather than the public library alone. A guest's `starred` and `visibility` are ignored. Drafts are searched in the browser, by their titles, descriptions and tags, with the same syntax: words, `"quoted phrases"` and `-exclusions`. The API's search takes the same `visibility` filter and the `updated` sort ([API](api.md)).
 
 With JavaScript, each list searches in place ([#338](https://github.com/openchronology/timeline-app/issues/338)): it changes the address with `history.pushState` (or `replaceState` while typing) and fetches its page from the search API, so the page doesn't load again and Back works. Each result also carries what its card shows of its moments: `first_time` and `last_time` (exact), `time_span` (the two in the timeline's own time display, as precise as the span calls for: years for a 200-year timeline, clock times for a 3-hour incident, ages in deep time) and `shape` (how densely 24 equal parts of the span hold moments, read from the top three levels of its moment tree). Forks that read through to their source, and comparisons, have none of these, as reading them would cost far more.
 
@@ -75,6 +73,8 @@ Explore's search also finds events: moments and durations on every timeline the 
 | ------------ | --------------------------------------------------------------------------------------- |
 | `show`       | `timelines`, `moments`, `durations`, comma-separated or repeated; all three when absent |
 | `within`     | `mine`: the signed-in account's own timelines only                                      |
+| `starred`    | `1`: only timelines the signed-in account starred                                       |
+| `visibility` | `public` or `private`: only those timelines, signed in                                  |
 | `entityPage` | The page of events, 20 to a page; the timelines keep their own `page`                   |
 
 What it searches:

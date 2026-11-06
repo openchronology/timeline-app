@@ -111,6 +111,18 @@ export const paths = {
               ...ref('Uuid'),
               description: 'A timeline to leave out: the one linking (#422).',
             },
+            starred: {
+              type: 'boolean',
+              default: false,
+              description:
+                'Only events on timelines the caller starred, within the scope. Needs sign-in.',
+            },
+            visibility: {
+              type: 'string',
+              enum: ['', 'public', 'private'],
+              default: '',
+              description: 'Only events on public or only on private timelines; empty for both.',
+            },
 
             owner: {
               type: 'string',
@@ -695,6 +707,12 @@ export const schemas = {
       exclude: {
         ...ref('Uuid'),
         description: 'A timeline to leave out: the one linking (#422).',
+      },
+      starred: {
+        type: 'boolean',
+        default: false,
+        description:
+          'Only timelines the caller starred, within the scope: with `mine`, the caller’s own they starred. Needs sign-in.',
       },
       visibility: {
         type: 'string',

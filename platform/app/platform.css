@@ -313,6 +313,12 @@ main.platform {
   gap: 16px;
   flex-wrap: wrap;
 }
+/* The dashboard's actions beside its heading: a new timeline, the account's profile. */
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 h1 {
   font:
     normal 38px Georgia,
