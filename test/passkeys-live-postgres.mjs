@@ -138,6 +138,23 @@ try {
   }
   const signedIn = async () =>
     (await tab.evaluate(() => fetch('/api/session').then((r) => r.json()))).user?.username;
+  /**
+   * Fails with what the sign-in page showed and what the session said, for a step that
+   * timed out waiting for the page (#465).
+   */
+  const failedOn = (what) => async (error) => {
+    console.error(`On /login, ${what} (#465):`, {
+      url: tab.url(),
+      card: await tab
+        .locator('.auth-card')
+        .innerText({ timeout: 1000 })
+        .catch(() => null),
+      session: await tab
+        .evaluate(() => fetch('/api/session').then((r) => r.json()))
+        .catch((e) => String(e)),
+    });
+    throw error;
+  };
   async function signOut() {
     await tab.goto(origin + '/account');
     await tab
@@ -210,19 +227,7 @@ try {
   await tab.goto(origin + '/login');
   const button = tab.getByRole('button', { name: 'Sign in with a passkey' });
   // It once never appeared (#465): if so, what the page showed and what the session said.
-  await button.waitFor().catch(async (error) => {
-    console.error('The passkey button never appeared (#465):', {
-      url: tab.url(),
-      card: await tab
-        .locator('.auth-card')
-        .innerText({ timeout: 1000 })
-        .catch(() => null),
-      session: await tab
-        .evaluate(() => fetch('/api/session').then((r) => r.json()))
-        .catch((e) => String(e)),
-    });
-    throw error;
-  });
+  await button.waitFor().catch(failedOn('the passkey button never appeared'));
   assert.equal(await tab.getByLabel('Username').getAttribute('autocomplete'), 'username webauthn');
   await askedMore(shown);
   await presence(true);
@@ -298,7 +303,8 @@ try {
     (r) => r.url().endsWith('/api/auth/passkeys/sign-in') && r.status() === 401,
   );
   await tab.goto(origin + '/login');
-  await firstRefusal;
+  // Once never sent (#465): if so, what the page showed and what the session said.
+  await firstRefusal.catch(failedOn('the autofill never asked for a passkey'));
   await presence(false);
   const refused = asked;
   await tab.getByText('That passkey was not recognized.', { exact: false }).waitFor();
