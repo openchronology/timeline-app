@@ -223,6 +223,62 @@ test('Titles fit search results: shorter forms in turn, link previews whole (#46
   assert.equal(long.twitter.title, long.openGraph.title);
 });
 
+test('Trails and kinds of page for search engines and previews (#474)', () => {
+  const o = 'https://chronology.example';
+  assert.deepEqual(
+    sharing.entityBreadcrumbs(timeline(), { kind: 'moment', id: 'leg:2' }, 'Storm'),
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: '@ada', item: `${o}/ada` },
+        { '@type': 'ListItem', position: 2, name: 'Voyages', item: `${o}/ada/voyages` },
+        {
+          '@type': 'ListItem',
+          position: 3,
+          name: 'Storm',
+          item: `${o}/ada/voyages/moments/leg%3A2`,
+        },
+      ],
+    },
+  );
+  // None where the page isn't for search engines; nested, without its context.
+  assert.equal(
+    sharing.entityBreadcrumbs(
+      timeline({ visibility: 'private' }),
+      { kind: 'moment', id: 'x' },
+      'X',
+    ),
+    null,
+  );
+  assert.equal(
+    '@context' in sharing.breadcrumbData([{ name: 'Help', path: '/help' }], { nested: true }),
+    false,
+  );
+  // An event's page previews as an article; a timeline's as a website.
+  const entity = sharing.entityMetadata(
+    timeline(),
+    { kind: 'moment', id: 'leg:2' },
+    'Storm',
+    '1970',
+  );
+  assert.equal(entity.openGraph.type, 'article');
+  assert.equal(
+    sharing.pageMetadata(timeline(), '/ada/voyages', 'Voyages', 'D').openGraph.type,
+    'website',
+  );
+  // The software, with what a page adds.
+  assert.deepEqual(sharing.softwareData({ softwareVersion: '0.23.0' }), {
+    '@type': 'SoftwareApplication',
+    name: 'OpenChronology',
+    applicationCategory: 'Timeline editor',
+    operatingSystem: 'Web, Windows, macOS, Linux',
+    license: 'https://www.gnu.org/licenses/gpl-3.0.html',
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    softwareVersion: '0.23.0',
+  });
+});
+
 test('Metadata: labelled timelines describe their labels, not the notes, and are not indexed', () => {
   const entity = { kind: 'moment', id: 'leg:2' };
   const shown = sharing.entityMetadata(timeline(), entity, 'Storm', '2 Jan 1970', 'Rough seas');

@@ -13,7 +13,7 @@ import {
 } from '../components/landing.jsx';
 import { landingContent, landingEnabled } from '../../server/landing.mjs';
 import { landingData, landingMetadata } from '../lib/landing.js';
-import { webPageData } from '../lib/sharing.js';
+import { softwareData, webPageData } from '../lib/sharing.js';
 // Rendered for every request: it depends on who is signed in and on the query.
 export const dynamic = 'force-dynamic';
 /**
@@ -40,14 +40,7 @@ export default async function Home({ searchParams }) {
     <main className="platform landing">
       <StructuredData
         data={webPageData('/', meta.title, meta.description ?? meta.promise ?? '', {
-          about: {
-            '@type': 'SoftwareApplication',
-            name: 'OpenChronology',
-            applicationCategory: 'Timeline editor',
-            operatingSystem: 'Web, Windows, macOS, Linux',
-            license: 'https://www.gnu.org/licenses/gpl-3.0.html',
-            offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-          },
+          about: softwareData(),
         })}
       />
       <LandingHero meta={meta} data={data} />

@@ -13,6 +13,7 @@ import {
   durationTitle,
   entityFacts,
   entityMetadata,
+  entityBreadcrumbs,
   entityParam,
   eventListed,
   entityStructuredData,
@@ -62,10 +63,15 @@ export default async function DurationPage({ params }) {
     last: band.last,
     tags: entityFacts(timeline, duration.metadata).tags,
   });
+  const trail = entityBreadcrumbs(timeline, entity, durationTitle(duration));
   return (
     <main className="editor-page">
       {data && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(data) }} />
+      )}
+      {/* Its trail: its timeline's owner, the timeline, it (#474). */}
+      {trail && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(trail) }} />
       )}
       <TimelineSummary timeline={timeline}>
         <EntitySummary

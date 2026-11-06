@@ -351,6 +351,20 @@ try {
       author: { '@type': 'Person', name: '@' + username, url: `${origin}/${username}` },
     },
   });
+  // Its trail (#474), in a script of its own: owner, timeline, moment; and it previews as an
+  // article.
+  const trail = [...moment.matchAll(/<script type="application\/ld\+json">([^<]*)<\/script>/g)]
+    .map((m) => JSON.parse(m[1]))
+    .find((d) => d['@type'] === 'BreadcrumbList');
+  assert.deepEqual(
+    trail.itemListElement.map((i) => [i.position, i.name, i.item]),
+    [
+      [1, '@' + username, `${origin}/${username}`],
+      [2, 'Voyages of ' + suffix, origin + base],
+      [3, 'Storm ' + suffix, origin + momentPath],
+    ],
+  );
+  assert.equal(meta(moment, 'og:type'), 'article');
   // A note can't end the script early.
   const ret = await guest.request(base + '/moments/leg%3A3');
   assert(ret.includes('"description":"In \\u003c/script x"'));

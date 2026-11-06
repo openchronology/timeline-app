@@ -11,6 +11,7 @@ import { timelinePath } from '../../../../../../src/addresses.ts';
 import {
   entityFacts,
   entityMetadata,
+  entityBreadcrumbs,
   entityParam,
   eventListed,
   entityStructuredData,
@@ -62,10 +63,15 @@ export default async function MomentPage({ params }) {
     last: event.time,
     tags: entityFacts(timeline, event.metadata).tags,
   });
+  const trail = entityBreadcrumbs(timeline, entity, momentTitle(event));
   return (
     <main className="editor-page">
       {data && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(data) }} />
+      )}
+      {/* Its trail: its timeline's owner, the timeline, it (#474). */}
+      {trail && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(trail) }} />
       )}
       <TimelineSummary timeline={timeline}>
         <EntitySummary

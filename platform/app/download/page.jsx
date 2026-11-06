@@ -19,14 +19,18 @@ import {
 } from '../../lib/releases.js';
 import { EDITIONS } from '../../../dist/core.mjs';
 import { latestRelease } from '../../lib/latest-release.js';
-import { siteName } from '../../lib/sharing.js';
+import { siteName, siteOrigin, softwareData, webPageData } from '../../lib/sharing.js';
+import { StructuredData } from '../../components/landing.jsx';
 // Rendered per request: what it puts first depends on the visitor's browser.
 export const dynamic = 'force-dynamic';
+/** What the page offers, for its metadata and structured data. */
+const DOWNLOAD_DESCRIPTION =
+  'The OpenChronology desktop app for Windows, macOS and Linux, and the server.';
 /** The page's title, description and canonical address. */
 export function generateMetadata() {
   return {
     title: `Download · ${siteName()}`,
-    description: 'The OpenChronology desktop app for Windows, macOS and Linux, and the server.',
+    description: DOWNLOAD_DESCRIPTION,
     alternates: { canonical: '/download' },
   };
 }
@@ -104,6 +108,16 @@ export default async function Download() {
     : null;
   return (
     <main className="platform download-page">
+      {/* The software and where to download it, for search engines (#474). */}
+      <StructuredData
+        data={webPageData('/download', 'Download OpenChronology', DOWNLOAD_DESCRIPTION, {
+          mainEntity: softwareData({
+            downloadUrl: siteOrigin() + '/download',
+            ...(release?.tag ? { softwareVersion: release.tag.replace(/^v/, '') } : {}),
+            ...(release?.published ? { datePublished: release.published } : {}),
+          }),
+        })}
+      />
       <h1>Download OpenChronology</h1>
       <p className="muted download-release">
         {release ? (

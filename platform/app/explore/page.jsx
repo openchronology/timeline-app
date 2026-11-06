@@ -3,7 +3,8 @@
 // is off, with every list's search, tag, sort and page in its query.
 import Dashboard from '../../components/dashboard.jsx';
 import { landingEnabled } from '../../../server/landing.mjs';
-import { pageTitle } from '../../lib/sharing.js';
+import { pageTitle, webPageData } from '../../lib/sharing.js';
+import { StructuredData } from '../../components/landing.jsx';
 export const dynamic = 'force-dynamic';
 /**
  * One address for search engines, whatever the query: /explore with the landing page on;
@@ -19,5 +20,20 @@ export function generateMetadata() {
     : { alternates: { canonical: '/' } };
 }
 export default function Explore({ searchParams }) {
-  return <Dashboard searchParams={searchParams} basePath="/explore" />;
+  return (
+    <>
+      {/* What it is, for search engines: the library's collection of timelines (#474). */}
+      {landingEnabled() && (
+        <StructuredData
+          data={webPageData(
+            '/explore',
+            'Explore timelines',
+            'Search and browse public timelines and their events.',
+            { '@type': 'CollectionPage' },
+          )}
+        />
+      )}
+      <Dashboard searchParams={searchParams} basePath="/explore" />
+    </>
+  );
 }

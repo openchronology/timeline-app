@@ -402,7 +402,12 @@ export function entityMetadata(timeline, entity, title, time, notes, { listed = 
       : entityDescription(time, notes),
     null,
     // An event its timeline doesn't list still leads to those it relates to and its timeline.
-    { index: entitiesIndexable(timeline) && listed, follow: entitiesIndexable(timeline) },
+    {
+      index: entitiesIndexable(timeline) && listed,
+      follow: entitiesIndexable(timeline),
+      // A page about one event reads as an article in link previews (#474).
+      type: 'article',
+    },
   );
 }
 /**
@@ -566,7 +571,7 @@ export function pageMetadata(
   title,
   description,
   image = null,
-  { index = true, follow = index } = {},
+  { index = true, follow = index, type = 'website' } = {},
 ) {
   const origin = siteOrigin(),
     url = origin + path,
@@ -602,7 +607,7 @@ export function pageMetadata(
     // Private pages are for their members: not for search engines.
     ...(shown && index ? {} : { robots: { index: false, follow: shown && follow } }),
     openGraph: {
-      type: 'website',
+      type,
       siteName: siteName(),
       locale: 'en_US',
       title: whole,
@@ -658,6 +663,53 @@ export function webPageData(path, title, description, more = {}) {
     description,
     url: origin + path,
     isPartOf: { '@type': 'WebSite', name: siteName(), url: origin + '/' },
+    ...more,
+  };
+}
+
+/**
+ * A trail of pages (#474) as schema.org's `BreadcrumbList`: `items` from the outermost, each
+ * `{ name, path }`, the last the page itself. Search results can show it in place of the
+ * page's address. Standalone (with `@context`) unless `nested`, inside a page's data.
+ * @param {{name: string, path: string}[]} items
+ */
+export function breadcrumbData(items, { nested = false } = {}) {
+  const origin = siteOrigin();
+  return {
+    ...(nested ? {} : { '@context': 'https://schema.org' }),
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: item.name,
+      item: origin + item.path,
+    })),
+  };
+}
+/**
+ * A moment's or duration's trail (#474): its timeline's owner, the timeline, then it; null
+ * where its page is not for search engines (as its structured data).
+ */
+export function entityBreadcrumbs(timeline, entity, title) {
+  if (!entitiesIndexable(timeline)) return null;
+  return breadcrumbData([
+    ...(timeline.owner ? [{ name: '@' + timeline.owner, path: profilePath(timeline.owner) }] : []),
+    { name: timelineTitle(timeline), path: timelinePath(timeline) },
+    { name: title, path: sharedPath(timeline, entity) },
+  ]);
+}
+/**
+ * The software as schema.org's `SoftwareApplication`: free, GPL-3.0, for the web, Windows,
+ * macOS and Linux, with `more` (such as its version and where to download it).
+ */
+export function softwareData(more = {}) {
+  return {
+    '@type': 'SoftwareApplication',
+    name: 'OpenChronology',
+    applicationCategory: 'Timeline editor',
+    operatingSystem: 'Web, Windows, macOS, Linux',
+    license: 'https://www.gnu.org/licenses/gpl-3.0.html',
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     ...more,
   };
 }

@@ -3,7 +3,8 @@
 import { notFound } from 'next/navigation';
 import HelpShell from '../../../components/help-shell.jsx';
 import { helpPages } from '../../../../server/help.mjs';
-import { pageTitle } from '../../../lib/sharing.js';
+import { breadcrumbData, pageTitle } from '../../../lib/sharing.js';
+import { StructuredData } from '../../../components/landing.jsx';
 export const dynamic = 'force-dynamic';
 async function load(params) {
   const { page: slug } = await params;
@@ -27,6 +28,13 @@ export default async function HelpPage({ params }) {
   const source = page.slug === 'readme' ? 'README.md' : `docs/${page.slug}.md`;
   return (
     <HelpShell pages={pages} current={page.slug}>
+      {/* Its trail: Help, then it (#474). */}
+      <StructuredData
+        data={breadcrumbData([
+          { name: 'Help', path: '/help' },
+          { name: page.title, path: '/help/' + page.slug },
+        ])}
+      />
       {contents.length > 2 && (
         <nav className="help-on-page" aria-label="On this page">
           <strong>On this page</strong>
