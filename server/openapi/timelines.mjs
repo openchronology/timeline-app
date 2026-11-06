@@ -487,6 +487,11 @@ export const schemas = {
       retention_applied_at: { type: ['string', 'null'], format: 'date-time' },
       retention_removed: { type: ['string', 'null'] },
       keep_history: { type: 'boolean', description: 'Whether it keeps saved history.' },
+      index_events: {
+        enum: ['auto', 'all', 'none'],
+        description:
+          'Which of its moments’ and durations’ pages search engines list, while it is public (#467): `auto` those with notes and titles of their own, unless its notes are templated; `all`; or `none`.',
+      },
       history_since: { type: ['string', 'null'] },
       content_labels: { type: 'array', items: { type: 'string' } },
       moderator_labels: { type: 'array', items: { type: 'string' } },
@@ -1402,7 +1407,7 @@ export const paths = {
       tags: ['Timelines'],
       summary: 'Change a timeline’s settings',
       description:
-        'For its owner (or an administrator): any of its visibility, private forking policy, retention period, whether it keeps saved history, sensitive-content labels, address and image. Turning saved history off deletes past revisions at once, apart from those forks and pull requests still use. A timeline goes public only if moderators have not restricted it, it is not a copy of a private timeline, and (for a comparison) all its sources are public. Changing anything but the address saves a new revision; the image, one of the document’s settings, is saved as a revision of the settings alone, kept in saved history, exports and forks.',
+        'For its owner (or an administrator): any of its visibility, private forking policy, retention period, whether it keeps saved history, sensitive-content labels, address, image and which events search engines list. Turning saved history off deletes past revisions at once, apart from those forks and pull requests still use. A timeline goes public only if moderators have not restricted it, it is not a copy of a private timeline, and (for a comparison) all its sources are public. Changing anything but the address saves a new revision; the image, one of the document’s settings, is saved as a revision of the settings alone, kept in saved history, exports and forks.',
       security: TIMELINE_WRITE,
       requestBody: body({
         type: 'object',
@@ -1435,6 +1440,11 @@ export const paths = {
           image: {
             ...nullable(ref('TimelineImage')),
             description: 'Its own image, set or replaced; null removes it. Not for a comparison.',
+          },
+          indexEvents: {
+            enum: ['auto', 'all', 'none'],
+            description:
+              'Which of its moments’ and durations’ pages search engines list (#467): `auto` (the default) those with at least 150 characters of notes and a title no other event of it shares, and none if most of its notes are one template with numbers and names changed; `all`; or `none`, its own page only.',
           },
         },
       }),

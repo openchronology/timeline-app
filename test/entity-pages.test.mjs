@@ -212,6 +212,10 @@ test('Metadata: labelled timelines describe their labels, not the notes, and are
   assert.deepEqual(labelled.robots, { index: false, follow: false });
   const hidden = sharing.entityMetadata(timeline({ visibility: 'private' }), entity, 'S', 't');
   assert.deepEqual(hidden.robots, { index: false, follow: false });
+  // An event its timeline doesn't list for search engines (#467): not indexed, its links
+  // still followed.
+  const unlisted = sharing.entityMetadata(timeline(), entity, 'S', 't', '', { listed: false });
+  assert.deepEqual(unlisted.robots, { index: false, follow: true });
 });
 
 test('Its page as text: tags, notes, enabled plugins’ fields, https sources, related, a link in', () => {

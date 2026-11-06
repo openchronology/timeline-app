@@ -14,6 +14,7 @@ import {
   entityFacts,
   entityMetadata,
   entityParam,
+  eventListed,
   entityStructuredData,
   jsonLd,
   linksOf,
@@ -33,13 +34,16 @@ async function load(params) {
   return { ...found, ...result };
 }
 export async function generateMetadata({ params }) {
-  const { timeline, duration, band } = await load(params);
+  const { timeline, services, duration, band } = await load(params);
+  const entity = { kind: 'duration', id: band.id };
   return entityMetadata(
     timeline,
-    { kind: 'duration', id: band.id },
+    entity,
     durationTitle(duration),
     `${presentTime(timeline, band.first)} – ${presentTime(timeline, band.last)}`,
     duration.metadata?.description,
+    // Not for search engines unless its timeline lists it (#467).
+    { listed: await eventListed(services, timeline, entity) },
   );
 }
 export default async function DurationPage({ params }) {

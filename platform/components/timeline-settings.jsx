@@ -387,6 +387,44 @@ export default function TimelineSettings({
       </section>
       <section>
         <h2>
+          Search engines
+          <HelpTip topic="sharing#which-events-search-engines-list" about="search engines">
+            Each event has a page of its own. Search engines rate a site lower for many pages that
+            say little, so only events with something of their own are listed.
+          </HelpTip>
+        </h2>
+        <p className="muted">
+          While the timeline is public, search engines can find its page and, as chosen here, the
+          pages of its events. Its own page is always listed.
+        </p>
+        <fieldset className="index-events" disabled={busy || !!timeline.comparison}>
+          <legend>List the pages of its events</legend>
+          {[
+            [
+              'auto',
+              'Automatically',
+              'Events with notes of a few sentences and a title of their own. None when most notes are one template, as a log import’s are.',
+            ],
+            ['all', 'All of them', 'Every event, however little it says.'],
+            ['none', 'None', 'Only the timeline’s own page.'],
+          ].map(([value, name, hint]) => (
+            <label key={value} className="checkbox-label">
+              <input
+                type="radio"
+                name="index-events"
+                value={value}
+                checked={(timeline.index_events ?? 'auto') === value}
+                onChange={() => void mutate('/settings', 'PATCH', { indexEvents: value })}
+              />
+              <span>
+                {name} <span className="muted">· {hint}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+      </section>
+      <section>
+        <h2>
           Data retention
           <HelpTip
             topic="retention#keeping-only-the-last-year-or-month-or-week"

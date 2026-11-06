@@ -77,10 +77,12 @@ export function timelineEntityLimit(env = process.env) {
  * most moments a listed timeline may have as `limit` (a parameter's placeholder): without
  * sensitive-content labels (their previews show nothing of them), not a comparison (its
  * entities are its sources') or a copy still being prepared, and with at most that many
- * moments (event_count is kept on the row, so this reads no entities).
+ * moments (event_count is kept on the row, so this reads no entities), and not set to list
+ * none (#467). Which of its entities are listed is server/event-listing.mjs's.
  */
 export const entitiesListed = (limit) => `t.content_labels='{}' AND t.moderator_labels='{}'
-  AND t.comparison IS NULL AND t.preparing_revision_id IS NULL AND t.event_count <= ${limit}`;
+  AND t.comparison IS NULL AND t.preparing_revision_id IS NULL AND t.event_count <= ${limit}
+  AND t.index_events<>'none'`;
 // The addresses the sitemap lists (platform/lib/sitemap.js): every public timeline, whether
 // its entities are listed, and each account that owns one and is not disabled, for its profile.
 const PUBLIC_PAGES = `SELECT t.id, t.slug, u.username AS owner, u.is_disabled AS disabled, t.updated_at,
@@ -263,7 +265,7 @@ export class IndexNow {
       queue(
         id,
         // Gone, private or being prepared since the read: its next poll sees that.
-        await this.store.entityKeys(id, limit).catch((error) => {
+        await this.store.listedEntityKeys(id, limit).catch((error) => {
           if (error.status === 404 || error.status === 409) return [];
           throw error;
         }),
@@ -271,7 +273,17 @@ export class IndexNow {
     if (!saved.length) return;
     const client = await this.pool.connect();
     try {
-      for (const [id, from, to] of saved) queue(id, await changedEntities(client, from, to, limit));
+      // Of those that changed, those listed for search engines (#467), and those removed.
+      for (const [id, from, to] of saved)
+        queue(
+          id,
+          await this.store
+            .listedOf(id, await changedEntities(client, from, to, limit), limit)
+            .catch((error) => {
+              if (error.status === 404 || error.status === 409) return [];
+              throw error;
+            }),
+        );
     } finally {
       client.release();
     }

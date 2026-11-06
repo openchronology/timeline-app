@@ -196,7 +196,8 @@ async function entityPage(origin, pool, start) {
   const { store } = await platformServices();
   const entries = [];
   for (const timeline of rows) {
-    const keys = await store.entityKeys(timeline.id, limit).catch((error) => {
+    // Only those with pages for search engines (#467; server/event-listing.mjs).
+    const keys = await store.listedEntityKeys(timeline.id, limit).catch((error) => {
       // Gone, private or still being prepared since: nothing of it is listed.
       if (error.status === 404 || error.status === 409) return [];
       throw error;
