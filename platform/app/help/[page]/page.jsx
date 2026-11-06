@@ -2,8 +2,8 @@
 // A page of the help (#172): docs/<page>.md, rendered as the site runs.
 import { notFound } from 'next/navigation';
 import HelpShell from '../../../components/help-shell.jsx';
-import { helpPages } from '../../../../server/help.mjs';
-import { breadcrumbData, pageTitle } from '../../../lib/sharing.js';
+import { faqData, helpPages } from '../../../../server/help.mjs';
+import { breadcrumbData, jsonLd, pageTitle, siteOrigin } from '../../../lib/sharing.js';
 import { StructuredData } from '../../../components/landing.jsx';
 export const dynamic = 'force-dynamic';
 async function load(params) {
@@ -26,6 +26,7 @@ export default async function HelpPage({ params }) {
   const { pages, page } = await load(params);
   const contents = page.headings.filter((h) => h.depth === 2);
   const source = page.slug === 'readme' ? 'README.md' : `docs/${page.slug}.md`;
+  const faq = faqData(page, siteOrigin() + '/help/' + page.slug);
   return (
     <HelpShell pages={pages} current={page.slug}>
       {/* Its trail: Help, then it (#474). */}
@@ -49,6 +50,10 @@ export default async function HelpPage({ params }) {
       )}
       {/* The repository's own docs, rendered by server/help.mjs, which escapes their text. */}
       <article className="help-article" dangerouslySetInnerHTML={{ __html: page.html }} />
+      {/* A page of questions, as one for search engines and AI answers (#483). */}
+      {faq && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(faq) }} />
+      )}
       <p className="muted help-source">
         This page is <code>{source}</code> in the{' '}
         <a href={'https://github.com/openchronology/timeline-app/blob/main/' + source}>

@@ -374,6 +374,22 @@ export function helpPage(slug, source) {
     } else current.text.push(line);
   }
   sections.push(current);
+  // Each section's first paragraph, as plain text: the answer to a question heading (#483).
+  const lead = (lines) => {
+    const paragraph = [];
+    for (const l of lines) {
+      if (!l.trim()) {
+        if (paragraph.length) break;
+        continue;
+      }
+      if (/^(#|\||```|~~~)/.test(l)) {
+        if (paragraph.length) break;
+        continue;
+      }
+      paragraph.push(l);
+    }
+    return plainText(paragraph.join(' ')).replace(/\s+/g, ' ').trim();
+  };
   return {
     slug,
     title,
@@ -383,6 +399,7 @@ export function helpPage(slug, source) {
     sections: sections
       .map((s) => ({
         ...s,
+        lead: lead(s.text),
         text: plainText(s.text.join(' '))
           .replace(/^[|:\- ]+$/gm, ' ')
           .replace(/[|#>]+/g, ' ')
@@ -493,4 +510,26 @@ export function snippet(text, terms, length = 220) {
   const start = Math.max(0, Math.min(at - 60, text.length - length));
   const part = text.slice(start, start + length);
   return (start > 0 ? '…' : '') + part.trim() + (start + length < text.length ? '…' : '');
+}
+
+/**
+ * A page of questions as schema.org's `FAQPage` (#483): each second-level heading that asks
+ * (ends with "?") with its first paragraph as the answer, so the data says what the page says.
+ * Null when the page asks nothing.
+ * @param {{sections: {title: string, lead: string}[]}} page a help page (helpPage)
+ * @param {string} url its address
+ */
+export function faqData(page, url) {
+  const questions = page.sections.filter((s) => s.title.trim().endsWith('?') && s.lead);
+  if (!questions.length) return null;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    url,
+    mainEntity: questions.map((s) => ({
+      '@type': 'Question',
+      name: s.title,
+      acceptedAnswer: { '@type': 'Answer', text: s.lead },
+    })),
+  };
 }
