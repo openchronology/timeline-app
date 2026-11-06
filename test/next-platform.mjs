@@ -196,6 +196,15 @@ try {
     assert.equal(await file.text(), 'platform-test-key-389');
     assert.equal((await fetch(origin + '/another-key-1234.txt')).status, 404);
   }
+  // A help page's own heading comes before the help's navigation, whose group names are not
+  // headings, so its outline is its own (#484).
+  {
+    const help = await (await fetch(origin + '/help/faq')).text();
+    const main = help.slice(help.indexOf('<main'));
+    assert(main.indexOf('<h1') >= 0 && main.indexOf('<h1') < main.indexOf('help-contents'));
+    const nav = main.slice(main.indexOf('<nav class="help-contents"'));
+    assert.doesNotMatch(nav.slice(0, nav.indexOf('</nav>')), /<h[1-6]/);
+  }
   // Each page's title says what it is, then the site's name (#210).
   for (const [path, title] of [
     ['/login', 'Sign in · timescale.test'],
