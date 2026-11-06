@@ -147,6 +147,9 @@ described by their labels instead of their notes, and ask search engines not to 
   - A timeline's entities are read by the primary key of its search rows (see
     [search](search.md#storage-and-api)), as a guest sees them, so its size costs nothing beyond
     the addresses listed.
+- **The FAQ** (`/help/faq`) also describes itself as a schema.org `FAQPage`
+  ([#483](https://github.com/openchronology/timeline-app/issues/483)): each heading that asks a
+  question, with its answer's first paragraph as plain text, so the data says what the page says.
 - To tell Google about it, open [Search Console](https://search.google.com/search-console)
   for the site's domain (verified by a DNS record or an HTML file), choose **Sitemaps**, and
   submit `sitemap.xml`. Google reads the index and then each page it names; the report shows
