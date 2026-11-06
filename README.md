@@ -1,6 +1,6 @@
 # OpenChronology
 
-A timeline editor for moments in time. Time is an arbitrary-precision rational coordinate; metadata is JSON. The same interface runs in a browser and in a Linux Tauri desktop application.
+OpenChronology is a free, open-source timeline editor for exact dates at any scale, from deep time to fractions of a second, with sources on every event. Use it at [timescale.info](https://timescale.info), as a desktop app for Windows, macOS and Linux, as a single offline HTML file, or on your own server. Time is an arbitrary-precision rational coordinate, and metadata is JSON.
 
 The [user guide](docs/guide.md), the [FAQ](docs/faq.md) and everything in [`docs/`](docs/) are also on every server, at `/help`, searchable and as current as the code it runs.
 
