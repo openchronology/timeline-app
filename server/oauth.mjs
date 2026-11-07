@@ -9,6 +9,7 @@ import {
   createPublicKey,
   verify,
 } from 'node:crypto';
+import { signInReturn } from '../dist/core.mjs';
 import { HttpError } from './store.mjs';
 import { limitAddress, tokenHash } from './auth.mjs';
 import { DIRECTORY_ONLY } from './account-security.mjs';
@@ -159,11 +160,9 @@ export class OAuth {
     else this.auth.require(session, req);
     await this.auth.rateLimit(limitAddress(req));
     const returnTo = input.returnTo ?? '/';
-    if (
-      !['/', '/editor', '/account', '/plugins'].includes(returnTo) &&
-      !/^\/(?:#desktop\/|connect\/desktop\/)[A-Z2-9]{10}$/.test(returnTo) &&
-      !/^\/timelines\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(returnTo)
-    )
+    // The pages the login page may return to (signInReturn), and the desktop app's old
+    // `/#desktop/<code>` address.
+    if (!signInReturn(returnTo) && !/^\/#desktop\/[A-Z2-9]{10}$/.test(returnTo))
       throw new HttpError(400, 'Invalid sign-in return location.');
     const state = secret(),
       browser = this.auth.nonce(req, 'oauth'),

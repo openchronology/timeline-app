@@ -180,3 +180,17 @@ export function timelineAddress(
   if (!(SLUG.test(name) || TIMELINE_UUID.test(name))) return null;
   return { owner, name, rest: named[3] ?? '' };
 }
+
+/**
+ * Whether signing in may return to `path`: one of the site's own pages a person signs in from
+ * (the dashboard, Explore, the editor, the account and plugin pages), a timeline's page at
+ * either of its addresses, or a desktop sign-in's approval page. Anything else, such as another
+ * site, is refused, so a link cannot send people elsewhere. The login page and the server's
+ * social sign-in check the same list.
+ */
+export function signInReturn(path: unknown): path is string {
+  if (typeof path !== 'string') return false;
+  if (['/', '/explore', '/editor', '/account', '/plugins'].includes(path)) return true;
+  if (/^\/connect\/desktop\/[A-Z2-9]{10}$/.test(path)) return true;
+  return timelineAddress(path)?.rest === '';
+}

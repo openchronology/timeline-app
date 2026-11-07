@@ -393,10 +393,16 @@ test('authorization state is browser-bound, one-use, provider-bound and never an
       headers: { cookie: `__Host-oc_login=${csrf}`, 'x-csrf-token': csrf },
       socket: { remoteAddress: '127.0.0.1' },
     };
-  await assert.rejects(
-    oauth.start(req, 'github', { returnTo: 'https://attacker.example' }, null),
-    rejects(400),
-  );
+  for (const returnTo of ['https://attacker.example', '//attacker.example', '/admin', '/x/y/z'])
+    await assert.rejects(oauth.start(req, 'github', { returnTo }, null), rejects(400), returnTo);
+  // Every page the login page may return to starts a sign-in, Explore and timelines' named
+  // addresses included.
+  for (const returnTo of [
+    '/explore',
+    '/athan/rome',
+    '/timelines/' + '0'.repeat(8) + '-0000-4000-8000-' + '0'.repeat(12),
+  ])
+    assert.ok((await oauth.start(req, 'github', { returnTo }, null)).url, returnTo);
   const start = await oauth.start(req, 'github', { returnTo: '/#desktop/ABCDEFGH23' }, null),
     url = new URL(start.url);
   assert.equal(url.searchParams.get('code_challenge_method'), 'S256');

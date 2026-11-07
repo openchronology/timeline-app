@@ -1,21 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Where signing in may return to: only the site's own pages, so a link cannot send people
 // elsewhere.
-import { timelineAddress } from '../../src/addresses.ts';
+import { signInReturn } from '../../src/addresses.ts';
+/** `value` when signing in may return there (signInReturn, which the server checks too), else `fallback`. */
 export function safeReturnTo(value, fallback = '/') {
-  if (
-    value === '/' ||
-    value === '/explore' ||
-    value === '/editor' ||
-    value === '/account' ||
-    value === '/plugins'
-  )
-    return value;
-  if (
-    typeof value === 'string' &&
-    // A timeline's page, at either of its addresses (#148).
-    (timelineAddress(value)?.rest === '' || /^\/connect\/desktop\/[A-Z2-9]{10}$/.test(value))
-  )
-    return value;
-  return fallback;
+  return signInReturn(value) ? value : fallback;
 }
