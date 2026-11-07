@@ -28,6 +28,20 @@ use std::{
 };
 /// Makes temporary directory and file names unique within this process.
 static NEXT: AtomicU64 = AtomicU64::new(0);
+/// Creates a new, empty file at `path`, failing if anything is there already, readable and
+/// writable only by the user from the moment it exists (0600 on Unix). Created with the usual
+/// mode and narrowed after, it would be readable to others in between, and another user who
+/// opened it then could go on reading everything later written to it.
+fn create_private(path: &Path) -> std::io::Result<std::fs::File> {
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options.open(path)
+}
 /// The byte budget for one query's SQLite results, and for its JSON reply (counted as UTF-16
 /// in the webview, so twice its UTF-8 length; see `Snapshot::query`).
 const BUDGET: usize = 8 * 1024 * 1024;
@@ -261,18 +275,7 @@ impl Snapshot {
                 .as_nanos(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
-        let created = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&source)
-            .map_err(|e| e.to_string())?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            created
-                .set_permissions(std::fs::Permissions::from_mode(0o600))
-                .map_err(|e| e.to_string())?;
-        }
+        create_private(&source).map_err(|e| e.to_string())?;
         let result = (|| {
             super::save(&source, document)?;
             Self::open(&source)
@@ -1535,6 +1538,26 @@ mod safety_tests {
         let path = crafted(&baseline, "innocuous.och", "upper(title)");
         assert_eq!(Snapshot::open(&path).err().as_deref(), Some(refused));
         assert_eq!(crate::open(&path).err().as_deref(), Some(refused));
+    }
+    /// Staged documents are created readable only by the user, whatever the umask, and
+    /// snapshots live in a folder only the user can enter.
+    #[cfg(unix)]
+    #[test]
+    fn staged_files_and_snapshots_are_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = |path: &Path| std::fs::metadata(path).unwrap().permissions().mode() & 0o777;
+        let path = std::env::temp_dir().join(format!(
+            "och-private-{}-{}.och",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        create_private(&path).unwrap();
+        assert_eq!(mode(&path), 0o600);
+        assert!(create_private(&path).is_err(), "never an existing file");
+        std::fs::remove_file(&path).unwrap();
+        let document:Document=serde_json::from_value(json!({"format":"openchronology","version":1,"title":"Private","description":"","events":[]})).unwrap();
+        let snapshot = Snapshot::from_document(&document).unwrap();
+        assert_eq!(mode(snapshot.directory()), 0o700);
     }
     /// q_decimal takes exponents up to 10,000 either way, as the editor's parser does, and
     /// refuses larger ones (and arguments over 1 MiB) with an error.

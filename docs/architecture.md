@@ -180,7 +180,9 @@ with SQLite's [online backup API](https://www.sqlite.org/backup.html), including
 committed WAL content. It does not turn the database into a Rust event vector or
 send a full document through Tauri during ordinary opening/navigation. Baselines
 are removed on normal release/shutdown; their directories have owner-only Unix
-permissions. An abnormal exit can leave temporary files for the OS/operator to
+permissions, and a document staged on disk before it becomes one (an import, a
+populated timeline, a large document moved out of the page) is created
+owner-only (0600) from the start. An abnormal exit can leave temporary files for the OS/operator to
 clean up.
 
 The editor shares `ViewportCache` and `RemoteWorkspace` with server timelines.
