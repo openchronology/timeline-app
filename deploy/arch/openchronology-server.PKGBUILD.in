@@ -71,6 +71,7 @@ package() {
   install -Dm755 "$srcdir/openchronology-reset-admin-password" \
     "$pkgdir/usr/bin/openchronology-reset-admin-password"
   install -Dm755 "$srcdir/och-import-logs" "$pkgdir/usr/bin/och-import-logs"
+  install -Dm755 "$srcdir/openchronology-log-files" "$app/bin/openchronology-log-files"
   install -Dm644 "$srcdir/openchronology-server.sysusers" "$pkgdir/usr/lib/sysusers.d/openchronology-server.conf"
   install -Dm644 "$srcdir/openchronology-server.tmpfiles" "$pkgdir/usr/lib/tmpfiles.d/openchronology-server.conf"
 

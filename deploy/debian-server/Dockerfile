@@ -135,6 +135,7 @@ RUN set -eu; \
     install -D -m 0755 /root/debian/openchronology-migrate "$ROOT/usr/sbin/openchronology-migrate"; \
     install -D -m 0755 /root/debian/openchronology-reset-admin-password "$ROOT/usr/sbin/openchronology-reset-admin-password"; \
     install -D -m 0755 /root/debian/och-import-logs "$ROOT/usr/bin/och-import-logs"; \
+    install -D -m 0755 /root/debian/openchronology-log-files "$APP/bin/openchronology-log-files"; \
     mkdir -p "$ROOT/DEBIAN"; \
     for script in postinst prerm postrm; do \
       sed "s/@PG_MAJOR@/$PG_MAJOR/g" "/root/debian/$script" > "$ROOT/DEBIAN/$script"; \

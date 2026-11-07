@@ -6,7 +6,8 @@
 // runs each service as its unit would (unitCommand), configured with placeholders: a Resend key
 // for the mail worker (the outbox is empty, so it sends nothing), an API key and a timeline for
 // the importers. Nothing reaches the receiver, and the container has no systemd-journald, so the
-// follower's journalctl finds no entries; both still run, as their units would.
+// follower's journalctl finds no entries; both still run, as their units would. The upgrade
+// moves the importers' files from the openchronology user to openchronology-logs (#501).
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { unitCommand } from './server-syslog.mjs';
@@ -22,6 +23,8 @@ const services = {
   'openchronology-syslog.service': { name: 'syslog receiver', ready: /^syslog: listening/m },
   'openchronology-journald.service': { name: 'journald follower', ready: /^journald: following/m },
 };
+// A known-hosts file outside the configuration, named through a symbolic link (#501).
+const linkedHosts = '/tmp/och-test-known-hosts';
 const pidFile = (unit) => `/tmp/${unit}.pid`;
 const logFile = (unit) => `/tmp/${unit}.log`;
 // The configuration files the placeholders go in, restored afterwards.
@@ -120,7 +123,7 @@ export async function checkServicesUpgrade({ sh, upgrade }) {
       `-e 's/^AUTH_EMAIL_FROM=.*/AUTH_EMAIL_FROM=mail@example.test/' ${etc}/openchronology.env; ` +
       `sed -i 's/^OCH_API_KEY=.*/OCH_API_KEY=${apiKey}/' ${etc}/syslog.env ${etc}/journald.env; ` +
       `printf '{"default":"${timeline}"}' > ${etc}/syslog-routes.json; ` +
-      `chown root:openchronology ${etc}/syslog-routes.json; chmod 0640 ${etc}/syslog-routes.json; ` +
+      `chown root:openchronology-logs ${etc}/syslog-routes.json; chmod 0640 ${etc}/syslog-routes.json; ` +
       `sed -i 's/^JOURNALD_TIMELINE=.*/JOURNALD_TIMELINE=${timeline}/' ${etc}/journald.env`,
   );
   const logs = () =>
@@ -135,8 +138,33 @@ export async function checkServicesUpgrade({ sh, upgrade }) {
     await sh(`systemctl enable --now ${units.join(' ')}`);
     assert.deepEqual(await states(), all('active'), await logs());
 
+    // The log importers' files as an installation from before #501 has them, for the upgrade to
+    // move to openchronology-logs: the configuration and routes in openchronology's group, an
+    // SSH key it owns, and a known-hosts file reached through a symbolic link, which stays.
+    await sh(
+      `set -e; chgrp openchronology ${etc}/syslog.env ${etc}/journald.env ${etc}/syslog-routes.json; ` +
+        `printf 'key\\n' > ${etc}/journald_ssh_key; chmod 0600 ${etc}/journald_ssh_key; ` +
+        `chown openchronology:openchronology ${etc}/journald_ssh_key; ` +
+        `printf 'hosts\\n' > ${linkedHosts}; chmod 0644 ${linkedHosts}; ` +
+        `chown openchronology:openchronology ${linkedHosts}; ` +
+        `ln -s ${linkedHosts} ${etc}/journald_known_hosts; ` +
+        `printf 'JOURNALD_SSH_KEY=${etc}/journald_ssh_key\\nJOURNALD_KNOWN_HOSTS="${etc}/journald_known_hosts"\\n' >> ${etc}/journald.env`,
+    );
     const upgraded = await upgrade();
     assert.deepEqual(await states(), all('inactive'), 'the upgrade stops them');
+    const owners = async (files) =>
+      (await sh(`stat -c '%a %U %G' ${files.join(' ')}`)).trim().split('\n');
+    assert.deepEqual(
+      await owners([`${etc}/syslog.env`, `${etc}/journald.env`, `${etc}/syslog-routes.json`]),
+      Array(3).fill('640 root openchronology-logs'),
+      upgraded,
+    );
+    assert.deepEqual(await owners([`${etc}/journald_ssh_key`]), [
+      '600 openchronology-logs openchronology-logs',
+    ]);
+    assert.deepEqual(await owners([linkedHosts]), ['644 openchronology openchronology']);
+    assert.match(upgraded, /journald_known_hosts is not a regular file; left as it is/);
+    assert.deepEqual(await owners([`${etc}/openchronology.env`]), ['640 root openchronology']);
 
     await sh(`: > ${state}/calls`);
     const migrated = await sh('openchronology-migrate 2>&1');
@@ -175,6 +203,7 @@ export async function checkServicesUpgrade({ sh, upgrade }) {
       `systemctl stop ${units.join(' ')}; real=$(cat /tmp/systemctl.path); ` +
         `if [ -n "$real" ]; then mv "$real.real" "$real"; else rm -f /usr/bin/systemctl; fi; ` +
         `rm -rf ${state} /run/systemd/system; ` +
+        `rm -f ${etc}/journald_ssh_key ${etc}/journald_known_hosts ${linkedHosts}; ` +
         configs
           .map((file) => `if [ -e ${file}.och-test ]; then mv ${file}.och-test ${file}; fi; `)
           .join(''),

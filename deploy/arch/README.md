@@ -13,7 +13,7 @@ The AUR packages for Arch Linux (#331). [`scripts/aur-packages.mjs`](../../scrip
 | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | [`openchronology-server.PKGBUILD.in`](openchronology-server.PKGBUILD.in)           | The server's PKGBUILD, with the version, the archive's address and the checksums to fill in.                   |
 | [`openchronology-server.install`](openchronology-server.install)                   | pacman's scripts: what to run after installing, stopping the services for an upgrade, and what removal leaves. |
-| [`openchronology-server.sysusers`](openchronology-server.sysusers)                 | The `openchronology` system user.                                                                              |
+| [`openchronology-server.sysusers`](openchronology-server.sysusers)                 | The `openchronology` system user, and `openchronology-logs` for the log importers (#501).                      |
 | [`openchronology-server.tmpfiles`](openchronology-server.tmpfiles)                 | Its home and configuration directories.                                                                        |
 | [`openchronology-setup`](openchronology-setup)                                     | Sets up PostgreSQL, the configuration and the database after installing, and advises on upgrades.              |
 | [`README.Arch`](README.Arch)                                                       | The administrator's README the server package installs.                                                        |

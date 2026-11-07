@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 # services.openchronology (#461; docs/nix.md): the OpenChronology server on NixOS, doing what
-# the Debian package's scripts do (deploy/debian-server): a system user, a local PostgreSQL
-# database with pgmp, a generated AUTH_ENCRYPTION_KEY, the migration before each start, the
+# the Debian package's scripts do (deploy/debian-server): system users (the log importers their
+# own, #501), a local PostgreSQL database with pgmp, a generated AUTH_ENCRYPTION_KEY, the migration before each start, the
 # server as a hardened systemd service, and optionally the mail worker, the log importers and
 # an nginx virtual host in front of it.
 self:
@@ -87,6 +87,58 @@ let
         SuccessExitStatus = 143;
         WorkingDirectory = "${cfg.package}/lib/openchronology";
       } // extra;
+    };
+  # A log importer (#501): as the openchronology-logs user, with only its own settings and
+  # environment file, not the server's settings, generated key or environment file. It cannot
+  # log in to the local database, which has no role for it.
+  logService =
+    {
+      description,
+      command,
+      settings,
+      environmentFile,
+      extra ? { },
+    }:
+    {
+      inherit description;
+      after = [
+        "network.target"
+        "openchronology.service"
+      ];
+      wants = [ "openchronology.service" ];
+      wantedBy = [ "multi-user.target" ];
+      environment = {
+        OCH_API_URL = "http://${cfg.host}:${toString cfg.port}";
+      }
+      // settings;
+      serviceConfig = hardening // {
+        Type = "simple";
+        User = "openchronology-logs";
+        Group = "openchronology-logs";
+        EnvironmentFile = lib.optional (environmentFile != null) environmentFile;
+        ExecStart = "${cfg.package}/bin/${command}";
+        Restart = "on-failure";
+        RestartSec = 10;
+        # Node exits with 128 + SIGTERM when stopped; that is a clean stop, not a failure.
+        SuccessExitStatus = 143;
+        WorkingDirectory = "${cfg.package}/lib/openchronology";
+        # Other users' processes are hidden from it.
+        ProtectProc = "invisible";
+      } // extra;
+    };
+  # A log importer's own environment file.
+  logEnvironmentFile =
+    name:
+    mkOption {
+      type = types.nullOr types.path;
+      default = null;
+      example = "/run/secrets/openchronology-${name}.env";
+      description = ''
+        A file of KEY=value lines with the ${name} importer's secrets, such as OCH_API_KEY,
+        overriding its `settings`. Only it reads this file, and it does not read the server's
+        `environmentFile`. Files its settings name (routes, keys) must be readable by the
+        openchronology-logs user.
+      '';
     };
 in
 {
@@ -175,6 +227,7 @@ in
 
     syslog = {
       enable = mkEnableOption "the syslog receiver, which records syslog messages as timelines";
+      environmentFile = logEnvironmentFile "syslog";
       settings = mkOption {
         type = types.attrsOf types.str;
         default = { };
@@ -185,13 +238,14 @@ in
         };
         description = ''
           Its configuration (deploy/debian-server/syslog.env). OCH_API_URL defaults to this
-          server; give its OCH_API_KEY in `environmentFile`.
+          server; give its OCH_API_KEY in its own `environmentFile`.
         '';
       };
     };
 
     journald = {
       enable = mkEnableOption "the journald follower, which records the systemd journal as timelines";
+      environmentFile = logEnvironmentFile "journald";
       settings = mkOption {
         type = types.attrsOf types.str;
         default = { };
@@ -201,7 +255,7 @@ in
         };
         description = ''
           Its configuration (deploy/debian-server/journald.env). OCH_API_URL defaults to this
-          server; give its OCH_API_KEY in `environmentFile`.
+          server; give its OCH_API_KEY in its own `environmentFile`.
         '';
       };
     };
@@ -310,19 +364,47 @@ in
       };
     })
 
+    (mkIf (cfg.syslog.enable || cfg.journald.enable) {
+      # The log importers' own user (#501).
+      users.users.openchronology-logs = {
+        isSystemUser = true;
+        group = "openchronology-logs";
+        description = "OpenChronology log receivers";
+      };
+      users.groups.openchronology-logs = { };
+    })
+
     (mkIf cfg.syslog.enable {
-      systemd.services.openchronology-syslog = lib.recursiveUpdate (service {
+      warnings = lib.optional (cfg.syslog.environmentFile == null) ''
+        services.openchronology.syslog.environmentFile is not set: the syslog receiver does not
+        read services.openchronology.environmentFile (#501), so give its OCH_API_KEY there.
+      '';
+      systemd.services.openchronology-syslog = logService {
         description = "OpenChronology syslog receiver";
         command = "openchronology-syslog";
-      }) { environment = { OCH_API_URL = "http://${cfg.host}:${toString cfg.port}"; } // cfg.syslog.settings; };
+        inherit (cfg.syslog) settings environmentFile;
+      };
     })
 
     (mkIf cfg.journald.enable {
-      systemd.services.openchronology-journald = lib.recursiveUpdate (service {
+      warnings = lib.optional (cfg.journald.environmentFile == null) ''
+        services.openchronology.journald.environmentFile is not set: the journald follower does
+        not read services.openchronology.environmentFile (#501), so give its OCH_API_KEY there.
+      '';
+      systemd.services.openchronology-journald = logService {
         description = "OpenChronology journald follower";
         command = "openchronology-journald";
-        extra.SupplementaryGroups = [ "systemd-journal" ];
-      }) { environment = { OCH_API_URL = "http://${cfg.host}:${toString cfg.port}"; } // cfg.journald.settings; };
+        inherit (cfg.journald) settings environmentFile;
+        extra = {
+          # Reading the journal needs systemd-journal, which the syslog receiver (also
+          # openchronology-logs) does not have. As the main group, it also keeps the receiver
+          # from tracing this process or reading its memory (that needs the same groups).
+          Group = "systemd-journal";
+          SupplementaryGroups = [ "openchronology-logs" ];
+          # The cursor of the last entry sent (and, over SSH, the hosts seen).
+          StateDirectory = "openchronology-journald";
+        };
+      };
     })
 
     (mkIf cfg.nginx.enable {

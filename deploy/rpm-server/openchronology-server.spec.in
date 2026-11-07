@@ -45,6 +45,12 @@ getent group openchronology >/dev/null || groupadd -r openchronology
 getent passwd openchronology >/dev/null ||
   useradd -r -g openchronology -d /var/lib/openchronology -s /sbin/nologin \
     -c "OpenChronology server" openchronology
+# The log receivers' own user (#501): it reads their configuration, not the server's, and has
+# no database role.
+getent group openchronology-logs >/dev/null || groupadd -r openchronology-logs
+getent passwd openchronology-logs >/dev/null ||
+  useradd -r -M -g openchronology-logs -d / -s /sbin/nologin \
+    -c "OpenChronology log receivers" openchronology-logs
 # An upgrade stops the server; it starts again once openchronology-migrate has run.
 if [ "$1" -ge 2 ] && [ -d /run/systemd/system ]; then
   systemctl stop openchronology.service openchronology-mail.service \
@@ -68,13 +74,14 @@ if [ "$1" -eq 0 ]; then
   cat <<'MSG'
 
 OpenChronology was removed. Its configuration (/etc/openchronology, including
-AUTH_ENCRYPTION_KEY), the PostgreSQL database and the openchronology system user remain.
-To delete them as well:
+AUTH_ENCRYPTION_KEY), the PostgreSQL database and the openchronology and openchronology-logs
+system users remain. To delete them as well:
 
   sudo rm -rf /etc/openchronology /var/lib/openchronology /var/cache/openchronology
   sudo -u postgres dropdb openchronology
   sudo -u postgres dropuser openchronology
   sudo userdel openchronology
+  sudo userdel openchronology-logs
 
 MSG
 fi
