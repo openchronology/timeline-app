@@ -284,8 +284,15 @@ impl Access {
 /// Whether `path` may be followed (see `Access::allows`), against the chosen `roots`, and
 /// anywhere once `trusted`.
 fn allowed(roots: &[&Root], trusted: bool, path: &Path) -> Result<PathBuf, Refusal> {
-    // Only whole paths, and none that climb: links are written plainly.
+    // Only whole paths, and none that climb: links are written plainly. The text is checked
+    // too, because in a Windows verbatim path (`\\?\C:\...`) a `/../` is not a component of
+    // its own, yet opening the path still climbs.
+    let climbs = path
+        .to_string_lossy()
+        .split(['/', '\\'])
+        .any(|part| part == ".." || part == ".");
     if !path.is_absolute()
+        || climbs
         || path
             .components()
             .any(|c| matches!(c, Component::ParentDir | Component::CurDir))
