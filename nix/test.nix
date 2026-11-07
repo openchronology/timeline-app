@@ -33,6 +33,10 @@ pkgs.testers.runNixOSTest {
     machine.wait_for_unit("nginx.service")
     machine.succeed("curl -fs http://localhost/healthz | grep -q '\"status\":\"ok\"'")
     machine.succeed("curl -fs http://localhost/ | grep -q 'Explore timelines'")
+    # nginx names itself without its version (#521).
+    machine.succeed(
+        r"curl -fs -o /dev/null -D - http://localhost/healthz | tr -d '\r' | grep -qix 'server: nginx'"
+    )
     machine.succeed(
         "runuser -u postgres -- psql -d openchronology -tAc "
         "\"SELECT extname FROM pg_extension WHERE extname='pgmp'\" | grep -qx pgmp"

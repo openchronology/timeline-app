@@ -141,7 +141,7 @@ Without a cache, Nix builds from source: a few minutes for the server, longer fo
 
 `nix flake check` builds the packages and runs the NixOS test (`nix/test.nix`), which needs KVM to be quick. The test boots a machine with the module and nginx, then checks that:
 
-- the server answers through nginx, and PostgreSQL has `pgmp`;
+- the server answers through nginx, which names itself without its version (`serverTokens` is off), and PostgreSQL has `pgmp`;
 - the configured administrator can sign in, save a timeline, find it in the search, and download it as an `.och` file;
 - the encryption key survives a restart.
 

@@ -312,6 +312,8 @@ in
       services.openchronology.settings.TRUST_PROXY = lib.mkDefault true;
       services.nginx = {
         enable = true;
+        # No nginx version in the Server header and error pages (#521); NixOS's default too.
+        serverTokens = lib.mkDefault false;
         virtualHosts.${cfg.nginx.hostName}.locations."/" = {
           proxyPass = "http://${cfg.host}:${toString cfg.port}";
           proxyWebsockets = true;
