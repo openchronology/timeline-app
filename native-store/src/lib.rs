@@ -188,7 +188,9 @@ pub struct Group {
 /// Refuses anything that is not a version-1 OpenChronology timeline, and any file whose
 /// data tables have been replaced by views or other schema objects: with `trusted_schema=OFF`
 /// a view still runs its own SQL when read, so a crafted file could otherwise substitute
-/// arbitrary queries for the tables the store reads.
+/// arbitrary queries for the tables the store reads. Generated (and other hidden) columns
+/// are refused in every ordinary table for the same reason: SQLite computes them from the
+/// file's own expression whenever the column is read. The store never makes one.
 fn check_file(db: &Connection) -> Result<(), String> {
     if db.scalar("PRAGMA application_id", &[])? != APPLICATION_ID
         || db.scalar("PRAGMA user_version", &[])? != "1"
@@ -201,6 +203,22 @@ fn check_file(db: &Connection) -> Result<(), String> {
     if db.scalar("SELECT count(*) FROM sqlite_schema WHERE name IN ('events','timeline_meta') AND type='table'", &[])? != "2"
         || db.scalar("SELECT count(*) FROM sqlite_schema WHERE name IN ('timeline_settings','timeline_plugins','timeline_extras','durations','relationships') AND type!='table'", &[])? != "0" {
         return Err("Invalid timeline data tables".into());
+    }
+    // pragma_table_list names each table's kind from the parsed schema; virtual tables are
+    // left out, since their columns are the module's (rational_index has hidden inputs), and
+    // listing a virtual table's columns would connect it.
+    for row in db.query(
+        "SELECT name FROM pragma_table_list WHERE schema='main' AND type IN ('table','shadow')",
+        &[],
+    )? {
+        let name = row.into_iter().next().flatten().unwrap_or_default();
+        if db.scalar(
+            "SELECT count(*) FROM pragma_table_xinfo(?1,'main') WHERE hidden<>0",
+            &[&name],
+        )? != "0"
+        {
+            return Err("Timeline tables must not have generated or hidden columns".into());
+        }
     }
     Ok(())
 }

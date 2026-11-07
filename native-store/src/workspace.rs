@@ -1504,6 +1504,66 @@ mod safety_tests {
             .unwrap();
         assert!(Snapshot::open(path).is_err());
     }
+    /// A copy of a one-moment timeline whose `timeline_meta.description` is a generated column
+    /// computing `expression`, written into the schema by hand as an attacker would.
+    fn crafted(baseline: &Snapshot, name: &str, expression: &str) -> std::path::PathBuf {
+        let path = baseline.directory().join(name);
+        std::fs::copy(baseline.path(), &path).unwrap();
+        let db = Connection::open(&path, true).unwrap();
+        db.execute("PRAGMA writable_schema=ON", &[]).unwrap();
+        db.execute("UPDATE sqlite_schema SET sql=replace(sql,'description TEXT NOT NULL','description TEXT GENERATED ALWAYS AS ('||?1||') VIRTUAL') WHERE name='timeline_meta'", &[expression]).unwrap();
+        path
+    }
+    /// A generated column calling `q_decimal` with an exponent too large for GMP (which used to
+    /// kill the process) is refused with an error by every reader: the function may not appear
+    /// in a schema at all. A generated column of any other expression is refused by the check
+    /// of the file's tables before anything reads it.
+    #[test]
+    fn generated_columns_are_refused_without_crashing() {
+        let document:Document=serde_json::from_value(json!({"format":"openchronology","version":1,"title":"Crafted","description":"","events":[{"id":"a","time":"1/1","metadata":{"title":"A"}}]})).unwrap();
+        let baseline = Snapshot::from_document(&document).unwrap();
+        let path = crafted(&baseline, "decimal.och", "q_decimal('1e99999999999')");
+        for error in [Snapshot::open(&path).err(), crate::open(&path).err()] {
+            assert!(error.unwrap().contains("unsafe use of q_decimal()"));
+        }
+        // Even a reader that skips the checks gets an error: SQLite refuses the schema.
+        assert!(Connection::open(&path, false)
+            .and_then(|db| db.query("SELECT description FROM timeline_meta", &[]))
+            .unwrap_err()
+            .contains("unsafe use of q_decimal()"));
+        let refused = "Timeline tables must not have generated or hidden columns";
+        let path = crafted(&baseline, "innocuous.och", "upper(title)");
+        assert_eq!(Snapshot::open(&path).err().as_deref(), Some(refused));
+        assert_eq!(crate::open(&path).err().as_deref(), Some(refused));
+    }
+    /// q_decimal takes exponents up to 10,000 either way, as the editor's parser does, and
+    /// refuses larger ones (and arguments over 1 MiB) with an error.
+    #[test]
+    fn rational_functions_bound_exponents_and_argument_sizes() {
+        let path = std::env::temp_dir().join(format!("och-bounds-{}.och", std::process::id()));
+        let db = Connection::open(&path, true).unwrap();
+        let big = db.scalar("SELECT q_decimal('1e10000')", &[]).unwrap();
+        assert_eq!(big.len(), 10003);
+        let small = db.scalar("SELECT q_decimal('-25e-10000')", &[]).unwrap();
+        assert_eq!(small, format!("-1/4{}", "0".repeat(9998)));
+        for source in ["1e10001", "1e-10001", "1e99999999999", "1e-99999999999"] {
+            assert!(db
+                .scalar("SELECT q_decimal(?1)", &[source])
+                .unwrap_err()
+                .contains("too large"));
+        }
+        let long = "1".repeat(1048577);
+        assert!(db
+            .scalar("SELECT q_add(?1,'1')", &[&long])
+            .unwrap_err()
+            .contains("too large"));
+        assert_eq!(
+            db.scalar("SELECT q_cmp(?1,?1)", &[&long[1..]]).unwrap(),
+            "0"
+        );
+        drop(db);
+        let _ = std::fs::remove_file(&path);
+    }
 }
 
 /// Relationships: arcs, related pages, separations by relationship, and sparse link edits.
