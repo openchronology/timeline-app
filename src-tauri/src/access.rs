@@ -376,7 +376,12 @@ mod tests {
             Err(Refusal::Never)
         );
         assert_eq!(
-            allowed(&roots, true, &photos.join("../elsewhere/b.jpg")),
+            // Written out, since on Windows joining onto a verbatim (`\\?\`) path resolves `..`.
+            allowed(
+                &roots,
+                true,
+                Path::new(&format!("{}/../elsewhere/b.jpg", photos.display()))
+            ),
             Err(Refusal::Never)
         );
         #[cfg(unix)]
