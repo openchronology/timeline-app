@@ -14,7 +14,7 @@ import {
 } from '../../../components/landing.jsx';
 import { AUDIENCES, landingContent, landingEnabled } from '../../../../server/landing.mjs';
 import { landingData, landingMetadata } from '../../../lib/landing.js';
-import { webPageData } from '../../../lib/sharing.js';
+import { breadcrumbData, webPageData } from '../../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
 /** The audience in the address, or not found when the landing page is off or it is unknown. */
 async function audience(params) {
@@ -40,6 +40,15 @@ export default async function AudiencePage({ params }) {
         data={webPageData(path, meta.title, meta.description ?? meta.promise ?? '', {
           audience: { '@type': 'Audience', audienceType: meta.label ?? key },
           about: { '@type': 'SoftwareApplication', name: 'OpenChronology' },
+          // The trail the page shows above its heading (#474).
+          breadcrumb: breadcrumbData(
+            [
+              { name: 'Home', path: '/' },
+              { name: 'Who it’s for', path: '/for' },
+              { name: meta.label ?? key, path },
+            ],
+            { nested: true },
+          ),
         })}
       />
       <nav className="landing-breadcrumb" aria-label="Breadcrumb">

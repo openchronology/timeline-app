@@ -1,10 +1,10 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // A page of the help (#172): docs/<page>.md, rendered as the site runs.
 import { notFound } from 'next/navigation';
-import { jsonLd, siteOrigin } from '../../../lib/sharing.js';
 import HelpShell from '../../../components/help-shell.jsx';
 import { faqData, helpPages } from '../../../../server/help.mjs';
-import { pageTitle } from '../../../lib/sharing.js';
+import { breadcrumbData, jsonLd, pageTitle, siteOrigin } from '../../../lib/sharing.js';
+import { StructuredData } from '../../../components/landing.jsx';
 export const dynamic = 'force-dynamic';
 async function load(params) {
   const { page: slug } = await params;
@@ -29,6 +29,13 @@ export default async function HelpPage({ params }) {
   const faq = faqData(page, siteOrigin() + '/help/' + page.slug);
   return (
     <HelpShell pages={pages} current={page.slug}>
+      {/* Its trail: Help, then it (#474). */}
+      <StructuredData
+        data={breadcrumbData([
+          { name: 'Help', path: '/help' },
+          { name: page.title, path: '/help/' + page.slug },
+        ])}
+      />
       {contents.length > 2 && (
         <nav className="help-on-page" aria-label="On this page">
           <strong>On this page</strong>

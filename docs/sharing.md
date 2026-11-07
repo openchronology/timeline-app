@@ -211,6 +211,12 @@ described by their labels instead of their notes, and ask search engines not to 
   - never an `Event`, which search engines take for a happening to attend, and fault for
     lacking a place, tickets and organizer.
   - Private and labelled timelines' pages have none.
+- **Trails and kinds of page** ([#474](https://github.com/openchronology/timeline-app/issues/474)):
+  a moment's or duration's page also has a `BreadcrumbList` (its timeline's owner, the timeline,
+  then it), which search results can show in place of its address, and it previews as an
+  `article` rather than a `website`. Help pages have one too (Help, then the page), and the
+  audience pages' `WebPage` carries the trail they show above their heading. Explore is a
+  `CollectionPage`, and Download describes the `SoftwareApplication` with its version.
 
 ### Which events search engines list
 
