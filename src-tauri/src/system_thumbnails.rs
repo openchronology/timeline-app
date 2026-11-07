@@ -27,9 +27,9 @@ const ASKED: u32 = 256;
 const MOST_SECONDS: u64 = 15;
 
 /// The system's thumbnail of `path`, upright as the system shows it; made by its thumbnailers
-/// only when `run`.
-pub fn thumbnail(path: &Path, run: bool) -> Option<DynamicImage> {
-    platform::thumbnail(path, run)
+/// only when `allowed`.
+pub fn thumbnail(path: &Path, allowed: bool) -> Option<DynamicImage> {
+    platform::thumbnail(path, allowed)
 }
 
 /// Runs `command` to its end, or kills it after MOST_SECONDS: whether it succeeded.
@@ -385,9 +385,9 @@ mod platform {
     use std::{path::Path, process::Command};
 
     /// Quick Look's thumbnail, which qlmanage writes as `<file name>.png` in the folder given;
-    /// None unless `run`.
-    pub fn thumbnail(path: &Path, run: bool) -> Option<DynamicImage> {
-        if !run {
+    /// None unless `allowed`.
+    pub fn thumbnail(path: &Path, allowed: bool) -> Option<DynamicImage> {
+        if !allowed {
             return None;
         }
         let scratch = Scratch::new()?;
@@ -429,9 +429,9 @@ mod platform {
     };
 
     /// The Shell's thumbnail, as Explorer shows it; never the file type's icon. None unless
-    /// `run`: the Shell's thumbnail handlers decode the file in this process.
-    pub fn thumbnail(path: &Path, run: bool) -> Option<DynamicImage> {
-        if !run {
+    /// `allowed`: the Shell's thumbnail handlers decode the file in this process.
+    pub fn thumbnail(path: &Path, allowed: bool) -> Option<DynamicImage> {
+        if !allowed {
             return None;
         }
         unsafe {
