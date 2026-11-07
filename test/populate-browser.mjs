@@ -9,8 +9,9 @@ import { Q, Viewport, TimelineIndex } from '../dist/core.mjs';
 /**
  * The populator: its choices follow the kind of file (only media is dated by its metadata, read
  * in a zone, or placed); it sends Rust the choices and a template, never a path; the timeline it
- * makes opens unsaved with a summary; and a moment's file opens in its app once the timeline is
- * trusted, or shows in its folder.
+ * makes opens unsaved with a summary; Rust is asked for thumbnails and to open a moment's file in
+ * its app, or show it in its folder, for the timeline on screen (Rust, not the page, asks the
+ * user whether to trust a timeline).
  */
 // A one-pixel picture, as the desktop's thumbnails come: a data: URL.
 const THUMBNAIL =
@@ -65,6 +66,8 @@ export async function checkPopulate(browser) {
       };
     }
     if (command === 'desktop_accept_open') return 1;
+    // A populated timeline is the user's own: trusted, as Rust keeps it.
+    if (command === 'desktop_trust') return { trusted: true, images: true };
     if (command === 'desktop_document') return document;
     if (command === 'desktop_query') {
       const q = args.query;
@@ -88,8 +91,9 @@ export async function checkPopulate(browser) {
     // A thumbnail (#440, #442) for each photo asked for; this video has none to give.
     if (command === 'desktop_thumbnails')
       return args.urls.map((url) => (/\.jpg$/i.test(url) ? THUMBNAIL : null));
-    if (['desktop_open_file', 'desktop_reveal_file', 'desktop_populate_clear'].includes(command))
-      return null;
+    if (['desktop_open_file', 'desktop_reveal_file'].includes(command))
+      return { trusted: true, images: true };
+    if (command === 'desktop_populate_clear') return null;
     throw new Error('Unexpected desktop command ' + command);
   });
   await context.addInitScript(() => {
@@ -202,9 +206,12 @@ export async function checkPopulate(browser) {
       [photo, video].sort(),
       'the photo and the video are asked for',
     );
+    // For the timeline file on screen, by its generation: Rust decides what it may picture.
+    assert(asks.every(([, args]) => args.generation === 1));
     assert.equal(await page.locator('.event-marker.icon').count(), 1);
 
-    // A moment's file: its name as a link, opened in its app once the timeline is trusted.
+    // A moment's file: its name as a link, opened in its app by Rust, which asks the user first
+    // in its own dialog unless the timeline is trusted; the page asks nothing itself.
     await page.locator('#fit-button').click();
     await page.locator('.event-marker').first().click();
     const link = page.locator('#inspector .plugin-source-links a.local-file-link').first();
@@ -217,15 +224,20 @@ export async function checkPopulate(browser) {
     await page.waitForFunction(() => true);
     for (let i = 0; i < 50 && opened().length < 2; i++) await page.waitForTimeout(50);
     assert.deepEqual(
-      opened().map(([, args]) => args.url),
-      [photo, photo],
+      opened().map(([, args]) => args),
+      [
+        { url: photo, generation: 1 },
+        { url: photo, generation: 1 },
+      ],
     );
-    assert.equal(confirms.length, 1, 'asked once for this timeline');
-    assert.match(confirms[0], /Open .*IMG_0042\.JPG in its app\?/);
+    assert.deepEqual(confirms, [], 'the page asks nothing');
     await page.locator('#inspector .local-file-reveal').first().click();
     for (let i = 0; i < 50 && !calls.some(([c]) => c === 'desktop_reveal_file'); i++)
       await page.waitForTimeout(50);
-    assert.deepEqual(calls.find(([c]) => c === 'desktop_reveal_file')[1], { url: photo });
+    assert.deepEqual(calls.find(([c]) => c === 'desktop_reveal_file')[1], {
+      url: photo,
+      generation: 1,
+    });
     assert.deepEqual(errors, []);
     console.log(
       'PASS file populator: choices follow the kind of file, Rust is asked without a path, the new timeline opens with a summary, a photo shows its thumbnail, and a file opens in its app or folder.',

@@ -16,9 +16,13 @@
 //! - `server::Server`: the connected servers and their sign-ins (server.rs).
 //! - `Population`: the folders and files picked for the file populator (populate.rs), the only
 //!   paths it scans, and whether the one running was cancelled.
+//! - `access::Access`: which files on this computer the timeline open may make the app picture,
+//!   show or open, and which timelines the user trusted (access.rs). The page names files only
+//!   by a timeline's links, and every command that follows one asks it first.
 //!
 //! File work runs on Tauri's blocking thread pool (`spawn_blocking`), so long reads and saves
 //! never stall the async runtime that serves IPC.
+mod access;
 mod populate;
 mod server;
 mod system_thumbnails;
@@ -328,6 +332,7 @@ async fn desktop_open(app: tauri::AppHandle) -> Result<Option<Opened>, String> {
         let state = app.state::<Mutex<Files>>();
         let mut files = state.lock().map_err(|e| e.to_string())?;
         files.pending = Some((path.clone(), baseline, before));
+        app.state::<access::Access>().opening(&path);
         Ok(Some(Opened {
             header,
             path: path.to_string_lossy().into_owned(),
@@ -354,7 +359,7 @@ async fn desktop_import(app: tauri::AppHandle) -> Result<Option<Opened>, String>
     let path = file.into_path().map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         use std::io::Read;
-        let input = std::fs::File::open(path).map_err(|e| e.to_string())?;
+        let input = std::fs::File::open(&path).map_err(|e| e.to_string())?;
         if input.metadata().map_err(|e| e.to_string())?.len() > 32 * 1024 * 1024 {
             return Err(
                 "JSON imports are limited to 32 MiB. Use .och for larger timelines.".into(),
@@ -366,12 +371,15 @@ async fn desktop_import(app: tauri::AppHandle) -> Result<Option<Opened>, String>
             serde_json::from_reader(std::io::BufReader::new(input).take(32 * 1024 * 1024 + 1))
                 .map_err(|e| e.to_string())?;
         let baseline = Arc::new(Snapshot::from_document(&document)?);
+        let picked = path;
         let path = baseline.path().to_path_buf();
         let before = stamp(&path)?;
         let header = baseline.header()?;
         let state = app.state::<Mutex<Files>>();
         let mut files = state.lock().map_err(|e| e.to_string())?;
         files.pending = Some((path.clone(), baseline, before));
+        // Its trust, and the folder whose files it may name, are the picked file's.
+        app.state::<access::Access>().opening(&picked);
         Ok(Some(Opened {
             header,
             path: path.to_string_lossy().into_owned(),
@@ -469,6 +477,9 @@ async fn desktop_populate(
         let files = app.state::<Mutex<Files>>();
         let mut files = files.lock().map_err(|e| e.to_string())?;
         files.pending = Some((path.clone(), baseline, before));
+        // The user picked these folders: their files may be pictured and shown, in this
+        // timeline and any other, and this timeline, the user's own, is trusted.
+        app.state::<access::Access>().populated(&roots);
         Ok(Populated {
             opened: Opened {
                 header,
@@ -481,19 +492,120 @@ async fn desktop_populate(
     .await
     .map_err(|e| e.to_string())?
 }
-/// Opens a moment's `file:///` source in the system's app for that file (#433). Refuses
-/// programs, scripts and anything that isn't a file on this computer (populate::local_file).
+/// Whether the editor shows the timeline file open here: it named the file's current
+/// `generation`. Otherwise it shows a timeline it holds alone (new, or from a server).
+fn showing_file(app: &tauri::AppHandle, generation: Option<u64>) -> bool {
+    generation.is_some()
+        && app
+            .state::<Mutex<Files>>()
+            .lock()
+            .is_ok_and(|files| Some(files.generation) == generation)
+}
+/// `showing_file` on the blocking pool, as a save holds the file lock it takes.
+async fn showing(app: &tauri::AppHandle, generation: Option<u64>) -> Result<bool, String> {
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || showing_file(&app, generation))
+        .await
+        .map_err(|e| e.to_string())
+}
+/// What the user trusted the timeline on screen with (access.rs), for the editor: whether it
+/// may name files anywhere on this computer, and whether its images from other sites show.
+#[derive(serde::Serialize)]
+struct Trust {
+    trusted: bool,
+    images: bool,
+}
+impl From<access::Origin> for Trust {
+    fn from(origin: access::Origin) -> Trust {
+        Trust {
+            trusted: origin.trusted,
+            images: origin.images,
+        }
+    }
+}
+/// Asks the user, in a native dialog that the page can neither answer nor draw, whether to
+/// trust the timeline on screen so as to `action` (such as "Open IMG_0042.JPG in its app?").
+/// Runs on the blocking pool, since the dialog waits for the user. Resolves to the answer.
+async fn ask_trust(app: &tauri::AppHandle, action: String) -> Result<bool, String> {
+    use tauri_plugin_dialog::{MessageDialogButtons, MessageDialogKind};
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .message(format!(
+                "{action}\n\nOpen files from a timeline only when you trust where it came from. \
+                 Trusting it lets it show pictures of the files on this computer it links to, \
+                 wherever they are, and open them, and shows its images from other sites. \
+                 You are asked once for each timeline."
+            ))
+            .title("Trust this timeline?")
+            .kind(MessageDialogKind::Warning)
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                "Trust it".into(),
+                "Cancel".into(),
+            ))
+            .blocking_show()
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+/// The name a link gives its file, for a question about it, read from the link alone.
+fn file_name(path: &std::path::Path) -> String {
+    path.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.to_string_lossy().into_owned())
+}
+/// A link not followed, as the editor shows it.
+fn refused(refusal: access::Refusal) -> String {
+    match refusal {
+        access::Refusal::Missing => "That file isn't on this computer, or can't be read.",
+        access::Refusal::Never | access::Refusal::Untrusted => {
+            "Files there aren't opened from a timeline."
+        }
+    }
+    .into()
+}
+/// Opens a moment's `file:///` source in the system's app for that file (#433), once the user
+/// trusts the timeline on screen (`generation` as for `showing_file`): asked here, natively,
+/// the first time, and remembered for its file (access.rs). Refuses programs, scripts and
+/// anything that isn't a file on this computer (populate::local_file). Resolves to the
+/// timeline's trust, which a yes changes; after a no it opens nothing.
 #[tauri::command]
-fn desktop_open_file(url: String) -> Result<(), String> {
-    populate::open_file(&url)
+async fn desktop_open_file(
+    app: tauri::AppHandle,
+    url: String,
+    generation: Option<u64>,
+) -> Result<Trust, String> {
+    let path = populate::local_path(&url)?;
+    let open = showing(&app, generation).await?;
+    let access = app.state::<access::Access>();
+    if !access.origin(open).trusted {
+        if !ask_trust(&app, format!("Open {} in its app?", file_name(&path))).await? {
+            return Ok(access.origin(open).into());
+        }
+        access.trust(open);
+    }
+    let origin = access.origin(open);
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        app.state::<access::Access>()
+            .allows(&origin, &path)
+            .map_err(refused)?;
+        populate::open_file(&url)?;
+        Ok(origin.into())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 /// Thumbnails of the photos `urls` (`file:///` links) name (#440), in order, each a `data:` URL
-/// or null when it isn't a photo on this computer or can't be read; made in parallel, and kept
-/// in the app's cache folder (thumbnails.rs). At most 64 at once.
+/// or null when it isn't a photo on this computer or can't be read, or the timeline on screen
+/// (`generation` as for `showing_file`) may not name it (access.rs): it is outside the folders
+/// the user chose, and the user hasn't trusted the timeline. Made in parallel, and kept in the
+/// app's cache folder (thumbnails.rs). At most 64 at once.
 #[tauri::command]
 async fn desktop_thumbnails(
     app: tauri::AppHandle,
     urls: Vec<String>,
+    generation: Option<u64>,
 ) -> Result<Vec<Option<String>>, String> {
     if urls.len() > thumbnails::MOST_AT_ONCE {
         return Err("Ask for at most 64 thumbnails at once.".into());
@@ -504,13 +616,22 @@ async fn desktop_thumbnails(
         .map_err(|e| e.to_string())?
         .join("thumbnails");
     tauri::async_runtime::spawn_blocking(move || {
+        let access = app.state::<access::Access>();
+        let origin = access.origin(showing_file(&app, generation));
+        let allowed = |url: &String| {
+            populate::local_path(url)
+                .ok()
+                .is_some_and(|path| access.allows(&origin, &path).is_ok())
+        };
         let mut found = vec![None; urls.len()];
         std::thread::scope(|scope| {
             for (chunk, found) in urls.chunks(16).zip(found.chunks_mut(16)) {
-                let cache = &cache;
+                let (cache, allowed) = (&cache, &allowed);
                 scope.spawn(move || {
                     for (url, slot) in chunk.iter().zip(found) {
-                        *slot = thumbnails::thumbnail(cache, url);
+                        if allowed(url) {
+                            *slot = thumbnails::thumbnail(cache, url);
+                        }
                     }
                 });
             }
@@ -520,10 +641,78 @@ async fn desktop_thumbnails(
     .await
     .map_err(|e| e.to_string())
 }
-/// Shows a moment's `file:///` source in its folder, in the system's file manager.
+/// Shows a moment's `file:///` source in its folder, in the system's file manager: at once in a
+/// folder the user chose, or once the user trusts the timeline on screen (`generation` as for
+/// `showing_file`), asked here natively (access.rs). Resolves to the timeline's trust.
 #[tauri::command]
-fn desktop_reveal_file(url: String) -> Result<(), String> {
-    populate::reveal_file(&url)
+async fn desktop_reveal_file(
+    app: tauri::AppHandle,
+    url: String,
+    generation: Option<u64>,
+) -> Result<Trust, String> {
+    let path = populate::local_path(&url)?;
+    let open = showing(&app, generation).await?;
+    let access = app.state::<access::Access>();
+    let origin = access.origin(open);
+    let check = {
+        let (app, origin, path) = (app.clone(), origin.clone(), path.clone());
+        move || app.state::<access::Access>().allows(&origin, &path)
+    };
+    let origin = match tauri::async_runtime::spawn_blocking(check)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        Ok(_) => origin,
+        Err(access::Refusal::Untrusted) => {
+            if !ask_trust(&app, format!("Show {} in its folder?", file_name(&path))).await? {
+                return Ok(origin.into());
+            }
+            access.trust(open);
+            access.origin(open)
+        }
+        Err(refusal) => return Err(refused(refusal)),
+    };
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        app.state::<access::Access>()
+            .allows(&origin, &path)
+            .map_err(refused)?;
+        populate::reveal_file(&url)?;
+        Ok(origin.into())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+/// What the user trusted the timeline on screen with (`generation` as for `showing_file`):
+/// the editor holds back a timeline file's images from other sites until they may show. On the
+/// blocking pool, like the next, as a save holds the file lock `showing_file` takes.
+#[tauri::command]
+async fn desktop_trust(app: tauri::AppHandle, generation: Option<u64>) -> Result<Trust, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let open = showing_file(&app, generation);
+        app.state::<access::Access>().origin(open).into()
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+/// Shows the images from other sites of the timeline file on screen from now on, as the user
+/// chose (`generation` as for `showing_file`), remembered for its file. Images are the page's
+/// to show; this only remembers the choice, so it asks nothing. Resolves to the trust.
+#[tauri::command]
+async fn desktop_show_images(
+    app: tauri::AppHandle,
+    generation: Option<u64>,
+) -> Result<Trust, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let open = showing_file(&app, generation);
+        let access = app.state::<access::Access>();
+        if open {
+            access.show_images();
+        }
+        access.origin(open).into()
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 /// Moves a document the editor holds in the page into a disk-backed baseline, pending like
 /// `desktop_open`'s: the editor does this when a timeline grows past 2048 moments, so it can
@@ -538,6 +727,7 @@ async fn desktop_stage(app: tauri::AppHandle, document: Document) -> Result<Open
         let state = app.state::<Mutex<Files>>();
         let mut files = state.lock().map_err(|e| e.to_string())?;
         files.pending = Some((path.clone(), baseline, before));
+        app.state::<access::Access>().staged();
         Ok(Opened {
             header,
             path: path.to_string_lossy().into_owned(),
@@ -568,6 +758,7 @@ async fn desktop_accept_open(app: tauri::AppHandle, path: String) -> Result<u64,
         files.stamp = Some(stamp);
         files.generation += 1;
         files.forget_kept();
+        app.state::<access::Access>().accepted();
         Ok(files.generation)
     })
     .await
@@ -691,6 +882,10 @@ async fn desktop_save(
         files.stamp = Some(stamp(&path)?);
         files.generation += 1;
         files.forget_kept();
+        // The saved file is the timeline open now, trusted as the timeline saved was: the open
+        // file's (its generation was checked above) or the page's own.
+        let access = app.state::<access::Access>();
+        access.saved(access.origin(generation.is_some()), &path);
         Ok(Some(Opened {
             header,
             path: path.to_string_lossy().into_owned(),
@@ -707,10 +902,15 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(Mutex::new(Files::default()))
         .manage(Population::default())
+        .manage(access::Access::default())
         .manage(server::Server::new().expect("Invalid server configuration"))
         .setup(|app| {
             // The servers connected last time; before several, the one server (or none).
             let directory = app.path().app_config_dir().ok();
+            // The folders chosen and the timelines trusted before (access.rs).
+            if let Some(directory) = &directory {
+                app.state::<access::Access>().load(directory.clone());
+            }
             let read = |name: &str| {
                 directory
                     .as_ref()
@@ -739,6 +939,8 @@ fn main() {
             desktop_open_file,
             desktop_reveal_file,
             desktop_thumbnails,
+            desktop_trust,
+            desktop_show_images,
             desktop_populate_pick,
             desktop_populate_clear,
             desktop_populate_cancel,

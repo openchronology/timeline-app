@@ -26,6 +26,24 @@ A timeline can have an image of its own ([#339](https://github.com/openchronolog
 
 It is one of the document's settings, like its title and tags (`image` in the `.ochx` file: `{"url": "https://…", "alt": "…", "width": 1200, "height": 800}`, its size optional), so its saved history, exports, forks and pull requests keep it, and a document saved or imported with one sets it. Through the API it is set with `PATCH /api/timelines/:id/settings` and `{"image": {"url", "alt"}}`, or removed with `{"image": null}`; that saves the settings as a revision of its own. Like every image here it is a link, not a copy: the server keeps the address, and **Export** carries a copy for offline use. Its link must be HTTPS without credentials, and the same rules and reports apply as to other images.
 
+## What loading an image tells its host
+
+Since images are links, a reader's browser fetches each one from its host when it shows: a moment's icon as its marker comes into view, a duration's background, the timeline's own image, an avatar on a profile. Like any web page's images, that tells the host:
+
+- **the reader's IP address**, and so roughly where they are and which network they use;
+- **when** they looked, and which images, which can tell which timeline or part of it they were reading;
+- **their browser** (its User-Agent).
+
+It doesn't tell the host which page the image is on: the site sends `Referrer-Policy: no-referrer`, and every image is loaded with `referrerpolicy="no-referrer"` as well, so no address of the site, timeline or embed is sent. Nor are the reader's cookies for the site sent. Backgrounds are requested anonymously (`crossorigin="anonymous"`), without any cookies; other images aren't CORS requests, since most hosts don't allow them and the images wouldn't show, so the host's own cookies, if the browser keeps any for it, follow the browser's rules for third-party cookies (most browsers block them).
+
+So whoever chooses a timeline's images could count who reads it, as any web page's author could. Readers who mind can block images from other sites in their browser, or read a copy offline: **Export** and the offline HTML embed copies, which are shown instead of fetching the links. The server never fetches or proxies images ([why links](#why-links-not-copies)), so it learns nothing of them either.
+
+### In the desktop app
+
+A timeline opened in the desktop app from a file (an `.och` or `.ochx` someone sent, or a download) may link images on any site, and opening the file would otherwise tell those sites the reader's address and when they opened it. So the app holds those images back: copies the file carries still show, but images from other sites wait, and the timeline's heading says **Images from other sites are hidden**, with **Show images from other sites**. Choosing it shows them, and the app remembers the choice for that file (by its path, in the app's settings folder, with the timelines trusted to open files; see [the file populator](file-populator.md#which-files-a-timeline-may-show)). A timeline the reader trusted that way shows its images at once.
+
+They show without asking for timelines on a server (the editor's own, or a connected server's), for a new timeline, and for one made by the file populator, which are the reader's own or the server's to show. Saving a timeline to a file keeps whether its images showed: a timeline saved from the server or made in the app shows them when opened again.
+
 ## Why links, not copies
 
 Whether showing an image linked from elsewhere infringes its copyright depends on where you are. Storing a copy is clearer: it reproduces the image, and the server would then distribute it. As of October 2026, the main cases are:

@@ -3576,6 +3576,7 @@ body[data-warnings]:not([data-images-shown])
   font-size: 13px;
 }
 .sensitive-status .link-button,
+.remote-images-status .link-button,
 .sensitive-note .link-button {
   min-height: 0;
   padding: 0;

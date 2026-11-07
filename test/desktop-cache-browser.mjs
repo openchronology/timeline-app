@@ -24,6 +24,8 @@ export async function checkDesktopCache(browser) {
     version: 1,
     title: 'Cached SQLite timeline',
     description: '',
+    // An image from another site, which waits until the reader shows it.
+    image: { url: 'https://images.example/cover.png', alt: 'The cover' },
     events: [
       ...Array.from({ length: 10000 }, (_, i) => ({
         id: 'dense-' + i,
@@ -52,6 +54,8 @@ export async function checkDesktopCache(browser) {
     relationships: [{ a: { moment: 'far' }, b: { moment: 'near' } }],
   };
   let index = new TimelineIndex(document),
+    imagesShown = false,
+    imageRequests = 0,
     slowViews = false,
     generation = 1,
     reads = 0,
@@ -77,6 +81,16 @@ export async function checkDesktopCache(browser) {
     if (command === 'desktop_servers') return [];
     if (command === 'desktop_open') return header();
     if (command === 'desktop_accept_open') return generation;
+    // A file from someone else: neither trusted nor its images shown, until the reader asks.
+    if (command === 'desktop_trust') {
+      assert.equal(args.generation, generation);
+      return { trusted: false, images: imagesShown };
+    }
+    if (command === 'desktop_show_images') {
+      assert.equal(args.generation, generation);
+      imagesShown = true;
+      return { trusted: false, images: true };
+    }
     if (command === 'desktop_document') {
       assert.equal(args.generation, generation);
       reads++;
@@ -175,6 +189,16 @@ export async function checkDesktopCache(browser) {
           : 'text/javascript',
     });
   });
+  await context.route('https://images.example/**', async (route) => {
+    imageRequests++;
+    await route.fulfill({
+      contentType: 'image/png',
+      body: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    });
+  });
   const page = await context.newPage();
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('dialog', (d) => d.accept());
@@ -202,6 +226,22 @@ export async function checkDesktopCache(browser) {
     assert.equal(reads, 0);
     assert.equal(details.length, 0);
     assert(overviews.length > 0);
+    // Its image from another site waits, and the heading says so, until the reader shows it:
+    // then it is fetched, and Rust is asked to remember the choice for this file.
+    const notice = page.locator('#remote-images-status');
+    await notice.waitFor();
+    assert.match(await notice.textContent(), /Images from other sites are hidden/);
+    assert(await page.locator('#timeline-image').isHidden());
+    assert.equal(imageRequests, 0, 'nothing fetched from the other site');
+    await notice.getByRole('button', { name: 'Show images from other sites' }).click();
+    await page.locator('#timeline-image').waitFor();
+    assert.equal(
+      await page.locator('#timeline-image').getAttribute('src'),
+      'https://images.example/cover.png',
+    );
+    assert(await notice.isHidden());
+    assert(imagesShown, 'remembered for the file');
+    assert.equal(imageRequests, 1);
     await bounds('0', '20');
     await page.getByRole('button', { name: 'Nearby moment', exact: true }).waitFor();
     const fetched = overviews.length;

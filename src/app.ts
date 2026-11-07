@@ -15,7 +15,13 @@ import { comparisonUI } from './comparison-ui.js';
 import { createCommunityUI } from './community-ui.js';
 import { createSuiteUI } from './suite-ui.js';
 import type { Proposal } from './community-ui.js';
-import { configureImages, imageSource, embedImages, useLocalImages } from './image-assets.js';
+import {
+  configureImages,
+  imageSource,
+  embedImages,
+  useLocalImages,
+  holdRemoteImages,
+} from './image-assets.js';
 import { allowLocalSources } from './local-files.js';
 import { stageScheme, themeProperties, themeScales } from './timeline-theme.js';
 import { chooseTheme, followChoice, parseChoice, storedChoice } from './theme-choice.js';
@@ -283,6 +289,15 @@ interface NativeOpened {
   event_count: string;
   first?: string;
   last?: string;
+}
+/**
+ * What the reader trusted the timeline on screen with, as the desktop app keeps it
+ * (src-tauri/src/access.rs): `trusted`, to picture and open the files it links to anywhere on
+ * this computer; `images`, to show its images from other sites.
+ */
+interface DesktopTrust {
+  trusted: boolean;
+  images: boolean;
 }
 /** How a file population went (#433, src-tauri/src/populate.rs): moments made, files left out. */
 interface PopulateReport {
@@ -896,6 +911,10 @@ let toastTimer: ReturnType<typeof setTimeout>,
   sqlitePath: string | null = null,
   sqliteSavedVersion: number | null = null,
   documentRequest = 0,
+  // In the desktop app, the document request whose images from other sites wait (a timeline
+  // file the reader hasn't shown them for), and the one whose heading says so.
+  remoteImagesHeld = -1,
+  remoteImagesNoticed = -1,
   // The timeline whose heading the page arrived with (#428, platform/app/editor/frame), and the
   // document request it is held through: from the start until the editor has opened it.
   prefilled: string | null =
@@ -2692,6 +2711,9 @@ function heading() {
       : (model?.assets ?? remote?.assets),
     offlineHtml,
   );
+  // Says that images from other sites wait only while this timeline's do, once one has.
+  el('remote-images-status').hidden =
+    remoteImagesHeld !== documentRequest || remoteImagesNoticed !== documentRequest;
   // The heading the page arrived with stands until its timeline has loaded (#428), instead of
   // the sample's or "Loading timeline…"; any other document ends it.
   const holding =
@@ -7867,7 +7889,15 @@ if (desktop) {
       path: result.path,
     });
     if (workspace !== documentRequest) return;
+    // A timeline from a file shows its images from other sites only once the reader has
+    // chosen to, for that file (remembered by Rust); a populated one is the reader's own.
+    const trust = await window
+      .__TAURI__!.core.invoke<DesktopTrust>('desktop_trust', { generation })
+      .catch((): DesktopTrust => ({ trusted: false, images: false }));
+    if (workspace !== documentRequest) return;
     historyReplace();
+    // Set before loadDocument, which starts this next document request and may draw at once.
+    remoteImagesHeld = trust.images ? -1 : documentRequest + 1;
     loadDocument(document);
     model = new RemoteWorkspace(document);
     local = { ...result, generation, id: 'local-sqlite', revision: String(generation) };
@@ -7899,17 +7929,57 @@ if (desktop) {
       .then((result) => adoptNative(result, workspace, false))
       .catch(fail);
   };
+  // Images from other sites in a timeline from a file wait until the reader shows them, since
+  // fetching one tells its site the reader's address and when they looked; the heading says so
+  // once one has been held back. Rust remembers the choice for the file.
+  holdRemoteImages(
+    () => remoteImagesHeld === documentRequest,
+    () => {
+      if (remoteImagesNoticed === documentRequest) return;
+      remoteImagesNoticed = documentRequest;
+      el('remote-images-status').hidden = false;
+    },
+  );
+  /** Shows the open timeline's images from other sites, and its files' thumbnails, as trusted. */
+  const applyTrust = (trust: DesktopTrust, request: number) => {
+    if (request !== documentRequest) return;
+    if (trust.images && remoteImagesHeld === documentRequest) {
+      remoteImagesHeld = -1;
+      heading();
+      requestRender();
+    }
+    // Trusted now, files outside the chosen folders get thumbnails: asked again.
+    if (trust.trusted) forgetMissingThumbnails();
+  };
+  el('remote-images-show').onclick = () => {
+    const request = documentRequest;
+    remoteImagesHeld = -1;
+    heading();
+    requestRender();
+    void window
+      .__TAURI__!.core.invoke<DesktopTrust>('desktop_show_images', {
+        generation: local?.generation,
+      })
+      .then((trust) => applyTrust(trust, request))
+      .catch(fail);
+  };
   // Sources open outside the page (#433): HTTPS links in the system browser, and a file on
-  // this computer in its own app, once its timeline is trusted (asked the first time one of its
-  // files is opened), or shown in its folder.
-  let trustedFiles = -1;
+  // this computer in its own app, or shown in its folder. Rust follows a timeline's file links
+  // only in the folders the user chose, or once the user trusts the timeline, which it asks in
+  // its own dialog (src-tauri/src/access.rs): the page can't answer for the user.
   document.addEventListener('click', (event) => {
     const target = event.target as Element;
+    const request = documentRequest,
+      generation = local?.generation;
     const reveal = target.closest<HTMLButtonElement>('.local-file-reveal');
     if (reveal) {
       event.preventDefault();
       void window
-        .__TAURI__!.core.invoke('desktop_reveal_file', { url: reveal.dataset.localFile })
+        .__TAURI__!.core.invoke<DesktopTrust>('desktop_reveal_file', {
+          url: reveal.dataset.localFile,
+          generation,
+        })
+        .then((trust) => applyTrust(trust, request))
         .catch(fail);
       return;
     }
@@ -7920,34 +7990,45 @@ if (desktop) {
       void window.__TAURI__!.core.invoke('desktop_open_image', { url: link.href }).catch(fail);
       return;
     }
-    if (
-      trustedFiles !== documentRequest &&
-      !confirm(
-        `Open ${link.title} in its app? Open files from a timeline only when you trust where it came from.`,
-      )
-    )
-      return;
-    trustedFiles = documentRequest;
-    void window.__TAURI__!.core.invoke('desktop_open_file', { url: link.href }).catch(fail);
+    void window
+      .__TAURI__!.core.invoke<DesktopTrust>('desktop_open_file', { url: link.href, generation })
+      .then((trust) => applyTrust(trust, request))
+      .catch(fail);
   });
   // Thumbnails of photos on this computer (#440), as markers show them: asked of Rust in
   // batches of up to 64 as markers need them, kept here (the latest 2,000, and the photos that
-  // have none), and drawn when they come. They stay in this page: they are never saved.
+  // have none), and drawn when they come. They stay in this page: they are never saved. Rust
+  // makes them only of files the timeline on screen may name, so they are kept for that
+  // timeline alone, and those it had none of are asked again once it is trusted.
   const thumbnails = new Map<string, string | null>(),
     wantedThumbnails = new Set<string>();
-  let thumbnailTimer: ReturnType<typeof setTimeout> | undefined;
+  let thumbnailTimer: ReturnType<typeof setTimeout> | undefined,
+    thumbnailsFor = documentRequest;
+  const forgetMissingThumbnails = () => {
+    for (const [url, found] of thumbnails) if (found === null) thumbnails.delete(url);
+    requestRender(false);
+  };
   const askThumbnails = async () => {
     const urls = [...wantedThumbnails].slice(0, 64);
     for (const url of urls) wantedThumbnails.delete(url);
+    const request = documentRequest;
     const found = await window
-      .__TAURI__!.core.invoke<(string | null)[]>('desktop_thumbnails', { urls })
+      .__TAURI__!.core.invoke<(string | null)[]>('desktop_thumbnails', {
+        urls,
+        generation: local?.generation,
+      })
       .catch(() => [] as (string | null)[]);
-    urls.forEach((url, i) => thumbnails.set(url, found[i] ?? null));
+    if (request === documentRequest)
+      urls.forEach((url, i) => thumbnails.set(url, found[i] ?? null));
     while (thumbnails.size > 2000) thumbnails.delete(thumbnails.keys().next().value!);
     requestRender(false);
     thumbnailTimer = wantedThumbnails.size ? setTimeout(() => void askThumbnails(), 0) : undefined;
   };
   useLocalImages((url) => {
+    if (thumbnailsFor !== documentRequest) {
+      thumbnailsFor = documentRequest;
+      thumbnails.clear();
+    }
     if (thumbnails.has(url)) return thumbnails.get(url)!;
     wantedThumbnails.add(url);
     thumbnailTimer ??= setTimeout(() => void askThumbnails(), 30);

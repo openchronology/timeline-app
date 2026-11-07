@@ -81,7 +81,14 @@ export default async function Profile({ username, searchParams }) {
     <main className="platform">
       <Link href={browserPath()}>All timelines</Link>
       {rows[0].avatar_url && (
-        <img className="account-avatar" src={rows[0].avatar_url} alt="" width={64} height={64} />
+        <img
+          className="account-avatar"
+          src={rows[0].avatar_url}
+          alt=""
+          width={64}
+          height={64}
+          referrerPolicy="no-referrer"
+        />
       )}
       <h1>@{username}</h1>
       {current.user?.username !== username && (
