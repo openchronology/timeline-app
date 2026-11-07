@@ -152,6 +152,13 @@ described by their labels instead of their notes, and ask search engines not to 
   - A timeline's entities are read by the primary key of its search rows (see
     [search](search.md#storage-and-api)), as a guest sees them, so its size costs nothing beyond
     the addresses listed.
+- **For AI engines and agents** ([#482](https://github.com/openchronology/timeline-app/issues/482)):
+  `/llms.txt` ([llmstxt.org](https://llmstxt.org)) says in Markdown what the site is (its name,
+  and that it runs OpenChronology), and links its main pages, every help page, the API reference
+  and its OpenAPI description, and up to ten featured public timelines, each with a line from its
+  description. `/llms-full.txt` holds every help page's Markdown in one file. Both are generated
+  from the help and the site's settings, so they follow the docs; every page's footer links
+  `/llms.txt`, and the sitemap lists it.
 - **The FAQ** (`/help/faq`) also describes itself as a schema.org `FAQPage`
   ([#483](https://github.com/openchronology/timeline-app/issues/483)): each heading that asks a
   question, with its answer's first paragraph as plain text, so the data says what the page says.

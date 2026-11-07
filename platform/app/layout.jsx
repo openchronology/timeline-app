@@ -131,7 +131,7 @@ export default async function RootLayout({ children }) {
               <a href={support}>Support this site</a> ·{' '}
             </>
           ) : null}
-          <a href="/docs/api">HTTP API</a> ·{' '}
+          <a href="/docs/api">HTTP API</a> · <a href="/llms.txt">llms.txt</a> ·{' '}
           <a href="/openchronology-web-source.tar.gz" download>
             Source
           </a>{' '}
