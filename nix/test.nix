@@ -31,7 +31,7 @@ pkgs.testers.runNixOSTest {
         enable = true;
         settings.SYSLOG_ROUTES_JSON = ''{"default":"00000000-0000-0000-0000-000000000000"}'';
         environmentFile = pkgs.writeText "openchronology-syslog-test.env" ''
-          OCH_API_KEY=och_key_test
+          OCH_API_KEY=och_key_00000000000000000000000000000000_0000000000000000000000000000000000000000000000000000000000000000
         '';
       };
     };
