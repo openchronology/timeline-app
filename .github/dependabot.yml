@@ -1,0 +1,32 @@
+# Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+# Dependabot keeps the pinned base images and actions current (#514): the Dockerfiles' images,
+# pinned by tag (and digest, where known), and the workflows' actions, pinned by commit. Each
+# week's updates come as one pull request per ecosystem. Node.js and PostgreSQL stay on their
+# major versions (24 and 16), which the packages and the database's files depend on; the Rust
+# release the builds install with rustup is not Dependabot's, and is raised by hand
+# (test/ci-workflows.test.mjs checks every build names the same one).
+version: 2
+updates:
+  - package-ecosystem: docker
+    directories:
+      - /deploy
+      - /deploy/debian-server
+      - /deploy/platform
+      - /deploy/rpm-server
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: node
+        update-types: [version-update:semver-major]
+      - dependency-name: postgres
+        update-types: [version-update:semver-major]
+    groups:
+      images:
+        patterns: ['*']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']

@@ -30,3 +30,23 @@ migration. Copy admission checks counters first, applies rate/concurrency limits
 and query timeouts, and never measures a large document as part of a guest request.
 Limits are also enforced while reading response bytes in the browser. Guest full
 JSON downloads share the admission gate; SQLite exchange requires sign-in.
+
+## The hosted copy
+
+The offline editor is also at <https://openchronology.github.io/>, with each edition at
+`/<edition>/` such as `/cfam/`. It is published from each stable release's tag, never from
+unreleased changes, so it is the same version as that release's download
+([#510](https://github.com/openchronology/timeline-app/issues/510)).
+
+**The downloaded file is the recommended way to use it.** The hosted copy is served from
+`openchronology.github.io`, the address GitHub Pages also gives every other project site of
+the organization (`openchronology.github.io/<project>/`). Browsers treat all of them as one
+site, so a page on any of them can read and change what the editor keeps in the browser's
+storage (its theme and view settings), and script an editor window or frame it opened,
+including reading a timeline imported there. GitHub Pages also lets any site frame the hosted
+copy. The editor keeps your timelines only in memory and sends them nowhere, which limits what
+such a page could do, but a file you downloaded and opened from your own computer has none of
+these neighbours. [Releases](https://github.com/openchronology/timeline-app/releases/latest)
+attach it as `openchronology-offline.html` (and `openchronology-offline-<edition>.html`), with
+their checksums in `SHA256SUMS.txt`, and the download page of any OpenChronology server links
+to them.

@@ -3,7 +3,7 @@
 # scripts/server-package.mjs, which passes these arguments and collects the package:
 #   BASE      debian:trixie or ubuntu:24.04   PG_MAJOR  17 or 16 (that distribution's server)
 #   DEB_VERSION, OCH_BUILD_COMMIT, OCH_BUILD_VERSION
-ARG BASE=debian:trixie
+ARG BASE=debian:trixie@sha256:9c6e381421d0f48d1b8133e573f33c185ee16cbf505eda9c4a8a4791b25ea8a6
 
 # The target distribution, as the native build and the package start from it.
 FROM ${BASE} AS base
@@ -21,7 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential cmake pkg-config curl ca-certificates python3 \
         libgmp-dev libsqlite3-dev postgresql-server-dev-${PG_MAJOR} \
     && rm -rf /var/lib/apt/lists/*
-RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+# A fixed Rust release, as every build of the project uses (#514).
+RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.99.0
 ENV PATH=/root/.cargo/bin:$PATH
 WORKDIR /build
 COPY native-store native-store
@@ -39,7 +40,7 @@ RUN curl -fsSL --retry 3 "https://codeload.github.com/dvarrazzo/pgmp/tar.gz/$PGM
     && make PG_CONFIG=/usr/lib/postgresql/${PG_MAJOR}/bin/pg_config with_llvm=no DESTDIR=/stage install
 
 # The editor and the Next.js platform: plain JavaScript, the same for every distribution.
-FROM node:24-bookworm-slim AS app
+FROM node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS app
 # apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
 RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*

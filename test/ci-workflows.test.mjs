@@ -203,3 +203,48 @@ test('the package Dockerfiles check the Node.js tarball, given or downloaded', a
     assert(after.indexOf('sha256sum -c') < after.indexOf('tar -xJf'), `${file}: checked first`);
   }
 });
+
+// Pinned toolchains and images (#514): every build uses one fixed Rust release, never the
+// floating `stable`, and every base image names a tag (with its digest, where known).
+test('every build uses the same fixed Rust release', async () => {
+  const files = [
+    ...(await dockerfiles()),
+    ...(await readdir('.github/workflows'))
+      .filter((name) => name.endsWith('.yml'))
+      .map((name) => `.github/workflows/${name}`),
+  ];
+  const versions = new Map();
+  for (const file of files) {
+    const text = await readFile(file, 'utf8');
+    assert.doesNotMatch(text, /rustup (?:update|default) stable|--default-toolchain stable/, file);
+    assert.doesNotMatch(text, /FROM rust:1-/, file);
+    for (const [, version] of text.matchAll(
+      /(?:rustup toolchain install|rustup default|--default-toolchain|FROM rust:)\s*([\d.]+?)(?:-bookworm|@|\s|$)/gm,
+    ))
+      versions.set(`${file}: ${version}`, version);
+  }
+  assert(versions.size >= 8, `Rust is named in ${versions.size} files`);
+  const [first] = versions.values();
+  assert.match(first, /^\d+\.\d+\.\d+$/);
+  for (const [where, version] of versions) assert.equal(version, first, where);
+});
+
+test('every Dockerfile base image names its tag', async () => {
+  for (const file of await dockerfiles()) {
+    const text = await readFile(file, 'utf8');
+    const all = stages(text);
+    for (const { parent } of all) {
+      if (parent === 'scratch' || all.some((s) => s.name === parent)) continue;
+      // An ARG's default, such as BASE=debian:trixie.
+      const image = parent.startsWith('${')
+        ? text.match(new RegExp(`^ARG ${parent.slice(2, -1)}=(\\S+)`, 'm'))?.[1]
+        : parent;
+      assert.match(
+        image ?? '',
+        /^[\w./-]+:[\w.-]+(?:@sha256:[0-9a-f]{64})?$/,
+        `${file}: ${parent}`,
+      );
+      assert.doesNotMatch(image, /:latest\b/, `${file}: ${parent}`);
+    }
+  }
+});

@@ -8,7 +8,7 @@ OpenChronology is one codebase for four editions: the website (a Next.js platfor
 
 | File                                         | What it is for                                                                                                                          |
 | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| [`.github/`](.github/workflows/README.md)    | GitHub Actions: continuous integration, benchmarks, desktop and server packages, releases and the pages site (in `.github/workflows/`). |
+| [`.github/`](.github/workflows/README.md)    | GitHub Actions (in `.github/workflows/`): CI, benchmarks, packages, releases, the pages site; Dependabot's settings (`dependabot.yml`). |
 | [`bench/`](bench/README.md)                  | Benchmarks of the stores, the browser and desktop UI, and capacity, with the budgets CI holds them to.                                  |
 | [`deploy/`](deploy/README.md)                | Docker images and the server packages for Debian, Ubuntu, RPM systems, FreeBSD, macOS (Homebrew) and Windows.                           |
 | [`docs/`](docs/README.md)                    | The documentation: the user guide, FAQ and every topic in detail, also shown at `/help` on every server.                                |

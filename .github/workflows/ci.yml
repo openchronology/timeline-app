@@ -135,7 +135,7 @@ jobs:
     # the runner's Ubuntu mirror: WebKit's ~130 packages outlasted the job when it was slow
     # (#351). Its version follows the playwright package's.
     container:
-      image: mcr.microsoft.com/playwright:v1.58.2-noble
+      image: mcr.microsoft.com/playwright:v1.58.2-noble@sha256:6446946a1d9fd62d9ae501312a2d76a43ee688542b21622056a372959b65d63d
       options: --ipc=host
     env:
       # Firefox will not start as root with another user's home.
@@ -186,7 +186,7 @@ jobs:
     timeout-minutes: 60
     # In Playwright's image, as the browser jobs are (#351).
     container:
-      image: mcr.microsoft.com/playwright:v1.58.2-noble
+      image: mcr.microsoft.com/playwright:v1.58.2-noble@sha256:6446946a1d9fd62d9ae501312a2d76a43ee688542b21622056a372959b65d63d
       options: --ipc=host
     env:
       HOME: /root
@@ -275,8 +275,8 @@ jobs:
       - run: node test/sql-oracle.mjs
       - name: Build the isolated SQLite file converter
         run: |
-          rustup update stable --no-self-update
-          rustup default stable
+          rustup toolchain install 1.99.0 --profile minimal --no-self-update
+          rustup default 1.99.0
           cargo build --manifest-path native-store/Cargo.toml --locked --release --bin och-convert
       - run: node test/files.mjs
       - run: node test/durations-postgres.mjs
@@ -432,10 +432,10 @@ jobs:
           sh scripts/ubuntu-archive.sh
           sudo apt-get update
           sudo apt-get install -y build-essential cmake pkg-config libgmp-dev libsqlite3-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev webkit2gtk-driver xvfb
-      - name: Stable Rust and tauri-driver
+      - name: Rust and tauri-driver
         run: |
-          rustup update stable --no-self-update
-          rustup default stable
+          rustup toolchain install 1.99.0 --profile minimal --no-self-update
+          rustup default 1.99.0
           cargo install tauri-driver --locked
       - run: node scripts/npm-ci.mjs
       - run: npm run build:editor

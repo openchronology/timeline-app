@@ -7,14 +7,14 @@
 #   OCH_BUILD_COMMIT, OCH_BUILD_VERSION
 
 # The Rust crates of och-convert, vendored into the platform's source archive.
-FROM rust:1-bookworm AS native
+FROM rust:1.99.0-bookworm@sha256:114c7a4425406451c2866b6aafe69fe29b1b298832db1277d411ac73c82d04d6 AS native
 WORKDIR /build
 COPY native-store native-store
 COPY vendor/sqlite-rational vendor/sqlite-rational
 RUN cargo vendor --locked --manifest-path native-store/Cargo.toml /build/rust-dependencies
 
 # The editor and the Next.js platform: plain JavaScript, the same for every distribution.
-FROM node:24-bookworm-slim AS app
+FROM node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS app
 # apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
 RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
@@ -51,7 +51,7 @@ RUN --mount=type=bind,target=/build-context \
 # The application, laid out as the Linux packages do, without their Linux-only image library
 # (the platform does not optimize images) and without a Node.js runtime: FreeBSD's node24
 # package and Homebrew's node@24 provide it.
-FROM debian:bookworm-slim AS tree
+FROM debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc AS tree
 COPY --from=app /app/platform/.next/standalone /out/lib/openchronology/
 COPY --from=app /app/platform/.next/static /out/lib/openchronology/platform/.next/static
 COPY --from=app /app/platform/public /out/lib/openchronology/platform/public

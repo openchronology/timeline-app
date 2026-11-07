@@ -4,7 +4,7 @@
 #   BASE         rockylinux/rockylinux:10 or fedora:44
 #   RPM_VERSION, RPM_RELEASE (1.el10, 1.fc44), OCH_BUILD_COMMIT, OCH_BUILD_VERSION
 # The services, configuration and commands are the Debian package's (deploy/debian-server).
-ARG BASE=fedora:44
+ARG BASE=fedora:44@sha256:15da97ed9aa94dd3d92c3925eb89520f6c80e07ea7ee24cba848d1f8b6912b3e
 
 # The target distribution, as the native build and the package start from it.
 FROM ${BASE} AS base
@@ -26,7 +26,8 @@ RUN set -eu; \
     dnf -y install gcc gcc-c++ make cmake pkgconf-pkg-config python3 curl-minimal ca-certificates \
         gmp-devel sqlite-devel postgresql-server-devel redhat-rpm-config \
     && dnf clean all
-RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+# A fixed Rust release, as every build of the project uses (#514).
+RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.99.0
 ENV PATH=/root/.cargo/bin:$PATH
 WORKDIR /build
 COPY native-store native-store
@@ -45,7 +46,7 @@ RUN curl -fsSL --retry 3 "https://codeload.github.com/dvarrazzo/pgmp/tar.gz/$PGM
     && pg_config --version | sed -E 's/^PostgreSQL ([0-9]+).*/\1/' > /stage/pg-major
 
 # The editor and the Next.js platform: plain JavaScript, the same for every distribution.
-FROM node:24-bookworm-slim AS app
+FROM node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS app
 # apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
 RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*

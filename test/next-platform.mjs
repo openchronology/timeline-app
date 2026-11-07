@@ -335,6 +335,34 @@ try {
   assert.match(found, /href="\/help\/tags#separating-by-tags"/);
   assert.equal((await fetch(origin + '/help/no-such-page')).status, 404);
   assert.match(html, /href="\/help"/);
+  // Signed-out views of public pages may be kept briefly by a shared cache, apart from a
+  // session's (#473); with a session cookie, the router's payload and other pages stay private.
+  {
+    const kept = /^public, s-maxage=\d+, stale-while-revalidate=\d+$/;
+    for (const path of ['/', '/help', '/help/tags']) {
+      const r = await fetch(origin + path);
+      assert.match(r.headers.get('cache-control'), kept, path);
+      assert.match(r.headers.get('vary'), /(?:^|, )Cookie$/, path);
+      // The copy a cache keeps runs with the nonce it was rendered with.
+      const keptNonce = r.headers.get('content-security-policy').match(/'nonce-([^']+)'/)[1];
+      assert((await r.text()).includes(`nonce="${keptNonce}"`), path);
+    }
+    const kept404 = await fetch(origin + '/timelines/00000000-0000-0000-0000-000000000001');
+    assert.equal(kept404.status, 404);
+    assert.match(kept404.headers.get('cache-control'), kept);
+    const privately = /^private, no-cache, no-store/;
+    for (const [path, headers] of [
+      ['/help', { Cookie: 'oc_session=not-a-session' }],
+      ['/help', { Authorization: 'Bearer not-a-token' }],
+      ['/help', { RSC: '1' }],
+      ['/login', {}],
+      ['/download', {}],
+      ['/account', {}],
+    ]) {
+      const r = await fetch(origin + path, { headers, redirect: 'manual' });
+      assert.match(r.headers.get('cache-control'), privately, `${path} ${JSON.stringify(headers)}`);
+    }
+  }
   // The plugin library page lists the official plugin suites (#78) above the plugins.
   const plugins = await (await fetch(origin + '/plugins')).text();
   assert.match(plugins, /Plugin suites/);
