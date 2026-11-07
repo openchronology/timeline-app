@@ -93,7 +93,7 @@ await checkSyslogService({
     assert.match(await sh('service openchronology_syslog status'), /is running/);
   },
   stop: async () => {
-    assert.match(await sh('ps -U openchronology -o command='), /server\/syslog-receiver\.mjs/);
+    assert.match(await sh('ps -U openchronology-logs -o command='), /server\/syslog-receiver\.mjs/);
     await sh('service openchronology_syslog stop && sysrc openchronology_syslog_enable=NO');
   },
   logs: () => sh('grep openchronology_syslog /var/log/messages | tail -40', { allowFailure: true }),
