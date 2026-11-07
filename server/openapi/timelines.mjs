@@ -1310,7 +1310,7 @@ export const paths = {
       tags: ['Timelines'],
       summary: 'What a pasted address names, to link to',
       description:
-        'Reads a page address someone pasted (#422): a timeline’s page at `/<owner>/<slug>` or `/timelines/<id>`, a moment’s or duration’s page under it, an embed (`/embed/<id>`), the editor’s `#timeline/<id>/…`, or any of these with a `#moment/<id>` or `#duration/<id>` fragment; a path, or a full address on this site. Answers the timeline it names and the moment or duration, with whether it is this timeline (`same`: relate its entities instead), whether the caller may save it, and whether it already has as many links as it may (`full`). 400 for an address that names no timeline here; 404 for one the caller may not read, or an entity it lacks.',
+        'Reads a page address someone pasted (#422): a timeline’s page at `/<owner>/<slug>` or `/timelines/<id>`, a moment’s or duration’s page under it, an embed (`/embed/<id>`), the editor’s `#timeline/<id>/…`, or any of these with a `#moment/<id>` or `#duration/<id>` fragment; a path, or a full address on this site. Answers the timeline it names and the moment or duration, with whether it is this timeline (`same`: relate its entities instead), whether the caller may save it, and whether it already has as many links as it may (`full`). 400 for an address that names no timeline here; 404 for one the caller may not read, or an entity it lacks. An address with no timeline at it answers the same 404 as one with a timeline the caller may not read, so a private timeline’s address cannot be confirmed.',
       security: TIMELINE_READ,
       parameters: [timelineId],
       requestBody: body({
@@ -1609,12 +1609,12 @@ export const paths = {
       tags: ['Timeline data'],
       summary: 'Read part of a timeline',
       description:
-        'Reads a bounded part of a timeline, by `kind`: moments in a range a page at a time, an overview of a range for drawing it, durations in a range, one event, the entities related to one, a search of its moments and durations, or the tags it uses. A read, so API keys need only `timelines:read` and sessions no CSRF token. Comparisons are read through their sources (409).',
+        'Reads a bounded part of a timeline, by `kind`: moments in a range a page at a time, an overview of a range for drawing it, durations in a range, one event, the entities related to one, a search of its moments and durations, or the tags it uses. A read, so API keys need only `timelines:read` and sessions no CSRF token. Comparisons are read through their sources (409). The body is at most 1 MiB and 64 KiB (an overview may carry a comparison’s plugins, at most 1 MiB of them; 413 beyond). Without an account, at most 600 queries a minute per address (an IPv6 address counts by its /64; 429 beyond). A separation (`filter`) not built yet for the current revision is built first: at most 20 a minute per address without an account and 60 per account (429 beyond), two at once per server process with up to 16 waiting (503 beyond). Only the filter’s tags the timeline has count, so tags it lacks build nothing new.',
       security: TIMELINE_READ,
       requestBody: body(ref('TimelineQuery')),
       responses: {
         200: json(ref('TimelineQueryResult'), 'What the query reads.'),
-        ...errors(400, 403, 404, 409, 429, 503),
+        ...errors(400, 403, 404, 409, 413, 429, 503),
         ...NOT_JSON,
       },
     },

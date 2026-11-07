@@ -32,6 +32,9 @@ test('filter values are escaped as RFC 4515 requires', () => {
     userFilter(config, '*)(objectClass=*'),
     '(&(objectClass=user)(sAMAccountName=\\2a\\29\\28objectClass=\\2a))',
   );
+  // `$` patterns in a name stay as typed rather than splicing in parts of the filter.
+  for (const name of ['$`', "$'", '$&', '$$'])
+    assert.equal(userFilter(config, name), `(&(objectClass=user)(sAMAccountName=${name}))`);
   assert.equal(
     userFilter(
       directoryFromEnv({ ...base, LDAP_REQUIRED_GROUP: 'CN=Staff (all),DC=school,DC=example' }),

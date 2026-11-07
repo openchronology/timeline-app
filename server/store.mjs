@@ -116,6 +116,15 @@ export class HttpError extends Error {
     this.status = status;
   }
 }
+/**
+ * How many separation views (PostgresStore.view) a process builds at once, and how many more
+ * builds may wait for a turn. Each build reads a whole timeline into memory and writes its
+ * index again, holding a connection throughout; beyond these, a build is refused (503).
+ */
+const VIEW_BUILDS = 2,
+  VIEW_QUEUE = 16;
+/** How many separations' plans (PostgresStore.#viewPlan) the store keeps. */
+const VIEW_PLANS = 1000;
 /** How many timelines' templated-notes verdicts the store keeps (#467). */
 const LISTING_CACHE = 1000;
 /** Why a past revision of a timeline that keeps no saved history cannot be read. */
@@ -282,6 +291,10 @@ export class PostgresStore {
     // Whether timelines' notes are templated (#467), by timeline and revision: read again only
     // after a save. The oldest go first past LISTING_CACHE.
     this.listings = new Map();
+    // Separation views being built (view) in this process, and the builds waiting their turn.
+    this.viewBuilds = { running: 0, waiting: [] };
+    // What each separation asked for needs (#viewPlan), by timeline, revision and filter.
+    this.viewPlans = new Map();
   }
   /**
    * Refuses (HTTP 400) installed plugins `plugins` whose scripts do not compile, compiling
@@ -1978,46 +1991,131 @@ export class PostgresStore {
    * building it from the saved document on first use. A save discards views; each timeline
    * keeps its eight most recent.
    *
-   * Returns the view's ID (oc_views), for query to read in place of the timeline's index.
-   * HttpError 404 without access, 409 for a comparison.
+   * Only the filter's tags the timeline has count (and a relationship filter's entity only if
+   * the timeline has it), so filters naming what it lacks share one view rather than each
+   * building its own: a side that keeps everything is the timeline itself (null, its own
+   * index), and one that keeps nothing is one empty view. A view not built yet waits for a
+   * turn (VIEW_BUILDS at once in this process, VIEW_QUEUE waiting, else 503), after
+   * `beforeBuild`, which the caller uses for its rate limit; one already built is found
+   * without either.
+   *
+   * Returns the view's ID (oc_views), for query to read in place of the timeline's index, or
+   * null to read the timeline's own. HttpError 404 without access, 409 for a comparison.
    */
-  async view(id, userId, filter) {
-    const key = viewFilterKey(filter);
-    return this.transaction(async (c) => {
+  async view(id, userId, filter, { beforeBuild } = {}) {
+    const found = await this.transaction(async (c) => {
       const t = await this.access(id, userId, c);
       if (t.comparison) throw new HttpError(409, 'Comparisons cannot be separated by tags.');
-      // Concurrent requests for the same view (timeline, revision, filter) wait here, so
-      // one builds it and the others find it below, instead of all building it and all but
-      // one failing on oc_views' unique (timeline_id, revision, filter_key). The lock is
-      // transaction-scoped: released at commit, once the view is visible.
-      await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
-        id + '|' + t.revision + '|' + key,
-      ]);
-      // Found by the unique index on (timeline_id, revision, filter_key).
-      const existing = await c.query(
+      const plan = await this.#viewPlan(c, t, filter);
+      if (!plan) return { view: null };
+      const { rows } = await c.query(
         'SELECT id FROM oc_views WHERE timeline_id=$1 AND revision=$2 AND filter_key=$3',
-        [id, t.revision, key],
+        [id, t.revision, plan.key],
       );
-      if (existing.rows[0]) return existing.rows[0].id;
-      const document = filterDocument(await this.branchDocument(c, t), filter);
-      const tree = indexedNodes(document),
-        viewId = randomUUID();
-      await c.query(
-        'INSERT INTO oc_views(id,timeline_id,revision,filter_key,root,event_count) VALUES($1,$2,$3,$4,$5,$6)',
-        [viewId, id, t.revision, key, tree.root, tree.count],
-      );
-      await writeMoments(c, 'oc_view_moments', viewId, document.events);
-      await writeNodes(c, 'oc_view_nodes', viewId, tree);
-      const durations = await writeDurationNodes(c, 'oc_view_duration_nodes', viewId, document);
-      await c.query('UPDATE oc_views SET duration_root=$2 WHERE id=$1', [viewId, durations.root]);
-      // Keeps the timeline's eight newest views (this one included); older ones go, their
-      // rows with them (ON DELETE CASCADE).
-      await c.query(
-        'DELETE FROM oc_views WHERE timeline_id=$1 AND id NOT IN (SELECT id FROM oc_views WHERE timeline_id=$1 ORDER BY created_at DESC,id LIMIT 8)',
-        [id],
-      );
-      return viewId;
+      return rows[0] ? { view: rows[0].id } : null;
     });
+    if (found) return found.view;
+    await beforeBuild?.();
+    await this.#viewTurn();
+    try {
+      return await this.transaction(async (c) => {
+        const t = await this.access(id, userId, c);
+        if (t.comparison) throw new HttpError(409, 'Comparisons cannot be separated by tags.');
+        // Planned again: a save since the look above may have changed which tags there are.
+        const plan = await this.#viewPlan(c, t, filter);
+        if (!plan) return null;
+        const key = plan.key;
+        // Concurrent requests for the same view (timeline, revision, filter) wait here, so
+        // one builds it and the others find it below, instead of all building it and all but
+        // one failing on oc_views' unique (timeline_id, revision, filter_key). The lock is
+        // transaction-scoped: released at commit, once the view is visible.
+        await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+          id + '|' + t.revision + '|' + key,
+        ]);
+        // Found by the unique index on (timeline_id, revision, filter_key).
+        const existing = await c.query(
+          'SELECT id FROM oc_views WHERE timeline_id=$1 AND revision=$2 AND filter_key=$3',
+          [id, t.revision, key],
+        );
+        if (existing.rows[0]) return existing.rows[0].id;
+        const document = filterDocument(await this.branchDocument(c, t), plan.filter);
+        const tree = indexedNodes(document),
+          viewId = randomUUID();
+        await c.query(
+          'INSERT INTO oc_views(id,timeline_id,revision,filter_key,root,event_count) VALUES($1,$2,$3,$4,$5,$6)',
+          [viewId, id, t.revision, key, tree.root, tree.count],
+        );
+        await writeMoments(c, 'oc_view_moments', viewId, document.events);
+        await writeNodes(c, 'oc_view_nodes', viewId, tree);
+        const durations = await writeDurationNodes(c, 'oc_view_duration_nodes', viewId, document);
+        await c.query('UPDATE oc_views SET duration_root=$2 WHERE id=$1', [viewId, durations.root]);
+        // Keeps the timeline's eight newest views (this one included); older ones go, their
+        // rows with them (ON DELETE CASCADE).
+        await c.query(
+          'DELETE FROM oc_views WHERE timeline_id=$1 AND id NOT IN (SELECT id FROM oc_views WHERE timeline_id=$1 ORDER BY created_at DESC,id LIMIT 8)',
+          [id],
+        );
+        return viewId;
+      });
+    } finally {
+      // The turn passes to the next waiting build, if any, so `running` stays the same.
+      const next = this.viewBuilds.waiting.shift();
+      if (next) next();
+      else this.viewBuilds.running--;
+    }
+  }
+  /**
+   * The view a separation of timeline `t` (as access gave it, read in `c`) needs: `{ filter,
+   * key }`, its filter narrowed to the tags the timeline has (from its entity search rows),
+   * or null when that side is the whole timeline. A relationship filter is kept when the
+   * timeline has its entity. When nothing matches, the "none" side is the whole timeline and
+   * the "any" side is empty: the same empty view whatever the filter named. Kept per
+   * timeline, revision and filter (the newest VIEW_PLANS), since every query of a separation
+   * asks, and finding the tags reads all of the timeline's search rows.
+   */
+  async #viewPlan(c, t, filter) {
+    // Saved before entity search existed (migrate.mjs builds its rows): taken as given.
+    if (Number(t.search_version) < 1) return { filter, key: viewFilterKey(filter) };
+    const cached = `${t.id}:${t.revision}:${viewFilterKey(filter)}`;
+    if (this.viewPlans.has(cached)) return this.viewPlans.get(cached);
+    const plan = await this.#planView(c, t, filter);
+    this.viewPlans.set(cached, plan);
+    if (this.viewPlans.size > VIEW_PLANS) this.viewPlans.delete(this.viewPlans.keys().next().value);
+    return plan;
+  }
+  async #planView(c, t, filter) {
+    const rows = (await indexReader(c, t))('oc_entity_search', '$1', { scan: true });
+    if ('related' in filter) {
+      const kind = 'moment' in filter.related ? 'moment' : 'duration';
+      const { rows: found } = await c.query(
+        `SELECT 1 FROM ${rows} s WHERE s.kind=$2 AND s.entity_id=$3 LIMIT 1`,
+        [t.id, kind, filter.related[kind]],
+      );
+      if (found.length) return { filter, key: viewFilterKey(filter) };
+    } else {
+      const { rows: found } = await c.query(
+        `SELECT DISTINCT tag FROM ${rows} s,unnest(s.tags) AS tag WHERE tag=ANY($2::text[])`,
+        [t.id, filter.tags],
+      );
+      if (found.length) {
+        const narrowed = { tags: found.map((r) => r.tag), mode: filter.mode };
+        return { filter: narrowed, key: viewFilterKey(narrowed) };
+      }
+    }
+    if (filter.mode === 'none') return null;
+    const empty = { tags: [], mode: 'any' };
+    return { filter: empty, key: viewFilterKey(empty) };
+  }
+  /** Waits for a turn to build a view (VIEW_BUILDS at once); 503 when too many wait already. */
+  async #viewTurn() {
+    const builds = this.viewBuilds;
+    if (builds.running < VIEW_BUILDS) {
+      builds.running++;
+      return;
+    }
+    if (builds.waiting.length >= VIEW_QUEUE)
+      throw new HttpError(503, 'Separating is busy. Please try again shortly.');
+    await new Promise((resolve) => builds.waiting.push(resolve));
   }
 
   /**
@@ -2127,9 +2225,10 @@ export class PostgresStore {
    * revision it was read at. HttpError 404 without access, 409 for a comparison, for a copy
    * still being prepared, or when `query.revision` is given and is not the current one.
    */
-  async query(id, userId, query) {
-    // Tag separations read a derived index for the filter, built on first use.
-    const view = query.filter ? await this.view(id, userId, query.filter) : null;
+  async query(id, userId, query, { beforeBuild } = {}) {
+    // Tag separations read a derived index for the filter, built on first use (after
+    // `beforeBuild`, the caller's rate limit on building one).
+    const view = query.filter ? await this.view(id, userId, query.filter, { beforeBuild }) : null;
     const tree = view ?? id,
       names = treeNames(view);
     return this.transaction(async (c) => {
