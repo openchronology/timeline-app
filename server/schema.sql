@@ -2160,7 +2160,7 @@ ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS show_sensitive boolean NOT NULL DE
 ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS terms_version text;
 -- The version in force, as policies.mjs POLICY_VERSION has it (a test keeps them equal); for
 -- SQL that makes accounts which agreed, such as the tests'.
-CREATE OR REPLACE FUNCTION oc_policy_version() RETURNS text LANGUAGE sql IMMUTABLE AS $$ SELECT '2026-10-25' $$;
+CREATE OR REPLACE FUNCTION oc_policy_version() RETURNS text LANGUAGE sql IMMUTABLE AS $$ SELECT '2026-11-07' $$;
 ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS terms_accepted_at timestamptz;
 ALTER TABLE oc_registrations ADD COLUMN IF NOT EXISTS terms_version text;
 ALTER TABLE oc_registrations ADD COLUMN IF NOT EXISTS terms_accepted_at timestamptz;

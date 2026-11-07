@@ -91,7 +91,7 @@ const email = {
 // Agreeing to the terms of service and privacy policy (#277; server/policies.mjs).
 const acceptTerms = {
   type: 'string',
-  example: '2026-10-25',
+  example: '2026-11-07',
   description:
     'Agreement to the terms of service and privacy policy: the version shown, which is the session’s `terms` (their effective date). Refused (400) when missing or not the version in force.',
 };
@@ -958,7 +958,7 @@ export const schemas = {
       user: { oneOf: [ref('SessionUser'), { type: 'null' }] },
       terms: {
         type: 'string',
-        example: '2026-10-25',
+        example: '2026-11-07',
         description:
           'The version of the terms of service and privacy policy in force (their effective date), which agreeing to them sends as `acceptTerms`. Absent without accounts.',
       },

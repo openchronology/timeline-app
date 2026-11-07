@@ -26,4 +26,4 @@ Every server also serves this documentation at `/help`, searchable and matching 
 
 ## License
 
-Copyright (c) 2026 Athan Clark. OpenChronology software, official plugins and first-party documentation are [GPLv3 only](LICENSE); see [NOTICE](NOTICE) for scope, [third-party notices](THIRD_PARTY.md) for dependencies, and [licensing](docs/licensing.md) for release source bundles. User timelines and original user scripts retain their owners' rights. timescale.info's [terms](legal/TERMS.md), [privacy policy](legal/PRIVACY.md) and [copyright policy](legal/COPYRIGHT.md) took effect on 25 October 2026.
+Copyright (c) 2026 Athan Clark. OpenChronology software, official plugins and first-party documentation are [GPLv3 only](LICENSE); see [NOTICE](NOTICE) for scope, [third-party notices](THIRD_PARTY.md) for dependencies, and [licensing](docs/licensing.md) for release source bundles. User timelines and original user scripts retain their owners' rights. timescale.info's [terms](legal/TERMS.md) and [privacy policy](legal/PRIVACY.md) are in effect from 7 November 2026, and its [copyright policy](legal/COPYRIGHT.md) from 25 October 2026.

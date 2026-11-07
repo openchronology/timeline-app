@@ -6,11 +6,11 @@ import { HttpError } from './store.mjs';
 import { keyRequestRead } from './api-keys.mjs';
 
 /**
- * The version of the terms of service and privacy policy in force: their effective date, as
- * legal/TERMS.md and legal/PRIVACY.md state it ("Effective 25 October 2026"). Change it when
- * either changes materially; every account is then asked to agree again.
+ * The version of the terms of service and privacy policy in force: their shared effective date,
+ * as legal/TERMS.md and legal/PRIVACY.md state it ("Effective 7 November 2026"). Change
+ * it when either changes materially; every account is then asked to agree again.
  */
-export const POLICY_VERSION = '2026-10-25';
+export const POLICY_VERSION = '2026-11-07';
 
 /** Why a request needs agreement first; the client shows it with a way to agree. */
 export const AGREEMENT_NEEDED =
