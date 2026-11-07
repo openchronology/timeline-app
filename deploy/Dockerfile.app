@@ -1,7 +1,7 @@
 # The platform's Docker image (compose.yml's app service): och-convert, the editor and the
 # Next.js platform built from this checkout with its web source archive, run as a standalone
 # Node.js server on port 5173.
-FROM rust:1.99.0-bookworm AS converter
+FROM rust:1.99.0-bookworm@sha256:114c7a4425406451c2866b6aafe69fe29b1b298832db1277d411ac73c82d04d6 AS converter
 # apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
 RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
 RUN apt-get update && apt-get install -y --no-install-recommends cmake libsqlite3-dev libgmp-dev && rm -rf /var/lib/apt/lists/*
@@ -11,7 +11,7 @@ COPY vendor/sqlite-rational vendor/sqlite-rational
 RUN cargo build --manifest-path native-store/Cargo.toml --release --locked --bin och-convert
 RUN cargo vendor --locked --manifest-path native-store/Cargo.toml /app/rust-dependencies
 
-FROM node:24-bookworm-slim AS build
+FROM node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS build
 # apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
 RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
@@ -38,7 +38,7 @@ COPY README.md compose.yml tsconfig.json pnpm-lock.yaml yarn.lock .yarnrc.yml .d
 COPY --from=converter /app/rust-dependencies /app/rust-dependencies
 RUN --mount=type=bind,target=/build-context export OCH_BUILD_CONTEXT=/build-context OCH_BUILD_COMMIT="$OCH_BUILD_COMMIT" OCH_BUILD_VERSION="$OCH_BUILD_VERSION" && npm run build && node scripts/source.mjs --rust-vendor /app/rust-dependencies && cp dist/openchronology-web-source.tar.gz platform/public/
 
-FROM node:24-bookworm-slim
+FROM node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
 # apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
 RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
 RUN apt-get update && apt-get install -y --no-install-recommends libsqlite3-0 libgmp10 && rm -rf /var/lib/apt/lists/*

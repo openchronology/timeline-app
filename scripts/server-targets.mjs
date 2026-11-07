@@ -7,10 +7,28 @@ import { readFileSync } from 'node:fs';
  * distribution ships (pg_config, when they are built).
  */
 export const serverTargets = {
-  debian13: { format: 'deb', base: 'debian:trixie', pg: 17, suffix: 'deb13' },
-  'ubuntu24.04': { format: 'deb', base: 'ubuntu:24.04', pg: 16, suffix: 'ubuntu24.04' },
-  rocky10: { format: 'rpm', base: 'rockylinux/rockylinux:10', dist: 'el10' },
-  fedora44: { format: 'rpm', base: 'fedora:44', dist: 'fc44' },
+  debian13: {
+    format: 'deb',
+    base: 'debian:trixie@sha256:9c6e381421d0f48d1b8133e573f33c185ee16cbf505eda9c4a8a4791b25ea8a6',
+    pg: 17,
+    suffix: 'deb13',
+  },
+  'ubuntu24.04': {
+    format: 'deb',
+    base: 'ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852',
+    pg: 16,
+    suffix: 'ubuntu24.04',
+  },
+  rocky10: {
+    format: 'rpm',
+    base: 'rockylinux/rockylinux:10@sha256:827d37bc128288ccf160ee318bb3cb92d591164cb217e92f8bc61e3982ae1834',
+    dist: 'el10',
+  },
+  fedora44: {
+    format: 'rpm',
+    base: 'fedora:44@sha256:15da97ed9aa94dd3d92c3925eb89520f6c80e07ea7ee24cba848d1f8b6912b3e',
+    dist: 'fc44',
+  },
   // Built in a FreeBSD virtual machine (deploy/freebsd-server/build.sh) from the platform built
   // on Linux; packages are tied to a FreeBSD major version.
   freebsd14: { format: 'pkg', release: '14', pg: 17 },

@@ -130,7 +130,7 @@ jobs:
     # the runner's Ubuntu mirror: WebKit's ~130 packages outlasted the job when it was slow
     # (#351). Its version follows the playwright package's.
     container:
-      image: mcr.microsoft.com/playwright:v1.58.2-noble
+      image: mcr.microsoft.com/playwright:v1.58.2-noble@sha256:6446946a1d9fd62d9ae501312a2d76a43ee688542b21622056a372959b65d63d
       options: --ipc=host
     env:
       # Firefox will not start as root with another user's home.
@@ -179,7 +179,7 @@ jobs:
     timeout-minutes: 60
     # In Playwright's image, as the browser jobs are (#351).
     container:
-      image: mcr.microsoft.com/playwright:v1.58.2-noble
+      image: mcr.microsoft.com/playwright:v1.58.2-noble@sha256:6446946a1d9fd62d9ae501312a2d76a43ee688542b21622056a372959b65d63d
       options: --ipc=host
     env:
       HOME: /root
