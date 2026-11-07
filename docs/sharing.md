@@ -271,8 +271,11 @@ answer below leaves it to the system; add the parameter to its iframe's address 
 timeline's own [theme](plugins.md#timeline-theme) keeps its colors either way.
 
 Any site may frame embeds unless the operator sets `EMBED_FRAME_ANCESTORS` to a list of
-origins (see [deployment](docker.md#public-hosting)). Other pages of the platform cannot be
-framed by other sites.
+origins (see [deployment](docker.md#public-hosting)). Every other page of the platform,
+including comparisons, the legal pages and pages that don't exist, refuses to be framed at all
+(`frame-ancestors 'none'`), and sends no referrer to other sites; only the site's own pages
+frame the editor (`/editor/frame`). Over https, embeds and the editor's frame ask browsers to
+keep to https (HSTS), as every other page does.
 
 ### oEmbed
 

@@ -3,16 +3,12 @@
  * A public timeline for other sites to frame: the editor, read-only and anonymous (see
  * `embedded` in src/app.ts). Private timelines, and comparisons of them, are never embedded.
  */
-import { editorHtml, editorPolicy } from '../../../lib/editor-html.js';
+import { editorHtml, editorPolicy, titledEditor } from '../../../lib/editor-html.js';
 import { publicTimeline, sharedPath, siteOrigin, timelineTitle } from '../../../lib/sharing.js';
 import { platformServices } from '../../../../server/platform.mjs';
+import { transportSecurity } from '../../../../server/site.mjs';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-const escape = (text) =>
-  String(text).replace(
-    /[&<>"]/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c],
-  );
 export async function GET(request, { params }) {
   const { id } = await params;
   // Pages that may frame embeds: any, unless the operator lists some.
@@ -23,6 +19,8 @@ export async function GET(request, { params }) {
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'X-Robots-Tag': 'noindex',
+    // Over https, browsers keep to it here as on the site's other pages (proxy.js).
+    ...(transportSecurity() ? { 'Strict-Transport-Security': transportSecurity() } : {}),
   };
   let timeline = null;
   try {
@@ -36,9 +34,6 @@ export async function GET(request, { params }) {
       { status: 404, headers },
     );
   const canonical = siteOrigin() + sharedPath(timeline);
-  const html = (await editorHtml()).replace(
-    /<title>[^<]*<\/title>/,
-    `<title>${escape(timelineTitle(timeline))} · OpenChronology</title><link rel="canonical" href="${escape(canonical)}" />`,
-  );
+  const html = titledEditor(await editorHtml(), timelineTitle(timeline), canonical);
   return new Response(html, { headers });
 }

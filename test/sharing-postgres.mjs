@@ -219,6 +219,8 @@ try {
   // Private: members see the page, but nothing announces or previews it.
   const privatePage = await owner.request(base);
   assert.equal(meta(privatePage, 'robots'), 'noindex, nofollow');
+  // Nor does it let analytics name it (platform/lib/analytics.js).
+  assert(!privatePage.includes('data-analytics-'));
   assert(!privatePage.includes('application/json+oembed'));
   await guest.request(base, { status: 404 });
   await guest.request('/timelines/' + timelineId, { status: 404 });
@@ -293,6 +295,12 @@ try {
   assert.equal(meta(page, 'twitter:card'), 'summary_large_image');
   assert.equal(meta(page, 'robots'), null);
   assert(page.includes(`<link rel="canonical" href="${origin + base}"/>`));
+  // Public, it lets analytics name it, at its address and with its title.
+  assert(
+    page.includes(
+      `<main class="editor-page" data-analytics-path="${base}" data-analytics-title="Voyages of ${suffix} · OpenChronology">`,
+    ),
+  );
   const image = meta(page, 'og:image');
   // Next names preview images by the route they are in, at the timeline's ID.
   assert(image.startsWith(`${origin}/timelines/${timelineId}/opengraph-image`), image);
@@ -315,6 +323,11 @@ try {
   const moment = await guest.request(momentPath);
   assert.equal(meta(moment, 'og:title'), `Storm ${suffix} · Voyages of ${suffix}`);
   assert.equal(meta(moment, 'og:url'), origin + momentPath);
+  assert(
+    moment.includes(
+      `data-analytics-path="${momentPath}" data-analytics-title="Storm ${suffix} · Voyages of ${suffix}`,
+    ),
+  );
   assert(
     meta(moment, 'og:image').startsWith(
       `${origin}/timelines/${timelineId}/moments/leg%3A2/opengraph-image`,

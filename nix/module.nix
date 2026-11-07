@@ -29,12 +29,30 @@ let
   # The systemd hardening of the Debian units.
   hardening = {
     NoNewPrivileges = true;
+    CapabilityBoundingSet = "";
     PrivateTmp = true;
+    PrivateDevices = true;
     ProtectSystem = "strict";
     ProtectHome = true;
     ProtectKernelTunables = true;
+    ProtectKernelModules = true;
+    ProtectKernelLogs = true;
     ProtectControlGroups = true;
+    ProtectClock = true;
     RestrictSUIDSGID = true;
+    RestrictNamespaces = true;
+    # AF_NETLINK is for Node's network interface list.
+    RestrictAddressFamilies = [
+      "AF_UNIX"
+      "AF_INET"
+      "AF_INET6"
+      "AF_NETLINK"
+    ];
+    LockPersonality = true;
+    SystemCallArchitectures = "native";
+    SystemCallFilter = [ "@system-service" ];
+    SystemCallErrorNumber = "EPERM";
+    UMask = "0077";
   };
   # A service running one of the package's commands as the openchronology user, with the
   # settings, the generated key and the administrator's environment file (which wins).
@@ -317,6 +335,10 @@ in
         virtualHosts.${cfg.nginx.hostName}.locations."/" = {
           proxyPass = "http://${cfg.host}:${toString cfg.port}";
           proxyWebsockets = true;
+          # Only this location's headers: services.nginx.recommendedProxySettings would add a
+          # second X-Forwarded-For (the client's list), and the server, which takes the header
+          # only as a single address, would then count every client as nginx itself.
+          recommendedProxySettings = false;
           extraConfig = ''
             proxy_set_header Host $host;
             proxy_set_header X-Forwarded-For $remote_addr;

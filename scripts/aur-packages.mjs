@@ -36,8 +36,9 @@ export const SERVER_FILES = {
     'README.Arch',
   ],
 };
-const PGMP =
-  'https://codeload.github.com/dvarrazzo/pgmp/tar.gz/1849585416f2bc3d070bf8cef6a659907687ec7f';
+// The pinned pgmp source's checksum, which the Windows build checks the same download against:
+// a release never takes it from whatever the download returns that day.
+const PGMP_SHA256 = 'deploy/windows-server/pgmp.sha256';
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 /** An AUR version: pacman compares dotted parts, so a suffix becomes more of them. */
@@ -48,7 +49,7 @@ export const aurVersion = (upstream) => freebsdVersion(upstream);
  * left out, and its package is not rendered.
  * @returns {Promise<string[]>} the folders written
  */
-export async function renderAur({ out, version, platform, desktop, pgmp }) {
+export async function renderAur({ out, version, platform, desktop }) {
   if (!/^[0-9][0-9A-Za-z.]*$/.test(version))
     throw new Error('An AUR version is dotted letters and digits.');
   const written = [];
@@ -60,7 +61,9 @@ export async function renderAur({ out, version, platform, desktop, pgmp }) {
     );
     const archive = `openchronology-server-platform-${version}.tar.gz`;
     if (!platform.url) await copyFile(platform.file, join(dir, archive));
-    const sums = [sha256(await readFile(platform.file)), pgmp ?? sha256(await download(PGMP))];
+    const pgmp = (await readFile(PGMP_SHA256, 'utf8')).trim();
+    if (!/^[0-9a-f]{64}$/.test(pgmp)) throw new Error(`${PGMP_SHA256} is not a SHA-256 checksum.`);
+    const sums = [sha256(await readFile(platform.file)), pgmp];
     for (const { from, name } of local) {
       const bytes = await readFile(from);
       await writeFile(join(dir, name), bytes);
@@ -102,12 +105,6 @@ export async function renderAur({ out, version, platform, desktop, pgmp }) {
   }
   return written;
 }
-async function download(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Downloading ${url} failed: ${response.status}`);
-  return Buffer.from(await response.arrayBuffer());
-}
-
 if (import.meta.url === `file://${process.argv[1]}`) {
   const { values } = parseArgs({
     options: {

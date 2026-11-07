@@ -1,6 +1,6 @@
 # PostgreSQL 16 with the pgmp extension built in (compose.yml's database service): pgmp stores
-# times as exact rationals.
-FROM postgres:16-bookworm AS postgres-base
+# times as exact rationals. It also carries the database-setup service's script.
+FROM postgres:16-bookworm@sha256:5264710be20f409750ac6dc4e5706dcef929c87e241605463f0f9aefa932a8d9 AS postgres-base
 # apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
 RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
 
@@ -25,3 +25,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgmp10 && rm 
 COPY --from=build /stage/ /
 COPY --from=build /build/COPYING /build/pgmp.tar.gz /usr/share/doc/pgmp/
 RUN cp /usr/share/common-licenses/GPL-3 /usr/share/doc/pgmp/GPL-3
+# Compose's database-setup service: pgmp and the application's own, non-superuser role.
+COPY deploy/database-setup.sh /usr/local/bin/openchronology-database-setup
+RUN chmod 0755 /usr/local/bin/openchronology-database-setup

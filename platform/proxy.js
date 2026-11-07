@@ -1,22 +1,14 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// Runs before the site's pages (Next.js's proxy): gives them their content security policy,
+// Runs before the site's pages (Next.js's proxy): gives every one its security headers,
 // serves a timeline's pages at its own address, /<owner>/<slug or id>/…, by rewriting them
 // to /timelines/<id>/… (#148), and serves the IndexNow key's file, /<key>.txt (#389).
 import { NextResponse } from 'next/server';
-import { analyticsPolicy } from '../server/site.mjs';
+import { analyticsPolicy, transportSecurity } from '../server/site.mjs';
 import { landingFramePolicy } from '../server/landing.mjs';
 import { platformServices } from '../server/platform.mjs';
 import { SHARED_CACHE_CONTROL, sharedPage } from '../server/shared-cache.mjs';
 import { indexNowKeyFile } from '../server/indexnow.mjs';
-import { RESERVED_NAMES, USERNAME, timelineAddress } from '../src/addresses.ts';
-/**
- * The site's own pages, which get the content security policy: the home page (the empty
- * alternative), the account, administration, plugin, download, legal, editor and explore
- * pages, and the docs, help, timeline, user, connect and audience (`for`, #379) sections. Profiles and timelines' addresses are
- * matched separately in `proxy`.
- */
-const PAGES =
-  /^\/(?:login|account|admin|plugins|download|legal|editor|explore|for(?:\/.*)?|docs(?:\/.*)?|help(?:\/.*)?|timelines(?:\/.*)?|users(?:\/.*)?|connect(?:\/.*)?)?$/;
+import { timelineAddress } from '../src/addresses.ts';
 /**
  * Marks what this proxy told a page, so a client cannot claim it. A fresh random value for
  * each server process: a client never sees it (the header is set on the request, not the
@@ -33,9 +25,11 @@ const PASS = crypto.randomUUID();
  *    unchanged (and is a 404 there). The page is told, in the `x-timeline-address` request
  *    header, which address was asked for, so that it can redirect other addresses of the
  *    timeline to its current one once it knows the reader may open it (lib/timeline.js).
- * 3. The site's pages, profiles and timelines get a per-request nonce (`x-nonce`; the root
- *    layout reads it for the analytics scripts it writes) and the security headers below.
- *    Everything else (files, embeds, the editor's frame) sets its own headers.
+ * 3. Every response it covers gets a per-request nonce (`x-nonce`; the root layout reads it
+ *    for the analytics scripts it writes) and the security headers below: each of the site's
+ *    pages, whether listed anywhere or not (a page added later, or a 404), so none is left
+ *    without them. On the site's files they are harmless. Embeds and the editor's frame, which
+ *    other pages frame, set their own and are left out by `config.matcher`.
  *
  * @param {import('next/server').NextRequest} request
  * @returns {Promise<NextResponse>} a pass-through, or a rewrite to the timeline's page
@@ -67,15 +61,15 @@ export async function proxy(request) {
   headers.delete('x-timeline-address');
   if (address?.owner) {
     // A named address: the store maps the owner and slug (or id) to the timeline's id. A lookup
-    // that fails is logged and treated as no timeline, so a database error is a 404, not a 500.
+    // that fails is logged and treated as no timeline, so a database error is a 404, not a 500;
+    // the 404 page still gets the headers below.
     try {
       id = await (await platformServices()).store?.addressed(address.owner, address.name);
     } catch (error) {
       console.error(error);
     }
-    if (!id) return NextResponse.next();
   }
-  if (address) {
+  if (address && id) {
     // What the reader asked for (`path`, and `rest` after the timeline's part), for the redirect
     // to its own address. What that redirect keeps of the query: not the router's own.
     const query = new URLSearchParams(request.nextUrl.search);
@@ -86,15 +80,6 @@ export async function proxy(request) {
       JSON.stringify({ id, path: pathname, rest: address.rest, search, pass: PASS }),
     );
   }
-  // Everything else but the site's pages and profiles, such as files, embeds and the editor's
-  // frame, sets its own headers.
-  const profile = /^\/([^/]+)$/.exec(pathname)?.[1]?.toLowerCase();
-  if (
-    !address &&
-    !PAGES.test(pathname) &&
-    !(profile && USERNAME.test(profile) && !RESERVED_NAMES.has(profile))
-  )
-    return NextResponse.next();
   // A fresh nonce for each response: only scripts carrying it may run (Next's own, and the
   // layout's), and 'strict-dynamic' lets those load the rest of the app's chunks.
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
@@ -124,9 +109,10 @@ export async function proxy(request) {
   const target = request.nextUrl.clone();
   target.protocol = 'http:';
   target.pathname = `/timelines/${id}${address?.rest ?? ''}`;
-  const response = address?.owner
-    ? NextResponse.rewrite(target, { request: { headers } })
-    : NextResponse.next({ request: { headers } });
+  const response =
+    address?.owner && id
+      ? NextResponse.rewrite(target, { request: { headers } })
+      : NextResponse.next({ request: { headers } });
   // The headers the browser gets: the policy itself; no guessing a response's type from its
   // content (nosniff); no Referer sent to other sites, so private timelines' addresses do not
   // leak through links; and, when the site is served over https, HSTS for a year.
@@ -138,13 +124,14 @@ export async function proxy(request) {
   if (sharedPage({ method: request.method, pathname, headers: request.headers }))
     response.headers.set('Cache-Control', SHARED_CACHE_CONTROL);
   response.headers.set('Referrer-Policy', 'no-referrer');
-  if (process.env.APP_ORIGIN?.startsWith('https:'))
-    response.headers.set('Strict-Transport-Security', 'max-age=31536000');
+  const hsts = transportSecurity();
+  if (hsts) response.headers.set('Strict-Transport-Security', hsts);
   return response;
 }
 /** Which requests the proxy runs for (Next.js's matcher, a path pattern). */
 export const config = {
-  // Every page but the API's, Next's own files, embeds and the editor's frame; profiles and
-  // timelines' addresses (#148) are among them.
+  // Every page and file but the API's (whose server sets its own headers), Next's own files,
+  // embeds and the editor's frame (which set their own, letting other pages frame them);
+  // profiles, timelines' addresses (#148) and pages that don't exist are among them.
   matcher: ['/((?!api/|_next/|embed/|editor/frame).*)'],
 };

@@ -15,6 +15,7 @@ Everything that installs the OpenChronology server: the Docker images that `comp
 | [`platform/`](platform/README.md)              | The platform-independent server archive that the FreeBSD, Homebrew and Windows packages build from.                                         |
 | [`rpm-server/`](rpm-server/README.md)          | The .rpm server package for Rocky Linux, RHEL and Fedora.                                                                                   |
 | [`windows-server/`](windows-server/README.md)  | The Windows server installer, with its own PostgreSQL and Windows services.                                                                 |
+| [`database-setup.sh`](database-setup.sh)       | Compose's database-setup service: as the superuser, creates pgmp and the app's own role, which owns the database but is not a superuser.    |
 | [`Dockerfile.app`](Dockerfile.app)             | The platform's Docker image (Compose's app service): the converter, the editor and the Next.js platform as a standalone Node.js server.     |
 | [`Dockerfile.postgres`](Dockerfile.postgres)   | PostgreSQL 16 with the pgmp extension for exact rationals (Compose's database service).                                                     |
 | [`plugins.example.json`](plugins.example.json) | An example plugin library: copy it, and set `PLUGIN_LIBRARY` to its path ([docs/plugins.md](../docs/plugins.md)) to publish its definition. |

@@ -1,7 +1,8 @@
 name: Tagged release
 # A version tag or published release: builds the desktop and server packages, the offline HTML
-# and matching source, checks every asset (scripts/release-assets.mjs) and attaches them, then
-# publishes the Homebrew formula and the AUR packages for a stable release.
+# and matching source, checks every asset (scripts/release-assets.mjs), attests their build
+# provenance and attaches them, then publishes the Homebrew formula and the AUR packages for a
+# stable release.
 on:
   push:
     tags: ['v*']
@@ -68,9 +69,39 @@ jobs:
           name: release-web
           path: release-assets/
           if-no-files-found: error
+  # GitHub's signed record that each asset was built by this workflow from the tag's commit
+  # (docs/licensing.md#verifying-a-download): gh attestation verify checks a download against it.
+  # Only this job may request the signing identity and write attestations.
+  attest:
+    name: Attest the release assets' build provenance
+    needs: [desktop, server, web]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref_name }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.1
+        with:
+          path: release-assets/
+          merge-multiple: true
+      - name: Validate complete release and calculate checksums
+        run: node scripts/release-assets.mjs "$RELEASE_TAG"
+      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+        with:
+          subject-path: 'release-assets/*'
   publish:
     name: Publish all runner-built release targets
-    needs: [desktop, server, web]
+    needs: [desktop, server, web, attest]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

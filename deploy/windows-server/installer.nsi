@@ -2,7 +2,9 @@
 ; The OpenChronology server installer for Windows (#116), built by build.ps1:
 ;   makensis /DVERSION=<version> /DSTAGE=<staged files> /DOUT=<installer.exe> installer.nsi
 ; It installs into Program Files and runs setup.ps1, which sets up the bundled PostgreSQL, the
-; database and the services; the configuration and database live in ProgramData. Silent
+; database and the services; the configuration and database live in ProgramData. Installed in
+; another folder, setup gives it Program Files' access (users read and run, administrators
+; change). Silent
 ; installs (/S) exit with 2 when setup does not finish.
 Unicode true
 !include "MUI2.nsh"
@@ -63,7 +65,7 @@ Section "OpenChronology Server"
   Pop $0
   ${If} $0 != 0
     SetErrorLevel 2
-    MessageBox MB_ICONEXCLAMATION|MB_OK "Setup did not finish. See C:\ProgramData\OpenChronology\setup.log, then run setup.ps1 in $INSTDIR as an administrator." /SD IDOK
+    MessageBox MB_ICONEXCLAMATION|MB_OK "Setup did not finish. See the details above and C:\ProgramData\OpenChronology\setup.log, then run setup.ps1 in $INSTDIR as an administrator." /SD IDOK
   ${EndIf}
 SectionEnd
 

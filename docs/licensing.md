@@ -76,6 +76,28 @@ artifact. A public repository URL alone must not substitute for missing preferre
 dependency source in a compiled distribution. Document the release commit, dependency
 versions, build commands, and source download location in release notes.
 
+## Verifying a download
+
+Every release asset (the server and desktop packages, the offline HTML, the source
+archives and `SHA256SUMS.txt`) has a build provenance attestation: a record, signed
+through GitHub with Sigstore, that the release workflow built it from the tagged
+commit of this repository. With the [GitHub CLI](https://cli.github.com/), check a
+download before installing it:
+
+```
+gh attestation verify openchronology-server-debian13-amd64.deb \
+  --repo openchronology/timeline-app \
+  --signer-workflow openchronology/timeline-app/.github/workflows/release.yml
+```
+
+It prints the commit and workflow run that made the file, and fails for a file the
+workflow did not build, however it reached you. `SHA256SUMS.txt` beside the assets
+detects a damaged download; on its own it cannot show who made the files, since
+whoever could replace an asset could replace it too. Releases from before the
+attestations were added have none. The Windows installers and macOS applications
+are not yet code-signed (see the README), so Windows and macOS warn about them even
+when they verify.
+
 ## Contributions and license changes
 
 Contributions to the first-party application should be submitted under GPL-3.0-only
