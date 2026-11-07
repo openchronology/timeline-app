@@ -1,6 +1,6 @@
 # timescale.info — privacy policy
 
-Effective 25 October 2026. This policy describes how the hosted service at
+Effective 7 November 2026 (first in effect 25 October 2026). This policy describes how the hosted service at
 https://timescale.info, and the desktop app when connected to it, collects, uses,
 shares and keeps information. The service is operated by Athan Clark, an individual
 (the "operator"). For any privacy question or request, write to
