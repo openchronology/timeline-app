@@ -149,6 +149,18 @@ jobs:
           git -c user.name="OpenChronology releases" -c user.email="releases@openchronology.invalid" \
             commit -m "openchronology-server ${RELEASE_TAG#v}"
           git push origin HEAD:main
+  # Stable releases publish the offline editor to openchronology.github.io (#510), built at the
+  # tag, so the hosted copy is a release's, never unreleased changes on main. Called from here
+  # because a release published with this workflow's token starts no other workflow.
+  pages:
+    name: Publish the offline editor to openchronology.github.io
+    needs: publish
+    if: ${{ !contains(github.event.release.tag_name || github.ref_name, '-') }}
+    uses: ./.github/workflows/pages.yml
+    with:
+      tag: ${{ github.event.release.tag_name || github.ref_name }}
+    secrets:
+      PAGES_DEPLOY_KEY: ${{ secrets.PAGES_DEPLOY_KEY }}
   # Stable releases publish the AUR packages (#331), openchronology-server and
   # openchronology-desktop-bin, for the platform archive and desktop .deb this release attached,
   # once AUR_SSH_KEY holds the private key of an AUR account that may push them (the first
