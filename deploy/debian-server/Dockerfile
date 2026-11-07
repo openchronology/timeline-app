@@ -21,7 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential cmake pkg-config curl ca-certificates python3 \
         libgmp-dev libsqlite3-dev postgresql-server-dev-${PG_MAJOR} \
     && rm -rf /var/lib/apt/lists/*
-RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+# A fixed Rust release, as every build of the project uses (#514).
+RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.99.0
 ENV PATH=/root/.cargo/bin:$PATH
 WORKDIR /build
 COPY native-store native-store

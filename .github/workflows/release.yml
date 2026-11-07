@@ -48,8 +48,8 @@ jobs:
           node --input-type=module -e 'import {releaseVersion} from "./scripts/build-info.mjs"; if(!releaseVersion.test(process.env.RELEASE_TAG)) throw Error("Use a semantic version tag, such as v1.2.3");'
           echo "OCH_BUILD_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
           echo "OCH_BUILD_VERSION=$RELEASE_TAG" >> "$GITHUB_ENV"
-          rustup update stable --no-self-update
-          rustup default stable
+          rustup toolchain install 1.99.0 --profile minimal --no-self-update
+          rustup default 1.99.0
       - run: node scripts/npm-ci.mjs
       - run: npm run typecheck
       - run: npm run build:offline

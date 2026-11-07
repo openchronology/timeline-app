@@ -26,7 +26,8 @@ RUN set -eu; \
     dnf -y install gcc gcc-c++ make cmake pkgconf-pkg-config python3 curl-minimal ca-certificates \
         gmp-devel sqlite-devel postgresql-server-devel redhat-rpm-config \
     && dnf clean all
-RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+# A fixed Rust release, as every build of the project uses (#514).
+RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.99.0
 ENV PATH=/root/.cargo/bin:$PATH
 WORKDIR /build
 COPY native-store native-store

@@ -70,8 +70,8 @@ jobs:
         timeout-minutes: 10
       - name: Install Rust
         run: |
-          rustup update stable --no-self-update
-          rustup default stable
+          rustup toolchain install 1.99.0 --profile minimal --no-self-update
+          rustup default 1.99.0
       # The platform interaction runs drive the production Next.js server.
       - run: npm run build
       - run: npm run bench:seed

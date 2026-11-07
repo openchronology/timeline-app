@@ -1,7 +1,7 @@
 # The platform's Docker image (compose.yml's app service): och-convert, the editor and the
 # Next.js platform built from this checkout with its web source archive, run as a standalone
 # Node.js server on port 5173.
-FROM rust:1-bookworm AS converter
+FROM rust:1.99.0-bookworm AS converter
 # apt retries a failed download and gives up on a stalled mirror after 30 s (#367).
 RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries
 RUN apt-get update && apt-get install -y --no-install-recommends cmake libsqlite3-dev libgmp-dev && rm -rf /var/lib/apt/lists/*

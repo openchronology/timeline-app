@@ -7,7 +7,7 @@
 #   OCH_BUILD_COMMIT, OCH_BUILD_VERSION
 
 # The Rust crates of och-convert, vendored into the platform's source archive.
-FROM rust:1-bookworm AS native
+FROM rust:1.99.0-bookworm AS native
 WORKDIR /build
 COPY native-store native-store
 COPY vendor/sqlite-rational vendor/sqlite-rational

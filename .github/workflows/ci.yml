@@ -264,8 +264,8 @@ jobs:
       - run: node test/sql-oracle.mjs
       - name: Build the isolated SQLite file converter
         run: |
-          rustup update stable --no-self-update
-          rustup default stable
+          rustup toolchain install 1.99.0 --profile minimal --no-self-update
+          rustup default 1.99.0
           cargo build --manifest-path native-store/Cargo.toml --locked --release --bin och-convert
       - run: node test/files.mjs
       - run: node test/durations-postgres.mjs
@@ -419,10 +419,10 @@ jobs:
           sh scripts/ubuntu-archive.sh
           sudo apt-get update
           sudo apt-get install -y build-essential cmake pkg-config libgmp-dev libsqlite3-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev webkit2gtk-driver xvfb
-      - name: Stable Rust and tauri-driver
+      - name: Rust and tauri-driver
         run: |
-          rustup update stable --no-self-update
-          rustup default stable
+          rustup toolchain install 1.99.0 --profile minimal --no-self-update
+          rustup default 1.99.0
           cargo install tauri-driver --locked
       - run: node scripts/npm-ci.mjs
       - run: npm run build:editor
