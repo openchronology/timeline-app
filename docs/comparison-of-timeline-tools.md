@@ -4,11 +4,11 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-How OpenChronology compares with seven other timeline tools on dates before year 1, date precision, sources, size, offline use, hosting and export, licence and price, and working together. Each tool's facts come from its own website or documentation, linked in its section below. **Last checked: 2026-11-07.** Prices and features change; check the linked page before you decide. "Not stated" means we could not find the fact in the tool's own documentation, not that the tool lacks it. OpenChronology's facts come from this help.
+How OpenChronology compares with seven other timeline tools on dates before year 1, date precision, sources, size, offline use, hosting and export, licence and price, and working together. Each tool's facts come from its own website or documentation, linked in its section below. **Last checked: 2026-11-06.** Prices and features change; check the linked page before you decide. "Not stated" means we could not find the fact in the tool's own documentation, not that the tool lacks it. OpenChronology's facts come from this help.
 
 ## Summary
 
-| Tool                                  | Before year 1                                             | Precision and uncertain dates                                         | Sources and notes per event                  | Size                                                 | Offline and desktop                                    | Self-hosting and export                                      | Licence and price (as of 2026-11-07)              | Collaboration                                           |
+| Tool                                  | Before year 1                                             | Precision and uncertain dates                                         | Sources and notes per event                  | Size                                                 | Offline and desktop                                    | Self-hosting and export                                      | Licence and price (as of 2026-11-06)              | Collaboration                                           |
 | ------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------- | ------------------------------------------------------- |
 | [OpenChronology](#openchronology)     | Yes, any integer year (CE/BCE), and deep time             | Exact, to any fraction of a second; precision and estimates by plugin | List of source links, notes                  | 200,000 moments (a self-hosted server can change it) | Desktop app (Windows, macOS, Linux), offline HTML file | Self-hosted server; `.ochx` (JSON) and `.och` (SQLite) files | GPLv3; free                                       | Roles, forks, pull requests, merged saves               |
 | [TimelineJS](#timelinejs)             | Yes, negative years; year-only beyond about 250,000 years | Year to millisecond; a display date for unknown dates                 | Text, media with credit and caption          | Recommends no more than 20 slides                    | Not stated                                             | Host its files yourself; data in a Google Sheet or JSON      | MPL 2.0; free                                     | Not stated                                              |
@@ -65,7 +65,7 @@ From Aeon Timeline: [pricing](https://www.aeontimeline.com/pricing), [FAQ](https
 - **Size:** not stated.
 - **Offline and desktop:** apps for Mac, Windows and iOS. Files are stored on your device; after signing in, it works without the internet.
 - **Self-hosting and export:** timelines can't be published on the web. Export to CSV or TSV, PNG, JPEG or PDF, Markdown and Word. Syncs with Scrivener and Ulysses.
-- **Licence and price:** proprietary. As of 2026-11-07, $65 once for the current version on up to five devices with a year of updates, then $35 a year for further updates; a 14-day free trial.
+- **Licence and price:** proprietary. As of 2026-11-06, $65 once for the current version on up to five devices with a year of updates, then $35 a year for further updates; a 14-day free trial.
 - **Collaboration:** keep the file on a shared drive; "if two users edit the file simultaneously, it will cause conflict issues". Others can view a file with the free read-only app.
 
 **Better choice for:** novelists and worldbuilders planning stories, and anyone who wants a polished desktop app with a spreadsheet view and writing-tool sync.
@@ -95,7 +95,7 @@ From Time.Graphics: [home page](https://time.graphics/), [pricing](https://time.
 - **Size:** 18 events in the editor on the free plan; unlimited with Premium.
 - **Offline and desktop:** "Complete export for offline viewing" as a ZIP archive. A desktop app is not stated.
 - **Self-hosting and export:** self-hosting is not stated. Downloads in "a variety of formats", with a watermark on the free plan; Google Calendar and Google Sheets import.
-- **Licence and price:** licence not stated. As of 2026-11-07, public timelines are free; Premium is $4.9 for 2 days, $18.9 a month or $97.9 a year, "valid until 2026 November 30". Private timelines need Premium.
+- **Licence and price:** licence not stated. As of 2026-11-06, public timelines are free; Premium is $4.9 for 2 days, $18.9 a month or $97.9 a year, "valid until 2026 November 30". Private timelines need Premium.
 - **Collaboration:** "collaborate on timelines in real time"; dashboards for schools and companies.
 
 **Better choice for:** classroom timelines, real-time group editing and large poster images.
@@ -110,7 +110,7 @@ From Preceden: [pricing](https://www.preceden.com/pricing), [features](https://w
 - **Size:** 10 events per timeline on the free plan; paid plans allow up to 1,500, and the editor slows "somewhere in the 500-600 range".
 - **Offline and desktop:** not stated.
 - **Self-hosting and export:** self-hosting is not stated. Export to PDF, PNG, PowerPoint, CSV and Excel; share by link or embed.
-- **Licence and price:** licence not stated. As of 2026-11-07: free; Basic $10 a month billed annually ($25 monthly); Pro $16 a month billed annually ($40 monthly).
+- **Licence and price:** licence not stated. As of 2026-11-06: free; Basic $10 a month billed annually ($25 monthly); Pro $16 a month billed annually ($40 monthly).
 - **Collaboration:** invited collaborators can edit, on the Pro plan.
 
 **Better choice for:** project plans, legal and business timelines that end up in PowerPoint or a PDF, and spreadsheet imports.
@@ -125,7 +125,7 @@ From Webalon Ltd: [home page and plans](https://www.tiki-toki.com/), [FAQ](https
 - **Size:** "potentially possible to have more than 1,000 stories", but no more than 500 recommended; 200 on the free account.
 - **Offline and desktop:** TikiToki Desktop for Mac saves `.tki` files on your computer; it can't make web timelines.
 - **Self-hosting and export:** a licence to host a timeline on your own servers "start[s] at US$2,000 for a single timeline". Print, PDF, CSV and JSON exports.
-- **Licence and price:** licence not stated. As of 2026-11-07: free (one timeline); Bronze $9.50 a month; Silver $25 a month; Teacher $150 a year; TikiToki Desktop $24.99 (listed down from $49.99).
+- **Licence and price:** licence not stated. As of 2026-11-06: free (one timeline); Bronze $9.50 a month; Silver $25 a month; Teacher $150 a year; TikiToki Desktop $24.99 (listed down from $49.99).
 - **Collaboration:** Group Edit on paid accounts: contributors with a secret word add and edit their own stories.
 
 **Better choice for:** visual, media-rich story timelines, including a 3D view.
