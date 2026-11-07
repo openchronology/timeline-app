@@ -65,9 +65,23 @@ export async function editorHtml(heading) {
   if (heading.image?.url)
     html = html.replace(
       /<img\s+id="timeline-image"[^>]*>/,
-      `<img id="timeline-image" class="timeline-image" src="${escape(heading.image.url)}" alt="${escape(heading.image.alt ?? '')}" referrerpolicy="no-referrer" />`,
+      () =>
+        `<img id="timeline-image" class="timeline-image" src="${escape(heading.image.url)}" alt="${escape(heading.image.alt ?? '')}" referrerpolicy="no-referrer" />`,
     );
   return html;
+}
+/**
+ * The editor's page `html` (editorHtml) titled with a timeline's `title` and the site's name,
+ * naming `canonical` as the page it shows, for an embed. The new title is given by a function:
+ * a string would have `$&`, `$'` and the like in a timeline's title expanded into copies of
+ * the page.
+ */
+export function titledEditor(html, title, canonical) {
+  return html.replace(
+    /<title>[^<]*<\/title>/,
+    () =>
+      `<title>${escape(title)} · OpenChronology</title><link rel="canonical" href="${escape(canonical)}" />`,
+  );
 }
 /** The editor's content security policy; `ancestors` are the pages that may frame it. */
 export function editorPolicy(ancestors) {
