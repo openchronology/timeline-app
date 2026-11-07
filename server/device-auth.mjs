@@ -4,7 +4,7 @@
 // seeing which computer asked, from where and when, and typing the code their desktop app shows.
 import { randomBytes } from 'node:crypto';
 import { isIP } from 'node:net';
-import { tokenHash } from './auth.mjs';
+import { addressKey, limitAddress, tokenHash } from './auth.mjs';
 import { HttpError } from './store.mjs';
 /**
  * Desktop sign-in through the system browser (oc_device_logins), in the manner of the OAuth
@@ -108,7 +108,7 @@ export class DeviceAuth {
    * interval (three seconds) and the lifetime (ten minutes).
    */
   async start(ip, userAgent, device) {
-    await this.auth.rateLimit(ip);
+    await this.auth.rateLimit(addressKey(ip));
     const deviceCode = randomBytes(32).toString('hex'),
       alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     // 32 symbols without the look-alikes 0, O, 1 and I; 256 is a multiple of 32, so taking each
@@ -150,7 +150,7 @@ export class DeviceAuth {
     const address = req.clientAddress ?? req.socket.remoteAddress ?? 'unknown';
     // Its own key, so opening the page does not use up the address's sign-in attempts.
     await this.auth.rateLimit(
-      'device-request:' + address,
+      'device-request:' + addressKey(address),
       10,
       'Too many requests. Please wait a minute.',
     );
@@ -193,7 +193,7 @@ export class DeviceAuth {
       throw new HttpError(403, 'Sign in again before approving a desktop connection.');
     if (!/^[A-Z2-9]{10}$/.test(code ?? '')) throw new HttpError(400, 'Invalid desktop code.');
     const address = req.clientAddress ?? req.socket.remoteAddress ?? 'unknown';
-    await this.auth.rateLimit(address);
+    await this.auth.rateLimit(limitAddress(req));
     const security = this.auth.security;
     const result = await security.transaction(async (c) => {
       // Takes the account lock security changes take, then re-reads the session under it: a

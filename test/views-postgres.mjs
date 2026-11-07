@@ -134,6 +134,62 @@ try {
     filter: { tags: ['war'], mode: 'any' },
   });
   assert.equal(await count(), '6');
+  // Only the tags the timeline has count: filters naming others build nothing new. The rest
+  // of the timeline is the timeline itself; their side is one empty view, built once.
+  let builds = 0;
+  const overview = (filter, beforeBuild = () => builds++) =>
+    store.query(
+      timeline.id,
+      user,
+      {
+        kind: 'overview',
+        lower: '0/1',
+        upper: '1000/1',
+        threshold: '1/1',
+        ...(filter ? { filter } : {}),
+      },
+      { beforeBuild },
+    );
+  const whole = shape(await overview(undefined));
+  for (let i = 0; i < 3; i++)
+    assert.deepEqual(shape(await overview({ tags: ['absent-' + i], mode: 'none' })), whole);
+  assert.deepEqual(
+    shape(await overview({ tags: ['war', 'absent'], mode: 'any' })),
+    shape(await overview({ tags: ['war'], mode: 'any' })),
+  );
+  assert.equal(await count(), '6');
+  assert.equal(builds, 0);
+  for (const filter of [
+    { tags: ['absent-a'], mode: 'any' },
+    { tags: ['absent-b', 'absent-c'], mode: 'any' },
+    { related: { moment: 'no-such-moment' }, depth: 'all', mode: 'any' },
+  ])
+    assert.deepEqual(shape(await overview(filter)), { groups: [], bands: [] });
+  assert.deepEqual(
+    shape(await overview({ related: { moment: 'no-such-moment' }, depth: 'direct', mode: 'none' })),
+    whole,
+  );
+  assert.equal(await count(), '7');
+  assert.equal(builds, 1);
+  // A view not built yet passes the caller's limit first, and waits for a turn to build:
+  // refused while too many wait, but one built already is read without either.
+  await assert.rejects(
+    overview({ related: { moment: 'm1' }, depth: 'direct', mode: 'any' }, () => {
+      throw Object.assign(new Error('limited'), { status: 429 });
+    }),
+    { status: 429 },
+  );
+  const turns = store.viewBuilds;
+  store.viewBuilds = { running: 2, waiting: Array.from({ length: 16 }, () => () => {}) };
+  try {
+    await assert.rejects(overview({ related: { moment: 'm1' }, depth: 'direct', mode: 'any' }), {
+      status: 503,
+    });
+    await overview({ tags: ['war'], mode: 'any' });
+  } finally {
+    store.viewBuilds = turns;
+  }
+  assert.equal(await count(), '7');
   timeline = await store.save(timeline.id, user, timeline.revision, undefined, {
     settings: { ...doc, events: [], durations: undefined },
     changes: [{ id: 'm0', event: { ...doc.events[0], metadata: { title: 'M0', tags: ['war'] } } }],
@@ -150,7 +206,7 @@ try {
   });
   assert.equal(fresh.events[0].id, 'm0');
   console.log(
-    `PASS PostgreSQL tag views: ${compared} random views of six separations match the browser index; pages, tag counts, caching and invalidation on save.`,
+    `PASS PostgreSQL tag views: ${compared} random views of six separations match the browser index; pages, tag counts, caching and invalidation on save; filters naming what a timeline lacks build nothing new, and builds pass a limit and wait their turn.`,
   );
 } finally {
   if (timeline) await pool.query('DELETE FROM oc_timelines WHERE id=$1', [timeline.id]);

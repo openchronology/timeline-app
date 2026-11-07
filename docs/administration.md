@@ -236,7 +236,16 @@ Some limits stay the same whatever this setting is:
 - An HTTP request carries at most 16 MiB, so creating or importing a whole timeline in one
   request stays below roughly 100,000 moments. Larger timelines grow through saves: the
   platform's editor, the [log importer](log-import.md) and the [syslog receiver](syslog.md)
-  all save in batches.
+  all save in batches. Requests anyone may make carry only what they need: a query of a
+  timeline at most 1 MiB and 64 KiB (most are a few hundred bytes; an overview may carry a
+  comparison's plugins), the desktop and social sign-in starts and the desktop poll 1 KiB,
+  and a JSON body nested more than 128 levels deep is refused unread.
+- Without an account, an address may query timelines 600 times a minute in each server
+  process (an IPv6 address counts by its /64 network, as for every per-address limit). A
+  separation by tags or relationships is built on its first query for each saved revision:
+  at most 20 builds a minute per address without an account and 60 per account, two at once
+  in each process with up to 16 waiting (503 "Separating is busy" beyond). Filters naming
+  tags or entities a timeline lacks build nothing new ([views](tags.md#views)).
 - `.och` files exchanged with the server are at most 64 MiB. `TIMELINE_FILE_BYTES` in the
   environment file changes this: a size from `1MiB` to `1GiB`, such as `128MiB`. An invalid
   value stops the server at startup. The limit applies to uploads, exports, and the

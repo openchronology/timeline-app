@@ -1,12 +1,13 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Signing in (server/auth.mjs, server/oauth.mjs, server/device-auth.mjs): provider settings and
 // PKCE, anonymous sign-in, session expiry, Google, Microsoft and Facebook token checks, OAuth
-// state, older password hashes, and whether a desktop sign-in came from the approving browser's
-// network.
+// state, older password hashes, the addresses per-address limits count, and whether a desktop
+// sign-in came from the approving browser's network.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign, createHmac, scryptSync } from 'node:crypto';
 import {
+  addressKey,
   Auth,
   tokenHash,
   passwordMatches,
@@ -530,4 +531,21 @@ test("a desktop sign-in is on the browser's network only from its address or its
   assert.equal(network('203.0.113.7', '2001:db8::1'), 'unknown');
   assert.equal(network(null, '203.0.113.7'), 'unknown');
   assert.equal(network('unknown', 'unknown'), 'unknown');
+});
+
+test('per-address limits count an IPv6 client by its /64 network', () => {
+  for (const [address, key] of [
+    ['203.0.113.9', '203.0.113.9'],
+    ['::ffff:203.0.113.9', '203.0.113.9'],
+    ['2001:db8:1:2::1', '2001:db8:1:2::/64'],
+    ['2001:0db8:0001:0002:ffff:0:0:1', '2001:db8:1:2::/64'],
+    ['2001:db8::1', '2001:db8:0:0::/64'],
+    ['::1', '0:0:0:0::/64'],
+    ['fe80::1%eth0', 'fe80:0:0:0::/64'],
+    ['64:ff9b::203.0.113.9', '64:ff9b:0:0::/64'],
+    ['unknown', 'unknown'],
+  ])
+    assert.equal(addressKey(address), key, address);
+  // Applying it again changes nothing.
+  assert.equal(addressKey(addressKey('2001:db8:1:2::1')), '2001:db8:1:2::/64');
 });

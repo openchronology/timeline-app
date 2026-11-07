@@ -72,6 +72,39 @@ test('proof of work answers are signed, bound to their purpose, and spent once',
   await refused(challenges.require({ headers: { 'x-challenge': 'not base64 json' } }, 'register'));
 });
 
+test('an answer split differently between salt and number is not another answer', async () => {
+  const challenges = new Challenges({
+    pool: spentAnswers(),
+    difficulty: 2000,
+    key: Buffer.alloc(32),
+  });
+  // A number of several digits, so some can be moved onto the salt.
+  let issued, number;
+  do {
+    issued = await refused(challenges.require({ headers: {} }, 'register'));
+    number = solve(issued);
+  } while (number < 100);
+  await challenges.require(header({ provider: 'pow', ...issued, number }), 'register');
+  const digits = String(number);
+  for (let moved = 1; moved < digits.length; moved++) {
+    if (digits[moved] === '0') continue;
+    const shifted = {
+      provider: 'pow',
+      ...issued,
+      salt: issued.salt + digits.slice(0, moved),
+      number: Number(digits.slice(moved)),
+    };
+    // The same hash and signature, but not the salt as issued.
+    assert.equal(
+      createHash('sha256')
+        .update(shifted.salt + shifted.number)
+        .digest('hex'),
+      issued.challenge,
+    );
+    await refused(challenges.require(header(shifted), 'register'));
+  }
+});
+
 test('expired proof of work is refused', async () => {
   const challenges = new Challenges({ pool: spentAnswers(), difficulty: 2000 });
   const issued = await refused(challenges.require({ headers: {} }, 'email'));

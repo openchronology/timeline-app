@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { HttpError } from './store.mjs';
-import { tokenHash } from './auth.mjs';
+import { limitAddress, tokenHash } from './auth.mjs';
 
 /**
  * Human-verification challenges for actions that spam would use: sign-up and email sending,
@@ -169,15 +169,27 @@ export class Challenges {
   }
   /**
    * Whether a proof-of-work `answer` is valid for `purpose`, spending it if so. The salt must
-   * name this purpose and an unexpired time; sha256(salt + number) must equal the challenge, and
-   * the challenge must carry this server's signature, which proves it was issued here (the
-   * client cannot invent an easy challenge, nor change the salt, which the hash covers).
+   * be as issued, naming this purpose and an unexpired time; sha256(salt + number) must equal
+   * the challenge, and the challenge must carry this server's signature, which proves it was
+   * issued here (the client cannot invent an easy challenge, nor change the salt, which the
+   * hash covers).
    */
   async verifyWork(answer, purpose) {
     const { salt, number, challenge, signature } = answer;
-    if (typeof salt !== 'string' || salt.length > 200 || !Number.isInteger(number)) return false;
-    const [, saltPurpose, expires] = salt.split('.');
-    if (saltPurpose !== purpose || !(Number(expires) * 1000 > Date.now())) return false;
+    if (typeof salt !== 'string' || !Number.isInteger(number)) return false;
+    // The salt must be as issued, its fields of fixed width (24 hex digits, the purpose, a
+    // ten-digit expiry), so salt and number join only one way. Otherwise moving the number's
+    // leading digits onto the salt's end would hash the same, carry the same signature, and
+    // count as another answer, unspent and expiring centuries later. Nor may it expire later
+    // than a challenge issued now would (with a minute for clocks that differ between servers).
+    const parts = /^[a-f0-9]{24}\.([a-z-]+)\.(\d{10})$/.exec(salt);
+    if (!parts || parts[1] !== purpose) return false;
+    const expires = Number(parts[2]);
+    if (
+      !(expires * 1000 > Date.now()) ||
+      expires * 1000 > Date.now() + (LIFETIME_SECONDS + 60) * 1000
+    )
+      return false;
     if (number < 0 || number > this.difficulty) return false;
     const expected = sha256(salt + number);
     if (!same(challenge, expected) || !same(signature, this.sign(expected))) return false;
@@ -252,7 +264,7 @@ export class Challenges {
    */
   async signInGate(req, username, session) {
     if (this.provider !== 'off') {
-      if (await this.signInNeeded(req.clientAddress, username))
+      if (await this.signInNeeded(limitAddress(req), username))
         await this.require(req, 'sign-in', session);
       return;
     }
