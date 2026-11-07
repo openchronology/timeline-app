@@ -4,6 +4,7 @@
 // and email build on it (account-security.mjs, api-keys.mjs, mail.mjs).
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual, createHash } from 'node:crypto';
 import { promisify } from 'node:util';
+import { isIP } from 'node:net';
 import { availableParallelism } from 'node:os';
 import { checkPasswordBreach } from './security-crypto.mjs';
 import { ApiKeys } from './api-keys.mjs';
@@ -147,6 +148,39 @@ export async function passwordMatches(password, hash) {
   const expected = Buffer.from(encoded, 'hex'),
     actual = await derive(password, salt, version);
   return expected.length === actual.length && timingSafeEqual(actual, expected);
+}
+/**
+ * The key per-address limits count client `address` under: an IPv4 address as it is (also when
+ * written IPv4-mapped, `::ffff:a.b.c.d`), and an IPv6 address by its /64 network, written
+ * `<first four groups>::/64`. One home connection or server is usually given a whole /64, so
+ * counting each of its addresses apart would let one client pass every per-address limit by
+ * changing address. Anything else (`unknown`) is kept as it is.
+ */
+export function addressKey(address) {
+  const text = String(address ?? 'unknown').replace(/%.*$/, '');
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(text);
+  if (mapped && isIP(mapped[1]) === 4) return mapped[1];
+  if (isIP(text) !== 6) return text;
+  // Groups as written, an embedded IPv4 address counting as two; `::` stands for the zeros.
+  const groups = (part) =>
+    part ? part.split(':').flatMap((g) => (g.includes('.') ? ['0', '0'] : [g])) : [];
+  const [head, tail] = text.split('::');
+  const front = groups(head),
+    back = groups(tail);
+  const all =
+    tail === undefined
+      ? front
+      : [...front, ...Array(8 - front.length - back.length).fill('0'), ...back];
+  return (
+    all
+      .slice(0, 4)
+      .map((g) => parseInt(g, 16).toString(16))
+      .join(':') + '::/64'
+  );
+}
+/** addressKey of the address request `req` came from (`clientAddress`, set by http.mjs). */
+export function limitAddress(req) {
+  return addressKey(req.clientAddress ?? req.socket?.remoteAddress ?? 'unknown');
 }
 /** The youngest age an account is for (#115). */
 export const ACCOUNT_AGE = 13;

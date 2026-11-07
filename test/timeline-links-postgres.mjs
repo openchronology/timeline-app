@@ -509,6 +509,14 @@ try {
     ['not an address at all', 400],
   ])
     assert.equal((await resolve(address))[0], status, address);
+  // A private timeline's address answers as one with no timeline, so it cannot be confirmed.
+  await pool.query("UPDATE oc_timelines SET slug='persia-secret' WHERE id=$1", [persia.id]);
+  const otherName = `http://localhost:5173/links_${other.slice(0, 8)}/`;
+  const hidden = await resolve(otherName + 'persia-secret'),
+    missing = await resolve(otherName + 'persia-nothing');
+  assert.equal(hidden[0], 404);
+  assert.deepEqual(hidden, missing);
+  assert.deepEqual(await resolve(`/timelines/${persia.id}`), missing);
   // Deleting a timeline takes its links off the other's count.
   await call(owner, 'DELETE', `/api/timelines/${lyra.id}`);
   assert.equal(await linkCount(draco.id), 0);

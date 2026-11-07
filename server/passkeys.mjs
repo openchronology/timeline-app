@@ -6,6 +6,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { HttpError } from './store.mjs';
+import { limitAddress } from './auth.mjs';
 import { digest, recoveryCodes } from './security-crypto.mjs';
 import {
   ALGORITHMS,
@@ -534,7 +535,7 @@ export class Passkeys {
    */
   async route(req, pathname, method, session, read) {
     const path = pathname.slice('/api/auth/passkeys'.length);
-    const ip = req.clientAddress;
+    const ip = limitAddress(req);
     if (method === 'POST' && (path === '/sign-in/options' || path === '/sign-in')) {
       if (session) this.auth.require(session, req);
       else this.auth.requireLogin(req);
